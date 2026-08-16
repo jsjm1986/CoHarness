@@ -37,6 +37,13 @@ export interface CollaborationUser {
   role: string
 }
 
+/** Minimal user view for the invitation member picker. */
+export interface UserSummary {
+  id: number
+  username: string
+  displayName: string
+}
+
 /** Active Gateway scope for the browser page. */
 export type CollaborationScope =
   | { kind: 'personal' }
@@ -115,6 +122,10 @@ export interface CollaborationTransport {
   listInvitations?: (projectId: number | undefined, signal: AbortSignal) => Promise<ProjectInvitation[]>
   inviteMember?: (projectId: number, username: string, mode: 'ro' | 'rw', signal: AbortSignal) => Promise<ProjectInvitation>
   acceptInvitation?: (invitationId: string, signal: AbortSignal) => Promise<void>
+  /** List active users for the invitation member picker. */
+  listUsers?: (signal: AbortSignal) => Promise<UserSummary[]>
+  /** Count pending invitations where the current user is the invitee. */
+  getInvitationCount?: (signal: AbortSignal) => Promise<{ pending: number }>
   reload: () => void
 }
 
@@ -376,6 +387,23 @@ export function createBrowserCollaborationTransport(options: {
         method: 'POST', signal, headers: jsonHeaders,
       },
     ),
+    listUsers: signal => jsonRequest(
+      fetcher, '/account/api/users', { signal },
+      (value) => {
+        if (!Array.isArray(value)) throw new Error('invalid collaboration response')
+        return value.map((row: unknown) => {
+          const u = object(row)
+          return { id: integer(u.id), username: string(u.username), displayName: string(u.displayName) }
+        })
+      },
+    ),
+    getInvitationCount: signal => jsonRequest(
+      fetcher, '/account/api/invitations/count', { signal },
+      (value) => {
+        const body = object(value)
+        return { pending: integer(body.pending) }
+      },
+    ),
     reload,
   }
 }
@@ -551,6 +579,28 @@ export class CollaborationClient {
     await operation(invitationId, this.abortController.signal)
     if (this.abortController.signal.aborted) return
     await this.load(true)
+  }
+
+  /**
+   * List all active users for the invitation member picker.
+   * @returns active user summaries.
+   */
+  listUsers(): Promise<UserSummary[]> {
+    if (this.disposed) return Promise.resolve([])
+    const operation = this.transport.listUsers
+    if (operation === undefined) return Promise.reject(new CollaborationRequestError(503, 'users-unavailable'))
+    return operation(this.abortController.signal)
+  }
+
+  /**
+   * Count pending invitations where the current user is the invitee.
+   * @returns the pending count.
+   */
+  getInvitationCount(): Promise<{ pending: number }> {
+    if (this.disposed) return Promise.resolve({ pending: 0 })
+    const operation = this.transport.getInvitationCount
+    if (operation === undefined) return Promise.reject(new CollaborationRequestError(503, 'invitations-unavailable'))
+    return operation(this.abortController.signal)
   }
 
   /**

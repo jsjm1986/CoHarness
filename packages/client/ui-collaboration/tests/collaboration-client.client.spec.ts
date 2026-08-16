@@ -182,6 +182,40 @@ describe('browser transport', () => {
     expect(fetcher).toHaveBeenNthCalledWith(4, '/account/api/invitations/invite%2F1/accept', expect.objectContaining({ method: 'POST' }))
   })
 
+  it('uses the user picker and pending-invitation count routes', async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(Response.json([
+        { id: 7, username: 'lin', displayName: '林工' },
+        { id: 8, username: 'zhou', displayName: '周工' },
+      ]))
+      .mockResolvedValueOnce(Response.json({ pending: 2 })) as unknown as typeof fetch
+    const api = createBrowserCollaborationTransport({ fetch: fetcher, reload: vi.fn() })
+    const signal = new AbortController().signal
+
+    await expect(api.listUsers?.(signal)).resolves.toEqual([
+      { id: 7, username: 'lin', displayName: '林工' },
+      { id: 8, username: 'zhou', displayName: '周工' },
+    ])
+    await expect(api.getInvitationCount?.(signal)).resolves.toEqual({ pending: 2 })
+    expect(fetcher).toHaveBeenNthCalledWith(1, '/account/api/users', { credentials: 'same-origin', signal })
+    expect(fetcher).toHaveBeenNthCalledWith(2, '/account/api/invitations/count', { credentials: 'same-origin', signal })
+  })
+
+  it('rejects malformed user picker and invitation count responses at the HTTP boundary', async () => {
+    const invalidUserLists: unknown[] = [null, 1, [1], [{ id: 'bad', username: 'x', displayName: 'x' }]]
+    for (const body of invalidUserLists) {
+      const fetcher = vi.fn().mockResolvedValueOnce(Response.json(body)) as unknown as typeof fetch
+      const api = createBrowserCollaborationTransport({ fetch: fetcher, reload: vi.fn() })
+      await expect(api.listUsers?.(new AbortController().signal)).rejects.toThrow('invalid collaboration response')
+    }
+    const invalidCounts: unknown[] = [null, [], { pending: 'many' }, { pending: 1.5 }]
+    for (const body of invalidCounts) {
+      const fetcher = vi.fn().mockResolvedValueOnce(Response.json(body)) as unknown as typeof fetch
+      const api = createBrowserCollaborationTransport({ fetch: fetcher, reload: vi.fn() })
+      await expect(api.getInvitationCount?.(new AbortController().signal)).rejects.toThrow('invalid collaboration response')
+    }
+  })
+
   it('retains machine error codes and tolerates malformed error bodies', async () => {
     const fetcher = vi.fn()
       .mockResolvedValueOnce(Response.json({ error: 'visibility-locked' }, { status: 409 }))
@@ -357,6 +391,22 @@ describe('CollaborationClient', () => {
     await expect(client.matchesConversationVisibility('matching', 'project')).resolves.toBe(true)
     await expect(client.matchesConversationVisibility('matching', 'private')).resolves.toBe(false)
     await expect(client.matchesConversationVisibility('failed', 'project')).resolves.toBe(false)
+  })
+
+  it('delegates user listing and pending-invitation counts to the transport', async () => {
+    const listUsers = vi.fn().mockResolvedValue([{ id: 8, username: 'zhou', displayName: '周工' }])
+    const getInvitationCount = vi.fn().mockResolvedValue({ pending: 1 })
+    const client = new CollaborationClient(transport({ listUsers, getInvitationCount }))
+    await expect(client.listUsers()).resolves.toEqual([{ id: 8, username: 'zhou', displayName: '周工' }])
+    await expect(client.getInvitationCount()).resolves.toEqual({ pending: 1 })
+
+    const bare = new CollaborationClient(transport())
+    await expect(bare.listUsers()).rejects.toEqual(new CollaborationRequestError(503, 'users-unavailable'))
+    await expect(bare.getInvitationCount()).rejects.toEqual(new CollaborationRequestError(503, 'invitations-unavailable'))
+
+    bare.dispose()
+    await expect(bare.listUsers()).resolves.toEqual([])
+    await expect(bare.getInvitationCount()).resolves.toEqual({ pending: 0 })
   })
 
   it('rejects visibility reuse while saving or after disposal', async () => {

@@ -400,6 +400,17 @@ export class PostgresProjectService {
     return Promise.all(result.rows.map(row => this.invitationById(row.id)))
   }
 
+  async countPendingInvitations(userId: number): Promise<number> {
+    const internalUser = await internalUserId(this.context.pool, this.context.organizationId, userId)
+    if (internalUser === null) return 0
+    const result = await this.context.pool.query<{ n: string }>(
+      `SELECT COUNT(*)::text n FROM harness.project_invitations
+       WHERE organization_id=$1 AND invitee_user_id=$2 AND status='pending'`,
+      [this.context.organizationId, internalUser],
+    )
+    return Number(result.rows[0]?.n ?? 0)
+  }
+
   async acceptInvitation(invitationId: string, userId: number): Promise<void> {
     if (!isUuid(invitationId)) throw new Error('invitation-not-found')
     const result = await transaction(this.context.pool, async (client) => {

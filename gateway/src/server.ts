@@ -343,6 +343,15 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       return
     }
 
+    if (pathname === '/account/api/users' && req.method === 'GET') {
+      const all = await users.list()
+      const active = all.filter(u => u.status === 'active').map(u => ({
+        id: u.id, username: u.username, displayName: u.displayName,
+      }))
+      send(res, 200, JSON.stringify(active), 'application/json')
+      return
+    }
+
     if (pathname === '/account/api/projects') {
       try {
         if (req.method === 'GET') {
@@ -371,6 +380,14 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         const mapped = accountProjectError(error)
         send(res, mapped.status, JSON.stringify({ error: mapped.error }), 'application/json')
       }
+      return
+    }
+
+    if (pathname === '/account/api/invitations/count' && req.method === 'GET') {
+      if (deps.projects.countPendingInvitations === undefined) {
+        send(res, 503, '{"error":"invitations-unavailable"}', 'application/json'); return
+      }
+      send(res, 200, JSON.stringify({ pending: await deps.projects.countPendingInvitations(user.id) }), 'application/json')
       return
     }
 

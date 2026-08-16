@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Button, Input, Modal, IconFolderOpenOutline16, IconPlusOutline16, IconShareOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { ProjectInvitation } from './collaboration-client.ts'
+import type { ProjectInvitation, UserSummary } from './collaboration-client.ts'
 import type { CollaborationKey } from './locales.ts'
 import css from './ProjectManagerModal.module.css'
 
@@ -19,6 +19,7 @@ export interface ProjectManagerModalProps {
   listInvitations?: (projectId?: number) => Promise<ProjectInvitation[]>
   inviteMember?: (projectId: number, username: string, mode: 'ro' | 'rw') => Promise<ProjectInvitation>
   acceptInvitation?: (id: string) => Promise<void>
+  listUsers?: () => Promise<UserSummary[]>
   onCreated: (projectId: number) => void
   onClose: () => void
 }
@@ -51,12 +52,13 @@ function errorText(error: unknown, t: ProjectManagerModalProps['t']): string {
 /** Render the user-owned project creation and member invitation dialog. */
 export function ProjectManagerModal({
   open, mode, projectId, canManage = false, currentUserId, t,
-  createProject, listInvitations, inviteMember, acceptInvitation, onCreated, onClose,
+  createProject, listInvitations, inviteMember, acceptInvitation, listUsers, onCreated, onClose,
 }: ProjectManagerModalProps) {
   const [name, setName] = useState('')
   const [username, setUsername] = useState('')
   const [memberMode, setMemberMode] = useState<'ro' | 'rw'>('rw')
   const [invitations, setInvitations] = useState<ProjectInvitation[]>([])
+  const [users, setUsers] = useState<UserSummary[]>([])
   const [loadingInvitations, setLoadingInvitations] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
@@ -67,6 +69,7 @@ export function ProjectManagerModal({
     setUsername('')
     setMemberMode('rw')
     setError(undefined)
+    setUsers([])
     if (mode !== 'members' || listInvitations === undefined) {
       setInvitations([])
       return
@@ -77,8 +80,13 @@ export function ProjectManagerModal({
       .then((next) => { if (active) setInvitations(next) })
       .catch((nextError: unknown) => { if (active) setError(errorText(nextError, t)) })
       .finally(() => { if (active) setLoadingInvitations(false) })
+    if (listUsers !== undefined) {
+      void listUsers()
+        .then((next) => { if (active) setUsers(next) })
+        .catch(() => { /* user list is non-critical; the form stays usable */ })
+    }
     return () => { active = false }
-  }, [open, mode, projectId, listInvitations, t])
+  }, [open, mode, projectId, listInvitations, listUsers, t])
 
   const submitCreate = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault()
@@ -125,6 +133,10 @@ export function ProjectManagerModal({
   }
 
   const pending = invitations.filter(invitation => invitation.status === 'pending')
+  const invitedMemberIds = new Set<number>()
+  for (const inv of invitations) {
+    if (inv.invitee.id !== currentUserId) invitedMemberIds.add(inv.invitee.id)
+  }
   const title = mode === 'create' ? t('manager.createTitle') : t('manager.membersTitle')
 
   return (
@@ -166,14 +178,21 @@ export function ProjectManagerModal({
           {canManage && projectId !== undefined && (
             <form className={css.form} onSubmit={(event) => { void submitInvite(event) }}>
               <label className={css.label} htmlFor="collaboration-invite-username">{t('manager.usernameLabel')}</label>
-              <Input
+              <select
                 id="collaboration-invite-username"
+                className={css.select}
                 value={username}
                 onChange={(event) => { setUsername(event.target.value) }}
-                placeholder={t('manager.usernamePlaceholder')}
                 autoFocus
                 required
-              />
+              >
+                <option value="">{t('manager.usernamePlaceholder')}</option>
+                {users
+                  .filter(u => u.id !== currentUserId && !invitedMemberIds.has(u.id))
+                  .map(u => (
+                    <option key={u.id} value={u.username}>{u.displayName}</option>
+                  ))}
+              </select>
               <label className={css.label} htmlFor="collaboration-invite-mode">{t('manager.modeLabel')}</label>
               <select
                 id="collaboration-invite-mode"
