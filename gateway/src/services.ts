@@ -78,6 +78,7 @@ export interface GatewayProjectService {
   }): Awaitable<ProjectInvitation>
   listInvitations?(userId: number, projectId?: number): Awaitable<ProjectInvitation[]>
   acceptInvitation?(invitationId: string, userId: number): Awaitable<void>
+  countPendingInvitations?(userId: number): Awaitable<number>
 }
 
 /** Project membership and shared-conversation authorization operations. */

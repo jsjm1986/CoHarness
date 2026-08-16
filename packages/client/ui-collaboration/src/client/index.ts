@@ -23,7 +23,7 @@ import { en, NS, zh, type CollaborationKey } from './locales.ts'
 export type {
   CollaborationContext, CollaborationScope, CollaborationSnapshot,
   CollaborationVisibility, ConversationAccess, ConversationCollaboration,
-  ConversationDetail, ConversationParticipant, ProjectInvitation, ProjectMembership,
+  ConversationDetail, ConversationParticipant, ProjectInvitation, ProjectMembership, UserSummary,
 } from './collaboration-client.ts'
 export type { ConversationShareActionProps, ConversationShareInjected } from './ConversationShareAction.tsx'
 export type { ProjectReadOnlyMatch, ReadOnlyComposerProps } from './ReadOnlyComposer.tsx'
@@ -95,6 +95,8 @@ export function apply(ctx: ClientContext): void {
     listInvitations: projectId => collaboration.listInvitations(projectId),
     inviteMember: (projectId, username, mode) => collaboration.inviteMember(projectId, username, mode),
     acceptInvitation: id => collaboration.acceptInvitation(id),
+    listUsers: () => collaboration.listUsers(),
+    getInvitationCount: () => collaboration.getInvitationCount(),
   })
   const conversationInjected = (sessionId: SessionId): ConversationShareInjected => ({
     hooks,

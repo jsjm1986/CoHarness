@@ -299,6 +299,60 @@ describe('gateway server', () => {
     expect(await adminProjects.json()).toEqual([expect.objectContaining({ id: adminProject.id, origin: 'admin' })])
   })
 
+  it('lists active users for the member picker and counts pending invitations', async () => {
+    const { deps, base } = await setup()
+    const alice = await deps.users.create({ username: 'alice', password: 'pw-12345678', displayName: 'Alice' })
+    const bob = await deps.users.create({ username: 'bob', password: 'pw-12345678', displayName: 'Bob' })
+    const carol = await deps.users.create({ username: 'carol', password: 'pw-12345678', displayName: 'Carol' })
+    await deps.users.changeOwnPassword(alice.id, 'pw-12345678')
+    await deps.users.changeOwnPassword(bob.id, 'pw-12345678')
+    await deps.users.setStatus(carol.id, 'disabled')
+    installProjectCollaboration(deps)
+
+    const aliceCookie = await login(base, 'alice', 'pw-12345678')
+    const aliceUsers = await fetch(`${base}/account/api/users`, { headers: { cookie: aliceCookie } })
+    expect(aliceUsers.status).toBe(200)
+    const visible = await aliceUsers.json() as Array<{ id: number; username: string; displayName: string }>
+    expect(visible).toEqual(expect.arrayContaining([
+      { id: alice.id, username: 'alice', displayName: 'Alice' },
+      { id: bob.id, username: 'bob', displayName: 'Bob' },
+    ]))
+    // Disabled accounts are not pickable; enabled admins are.
+    expect(visible.map(user => user.username)).not.toContain('carol')
+    expect(visible.map(user => user.username)).toContain('root-admin')
+
+    const created = await fetch(`${base}/account/api/projects`, {
+      method: 'POST', headers: {
+        cookie: aliceCookie, origin: base, 'content-type': 'application/json',
+      }, body: JSON.stringify({ name: 'Picker workspace' }),
+    })
+    expect(created.status).toBe(201)
+    const project = await created.json() as { id: number }
+
+    const bobCookie = await login(base, 'bob', 'pw-12345678')
+    const before = await fetch(`${base}/account/api/invitations/count`, { headers: { cookie: bobCookie } })
+    expect(before.status).toBe(200)
+    expect(await before.json()).toEqual({ pending: 0 })
+
+    const invitationResponse = await fetch(`${base}/account/api/projects/${project.id}/invitations`, {
+      method: 'POST', headers: {
+        cookie: aliceCookie, origin: base, 'content-type': 'application/json',
+      }, body: JSON.stringify({ username: 'bob', mode: 'ro' }),
+    })
+    expect(invitationResponse.status).toBe(201)
+
+    const after = await fetch(`${base}/account/api/invitations/count`, { headers: { cookie: bobCookie } })
+    expect(await after.json()).toEqual({ pending: 1 })
+
+    const invitation = await invitationResponse.json() as { id: string }
+    const accepted = await fetch(`${base}/account/api/invitations/${encodeURIComponent(invitation.id)}/accept`, {
+      method: 'POST', headers: { cookie: bobCookie, origin: base },
+    })
+    expect(accepted.status).toBe(204)
+    const cleared = await fetch(`${base}/account/api/invitations/count`, { headers: { cookie: bobCookie } })
+    expect(await cleared.json()).toEqual({ pending: 0 })
+  })
+
   it('rejects malformed encoded conversation ids without raising a server error', async () => {
     const { deps, base } = await setup()
     deps.collaboration = {

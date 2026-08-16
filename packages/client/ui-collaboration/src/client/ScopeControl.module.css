@@ -79,6 +79,27 @@
   white-space: normal;
 }
 
+.entryLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--dsw-space-2);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--dsw-alias-brand-primary, #0066cc);
+  color: #fff;
+  font-size: 11px;
+  line-height: 18px;
+  font-weight: 600;
+}
+
 @media (pointer: coarse) {
   .trigger {
     min-height: var(--dsw-touch-target);

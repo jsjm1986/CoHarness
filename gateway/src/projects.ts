@@ -375,6 +375,12 @@ export class ProjectService {
     return rows.map(row => this.invitation(row.id))
   }
 
+  countPendingInvitations(userId: number): number {
+    return (this.db.prepare(
+      `SELECT COUNT(*) AS n FROM project_invitations WHERE invitee_user_id = ? AND status = 'pending'`,
+    ).get(userId) as { n: number }).n
+  }
+
   acceptInvitation(id: string, userId: number): void {
     if (!/^[1-9][0-9]*$/.test(id)) throw new Error('invitation-not-found')
     const invitationId = Number(id)

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   IconChevronDownOutline14, IconGlobeOutline14, IconShareOutline16,
@@ -27,6 +27,10 @@ export interface ScopeControlInjected {
   listInvitations?: (projectId?: number) => Promise<import('./collaboration-client.ts').ProjectInvitation[]>
   inviteMember?: (projectId: number, username: string, mode: 'ro' | 'rw') => Promise<import('./collaboration-client.ts').ProjectInvitation>
   acceptInvitation?: (id: string) => Promise<void>
+  /** List active users for the invitation member picker. */
+  listUsers?: () => Promise<import('./collaboration-client.ts').UserSummary[]>
+  /** Count pending invitations where the current user is the invitee. */
+  getInvitationCount?: () => Promise<{ pending: number }>
 }
 
 /** Full sidebar collaboration-control props. */
@@ -42,12 +46,22 @@ export type ScopeControlProps =
  */
 export function ScopeControl({
   wide, useCollaboration, switchScope, stageVisibility,
-  createProject, listInvitations, inviteMember, acceptInvitation, t,
+  createProject, listInvitations, inviteMember, acceptInvitation, listUsers, getInvitationCount, t,
 }: ScopeControlProps) {
   const state = useCollaboration(snapshot => snapshot)
   const [open, setOpen] = useState(false)
   const [managerMode, setManagerMode] = useState<ProjectManagerMode>()
+  const [invitationCount, setInvitationCount] = useState(0)
   const context = state.context
+
+  useEffect(() => {
+    if (getInvitationCount === undefined) return
+    let active = true
+    void getInvitationCount()
+      .then((next) => { if (active) setInvitationCount(next.pending) })
+      .catch(() => { if (active) setInvitationCount(0) })
+    return () => { active = false }
+  }, [open, managerMode, getInvitationCount])
   if (state.status !== 'ready' || context === undefined
     || (context.scope.kind === 'personal' && context.projects.length === 0
       && createProject === undefined && listInvitations === undefined)) return null
@@ -96,7 +110,12 @@ export function ScopeControl({
   if (listInvitations !== undefined) {
     managerEntries.push({
       id: 'project:members',
-      label: currentProject?.canManage === true ? t('manager.membersAction') : t('manager.invitationsAction'),
+      label: (
+        <span className={css.entryLabel}>
+          {currentProject?.canManage === true ? t('manager.membersAction') : t('manager.invitationsAction')}
+          {invitationCount > 0 && <span className={css.badge}>{invitationCount}</span>}
+        </span>
+      ),
       icon: <IconShareOutline16 size={16} />,
     })
   }
@@ -208,6 +227,7 @@ export function ScopeControl({
         {...listInvitations === undefined ? {} : { listInvitations }}
         {...inviteMember === undefined ? {} : { inviteMember }}
         {...acceptInvitation === undefined ? {} : { acceptInvitation }}
+        {...listUsers === undefined ? {} : { listUsers }}
         onCreated={(projectId) => {
           setManagerMode(undefined)
           void switchScope({ kind: 'project', projectId })
