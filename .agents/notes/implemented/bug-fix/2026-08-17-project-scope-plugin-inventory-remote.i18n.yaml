@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-17-project-scope-plugin-inventory-remote.md
-2026-08-17-project-scope-plugin-inventory-remote.md: a9eb78eeee66e69b6c8484a13459fe6e5aa3cc1f
+2026-08-17-project-scope-plugin-inventory-remote.md: dbc65d6994ff22950a6649844d5fb90c30334065
 2026-08-17-project-scope-plugin-inventory-remote.zh.md: b4efad5c9d228a0b462b3b1b7a7990df8fcd001b

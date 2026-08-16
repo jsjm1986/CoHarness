@@ -253,6 +253,19 @@ describe('project collaboration Typert Remote ACL', () => {
     )).resolves.toBeUndefined()
   })
 
+  it('admits registry-authorized Remotes in project scope', async () => {
+    const { ctx } = await harness(controlledAuthority().authority)
+
+    await expect(authorizeTypertRemote(
+      ctx,
+      typertRequest('dynamicCordisRunner/resolveRequestRun', { requestId: 'test', resolution: { ok: false, reason: 'rejected' } }),
+    )).resolves.toBeUndefined()
+    await expect(authorizeTypertRemote(
+      ctx,
+      typertRequest('dynamicCordisRunner/invoke', { pluginId: 'test', pluginRunId: 'r', method: 'x', args: null }),
+    )).resolves.toBeUndefined()
+  })
+
   it('does not apply project policy to a personal principal', async () => {
     const projectAuthority = controlledAuthority().authority
     const authority: CollaborationAuthority = {

@@ -191,6 +191,17 @@ const PROJECT_TYPERT_PROCESS_WIDE_READS: ReadonlySet<string> = new Set([
   'dynamicCordisRunner/inventory',
 ])
 
+/**
+ * Project-scope Remote methods whose wire arguments carry no Session identity
+ * because only the owning service's registry can resolve it. The service
+ * enforces the per-Session ACL itself; this table only admits the call after
+ * principal capture has verified project membership.
+ */
+const PROJECT_TYPERT_REGISTRY_AUTHORIZED: ReadonlySet<string> = new Set([
+  'dynamicCordisRunner/resolveRequestRun',
+  'dynamicCordisRunner/invoke',
+])
+
 /** Brand one validated non-empty wire string as a Session identity. */
 function typertSessionId(value: unknown): SessionId | undefined {
   return typeof value === 'string' && value.length > 0 ? brandSessionId(value) : undefined
@@ -230,6 +241,7 @@ export async function authorizeTypertRemote(
   }
   if (authority.participant.scope.kind === 'personal') return
   if (PROJECT_TYPERT_PROCESS_WIDE_READS.has(payload.endpoint)) return
+  if (PROJECT_TYPERT_REGISTRY_AUTHORIZED.has(payload.endpoint)) return
   if (policy === undefined) {
     rejectTypertCollaboration(new CollaborationError('forbidden'), action)
   }
