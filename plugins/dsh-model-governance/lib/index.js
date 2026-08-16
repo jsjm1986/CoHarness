@@ -5,6 +5,7 @@ import { ReloadableModelAccess } from "./access.js";
 import { UsageOutbox } from "./outbox.js";
 import { loadPolicy } from "./policy.js";
 import { PolicyReloader } from "./reload.js";
+import { UserDeclaredRoutes } from "./user-routes.js";
 export const name = 'dsh-model-governance';
 export const inject = ['llm'];
 function credentialClass(source) {
@@ -22,8 +23,28 @@ export function apply(ctx) {
     const home = process.env.DSH_HOME ?? join(homedir(), '.dsh');
     const policyPath = process.env.DSH_MODEL_GOVERNANCE ?? join(home, 'model-governance.json');
     const policy = loadPolicy(policyPath);
-    const access = new ReloadableModelAccess(policy);
+    const userDeclared = new UserDeclaredRoutes();
+    const access = new ReloadableModelAccess(policy, userDeclared);
     ctx.provide('modelAccess', access);
+    // Registry topology changes introduce or withdraw configurable providers;
+    // recompute the user-declared set whenever the directory or route set moves.
+    ctx.on('llm/adapters-updated', () => {
+        const settings = ctx.get('settings');
+        if (settings === undefined) {
+            userDeclared.clear();
+            return;
+        }
+        userDeclared.refresh(ctx.llm, settings);
+    });
+    // The raw user layer can change without moving any route (a shipped
+    // provider gaining its first stored key), so the document event refreshes
+    // the set as well; the scoped fiber releases the subscription and the facts
+    // when the settings service goes away.
+    ctx.inject(['settings'], (sctx) => {
+        sctx.on('settings/document-updated', () => userDeclared.refresh(ctx.llm, sctx.settings));
+        userDeclared.refresh(ctx.llm, sctx.settings);
+        sctx.effect(() => () => userDeclared.clear());
+    });
     const outbox = new UsageOutbox(join(home, 'model-governance-outbox'), policy.intakeUrl, policy.intakeToken);
     let reloader;
     ctx.effect(() => async () => {

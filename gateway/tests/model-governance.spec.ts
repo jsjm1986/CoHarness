@@ -32,7 +32,9 @@ describe('ModelGovernanceService', () => {
       adminAllowed: true, userAllowed: false, inputMicrosPerMillion: 0, outputMicrosPerMillion: 0,
       cacheReadMicrosPerMillion: 0, cacheWriteMicrosPerMillion: 0 })
     expect(governance.policyFor(admin).models[0]?.allowed).toBe(true)
+    expect(governance.policyFor(admin).defaultAllowed).toBe(false)
     expect(governance.policyFor(user).models[0]?.allowed).toBe(false)
+    expect(governance.policyFor(user).defaultAllowed).toBe(false)
     governance.setUserAccess(user.id, 'p', 'm', true)
     expect(governance.policyFor(user).models[0]?.allowed).toBe(true)
     governance.upsertModel({ provider: 'p', model: 'm', displayName: 'M', enabled: false,

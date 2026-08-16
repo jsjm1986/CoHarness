@@ -5,7 +5,9 @@
  * under the profile's reference, deriving `<ROUTE>_API_KEY` when the profile
  * has none. The pi-ai profile records that derivation as `apiKeyEnv` only when
  * a key is entered; a blank key materializes a reference-free profile for
- * provider-native authentication);
+ * provider-native authentication. A typed key on the DeepSeek section root
+ * records the schema-default reference the same way, which marks the route as
+ * user-configured for model governance without changing the resolved value);
  * the collapsed 自定义设置 area carries the per-family extras (`baseURL` for
  * both families, DeepSeek's id/name/context-window model catalog, and the
  * display name and wire protocol of a pi-ai route the adapter does not ship —
@@ -236,10 +238,16 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
    */
   const applyOnce = async (): Promise<string | undefined> => {
     const ns = namespace.ns
-    // A pi-ai profile names the conventional reference only when this page is
-    // about to store a key. Otherwise the provider keeps its native auth path.
-    const next = layout === 'pi-ai' && stringAt(draft, 'apiKeyEnv') === undefined
-      && stringAt(fallback, 'apiKeyEnv') === undefined && keyValue.length > 0
+    // A typed key records the credential reference it stores under in the user
+    // layer: a pi-ai profile names the conventional reference only when this
+    // page is about to store a key and nothing above or below it names one
+    // (otherwise the provider keeps its native auth path), while the deepseek
+    // section root always resolves the schema default, so the record marks the
+    // route as user-configured — model governance's user-declared signal —
+    // without changing what the adapter resolves.
+    const recordsKeyRef = keyValue.length > 0 && stringAt(draft, 'apiKeyEnv') === undefined
+      && (layout === 'deepseek' || (layout === 'pi-ai' && stringAt(fallback, 'apiKeyEnv') === undefined))
+    const next = recordsKeyRef
       ? setPath(draft, ['apiKeyEnv'], keyRef)
       : draft
     if (props.credentialOnly !== true) {

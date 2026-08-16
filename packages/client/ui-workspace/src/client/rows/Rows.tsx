@@ -428,6 +428,9 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
         </span>
       )}
       <span className={css.title}>{title}</span>
+      {/* A private (creator-only) project conversation is marked so the
+          shared-runtime session list does not read it as team content. */}
+      {row.visibility === 'private' && <span className={css.privateBadge}>{t('session.private')}</span>}
       {/* A blank New Session row is a provisional placeholder: nothing has
           happened in it yet, so a "now" timestamp and the row verbs
           (rename/fork/archive) would all act on content that does not

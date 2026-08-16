@@ -30,6 +30,10 @@ export interface SessionNode {
   /** Finished running while not selected and not yet opened (the green "done" reminder dot). */
   completed: boolean
   updatedAt: number
+  /** Collaboration visibility; present only for project-scoped sessions. */
+  visibility?: 'project' | 'private'
+  /** Owning project id for project-scoped sessions. */
+  projectId?: number
 }
 
 /** Session order selected by the Workspace browser. */
@@ -224,6 +228,8 @@ function sessionNode(
     completed: s.completed === true,
     updatedAt: s.updatedAt,
     ...(s.pendingInteraction === undefined ? {} : { pendingInteraction: s.pendingInteraction }),
+    ...(s.visibility === undefined ? {} : { visibility: s.visibility }),
+    ...(s.projectId === undefined ? {} : { projectId: s.projectId }),
   }
 }
 

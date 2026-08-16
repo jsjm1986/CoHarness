@@ -3,6 +3,13 @@ import { readFileSync } from 'node:fs'
 export interface GovernancePolicyFile {
   version: number
   defaultAllowed: boolean
+  /**
+   * Whether routes absent from `models` are authorized when the instance's own
+   * settings user layer declares the provider (personal BYOK). The gateway
+   * writes `true` for personal runtimes and `false` for shared project
+   * runtimes; a route present in `models` always follows its catalog entry.
+   */
+  userDeclaredAllowed: boolean
   models: Array<{ provider: string; model: string; allowed: boolean }>
   intakeUrl: string
   intakeToken: string
@@ -23,6 +30,7 @@ export function loadPolicy(filename: string): GovernancePolicyFile {
   const input = raw as Record<string, unknown>
   if (!Number.isSafeInteger(input.version) || Number(input.version) < 0) throw new Error('model-governance: version must be a non-negative integer')
   if (typeof input.defaultAllowed !== 'boolean' || !Array.isArray(input.models)) throw new Error('model-governance: invalid policy defaults')
+  if (typeof input.userDeclaredAllowed !== 'boolean') throw new Error('model-governance: userDeclaredAllowed must be boolean')
   const seen = new Set<string>()
   const models = input.models.map((entry, index) => {
     if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) throw new Error(`model-governance: models[${index}] must be an object`)
@@ -36,7 +44,8 @@ export function loadPolicy(filename: string): GovernancePolicyFile {
     return { provider, model, allowed: row.allowed }
   })
   return {
-    version: Number(input.version), defaultAllowed: input.defaultAllowed, models,
+    version: Number(input.version), defaultAllowed: input.defaultAllowed,
+    userDeclaredAllowed: input.userDeclaredAllowed, models,
     intakeUrl: requiredString(input.intakeUrl, 'intakeUrl'), intakeToken: requiredString(input.intakeToken, 'intakeToken'),
   }
 }

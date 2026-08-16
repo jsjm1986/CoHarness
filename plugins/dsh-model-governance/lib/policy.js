@@ -20,6 +20,8 @@ export function loadPolicy(filename) {
         throw new Error('model-governance: version must be a non-negative integer');
     if (typeof input.defaultAllowed !== 'boolean' || !Array.isArray(input.models))
         throw new Error('model-governance: invalid policy defaults');
+    if (typeof input.userDeclaredAllowed !== 'boolean')
+        throw new Error('model-governance: userDeclaredAllowed must be boolean');
     const seen = new Set();
     const models = input.models.map((entry, index) => {
         if (entry === null || typeof entry !== 'object' || Array.isArray(entry))
@@ -36,7 +38,8 @@ export function loadPolicy(filename) {
         return { provider, model, allowed: row.allowed };
     });
     return {
-        version: Number(input.version), defaultAllowed: input.defaultAllowed, models,
+        version: Number(input.version), defaultAllowed: input.defaultAllowed,
+        userDeclaredAllowed: input.userDeclaredAllowed, models,
         intakeUrl: requiredString(input.intakeUrl, 'intakeUrl'), intakeToken: requiredString(input.intakeToken, 'intakeToken'),
     };
 }

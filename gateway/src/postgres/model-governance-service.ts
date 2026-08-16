@@ -295,7 +295,7 @@ export class PostgresModelGovernanceService {
 
   async policyFor(user: UserRow): Promise<{
     version: number
-    defaultAllowed: boolean
+    defaultAllowed: false
     models: Array<{ provider: string; model: string; allowed: boolean }>
   }> {
     const result = await this.context.pool.query<{
@@ -315,7 +315,9 @@ export class PostgresModelGovernanceService {
     [this.context.organizationId, user.id, user.role === 'admin', roleForPostgres(user.role)])
     return {
       version: Date.now(),
-      defaultAllowed: user.role === 'admin',
+      // The catalog is the sole authorization source for every role; unlisted
+      // routes fall through to the plugin's user-declared allowance instead.
+      defaultAllowed: false,
       models: result.rows.map(row => ({
         provider: row.provider,
         model: row.model,

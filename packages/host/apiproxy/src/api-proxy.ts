@@ -2178,7 +2178,18 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     if (collaboration === undefined) return items
     const captured = authority ?? collaboration.capture()
     const readable = await captured.readableSessionIds(items.map(item => item.sessionId))
-    return items.filter(item => readable.has(item.sessionId))
+    const visible = items.filter(item => readable.has(item.sessionId))
+    // Enrich visible sessions with collaboration metadata (visibility, project
+    // id) so the session list can display project context. A failed authorize
+    // call for a personal-scope or stale session is silently dropped.
+    await Promise.all(visible.map(async (item) => {
+      try {
+        const access = await captured.authorize(item.sessionId, 'read')
+        if (access.visibility !== undefined) item.visibility = access.visibility
+        if (access.projectId !== undefined) item.projectId = access.projectId
+      } catch { /* personal scope or stale session; skip metadata */ }
+    }))
+    return visible
   }
 
   /**

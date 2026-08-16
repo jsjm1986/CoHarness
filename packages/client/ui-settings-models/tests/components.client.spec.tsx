@@ -435,6 +435,24 @@ describe('ModelsSection', () => {
     })
   })
 
+  it('records the schema-default reference in the user layer when a key is typed', async () => {
+    const { mutate, set } = await mountDeepSeekCard({
+      mutate: vi.fn(() => Promise.resolve(ok(wireNamespaces()[0]))),
+    })
+    fireEvent.change(screen.getByLabelText(en.keyInput), { target: { value: 'sk-personal' } })
+    fireEvent.click(screen.getByText(en.apply))
+    await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
+    // The resolved section already carries the schema default, so this record
+    // changes nothing the adapter resolves; it marks the route as
+    // user-configured (model governance's user-declared signal).
+    expect(mutate.mock.calls[0]?.[0]).toEqual({
+      ns: 'llm-deepseek',
+      ops: [{ op: 'set', path: ['apiKeyEnv'], value: 'DEEPSEEK_API_KEY' }],
+      expectedRevision: 0,
+    })
+    await waitFor(() => { expect(set).toHaveBeenCalledWith({ ref: 'DEEPSEEK_API_KEY', value: 'sk-personal' }) })
+  })
+
   it('materializes inherited models and adds an arbitrary DeepSeek id', async () => {
     const { mutate } = await mountDeepSeekCard({
       mutate: vi.fn(() => Promise.resolve(ok(wireNamespaces()[0]))),

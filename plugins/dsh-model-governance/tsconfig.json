@@ -23,6 +23,12 @@
       ],
       "@deepseek-ai/dsh-agent": [
         "../../packages/core/agent/lib/types/index.d.ts"
+      ],
+      "@deepseek-ai/dsh-settings": [
+        "../../packages/settings/settings/lib/types/index.d.ts"
+      ],
+      "@deepseek-ai/schemastery": [
+        "../../vendor/schemastery/lib/types/index.d.ts"
       ]
     }
   },
