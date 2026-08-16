@@ -175,7 +175,7 @@ describe('project collaboration Typert Remote ACL', () => {
     const sessionId = SessionId('remote-session')
     const cases: Array<{
       endpoint: string
-      action: 'read' | 'write'
+      action: 'read' | 'write' | 'approve'
       args: Readonly<Record<string, unknown>>
     }> = [
       ...['create', 'edit', 'pause', 'resume', 'complete', 'clear'].map(method => ({
@@ -186,6 +186,13 @@ describe('project collaboration Typert Remote ACL', () => {
       { endpoint: 'messageFeedback/list', action: 'read', args: { request: { sessionId } } },
       { endpoint: 'messageFeedback/put', action: 'write', args: { request: { sessionId } } },
       { endpoint: 'messageFeedback/delete', action: 'write', args: { request: { sessionId } } },
+      { endpoint: 'dynamicCordisRunner/runHostHalf', action: 'approve', args: { agentId: sessionId } },
+      { endpoint: 'dynamicCordisRunner/getClientCode', action: 'read', args: { agentId: sessionId } },
+      { endpoint: 'dynamicCordisRunner/settleUserRun', action: 'write', args: { agentId: sessionId } },
+      { endpoint: 'dynamicCordisRunner/stopFromPanel', action: 'write', args: { agentId: sessionId } },
+      { endpoint: 'dynamicCordisRunner/undefineFromPanel', action: 'write', args: { agentId: sessionId } },
+      { endpoint: 'dynamicCordisRunner/reportRenderFailure', action: 'write', args: { agentId: sessionId } },
+      { endpoint: 'dynamicCordisRunner/reportClientGuardFailure', action: 'write', args: { agentId: sessionId } },
     ]
 
     for (const entry of cases) {
@@ -230,6 +237,10 @@ describe('project collaboration Typert Remote ACL', () => {
     await expect(authorizeTypertRemote(
       ctx,
       typertRequest('pluginInventory/list', {}),
+    )).resolves.toBeUndefined()
+    await expect(authorizeTypertRemote(
+      ctx,
+      typertRequest('dynamicCordisRunner/inventory', {}),
     )).resolves.toBeUndefined()
   })
 

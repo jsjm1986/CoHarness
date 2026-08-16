@@ -111,8 +111,8 @@ export async function setup(config?: Config): Promise<Harness> {
  * @param agent - the session to project.
  * @returns id/running pairs in define order.
  */
-export function running(runner: DynamicCordisRunnerService, agent: Agent): { id: string; running: boolean }[] {
-  return runner.inventory()
+export async function running(runner: DynamicCordisRunnerService, agent: Agent): Promise<{ id: string; running: boolean }[]> {
+  return (await runner.inventory())
     .filter(row => row.agentId === agent.id)
     .map(row => ({ id: String(row.pluginId), running: row.activeRun !== undefined }))
 }

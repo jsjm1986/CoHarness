@@ -78,6 +78,7 @@ import type { GoalRef as CoreGoalRef } from '@deepseek-ai/dsh-goal'
 import type {} from '@deepseek-ai/dsh-commands'
 import {
   CollaborationError,
+  collaborationRefusal,
   type CollaborationAccess,
   type CollaborationAction,
   type CollaborationAuthority,
@@ -154,29 +155,6 @@ const COLD_SUMMARY_BATCH_SIZE = 16
 /** Default maximum artifact size eligible for one cold blankness read. */
 export const DEFAULT_COLD_BLANK_PROBE_MAX_BYTES = 1024
 
-/** Build the stable RPC refusal for a project-membership or conversation-ACL failure. */
-function collaborationRefusal(
-  error: unknown,
-  action: CollaborationAction,
-  sessionId?: SessionId,
-): RpcError {
-  const reason = error instanceof CollaborationError ? error.code : 'gateway-unavailable'
-  const message = reason === 'conversation-not-found'
-    ? 'Conversation is unavailable.'
-    : reason === 'not-member'
-      ? 'You are not a member of this project.'
-      : reason === 'visibility-locked'
-        ? 'Conversation visibility cannot be changed after another participant contributes.'
-        : reason === 'gateway-unavailable'
-          ? 'Collaboration authorization is temporarily unavailable.'
-          : 'You do not have permission to perform this action.'
-  return {
-    code: 'collaboration-forbidden',
-    message,
-    details: { action, reason, ...(sessionId === undefined ? {} : { sessionId }) },
-  }
-}
-
 interface TypertSessionAuthorization {
   readonly action: CollaborationAction
   readonly sessionId: (args: Readonly<Record<string, unknown>>) => SessionId | undefined
@@ -193,15 +171,25 @@ const PROJECT_TYPERT_SESSION_AUTHORIZATION: Readonly<Record<string, TypertSessio
   'messageFeedback/list': { action: 'read', sessionId: args => typertRequestSessionId(args.request) },
   'messageFeedback/put': { action: 'write', sessionId: args => typertRequestSessionId(args.request) },
   'messageFeedback/delete': { action: 'write', sessionId: args => typertRequestSessionId(args.request) },
+  'dynamicCordisRunner/runHostHalf': { action: 'approve', sessionId: args => typertSessionId(args.agentId) },
+  'dynamicCordisRunner/getClientCode': { action: 'read', sessionId: args => typertSessionId(args.agentId) },
+  'dynamicCordisRunner/settleUserRun': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
+  'dynamicCordisRunner/stopFromPanel': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
+  'dynamicCordisRunner/undefineFromPanel': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
+  'dynamicCordisRunner/reportRenderFailure': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
+  'dynamicCordisRunner/reportClientGuardFailure': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
 })
 
 /**
  * Project-scope Remote methods that expose read-only process-wide runtime state
  * with no Session identity. Project membership is already verified when the
- * request principal is captured, so every member (ro or rw) may call them and
- * no session ACL applies.
+ * request principal is captured, so every member (ro or rw) may call them; the
+ * owning service filters rows that carry Session-scoped metadata itself.
  */
-const PROJECT_TYPERT_PROCESS_WIDE_READS: ReadonlySet<string> = new Set(['pluginInventory/list'])
+const PROJECT_TYPERT_PROCESS_WIDE_READS: ReadonlySet<string> = new Set([
+  'pluginInventory/list',
+  'dynamicCordisRunner/inventory',
+])
 
 /** Brand one validated non-empty wire string as a Session identity. */
 function typertSessionId(value: unknown): SessionId | undefined {

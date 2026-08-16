@@ -93,6 +93,41 @@ export type CollaborationErrorCode =
   | 'visibility-locked'
   | 'gateway-unavailable'
 
+/** Wire refusal for a project-membership or conversation-ACL failure: code, message, and details. */
+export interface CollaborationRefusal {
+  readonly code: 'collaboration-forbidden'
+  readonly message: string
+  readonly details: {
+    readonly action: CollaborationAction
+    readonly reason: CollaborationErrorCode
+    readonly sessionId?: SessionId
+  }
+}
+
+/** Build the stable RPC refusal shared by every collaboration enforcement point. */
+export function collaborationRefusal(
+  error: unknown,
+  action: CollaborationAction,
+  sessionId?: SessionId,
+): CollaborationRefusal {
+  const reason = error instanceof CollaborationError ? error.code : 'gateway-unavailable'
+  const message = reason === 'conversation-not-found'
+    ? 'Conversation is unavailable.'
+    : reason === 'not-member'
+      ? 'You are not a member of this project.'
+      : reason === 'visibility-locked'
+        ? 'Conversation visibility cannot be changed after another participant contributes.'
+        : reason === 'gateway-unavailable'
+          ? 'Collaboration authorization is temporarily unavailable.'
+          : 'You do not have permission to perform this action.'
+  return {
+    code: 'collaboration-forbidden',
+    message,
+    details: { action, reason, ...(sessionId === undefined ? {} : { sessionId }) },
+  }
+}
+
+
 /** Collaboration denial or provider failure with a stable machine-readable code. */
 export class CollaborationError extends Error {
   /**

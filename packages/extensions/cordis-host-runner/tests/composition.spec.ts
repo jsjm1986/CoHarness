@@ -19,8 +19,8 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-function latestPackage(harness: Awaited<ReturnType<typeof setup>>, pluginId: CordisDynamicPluginId): CordisDynamicPackageId {
-  const row = harness.runner.inventory().find(candidate => candidate.pluginId === pluginId)
+async function latestPackage(harness: Awaited<ReturnType<typeof setup>>, pluginId: CordisDynamicPluginId): Promise<CordisDynamicPackageId> {
+  const row = (await harness.runner.inventory()).find(candidate => candidate.pluginId === pluginId)
   const packageId = row?.packages.at(-1)?.packageId
   if (packageId === undefined) throw new Error(`missing package for ${pluginId}`)
   return packageId
@@ -49,7 +49,7 @@ describe('cross-package provide/inject', () => {
     expect(row?.activeRun?.fiber).toBeDefined()
     expect(missingServices(harness.ctx, row?.activeRun?.fiber as never)).toEqual(['greeter'])
     expect(harness.ctx.tools.get('greet')).toBeUndefined()
-    expect(running(harness.runner, AGENT_A)).toEqual([{ id: consumer, running: true }])
+    expect(await running(harness.runner, AGENT_A)).toEqual([{ id: consumer, running: true }])
 
     await mount(harness, PROVIDER_CODE)
     expect(harness.ctx.tools.get('greet')).toBeDefined()
@@ -78,7 +78,7 @@ describe('cross-package provide/inject', () => {
     // The same definition, a new dispatch: the consumer's apply re-runs through
     // a new façade rather than needing its own re-definition.
     await expect(harness.runner.run(
-      AGENT_A, provider, latestPackage(harness, provider), 'run',
+      AGENT_A, provider, await latestPackage(harness, provider), 'run',
     )).resolves.toMatchObject({ ok: true })
     expect(harness.ctx.tools.get('greet')).toBeDefined()
     expect(text(await call(harness.ctx, 'greet', { name: 'again' }))).toBe('hi again')
@@ -165,7 +165,7 @@ describe('stop reaches quiescence', () => {
     await harness.runner.stop(AGENT_A, id)
     expect(harness.ctx.tools.get('reverse_text')).toBeUndefined()
 
-    await harness.runner.run(AGENT_A, id, latestPackage(harness, id), 'run')
+    await harness.runner.run(AGENT_A, id, await latestPackage(harness, id), 'run')
     expect(harness.ctx.tools.get('reverse_text')).toBeDefined()
   })
 

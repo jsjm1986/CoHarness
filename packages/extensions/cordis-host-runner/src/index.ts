@@ -8,9 +8,12 @@ import { Context } from '@deepseek-ai/cordis'
 import type { Fiber } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+import { collaborationRefusal } from '@deepseek-ai/dsh-collaboration'
+import type { CollaborationAction } from '@deepseek-ai/dsh-collaboration'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { JsonValue } from '@deepseek-ai/dsh-session/types'
-import { TypertRemoteService, Remote } from '@deepseek-ai/dsh-typert-protocol'
+import { TypertLookupFailure, TypertRemoteService, Remote } from '@deepseek-ai/dsh-typert-protocol'
 import { isPlugin, normalizeHandler } from './guard.ts'
 import { CordisInspectRegistryService } from './inspect-registry.ts'
 import { missingServices, startHostHalf } from './lifecycle.ts'
@@ -141,6 +144,32 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
     this.rootCtx = ctx
     this.resolved = config as ResolvedConfig
     this.inspectRegistry = new CordisInspectRegistryService(ctx)
+  }
+
+  /**
+   * Authorize a registry-resolved Session for project collaboration. Used by
+   * Remote methods whose wire arguments carry no Session identity because only
+   * this registry knows it; the apiproxy table authorizes every
+   * `agentId`-carrying method instead. Personal and collaboration-free
+   * compositions pass without checks.
+   * @param sessionId - Session owning the targeted Plugin or run request.
+   * @param action - operation class to authorize.
+   */
+  private async authorizeRegistrySession(sessionId: SessionId, action: CollaborationAction): Promise<void> {
+    const collaboration = this.ctx.get('collaboration')
+    if (collaboration === undefined) return
+    let authority
+    try {
+      authority = collaboration.capture()
+    } catch (error: unknown) {
+      throw new TypertLookupFailure(collaborationRefusal(error, action, sessionId))
+    }
+    if (authority.participant.scope.kind === 'personal') return
+    try {
+      await authority.authorize(sessionId, action)
+    } catch (error: unknown) {
+      throw new TypertLookupFailure(collaborationRefusal(error, action, sessionId))
+    }
   }
 
   /**
@@ -417,6 +446,7 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
     const pending = this.registry.peekRequest(requestId)
     if (pending === undefined) return { accepted: false }
     const plugin = this.registry.get(pending.pluginId)
+    if (plugin !== undefined) await this.authorizeRegistrySession(plugin.sessionId, 'approve')
     if (resolution.ok && plugin?.run?.pluginRunId !== resolution.pluginRunId) return { accepted: false }
     if (!resolution.ok && resolution.pluginRunId !== undefined
       && plugin?.run?.pluginRunId !== resolution.pluginRunId) return { accepted: false }
@@ -517,13 +547,14 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
   }
 
   /**
-   * Frame-wide inventory, grouped as one row per stable Plugin.
-   * @returns Source-free metadata for every process-local Plugin.
+   * Frame-wide inventory, grouped as one row per stable Plugin. In project
+   * scope, rows are filtered to Sessions the current participant may read, so
+   * private conversations never reveal their Plugin metadata.
+   * @returns Source-free metadata for every readable process-local Plugin.
    */
-  /* jscpd:ignore-start */
   @Remote('inventory')
-  inventory(): DynamicCordisInventoryRow[] {
-    return this.registry.all().map(plugin => ({
+  async inventory(): Promise<DynamicCordisInventoryRow[]> {
+    const rows = this.registry.all().map(plugin => ({
       pluginId: plugin.pluginId,
       agentId: plugin.sessionId,
       packages: [...plugin.packages.values()].map(definition => ({
@@ -540,8 +571,18 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
       },
       ...plugin.latestRun === undefined ? {} : { latestRun: cloneAttempt(plugin.latestRun) },
     }))
+    const collaboration = this.ctx.get('collaboration')
+    if (collaboration === undefined) return rows
+    let authority
+    try {
+      authority = collaboration.capture()
+    } catch (error: unknown) {
+      throw new TypertLookupFailure(collaborationRefusal(error, 'read'))
+    }
+    if (authority.participant.scope.kind === 'personal') return rows
+    const readable = await authority.readableSessionIds(rows.map(row => row.agentId))
+    return rows.filter(row => readable.has(row.agentId))
   }
-  /* jscpd:ignore-end */
 
   /**
    * Read one Session's Host-rich state for inspection and result rendering.
@@ -748,6 +789,7 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
     if (plugin === undefined || plugin.run === undefined) {
       return { ok: false, code: 'plugin-not-running', message: `dynamic plugin "${pluginId}" is not running` }
     }
+    await this.authorizeRegistrySession(plugin.sessionId, 'write')
     const run = plugin.run
     if (run.pluginRunId !== pluginRunId) {
       return { ok: false, code: 'stale-run', message: `activation "${pluginRunId}" is no longer active` }

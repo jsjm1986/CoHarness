@@ -24,18 +24,18 @@ describe('dynamic Plugin versions', () => {
     })
     await expect(runner.run(AGENT_A, first.pluginId, second.packageId, 'update'))
       .resolves.toMatchObject({ ok: false, reason: 'host-half-failed' })
-    expect(runner.inventory()[0]).toMatchObject({
+    expect((await runner.inventory())[0]).toMatchObject({
       currentPackageId: first.packageId,
       nextPackageId: second.packageId,
     })
-    expect(runner.inventory()[0]?.activeRun).toBeUndefined()
+    expect((await runner.inventory())[0]?.activeRun).toBeUndefined()
 
     await expect(runner.run(AGENT_A, first.pluginId, first.packageId, 'run')).resolves.toMatchObject({ ok: true })
-    expect(runner.inventory()[0]).toMatchObject({
+    expect((await runner.inventory())[0]).toMatchObject({
       currentPackageId: first.packageId,
       activeRun: { packageId: first.packageId },
     })
-    expect(runner.inventory()[0]?.nextPackageId).toBeUndefined()
+    expect((await runner.inventory())[0]?.nextPackageId).toBeUndefined()
   })
 
   it('cancels and retracts a Host activation owned by the pending approval', async () => {
@@ -67,9 +67,9 @@ describe('dynamic Plugin versions', () => {
     controller.abort()
 
     await expect(pending).resolves.toMatchObject({ ok: true, status: 'awaiting-approval' })
-    expect(runner.inventory()[0]?.activeRun).toBeDefined()
+    expect((await runner.inventory())[0]?.activeRun).toBeDefined()
     await runner.stop(AGENT_A, defined.pluginId)
-    expect(runner.inventory()[0]?.activeRun).toBeUndefined()
+    expect((await runner.inventory())[0]?.activeRun).toBeUndefined()
   })
 
   it('does not stop an existing Host run when an attaching page fails to load Client code', async () => {
@@ -100,7 +100,7 @@ describe('dynamic Plugin versions', () => {
       message: 'this page cannot load it',
     })).resolves.toMatchObject({ ok: false, reason: 'client-half-failed' })
 
-    expect(runner.inventory()[0]?.activeRun).toEqual({
+    expect((await runner.inventory())[0]?.activeRun).toEqual({
       packageId: defined.packageId,
       pluginRunId: first.pluginRunId,
     })

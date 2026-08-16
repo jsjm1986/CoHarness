@@ -61,7 +61,7 @@ describe('sandbox isolation and Node-API traps', () => {
       error instanceof Error ? error.message : String(error))
     expect(failure).toContain(trapMessage)
     expect(failure).toContain(redirect)
-    expect(running(harness.runner, AGENT_A)).toEqual([{ id: 'probe-1', running: false }])
+    expect(await running(harness.runner, AGENT_A)).toEqual([{ id: 'probe-1', running: false }])
   })
 
   it('lets a host half schedule through the cordis timer service (inject: [\'timer\'])', async () => {
@@ -138,7 +138,7 @@ describe('sandbox isolation and Node-API traps', () => {
   it('honors the configured vmTimeoutMs for the synchronous portion', async () => {
     const harness = await setup({ vmTimeoutMs: 50 })
     await expect(mount(harness, 'while (true) {}')).rejects.toThrow(/timed? ?out/i)
-    expect(running(harness.runner, AGENT_A)).toEqual([{ id: 'probe-1', running: false }])
+    expect(await running(harness.runner, AGENT_A)).toEqual([{ id: 'probe-1', running: false }])
   })
 })
 
@@ -152,7 +152,7 @@ describe('host-half failures leave nothing running', () => {
   ])('refuses %j with a teaching message', async (code, message) => {
     const harness = await setup()
     await expect(mount(harness, code)).rejects.toThrow(message)
-    expect(running(harness.runner, AGENT_A)).toEqual([{ id: 'probe-1', running: false }])
+    expect(await running(harness.runner, AGENT_A)).toEqual([{ id: 'probe-1', running: false }])
   })
 
   it('passes a null throw through untouched (no SyntaxError misclassification)', async () => {
@@ -172,7 +172,7 @@ describe('parse failures teach the fix', () => {
       purpose: 'p',
       code: { host: 'return { name: \'ts\' as const, apply(ctx) {} }' },
     })).toThrow('plain JavaScript, not TypeScript')
-    expect(running(harness.runner, AGENT_A)).toEqual([])
+    expect(await running(harness.runner, AGENT_A)).toEqual([])
   })
 
   it('surfaces the offending line + caret and the bracket-balance hint on a syntax error', async () => {

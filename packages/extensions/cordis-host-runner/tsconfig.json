@@ -9,6 +9,9 @@
   ],
   "references": [
     {
+      "path": "../../context/collaboration"
+    },
+    {
       "path": "../../../vendor/cosmokit"
     },
     {

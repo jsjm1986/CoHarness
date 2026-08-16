@@ -55,7 +55,7 @@ describe('dynamic runner definitions', () => {
 
     // Global by design: a run-control surface that is not inside a session can
     // still name every package, and each row carries the address later verbs need.
-    expect(runner.inventory()).toEqual([
+    expect(await runner.inventory()).toEqual([
       {
         pluginId: mine.pluginId,
         agentId: AGENT_A.id,
@@ -89,7 +89,7 @@ describe('dynamic runner definitions', () => {
 
     // A host-only package cannot be loaded into a page, so the surface must be
     // able to tell the two apart from the listing alone.
-    expect(runner.inventory().map(row => [String(row.pluginId), row.packages[0]?.hasClientHalf])).toEqual([
+    expect((await runner.inventory()).map(row => [String(row.pluginId), row.packages[0]?.hasClientHalf])).toEqual([
       ['dyn-1', false],
       ['dyn-2', true],
     ])
@@ -109,7 +109,7 @@ describe('dynamic runner definitions', () => {
       pluginId: 'dyn-2', packageId: 'pkg-2', name: 'second', purpose: 'do another',
       hasHostHalf: false, hasClientHalf: true,
     })
-    expect(running(runner, AGENT_A)).toEqual([{ id: 'dyn-1', running: false }, { id: 'dyn-2', running: false }])
+    expect(await running(runner, AGENT_A)).toEqual([{ id: 'dyn-1', running: false }, { id: 'dyn-2', running: false }])
   })
 
   it.each([
@@ -130,7 +130,7 @@ describe('dynamic runner definitions', () => {
       purpose: 'p',
       client: 'return { type: \'text\' as const }',
     })).toThrow('The sandbox runs plain JavaScript, not TypeScript')
-    expect(running(runner, AGENT_A)).toEqual([])
+    expect(await running(runner, AGENT_A)).toEqual([])
   })
 
   it('hides another session\'s definition, so only its own card can address it', async () => {
@@ -139,7 +139,7 @@ describe('dynamic runner definitions', () => {
       sessionId: AGENT_A.id, name: 'owned', purpose: 'p', host: HOST_CODE,
     })
 
-    expect(running(runner, AGENT_B)).toEqual([])
+    expect(await running(runner, AGENT_B)).toEqual([])
     await expect(runner.run(AGENT_B, pluginId, packageId, 'run'))
       .resolves.toMatchObject({ ok: false, reason: 'plugin-missing' })
     await expect(runner.stop(AGENT_B, pluginId)).resolves.toMatchObject({ ok: false, reason: 'plugin-missing' })
@@ -172,7 +172,7 @@ describe('dynamic runner dispatch', () => {
     ])
     await expect(runner.invoke(pluginId, 'run-1' as never, 'double', { value: 21 }))
       .resolves.toEqual({ ok: true, value: 42 })
-    expect(running(runner, AGENT_A)).toEqual([{ id: pluginId, running: true }])
+    expect(await running(runner, AGENT_A)).toEqual([{ id: pluginId, running: true }])
   })
 
   it('returns awaiting approval, then records the page activation asynchronously', async () => {
@@ -197,7 +197,7 @@ describe('dynamic runner dispatch', () => {
     })
     await gateway.answering
     expect(ctx.get('dynDoubler')).toEqual({ ok: true })
-    expect(runner.inventory()[0]?.latestRun).toMatchObject({
+    expect((await runner.inventory())[0]?.latestRun).toMatchObject({
       status: 'waiting',
       client: { status: 'waiting', waitingFor: ['slots'] },
     })
@@ -219,7 +219,7 @@ describe('dynamic runner dispatch', () => {
     expect(receipt).toMatchObject({ ok: true, status: 'awaiting-approval' })
     await gateway.answering
     expect(ctx.get('dynDoubler')).toBeUndefined()
-    expect(running(runner, AGENT_A)).toEqual([{ id: pluginId, running: false }])
+    expect(await running(runner, AGENT_A)).toEqual([{ id: pluginId, running: false }])
     expect(gateway.events.at(-1)).toMatchObject(['cordis/request-run-resolved', { outcome: 'rejected' }])
   })
 
@@ -234,13 +234,13 @@ describe('dynamic runner dispatch', () => {
 
     expect(receipt).toMatchObject({ ok: true, status: 'awaiting-approval' })
     await gateway.answering
-    expect(runner.inventory()[0]?.latestRun).toMatchObject({
+    expect((await runner.inventory())[0]?.latestRun).toMatchObject({
       status: 'failed',
       error: { message: 'createElement is not defined' },
     })
     // Rollback restores the state the request found: nothing was running before.
     expect(ctx.get('dynDoubler')).toBeUndefined()
-    expect(running(runner, AGENT_A)).toEqual([{ id: pluginId, running: false }])
+    expect(await running(runner, AGENT_A)).toEqual([{ id: pluginId, running: false }])
     expect(gateway.events.at(-1)?.[1]).toMatchObject({ outcome: 'failed' })
   })
 
@@ -259,12 +259,12 @@ describe('dynamic runner dispatch', () => {
 
     expect(receipt).toMatchObject({ ok: true, status: 'starting' })
     await gateway.answering
-    expect(runner.inventory()[0]?.latestRun).toMatchObject({
+    expect((await runner.inventory())[0]?.latestRun).toMatchObject({
       status: 'failed',
       error: { message: 'this page could not load it' },
     })
     expect(ctx.get('dynDoubler')).toBeUndefined()
-    expect(running(runner, AGENT_A)).toEqual([{ id: pluginId, running: false }])
+    expect(await running(runner, AGENT_A)).toEqual([{ id: pluginId, running: false }])
   })
 
   it('binds a running host half instead of evaluating it twice', async () => {
@@ -396,7 +396,7 @@ describe('dynamic runner dispatch', () => {
     if (!started.ok) throw new Error(started.message)
     await expect(runner.resolveRequestRun(requestId, { ok: true, pluginRunId: started.pluginRunId }))
       .resolves.toEqual({ accepted: true })
-    expect(running(runner, AGENT_A)).toEqual([{ id: pluginId, running: true }])
+    expect(await running(runner, AGENT_A)).toEqual([{ id: pluginId, running: true }])
   })
 
   it('reports the sandbox failure and starts nothing when the host half throws', async () => {
@@ -412,7 +412,7 @@ describe('dynamic runner dispatch', () => {
 
     expect(receipt).toMatchObject({ ok: false, reason: 'host-half-failed' })
     expect(gateway.events).toEqual([])
-    expect(running(runner, AGENT_A)).toEqual([{ id: pluginId, running: false }])
+    expect(await running(runner, AGENT_A)).toEqual([{ id: pluginId, running: false }])
     await expect(runner.invoke(pluginId, 'run-1' as never, 'never', null))
       .resolves.toMatchObject({ code: 'plugin-not-running' })
   })
@@ -437,7 +437,7 @@ describe('dynamic runner teardown', () => {
     expect(gateway.events.at(-1)).toEqual(['cordis/dynamic-retract', {
       pluginId, packageId, pluginRunId: first.pluginRunId,
     }])
-    expect(running(runner, AGENT_A)).toEqual([{ id: pluginId, running: false }])
+    expect(await running(runner, AGENT_A)).toEqual([{ id: pluginId, running: false }])
     // Runnable again, with a fresh activation identity.
     await expect(runner.run(AGENT_A, pluginId, packageId, 'run'))
       .resolves.toMatchObject({ ok: true, pluginRunId: 'run-2' })
@@ -479,7 +479,7 @@ describe('dynamic runner teardown', () => {
     await expect(runner.undefine(AGENT_A, pluginId)).resolves.toEqual({ ok: true, wasRunning: true })
 
     expect(ctx.get('dynDoubler')).toBeUndefined()
-    expect(running(runner, AGENT_A)).toEqual([])
+    expect(await running(runner, AGENT_A)).toEqual([])
     expect(gateway.events.map(([name]) => name))
       .toEqual(['cordis/dynamic-package', 'cordis/dynamic-retract'])
     await expect(runner.run(AGENT_A, pluginId, packageId, 'run'))
