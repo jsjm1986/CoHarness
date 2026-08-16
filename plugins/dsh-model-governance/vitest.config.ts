@@ -10,6 +10,8 @@ export default defineConfig({
       '@deepseek-ai/dsh-agent': resolve(repo, 'packages/core/agent/src/index.ts'),
       '@deepseek-ai/dsh-llm': resolve(repo, 'packages/llm/llm/src/index.ts'),
       '@deepseek-ai/dsh-model-access': resolve(repo, 'packages/llm/model-access/src/index.ts'),
+      '@deepseek-ai/dsh-settings': resolve(repo, 'packages/settings/settings/src/index.ts'),
+      '@deepseek-ai/schemastery': resolve(repo, 'vendor/schemastery/src/index.ts'),
     },
   },
   test: { include: ['tests/**/*.spec.ts'] },

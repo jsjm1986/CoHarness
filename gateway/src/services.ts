@@ -78,6 +78,7 @@ export interface GatewayProjectService {
   }): Awaitable<ProjectInvitation>
   listInvitations?(userId: number, projectId?: number): Awaitable<ProjectInvitation[]>
   acceptInvitation?(invitationId: string, userId: number): Awaitable<void>
+  countPendingInvitations?(userId: number): Awaitable<number>
 }
 
 /** Project membership and shared-conversation authorization operations. */
@@ -129,7 +130,7 @@ export interface GatewayModelGovernanceService {
   userOverrides(userId: number): Awaitable<Array<{ provider: string; model: string; allowed: boolean }>>
   policyFor(user: UserRow): Awaitable<{
     version: number
-    defaultAllowed: boolean
+    defaultAllowed: false
     models: Array<{ provider: string; model: string; allowed: boolean }>
   }>
   policyForProject(projectId: number): Awaitable<{

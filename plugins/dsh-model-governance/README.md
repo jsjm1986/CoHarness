@@ -4,9 +4,24 @@ English | [中文](README.zh.md)
 
 Tree-external per-instance policy plugin. It loads the gateway-generated `model-governance.json`, publishes a plain `ctx.modelAccess` service, enforces every `llm/stream` call before adapter dispatch, and commits usage to a crash-safe local outbox before reporting it to the bearer-authenticated loopback gateway intake. A running instance watches the policy's parent directory, so the Gateway's atomic replacement is applied without restarting the instance. Missing or malformed policy fails activation at boot; an invalid live replacement enters fail-closed mode until the next valid policy arrives.
 
-The emitted JavaScript has no external runtime imports beyond Node built-ins, so a copied production plugin does not load a second Cordis instance or depend on workspace resolution. `@deepseek-ai/dsh-llm`, `dsh-agent`, and `dsh-model-access` are compile-time contracts supplied by the host runtime.
+The emitted JavaScript has no external runtime imports beyond Node built-ins, so a copied production plugin does not load a second Cordis instance or depend on workspace resolution. `@deepseek-ai/dsh-llm`, `dsh-agent`, `dsh-model-access`, and `dsh-settings` are compile-time contracts supplied by the host runtime.
 
 Policy and usage records contain no API key or prompt/response content. Credential source is a non-secret layer id used only to distinguish company and personal cost. UUID-named outbox files are committed by same-directory rename and removed only after a successful intake response; intake deduplication makes retries safe.
+
+## Authorization decision order
+
+For each `(provider, model)` route, the plugin decides in this order:
+
+1. **Policy file unavailable** (invalid live reload) → deny with `POLICY_UNAVAILABLE`.
+2. **Route listed in the policy catalog** → the catalog entry's `allowed` flag decides (a catalog denial cannot be overturned by a user-layer declaration).
+3. **Route absent from the catalog and `userDeclaredAllowed` is `true`** → authorize if the instance's own settings user layer declares the provider (personal BYOK), deny otherwise.
+4. **Fallback to `defaultAllowed`** (the gateway now writes `false` for every role).
+
+A forbidden route terminates the stream with `MODEL_FORBIDDEN` before provider dispatch. The `userDeclaredAllowed` flag is written by the gateway: `true` for personal runtimes, `false` for shared project runtimes.
+
+## User-declared provider discovery
+
+The plugin tracks provider routes the user layer of the instance's own settings document carries. The set is refreshed from `ctx.llm.listConfigurableProviders()` and `ctx.settings.describe()` on every `llm/adapters-updated` and `settings/document-updated` event, so a user adding a provider through the Settings UI takes effect without a restart.
 
 ## Model Experience
 

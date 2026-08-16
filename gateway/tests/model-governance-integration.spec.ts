@@ -56,8 +56,12 @@ describe('model governance integration', () => {
     const { cfg, user, governance } = await fixture()
     governance.setUserAccess(user.id, 'p', 'm', false)
     const path = await writeModelGovernanceFile(cfg, governance, user)
-    const first = JSON.parse(readFileSync(path, 'utf8')) as { intakeToken: string; models: Array<{ allowed: boolean }> }
+    const first = JSON.parse(readFileSync(path, 'utf8')) as {
+      intakeToken: string; defaultAllowed: boolean; userDeclaredAllowed: boolean; models: Array<{ allowed: boolean }>
+    }
     expect(statSync(path).mode & 0o777).toBe(0o600)
+    expect(first.defaultAllowed).toBe(false)
+    expect(first.userDeclaredAllowed).toBe(true)
     expect(first.models[0]?.allowed).toBe(false)
     governance.setUserAccess(user.id, 'p', 'm', true)
     await writeModelGovernanceFile(cfg, governance, user)

@@ -71,6 +71,13 @@ export interface SessionSummary {
   updatedAt: number
   /** Current host-computed projection values retained by the object layer. */
   projectionValues?: Readonly<Partial<SessionProjectionMap>>
+  /**
+   * Collaboration visibility for this session in a project runtime.
+   * Present only for project-scoped sessions; personal scope omits it.
+   */
+  visibility?: 'project' | 'private'
+  /** Owning project id, when this session belongs to a project runtime. */
+  projectId?: number
 }
 
 /**

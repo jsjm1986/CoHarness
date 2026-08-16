@@ -42,3 +42,4 @@ worktrees/
 !plugins/dsh-model-governance/lib/index.js
 !plugins/dsh-model-governance/lib/outbox.js
 !plugins/dsh-model-governance/lib/policy.js
+!plugins/dsh-model-governance/lib/user-routes.js

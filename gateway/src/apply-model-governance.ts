@@ -37,6 +37,9 @@ async function writeProjection(
     ...policy,
     intakeUrl: `http://127.0.0.1:${cfg.intakePort}/usage`,
     intakeToken: token,
+    // A personal runtime honors user-declared (BYOK) routes; a shared project
+    // runtime stays catalog-only because members share one settings document.
+    userDeclaredAllowed: subject.kind === 'user',
   }
   const temp = `${path}.${process.pid}.${Date.now()}.tmp`
   writeFileSync(temp, JSON.stringify(body, null, 2), { mode: 0o600 })

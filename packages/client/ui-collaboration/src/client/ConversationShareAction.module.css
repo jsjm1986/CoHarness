@@ -110,3 +110,27 @@
     animation: none;
   }
 }
+
+/* Container: trigger button + participant summary row. */
+.shareAction {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+/* Horizontal participant summary row below the trigger button. */
+.participantRow {
+  max-width: 220px;
+  padding: 0 var(--dsw-space-2);
+  overflow: hidden;
+}
+
+.participantSummary {
+  color: var(--dsw-alias-label-caption);
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

@@ -240,6 +240,17 @@ export interface SessionSummary {
    * absence as "no title yet", exactly like a blank session.
    */
   projections?: SessionProjectionsBlock
+  /**
+   * Collaboration visibility for this session in a project runtime. Present
+   * only when the session is project-scoped and the collaboration service
+   * answered the visibility query; personal-scope sessions omit it.
+   */
+  visibility?: 'project' | 'private'
+  /**
+   * Owning project id, when this session belongs to a project runtime.
+   * Present only when the collaboration service identified the project.
+   */
+  projectId?: number
 }
 
 /** One session-content search result; display metadata stays owned by `session.list`. */

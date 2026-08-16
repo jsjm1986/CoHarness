@@ -27,6 +27,7 @@ async function drain(source: AsyncIterable<StreamChunk>): Promise<StreamChunk[]>
 }
 function policy(home: string, allowed: boolean): void {
   writeFileSync(join(home, 'model-governance.json'), JSON.stringify({ version: 1, defaultAllowed: false,
+    userDeclaredAllowed: false,
     models: [{ provider: 'p', model: 'm', allowed }], intakeUrl: 'http://127.0.0.1:1/usage', intakeToken: 'token' }))
 }
 
@@ -34,6 +35,7 @@ function replacePolicy(home: string, allowed: boolean): void {
   const path = join(home, 'model-governance.json')
   const temp = `${path}.tmp`
   writeFileSync(temp, JSON.stringify({ version: 1, defaultAllowed: false,
+    userDeclaredAllowed: false,
     models: [{ provider: 'p', model: 'm', allowed }], intakeUrl: 'http://127.0.0.1:1/usage', intakeToken: 'token' }))
   renameSync(temp, path)
 }

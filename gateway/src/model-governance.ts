@@ -185,7 +185,7 @@ export class ModelGovernanceService {
     return rows.map(row => ({ provider: row.provider, model: row.model, allowed: row.allowed === 1 }))
   }
 
-  policyFor(user: UserRow): { version: number; defaultAllowed: boolean; models: Array<{ provider: string; model: string; allowed: boolean }> } {
+  policyFor(user: UserRow): { version: number; defaultAllowed: false; models: Array<{ provider: string; model: string; allowed: boolean }> } {
     const rows = this.db.prepare(`SELECT m.provider,m.model,m.enabled,
       COALESCE(x.allowed,r.allowed,CASE WHEN ?='admin' THEN 1 ELSE 0 END) AS allowed
       FROM model_catalog m
@@ -196,7 +196,9 @@ export class ModelGovernanceService {
       }>
     return {
       version: Date.now(),
-      defaultAllowed: user.role === 'admin',
+      // The catalog is the sole authorization source for every role; unlisted
+      // routes fall through to the plugin's user-declared allowance instead.
+      defaultAllowed: false,
       models: rows.map(row => ({ provider: row.provider, model: row.model, allowed: row.enabled === 1 && row.allowed === 1 })),
     }
   }

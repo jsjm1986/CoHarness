@@ -25,6 +25,7 @@ function policy(defaultAllowed: boolean): GovernancePolicyFile {
   return {
     version: 1,
     defaultAllowed,
+    userDeclaredAllowed: false,
     models: [],
     intakeUrl: 'http://127.0.0.1:8899/usage',
     intakeToken: 'token',

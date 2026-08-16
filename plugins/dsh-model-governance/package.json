@@ -22,7 +22,8 @@
     "@deepseek-ai/cordis": "4.0.1",
     "@deepseek-ai/dsh-llm": "0.1.0-rc.5",
     "@deepseek-ai/dsh-model-access": "0.1.0-rc.5",
-    "@deepseek-ai/dsh-agent": "0.1.0-rc.5"
+    "@deepseek-ai/dsh-agent": "0.1.0-rc.5",
+    "@deepseek-ai/dsh-settings": "0.1.0-rc.5"
   },
   "devDependencies": {
     "@types/node": "22.20.0",

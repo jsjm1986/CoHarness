@@ -4,9 +4,24 @@
 
 树外的每实例策略插件。它读取网关生成的 `model-governance.json`，发布普通对象形式的 `ctx.modelAccess` 服务，在适配器派发前强制检查每次 `llm/stream` 调用，并先将用量提交到崩溃安全的本地 outbox，再上报到 Bearer 鉴权的回环网关 intake。运行中的实例会监视策略文件的父目录，因此 Gateway 原子替换策略后无需重启实例即可生效。启动时策略缺失或格式错误会令插件激活失败；运行中替换为无效文件时会进入 fail-closed 状态，直到下一份有效策略到达。
 
-编译后的 JavaScript 除 Node 内置模块外没有外部运行时 import，因此复制到生产目录的插件不会加载第二份 Cordis，也不依赖 workspace 解析。`@deepseek-ai/dsh-llm`、`dsh-agent` 与 `dsh-model-access` 是由宿主运行时提供的编译期契约。
+编译后的 JavaScript 除 Node 内置模块外没有外部运行时 import，因此复制到生产目录的插件不会加载第二份 Cordis，也不依赖 workspace 解析。`@deepseek-ai/dsh-llm`、`dsh-agent`、`dsh-model-access` 与 `dsh-settings` 是由宿主运行时提供的编译期契约。
 
 策略与用量记录不包含 API Key、提示词或回复内容。凭据来源只是用于区分公司与个人成本的非秘密层标识。以 UUID 命名的 outbox 文件通过同目录 rename 提交，仅在 intake 成功响应后删除；intake 去重使重试安全。
+
+## 授权判定顺序
+
+对每个 `(provider, model)` 路由，插件按以下顺序判定：
+
+1. **策略文件不可用**（运行中损坏）→ 拒绝 `POLICY_UNAVAILABLE`。
+2. **路由在治理目录中** → 按目录条目的 `allowed` 决定（目录 deny 不可被 user 层声明覆盖）。
+3. **路由不在目录且 `userDeclaredAllowed` 为 `true`** → 当实例的 settings user 层声明了该 provider 时放行（个人 BYOK），否则拒绝。
+4. **回退到 `defaultAllowed`**（网关现在对每个角色都写 `false`）。
+
+禁止的路由在 provider 派发前以 `MODEL_FORBIDDEN` 结束 stream。`userDeclaredAllowed` 由网关写入：个人运行时为 `true`，项目共享运行时为 `false`。
+
+## 用户声明 provider 的发现
+
+插件跟踪实例 settings 文档中 user 层声明的 provider 路由。集合在每次 `llm/adapters-updated` 和 `settings/document-updated` 事件时通过 `ctx.llm.listConfigurableProviders()` 和 `ctx.settings.describe()` 刷新，因此用户在设置 UI 中添加 provider 后无需重启即可生效。
 
 ## 模型体验
 

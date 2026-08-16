@@ -1076,6 +1076,8 @@ describePg('PostgreSQL baseline', () => {
       })
       await governance.setUserAccess(member.id, 'runtime', 'chat', false)
       expect((await governance.policyFor(member)).models[0]?.allowed).toBe(false)
+      expect((await governance.policyFor(member)).defaultAllowed).toBe(false)
+      expect((await governance.policyFor(admin)).defaultAllowed).toBe(false)
       await governance.setUserAccess(member.id, 'runtime', 'chat', null)
       await governance.setQuota('role', 'user', 10, 100)
       const intakeToken = await governance.issueIntakeToken({ kind: 'user', id: member.id })
@@ -1114,10 +1116,11 @@ describePg('PostgreSQL baseline', () => {
       })
       const projectPolicy = JSON.parse(await readFile(projectPolicyPath, 'utf8')) as {
         defaultAllowed: boolean
+        userDeclaredAllowed: boolean
         intakeToken: string
         models: Array<{ allowed: boolean }>
       }
-      expect(projectPolicy).toMatchObject({ defaultAllowed: false, models: [{ allowed: true }] })
+      expect(projectPolicy).toMatchObject({ defaultAllowed: false, userDeclaredAllowed: false, models: [{ allowed: true }] })
       expect(await governance.subjectForIntakeToken(projectPolicy.intakeToken))
         .toEqual({ kind: 'project', id: project.id })
       await governance.setQuota('project', String(project.id), 10, 100)

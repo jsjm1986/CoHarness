@@ -354,3 +354,16 @@
     transition: none;
   }
 }
+
+/* Private conversation badge: inline label after the session title. */
+.sessionRow .privateBadge {
+  flex: none;
+  margin-left: var(--dsw-space-1);
+  padding: 0 var(--dsw-space-1);
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-caption);
+  font-size: 10px;
+  line-height: 16px;
+  white-space: nowrap;
+}
