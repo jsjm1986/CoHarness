@@ -1,0 +1,32 @@
+.root {
+  margin: var(--dsw-space-1) 0;
+}
+
+.toggle {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+  padding: 2px 6px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: var(--dsw-radius-sm);
+}
+
+.toggle:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.body {
+  margin: var(--dsw-space-1) 0 0;
+  padding: var(--dsw-space-2);
+  max-height: 200px;
+  overflow: auto;
+  background: var(--dsw-alias-markdown-code-block);
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: var(--dsw-radius-sm);
+  font-family: var(--ds-font-family-code);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-primary);
+}

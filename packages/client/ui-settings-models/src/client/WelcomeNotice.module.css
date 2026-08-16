@@ -1,0 +1,37 @@
+.copy {
+  font-size: 14px;
+  line-height: 24px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.copy p {
+  margin: 0;
+}
+
+.copy p + p {
+  margin-top: var(--dsw-space-3);
+}
+
+.error {
+  margin: var(--dsw-space-4) 0 0;
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--dsw-space-6);
+}
+
+.primary {
+  min-width: 120px;
+}
+
+/* Compact-viewport tightening (below the 768 medium boundary, docs/web-styling.md). */
+@media (max-width: 767px) {
+  .primary {
+    width: 100%;
+  }
+}

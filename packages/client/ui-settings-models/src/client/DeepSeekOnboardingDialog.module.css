@@ -1,0 +1,17 @@
+.description {
+  margin: 0;
+  font-size: 14px;
+  line-height: 24px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.editor {
+  margin-top: var(--dsw-space-6);
+}
+
+/* Compact-viewport tightening (below the 768 medium boundary, docs/web-styling.md). */
+@media (max-width: 767px) {
+  .editor {
+    margin-top: var(--dsw-space-5);
+  }
+}

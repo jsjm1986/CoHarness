@@ -1,0 +1,52 @@
+.wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 var(--dsw-space-2);
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-layer-1);
+}
+
+.wrap:focus-within {
+  border-color: var(--dsw-alias-brand-primary);
+}
+
+.icon {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.input::placeholder {
+  color: var(--dsw-alias-label-dimmed);
+}
+
+/* Coarse pointers: 16px text keeps iOS Safari from zooming the page on
+   focus (it zooms any control below 16px); the wrap grows to fit. */
+@media (pointer: coarse) {
+  .wrap {
+    height: auto;
+    min-height: 40px;
+  }
+
+  .input {
+    font-size: 16px;
+    line-height: 24px;
+  }
+}

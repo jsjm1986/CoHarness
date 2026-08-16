@@ -1,0 +1,130 @@
+/* Full-viewport layer (figma Mask + Dialog 451:18655): mask + centered card. */
+.root {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--dsw-space-6);
+}
+
+/* User/spec mask: rgba(0,0,0,0.24) + blur(2px) via --dsw-alias-bg-mask-1 /
+   --dsw-mask-blur (light); dark theme raises mask opacity. */
+.mask {
+  position: absolute;
+  inset: 0;
+  background: var(--dsw-alias-bg-mask-1);
+  backdrop-filter: var(--dsw-mask-blur);
+}
+
+/* Dialog card: r24, shadow-lv3, layer-2 fill, inverted border, pb 24. */
+.dialog {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsw-space-5);
+  width: min(380px, 100%);
+  padding: 0 0 var(--dsw-space-6);
+  overflow: hidden;
+  border: 1px solid var(--dsw-alias-border-inverted);
+  border-radius: 24px;
+  background: var(--dsw-alias-bg-layer-2);
+  box-shadow: var(--dsw-shadow-lv3);
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+/* Header row (figma Title row): pad l24/t22/r14/b12, SPACE_BETWEEN —
+ * title left, close button right. */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--dsw-space-2);
+  padding: 22px 14px var(--dsw-space-3) var(--dsw-space-6);
+}
+
+.title {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 500; /* figma wt510, rendered 500 */
+  color: var(--dsw-alias-label-primary);
+}
+
+.close {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--dsw-radius-md);
+  background: transparent;
+  cursor: pointer;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.close:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+/* Compact viewports (below the 768 medium boundary, docs/web-styling.md):
+   the centered card becomes a bottom sheet — full width, top-only radius,
+   home-indicator clearance. Portal surface, so the threshold is a media
+   query rather than the frame's data-viewport stamp. */
+@media (max-width: 767px) {
+  .root {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .dialog {
+    width: 100%;
+    max-height: calc(100% - var(--dsw-space-8) - var(--dsw-safe-top));
+    padding-bottom: calc(var(--dsw-space-6) + var(--dsw-safe-bottom));
+    border-bottom: none;
+    border-radius: var(--dsw-radius-xl) var(--dsw-radius-xl) 0 0;
+  }
+}
+
+/* Coarse pointers get the full touch target on the close control. */
+@media (pointer: coarse) {
+  .close {
+    width: var(--dsw-touch-target);
+    height: var(--dsw-touch-target);
+  }
+}
+
+/* Description and body share the 332px content column (24px side pads). */
+.description {
+  margin: 0;
+  padding: 0 var(--dsw-space-6);
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 400;
+  color: var(--dsw-alias-label-primary);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin-top: var(--dsw-space-5);
+  padding: 0 var(--dsw-space-6);
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--dsw-space-2);
+  padding: 0 var(--dsw-space-6);
+}

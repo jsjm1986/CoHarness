@@ -1,0 +1,33 @@
+.dialog {
+  width: min(600px, 100%);
+  padding: 0;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 48px);
+  padding: var(--dsw-space-7);
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+.title {
+  margin: 0;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-primary);
+  outline: none;
+}
+
+.body {
+  margin-top: var(--dsw-space-5);
+}
+
+/* Compact-viewport tightening (below the 768 medium boundary, docs/web-styling.md). */
+@media (max-width: 767px) {
+  .content {
+    padding: var(--dsw-space-6);
+  }
+}

@@ -1,0 +1,30 @@
+# dsh-directory-guard bundle patch.
+#
+# 1. Mount the guard plugin so its tools/pre-execute listener is active.
+# 2. Re-state the regular-user permission-presets table WITHOUT
+#    danger-full-access. Gateway administrators append cordis.admin.patch.yml
+#    after this file. (A patch replaces the whole config, so every retained
+#    preset is restated.)
+- insert:
+    - id: directory-guard
+      name: '@deepseek-ai/dsh-directory-guard'
+    # Pin the in-app directory browser. Gateway instances bind 127.0.0.1 on
+    # a machine with a display, so -auto would mount the native OS chooser
+    # and open it on the host — invisible to a browser on the public domain.
+    - id: directory-picker-browse
+      name: '@deepseek-ai/dsh-host-directory-picker-browse'
+    - id: ui-directory-picker-browse
+      name: '@deepseek-ai/dsh-client-ui-directory-picker-browse'
+
+- id: directory-picker
+  disabled: true
+
+- id: permission
+  config:
+    presets:
+      read-only:
+        sandbox: read-only
+        approval: ask
+      workspace-write:
+        sandbox: workspace-write
+        approval: ask

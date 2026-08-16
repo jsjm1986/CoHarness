@@ -1,0 +1,9 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsw-space-4);
+}
+
+.actions {
+  margin-left: -6px;
+}
