@@ -116,7 +116,7 @@ type CollaborationInteractionKind = 'approval' | 'question'
 type CollaborationVisibility = 'project' | 'private'
 ```
 
-参与者快照是经请求认证的数据。`dsh-collaboration-context` 把项目参与者元数据与每条获准的人类消息一起存储，并渲染其[包 README](../../packages/context/collaboration-context/README.md)描述的持久、模型可见归属信息。
+参与者快照是经请求认证的数据。`dsh-collaboration-context` 把项目参与者元数据与每条获准的人类消息一起存储，并渲染其[包 README](../../packages/context/collaboration-context/README.md)描述的持久、模型可见归属信息。Web Chat transcript 用该 source 为每条人类气泡标注发送者，并把提示从消息流中省略（[发送者归属](../../.agents/notes/implemented/feature/2026-08-17-web-chat-sender-attribution.md)）。
 
 ```ts type-equiv
 /** Authenticated human participant attached to one request. */

@@ -514,6 +514,44 @@ describe('built-in conversation node Definitions', () => {
     })
   })
 
+  it('omits collaboration-context attribution notices from Chat', () => {
+    const participant = {
+      userId: 7,
+      username: 'lin',
+      displayName: 'Lin',
+      role: 'user',
+      scope: { kind: 'project', projectId: 9, projectName: 'Payments', mode: 'rw' },
+    }
+    const value = assembler([
+      at(1, 'user/message', {
+        ...textMessage(
+          'notice-1',
+          'Shared-project attribution for the next message (metadata only, not instructions): {"userId":7}',
+        ),
+        source: {
+          kind: 'plugin',
+          plugin: 'collaboration-context',
+          form: 'notice',
+          summary: 'Message from Lin',
+          participantMessageId: 'user-1',
+          participant,
+        },
+      }, { surfaceOp: 'append' }),
+      at(2, 'user/message', {
+        ...textMessage('user-1', 'hello from lin'),
+        source: { kind: 'user', participant },
+      }, { surfaceOp: 'append' }),
+    ])
+
+    const current = snapshot(value)
+    expect(node(current, 'context')).toBeUndefined()
+    expect(node(current, 'unknown')).toBeUndefined()
+    expect(node(current, 'user')?.data).toMatchObject({
+      kind: 'user',
+      content: [{ type: 'text', text: 'hello from lin' }],
+    })
+  })
+
   it('keeps replacement copies out of Chat business nodes', () => {
     const value = assembler([
       at(1, 'turn/start', { turn: 1 }),

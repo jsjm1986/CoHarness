@@ -5,6 +5,7 @@ import type {
 import {
   contextForm, contextProvenance, isAppendSurfaceEvent, isReplacementSurfaceEvent,
 } from '@deepseek-ai/dsh-client-runtime/client'
+import { isCollaborationAttributionNotice } from '../chat/message-sender.ts'
 import type { InboxState } from './inbox.ts'
 import { chatNode } from './common.ts'
 
@@ -71,6 +72,7 @@ export const messageDefinition: ConversationNodeDefinition<MessageNode> = {
   update: context => context.state,
   buildViewNode: (context) => {
     if (context.state === undefined) return null
+    if (isCollaborationAttributionNotice(context.state.source)) return null
     return chatNode(context, context.state.kind, context.state.seq, context.state)
   },
 }

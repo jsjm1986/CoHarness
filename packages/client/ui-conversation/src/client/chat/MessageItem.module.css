@@ -16,6 +16,27 @@
   min-width: 0;
   max-width: min(525px, 82%);
 }
+
+.sender {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: var(--dsw-space-2);
+  max-width: 100%;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.senderName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.senderRole {
+  flex: none;
+}
 .bubble {
   /* 525px cap inside the 736 column; percentage keeps narrow windows sane. */
   max-width: 100%;
