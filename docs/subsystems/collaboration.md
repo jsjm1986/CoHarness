@@ -116,7 +116,7 @@ A project root conversation is readable by every current project member when `pr
 type CollaborationVisibility = 'project' | 'private'
 ```
 
-The participant snapshot is request-authenticated data. `dsh-collaboration-context` stores project participant metadata with each admitted human message and renders the durable model-visible attribution described in its [package README](../../packages/context/collaboration-context/README.md).
+The participant snapshot is request-authenticated data. `dsh-collaboration-context` stores project participant metadata with each admitted human message and renders the durable model-visible attribution described in its [package README](../../packages/context/collaboration-context/README.md). The Web Chat transcript labels each human bubble from that source and omits the notice from the flow ([sender attribution](../../.agents/notes/implemented/feature/2026-08-17-web-chat-sender-attribution.md)).
 
 ```ts type-equiv
 /** Authenticated human participant attached to one request. */

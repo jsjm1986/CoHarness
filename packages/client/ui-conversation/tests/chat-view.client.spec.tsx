@@ -85,12 +85,12 @@ function makeSource(init?: Partial<ConversationSnapshot>) {
   }
 }
 
-const user = (seq: number, text: string): UserMessageNode => ({
+const user = (seq: number, text: string, source: unknown = null): UserMessageNode => ({
   kind: 'user',
   seq,
   time: seq * 1000,
   content: [{ type: 'text', text }] as never,
-  source: null,
+  source,
 })
 const assistant = (seq: number, text: string, turn = 1): AssistantMessageNode => ({
   kind: 'assistant', seq, time: seq * 1_000, turn, step: 1, blocks: [{ kind: 'text', text }],
@@ -708,6 +708,66 @@ describe('ChatView', () => {
     })
     const view = render(<h.ChatView {...h.props} />)
     expect(view.queryByText(/首 token|tok\/s/)).toBeNull()
+  })
+
+  it('labels a project user bubble with the participant display name', () => {
+    const h = makeHarness({
+      nodes: [user(1, 'hello from lin', {
+        kind: 'user',
+        participant: {
+          userId: 7, username: 'lin', displayName: 'Lin', role: 'user',
+          scope: { kind: 'project', projectId: 9, projectName: 'Payments', mode: 'rw' },
+        },
+      })],
+    })
+    const view = render(<h.ChatView {...h.props} />)
+    const sender = view.getByText('Lin').closest('[data-message-sender]')
+    expect(sender).not.toBeNull()
+    expect(sender!.textContent).toBe('Lin')
+    expect(view.getByText('hello from lin')).toBeTruthy()
+  })
+
+  it('appends the admin role to an administrator sender', () => {
+    const h = makeHarness({
+      nodes: [user(1, 'approve this', {
+        kind: 'user',
+        participant: {
+          userId: 1, username: 'root', displayName: 'Root', role: 'admin',
+          scope: { kind: 'project', projectId: 9, projectName: 'Payments', mode: 'rw' },
+        },
+      })],
+    })
+    const view = render(<h.ChatView {...h.props} />)
+    expect(view.getByText('Root').closest('[data-message-sender]')!.textContent).toBe('Root管理员')
+  })
+
+  it('omits a sender label when the source has no participant', () => {
+    const h = makeHarness({ nodes: [user(1, 'personal prompt')] })
+    const view = render(<h.ChatView {...h.props} />)
+    expect(view.container.querySelector('[data-message-sender]')).toBeNull()
+    expect(view.getByText('personal prompt')).toBeTruthy()
+  })
+
+  it('labels a durable steering bubble from the same participant source', () => {
+    const h = makeHarness({
+      nodes: [{
+        kind: 'steering',
+        messageId: 'steer-1' as never,
+        seq: 2,
+        time: 2_000,
+        content: [{ type: 'text', text: 'change course' }],
+        source: {
+          kind: 'user',
+          participant: {
+            userId: 8, username: 'zhou', displayName: 'Zhou', role: 'user',
+            scope: { kind: 'project', projectId: 9, projectName: 'Payments', mode: 'rw' },
+          },
+        },
+      }],
+    })
+    const view = render(<h.ChatView {...h.props} />)
+    expect(view.getByText('Zhou').closest('[data-message-sender]')).not.toBeNull()
+    expect(view.getByText('change course')).toBeTruthy()
   })
 
   it('user and assistant message containers scope the hover-revealed time chrome', () => {

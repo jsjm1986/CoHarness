@@ -24,7 +24,7 @@ Gateway 为个人 scope 的每个用户分配一个运行时，并为每个项�
 
 项目运行时用 `dsh-session-persistence-gateway` 取代本地 JSONL 提供方。它保留标准 [`SessionPersistence`](../architecture/2026-06-14-session-persistence.md) coordinator 语义，同时通过私有 Gateway API 把 header 和完整事件存入 [JSONB 基线](../architecture/2026-08-14-postgresql-jsonb-gateway-baseline.md)引入的 PostgreSQL 对话 repository。写入 API 与提供方响应解码器只接受事件字段 `type`、`seq`、`time`、`data`、`surfaceOp`、`sourceEventSeqs` 和 `ignorable`；消息事件必须带有效 append 或精确 replace 操作，纯日志事件拒绝 surface 元数据。提供方只保留 coordinator 明确支持的 pre-react-loop `steering/message` 读取例外。创建根时记录已认证创建者和请求的可见性；注册子会话时复制已锁定的根 ACL。幂等 append 批次保持事件序列连续、崩溃修复和重试语义。个人运行时保留其配置的本地持久化和[按项目分组的会话目录](../architecture/2026-07-24-project-session-directories.md)行为。
 
-每条获准的人类消息都会附上已认证项目参与者元数据，并存入普通 `user/message` source。`dsh-collaboration-context` 在 `agent/pre-step` waterfall 委托后，立即在该消息前插入一条持久、模型可见的元数据提示，因此模型能够区分贡献者，回放也能重建相同归属。PostgreSQL 从已提交事件投影参与者和贡献次数；后续账户或成员身份编辑不会重写历史归属。
+每条获准的人类消息都会附上已认证项目参与者元数据，并存入普通 `user/message` source。`dsh-collaboration-context` 在 `agent/pre-step` waterfall 委托后，立即在该消息前插入一条持久、模型可见的元数据提示，因此模型能够区分贡献者，回放也能重建相同归属。Web Chat transcript 用同一份 source 为每条人类气泡标注发送者，并把该提示从消息流中省略（[发送者归属](2026-08-17-web-chat-sender-attribution.md)）。PostgreSQL 从已提交事件投影参与者和贡献次数；后续账户或成员身份编辑不会重写历史归属。
 
 `dsh-client-ui-collaboration` 负责浏览器 scope 选择器、新根对话可见性选择、对话可见性/创建者/参与者菜单，以及供 `ro` 成员使用的完整只读 composer 替换。它使用已有 Client slot 和 `sessions/prepare-create` waterfall，而不修改对话 shell。New Session 会在考虑空白候选项之前运行该 waterfall，随后 `sessions/confirm-blank-reuse` 会让插件通过 Gateway 重新校验候选项的根可见性；只有可见性完全匹配时才允许复用。切换 scope 会刷新页面，因为个人与项目 scope 指向不同 Host 进程。共享项目运行时把 Host 设置暴露为只读：设置消费方不会尝试修改，欢迎提示只在当前 Client 进程内保留确认，因此整页重新加载后会再次显示。浏览器控件只提供操作入口；签名 principal、Host 授权、内部 API 和 PostgreSQL 事务仍具有权威性。
 
@@ -38,7 +38,7 @@ Linux systemd 单元会先用只读临时文件系统遮蔽用户根、项目运
 
 ## 验证
 
-包测试覆盖 principal 与启动凭据验证、提供方 dispose、严格事件响应解码、根继承 ACL、参与者归属与 invariant、Gateway 持久化行为、Client 状态与组件行为、空白会话可见性兼容性、只读欢迎确认回退，以及 `ro` composer 替换。Gateway 测试覆盖 systemd 遮蔽与回绑、项目根校验、运行时写入 envelope 拒绝、配置端口解析，以及管理员访问尚未物化的私密根对话。Host/API Proxy 测试覆盖各类会话操作拒绝、可读列表过滤、参与者传播、根创建可见性，以及审批/问题原子抢占。真实 PostgreSQL 测试覆盖直到版本 5 的 migration、包含项目邀请的可重复 SQLite 导入、完整 JSON 事件往返、从空节点配置端口基准分配共享运行时、创建者/私密可见性、无项目成员记录时基于当前角色的管理员覆盖、子会话继承、贡献投影、成员移除保护、交互竞态、项目凭据、项目用量和显式项目额度模式。Gateway 与 permission 测试覆盖按来源筛选的 Admin 视图、用户项目与邀请生命周期、管理员在个人和项目 scope 中的 `fullAccess`，以及拒绝管理员专用的新会话默认值。无密钥组装态 Web 浏览器场景通过交付的 Client 组合覆盖项目 scope、可见性控件、参与者展示、拒绝不匹配空白会话与复用匹配空白会话、`ro` 体验和进程内欢迎确认。生产构建入口会在每个组件构建后验证完整运行时载荷。
+包测试覆盖 principal 与启动凭据验证、提供方 dispose、严格事件响应解码、根继承 ACL、参与者归属与 invariant、Gateway 持久化行为、Client 状态与组件行为、空白会话可见性兼容性、只读欢迎确认回退，以及 `ro` composer 替换。Gateway 测试覆盖 systemd 遮蔽与回绑、项目根校验、运行时写入 envelope 拒绝、配置端口解析，以及管理员访问尚未物化的私密根对话。Host/API Proxy 测试覆盖各类会话操作拒绝、可读列表过滤、参与者传播、根创建可见性，以及审批/问题原子抢占。真实 PostgreSQL 测试覆盖直到版本 5 的 migration、包含项目邀请的可重复 SQLite 导入、完整 JSON 事件往返、从空节点配置端口基准分配共享运行时、创建者/私密可见性、无项目成员记录时基于当前角色的管理员覆盖、子会话继承、贡献投影、成员移除保护、交互竞态、项目凭据、项目用量和显式项目额度模式。Gateway 与 permission 测试覆盖按来源筛选的 Admin 视图、用户项目与邀请生命周期、管理员在个人和项目 scope 中的 `fullAccess`，以及拒绝管理员专用的新会话默认值。无密钥组装态 Web 浏览器场景通过交付的 Client 组合覆盖项目 scope、可见性控件、参与者展示、拒绝不匹配空白会话与复用匹配空白会话、`ro` 体验、进程内欢迎确认，以及 Chat 发送者标签。生产构建入口会在每个组件构建后验证完整运行时载荷。
 
 ## 曾考虑的替代方案
 

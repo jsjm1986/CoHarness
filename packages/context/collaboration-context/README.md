@@ -10,6 +10,7 @@ Durable model-visible participant attribution for shared project conversations. 
 - Each inserted `user/message` uses plugin source `collaboration-context`, cites the following participant message id, and stores the same participant snapshot. The package invariant requires the pair to remain adjacent, text-identical to the renderer, and scoped to a project participant.
 - Malformed participant metadata throws before model admission instead of silently dropping attribution. Personal messages and messages without participant metadata pass through unchanged.
 - The listener delegates through the `agent/pre-step` waterfall first, then transforms the final admitted messages so later policy cannot separate the notice from the participant message.
+- The Web Chat transcript does not render this notice; it labels the following human bubble from the same participant snapshot ([decision](../../../.agents/notes/implemented/feature/2026-08-17-web-chat-sender-attribution.md)).
 
 ## Model Experience
 

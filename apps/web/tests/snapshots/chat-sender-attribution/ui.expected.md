@@ -1,0 +1,36 @@
+- text: Zhou ZHOU_PROMPT 7/25 {{clock}}
+- button "Copy":
+  - img
+- paragraph: ZHOU_REPLY
+- button "Copy":
+  - img
+- button "Good response":
+  - img
+- button "Bad response":
+  - img
+- button "Branch into a new conversation":
+  - img
+- text: 7/25 {{clock}} Ran for {{duration}} Lin admin LIN_PROMPT 7/25 {{clock}}
+- button "Copy":
+  - img
+- paragraph: LIN_REPLY
+- button "Copy":
+  - img
+- button "Good response":
+  - img
+- button "Bad response":
+  - img
+- button "Branch into a new conversation":
+  - img
+- text: 7/25 {{clock}} Ran for {{duration}}
+- textbox "Message the agent"
+- button "Add images or documents":
+  - img
+- button "Commands":
+  - img
+- 'button "Access mode, current: Workspace Write"': Workspace Write
+- button "Select model, current DeepSeek-V4-Flash":
+  - text: DeepSeek-V4-Flash
+  - img
+- button "Send message" [disabled]
+- text: 2 turns · 2 steps LLM {{duration}}

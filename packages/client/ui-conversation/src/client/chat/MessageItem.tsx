@@ -15,6 +15,7 @@ import { messageImageLabels } from '../image-labels.ts'
 import { CompactionItem } from './CompactionItem.tsx'
 import { ContextInjectionRow } from './ContextInjectionRow.tsx'
 import { MessageIconActions } from './MessageIconActions.tsx'
+import { messageSender } from './message-sender.ts'
 import css from './MessageItem.module.css'
 
 type UserImage = Extract<UserMessageNode['content'][number], { type: 'image' }>
@@ -177,9 +178,10 @@ function projectUserText(text: string): ReactNode {
 
 /** Right-aligned bubble shared by user and steering rows. */
 function UserStyleBubble({
-  content, imageLoader, actions, pending = false, t,
+  content, source, imageLoader, actions, pending = false, t,
 }: {
   content: readonly unknown[]
+  source?: unknown
   imageLoader: ImageLoader
   /** Optional IconActions (or similar) below the bubble; receives the joined text. */
   actions?: (text: string) => ReactNode
@@ -190,9 +192,16 @@ function UserStyleBubble({
   const { text, images, rest } = contentParts(content)
   const truncated = (total: number): string => t('json.truncated', { total })
   const showBubble = text !== '' || rest.length > 0
+  const sender = messageSender(source)
   return (
     <div className={css.userRow} data-pending-steering={pending || undefined} data-time-hover-root>
       <div className={css.userStack}>
+        {sender !== undefined && (
+          <div className={css.sender} data-message-sender>
+            <span className={css.senderName}>{sender.name}</span>
+            {sender.admin && <span className={css.senderRole}>{t('participant.admin')}</span>}
+          </div>
+        )}
         <ImageGallery images={images} load={imageLoader} align="end" labels={messageImageLabels(t)} />
         {showBubble && <div className={css.bubble}>
           {projectUserText(text)}
@@ -242,6 +251,7 @@ export const UserMessageNodeView = memo(function UserMessageNodeView({
   return (
     <UserStyleBubble
       content={data.content}
+      source={data.source}
       imageLoader={loadImage}
       t={t}
       actions={text => (
