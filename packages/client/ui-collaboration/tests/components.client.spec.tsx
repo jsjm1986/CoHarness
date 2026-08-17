@@ -190,9 +190,9 @@ describe('ConversationShareAction', () => {
     fireEvent.click(trigger)
     expect(refresh).toHaveBeenCalledOnce()
     expect(screen.getByText('创建者：林工')).toBeTruthy()
-    expect(screen.getByText('参与者（2）')).toBeTruthy()
-    expect(screen.getByText('3 次参与')).toBeTruthy()
-    expect(screen.getByText('1 次参与')).toBeTruthy()
+    expect(screen.getAllByText('参与者（2）').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('3 次参与').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('1 次参与').length).toBeGreaterThan(0)
     fireEvent.click(screen.getByRole('menuitem', { name: /仅自己/ }))
     expect(setVisibility).toHaveBeenCalledWith('private')
     fireEvent.click(trigger)
@@ -229,7 +229,7 @@ describe('ConversationShareAction', () => {
       conversations: { child: { status: 'ready', saving: false, detail: privateDetail } },
     }))} />)
     fireEvent.click(screen.getByRole('button', { name: '管理对话共享范围' }))
-    expect(screen.getByText('暂无其他参与者')).toBeTruthy()
+    expect(screen.getAllByText('暂无其他参与者').length).toBeGreaterThan(0)
     expect(screen.getByText('只有创建者可以更改共享范围')).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: /项目公开/ }).hasAttribute('disabled')).toBe(true)
 

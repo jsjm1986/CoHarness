@@ -37,10 +37,16 @@ function participantLabel(
 ) {
   return (
     <span className={css.participantText}>
-      <span className={css.participantName}>{participant.displayName}</span>
-      <span className={css.participantMeta}>{contributions(participant.contributionCount)}</span>
+      <span className={css.menuName}>{participant.displayName}</span>
+      <span className={css.participantMetaText}>{contributions(participant.contributionCount)}</span>
     </span>
   )
+}
+
+function formatParticipantPreview(participants: ConversationParticipant[]) {
+  const visibleParticipants = participants.slice(0, 3)
+  const overflowCount = participants.length - visibleParticipants.length
+  return { visibleParticipants, overflowCount }
 }
 
 /**
@@ -150,9 +156,7 @@ export function ConversationShareAction({
   )
 
   const triggerTitle = access.canManage ? t('conversation.aria') : t('conversation.manageDenied')
-  const participantSummary = participants.length > 3
-    ? participants.slice(0, 3).map(p => p.displayName).join('、') + ' +' + String(participants.length - 3)
-    : participants.map(p => p.displayName).join('、')
+  const { visibleParticipants, overflowCount } = formatParticipantPreview(participants)
   return (
     <div className={css.shareAction}>
       <Menu
@@ -192,11 +196,26 @@ export function ConversationShareAction({
           </button>
         )}
       />
-      {participants.length > 0 && (
-        <div className={css.participantRow}>
-          <span className={css.participantSummary}>{participantSummary}</span>
+      <div className={css.participantMetaPanel}>
+        <div className={css.participantMetaHeader}>
+          <span className={css.participantMetaTitle}>
+            {t('conversation.participants', { count: participants.length })}
+          </span>
         </div>
-      )}
+        {participants.length === 0 ? (
+          <span className={css.participantMetaEmpty}>{t('conversation.noParticipants')}</span>
+        ) : (
+          <div className={css.participantList}>
+            {visibleParticipants.map(participant => (
+              <span key={participant.userId} className={css.participantChip}>
+                <span className={css.participantName}>{participant.displayName}</span>
+                <span className={css.participantMetaCount}>{t('conversation.contributions', { count: participant.contributionCount })}</span>
+              </span>
+            ))}
+            {overflowCount > 0 && <span className={css.participantMore}>+{overflowCount}</span>}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
