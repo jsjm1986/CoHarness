@@ -2278,6 +2278,30 @@ describe('continuable errors', () => {
     await waitNoActivation(ctx, started.childId)
   })
 
+  it('records and reapplies the latest logged parent route on cold resume', async () => {
+    const { ctx, parent, adapter } = await setup([textResponse('first'), textResponse('resumed')])
+    parkParent(ctx, parent)
+    parent.session.append('request/header', {
+      header: { config: { provider: 'mock', model: 'current-model' } },
+      reason: 'initial',
+    })
+
+    const started = await ctx.subagents.startContinuable(startSpec(parent))
+    await waitNoActivation(ctx, started.childId)
+    const loaded = await ctx.sessionPersistence.load(started.childId)
+    expect(loaded.events.find(event => event.type === 'subagent/descriptor')?.data)
+      .toMatchObject({ agentProvider: 'mock', agentModel: 'current-model' })
+    expect(adapter.requests[0]?.model).toBe('current-model')
+
+    await followup(ctx, parent, started.childId, message('again'))
+    await vi.waitFor(() => {
+      expect(ctx.agents.get(started.childId)?.options.model).toBe('current-model')
+    })
+    await vi.waitFor(() => { expect(adapter.requests).toHaveLength(2) })
+    expect(adapter.requests[1]?.model).toBe('current-model')
+    await waitNoActivation(ctx, started.childId)
+  })
+
   it('unloading the manager drains its live activations', async () => {
     const hold = Promise.withResolvers<undefined>()
     const adapter = new GatedAdapter([{ chunks: textResponse('child'), gate: hold.promise }])

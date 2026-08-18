@@ -1,0 +1,11 @@
+# Snapshot overlay: make the root's first effective request use the pro model
+# while leaving its creation option on flash, so child inheritance must consult
+# the logged request target rather than the static creation table.
+- id: base
+  name: '@deepseek-ai/cordis-plugin-include'
+  config:
+    path: ./cordis.yml
+    patches:
+      - insert:
+          - id: subagent-current-model
+            name: './tests/fixtures/subagent-current-model.ts'

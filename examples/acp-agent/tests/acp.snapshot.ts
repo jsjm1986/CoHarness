@@ -56,6 +56,9 @@ const SUBAGENT_DURABILITY_FAILURE_CONFIG = fileURLToPath(
 const SUBAGENT_CONTINUABLE_INHERITANCE_CONFIG = fileURLToPath(
   new URL('../subagent-continuable-inheritance.cordis.yml', import.meta.url),
 )
+const SUBAGENT_CURRENT_MODEL_CONFIG = fileURLToPath(
+  new URL('../subagent-current-model.cordis.yml', import.meta.url),
+)
 const LSP_CONFIG = fileURLToPath(new URL('./lsp.cordis.yml', import.meta.url))
 const WEB_CONFIG = fileURLToPath(new URL('../web.cordis.yml', import.meta.url))
 const FS_SEARCH_CONFIG = fileURLToPath(new URL('./fs-search.cordis.yml', import.meta.url))
@@ -396,6 +399,17 @@ const SCENARIOS: Scenario[] = [
   // Windows bash process-tree kill is deferred with the Bash execution domain.
   { name: 'cancel-tool-calls', hasModelTurn: true, recorded: false, overridden: true, posixOnly: true },
   { name: 'subagent-spawn-in-process', hasModelTurn: true, recorded: true },
+  {
+    name: 'subagent-current-model',
+    hasModelTurn: true,
+    recorded: false,
+    pinsHeader: true,
+    headerClass: 'subagent-current-model',
+    systemPromptSource: 'text-turn',
+    toolSchemasSource: 'text-turn',
+    pinsChildSystemPrompts: [1],
+    configPath: SUBAGENT_CURRENT_MODEL_CONFIG,
+  },
   // Keyless authored scenario: the child ends at max-tokens with an empty
   // usage-only assistant/message after earlier text and a tool call. The
   // parent's tool result must retain that assistant output and stop reason.
