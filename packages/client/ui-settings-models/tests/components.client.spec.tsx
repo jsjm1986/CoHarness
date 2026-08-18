@@ -183,7 +183,10 @@ function scriptedFace(overrides: {
 
 type WireFace = ConstructorParameters<typeof ModelsSettingsStore>[0]
 
-async function mountFace(scripted: ReturnType<typeof scriptedFace>) {
+async function mountFace(
+  scripted: ReturnType<typeof scriptedFace>,
+  section: Pick<ModelsSectionProps, 'managementScope' | 'providerIdPattern'> = {},
+) {
   const { face, update, replace, mutate, set, unset } = scripted
   const controller = new ModelsSettingsStore(face as unknown as WireFace)
   await controller.load()
@@ -193,7 +196,7 @@ async function mountFace(scripted: ReturnType<typeof scriptedFace>) {
     api: face as never,
     t,
   }
-  const view = render(<ModelsSection {...injected} />)
+  const view = render(<ModelsSection {...injected} {...section} />)
   return { view, face, update, replace, mutate, set, unset, controller }
 }
 
@@ -252,6 +255,16 @@ describe('ModelsSection', () => {
     expect(screen.getByText(en.organizationNoModels)).toBeTruthy()
     expect(screen.getByText(en.organizationCatalogFailed)).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Edit Organization (org-primary)' })).toBeNull()
+  })
+
+  it('scopes the page to organization routes and hides personal rows', async () => {
+    await mountFace(scriptedFace(), {
+      managementScope: 'organization',
+      providerIdPattern: /^org-[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/,
+    })
+    expect(screen.queryByRole('heading', { name: en.organizationTitle })).toBeNull()
+    expect(screen.queryByText('openai')).toBeNull()
+    expect(screen.queryByText('DeepSeek')).toBeNull()
   })
 
   it('renders the unkeyed whole-section provider as an open setup card in the first-run posture', async () => {
@@ -680,6 +693,35 @@ describe('ModelsSection', () => {
     expect(screen.getByText(en.modelsInherited)).toBeTruthy()
     expect(screen.getAllByLabelText(new RegExp(en.modelId)).map(input => (input as HTMLInputElement).value))
       .toEqual(base === undefined ? ['deepseek-v4-flash', 'deepseek-v4-pro'] : ['pinned-by-deployment'])
+  })
+
+  it('keeps the organization catalog override instead of offering a personal restore', async () => {
+    const { face } = scriptedFace()
+    const stored = { models: [{ id: 'org-only-model', name: 'Org Only' }] }
+    const overridden: SettingsNamespaceView = {
+      ns: 'llm-deepseek',
+      schema: JSON.parse(JSON.stringify(DeepSeekConfig.toJSON())) as unknown,
+      value: { ...stored, defaultContextWindow: 1_000_000 },
+      user: stored,
+      applies: 'live',
+      secrets: [],
+      revision: 0,
+    }
+    const { ProviderEditor } = await import('../src/client/ProviderEditor.tsx')
+    render(<ProviderEditor
+      provider="org-primary"
+      displayName="Organization"
+      namespace={overridden}
+      settingsPath={[]}
+      api={face as never}
+      t={t}
+      readOnly={false}
+      credentialScope="organization"
+      onClose={() => {}}
+    />)
+    fireEvent.click(screen.getByText(en.customized))
+    expect(screen.getByText(en.modelsCustomized)).toBeTruthy()
+    expect(screen.queryByText(en.resetModels)).toBeNull()
   })
 
   it('keeps every row\'s unreadable text, not just the last one edited', async () => {
