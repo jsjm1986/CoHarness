@@ -54,6 +54,8 @@ describe('loadConfig', () => {
       HGW_RUNTIME_API_BODY_LIMIT_BYTES: '8388608',
       HGW_FCM_PROJECT_ID: '  firebase-project  ',
       HGW_FCM_SERVICE_ACCOUNT_FILE: '  /srv/harness/firebase.json  ',
+      HGW_JPUSH_APP_KEY: '  jpush-app-key  ',
+      HGW_JPUSH_MASTER_SECRET: '  jpush-master-secret  ',
     })
     expect(cfg.port).toBe(9001)
     expect(cfg.organizationSlug).toBe('internal')
@@ -66,7 +68,16 @@ describe('loadConfig', () => {
     expect(cfg.runtimeApiBodyLimitBytes).toBe(8 * 1024 * 1024)
     expect(cfg.fcmProjectId).toBe('firebase-project')
     expect(cfg.fcmServiceAccountFile).toBe('/srv/harness/firebase.json')
+    expect(cfg.jpushAppKey).toBe('jpush-app-key')
+    expect(cfg.jpushMasterSecret).toBe('jpush-master-secret')
     expect(cfg.secureCookies).toBe(true)
+  })
+
+  it('requires both JPush credentials when JPush delivery is enabled', () => {
+    expect(() => loadConfig({ HGW_JPUSH_APP_KEY: 'app-key' }))
+      .toThrow(/HGW_JPUSH_APP_KEY and HGW_JPUSH_MASTER_SECRET/)
+    expect(() => loadConfig({ HGW_JPUSH_MASTER_SECRET: 'master-secret' }))
+      .toThrow(/HGW_JPUSH_APP_KEY and HGW_JPUSH_MASTER_SECRET/)
   })
 
   it('rejects a project runtime account that systemd cannot address', () => {

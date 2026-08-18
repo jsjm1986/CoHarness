@@ -4,21 +4,23 @@ Status: implemented
 
 English | [中文](2026-08-17-android-remote-web-fcm-notifications.zh.md)
 
+The JPush and domestic-channel extension is recorded in [Android JPush multi-provider delivery](2026-08-18-android-jpush-multi-provider-delivery.md).
+
 ## Problem
 
 The Web UI needs a simple Android installation path and a phone notification when an AI reply finishes. Rebuilding an APK for every Web UI change would make the wrapper expensive to operate, while sending complete replies through a mobile notification would expose conversation content outside the authenticated UI.
 
 ## Decision
 
-The Android application is a Capacitor shell whose `server.url` points at the deployed HTTPS Web UI. The shell contains only the native project and push capability; ordinary Web UI releases remain server-side and do not require an APK rebuild. A new native plugin, permission, application id, icon, or notification-handling behavior requires `cap sync` and a new build.
+The Android application is a Capacitor shell whose `server.url` points at the deployed HTTPS Web UI. The shell contains only the native project and push capability; ordinary Web UI releases remain server-side and do not require an APK rebuild. The application id is fixed at `com.coharness`; changing it creates a new Android package and requires a new Firebase client registration. A new native plugin, permission, icon, or notification-handling behavior requires `cap sync` and a new build.
 
 The shell remains a private workspace application rather than an npm release member. The root workspace includes it for dependency resolution and local commands, while release discovery and npm baseline packing exclude `apps/android-shell`.
 
-The Web UI registers an Android FCM token after the authenticated user grants notification permission and stores it through `/account/api/push-devices`. PostgreSQL records organization, user, token, platform, and device metadata. A token is unique within an organization, and deletion requires the owning authenticated user. Firebase service-account JSON stays on the Gateway host and is never committed or sent to the Web client.
+The Web UI registers an Android FCM token after the authenticated user grants notification permission and stores it through `/account/api/push-devices`; the later JPush extension uses the same route with a provider tag. PostgreSQL records organization, user, provider, token, platform, and device metadata. A registration is unique within an organization and provider, and deletion requires the owning authenticated user. Firebase service-account JSON stays on the Gateway host and is never committed or sent to the Web client.
 
 The Gateway notifies only the conversation creator's registered devices. It schedules a notification after a conversation append returns `inserted` and the appended events contain `turn/end` with `data.reason.kind === 'completed'`; duplicate appends and non-completed endings do not schedule a second notification. The payload contains only the session id and event sequence, so the app opens the existing authenticated Web UI instead of placing reply text in the notification.
 
-`push_deliveries` records one delivery key per organization, session, event sequence, and device. A sent record is not claimed again, and FCM responses identifying an unregistered token remove that token. The first implementation sends asynchronously after persistence and logs failures; it does not add a background outbox worker, so a process exit between the append and the send can lose a notification without losing the conversation.
+`push_deliveries` records one delivery key per organization, session, event sequence, and device. A sent record is not claimed again, and a provider response identifying an invalid registration removes that registration. The first implementation sends asynchronously after persistence and logs failures; it does not add a background outbox worker, so a process exit between the append and the send can lose a notification without losing the conversation.
 
 ## Alternatives considered
 
@@ -34,8 +36,8 @@ The Gateway notifies only the conversation creator's registered devices. It sche
 
 ## Consequences
 
-The Android package stays small and stable while Web UI deployments remain independent. Users must grant Android notification permission and the Gateway deployment must provide a Firebase Android app registration plus an owner-only service-account file. Notifications are creator-scoped rather than broadcast to every project member, and they are hints that open the authoritative conversation history.
+The Android package stays small and stable while Web UI deployments remain independent. Users must grant Android notification permission, and the Gateway deployment provides the credentials for whichever push providers are enabled. Notifications are creator-scoped rather than broadcast to every project member, and they are hints that open the authoritative conversation history.
 
 ## Verification
 
-Gateway unit tests cover FCM request fields, token registration and ownership checks, delivery idempotency, invalid-token removal, configuration, HTTP authentication, and completed-event filtering. PostgreSQL integration tests assert migration 008 and both push tables when `HGW_TEST_DATABASE_URL` is configured. The Android shell fallback build and Capacitor project generation run without Firebase credentials; release assembly additionally requires the deployment's `google-services.json` and a Java/Android SDK toolchain.
+Gateway unit tests cover FCM request fields, token registration and ownership checks, delivery idempotency, invalid-token removal, configuration, HTTP authentication, and completed-event filtering. PostgreSQL integration tests assert migration 008 and both push tables when `HGW_TEST_DATABASE_URL` is configured. The Android shell fallback build and Capacitor project generation run without Firebase credentials; release assembly additionally requires the deployment's client configuration files and a Java/Android SDK toolchain.

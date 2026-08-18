@@ -74,6 +74,10 @@ export interface GatewayConfig {
   fcmProjectId?: string
   /** Owner-only Firebase service-account JSON file used for FCM HTTP v1. */
   fcmServiceAccountFile?: string
+  /** JPush application key used by the Gateway REST sender. */
+  jpushAppKey?: string
+  /** Owner-only JPush master secret used by the Gateway REST sender. */
+  jpushMasterSecret?: string
 }
 
 const gatewayRoot = resolve(import.meta.dirname, '..')
@@ -190,6 +194,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   if (!Number.isSafeInteger(instancePortBase) || instancePortBase < 1024 || instancePortBase > 65535) {
     throw new Error('HGW_INSTANCE_PORT_BASE must be an integer between 1024 and 65535')
   }
+  const jpushAppKey = env.HGW_JPUSH_APP_KEY?.trim() || undefined
+  const jpushMasterSecret = env.HGW_JPUSH_MASTER_SECRET?.trim() || undefined
+  if ((jpushAppKey === undefined) !== (jpushMasterSecret === undefined)) {
+    throw new Error('HGW_JPUSH_APP_KEY and HGW_JPUSH_MASTER_SECRET must be configured together')
+  }
   return {
     port,
     organizationSlug: env.HGW_ORGANIZATION_SLUG ?? 'default',
@@ -227,5 +236,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     defaultEnvFile: env.HGW_DEFAULT_ENV_FILE ?? '',
     fcmProjectId: env.HGW_FCM_PROJECT_ID?.trim() || undefined,
     fcmServiceAccountFile: env.HGW_FCM_SERVICE_ACCOUNT_FILE?.trim() || undefined,
+    jpushAppKey,
+    jpushMasterSecret,
   }
 }

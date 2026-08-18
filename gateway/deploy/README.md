@@ -31,9 +31,13 @@ Stop the existing Gateway before the final import so no SQLite write can race th
 
 Keep the frozen SQLite backup and the exact pre-cutover Gateway artifact together. Rollback stops the PostgreSQL Gateway, restores those two artifacts, and starts only the SQLite version. Do not copy a live WAL database, run both versions simultaneously, or attempt to merge PostgreSQL writes back into SQLite. PostgreSQL remains preserved for diagnosis and a later clean cutover.
 
-## Android shell and FCM
+## Android shell and push providers
 
-Create a Firebase project and register the Android application id `com.deepseek.harness`. Download `google-services.json` into `apps/android-shell/android/app/google-services.json`; keep that client configuration with the Android build inputs and do not commit the Gateway service-account JSON. Store the service-account JSON on the Gateway host with mode `0600`, set `HGW_FCM_PROJECT_ID` and `HGW_FCM_SERVICE_ACCOUNT_FILE` in the Gateway service environment, and apply PostgreSQL migration 008 through the normal startup migration.
+The Android application id is `com.coharness`. Register that exact id in JPush and, when used, Firebase and Huawei consoles. The shell can use JPush alone or combine it with FCM and optional vendor channels. Keep all credentials outside Git.
+
+For JPush, set `JPUSH_APPKEY` as a Gradle property or environment variable when building. The shell initializes JPush only after Android notification permission is granted and remembers that consent for later launches. The module defaults to JPush `6.2.0`; enable vendor plugins with `JPUSH_ENABLE_HUAWEI`, `JPUSH_ENABLE_FCM`, `JPUSH_ENABLE_XIAOMI`, `JPUSH_ENABLE_OPPO`, `JPUSH_ENABLE_VIVO`, `JPUSH_ENABLE_MEIZU`, or `JPUSH_ENABLE_HONOR`. Huawei requires `apps/android-shell/android/app/agconnect-services.json`; FCM requires `apps/android-shell/android/app/google-services.json`. These files are deployment inputs and must not be committed.
+
+For Gateway delivery, store the JPush Master Secret and any Firebase service-account JSON on the host with mode `0600`. Set `HGW_JPUSH_APP_KEY` and `HGW_JPUSH_MASTER_SECRET` together for JPush. For FCM also set `HGW_FCM_PROJECT_ID` and `HGW_FCM_SERVICE_ACCOUNT_FILE`. Normal Gateway startup applies PostgreSQL migration 010, which keeps FCM and JPush registrations unique per provider.
 
 Build the shell against the deployed Web UI with a Java/Android SDK toolchain. For the current deployment use `DSH_ANDROID_WEB_URL=https://harness.maycran.com/ pnpm --dir apps/android-shell run build` and `DSH_ANDROID_WEB_URL=https://harness.maycran.com/ pnpm --dir apps/android-shell run cap:sync`, then `cd apps/android-shell/android && ./gradlew assembleRelease`. Publishing ordinary Web UI assets does not require another APK; rebuild only for native project, permission, package, icon, or notification-handler changes. A completed AI turn sends the creator's devices a notification containing the session id and event sequence, and tapping it opens the existing Web UI session.
 

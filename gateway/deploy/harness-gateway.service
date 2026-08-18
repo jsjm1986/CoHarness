@@ -38,6 +38,10 @@ Environment=HGW_DEFAULT_ENV_FILE=/srv/harness/gateway-data/company.env
 # setting the project id from the Firebase project configuration:
 # Environment=HGW_FCM_PROJECT_ID=<firebase-project-id>
 # Environment=HGW_FCM_SERVICE_ACCOUNT_FILE=/srv/harness/gateway-data/firebase/service-account.json
+# Enable JPush after storing the AppKey and Master Secret outside the unit file
+# (for example in a root-readable EnvironmentFile with mode 0600):
+# Environment=HGW_JPUSH_APP_KEY=<jpush-app-key>
+# Environment=HGW_JPUSH_MASTER_SECRET=<jpush-master-secret>
 ExecStart=/usr/local/bin/node --import tsx/esm src/index.ts
 Restart=always
 RestartSec=3

@@ -31,9 +31,13 @@
 
 冻结的 SQLite 备份必须与切换前的精确 Gateway 产物一起保留。回滚会停止 PostgreSQL Gateway，恢复这两份产物，并且只启动 SQLite 版本。不得复制正在使用 WAL 的数据库、不得让两个版本同时运行，也不得尝试把 PostgreSQL 写入合并回 SQLite。PostgreSQL 保留用于诊断和后续干净切换。
 
-## Android 薄壳与 FCM
+## Android 薄壳与推送通道
 
-创建 Firebase 项目并注册 Android 应用 id `com.deepseek.harness`。把 `google-services.json` 下载到 `apps/android-shell/android/app/google-services.json`；该客户端配置只作为 Android 构建输入，Gateway service-account JSON 不得提交仓库。把 service-account JSON 以 `0600` 权限保存到 Gateway 主机，给 Gateway 服务环境设置 `HGW_FCM_PROJECT_ID` 和 `HGW_FCM_SERVICE_ACCOUNT_FILE`，并让正常启动 migration 流程应用 PostgreSQL migration 008。
+Android 应用 id 是 `com.coharness`。在 JPush，以及需要使用时的 Firebase 和华为控制台，都必须注册这个 id。薄壳可以只使用 JPush，也可以与 FCM 和可选的厂商通道组合使用。所有凭据都必须放在 Git 之外。
+
+使用 JPush 时，在构建时通过 Gradle 属性或环境变量设置 `JPUSH_APPKEY`。薄壳只在 Android 通知权限获准后初始化 JPush，并在后续启动中记住该授权。module 默认使用 JPush `6.2.0`；可用 `JPUSH_ENABLE_HUAWEI`、`JPUSH_ENABLE_FCM`、`JPUSH_ENABLE_XIAOMI`、`JPUSH_ENABLE_OPPO`、`JPUSH_ENABLE_VIVO`、`JPUSH_ENABLE_MEIZU` 或 `JPUSH_ENABLE_HONOR` 启用厂商插件。华为需要 `apps/android-shell/android/app/agconnect-services.json`；FCM 需要 `apps/android-shell/android/app/google-services.json`。这些文件只是部署构建输入，不得提交仓库。
+
+Gateway 发送端需要把 JPush Master Secret 和 Firebase service-account JSON 以 `0600` 权限保存到主机。启用 JPush 时同时设置 `HGW_JPUSH_APP_KEY` 与 `HGW_JPUSH_MASTER_SECRET`；启用 FCM 时还要设置 `HGW_FCM_PROJECT_ID` 与 `HGW_FCM_SERVICE_ACCOUNT_FILE`。Gateway 正常启动会应用 PostgreSQL migration 010，使 FCM 与 JPush Token 在各自 provider 内保持唯一。
 
 使用 Java/Android SDK 工具链并指向已部署 Web UI 构建薄壳。当前部署使用 `DSH_ANDROID_WEB_URL=https://harness.maycran.com/ pnpm --dir apps/android-shell run build`、`DSH_ANDROID_WEB_URL=https://harness.maycran.com/ pnpm --dir apps/android-shell run cap:sync`，然后执行 `cd apps/android-shell/android && ./gradlew assembleRelease`。发布普通 Web UI 资源不需要再次构建 APK；只有原生工程、权限、包名、图标或通知处理逻辑变化时才重建。AI turn 完成后，Gateway 会向会话创建者的设备发送包含会话 id 和事件序号的通知，点击后打开现有 Web UI 会话。
 

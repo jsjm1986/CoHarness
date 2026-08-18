@@ -43,6 +43,8 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 | `HGW_DEFAULT_ENV_FILE` | （空） | 每次启动复制到实例 `$DSH_HOME/.env` 的公司默认凭据 |
 | `HGW_FCM_PROJECT_ID` | （未设置） | 用于 Android 完成通知的 Firebase Cloud Messaging 企业 id |
 | `HGW_FCM_SERVICE_ACCOUNT_FILE` | （未设置） | 仅所有者可读的 Firebase service-account JSON 文件；未设置时仍保存 Token，但不发送 FCM |
+| `HGW_JPUSH_APP_KEY` | （未设置） | JPush 应用 AppKey；必须与 `HGW_JPUSH_MASTER_SECRET` 成对设置 |
+| `HGW_JPUSH_MASTER_SECRET` | （未设置） | 仅所有者可读的 JPush Master Secret；两项同时设置后才启用 JPush |
 | `HGW_MEMORY_MAX` / `HGW_CPU_QUOTA` | `1G` / `100%` | 每实例 systemd 资源限额 |
 | `HGW_GATEWAY_DIR` | 网关根目录 | 对实例遮蔽的目录（`InaccessiblePaths`） |
 
@@ -60,7 +62,11 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 
 ## Android 薄壳与完成通知
 
-`apps/android-shell` 是通过 `DSH_ANDROID_WEB_URL` 加载已部署 Web UI 的 Capacitor 薄壳。普通 Web UI 修改直接发布到 Gateway，不需要重建 APK。只有原生工程、权限、包名、图标或通知处理逻辑变化时，才重新执行 `pnpm --dir apps/android-shell run cap:sync` 并构建。请在 Firebase 注册 Android 应用，并把生成的 `google-services.json` 放到 `apps/android-shell/android/app/google-services.json`；Gateway 的 service-account JSON 必须放在主机上仅所有者可读的路径，并设置 `HGW_FCM_PROJECT_ID` 与 `HGW_FCM_SERVICE_ACCOUNT_FILE`。Gateway 按认证用户保存 Android Token，只在持久化 completed turn 后向会话创建者发送小型通知；通知只携带会话 id，并打开现有 Web UI，不暴露回复文本。
+`apps/android-shell` 是通过 `DSH_ANDROID_WEB_URL` 加载已部署 Web UI 的 Capacitor 薄壳。普通 Web UI 修改直接发布到 Gateway，不需要重建 APK。只有原生工程、权限、包名、图标或通知处理逻辑变化时，才重新执行 `pnpm --dir apps/android-shell run cap:sync` 并构建。应用包名固定为 `com.coharness`。
+
+薄壳可以独立注册 FCM 和 JPush。FCM 需要把 Firebase 客户端文件放到 `apps/android-shell/android/app/google-services.json`；Gateway 需要设置 `HGW_FCM_PROJECT_ID` 和主机上仅所有者可读的 `HGW_FCM_SERVICE_ACCOUNT_FILE`。JPush 使用通过 `JPUSH_APPKEY`（Gradle 属性或环境变量）提供的 Android JPush AppKey，Gateway 使用成对的 `HGW_JPUSH_APP_KEY` / `HGW_JPUSH_MASTER_SECRET`。JPush RegistrationID 以 `jpush` provider 保存；没有 provider 的旧客户端仍按 `fcm` 处理。华为及其他国内厂商通道是可选的 Gradle 集成；华为还需要 `agconnect-services.json` 和 `JPUSH_ENABLE_HUAWEI=true`。任何 AppKey、Secret、Firebase service-account JSON 或厂商配置文件都不得提交仓库。
+
+Gateway 按认证用户保存 Android Token，只在持久化 completed turn 后向会话创建者发送小型通知；通知只携带会话 id，并打开现有 Web UI，不暴露回复文本。PostgreSQL migration 010 增加按 provider 区分的 Token 唯一性；正常启动 Gateway 会自动应用它。
 
 ## 项目协作对话
 

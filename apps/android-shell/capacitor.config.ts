@@ -4,7 +4,7 @@ const webUrl = process.env.DSH_ANDROID_WEB_URL?.trim() || 'https://harness.maycr
 const parsed = new URL(webUrl)
 
 const config: CapacitorConfig = {
-  appId: process.env.DSH_ANDROID_APP_ID?.trim() || 'com.deepseek.harness',
+  appId: 'com.coharness',
   appName: 'CoHarness',
   webDir: 'dist',
   server: {

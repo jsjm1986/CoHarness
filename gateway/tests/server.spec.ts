@@ -159,6 +159,7 @@ describe('gateway server', () => {
     const registerDevice = vi.fn(async (userId: number, input: {
       token: string
       platform: 'android'
+      provider?: 'fcm' | 'jpush'
       deviceId?: string
       appVersion?: string
     }) => {
@@ -181,7 +182,17 @@ describe('gateway server', () => {
     expect(registered.status).toBe(201)
     expect(await registered.json()).toEqual({ id: 'device-token' })
     expect(registerDevice).toHaveBeenCalledWith(1, {
-      token: 'token', platform: 'android', appVersion: '1.0.0',
+      token: 'token', platform: 'android', provider: 'fcm', appVersion: '1.0.0',
+    })
+
+    const jpushRegistered = await fetch(`${base}/account/api/push-devices`, {
+      method: 'POST',
+      headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ token: 'jpush-token', platform: 'android', provider: 'jpush' }),
+    })
+    expect(jpushRegistered.status).toBe(201)
+    expect(registerDevice).toHaveBeenCalledWith(1, {
+      token: 'jpush-token', platform: 'android', provider: 'jpush',
     })
 
     const invalid = await fetch(`${base}/account/api/push-devices`, {
@@ -191,6 +202,14 @@ describe('gateway server', () => {
     })
     expect(invalid.status).toBe(400)
     expect(await invalid.json()).toEqual({ error: 'invalid-push-device' })
+
+    const invalidProvider = await fetch(`${base}/account/api/push-devices`, {
+      method: 'POST',
+      headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ token: 'token', platform: 'android', provider: 'unknown' }),
+    })
+    expect(invalidProvider.status).toBe(400)
+    expect(await invalidProvider.json()).toEqual({ error: 'invalid-push-device' })
 
     const removed = await fetch(`${base}/account/api/push-devices/device-token`, {
       method: 'DELETE', headers: { cookie, origin: base },

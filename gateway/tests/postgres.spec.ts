@@ -120,9 +120,9 @@ describePg('PostgreSQL baseline', () => {
     pool = createPostgresPool(DATABASE_URL!, { max: 4 })
     await pool.query('DROP SCHEMA IF EXISTS harness CASCADE')
     const migrated = await runMigrations(pool, MIGRATIONS)
-    expect(migrated).toEqual({ applied: [1, 2, 3, 4, 5, 6, 7, 8, 9], current: 9 })
+    expect(migrated).toEqual({ applied: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], current: 10 })
     expect(await runMigrations(pool, MIGRATIONS))
-      .toEqual({ applied: [], current: 9 })
+      .toEqual({ applied: [], current: 10 })
     const pushTables = await pool.query<{ table_name: string }>(`SELECT table_name
       FROM information_schema.tables
       WHERE table_schema='harness' AND table_name IN ('push_devices','push_deliveries')
@@ -131,6 +131,10 @@ describePg('PostgreSQL baseline', () => {
       { table_name: 'push_deliveries' },
       { table_name: 'push_devices' },
     ])
+    const providerColumn = await pool.query<{ is_nullable: string; column_default: string | null }>(`SELECT is_nullable,column_default
+      FROM information_schema.columns
+      WHERE table_schema='harness' AND table_name='push_devices' AND column_name='provider'`)
+    expect(providerColumn.rows).toEqual([{ is_nullable: 'NO', column_default: "'fcm'::text" }])
     const homeColumns = await pool.query<{ table_name: string; is_nullable: string }>(`SELECT table_name,is_nullable
       FROM information_schema.columns WHERE table_schema='harness' AND column_name='home_path' ORDER BY table_name`)
     expect(homeColumns.rows).toEqual([{ table_name: 'users', is_nullable: 'NO' }])
