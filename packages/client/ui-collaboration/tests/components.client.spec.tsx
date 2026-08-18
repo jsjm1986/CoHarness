@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ConversationShareAction, type ConversationShareActionProps } from '../src/client/ConversationShareAction.tsx'
 import { ReadOnlyComposer, type ReadOnlyComposerProps } from '../src/client/ReadOnlyComposer.tsx'
 import { ScopeControl, type ScopeControlProps } from '../src/client/ScopeControl.tsx'
+import css from '../src/client/ScopeControl.module.css'
 import type {
   CollaborationContext, CollaborationSnapshot, ConversationDetail,
 } from '../src/client/collaboration-client.ts'
@@ -132,6 +133,7 @@ describe('ScopeControl', () => {
     expect(screen.getByRole('button', { name: '切换个人或项目空间' }).textContent).toContain('只读')
     view.rerender(<ScopeControl {...scopeProps(snapshot({ context }), { wide: false })} />)
     const trigger = screen.getByRole('button', { name: '切换个人或项目空间' })
+    expect(trigger.className.split(/\s+/)).toContain(css.rail)
     expect(trigger.textContent).not.toContain('审计平台')
     fireEvent.click(trigger)
     expect(screen.queryByText('新对话可见范围')).toBeNull()

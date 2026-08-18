@@ -27,7 +27,7 @@ export function DocumentsButton({
       <Tooltip label={t('button.label')} side="right" delayMs={500} disabled={wide}>
         <button
           type="button"
-          className={css.trigger}
+          className={wide ? css.trigger : `${css.trigger} ${css.rail}`}
           aria-label={t('button.label')}
           onClick={handleOpen}
         >

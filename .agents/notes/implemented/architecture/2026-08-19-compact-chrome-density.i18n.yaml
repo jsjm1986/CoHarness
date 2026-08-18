@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-19-compact-chrome-density.md
-2026-08-19-compact-chrome-density.md: 2f47f6bc8da4068d4931da32b460aa15267c4409
-2026-08-19-compact-chrome-density.zh.md: dbd088496ce5536a24bc04f1051ffbe7b1797da2
+2026-08-19-compact-chrome-density.md: 927f057499ee3919ecb0c018a2c9c63a41901f63
+2026-08-19-compact-chrome-density.zh.md: 599f92651bb21bdf96426e966a668e5759e7bd10
