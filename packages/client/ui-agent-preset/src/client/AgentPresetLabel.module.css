@@ -21,3 +21,7 @@
   flex: none;
   opacity: 0.7;
 }
+
+:global([data-viewport='compact']) .label {
+  max-width: 100%;
+}

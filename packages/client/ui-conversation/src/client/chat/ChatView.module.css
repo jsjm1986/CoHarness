@@ -190,3 +190,13 @@
 .toBottom:hover {
   background: var(--dsw-alias-button-floating-hover);
 }
+
+:global([data-viewport='compact']) .toBottom {
+  width: var(--dsw-touch-target);
+  height: var(--dsw-touch-target);
+  margin-top: calc(0px - var(--dsw-touch-target));
+}
+
+:global([data-viewport='compact']) .scroll {
+  padding-inline: calc(var(--dsh-composer-side-clearance) + 8px);
+}

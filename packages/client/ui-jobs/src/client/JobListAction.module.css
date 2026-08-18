@@ -123,3 +123,18 @@
 .duration {
   font-variant-numeric: tabular-nums;
 }
+
+@media (pointer: coarse) {
+  .trigger {
+    min-height: var(--dsw-touch-target);
+  }
+}
+
+:global([data-viewport='compact']) .trigger {
+  min-height: var(--dsw-touch-target);
+}
+
+:global([data-viewport='compact']) .status {
+  max-width: none;
+  white-space: normal;
+}

@@ -372,6 +372,58 @@
   min-width: 72px;
 }
 
+/* Compact: one Miller pane at a time (the row already scrolls sideways),
+   28px rows grow to the touch target, and the card fills the bottom sheet. */
+@media (max-width: 767px) {
+  .dialog.dialog {
+    width: 100%;
+    height: calc(var(--dsw-viewport-height, 100dvh) - var(--dsw-space-8) - var(--dsw-safe-top));
+  }
+
+  .millerRow {
+    scroll-snap-type: x mandatory;
+  }
+
+  .column {
+    flex: 0 0 100%;
+    min-width: 100%;
+    scroll-snap-align: start;
+  }
+
+  .divider {
+    display: none;
+  }
+
+  .row {
+    height: var(--dsw-touch-target);
+  }
+
+  .crumb {
+    min-height: var(--dsw-touch-target);
+    max-width: min(160px, 40vw);
+  }
+
+  .crumbEditZone,
+  .pathInput {
+    min-height: var(--dsw-touch-target);
+    height: auto;
+  }
+
+  .showHiddenToggle,
+  .footerAction {
+    min-height: var(--dsw-touch-target);
+  }
+
+  .footerAction {
+    flex: 1 1 0;
+  }
+
+  .footerGap {
+    flex: 1 1 100%;
+    height: 0;
+  }
+}
+
 /* Nested create dialog (figma 813:23278): a small centered card. */
 .createDialog.createDialog {
   width: min(380px, 100%);

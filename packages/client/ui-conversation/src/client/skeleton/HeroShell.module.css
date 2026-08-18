@@ -205,3 +205,30 @@
   line-height: 18px;
   color: var(--dsw-alias-state-error-primary);
 }
+
+:global([data-viewport='compact']) .root {
+  padding: 0 var(--dsw-space-4);
+}
+
+:global([data-viewport='compact']) .headline {
+  grid-template-columns: 28px minmax(0, auto) auto;
+  column-gap: var(--dsw-space-2);
+  font-size: 20px;
+  line-height: 26px;
+}
+
+:global([data-viewport='compact']) .headlineText {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+:global([data-viewport='compact']) .workspace {
+  max-width: 100%;
+  min-height: var(--dsw-touch-target);
+}
+
+:global([data-viewport='compact']) .body > .workspaceRow {
+  flex-wrap: wrap;
+  justify-content: center;
+  padding-left: 0;
+}

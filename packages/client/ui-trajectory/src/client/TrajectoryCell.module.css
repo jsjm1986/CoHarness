@@ -136,3 +136,20 @@
   color: var(--dsw-alias-label-tertiary);
   white-space: nowrap;
 }
+
+:global([data-viewport='compact']) .root {
+  height: auto;
+  min-height: var(--dsw-touch-target);
+  flex-wrap: wrap;
+  padding: var(--dsw-space-2);
+  gap: var(--dsw-space-2);
+}
+
+:global([data-viewport='compact']) .text {
+  white-space: normal;
+}
+
+:global([data-viewport='compact']) .trailing {
+  width: 100%;
+  justify-content: flex-start;
+}

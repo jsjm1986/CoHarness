@@ -46,6 +46,11 @@
   white-space: nowrap;
 }
 
+:global([data-viewport='compact']) .trigger {
+  height: auto;
+  min-height: var(--dsw-touch-target);
+}
+
 /* Full-viewport layer (figma Mask 501:29946 #000@24%): mask tokens match the
    Modal primitive (--dsw-alias-bg-mask-1 + --dsw-mask-blur). */
 .overlay {
@@ -163,6 +168,7 @@
 .content {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
@@ -226,47 +232,83 @@
 }
 
 /* Compact viewports (below the 768 medium boundary, docs/web-styling.md):
-   the centered card fills the screen and the nav rail folds into a
-   horizontally scrolling tab strip above the content column. */
+   the portaled overlay is a full-screen page. `display: contents` lifts the
+   title, close row, tab strip, and options into one grid so the title stays
+   visible beside close and only `.options` scrolls. Portal surface, so the
+   threshold is a media query rather than the frame's data-viewport stamp. */
 @media (max-width: 767px) {
   .overlay {
     align-items: stretch;
     justify-content: stretch;
+    bottom: auto;
+    height: var(--dsw-viewport-height, 100dvh);
+    max-height: var(--dsw-viewport-height, 100dvh);
   }
 
   .panel {
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto minmax(0, 1fr);
     width: 100%;
     height: 100%;
     max-width: none;
     border-radius: 0;
   }
 
-  .nav {
-    flex-direction: row;
-    align-items: center;
-    width: 100%;
-    gap: var(--dsw-space-2);
-    padding: calc(var(--dsw-space-3) + var(--dsw-safe-top)) var(--dsw-space-3) 0;
-    overflow-x: auto;
+  .nav,
+  .content {
+    display: contents;
   }
 
   .navTitle {
-    display: none;
+    grid-column: 1;
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    padding: calc(var(--dsw-space-3) + var(--dsw-safe-top)) 0 0 var(--dsw-space-4);
+  }
+
+  .header {
+    grid-column: 2;
+    grid-row: 1;
+    height: auto;
+    min-height: var(--dsw-touch-target);
+    align-items: center;
+    padding: calc(var(--dsw-space-3) + var(--dsw-safe-top)) var(--dsw-space-3) 0;
   }
 
   .navList {
+    grid-column: 1 / -1;
+    grid-row: 2;
     flex-direction: row;
-    gap: var(--dsw-space-1);
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    /* overflow-x: auto computes overflow-y to auto; the tab strip must not
+       become a second vertical scroller. */
+    overflow-y: hidden;
+    padding: var(--dsw-space-2) var(--dsw-space-2) 0;
   }
 
   .navCell {
-    height: 36px;
-    padding: 6px var(--dsw-space-3);
+    flex: none;
+    height: var(--dsw-touch-target);
+    padding: 6px 6px;
     white-space: nowrap;
   }
 
   .options {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    min-height: 0;
     padding: 0 var(--dsw-space-4) calc(var(--dsw-space-4) + var(--dsw-safe-bottom));
+    overscroll-behavior: contain;
+  }
+}
+
+@media (pointer: coarse) {
+  .close {
+    width: var(--dsw-touch-target);
+    height: var(--dsw-touch-target);
   }
 }

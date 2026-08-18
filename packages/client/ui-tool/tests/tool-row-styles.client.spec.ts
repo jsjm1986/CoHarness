@@ -42,4 +42,10 @@ describe('ToolRow.module.css summary line', () => {
     ]))
     expect(declarations('.summarySuffix')).not.toEqual(expect.arrayContaining(['text-overflow: ellipsis']))
   })
+
+  it('wraps the summary and file path on compact viewports', () => {
+    expect(css).toContain("[data-viewport='compact']")
+    expect(css).toContain('.fileLink')
+    expect(css).toContain('white-space: normal')
+  })
 })

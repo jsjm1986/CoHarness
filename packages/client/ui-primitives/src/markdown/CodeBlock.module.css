@@ -66,6 +66,13 @@
   font: inherit;
 }
 
+@media (max-width: 767px) {
+  .copyButton {
+    min-width: var(--dsw-touch-target);
+    min-height: var(--dsw-touch-target);
+  }
+}
+
 .block :where(pre) {
   font: var(--dsl-code-block-content-font);
   padding: var(--dsw-space-4);

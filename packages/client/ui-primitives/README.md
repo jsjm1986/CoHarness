@@ -4,7 +4,7 @@ English | [中文](README.zh.md)
 
 Pure React atoms (zero cordis): StateDot, DisclosureRow, ic_ds_* icons, Button/Pill/Menu/Modal/Input, the Toast transient banner, the OnboardingSurface first-run takeover (body-portaled mask + opaque stage that holds `#root` inert for exactly its own lifetime), the markdown family (MessageText/MarkdownText/JsonBlock), the read-only JsonTree inspector, the `useAnchoredMaxHeight` hook that clamps a bottom-anchored overlay to the viewport space above its anchor (re-measured on resize, scroll, and a caller-supplied dependency), the `useMediaQuery` subscription hook for portal surfaces and pointer-capability branches, TerminalBlock, DiffBlock, ReadBlock, SearchBlock, and WebBlock.
 
-The atoms carry the touch baseline from [web-styling](../../../docs/web-styling.md): on compact viewports Modal becomes a bottom sheet and Menu submenus unfold inline; on coarse pointers menu rows and dismiss controls grow to the shared touch target, Input text holds 16px (no iOS focus zoom), and Tooltip stays hidden (anchors keep their aria-labels).
+The atoms carry the touch baseline from [web-styling](../../../docs/web-styling.md): on compact viewports Modal becomes a bottom sheet, Menu submenus unfold inline, and menu rows plus dismiss controls grow to the shared touch target; HoverCard width caps at the viewport minus 24px, Toast sits below `--dsw-safe-top` instead of a fixed 120px, and RiskConfirmation uses `--dsw-viewport-height`. On coarse pointers those same rows and dismiss controls also grow, Input text holds 16px (no iOS focus zoom), and Tooltip stays hidden (anchors keep their aria-labels).
 
 ## Hover cards
 

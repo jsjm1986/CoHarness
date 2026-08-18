@@ -17,6 +17,15 @@
   max-width: min(525px, 82%);
 }
 
+:global([data-viewport='compact']) .userStack {
+  max-width: 100%;
+}
+
+:global([data-viewport='compact']) .compactionButton {
+  height: auto;
+  min-height: var(--dsw-touch-target);
+}
+
 .sender {
   display: flex;
   align-items: baseline;

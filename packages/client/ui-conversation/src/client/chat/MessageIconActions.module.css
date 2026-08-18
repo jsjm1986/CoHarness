@@ -84,3 +84,28 @@
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+
+@media (pointer: coarse) {
+  .actions {
+    height: auto;
+    min-height: var(--dsw-touch-target);
+  }
+
+  .action {
+    width: var(--dsw-touch-target);
+    height: var(--dsw-touch-target);
+  }
+}
+
+:global([data-viewport='compact']) .actions {
+  height: auto;
+  min-height: var(--dsw-touch-target);
+  flex-wrap: wrap;
+}
+
+:global([data-viewport='compact']) .action {
+  flex: none;
+  width: var(--dsw-touch-target);
+  min-width: var(--dsw-touch-target);
+  height: var(--dsw-touch-target);
+}

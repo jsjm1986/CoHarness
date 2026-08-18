@@ -67,3 +67,19 @@ button.leading {
   line-height: 24px;
   color: var(--dsw-alias-label-secondary);
 }
+
+:global([data-viewport='compact']) .row {
+  height: auto;
+  min-height: var(--dsw-touch-target);
+  overflow: visible;
+  flex-wrap: wrap;
+}
+
+:global([data-viewport='compact']) .chevronHover {
+  opacity: 1;
+}
+
+:global([data-viewport='compact']) button.leading {
+  width: var(--dsw-touch-target);
+  height: var(--dsw-touch-target);
+}

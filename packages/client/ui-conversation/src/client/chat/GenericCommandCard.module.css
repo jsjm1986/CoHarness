@@ -66,6 +66,10 @@
   color: var(--dsw-alias-state-error-primary);
 }
 
+:global([data-viewport='compact']) .summary {
+  white-space: normal;
+}
+
 .body {
   max-height: 260px;
   margin: var(--dsw-space-1) 0 var(--dsw-space-1) var(--dsw-space-1);

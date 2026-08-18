@@ -25,3 +25,14 @@
   font: var(--dsw-font-xs-13);
   color: var(--dsw-alias-label-tertiary);
 }
+
+:global([data-viewport='compact']) .root {
+  height: auto;
+  min-height: var(--dsw-touch-target);
+  flex-wrap: wrap;
+}
+
+:global([data-viewport='compact']) .description {
+  flex-basis: 100%;
+  white-space: normal;
+}

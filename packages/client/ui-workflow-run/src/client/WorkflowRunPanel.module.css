@@ -252,4 +252,14 @@
   .members {
     padding-left: var(--dsw-space-3);
   }
+
+  .runHeader {
+    height: auto;
+    min-height: var(--dsw-touch-target);
+    flex-wrap: wrap;
+  }
+
+  .runTitle {
+    max-width: none;
+  }
 }

@@ -119,6 +119,10 @@
   display: none;
 }
 
+:global([data-viewport='compact']) .trigger {
+  min-height: var(--dsw-touch-target);
+}
+
 @media (pointer: coarse) {
   .trigger {
     min-height: var(--dsw-touch-target);

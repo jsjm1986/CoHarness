@@ -89,4 +89,40 @@ describe('ModelsSection theme styles', () => {
     // branch, and a literal here is a single colour for both themes.
     expect(css).not.toMatch(/var\(--dsw-[a-z0-9-]+\s*,\s*(?:#|rgb|rgba|hsl|hsla)/)
   })
+
+  it('stacks organization model rows and drops nowrap clipping under 768px', () => {
+    const compact = mediaBody(css, '(max-width: 767px)')
+    expect(compact).toContain('flex-direction: column')
+    expect(compact).toContain('white-space: normal')
+    expect(compact).toContain('grid-template-columns: minmax(0, 1fr)')
+    expect(compact).toContain('max-width: none')
+  })
+
+  it('gives dense model controls the touch target on coarse pointers', () => {
+    const coarse = mediaBody(css, '(pointer: coarse)')
+    expect(coarse).toContain('var(--dsw-touch-target)')
+  })
 })
+
+/**
+ * Inner text of one `@media` block, including nested rules.
+ * @param source - stylesheet text.
+ * @param query - the media condition, e.g. `(max-width: 767px)`.
+ * @returns the block body.
+ */
+function mediaBody(source: string, query: string): string {
+  const marker = `@media ${query}`
+  const start = source.indexOf(marker)
+  if (start === -1) throw new Error(`stylesheet has no @media ${query}`)
+  const open = source.indexOf('{', start)
+  let depth = 0
+  for (let i = open; i < source.length; i += 1) {
+    const ch = source[i]
+    if (ch === '{') depth += 1
+    else if (ch === '}') {
+      depth -= 1
+      if (depth === 0) return source.slice(open + 1, i)
+    }
+  }
+  throw new Error(`stylesheet @media ${query} is unbalanced`)
+}

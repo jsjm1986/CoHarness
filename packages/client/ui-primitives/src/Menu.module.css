@@ -258,6 +258,18 @@
    a side-flyout would overflow the screen, so the submenu unfolds inline
    under its parent row as an indented group. */
 @media (max-width: 767px) {
+  .list {
+    min-width: min(218px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+    max-height: min(70dvh, calc(var(--dsw-viewport-height, 100dvh) - 48px));
+    overflow-y: auto;
+  }
+
+  .item {
+    min-height: var(--dsw-touch-target);
+    height: auto;
+  }
+
   .submenu {
     position: static;
     min-width: 0;

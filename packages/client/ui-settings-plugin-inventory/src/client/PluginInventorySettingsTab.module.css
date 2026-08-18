@@ -277,4 +277,9 @@
   .cards {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  .search input {
+    height: var(--dsw-touch-target);
+    font-size: 16px;
+  }
 }

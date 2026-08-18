@@ -13,6 +13,10 @@
   max-width: min(525px, 82%);
 }
 
+:global([data-viewport='compact']) .stack {
+  max-width: 100%;
+}
+
 .bubble {
   max-width: 100%;
   padding: 10px var(--dsw-space-4);

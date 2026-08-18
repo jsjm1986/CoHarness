@@ -275,3 +275,25 @@
   flex: 0 0 auto;
   color: var(--dsw-alias-label-tertiary);
 }
+
+:global([data-viewport='compact']) .root {
+  max-width: none;
+}
+
+:global([data-viewport='compact']) .trigger {
+  height: var(--dsw-touch-target);
+}
+
+:global([data-viewport='compact']) .menu {
+  left: 0;
+  right: auto;
+  width: min(calc(100vw - 24px), 360px);
+  max-width: min(100%, calc(100vw - 24px));
+  max-height: min(40dvh, calc(var(--dsw-viewport-height, 100dvh) - 160px));
+}
+
+:global([data-viewport='compact']) .option,
+:global([data-viewport='compact']) .cell {
+  min-height: var(--dsw-touch-target);
+  height: auto;
+}

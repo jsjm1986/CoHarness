@@ -92,3 +92,19 @@
 .code[data-error] {
   color: var(--dsw-alias-state-error-primary);
 }
+
+@media (pointer: coarse) {
+  .close {
+    width: var(--dsw-touch-target);
+    height: var(--dsw-touch-target);
+  }
+}
+
+:global([data-viewport='compact']) .close {
+  width: var(--dsw-touch-target);
+  height: var(--dsw-touch-target);
+}
+
+:global([data-viewport='compact']) .title {
+  white-space: normal;
+}

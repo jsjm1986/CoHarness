@@ -93,6 +93,10 @@
   opacity: 1;
 }
 
+:global([data-viewport='compact']) .earlierHistory {
+  width: var(--dsw-touch-target);
+}
+
 .earlierHistory[aria-disabled='true'] {
   cursor: default;
 }

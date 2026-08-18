@@ -172,6 +172,17 @@
   }
 }
 
+:global([data-viewport='compact']) .inspectButton {
+  opacity: 1;
+  min-width: var(--dsw-touch-target);
+  min-height: var(--dsw-touch-target);
+}
+
+:global([data-viewport='compact']) .summary,
+:global([data-viewport='compact']) .fileLink {
+  white-space: normal;
+}
+
 /* Solid hover fill (a translucent token would let content bleed through). */
 .inspectButton:hover {
   background: var(--dsw-alias-interactive-bg-hover-solid);

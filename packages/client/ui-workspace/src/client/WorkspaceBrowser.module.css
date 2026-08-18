@@ -38,6 +38,25 @@
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
+@media (pointer: coarse) {
+  .iconButton,
+  .searchButton {
+    width: var(--dsw-touch-target);
+    height: var(--dsw-touch-target);
+  }
+}
+
+:global([data-viewport='compact']) .iconButton,
+:global([data-viewport='compact']) .searchButton {
+  width: var(--dsw-touch-target);
+  height: var(--dsw-touch-target);
+}
+
+:global([data-viewport='compact']) .sectionHeader {
+  height: auto;
+  min-height: var(--dsw-touch-target);
+}
+
 /* Section header: title, an inline search control, and the two trailing
    actions. Expanding search collapses the action cluster and takes its room. */
 .sectionHeader {

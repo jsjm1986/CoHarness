@@ -125,3 +125,28 @@
   opacity: 0.4;
   cursor: default;
 }
+
+:global([data-viewport='compact']) .bar {
+  height: auto;
+  min-height: var(--dsw-touch-target);
+  flex-wrap: wrap;
+  padding: var(--dsw-space-2);
+}
+
+:global([data-viewport='compact']) .objective,
+:global([data-viewport='compact']) .error {
+  flex-basis: 100%;
+  white-space: normal;
+}
+
+:global([data-viewport='compact']) .iconBtn {
+  width: var(--dsw-touch-target);
+  height: var(--dsw-touch-target);
+}
+
+@media (pointer: coarse) {
+  .iconBtn {
+    width: var(--dsw-touch-target);
+    height: var(--dsw-touch-target);
+  }
+}

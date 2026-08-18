@@ -351,6 +351,47 @@
   padding-left: var(--dsw-space-5);
 }
 
+:global([data-viewport='compact']) .root {
+  --dsh-composer-side-clearance: 12px;
+}
+
+:global([data-viewport='compact']) .header {
+  padding: var(--dsw-space-2) var(--dsw-space-3) 0;
+}
+
+:global([data-viewport='compact']) .tabs {
+  gap: var(--dsw-space-4);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+:global([data-viewport='compact']) .tab {
+  flex: none;
+  display: inline-flex;
+  align-items: flex-end;
+  min-height: var(--dsw-touch-target);
+}
+
+:global([data-viewport='compact']) .titleRow {
+  flex-wrap: wrap;
+  min-height: var(--dsw-touch-target);
+}
+
+:global([data-viewport='compact']) .headerUtilities {
+  margin-left: auto;
+}
+
+:global([data-viewport='compact']) .crumb {
+  max-width: 100%;
+}
+
+:global([data-viewport='compact']) .heroWorkspaceRow {
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--dsw-space-1);
+  padding-left: 0;
+}
+
 /* Hero: the composer sits inside the session scroll body; center there so
    the tree seat matches active (sticky footer) without a Root remount. */
 .root[data-phase='hero'] .scrollBody {

@@ -784,3 +784,59 @@ select.input {
   font-size: 13px;
   overflow-wrap: anywhere;
 }
+
+/* Compact viewports (below the 768 medium boundary, docs/web-styling.md):
+   the settings overlay is a full-width page, so the section drops its desktop
+   column cap and stacks name/id instead of clipping with nowrap. */
+@media (max-width: 767px) {
+  .section {
+    max-width: none;
+  }
+
+  .organizationProvider > span,
+  .organizationModels > li {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .organizationModels > li {
+    min-height: var(--dsw-touch-target);
+    padding-top: var(--dsw-space-2);
+    padding-bottom: var(--dsw-space-2);
+  }
+
+  .organizationProvider strong,
+  .organizationProvider code,
+  .organizationModels span,
+  .organizationModels code {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .rowHead,
+  .editorActions {
+    flex-wrap: wrap;
+  }
+
+  .rowActions {
+    margin-left: 0;
+  }
+
+  .modelRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (pointer: coarse) {
+  .rowActions .secondaryButton,
+  .rowActions .dangerButton,
+  .addModelButton {
+    height: var(--dsw-touch-target);
+    min-width: var(--dsw-touch-target);
+  }
+
+  .iconButton {
+    width: var(--dsw-touch-target);
+    height: var(--dsw-touch-target);
+  }
+}

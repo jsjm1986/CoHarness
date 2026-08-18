@@ -72,6 +72,10 @@
   }
 }
 
+:global([data-viewport='compact']) .trigger {
+  height: var(--dsw-touch-target);
+}
+
 .chevronOpen {
   transform: rotate(180deg);
 }
