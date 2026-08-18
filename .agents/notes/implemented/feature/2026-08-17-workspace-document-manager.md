@@ -1,0 +1,40 @@
+# Agent Note: Workspace document manager UI
+
+Status: implemented
+
+English | [中文](2026-08-17-workspace-document-manager.zh.md)
+
+## Problem
+
+The conversation input box accepts file uploads that land in the runtime's `uploads/` directory, but the browser UI provides no way to browse, preview, upload, or delete previously uploaded documents. Users accumulate documents with no management interface.
+
+## Decision
+
+Add a new Cordis plugin package `@deepseek-ai/dsh-client-ui-documents` that registers a **Documents** button in the `sidebar.footer.action` slot. Clicking opens a modal manager showing all documents in the current scope (personal or project runtime), powered by the existing `/api/documents` HTTP surface (`@deepseek-ai/dsh-host-userdoc-http` + `@deepseek-ai/dsh-userdoc-local`). `dsh-web-app` mounts the plugin in `cordis.patch.yml` and lists it in the bundle's `dependencies`, so `verify-cordis-config` can resolve the bare plugin name.
+
+The backend capability (`ctx.userDocs.list`, `save`, `remove`, `stat`, `read`) already existed and was fully wired. The only gap was the browser UI.
+
+## Design
+
+- **Package**: `packages/client/ui-documents/` follows the pattern of `ui-collaboration`: a `client/` subentry with browser-only plugin code, `tsdown.config.ts` for the client bundle, and `src/client/` for components.
+- **Entry point**: `sidebar.footer.action` slot, alongside the scope selector from `ui-collaboration`. The button uses an inline SVG document icon (no external icon dependency).
+- **Modal**: renders a `Modal` from `@deepseek-ai/dsh-client-ui-primitives` with a search bar, date-grouped document list, upload button, and per-row actions (Preview, Download, Delete).
+- **Preview**: routes by media type — images (`<img>`), PDFs (`<iframe>`), text-based files (fetch + `<pre>`, capped at 256 KiB), others fallback.
+- **Delete**: shows a confirmation dialog with a strong warning about conversation history references; project-scope deletes warn about affecting all members.
+- **Locale**: bilingual (zh/en) via `locales.ts`.
+
+## Consequences
+
+Users can now browse, preview, upload, and delete documents through the conversation UI. The storage layout is unchanged — documents remain in the runtime's `uploads/` directory, isolated per scope. No new backend API or database migrations were needed.
+
+## Verification
+
+- Package plugin test: verifies the plugin registers in `sidebar.footer.action` with `id: 'documents'` and `order: -10`.
+- Component test: verifies the button renders and opens the modal on click.
+- Keyless snapshot via e2e browser test is deferred to a follow-up PR.
+
+## Alternatives considered
+
+**Embed the manager inside the conversation composer.** Rejected because the composer is per-conversation state while uploaded documents are runtime-scoped and shared; a sidebar entry keeps the manager available across sessions and conversations.
+
+**Add a gateway-side document API for cross-runtime management.** Rejected because uploads already live in the runtime's own `uploads/` directory and the existing `/api/documents` surface fully covers list/upload/remove; centralizing would duplicate storage and authorization.
