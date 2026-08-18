@@ -6,6 +6,7 @@ import { CollaborationDeniedError } from './collaboration.ts'
 import type { GatewayConfig } from './config.ts'
 import type { ProjectRuntime } from './instances.ts'
 import type { PrincipalScope } from './principal.ts'
+import type { GatewayPushService } from './push-notifications.ts'
 import { loginPage, passwordPage } from './html.ts'
 import type {
   Awaitable,
@@ -28,6 +29,8 @@ export interface GatewayDeps {
   instances: GatewayInstanceService
   governance?: GatewayModelGovernanceService
   collaboration?: GatewayCollaborationService
+  /** Optional persistent device registry and FCM delivery service. */
+  push?: GatewayPushService
   readiness?: () => Awaitable<void>
 }
 
@@ -284,6 +287,59 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       }
     }
 
+    if (pathname === '/account/api/push-devices' && req.method === 'POST') {
+      if (deps.push === undefined) {
+        send(res, 503, '{"error":"push-unavailable"}', 'application/json')
+        return
+      }
+      const input = jsonObject(await readBody(req))
+      const token = stringField(input?.token)
+      const platform = input?.platform
+      const deviceId = input?.deviceId === undefined ? undefined : stringField(input.deviceId)
+      const appVersion = input?.appVersion === undefined ? undefined : stringField(input.appVersion)
+      if (token === undefined || token.length > 4096 || platform !== 'android'
+        || (input?.deviceId !== undefined && deviceId === undefined)
+        || (input?.appVersion !== undefined && appVersion === undefined)) {
+        send(res, 400, '{"error":"invalid-push-device"}', 'application/json')
+        return
+      }
+      const device = await deps.push.registerDevice(user.id, {
+        token,
+        platform,
+        ...(deviceId === undefined ? {} : { deviceId }),
+        ...(appVersion === undefined ? {} : { appVersion }),
+      })
+      send(res, 201, JSON.stringify(device), 'application/json')
+      return
+    }
+
+    const pushDeviceRoute = pathname.match(/^\/account\/api\/push-devices\/([^/]+)$/)
+    if (pushDeviceRoute !== null && req.method === 'DELETE') {
+      if (deps.push === undefined) {
+        send(res, 503, '{"error":"push-unavailable"}', 'application/json')
+        return
+      }
+      let deviceId: string
+      try {
+        deviceId = decodeURIComponent(pushDeviceRoute[1] ?? '')
+      } catch {
+        send(res, 400, '{"error":"invalid-push-device-id"}', 'application/json')
+        return
+      }
+      if (deviceId === '') {
+        send(res, 400, '{"error":"invalid-push-device-id"}', 'application/json')
+        return
+      }
+      const removed = await deps.push.removeDevice(user.id, deviceId)
+      if (!removed) {
+        send(res, 404, '{"error":"push-device-not-found"}', 'application/json')
+        return
+      }
+      res.writeHead(204)
+      res.end()
+      return
+    }
+
     if (pathname === '/account/api/scope' && req.method === 'POST') {
       let requested: unknown
       try {
@@ -298,6 +354,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       }
       const value = requested as { kind?: unknown; projectId?: unknown }
       if (value.kind === 'personal') {
+        await deps.instances.ensureRunning(user)
         res.writeHead(204, { 'set-cookie': scopeCookie('personal', cfg) })
         res.end()
         return
@@ -312,6 +369,12 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         send(res, 403, '{"error":"not-member"}', 'application/json')
         return
       }
+      await deps.instances.ensureRunning({
+        kind: 'project',
+        id: value.projectId,
+        name: project.name,
+        path: project.path,
+      })
       res.writeHead(204, { 'set-cookie': scopeCookie(`project:${value.projectId}`, cfg) })
       res.end()
       return

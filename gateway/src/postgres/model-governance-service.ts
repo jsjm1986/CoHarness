@@ -2,14 +2,31 @@ import { createHash, randomBytes } from 'node:crypto'
 import type { UserRow } from '../auth.ts'
 import type {
   CredentialClass,
+  ModelProviderInput,
+  ModelProviderProtocol,
+  ModelProviderRow,
   ModelUsageSubject,
   ModelRow,
+  RuntimeModelPolicy,
+  RuntimeModelProvider,
   UsageEvent,
   UsageSummary,
 } from '../model-governance.ts'
+import { ORGANIZATION_PROVIDER_PATTERN } from '../model-governance.ts'
+import { OrganizationModelCredentialCipher } from '../organization-model-credentials.ts'
 import type { Queryable } from './database.ts'
 import { transaction } from './database.ts'
 import { internalProjectId, internalUserId, type PostgresRuntimeContext } from './runtime-context.ts'
+import {
+  discoverOrganizationModels,
+  organizationModelSettingsSchema,
+  validateOrganizationProfiles,
+} from '../organization-model-settings.ts'
+import type {
+  ModelSettingsPathOp,
+  OrganizationCredentialView,
+  OrganizationModelSettingsView,
+} from '../model-governance.ts'
 
 const nonEmpty = (value: string, name: string): string => {
   const accepted = value.trim()
@@ -24,7 +41,7 @@ const nonnegative = (value: number, name: string): number => {
 
 function credentialClassOf(source: string): CredentialClass {
   if (source === 'file' || source === 'project-env' || source === 'request') return 'personal'
-  if (source === 'env' || source === 'process' || source === 'user-env') return 'company'
+  if (source === 'organization' || source === 'env' || source === 'process' || source === 'user-env') return 'company'
   return 'unknown'
 }
 
@@ -126,6 +143,77 @@ function roleForPostgres(role: 'admin' | 'user'): 'admin' | 'member' {
   return role === 'admin' ? 'admin' : 'member'
 }
 
+const PROVIDER_PROTOCOLS = new Set<ModelProviderProtocol>([
+  'openai-completions',
+  'openai-responses',
+  'anthropic-messages',
+])
+
+function providerCredentialRef(provider: string): string {
+  return `DSH_${provider.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_API_KEY`
+}
+
+function providerBaseURL(value: string): string {
+  const accepted = nonEmpty(value, 'baseURL')
+  let parsed: URL
+  try {
+    parsed = new URL(accepted)
+  } catch {
+    throw new Error('baseURL must be an absolute http or https URL')
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('baseURL must be an absolute http or https URL')
+  }
+  if (parsed.username !== '' || parsed.password !== '' || parsed.hash !== '') {
+    throw new Error('baseURL must not contain credentials or a fragment')
+  }
+  return accepted.replace(/\/$/, '')
+}
+
+function jsonObject(value: unknown, name: string): Record<string, unknown> {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${name} must be an object`)
+  return value as Record<string, unknown>
+}
+
+function cloneJson<T>(value: T): T {
+  return structuredClone(value)
+}
+
+function setJsonPath(root: Record<string, unknown>, path: readonly string[], value: unknown): void {
+  let cursor = root
+  for (const segment of path.slice(0, -1)) {
+    const existing = cursor[segment]
+    if (existing === null || typeof existing !== 'object' || Array.isArray(existing)) cursor[segment] = {}
+    cursor = cursor[segment] as Record<string, unknown>
+  }
+  const leaf = path[path.length - 1]
+  if (leaf === undefined) throw new Error('settings path must not be empty')
+  cursor[leaf] = cloneJson(value)
+}
+
+function unsetJsonPath(root: Record<string, unknown>, path: readonly string[]): void {
+  if (path.length === 0) throw new Error('settings path must not be empty')
+  let cursor: Record<string, unknown> | undefined = root
+  for (const segment of path.slice(0, -1)) {
+    const next = cursor[segment]
+    if (next === null || typeof next !== 'object' || Array.isArray(next)) return
+    cursor = next as Record<string, unknown>
+  }
+  delete cursor[path[path.length - 1] as string]
+}
+
+function apiKeyRefOf(profile: Record<string, unknown>): string | undefined {
+  const value = profile.apiKeyEnv
+  return typeof value === 'string' && value.length > 0 ? value : undefined
+}
+
+function profileModelsOf(profile: Record<string, unknown>): Array<Record<string, unknown>> {
+  const value = profile.models
+  if (value === undefined) return []
+  if (!Array.isArray(value)) throw new Error('provider models must be an array')
+  return value.map((model, index) => jsonObject(model, `models[${index}]`))
+}
+
 interface UsageTotalsRow {
   input: string
   output: string
@@ -179,9 +267,280 @@ function usageSummary(
 export class PostgresModelGovernanceService {
   constructor(
     private readonly context: PostgresRuntimeContext,
+    private readonly credentialCipher: OrganizationModelCredentialCipher,
     private readonly timeZone = 'Asia/Shanghai',
   ) {
     new Intl.DateTimeFormat('en-US', { timeZone }).format()
+  }
+
+  async listProviders(): Promise<ModelProviderRow[]> {
+    const result = await this.context.pool.query<{
+      provider: string
+      display_name: string
+      driver: 'pi-ai'
+      protocol: ModelProviderProtocol | null
+      base_url: string | null
+      auth_mode: 'api-key' | 'none'
+      status: 'draft' | 'enabled' | 'disabled' | 'archived'
+      credential_ref: string | null
+      credential_configured: boolean
+      source: 'managed' | 'legacy-catalog'
+      revision: string
+      model_count: string
+      profile: Record<string, unknown>
+    }>(`SELECT provider.provider_key provider,provider.display_name,provider.driver,provider.protocol,
+      provider.base_url,provider.auth_mode,provider.status,provider.credential_ref,provider.source,
+      provider.revision::text,provider.profile,COUNT(model.id)::text model_count,
+      (credential.provider_id IS NOT NULL) credential_configured
+      FROM harness.model_providers provider
+      LEFT JOIN harness.model_catalog model ON model.provider_id=provider.id
+        AND model.organization_id=provider.organization_id
+      LEFT JOIN harness.organization_model_credentials credential ON credential.provider_id=provider.id
+        AND credential.organization_id=provider.organization_id
+      WHERE provider.organization_id=$1
+      GROUP BY provider.id,credential.provider_id
+      ORDER BY provider.provider_key`, [this.context.organizationId])
+    return result.rows.map(row => ({
+      provider: row.provider,
+      displayName: row.display_name,
+      driver: row.driver,
+      protocol: row.protocol,
+      baseURL: row.base_url,
+      authMode: row.auth_mode,
+      status: row.status,
+      credentialRef: row.credential_ref,
+      credentialConfigured: row.credential_configured,
+      source: row.source,
+      revision: safeCount(row.revision, 'provider revision'),
+      modelCount: safeCount(row.model_count, 'provider model count'),
+      ...row.profile === undefined ? {} : { profile: row.profile },
+    }))
+  }
+
+  async upsertProvider(input: ModelProviderInput): Promise<void> {
+    const provider = nonEmpty(input.provider, 'provider')
+    if (!ORGANIZATION_PROVIDER_PATTERN.test(provider)) {
+      throw new Error(`organization provider must match ${String(ORGANIZATION_PROVIDER_PATTERN)}`)
+    }
+    const displayName = nonEmpty(input.displayName, 'displayName')
+    if (input.driver !== 'pi-ai') throw new Error('organization provider driver must be pi-ai')
+    if (!PROVIDER_PROTOCOLS.has(input.protocol)) throw new Error(`unsupported provider protocol ${input.protocol}`)
+    const baseURL = providerBaseURL(input.baseURL)
+    const credentialRef = input.authMode === 'api-key' ? providerCredentialRef(provider) : null
+    if (input.authMode === 'none' && typeof input.credential === 'string') {
+      throw new Error(`provider ${provider} does not accept an organization credential`)
+    }
+    await transaction(this.context.pool, async (client) => {
+      const existing = await client.query<{ id: string; source: 'managed' | 'legacy-catalog'; status: string }>(`SELECT
+        id,source,status FROM harness.model_providers WHERE organization_id=$1 AND provider_key=$2 FOR UPDATE`,
+      [this.context.organizationId, provider])
+      const current = existing.rows[0]
+      if (current?.source === 'legacy-catalog') {
+        throw new Error(`legacy catalog provider ${provider} cannot be managed; create an org-* provider`)
+      }
+      if (current?.status === 'archived' && input.status !== 'archived') {
+        throw new Error(`archived provider ${provider} cannot be restored`)
+      }
+      const profile = {
+        ...(input.profile ?? {}),
+        displayName,
+        api: input.protocol,
+        baseURL,
+        ...credentialRef === null ? {} : { apiKeyEnv: credentialRef },
+      }
+      const stored = await client.query<{ id: string }>(`INSERT INTO harness.model_providers(
+        organization_id,provider_key,display_name,driver,protocol,base_url,auth_mode,credential_ref,status,profile
+      ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+      ON CONFLICT(organization_id,provider_key) DO UPDATE SET
+        display_name=excluded.display_name,driver=excluded.driver,protocol=excluded.protocol,
+        base_url=excluded.base_url,auth_mode=excluded.auth_mode,credential_ref=excluded.credential_ref,
+        status=excluded.status,profile=COALESCE(excluded.profile,harness.model_providers.profile),
+        revision=harness.model_providers.revision+1,updated_at=now()
+      RETURNING id`, [this.context.organizationId, provider, displayName, input.driver, input.protocol,
+        baseURL, input.authMode, credentialRef, input.status, profile])
+      const providerId = stored.rows[0]?.id
+      if (providerId === undefined) throw new Error('provider upsert returned no row')
+      if (input.authMode === 'none' || input.credential === null) {
+        await client.query(`DELETE FROM harness.organization_model_credentials
+          WHERE organization_id=$1 AND provider_id=$2`, [this.context.organizationId, providerId])
+      } else if (input.credential !== undefined) {
+        const encrypted = this.credentialCipher.encrypt(this.context.organizationId, providerId, input.credential)
+        await client.query(`INSERT INTO harness.organization_model_credentials(
+          organization_id,provider_id,key_version,nonce,ciphertext,auth_tag
+        ) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(provider_id) DO UPDATE SET
+          key_version=excluded.key_version,nonce=excluded.nonce,ciphertext=excluded.ciphertext,
+          auth_tag=excluded.auth_tag,updated_at=now()`, [
+          this.context.organizationId,
+          providerId,
+          encrypted.keyVersion,
+          encrypted.nonce,
+          encrypted.ciphertext,
+          encrypted.authTag,
+        ])
+      }
+      if (input.status === 'enabled') {
+        const readiness = await client.query<{ models: string; credential_configured: boolean }>(`SELECT
+          COUNT(model.id)::text models,
+          EXISTS(SELECT 1 FROM harness.organization_model_credentials credential
+            WHERE credential.organization_id=$1 AND credential.provider_id=$2) credential_configured
+          FROM harness.model_catalog model WHERE model.organization_id=$1 AND model.provider_id=$2`,
+        [this.context.organizationId, providerId])
+        if (safeCount(readiness.rows[0]!.models, 'provider model count') === 0) {
+          throw new Error(`provider ${provider} cannot be enabled without a model`)
+        }
+        if (input.authMode === 'api-key' && !readiness.rows[0]!.credential_configured) {
+          throw new Error(`provider ${provider} cannot be enabled without an organization credential`)
+        }
+      }
+      await this.bumpConfigurationRevision(client)
+    })
+  }
+
+  /** Return the organization pi-ai namespace in the same form as settings.describe. */
+  async describeOrganizationModelSettings(): Promise<OrganizationModelSettingsView> {
+    const revisionResult = await this.context.pool.query<{ revision: string }>(`SELECT model_configuration_revision::text revision
+      FROM harness.organizations WHERE id=$1`, [this.context.organizationId])
+    const revision = safeCount(revisionResult.rows[0]?.revision ?? '0', 'organization model configuration revision')
+    const profiles = await this.organizationProfiles(this.context.pool)
+    return this.organizationSettingsView(profiles, revision)
+  }
+
+  /** Apply path edits from the shared Models editor and synchronize governance rows. */
+  async mutateOrganizationModelSettings(
+    ops: ModelSettingsPathOp[],
+    expectedRevision?: number,
+  ): Promise<OrganizationModelSettingsView> {
+    return transaction(this.context.pool, async (client) => {
+      const revisionResult = await client.query<{ revision: string }>(`SELECT model_configuration_revision::text revision
+        FROM harness.organizations WHERE id=$1 FOR UPDATE`, [this.context.organizationId])
+      const revision = safeCount(revisionResult.rows[0]?.revision ?? '0', 'organization model configuration revision')
+      if (expectedRevision !== undefined && expectedRevision !== revision) throw new Error('settings-conflict')
+      const current = await this.organizationProfiles(client)
+      const section: Record<string, unknown> = { providers: Object.fromEntries(current) }
+      for (const op of ops) {
+        if (op.path.length < 2 || op.path[0] !== 'providers') throw new Error('organization settings path must address providers')
+        if (op.op === 'set') setJsonPath(section, op.path, op.value)
+        else unsetJsonPath(section, op.path)
+      }
+      const profilesObject = validateOrganizationProfiles(section)
+      const profiles = new Map<string, Record<string, unknown>>(Object.entries(profilesObject))
+      const existing = await client.query<{
+        id: string
+        provider_key: string
+        status: 'draft' | 'enabled' | 'disabled' | 'archived'
+        credential_ref: string | null
+        profile: Record<string, unknown>
+      }>(`SELECT id,provider_key,status,credential_ref,profile FROM harness.model_providers
+        WHERE organization_id=$1 AND source='managed' FOR UPDATE`, [this.context.organizationId])
+      const oldByProvider = new Map(existing.rows.map(row => [row.provider_key, row]))
+      for (const [provider, profile] of profiles) {
+        const displayName = typeof profile.displayName === 'string' && profile.displayName.trim() !== ''
+          ? profile.displayName.trim()
+          : provider
+        const protocol = typeof profile.api === 'string' ? profile.api : null
+        const baseURL = typeof profile.baseURL === 'string' ? providerBaseURL(profile.baseURL) : null
+        const credentialRef = apiKeyRefOf(profile)
+        const old = oldByProvider.get(provider)
+        // A credential belongs to the reference named by the new profile. A
+        // provider row can retain an encrypted value while its profile points
+        // at a different reference, so the old row is usable only when both
+        // references still match.
+        const credentialConfigured = credentialRef !== undefined
+          && old?.credential_ref === credentialRef
+          && await this.organizationCredentialExists(client, old?.id)
+        const models = profileModelsOf(profile)
+        const complete = protocol !== null && baseURL !== null && models.length > 0
+          && (credentialRef === undefined || credentialConfigured)
+        // The shared editor owns completeness, not a second lifecycle switch.
+        // A previously disabled route becomes usable once its complete profile
+        // is saved; incomplete edits remain drafts.
+        const status = complete ? 'enabled' : 'draft'
+        const stored = await client.query<{ id: string }>(`INSERT INTO harness.model_providers(
+          organization_id,provider_key,display_name,driver,protocol,base_url,auth_mode,credential_ref,status,profile
+        ) VALUES($1,$2,$3,'pi-ai',$4,$5,$6,$7,$8,$9)
+        ON CONFLICT(organization_id,provider_key) DO UPDATE SET
+          display_name=excluded.display_name,protocol=excluded.protocol,base_url=excluded.base_url,
+          auth_mode=excluded.auth_mode,credential_ref=excluded.credential_ref,status=excluded.status,
+          profile=excluded.profile,revision=harness.model_providers.revision+1,updated_at=now()
+        RETURNING id`, [this.context.organizationId, provider, displayName, protocol, baseURL,
+          credentialRef === undefined ? 'none' : 'api-key', credentialRef, status, profile])
+        const providerId = stored.rows[0]?.id
+        if (providerId === undefined) throw new Error(`provider ${provider} upsert returned no row`)
+        if (old?.credential_ref !== null && old?.credential_ref !== undefined && old.credential_ref !== credentialRef) {
+          await client.query(`DELETE FROM harness.organization_model_credentials WHERE organization_id=$1 AND provider_id=$2`,
+            [this.context.organizationId, providerId])
+        }
+        await this.syncProviderModels(client, providerId, provider, models)
+      }
+      for (const old of existing.rows) {
+        if (profiles.has(old.provider_key)) continue
+        await client.query(`DELETE FROM harness.organization_model_credentials
+          WHERE organization_id=$1 AND provider_id=$2`, [this.context.organizationId, old.id])
+        await client.query(`UPDATE harness.model_providers SET status='archived',profile='{}'::jsonb,
+          revision=revision+1,updated_at=now() WHERE organization_id=$1 AND id=$2`, [this.context.organizationId, old.id])
+        await client.query(`UPDATE harness.model_catalog SET enabled=false,updated_at=now()
+          WHERE organization_id=$1 AND provider_id=$2`, [this.context.organizationId, old.id])
+      }
+      await this.bumpConfigurationRevision(client)
+      const nextRevision = revision + 1
+      return this.organizationSettingsView(profiles, nextRevision, client)
+    })
+  }
+
+  /** Describe organization-owned credential state without returning values. */
+  async describeOrganizationCredentials(refs: string[]): Promise<Record<string, OrganizationCredentialView>> {
+    const accepted = [...new Set(refs)]
+    const result = await this.context.pool.query<{ credential_ref: string }>(`SELECT provider.credential_ref
+      FROM harness.model_providers provider
+      JOIN harness.organization_model_credentials credential
+        ON credential.organization_id=provider.organization_id AND credential.provider_id=provider.id
+      WHERE provider.organization_id=$1 AND provider.source='managed' AND provider.status <> 'archived'
+        AND provider.credential_ref = ANY($2::text[])`,
+    [this.context.organizationId, accepted])
+    const configured = new Set(result.rows.map(row => row.credential_ref))
+    const rows: Record<string, OrganizationCredentialView> = {}
+    for (const ref of accepted) rows[ref] = { configured: configured.has(ref), source: 'organization', writable: true }
+    return rows
+  }
+
+  /** Store one encrypted organization credential and refresh provider readiness. */
+  async setOrganizationCredential(ref: string, value: string): Promise<void> {
+    const accepted = nonEmpty(value, 'credential')
+    await transaction(this.context.pool, async (client) => {
+      const provider = await this.providerForCredential(client, ref)
+      if (provider === undefined) throw new Error(`unknown organization credential ${ref}`)
+      const encrypted = this.credentialCipher.encrypt(this.context.organizationId, provider.id, accepted)
+      await client.query(`INSERT INTO harness.organization_model_credentials(
+        organization_id,provider_id,key_version,nonce,ciphertext,auth_tag
+      ) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(provider_id) DO UPDATE SET
+        key_version=excluded.key_version,nonce=excluded.nonce,ciphertext=excluded.ciphertext,auth_tag=excluded.auth_tag,updated_at=now()`, [
+        this.context.organizationId, provider.id, encrypted.keyVersion, encrypted.nonce, encrypted.ciphertext, encrypted.authTag,
+      ])
+      await this.refreshProviderReadiness(client, provider.id)
+      await this.bumpConfigurationRevision(client)
+    })
+  }
+
+  /** Remove one encrypted organization credential. */
+  async unsetOrganizationCredential(ref: string): Promise<void> {
+    await transaction(this.context.pool, async (client) => {
+      const provider = await this.providerForCredential(client, ref)
+      if (provider === undefined) return
+      await client.query(`DELETE FROM harness.organization_model_credentials WHERE organization_id=$1 AND provider_id=$2`,
+        [this.context.organizationId, provider.id])
+      await this.refreshProviderReadiness(client, provider.id)
+      await this.bumpConfigurationRevision(client)
+    })
+  }
+
+  /** Reuse the pi-ai discovery implementation for the organization editor. */
+  async discoverOrganizationModels(request: {
+    provider?: string
+    baseURL?: string
+    api?: string
+    apiKey?: string
+  }): Promise<Array<{ id: string; name?: string; contextWindow?: number; maxTokens?: number }>> {
+    return discoverOrganizationModels(request)
   }
 
   async listModels(): Promise<ModelRow[]> {
@@ -203,13 +562,16 @@ export class PostgresModelGovernanceService {
       COALESCE(p.cache_read_per_million,0)::text cache_read_price,
       COALESCE(p.cache_write_per_million,0)::text cache_write_price
       FROM harness.model_catalog m
+      JOIN harness.model_providers provider ON provider.id=m.provider_id
+        AND provider.organization_id=m.organization_id
       LEFT JOIN harness.model_role_access a ON a.organization_id=m.organization_id
         AND a.model_id=m.id AND a.role='admin'
       LEFT JOIN harness.model_role_access u ON u.organization_id=m.organization_id
         AND u.model_id=m.id AND u.role='member'
       LEFT JOIN LATERAL (SELECT * FROM harness.model_prices p
         WHERE p.model_id=m.id ORDER BY p.effective_at DESC,p.id DESC LIMIT 1) p ON true
-      WHERE m.organization_id=$1 ORDER BY m.provider_key,m.model_key`, [this.context.organizationId])
+      WHERE m.organization_id=$1 AND provider.source='managed' AND provider.status <> 'archived'
+      ORDER BY m.provider_key,m.model_key`, [this.context.organizationId])
     return result.rows.map(row => ({
       provider: row.provider,
       model: row.model,
@@ -237,11 +599,21 @@ export class PostgresModelGovernanceService {
       input.cacheWriteMicrosPerMillion,
     ].map((value, index) => microsToDecimal(nonnegative(value, `price[${String(index)}]`)))
     await transaction(this.context.pool, async (client) => {
+      const providerRow = await client.query<{ id: string; source: string; status: string }>(`SELECT id,source,status
+        FROM harness.model_providers WHERE organization_id=$1 AND provider_key=$2 FOR UPDATE`,
+      [this.context.organizationId, provider])
+      const configuredProvider = providerRow.rows[0]
+      if (configuredProvider === undefined) throw new Error(`unknown provider ${provider}`)
+      if (configuredProvider.source !== 'managed') {
+        throw new Error(`legacy catalog provider ${provider} cannot accept model changes`)
+      }
+      if (configuredProvider.status === 'archived') throw new Error(`provider ${provider} is archived`)
       const catalog = await client.query<{ id: string }>(`INSERT INTO harness.model_catalog(
-        organization_id,provider_key,model_key,display_name,enabled
-      ) VALUES($1,$2,$3,$4,$5) ON CONFLICT(organization_id,provider_key,model_key) DO UPDATE SET
+        organization_id,provider_id,provider_key,model_key,display_name,enabled
+      ) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(organization_id,provider_key,model_key) DO UPDATE SET
         display_name=excluded.display_name,enabled=excluded.enabled,updated_at=now() RETURNING id`,
-      [this.context.organizationId, provider, model, nonEmpty(input.displayName, 'displayName'), input.enabled])
+      [this.context.organizationId, configuredProvider.id, provider, model,
+        nonEmpty(input.displayName, 'displayName'), input.enabled])
       const modelId = catalog.rows[0]?.id
       if (modelId === undefined) throw new Error('model upsert returned no row')
       for (const [role, allowed] of [
@@ -258,6 +630,9 @@ export class PostgresModelGovernanceService {
       await client.query(`INSERT INTO harness.model_prices(model_id,effective_at,input_per_million,
         output_per_million,cache_read_per_million,cache_write_per_million)
         VALUES($1,$2,$3,$4,$5,$6)`, [modelId, latest.rows[0]!.effective_at, ...prices])
+      await client.query(`UPDATE harness.model_providers SET revision=revision+1,updated_at=now()
+        WHERE id=$1 AND organization_id=$2`, [configuredProvider.id, this.context.organizationId])
+      await this.bumpConfigurationRevision(client)
     })
   }
 
@@ -267,8 +642,11 @@ export class PostgresModelGovernanceService {
     await transaction(this.context.pool, async (client) => {
       const user = await internalUserId(client, this.context.organizationId, userId)
       if (user === null) throw new Error(`unknown user ${String(userId)}`)
-      const catalog = await client.query<{ id: string }>(`SELECT id FROM harness.model_catalog
-        WHERE organization_id=$1 AND provider_key=$2 AND model_key=$3`,
+      const catalog = await client.query<{ id: string }>(`SELECT model.id FROM harness.model_catalog model
+        JOIN harness.model_providers provider ON provider.id=model.provider_id
+          AND provider.organization_id=model.organization_id
+        WHERE model.organization_id=$1 AND model.provider_key=$2 AND model.model_key=$3
+          AND provider.source='managed' AND provider.status <> 'archived'`,
       [this.context.organizationId, provider, model])
       const modelId = catalog.rows[0]?.id
       if (modelId === undefined) throw new Error(`unknown model ${provider}/${model}`)
@@ -279,6 +657,7 @@ export class PostgresModelGovernanceService {
           VALUES($1,$2,$3,$4) ON CONFLICT(user_id,model_id) DO UPDATE SET allowed=excluded.allowed`,
         [this.context.organizationId, user, modelId, allowed])
       }
+      await this.bumpConfigurationRevision(client)
     })
   }
 
@@ -293,67 +672,166 @@ export class PostgresModelGovernanceService {
     return result.rows
   }
 
-  async policyFor(user: UserRow): Promise<{
-    version: number
-    defaultAllowed: false
-    models: Array<{ provider: string; model: string; allowed: boolean }>
-  }> {
-    const result = await this.context.pool.query<{
-      provider: string
-      model: string
-      enabled: boolean
-      allowed: boolean
-    }>(`SELECT m.provider_key provider,m.model_key model,m.enabled,
-      COALESCE(x.allowed,r.allowed,$3::boolean) allowed
-      FROM harness.model_catalog m
-      LEFT JOIN harness.model_role_access r ON r.organization_id=m.organization_id
-        AND r.model_id=m.id AND r.role=$4
-      LEFT JOIN harness.users u ON u.organization_id=m.organization_id AND u.public_id=$2
-      LEFT JOIN harness.model_user_access x ON x.organization_id=m.organization_id
-        AND x.model_id=m.id AND x.user_id=u.id
-      WHERE m.organization_id=$1 ORDER BY m.provider_key,m.model_key`,
-    [this.context.organizationId, user.id, user.role === 'admin', roleForPostgres(user.role)])
-    return {
-      version: Date.now(),
-      // The catalog is the sole authorization source for every role; unlisted
-      // routes fall through to the plugin's user-declared allowance instead.
-      defaultAllowed: false,
-      models: result.rows.map(row => ({
-        provider: row.provider,
-        model: row.model,
-        allowed: row.enabled && row.allowed,
-      })),
-    }
+  async setProjectAccess(
+    projectId: number,
+    provider: string,
+    model: string,
+    allowed: boolean | null,
+  ): Promise<void> {
+    provider = nonEmpty(provider, 'provider')
+    model = nonEmpty(model, 'model')
+    await transaction(this.context.pool, async (client) => {
+      const project = await internalProjectId(client, this.context.organizationId, projectId)
+      if (project === null) throw new Error(`unknown project ${String(projectId)}`)
+      const catalog = await client.query<{ id: string }>(`SELECT model.id FROM harness.model_catalog model
+        JOIN harness.model_providers provider ON provider.id=model.provider_id
+          AND provider.organization_id=model.organization_id
+        WHERE model.organization_id=$1 AND model.provider_key=$2 AND model.model_key=$3
+          AND provider.source='managed' AND provider.status <> 'archived'`,
+      [this.context.organizationId, provider, model])
+      const modelId = catalog.rows[0]?.id
+      if (modelId === undefined) throw new Error(`unknown model ${provider}/${model}`)
+      if (allowed === null) {
+        await client.query('DELETE FROM harness.model_project_access WHERE project_id=$1 AND model_id=$2',
+          [project, modelId])
+      } else {
+        await client.query(`INSERT INTO harness.model_project_access(
+          organization_id,project_id,model_id,allowed
+        ) VALUES($1,$2,$3,$4) ON CONFLICT(project_id,model_id) DO UPDATE SET
+          allowed=excluded.allowed,updated_at=now()`, [this.context.organizationId, project, modelId, allowed])
+      }
+      await this.bumpConfigurationRevision(client)
+    })
   }
 
-  async policyForProject(projectId: number): Promise<{
-    version: number
-    defaultAllowed: false
-    models: Array<{ provider: string; model: string; allowed: boolean }>
-  }> {
-    if (await internalProjectId(this.context.pool, this.context.organizationId, projectId) === null) {
-      throw new Error(`unknown project ${String(projectId)}`)
-    }
+  async projectOverrides(projectId: number): Promise<Array<{ provider: string; model: string; allowed: boolean }>> {
+    const project = await internalProjectId(this.context.pool, this.context.organizationId, projectId)
+    if (project === null) throw new Error(`unknown project ${String(projectId)}`)
+    const result = await this.context.pool.query<{ provider: string; model: string; allowed: boolean }>(`SELECT
+      model.provider_key provider,model.model_key model,access.allowed
+      FROM harness.model_project_access access
+      JOIN harness.model_catalog model ON model.id=access.model_id AND model.organization_id=access.organization_id
+      WHERE access.organization_id=$1 AND access.project_id=$2 ORDER BY model.provider_key,model.model_key`,
+    [this.context.organizationId, project])
+    return result.rows
+  }
+
+  async policyFor(user: UserRow): Promise<RuntimeModelPolicy> {
+    return transaction(this.context.pool, async (client) => {
+      const version = await this.lockConfigurationRevision(client)
+      const result = await client.query<{
+        provider: string
+        model: string
+        provider_enabled: boolean
+        model_enabled: boolean
+        allowed: boolean
+      }>(`SELECT model.provider_key provider,model.model_key model,
+        (provider.status='enabled') provider_enabled,model.enabled model_enabled,
+        COALESCE(access.allowed,role_access.allowed,$3::boolean) allowed
+        FROM harness.model_catalog model
+        JOIN harness.model_providers provider ON provider.id=model.provider_id
+          AND provider.organization_id=model.organization_id
+        LEFT JOIN harness.model_role_access role_access ON role_access.organization_id=model.organization_id
+          AND role_access.model_id=model.id AND role_access.role=$4
+        LEFT JOIN harness.users target ON target.organization_id=model.organization_id AND target.public_id=$2
+        LEFT JOIN harness.model_user_access access ON access.organization_id=model.organization_id
+          AND access.model_id=model.id AND access.user_id=target.id
+        WHERE model.organization_id=$1 AND provider.source='managed' AND provider.status <> 'archived'
+        ORDER BY model.provider_key,model.model_key`,
+      [this.context.organizationId, user.id, user.role === 'admin', roleForPostgres(user.role)])
+      return {
+        version,
+        defaultAllowed: false,
+        models: result.rows.map(row => ({
+          provider: row.provider,
+          model: row.model,
+          allowed: row.provider_enabled && row.model_enabled && row.allowed,
+        })),
+        providers: await this.runtimeProviders(client),
+      }
+    })
+  }
+
+  async policyForProject(projectId: number): Promise<RuntimeModelPolicy> {
+    return transaction(this.context.pool, async (client) => {
+      const project = await internalProjectId(client, this.context.organizationId, projectId)
+      if (project === null) throw new Error(`unknown project ${String(projectId)}`)
+      const version = await this.lockConfigurationRevision(client)
+      const result = await client.query<{
+        provider: string
+        model: string
+        provider_enabled: boolean
+        model_enabled: boolean
+        allowed: boolean
+      }>(`SELECT model.provider_key provider,model.model_key model,
+        (provider.status='enabled') provider_enabled,model.enabled model_enabled,
+        COALESCE(access.allowed,false) allowed
+        FROM harness.model_catalog model
+        JOIN harness.model_providers provider ON provider.id=model.provider_id
+          AND provider.organization_id=model.organization_id
+        LEFT JOIN harness.model_project_access access ON access.organization_id=model.organization_id
+          AND access.model_id=model.id AND access.project_id=$2
+        WHERE model.organization_id=$1 AND provider.source='managed' AND provider.status <> 'archived'
+        ORDER BY model.provider_key,model.model_key`,
+      [this.context.organizationId, project])
+      return {
+        version,
+        defaultAllowed: false,
+        models: result.rows.map(row => ({
+          provider: row.provider,
+          model: row.model,
+          allowed: row.provider_enabled && row.model_enabled && row.allowed,
+        })),
+        providers: await this.runtimeProviders(client),
+      }
+    })
+  }
+
+  async resolveOrganizationCredential(subject: ModelUsageSubject, ref: string): Promise<string | null> {
+    const subjectId = subject.kind === 'user'
+      ? await internalUserId(this.context.pool, this.context.organizationId, subject.id)
+      : await internalProjectId(this.context.pool, this.context.organizationId, subject.id)
+    if (subjectId === null) return null
+    const authorization = subject.kind === 'user'
+      ? `EXISTS(SELECT 1 FROM harness.model_catalog model
+          JOIN harness.users target ON target.organization_id=model.organization_id AND target.id=$3
+          JOIN harness.memberships membership ON membership.organization_id=target.organization_id
+            AND membership.user_id=target.id AND membership.status='active'
+          LEFT JOIN harness.model_role_access role_access ON role_access.organization_id=model.organization_id
+            AND role_access.model_id=model.id AND role_access.role=membership.role
+          LEFT JOIN harness.model_user_access user_access ON user_access.organization_id=model.organization_id
+            AND user_access.model_id=model.id AND user_access.user_id=target.id
+          WHERE model.organization_id=provider.organization_id AND model.provider_id=provider.id
+            AND provider.source='managed' AND provider.status <> 'archived'
+            AND model.enabled AND COALESCE(user_access.allowed,role_access.allowed,membership.role='admin'))`
+      : `EXISTS(SELECT 1 FROM harness.model_catalog model
+          JOIN harness.model_project_access access ON access.organization_id=model.organization_id
+            AND access.model_id=model.id AND access.project_id=$3 AND access.allowed
+          WHERE model.organization_id=provider.organization_id AND model.provider_id=provider.id
+            AND provider.source='managed' AND provider.status <> 'archived'
+            AND model.enabled)`
     const result = await this.context.pool.query<{
-      provider: string
-      model: string
-      enabled: boolean
-      allowed: boolean
-    }>(`SELECT m.provider_key provider,m.model_key model,m.enabled,
-      COALESCE(r.allowed,false) allowed
-      FROM harness.model_catalog m
-      LEFT JOIN harness.model_role_access r ON r.organization_id=m.organization_id
-        AND r.model_id=m.id AND r.role='member'
-      WHERE m.organization_id=$1 ORDER BY m.provider_key,m.model_key`, [this.context.organizationId])
-    return {
-      version: Date.now(),
-      defaultAllowed: false,
-      models: result.rows.map(row => ({
-        provider: row.provider,
-        model: row.model,
-        allowed: row.enabled && row.allowed,
-      })),
-    }
+      provider_id: string
+      key_version: number
+      nonce: Buffer
+      ciphertext: Buffer
+      auth_tag: Buffer
+    }>(`SELECT provider.id provider_id,credential.key_version,credential.nonce,
+      credential.ciphertext,credential.auth_tag
+      FROM harness.model_providers provider
+      JOIN harness.organization_model_credentials credential ON credential.organization_id=provider.organization_id
+        AND credential.provider_id=provider.id
+      WHERE provider.organization_id=$1 AND provider.credential_ref=$2
+        AND provider.source='managed' AND provider.status='enabled' AND ${authorization}
+      LIMIT 1`, [this.context.organizationId, ref, subjectId])
+    const row = result.rows[0]
+    if (row === undefined) return null
+    return this.credentialCipher.decrypt(this.context.organizationId, row.provider_id, {
+      keyVersion: row.key_version as 1,
+      nonce: row.nonce,
+      ciphertext: row.ciphertext,
+      authTag: row.auth_tag,
+    })
   }
 
   async issueIntakeToken(subject: ModelUsageSubject): Promise<string> {
@@ -674,5 +1152,237 @@ export class PostgresModelGovernanceService {
       }
     }
     return inserted
+  }
+
+  private async bumpConfigurationRevision(queryable: Queryable): Promise<void> {
+    const updated = await queryable.query(`UPDATE harness.organizations
+      SET model_configuration_revision=model_configuration_revision+1,updated_at=now()
+      WHERE id=$1`, [this.context.organizationId])
+    if (updated.rowCount !== 1) throw new Error('organization model configuration revision update failed')
+  }
+
+  private async organizationProfiles(queryable: Queryable): Promise<Map<string, Record<string, unknown>>> {
+    const providers = await queryable.query<{
+      provider_key: string
+      display_name: string
+      protocol: ModelProviderProtocol | null
+      base_url: string | null
+      credential_ref: string | null
+      profile: Record<string, unknown>
+    }>(`SELECT provider_key,display_name,protocol,base_url,credential_ref,profile
+      FROM harness.model_providers WHERE organization_id=$1 AND source='managed' AND status <> 'archived'
+      ORDER BY provider_key`, [this.context.organizationId])
+    const catalog = await queryable.query<{
+      provider_key: string
+      model_key: string
+      display_name: string
+    }>(`SELECT provider_key,model_key,display_name FROM harness.model_catalog
+      WHERE organization_id=$1 AND enabled ORDER BY provider_key,model_key`, [this.context.organizationId])
+    const modelsByProvider = new Map<string, Array<Record<string, unknown>>>()
+    for (const row of catalog.rows) {
+      const models = modelsByProvider.get(row.provider_key) ?? []
+      models.push({ id: row.model_key, name: row.display_name })
+      modelsByProvider.set(row.provider_key, models)
+    }
+    return new Map(providers.rows.map(row => {
+      const profile = jsonObject(cloneJson(row.profile), `provider ${row.provider_key}`)
+      const configuredModels = profileModelsOf(profile)
+      const inheritedModels = modelsByProvider.get(row.provider_key) ?? []
+      const hydrated: Record<string, unknown> = {
+        ...profile,
+        ...profile.displayName === undefined ? { displayName: row.display_name } : {},
+        ...profile.api === undefined && row.protocol !== null ? { api: row.protocol } : {},
+        ...profile.baseURL === undefined && row.base_url !== null ? { baseURL: row.base_url } : {},
+        ...profile.apiKeyEnv === undefined && row.credential_ref !== null ? { apiKeyEnv: row.credential_ref } : {},
+        ...configuredModels.length === 0 && inheritedModels.length > 0 ? { models: inheritedModels } : {},
+      }
+      return [row.provider_key, hydrated]
+    }))
+  }
+
+  private async organizationSettingsView(
+    profiles: Map<string, Record<string, unknown>>,
+    revision: number,
+    queryable: Queryable = this.context.pool,
+  ): Promise<OrganizationModelSettingsView> {
+    const profileObject = Object.fromEntries([...profiles.entries()].map(([provider, profile]) => [provider, cloneJson(profile)]))
+    const value: unknown = { providers: profileObject }
+    const refs = [...profiles.values()].flatMap(profile => {
+      const ref = apiKeyRefOf(profile)
+      return ref === undefined ? [] : [ref]
+    })
+    const configured = new Set<string>()
+    if (refs.length > 0) {
+      const result = await queryable.query<{ credential_ref: string }>(`SELECT provider.credential_ref
+          FROM harness.model_providers provider JOIN harness.organization_model_credentials credential
+            ON credential.organization_id=provider.organization_id AND credential.provider_id=provider.id
+          WHERE provider.organization_id=$1 AND provider.source='managed' AND provider.status <> 'archived'
+            AND provider.credential_ref = ANY($2::text[])`, [this.context.organizationId, refs])
+      for (const row of result.rows) configured.add(row.credential_ref)
+    }
+    const secrets = [...profiles.entries()].flatMap(([provider, profile]) => {
+      const ref = apiKeyRefOf(profile)
+      return ref === undefined ? [] : [{ path: ['providers', provider, 'apiKeyEnv'], set: configured.has(ref) }]
+    })
+    return {
+      writable: true,
+      hasDocument: false,
+      namespaces: [{
+        ns: 'llm-pi-ai',
+        schema: organizationModelSettingsSchema(),
+        value,
+        base: { providers: {} },
+        user: { providers: profileObject },
+        applies: 'live',
+        secrets,
+        revision,
+      }],
+    }
+  }
+
+  private async organizationCredentialExists(queryable: Queryable, providerId: string | undefined): Promise<boolean> {
+    if (providerId === undefined) return false
+    const result = await queryable.query<{ exists: boolean }>(`SELECT EXISTS(SELECT 1 FROM harness.organization_model_credentials
+      WHERE organization_id=$1 AND provider_id=$2) exists`, [this.context.organizationId, providerId])
+    return result.rows[0]?.exists === true
+  }
+
+  private async syncProviderModels(
+    queryable: Queryable,
+    providerId: string,
+    provider: string,
+    models: Array<Record<string, unknown>>,
+  ): Promise<void> {
+    const ids: string[] = []
+    for (const [index, model] of models.entries()) {
+      const id = typeof model.id === 'string' ? model.id.trim() : ''
+      if (id === '') throw new Error(`provider ${provider} model ${String(index + 1)} must have an id`)
+      const name = typeof model.name === 'string' && model.name.trim() !== '' ? model.name.trim() : id
+      ids.push(id)
+      const stored = await queryable.query<{ id: string }>(`INSERT INTO harness.model_catalog(
+        organization_id,provider_id,provider_key,model_key,display_name,enabled
+      ) VALUES($1,$2,$3,$4,$5,true)
+      ON CONFLICT(organization_id,provider_key,model_key) DO UPDATE SET
+        provider_id=excluded.provider_id,display_name=excluded.display_name,enabled=true,updated_at=now()
+      RETURNING id`, [this.context.organizationId, providerId, provider, id, name])
+      const modelId = stored.rows[0]?.id
+      if (modelId === undefined) throw new Error(`model ${provider}/${id} upsert returned no row`)
+      await queryable.query(`INSERT INTO harness.model_role_access(organization_id,role,model_id,allowed)
+        VALUES($1,'admin',$2,true) ON CONFLICT DO NOTHING`, [this.context.organizationId, modelId])
+      await queryable.query(`INSERT INTO harness.model_role_access(organization_id,role,model_id,allowed)
+        VALUES($1,'member',$2,false) ON CONFLICT DO NOTHING`, [this.context.organizationId, modelId])
+    }
+    await queryable.query(`UPDATE harness.model_catalog SET enabled=false,updated_at=now()
+      WHERE organization_id=$1 AND provider_id=$2 AND NOT (model_key = ANY($3::text[]))`,
+    [this.context.organizationId, providerId, ids])
+  }
+
+  private async providerForCredential(queryable: Queryable, ref: string): Promise<{
+    id: string
+    status: 'draft' | 'enabled' | 'disabled' | 'archived'
+    credential_ref: string
+    profile: Record<string, unknown>
+  } | undefined> {
+    const result = await queryable.query<{
+      id: string
+      status: 'draft' | 'enabled' | 'disabled' | 'archived'
+      credential_ref: string
+      profile: Record<string, unknown>
+    }>(`SELECT id,status,credential_ref,profile FROM harness.model_providers
+      WHERE organization_id=$1 AND source='managed' AND credential_ref=$2`, [this.context.organizationId, ref])
+    return result.rows[0]
+  }
+
+  private async refreshProviderReadiness(queryable: Queryable, providerId: string): Promise<void> {
+    const result = await queryable.query<{
+      status: 'draft' | 'enabled' | 'disabled' | 'archived'
+      credential_ref: string | null
+      profile: Record<string, unknown>
+      models: string
+      credential_configured: boolean
+    }>(`SELECT provider.status,provider.credential_ref,provider.profile,COUNT(model.id)::text models,
+      EXISTS(SELECT 1 FROM harness.organization_model_credentials credential
+        WHERE credential.organization_id=provider.organization_id AND credential.provider_id=provider.id) credential_configured
+      FROM harness.model_providers provider LEFT JOIN harness.model_catalog model
+        ON model.organization_id=provider.organization_id AND model.provider_id=provider.id AND model.enabled
+      WHERE provider.organization_id=$1 AND provider.id=$2 GROUP BY provider.id`, [this.context.organizationId, providerId])
+    const row = result.rows[0]
+    if (row === undefined || row.status === 'disabled' || row.status === 'archived') return
+    const profile = jsonObject(row.profile, 'provider profile')
+    const ready = typeof profile.api === 'string' && typeof profile.baseURL === 'string'
+      && safeCount(row.models, 'provider model count') > 0
+      && (row.credential_ref === null || row.credential_configured)
+    await queryable.query(`UPDATE harness.model_providers SET status=$3,updated_at=now()
+      WHERE organization_id=$1 AND id=$2`, [this.context.organizationId, providerId, ready ? 'enabled' : 'draft'])
+  }
+
+  private async lockConfigurationRevision(queryable: Queryable): Promise<number> {
+    const result = await queryable.query<{ revision: string }>(`SELECT model_configuration_revision::text revision
+      FROM harness.organizations WHERE id=$1 FOR SHARE`, [this.context.organizationId])
+    const revision = result.rows[0]?.revision
+    if (revision === undefined) throw new Error('organization model configuration revision is unavailable')
+    return safeCount(revision, 'organization model configuration revision')
+  }
+
+  private async runtimeProviders(queryable: Queryable): Promise<RuntimeModelProvider[]> {
+    const result = await queryable.query<{
+      provider: string
+      display_name: string
+      protocol: ModelProviderProtocol
+      base_url: string
+      credential_ref: string | null
+      profile: Record<string, unknown>
+      model_id: string
+      model_name: string
+    }>(`SELECT provider.provider_key provider,provider.display_name,provider.protocol,
+      provider.base_url,provider.credential_ref,provider.profile,model.model_key model_id,model.display_name model_name
+      FROM harness.model_providers provider
+      JOIN harness.model_catalog model ON model.organization_id=provider.organization_id
+        AND model.provider_id=provider.id
+      WHERE provider.organization_id=$1 AND provider.source='managed' AND provider.status='enabled'
+      ORDER BY provider.provider_key,model.model_key`, [this.context.organizationId])
+    const providers = new Map<string, RuntimeModelProvider>()
+    for (const row of result.rows) {
+      let provider = providers.get(row.provider)
+      if (provider === undefined) {
+        provider = {
+          provider: row.provider,
+          displayName: row.display_name,
+          driver: 'pi-ai',
+          protocol: row.protocol,
+          baseURL: row.base_url,
+          ...row.credential_ref === null ? {} : { credentialRef: row.credential_ref },
+          profile: cloneJson(row.profile),
+          models: [],
+        }
+        providers.set(row.provider, provider)
+      }
+      const configured = profileModelsOf(jsonObject(row.profile, `provider ${row.provider} profile`))
+        .find(model => model.id === row.model_id)
+      const contextWindow = typeof configured?.contextWindow === 'number' ? configured.contextWindow : undefined
+      const maxTokens = typeof configured?.maxTokens === 'number' ? configured.maxTokens : undefined
+      const input = Array.isArray(configured?.input)
+        ? configured.input.filter((value): value is 'text' | 'image' => value === 'text' || value === 'image')
+        : undefined
+      const reasoningEfforts = configured?.reasoningEfforts === false
+        ? false
+        : configured?.reasoningEfforts !== undefined
+          && typeof configured.reasoningEfforts === 'object' && configured.reasoningEfforts !== null
+          ? configured.reasoningEfforts as RuntimeModelProvider['models'][number]['reasoningEfforts']
+          : undefined
+      const compat = configured?.compat !== undefined && typeof configured.compat === 'object' && configured.compat !== null
+        ? configured.compat as RuntimeModelProvider['models'][number]['compat']
+        : undefined
+      provider.models.push({
+        id: row.model_id,
+        name: row.model_name,
+        ...contextWindow === undefined ? {} : { contextWindow },
+        ...maxTokens === undefined ? {} : { maxTokens },
+        ...input === undefined ? {} : { input },
+        ...reasoningEfforts === undefined ? {} : { reasoningEfforts },
+        ...compat === undefined ? {} : { compat },
+      })
+    }
+    return [...providers.values()]
   }
 }

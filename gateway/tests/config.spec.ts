@@ -52,6 +52,8 @@ describe('loadConfig', () => {
       HGW_PROJECTS_ROOT: '/srv/harness/projects/admin',
       HGW_IDLE_TIMEOUT_MS: '60000',
       HGW_RUNTIME_API_BODY_LIMIT_BYTES: '8388608',
+      HGW_FCM_PROJECT_ID: '  firebase-project  ',
+      HGW_FCM_SERVICE_ACCOUNT_FILE: '  /srv/harness/firebase.json  ',
     })
     expect(cfg.port).toBe(9001)
     expect(cfg.organizationSlug).toBe('internal')
@@ -62,6 +64,8 @@ describe('loadConfig', () => {
     expect(cfg.projectsRoot).toBe('/srv/harness/projects/admin')
     expect(cfg.idleTimeoutMs).toBe(60000)
     expect(cfg.runtimeApiBodyLimitBytes).toBe(8 * 1024 * 1024)
+    expect(cfg.fcmProjectId).toBe('firebase-project')
+    expect(cfg.fcmServiceAccountFile).toBe('/srv/harness/firebase.json')
     expect(cfg.secureCookies).toBe(true)
   })
 

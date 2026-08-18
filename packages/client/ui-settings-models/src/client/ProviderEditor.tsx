@@ -71,6 +71,8 @@ export interface ProviderEditorProps {
   t: (key: keyof typeof en) => string
   /** Disable writes (read-only settings provider). */
   readOnly: boolean
+  /** Credential namespace used when this card materializes a new key reference. */
+  credentialScope?: 'personal' | 'organization'
   /** Render only the credential field and actions, without provider settings. */
   credentialOnly?: boolean
   /** Require a newly entered credential before this editor can submit. */
@@ -131,12 +133,17 @@ function layoutOf(ns: string): EditorLayout {
 }
 
 /** The credential reference this profile resolves keys through. */
-function refFor(namespace: SettingsNamespaceView, path: readonly string[], provider: string): string {
+function refFor(
+  namespace: SettingsNamespaceView,
+  path: readonly string[],
+  provider: string,
+  scope: 'personal' | 'organization',
+): string {
   const profile = getPath(namespace.value, path)
   const named = typeof profile === 'object' && profile !== null
     ? (profile as { apiKeyEnv?: unknown }).apiKeyEnv
     : undefined
-  return typeof named === 'string' && named.length > 0 ? named : deriveKeyRef(provider)
+  return typeof named === 'string' && named.length > 0 ? named : deriveKeyRef(provider, scope)
 }
 
 /**
@@ -163,7 +170,7 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
   const fallback = getPath(namespace.value, settingsPath)
   const disabled = props.readOnly || busy
   const layout = layoutOf(namespace.ns)
-  const keyRef = refFor(namespace, settingsPath, props.provider)
+  const keyRef = refFor(namespace, settingsPath, props.provider, props.credentialScope ?? 'personal')
   // The same schema read the create card makes, so the choices offered here
   // and there cannot drift apart: both come from the adapter's own `Config`.
   // Only the pi-ai layout has a per-route protocol for the read to find, and
@@ -363,7 +370,9 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
       onChange: (next: Record<string, unknown>[]) => {
         setDraft(current => setPath(current, ['models'], next))
       },
-      onReset: () => { setDraft(current => deletePath(current, ['models'])) },
+      ...props.credentialScope === 'organization'
+        ? {}
+        : { onReset: () => { setDraft(current => deletePath(current, ['models'])) } },
     }
     return (
       <>

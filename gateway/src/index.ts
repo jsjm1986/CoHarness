@@ -12,11 +12,16 @@ import { createPostgresPool, databaseUrlFromFile, runMigrations } from './postgr
 import { ConversationRepository } from './postgres/conversation-repository.ts'
 import { PostgresInstanceRepository } from './postgres/instance-repository.ts'
 import { PostgresModelGovernanceService } from './postgres/model-governance-service.ts'
+import {
+  loadOrganizationModelCredentialKey,
+  OrganizationModelCredentialCipher,
+} from './organization-model-credentials.ts'
 import { PostgresProjectService } from './postgres/project-service.ts'
 import { checkPostgresReadiness, resolvePostgresRuntimeContext } from './postgres/runtime-context.ts'
 import { PostgresUserService } from './postgres/user-service.ts'
 import { loadPrincipalKeys } from './principal.ts'
 import { createProxyHandlers } from './proxy.ts'
+import { createPostgresPushService } from './push-notifications.ts'
 import { createRuntimeApiHandler } from './runtime-api.ts'
 import { runtimeDirectoryGrants } from './runtime-directory-grants.ts'
 import { createGatewayServer, type GatewayDeps } from './server.ts'
@@ -34,8 +39,15 @@ const auth = new PostgresAuthService(context, cfg)
 const users = new PostgresUserService(context, cfg)
 const projects = new PostgresProjectService(context, cfg)
 const audit = new PostgresAuditService(context)
-const governance = new PostgresModelGovernanceService(context, cfg.usageTimeZone)
+const governance = new PostgresModelGovernanceService(
+  context,
+  new OrganizationModelCredentialCipher(
+    loadOrganizationModelCredentialKey(cfg.organizationModelCredentialKeyFile),
+  ),
+  cfg.usageTimeZone,
+)
 const collaboration = new PostgresCollaborationService(context)
+const push = createPostgresPushService(context, cfg)
 const principalKeys = loadPrincipalKeys(cfg.principalKeyDir, cfg.organizationSlug, cfg.principalAssertionTtlMs)
 const instanceRepository = new PostgresInstanceRepository(context, cfg.instancePortBase)
 const conversations = new ConversationRepository(pool)
@@ -68,6 +80,7 @@ const deps: GatewayDeps = {
   audit,
   governance,
   collaboration,
+  push,
   instances: new InstanceManager(instanceRepository, cfg, launcher, {
     principalPublicKey: principalKeys.publicKeyPem,
   }),
@@ -91,6 +104,8 @@ const server = createGatewayServer(deps, {
     conversations,
     collaboration,
     principals: principalKeys.signer,
+    governance,
+    push,
   }),
 })
 // Bind loopback only: the gateway is reached through the TLS entry (Cloudflare

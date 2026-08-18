@@ -90,6 +90,7 @@ function scriptedFace(options: {
           displayName: provider,
           settingsNs: 'llm-pi-ai',
           settingsPath: ['providers', provider],
+          management: 'personal' as const,
           active: true,
           declared: options.declaredRoutes?.includes(provider) ?? false,
         })),
@@ -634,6 +635,7 @@ describe('provider rows', () => {
         displayName: 'openai',
         settingsNs: 'llm-pi-ai',
         settingsPath: ['providers', 'openai'],
+        management: 'personal',
         active: true,
       }],
     }))) as never
@@ -795,6 +797,7 @@ describe('hand-declared providers', () => {
         displayName: 'Acme 网关',
         settingsNs: 'llm-pi-ai',
         settingsPath: ['providers', 'acme-gateway'],
+        management: 'personal',
         active: true,
         declared: true,
       }],

@@ -9,19 +9,35 @@ import { TestRemote, usePinnedBrowserLanguages } from '@deepseek-ai/dsh-client-t
 import { SettingsScopeBinder } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { apply, inject } from '@deepseek-ai/dsh-client-ui-settings-plugins/client'
 import type {
-  ConfigurablePluginsTabInjected, PluginsSettingsSectionInjected,
+  ConfigurablePluginsTabFace, PluginsSettingsSectionInjected,
 } from '@deepseek-ai/dsh-client-ui-settings-plugins/client'
 
 // The service reads its initial locale from the browser; these specs assert
 // the shipped Chinese copy, so they state the browser they assume.
 usePinnedBrowserLanguages('zh-CN')
 
-async function bench() {
+/** Build a browser context whose Host describes `served`, or refuses when omitted. */
+async function bench(served?: string[]) {
   const ctx = new Context()
   await ctx.plugin(SlotRegistry).await()
   const locale = new LocaleRuntime(ctx)
   ctx.provide('locale', locale)
   const describeCredentials = vi.fn(() => Promise.resolve({ rpcId: 'c', result: { ok: false, error: {} } }))
+  const describeSettings = vi.fn(() => Promise.resolve(served === undefined
+    ? { rpcId: 's', result: { ok: false, error: {} } }
+    : {
+      rpcId: 's',
+      result: {
+        ok: true,
+        value: {
+          writable: true,
+          hasDocument: true,
+          namespaces: served.map(ns => ({
+            ns, schema: {}, value: {}, applies: 'live', secrets: [], revision: 0,
+          })),
+        },
+      },
+    }))
   // The section binds its scopes through the Settings surface's service, and
   // forwarded Host events reach it through the same `$dispatch` handoff the
   // connection sink makes.
@@ -29,12 +45,12 @@ async function bench() {
   ctx.provide('connection', {
     isLoopback: true,
     api: {
-      settings: { describe: vi.fn(() => Promise.resolve({ rpcId: 's', result: { ok: false, error: {} } })) },
+      settings: { describe: describeSettings },
       credentials: { describe: describeCredentials },
     },
   } as never)
   await ctx.plugin(SettingsScopeBinder).await()
-  return { ctx, slots: ctx.get('slots') as SlotRegistry, describeCredentials }
+  return { ctx, slots: ctx.get('slots') as SlotRegistry, describeCredentials, describeSettings }
 }
 
 function declareRoot(slots: SlotRegistry): () => void {
@@ -63,20 +79,10 @@ describe('ui-settings-plugins apply', () => {
     const tab = slots.entries('settings.plugins.tab')[0]!
     expect(tab.options).toMatchObject({ id: 'configurable', order: 0 })
     expect(resolveSlotLabel(tab.options.label)).toBe('插件配置')
-    expect(slots.spec('settings.plugin.item')).toMatchObject({ kind: 'list', scope: 'root' })
+    expect(slots.spec('settings.plugin.item')).toMatchObject({ kind: 'keyed', scope: 'root' })
   })
 
-  it('registers one card per host-plane section it ships, in a stable order', async () => {
-    const { ctx, slots } = await bench()
-    declareRoot(slots)
-
-    await ctx.plugin({ inject: [...inject], apply }).await()
-
-    expect(slots.entries('settings.plugin.item').map(entry => entry.options.id))
-      .toEqual(['bash', 'agent-loop', 'web-search'])
-  })
-
-  it('injects a live tab projection, a card count, and one business face per card', async () => {
+  it('injects a live tab projection, the card directory, and one business face per card', async () => {
     const { ctx, slots } = await bench()
     declareRoot(slots)
     await ctx.plugin({ inject: [...inject], apply }).await()
@@ -99,12 +105,60 @@ describe('ui-settings-plugins apply', () => {
     unsubscribe()
 
     const tab = slots.entries('settings.plugins.tab')[0]!
-    expect((tab.inject as unknown as () => ConfigurablePluginsTabInjected)()).toEqual({ cardCount: 3 })
+    const tabFace = (tab.inject as unknown as () => ConfigurablePluginsTabFace)()
+    expect(Object.keys(tabFace.hooks)).toEqual(['configurablePlugins'])
     for (const entry of slots.entries('settings.plugin.item')) {
       const face = (entry as { inject?: () => unknown }).inject?.() as { hooks: Record<string, unknown> }
       // Each card injects exactly one snapshot store plus its own actions.
       expect(Object.keys(face.hooks)).toHaveLength(1)
     }
+  })
+
+  it('keys each shipped card on the settings namespace it edits', async () => {
+    const { ctx, slots } = await bench()
+    declareRoot(slots)
+
+    await ctx.plugin({ inject: [...inject], apply }).await()
+
+    expect(slots.entries('settings.plugin.item').map(entry => entry.options.key))
+      .toEqual(['shell', 'agent-loop', 'web-search-deepseek'])
+  })
+
+  it('dispatches only served namespaces claimed by registered cards', async () => {
+    const { ctx, slots } = await bench(['agent-loop', 'ui-theme', 'web-search-deepseek'])
+    declareRoot(slots)
+    await ctx.plugin({ inject: [...inject], apply }).await()
+
+    const tab = slots.entries('settings.plugins.tab')[0]!
+    const face = (tab.inject as unknown as () => ConfigurablePluginsTabFace)()
+    await vi.waitFor(() => {
+      expect(face.hooks.configurablePlugins.getSnapshot().namespaces)
+        .toEqual(['agent-loop', 'web-search-deepseek'])
+    })
+  })
+
+  it('re-reads served namespaces after a settings document update', async () => {
+    const { ctx, slots, describeSettings } = await bench(['shell'])
+    declareRoot(slots)
+    await ctx.plugin({ inject: [...inject], apply }).await()
+    await vi.waitFor(() => { expect(describeSettings).toHaveBeenCalled() })
+    describeSettings.mockClear()
+
+    ctx.remote.$dispatch('settings/document-updated', ['shell', 1])
+
+    await vi.waitFor(() => { expect(describeSettings).toHaveBeenCalledOnce() })
+  })
+
+  it('re-reads served namespaces after a reconnect', async () => {
+    const { ctx, slots, describeSettings } = await bench(['shell'])
+    declareRoot(slots)
+    await ctx.plugin({ inject: [...inject], apply }).await()
+    await vi.waitFor(() => { expect(describeSettings).toHaveBeenCalled() })
+    describeSettings.mockClear()
+
+    ctx.emit('connection/reset')
+
+    await vi.waitFor(() => { expect(describeSettings).toHaveBeenCalledOnce() })
   })
 
   it('re-reads the credential when the Host reports the watched reference changed', async () => {

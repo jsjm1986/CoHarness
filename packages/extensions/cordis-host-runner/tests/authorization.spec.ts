@@ -95,10 +95,10 @@ describe('registry-resolved collaboration authorization', () => {
   it('resolveRequestRun authorizes approve against the request Session and settles when granted', async () => {
     const authority = projectAuthority()
     const granted: Array<[SessionId, string]> = []
-    const base = authority.authorize
+    const base = authority.authorize.bind(authority)
     authority.authorize = async (sessionId, action) => {
       granted.push([sessionId, action])
-      return base(sessionId, action) as never
+      return base(sessionId, action)
     }
     const harness = await setupWithCollaboration(authority)
     const pluginId = await defineClientPlugin(harness, AGENT_A)
@@ -128,10 +128,10 @@ describe('registry-resolved collaboration authorization', () => {
   it('invoke authorizes write against the owning Session before running the handler', async () => {
     const authority = projectAuthority()
     const granted: Array<[SessionId, string]> = []
-    const base = authority.authorize
+    const base = authority.authorize.bind(authority)
     authority.authorize = async (sessionId, action) => {
       granted.push([sessionId, action])
-      return base(sessionId, action) as never
+      return base(sessionId, action)
     }
     const harness = await setupWithCollaboration(authority)
     const pluginId = await mount(harness, HOST_ONLY_CODE)
@@ -161,7 +161,7 @@ describe('registry-resolved collaboration authorization', () => {
   it('inventory keeps every row without collaboration and filters to readable Sessions in project scope', async () => {
     const bare = await setup()
     const own = await defineClientPlugin(bare, AGENT_A)
-    expect((await bare.runner.inventory()).map(row => String(row.pluginId))).toEqual([String(own)])
+    expect((await bare.runner.inventory()).map(row => row.pluginId)).toEqual([own])
 
     const readable = new Set<SessionId>([AGENT_A.id])
     const harness = await setupWithCollaboration(projectAuthority({
@@ -177,8 +177,8 @@ describe('registry-resolved collaboration authorization', () => {
     })
 
     const rows = await harness.runner.inventory()
-    expect(rows.map(row => String(row.pluginId))).toEqual([String(visible)])
-    expect(rows.some(row => String(row.pluginId) === String(hidden.pluginId))).toBe(false)
+    expect(rows.map(row => row.pluginId)).toEqual([visible])
+    expect(rows.some(row => row.pluginId === hidden.pluginId)).toBe(false)
   })
 
   it('inventory keeps every row for a personal principal', async () => {
@@ -194,6 +194,6 @@ describe('registry-resolved collaboration authorization', () => {
 
     const rows = await harness.runner.inventory()
     expect(rows).toHaveLength(2)
-    expect(rows.some(row => String(row.pluginId) === String(visible))).toBe(true)
+    expect(rows.some(row => row.pluginId === visible)).toBe(true)
   })
 })

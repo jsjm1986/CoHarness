@@ -48,6 +48,9 @@
       "path": "../../llm/model-access"
     },
     {
+      "path": "../../llm/model-provider-config"
+    },
+    {
       "path": "../../core/agent"
     },
     {

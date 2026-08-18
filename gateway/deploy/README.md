@@ -6,7 +6,7 @@ Brings the gateway online on a Linux host with systemd kernel confinement and sw
 
 ## Prerequisites
 
-- Linux with systemd, root access, Docker Compose, `sqlite3` for one-time import/rollback, and Node 25 (`/usr/local/bin/node`; adjust unit paths for nvm layouts). Create the non-login `harness-project` account used by shared project units, create each `HGW_PROJECT_PATH_ROOTS` directory, and grant the account the required Unix read/write access to every project directory below those roots. Both managed roots must preserve that access for directories created later; for example: `install -d -o root -g harness-project -m 2770 /srv/harness/projects/admin /srv/harness/projects/user-projects` (use an equivalent default ACL when group inheritance is not available). The setgid parent gives Gateway-created `0770` project folders the shared runtime group.
+- Linux with systemd, root access, Docker Compose, `sqlite3` for one-time import/rollback, and Node 25 (`/usr/local/bin/node`; adjust unit paths for nvm layouts). Create the non-login `harness-project` account used by shared project units, create each `HGW_PROJECT_PATH_ROOTS` directory, and grant the account the required Unix read/write access to every project directory below those roots. Each configured root becomes one top-level entry in the administrator host browser; the root itself is navigation-only, and imported projects must be strict descendants. Both managed roots must preserve runtime access for directories created later; for example: `install -d -o root -g harness-project -m 2770 /srv/harness/projects/admin /srv/harness/projects/user-projects` (use an equivalent default ACL when group inheritance is not available). The setgid parent gives Gateway-created `0770` project folders the shared runtime group.
 - The pinned dsh release: `npm install -g @deepseek-ai/dsh@0.1.0-rc.5` (upgrades are a version bump + rolling restarts, never a source checkout). Note: locally uncommitted work in a dev clone (for example UI changes) is not in the npm release until it lands upstream.
 - DNS/entry control for the public domain (Nginx or Cloudflare Tunnel).
 
@@ -23,13 +23,19 @@ From the exact release checkout, run `pnpm install --frozen-lockfile && pnpm run
 
 ## Per-user provisioning
 
-Create the user in `/admin`, then run `deploy/provision-user.sh <username>` once as root: it creates the `harness-<username>` system account and chowns `/srv/harness/users/<username>/{home,dsh}`. The personal unit is rendered automatically on every start from the user's current grants. An administrator-origin project is created from its name and gets a managed `0770` directory below `HGW_PROJECTS_ROOT`; importing an existing explicit path is still available and needs explicit `harness-project` access. A user-origin project allocates an empty directory below `HGW_USER_PROJECTS_ROOT`; the setgid/default-ACL setup above supplies the project unit's access, and the creator becomes its `rw` owner. Both origins allocate one shared runtime, support `ro`/`rw` invitations, and use the same conversation and folder scope. Project directories cannot overlap user data, runtime data, the Gateway directory, or another project. Membership and personal directory-permission writes restart a live personal runtime when required; project ACL checks are request-time and do not require a shared runtime restart. Administrators retain the `danger-full-access` preset in both personal and project scopes, while a project runtime remains kernel-confined to its path.
+Create the user in `/admin`, then run `deploy/provision-user.sh <username>` once as root: it creates the `harness-<username>` system account and chowns `/srv/harness/users/<username>/{home,dsh}`. The personal unit is rendered automatically on every start from the user's current grants. An administrator-origin project either gets a managed `0770` directory below `HGW_PROJECTS_ROOT` or imports an existing directory selected below `HGW_PROJECT_PATH_ROOTS`; imported directories need an explicit `harness-project` read/write grant. A user-origin project remains name-only and allocates an empty directory below `HGW_USER_PROJECTS_ROOT`; the setgid/default-ACL setup above supplies the project unit's access, and the creator becomes its `rw` owner. Both origins allocate one shared runtime, support `ro`/`rw` invitations, and use the same conversation and folder scope. Project directories cannot overlap user data, runtime or credential data, Gateway/release/plugin code, user-managed project storage, or another project. Membership and personal directory-permission writes restart a live personal runtime when required; project ACL checks are request-time and do not require a shared runtime restart. Administrators retain the `danger-full-access` preset in both personal and project scopes, while a project runtime remains kernel-confined to its path.
 
 ## Database cutover and rollback
 
 Stop the existing Gateway before the final import so no SQLite write can race the authority change. Create an online SQLite backup, import that standalone file into the configured PostgreSQL organization/node, then run `pg:backup` and `pg:restore-check`. Start the PostgreSQL Gateway only after all four operations succeed. Authentication sessions and intake tokens are deliberately absent from the import, so a new login and freshly projected instance policy are expected.
 
 Keep the frozen SQLite backup and the exact pre-cutover Gateway artifact together. Rollback stops the PostgreSQL Gateway, restores those two artifacts, and starts only the SQLite version. Do not copy a live WAL database, run both versions simultaneously, or attempt to merge PostgreSQL writes back into SQLite. PostgreSQL remains preserved for diagnosis and a later clean cutover.
+
+## Android shell and FCM
+
+Create a Firebase project and register the Android application id `com.deepseek.harness`. Download `google-services.json` into `apps/android-shell/android/app/google-services.json`; keep that client configuration with the Android build inputs and do not commit the Gateway service-account JSON. Store the service-account JSON on the Gateway host with mode `0600`, set `HGW_FCM_PROJECT_ID` and `HGW_FCM_SERVICE_ACCOUNT_FILE` in the Gateway service environment, and apply PostgreSQL migration 008 through the normal startup migration.
+
+Build the shell against the deployed Web UI with a Java/Android SDK toolchain. For the current deployment use `DSH_ANDROID_WEB_URL=https://harness.maycran.com/ pnpm --dir apps/android-shell run build` and `DSH_ANDROID_WEB_URL=https://harness.maycran.com/ pnpm --dir apps/android-shell run cap:sync`, then `cd apps/android-shell/android && ./gradlew assembleRelease`. Publishing ordinary Web UI assets does not require another APK; rebuild only for native project, permission, package, icon, or notification-handler changes. A completed AI turn sends the creator's devices a notification containing the session id and event sequence, and tapping it opens the existing Web UI session.
 
 ## TLS entry and cutover
 
@@ -38,7 +44,7 @@ Point the public domain at the gateway and close the direct instance port. Nginx
 ```nginx
 server {
   listen 443 ssl;
-  server_name harness.example.com;
+  server_name harness.maycran.com;
   location / {
     proxy_pass http://127.0.0.1:8899;
     proxy_http_version 1.1;
@@ -51,7 +57,7 @@ server {
 }
 ```
 
-Cutover checklist: set `HGW_PUBLIC_ORIGINS=https://<domain>` (Secure cookies switch on it), reload the entry to upstream `127.0.0.1:8899`, then **stop the previously exposed single dsh instance** (or rebind it to loopback) — after cutover nothing but the TLS entry may reach the host ports.
+Cutover checklist: set `HGW_PUBLIC_ORIGINS=https://harness.maycran.com` (Secure cookies switch on it), reload the entry to upstream `127.0.0.1:8899`, then **stop the previously exposed single dsh instance** (or rebind it to loopback) — after cutover nothing but the TLS entry may reach the host ports.
 
 ## Acceptance
 
@@ -63,7 +69,7 @@ Cutover checklist: set `HGW_PUBLIC_ORIGINS=https://<domain>` (Secure cookies swi
 
 ## macOS variant (launchd, tunnel entry)
 
-A macOS host (e.g. an office machine behind a Cloudflare Tunnel) runs the same gateway with `HGW_LAUNCHER=local` and launchd instead of systemd: a `~/Library/LaunchAgents/com.maycran.harness-gateway.plist` (KeepAlive, RunAtLoad) execs `node --import tsx/esm src/index.ts` in the gateway directory with the PostgreSQL and other `HGW_*` variables, and the tunnel config's ingress upstream points at `http://127.0.0.1:8899`. Set explicit writable `HGW_PROJECT_RUNTIMES_ROOT`, `HGW_PRINCIPAL_KEY_DIR`, and `HGW_RUNTIME_CREDENTIAL_DIR` paths owned by the launchd account. Kernel directory confinement does not exist on macOS: personal and shared project processes rely on the directory-guard plugin and ordinary account permissions, so treat a macOS deployment as a trusted-team form, not the full Phase 2 boundary. Cutover disables the previous direct-instance LaunchAgent (`launchctl bootout` and rename the plist so RunAtLoad cannot revive it).
+A macOS host (e.g. an office machine behind a Cloudflare Tunnel) runs the same gateway with `HGW_LAUNCHER=local` and launchd instead of systemd: a `~/Library/LaunchAgents/com.maycran.harness-gateway.plist` (KeepAlive, RunAtLoad) execs `node --import tsx/esm src/index.ts` in the gateway directory with the PostgreSQL and other `HGW_*` variables, and the tunnel config's ingress upstream points at `http://127.0.0.1:8899`. Set explicit writable `HGW_PROJECT_RUNTIMES_ROOT`, `HGW_PRINCIPAL_KEY_DIR`, and `HGW_RUNTIME_CREDENTIAL_DIR` paths owned by the launchd account. The administrator host browser starts at `/`, and mounted external disks appear below `/Volumes`; grant the launchd process the required macOS Privacy & Security file access, including Full Disk Access when the selected directories require it. Kernel directory confinement does not exist on macOS: personal and shared project processes rely on the directory-guard plugin and ordinary account permissions, so treat a macOS deployment as a trusted-team form, not the full Phase 2 boundary. Cutover disables the previous direct-instance LaunchAgent (`launchctl bootout` and rename the plist so RunAtLoad cannot revive it).
 
 ## Upgrades and backup
 

@@ -1,0 +1,23 @@
+{
+  "name": "@deepseek-ai/dsh-android-shell",
+  "version": "0.1.0",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/prepare-web-fallback.mjs",
+    "cap:add": "cap add android",
+    "cap:sync": "cap sync android",
+    "android:open": "cap open android",
+    "android:debug": "cap run android",
+    "android:release": "cd android && ./gradlew assembleRelease"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.0",
+    "@capacitor/core": "8.5.0",
+    "@capacitor/push-notifications": "8.1.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.0"
+  }
+}

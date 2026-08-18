@@ -8,8 +8,11 @@ export default defineConfig({
     alias: {
       '@deepseek-ai/cordis': resolve(repo, 'vendor/cordis/src/index.ts'),
       '@deepseek-ai/dsh-agent': resolve(repo, 'packages/core/agent/src/index.ts'),
+      '@deepseek-ai/dsh-credentials': resolve(repo, 'packages/credentials/credentials/src/index.ts'),
+      '@deepseek-ai/dsh-gateway-runtime': resolve(repo, 'packages/context/gateway-runtime/src/index.ts'),
       '@deepseek-ai/dsh-llm': resolve(repo, 'packages/llm/llm/src/index.ts'),
       '@deepseek-ai/dsh-model-access': resolve(repo, 'packages/llm/model-access/src/index.ts'),
+      '@deepseek-ai/dsh-model-provider-config': resolve(repo, 'packages/llm/model-provider-config/src/index.ts'),
       '@deepseek-ai/dsh-settings': resolve(repo, 'packages/settings/settings/src/index.ts'),
       '@deepseek-ai/schemastery': resolve(repo, 'vendor/schemastery/src/index.ts'),
     },

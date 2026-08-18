@@ -6,13 +6,13 @@ The **Plugins** settings section and its **Plugin configuration** tab. The secti
 
 ## What appears here
 
-A card renders only when its namespace is both registered by a live Host plugin and served to the browser. A deployment that does not compose the owning plugin — or serves the namespace to no client — renders nothing for it rather than an empty or disabled card, so the configurable tab reflects what this deployment actually runs.
+A card renders only when its namespace is both served to the current settings authority and registered under the matching slot key. The tab reads the Host namespace directory and intersects it with the card ledger, so an uncomposed plugin leaves no trace, a namespace owned by another page renders nothing here, and the empty line waits until the first Host answer. Personal scope receives every registered namespace; shared project scope receives only its approved read-only subset.
 
-The first batch covers the shell executor (`bash`), the agent loop's tool-call parallelism (`agent-loop`), and the DeepSeek search provider (`web-search-deepseek`).
+The cards this package ships cover the shell executor (`shell`), the agent loop's tool-call parallelism (`agent-loop`), and the DeepSeek search provider (`web-search-deepseek`).
 
 ## Extension point
 
-The section declares `settings.plugins.tab`, a root list slot whose labels become ordered tabs. It keeps a tab mounted after its first selection, so local drafts and read-only snapshots survive tab switches. The package registers its own `configurable` contribution, which declares the nested `settings.plugin.item` list slot. A plugin that ships a browser half registers its own card into that nested slot and owns its controls; this package neither enumerates namespaces nor renders a form it was not given. Both levels follow the contribution's `order`.
+The section declares `settings.plugins.tab`, a root list slot whose labels become ordered tabs. It keeps a tab mounted after its first selection, so local drafts and read-only snapshots survive tab switches. The package registers its own `configurable` contribution, which declares `settings.plugin.item` as a slot keyed by the settings namespace each card edits. A plugin that ships a browser half registers its card under its namespace and owns its chrome, controls, and copy; the tab pairs Host namespaces with those keys without interpreting either. Tabs follow their contribution `order`; cards follow registration order. The [settings-card cookbook](../../../docs/cookbook/adding-a-settings-card.md) covers the full extension path.
 
 ## Writes
 
@@ -35,6 +35,7 @@ None; this package neither assembles nor sends a provider request.
 ## Known Limitations and Deferred Work
 
 - **Only host-plane plugins appear** — a plugin an agent preset mounts carries its configuration inline in that preset's `agent.cordis.yml` and cannot register a settings namespace at all (a second session mounting the same preset would fail on a duplicate registration), so this section lists nothing for it. Editing those values remains the preset editor's job.
-- **Exposure is a Host allowlist, not a plugin declaration** — a namespace absent from the api-proxy's allowlist answers `settings-not-exposed` even when its owner registered it, so a plugin distributed outside this repository cannot surface its own configuration here without a change in `packages/host/apiproxy`.
-- **The shell card follows the composed executor** — the POSIX and PowerShell executor families share the `bash` namespace because a host composes exactly one of them, so the served schema differs by platform (PowerShell adds `pwshPath`) even though the card edits the same two fields on both, and a deployment composing neither shows no card.
-- **The empty line counts registered cards, not visible ones** — a card whose namespace this deployment does not expose renders nothing, but still counts, so a deployment that exposes none shows an empty list rather than the empty line. The count is also read once, because the renderer caches a root entry's inject face; a card registered later does not raise it.
+- **External cards are personal-scope configuration** — personal settings serve every registered namespace, while shared project settings expose only an approved read-only subset. A third-party card appears for the personal owner but not for project participants unless the project-visible set explicitly admits its namespace ([rationale](../../../.agents/notes/implemented/architecture/2026-08-12-plugin-owned-settings-surface.md)).
+- **A card still needs a browser bundle** — the browser half must be a `dsh.client` package built in the client module system's lazy-CJS factory format. The `clientBundle` preset is not published, and the bundle-purity check forbids importing this package's card chrome or form model as values, so an external card owns its own build, staging, and revision fencing.
+- **Namespace registrations have no dedicated invalidation event** — the tab re-reads after settings-document updates and connection resets. A namespace registered after its initial read appears after the next such signal; a card registered late is added immediately from the slot ledger.
+- **The shell card follows the composed executor** — the POSIX and PowerShell executor families share the `shell` namespace because a host composes exactly one of them, so the served schema differs by platform (PowerShell adds `pwshPath`) even though the card edits the same two fields on both, and a deployment composing neither shows no card.

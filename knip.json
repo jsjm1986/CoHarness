@@ -742,6 +742,17 @@
         "react-dom"
       ]
     },
+    "apps/android-shell": {
+      "entry": [
+        "scripts/**/*.mjs"
+      ],
+      "project": [
+        "scripts/**/*.mjs"
+      ],
+      "ignoreDependencies": [
+        "@capacitor/push-notifications"
+      ]
+    },
     "apps/cli": {
       "entry": [
         "tests/**/*.spec.ts",

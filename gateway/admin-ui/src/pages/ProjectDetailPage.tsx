@@ -1,17 +1,23 @@
-import { ArrowLeft, Pencil, Settings2, Trash2, Users } from 'lucide-react'
+import { ArrowLeft, Pencil, Settings2, Sparkles, Trash2, Users } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   deleteProject,
+  getProjectModelAccess,
   getProject,
   getProjectUsage,
+  listModelProviders,
+  listModels,
   listUsers,
   removeMember,
   renameProject,
   setMember,
+  setProjectModelAccess,
   setQuota,
   type AdminUser,
   type GrantMode,
+  type ModelGovernanceRow,
+  type ModelProviderRow,
   type ProjectDetail,
   type UsageSummary,
 } from '../api.ts'
@@ -26,6 +32,7 @@ import {
   PageHeader,
   Section,
   StatusBadge,
+  Switch,
 } from '../components/ui.tsx'
 import { formatCompact, formatMoney, Metric, QuotaSummary } from '../components/usage.tsx'
 
@@ -63,6 +70,12 @@ export function ProjectDetailPage() {
   const [costMode, setCostMode] = useState<ProjectLimitMode>('unlimited')
   const [tokenLimit, setTokenLimit] = useState('')
   const [costLimit, setCostLimit] = useState('')
+  const [models, setModels] = useState<ModelGovernanceRow[]>([])
+  const [modelProviders, setModelProviders] = useState<ModelProviderRow[]>([])
+  const [modelAssignments, setModelAssignments] = useState(new Set<string>())
+  const [modelsLoading, setModelsLoading] = useState(true)
+  const [modelsError, setModelsError] = useState('')
+  const [modelPending, setModelPending] = useState('')
 
   const reload = useCallback(async (showLoading = false) => {
     if (!Number.isInteger(projectId) || projectId <= 0) {
@@ -105,7 +118,40 @@ export function ProjectDetailPage() {
 
   useEffect(() => { void reloadUsage(true) }, [reloadUsage])
 
+  const reloadModelAccess = useCallback(async (showLoading = false) => {
+    if (!Number.isInteger(projectId) || projectId <= 0) {
+      setModelsError('项目 ID 无效')
+      setModelsLoading(false)
+      return
+    }
+    if (showLoading) setModelsLoading(true)
+    try {
+      const [nextModels, nextProviders, access] = await Promise.all([
+        listModels(),
+        listModelProviders(),
+        getProjectModelAccess(projectId),
+      ])
+      setModels(nextModels)
+      setModelProviders(nextProviders)
+      setModelAssignments(new Set(access.overrides.filter(row => row.allowed).map(modelKey)))
+      setModelsError('')
+    } catch (cause) {
+      setModelsError(messageFrom(cause))
+    } finally {
+      if (showLoading) setModelsLoading(false)
+    }
+  }, [projectId])
+
+  useEffect(() => { void reloadModelAccess(true) }, [reloadModelAccess])
+
   const assigned = useMemo(() => new Map((project?.members ?? []).map(member => [member.userId, member.mode])), [project])
+  const assignableModels = useMemo(() => {
+    const providers = new Map(modelProviders.map(provider => [provider.provider, provider]))
+    return models.filter(model => {
+      const provider = providers.get(model.provider)
+      return provider?.source === 'managed' && provider.status !== 'archived'
+    })
+  }, [modelProviders, models])
 
   async function applyMode(userId: number, mode: GrantMode) {
     setPending(`member:${userId}`)
@@ -130,6 +176,19 @@ export function ProjectDetailPage() {
       setError(messageFrom(cause))
     } finally {
       setPending('')
+    }
+  }
+
+  async function changeModelAssignment(model: ModelGovernanceRow, assigned: boolean) {
+    const key = modelKey(model)
+    setModelPending(key)
+    try {
+      await setProjectModelAccess(projectId, model.provider, model.model, assigned ? true : null)
+      await reloadModelAccess()
+    } catch (cause) {
+      setModelsError(messageFrom(cause))
+    } finally {
+      setModelPending('')
     }
   }
 
@@ -208,7 +267,7 @@ export function ProjectDetailPage() {
   }
 
   return (
-    <div className="page">
+    <div className="page projectDetailPage">
       <Link className="breadcrumb" to="/projects"><ArrowLeft aria-hidden="true" />返回项目</Link>
       <PageHeader
         title={project?.name ?? '项目详情'}
@@ -265,6 +324,54 @@ export function ProjectDetailPage() {
                     <QuotaSummary summary={usage} />
                     <p className="quotaEffectiveNote">这里显示当前生效值；配置时需明确选择继承普通成员额度或使用项目独立额度。</p>
                   </div>
+                </div>
+              </>
+            )}
+          </Section>
+          <Section
+            className="responsiveSection"
+            title="项目模型权限"
+            meta={`${modelAssignments.size} / ${assignableModels.length} 个模型已分配 · 所有成员共享`}
+          >
+            <ErrorBanner message={modelsError} />
+            {modelsLoading ? <LoadingState label="正在加载项目模型权限" /> : assignableModels.length === 0 ? (
+              <EmptyState icon={Sparkles} title="没有可分配的组织模型" detail="请先在模型治理中配置完整的组织 Provider 和模型。" />
+            ) : (
+              <>
+                <div className="tableWrap desktopOnly">
+                  <table className="dataTable projectModelAccessTable" aria-label="项目模型权限">
+                    <thead><tr><th>模型</th><th>运行状态</th><th>项目权限</th></tr></thead>
+                    <tbody>{assignableModels.map(model => {
+                      const key = modelKey(model)
+                      const assignedToProject = modelAssignments.has(key)
+                      const providerEnabled = modelProviders.find(provider => provider.provider === model.provider)?.status === 'enabled'
+                      return (
+                        <tr key={key}>
+                          <td><ProjectModelIdentity model={model} /></td>
+                          <td><StatusBadge tone={providerEnabled && model.enabled ? 'success' : 'warning'}>{providerEnabled && model.enabled ? '可用' : '暂不可用'}</StatusBadge></td>
+                          <td><Switch label={assignedToProject ? '已分配' : '未分配'} checked={assignedToProject} disabled={modelPending === key} onChange={value => { void changeModelAssignment(model, value) }} /></td>
+                        </tr>
+                      )
+                    })}</tbody>
+                  </table>
+                </div>
+                <div className="mobileList">
+                  {assignableModels.map(model => {
+                    const key = modelKey(model)
+                    const assignedToProject = modelAssignments.has(key)
+                    const providerEnabled = modelProviders.find(provider => provider.provider === model.provider)?.status === 'enabled'
+                    return (
+                      <article className="mobileItem" key={key}>
+                        <div className="mobileItemHeader">
+                          <ProjectModelIdentity model={model} />
+                          <StatusBadge tone={providerEnabled && model.enabled ? 'success' : 'warning'}>{providerEnabled && model.enabled ? '可用' : '暂不可用'}</StatusBadge>
+                        </div>
+                        <div className="mobileItemBody">
+                          <Switch label={assignedToProject ? '已分配给项目' : '未分配给项目'} checked={assignedToProject} disabled={modelPending === key} onChange={value => { void changeModelAssignment(model, value) }} />
+                        </div>
+                      </article>
+                    )
+                  })}
                 </div>
               </>
             )}
@@ -406,6 +513,15 @@ function MemberIdentity({ user }: { user: AdminUser }) {
   )
 }
 
+function ProjectModelIdentity({ model }: { model: ModelGovernanceRow }) {
+  return (
+    <div className="modelIdentity">
+      <span className="itemIcon"><Sparkles aria-hidden="true" /></span>
+      <span className="modelIdentityText"><strong>{model.displayName}</strong><span className="codeText">{model.provider}/{model.model}</span></span>
+    </div>
+  )
+}
+
 function PermissionControl({ user, mode, pending, onChange }: {
   user: AdminUser
   mode: MatrixMode
@@ -473,4 +589,8 @@ function changeMode(
 
 function messageFrom(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause)
+}
+
+function modelKey(model: { provider: string; model: string }): string {
+  return `${model.provider}\0${model.model}`
 }

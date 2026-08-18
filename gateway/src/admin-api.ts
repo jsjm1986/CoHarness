@@ -3,6 +3,13 @@ import { applyGrantsToUser } from './apply-grants.ts'
 import { applyModelGovernanceToProject, applyModelGovernanceToUser } from './apply-model-governance.ts'
 import type { UserRow } from './auth.ts'
 import { CollaborationDeniedError } from './collaboration.ts'
+import type {
+  ModelProviderAuthMode,
+  ModelProviderProtocol,
+  ModelProviderStatus,
+  ModelSettingsPathOp,
+} from './model-governance.ts'
+import { listProjectDirectories } from './project-directories.ts'
 import type { GrantMode } from './projects.ts'
 import type { GatewayDeps, GatewayHandlers } from './server.ts'
 
@@ -55,6 +62,12 @@ function mapError(error: unknown): { status: number; error: string } {
   if (error instanceof Error && error.message.startsWith('duplicate ')) {
     return { status: 409, error: error.message }
   }
+  if (error instanceof Error && error.message === 'project-path-overlap') {
+    return { status: 409, error: error.message }
+  }
+  if (error instanceof Error && error.message === 'settings-conflict') {
+    return { status: 409, error: error.message }
+  }
   if (isCodedError(error) && error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
     return { status: 409, error: 'duplicate' }
   }
@@ -93,6 +106,27 @@ async function dispatch(
   const ip = req.socket.remoteAddress ?? ''
   const write = async (action: string, detail: Record<string, unknown>): Promise<void> =>
     deps.audit.write({ userId: admin.id, action, detail: JSON.stringify(detail), ip })
+
+  const refreshModelPolicies = async (): Promise<void> => {
+    if (deps.governance === undefined) return
+    for (const target of await deps.users.list()) await applyModelGovernanceToUser(deps, target.id)
+    for (const project of await deps.projects.list()) await applyModelGovernanceToProject(deps, project.id)
+  }
+
+  const settingsOps = (value: unknown): ModelSettingsPathOp[] => {
+    if (!Array.isArray(value) || value.length === 0) throw new Error('ops must be a non-empty array')
+    return value.map((raw, index) => {
+      if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) throw new Error(`ops[${String(index)}] must be an object`)
+      const op = raw as Record<string, unknown>
+      const path = op.path
+      if (!Array.isArray(path) || path.some(segment => typeof segment !== 'string' || segment.length === 0)) {
+        throw new Error(`ops[${String(index)}].path must be a non-empty string array`)
+      }
+      if (op.op === 'unset') return { op: 'unset', path: [...path] }
+      if (op.op === 'set' && Object.hasOwn(op, 'value')) return { op: 'set', path: [...path], value: op.value }
+      throw new Error(`ops[${String(index)}] must be set or unset`)
+    })
+  }
 
   const apply = async (userId: number): Promise<void> => {
     const prior = await deps.audit.query({ action: 'admin.instances.restart-failed', userId: admin.id })
@@ -230,6 +264,120 @@ async function dispatch(
     return false
   }
 
+  if (pathname === '/admin/api/model-settings') {
+    if (deps.governance === undefined) { sendError(res, 503, 'model governance unavailable'); return true }
+    if (method === 'GET') {
+      sendJson(res, 200, await deps.governance.describeOrganizationModelSettings())
+      return true
+    }
+    if (method === 'PUT') {
+      const input = parseObject(body)
+      const expectedRevision = input.expectedRevision
+      if (expectedRevision !== undefined && (typeof expectedRevision !== 'number' || !Number.isSafeInteger(expectedRevision) || expectedRevision < 0)) {
+        sendError(res, 400, 'expectedRevision must be a non-negative safe integer')
+        return true
+      }
+      const view = await deps.governance.mutateOrganizationModelSettings(
+        settingsOps(input.ops),
+        expectedRevision as number | undefined,
+      )
+      await refreshModelPolicies()
+      await write('admin.model-settings.mutate', { opCount: (input.ops as unknown[]).length })
+      sendJson(res, 200, view)
+      return true
+    }
+    return false
+  }
+
+  if (pathname === '/admin/api/model-settings/credentials') {
+    if (deps.governance === undefined) { sendError(res, 503, 'model governance unavailable'); return true }
+    const query = new URL(req.url ?? '/', 'http://x').searchParams
+    const queryRefs = query.getAll('refs').flatMap(value => value.split(',')).map(value => value.trim()).filter(value => value !== '')
+    if (method === 'GET') {
+      sendJson(res, 200, { credentials: await deps.governance.describeOrganizationCredentials([...new Set(queryRefs)]) })
+      return true
+    }
+    const input = parseObject(body)
+    const ref = str(input, 'ref') ?? query.get('ref') ?? undefined
+    if (ref === undefined) { sendError(res, 400, 'ref required'); return true }
+    if (method === 'PUT') {
+      const value = str(input, 'value')
+      if (value === undefined) { sendError(res, 400, 'value required'); return true }
+      await deps.governance.setOrganizationCredential(ref, value)
+      await refreshModelPolicies()
+      await write('admin.model-settings.credential.set', { ref })
+      sendNoContent(res)
+      return true
+    }
+    if (method === 'DELETE') {
+      await deps.governance.unsetOrganizationCredential(ref)
+      await refreshModelPolicies()
+      await write('admin.model-settings.credential.unset', { ref })
+      sendNoContent(res)
+      return true
+    }
+    return false
+  }
+
+  if (pathname === '/admin/api/model-settings/discover') {
+    if (deps.governance === undefined || method !== 'POST') return false
+    const input = parseObject(body)
+    const provider = str(input, 'provider')
+    const baseURL = str(input, 'baseURL')
+    const api = str(input, 'api')
+    const apiKey = str(input, 'apiKey')
+    sendJson(res, 200, {
+      models: await deps.governance.discoverOrganizationModels({
+        ...provider === undefined ? {} : { provider },
+        ...baseURL === undefined ? {} : { baseURL },
+        ...api === undefined ? {} : { api },
+        ...apiKey === undefined ? {} : { apiKey },
+      }),
+    })
+    return true
+  }
+
+  if (pathname === '/admin/api/model-providers') {
+    if (deps.governance === undefined) { sendError(res, 503, 'model governance unavailable'); return true }
+    if (method === 'GET') { sendJson(res, 200, await deps.governance.listProviders()); return true }
+    if (method === 'PUT') {
+      const input = parseObject(body)
+      const provider = str(input, 'provider')
+      const displayName = str(input, 'displayName')
+      const driver = str(input, 'driver')
+      const protocol = str(input, 'protocol')
+      const baseURL = str(input, 'baseURL')
+      const authMode = str(input, 'authMode')
+      const status = str(input, 'status')
+      const credential = input.credential
+      if (provider === undefined || displayName === undefined || driver !== 'pi-ai'
+        || (protocol !== 'openai-completions' && protocol !== 'openai-responses'
+          && protocol !== 'anthropic-messages')
+        || baseURL === undefined || (authMode !== 'api-key' && authMode !== 'none')
+        || (status !== 'draft' && status !== 'enabled' && status !== 'disabled' && status !== 'archived')
+        || (credential !== undefined && credential !== null && typeof credential !== 'string')) {
+        sendError(res, 400, 'valid provider, displayName, driver, protocol, baseURL, authMode and status required')
+        return true
+      }
+      await deps.governance.upsertProvider({
+        provider,
+        displayName,
+        driver,
+        protocol: protocol as ModelProviderProtocol,
+        baseURL,
+        authMode: authMode as ModelProviderAuthMode,
+        status: status as ModelProviderStatus,
+        ...credential === undefined ? {} : { credential: credential as string | null },
+      })
+      await write('admin.model-providers.upsert', { provider, status })
+      for (const target of await deps.users.list()) await applyModelGovernanceToUser(deps, target.id)
+      for (const project of await deps.projects.list()) await applyModelGovernanceToProject(deps, project.id)
+      sendNoContent(res)
+      return true
+    }
+    return false
+  }
+
   if (pathname === '/admin/api/model-access') {
     if (deps.governance === undefined) { sendError(res, 503, 'model governance unavailable'); return true }
     const query = new URL(req.url ?? '/', 'http://x').searchParams
@@ -252,6 +400,39 @@ async function dispatch(
       await deps.governance.setUserAccess(userId, provider, model, allowed as boolean | null)
       await applyModelGovernanceToUser(deps, userId)
       await write('admin.models.user-access', { userId, provider, model, allowed }); sendNoContent(res); return true
+    }
+    return false
+  }
+
+  if (pathname === '/admin/api/project-model-access') {
+    if (deps.governance === undefined) { sendError(res, 503, 'model governance unavailable'); return true }
+    const query = new URL(req.url ?? '/', 'http://x').searchParams
+    if (method === 'GET') {
+      const projectId = Number(query.get('projectId'))
+      if (await deps.projects.getById(projectId) === null) { sendError(res, 404, 'project not found'); return true }
+      sendJson(res, 200, {
+        effective: await deps.governance.policyForProject(projectId),
+        overrides: await deps.governance.projectOverrides(projectId),
+      })
+      return true
+    }
+    if (method === 'PUT') {
+      const input = parseObject(body)
+      const projectId = Number(input.projectId)
+      const provider = str(input, 'provider')
+      const model = str(input, 'model')
+      const allowed = input.allowed
+      if (!Number.isSafeInteger(projectId) || provider === undefined || model === undefined
+        || (allowed !== null && typeof allowed !== 'boolean')) {
+        sendError(res, 400, 'projectId, provider, model and boolean|null allowed required')
+        return true
+      }
+      if (await deps.projects.getById(projectId) === null) { sendError(res, 404, 'project not found'); return true }
+      await deps.governance.setProjectAccess(projectId, provider, model, allowed as boolean | null)
+      await applyModelGovernanceToProject(deps, projectId)
+      await write('admin.models.project-access', { projectId, provider, model, allowed })
+      sendNoContent(res)
+      return true
     }
     return false
   }
@@ -297,6 +478,18 @@ async function dispatch(
       ...await deps.governance!.summary({ kind: 'user', id: user.id }, month),
     })))
     sendJson(res, 200, summaries)
+    return true
+  }
+
+  if (pathname === '/admin/api/project-directories') {
+    if (method !== 'GET') return false
+    const requestedPath = new URL(req.url ?? '/', 'http://x').searchParams.get('path') ?? undefined
+    const [projects, users] = await Promise.all([deps.projects.list(), deps.users.list()])
+    sendJson(res, 200, listProjectDirectories(
+      deps.cfg,
+      requestedPath,
+      [...projects.map(project => project.path), ...users.map(user => user.homePath)],
+    ))
     return true
   }
 

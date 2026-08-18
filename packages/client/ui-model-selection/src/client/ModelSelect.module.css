@@ -1,6 +1,11 @@
 .root {
   position: relative;
+  /* The composer gives the model seat the remaining trailing-row width. A
+     flex basis keeps the desktop cap while allowing the trigger to contract
+     before it can cover the context meter or Send button. */
+  flex: 1 1 220px;
   min-width: 0;
+  max-width: 220px;
 }
 
 /* Figma 313:14108 ToggleButton: 13/20 medium secondary label, 4px gap,
@@ -11,7 +16,8 @@
   align-items: center;
   gap: var(--dsw-space-1);
   min-width: 0;
-  max-width: 220px;
+  width: 100%;
+  max-width: none;
   height: 28px;
   padding: 0 var(--dsw-space-1) 0 var(--dsw-space-2);
   border: none;
@@ -50,6 +56,16 @@
 .triggerEffort {
   flex: 0 0 auto;
   color: var(--dsw-alias-label-caption);
+}
+
+/* The effort is still available in the menu and the trigger title, but it is
+   secondary chrome on a phone. Dropping it at the shared narrow step leaves
+   the model label and chevron a real flex allocation instead of letting the
+   effort's min-content width push into the meter. */
+@container (max-width: 480px) {
+  .triggerEffort {
+    display: none;
+  }
 }
 
 .chevron {

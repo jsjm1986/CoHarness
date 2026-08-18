@@ -19,6 +19,7 @@ import { createInterface } from 'node:readline/promises'
 import { pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 import { validateTarballPayload } from './publication-payload.ts'
+import { isPublishableWorkspaceDirectory } from './workspace-package-policy.ts'
 
 const DEFAULT_REGISTRY = 'https://registry.npm.harnessment.com'
 const DEFAULT_OUTPUT_DIRECTORY = '.artifacts/npm-baseline'
@@ -242,7 +243,9 @@ class WorkspacePackageSet {
   ) {}
 
   static discover(root: string): WorkspacePackageSet {
-    const manifestPaths = globSync(PACKAGE_PATTERNS, { cwd: root }).sort()
+    const manifestPaths = globSync(PACKAGE_PATTERNS, { cwd: root })
+      .filter(manifestPath => isPublishableWorkspaceDirectory(dirname(manifestPath)))
+      .sort()
     if (manifestPaths.length === 0) {
       throw new Error('no package manifests found under vendor/, packages/, or apps/')
     }
@@ -567,10 +570,11 @@ class BaselinePackager {
       this.runner.run('pnpm', ['run', 'build'], worktree.path)
       this.runner.run('pnpm', ['run', 'publint'], worktree.path)
       this.runner.run('pnpm', ['run', 'verify-built-package-invariants'], worktree.path)
+      const packFilters = packageSet.packages.flatMap(({ directory }) => [
+        '--filter', `./${directory}`,
+      ])
       this.runner.run('pnpm', [
-        '--filter', './vendor/**',
-        '--filter', './packages/**',
-        '--filter', './apps/**',
+        ...packFilters,
         '--recursive',
         'pack',
         '--pack-destination', artifactDirectory,

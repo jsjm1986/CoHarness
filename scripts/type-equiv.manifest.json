@@ -438,6 +438,11 @@
     },
     {
       "doc": "docs/subsystems/llm-streaming.md",
+      "symbol": "ReplayEnvelope",
+      "source": "packages/llm/llm/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/llm-streaming.md",
       "symbol": "StreamChunk",
       "source": "packages/llm/llm/src/types.ts"
     },
@@ -1686,6 +1691,11 @@
       "source": "packages/credentials/credentials/src/index.ts"
     },
     {
+      "doc": "docs/subsystems/credentials.md",
+      "symbol": "ReadOnlyCredentialLayer",
+      "source": "packages/credentials/credentials/src/index.ts"
+    },
+    {
       "doc": "docs/subsystems/settings.md",
       "symbol": "SettingsDescribeOptions",
       "source": "packages/settings/settings/src/index.ts"
@@ -1694,6 +1704,26 @@
       "doc": "docs/subsystems/llm-streaming.md",
       "symbol": "LlmConfigurableProvider",
       "source": "packages/llm/llm/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/llm-streaming.md",
+      "symbol": "ManagedModelProviderProtocol",
+      "source": "packages/llm/model-provider-config/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/llm-streaming.md",
+      "symbol": "ManagedModelProfile",
+      "source": "packages/llm/model-provider-config/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/llm-streaming.md",
+      "symbol": "ManagedModelProviderProfile",
+      "source": "packages/llm/model-provider-config/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/llm-streaming.md",
+      "symbol": "ModelProviderConfigSnapshot",
+      "source": "packages/llm/model-provider-config/src/index.ts"
     },
     {
       "doc": "docs/subsystems/settings.md",

@@ -50,6 +50,8 @@ export interface EventsApi {
    * attached session, then replays each session's still-pending approval/question requested
    * frames (rpcId reused verbatim — the refresh-recovery baseline). Session titles ride the
    * generic projection pair (history-tail projections block + session/projection frames).
+   * Calling `mux` opens the subscription immediately; iteration drains frames already captured
+   * after that call, so delayed first pull cannot lose committed events.
    * since: resume hook, unimplemented in v1 (ignored if passed); reconnection = reopen the
    * stream + refetch history.
    */
@@ -57,7 +59,8 @@ export interface EventsApi {
 
   /**
    * Host-level info stream: session create/destroy, running-status flips, and
-   * agent failures with no turn position. Empty payload uses `{}`.
+   * agent failures with no turn position. Calling `host` opens the subscription
+   * immediately; iteration only drains captured frames. Empty payload uses `{}`.
    */
   host(request: RpcRequest<{}>, signal: AbortSignal): AsyncIterable<RpcRequest<HostFrame>>
 }

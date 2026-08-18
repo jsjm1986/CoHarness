@@ -16,9 +16,10 @@ afterEach(() => { process.env.DSH_HOME = oldHome; vi.restoreAllMocks() })
 
 class Adapter extends LlmAdapter {
   calls = 0
+  constructor(private readonly credentialSource = 'file') { super() }
   async *stream(_options: GenerateOptions): AsyncIterable<StreamChunk> {
     this.calls++
-    yield { type: 'usage', usage: { inputTokens: 3, outputTokens: 2 }, credentialSource: 'file' }
+    yield { type: 'usage', usage: { inputTokens: 3, outputTokens: 2 }, credentialSource: this.credentialSource }
     yield { type: 'finish', reason: { kind: 'stop' } }
   }
 }
@@ -28,7 +29,8 @@ async function drain(source: AsyncIterable<StreamChunk>): Promise<StreamChunk[]>
 function policy(home: string, allowed: boolean): void {
   writeFileSync(join(home, 'model-governance.json'), JSON.stringify({ version: 1, defaultAllowed: false,
     userDeclaredAllowed: false,
-    models: [{ provider: 'p', model: 'm', allowed }], intakeUrl: 'http://127.0.0.1:1/usage', intakeToken: 'token' }))
+    models: [{ provider: 'p', model: 'm', allowed }], providers: [],
+    intakeUrl: 'http://127.0.0.1:1/usage', intakeToken: 'token' }))
 }
 
 function replacePolicy(home: string, allowed: boolean): void {
@@ -36,7 +38,8 @@ function replacePolicy(home: string, allowed: boolean): void {
   const temp = `${path}.tmp`
   writeFileSync(temp, JSON.stringify({ version: 1, defaultAllowed: false,
     userDeclaredAllowed: false,
-    models: [{ provider: 'p', model: 'm', allowed }], intakeUrl: 'http://127.0.0.1:1/usage', intakeToken: 'token' }))
+    models: [{ provider: 'p', model: 'm', allowed }], providers: [],
+    intakeUrl: 'http://127.0.0.1:1/usage', intakeToken: 'token' }))
   renameSync(temp, path)
 }
 
@@ -67,6 +70,20 @@ describe('instance model governance', () => {
     expect(file).toBeDefined()
     expect(JSON.parse(readFileSync(join(home, 'model-governance-outbox', file!), 'utf8'))).toMatchObject({
       credentialSource: 'file', credentialClass: 'personal', status: 'succeeded', usage: { inputTokens: 3, outputTokens: 2 },
+    })
+    await ctx.fiber.dispose()
+  })
+
+  it('records organization credentials as company usage', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'dsh-gov-')); process.env.DSH_HOME = home; policy(home, true)
+    const ctx = new Context(); await ctx.plugin(LlmRuntime)
+    const adapter = new Adapter('organization'); ctx.llm.registerAdapter(['p'], adapter); await ctx.plugin(Governance)
+    await drain(ctx.llm.stream({ provider: 'p', model: 'm', messages: [] }))
+    await new Promise(resolve => setTimeout(resolve, 20))
+    const file = readdirSync(join(home, 'model-governance-outbox')).find(name => name.endsWith('.json'))
+    expect(file).toBeDefined()
+    expect(JSON.parse(readFileSync(join(home, 'model-governance-outbox', file!), 'utf8'))).toMatchObject({
+      credentialSource: 'organization', credentialClass: 'company', status: 'succeeded',
     })
     await ctx.fiber.dispose()
   })

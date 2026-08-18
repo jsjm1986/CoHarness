@@ -1,12 +1,21 @@
+/** Escape one value before inserting it into Gateway-owned HTML. */
 export function escapeHtml(value: string): string {
   return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;').replaceAll("'", '&#39;')
 }
 
-export function layout(title: string, body: string): string {
+/**
+ * Render the small Gateway-owned document shell.
+ * @param title - document title, escaped before insertion
+ * @param body - trusted Gateway-owned body markup
+ * @param head - trusted Gateway-owned metadata placed inside `head`
+ * @returns complete HTML document
+ */
+export function layout(title: string, body: string, head = ''): string {
   return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(title)}</title>
+${head}
 <style>
 body{font-family:system-ui,-apple-system,sans-serif;margin:0;background:#f5f5f7;color:#1d1d1f}
 main{max-width:960px;margin:48px auto;padding:0 24px}
@@ -43,8 +52,9 @@ ${error === '' ? '' : `<p class="error">${escapeHtml(error)}</p>`}
 </form></div>`)
 }
 
+/** Render the retry page shown while a personal or project runtime starts. */
 export function waitingPage(): string {
-  return layout('正在启动 - Harness', `<meta http-equiv="refresh" content="2">
-<div class="card" style="max-width:380px;margin:80px auto;text-align:center">
-<h1>正在启动您的工作台…</h1><p class="muted">通常需要几秒钟，页面会自动刷新。</p></div>`)
+  return layout('正在启动 - Harness', `<div class="card" style="max-width:380px;margin:80px auto;text-align:center">
+<h1>正在启动您的工作台…</h1><p class="muted">通常需要几秒钟，页面会自动刷新。</p></div>`,
+  '<meta http-equiv="refresh" content="2">')
 }

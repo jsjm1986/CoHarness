@@ -132,6 +132,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'An optional deployment-owned policy decides exact provider/model routes; the gateway instance supplies the implementation, while apiproxy uses the decision for catalog and selection checks.',
   },
   {
+    key: 'modelProviderConfig',
+    pkg: 'model-provider-config',
+    title: 'Organization-managed model provider configuration',
+    mode: 'seam',
+    consumers: ['llm-pi-ai', 'apiproxy'],
+    note: 'Deployment-owned providers publish immutable organization routes; LLM adapters consume them as non-editable provider profiles and the API proxy exposes their authorized catalog.',
+  },
+  {
     key: 'tokenMeter',
     pkg: 'token-meter',
     title: 'Replay token measurement',
@@ -828,6 +836,17 @@ type CallSiteIndex = Map<ts.SignatureDeclaration | ts.JSDocSignature, ts.CallExp
 const EVENT_API_METHODS = new Set(['on', 'once', 'emit', 'parallel', 'serial', 'waterfall', 'dispatch'])
 
 /**
+ * Dispatchers implemented by loadable plugins outside the packages/ TypeScript
+ * aggregate. Keep this list explicit because those plugin programs are built
+ * separately and are intentionally not merged into the host Context program.
+ */
+const CURATED_EVENT_DISPATCHERS: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>> = {
+  'model-provider-config/updated': {
+    'model-governance': ['emit'],
+  },
+}
+
+/**
  * Collect event dispatch/listener relations from real cross-file receiver types.
  *
  * TODO: the program is seeded from the host aggregate alone (ts-project.ts
@@ -1204,7 +1223,17 @@ export function collectPackageSources(project: TypeScriptProject): PackageSource
 
 function collectEventRelations(): Map<string, EventRelation> {
   const project = new TypeScriptProject(root)
-  return new EventRelationCollector(project, collectPackageSources(project)).collect()
+  const relations = new EventRelationCollector(project, collectPackageSources(project)).collect()
+  for (const [event, dispatchers] of Object.entries(CURATED_EVENT_DISPATCHERS)) {
+    const relation = relations.get(event) ?? { dispatchers: new Map<string, Set<string>>(), listeners: new Set<string>() }
+    for (const [pkg, methods] of Object.entries(dispatchers)) {
+      const entries = relation.dispatchers.get(pkg) ?? new Set<string>()
+      for (const method of methods) entries.add(method)
+      relation.dispatchers.set(pkg, entries)
+    }
+    relations.set(event, relation)
+  }
+  return relations
 }
 
 function relationPackages(map: Map<string, Set<string>>, pkgsByShort: Map<string, Pkg>): string {

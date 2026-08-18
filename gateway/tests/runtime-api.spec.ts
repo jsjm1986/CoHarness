@@ -107,6 +107,11 @@ function fixture() {
     _header?: ConversationHeader,
   ): Promise<'inserted' | 'duplicate'> => 'inserted')
   const load = vi.fn(async (_sessionId: string): Promise<StoredConversation | undefined> => undefined)
+  const resolveOrganizationCredential = vi.fn(async (_subject, ref: string) =>
+    ref === 'DSH_ORG_PRIMARY_API_KEY' ? 'sk-organization' : null)
+  const push = {
+    notifyCompleted: vi.fn(async (_sessionId: string, _eventSeq: number): Promise<void> => {}),
+  }
   const deps = {
     context: {
       organizationSlug: ORGANIZATION_SLUG,
@@ -138,6 +143,8 @@ function fixture() {
       readableSessionIds: vi.fn(async () => []),
     },
     principals,
+    governance: { resolveOrganizationCredential },
+    push,
   } satisfies RuntimeDependencies
   const issuePrincipal = (userId: number, mode: 'ro' | 'rw' = modes.get(userId) ?? 'rw') => principals.issue({
     user: user(userId, userId === ADMIN_ID ? 'admin' : 'user'),
@@ -155,6 +162,8 @@ function fixture() {
     issuePrincipal,
     modes,
     principals,
+    resolveOrganizationCredential,
+    push,
   }
 }
 
@@ -367,6 +376,96 @@ describe('runtime session creation authorization', () => {
       body: { error: 'forbidden' },
     })
     expect(runtime.append).not.toHaveBeenCalled()
+  })
+})
+
+describe('runtime completed-turn push notifications', () => {
+  it('notifies only after an inserted completed turn/end event', async () => {
+    const runtime = fixture()
+    const sessionId = 'push-completed'
+    const authorization = await prepare(runtime, sessionId, 'project')
+    const completed: ConversationEvent = {
+      type: 'turn/end',
+      seq: 9,
+      time: CREATED_AT + 9,
+      data: { turn: 1, reason: { kind: 'completed' } },
+    }
+
+    const response = await request(runtime.handler, '/internal/runtime/session/append', {
+      body: {
+        sessionId,
+        batchId: `batch-${sessionId}`,
+        creationAuthorization: authorization,
+        events: [completed],
+      },
+    })
+
+    expect(response).toMatchObject({ handled: true, status: 200, body: { result: 'inserted' } })
+    expect(runtime.push.notifyCompleted).toHaveBeenCalledOnce()
+    expect(runtime.push.notifyCompleted).toHaveBeenCalledWith(sessionId, 9)
+  })
+
+  it('does not notify duplicate appends or non-completed turn endings', async () => {
+    const runtime = fixture()
+    const sessionId = 'push-filtered'
+    const authorization = await prepare(runtime, sessionId, 'project')
+    const ended: ConversationEvent = {
+      type: 'turn/end',
+      seq: 10,
+      time: CREATED_AT + 10,
+      data: { turn: 1, reason: { kind: 'aborted' } },
+    }
+    runtime.append.mockResolvedValueOnce('duplicate')
+
+    const duplicate = await request(runtime.handler, '/internal/runtime/session/append', {
+      body: {
+        sessionId,
+        batchId: `duplicate-${sessionId}`,
+        creationAuthorization: authorization,
+        events: [{ ...ended, seq: 10 }],
+      },
+    })
+    const nonCompleted = await request(runtime.handler, '/internal/runtime/session/append', {
+      body: {
+        sessionId,
+        batchId: `aborted-${sessionId}`,
+        creationAuthorization: authorization,
+        events: [ended],
+      },
+    })
+
+    expect(duplicate).toMatchObject({ body: { result: 'duplicate' } })
+    expect(nonCompleted).toMatchObject({ body: { result: 'inserted' } })
+    expect(runtime.push.notifyCompleted).not.toHaveBeenCalled()
+  })
+})
+
+describe('runtime organization credentials', () => {
+  it('resolves one allowed reference through the authenticated runtime subject without a browser principal', async () => {
+    const runtime = fixture()
+    const response = await request(runtime.handler, '/internal/runtime/model-credential', {
+      body: { ref: 'DSH_ORG_PRIMARY_API_KEY' },
+    })
+
+    expect(response).toMatchObject({
+      handled: true,
+      status: 200,
+      body: { configured: true, value: 'sk-organization' },
+    })
+    expect(runtime.resolveOrganizationCredential).toHaveBeenCalledWith(
+      { kind: 'project', id: PROJECT_ID },
+      'DSH_ORG_PRIMARY_API_KEY',
+    )
+  })
+
+  it('reports an unavailable reference without exposing another credential', async () => {
+    const runtime = fixture()
+    expect(await request(runtime.handler, '/internal/runtime/model-credential', {
+      body: { ref: 'DSH_ORG_MISSING_API_KEY' },
+    })).toMatchObject({ handled: true, status: 200, body: { configured: false } })
+    expect(await request(runtime.handler, '/internal/runtime/model-credential', {
+      body: { ref: '../secret' },
+    })).toMatchObject({ handled: true, status: 400 })
   })
 })
 

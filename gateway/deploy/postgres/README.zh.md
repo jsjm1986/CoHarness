@@ -83,4 +83,4 @@ HGW_TEST_SQLITE_FILE=/tmp/gateway-before-postgres.sqlite \
   npm run test:postgres
 ```
 
-测试会删除所提供测试数据库中的 `harness` schema，绝不能指向生产库。覆盖内容包括直到版本 6 的不可变 migration、未知 migration ledger 拒绝、企业隔离、任意字符串 Session ID、包含 NUL 字符串的完整 JSON 往返、连续序号约束、并发批次幂等、嵌套工具结果搜索、包含项目邀请的可重复 SQLite 导入、根继承协作 ACL、贡献投影、交互竞态、从空节点配置端口基准分配共享项目运行时、项目凭据/额度/用量，以及在线认证、用户、项目、节点实例、审计和模型治理服务。
+测试会删除所提供测试数据库中的 `harness` schema，绝不能指向生产库。覆盖内容包括直到版本 9 的不可变 migration、未知 migration ledger 拒绝、企业隔离、任意字符串 Session ID、包含 NUL 字符串的完整 JSON 往返、连续序号约束、并发批次幂等、嵌套工具结果搜索、包含项目邀请的可重复 SQLite 导入、根继承协作 ACL、贡献投影、交互竞态、从空节点配置端口基准分配共享项目运行时、项目凭据/额度/用量，以及在线认证、用户、项目、节点实例、审计和模型治理服务。

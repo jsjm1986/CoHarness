@@ -14,14 +14,14 @@ export class MemoryCredentials extends CredentialProvider {
     for (const [key, value] of Object.entries(seed)) this.store.set(key, value)
   }
 
-  override resolve(ref: CredentialRef): Promise<ResolvedCredential | undefined> {
+  protected override resolveOwned(ref: CredentialRef): Promise<ResolvedCredential | undefined> {
     const value = this.store.get(ref)
     return Promise.resolve(value === undefined || value.length === 0
       ? undefined
       : { value, source: 'memory' })
   }
 
-  override describe(ref: CredentialRef): Promise<CredentialInfo> {
+  protected override describeOwned(ref: CredentialRef): Promise<CredentialInfo> {
     const value = this.store.get(ref)
     const configured = value !== undefined && value.length > 0
     return Promise.resolve({
@@ -31,16 +31,13 @@ export class MemoryCredentials extends CredentialProvider {
     })
   }
 
-  override set(ref: CredentialRef, value: string): Promise<void> {
-    if (value.length === 0) {
-      return Promise.reject(new Error('memory credentials: an empty value cannot be stored; use unset'))
-    }
+  protected override setOwned(ref: CredentialRef, value: string): Promise<void> {
     this.store.set(ref, value)
     this.ctx.emit('credentials/updated', ref)
     return Promise.resolve()
   }
 
-  override unset(ref: CredentialRef): Promise<void> {
+  protected override unsetOwned(ref: CredentialRef): Promise<void> {
     if (this.store.delete(ref)) {
       this.ctx.emit('credentials/updated', ref)
     }

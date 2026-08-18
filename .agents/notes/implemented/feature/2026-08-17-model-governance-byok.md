@@ -10,7 +10,7 @@ Model governance originally had a `defaultAllowed` bypass for the `admin` role: 
 
 ## Decision
 
-1. **Remove the admin `defaultAllowed` bypass.** The governance catalog is the sole authorization source for every role. Out-of-catalog routes are denied for everyone. In-catalog role defaults (the per-route `adminAllowed`/`userAllowed` flags set at upsert time) are unaffected.
+1. **Remove the admin `defaultAllowed` bypass.** Administrator status never authorizes an out-of-catalog route by itself. Organization catalog routes follow their role and user access entries; a personal runtime may authorize an out-of-catalog route only through the explicit BYOK rule below.
 
 2. **Personal runtimes allow user-declared (BYOK) routes.** A route absent from the governance catalog is authorized when the instance's own settings user layer declares the provider. Usage is recorded with the same ledger: the catalog has no price, so the estimated cost is 0, and the personal credential attribution keeps the company cost at 0. Project runtimes stay catalog-only.
 
@@ -23,7 +23,7 @@ Model governance originally had a `defaultAllowed` bypass for the `admin` role: 
 - The gateway writes `userDeclaredAllowed: true` for personal runtimes and `false` for project runtimes into the policy file (the single `writeProjection` function in `apply-model-governance.ts`).
 - The plugin validates the new field and fails loud at boot when it is absent or non-boolean.
 - `ReloadableModelAccess` gains a `userDeclared` lookup callback. The decision order is: unavailable → catalog routes → (userDeclaredAllowed && provider has a user-layer profile) → defaultAllowed.
-- A `UserDeclaredRoutes` class tracks the provider id set, refreshed from `ctx.llm.listConfigurableProviders()` + `ctx.settings.describe()` on `llm/adapters-unpdated` and `settings/document-updated` events.
+- A `UserDeclaredRoutes` class tracks the provider id set, refreshed from `ctx.llm.listConfigurableProviders()` + `ctx.settings.describe()` on `llm/adapters-updated` and `settings/document-updated` events.
 - `dsh-settings` is a compile-time (type-only) dependency; the emitted lib retains the no-runtime-imports constraint.
 
 ## Alternatives considered
@@ -46,4 +46,4 @@ Model governance originally had a `defaultAllowed` bypass for the `admin` role: 
 
 ## Consequences
 
-The governance catalog is now the sole authorized model source for every role, so cost statistics are reliable. Users who configure their own providers in Settings (BYOK) see them appear in the model picker immediately and can use them; usage is recorded with personal-cost attribution and no catalog price. Project runtimes remain catalog-only, so shared project members cannot add personal providers. The DeepSeek provider editor also writes the credential reference into the user layer, so both adapter families produce a consistent "user configured this route" signal. The new `userDeclaredAllowed` field is required in the policy file — gateways that write it are compatible with the updated plugin, but the plugin rejects a missing field at boot with a clear error message. The `defaultAllowed` field is written as `false` for every role, so the admin bypass is gone; administrators who need to test an unregistered model must register it in the catalog first.
+Organization catalog routes now require explicit catalog authorization for every role, so administrator status cannot bypass pricing and access records. Users who configure their own providers in Settings (BYOK) see them appear in the model picker immediately and can use them; usage is recorded with personal-cost attribution and no catalog price. Project runtimes remain catalog-only, so shared project members cannot add personal providers. The DeepSeek provider editor also writes the credential reference into the user layer, so both adapter families produce a consistent "user configured this route" signal. The new `userDeclaredAllowed` field is required in the policy file — gateways that write it are compatible with the updated plugin, but the plugin rejects a missing field at boot with a clear error message. The `defaultAllowed` field is written as `false` for every role, so the admin bypass is gone; administrators who need to test an unregistered organization model must register it in the catalog first.

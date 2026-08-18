@@ -5,6 +5,111 @@ import type { UserRow } from './auth.ts'
 export type CredentialClass = 'company' | 'personal' | 'unknown'
 export type UsageStatus = 'succeeded' | 'failed' | 'cancelled' | 'missing-usage' | 'denied'
 
+/** Provider ids reserved for organization-managed routes. */
+export const ORGANIZATION_PROVIDER_PATTERN = /^org-[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
+
+/** Wire protocols currently supported by organization-managed pi-ai routes. */
+export type ModelProviderProtocol = 'openai-completions' | 'openai-responses' | 'anthropic-messages'
+
+/** Lifecycle state of one organization-managed model Provider. */
+export type ModelProviderStatus = 'draft' | 'enabled' | 'disabled' | 'archived'
+
+/** Persistence origin; legacy catalog rows remain drafts until replaced explicitly. */
+export type ModelProviderSource = 'managed' | 'legacy-catalog'
+
+/** Authentication supported by the initial organization Provider implementation. */
+export type ModelProviderAuthMode = 'api-key' | 'none'
+
+/** Organization Provider fields accepted by the Gateway control plane. */
+export interface ModelProviderInput {
+  provider: string
+  displayName: string
+  driver: 'pi-ai'
+  protocol: ModelProviderProtocol
+  baseURL: string
+  authMode: ModelProviderAuthMode
+  status: ModelProviderStatus
+  /** New plaintext value, `null` to clear, or absent to keep the stored credential. */
+  credential?: string | null
+  /** Complete pi-ai profile fields supplied by the shared models editor. */
+  profile?: Record<string, unknown>
+}
+
+/** Organization Provider metadata safe to return from the admin API. */
+export interface ModelProviderRow {
+  provider: string
+  displayName: string
+  driver: 'pi-ai'
+  protocol: ModelProviderProtocol | null
+  baseURL: string | null
+  authMode: ModelProviderAuthMode
+  status: ModelProviderStatus
+  credentialRef: string | null
+  credentialConfigured: boolean
+  source: ModelProviderSource
+  revision: number
+  modelCount: number
+  /** Complete redacted pi-ai profile used by the shared organization editor. */
+  profile?: Record<string, unknown>
+}
+
+/** Enabled organization Provider profile projected into one managed runtime. */
+export interface RuntimeModelProvider {
+  provider: string
+  displayName: string
+  driver: 'pi-ai'
+  protocol: ModelProviderProtocol
+  baseURL: string
+  credentialRef?: string
+  /** Provider-level pi-ai fields that are not represented by governance columns. */
+  profile?: Record<string, unknown>
+  models: Array<{
+    id: string
+    name: string
+    contextWindow?: number
+    maxTokens?: number
+    input?: Array<'text' | 'image'>
+    reasoningEfforts?: false | Partial<Record<'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max', string | null>>
+    compat?: { thinkingFormat?: string; supportsReasoningEffort?: boolean }
+  }>
+}
+
+/** Complete authorization and Provider projection consumed by the runtime plugin. */
+export interface RuntimeModelPolicy {
+  version: number
+  defaultAllowed: false
+  models: Array<{ provider: string; model: string; allowed: boolean }>
+  providers: RuntimeModelProvider[]
+}
+
+/** One path-addressed edit accepted by the organization models settings facade. */
+export type ModelSettingsPathOp =
+  | { op: 'set'; path: string[]; value: unknown }
+  | { op: 'unset'; path: string[] }
+
+/** Redacted settings namespace returned to the admin models plugin. */
+export interface OrganizationModelSettingsView {
+  writable: boolean
+  hasDocument: boolean
+  namespaces: Array<{
+    ns: 'llm-pi-ai'
+    schema: unknown
+    value: unknown
+    base?: unknown
+    user?: unknown
+    applies: 'live'
+    secrets: Array<{ path: string[]; set: boolean }>
+    revision: number
+  }>
+}
+
+/** Credential state exposed by the organization settings facade. */
+export interface OrganizationCredentialView {
+  configured: boolean
+  source: 'organization'
+  writable: true
+}
+
 /** Durable owner charged for one model-usage record. */
 export type ModelUsageSubject = { kind: 'user'; id: number } | { kind: 'project'; id: number }
 
@@ -64,7 +169,7 @@ const nonnegative = (value: number, name: string): number => {
 
 function credentialClassOf(source: string): CredentialClass {
   if (source === 'file' || source === 'project-env' || source === 'request') return 'personal'
-  if (source === 'env' || source === 'process' || source === 'user-env') return 'company'
+  if (source === 'organization' || source === 'env' || source === 'process' || source === 'user-env') return 'company'
   return 'unknown'
 }
 
@@ -111,6 +216,57 @@ function monthOf(time: number, timeZone: string): string {
 export class ModelGovernanceService {
   constructor(private readonly db: Database.Database, private readonly timeZone = 'Asia/Shanghai') {
     new Intl.DateTimeFormat('en-US', { timeZone }).format()
+  }
+
+  listProviders(): ModelProviderRow[] {
+    const rows = this.db.prepare(`SELECT provider,COUNT(*) model_count FROM model_catalog
+      GROUP BY provider ORDER BY provider`).all() as Array<{ provider: string; model_count: number }>
+    return rows.map(row => ({
+      provider: row.provider,
+      displayName: row.provider,
+      driver: 'pi-ai',
+      protocol: null,
+      baseURL: null,
+      authMode: 'none',
+      status: 'draft',
+      credentialRef: null,
+      credentialConfigured: false,
+      source: 'legacy-catalog',
+      revision: 1,
+      modelCount: row.model_count,
+    }))
+  }
+
+  upsertProvider(_input: ModelProviderInput): void {
+    throw new Error('SQLite model governance has no organization Provider support')
+  }
+
+  resolveOrganizationCredential(_subject: ModelUsageSubject, _ref: string): string | null {
+    return null
+  }
+
+  describeOrganizationModelSettings(): OrganizationModelSettingsView {
+    throw new Error('SQLite model governance has no organization settings support')
+  }
+
+  mutateOrganizationModelSettings(_ops: ModelSettingsPathOp[], _expectedRevision?: number): OrganizationModelSettingsView {
+    throw new Error('SQLite model governance has no organization settings support')
+  }
+
+  describeOrganizationCredentials(_refs: string[]): Record<string, OrganizationCredentialView> {
+    throw new Error('SQLite model governance has no organization credential support')
+  }
+
+  setOrganizationCredential(_ref: string, _value: string): void {
+    throw new Error('SQLite model governance has no organization credential support')
+  }
+
+  unsetOrganizationCredential(_ref: string): void {
+    throw new Error('SQLite model governance has no organization credential support')
+  }
+
+  discoverOrganizationModels(_request: { provider?: string; baseURL?: string; api?: string; apiKey?: string }): Array<{ id: string; name?: string; contextWindow?: number; maxTokens?: number }> {
+    throw new Error('SQLite model governance has no organization model discovery support')
   }
 
   listModels(): ModelRow[] {
@@ -185,7 +341,20 @@ export class ModelGovernanceService {
     return rows.map(row => ({ provider: row.provider, model: row.model, allowed: row.allowed === 1 }))
   }
 
-  policyFor(user: UserRow): { version: number; defaultAllowed: false; models: Array<{ provider: string; model: string; allowed: boolean }> } {
+  setProjectAccess(
+    _projectId: number,
+    _provider: string,
+    _model: string,
+    _allowed: boolean | null,
+  ): void {
+    throw new Error('SQLite model governance has no project runtime support')
+  }
+
+  projectOverrides(_projectId: number): Array<{ provider: string; model: string; allowed: boolean }> {
+    throw new Error('SQLite model governance has no project runtime support')
+  }
+
+  policyFor(user: UserRow): RuntimeModelPolicy {
     const rows = this.db.prepare(`SELECT m.provider,m.model,m.enabled,
       COALESCE(x.allowed,r.allowed,CASE WHEN ?='admin' THEN 1 ELSE 0 END) AS allowed
       FROM model_catalog m
@@ -200,14 +369,11 @@ export class ModelGovernanceService {
       // routes fall through to the plugin's user-declared allowance instead.
       defaultAllowed: false,
       models: rows.map(row => ({ provider: row.provider, model: row.model, allowed: row.enabled === 1 && row.allowed === 1 })),
+      providers: [],
     }
   }
 
-  policyForProject(_projectId: number): {
-    version: number
-    defaultAllowed: false
-    models: Array<{ provider: string; model: string; allowed: boolean }>
-  } {
+  policyForProject(_projectId: number): RuntimeModelPolicy {
     throw new Error('SQLite model governance has no project runtime support')
   }
 

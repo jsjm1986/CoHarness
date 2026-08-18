@@ -2,7 +2,7 @@
 
 [English](credentials.md) | 中文
 
-[dsh-credentials](../../packages/credentials/credentials) 的凭据 seam 把机密挡在配置之外：settings 分节与 `cordis.yml` 条目携带的是*引用*（环境变量名），值归 [dsh-credentials-local](../../packages/credentials/credentials-local) 这类提供方所有，消费方每个操作解析一次引用——LLM（大语言模型）适配器每次模型请求解析一次，因此轮换后的凭据无需任何重启即可作用于紧随其后的下一次请求。一条 seam 级规则约束每个提供方：空的存储值在任何地方都视为不存在。
+[dsh-credentials](../../packages/credentials/credentials) 的凭据 seam 把机密挡在配置之外：settings 分节与 `cordis.yml` 条目携带的是*引用*（环境变量名），可写值归 [dsh-credentials-local](../../packages/credentials/credentials-local) 这类提供方所有，消费方每个操作解析一次引用——LLM（大语言模型）适配器每次模型请求解析一次，因此轮换后的凭据无需任何重启即可作用于紧随其后的下一次请求。已注册只读层可以独占由其他服务提供的指定引用。空的存储值在任何地方都视为不存在。
 
 来源：[`packages/credentials/credentials/src/index.ts`](../../packages/credentials/credentials/src/index.ts)
 
@@ -17,7 +17,7 @@ type CredentialRef = Branded<'CredentialRef'>
 
 ## 解析
 
-`resolve(ref)` 返回值及提供该值的来源层（由提供方定义）；未配置期间返回 `undefined`。消费方在每个操作中重新解析，绝不跨操作缓存——这种按操作进行的读取正是热更新机制。
+`resolve(ref)` 返回值及提供该值的来源层；未配置期间返回 `undefined`。消费方在每个操作中重新解析，绝不跨操作缓存——这种按操作进行的读取正是热更新机制。已注册只读层声明引用后，即使该层返回 `undefined` 或失败，也绝不回退到提供方的可写来源。
 
 ```ts type-equiv
 /** One resolved credential value and the source layer that supplied it. */
@@ -31,7 +31,7 @@ interface ResolvedCredential {
 
 ## 描述
 
-`describe(ref)` 在绝不暴露值的前提下回应配置界面：引用当前是否可解析、来自哪一层、`set` 当前能否成功。本地提供方把由当前进程环境供值的引用报告为 `writable: false`——那样的写入会表面成功而解析持续返回遮蔽值，因此 seam 直接拒绝，界面也得以提前把该引用渲染为只读。
+`describe(ref)` 在绝不暴露值的前提下回应配置界面：引用当前是否可解析、来自哪一层、`set` 当前能否成功。本地提供方把由当前进程环境供值的引用报告为 `writable: false`。已注册只读层同样报告 `writable: false`；只要该层拥有引用，`set` 与 `unset` 就会拒绝。
 
 ```ts type-equiv
 /** Source and writability facts for one reference, safe for configuration UIs — never the value. */
@@ -42,6 +42,24 @@ interface CredentialInfo {
   source?: string
   /** Whether {@link CredentialProvider.set} would currently succeed for this reference. */
   writable: boolean
+}
+```
+
+## 只读层
+
+提供方可以注册彼此不重叠的只读层，其 `owns(ref)` 结果随当前运行时状态变化。所有权在整段注册生命周期内保持独占：读取只走拥有该引用的层，写入会拒绝，多个层重复声明时会明确报错。释放注册会同时释放这些声明。
+
+```ts type-equiv
+/** One externally supplied read-only credential layer with exclusive reference ownership. */
+interface ReadOnlyCredentialLayer {
+  /** Stable diagnostic id for registration and write refusals. */
+  readonly id: string
+  /** Return whether this layer exclusively owns one reference. */
+  owns(ref: CredentialRef): boolean
+  /** Resolve an owned reference without falling through to the writable Provider source. */
+  resolve(ref: CredentialRef): Promise<ResolvedCredential | undefined>
+  /** Describe an owned reference without exposing its value. */
+  describe(ref: CredentialRef): Promise<CredentialInfo>
 }
 ```
 
@@ -61,9 +79,16 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 
 ### `ctx.credentials` — `CredentialProvider` (abstract seam)
 
-Abstract credential service. Providers implement the four operations over their source layers; one seam-wide rule binds them all: an empty stored value is absent everywhere — `resolve` skips it, `describe` reports it unconfigured — so a blank never masquerades as a configured secret.
+Abstract credential service. Providers implement one writable source and may accept disjoint read-only layers. A read-only layer exclusively owns every reference it claims, so resolution never falls through to a personal value and writes reject. An empty stored value is absent everywhere.
 
 ```ts cordis-catalog
+/**
+ * Register one disjoint read-only source layer.
+ * @param layer - source ownership, value resolution, and value-free description.
+ * @returns an exact-registration disposer.
+ */
+registerReadOnlyLayer(layer: ReadOnlyCredentialLayer): () => void
+
 /**
  * Resolve one reference to its current value. Resolution is per call:
  * consumers re-resolve at each operation and must not cache across
@@ -72,7 +97,7 @@ Abstract credential service. Providers implement the four operations over their 
  * @param ref - the reference to resolve.
  * @returns the value and its source, or `undefined` while unconfigured.
  */
-abstract resolve(ref: CredentialRef): Promise<ResolvedCredential | undefined>
+async resolve(ref: CredentialRef): Promise<ResolvedCredential | undefined>
 
 /**
  * Describe one reference for configuration surfaces without exposing the
@@ -80,7 +105,7 @@ abstract resolve(ref: CredentialRef): Promise<ResolvedCredential | undefined>
  * @param ref - the reference to describe.
  * @returns configured state, supplying source, and writability.
  */
-abstract describe(ref: CredentialRef): Promise<CredentialInfo>
+async describe(ref: CredentialRef): Promise<CredentialInfo>
 
 /**
  * Durably store one value in the provider-managed writable source. Rejects
@@ -90,7 +115,7 @@ abstract describe(ref: CredentialRef): Promise<CredentialInfo>
  * @param ref - the reference to store.
  * @param value - the non-empty secret value.
  */
-abstract set(ref: CredentialRef, value: string): Promise<void>
+set(ref: CredentialRef, value: string): Promise<void>
 
 /**
  * Remove one reference from the provider-managed writable source; removing
@@ -98,10 +123,10 @@ abstract set(ref: CredentialRef, value: string): Promise<void>
  * the reference, like {@link set}.
  * @param ref - the reference to remove.
  */
-abstract unset(ref: CredentialRef): Promise<void>
+unset(ref: CredentialRef): Promise<void>
 ```
 
-Source: [`packages/credentials/credentials/src/index.ts:60`](../../packages/credentials/credentials/src/index.ts)
+Source: [`packages/credentials/credentials/src/index.ts:72`](../../packages/credentials/credentials/src/index.ts)
 
 <a id="credentials-events"></a>
 

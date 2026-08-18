@@ -195,6 +195,23 @@ describe('agent loop', () => {
     expect(messages[1]!.content).toEqual([{ type: 'text', text: 'hello there' }])
   })
 
+  it('appends the complete entered-message batch before dispatching message-entered effects', async () => {
+    const adapter = new MockAdapter([textResponse('done')])
+    const ctx = await harness(adapter)
+    ctx.systemPrompt.context({ name: 'policy', order: 0, text: 'Mode: read-only.' })
+    const agent = ctx.agentLoop.create(SessionId('entered-message-batch'), { provider: 'mock', model: 'mock' })
+    const visibleCounts: number[] = []
+    ctx.on('agent/message-entered', ({ agent: subject }) => {
+      if (subject !== agent) return
+      visibleCounts.push(subject.session.events.filter(event => event.type === 'user/message').length)
+    })
+
+    send(agent, 'inspect the complete batch')
+    await waitForIdle(ctx, agent)
+
+    expect(visibleCounts).toEqual([2, 2])
+  })
+
   it('round-trips tool calls: model requests tool → executes → result in next request', async () => {
     const adapter = new MockAdapter([
       toolCallResponse('c1', 'echo', { text: 'ping' }, 'calling echo'),
@@ -1192,15 +1209,29 @@ describe('agent loop', () => {
       { type: 'block-end', index: 0, block: { type: 'text', text: 'partial text' } },
       { type: 'block-start', index: 1, blockType: 'tool-call' },
       { type: 'tool-call-delta', index: 1, id: callId, name: 'echo', argumentsDelta: '{"text"' },
-      { type: 'finish', reason: { kind: 'max-tokens' } },
-    ]])
+      {
+        type: 'finish',
+        reason: { kind: 'max-tokens' },
+        replayState: { response: { responseId: 'resp-1' }, blocks: ['text-meta', 'tool-meta'] },
+      },
+    ], textResponse('continued')])
     const ctx = await harness(adapter)
     const agent = ctx.agentLoop.create(SessionId('a1'), { provider: 'mock', model: 'mock' })
 
     send(agent, 'go')
     await waitForIdle(ctx, agent)
+    send(agent, 'continue')
+    await waitForIdle(ctx, agent)
 
     expect(agent.session.events.some(e => e.type === 'tool/call')).toBe(false)
+    // The follow-up request replays the truncated message with its replay
+    // metadata pruned in step with the dropped tool call.
+    expect(adapter.requests[1]?.messages[1]?.source).toEqual({
+      kind: 'model',
+      provider: 'mock',
+      model: 'mock',
+      replayState: { response: { responseId: 'resp-1' }, blocks: ['text-meta'] },
+    })
     expect(agent.session.deriveMessages()).toEqual([
       {
         id: expect.any(String) as unknown,
@@ -1212,6 +1243,23 @@ describe('agent loop', () => {
         id: expect.any(String) as unknown,
         role: 'assistant',
         content: [{ type: 'text', text: 'partial text' }],
+        source: {
+          kind: 'model',
+          provider: 'mock',
+          model: 'mock',
+          replayState: { response: { responseId: 'resp-1' }, blocks: ['text-meta'] },
+        },
+      },
+      {
+        id: expect.any(String) as unknown,
+        role: 'user',
+        content: [{ type: 'text', text: 'continue' }],
+        source: { kind: 'user' },
+      },
+      {
+        id: expect.any(String) as unknown,
+        role: 'assistant',
+        content: [{ type: 'text', text: 'continued' }],
         source: { kind: 'model', provider: 'mock', model: 'mock' },
       },
     ])

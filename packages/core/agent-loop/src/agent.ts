@@ -279,8 +279,9 @@ export class ReactLoopAgent implements Agent {
         this.session.append('step/start', { turn, step })
         phase.step = step
         try {
-          for (const message of decision.messages) {
-            const event = this.session.append('user/message', message, { surfaceOp: 'append' })
+          const entered = decision.messages.map(message =>
+            this.session.append('user/message', message, { surfaceOp: 'append' }))
+          for (const event of entered) {
             await this.dispatch.serial('agent/message-entered', { event, turn, step, signal })
             signal.throwIfAborted()
           }

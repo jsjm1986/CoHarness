@@ -14,7 +14,7 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=/srv/harness/gateway
 Environment=HGW_PORT=8899
-Environment=HGW_PUBLIC_ORIGINS=https://harness.example.com
+Environment=HGW_PUBLIC_ORIGINS=https://harness.maycran.com
 Environment=HGW_DATABASE_URL_FILE=/srv/harness/gateway-data/database-url
 Environment=HGW_ORGANIZATION_SLUG=default
 Environment=HGW_COMPUTE_NODE_NAME=local
@@ -34,6 +34,10 @@ Environment=HGW_GUARD_PATCH=/srv/harness/plugins/dsh-directory-guard/cordis.patc
 Environment=HGW_MODEL_GOVERNANCE_PACKAGE=/srv/harness/plugins/dsh-model-governance
 Environment=HGW_USAGE_TIME_ZONE=Asia/Shanghai
 Environment=HGW_DEFAULT_ENV_FILE=/srv/harness/gateway-data/company.env
+# Enable after placing the Firebase service-account JSON at the host path and
+# setting the project id from the Firebase project configuration:
+# Environment=HGW_FCM_PROJECT_ID=<firebase-project-id>
+# Environment=HGW_FCM_SERVICE_ACCOUNT_FILE=/srv/harness/gateway-data/firebase/service-account.json
 ExecStart=/usr/local/bin/node --import tsx/esm src/index.ts
 Restart=always
 RestartSec=3

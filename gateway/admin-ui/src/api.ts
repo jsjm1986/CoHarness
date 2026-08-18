@@ -26,6 +26,15 @@ export type ProjectDetail = Project & {
   members: Array<{ userId: number; username: string; mode: GrantMode }>
 }
 
+export type ProjectDirectoryListing = {
+  path: string | null
+  scope: 'filesystem' | 'configured-roots'
+  crumbs: Array<{ name: string; path: string | null }>
+  entries: Array<{ name: string; path: string; hidden: boolean }>
+  selectable: boolean
+  truncated: boolean
+}
+
 export type AuditEntry = {
   id: number
   ts: number
@@ -45,13 +54,20 @@ export type AuditFilter = {
   offset?: number
 }
 
+export class AdminRequestError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message)
+    this.name = 'AdminRequestError'
+  }
+}
+
 async function request<T>(url: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(url, {
     ...init,
     credentials: 'same-origin',
     headers: { 'content-type': 'application/json', ...init.headers },
   })
-  if (!res.ok) throw new Error((await res.json() as { error: string }).error)
+  if (!res.ok) throw new AdminRequestError(res.status, (await res.json() as { error: string }).error)
   if (res.status === 204) return undefined as T
   return await res.json() as T
 }
@@ -91,6 +107,11 @@ export function controlInstance(id: number, op: 'start' | 'stop' | 'restart'): P
 
 export function listProjects(origin?: 'admin' | 'user'): Promise<Project[]> {
   return request(`/admin/api/projects${origin === undefined ? '' : `?origin=${origin}`}`)
+}
+
+export function listProjectDirectories(path?: string): Promise<ProjectDirectoryListing> {
+  const query = path === undefined ? '' : `?${new URLSearchParams({ path }).toString()}`
+  return request(`/admin/api/project-directories${query}`)
 }
 
 export function createProject(body: { name: string; path?: string }): Promise<Project> {
@@ -145,6 +166,97 @@ export type ModelGovernanceRow = {
   cacheWriteMicrosPerMillion: number
 }
 
+export type ModelProviderProtocol = 'openai-completions' | 'openai-responses' | 'anthropic-messages'
+export type ModelProviderStatus = 'draft' | 'enabled' | 'disabled' | 'archived'
+export type ModelProviderAuthMode = 'api-key' | 'none'
+
+export type ModelProviderRow = {
+  provider: string
+  displayName: string
+  driver: 'pi-ai'
+  protocol: ModelProviderProtocol | null
+  baseURL: string | null
+  authMode: ModelProviderAuthMode
+  status: ModelProviderStatus
+  credentialRef: string | null
+  credentialConfigured: boolean
+  source: 'managed' | 'legacy-catalog'
+  revision: number
+  modelCount: number
+  profile?: Record<string, unknown>
+}
+
+export type ModelProviderInput = {
+  provider: string
+  displayName: string
+  driver: 'pi-ai'
+  protocol: ModelProviderProtocol
+  baseURL: string
+  authMode: ModelProviderAuthMode
+  status: ModelProviderStatus
+  credential?: string | null
+  profile?: Record<string, unknown>
+}
+
+export type OrganizationModelSettingsView = {
+  writable: boolean
+  hasDocument: boolean
+  namespaces: Array<{
+    ns: 'llm-pi-ai'
+    schema: unknown
+    value: unknown
+    base?: unknown
+    user?: unknown
+    applies: 'live'
+    secrets: Array<{ path: string[]; set: boolean }>
+    revision: number
+  }>
+}
+
+export type OrganizationCredentialView = {
+  configured: boolean
+  source: 'organization'
+  writable: true
+}
+
+export type OrganizationModelDiscovery = {
+  provider?: string
+  baseURL?: string
+  api?: string
+  apiKey?: string
+}
+
+export function describeOrganizationModelSettings(): Promise<OrganizationModelSettingsView> {
+  return request('/admin/api/model-settings')
+}
+
+export function mutateOrganizationModelSettings(body: {
+  ops: Array<{ op: 'set' | 'unset'; path: string[]; value?: unknown }>
+  expectedRevision?: number
+}): Promise<OrganizationModelSettingsView> {
+  return request('/admin/api/model-settings', { method: 'PUT', body: JSON.stringify(body) })
+}
+
+export function describeOrganizationCredentials(refs: string[]): Promise<{ credentials: Record<string, OrganizationCredentialView> }> {
+  const query = new URLSearchParams()
+  for (const ref of refs) query.append('refs', ref)
+  return request(`/admin/api/model-settings/credentials?${query.toString()}`)
+}
+
+export function setOrganizationCredential(ref: string, value: string): Promise<void> {
+  return request('/admin/api/model-settings/credentials', { method: 'PUT', body: JSON.stringify({ ref, value }) })
+}
+
+export function unsetOrganizationCredential(ref: string): Promise<void> {
+  return request('/admin/api/model-settings/credentials', { method: 'DELETE', body: JSON.stringify({ ref }) })
+}
+
+export function discoverOrganizationModels(body: OrganizationModelDiscovery): Promise<{
+  models: Array<{ id: string; name?: string; contextWindow?: number; maxTokens?: number }>
+}> {
+  return request('/admin/api/model-settings/discover', { method: 'POST', body: JSON.stringify(body) })
+}
+
 export type ModelAccessView = {
   effective: {
     version: number
@@ -176,6 +288,14 @@ export function listModels(): Promise<ModelGovernanceRow[]> {
   return request('/admin/api/models')
 }
 
+export function listModelProviders(): Promise<ModelProviderRow[]> {
+  return request('/admin/api/model-providers')
+}
+
+export function saveModelProvider(provider: ModelProviderInput): Promise<void> {
+  return request('/admin/api/model-providers', { method: 'PUT', body: JSON.stringify(provider) })
+}
+
 export function saveModel(model: ModelGovernanceRow): Promise<void> {
   return request('/admin/api/models', { method: 'PUT', body: JSON.stringify(model) })
 }
@@ -187,6 +307,21 @@ export function getModelAccess(userId: number): Promise<ModelAccessView> {
 export function setModelAccess(userId: number, provider: string, model: string, allowed: boolean | null): Promise<void> {
   return request('/admin/api/model-access', {
     method: 'PUT', body: JSON.stringify({ userId, provider, model, allowed }),
+  })
+}
+
+export function getProjectModelAccess(projectId: number): Promise<ModelAccessView> {
+  return request(`/admin/api/project-model-access?projectId=${projectId}`)
+}
+
+export function setProjectModelAccess(
+  projectId: number,
+  provider: string,
+  model: string,
+  allowed: boolean | null,
+): Promise<void> {
+  return request('/admin/api/project-model-access', {
+    method: 'PUT', body: JSON.stringify({ projectId, provider, model, allowed }),
   })
 }
 

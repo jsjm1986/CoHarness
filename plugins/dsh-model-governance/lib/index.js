@@ -3,7 +3,9 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { ReloadableModelAccess } from "./access.js";
 import { UsageOutbox } from "./outbox.js";
+import { OrganizationCredentialLayer } from "./organization-credentials.js";
 import { loadPolicy } from "./policy.js";
+import { ReloadableModelProviderConfig, stagedProviderSnapshot } from "./provider-config.js";
 import { PolicyReloader } from "./reload.js";
 import { UserDeclaredRoutes } from "./user-routes.js";
 export const name = 'dsh-model-governance';
@@ -11,7 +13,7 @@ export const inject = ['llm'];
 function credentialClass(source) {
     if (source === 'file' || source === 'project-env' || source === 'request')
         return 'personal';
-    if (source === 'env' || source === 'process' || source === 'user-env')
+    if (source === 'organization' || source === 'env' || source === 'process' || source === 'user-env')
         return 'company';
     return 'unknown';
 }
@@ -25,7 +27,15 @@ export function apply(ctx) {
     const policy = loadPolicy(policyPath);
     const userDeclared = new UserDeclaredRoutes();
     const access = new ReloadableModelAccess(policy, userDeclared);
+    const providerConfig = new ReloadableModelProviderConfig(ctx, {
+        revision: policy.version,
+        providers: policy.providers,
+    });
     ctx.provide('modelAccess', access);
+    ctx.inject(['credentials', 'gatewayRuntime', 'modelProviderConfig'], (sctx) => {
+        const layer = new OrganizationCredentialLayer(sctx.gatewayRuntime, sctx.modelProviderConfig);
+        sctx.effect(() => sctx.credentials.registerReadOnlyLayer(layer), 'model-governance: organization Provider credentials');
+    });
     // Registry topology changes introduce or withdraw configurable providers;
     // recompute the user-declared set whenever the directory or route set moves.
     ctx.on('llm/adapters-updated', () => {
@@ -54,7 +64,12 @@ export function apply(ctx) {
     reloader = new PolicyReloader({
         filename: policyPath,
         onValid: next => {
+            providerConfig.replace(stagedProviderSnapshot(providerConfig.snapshot(), {
+                revision: next.version,
+                providers: next.providers,
+            }));
             access.replace(next);
+            providerConfig.replace({ revision: next.version, providers: next.providers });
             outbox.setEndpoint(next.intakeUrl, next.intakeToken);
         },
         onInvalid: error => {

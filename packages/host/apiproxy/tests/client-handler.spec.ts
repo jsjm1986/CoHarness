@@ -734,6 +734,7 @@ describe('config unary surface', () => {
       settingsNs: 'llm-pi-ai',
       settingsPath: ['providers', 'openai'],
       active: false,
+      management: 'personal' as const,
     }
     const group = { id: 'deepseek-official', name: 'DeepSeek', models: [{ id: 'deepseek-v4-flash', name: 'Flash' }] }
     const api = scriptedApi({

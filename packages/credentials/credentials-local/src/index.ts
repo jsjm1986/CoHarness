@@ -306,7 +306,7 @@ export class LocalCredentialProvider extends CredentialProvider {
     /* jscpd:ignore-end */
   }
 
-  override resolve(ref: CredentialRef): Promise<ResolvedCredential | undefined> {
+  protected override resolveOwned(ref: CredentialRef): Promise<ResolvedCredential | undefined> {
     const inherited = this.inherited(ref)
     if (inherited !== undefined) return Promise.resolve({ value: inherited, source: 'env' })
     const stored = this.values.get(ref)
@@ -316,7 +316,7 @@ export class LocalCredentialProvider extends CredentialProvider {
     return Promise.resolve(undefined)
   }
 
-  override describe(ref: CredentialRef): Promise<CredentialInfo> {
+  protected override describeOwned(ref: CredentialRef): Promise<CredentialInfo> {
     // Only the inherited environment is unwritable: it is the one layer this
     // process cannot edit. A user `.env` value is writable in the sense that
     // matters — storing a key replaces it as the effective one.
@@ -330,14 +330,11 @@ export class LocalCredentialProvider extends CredentialProvider {
     return Promise.resolve({ configured: false, writable: true })
   }
 
-  override async set(ref: CredentialRef, value: string): Promise<void> {
-    if (value.length === 0) {
-      throw new Error(`credentials-local: an empty value cannot be stored for "${ref}"; use unset`)
-    }
+  protected override async setOwned(ref: CredentialRef, value: string): Promise<void> {
     await this.write(ref, value)
   }
 
-  override async unset(ref: CredentialRef): Promise<void> {
+  protected override async unsetOwned(ref: CredentialRef): Promise<void> {
     await this.write(ref, undefined)
   }
 

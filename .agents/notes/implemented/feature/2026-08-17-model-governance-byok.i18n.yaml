@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-17-model-governance-byok.md
-2026-08-17-model-governance-byok.md: eb173acaba9202e05a29ba1171655002c4092910
-2026-08-17-model-governance-byok.zh.md: e3d03c520c2f48f8ca8f8980bc0197078f15c6fb
+2026-08-17-model-governance-byok.md: ebbcb6a9793d45580f40c385a1e661ce617a31f7
+2026-08-17-model-governance-byok.zh.md: 71f2105b6d5af52aa17430983011e1497a27c249

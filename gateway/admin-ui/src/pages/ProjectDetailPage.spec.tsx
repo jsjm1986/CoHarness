@@ -7,12 +7,16 @@ import { ProjectDetailPage } from './ProjectDetailPage.tsx'
 
 vi.mock('../api.ts', () => ({
   deleteProject: vi.fn(),
+  getProjectModelAccess: vi.fn(),
   getProject: vi.fn(),
   getProjectUsage: vi.fn(),
+  listModelProviders: vi.fn(),
+  listModels: vi.fn(),
   listUsers: vi.fn(),
   removeMember: vi.fn(),
   renameProject: vi.fn(),
   setMember: vi.fn(),
+  setProjectModelAccess: vi.fn(),
   setQuota: vi.fn(),
 }))
 
@@ -52,6 +56,48 @@ const usage = {
   alerts: [],
 }
 
+const modelProviders: api.ModelProviderRow[] = [{
+  provider: 'org-primary',
+  displayName: 'Primary',
+  driver: 'pi-ai',
+  protocol: 'openai-completions',
+  baseURL: 'https://api.example.com/v1',
+  authMode: 'api-key',
+  status: 'enabled',
+  credentialRef: 'organization-model/org-primary/api-key',
+  credentialConfigured: true,
+  source: 'managed',
+  revision: 1,
+  modelCount: 2,
+}]
+
+const models: api.ModelGovernanceRow[] = [
+  {
+    provider: 'org-primary',
+    model: 'deepseek-chat',
+    displayName: 'DeepSeek Chat',
+    enabled: true,
+    adminAllowed: true,
+    userAllowed: true,
+    inputMicrosPerMillion: 0,
+    outputMicrosPerMillion: 0,
+    cacheReadMicrosPerMillion: 0,
+    cacheWriteMicrosPerMillion: 0,
+  },
+  {
+    provider: 'org-primary',
+    model: 'deepseek-reasoner',
+    displayName: 'DeepSeek Reasoner',
+    enabled: true,
+    adminAllowed: true,
+    userAllowed: false,
+    inputMicrosPerMillion: 0,
+    outputMicrosPerMillion: 0,
+    cacheReadMicrosPerMillion: 0,
+    cacheWriteMicrosPerMillion: 0,
+  },
+]
+
 function renderPage() {
   return render(
     <MemoryRouter initialEntries={['/projects/7']}>
@@ -68,6 +114,13 @@ describe('ProjectDetailPage', () => {
     vi.mocked(api.getProject).mockResolvedValue(project)
     vi.mocked(api.listUsers).mockResolvedValue([alice])
     vi.mocked(api.getProjectUsage).mockResolvedValue(usage)
+    vi.mocked(api.listModelProviders).mockResolvedValue(modelProviders)
+    vi.mocked(api.listModels).mockResolvedValue(models)
+    vi.mocked(api.getProjectModelAccess).mockResolvedValue({
+      effective: { version: 1, defaultAllowed: false, models: [] },
+      overrides: [{ provider: 'org-primary', model: 'deepseek-chat', allowed: true }],
+    })
+    vi.mocked(api.setProjectModelAccess).mockResolvedValue(undefined)
     vi.mocked(api.setQuota).mockResolvedValue(undefined)
   })
 
@@ -115,5 +168,25 @@ describe('ProjectDetailPage', () => {
       tokenLimit: 12_000,
       companyCostMicrosLimit: 8_500_000,
     }))
+  })
+
+  it('assigns and removes project models without role or user inheritance', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    const table = await screen.findByRole('table', { name: '项目模型权限' })
+    const chatRow = within(table).getByRole('row', { name: /DeepSeek Chat/ })
+    const reasonerRow = within(table).getByRole('row', { name: /DeepSeek Reasoner/ })
+    expect((within(chatRow).getByRole('checkbox') as HTMLInputElement).checked).toBe(true)
+    expect((within(reasonerRow).getByRole('checkbox') as HTMLInputElement).checked).toBe(false)
+    expect(screen.queryByText('继承角色')).toBeNull()
+
+    await user.click(within(reasonerRow).getByRole('checkbox'))
+    await waitFor(() => expect(api.setProjectModelAccess).toHaveBeenCalledWith(
+      7, 'org-primary', 'deepseek-reasoner', true,
+    ))
+    await user.click(within(chatRow).getByRole('checkbox'))
+    await waitFor(() => expect(api.setProjectModelAccess).toHaveBeenCalledWith(
+      7, 'org-primary', 'deepseek-chat', null,
+    ))
   })
 })

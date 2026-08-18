@@ -26,6 +26,8 @@
   },
   "license": "MIT",
   "dependencies": {
+    "@capacitor/core": "8.5.0",
+    "@capacitor/push-notifications": "8.1.2",
     "@deepseek-ai/dsh-client-web": "workspace:^",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"

@@ -6,6 +6,8 @@ English | [中文](2026-07-30-config-plane-boundaries.zh.md)
 
 > Scope: boundary hardening of the [web configuration plane](2026-07-30-web-config-plane.md) — which namespaces reach the wire, which callers reach them, and how an editor holding a partial, possibly stale view writes without destroying what it cannot see.
 
+> The caller restrictions, redaction, and revision fencing remain current. Namespace admission is superseded by [plugin-owned settings with project isolation](2026-08-12-plugin-owned-settings-surface.md): personal scope serves every registered namespace, while shared project scope retains a read-only approved subset.
+
 ## Problem
 
 The plane worked and was reachable by more callers, and with more authority, than its design claimed.

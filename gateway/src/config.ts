@@ -32,6 +32,8 @@ export interface GatewayConfig {
   runtimeApiBodyLimitBytes: number
   /** Private host directory used as the source for systemd runtime credentials. */
   runtimeCredentialDir: string
+  /** Owner-only AES-GCM master-key file for organization model credentials. */
+  organizationModelCredentialKeyFile: string
   dshCommand: string[]
   dshRepoRoot: string
   instancePortBase: number
@@ -66,8 +68,12 @@ export interface GatewayConfig {
    * user-env layer, which the managed `.credentials.yaml` (a user's personal
    * key set from Settings) outranks — so seeding never clobbers a personal
    * key, while a rotated company key reaches instances on their next start.
-   */
+  */
   defaultEnvFile: string
+  /** Firebase Cloud Messaging project id; absent disables outbound push delivery. */
+  fcmProjectId?: string
+  /** Owner-only Firebase service-account JSON file used for FCM HTTP v1. */
+  fcmServiceAccountFile?: string
 }
 
 const gatewayRoot = resolve(import.meta.dirname, '..')
@@ -201,6 +207,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     principalAssertionTtlMs: Number(env.HGW_PRINCIPAL_ASSERTION_TTL_MS ?? 30_000),
     runtimeApiBodyLimitBytes,
     runtimeCredentialDir: env.HGW_RUNTIME_CREDENTIAL_DIR ?? join(stateRoot, 'runtime-credentials'),
+    organizationModelCredentialKeyFile: env.HGW_ORGANIZATION_MODEL_CREDENTIAL_KEY_FILE
+      ?? join(stateRoot, 'organization-model-credentials.key'),
     dshCommand,
     dshRepoRoot,
     instancePortBase,
@@ -217,5 +225,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     guardPatch,
     modelGovernancePackage: env.HGW_MODEL_GOVERNANCE_PACKAGE ?? join(dshRepoRoot, 'plugins/dsh-model-governance'),
     defaultEnvFile: env.HGW_DEFAULT_ENV_FILE ?? '',
+    fcmProjectId: env.HGW_FCM_PROJECT_ID?.trim() || undefined,
+    fcmServiceAccountFile: env.HGW_FCM_SERVICE_ACCOUNT_FILE?.trim() || undefined,
   }
 }

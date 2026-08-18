@@ -122,13 +122,14 @@ function installAttachedEventCheck(ctx: Context, fail: InvariantFailure): void {
   }, { global: true })
 }
 
-function installUserDocInvariant(ctx: Context, fail: InvariantFailure): void {
+/* jscpd:ignore-start -- package companions share replay and dispatch plumbing */
+/** Install durable document relation checks for loaded and live sessions. */
+const install: InvariantInstaller = Object.assign((ctx: Context, fail: InvariantFailure) => {
   validateExistingSessions(ctx.sessions.list(), fail)
   installCreatedSessionCheck(ctx, fail)
   installAttachedEventCheck(ctx, fail)
-}
-
-const install: InvariantInstaller = Object.assign(installUserDocInvariant, { inject: ['sessions'] })
+}, { inject: ['sessions'] })
+/* jscpd:ignore-end */
 
 /**
  * Register the package-owned durable relation checks.

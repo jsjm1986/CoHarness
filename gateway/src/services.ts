@@ -9,8 +9,14 @@ import type {
 } from './collaboration.ts'
 import type { InstanceManager } from './instances.ts'
 import type {
+  ModelSettingsPathOp,
   ModelUsageSubject,
+  ModelProviderInput,
+  ModelProviderRow,
   ModelRow,
+  OrganizationCredentialView,
+  OrganizationModelSettingsView,
+  RuntimeModelPolicy,
   UsageEvent,
   UsageSummary,
 } from './model-governance.ts'
@@ -121,6 +127,8 @@ export interface GatewayAuditService {
 
 /** Model authorization, pricing, quota, and usage operations consumed by the Gateway. */
 export interface GatewayModelGovernanceService {
+  listProviders(): Awaitable<ModelProviderRow[]>
+  upsertProvider(input: ModelProviderInput): Awaitable<void>
   listModels(): Awaitable<ModelRow[]>
   upsertModel(input: Omit<ModelRow, 'adminAllowed' | 'userAllowed'> & {
     adminAllowed?: boolean
@@ -128,16 +136,22 @@ export interface GatewayModelGovernanceService {
   }): Awaitable<void>
   setUserAccess(userId: number, provider: string, model: string, allowed: boolean | null): Awaitable<void>
   userOverrides(userId: number): Awaitable<Array<{ provider: string; model: string; allowed: boolean }>>
-  policyFor(user: UserRow): Awaitable<{
-    version: number
-    defaultAllowed: false
-    models: Array<{ provider: string; model: string; allowed: boolean }>
-  }>
-  policyForProject(projectId: number): Awaitable<{
-    version: number
-    defaultAllowed: false
-    models: Array<{ provider: string; model: string; allowed: boolean }>
-  }>
+  setProjectAccess(projectId: number, provider: string, model: string, allowed: boolean | null): Awaitable<void>
+  projectOverrides(projectId: number): Awaitable<Array<{ provider: string; model: string; allowed: boolean }>>
+  policyFor(user: UserRow): Awaitable<RuntimeModelPolicy>
+  policyForProject(projectId: number): Awaitable<RuntimeModelPolicy>
+  resolveOrganizationCredential(subject: ModelUsageSubject, ref: string): Awaitable<string | null>
+  describeOrganizationModelSettings(): Awaitable<OrganizationModelSettingsView>
+  mutateOrganizationModelSettings(ops: ModelSettingsPathOp[], expectedRevision?: number): Awaitable<OrganizationModelSettingsView>
+  describeOrganizationCredentials(refs: string[]): Awaitable<Record<string, OrganizationCredentialView>>
+  setOrganizationCredential(ref: string, value: string): Awaitable<void>
+  unsetOrganizationCredential(ref: string): Awaitable<void>
+  discoverOrganizationModels(request: {
+    provider?: string
+    baseURL?: string
+    api?: string
+    apiKey?: string
+  }): Awaitable<Array<{ id: string; name?: string; contextWindow?: number; maxTokens?: number }>>
   issueIntakeToken(subject: ModelUsageSubject): Awaitable<string>
   subjectForIntakeToken(token: string): Awaitable<ModelUsageSubject | null>
   setQuota(

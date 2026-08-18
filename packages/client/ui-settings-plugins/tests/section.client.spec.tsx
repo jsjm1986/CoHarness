@@ -22,6 +22,7 @@ import type { WebSearchCardProps } from '../src/client/WebSearchCard.tsx'
 import type { AgentLoopCardState } from '../src/client/agent-loop-card-controller.ts'
 import type { BashCardState } from '../src/client/bash-card-controller.ts'
 import type { CardFieldState, CardShell } from '../src/client/card-form.ts'
+import type { ConfigurablePluginsTabState } from '../src/client/tab-store.ts'
 import type { WebSearchCardState } from '../src/client/web-search-card-controller.ts'
 import { en } from '../src/client/locales.ts'
 
@@ -59,11 +60,16 @@ function renderSection(rows: readonly PluginsSettingsTabEntry[]) {
   render(<PluginsSettingsSection {...props} />)
 }
 
-function renderConfigurable(cardCount: number, cards = 'cards') {
+/** Render the card slot for the namespaces selected by the directory. */
+function renderConfigurable(namespaces: string[], cards: Record<string, string> = {}, loaded = true) {
+  const store = createSnapshotStore<ConfigurablePluginsTabState>({ loaded, namespaces })
   const props = {
     t,
-    cardCount,
-    renderSlot: () => <li>{cards}</li>,
+    useConfigurablePlugins: bindSnapshotSelector(store),
+    renderSlot: (_name: string, _owner: object, opts?: { entryKey?: string }) => {
+      const card = opts?.entryKey === undefined ? undefined : cards[opts.entryKey]
+      return card === undefined ? null : <li>{card}</li>
+    },
   } as unknown as ConfigurablePluginsTabProps
   render(<ConfigurablePluginsTab {...props} />)
 }
@@ -153,16 +159,22 @@ describe('PluginsSettingsSection', () => {
 
 describe('ConfigurablePluginsTab', () => {
   it('says so when no plugin contributed a card', () => {
-    renderConfigurable(0)
+    renderConfigurable([], { shell: 'shell' })
 
     expect(screen.getByText(en.empty)).toBeTruthy()
-    expect(screen.queryByText('cards')).toBeNull()
+    expect(screen.queryByText('shell')).toBeNull()
   })
 
-  it('renders the card list once a plugin contributed one', () => {
-    renderConfigurable(1)
+  it('withholds the empty line until the Host answers', () => {
+    renderConfigurable([], { shell: 'shell' }, false)
 
-    expect(screen.getByText('cards')).toBeTruthy()
+    expect(screen.queryByText(en.empty)).toBeNull()
+  })
+
+  it('dispatches one card per namespace using that namespace as the key', () => {
+    renderConfigurable(['shell', 'agent-loop'], { shell: 'shell', 'agent-loop': 'loop' })
+
+    expect(screen.getAllByRole('listitem').map(item => item.textContent)).toEqual(['shell', 'loop'])
     expect(screen.queryByText(en.empty)).toBeNull()
   })
 })
