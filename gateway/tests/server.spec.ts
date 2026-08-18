@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, realpathSync } from 'node:fs'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AuditService } from '../src/audit.ts'
 import { AuthService } from '../src/auth.ts'
@@ -109,12 +109,24 @@ const emptyUsageSummary: UsageSummary = {
 describe('gateway server', () => {
   it('serves healthz without auth and redirects anonymous html to /login', async () => {
     const { base } = await setup()
-    expect((await fetch(`${base}/healthz`)).status).toBe(200)
+    const health = await fetch(`${base}/healthz`)
+    expect(health.status).toBe(200)
+    expect(await health.json()).toEqual({ ok: true })
     const anonymous = await fetch(`${base}/`, { redirect: 'manual', headers: { accept: 'text/html' } })
     expect(anonymous.status).toBe(302)
     expect(anonymous.headers.get('location')).toBe('/login')
     const api = await fetch(`${base}/api/session.list`, { method: 'POST', headers: { origin: base } })
     expect(api.status).toBe(401)
+  })
+
+  it('publishes the immutable release identifier in health diagnostics', async () => {
+    const releaseRoot = realpathSync(join(import.meta.dirname, '../..'))
+    const { base } = await setup({ HGW_RELEASE_ROOT: releaseRoot })
+
+    expect(await (await fetch(`${base}/healthz`)).json()).toEqual({
+      ok: true,
+      release: basename(releaseRoot),
+    })
   })
 
   it('uses the runtime API body limit and returns JSON 413 before dispatch', async () => {

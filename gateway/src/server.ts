@@ -203,9 +203,9 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     if (pathname === '/healthz') {
       try {
         await deps.readiness?.()
-        send(res, 200, '{"ok":true}', 'application/json')
+        send(res, 200, JSON.stringify({ ok: true, release: cfg.releaseId }), 'application/json')
       } catch {
-        send(res, 503, '{"ok":false}', 'application/json')
+        send(res, 503, JSON.stringify({ ok: false, release: cfg.releaseId }), 'application/json')
       }
       return
     }

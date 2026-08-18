@@ -31,22 +31,25 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 | `HGW_PRINCIPAL_ASSERTION_TTL_MS` | 30 秒 | 一份签名 principal 的生命周期；WebSocket 客户端会在过期前重连 |
 | `HGW_RUNTIME_CREDENTIAL_DIR` | `~/.harness-gateway/runtime-credentials` | systemd 用户/项目运行时加载的宿主私有凭据文件 |
 | `HGW_RUNTIME_API_BODY_LIMIT_BYTES` | 64 MiB | 单次认证私有运行时 API 请求允许的最大 body 大小 |
-| `HGW_DSH_COMMAND` | 源码入口 `apps/cli/src/bin.ts web --port {port}` | 实例启动命令；生产必须使用已构建的 `apps/cli/lib/bin.js` 或钉死版本的 npm `dsh` bin，不能使用源码/tsx 入口 |
-| `HGW_DSH_REPO_ROOT` | 仓库根 | 解析源码运行入口 |
+| `HGW_DATABASE_STARTUP_RETRY_INITIAL_MS` | 1 秒 | PostgreSQL 启动连接暂时失败时的初始重试间隔 |
+| `HGW_DATABASE_STARTUP_RETRY_MAX_MS` | 30 秒 | PostgreSQL 启动瞬时故障的最大重试间隔；认证和 migration 错误仍会立即失败 |
+| `HGW_RELEASE_ROOT` | （未设置） | 受控部署的规范化不可变 release 目录；Gateway、CLI、策略插件和 `/healthz` 共用由目录名派生的 release id |
+| `HGW_DSH_COMMAND` | 源码入口 `apps/cli/src/bin.ts web --port {port}` | 实例启动命令；设置 `HGW_RELEASE_ROOT` 时必须留空，由该 release 派生已构建 CLI 命令 |
+| `HGW_DSH_REPO_ROOT` | 仓库根 | 解析源码运行入口；受控 release 模式下必须解析到 `HGW_RELEASE_ROOT` |
 | `HGW_INSTANCE_PORT_BASE` | 42000 | 实例端口分配起点 |
 | `HGW_IDLE_TIMEOUT_MS` | 30 分钟 | 实例闲置休眠阈值 |
 | `HGW_READINESS_TIMEOUT_MS` | 30 秒 | 实例就绪等待上限 |
 | `HGW_LAUNCHER` | `local` | 实例启动驱动：`local`（macOS 开发子进程）/ `systemd`（Linux 生产每用户单元） |
 | `HGW_SYSTEMD_UNIT_DIR` | `/etc/systemd/system` | systemd 驱动写每用户单元文件的目录 |
-| `HGW_GUARD_PATCH` | `<仓库>/plugins/dsh-directory-guard/cordis.patch.yml` | 实体安装进每个实例的 directory-guard bundle 补丁；同目录的管理员覆盖层为管理员恢复 Full access；`off` 关闭 |
-| `HGW_MODEL_GOVERNANCE_PACKAGE` | `<仓库>/plugins/dsh-model-governance` | 从 `package.json`、`lib/` 与 bundle 补丁文件复制到每个 profile 的树外实例授权与用量插件 |
+| `HGW_GUARD_PATCH` | `<仓库>/plugins/dsh-directory-guard/cordis.patch.yml` | 实体安装进每个实例的 directory-guard bundle 补丁；release 模式把它固定在 `HGW_RELEASE_ROOT` 内，`off` 可关闭 |
+| `HGW_MODEL_GOVERNANCE_PACKAGE` | `<仓库>/plugins/dsh-model-governance` | 树外实例授权与用量插件；release 模式把它固定在 `HGW_RELEASE_ROOT` 内 |
 | `HGW_DEFAULT_ENV_FILE` | （空） | 每次启动复制到实例 `$DSH_HOME/.env` 的公司默认凭据 |
 | `HGW_FCM_PROJECT_ID` | （未设置） | 用于 Android 完成通知的 Firebase Cloud Messaging 企业 id |
 | `HGW_FCM_SERVICE_ACCOUNT_FILE` | （未设置） | 仅所有者可读的 Firebase service-account JSON 文件；未设置时仍保存 Token，但不发送 FCM |
 | `HGW_JPUSH_APP_KEY` | （未设置） | JPush 应用 AppKey；必须与 `HGW_JPUSH_MASTER_SECRET` 成对设置 |
 | `HGW_JPUSH_MASTER_SECRET` | （未设置） | 仅所有者可读的 JPush Master Secret；两项同时设置后才启用 JPush |
 | `HGW_MEMORY_MAX` / `HGW_CPU_QUOTA` | `1G` / `100%` | 每实例 systemd 资源限额 |
-| `HGW_GATEWAY_DIR` | 网关根目录 | 对实例遮蔽的目录（`InaccessiblePaths`） |
+| `HGW_GATEWAY_DIR` | 网关根目录 | 对实例遮蔽的目录（`InaccessiblePaths`）；release 模式固定为 `<HGW_RELEASE_ROOT>/gateway` |
 
 生产安装、切流与验收见 [deploy/README.md](deploy/README.md)。
 

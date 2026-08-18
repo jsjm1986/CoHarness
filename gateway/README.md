@@ -31,22 +31,25 @@ The public-facing portal gateway for DeepSeek Harness: PostgreSQL-backed login/s
 | `HGW_PRINCIPAL_ASSERTION_TTL_MS` | 30 s | Lifetime of one signed principal; WebSocket clients reconnect before expiry |
 | `HGW_RUNTIME_CREDENTIAL_DIR` | `~/.harness-gateway/runtime-credentials` | Host-private credential files loaded into systemd user/project runtimes |
 | `HGW_RUNTIME_API_BODY_LIMIT_BYTES` | 64 MiB | Maximum body size accepted by one authenticated private runtime API request |
-| `HGW_DSH_COMMAND` | source entry `apps/cli/src/bin.ts web --port {port}` | Instance launch command; production must use the built `apps/cli/lib/bin.js` or a pinned npm `dsh` bin, not the source/tsx entry |
-| `HGW_DSH_REPO_ROOT` | repo root | Resolves the source-run entry |
+| `HGW_DATABASE_STARTUP_RETRY_INITIAL_MS` | 1 s | Initial delay before retrying a transient PostgreSQL startup connection failure |
+| `HGW_DATABASE_STARTUP_RETRY_MAX_MS` | 30 s | Maximum delay between transient PostgreSQL startup retries; authentication and migration errors still fail immediately |
+| `HGW_RELEASE_ROOT` | (unset) | Canonical immutable release directory for managed deployments; Gateway, CLI, policy plugins, and `/healthz` share its directory-derived release id |
+| `HGW_DSH_COMMAND` | source entry `apps/cli/src/bin.ts web --port {port}` | Instance launch command; must be unset with `HGW_RELEASE_ROOT`, which derives the built CLI command from that release |
+| `HGW_DSH_REPO_ROOT` | repo root | Resolves the source-run entry; must resolve to `HGW_RELEASE_ROOT` in managed release mode |
 | `HGW_INSTANCE_PORT_BASE` | 42000 | Instance port allocation base |
 | `HGW_IDLE_TIMEOUT_MS` | 30 min | Instance idle-sleep threshold |
 | `HGW_READINESS_TIMEOUT_MS` | 30 s | Instance readiness wait ceiling |
 | `HGW_LAUNCHER` | `local` | Instance launch driver: `local` (macOS dev subprocess) / `systemd` (Linux production per-user units) |
 | `HGW_SYSTEMD_UNIT_DIR` | `/etc/systemd/system` | Unit directory the systemd driver writes per-user unit files into |
-| `HGW_GUARD_PATCH` | `<repo>/plugins/dsh-directory-guard/cordis.patch.yml` | directory-guard bundle patch materialized into every instance; its sibling admin overlay restores Full access for administrators; `off` disables |
-| `HGW_MODEL_GOVERNANCE_PACKAGE` | `<repo>/plugins/dsh-model-governance` | Tree-external per-instance authorization and usage plugin materialized into each profile from its `package.json`, `lib/`, and bundle patch files |
+| `HGW_GUARD_PATCH` | `<repo>/plugins/dsh-directory-guard/cordis.patch.yml` | directory-guard bundle patch materialized into every instance; release mode pins it inside `HGW_RELEASE_ROOT`, while `off` disables it |
+| `HGW_MODEL_GOVERNANCE_PACKAGE` | `<repo>/plugins/dsh-model-governance` | Tree-external per-instance authorization and usage plugin; release mode pins it inside `HGW_RELEASE_ROOT` |
 | `HGW_DEFAULT_ENV_FILE` | (empty) | Company default credentials copied to each instance's `$DSH_HOME/.env` on start |
 | `HGW_FCM_PROJECT_ID` | (unset) | Firebase Cloud Messaging project id used for Android completion notifications |
 | `HGW_FCM_SERVICE_ACCOUNT_FILE` | (unset) | Owner-private Firebase service-account JSON file; absent means tokens are stored but no outbound FCM is sent |
 | `HGW_JPUSH_APP_KEY` | (unset) | JPush application key; must be paired with `HGW_JPUSH_MASTER_SECRET` |
 | `HGW_JPUSH_MASTER_SECRET` | (unset) | Owner-private JPush master secret; both JPush variables are required to enable JPush delivery |
 | `HGW_MEMORY_MAX` / `HGW_CPU_QUOTA` | `1G` / `100%` | Per-instance systemd resource limits |
-| `HGW_GATEWAY_DIR` | gateway root | Directory masked from instances (`InaccessiblePaths`) |
+| `HGW_GATEWAY_DIR` | gateway root | Directory masked from instances (`InaccessiblePaths`); release mode pins it to `<HGW_RELEASE_ROOT>/gateway` |
 
 Production install, cutover, and acceptance live in [deploy/README.md](deploy/README.md).
 

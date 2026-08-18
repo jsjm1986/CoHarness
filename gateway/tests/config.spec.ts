@@ -1,6 +1,12 @@
-import { isAbsolute } from 'node:path'
+import { realpathSync } from 'node:fs'
+import { basename, isAbsolute, join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_RUNTIME_API_BODY_LIMIT_BYTES, loadConfig } from '../src/config.ts'
+import {
+  DEFAULT_DATABASE_STARTUP_RETRY_INITIAL_MS,
+  DEFAULT_DATABASE_STARTUP_RETRY_MAX_MS,
+  DEFAULT_RUNTIME_API_BODY_LIMIT_BYTES,
+  loadConfig,
+} from '../src/config.ts'
 
 describe('loadConfig', () => {
   it('provides workable defaults', () => {
@@ -11,6 +17,8 @@ describe('loadConfig', () => {
     expect(cfg.secureCookies).toBe(false)
     expect(cfg.dshCommand).toContain('{port}')
     expect(cfg.runtimeApiBodyLimitBytes).toBe(DEFAULT_RUNTIME_API_BODY_LIMIT_BYTES)
+    expect(cfg.databaseStartupRetryInitialMs).toBe(DEFAULT_DATABASE_STARTUP_RETRY_INITIAL_MS)
+    expect(cfg.databaseStartupRetryMaxMs).toBe(DEFAULT_DATABASE_STARTUP_RETRY_MAX_MS)
     expect(cfg.projectPathRoots).toEqual([])
     expect(cfg.userProjectsRoot).toMatch(/user-projects$/)
     expect(cfg.projectsRoot).toMatch(/harness-projects$/)
@@ -24,6 +32,38 @@ describe('loadConfig', () => {
   it('resolves the default CLI entry against HGW_DSH_REPO_ROOT', () => {
     const cfg = loadConfig({ HGW_DSH_REPO_ROOT: '/opt/harness' })
     expect(cfg.dshCommand).toContain('/opt/harness/apps/cli/src/bin.ts')
+  })
+
+  it('pins every release-owned path to one canonical immutable release', () => {
+    const releaseRoot = realpathSync(resolve(import.meta.dirname, '../..'))
+    const cfg = loadConfig({ HGW_RELEASE_ROOT: releaseRoot })
+
+    expect(cfg.releaseRoot).toBe(releaseRoot)
+    expect(cfg.releaseId).toBe(basename(releaseRoot))
+    expect(cfg.dshRepoRoot).toBe(releaseRoot)
+    expect(cfg.gatewayDir).toBe(join(releaseRoot, 'gateway'))
+    expect(cfg.dshCommand).toEqual([
+      process.execPath,
+      join(releaseRoot, 'apps/cli/lib/bin.js'),
+      'web',
+      '--port',
+      '{port}',
+    ])
+    expect(cfg.guardPatch).toBe(join(releaseRoot, 'plugins/dsh-directory-guard/cordis.patch.yml'))
+    expect(cfg.modelGovernancePackage).toBe(join(releaseRoot, 'plugins/dsh-model-governance'))
+  })
+
+  it('rejects independently configured runtime paths in release mode', () => {
+    const releaseRoot = realpathSync(resolve(import.meta.dirname, '../..'))
+
+    expect(() => loadConfig({ HGW_RELEASE_ROOT: releaseRoot, HGW_DSH_COMMAND: 'node somewhere-else.js' }))
+      .toThrow(/HGW_DSH_COMMAND must be unset/)
+    expect(() => loadConfig({ HGW_RELEASE_ROOT: releaseRoot, HGW_DSH_REPO_ROOT: '/tmp' }))
+      .toThrow(/HGW_DSH_REPO_ROOT must resolve inside/)
+    expect(() => loadConfig({ HGW_RELEASE_ROOT: releaseRoot, HGW_GATEWAY_DIR: '/tmp' }))
+      .toThrow(/HGW_GATEWAY_DIR must resolve inside/)
+    expect(() => loadConfig({ HGW_RELEASE_ROOT: releaseRoot, HGW_MODEL_GOVERNANCE_PACKAGE: '/tmp' }))
+      .toThrow(/HGW_MODEL_GOVERNANCE_PACKAGE must resolve inside/)
   })
 
   it('resolves the tsx loader to an absolute file for the real repo (instances spawn outside it)', () => {
@@ -52,6 +92,8 @@ describe('loadConfig', () => {
       HGW_PROJECTS_ROOT: '/srv/harness/projects/admin',
       HGW_IDLE_TIMEOUT_MS: '60000',
       HGW_RUNTIME_API_BODY_LIMIT_BYTES: '8388608',
+      HGW_DATABASE_STARTUP_RETRY_INITIAL_MS: '250',
+      HGW_DATABASE_STARTUP_RETRY_MAX_MS: '5000',
       HGW_FCM_PROJECT_ID: '  firebase-project  ',
       HGW_FCM_SERVICE_ACCOUNT_FILE: '  /srv/harness/firebase.json  ',
       HGW_JPUSH_APP_KEY: '  jpush-app-key  ',
@@ -66,6 +108,8 @@ describe('loadConfig', () => {
     expect(cfg.projectsRoot).toBe('/srv/harness/projects/admin')
     expect(cfg.idleTimeoutMs).toBe(60000)
     expect(cfg.runtimeApiBodyLimitBytes).toBe(8 * 1024 * 1024)
+    expect(cfg.databaseStartupRetryInitialMs).toBe(250)
+    expect(cfg.databaseStartupRetryMaxMs).toBe(5000)
     expect(cfg.fcmProjectId).toBe('firebase-project')
     expect(cfg.fcmServiceAccountFile).toBe('/srv/harness/firebase.json')
     expect(cfg.jpushAppKey).toBe('jpush-app-key')
@@ -138,6 +182,17 @@ describe('loadConfig', () => {
       .toThrow(/positive safe integer/)
     expect(() => loadConfig({ HGW_RUNTIME_API_BODY_LIMIT_BYTES: 'not-a-number' }))
       .toThrow(/positive safe integer/)
+  })
+
+  it('rejects invalid database startup retry windows', () => {
+    expect(() => loadConfig({ HGW_DATABASE_STARTUP_RETRY_INITIAL_MS: '0' }))
+      .toThrow(/HGW_DATABASE_STARTUP_RETRY_INITIAL_MS/)
+    expect(() => loadConfig({ HGW_DATABASE_STARTUP_RETRY_MAX_MS: 'not-a-number' }))
+      .toThrow(/HGW_DATABASE_STARTUP_RETRY_MAX_MS/)
+    expect(() => loadConfig({
+      HGW_DATABASE_STARTUP_RETRY_INITIAL_MS: '5000',
+      HGW_DATABASE_STARTUP_RETRY_MAX_MS: '1000',
+    })).toThrow(/HGW_DATABASE_STARTUP_RETRY_MAX_MS must be at least/)
   })
 
   it('rejects an invalid instance port base', () => {
