@@ -59,6 +59,7 @@ export function apply(ctx: Context): void {
           return session.getSnapshot().views.get('trajectory') !== before
         },
         setActualDuration: (value) => { duration.set(value) },
+        ensureHistoryDetail: () => session.ensureHistoryDetail(),
       }
     },
   }, TrajectoryView))

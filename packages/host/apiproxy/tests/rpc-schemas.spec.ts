@@ -198,6 +198,9 @@ describe('sessions domain schemas', () => {
     expect(() => sessionCreateRequestSchema.parse({ workspaceId: 'w1', cwd: '/w' })).toThrow(/not both/)
     expect(sessionCreateValueSchema.parse({ sessionId: 's1' }).sessionId).toBe('s1')
     expect(sessionHistoryRequestSchema.parse({ sessionId: 's1', beforeSeq: 3, maxMessages: 5 }).beforeSeq).toBe(3)
+    expect(sessionHistoryRequestSchema.parse({ sessionId: 's1', detail: 'conversation' }).detail).toBe('conversation')
+    expect(sessionHistoryRequestSchema.parse({ sessionId: 's1' }).detail).toBeUndefined()
+    expect(() => sessionHistoryRequestSchema.parse({ sessionId: 's1', detail: 'chunks' })).toThrow()
     expect(() => sessionHistoryRequestSchema.parse({ sessionId: 's1', maxMessages: 0 })).toThrow()
     expect(sessionModelsRequestSchema.parse({ sessionId: 's1' }).sessionId).toBe('s1')
     expect(sessionModelsValueSchema.parse({
@@ -309,6 +312,20 @@ describe('history wire schema', () => {
       events: [{ event }],
       hasMore: true,
     })
+    expect(historyWireValueSchema.parse({
+      records: [{ event }],
+      hasMore: false,
+      omittedSpans: [{ startSeq: 2, endSeq: 9 }],
+    })).toStrictEqual({
+      events: [{ event }],
+      hasMore: false,
+      omittedSpans: [{ startSeq: 2, endSeq: 9 }],
+    })
+    expect(() => historyWireValueSchema.parse({
+      records: [{ event }],
+      hasMore: false,
+      omittedSpans: [{ startSeq: 9, endSeq: 2 }],
+    })).toThrow()
   })
 })
 

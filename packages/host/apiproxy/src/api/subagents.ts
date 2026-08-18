@@ -8,7 +8,7 @@ import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm/types'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { RpcRequest, RpcResponse } from './rpc.ts'
-import type { HistoryEntry, SessionProjectionsBlock } from './sessions.ts'
+import type { HistoryDetail, HistoryEntry, HistoryOmittedSpan, SessionProjectionsBlock } from './sessions.ts'
 
 /** Complete durable direct-child catalog row. */
 export type SubagentListEntry =
@@ -78,14 +78,22 @@ export interface SubagentsApi {
    * Reads one healthy catalog child's transcript — the in-memory snapshot of
    * a live child, the persisted log of a cold one — with ordinary
    * message-aligned pagination and render intents, without Agent activation.
+   * `detail` is the same download gear as `session.history`: omitted or
+   * `'full'` keeps every event; `'conversation'` omits completed historical
+   * chunk runs and reports `omittedSpans`.
    */
   history(
-    request: RpcRequest<SubagentAddress & { beforeSeq?: number; maxMessages?: number }>,
+    request: RpcRequest<SubagentAddress & {
+      beforeSeq?: number
+      maxMessages?: number
+      detail?: HistoryDetail
+    }>,
     signal?: AbortSignal,
   ): Promise<RpcResponse<{
     events: HistoryEntry[]
     hasMore: boolean
     projections?: SessionProjectionsBlock
+    omittedSpans?: readonly HistoryOmittedSpan[]
   }>>
 
   /**

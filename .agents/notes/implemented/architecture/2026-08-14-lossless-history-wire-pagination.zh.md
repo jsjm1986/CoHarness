@@ -20,7 +20,7 @@ Status: implemented
 
 ### 验证
 
-聚焦的编解码、Fetch 载体、schema 与 Host 插件测试钉住重建、恰好放下 / 少一字节的截断、超大消息组前进、畸形记录拒绝，以及未知事件透传。无密钥组装 Web 场景 `apps/web/tests/lossless-history-wire.e2e.ts` 植入少于 50 条追加来源消息，经生产 Host 桥接行使默认 131,072 字节目标，要求至少两次 load-older，并在展开前后记录 Chat/Trajectory/工具/计时 golden。
+聚焦的编解码、Fetch 载体、schema 与 Host 插件测试钉住重建、恰好放下 / 少一字节的截断、超大消息组前进、畸形记录拒绝，以及未知事件透传。无密钥组装 Web 场景 `apps/web/tests/lossless-history-wire.e2e.ts` 植入少于 50 条追加来源消息，经生产 Host 桥接行使默认 131,072 字节目标，并记录 conversation 档 Chat golden 以及 Trajectory `detail: 'full'` 补全之后的结果。浏览器 Chat 首次打开不再展开全部历史打包 chunk；该下载档见 [两档会话历史传输](2026-08-18-conversation-history-tier.md)。
 
 ## 考虑过的替代方案
 
@@ -40,4 +40,4 @@ Status: implemented
 
 浏览器历史页靠近配置目标，展开后的逻辑事件流、投影、工具视图与 Conversation 节点保持相同。直接 API 与实时帧继续遵守透传纪律。操作方可以从 connection 配置升降目标，而不改持久化。单个超大消息组仍整组发送，因此一条工具密集或很长的流式消息可以超过目标。Host 必须为每次历史请求编码并计量候选后缀；该 CPU 成本用来换公网传输下降。
 
-相关所有者：[打包 chunk 行](2026-07-26-packed-chunk-rows-by-default.md)、[GUI 分层与 RPC 协议](2026-07-19-gui-layering-and-rpc-protocol.md)、[人类转写的追加来源分页](../bug-fix/2026-07-29-human-transcript-append-origin.md)、[Conversation 组装](2026-08-09-client-conversation-node-assembly.md)，以及 [子代理历史来源](2026-08-06-subagent-list-identity-projection.md)。
+相关所有者：[打包 chunk 行](2026-07-26-packed-chunk-rows-by-default.md)、[GUI 分层与 RPC 协议](2026-07-19-gui-layering-and-rpc-protocol.md)、[人类转写的追加来源分页](../bug-fix/2026-07-29-human-transcript-append-origin.md)、[Conversation 组装](2026-08-09-client-conversation-node-assembly.md)、[子代理历史来源](2026-08-06-subagent-list-identity-projection.md)，以及 [两档会话历史传输](2026-08-18-conversation-history-tier.md)。

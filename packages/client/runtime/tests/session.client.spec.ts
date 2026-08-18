@@ -170,9 +170,17 @@ function chatSeqs(snapshot: ConversationSnapshot): number[] {
   return chatEvents(snapshot).map(item => item.event.seq)
 }
 
-function histResponse(events: SessionEvent[], hasMore = false) {
+function histResponse(
+  events: SessionEvent[],
+  hasMore = false,
+  omittedSpans?: readonly { startSeq: number; endSeq: number }[],
+) {
   // history returns HistoryEntry[] ({event, view?}); these tests are view-less.
-  return Promise.resolve(ok({ events: entries(events) as never[], hasMore }))
+  return Promise.resolve(ok({
+    events: entries(events) as never[],
+    hasMore,
+    ...omittedSpans === undefined ? {} : { omittedSpans },
+  }))
 }
 
 describe('open', () => {
@@ -445,6 +453,116 @@ describe('paging', () => {
   })
 })
 
+describe('conversation-tier history', () => {
+  it('treats omittedSpans as the logical base so loadOlder stays continuous', async () => {
+    const { api, session } = makeSession()
+    api.onHistory = (payload) => {
+      if (payload.beforeSeq === undefined) {
+        return histResponse([ev.assistant(10, 1, '尾')], true, [{ startSeq: 2, endSeq: 9 }])
+      }
+      expect(payload.beforeSeq).toBe(2)
+      expect(payload.detail).toBe('conversation')
+      return histResponse([ev.user(1, '头')], false)
+    }
+    await session.open()
+    expect(session.getSnapshot().historyDetail).toBe('conversation')
+    await session.loadOlder()
+    expect(session.getSnapshot().nodes.map(node => node.seq)).toEqual([1, 10])
+    expect(session.getSnapshot().hasMore).toBe(false)
+  })
+
+  it('does not repairGap when the next live seq is logicalTail + 1 across omitted spans', async () => {
+    const { api, session } = makeSession()
+    api.onHistory = () => histResponse([ev.assistant(10, 1, '尾')], false, [{ startSeq: 2, endSeq: 9 }])
+    await session.open()
+    expect(api.callsOf('session.history')).toHaveLength(1)
+    session.handleMuxEnvelope('r' as never, {
+      type: 'session/event',
+      sessionId: SID,
+      event: ev.user(11, 'live'),
+    })
+    await Promise.resolve()
+    expect(api.callsOf('session.history')).toHaveLength(1)
+    expect(session.getSnapshot().nodes.map(node => node.seq)).toEqual([10, 11])
+  })
+
+  it('merges detail fill by seq, clears spans, and ignores a second fill', async () => {
+    const { api, session } = makeSession()
+    const conversationPage = [ev.user(1, '问'), ev.assistant(10, 1, '答')]
+    const chunks = [2, 3, 4, 5, 6, 7, 8, 9].map(seq => ev.chunkText(seq, 1, 'x'))
+    api.onHistory = (payload) => {
+      if (payload.detail !== 'full') {
+        return histResponse(conversationPage, false, [{ startSeq: 2, endSeq: 9 }])
+      }
+      return histResponse([...conversationPage.slice(0, 1), ...chunks, conversationPage[1]!], false)
+    }
+    await session.open()
+    expect(session.getSnapshot().historyDetail).toBe('conversation')
+    await session.ensureHistoryDetail()
+    expect(session.getSnapshot().historyDetail).toBe('full')
+    const afterFirst = api.callsOf('session.history').length
+    await session.ensureHistoryDetail()
+    expect(api.callsOf('session.history')).toHaveLength(afterFirst)
+    expect(api.callsOf('session.history').filter(call =>
+      (call as { detail?: string }).detail === 'full')).toHaveLength(1)
+  })
+
+  it('walks older full pages until the window spans are covered', async () => {
+    const { api, session } = makeSession()
+    api.onHistory = (payload) => {
+      if (payload.detail !== 'full') {
+        return histResponse(
+          [ev.user(1, '问'), ev.assistant(20, 1, '答')],
+          false,
+          [{ startSeq: 2, endSeq: 19 }],
+        )
+      }
+      if (payload.beforeSeq === undefined) {
+        return histResponse(
+          [ev.chunkText(15, 1, '后'), ev.assistant(20, 1, '答')],
+          true,
+        )
+      }
+      expect(payload.beforeSeq).toBe(15)
+      return histResponse([
+        ev.user(1, '问'),
+        ...Array.from({ length: 18 }, (_, index) => ev.chunkText(index + 2, 1, 'x')),
+        ev.assistant(20, 1, '答'),
+      ], false)
+    }
+    await session.open()
+    await session.ensureHistoryDetail()
+    expect(session.getSnapshot().historyDetail).toBe('full')
+    expect(api.callsOf('session.history').filter(call =>
+      (call as { detail?: string }).detail === 'full')).toHaveLength(2)
+  })
+
+  it('marks a conversation page with no omitted spans as full without a fill fetch', async () => {
+    const { api, session } = makeSession()
+    api.onHistory = () => histResponse([ev.user(1, '问'), ev.assistant(2, 1, '答')], false)
+    await session.open()
+    await session.ensureHistoryDetail()
+    expect(session.getSnapshot().historyDetail).toBe('full')
+    expect(api.callsOf('session.history').filter(call =>
+      (call as { detail?: string }).detail === 'full')).toHaveLength(0)
+  })
+
+  it('keeps prompt sendable while conversation-tier open is still loading', async () => {
+    const { api, session } = makeSession()
+    session.handleBlank(false)
+    const gate = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()
+    api.onHistory = () => gate.promise
+    const opening = session.open()
+    expect(session.getSnapshot().openState).toBe('loading')
+    const sending = session.prompt([{ type: 'text', text: '先发' }], 'queue')
+    gate.resolve(ok({ events: entries(plainTurn(0, 0, 'a', 'b')) as never[], hasMore: false }))
+    await opening
+    const result = await sending
+    expect(result).toEqual({ ok: true, value: { accepted: true } })
+    expect(api.callsOf('session.prompt')).toHaveLength(1)
+  })
+})
+
 describe('prompt and cancel errors', () => {
   it('routes an addressed child through non-activating history, continuation prompt, and interrupt only', async () => {
     const api = new FakeApiClient()
@@ -459,7 +577,10 @@ describe('prompt and cancel errors', () => {
     expect(prompted).toEqual({ ok: true, value: { accepted: true } })
     expect(cancelled).toEqual({ ok: true, value: { accepted: true } })
     expect(api.callsOf('subagent.history')).toEqual([
-      { parentSessionId: PARENT, childSessionId: SID, mode: 'continuable', maxMessages: 50 },
+      {
+        parentSessionId: PARENT, childSessionId: SID, mode: 'continuable',
+        maxMessages: 50, detail: 'conversation',
+      },
     ])
     expect(api.callsOf('subagent.prompt')).toEqual([
       {
@@ -511,7 +632,10 @@ describe('prompt and cancel errors', () => {
     expect(prompted).toMatchObject({ ok: false, error: { code: 'subagent-not-resumable' } })
     expect(cancelled).toMatchObject({ ok: false, error: { code: 'subagent-delivery-unavailable' } })
     expect(api.callsOf('subagent.history')).toEqual([
-      { parentSessionId: PARENT, childSessionId: SID, mode: 'one-shot', maxMessages: 50 },
+      {
+        parentSessionId: PARENT, childSessionId: SID, mode: 'one-shot',
+        maxMessages: 50, detail: 'conversation',
+      },
     ])
     expect(api.callsOf('subagent.prompt')).toEqual([])
     expect(api.callsOf('subagent.interrupt')).toEqual([])

@@ -348,6 +348,54 @@ describe('connection node half', () => {
     await dispose()
   })
 
+  it('round-trips omittedSpans on physical session.history responses', async () => {
+    const page = {
+      events: [{
+        event: {
+          type: 'assistant/message' as const,
+          seq: 10,
+          time: 1010,
+          data: { content: [{ type: 'text' as const, text: 'done' }], source: { kind: 'model' as const } },
+          surfaceOp: 'append' as const,
+        },
+      }],
+      hasMore: false,
+      omittedSpans: [{ startSeq: 2, endSeq: 9 }],
+    }
+    const apiProxy = {
+      sessions: {
+        async history(request: Parameters<ApiProxy['sessions']['history']>[0]) {
+          expect(request.payload.detail).toBe('conversation')
+          return { rpcId: request.rpcId, result: { ok: true as const, value: page } }
+        },
+      },
+    } as unknown as ApiProxy
+    const { routes, dispose } = await mounted({}, apiProxy)
+    const request: ClientRequest = {
+      type: 'client-request',
+      rpcId: RpcId('history-spans'),
+      method: 'session.history',
+      payload: { sessionId: 'scripted-history', detail: 'conversation' },
+    }
+    const result = fakeResponse()
+    await routes[0]!.handler(
+      fakePost({ host: '127.0.0.1:3080' }, '/api/session.history', request),
+      result.response,
+    )
+    const value = (JSON.parse(String(result.state.body)) as {
+      result: {
+        ok: true
+        value: {
+          records: unknown[]
+          omittedSpans?: { startSeq: number; endSeq: number }[]
+        }
+      }
+    }).result.value
+    expect(value).not.toHaveProperty('events')
+    expect(value.omittedSpans).toEqual([{ startSeq: 2, endSeq: 9 }])
+    await dispose()
+  })
+
   it('provides a disposable dedicated RPC channel without requiring apiProxy', async () => {
     const ctx = new Context()
     const routes: WebRoute[] = []

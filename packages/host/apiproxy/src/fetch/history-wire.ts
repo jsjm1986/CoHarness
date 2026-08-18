@@ -18,8 +18,9 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import type { RpcId, ServerResponse } from '../api/rpc.ts'
 import type { ResponseValue } from '../api/rpc-map.ts'
 import type { Wire } from '../api/rpc.schema.ts'
-import type { HistoryEntry, SessionProjectionsBlock } from '../api/sessions.ts'
-import { historyEntrySchema, sessionProjectionsBlockSchema } from '../api/sessions.schema.ts'
+import type { HistoryEntry, HistoryOmittedSpan, SessionProjectionsBlock } from '../api/sessions.ts'
+import { historyEntrySchema, historyOmittedSpanSchema, sessionProjectionsBlockSchema } from '../api/sessions.schema.ts'
+import { appendOriginGroupStart, clipOmittedSpans } from './history-detail.ts'
 
 type HistoryValue = ResponseValue<'session.history'>
 
@@ -32,6 +33,7 @@ interface HistoryWireValue {
   records: HistoryWireRecord[]
   hasMore: boolean
   projections?: SessionProjectionsBlock
+  omittedSpans?: readonly HistoryOmittedSpan[]
 }
 
 const MESSAGE_TYPES = new Set(['user/message', 'assistant/message'])
@@ -61,8 +63,7 @@ function appendGroupStarts(entries: readonly HistoryEntry[]): number[] {
   const starts: number[] = []
   for (const { event } of entries) {
     if (!MESSAGE_TYPES.has(event.type) || !isAppendSurfaceEvent(event)) continue
-    const sources = (event as SessionEvent & { sourceEventSeqs?: number[] }).sourceEventSeqs
-    starts.push(sources !== undefined && sources.length > 0 ? Math.min(event.seq, ...sources) : event.seq)
+    starts.push(appendOriginGroupStart(event))
   }
   return starts
 }
@@ -71,11 +72,13 @@ function toWireValue(
   entries: readonly HistoryEntry[],
   hasMore: boolean,
   projections: SessionProjectionsBlock | undefined,
+  omittedSpans: readonly HistoryOmittedSpan[] | undefined,
 ): HistoryWireValue {
   return {
     records: packEntries(entries),
     hasMore,
     ...projections === undefined ? {} : { projections },
+    ...omittedSpans === undefined || omittedSpans.length === 0 ? {} : { omittedSpans },
   }
 }
 
@@ -119,6 +122,7 @@ interface SuffixCandidate {
   entries: HistoryEntry[]
   groupCount: number
   omitsPrefix: boolean
+  cutSeq: number
 }
 
 /**
@@ -140,6 +144,7 @@ function suffixCandidates(entries: readonly HistoryEntry[]): SuffixCandidate[] {
       entries: suffix,
       groupCount: appendMessageCount(suffix),
       omitsPrefix: omittedPrefix(entries, accCut),
+      cutSeq: accCut,
     })
   }
   return out
@@ -150,11 +155,13 @@ function candidate(
   value: HistoryValue,
   entries: readonly HistoryEntry[],
   cutOmitsPrefix: boolean,
+  cutSeq?: number,
 ): ServerResponse {
   return envelope(rpcId, toWireValue(
     entries,
     value.hasMore || cutOmitsPrefix,
     value.projections,
+    cutSeq === undefined ? value.omittedSpans : clipOmittedSpans(value.omittedSpans, cutSeq),
   ))
 }
 
@@ -179,7 +186,9 @@ function preferPage(current: SizedPage, next: SizedPage): SizedPage {
  * non-monotonic `sourceEventSeqs` cannot drop a newer message's cited prefix.
  *
  * @param rpcId - echoed request id on the envelope.
- * @param value - logical history page (`events`, `hasMore`, optional `projections`).
+ * @param value - logical history page (`events`, `hasMore`, optional
+ *   `projections` and `omittedSpans`). Byte-target suffix cuts clip
+ *   `omittedSpans` to seqs inside the returned suffix.
  * @param targetBytes - complete-envelope UTF-8 JSON latency target.
  * @returns the packed success envelope; `hasMore` is true when this encoder
  *   dropped a logical prefix or the input page already had `hasMore`.
@@ -199,7 +208,7 @@ export function encodeHistoryServerResponse(
 
   const indivisible = suffixes[0] as SuffixCandidate
   const indivisiblePage: SizedPage = {
-    body: candidate(rpcId, value, indivisible.entries, indivisible.omitsPrefix),
+    body: candidate(rpcId, value, indivisible.entries, indivisible.omitsPrefix, indivisible.cutSeq),
     groupCount: indivisible.groupCount,
     eventCount: indivisible.entries.length,
   }
@@ -207,7 +216,7 @@ export function encodeHistoryServerResponse(
   const pages: SizedPage[] = [full]
   for (const suffix of suffixes) {
     pages.push({
-      body: candidate(rpcId, value, suffix.entries, suffix.omitsPrefix),
+      body: candidate(rpcId, value, suffix.entries, suffix.omitsPrefix, suffix.cutSeq),
       groupCount: suffix.groupCount,
       eventCount: suffix.entries.length,
     })
@@ -253,8 +262,12 @@ export const historyWireValueSchema: z.ZodType<Wire<HistoryValue>> = z.object({
   records: z.array(z.unknown()),
   hasMore: z.boolean(),
   projections: sessionProjectionsBlockSchema.optional(),
+  omittedSpans: z.array(historyOmittedSpanSchema).optional(),
 }).transform(value => ({
   events: value.records.flatMap(expandWireRecord),
   hasMore: value.hasMore,
   ...value.projections === undefined ? {} : { projections: value.projections },
+  ...value.omittedSpans === undefined || value.omittedSpans.length === 0
+    ? {}
+    : { omittedSpans: value.omittedSpans },
 })) as unknown as z.ZodType<Wire<HistoryValue>>

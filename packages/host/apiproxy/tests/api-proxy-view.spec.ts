@@ -319,6 +319,17 @@ describe('mux live view computation', () => {
       if (!response.result.ok) throw new Error('unreachable')
       expect(response.result.value.events.map(entry => entry.event.seq)).toEqual([...sources, message.seq])
       expect(response.result.value.hasMore).toBe(true)
+      expect(response.result.value.omittedSpans).toBeUndefined()
+
+      const conversation = await api.sessions.history({
+        rpcId: RpcId('t-hist-conversation-tier'),
+        payload: { sessionId: session.id, maxMessages: 1, detail: 'conversation' },
+      })
+      if (!conversation.result.ok) throw new Error('unreachable')
+      expect(conversation.result.value.events.map(entry => entry.event.seq)).toEqual([message.seq])
+      expect(conversation.result.value.omittedSpans).toEqual([
+        { startSeq: sources[0], endSeq: sources.at(-1) },
+      ])
     } finally {
       min.mockRestore()
     }

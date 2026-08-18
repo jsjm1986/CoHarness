@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-14-lossless-history-wire-pagination.md
-2026-08-14-lossless-history-wire-pagination.md: d6032d9f783dd46d856f26b3a57128449e44aa7a
-2026-08-14-lossless-history-wire-pagination.zh.md: da94faf4144908b3eae9b519f7121315d0c78b63
+2026-08-14-lossless-history-wire-pagination.md: 4838d4f05da5ca2c90066afb7833b94a8a0e41b0
+2026-08-14-lossless-history-wire-pagination.zh.md: f1805091d33e2f139d3b8e3b7dcbbf626d5a39b6

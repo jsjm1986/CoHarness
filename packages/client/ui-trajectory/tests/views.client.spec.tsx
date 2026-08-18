@@ -106,7 +106,7 @@ function historySnapshot(
     openState: 'open',
     openError: null,
     hasMore: false,
-    loadingOlder: false,
+    loadingOlder: false, historyDetail: 'full',
     promptError: null,
     blank: nodes.length === 0,
     lastAgentError: null,
@@ -117,12 +117,13 @@ function standaloneHistory(
   snapshot: ConversationSnapshot,
 ): Pick<
   ComponentProps<typeof TrajectoryView>,
-  'useSession' | 'loadOlder'
+  'useSession' | 'loadOlder' | 'ensureHistoryDetail'
 > {
   const store = createSnapshotStore(snapshot)
   return {
     useSession: bindSnapshotSelector(store),
     loadOlder: () => Promise.resolve(false),
+    ensureHistoryDetail: () => Promise.resolve(),
   }
 }
 
@@ -181,6 +182,7 @@ async function bench(snapshot = historySnapshot(NODES)) {
     getSnapshot: () => sessionStore.getSnapshot(),
     subscribe: (listener: () => void) => sessionStore.subscribe(listener),
     loadOlder,
+    ensureHistoryDetail: () => Promise.resolve(),
   }
   await ctx.plugin(ConversationEventRegistry).await()
   await ctx.plugin(ConversationViewRegistry).await()
@@ -248,6 +250,7 @@ function mount(slots: SlotRegistry, nodes: ConversationSnapshot['nodes'] = NODES
         return {
           loadOlder: trajectory.loadOlder,
           setActualDuration: trajectory.setActualDuration,
+          ensureHistoryDetail: trajectory.ensureHistoryDetail,
           useDuration: bindSnapshotSelector(trajectory.hooks.duration),
           t: (key: TrajectoryKey) => zh[key],
         }
@@ -1186,6 +1189,7 @@ describe('TrajectoryView state', () => {
         {...standaloneDuration()}
         useSession={bindSnapshotSelector(store)}
         loadOlder={vi.fn(() => Promise.resolve(false))}
+        ensureHistoryDetail={() => Promise.resolve()}
       />,
     )
     fireEvent.click(screen.getByRole('row', { name: /selected current response/ }))

@@ -20,7 +20,7 @@ Cuts use the minimum of each append-origin `user/message` or `assistant/message`
 
 ### Verification
 
-Focused codec, Fetch-carrier, schema, and Host-plugin tests pin reconstruction, exact-fit / one-byte-under cuts, oversized-group progress, malformed-record rejection, and unknown-event pass-through. The keyless assembled-Web scenario `apps/web/tests/lossless-history-wire.e2e.ts` seeds fewer than 50 append-origin messages, exercises the default 131,072-byte target through the production Host bridge, requires at least two load-older operations, and records Chat/Trajectory/tool/timing goldens before and after expansion.
+Focused codec, Fetch-carrier, schema, and Host-plugin tests pin reconstruction, exact-fit / one-byte-under cuts, oversized-group progress, malformed-record rejection, and unknown-event pass-through. The keyless assembled-Web scenario `apps/web/tests/lossless-history-wire.e2e.ts` seeds fewer than 50 append-origin messages, exercises the default 131,072-byte target through the production Host bridge, and records Chat goldens on the conversation-tier page plus after Trajectory `detail: 'full'` fill. Browser Chat no longer expands every historical packed chunk on first open; that download gear is [two-tier conversation history](2026-08-18-conversation-history-tier.md).
 
 ## Alternatives considered
 
@@ -40,4 +40,4 @@ Focused codec, Fetch-carrier, schema, and Host-plugin tests pin reconstruction, 
 
 Browser history pages stay near the configured target while the logical event stream, projections, tool views, and Conversation nodes remain identical after expansion. Direct APIs and live frames keep passthrough discipline. Operators can raise or lower the target from connection config without changing persistence. One oversized group still ships whole, so a single tool-heavy or long streaming message can exceed the target. The Host must encode and measure candidate suffixes per history request; that CPU cost is accepted in exchange for the public-path transfer reduction.
 
-Related owners: [packed chunk rows](2026-07-26-packed-chunk-rows-by-default.md), [GUI layering and RPC protocol](2026-07-19-gui-layering-and-rpc-protocol.md), [human-transcript append-origin pagination](../bug-fix/2026-07-29-human-transcript-append-origin.md), [Conversation assembly](2026-08-09-client-conversation-node-assembly.md), and [subagent history source](2026-08-06-subagent-list-identity-projection.md).
+Related owners: [packed chunk rows](2026-07-26-packed-chunk-rows-by-default.md), [GUI layering and RPC protocol](2026-07-19-gui-layering-and-rpc-protocol.md), [human-transcript append-origin pagination](../bug-fix/2026-07-29-human-transcript-append-origin.md), [Conversation assembly](2026-08-09-client-conversation-node-assembly.md), [subagent history source](2026-08-06-subagent-list-identity-projection.md), and [two-tier conversation history](2026-08-18-conversation-history-tier.md).

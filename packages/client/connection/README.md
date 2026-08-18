@@ -6,7 +6,7 @@ Wire consumer layer: the client plugin's apply mounts `ctx.connection` (shared a
 
 ## Host configuration
 
-`historyPageTargetBytes` accepts a positive integer and sets the target size of each complete uncompressed history RPC `server-response` JSON body in UTF-8 bytes. It defaults to 131072 bytes. Because pagination preserves complete append-origin message groups, one indivisible group may exceed the target.
+`historyPageTargetBytes` accepts a positive integer and sets the target size of each complete uncompressed history RPC `server-response` JSON body in UTF-8 bytes. It defaults to 131072 bytes. Because pagination preserves complete append-origin message groups, one indivisible group may exceed the target. Fetch history responses still pack remaining `assistant/chunk` runs and round-trip optional `omittedSpans` from `detail: 'conversation'`; the [two-tier conversation history decision](../../../.agents/notes/implemented/architecture/2026-08-18-conversation-history-tier.md) owns the download gears.
 
 ## /api browser-trust fence
 

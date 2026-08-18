@@ -73,6 +73,14 @@ export interface ISession {
    */
   loadOlder(): Promise<void>
   /**
+   * Download omitted historical `assistant/chunk` events for the installed
+   * window. Trajectory and inspect handoff call this; Chat does not. No-op
+   * when the window already has detail.
+   * @returns when the current range is seq-complete, or when a fill request
+   *   fails (the conversation-tier snapshot remains).
+   */
+  ensureHistoryDetail(): Promise<void>
+  /**
    * Execute one slash-command line against this session's agent — pure
    * admission semantics (the host executor durably logs the lifecycle).
    * @param line - the full command line, leading slash included.

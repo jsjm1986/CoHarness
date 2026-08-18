@@ -11,7 +11,7 @@ import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { RequestPayload, ResponseValue } from './rpc-map.ts'
 import type { Wire } from './rpc.schema.ts'
 import type {
-  HistoryEntry, ModelCatalogFailure, ModelCatalogModel, ModelProviderGroup, ModelReasoning,
+  HistoryEntry, HistoryOmittedSpan, ModelCatalogFailure, ModelCatalogModel, ModelProviderGroup, ModelReasoning,
   ModelReasoningEffort, ModelSelection, SessionListMetadata, SessionProjectionsBlock, SessionSearchItem, SessionSummary,
 } from './sessions.ts'
 import type { ToolEventView } from './events.ts'
@@ -140,11 +140,21 @@ export const sessionForkValueSchema = z.object({
   sessionId: sessionIdSchema,
 }) satisfies z.ZodType<Wire<ResponseValue<'session.fork'>>>
 
+/** Inclusive seq range of omitted historical chunk runs. */
+export const historyOmittedSpanSchema = z.object({
+  startSeq: z.number().int().nonnegative(),
+  endSeq: z.number().int().nonnegative(),
+}).refine(
+  span => span.startSeq <= span.endSeq,
+  { message: 'omitted span startSeq must be <= endSeq' },
+) satisfies z.ZodType<Wire<HistoryOmittedSpan>>
+
 /** session.history request payload (beforeSeq/maxMessages page backwards from the window tail). */
 export const sessionHistoryRequestSchema = z.object({
   sessionId: sessionIdSchema,
   beforeSeq: z.number().int().nonnegative().optional(),
   maxMessages: z.number().int().positive().optional(),
+  detail: z.enum(['conversation', 'full']).optional(),
 }) satisfies z.ZodType<Wire<RequestPayload<'session.history'>>>
 
 /** Complete provider/model selection. */

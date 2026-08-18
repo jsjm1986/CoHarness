@@ -44,7 +44,7 @@ import {
 import type { PresetBearingSession } from '@deepseek-ai/dsh-agent-presets'
 import type {} from '@deepseek-ai/dsh-tools'
 import type {
-  ApiProxy, ConfigurableProviderView, CredentialView, GoalRef, HistoryEntry, HostFrame,
+  ApiProxy, ConfigurableProviderView, CredentialView, GoalRef, HistoryDetail, HistoryEntry, HistoryOmittedSpan, HostFrame,
   ModelCatalogFailure, ModelProviderGroup,
   ModelReasoning, MuxFrame, PromptContentPart, QuestionResponsePayload, SessionListMetadata, SessionProjectionsBlock, SessionSearchItem,
   QueuedInboxItem, SessionSummary, SettingsNamespaceView, SubagentAddress, JobView, ToolEventView,
@@ -59,6 +59,7 @@ import {
   type SessionLogExportReady,
   type SessionLogCompressionLevel,
 } from './session-export.ts'
+import { applyHistoryDetail } from './fetch/history-detail.ts'
 import type { SessionRawArtifact } from '@deepseek-ai/dsh-session-persistence'
 import {
   SESSION_SEARCH_RESULT_LIMIT,
@@ -1045,6 +1046,29 @@ function historyPage(
       return { event, ...view === undefined ? {} : { view } }
     }),
     hasMore: page.hasMore,
+  }
+}
+
+/**
+ * Apply the requested history download gear after pagination. Missing
+ * `detail` is `'full'`: every event stays, and `omittedSpans` is absent.
+ */
+function historyValue(
+  page: { events: HistoryEntry[]; hasMore: boolean },
+  detail: HistoryDetail | undefined,
+  projections?: SessionProjectionsBlock,
+): {
+  events: HistoryEntry[]
+  hasMore: boolean
+  projections?: SessionProjectionsBlock
+  omittedSpans?: readonly HistoryOmittedSpan[]
+} {
+  const split = applyHistoryDetail(page.events, detail)
+  return {
+    events: split.events,
+    hasMore: page.hasMore,
+    ...projections === undefined ? {} : { projections },
+    ...split.omittedSpans === undefined ? {} : { omittedSpans: split.omittedSpans },
   }
 }
 
@@ -2691,7 +2715,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       },
 
       async history(request) {
-        const { sessionId, beforeSeq, maxMessages } = request.payload
+        const { sessionId, beforeSeq, maxMessages, detail } = request.payload
         const authorized = await authorizeSession(sessionId, 'read')
         if ('error' in authorized) return err(request, authorized.error)
         try {
@@ -2705,11 +2729,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           const scope = await presenterScopeFor(sessionId, sourceSession(source))
           const cut = historyCutOf(source, beforeSeq === undefined)
           const page = historyPage(ctx, cut.events, beforeSeq, maxMessages, scope)
-          return ok(request, {
-            events: page.events,
-            hasMore: page.hasMore,
-            ...cut.projections === undefined ? {} : { projections: cut.projections },
-          })
+          return ok(request, historyValue(page, detail, cut.projections))
         } catch (error: unknown) {
           if (error instanceof SessionNotFound) {
             return err(request, { code: 'session-not-found', message: error.message, details: { sessionId } })
@@ -3155,7 +3175,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
 
       async history(request, signal) {
         const {
-          parentSessionId, childSessionId, mode, beforeSeq, maxMessages,
+          parentSessionId, childSessionId, mode, beforeSeq, maxMessages, detail,
         } = request.payload
         const parentAccess = await authorizeSession(parentSessionId, 'read')
         if ('error' in parentAccess) return err(request, parentAccess.error)
@@ -3223,7 +3243,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           })
         }
         const page = historyPage(ctx, events, beforeSeq, maxMessages)
-        return ok(request, { ...page, ...projections === undefined ? {} : { projections } })
+        return ok(request, historyValue(page, detail, projections))
       },
 
       async prompt(request, signal) {

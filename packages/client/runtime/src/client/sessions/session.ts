@@ -4,7 +4,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { AttachmentIdType, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import type {
-  HistoryEntry, IApiClient, MessageId, MuxFrame, PromptContentPart, QueueAction, RpcError,
+  HistoryEntry, HistoryOmittedSpan, IApiClient, MessageId, MuxFrame, PromptContentPart, QueueAction, RpcError,
   RpcId, RpcResponse, RpcResult, SessionId, SubagentAddress, ToolEventView,
 } from '@deepseek-ai/dsh-api-remotes/client'
 // Value import from the inline-safe wire layer (not the connection plugin):
@@ -15,7 +15,7 @@ import { ConversationNodeAssembler } from './conversation-assembler.ts'
 import type { ConversationRuntime } from './conversation-assembler.ts'
 import type { ConversationEventInput, ConversationPublication } from '../contract/conversation.ts'
 import type {
-  ChatSnapshot, ComposerPhase, ConversationSnapshot, OpenState, PromptError,
+  ChatSnapshot, ComposerPhase, ConversationSnapshot, HistoryDetailState, OpenState, PromptError,
 } from './conversation.ts'
 import { EMPTY_CHAT_SNAPSHOT } from './conversation.ts'
 import type { PendingInteraction } from './pending.ts'
@@ -78,6 +78,14 @@ export class Session implements SessionFace {
    *  passes drop all writes once the generation moves on. */
   private openGeneration = 0
   private loadingOlder = false
+  /** Inclusive seq ranges of omitted historical chunks; part of the logical window. */
+  private omittedSpans: HistoryOmittedSpan[] = []
+  /**
+   * Download gear: Web open/loadOlder stay `'conversation'` until Trajectory
+   * fill succeeds, then `'full'` so later pages include chunks.
+   */
+  private historyDetail: HistoryDetailState = 'conversation'
+  private fillPromise: Promise<void> | null = null
   private pending = new Map<string, PendingInteraction>()
   private pendingRev = 0
   private pendingCache: { rev: number; value: PendingInteraction[] } | null = null
@@ -382,23 +390,24 @@ export class Session implements SessionFace {
       const { result } = await this.history({ beforeSeq: this.baseSeq, maxMessages: PAGE_MESSAGES })
       if (!result.ok) return // keep the window as-is; do not overwrite openError (open already succeeded)
       const older = result.value.events
-      if (older.length === 0) {
+      const olderSpans = [...(result.value.omittedSpans ?? [])]
+      if (older.length === 0 && olderSpans.length === 0) {
         this.hasMore = result.value.hasMore
         this.conversation.prepend([], this.hasMore)
         return
       }
-      const tail = older[older.length - 1]
-      if (tail === undefined || tail.event.seq + 1 !== this.baseSeq) {
+      const olderTail = logicalTailSeq(older.map(entry => entry.event), olderSpans)
+      if (olderTail === null || olderTail + 1 !== this.baseSeq) {
         // Continuity assertion: on violation drop the page fail-soft rather than render an out-of-order stream.
-        console.error(`[web-runtime] history page discontinuous: tail seq ${tail?.event.seq} vs baseSeq ${this.baseSeq}`)
+        console.error(`[web-runtime] history page discontinuous: tail seq ${olderTail} vs baseSeq ${this.baseSeq}`)
         this.hasMore = false
         this.conversation.prepend([], false)
         return
       }
       this.events = [...older.map(e => e.event), ...this.events]
       this.views = [...older.map(e => e.view), ...this.views]
-      /* v8 ignore next -- the ?? arm needs older[0] undefined, but the empty-page branch above already returned. */
-      this.baseSeq = older[0]?.event.seq ?? this.baseSeq
+      this.omittedSpans = [...olderSpans, ...this.omittedSpans]
+      this.baseSeq = logicalBaseSeq(this.events, this.omittedSpans) ?? this.baseSeq
       this.hasMore = result.value.hasMore
       this.conversation.prepend(older.map(conversationInput), this.hasMore)
     } catch (error) {
@@ -406,6 +415,26 @@ export class Session implements SessionFace {
     } finally {
       this.loadingOlder = false
       this.notifier.markDirty()
+    }
+  }
+
+  /**
+   * Download omitted historical chunks for the installed window. Idempotent
+   * once `historyDetail` is `'full'`.
+   * @returns when fill settles or is already complete.
+   */
+  async ensureHistoryDetail(): Promise<void> {
+    if (this.historyDetail === 'full') return
+    if (this.fillPromise !== null) return this.fillPromise
+    if (this.openState !== 'open') await this.open()
+    if (this.fillPromise !== null) return this.fillPromise
+    if (this.historyDetail !== 'conversation' && this.historyDetail !== 'filling') return
+    const promise = this.fillHistoryDetail()
+    this.fillPromise = promise
+    try {
+      await promise
+    } finally {
+      if (this.fillPromise === promise) this.fillPromise = null
     }
   }
 
@@ -426,7 +455,10 @@ export class Session implements SessionFace {
     this.openError = null
     this.events = []
     this.views = []
+    this.omittedSpans = []
     this.baseSeq = 0
+    if (this.historyDetail !== 'conversation') this.historyDetail = 'full'
+    this.fillPromise = null
     // Superseded, not settled: the baseline replay re-sends still-pending requested frames verbatim
     // (same rpcId), re-minting fresh waits; a stale reference's respond() still reaches the host.
     this.pending.clear()
@@ -623,13 +655,25 @@ export class Session implements SessionFace {
         this.openError = result.error
         return
       }
-      this.installWindow(result.value.events, result.value.hasMore, result.value.projections)
+      this.installWindow(
+        result.value.events,
+        result.value.hasMore,
+        result.value.projections,
+        result.value.omittedSpans,
+      )
       // Gap detection: baseline past the window tail and liveBuffer did not cover it -> pull the tail page once more.
       const tailSeq = this.windowTailSeq()
       if (this.subscribedLastSeq !== null && tailSeq !== null && this.subscribedLastSeq > tailSeq) {
         result = (await this.history({ maxMessages: PAGE_MESSAGES })).result
         if (generation !== this.openGeneration) return
-        if (result.ok) this.installWindow(result.value.events, result.value.hasMore, result.value.projections)
+        if (result.ok) {
+          this.installWindow(
+            result.value.events,
+            result.value.hasMore,
+            result.value.projections,
+            result.value.omittedSpans,
+          )
+        }
       }
       this.openState = 'open'
     } catch (error) {
@@ -650,10 +694,16 @@ export class Session implements SessionFace {
    *  A carried projections block seeds the value store (higher seq wins, so a stale
    *  baseline cannot overwrite a newer push frame); the window events themselves are
    *  never folded — the host is the only computation site. */
-  private installWindow(entries: HistoryEntry[], hasMore: boolean, projections?: ProjectionsBaseline): void {
+  private installWindow(
+    entries: HistoryEntry[],
+    hasMore: boolean,
+    projections?: ProjectionsBaseline,
+    omittedSpans?: readonly HistoryOmittedSpan[],
+  ): void {
     this.events = entries.map(e => e.event)
     this.views = entries.map(e => e.view)
-    this.baseSeq = this.events[0]?.seq ?? 0
+    this.omittedSpans = [...(omittedSpans ?? [])]
+    this.baseSeq = logicalBaseSeq(this.events, this.omittedSpans) ?? 0
     this.hasMore = hasMore
     if (this.events.some(event => event.type === 'turn/start')) this.firstPromptPendingTurn = false
     this.conversation.replaceWindow(entries.map(conversationInput), hasMore)
@@ -714,7 +764,12 @@ export class Session implements SessionFace {
       const { result } = await this.history({ maxMessages: PAGE_MESSAGES })
       // Failure or superseded by a full resync: drop — the resync path rebuilds and clears the buffer itself.
       if (result.ok && generation === this.openGeneration && this.openState === 'open') {
-        this.installWindow(result.value.events, result.value.hasMore, result.value.projections)
+        this.installWindow(
+          result.value.events,
+          result.value.hasMore,
+          result.value.projections,
+          result.value.omittedSpans,
+        )
       }
     } catch (error) {
       console.error('[web-runtime] gap repair failed:', error)
@@ -724,8 +779,7 @@ export class Session implements SessionFace {
   }
 
   private windowTailSeq(): number | null {
-    const tail = this.events[this.events.length - 1]
-    return tail === undefined ? null : tail.seq
+    return logicalTailSeq(this.events, this.omittedSpans)
   }
 
   private buildSnapshot(): ConversationSnapshot {
@@ -761,6 +815,7 @@ export class Session implements SessionFace {
       openError: this.openError,
       hasMore: this.hasMore,
       loadingOlder: this.loadingOlder,
+      historyDetail: this.historyDetail,
       promptError: this.promptError,
       blank: this.blankBit,
       lastAgentError: this.lastAgentError,
@@ -772,11 +827,113 @@ export class Session implements SessionFace {
     events: HistoryEntry[]
     hasMore: boolean
     projections?: ProjectionsBaseline
+    omittedSpans?: readonly HistoryOmittedSpan[]
   }>> {
+    const detail = this.historyDetail === 'conversation' ? 'conversation' as const : 'full' as const
     return this.address === undefined
-      ? this.api.sessions.history({ sessionId: this.sessionId, ...payload })
-      : this.api.subagents.history({ ...this.address, ...payload })
+      ? this.api.sessions.history({ sessionId: this.sessionId, ...payload, detail })
+      : this.api.subagents.history({ ...this.address, ...payload, detail })
   }
+
+  /**
+   * Walk `detail: 'full'` pages from the tail until every omitted span in the
+   * current window is present as an event. Existing seqs win on merge.
+   */
+  private async fillHistoryDetail(): Promise<void> {
+    if (this.openState !== 'open') return
+    this.historyDetail = 'filling'
+    this.notifier.markDirty()
+    const generation = this.openGeneration
+    const windowBase = this.baseSeq
+    try {
+      if (this.omittedSpans.length === 0) {
+        if (generation === this.openGeneration) this.historyDetail = 'full'
+        return
+      }
+      let beforeSeq: number | undefined
+      let previousOldest = Number.POSITIVE_INFINITY
+      for (let guard = 0; guard < 64; guard++) {
+        if (generation !== this.openGeneration || this.openState !== 'open') return
+        if (this.omittedSpans.length === 0) break
+        const { result } = await this.history({
+          ...beforeSeq === undefined ? {} : { beforeSeq },
+          maxMessages: PAGE_MESSAGES,
+        })
+        if (generation !== this.openGeneration || this.openState !== 'open') return
+        if (!result.ok || result.value.events.length === 0) break
+        const oldest = result.value.events.reduce(
+          (min, entry) => Math.min(min, entry.event.seq),
+          Number.POSITIVE_INFINITY,
+        )
+        this.mergeHistoryEntries(result.value.events)
+        this.dropCoveredSpans()
+        this.conversation.replaceWindow(
+          this.events.map((event, index) => ({ event, view: this.views[index] })),
+          this.hasMore,
+        )
+        this.notifier.markDirty()
+        if (oldest <= windowBase || !result.value.hasMore || oldest >= previousOldest) break
+        previousOldest = oldest
+        beforeSeq = oldest
+      }
+      if (generation === this.openGeneration) {
+        this.historyDetail = this.omittedSpans.length === 0 ? 'full' : 'conversation'
+      }
+    } finally {
+      if (generation === this.openGeneration) this.notifier.markDirty()
+    }
+  }
+
+  /** Merge incoming rows by seq; already-loaded events keep their view. */
+  private mergeHistoryEntries(incoming: readonly HistoryEntry[]): void {
+    const bySeq = new Map<number, { event: SessionEvent; view: ToolEventView | undefined }>()
+    for (const [index, event] of this.events.entries()) {
+      bySeq.set(event.seq, { event, view: this.views[index] })
+    }
+    for (const entry of incoming) {
+      if (bySeq.has(entry.event.seq)) continue
+      bySeq.set(entry.event.seq, { event: entry.event, view: entry.view })
+    }
+    const sorted = [...bySeq.entries()].sort((left, right) => left[0] - right[0])
+    this.events = sorted.map(([, row]) => row.event)
+    this.views = sorted.map(([, row]) => row.view)
+    this.baseSeq = logicalBaseSeq(this.events, this.omittedSpans) ?? this.baseSeq
+  }
+
+  /** Drop omitted spans whose seqs are now present as loaded events. */
+  private dropCoveredSpans(): void {
+    const seqs = new Set(this.events.map(event => event.seq))
+    this.omittedSpans = this.omittedSpans.filter((span) => {
+      for (let seq = span.startSeq; seq <= span.endSeq; seq++) {
+        if (!seqs.has(seq)) return true
+      }
+      return false
+    })
+  }
+}
+
+/** Inclusive min seq over loaded events and omitted spans. */
+function logicalBaseSeq(
+  events: readonly SessionEvent[],
+  spans: readonly HistoryOmittedSpan[],
+): number | null {
+  let base: number | null = events[0]?.seq ?? null
+  for (const span of spans) {
+    if (base === null || span.startSeq < base) base = span.startSeq
+  }
+  return base
+}
+
+/** Inclusive max seq over loaded events and omitted spans. */
+function logicalTailSeq(
+  events: readonly SessionEvent[],
+  spans: readonly HistoryOmittedSpan[],
+): number | null {
+  let tail: number | null = events[events.length - 1]?.seq ?? null
+  for (const span of spans) {
+    if (tail === null || span.endSeq > tail) tail = span.endSeq
+  }
+  return tail
 }
 
 /** Convert one wire history row into the assembler's transport-neutral input. */

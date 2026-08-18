@@ -334,6 +334,13 @@ export interface PartialAssistant {
 export type OpenState = 'cold' | 'loading' | 'open' | 'error'
 
 /**
+ * History download gear for the installed window. `'conversation'` omits
+ * completed historical chunks (Chat); `'filling'` is an in-flight detail
+ * fetch; `'full'` has every event in the current range (Trajectory).
+ */
+export type HistoryDetailState = 'conversation' | 'filling' | 'full'
+
+/**
  * Input-area shape of an OPEN session, derived at snapshot assembly (the one
  * place that knows the predicate — consumers switch, never re-derive):
  *
@@ -461,6 +468,12 @@ export interface ConversationSnapshot {
   openError: RpcError | null
   hasMore: boolean
   loadingOlder: boolean
+  /**
+   * Whether historical `assistant/chunk` events for the installed window
+   * have been downloaded. Chat stays on `'conversation'`; Trajectory fill
+   * is `'filling'` then `'full'`.
+   */
+  historyDetail: HistoryDetailState
   promptError: PromptError | null
   /**
    * Whether this session still has an empty log (no user message yet).
