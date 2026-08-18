@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ConversationShareAction, type ConversationShareActionProps } from '../src/client/ConversationShareAction.tsx'
 import { ReadOnlyComposer, type ReadOnlyComposerProps } from '../src/client/ReadOnlyComposer.tsx'
@@ -143,6 +143,28 @@ describe('ScopeControl', () => {
     expect(screen.getByRole('button', { name: '切换个人或项目空间' }).hasAttribute('disabled')).toBe(true)
     view.rerender(<ScopeControl {...scopeProps(snapshot({ scopeError: 'switch-failed' }))} />)
     expect(screen.getByRole('button', { name: '切换个人或项目空间' }).getAttribute('title')).toBe('空间切换失败，请重试')
+  })
+
+  it('shows a non-dismissible target and progress status while switching', () => {
+    vi.useFakeTimers()
+    try {
+      render(<ScopeControl {...scopeProps(snapshot({
+        scopeBusy: true,
+        scopeTarget: { kind: 'project', projectId: 10, projectName: '审计平台' },
+      }))} />)
+      expect(screen.getByRole('status').getAttribute('aria-busy')).toBe('true')
+      expect(screen.getByText('正在进入「审计平台」')).toBeTruthy()
+      expect(screen.getByText('正在提交空间切换请求')).toBeTruthy()
+
+      act(() => { vi.advanceTimersByTime(3_500) })
+      expect(screen.getByText('服务就绪后将自动连接工作台')).toBeTruthy()
+      expect(screen.getByText('已等待 3 秒')).toBeTruthy()
+
+      fireEvent.keyDown(document, { key: 'Escape' })
+      expect(screen.getByRole('status')).toBeTruthy()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('shows personal scope when projects remain available', () => {

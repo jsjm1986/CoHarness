@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.md
-2026-08-15-project-collaborative-conversations.md: d2a14116fc96dcf1b7e6297558f40f9fbdd31bb0
-2026-08-15-project-collaborative-conversations.zh.md: a31e81e2445be1442d5010d249feda02a9bf7829
+2026-08-15-project-collaborative-conversations.md: 911330d058b490fe2a41617fc36ebe34d449ca0d
+2026-08-15-project-collaborative-conversations.zh.md: 1324e37bea0503092b7ddd14d1c701aea98176c2

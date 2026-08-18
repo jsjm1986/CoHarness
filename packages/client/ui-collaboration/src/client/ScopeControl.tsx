@@ -10,6 +10,7 @@ import type {
 } from './collaboration-client.ts'
 import type { NS } from './locales.ts'
 import { ProjectManagerModal, type ProjectManagerMode } from './ProjectManagerModal.tsx'
+import { ScopeSwitchStatus } from './ScopeSwitchStatus.tsx'
 import css from './ScopeControl.module.css'
 
 /** Registration-side collaboration state and actions for the sidebar footer. */
@@ -234,6 +235,9 @@ export function ScopeControl({
         }}
         onClose={() => { setManagerMode(undefined) }}
       />
+      {state.scopeBusy && state.scopeTarget !== undefined && (
+        <ScopeSwitchStatus target={state.scopeTarget} t={t} />
+      )}
     </>
   )
 }

@@ -1,0 +1,6 @@
+- dialog "Switching scope":
+  - status:
+    - heading "Switching scope" [level=2]
+    - paragraph: Opening 'Audit platform'
+    - paragraph: The target scope is still being prepared. Please keep waiting.
+    - progressbar "Project scope switch progress"

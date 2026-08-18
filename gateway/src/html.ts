@@ -55,6 +55,20 @@ ${error === '' ? '' : `<p class="error">${escapeHtml(error)}</p>`}
 /** Render the retry page shown while a personal or project runtime starts. */
 export function waitingPage(): string {
   return layout('正在启动 - Harness', `<div class="card" style="max-width:380px;margin:80px auto;text-align:center">
-<h1>正在启动您的工作台…</h1><p class="muted">通常需要几秒钟，页面会自动刷新。</p></div>`,
-  '<meta http-equiv="refresh" content="2">')
+<div role="status" aria-live="polite" aria-busy="true">
+<div class="startup-spinner" aria-hidden="true"></div>
+<h1>正在启动您的工作台…</h1>
+<p class="muted">正在准备工作台服务，页面会自动连接。</p>
+<div class="startup-progress" role="progressbar" aria-label="工作台启动进度"><span></span></div>
+<p class="muted startup-wait">通常需要几秒钟，页面会自动刷新。</p>
+</div></div>`,
+  `<meta http-equiv="refresh" content="2"><style>
+.startup-spinner{width:28px;height:28px;margin:0 auto 18px;border:3px solid #d2d2d7;border-top-color:#0071e3;border-radius:50%;animation:startup-spin .8s linear infinite}
+.startup-progress{height:6px;margin:18px 0 10px;overflow:hidden;border-radius:3px;background:#e5e5ea}
+.startup-progress span{display:block;width:38%;height:100%;border-radius:inherit;background:#0071e3;animation:startup-progress 1.4s ease-in-out infinite}
+.startup-wait{margin-bottom:0}
+@keyframes startup-spin{to{transform:rotate(360deg)}}
+@keyframes startup-progress{0%{transform:translateX(-110%)}60%,100%{transform:translateX(290%)}}
+@media (prefers-reduced-motion:reduce){.startup-spinner,.startup-progress span{animation-duration:2.4s}}
+</style>`)
 }

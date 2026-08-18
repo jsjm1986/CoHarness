@@ -22,7 +22,7 @@ import { en, NS, zh, type CollaborationKey } from './locales.ts'
 
 export type {
   CollaborationContext, CollaborationScope, CollaborationSnapshot,
-  CollaborationVisibility, ConversationAccess, ConversationCollaboration,
+  CollaborationScopeTarget, CollaborationVisibility, ConversationAccess, ConversationCollaboration,
   ConversationDetail, ConversationParticipant, ProjectInvitation, ProjectMembership, UserSummary,
 } from './collaboration-client.ts'
 export type { ConversationShareActionProps, ConversationShareInjected } from './ConversationShareAction.tsx'

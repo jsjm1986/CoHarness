@@ -49,6 +49,11 @@ export type CollaborationScope =
   | { kind: 'personal' }
   | { kind: 'project'; projectId: number; projectName: string; mode: 'ro' | 'rw' }
 
+/** Target scope shown while the Gateway prepares the next runtime. */
+export type CollaborationScopeTarget =
+  | { kind: 'personal' }
+  | { kind: 'project'; projectId: number; projectName: string }
+
 /** Gateway account context used by the scope selector and create policy. */
 export interface CollaborationContext {
   user: CollaborationUser
@@ -107,6 +112,8 @@ export interface CollaborationSnapshot {
   context?: CollaborationContext
   stagedVisibility: CollaborationVisibility
   scopeBusy: boolean
+  /** Scope currently being prepared; present only during a switch request. */
+  scopeTarget?: CollaborationScopeTarget
   scopeError?: string
   conversations: Record<string, ConversationDetailState>
 }
@@ -507,20 +514,33 @@ export class CollaborationClient {
    * @returns settlement after the HTTP mutation; successful requests reload.
    */
   async switchScope(scope: { kind: 'personal' } | { kind: 'project'; projectId: number }): Promise<void> {
-    if (this.disposed || this.getSnapshot().scopeBusy) return
+    const snapshot = this.getSnapshot()
+    if (this.disposed || snapshot.scopeBusy) return
+    const target: CollaborationScopeTarget = scope.kind === 'personal'
+      ? { kind: 'personal' }
+      : {
+        kind: 'project',
+        projectId: scope.projectId,
+        projectName: snapshot.context?.projects.find(project => project.projectId === scope.projectId)?.name ?? '',
+      }
     this.store.update((draft) => {
       draft.scopeBusy = true
+      draft.scopeTarget = target
       delete draft.scopeError
     })
     try {
       await this.transport.switchScope(scope, this.abortController.signal)
       if (this.abortController.signal.aborted) return
-      this.store.update((draft) => { draft.scopeBusy = false })
+      this.store.update((draft) => {
+        draft.scopeBusy = false
+        delete draft.scopeTarget
+      })
       this.transport.reload()
     } catch (_scopeSwitchFailure) {
       if (this.abortController.signal.aborted) return
       this.store.update((draft) => {
         draft.scopeBusy = false
+        delete draft.scopeTarget
         draft.scopeError = 'switch-failed'
       })
     }
