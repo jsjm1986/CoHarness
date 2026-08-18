@@ -39,6 +39,7 @@
     "apps/web/tests/project-collaboration.e2e.ts",
     "apps/web/tests/chat-sender-attribution.e2e.ts",
     "apps/web/tests/stats-paged-history.e2e.ts",
+    "apps/web/tests/lossless-history-wire.e2e.ts",
     "apps/web/tests/sidebar-scrollbar.e2e.ts",
     "apps/web/tests/conversation-column-overflow.e2e.ts",
     "apps/web/tests/code-mode-round.e2e.ts",

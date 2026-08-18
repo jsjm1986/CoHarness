@@ -22,7 +22,6 @@ import {
   sessionAttachmentValueSchema,
   sessionCreateValueSchema,
   sessionForkValueSchema,
-  sessionHistoryValueSchema,
   sessionListValueSchema,
   sessionModelsValueSchema,
   sessionPromptValueSchema,
@@ -62,11 +61,11 @@ import {
 } from '../api/credentials.schema.ts'
 import { llmDiscoverModelsValueSchema, llmModelsValueSchema, llmProvidersValueSchema } from '../api/llm.schema.ts'
 import {
-  subagentHistoryValueSchema,
   subagentInterruptValueSchema,
   subagentListValueSchema,
   subagentPromptValueSchema,
 } from '../api/subagents.schema.ts'
+import { historyWireValueSchema } from './history-wire.ts'
 
 /**
  * Client consumption face of the contract (shape a): same domain tree as ApiProxy, but unary
@@ -173,7 +172,7 @@ const UNARY_VALUE_SCHEMAS: { [K in keyof RpcMethodMap]: z.ZodType<Wire<ResponseV
   'session.list': sessionListValueSchema,
   'session.search': sessionSearchValueSchema,
   'session.create': sessionCreateValueSchema,
-  'session.history': sessionHistoryValueSchema,
+  'session.history': historyWireValueSchema,
   'session.models': sessionModelsValueSchema,
   'session.selectModel': sessionSelectModelValueSchema,
   'session.rename': sessionRenameValueSchema,
@@ -183,7 +182,7 @@ const UNARY_VALUE_SCHEMAS: { [K in keyof RpcMethodMap]: z.ZodType<Wire<ResponseV
   'session.updateQueue': sessionUpdateQueueValueSchema,
   'session.cancel': sessionCancelValueSchema,
   'subagent.list': subagentListValueSchema,
-  'subagent.history': subagentHistoryValueSchema,
+  'subagent.history': historyWireValueSchema,
   'subagent.prompt': subagentPromptValueSchema,
   'subagent.interrupt': subagentInterruptValueSchema,
   'host.describe': hostDescribeValueSchema,

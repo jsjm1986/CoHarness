@@ -236,13 +236,6 @@ export const imageLimitsProjectionSchema = z.object({
   mediaTypes: z.array(z.string()),
 }) as unknown as z.ZodType<ImageAttachmentLimits>
 
-/** session.history response value (projections rides the tail page only). */
-export const sessionHistoryValueSchema: z.ZodType<Wire<ResponseValue<'session.history'>>> = z.object({
-  events: z.array(historyEntrySchema),
-  hasMore: z.boolean(),
-  projections: sessionProjectionsBlockSchema.optional(),
-})
-
 /** session.models request payload. */
 export const sessionModelsRequestSchema = z.object({
   sessionId: sessionIdSchema,

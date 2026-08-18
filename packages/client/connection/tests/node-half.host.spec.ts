@@ -17,6 +17,7 @@ import {
   HOST_EVENTS_PATH,
   inject,
   MUX_EVENTS_PATH,
+  type ConnectionConfig,
   type HostConnectionHandle,
 } from '../src/index.ts'
 
@@ -82,7 +83,10 @@ function fakeResponse(): { response: ServerResponse; state: { status?: number; b
   return { response, state }
 }
 
-async function mounted(config?: { trustedHosts?: string[] }): Promise<{
+async function mounted(
+  config?: ConnectionConfig,
+  apiProxy: ApiProxy = {} as unknown as ApiProxy,
+): Promise<{
   routes: WebRoute[]
   upgrades: WebUpgradeRoute[]
   dispose: () => Promise<void>
@@ -91,7 +95,7 @@ async function mounted(config?: { trustedHosts?: string[] }): Promise<{
   const routes: WebRoute[] = []
   const upgrades: WebUpgradeRoute[] = []
   ctx.provide('webServer', fakeHttpServer(routes, upgrades) as WebServer)
-  ctx.provide('apiProxy', {} as unknown as ApiProxy)
+  ctx.provide('apiProxy', apiProxy)
   const fiber = ctx.plugin({ inject: [...inject], apply }, config)
   await fiber.await()
   return { routes, upgrades, dispose: () => fiber.dispose() }
@@ -293,6 +297,55 @@ describe('connection node half', () => {
     expect(calls).toEqual(['content'])
     await expect(connection.dispatchHttp(missingUrl, fakeResponse().response)).resolves.toBe(false)
     await fiber.dispose()
+  })
+
+  it('applies historyPageTargetBytes to physical session.history responses', async () => {
+    const page = {
+      events: ['oldest', 'middle', 'newest'].map((text, seq) => ({
+        event: {
+          type: 'user/message' as const,
+          seq,
+          time: 1000 + seq,
+          data: { content: [{ type: 'text' as const, text }], source: { kind: 'user' as const } },
+          surfaceOp: 'append' as const,
+        },
+      })),
+      hasMore: false,
+    }
+    const apiProxy = {
+      sessions: {
+        async history(request: Parameters<ApiProxy['sessions']['history']>[0]) {
+          return { rpcId: request.rpcId, result: { ok: true as const, value: page } }
+        },
+      },
+    } as unknown as ApiProxy
+    const { routes, dispose } = await mounted({ historyPageTargetBytes: 1 }, apiProxy)
+    const request: ClientRequest = {
+      type: 'client-request',
+      rpcId: RpcId('history-target'),
+      method: 'session.history',
+      payload: { sessionId: 'scripted-history' },
+    }
+    const result = fakeResponse()
+
+    await routes[0]!.handler(
+      fakePost({ host: '127.0.0.1:3080' }, '/api/session.history', request),
+      result.response,
+    )
+
+    const value = (JSON.parse(String(result.state.body)) as {
+      result: {
+        ok: true
+        value: {
+          records: Array<{ event?: { seq: number } }>
+          hasMore: boolean
+        }
+      }
+    }).result.value
+    expect(value).not.toHaveProperty('events')
+    expect(value.records.map(record => record.event?.seq)).toEqual([2])
+    expect(value.hasMore).toBe(true)
+    await dispose()
   })
 
   it('provides a disposable dedicated RPC channel without requiring apiProxy', async () => {

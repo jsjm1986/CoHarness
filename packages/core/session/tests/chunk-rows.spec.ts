@@ -8,8 +8,9 @@ import { describe, expect, it } from 'vitest'
 import fc from 'fast-check'
 import { CallId } from '@deepseek-ai/dsh-llm'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
-import { decodeStorageRecord, packChunkRuns } from '@deepseek-ai/dsh-session'
+import { packChunkRuns } from '@deepseek-ai/dsh-session'
 import type { ChunkRow, SessionEvent, StorageRecord } from '@deepseek-ai/dsh-session'
+import { decodeChunkRow, decodeStorageRecord, isChunkRow } from '@deepseek-ai/dsh-session/chunk-rows'
 
 /** Build an `assistant/chunk` event with the exact live-append shape. */
 function chunkEvent(seq: number, time: number, chunk: StreamChunk, turn = 1, step = 1): SessionEvent {
@@ -20,6 +21,12 @@ function chunkEvent(seq: number, time: number, chunk: StreamChunk, turn = 1, ste
 function deltaRun(kind: 'text-delta' | 'reasoning-delta', count: number, seq0 = 0, index = 0): SessionEvent[] {
   return Array.from({ length: count }, (_, k) =>
     chunkEvent(seq0 + k, 1000 + 10 * k, { type: kind, index, text: `t${k}` }))
+}
+
+/** Text-delta run with explicit member strings (contiguous seqs, fixed 10ms gaps). */
+function textRun(seq0: number, texts: string[], index = 0): SessionEvent[] {
+  return texts.map((text, k) =>
+    chunkEvent(seq0 + k, 1000 + 10 * k, { type: 'text-delta', index, text }))
 }
 
 /** Decode a packed record list back to a flat event list. */
@@ -135,6 +142,16 @@ describe('packChunkRuns', () => {
       mk(6, { turn: 1, step: 1, chunk: { type: 'tool-call-delta', index: 0, id: 'c', name: 7, argumentsDelta: 'a' } }),
     ]
     expect(packChunkRuns(events)).toStrictEqual(events)
+  })
+})
+
+describe('decodeChunkRow', () => {
+  it('decodes a packed row and rejects non-row values', () => {
+    const packed = packChunkRuns(textRun(0, ['你', '好', '🙂']))
+    const row = packed[0]
+    expect(isChunkRow(row)).toBe(true)
+    expect(decodeChunkRow(JSON.parse(JSON.stringify(row)))).toStrictEqual(textRun(0, ['你', '好', '🙂']))
+    expect(() => decodeChunkRow({ type: 'assistant/chunk' })).toThrow(/packed chunk row/)
   })
 })
 

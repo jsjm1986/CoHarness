@@ -20,7 +20,7 @@ A checkpoint is recognized through the compaction seam's own contract — `isCom
 
 `session.history` counts only append-origin messages toward `maxMessages`. Each page remains one contiguous raw event range, so a compaction's `compaction/summary` event stays on the page of the replacement that cites it.
 
-No persisted event, RPC envelope, compaction transaction, or model-visible surface changed, and no migration is required.
+No persisted event, compaction transaction, or model-visible surface changed, and no migration is required. The logical history value remains `{ events, hasMore, projections? }`; only the Fetch carrier's physical `server-response` uses packed `records` and complete-envelope byte targeting at the same append-origin message groups ([lossless history wire pagination](../architecture/2026-08-14-lossless-history-wire-pagination.md)).
 
 ## Deferred
 

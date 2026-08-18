@@ -407,10 +407,16 @@ export interface ConnectionConfig {
   trustedHosts?: string[]
   /** Maximum buffered JSON body for every `/api` request. */
   maxRequestBodyBytes?: number
+  /**
+   * Target size of the complete uncompressed history RPC `server-response`
+   * JSON in UTF-8 bytes. Defaults to 131072 bytes; one indivisible complete
+   * message group may exceed it.
+   */
+  historyPageTargetBytes?: number
 }
 ```
 
-Source: [`packages/client/connection/src/index.ts:73`](../packages/client/connection/src/index.ts)
+Source: [`packages/client/connection/src/index.ts:76`](../packages/client/connection/src/index.ts)
 
 <a id="deepseek-aidsh-client-hmr"></a>
 
@@ -753,7 +759,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/host/apiproxy/src/index.ts:45`](../packages/host/apiproxy/src/index.ts)
+Source: [`packages/host/apiproxy/src/index.ts:46`](../packages/host/apiproxy/src/index.ts)
 
 <a id="deepseek-aidsh-host-directory-picker-browse"></a>
 
