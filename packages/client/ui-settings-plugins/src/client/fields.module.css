@@ -111,3 +111,11 @@
   line-height: 1.5;
   color: var(--dsw-alias-label-tertiary);
 }
+
+@media (max-width: 767px) {
+  .input {
+    width: 100%;
+    min-height: var(--dsw-touch-target);
+    height: var(--dsw-touch-target);
+  }
+}

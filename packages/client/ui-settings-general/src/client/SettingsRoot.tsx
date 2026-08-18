@@ -1,9 +1,11 @@
 /**
  * Settings shell root: the sidebar-foot trigger row plus the centered modal
- * panel (figma 501:29947, 1080x700) with the section nav rail. The shell is
- * a pure composition face — every piece of text (trigger label, panel title,
- * close label, sections) arrives from registrants through slots; accessible
- * names resolve to that content (trigger: its own text; dialog:
+ * panel (figma 501:29947, 1080x700) with the section nav rail. The overlay
+ * portals to document.body (OnboardingSurface / Modal precedent) so a compact
+ * sidebar drawer `transform` cannot re-parent this `position: fixed` layer.
+ * The shell is a pure composition face — every piece of text (trigger label,
+ * panel title, close label, sections) arrives from registrants through slots;
+ * accessible names resolve to that content (trigger: its own text; dialog:
  * aria-labelledby the title node; close: visually-hidden slot text). Modal
  * open state and the active section id are component-local viewing state;
  * the onboarding coordinator mounts exactly one ordered registrant while the
@@ -11,6 +13,7 @@
  * to the step, so a mounted-but-deciding step paints nothing here.
  */
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import clsx from 'clsx'
 import {
   IconAgentPresetOutline16, IconCloseOutline16, IconDataOutline16,
@@ -58,7 +61,19 @@ function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose }: PanelP
   const closeButton = useRef<HTMLButtonElement | null>(null)
   useEffect(() => { closeButton.current?.focus() }, [])
 
-  return (
+  // The overlay portals to document.body so a compact drawer `transform`
+  // cannot become the containing block of this `position: fixed` layer.
+  // `#root` stays inert for exactly the panel lifetime; restore the previous
+  // flag so an onboarding takeover that already held it is not cleared.
+  useEffect(() => {
+    const appRoot = document.getElementById('root')
+    if (appRoot === null) return
+    const previous = appRoot.inert
+    appRoot.inert = true
+    return () => { appRoot.inert = previous }
+  }, [])
+
+  return createPortal((
     <div className={css.overlay} role="presentation">
       <div className={css.mask} aria-hidden="true" onClick={onClose} />
       <div className={css.panel} role="dialog" aria-modal="true" aria-labelledby={titleId}>
@@ -93,7 +108,7 @@ function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose }: PanelP
         </div>
       </div>
     </div>
-  )
+  ), document.body)
 }
 
 /**

@@ -271,6 +271,39 @@
   width: auto;
 }
 
+@media (pointer: coarse) {
+  .iconButton {
+    width: var(--dsw-touch-target);
+    height: var(--dsw-touch-target);
+  }
+
+  .newSession {
+    min-height: var(--dsw-touch-target);
+  }
+}
+
+:global([data-viewport='compact']) .iconButton {
+  width: var(--dsw-touch-target);
+  height: var(--dsw-touch-target);
+}
+
+:global([data-viewport='compact']) .brand {
+  min-height: var(--dsw-touch-target);
+}
+
+:global([data-viewport='compact']) .logoRow {
+  height: auto;
+  min-height: var(--dsw-touch-target);
+}
+
+:global([data-viewport='compact']) .newSession {
+  min-height: var(--dsw-touch-target);
+}
+
+:global([data-viewport='compact']) .footArea {
+  padding-bottom: var(--dsw-safe-bottom);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .wide,
   .fading > *,

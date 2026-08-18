@@ -26,7 +26,7 @@
 
 需要响应自身宽度而非整个框架的面板，在其根元素声明 `container-type: inline-size`，并以匿名容器查询（`@container (max-width: …)`）在共享档位宽度 480、560、720 上分支。CSS Modules 会按模块对 `container-name` 做哈希，因此跨模块查询保持匿名；绝不在包含非自有 `position: fixed` 内容的祖先上声明 `container-type`，因为 layout containment 会改变 fixed 元素的包含块。
 
-间距与圆角取自度量 token（`--dsw-space-*`、`--dsw-radius-*`），设备安全区取自 `--dsw-safe-*`（metrics.css）。在粗指针设备上，悬停显现的控件需要 `@media (pointer: coarse)` 常显回退，交互目标保持至少 `--dsw-touch-target`；仅悬停的提示归入 `@media (hover: hover)`。portal 渲染的浮层看不到框架标记——它们在 JS 里用 ui-primitives 的 `useMediaQuery` 按相同阈值分支。
+间距与圆角取自度量 token（`--dsw-space-*`、`--dsw-radius-*`），设备安全区取自 `--dsw-safe-*`（metrics.css）。在粗指针设备上，悬停显现的控件需要 `@media (pointer: coarse)` 常显回退，交互目标保持至少 `--dsw-touch-target`；仅悬停的提示归入 `@media (hover: hover)`。框架内外壳在 `[data-viewport='compact']` 下同样放大这些目标，因为部分手机 WebView 会报 `pointer: fine`。portal 渲染的浮层看不到框架标记——它们在 JS 里用 ui-primitives 的 `useMediaQuery` 按相同阈值分支，并在 `@media (max-width: 767px)` 下放大同样的目标。
 
 ## 变更系统
 

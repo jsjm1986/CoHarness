@@ -273,3 +273,14 @@
 .refresh:hover {
   background: var(--dsw-alias-interactive-bg-hover);
 }
+
+@media (pointer: coarse) {
+  .trigger {
+    min-height: var(--dsw-touch-target);
+  }
+}
+
+:global([data-viewport='compact']) .trigger,
+:global([data-viewport='compact']) .refresh {
+  min-height: var(--dsw-touch-target);
+}

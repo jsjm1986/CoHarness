@@ -4,6 +4,22 @@
   overflow: hidden;
 }
 
+@media (max-width: 767px) {
+  .confirmation {
+    width: 100%;
+    max-height: calc(var(--dsw-viewport-height, 100dvh) - 48px);
+  }
+
+  .acknowledgement {
+    min-height: var(--dsw-touch-target);
+  }
+
+  .acknowledgement input {
+    width: 20px;
+    height: 20px;
+  }
+}
+
 .confirmationContent {
   min-height: 0;
   overflow-y: auto;

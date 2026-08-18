@@ -407,3 +407,18 @@
   opacity: 0.4;
   cursor: default;
 }
+
+@media (max-width: 767px) {
+  .section {
+    max-width: none;
+  }
+
+  .cards {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: auto;
+  }
+
+  .cardMain {
+    min-height: var(--dsw-touch-target);
+  }
+}

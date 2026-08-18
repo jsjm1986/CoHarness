@@ -93,6 +93,20 @@
     border-bottom: none;
     border-radius: var(--dsw-radius-xl) var(--dsw-radius-xl) 0 0;
   }
+
+  .title {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .close {
+    width: var(--dsw-touch-target);
+    height: var(--dsw-touch-target);
+  }
+
+  .footer {
+    flex-wrap: wrap;
+  }
 }
 
 /* Coarse pointers get the full touch target on the close control. */

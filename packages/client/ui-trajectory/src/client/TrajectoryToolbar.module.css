@@ -212,3 +212,26 @@
   height: 12px;
   cursor: pointer;
 }
+
+:global([data-viewport='compact']) .root {
+  height: auto;
+}
+
+:global([data-viewport='compact']) .inner {
+  flex-wrap: wrap;
+  height: auto;
+  min-height: var(--dsh-trajectory-toolbar-height);
+}
+
+:global([data-viewport='compact']) .toggle,
+:global([data-viewport='compact']) .control,
+:global([data-viewport='compact']) .action {
+  min-height: var(--dsw-touch-target);
+  height: auto;
+}
+
+:global([data-viewport='compact']) .search {
+  flex: 1 1 100%;
+  min-height: var(--dsw-touch-target);
+  height: auto;
+}

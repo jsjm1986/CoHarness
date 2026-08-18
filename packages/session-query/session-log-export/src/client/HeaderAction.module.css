@@ -34,3 +34,9 @@
 .sessionLogButton span {
   white-space: nowrap;
 }
+
+:global([data-viewport='compact']) .sessionLogButton {
+  min-width: 0;
+  min-height: var(--dsw-touch-target);
+  height: var(--dsw-touch-target);
+}

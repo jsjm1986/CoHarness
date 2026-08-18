@@ -113,4 +113,11 @@ describe('WorkspaceBrowser.module.css list', () => {
     expect(declarations('.rail .iconButton')?.get('width')).toBe('36px')
     expect(declarations('.rail .search')?.get('width')).toBe('36px')
   })
+
+  it('reveals row actions and grows session rows on coarse and compact', () => {
+    expect(rowsCss).toContain('@media (pointer: coarse)')
+    expect(rowsCss).toContain("[data-viewport='compact']")
+    expect(rowsCss).toContain('min-height: var(--dsw-touch-target)')
+    expect(rowsCss).toContain('.rowActions')
+  })
 })

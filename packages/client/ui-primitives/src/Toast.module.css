@@ -68,3 +68,10 @@
     animation: dsh-toast-fade 1000ms ease 3000ms forwards;
   }
 }
+
+@media (max-width: 767px) {
+  .toast {
+    top: calc(var(--dsw-safe-top, 0px) + var(--dsw-space-6));
+    max-width: calc(100vw - 24px);
+  }
+}

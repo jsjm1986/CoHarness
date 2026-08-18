@@ -403,15 +403,23 @@
   .option,
   .customRow {
     padding: var(--dsw-space-2) 6px;
+    min-height: var(--dsw-touch-target);
+  }
+
+  .iconButton {
+    width: var(--dsw-touch-target);
+    height: var(--dsw-touch-target);
   }
 
   .footer {
+    flex-wrap: wrap;
     align-items: flex-end;
     padding: 0 10px;
   }
 
   .footerActions {
     flex-shrink: 0;
+    flex-wrap: wrap;
   }
 }
 

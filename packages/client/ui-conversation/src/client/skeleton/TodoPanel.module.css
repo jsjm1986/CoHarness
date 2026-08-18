@@ -144,3 +144,11 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+:global([data-viewport='compact']) .header {
+  min-height: var(--dsw-touch-target);
+}
+
+:global([data-viewport='compact']) .content {
+  white-space: normal;
+}

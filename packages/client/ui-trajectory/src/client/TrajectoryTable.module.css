@@ -957,6 +957,11 @@
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
+:global([data-viewport='compact']) .close {
+  width: var(--dsw-touch-target);
+  height: var(--dsw-touch-target);
+}
+
 .detailTabs {
   display: flex;
   flex: none;
@@ -1790,12 +1795,28 @@
   .details {
     position: absolute;
     z-index: 5;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: min(92%, 420px);
-    max-width: 92%;
-    border-left-color: var(--dsw-alias-border-l3);
-    box-shadow: -12px 0 32px rgba(0, 0, 0, 0.14);
+    inset: 0;
+    width: 100%;
+    max-width: none;
+    border-left: none;
+    box-shadow: none;
+  }
+
+  .detailsHeader {
+    height: auto;
+    min-height: var(--dsw-touch-target);
+  }
+
+  .detailTab {
+    min-height: var(--dsw-touch-target);
+  }
+
+  .contentText {
+    white-space: normal;
+  }
+
+  .table tbody td {
+    height: auto;
+    min-height: var(--dsw-touch-target);
   }
 }

@@ -81,6 +81,15 @@
   }
 }
 
+:global([data-viewport='compact']) .remove {
+  opacity: 1;
+}
+
+:global([data-viewport='compact']) .arrow {
+  width: var(--dsw-touch-target);
+  height: var(--dsw-touch-target);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .remove {
     transition: none;

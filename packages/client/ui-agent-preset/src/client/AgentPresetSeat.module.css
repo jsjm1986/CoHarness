@@ -96,6 +96,15 @@
   color: var(--dsw-alias-label-caption);
 }
 
+:global([data-viewport='compact']) .seat {
+  max-width: 100%;
+  min-height: var(--dsw-touch-target);
+}
+
+:global([data-viewport='compact']) .item {
+  max-width: none;
+}
+
 /* Menu rows carry the name over its description: the id alone never said what
    a preset does, which is why the metadata exists. */
 .item {

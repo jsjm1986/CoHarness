@@ -267,3 +267,38 @@ describe('SettingsPanel navigation', () => {
     expect(listeners.size).toBe(0)
   })
 })
+
+describe('SettingsPanel overlay portal', () => {
+  it('portals the overlay to document.body rather than the sidebar trigger tree', () => {
+    const { view } = mount()
+    openPanel()
+    const dialog = screen.getByRole('dialog')
+    expect(view.container.contains(dialog)).toBe(false)
+    expect(document.body.contains(dialog)).toBe(true)
+    expect(dialog.parentElement?.parentElement).toBe(document.body)
+  })
+
+  it('holds #root inert while open and restores the previous inert state on close', () => {
+    const appRoot = document.createElement('div')
+    appRoot.id = 'root'
+    appRoot.inert = true
+    document.body.append(appRoot)
+    mount()
+    openPanel()
+    expect(appRoot.inert).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(appRoot.inert).toBe(true)
+    appRoot.inert = false
+    openPanel()
+    expect(appRoot.inert).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(appRoot.inert).toBe(false)
+    appRoot.remove()
+  })
+
+  it('opens when the composition has no #root element', () => {
+    mount()
+    openPanel()
+    expect(screen.getByRole('dialog')).toBeTruthy()
+  })
+})

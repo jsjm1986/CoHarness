@@ -6,6 +6,13 @@
   max-width: 360px;
   pointer-events: auto;
 }
+
+@media (max-width: 767px) {
+  .stack {
+    inset: calc(var(--dsw-safe-top) + var(--dsw-space-3)) var(--dsw-space-3) auto var(--dsw-space-3);
+    max-width: none;
+  }
+}
 .alert {
   padding: var(--dsw-space-3) var(--dsw-space-4);
   border: 1px solid var(--dsw-alias-state-warn-label);

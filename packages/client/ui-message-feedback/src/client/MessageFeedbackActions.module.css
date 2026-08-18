@@ -106,3 +106,14 @@
   font-size: 13px;
   line-height: 28px;
 }
+
+:global([data-viewport='compact']) .action {
+  flex: none;
+  width: var(--dsw-touch-target);
+  min-width: var(--dsw-touch-target);
+  height: var(--dsw-touch-target);
+}
+
+:global([data-viewport='compact']) .noteOpen {
+  max-width: 100%;
+}

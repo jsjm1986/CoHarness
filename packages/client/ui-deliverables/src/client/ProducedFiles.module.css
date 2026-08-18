@@ -86,6 +86,26 @@
   text-decoration: underline;
 }
 
+:global([data-viewport='compact']) .root {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+:global([data-viewport='compact']) .label,
+:global([data-viewport='compact']) .row,
+:global([data-viewport='compact']) .showFolder {
+  grid-column: 1;
+}
+
+:global([data-viewport='compact']) .row {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+
+:global([data-viewport='compact']) .file,
+:global([data-viewport='compact']) .showFolder {
+  min-height: var(--dsw-touch-target);
+}
+
 /* Exact browser-native probes for every candidate shown count. They share the
    visible styles but never affect layout, accessibility, or scroll width. */
 .measure {

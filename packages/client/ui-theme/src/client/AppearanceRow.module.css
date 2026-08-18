@@ -55,3 +55,18 @@
   background: var(--dsw-alias-bg-module-platform);
   border-color: var(--dsw-static-neutral-bluish-400);
 }
+
+@media (max-width: 767px) {
+  .cubeRow {
+    flex-wrap: nowrap;
+  }
+
+  .themeCube {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: var(--dsw-touch-target);
+    padding: var(--dsw-space-3) var(--dsw-space-2);
+    font-size: 12px;
+    line-height: 18px;
+  }
+}

@@ -106,3 +106,28 @@
   line-height: 22px;
   color: var(--dsw-alias-label-dimmed);
 }
+
+:global([data-viewport='compact']) .item,
+:global([data-viewport='compact']) .loading {
+  flex-shrink: 0;
+  min-height: var(--dsw-touch-target);
+  height: auto;
+}
+
+:global([data-viewport='compact']) .item {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+}
+
+:global([data-viewport='compact']) .itemName {
+  max-width: none;
+  flex: none;
+}
+
+:global([data-viewport='compact']) .itemDescription {
+  flex: none;
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

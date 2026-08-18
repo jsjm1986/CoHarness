@@ -187,3 +187,18 @@
   cursor: default;
   opacity: 0.45;
 }
+
+:global([data-viewport='compact']) .header,
+:global([data-viewport='compact']) .row {
+  height: auto;
+  min-height: var(--dsw-touch-target);
+}
+
+:global([data-viewport='compact']) .preview {
+  white-space: normal;
+}
+
+:global([data-viewport='compact']) .action {
+  width: var(--dsw-touch-target);
+  height: var(--dsw-touch-target);
+}

@@ -51,6 +51,11 @@
   padding-left: var(--dsh-composer-side-clearance);
 }
 
+:global([data-viewport='compact']) .panel {
+  min-height: var(--dsw-touch-target);
+  flex-wrap: wrap;
+}
+
 @media (pointer: coarse) {
   .panel {
     min-height: var(--dsw-touch-target);

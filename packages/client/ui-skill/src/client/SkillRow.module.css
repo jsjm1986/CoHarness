@@ -18,6 +18,20 @@
   cursor: pointer;
 }
 
+:global([data-viewport='compact']) .row {
+  height: auto;
+  min-height: var(--dsw-touch-target);
+}
+
+:global([data-viewport='compact']) .summary {
+  white-space: normal;
+}
+
+:global([data-viewport='compact']) .inspectButton {
+  opacity: 1;
+  min-height: var(--dsw-touch-target);
+}
+
 .card[data-state='running'] .row::after {
   content: '';
   position: absolute;

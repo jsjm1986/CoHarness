@@ -46,6 +46,11 @@
   white-space: nowrap;
 }
 
+:global([data-viewport='compact']) .summary,
+:global([data-viewport='compact']) .source {
+  white-space: normal;
+}
+
 .body {
   box-sizing: border-box;
   width: calc(100% - 22px);

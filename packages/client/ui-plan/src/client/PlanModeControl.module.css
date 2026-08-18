@@ -47,3 +47,13 @@
   font-size: 12px;
   line-height: 18px;
 }
+
+@media (pointer: coarse) {
+  .chip {
+    min-height: var(--dsw-touch-target);
+  }
+}
+
+:global([data-viewport='compact']) .chip {
+  min-height: var(--dsw-touch-target);
+}

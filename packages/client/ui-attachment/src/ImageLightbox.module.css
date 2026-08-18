@@ -42,3 +42,22 @@
   color: var(--dsw-alias-label-primary);
   cursor: pointer;
 }
+
+@media (max-width: 767px) {
+  .backdrop {
+    padding: calc(var(--dsw-safe-top) + var(--dsw-space-4)) var(--dsw-space-3)
+      calc(var(--dsw-safe-bottom) + var(--dsw-space-4));
+  }
+
+  .image {
+    max-width: 100%;
+    max-height: calc(var(--dsw-viewport-height, 100dvh) - 96px);
+  }
+
+  .close {
+    top: calc(var(--dsw-safe-top) + var(--dsw-space-3));
+    right: calc(var(--dsw-safe-right) + var(--dsw-space-3));
+    width: var(--dsw-touch-target);
+    height: var(--dsw-touch-target);
+  }
+}

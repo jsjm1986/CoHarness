@@ -46,3 +46,19 @@
   font: var(--dsw-font-xs-13);
   color: var(--dsw-alias-label-secondary);
 }
+
+:global([data-viewport='compact']) .root {
+  height: auto;
+  min-height: var(--dsw-touch-target);
+}
+
+:global([data-viewport='compact']) .inner {
+  flex-wrap: wrap;
+  height: auto;
+  min-height: var(--dsw-touch-target);
+  padding: var(--dsw-space-2);
+}
+
+:global([data-viewport='compact']) .columns {
+  width: 100%;
+}

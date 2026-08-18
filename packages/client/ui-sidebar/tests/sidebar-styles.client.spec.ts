@@ -63,4 +63,10 @@ describe('SidebarRoot.module.css', () => {
     expect(declarations('.collapsed .newSession')?.get('align-self')).toBe('flex-start')
     expect(declarations('.collapsed .newSession')?.get('width')).toBe('36px')
   })
+
+  it('grows the compact brand new-session control to the touch target', () => {
+    expect(css).toContain("[data-viewport='compact']")
+    expect(css).toContain('.brand')
+    expect(css).toContain('min-height: var(--dsw-touch-target)')
+  })
 })

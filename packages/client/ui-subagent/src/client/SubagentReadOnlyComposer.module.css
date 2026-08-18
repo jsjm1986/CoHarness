@@ -18,3 +18,8 @@
   color: var(--dsw-alias-label-primary);
   font-weight: 510;
 }
+
+:global([data-viewport='compact']) .frame {
+  margin: 0 var(--dsh-composer-side-clearance) var(--dsw-space-4);
+  flex-wrap: wrap;
+}

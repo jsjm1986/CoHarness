@@ -1,0 +1,53 @@
+/**
+ * Compact conversation chrome stylesheet contract, asserted against the CSS text.
+ */
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { describe, expect, it } from 'vitest'
+
+const root = readFileSync(fileURLToPath(new URL('../src/client/skeleton/ConversationRoot.module.css', import.meta.url)), 'utf8')
+const hero = readFileSync(fileURLToPath(new URL('../src/client/skeleton/HeroShell.module.css', import.meta.url)), 'utf8')
+const input = readFileSync(fileURLToPath(new URL('../src/client/skeleton/InputBar.module.css', import.meta.url)), 'utf8')
+
+describe('conversation compact chrome', () => {
+  it('wraps the hero workspace row and tightens header tabs on compact', () => {
+    expect(root).toContain("[data-viewport='compact']")
+    expect(root).toContain('.heroWorkspaceRow')
+    expect(root).toContain('flex-wrap: wrap')
+    expect(root).toContain('overflow-x: auto')
+    expect(root).toContain('.crumb')
+    expect(root).toContain('max-width: 100%')
+  })
+
+  it('shrinks the hero headline and grows the workspace chip on compact', () => {
+    expect(hero).toContain("[data-viewport='compact']")
+    expect(hero).toContain('overflow-wrap: anywhere')
+    expect(hero).toContain('min-height: var(--dsw-touch-target)')
+  })
+
+  it('gives attach and send the touch target on compact viewports', () => {
+    expect(input).toContain("[data-viewport='compact']")
+    expect(input).toContain('.add')
+    expect(input).toContain('.primary')
+    expect(input).toContain('var(--dsw-touch-target)')
+    expect(input).toContain('flex-wrap: wrap')
+  })
+
+  it('wraps stats and command summaries and grows jump-to-bottom on compact', () => {
+    const stats = readFileSync(fileURLToPath(new URL('../src/client/chat/StatsLine.module.css', import.meta.url)), 'utf8')
+    const chat = readFileSync(fileURLToPath(new URL('../src/client/chat/ChatView.module.css', import.meta.url)), 'utf8')
+    const reasoning = readFileSync(fileURLToPath(new URL('../src/client/chat/ReasoningRow.module.css', import.meta.url)), 'utf8')
+    const injection = readFileSync(fileURLToPath(new URL('../src/client/chat/ContextInjectionRow.module.css', import.meta.url)), 'utf8')
+    const command = readFileSync(fileURLToPath(new URL('../src/client/chat/GenericCommandCard.module.css', import.meta.url)), 'utf8')
+    expect(stats).toContain("[data-viewport='compact']")
+    expect(stats).toContain('white-space: normal')
+    expect(chat).toContain('.toBottom')
+    expect(chat).toContain('var(--dsw-touch-target)')
+    expect(reasoning).toContain('white-space: normal')
+    expect(injection).toContain('white-space: normal')
+    expect(command).toContain('white-space: normal')
+    const actions = readFileSync(fileURLToPath(new URL('../src/client/chat/MessageIconActions.module.css', import.meta.url)), 'utf8')
+    expect(actions).toContain('flex-wrap: wrap')
+    expect(actions).toContain('min-width: var(--dsw-touch-target)')
+  })
+})

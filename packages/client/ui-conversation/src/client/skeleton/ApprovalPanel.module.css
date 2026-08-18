@@ -101,3 +101,11 @@
   color: var(--dsw-alias-state-error-primary);
   border-color: transparent;
 }
+
+:global([data-viewport='compact']) .actionRow {
+  flex-wrap: wrap;
+}
+
+:global([data-viewport='compact']) .headline {
+  overflow-wrap: anywhere;
+}
