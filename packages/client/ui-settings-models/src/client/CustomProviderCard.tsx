@@ -64,6 +64,10 @@ export interface CustomProviderCardProps {
   t: (key: keyof typeof en) => string
   /** Disable writes (read-only settings provider). */
   readOnly: boolean
+  /** Credential namespace used when the new profile names its key reference. */
+  credentialScope?: 'personal' | 'organization'
+  /** Route validation pattern; personal routes use the default pattern. */
+  routePattern?: RegExp
   /** Close the card; `changed` reports whether a provider was created. */
   onClose: (changed: boolean) => void
 }
@@ -96,7 +100,7 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
   /** Everything but the key stops being editable once the provider exists. */
   const profileDisabled = disabled || committed
 
-  const routeInvalid = route.length > 0 && !ROUTE_PATTERN.test(route)
+  const routeInvalid = route.length > 0 && !(props.routePattern ?? ROUTE_PATTERN).test(route)
   const routeTaken = taken.includes(route)
   // Rows are checked by the same per-row validator the editor cards use, so a
   // bad row is named by its position here too. Capacities have route-level
@@ -130,7 +134,7 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
 
   /** Perform the create, returning a failure message or undefined. */
   const createOnce = async (): Promise<string | undefined> => {
-    const keyRef = deriveKeyRef(route)
+    const keyRef = deriveKeyRef(route, props.credentialScope ?? 'personal')
     const storesKey = keyValue.length > 0
     if (!committed) {
       const profile = {

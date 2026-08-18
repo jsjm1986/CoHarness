@@ -169,6 +169,15 @@ describe('request-level dynamic profiles', () => {
     expect(ctx.llm.listProviders().map(provider => provider.id)).toEqual(['openai'])
   })
 
+  it('keeps organization credential references out of personal settings', async () => {
+    const dir = await home()
+    const ctx = await boot(dir, {})
+
+    await expect(ctx.settings.update(NS, {
+      providers: { openai: { apiKeyEnv: 'DSH_ORG_PRIMARY_API_KEY' } },
+    })).rejects.toThrow(/credential reference .* reserved for organization configuration/)
+  })
+
   it('keeps serving its routes when a settings-born route collides with another adapter', async () => {
     const dir = await home()
     await writeFile(

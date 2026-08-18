@@ -25,22 +25,24 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 | `HGW_PROJECT_RUNTIMES_ROOT` | `~/harness-project-runtimes` | 共享项目运行时由宿主拥有的 `$DSH_HOME` 根目录 |
 | `HGW_PROJECTS_ROOT` | `~/harness-projects` | 管理员仅凭名称创建项目的受控根（`<root>/<name>`，mode `0770`；生产为 `/srv/harness/projects/admin`） |
 | `HGW_USER_PROJECTS_ROOT` | `<第一个项目根>/user-projects` | 用户创建项目的受控目录根；生产为 `/srv/harness/projects/user-projects` |
-| `HGW_PROJECT_PATH_ROOTS` | （`systemd` 必填） | 包含项目目录的逗号分隔、互不重叠 Linux 绝对根路径；禁止使用 `/` |
+| `HGW_PROJECT_PATH_ROOTS` | （`systemd` 必填） | 管理员宿主机浏览器显示且包含所有项目目录的逗号分隔、互不重叠 Linux 绝对根路径；禁止使用 `/` |
 | `HGW_PROJECT_RUNTIME_USER` | `harness-project` | 项目 scope systemd 单元使用的专用 Linux 账户 |
 | `HGW_PRINCIPAL_KEY_DIR` | `~/.harness-gateway/principal-keys` | 用于签发浏览器请求 principal 的仅所有者可读 Ed25519 密钥对 |
 | `HGW_PRINCIPAL_ASSERTION_TTL_MS` | 30 秒 | 一份签名 principal 的生命周期；WebSocket 客户端会在过期前重连 |
 | `HGW_RUNTIME_CREDENTIAL_DIR` | `~/.harness-gateway/runtime-credentials` | systemd 用户/项目运行时加载的宿主私有凭据文件 |
 | `HGW_RUNTIME_API_BODY_LIMIT_BYTES` | 64 MiB | 单次认证私有运行时 API 请求允许的最大 body 大小 |
-| `HGW_DSH_COMMAND` | 源码入口 `apps/cli/src/bin.ts web --port {port}` | 实例启动命令；生产指向钉死版本的 npm `dsh` bin |
+| `HGW_DSH_COMMAND` | 源码入口 `apps/cli/src/bin.ts web --port {port}` | 实例启动命令；生产必须使用已构建的 `apps/cli/lib/bin.js` 或钉死版本的 npm `dsh` bin，不能使用源码/tsx 入口 |
 | `HGW_DSH_REPO_ROOT` | 仓库根 | 解析源码运行入口 |
 | `HGW_INSTANCE_PORT_BASE` | 42000 | 实例端口分配起点 |
 | `HGW_IDLE_TIMEOUT_MS` | 30 分钟 | 实例闲置休眠阈值 |
 | `HGW_READINESS_TIMEOUT_MS` | 30 秒 | 实例就绪等待上限 |
 | `HGW_LAUNCHER` | `local` | 实例启动驱动：`local`（macOS 开发子进程）/ `systemd`（Linux 生产每用户单元） |
 | `HGW_SYSTEMD_UNIT_DIR` | `/etc/systemd/system` | systemd 驱动写每用户单元文件的目录 |
-| `HGW_GUARD_PATCH` | `<仓库>/plugins/dsh-directory-guard/cordis.patch.yml` | 挂载进每个实例的 directory-guard bundle 补丁；同目录的管理员覆盖层为管理员恢复 Full access；`off` 关闭 |
-| `HGW_MODEL_GOVERNANCE_PACKAGE` | `<仓库>/plugins/dsh-model-governance` | 链接进每个 profile 的树外实例授权与用量插件 |
+| `HGW_GUARD_PATCH` | `<仓库>/plugins/dsh-directory-guard/cordis.patch.yml` | 实体安装进每个实例的 directory-guard bundle 补丁；同目录的管理员覆盖层为管理员恢复 Full access；`off` 关闭 |
+| `HGW_MODEL_GOVERNANCE_PACKAGE` | `<仓库>/plugins/dsh-model-governance` | 从 `package.json`、`lib/` 与 bundle 补丁文件复制到每个 profile 的树外实例授权与用量插件 |
 | `HGW_DEFAULT_ENV_FILE` | （空） | 每次启动复制到实例 `$DSH_HOME/.env` 的公司默认凭据 |
+| `HGW_FCM_PROJECT_ID` | （未设置） | 用于 Android 完成通知的 Firebase Cloud Messaging 企业 id |
+| `HGW_FCM_SERVICE_ACCOUNT_FILE` | （未设置） | 仅所有者可读的 Firebase service-account JSON 文件；未设置时仍保存 Token，但不发送 FCM |
 | `HGW_MEMORY_MAX` / `HGW_CPU_QUOTA` | `1G` / `100%` | 每实例 systemd 资源限额 |
 | `HGW_GATEWAY_DIR` | 网关根目录 | 对实例遮蔽的目录（`InaccessiblePaths`） |
 
@@ -48,13 +50,21 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 
 ## 管理端与项目授权
 
-`/admin` 托管从 `gateway/admin-ui` 构建到 `gateway/public/admin` 的 Vite SPA；`/admin/api/*` 是网关 JSON API（非 `admin` 角色 403）。授权按项目：管理员发起的项目只凭名称创建，Gateway 会创建或复用 `<HGW_PROJECTS_ROOT>/<name>`（mode `0770`；JSON API 保留可选绝对 `path` 用于导入现有目录），用户发起的项目则在 `HGW_USER_PROJECTS_ROOT` 下分配一个目录；两者使用同一套工作空间、共享运行时、成员和对话模型。用户创建的项目把创建者设为 `rw` 所有者，并提供邀请生命周期操作；管理员可以在同一列表中查看两种来源并按来源筛选。成员为 `ro` 或 `rw`，普通用户的有效列表（私有 home 加成员身份，每条带 `label`）写入 `$DSH_HOME/directory-grants.json`。管理员在个人和项目 scope 都得到文件系统根目录的 `rw` 授权和 Full access 预设。该预设只改变 dsh 的应用内 sandbox 与审批旋钮；项目运行时仍受内核项目路径约束。角色变化会重写这份投影，并重启正在运行的个人实例。受控名称会被修剪且必须恰好构成一个目录段，因此 `.`/`..`、分隔符、控制字符和经符号链接解析的逃逸都会被拒绝；显式路径不存在、不是目录或 Gateway 无权访问时，创建弹窗会保留输入并显示修正提示。用户删除是逻辑删除：停止个人实例、吊销会话、移除项目与模型访问、在登录和管理列表中隐藏账号，并保留审计、用量、对话和 home 历史；用户名保持占用。项目路径不能与另一项目、用户 home、用户根或项目运行时根重叠；systemd 启动器还要求每个项目严格位于某个 `HGW_PROJECT_PATH_ROOTS` 条目之下，并避开 Gateway 目录。
+`/admin` 托管从 `gateway/admin-ui` 构建到 `gateway/public/admin` 的 Vite SPA；`/admin/api/*` 是网关 JSON API（非 `admin` 角色 403）。管理员发起项目有两种创建模式：**默认目录**只提交名称，并以 `0770` 权限创建或复用 `<HGW_PROJECTS_ROOT>/<name>`；**现有目录**提交名称以及从 Gateway 宿主机选择的目录。用户发起项目仍只提交名称，并在 `HGW_USER_PROJECTS_ROOT` 下分配目录。两种来源使用同一套工作空间、共享运行时、成员和对话模型。用户创建的项目把创建者设为 `rw` 所有者，并提供邀请生命周期操作；管理员可以在同一列表中查看两种来源并按来源筛选。
 
-管理端的用户、项目、模型、用量和审计页面共用一套视觉系统：克制的表面色、统一的页面与分区标题、状态徽标、明确的加载/空状态/错误状态、键盘焦点环，以及用于变更操作的弹窗表单。项目详情包含成员、实例状态、自然月 token/成本/缺失用量汇总，并要求明确选择额度模式：继承普通成员额度，或同时提交项目 token 与公司成本额度。视口宽度大于 `840px` 时使用固定侧栏和便于横向比较的数据表；宽度不超过 `840px` 时，侧栏变为吸顶品牌栏加五项固定底部导航，表格行切换为易读的卡片。宽度不超过 `560px` 时，表单网格改为单列、操作按钮填满可用宽度，弹窗接近全屏并让正文独立滚动。粗指针控件预留 `44px` 触控目标，同时遵循深色配色和减少动画偏好。修改界面后运行 `npm run build --prefix gateway/admin-ui` 重新生成静态资源；运行中的网关直接提供生成后的 `gateway/public/admin` 文件，不需要数据库迁移。
+`GET /admin/api/project-directories` 为现有目录浏览器提供数据。本地启动器模式从 `/` 开始，因此 macOS 外接磁盘显示在 `/Volumes` 下；systemd 模式显示只包含 `HGW_PROJECT_PATH_ROOTS` 的虚拟根，且配置根本身只能导航。每次响应包含一层排序后的目录，最多 1,000 条；隐藏目录带标记，并在 UI 中默认隐藏，直到管理员启用显示。离开 systemd 根的规范符号链接会被省略。浏览器绝不会读取管理员客户端的文件系统。最终创建项目时会再次解析和校验所选路径，并用稳定诊断拒绝非绝对路径、不存在、不是目录、不可访问、配置根外、Gateway 自有/保留、用户 home 和既有项目重叠的路径。受管名称会被修剪且必须恰好构成一个目录段，因此 `.`/`..`、分隔符、控制字符和经符号链接解析的逃逸都会被拒绝。重命名项目只改变目录中的名称，删除项目会保留宿主机文件。
+
+成员为 `ro` 或 `rw`，普通用户的有效列表（私有 home 加成员身份，每条带 `label`）写入 `$DSH_HOME/directory-grants.json`。管理员在个人和项目 scope 都得到文件系统根目录的 `rw` 授权和 Full access 预设。该预设只改变 dsh 的应用内 sandbox 与审批旋钮；项目运行时仍受内核项目路径约束。角色变化会重写这份投影，并重启正在运行的个人实例。用户删除是逻辑删除：停止个人实例、吊销会话、移除项目与模型访问、在登录和管理列表中隐藏账号，并保留审计、用量、对话和 home 历史；用户名保持占用。
+
+管理端的用户、项目、模型、用量和审计页面共用一套视觉系统：克制的表面色、统一的页面与分区标题、状态徽标、明确的加载/空状态/错误状态、键盘焦点环，以及用于变更操作的弹窗表单。项目详情包含成员、实例状态、按路由的模型分配（含全部开启与全部关闭）、自然月 token/成本/缺失用量汇总、默认使用项目独立 Token 与公司成本额度的配置弹窗（也可改为继承普通成员额度），以及额度来源、路径、发起方式、所有者、成员和已分配模型的配置摘要。视口宽度大于 `840px` 时使用固定侧栏和便于横向比较的数据表；宽度不超过 `840px` 时，侧栏变为吸顶品牌栏加五项固定底部导航，表格行切换为易读的卡片。宽度不超过 `560px` 时，表单网格改为单列、操作按钮填满可用宽度，弹窗接近全屏并让正文独立滚动。粗指针控件预留 `44px` 触控目标，同时遵循深色配色和减少动画偏好。修改界面后运行 `npm run build --prefix gateway/admin-ui` 重新生成静态资源；运行中的网关直接提供生成后的 `gateway/public/admin` 文件，不需要数据库迁移。
+
+## Android 薄壳与完成通知
+
+`apps/android-shell` 是通过 `DSH_ANDROID_WEB_URL` 加载已部署 Web UI 的 Capacitor 薄壳。普通 Web UI 修改直接发布到 Gateway，不需要重建 APK。只有原生工程、权限、包名、图标或通知处理逻辑变化时，才重新执行 `pnpm --dir apps/android-shell run cap:sync` 并构建。请在 Firebase 注册 Android 应用，并把生成的 `google-services.json` 放到 `apps/android-shell/android/app/google-services.json`；Gateway 的 service-account JSON 必须放在主机上仅所有者可读的路径，并设置 `HGW_FCM_PROJECT_ID` 与 `HGW_FCM_SERVICE_ACCOUNT_FILE`。Gateway 按认证用户保存 Android Token，只在持久化 completed turn 后向会话创建者发送小型通知；通知只携带会话 id，并打开现有 Web UI，不暴露回复文本。
 
 ## 项目协作对话
 
-账户运行在个人 scope 或一个可访问项目 scope 中。个人 scope 保留每用户运行时及其持久化；每个项目使用一个覆盖项目路径的共享运行时。Gateway 为所选运行时签发短期请求 principal，并在每次代理的 HTTP/WebSocket 操作中转发。运行时会在 Host 代码观察请求前验证组织、用户、scope、运行时 id 和 generation。私有运行时凭据与协作端点只允许 loopback 访问。完整决策见[项目协作对话](../.agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.md)。
+账户运行在个人 scope 或一个可访问项目 scope 中。个人 scope 保留每用户运行时及其持久化；每个项目使用一个覆盖项目路径的共享运行时。scope 选择端点会先启动并等待目标运行时就绪，再写入新的 scope Cookie；启动失败会保留当前 scope，成功后的页面重载会直接连接已就绪进程。代理重试响应禁止缓存并声明两秒后重试，HTML 等待页把自动刷新元数据放在文档 head 中。Gateway 为所选运行时签发短期请求 principal，并在每次代理的 HTTP/WebSocket 操作中转发。运行时会在 Host 代码观察请求前验证组织、用户、scope、运行时 id 和 generation。私有运行时凭据与协作端点只允许 loopback 访问。完整决策见[项目协作对话](../.agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.md)。
 
 项目成员分为 `ro` 和 `rw`。组织管理员无需项目成员记录，就对每个活动项目及其全部对话（包括私密根对话）拥有隐式 `rw` 权限。管理员专用的 `danger-full-access` 预设在个人或项目 scope 中都会在验证请求身份后提供；普通用户不能通过 `/permission` 或新会话默认设置选择它。在共享项目会话中，权限事件属于整个会话，因此管理员切换预设后，所有参与者看到的应用内预设都会改变，直到下一次获得授权的选择；systemd 项目单元仍把宿主访问限制在项目路径内。对普通成员而言，根对话选择项目公开或仅创建者可见，后代继承根 ACL。Host 操作会授权读取、写入、管理、fork、stream、审批和问题；PostgreSQL 只接受每项共享审批/问题的一份响应。项目运行时通过 Gateway PostgreSQL 提供方保存 Session header 和完整事件；其写入和读取解码器会在数据进入活动 Session 前要求精确的事件 envelope 字段与 surface 元数据。持久参与者元数据使模型与 transcript 能区分贡献者。Web 插件展示 scope、可见性、创建者、参与者和贡献次数，并为 `ro` 成员替换完整 composer；浏览器不是授权边界。
 

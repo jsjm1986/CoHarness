@@ -9,6 +9,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { hasTypertRemoteNavigation, isForbiddenPublicationFile } from './publication-payload.ts'
 import { collectProjectReferenceFaceViolations } from './project-reference-faces.ts'
+import { isPrivateWorkspaceDirectory } from './workspace-package-policy.ts'
 
 const root = resolve(import.meta.dirname, '..')
 // vendor/* is single-level; packages/<group>/<pkg> nests one level deeper
@@ -227,7 +228,13 @@ function checkWorkspace({ dir, manifest }: WorkspaceManifest): string[] {
     && manifest.name !== undefined
     && publicLandlockPackages.has(manifest.name)
 
-  if (isPublicLandlockPackage) {
+  if (isPrivateWorkspaceDirectory(dir)) {
+    // Native application shells stay in the pnpm workspace for dependency
+    // resolution, but they are not npm release members.
+    if (manifest.private !== true) {
+      errors.push(`${label}: private workspace application must set "private": true`)
+    }
+  } else if (isPublicLandlockPackage) {
     if (manifest.private === true) {
       errors.push(`${label}: published Landlock package must not set "private": true`)
     }
@@ -279,7 +286,7 @@ function checkWorkspace({ dir, manifest }: WorkspaceManifest): string[] {
     }
   }
 
-  if (dir.startsWith('apps/') && manifest.name?.startsWith('@deepseek-ai/')) {
+  if (!isPrivateWorkspaceDirectory(dir) && dir.startsWith('apps/') && manifest.name?.startsWith('@deepseek-ai/')) {
     const expectedFiles = appPackageFiles[manifest.name]
     if (expectedFiles === undefined) {
       errors.push(`${label}: app package has no publication files policy`)

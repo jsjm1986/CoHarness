@@ -10,7 +10,7 @@ The project creation dialog required an administrator to know and enter an absol
 
 ## Decision
 
-The admin creation flow accepts only a project name. The Gateway trims the name, requires one filesystem directory segment, creates or reuses `<HGW_PROJECTS_ROOT>/<name>`, forces a newly created directory to mode `0770`, resolves its canonical path, and persists that path as the project mount. `HGW_PROJECTS_ROOT` defaults to `~/harness-projects`; the production unit uses `/srv/harness/projects/admin`.
+The managed mode of the admin creation flow accepts only a project name. The Gateway trims the name, requires one filesystem directory segment, creates or reuses `<HGW_PROJECTS_ROOT>/<name>`, forces a newly created directory to mode `0770`, resolves its canonical path, and persists that path as the project mount. `HGW_PROJECTS_ROOT` defaults to `~/harness-projects`; the production unit uses `/srv/harness/projects/admin`. The separate [administrator host directory browser](2026-08-17-gateway-admin-host-directory-browser.md) owns the existing-directory mode.
 
 Managed names reject empty values, `.` and `..`, path separators, control characters, and any canonical result that differs from the direct child path. This prevents traversal and pre-existing symlinks from escaping the configured root. An existing non-directory receives the same stable path diagnostic as an explicit project path.
 
@@ -20,7 +20,7 @@ Linux deployment pre-creates `HGW_PROJECTS_ROOT` as `root:harness-project` with 
 
 ## Verification
 
-SQLite service tests cover automatic directory creation, Unicode names, `0770` group permissions, traversal rejection, and the existing explicit-path diagnostics. Admin API tests prove that `{ "name": "产品文档" }` creates and returns the canonical directory. Admin UI tests prove that the dialog has no path input and submits only the trimmed name. PostgreSQL integration coverage exercises the same managed-directory helper when `HGW_TEST_DATABASE_URL` is configured.
+SQLite service tests cover automatic directory creation, Unicode names, `0770` group permissions, traversal rejection, and the existing explicit-path diagnostics. Admin API tests prove that `{ "name": "产品文档" }` creates and returns the canonical directory. Admin UI tests prove that managed mode submits only the trimmed name; the [host-directory browser note](2026-08-17-gateway-admin-host-directory-browser.md) owns existing-directory coverage. PostgreSQL integration coverage exercises the same managed-directory helper when `HGW_TEST_DATABASE_URL` is configured.
 
 ## Alternatives considered
 
@@ -32,4 +32,4 @@ SQLite service tests cover automatic directory creation, Unicode names, `0770` g
 
 ## Consequences
 
-Administrators create a project with one meaningful field, while the stored path remains explicit for grants, mounts, audit, and recovery. Deployment owns one project-root permission decision instead of provisioning every managed child manually. Existing absolute-path imports remain available, but they retain their manual Unix permission requirement. Renaming a project changes its catalog label and does not rename the directory, so active mounts and external references stay stable.
+In managed mode, administrators create a project with one meaningful field, while the stored path remains explicit for grants, mounts, audit, and recovery. Deployment owns one project-root permission decision instead of provisioning every managed child manually. Existing absolute-path imports remain available, but they retain their manual Unix permission requirement. Renaming a project changes its catalog label and does not rename the directory, so active mounts and external references stay stable.

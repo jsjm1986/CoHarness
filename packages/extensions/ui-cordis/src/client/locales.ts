@@ -1,6 +1,6 @@
 /** Cordis dynamic-plugin UI dictionaries. */
 
-export const NS = 'cordis'
+export const NS = '@deepseek-ai/cordis'
 
 /** Simplified Chinese Cordis UI messages. */
 export const zh = {
@@ -61,7 +61,7 @@ export type CordisKey = keyof typeof zh
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
     /** Dynamic Cordis UI copy. */
-    cordis: CordisKey
+    '@deepseek-ai/cordis': CordisKey
   }
 }
 

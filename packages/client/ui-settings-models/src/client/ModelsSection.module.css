@@ -45,6 +45,117 @@
   color: var(--dsw-alias-state-success-primary);
 }
 
+.organizationSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsw-space-2);
+  margin-top: var(--dsw-space-3);
+}
+
+.organizationHeading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--dsw-space-2);
+}
+
+.organizationHeading h3 {
+  margin: 0;
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 22px;
+}
+
+.organizationHeading span {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.organizationRows,
+.organizationModels {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.organizationRows {
+  gap: var(--dsw-space-2);
+}
+
+.organizationCard {
+  overflow: hidden;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-lg);
+}
+
+.organizationProvider {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 14px;
+  background: var(--dsw-alias-bg-module-platform);
+}
+
+.organizationProvider > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.organizationProvider strong,
+.organizationModels span {
+  overflow: hidden;
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 22px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.organizationProvider code,
+.organizationModels code {
+  overflow: hidden;
+  color: var(--dsw-alias-label-tertiary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.organizationModels > li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 42px;
+  gap: 12px;
+  padding: 0 14px;
+  border-top: 1px solid var(--dsw-alias-border-l2);
+}
+
+.organizationModels code {
+  flex: none;
+}
+
+.organizationEmpty,
+.organizationFailure {
+  margin: 0;
+  padding: 11px 14px;
+  border-top: 1px solid var(--dsw-alias-border-l2);
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.organizationFailure {
+  color: var(--dsw-alias-state-warn-label);
+}
+
 .rows {
   list-style: none;
   /* Extra air between the title/intro block and the first provider card. */

@@ -45,6 +45,18 @@ export interface CredentialInfo {
   writable: boolean
 }
 
+/** One externally supplied read-only credential layer with exclusive reference ownership. */
+export interface ReadOnlyCredentialLayer {
+  /** Stable diagnostic id for registration and write refusals. */
+  readonly id: string
+  /** Return whether this layer exclusively owns one reference. */
+  owns(ref: CredentialRef): boolean
+  /** Resolve an owned reference without falling through to the writable Provider source. */
+  resolve(ref: CredentialRef): Promise<ResolvedCredential | undefined>
+  /** Describe an owned reference without exposing its value. */
+  describe(ref: CredentialRef): Promise<CredentialInfo>
+}
+
 declare module '@deepseek-ai/cordis' {
   interface Context {
     credentials: CredentialProvider
@@ -52,14 +64,42 @@ declare module '@deepseek-ai/cordis' {
 }
 
 /**
- * Abstract credential service. Providers implement the four operations over
- * their source layers; one seam-wide rule binds them all: an empty stored
- * value is absent everywhere — `resolve` skips it, `describe` reports it
- * unconfigured — so a blank never masquerades as a configured secret.
+ * Abstract credential service. Providers implement one writable source and
+ * may accept disjoint read-only layers. A read-only layer exclusively owns
+ * every reference it claims, so resolution never falls through to a personal
+ * value and writes reject. An empty stored value is absent everywhere.
  */
 export abstract class CredentialProvider extends Service {
+  private readonly readOnlyLayers = new Map<string, ReadOnlyCredentialLayer>()
+
   constructor(ctx: Context) {
     super(ctx, 'credentials')
+  }
+
+  /**
+   * Register one disjoint read-only source layer.
+   * @param layer - source ownership, value resolution, and value-free description.
+   * @returns an exact-registration disposer.
+   */
+  registerReadOnlyLayer(layer: ReadOnlyCredentialLayer): () => void {
+    if (layer.id.length === 0 || layer.id.trim() !== layer.id || /\s/.test(layer.id)) {
+      throw new Error('credentials: read-only layer id must be non-blank and contain no whitespace')
+    }
+    if (this.readOnlyLayers.has(layer.id)) {
+      throw new Error(`credentials: read-only layer "${layer.id}" is already registered`)
+    }
+    this.readOnlyLayers.set(layer.id, layer)
+    return () => {
+      if (this.readOnlyLayers.get(layer.id) === layer) this.readOnlyLayers.delete(layer.id)
+    }
+  }
+
+  private readOnlyLayer(ref: CredentialRef): ReadOnlyCredentialLayer | undefined {
+    const matches = [...this.readOnlyLayers.values()].filter(layer => layer.owns(ref))
+    if (matches.length > 1) {
+      throw new Error(`credentials: reference "${ref}" is owned by multiple read-only layers: ${matches.map(layer => layer.id).join(', ')}`)
+    }
+    return matches[0]
   }
 
   /**
@@ -70,7 +110,9 @@ export abstract class CredentialProvider extends Service {
    * @param ref - the reference to resolve.
    * @returns the value and its source, or `undefined` while unconfigured.
    */
-  abstract resolve(ref: CredentialRef): Promise<ResolvedCredential | undefined>
+  async resolve(ref: CredentialRef): Promise<ResolvedCredential | undefined> {
+    return this.readOnlyLayer(ref)?.resolve(ref) ?? this.resolveOwned(ref)
+  }
 
   /**
    * Describe one reference for configuration surfaces without exposing the
@@ -78,7 +120,9 @@ export abstract class CredentialProvider extends Service {
    * @param ref - the reference to describe.
    * @returns configured state, supplying source, and writability.
    */
-  abstract describe(ref: CredentialRef): Promise<CredentialInfo>
+  async describe(ref: CredentialRef): Promise<CredentialInfo> {
+    return this.readOnlyLayer(ref)?.describe(ref) ?? this.describeOwned(ref)
+  }
 
   /**
    * Durably store one value in the provider-managed writable source. Rejects
@@ -88,7 +132,16 @@ export abstract class CredentialProvider extends Service {
    * @param ref - the reference to store.
    * @param value - the non-empty secret value.
    */
-  abstract set(ref: CredentialRef, value: string): Promise<void>
+  set(ref: CredentialRef, value: string): Promise<void> {
+    if (value.length === 0) {
+      return Promise.reject(new Error(`credentials: an empty value cannot be stored for "${ref}"; use unset`))
+    }
+    const layer = this.readOnlyLayer(ref)
+    if (layer !== undefined) {
+      return Promise.reject(new Error(`credentials: reference "${ref}" is read-only in layer "${layer.id}"`))
+    }
+    return this.setOwned(ref, value)
+  }
 
   /**
    * Remove one reference from the provider-managed writable source; removing
@@ -96,7 +149,25 @@ export abstract class CredentialProvider extends Service {
    * the reference, like {@link set}.
    * @param ref - the reference to remove.
    */
-  abstract unset(ref: CredentialRef): Promise<void>
+  unset(ref: CredentialRef): Promise<void> {
+    const layer = this.readOnlyLayer(ref)
+    if (layer !== undefined) {
+      return Promise.reject(new Error(`credentials: reference "${ref}" is read-only in layer "${layer.id}"`))
+    }
+    return this.unsetOwned(ref)
+  }
+
+  /** Resolve one reference from the Provider's writable source layers. */
+  protected abstract resolveOwned(ref: CredentialRef): Promise<ResolvedCredential | undefined>
+
+  /** Describe one reference from the Provider's writable source layers. */
+  protected abstract describeOwned(ref: CredentialRef): Promise<CredentialInfo>
+
+  /** Store one validated non-empty value in the Provider's writable source. */
+  protected abstract setOwned(ref: CredentialRef, value: string): Promise<void>
+
+  /** Remove one reference from the Provider's writable source. */
+  protected abstract unsetOwned(ref: CredentialRef): Promise<void>
 
   /* jscpd:ignore-start -- deliberate symmetry with the settings seam's commit
      fan-out: the contained-dispatch shape is the reviewed listener-lifecycle

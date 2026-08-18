@@ -24,6 +24,8 @@ flowchart LR
   pkg_model_access["model-access"]
   svc_modelAccess["ctx.modelAccess<br/>Model-route authorization policy"]
   pkg_apiproxy["apiproxy"]
+  pkg_model_provider_config["model-provider-config"]
+  svc_modelProviderConfig["ctx.modelProviderConfig<br/>Organization-managed model provider configuration"]
   pkg_token_meter["token-meter"]
   svc_tokenMeter["ctx.tokenMeter<br/>Replay token measurement"]
   pkg_compaction_tool_result_pruner["compaction-tool-result-pruner"]
@@ -250,6 +252,7 @@ flowchart LR
   pkg_lsp_local --> svc_lsp
   pkg_message_feedback --> svc_messageFeedback
   pkg_model_access --> svc_modelAccess
+  pkg_model_provider_config --> svc_modelProviderConfig
   pkg_modules --> svc_clientModules
   pkg_permission_presets --> svc_permissionPresetAuthorization
   pkg_permission_presets --> svc_permissionPresets
@@ -353,6 +356,8 @@ flowchart LR
   svc_llm --> pkg_compaction_basic
   svc_lsp --> pkg_tool_lsp
   svc_modelAccess --> pkg_apiproxy
+  svc_modelProviderConfig --> pkg_apiproxy
+  svc_modelProviderConfig --> pkg_llm_pi_ai
   svc_permissionPresetAuthorization --> pkg_collaboration_gateway
   svc_sandbox --> pkg_bash_sandbox
   svc_sandbox --> pkg_terminal_bash
@@ -441,6 +446,7 @@ flowchart LR
 | `ctx.userDocs` | `seam` | [`userdoc`](../packages/attachment/userdoc) | [`userdoc-local`](../packages/attachment/userdoc-local) | - | - | Uploads land as real named files inside a directory the tool authorization policy already grants, so the agent reads them with its ordinary filesystem tools instead of through a retrieval channel of their own. |
 | `ctx.llm` | `seam` | [`llm`](../packages/llm/llm) | [`llm-deepseek`](../packages/llm/llm-deepseek), [`llm-pi-ai`](../packages/llm/llm-pi-ai), [`llm-replay`](../packages/test-support/llm-replay) | [`agent-loop`](../packages/core/agent-loop), [`compaction-basic`](../packages/compaction/compaction-basic) | - | Adapters register provider implementations; the loop and compaction call the provider-neutral stream service. |
 | `ctx.modelAccess` | `seam` | [`model-access`](../packages/llm/model-access) | - | `apiproxy` | - | An optional deployment-owned policy decides exact provider/model routes; the gateway instance supplies the implementation, while apiproxy uses the decision for catalog and selection checks. |
+| `ctx.modelProviderConfig` | `seam` | [`model-provider-config`](../packages/llm/model-provider-config) | - | [`llm-pi-ai`](../packages/llm/llm-pi-ai), `apiproxy` | - | Deployment-owned providers publish immutable organization routes; LLM adapters consume them as non-editable provider profiles and the API proxy exposes their authorized catalog. |
 | `ctx.tokenMeter` | `core` | [`token-meter`](../packages/llm/token-meter) | - | [`compaction-basic`](../packages/compaction/compaction-basic) | - | Owns isolated per-session replay folds; pressure consumers share immutable revisioned measurements. |
 | `ctx.toolResultPruner` | `core` | [`compaction-tool-result-pruner`](../packages/compaction/compaction-tool-result-pruner) | - | [`compaction-basic`](../packages/compaction/compaction-basic) | - | Rewrites oversized current tool results through replayable single-node surface replacements before summary compaction. |
 | `ctx.sessions` | `core` | [`session`](../packages/core/session) | - | [`agent-loop`](../packages/core/agent-loop), [`agent`](../packages/core/agent), [`session-persistence`](../packages/session/session-persistence), [`session-query`](../packages/session-query/session-query), [`session-query-sqlite`](../packages/session-query/session-query-sqlite), `subagent-inprocess`, [`invariants`](../packages/runtime-diagnostics/invariants), [`message-feedback`](../packages/feedback/message-feedback) | - | Owns append-only Session instances and emits the durable session event feed. |

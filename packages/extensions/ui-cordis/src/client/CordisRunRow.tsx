@@ -17,7 +17,7 @@ import css from './CordisRunRow.module.css'
 export type CordisRunRowProps = ToolCallViewProps
   & InjectFace<CordisRunCardFace>
   & PropsRenderSlots<'tool.view.cordis'>
-  & PropsLocale<'cordis'>
+  & PropsLocale<'@deepseek-ai/cordis'>
 
 type RunReading = CordisVisibleStatus | 'awaiting-approval' | 'failed' | 'removed' | 'superseded'
 

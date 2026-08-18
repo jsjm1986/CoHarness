@@ -91,6 +91,23 @@ describe('admin JSON API', () => {
     expect(await forbidden.json()).toEqual({ error: 'forbidden' })
   })
 
+  it('includes inherited project quota configuration on project detail', async () => {
+    const { base, cookie, root } = await setup()
+    const shared = join(root, 'shared-quota'); mkdirSync(shared)
+    const created = await fetch(`${base}/admin/api/projects`, {
+      method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Quota', path: shared }),
+    })
+    const project = await created.json() as { id: number }
+    const detail = await fetch(`${base}/admin/api/projects/${project.id}`, { headers: { cookie } })
+    expect(detail.status).toBe(200)
+    expect(await detail.json()).toMatchObject({
+      id: project.id,
+      name: 'Quota',
+      quota: { source: 'inherit', tokenLimit: null, companyCostMicrosLimit: null },
+    })
+  })
+
   it('returns a stable error when a project directory is missing', async () => {
     const { base, cookie, root } = await setup()
     const response = await fetch(`${base}/admin/api/projects`, {
@@ -113,6 +130,65 @@ describe('admin JSON API', () => {
     expect(project).toMatchObject({ name: '产品文档', path: expectedPath })
     expect(existsSync(expectedPath)).toBe(true)
     expect(statSync(expectedPath).isDirectory()).toBe(true)
+  })
+
+  it('lets only administrators browse host directories and omits registered projects', async () => {
+    const { base, cookie, root } = await setup()
+    const existing = join(root, 'existing-project')
+    const hidden = join(root, '.hidden-project')
+    mkdirSync(existing)
+    mkdirSync(hidden)
+    const first = await fetch(`${base}/admin/api/project-directories?path=${encodeURIComponent(root)}`, {
+      headers: { cookie },
+    })
+    expect(first.status).toBe(200)
+    expect(await first.json()).toMatchObject({
+      scope: 'filesystem',
+      entries: expect.arrayContaining([
+        { name: 'existing-project', path: realpathSync(existing), hidden: false },
+        { name: '.hidden-project', path: realpathSync(hidden), hidden: true },
+      ]),
+    })
+
+    const created = await fetch(`${base}/admin/api/projects`, {
+      method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Existing', path: existing }),
+    })
+    expect(created.status).toBe(200)
+    const second = await fetch(`${base}/admin/api/project-directories?path=${encodeURIComponent(root)}`, {
+      headers: { cookie },
+    })
+    const listing = await second.json() as { entries: Array<{ path: string }> }
+    expect(listing.entries.some(entry => entry.path === realpathSync(existing))).toBe(false)
+
+    const workerCookie = await login(base, 'worker', 'pw-12345678')
+    const forbidden = await fetch(`${base}/admin/api/project-directories`, { headers: { cookie: workerCookie } })
+    expect(forbidden.status).toBe(403)
+    expect(await forbidden.json()).toEqual({ error: 'forbidden' })
+  })
+
+  it('returns stable policy errors for invalid, reserved, and overlapping project paths', async () => {
+    const { base, cookie, root, admin } = await setup()
+    const request = (name: string, path: string) => fetch(`${base}/admin/api/projects`, {
+      method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ name, path }),
+    })
+
+    const relative = await request('Relative', 'relative/project')
+    expect(relative.status).toBe(400)
+    expect(await relative.json()).toEqual({ error: 'project-path-not-absolute' })
+
+    const reserved = await request('Reserved', admin.homePath)
+    expect(reserved.status).toBe(400)
+    expect(await reserved.json()).toEqual({ error: 'project-path-reserved' })
+
+    const projectPath = join(root, 'overlap')
+    const nestedPath = join(projectPath, 'nested')
+    mkdirSync(nestedPath, { recursive: true })
+    expect((await request('Parent', projectPath)).status).toBe(200)
+    const overlap = await request('Nested', nestedPath)
+    expect(overlap.status).toBe(409)
+    expect(await overlap.json()).toEqual({ error: 'project-path-overlap' })
   })
 
   it('deletes a user after stopping the runtime, revoking access, and recording the action', async () => {

@@ -12,7 +12,7 @@ Status: implemented
 
 网关拥有一个以精确 `(provider, model)` 路由为键、由 PostgreSQL 持久化的治理平面。目录保存启用状态、`admin` 与普通成员角色默认、按用户允许/拒绝/继承例外、输入/输出/缓存 token 类别的只追加生效时间价格，以及角色/用户/项目自然月 Token 与公司成本额度。按用户的每个额度字段区分继承、不限和非负自定义值。项目要么同时继承两项普通成员额度，要么保存一对显式额度，其中每项都可以不限或为非负值。自然月以可配置的 IANA `HGW_USAGE_TIME_ZONE` 计算（默认 `Asia/Shanghai`）。用户与项目额度生成持久且幂等的 80%/100% 提醒，但绝不阻断执行。
 
-策略原子投影到每个个人或共享项目运行时的权限 `0600` `$DSH_HOME/model-governance.json`，其中包含绑定用量主体的稳定回环 intake Bearer 凭据。个人策略使用账户角色及其用户例外；项目策略使用普通成员角色，因为一个进程由多位成员共享，所以不应用逐用户例外。策略编辑会重写投影，运行中的插件按[策略在线重载决策](2026-08-14-gateway-model-governance-live-policy-reload.md)无需重启即可应用验证通过的替换。强制的树外 `dsh-model-governance` bundle 与可选目录 guard 独立挂载，因此 `HGW_GUARD_PATCH=off` 不能关闭模型授权或核算。其编译 JavaScript 不含 Node 内置模块之外的运行时 import：它以普通对象发布类型化 `ctx.modelAccess` 接口，不会从真实文件路径加载第二份 Cordis。
+策略原子投影到每个个人或共享项目运行时的权限 `0600` `$DSH_HOME/model-governance.json`，其中包含绑定用量主体的稳定回环 intake Bearer 凭据。个人策略使用账户角色及其用户例外；项目策略使用普通成员角色，因为一个进程由多位成员共享，所以不应用逐用户例外。策略编辑会重写投影，运行中的插件按[策略在线重载决策](2026-08-14-gateway-model-governance-live-policy-reload.md)无需重启即可应用验证通过的替换。强制的树外 `dsh-model-governance` bundle 与可选目录 guard 独立实体安装，因此 `HGW_GUARD_PATCH=off` 不能关闭模型授权或核算。每个 profile 会接收 bundle 的 `package.json`、`lib/` 与补丁文件，源码和测试目录留在运行时之外。已构建的 governance 代码会从 profile 的 `node_modules` 解析声明的共享 `dsh-llm` 与 `dsh-model-provider-config` peer 依赖；如果链接源码树，Node 会从 checkout 的实际插件路径搜索，编译版 CLI 就无法使用 profile 的依赖图。插件通过宿主 Cordis 实例发布类型化 `ctx.modelAccess` 接口，不会加载第二份 Cordis。
 
 授权在同一 `@deepseek-ai/dsh-model-access` Service Definition 上有三层：`apiproxy` 过滤禁用目录项、拒绝禁用模型选择，并在当前路由禁用时拒绝发送；实例插件的 `llm/stream` listener 仍是聊天、标题、压缩与直接调用进入适配器前的最终边界。listener 还会拒绝与进程局部发起 Agent 不一致的显式 `sessionId`，并在 ID 缺失时从该发起方补齐。
 
@@ -20,11 +20,11 @@ DeepSeek 与 pi-ai 适配器只在 usage chunk 上附加非秘密凭据来源标
 
 每个调用的终态先通过同目录 rename 提交为运行时 outbox 中以 UUID 命名的 JSON 文件。后台 pump 把文件 POST 到 Bearer 鉴权的回环 intake，仅在成功后删除。PostgreSQL 在企业内按 UUID 保证幂等，因此重试不会重复写入用户或项目用量。价格按事件发生时间选择；个人凭据调用保留估算成本，但公司成本为零。provider 缺少 usage 时记录明确的 `missing-usage`，不会伪造 token 数。拒绝事件也写入网关审计日志。
 
-管理 SPA 提供“模型”和“用量”页面，用于目录、角色默认、用户例外、价格、用户额度与自然月汇总。项目详情复用同一套用量展示来呈现项目汇总，并要求在保存前明确选择继承或独立额度。认证用户只能通过 `/account/api/usage` 读取个人汇总；项目用量是所有成员共享的总量，因此保留为管理员视图。客户端插件把持久个人阈值提醒贡献到 `shell.overlay`，不会在浏览器重复计算额度策略。
+管理 SPA 提供“模型”和“用量”页面，用于目录、角色默认、用户例外、价格、用户额度与自然月汇总。项目详情复用同一套用量展示来呈现项目汇总；额度弹窗默认使用项目独立且不限的额度，也可改为继承普通成员额度；GET 项目会带上已保存的额度来源及当前生效上限。认证用户只能通过 `/account/api/usage` 读取个人汇总；项目用量是所有成员共享的总量，因此保留为管理员视图。客户端插件把持久个人阈值提醒贡献到 `shell.overlay`，不会在浏览器重复计算额度策略。
 
 ## 测试
 
-网关测试覆盖策略优先级与全局停用、项目成员策略、价格计算与个人成本排除、用户/项目 UUID 去重、阈值幂等、畸形 intake 拒绝、时区自然月边界、用户额度继承/不限/自定义语义、项目继承或显式额度语义、Bearer intake 鉴权与拒绝审计、绑定主体的策略投影/令牌复用，以及关闭目录 guard 时模型治理仍为强制。插件测试覆盖 fail-closed 策略解析、最终 stream 拒绝与用量捕获、归属冲突和 outbox 重试/删除。Host 测试覆盖目录过滤、选择拒绝与发送拒绝；适配器测试固定非秘密来源标签。管理端测试覆盖项目月份选择、用量渲染和显式额度来源提交。类型构建覆盖 host、client、管理 UI、model-access、提醒 bundle 与树外插件。
+网关测试覆盖策略优先级与全局停用、项目成员策略、价格计算与个人成本排除、用户/项目 UUID 去重、阈值幂等、畸形 intake 拒绝、时区自然月边界、用户额度继承/不限/自定义语义、项目继承或显式额度语义、Bearer intake 鉴权与拒绝审计、绑定主体的策略投影/令牌复用、关闭目录 guard 时模型治理仍为强制，以及两个策略包在 profile 内实体安装并解析 peer import。插件测试覆盖 fail-closed 策略解析、最终 stream 拒绝与用量捕获、归属冲突和 outbox 重试/删除。Host 测试覆盖目录过滤、选择拒绝与发送拒绝；适配器测试固定非秘密来源标签。管理端测试覆盖项目月份选择、用量渲染、显式额度来源提交，以及 GET 项目时的额度配置。类型构建覆盖 host、client、管理 UI、model-access、提醒 bundle 与树外插件。
 
 ## 曾考虑的替代方案
 
@@ -36,7 +36,9 @@ DeepSeek 与 pi-ai 适配器只在 usage chunk 上附加非秘密凭据来源标
 
 **信任客户端上报的凭据类别。** 否决，因为实例可以借此压低公司成本。网关会根据非秘密来源标签重新推导，并拒绝不一致。
 
-**给树外插件打包第二份 Cordis。** 否决，因为服务身份与隔离必须使用宿主 Cordis。插件没有外部运行时 import，并通过宿主 context 发布结构化服务接口。
+**给树外插件打包第二份 Cordis。** 否决，因为服务身份与隔离必须使用宿主 Cordis。插件把 Cordis 保留为宿主提供的服务，并通过该实例发布结构化服务接口；普通共享包 import 仍然作为 profile 依赖。
+
+**把源码 checkout 链接进每个 profile。** 否决，因为 Node 会从符号链接目标的实际路径解析 peer import，编译版 governance 代码会搜索 checkout 插件目录，而不是 profile 的 `node_modules`。Gateway 只把 package manifest、已构建运行时与 bundle 补丁复制到 profile，并在每次启动时刷新。
 
 **把额度做成硬限制。** 本版否决，因为 outbox 延迟与并发调用会让中央硬阻断产生意外竞态。额度明确只在 80% 与 100% 提示。
 

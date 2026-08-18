@@ -364,6 +364,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'completion after the encoded raster has been fully decoded.',
       },
       {
+        signature: 'async saveImages(inputs: readonly SaveImageAttachment[]): Promise<readonly ImageAttachmentRef[]>',
+        description: 'Validate one ordered image batch before committing any member. Validation failures start no writes; storage failures return no partial references, although already published content-addressed objects may stay unreachable until a future retention policy collects them.',
+        parameters: [{ name: 'inputs', description: 'encoded images in their owning message order.' }],
+        returns: 'durable references in the exact input order.',
+      },
+      {
         signature: 'abstract saveImage(input: SaveImageAttachment): Promise<ImageAttachmentRef>',
         description: 'Validate and durably commit one image before its owning session event is appended.',
         parameters: [{ name: 'input', description: 'encoded bytes, declared media type, and optional display name.' }],
@@ -524,27 +530,33 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   {
     key: 'credentials',
     summary: 'Abstract credential service.',
-    description: 'Abstract credential service. Providers implement the four operations over their source layers; one seam-wide rule binds them all: an empty stored value is absent everywhere — `resolve` skips it, `describe` reports it unconfigured — so a blank never masquerades as a configured secret.',
+    description: 'Abstract credential service. Providers implement one writable source and may accept disjoint read-only layers. A read-only layer exclusively owns every reference it claims, so resolution never falls through to a personal value and writes reject. An empty stored value is absent everywhere.',
     methods: [
       {
-        signature: 'abstract resolve(ref: CredentialRef): Promise<ResolvedCredential | undefined>',
+        signature: 'registerReadOnlyLayer(layer: ReadOnlyCredentialLayer): () => void',
+        description: 'Register one disjoint read-only source layer.',
+        parameters: [{ name: 'layer', description: 'source ownership, value resolution, and value-free description.' }],
+        returns: 'an exact-registration disposer.',
+      },
+      {
+        signature: 'async resolve(ref: CredentialRef): Promise<ResolvedCredential | undefined>',
         description: 'Resolve one reference to its current value. Resolution is per call: consumers re-resolve at each operation and must not cache across operations — that per-operation read is what makes a changed credential reach the next operation without a restart.',
         parameters: [{ name: 'ref', description: 'the reference to resolve.' }],
         returns: 'the value and its source, or `undefined` while unconfigured.',
       },
       {
-        signature: 'abstract describe(ref: CredentialRef): Promise<CredentialInfo>',
+        signature: 'async describe(ref: CredentialRef): Promise<CredentialInfo>',
         description: 'Describe one reference for configuration surfaces without exposing the value.',
         parameters: [{ name: 'ref', description: 'the reference to describe.' }],
         returns: 'configured state, supplying source, and writability.',
       },
       {
-        signature: 'abstract set(ref: CredentialRef, value: string): Promise<void>',
+        signature: 'set(ref: CredentialRef, value: string): Promise<void>',
         description: 'Durably store one value in the provider-managed writable source. Rejects while a read-only source shadows the reference — the write would appear to succeed while resolution keeps returning the shadowing value — and rejects an empty value (use unset).',
         parameters: [{ name: 'ref', description: 'the reference to store.' }, { name: 'value', description: 'the non-empty secret value.' }],
       },
       {
-        signature: 'abstract unset(ref: CredentialRef): Promise<void>',
+        signature: 'unset(ref: CredentialRef): Promise<void>',
         description: 'Remove one reference from the provider-managed writable source; removing an absent reference is a no-op. Rejects while a read-only source shadows the reference, like set.',
         parameters: [{ name: 'ref', description: 'the reference to remove.' }],
       },
@@ -988,6 +1000,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Decide whether one exact route is authorized.',
         parameters: [{ name: 'target', description: 'provider and provider-owned model id.' }],
         returns: 'the authorization decision and a display-safe denial reason.',
+      },
+    ],
+  },
+  {
+    key: 'modelProviderConfig',
+    summary: 'Organization Provider configuration published as `ctx.modelProviderConfig`.',
+    description: 'Organization Provider configuration published as `ctx.modelProviderConfig`.',
+    methods: [
+      {
+        signature: 'abstract snapshot(): ModelProviderConfigSnapshot',
+        description: 'Read the current immutable configuration.',
+        parameters: [],
+        returns: 'the complete enabled Provider set and its revision.',
       },
     ],
   },
@@ -2316,6 +2341,54 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
 /** Every harness event, sorted by name. */
 export const EVENT_API: readonly EventApiEntry[] = [
   {
+    name: '@deepseek-ai/cordis/dynamic-package',
+    mode: 'emit',
+    signature: '\'@deepseek-ai/cordis/dynamic-package\'(pkg: DynamicCordisPackage): void',
+    summary: 'One exact Plugin/Package activation is now live in the Host.',
+    description: 'One exact Plugin/Package activation is now live in the Host.',
+    parameters: [{ name: 'pkg', description: 'stable plugin, immutable package, run identity, and label.' }],
+  },
+  {
+    name: '@deepseek-ai/cordis/dynamic-retract',
+    mode: 'emit',
+    signature: '\'@deepseek-ai/cordis/dynamic-retract\'(retracted: DynamicCordisRetracted): void',
+    summary: 'One exact activation was withdrawn.',
+    description: 'One exact activation was withdrawn.',
+    parameters: [{ name: 'retracted', description: 'plugin, package, and run identity.' }],
+  },
+  {
+    name: '@deepseek-ai/cordis/inspect-query',
+    mode: 'emit',
+    signature: '\'@deepseek-ai/cordis/inspect-query\'(request: CordisInspectQueryRequest): void',
+    summary: 'Request a live read-only query from the Client inspect registry.',
+    description: 'Request a live read-only query from the Client inspect registry.',
+    parameters: [{ name: 'request', description: 'correlation, Session, provider, method, and JSON input.' }],
+  },
+  {
+    name: '@deepseek-ai/cordis/inspect-query-resolved',
+    mode: 'emit',
+    signature: '\'@deepseek-ai/cordis/inspect-query-resolved\'(resolved: CordisInspectQueryResolved): void',
+    summary: 'Notify every Client that an inspect query has settled or been cancelled.',
+    description: 'Notify every Client that an inspect query has settled or been cancelled.',
+    parameters: [{ name: 'resolved', description: 'exact query identity that is no longer answerable.' }],
+  },
+  {
+    name: '@deepseek-ai/cordis/request-run',
+    mode: 'emit',
+    signature: '\'@deepseek-ai/cordis/request-run\'(request: DynamicCordisRunRequest): void',
+    summary: 'A Client-bearing activation needs a browser page, and may require a user decision.',
+    description: 'A Client-bearing activation needs a browser page, and may require a user decision.',
+    parameters: [{ name: 'request', description: 'correlation identity, owner, target version, mode, and approval requirement.' }],
+  },
+  {
+    name: '@deepseek-ai/cordis/request-run-resolved',
+    mode: 'emit',
+    signature: '\'@deepseek-ai/cordis/request-run-resolved\'(resolved: DynamicCordisRequestResolved): void',
+    summary: 'A pending Client activation request left the answerable state.',
+    description: 'A pending Client activation request left the answerable state.',
+    parameters: [{ name: 'resolved', description: 'request identity and outcome.' }],
+  },
+  {
     name: 'agent-loop/config-start-failed',
     mode: 'emit',
     signature: '\'agent-loop/config-start-failed\'(payload: { sessionId: SessionId; error: unknown }): void',
@@ -2452,54 +2525,6 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [],
   },
   {
-    name: 'cordis/dynamic-package',
-    mode: 'emit',
-    signature: '\'cordis/dynamic-package\'(pkg: DynamicCordisPackage): void',
-    summary: 'One exact Plugin/Package activation is now live in the Host.',
-    description: 'One exact Plugin/Package activation is now live in the Host.',
-    parameters: [{ name: 'pkg', description: 'stable plugin, immutable package, run identity, and label.' }],
-  },
-  {
-    name: 'cordis/dynamic-retract',
-    mode: 'emit',
-    signature: '\'cordis/dynamic-retract\'(retracted: DynamicCordisRetracted): void',
-    summary: 'One exact activation was withdrawn.',
-    description: 'One exact activation was withdrawn.',
-    parameters: [{ name: 'retracted', description: 'plugin, package, and run identity.' }],
-  },
-  {
-    name: 'cordis/inspect-query',
-    mode: 'emit',
-    signature: '\'cordis/inspect-query\'(request: CordisInspectQueryRequest): void',
-    summary: 'Request a live read-only query from the Client inspect registry.',
-    description: 'Request a live read-only query from the Client inspect registry.',
-    parameters: [{ name: 'request', description: 'correlation, Session, provider, method, and JSON input.' }],
-  },
-  {
-    name: 'cordis/inspect-query-resolved',
-    mode: 'emit',
-    signature: '\'cordis/inspect-query-resolved\'(resolved: CordisInspectQueryResolved): void',
-    summary: 'Notify every Client that an inspect query has settled or been cancelled.',
-    description: 'Notify every Client that an inspect query has settled or been cancelled.',
-    parameters: [{ name: 'resolved', description: 'exact query identity that is no longer answerable.' }],
-  },
-  {
-    name: 'cordis/request-run',
-    mode: 'emit',
-    signature: '\'cordis/request-run\'(request: DynamicCordisRunRequest): void',
-    summary: 'A Client-bearing activation needs a browser page, and may require a user decision.',
-    description: 'A Client-bearing activation needs a browser page, and may require a user decision.',
-    parameters: [{ name: 'request', description: 'correlation identity, owner, target version, mode, and approval requirement.' }],
-  },
-  {
-    name: 'cordis/request-run-resolved',
-    mode: 'emit',
-    signature: '\'cordis/request-run-resolved\'(resolved: DynamicCordisRequestResolved): void',
-    summary: 'A pending Client activation request left the answerable state.',
-    description: 'A pending Client activation request left the answerable state.',
-    parameters: [{ name: 'resolved', description: 'request identity and outcome.' }],
-  },
-  {
     name: 'credentials/updated',
     mode: 'emit',
     signature: '\'credentials/updated\'(ref: CredentialRef): void',
@@ -2562,6 +2587,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     summary: 'Waterfall around every streaming model call (retry, replay, routing).',
     description: 'Waterfall around every streaming model call (retry, replay, routing). Bound to the LlmRuntime; call `next()` to reach the resolved adapter\'s stream, or yield your own chunks to short-circuit.',
     parameters: [{ name: 'options', description: 'the full request. A LOOP-built request carries the process-local {@link markAgentLoopRequest} identity and arrives deep-frozen (mutation throws): its content is a pure function of the session log (the reconstructability Agent Note), so listeners read it, never rewrite it. Hand-built calls do not carry that marker; their messages already obey the immutable creation contract.' }],
+  },
+  {
+    name: 'model-provider-config/updated',
+    mode: 'emit',
+    signature: '\'model-provider-config/updated\'(revision: number): void',
+    summary: 'Committed replacement of the organization Provider snapshot.',
+    description: 'Committed replacement of the organization Provider snapshot.',
+    parameters: [{ name: 'revision', description: 'revision now returned by {@link ModelProviderConfig.snapshot}.' }],
   },
   {
     name: 'session-telemetry/record',
@@ -3580,6 +3613,30 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface LspRange {\n    readonly start: LspPosition;\n    readonly end: LspPosition;\n}',
   },
   {
+    name: 'ManagedModelCompat',
+    declaration: 'export interface ManagedModelCompat {\n    thinkingFormat?: string;\n    supportsReasoningEffort?: boolean;\n}',
+  },
+  {
+    name: 'ManagedModelModality',
+    declaration: 'export type ManagedModelModality = \'text\' | \'image\';',
+  },
+  {
+    name: 'ManagedModelProfile',
+    declaration: 'export interface ManagedModelProfile {\n    id: string;\n    name: string;\n    contextWindow?: number;\n    maxTokens?: number;\n    input?: ManagedModelModality[];\n    reasoningEfforts?: false | ManagedModelReasoningEfforts;\n    compat?: ManagedModelCompat;\n}',
+  },
+  {
+    name: 'ManagedModelProviderProfile',
+    declaration: 'export interface ManagedModelProviderProfile {\n    provider: string;\n    displayName: string;\n    driver: \'pi-ai\';\n    protocol: ManagedModelProviderProtocol;\n    baseURL: string;\n    credentialRef?: string;\n    profile?: Record<string, unknown>;\n    defaultContextWindow?: number;\n    defaultMaxTokens?: number;\n    defaultInput?: ManagedModelModality[];\n    headers?: Record<string, string>;\n    reasoning?: \'off\' | \'minimal\' | \'low\' | \'medium\' | \'high\' | \'xhigh\' | \'max\';\n    thinkingBudgets?: {\n        minimal: number;\n        low: number;\n        medium: number;\n        high: number;\n    };\n    cacheRetention?: \'none\' | \'short\' | \'long\';\n    transport?: \'sse\' | \'websocket\' | \'websocket-cached\' | \'auto\';\n    timeoutMs?: number;\n    websocketConnectTimeoutMs?: number;\n    streamIdleTimeoutMs?: number;\n    retryPolicy?: {\n        mode: \'normal\';\n        maxRetries?: number;\n        retryableCodes?: string[];\n        backoff?: {\n            initialDelayMs?: number;\n            maxDelayMs?: number;\n            jitterRatio?: number;\n        };\n    } | {\n        mode: \'always\';\n        backoff?: {\n            initialDelayMs?: number;\n            maxDelayMs?: number;\n            jitterRatio?: number;\n        };\n    };\n    models: readonly ManagedModelProfile[];\n}',
+  },
+  {
+    name: 'ManagedModelProviderProtocol',
+    declaration: 'export type ManagedModelProviderProtocol = \'openai-completions\' | \'openai-responses\' | \'anthropic-messages\';',
+  },
+  {
+    name: 'ManagedModelReasoningEfforts',
+    declaration: 'export type ManagedModelReasoningEfforts = Partial<Record<\'off\' | \'minimal\' | \'low\' | \'medium\' | \'high\' | \'xhigh\' | \'max\', string | null>>;',
+  },
+  {
     name: 'ManualCompactAgentContext',
     declaration: 'export interface ManualCompactAgentContext extends CompactionAgentContext {\n    runMaintenance<T>(task: (signal: AbortSignal) => Promise<T>): Promise<T>;\n}',
   },
@@ -3696,6 +3753,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ModelModalityMap {\n    text: \'text\';\n    image: \'image\';\n}',
   },
   {
+    name: 'ModelProviderConfigSnapshot',
+    declaration: 'export interface ModelProviderConfigSnapshot {\n    revision: number;\n    providers: readonly ManagedModelProviderProfile[];\n}',
+  },
+  {
     name: 'ObjectJsonSchema',
     declaration: 'export type ObjectJsonSchema = JsonSchemaNode & {\n    type: \'object\';\n};',
   },
@@ -3792,6 +3853,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ReadFileLine {\n    number: number;\n    text: string;\n}',
   },
   {
+    name: 'ReadOnlyCredentialLayer',
+    declaration: 'export interface ReadOnlyCredentialLayer {\n    readonly id: string;\n    owns(ref: CredentialRef): boolean;\n    resolve(ref: CredentialRef): Promise<ResolvedCredential | undefined>;\n    describe(ref: CredentialRef): Promise<CredentialInfo>;\n}',
+  },
+  {
     name: 'ReadResultView',
     declaration: 'export interface ReadResultView {\n    card: \'read\';\n    title?: string;\n    path: string;\n    offset: number;\n    lines: ReadFileLine[];\n    totalLines: number;\n    lang?: string;\n    content?: ContentBlock[];\n}',
   },
@@ -3806,6 +3871,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'RedactedSecret',
     declaration: 'export interface RedactedSecret {\n    path: string[];\n    set: boolean;\n}',
+  },
+  {
+    name: 'ReplayEnvelope',
+    declaration: 'export interface ReplayEnvelope {\n    response: unknown;\n    blocks?: readonly unknown[];\n}',
   },
   {
     name: 'RequestContext',
@@ -4329,7 +4398,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'StreamChunk',
-    declaration: 'export type StreamChunk = {\n    type: \'block-start\';\n    index: number;\n    blockType: ContentBlockType;\n} | {\n    type: \'text-delta\';\n    index: number;\n    text: string;\n} | {\n    type: \'reasoning-delta\';\n    index: number;\n    text: string;\n} | {\n    type: \'tool-call-delta\';\n    index: number;\n    id: CallId;\n    name?: string;\n    argumentsDelta: string;\n} | {\n    type: \'block-end\';\n    index: number;\n    block: ContentBlock;\n} | {\n    type: \'usage\';\n    usage: TokenUsage;\n    credentialSource?: string;\n} | {\n    type: \'finish\';\n    reason: FinishReason;\n    replayState?: unknown;\n};',
+    declaration: 'export type StreamChunk = {\n    type: \'block-start\';\n    index: number;\n    blockType: ContentBlockType;\n} | {\n    type: \'text-delta\';\n    index: number;\n    text: string;\n} | {\n    type: \'reasoning-delta\';\n    index: number;\n    text: string;\n} | {\n    type: \'tool-call-delta\';\n    index: number;\n    id: CallId;\n    name?: string;\n    argumentsDelta: string;\n} | {\n    type: \'block-end\';\n    index: number;\n    block: ContentBlock;\n} | {\n    type: \'usage\';\n    usage: TokenUsage;\n    credentialSource?: string;\n} | {\n    type: \'finish\';\n    reason: FinishReason;\n    replayState?: ReplayEnvelope;\n};',
   },
   {
     name: 'SubagentCapabilities',

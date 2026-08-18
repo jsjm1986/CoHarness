@@ -210,6 +210,7 @@ export function Dialog({
   children,
   footer,
   danger = false,
+  wide = false,
 }: {
   open: boolean
   title: string
@@ -218,6 +219,7 @@ export function Dialog({
   children?: ReactNode
   footer?: ReactNode
   danger?: boolean
+  wide?: boolean
 }) {
   const ref = useRef<HTMLDialogElement>(null)
   const titleId = useId()
@@ -233,7 +235,7 @@ export function Dialog({
   return (
     <dialog
       ref={ref}
-      className="dialog"
+      className={`dialog ${wide ? 'dialogWide' : ''}`.trim()}
       aria-labelledby={titleId}
       aria-describedby={description === undefined ? undefined : descriptionId}
       onCancel={event => { event.preventDefault(); onClose() }}

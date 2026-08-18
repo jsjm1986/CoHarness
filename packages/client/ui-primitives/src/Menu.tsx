@@ -103,7 +103,7 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
   dense?: boolean
   compact?: boolean
   getAnchorRect?: () => DOMRect | null
-  className?: string
+  className?: string | undefined
 }) {
   const rootRef = useRef<HTMLSpanElement>(null)
   const listRef = useRef<HTMLDivElement>(null)

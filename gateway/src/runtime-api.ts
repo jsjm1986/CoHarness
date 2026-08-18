@@ -17,6 +17,8 @@ import type {
 import type { PostgresInstanceRepository } from './postgres/instance-repository.ts'
 import type { PostgresCollaborationService } from './postgres/collaboration-service.ts'
 import { internalUserId, type PostgresRuntimeContext } from './postgres/runtime-context.ts'
+import type { GatewayPushService } from './push-notifications.ts'
+import type { GatewayModelGovernanceService } from './services.ts'
 
 interface RuntimeCredentialSubject {
   organizationId: string
@@ -53,6 +55,9 @@ interface RuntimeApiDependencies {
     'access' | 'claimInteraction' | 'projectForUser' | 'readableSessionIds'
   >
   principals: GatewayPrincipalSigner
+  governance: Pick<GatewayModelGovernanceService, 'resolveOrganizationCredential'>
+  /** Optional FCM delivery; omitted in keyless/unit-test compositions. */
+  push?: Pick<GatewayPushService, 'notifyCompleted'>
 }
 
 function send(res: ServerResponse, status: number, value: unknown): void {
@@ -129,6 +134,15 @@ function conversationEvents(value: unknown): ConversationEvent[] {
     }
     return candidate as ConversationEvent
   })
+}
+
+function completedTurnEndSeqs(events: readonly ConversationEvent[]): number[] {
+  return events.filter((event) => {
+    if (event.type !== 'turn/end') return false
+    const data = record(event.data)
+    const reason = record(data?.reason)
+    return reason?.kind === 'completed'
+  }).map(event => event.seq)
 }
 
 function runtimeHeader(header: ConversationHeader): RuntimeSessionHeader {
@@ -334,6 +348,18 @@ export function createRuntimeApiHandler(
     }
     try {
       const url = new URL(req.url ?? '/', 'http://runtime')
+      if (pathname === '/internal/runtime/model-credential' && req.method === 'POST') {
+        const payload = record(JSON.parse(body))
+        const ref = payload?.ref
+        if (typeof ref !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(ref)) {
+          throw new Error('invalid organization credential reference')
+        }
+        const value = await deps.governance.resolveOrganizationCredential(subject.target, ref)
+        res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+        res.end(JSON.stringify(value === null ? { configured: false } : { configured: true, value }))
+        return true
+      }
+
       if (pathname === '/internal/runtime/session/create' && req.method === 'POST') {
         const payload = record(JSON.parse(body))
         const header = sessionHeader(payload?.header)
@@ -378,12 +404,21 @@ export function createRuntimeApiHandler(
         const materialization = creationAuthorization === undefined
           ? (header === undefined ? undefined : await createHeader(req, subject, header, payload.visibility))
           : await creationHeader(creationAuthorization, subject, payload.sessionId)
+        const events = conversationEvents(payload.events)
         const result = await deps.conversations.append(
           payload.sessionId,
           payload.batchId,
-          conversationEvents(payload.events),
+          events,
           materialization,
         )
+        if (result === 'inserted' && deps.push !== undefined) {
+          const completed = completedTurnEndSeqs(events)
+          for (const eventSeq of completed) {
+            void deps.push.notifyCompleted(payload.sessionId, eventSeq).catch((error: unknown) => {
+              console.error(`[gateway] completed-turn push failed for ${payload.sessionId}:`, error)
+            })
+          }
+        }
         send(res, 200, { result })
         return true
       }
@@ -442,7 +477,16 @@ export function createRuntimeApiHandler(
         }
         if (await stored(payload.sessionId, subject) === undefined) throw new CollaborationDeniedError('conversation-not-found')
         const closers = conversationEvents(payload.closers)
-        if (closers.length > 0) await deps.conversations.append(payload.sessionId, payload.batchId, closers)
+        if (closers.length > 0) {
+          const result = await deps.conversations.append(payload.sessionId, payload.batchId, closers)
+          if (result === 'inserted' && deps.push !== undefined) {
+            for (const eventSeq of completedTurnEndSeqs(closers)) {
+              void deps.push.notifyCompleted(payload.sessionId, eventSeq).catch((error: unknown) => {
+                console.error(`[gateway] repaired-turn push failed for ${payload.sessionId}:`, error)
+              })
+            }
+          }
+        }
         send(res, 200, { repaired: true })
         return true
       }

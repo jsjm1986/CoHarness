@@ -1,6 +1,17 @@
 import { createHash, randomBytes } from 'node:crypto'
-import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import {
+  copyFileSync,
+  cpSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs'
+import { basename, dirname, join } from 'node:path'
 import type Database from 'better-sqlite3'
 import type { UserRow } from './auth.ts'
 import type { GatewayConfig } from './config.ts'
@@ -18,8 +29,6 @@ const ADMIN_GUARD_PATCH_FILENAME = 'cordis.admin.patch.yml'
 const PROJECT_RUNTIME_PATCH = `- id: session-persistence-jsonl
   disabled: true
 - insert:
-    - id: gateway-runtime
-      name: '@deepseek-ai/dsh-gateway-runtime'
     - id: collaboration-gateway
       name: '@deepseek-ai/dsh-collaboration-gateway'
     - id: collaboration-context
@@ -295,6 +304,50 @@ export class InstanceManager {
     })
   }
 
+  private removeInstalledPolicyPackage(packagePath: string): void {
+    const entry = lstatSync(packagePath, { throwIfNoEntry: false })
+    if (entry === undefined) return
+    if (entry.isSymbolicLink()) {
+      unlinkSync(packagePath)
+      return
+    }
+    if (!entry.isDirectory()) throw new Error(`policy package target is not a directory: ${packagePath}`)
+    rmSync(packagePath, { recursive: true })
+  }
+
+  private materializePolicyPackage(sourceDir: string, targetDir: string, patchFiles: string[]): void {
+    const manifest = join(sourceDir, 'package.json')
+    const lib = join(sourceDir, 'lib')
+    if (!existsSync(manifest) || !existsSync(lib)) {
+      throw new Error(`policy package is incomplete: ${sourceDir}`)
+    }
+    for (const patchFile of patchFiles) {
+      if (!existsSync(patchFile)) throw new Error(`policy package patch not found: ${patchFile}`)
+    }
+
+    const stagingDir = join(
+      dirname(targetDir),
+      `.${basename(targetDir)}-${process.pid}-${randomBytes(6).toString('hex')}.tmp`,
+    )
+    mkdirSync(stagingDir, { mode: 0o700 })
+    try {
+      copyFileSync(manifest, join(stagingDir, 'package.json'))
+      cpSync(lib, join(stagingDir, 'lib'), { recursive: true, dereference: true })
+      const bundlePatch = join(sourceDir, 'cordis.patch.yml')
+      const copiedPatches = new Set(existsSync(bundlePatch) ? [bundlePatch, ...patchFiles] : patchFiles)
+      const adminPatch = join(sourceDir, ADMIN_GUARD_PATCH_FILENAME)
+      if (existsSync(adminPatch)) copiedPatches.add(adminPatch)
+      for (const patchFile of copiedPatches) {
+        copyFileSync(patchFile, join(stagingDir, basename(patchFile)))
+      }
+      this.removeInstalledPolicyPackage(targetDir)
+      renameSync(stagingDir, targetDir)
+    } catch (error) {
+      this.removeInstalledPolicyPackage(stagingDir)
+      throw error
+    }
+  }
+
   /**
    * Mount the mandatory model-governance bundle and, when configured, the
    * independent directory-guard bundle. Their patch sequences are composed
@@ -309,29 +362,35 @@ export class InstanceManager {
     }
 
     const dshHome = runtime.dshHome
-    const linkParent = join(dshHome, 'profiles', 'node_modules', '@deepseek-ai')
-    mkdirSync(linkParent, { recursive: true })
+    const packageParent = join(dshHome, 'profiles', 'node_modules', '@deepseek-ai')
+    mkdirSync(packageParent, { recursive: true })
     try {
-      const governanceLink = join(linkParent, 'dsh-model-governance')
-      if (lstatSync(governanceLink, { throwIfNoEntry: false }) !== undefined) rmSync(governanceLink, { recursive: true })
-      symlinkSync(governanceDir, governanceLink, 'dir')
+      // Materialize the package under the profile so Node resolves peer imports
+      // from the runtime dependency tree rather than the source checkout.
+      const governancePackage = join(packageParent, 'dsh-model-governance')
+      this.materializePolicyPackage(governanceDir, governancePackage, [governancePatch])
 
       let patchText = readFileSync(governancePatch, 'utf8').trimEnd() + '\n'
       const guardPatch = this.cfg.guardPatch
+      const guardPackage = join(packageParent, 'dsh-directory-guard')
+      this.removeInstalledPolicyPackage(guardPackage)
       if (guardPatch !== '') {
         if (!existsSync(guardPatch)) {
           throw new Error(`directory-guard patch not found: ${guardPatch} (set HGW_GUARD_PATCH=off to disable)`)
         }
         const guardDir = dirname(guardPatch)
-        const guardLink = join(linkParent, 'dsh-directory-guard')
-        if (lstatSync(guardLink, { throwIfNoEntry: false }) !== undefined) rmSync(guardLink, { recursive: true })
-        symlinkSync(guardDir, guardLink, 'dir')
-        patchText += readFileSync(guardPatch, 'utf8').trimEnd() + '\n'
+        const guardPatchFiles = [guardPatch]
         if (runtime.user?.role === 'admin') {
           const adminPatch = join(guardDir, ADMIN_GUARD_PATCH_FILENAME)
           if (!existsSync(adminPatch)) {
             throw new Error(`directory-guard admin patch not found: ${adminPatch}`)
           }
+          guardPatchFiles.push(adminPatch)
+        }
+        this.materializePolicyPackage(guardDir, guardPackage, guardPatchFiles)
+        patchText += readFileSync(guardPatch, 'utf8').trimEnd() + '\n'
+        if (runtime.user?.role === 'admin') {
+          const adminPatch = join(guardDir, ADMIN_GUARD_PATCH_FILENAME)
           patchText += readFileSync(adminPatch, 'utf8').trimEnd() + '\n'
         }
       }

@@ -120,7 +120,7 @@ The `apps/web/tests/**` e2e type-check in the root **`tsconfig.host.json`**: the
 
 That yields a discipline this design depends on: **when those tests import a value or a type from a Client package, they pull that package's whole project — and every project it references — into the Host build graph**. Four consumers (`ui-settings-general`, `ui-settings-models`, `ui-permission`, `ui-commands`) reference `api/remotes`' Client face, and that face cannot compile until Host tsdown has generated `@deepseek-ai/dsh-goal/remote`. The result is a build-order deadlock: Host tsc needs the Client face, which needs the generated artifact, which Host tsdown produces after Host tsc.
 
-The few Client-owned symbols are therefore **mirrored** on the test side (`scaffold.ts` exports the mirrored welcome-notice constants; the two chat e2e keep importing `dsh-client-runtime/client` because the `runtime` project is already in the Host graph), which lets those four consumers leave the Host graph. The 15 Client project references in `apps/cli/tsconfig.json` lost their owner-map role and are gone. Each mirrored value matches its source verbatim; a drift shows up as a missed selector or an unsuppressed notice, both loud failures.
+The few Client-owned symbols are therefore **mirrored** on the test side when a scenario needs them (the two chat e2e keep importing `dsh-client-runtime/client` because the `runtime` project is already in the Host graph), which lets those four consumers leave the Host graph. The 15 Client project references in `apps/cli/tsconfig.json` lost their owner-map role and are gone. Each mirrored value matches its source verbatim; a drift shows up as a missed selector, a loud failure.
 
 ### Change inventory
 

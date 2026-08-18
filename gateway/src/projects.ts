@@ -2,6 +2,7 @@ import { chmodSync, mkdirSync, realpathSync, rmSync, statSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import type Database from 'better-sqlite3'
 import type { GatewayConfig } from './config.ts'
+import { assertProjectImportPathAllowed } from './project-directories.ts'
 
 export type GrantMode = 'ro' | 'rw'
 
@@ -120,6 +121,7 @@ function rethrowProjectPathFailure(error: unknown): never {
  * @returns canonical directory path stored for grants and mounts
  */
 export function resolveProjectDirectory(path: string): string {
+  if (!isAbsolute(path)) throw new Error('project-path-not-absolute')
   let canonical: string
   try {
     canonical = realpathSync(path)
@@ -207,7 +209,7 @@ export class ProjectService {
     const name = normalizeProjectName(input.name)
     const canonical = this.allocateManagedDirectory(name)
     try {
-      this.assertNotReserved(canonical)
+      this.assertNotReserved(canonical, true)
       return this.insert({
         name,
         path: canonical,
@@ -472,47 +474,31 @@ export class ProjectService {
     return grants
   }
 
-  private assertNotReserved(canonical: string): void {
-    if (this.cfg.launcher === 'systemd' && !isProjectPathIsolated(canonical, this.cfg.projectPathRoots)) {
-      throw new Error(`project path is outside HGW_PROJECT_PATH_ROOTS: ${canonical}`)
-    }
-    const reservedPaths = [this.cfg.usersRoot, this.cfg.projectRuntimesRoot]
-      .map(path => realpathIfPresent(path) ?? path)
-    for (const reserved of reservedPaths) {
-      if (canonical === reserved) throw new Error(`project path overlaps reserved path: ${reserved}`)
-    }
-    if (this.cfg.launcher === 'systemd' && projectPathsOverlap(canonical, this.cfg.gatewayDir)) {
-      throw new Error(`project path overlaps gateway directory: ${this.cfg.gatewayDir}`)
-    }
+  private assertNotReserved(canonical: string, allowUserProjectsRoot = false): void {
+    assertProjectImportPathAllowed(this.cfg, canonical, { allowUserProjectsRoot })
     const users = this.db.prepare(`SELECT username, home_path FROM users`).all() as
       Array<{ username: string; home_path: string }>
     for (const user of users) {
       const home = realpathIfPresent(user.home_path) ?? user.home_path
       if (projectPathsOverlap(canonical, home)) {
-        throw new Error(`path is a user home: ${canonical}`)
+        throw new Error('project-path-reserved')
       }
       const dsh = join(this.cfg.usersRoot, user.username, 'dsh')
       const canonicalDsh = realpathIfPresent(dsh) ?? dsh
       if (projectPathsOverlap(canonical, canonicalDsh)) {
-        throw new Error(`path is a user dsh home: ${canonical}`)
+        throw new Error('project-path-reserved')
       }
     }
-    for (const reserved of reservedPaths) {
-      if (projectPathsOverlap(canonical, reserved)) throw new Error(`project path overlaps reserved path: ${reserved}`)
-    }
     const projects = this.db.prepare(`SELECT path FROM projects`).all() as Array<{ path: string }>
-    if (projects.some(project => project.path === canonical)) {
-      throw new Error(`duplicate project path: ${canonical}`)
-    }
     const overlap = projects.find(project => projectPathsOverlap(canonical, project.path))
-    if (overlap !== undefined) throw new Error(`project path overlaps existing project: ${overlap.path}`)
+    if (overlap !== undefined) throw new Error('project-path-overlap')
   }
 
   private rethrowUnique(error: unknown, name: string, path?: string): never {
     if (isCodedError(error) && error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
       if (error.message.includes('projects.name')) throw new Error(`duplicate project name: ${name}`)
       if (path !== undefined && error.message.includes('projects.path')) {
-        throw new Error(`duplicate project path: ${path}`)
+        throw new Error('project-path-overlap')
       }
       throw new Error(`duplicate project: ${error.message}`)
     }

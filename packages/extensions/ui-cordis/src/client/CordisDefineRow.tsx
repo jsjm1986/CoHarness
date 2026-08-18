@@ -13,7 +13,7 @@ import type { CordisKey } from './locales.ts'
 import css from './CordisDefineRow.module.css'
 
 /** Full card props composed by the keyed Tool slot. */
-export type CordisDefineRowProps = ToolCallViewProps & InjectFace<CordisCardFace> & PropsLocale<'cordis'>
+export type CordisDefineRowProps = ToolCallViewProps & InjectFace<CordisCardFace> & PropsLocale<'@deepseek-ai/cordis'>
 
 type CardReading = CordisVisibleStatus | 'removed'
 type SourceTab = 'client' | 'host'

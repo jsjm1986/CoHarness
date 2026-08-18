@@ -1,7 +1,8 @@
-import { ArrowUpRight, Folder, FolderKanban, Plus } from 'lucide-react'
+import { ArrowUpRight, CheckCircle2, Folder, FolderKanban, Plus } from 'lucide-react'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { createProject, listProjects, type Project } from '../api.ts'
+import { ProjectDirectoryBrowser } from '../components/ProjectDirectoryBrowser.tsx'
 import {
   Button,
   Dialog,
@@ -23,6 +24,8 @@ export function ProjectListPage() {
   const [pending, setPending] = useState(false)
   const [createError, setCreateError] = useState('')
   const [name, setName] = useState('')
+  const [createMode, setCreateMode] = useState<'managed' | 'existing'>('managed')
+  const [selectedPath, setSelectedPath] = useState<string>()
 
   const reload = useCallback(async (showLoading = false) => {
     if (showLoading) setLoading(true)
@@ -40,6 +43,8 @@ export function ProjectListPage() {
 
   function openCreate() {
     setCreateError('')
+    setCreateMode('managed')
+    setSelectedPath(undefined)
     setCreateOpen(true)
   }
 
@@ -54,8 +59,13 @@ export function ProjectListPage() {
     setPending(true)
     setCreateError('')
     try {
-      await createProject({ name: name.trim() })
+      if (createMode === 'existing' && selectedPath === undefined) return
+      await createProject(createMode === 'managed'
+        ? { name: name.trim() }
+        : { name: name.trim(), path: selectedPath })
       setName('')
+      setCreateMode('managed')
+      setSelectedPath(undefined)
       setCreateOpen(false)
       await reload()
     } catch (cause) {
@@ -63,6 +73,12 @@ export function ProjectListPage() {
     } finally {
       setPending(false)
     }
+  }
+
+  function selectDirectory(path: string) {
+    setSelectedPath(path)
+    setCreateError('')
+    if (name.trim() === '') setName(directoryName(path))
   }
 
   return (
@@ -84,7 +100,7 @@ export function ProjectListPage() {
           <EmptyState
             icon={FolderKanban}
             title="还没有项目"
-            detail="管理员项目登记现有目录；用户项目由账户在受控项目根目录中创建。"
+            detail="管理员项目可使用默认目录或导入现有目录；用户项目由账户在受控项目根目录中创建。"
             action={<Button variant="primary" icon={Plus} onClick={openCreate}>新建项目</Button>}
           />
         ) : (
@@ -148,20 +164,74 @@ export function ProjectListPage() {
       <Dialog
         open={createOpen}
         title="新建项目"
-        description="输入名称即可，Gateway 会自动创建项目目录。"
+        description="创建受管目录，或把 Gateway 主机上的现有项目加入工作区。"
         onClose={closeCreate}
+        wide
         footer={(
           <>
             <Button type="button" onClick={closeCreate} disabled={pending}>取消</Button>
-            <Button type="submit" form="create-project-form" variant="primary" loading={pending}>创建项目</Button>
+            <Button
+              type="submit"
+              form="create-project-form"
+              variant="primary"
+              loading={pending}
+              disabled={createMode === 'existing' && selectedPath === undefined}
+            >
+              创建项目
+            </Button>
           </>
         )}
       >
-        <form id="create-project-form" className="formGrid" onSubmit={event => void onCreate(event)}>
+        <form id="create-project-form" className="formGrid projectCreateForm" onSubmit={event => void onCreate(event)}>
           <div className="formSpanFull"><ErrorBanner message={createError} /></div>
-          <Field label="项目名称" hint="Gateway 会在项目根目录自动创建同名目录。" className="formSpanFull">
+          <Field
+            label="项目名称"
+            hint={createMode === 'managed' ? 'Gateway 会在默认项目根目录创建同名目录。' : '用于工作区列表显示，不会重命名现有目录。'}
+            className="formSpanFull"
+          >
             <input className="input" required autoFocus value={name} onChange={event => { setName(event.target.value); setCreateError('') }} placeholder="例如：产品文档" />
           </Field>
+          <fieldset className="field projectDirectoryField formSpanFull">
+            <legend className="fieldLabel">项目目录</legend>
+            <div className="segmented" role="group" aria-label="项目目录方式">
+              <button
+                type="button"
+                aria-pressed={createMode === 'managed'}
+                onClick={() => { setCreateMode('managed'); setCreateError('') }}
+              >
+                默认目录
+              </button>
+              <button
+                type="button"
+                aria-pressed={createMode === 'existing'}
+                onClick={() => { setCreateMode('existing'); setCreateError('') }}
+              >
+                现有目录
+              </button>
+            </div>
+            {createMode === 'managed' ? (
+              <div className="managedDirectorySummary">
+                <FolderKanban aria-hidden="true" />
+                <span>
+                  <strong>Gateway 默认项目目录</strong>
+                  <small>创建一个新的受管项目文件夹</small>
+                </span>
+              </div>
+            ) : (
+              <>
+                {selectedPath === undefined ? null : (
+                  <div className="selectedDirectory">
+                    <CheckCircle2 aria-hidden="true" />
+                    <span>
+                      <small>已选择目录</small>
+                      <strong title={selectedPath}>{selectedPath}</strong>
+                    </span>
+                  </div>
+                )}
+                <ProjectDirectoryBrowser selectedPath={selectedPath} onSelect={selectDirectory} />
+              </>
+            )}
+          </fieldset>
         </form>
       </Dialog>
     </div>
@@ -181,7 +251,16 @@ function projectMessageFrom(cause: unknown): string {
     return '项目根路径不是目录，请检查 Gateway 配置。'
   }
   if (message === 'project-path-outside-root') {
-    return '项目目录必须位于 Gateway 配置的项目根目录内。'
+    return '项目目录不在 Gateway 允许的项目根目录内。'
+  }
+  if (message === 'project-path-not-absolute') {
+    return '项目目录必须是 Gateway 主机上的绝对路径。'
+  }
+  if (message === 'project-path-reserved') {
+    return '不能把 Gateway 数据、凭据、运行时或用户目录登记为项目。'
+  }
+  if (message === 'project-path-overlap') {
+    return '该目录与已登记项目重叠，请选择其他目录。'
   }
   if (message === 'project-path-not-found') {
     return '目录不存在。请先在 Gateway 主机上创建该目录，再登记为项目。'
@@ -193,7 +272,9 @@ function projectMessageFrom(cause: unknown): string {
     return 'Gateway 无权访问该目录，请检查目录权限。'
   }
   if (message.startsWith('duplicate project name')) return '项目名称已存在。'
-  if (message.startsWith('duplicate project path')) return '该目录已经登记为项目。'
-  if (message.startsWith('path is a user ')) return '不能把用户主目录或 DSH 数据目录登记为项目。'
   return message
+}
+
+function directoryName(path: string): string {
+  return path.replace(/[\\/]+$/u, '').split(/[\\/]/u).at(-1) ?? ''
 }

@@ -9,7 +9,7 @@ import { cordisActionCard } from './card-model.ts'
 import css from './CordisRunRow.module.css'
 
 /** Full action-card props composed by the keyed Tool slot. */
-export type CordisActionRowProps = ToolCallViewProps & PropsLocale<'cordis'>
+export type CordisActionRowProps = ToolCallViewProps & PropsLocale<'@deepseek-ai/cordis'>
 
 /** Render one Stop or Remove call with Cordis-owned localized copy. */
 export function CordisActionRow({ callId, toolName, block, inspect, t }: CordisActionRowProps) {

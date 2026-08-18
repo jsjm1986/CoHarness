@@ -24,6 +24,9 @@
       "path": "../../llm/llm"
     },
     {
+      "path": "../model-provider-config"
+    },
+    {
       "path": "../../attachment/attachment"
     },
     {

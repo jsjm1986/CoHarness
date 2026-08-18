@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, realpathSync } from 'node:fs'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AuditService } from '../src/audit.ts'
 import { AuthService } from '../src/auth.ts'
 import { createAdminApiHandler } from '../src/admin-api.ts'
@@ -154,6 +154,51 @@ describe('gateway server', () => {
     expect(after.status).toBe(401)
   })
 
+  it('registers and removes push devices only through an authenticated same-origin request', async () => {
+    const { deps, base } = await setup()
+    const registerDevice = vi.fn(async (userId: number, input: {
+      token: string
+      platform: 'android'
+      deviceId?: string
+      appVersion?: string
+    }) => {
+      expect(userId).toBe(1)
+      return { id: `device-${input.token}` }
+    })
+    const removeDevice = vi.fn(async (userId: number, deviceId: string) => userId === 1 && deviceId === 'device-token')
+    deps.push = {
+      registerDevice,
+      removeDevice,
+      notifyCompleted: vi.fn(async () => {}),
+    }
+    const cookie = await login(base, 'root-admin', 'pw-12345678')
+
+    const registered = await fetch(`${base}/account/api/push-devices`, {
+      method: 'POST',
+      headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ token: 'token', platform: 'android', appVersion: '1.0.0' }),
+    })
+    expect(registered.status).toBe(201)
+    expect(await registered.json()).toEqual({ id: 'device-token' })
+    expect(registerDevice).toHaveBeenCalledWith(1, {
+      token: 'token', platform: 'android', appVersion: '1.0.0',
+    })
+
+    const invalid = await fetch(`${base}/account/api/push-devices`, {
+      method: 'POST',
+      headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ token: 'token', platform: 'ios' }),
+    })
+    expect(invalid.status).toBe(400)
+    expect(await invalid.json()).toEqual({ error: 'invalid-push-device' })
+
+    const removed = await fetch(`${base}/account/api/push-devices/device-token`, {
+      method: 'DELETE', headers: { cookie, origin: base },
+    })
+    expect(removed.status).toBe(204)
+    expect(removeDevice).toHaveBeenCalledWith(1, 'device-token')
+  })
+
   it('forces password change before proxying', async () => {
     const { deps, base } = await setup()
     await deps.users.create({ username: 'fresh', password: 'pw-11111111' })
@@ -206,6 +251,69 @@ describe('gateway server', () => {
       { subject: { kind: 'user', id: 1 }, month: '2026-07' },
       { subject: { kind: 'project', id: 42 }, month: '2026-06' },
     ])
+  })
+
+  it('starts the selected runtime before persisting a personal or project scope', async () => {
+    const { deps, base } = await setup()
+    installProjectCollaboration(deps)
+    vi.spyOn(deps.collaboration!, 'projectForUser').mockImplementation((projectId, userId) =>
+      projectId === 42 && userId === 1
+        ? {
+            projectId,
+            name: 'Shared project',
+            path: '/shared',
+            mode: 'rw',
+            administrator: true,
+          }
+        : null)
+    const ensureRunning = vi.spyOn(deps.instances, 'ensureRunning').mockResolvedValue({ port: 43200, generation: 1 })
+    const cookie = await login(base, 'root-admin', 'pw-12345678')
+
+    const project = await fetch(`${base}/account/api/scope`, {
+      method: 'POST',
+      headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ kind: 'project', projectId: 42 }),
+    })
+    expect(project.status).toBe(204)
+    expect(project.headers.get('set-cookie')).toContain('hgw_scope=project:42')
+    expect(ensureRunning).toHaveBeenNthCalledWith(1, {
+      kind: 'project', id: 42, name: 'Shared project', path: '/shared',
+    })
+
+    const personal = await fetch(`${base}/account/api/scope`, {
+      method: 'POST',
+      headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ kind: 'personal' }),
+    })
+    expect(personal.status).toBe(204)
+    expect(personal.headers.get('set-cookie')).toContain('hgw_scope=personal')
+    expect(ensureRunning).toHaveBeenNthCalledWith(2, expect.objectContaining({ id: 1, username: 'root-admin' }))
+  })
+
+  it('keeps the current scope when the selected runtime cannot start', async () => {
+    const { deps, base } = await setup()
+    installProjectCollaboration(deps)
+    vi.spyOn(deps.collaboration!, 'projectForUser').mockReturnValue({
+      projectId: 42,
+      name: 'Shared project',
+      path: '/shared',
+      mode: 'rw',
+      administrator: true,
+    })
+    vi.spyOn(deps.instances, 'ensureRunning').mockRejectedValue(new Error('runtime failed'))
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const cookie = await login(base, 'root-admin', 'pw-12345678')
+    try {
+      const response = await fetch(`${base}/account/api/scope`, {
+        method: 'POST',
+        headers: { cookie, origin: base, 'content-type': 'application/json' },
+        body: JSON.stringify({ kind: 'project', projectId: 42 }),
+      })
+      expect(response.status).toBe(500)
+      expect(response.headers.get('set-cookie')).toBeNull()
+    } finally {
+      logged.mockRestore()
+    }
   })
 
   it('lets a user own a managed project, invite a member, and exposes one admin project view', async () => {
@@ -285,7 +393,7 @@ describe('gateway server', () => {
       id: project.id, origin: 'user', owner: expect.objectContaining({ id: alice.id }),
     })])
 
-    const adminPath = join(deps.cfg.projectPathRoots[0] ?? deps.cfg.userProjectsRoot, 'admin-project')
+    const adminPath = join(deps.cfg.projectPathRoots[0] ?? deps.cfg.projectsRoot, 'admin-project')
     mkdirSync(adminPath, { recursive: true })
     const adminCreated = await fetch(`${base}/admin/api/projects`, {
       method: 'POST', headers: {

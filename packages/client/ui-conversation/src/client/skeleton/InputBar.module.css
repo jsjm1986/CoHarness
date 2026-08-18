@@ -405,6 +405,10 @@
    Read-only; the chip gap widened to 12 so the pill chips read as separate
    controls. */
 .tools {
+  /* Keep the left touch targets together. The model seat is the flexible
+     region; shrinking this group lets its children paint outside their flex
+     item and cover the model label on narrow cards. */
+  flex: 0 0 auto;
   gap: var(--dsw-space-4);
 }
 
@@ -413,7 +417,11 @@
 }
 
 .trailing {
-  flex: none;
+  /* Reserve the context meter and Send controls, then give the model seat
+     whatever width remains. Its label owns the ellipsis when that width is
+     small, so no toolbar child can overlap a sibling. */
+  flex: 1 1 auto;
+  justify-content: flex-end;
   gap: var(--dsw-space-3);
 }
 

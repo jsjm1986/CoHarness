@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { credentialRef } from '../src/index.ts'
-import type { CredentialRef } from '../src/index.ts'
+import type { CredentialRef, ReadOnlyCredentialLayer } from '../src/index.ts'
 import { MemoryCredentials } from './memory.ts'
 
 const REF = credentialRef('DEEPSEEK_API_KEY')
@@ -59,6 +59,40 @@ describe('the credentials seam through the memory provider', () => {
     await expect(ctx.credentials.set(REF, '')).rejects.toThrow(/empty value/)
     await ctx.credentials.unset(REF)
     expect(events).toEqual([])
+  })
+
+  it('gives a claimed read-only reference exclusive ownership until its registration is disposed', async () => {
+    const ctx = await boot({ DEEPSEEK_API_KEY: 'sk-personal' })
+    const layer: ReadOnlyCredentialLayer = {
+      id: 'organization',
+      owns: ref => ref === REF,
+      resolve: async () => undefined,
+      describe: async () => ({ configured: false, writable: false }),
+    }
+    const unregister = ctx.credentials.registerReadOnlyLayer(layer)
+
+    expect(await ctx.credentials.resolve(REF)).toBeUndefined()
+    expect(await ctx.credentials.describe(REF)).toEqual({ configured: false, writable: false })
+    await expect(ctx.credentials.set(REF, 'sk-replacement')).rejects.toThrow(/read-only.*organization/)
+    await expect(ctx.credentials.unset(REF)).rejects.toThrow(/read-only.*organization/)
+
+    unregister()
+    expect(await ctx.credentials.resolve(REF)).toEqual({ value: 'sk-personal', source: 'memory' })
+    expect(await ctx.credentials.describe(REF)).toEqual({ configured: true, source: 'memory', writable: true })
+  })
+
+  it('fails loud when multiple read-only layers claim one reference', async () => {
+    const ctx = await boot()
+    const layer = (id: string): ReadOnlyCredentialLayer => ({
+      id,
+      owns: ref => ref === REF,
+      resolve: async () => undefined,
+      describe: async () => ({ configured: false, writable: false }),
+    })
+    ctx.credentials.registerReadOnlyLayer(layer('first'))
+    ctx.credentials.registerReadOnlyLayer(layer('second'))
+
+    await expect(ctx.credentials.resolve(REF)).rejects.toThrow(/owned by multiple read-only layers: first, second/)
   })
 
   it('removes the service with its fiber', async () => {

@@ -1,4 +1,4 @@
-import { Pencil, Plus, Sparkles } from 'lucide-react'
+import { Pencil, Sparkles } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
   getModelAccess,
@@ -9,6 +9,7 @@ import {
   type AdminUser,
   type ModelGovernanceRow,
 } from '../api.ts'
+import { OrganizationModelsEditor } from '../components/OrganizationModelsEditor.tsx'
 import {
   Button,
   Dialog,
@@ -23,18 +24,7 @@ import {
   Switch,
 } from '../components/ui.tsx'
 
-const EMPTY_MODEL: ModelGovernanceRow = {
-  provider: '',
-  model: '',
-  displayName: '',
-  enabled: true,
-  adminAllowed: true,
-  userAllowed: false,
-  inputMicrosPerMillion: 0,
-  outputMicrosPerMillion: 0,
-  cacheReadMicrosPerMillion: 0,
-  cacheWriteMicrosPerMillion: 0,
-}
+type ModelsView = 'catalog' | 'governance'
 
 const PRICE_LABELS = ['输入', '输出', '缓存读取', '缓存写入'] as const
 
@@ -49,16 +39,18 @@ function microsToYuan(value: number): string {
 }
 
 export function ModelsPage() {
+  const [view, setView] = useState<ModelsView>('catalog')
   const [models, setModels] = useState<ModelGovernanceRow[]>([])
   const [users, setUsers] = useState<AdminUser[]>([])
   const [loading, setLoading] = useState(true)
   const [accessLoading, setAccessLoading] = useState(false)
   const [error, setError] = useState('')
-  const [editorOpen, setEditorOpen] = useState(false)
-  const [editingKey, setEditingKey] = useState('')
-  const [draft, setDraft] = useState<ModelGovernanceRow>(EMPTY_MODEL)
+
+  const [editingModel, setEditingModel] = useState<ModelGovernanceRow | null>(null)
+  const [modelDraft, setModelDraft] = useState<ModelGovernanceRow | null>(null)
   const [prices, setPrices] = useState(['0', '0', '0', '0'])
-  const [saving, setSaving] = useState(false)
+  const [modelSaving, setModelSaving] = useState(false)
+
   const [selectedUser, setSelectedUser] = useState('')
   const [overrides, setOverrides] = useState(new Map<string, boolean>())
   const [overridePending, setOverridePending] = useState('')
@@ -90,9 +82,9 @@ export function ModelsPage() {
       return () => { active = false }
     }
     setAccessLoading(true)
-    void getModelAccess(Number(selectedUser)).then(view => {
+    void getModelAccess(Number(selectedUser)).then(access => {
       if (!active) return
-      setOverrides(new Map(view.overrides.map(row => [modelKey(row), row.allowed])))
+      setOverrides(new Map(access.overrides.map(row => [modelKey(row), row.allowed])))
       setError('')
     }).catch(cause => {
       if (active) setError(messageFrom(cause))
@@ -103,43 +95,38 @@ export function ModelsPage() {
   }, [selectedUser])
 
   const selected = useMemo(() => users.find(user => String(user.id) === selectedUser), [selectedUser, users])
+  const modelSettingsChanged = useCallback(() => { void reload() }, [reload])
 
-  function openCreate() {
-    setEditingKey('')
-    setDraft(EMPTY_MODEL)
-    setPrices(['0', '0', '0', '0'])
-    setEditorOpen(true)
-  }
-
-  function openEdit(model: ModelGovernanceRow) {
-    setEditingKey(modelKey(model))
-    setDraft(model)
+  function openGovernanceEditor(model: ModelGovernanceRow) {
+    setEditingModel(model)
+    setModelDraft({ ...model })
     setPrices([
       microsToYuan(model.inputMicrosPerMillion),
       microsToYuan(model.outputMicrosPerMillion),
       microsToYuan(model.cacheReadMicrosPerMillion),
       microsToYuan(model.cacheWriteMicrosPerMillion),
     ])
-    setEditorOpen(true)
   }
 
-  async function submit(event: FormEvent) {
+  async function submitGovernance(event: FormEvent) {
     event.preventDefault()
-    setSaving(true)
+    if (modelDraft === null) return
+    setModelSaving(true)
     try {
       await saveModel({
-        ...draft,
+        ...modelDraft,
         inputMicrosPerMillion: yuanToMicros(prices[0] ?? '0'),
         outputMicrosPerMillion: yuanToMicros(prices[1] ?? '0'),
         cacheReadMicrosPerMillion: yuanToMicros(prices[2] ?? '0'),
         cacheWriteMicrosPerMillion: yuanToMicros(prices[3] ?? '0'),
       })
-      setEditorOpen(false)
+      setEditingModel(null)
+      setModelDraft(null)
       await reload()
     } catch (cause) {
       setError(messageFrom(cause))
     } finally {
-      setSaving(false)
+      setModelSaving(false)
     }
   }
 
@@ -150,8 +137,8 @@ export function ModelsPage() {
     try {
       const allowed = value === 'inherit' ? null : value === 'allow'
       await setModelAccess(Number(selectedUser), row.provider, row.model, allowed)
-      const view = await getModelAccess(Number(selectedUser))
-      setOverrides(new Map(view.overrides.map(item => [modelKey(item), item.allowed])))
+      const access = await getModelAccess(Number(selectedUser))
+      setOverrides(new Map(access.overrides.map(item => [modelKey(item), item.allowed])))
       setError('')
     } catch (cause) {
       setError(messageFrom(cause))
@@ -160,157 +147,215 @@ export function ModelsPage() {
     }
   }
 
+  const actions = (
+    <div className="pageToolbar modelPageToolbar">
+      <div className="segmented" role="group" aria-label="模型治理视图">
+        <button type="button" aria-pressed={view === 'catalog'} onClick={() => setView('catalog')}>Provider 与模型</button>
+        <button type="button" aria-pressed={view === 'governance'} onClick={() => setView('governance')}>权限与计价</button>
+      </div>
+    </div>
+  )
+
   return (
     <div className="page">
       <PageHeader
         title="模型治理"
-        description="集中控制模型可用性、角色默认权限、用户例外和历史计价。"
-        meta={loading ? undefined : `${models.length} 个模型`}
-        actions={<Button variant="primary" icon={Plus} onClick={openCreate}>登记模型</Button>}
+        description="管理员统一配置完整组织 Provider 和模型目录；个人运行时可同时使用获授权的组织模型与个人 BYOK，项目只使用显式分配的组织模型。"
+        meta={loading ? undefined : `${models.length} 个组织模型`}
+        actions={actions}
       />
       <ErrorBanner message={error} />
-      <Section
-        className="responsiveSection"
-        title="模型目录"
-        meta={loading ? undefined : `${models.length} 条路由`}
-        actions={users.length === 0 ? undefined : (
-          <div className="modelUserPicker">
-            <span>用户例外</span>
-            <select className="select selectCompact" value={selectedUser} onChange={event => setSelectedUser(event.target.value)} aria-label="用户例外">
-              {users.map(user => <option key={user.id} value={user.id}>{user.username}（{user.role === 'admin' ? '管理员' : '用户'}）</option>)}
-            </select>
-          </div>
-        )}
-      >
-        {loading ? <LoadingState label="正在加载模型目录" /> : models.length === 0 ? (
-          <EmptyState
-            icon={Sparkles}
-            title="还没有登记模型"
-            detail="登记 provider 与 model 路由后，可配置角色默认权限、用户例外和计价。"
-            action={<Button variant="primary" icon={Plus} onClick={openCreate}>登记模型</Button>}
+      {view === 'catalog'
+        ? <OrganizationModelsEditor onChanged={modelSettingsChanged} />
+        : (
+          <ModelDirectory
+            loading={loading}
+            models={models}
+            users={users}
+            selectedUser={selectedUser}
+            selected={selected}
+            accessLoading={accessLoading}
+            overrides={overrides}
+            overridePending={overridePending}
+            onSelectUser={setSelectedUser}
+            onEdit={openGovernanceEditor}
+            onOverride={changeOverride}
           />
-        ) : (
-          <>
-            {users.length === 0 ? <div className="inlineNotice">暂无用户；模型目录仍可编辑，创建用户后可配置用户例外。</div> : null}
-            <div className="tableWrap desktopOnly">
-              <table className="dataTable modelTable">
-                <thead>
-                  <tr>
-                    <th>模型</th>
-                    <th>状态</th>
-                    <th>角色默认</th>
-                    <th>{selected === undefined ? '用户例外' : `${selected.username} 的例外`}</th>
-                    <th>价格（元 / 百万 Token）</th>
-                    <th aria-label="操作" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {models.map(row => {
-                    const key = modelKey(row)
-                    const override = overrides.get(key)
-                    return (
-                      <tr key={key}>
-                        <td><ModelIdentity row={row} /></td>
-                        <td><StatusBadge tone={row.enabled ? 'success' : 'danger'}>{row.enabled ? '已启用' : '已停用'}</StatusBadge></td>
-                        <td><RoleDefaults row={row} /></td>
-                        <td>
-                          <OverrideSelect
-                            disabled={selectedUser === '' || accessLoading || overridePending === key}
-                            value={override}
-                            onChange={value => void changeOverride(row, value)}
-                          />
-                        </td>
-                        <td><PriceSummary row={row} /></td>
-                        <td><div className="rowActions"><IconButton label="编辑模型" icon={Pencil} onClick={() => openEdit(row)} /></div></td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-            <div className="mobileList">
-              {models.map(row => {
-                const key = modelKey(row)
-                const override = overrides.get(key)
-                return (
-                  <article className="mobileItem" key={key}>
-                    <div className="mobileItemHeader">
-                      <ModelIdentity row={row} />
-                      <IconButton label="编辑模型" icon={Pencil} onClick={() => openEdit(row)} />
-                    </div>
-                    <div className="mobileItemBody">
-                      <div className="mobileStatusRow">
-                        <StatusBadge tone={row.enabled ? 'success' : 'danger'}>{row.enabled ? '已启用' : '已停用'}</StatusBadge>
-                        <RoleDefaults row={row} />
-                      </div>
-                      <div>
-                        <span className="fieldLabel">{selected === undefined ? '用户例外' : `${selected.username} 的例外`}</span>
-                        <OverrideSelect
-                          disabled={selectedUser === '' || accessLoading || overridePending === key}
-                          value={override}
-                          onChange={value => void changeOverride(row, value)}
-                        />
-                      </div>
-                      <div><span className="fieldLabel">价格（元 / 百万 Token）</span><PriceSummary row={row} /></div>
-                    </div>
-                  </article>
-                )
-              })}
-            </div>
-          </>
         )}
-      </Section>
 
       <Dialog
-        open={editorOpen}
-        title={editingKey === '' ? '登记模型' : '编辑模型'}
-        description="权限按精确的 provider 与 model 路由生效，价格用于用量核算。"
-        onClose={() => { if (!saving) setEditorOpen(false) }}
+        open={editingModel !== null && modelDraft !== null}
+        title="配置模型治理"
+        description="Provider 和模型身份由组织模型插件维护；此处只配置运行权限和计价。"
+        onClose={() => {
+          if (modelSaving) return
+          setEditingModel(null)
+          setModelDraft(null)
+        }}
         footer={(
           <>
-            <Button type="button" disabled={saving} onClick={() => setEditorOpen(false)}>取消</Button>
-            <Button type="submit" form="model-editor-form" variant="primary" loading={saving}>保存模型</Button>
+            <Button type="button" disabled={modelSaving} onClick={() => {
+              setEditingModel(null)
+              setModelDraft(null)
+            }}>取消</Button>
+            <Button type="submit" form="model-governance-form" variant="primary" loading={modelSaving}>保存治理配置</Button>
           </>
         )}
       >
-        <form id="model-editor-form" onSubmit={event => void submit(event)}>
-          <div className="formGrid">
-            <Field label="Provider">
-              <input className="input codeText" required disabled={editingKey !== ''} value={draft.provider} onChange={event => setDraft({ ...draft, provider: event.target.value })} placeholder="deepseek" />
-            </Field>
-            <Field label="Model">
-              <input className="input codeText" required disabled={editingKey !== ''} value={draft.model} onChange={event => setDraft({ ...draft, model: event.target.value })} placeholder="deepseek-chat" />
-            </Field>
-            <Field label="显示名" className="formSpanFull">
-              <input className="input" required value={draft.displayName} onChange={event => setDraft({ ...draft, displayName: event.target.value })} />
-            </Field>
-          </div>
-          <div className="formDivider" />
-          <div className="toggleGrid">
-            <Switch label="启用模型" checked={draft.enabled} onChange={enabled => setDraft({ ...draft, enabled })} />
-            <Switch label="管理员默认允许" checked={draft.adminAllowed} onChange={adminAllowed => setDraft({ ...draft, adminAllowed })} />
-            <Switch label="普通用户默认允许" checked={draft.userAllowed} onChange={userAllowed => setDraft({ ...draft, userAllowed })} />
-          </div>
-          <div className="formDivider" />
-          <span className="fieldLabel">单价（人民币元 / 百万 Token）</span>
-          <div className="priceGrid formSectionSpacing">
-            {PRICE_LABELS.map((label, index) => (
-              <Field key={label} label={label}>
-                <input
-                  className="input"
-                  required
-                  min="0"
-                  step="0.0001"
-                  inputMode="decimal"
-                  value={prices[index]}
-                  onChange={event => setPrices(prices.map((value, current) => current === index ? event.target.value : value))}
-                />
-              </Field>
-            ))}
-          </div>
-        </form>
+        {modelDraft === null ? null : (
+          <form id="model-governance-form" onSubmit={event => void submitGovernance(event)}>
+            <div className="modelGovernanceIdentity">
+              <strong>{modelDraft.displayName}</strong>
+              <span className="codeText">{modelDraft.provider}/{modelDraft.model}</span>
+            </div>
+            <div className="formDivider" />
+            <div className="toggleGrid">
+              <Switch label="启用模型" checked={modelDraft.enabled} onChange={enabled => setModelDraft({ ...modelDraft, enabled })} />
+              <Switch label="管理员默认允许" checked={modelDraft.adminAllowed} onChange={adminAllowed => setModelDraft({ ...modelDraft, adminAllowed })} />
+              <Switch label="普通用户默认允许" checked={modelDraft.userAllowed} onChange={userAllowed => setModelDraft({ ...modelDraft, userAllowed })} />
+            </div>
+            <div className="formDivider" />
+            <span className="fieldLabel">单价（人民币元 / 百万 Token）</span>
+            <div className="priceGrid formSectionSpacing">
+              {PRICE_LABELS.map((label, index) => (
+                <Field key={label} label={label}>
+                  <input
+                    className="input"
+                    required
+                    min="0"
+                    step="0.0001"
+                    inputMode="decimal"
+                    value={prices[index]}
+                    onChange={event => setPrices(prices.map((value, current) => current === index ? event.target.value : value))}
+                  />
+                </Field>
+              ))}
+            </div>
+          </form>
+        )}
       </Dialog>
     </div>
+  )
+}
+
+function ModelDirectory({
+  loading,
+  models,
+  users,
+  selectedUser,
+  selected,
+  accessLoading,
+  overrides,
+  overridePending,
+  onSelectUser,
+  onEdit,
+  onOverride,
+}: {
+  loading: boolean
+  models: ModelGovernanceRow[]
+  users: AdminUser[]
+  selectedUser: string
+  selected: AdminUser | undefined
+  accessLoading: boolean
+  overrides: Map<string, boolean>
+  overridePending: string
+  onSelectUser: (userId: string) => void
+  onEdit: (model: ModelGovernanceRow) => void
+  onOverride: (model: ModelGovernanceRow, value: string) => Promise<void>
+}) {
+  return (
+    <Section
+      className="responsiveSection"
+      title="组织模型权限与计价"
+      meta={loading ? undefined : `${models.length} 个模型`}
+      actions={users.length === 0 ? undefined : (
+        <div className="modelUserPicker">
+          <span>用户例外</span>
+          <select className="select selectCompact" value={selectedUser} onChange={event => onSelectUser(event.target.value)} aria-label="用户例外">
+            {users.map(user => <option key={user.id} value={user.id}>{user.username}（{user.role === 'admin' ? '管理员' : '用户'}）</option>)}
+          </select>
+        </div>
+      )}
+    >
+      {loading ? <LoadingState label="正在加载模型治理配置" /> : models.length === 0 ? (
+        <EmptyState
+          icon={Sparkles}
+          title="还没有组织模型"
+          detail="完整模型目录由组织 Provider 配置统一维护。"
+        />
+      ) : (
+        <>
+          {users.length === 0 ? <div className="inlineNotice">暂无用户；角色默认与计价仍可配置。</div> : null}
+          <div className="tableWrap desktopOnly">
+            <table className="dataTable modelTable">
+              <thead>
+                <tr>
+                  <th>模型</th>
+                  <th>状态</th>
+                  <th>角色默认</th>
+                  <th>{selected === undefined ? '用户例外' : `${selected.username} 的例外`}</th>
+                  <th>价格（元 / 百万 Token）</th>
+                  <th aria-label="操作" />
+                </tr>
+              </thead>
+              <tbody>
+                {models.map(row => {
+                  const key = modelKey(row)
+                  const override = overrides.get(key)
+                  return (
+                    <tr key={key}>
+                      <td><ModelIdentity row={row} /></td>
+                      <td><StatusBadge tone={row.enabled ? 'success' : 'danger'}>{row.enabled ? '已启用' : '已停用'}</StatusBadge></td>
+                      <td><RoleDefaults row={row} /></td>
+                      <td>
+                        <OverrideSelect
+                          label={selected === undefined ? '用户例外' : `${selected.username} 的例外`}
+                          disabled={selectedUser === '' || accessLoading || overridePending === key}
+                          value={override}
+                          onChange={value => { void onOverride(row, value) }}
+                        />
+                      </td>
+                      <td><PriceSummary row={row} /></td>
+                      <td><div className="rowActions"><IconButton label="配置模型治理" icon={Pencil} onClick={() => onEdit(row)} /></div></td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="mobileList">
+            {models.map(row => {
+              const key = modelKey(row)
+              const override = overrides.get(key)
+              return (
+                <article className="mobileItem" key={key}>
+                  <div className="mobileItemHeader">
+                    <ModelIdentity row={row} />
+                    <IconButton label="配置模型治理" icon={Pencil} onClick={() => onEdit(row)} />
+                  </div>
+                  <div className="mobileItemBody">
+                    <div className="mobileStatusRow">
+                      <StatusBadge tone={row.enabled ? 'success' : 'danger'}>{row.enabled ? '已启用' : '已停用'}</StatusBadge>
+                      <RoleDefaults row={row} />
+                    </div>
+                    <div>
+                      <span className="fieldLabel">{selected === undefined ? '用户例外' : `${selected.username} 的例外`}</span>
+                      <OverrideSelect
+                        label={selected === undefined ? '用户例外' : `${selected.username} 的例外`}
+                        disabled={selectedUser === '' || accessLoading || overridePending === key}
+                        value={override}
+                        onChange={value => { void onOverride(row, value) }}
+                      />
+                    </div>
+                    <div><span className="fieldLabel">价格（元 / 百万 Token）</span><PriceSummary row={row} /></div>
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        </>
+      )}
+    </Section>
   )
 }
 
@@ -332,13 +377,14 @@ function RoleDefaults({ row }: { row: ModelGovernanceRow }) {
   )
 }
 
-function OverrideSelect({ value, disabled, onChange }: {
+function OverrideSelect({ label, value, disabled, onChange }: {
+  label: string
   value: boolean | undefined
   disabled: boolean
   onChange: (value: string) => void
 }) {
   return (
-    <select className="select selectCompact overrideSelect" disabled={disabled} value={value === undefined ? 'inherit' : value ? 'allow' : 'deny'} onChange={event => onChange(event.target.value)}>
+    <select aria-label={label} className="select selectCompact overrideSelect" disabled={disabled} value={value === undefined ? 'inherit' : value ? 'allow' : 'deny'} onChange={event => onChange(event.target.value)}>
       <option value="inherit">继承角色</option>
       <option value="allow">允许</option>
       <option value="deny">拒绝</option>

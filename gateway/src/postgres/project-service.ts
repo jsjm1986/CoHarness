@@ -4,9 +4,9 @@ import { mkdir, realpath, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { CollaborationDeniedError } from '../collaboration.ts'
 import type { GatewayConfig } from '../config.ts'
+import { assertProjectImportPathAllowed } from '../project-directories.ts'
 import {
   ensureManagedProjectDirectory,
-  isProjectPathIsolated,
   normalizeProjectName,
   projectPathsOverlap,
   resolveProjectDirectory,
@@ -88,7 +88,7 @@ export class PostgresProjectService {
     }
     if (canonical === undefined) throw new Error('managed project directory allocation failed')
     try {
-      await this.assertNotReserved(canonical)
+      await this.assertNotReserved(canonical, true)
       return await this.insert({
         name,
         canonical,
@@ -148,7 +148,7 @@ export class PostgresProjectService {
     } catch (error) {
       if (isCodedError(error) && error.code === '23505') {
         if (error.constraint === 'projects_organization_id_name_key') throw new Error(`duplicate project name: ${input.name}`)
-        if (error.constraint === 'project_mounts_node_id_canonical_path_key') throw new Error(`duplicate project path: ${input.canonical}`)
+        if (error.constraint === 'project_mounts_node_id_canonical_path_key') throw new Error('project-path-overlap')
         throw new Error(`duplicate project: ${error.message}`)
       }
       throw error
@@ -491,18 +491,8 @@ export class PostgresProjectService {
     return grants
   }
 
-  private async assertNotReserved(canonical: string): Promise<void> {
-    if (this.cfg.launcher === 'systemd' && !isProjectPathIsolated(canonical, this.cfg.projectPathRoots)) {
-      throw new Error(`project path is outside HGW_PROJECT_PATH_ROOTS: ${canonical}`)
-    }
-    const reservedPaths = [this.cfg.usersRoot, this.cfg.projectRuntimesRoot]
-      .map(path => realpathIfPresent(path) ?? path)
-    for (const reserved of reservedPaths) {
-      if (canonical === reserved) throw new Error(`project path overlaps reserved path: ${reserved}`)
-    }
-    if (this.cfg.launcher === 'systemd' && projectPathsOverlap(canonical, this.cfg.gatewayDir)) {
-      throw new Error(`project path overlaps gateway directory: ${this.cfg.gatewayDir}`)
-    }
+  private async assertNotReserved(canonical: string, allowUserProjectsRoot = false): Promise<void> {
+    assertProjectImportPathAllowed(this.cfg, canonical, { allowUserProjectsRoot })
     const users = await this.context.pool.query<{ username: string; home_path: string }>(
       'SELECT username::text,home_path FROM harness.users WHERE organization_id=$1',
       [this.context.organizationId],
@@ -510,26 +500,20 @@ export class PostgresProjectService {
     for (const user of users.rows) {
       const home = realpathIfPresent(user.home_path) ?? user.home_path
       if (projectPathsOverlap(canonical, home)) {
-        throw new Error(`path is a user home: ${canonical}`)
+        throw new Error('project-path-reserved')
       }
       const dsh = join(this.cfg.usersRoot, user.username, 'dsh')
       const canonicalDsh = realpathIfPresent(dsh) ?? dsh
       if (projectPathsOverlap(canonical, canonicalDsh)) {
-        throw new Error(`path is a user dsh home: ${canonical}`)
+        throw new Error('project-path-reserved')
       }
-    }
-    for (const reserved of reservedPaths) {
-      if (projectPathsOverlap(canonical, reserved)) throw new Error(`project path overlaps reserved path: ${reserved}`)
     }
     const projects = await this.context.pool.query<{ path: string }>(`SELECT pm.canonical_path path
       FROM harness.project_mounts pm
       JOIN harness.projects p ON p.id=pm.project_id AND p.organization_id=pm.organization_id
       WHERE pm.organization_id=$1 AND pm.node_id=$2 AND pm.status='active' AND p.status='active'`,
     [this.context.organizationId, this.context.nodeId])
-    if (projects.rows.some(project => project.path === canonical)) {
-      throw new Error(`duplicate project path: ${canonical}`)
-    }
     const overlap = projects.rows.find(project => projectPathsOverlap(canonical, project.path))
-    if (overlap !== undefined) throw new Error(`project path overlaps existing project: ${overlap.path}`)
+    if (overlap !== undefined) throw new Error('project-path-overlap')
   }
 }

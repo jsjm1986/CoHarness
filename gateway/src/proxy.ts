@@ -55,8 +55,14 @@ export function createProxyHandlers(
     if (!await instances.isLive(target)) {
       const pending = instances.ensureRunning(context.runtime)
       if (res !== null) {
-        if (wantsHtml(req)) { res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); res.end(waitingPage()) }
-        else { res.writeHead(503, { 'content-type': 'application/json' }); res.end('{"error":"instance-starting"}') }
+        const retryHeaders = { 'cache-control': 'no-store', 'retry-after': '2' }
+        if (wantsHtml(req)) {
+          res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', ...retryHeaders })
+          res.end(waitingPage())
+        } else {
+          res.writeHead(503, { 'content-type': 'application/json', ...retryHeaders })
+          res.end('{"error":"instance-starting"}')
+        }
         pending.catch(error => { console.error(`[gateway] instance start failed for ${target.kind} ${String(target.id)}:`, error) })
         return null
       }

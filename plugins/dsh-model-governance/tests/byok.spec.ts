@@ -57,6 +57,7 @@ function writePolicy(home: string, body: Record<string, unknown>): void {
     defaultAllowed: false,
     userDeclaredAllowed: false,
     models: [],
+    providers: [],
     intakeUrl: 'http://127.0.0.1:1/usage',
     intakeToken: 'token',
     ...body,

@@ -7,7 +7,7 @@
  */
 
 import type {
-  ConfigurableProviderView, CredentialView, IApiClient, SettingsNamespaceView,
+  ConfigurableProviderView, CredentialView, IApiClient, ModelProviderGroup, SettingsNamespaceView,
 } from '@deepseek-ai/dsh-api-remotes/client'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
@@ -31,6 +31,10 @@ export interface ProviderRow {
   apiKeyEnv: string | undefined
   /** Credential state for {@link apiKeyEnv}, once described. */
   credential: CredentialView | undefined
+  /** Models the current runtime policy permits through this route. */
+  models: readonly ModelProviderGroup['models'][number][]
+  /** Provider catalog failure, when model listing failed for this route. */
+  catalogFailure: string | undefined
 }
 
 /** Page snapshot. */
@@ -63,11 +67,15 @@ export function messageOf(error: unknown): string {
  * Derive the conventional credential reference for a provider route: the v1
  * page never asks for an environment-variable name, so a typed key stores
  * under this derived reference and the profile records it as `apiKeyEnv`.
+ * Organization-managed cards add the `DSH_` prefix so their references stay
+ * distinct from personal credentials.
  * @param provider - provider route id (e.g. `anthropic`, `minimax-cn`).
- * @returns the derived reference name (e.g. `MINIMAX_CN_API_KEY`).
+ * @param scope - ownership scope; organization references use the `DSH_` prefix.
+ * @returns the derived reference name (e.g. `MINIMAX_CN_API_KEY` or `DSH_ORG_PRIMARY_API_KEY`).
  */
-export function deriveKeyRef(provider: string): string {
-  return `${provider.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_API_KEY`
+export function deriveKeyRef(provider: string, scope: 'personal' | 'organization' = 'personal'): string {
+  const prefix = scope === 'organization' ? 'DSH_' : ''
+  return `${prefix}${provider.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_API_KEY`
 }
 
 /**
@@ -120,16 +128,22 @@ export class ModelsSettingsStore {
     const generation = ++this.generation
     this.store.update((s) => { s.status = 'loading'; s.error = null })
     let providers: ConfigurableProviderView[]
+    let modelGroups: ModelProviderGroup[]
+    let modelFailures: Array<{ id: string; message: string }>
     let writable: boolean
     let views: SettingsNamespaceView[]
     try {
-      const [providersResponse, settingsResponse] = await Promise.all([
+      const [providersResponse, modelsResponse, settingsResponse] = await Promise.all([
         this.api.llm.providers({}),
+        this.api.llm.models({}),
         this.api.settings.describe({}),
       ])
       if (!providersResponse.result.ok) throw new Error(providersResponse.result.error.message)
+      if (!modelsResponse.result.ok) throw new Error(modelsResponse.result.error.message)
       if (!settingsResponse.result.ok) throw new Error(settingsResponse.result.error.message)
       providers = providersResponse.result.value.providers
+      modelGroups = modelsResponse.result.value.groups
+      modelFailures = modelsResponse.result.value.failures
       writable = settingsResponse.result.value.writable
       views = settingsResponse.result.value.namespaces
     } catch (error) {
@@ -141,6 +155,8 @@ export class ModelsSettingsStore {
       return
     }
     const namespaces = new Map(views.map(view => [view.ns, view]))
+    const modelsByProvider = new Map(modelGroups.map(group => [group.id, group.models]))
+    const failuresByProvider = new Map(modelFailures.map(failure => [failure.id, failure.message]))
     const rows: ProviderRow[] = providers.map((entry) => {
       const namespace = namespaces.get(entry.settingsNs)
       const configured = namespace !== undefined
@@ -155,6 +171,8 @@ export class ModelsSettingsStore {
         removable,
         apiKeyEnv: apiKeyEnvOf(namespace, entry.settingsPath),
         credential: undefined,
+        models: modelsByProvider.get(entry.provider) ?? [],
+        catalogFailure: failuresByProvider.get(entry.provider),
       }
     })
     const refs = [...new Set(rows.flatMap(row => row.apiKeyEnv === undefined ? [] : [row.apiKeyEnv]))]
@@ -201,6 +219,7 @@ export class ModelsSettingsStore {
  */
 export function providerUsable(row: ProviderRow): boolean {
   if (!row.entry.active) return false
+  if (row.entry.management === 'organization') return row.models.length > 0
   if (row.apiKeyEnv === undefined) return true
   return row.credential?.configured === true
 }

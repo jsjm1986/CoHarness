@@ -1,3 +1,5 @@
 - insert:
+    - id: gateway-runtime
+      name: '@deepseek-ai/dsh-gateway-runtime'
     - id: model-governance
       name: '@deepseek-ai/dsh-model-governance'

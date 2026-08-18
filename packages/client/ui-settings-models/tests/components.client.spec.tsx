@@ -48,7 +48,7 @@ const PiAiConfig = Schema.object({
 const DeepSeekConfig = Schema.object({
   apiKeyEnv: Schema.string().role('credential-ref'),
   baseURL: Schema.string().pattern(/^https:\/\//),
-  reasoningEffort: Schema.union(['off', 'high', 'max']),
+  reasoningEffort: Schema.union(['off', 'low', 'high', 'max']),
   defaultContextWindow: Schema.number().step(1).min(1),
   models: Schema.array(Schema.object({
     id: Schema.string().required(),
@@ -148,17 +148,17 @@ function scriptedFace(overrides: {
   const unset = overrides.unset ?? vi.fn(() => Promise.resolve(ok({})))
   const face = {
     llm: {
-      providers: vi.fn(() => Promise.resolve(ok({
+      providers: vi.fn<WireFace['llm']['providers']>(() => Promise.resolve(ok({
         providers: [
-          { provider: 'deepseek-official', displayName: 'DeepSeek', settingsNs: 'llm-deepseek', settingsPath: [], active: true },
-          { provider: 'openai', displayName: 'openai', settingsNs: 'llm-pi-ai', settingsPath: ['providers', 'openai'], active: true },
-          { provider: 'anthropic', displayName: 'anthropic', settingsNs: 'llm-pi-ai', settingsPath: ['providers', 'anthropic'], active: false },
-          { provider: 'zombie', displayName: 'zombie', settingsNs: 'llm-pi-ai', settingsPath: ['providers', 'zombie'], active: false },
-          { provider: 'broken', displayName: 'broken', settingsNs: 'llm-pi-ai', settingsPath: ['nope', 'x'], active: false },
-          { provider: 'plain', displayName: 'plain', settingsNs: 'llm-plain', settingsPath: ['profiles', 'plain'], active: false },
+          { provider: 'deepseek-official', displayName: 'DeepSeek', settingsNs: 'llm-deepseek', settingsPath: [], active: true, management: 'personal' as const },
+          { provider: 'openai', displayName: 'openai', settingsNs: 'llm-pi-ai', settingsPath: ['providers', 'openai'], active: true, management: 'personal' as const },
+          { provider: 'anthropic', displayName: 'anthropic', settingsNs: 'llm-pi-ai', settingsPath: ['providers', 'anthropic'], active: false, management: 'personal' as const },
+          { provider: 'zombie', displayName: 'zombie', settingsNs: 'llm-pi-ai', settingsPath: ['providers', 'zombie'], active: false, management: 'personal' as const },
+          { provider: 'broken', displayName: 'broken', settingsNs: 'llm-pi-ai', settingsPath: ['nope', 'x'], active: false, management: 'personal' as const },
+          { provider: 'plain', displayName: 'plain', settingsNs: 'llm-plain', settingsPath: ['profiles', 'plain'], active: false, management: 'personal' as const },
         ],
       }))),
-      models: vi.fn(() => Promise.resolve(ok({ groups: [], failures: [] }))),
+      models: vi.fn<WireFace['llm']['models']>(() => Promise.resolve(ok({ groups: [], failures: [] }))),
     },
     settings: {
       describe: vi.fn(() => Promise.resolve(ok({ writable: true, hasDocument: false, namespaces: wireNamespaces() }))),
@@ -183,7 +183,10 @@ function scriptedFace(overrides: {
 
 type WireFace = ConstructorParameters<typeof ModelsSettingsStore>[0]
 
-async function mountFace(scripted: ReturnType<typeof scriptedFace>) {
+async function mountFace(
+  scripted: ReturnType<typeof scriptedFace>,
+  section: Pick<ModelsSectionProps, 'managementScope' | 'providerIdPattern'> = {},
+) {
   const { face, update, replace, mutate, set, unset } = scripted
   const controller = new ModelsSettingsStore(face as unknown as WireFace)
   await controller.load()
@@ -193,7 +196,7 @@ async function mountFace(scripted: ReturnType<typeof scriptedFace>) {
     api: face as never,
     t,
   }
-  const view = render(<ModelsSection {...injected} />)
+  const view = render(<ModelsSection {...injected} {...section} />)
   return { view, face, update, replace, mutate, set, unset, controller }
 }
 
@@ -230,6 +233,38 @@ describe('ModelsSection', () => {
     const uninjected = {} as ModelsSectionProps
     render(<ModelsSection {...uninjected} />)
     expect(document.body.textContent).toBe('')
+  })
+
+  it('renders authorized organization models as read-only rows', async () => {
+    const scripted = scriptedFace()
+    scripted.face.llm.providers.mockImplementation(() => Promise.resolve(ok({
+      providers: [
+        { provider: 'org-primary', displayName: 'Organization', settingsNs: '', settingsPath: [], active: true, management: 'organization' as const },
+        { provider: 'org-empty', displayName: 'Empty Organization Route', settingsNs: '', settingsPath: [], active: true, management: 'organization' as const },
+        { provider: 'org-failed', displayName: 'Failed Organization Route', settingsNs: '', settingsPath: [], active: true, management: 'organization' as const },
+      ],
+    })))
+    scripted.face.llm.models.mockImplementation(() => Promise.resolve(ok({
+      groups: [{ id: 'org-primary', name: 'Organization', models: [{ id: 'chat', name: 'Organization Chat' }] }],
+      failures: [{ id: 'org-failed', name: 'Failed Organization Route', message: 'catalog down' }],
+    })))
+    await mountFace(scripted)
+
+    expect(screen.getByRole('heading', { name: en.organizationTitle })).toBeTruthy()
+    expect(screen.getByText('Organization Chat')).toBeTruthy()
+    expect(screen.getByText(en.organizationNoModels)).toBeTruthy()
+    expect(screen.getByText(en.organizationCatalogFailed)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Edit Organization (org-primary)' })).toBeNull()
+  })
+
+  it('scopes the page to organization routes and hides personal rows', async () => {
+    await mountFace(scriptedFace(), {
+      managementScope: 'organization',
+      providerIdPattern: /^org-[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/,
+    })
+    expect(screen.queryByRole('heading', { name: en.organizationTitle })).toBeNull()
+    expect(screen.queryByText('openai')).toBeNull()
+    expect(screen.queryByText('DeepSeek')).toBeNull()
   })
 
   it('renders the unkeyed whole-section provider as an open setup card in the first-run posture', async () => {
@@ -302,13 +337,15 @@ describe('ModelsSection', () => {
   })
 
   it('decides setup need from the joined credential state and the first-run posture', () => {
-    const entry = { provider: 'p', displayName: 'p', settingsNs: 'llm-deepseek', settingsPath: [], active: true }
+    const entry = { provider: 'p', displayName: 'p', settingsNs: 'llm-deepseek', settingsPath: [], active: true, management: 'personal' as const }
     const row = (credential: ProviderRow['credential']): ProviderRow => ({
       entry,
       configured: true,
       removable: false,
       apiKeyEnv: 'X',
       credential,
+      models: [],
+      catalogFailure: undefined,
     })
     expect(needsSetup(row(undefined), false)).toBe(true)
     expect(needsSetup(row({ configured: true, writable: true }), false)).toBe(false)
@@ -322,6 +359,7 @@ describe('ModelsSection', () => {
   it('derives conventional credential references from route ids', () => {
     expect(deriveKeyRef('anthropic')).toBe('ANTHROPIC_API_KEY')
     expect(deriveKeyRef('minimax-cn')).toBe('MINIMAX_CN_API_KEY')
+    expect(deriveKeyRef('org-primary', 'organization')).toBe('DSH_ORG_PRIMARY_API_KEY')
   })
 
   it('uses one stable provider identity in action copy', () => {
@@ -655,6 +693,35 @@ describe('ModelsSection', () => {
     expect(screen.getByText(en.modelsInherited)).toBeTruthy()
     expect(screen.getAllByLabelText(new RegExp(en.modelId)).map(input => (input as HTMLInputElement).value))
       .toEqual(base === undefined ? ['deepseek-v4-flash', 'deepseek-v4-pro'] : ['pinned-by-deployment'])
+  })
+
+  it('keeps the organization catalog override instead of offering a personal restore', async () => {
+    const { face } = scriptedFace()
+    const stored = { models: [{ id: 'org-only-model', name: 'Org Only' }] }
+    const overridden: SettingsNamespaceView = {
+      ns: 'llm-deepseek',
+      schema: JSON.parse(JSON.stringify(DeepSeekConfig.toJSON())) as unknown,
+      value: { ...stored, defaultContextWindow: 1_000_000 },
+      user: stored,
+      applies: 'live',
+      secrets: [],
+      revision: 0,
+    }
+    const { ProviderEditor } = await import('../src/client/ProviderEditor.tsx')
+    render(<ProviderEditor
+      provider="org-primary"
+      displayName="Organization"
+      namespace={overridden}
+      settingsPath={[]}
+      api={face as never}
+      t={t}
+      readOnly={false}
+      credentialScope="organization"
+      onClose={() => {}}
+    />)
+    fireEvent.click(screen.getByText(en.customized))
+    expect(screen.getByText(en.modelsCustomized)).toBeTruthy()
+    expect(screen.queryByText(en.resetModels)).toBeNull()
   })
 
   it('keeps every row\'s unreadable text, not just the last one edited', async () => {

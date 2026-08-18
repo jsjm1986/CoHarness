@@ -261,7 +261,7 @@ abstract currentCreation(): CollaborationSessionCreation | undefined
 abstract withSessionCreation<T>( creation: CollaborationSessionCreation, operation: () => Promise<T>, ): Promise<T>
 ```
 
-Source: [`packages/context/collaboration/src/index.ts:116`](../../packages/context/collaboration/src/index.ts)
+Source: [`packages/context/collaboration/src/index.ts:157`](../../packages/context/collaboration/src/index.ts)
 
 <a id="ctxgatewayruntime--gatewayruntime"></a>
 

@@ -109,7 +109,11 @@ describe('proxy handlers', () => {
     expect(await deps.instances.isLive(alice.id)).toBe(false)
     const waiting = await fetch(base + '/', { headers: { cookie, accept: 'text/html' }, redirect: 'manual' })
     expect(waiting.status).toBe(200)
-    expect(await waiting.text()).toContain('正在启动您的工作台')
+    expect(waiting.headers.get('cache-control')).toBe('no-store')
+    expect(waiting.headers.get('retry-after')).toBe('2')
+    const waitingHtml = await waiting.text()
+    expect(waitingHtml).toContain('正在启动您的工作台')
+    expect(waitingHtml.indexOf('<meta http-equiv="refresh"')).toBeLessThan(waitingHtml.indexOf('</head>'))
     const deadline = Date.now() + 8000
     while (Date.now() < deadline && !await deps.instances.isLive(alice.id)) {
       await new Promise(r => setTimeout(r, 100))

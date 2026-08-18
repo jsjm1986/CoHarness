@@ -1,5 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { deleteUser, getProjectUsage, listAudit, listUsers, patchUser, setMember, setQuota } from './api.ts'
+import {
+  deleteUser,
+  getProjectModelAccess,
+  getProjectUsage,
+  listAudit,
+  listModelProviders,
+  listUsers,
+  patchUser,
+  saveModelProvider,
+  setMember,
+  setAllProjectModelAccess,
+  setProjectModelAccess,
+  setQuota,
+} from './api.ts'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -85,6 +98,67 @@ describe('admin api URLs', () => {
         credentials: 'same-origin',
         headers: { 'content-type': 'application/json' },
       },
+    ])
+  })
+
+  it('reads and writes organization providers and project model assignments', async () => {
+    const provider = {
+      provider: 'org-primary',
+      displayName: 'Primary',
+      driver: 'pi-ai' as const,
+      protocol: 'openai-completions' as const,
+      baseURL: 'https://api.example.com/v1',
+      authMode: 'api-key' as const,
+      status: 'draft' as const,
+      credential: 'secret',
+    }
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonOk([]))
+      .mockResolvedValueOnce(jsonOk(undefined, 204))
+      .mockResolvedValueOnce(jsonOk({ effective: {}, overrides: [] }))
+      .mockResolvedValueOnce(jsonOk(undefined, 204))
+      .mockResolvedValueOnce(jsonOk(undefined, 204))
+      .mockResolvedValueOnce(jsonOk(undefined, 204))
+    vi.stubGlobal('fetch', fetchMock)
+    await listModelProviders()
+    await saveModelProvider(provider)
+    await getProjectModelAccess(11)
+    await setProjectModelAccess(11, 'org-primary', 'deepseek-chat', true)
+    await setAllProjectModelAccess(11, true)
+    await setAllProjectModelAccess(11, null)
+    expect(fetchMock.mock.calls).toEqual([
+      ['/admin/api/model-providers', {
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json' },
+      }],
+      ['/admin/api/model-providers', {
+        method: 'PUT',
+        body: JSON.stringify(provider),
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json' },
+      }],
+      ['/admin/api/project-model-access?projectId=11', {
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json' },
+      }],
+      ['/admin/api/project-model-access', {
+        method: 'PUT',
+        body: JSON.stringify({ projectId: 11, provider: 'org-primary', model: 'deepseek-chat', allowed: true }),
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json' },
+      }],
+      ['/admin/api/project-model-access', {
+        method: 'PUT',
+        body: JSON.stringify({ projectId: 11, all: true, allowed: true }),
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json' },
+      }],
+      ['/admin/api/project-model-access', {
+        method: 'PUT',
+        body: JSON.stringify({ projectId: 11, all: true, allowed: null }),
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json' },
+      }],
     ])
   })
 

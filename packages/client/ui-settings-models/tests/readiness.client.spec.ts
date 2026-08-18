@@ -14,11 +14,14 @@ function row(overrides: Partial<ProviderRow> = {}): ProviderRow {
       settingsNs: 'llm-deepseek',
       settingsPath: [],
       active: true,
+      management: 'personal',
     },
     configured: true,
     removable: false,
     apiKeyEnv: 'DEEPSEEK_API_KEY',
     credential: missingCredential,
+    models: [],
+    catalogFailure: undefined,
     ...overrides,
   }
 }
@@ -32,11 +35,14 @@ function otherRow(overrides: Partial<ProviderRow> = {}): ProviderRow {
       settingsNs: 'llm-pi-ai',
       settingsPath: ['providers', 'hfai'],
       active: true,
+      management: 'personal',
     },
     configured: true,
     removable: true,
     apiKeyEnv: 'HFAI_API_KEY',
     credential: { configured: true, source: 'file', writable: true },
+    models: [],
+    catalogFailure: undefined,
     ...overrides,
   }
 }
@@ -63,6 +69,17 @@ describe('providerUsable', () => {
 
   it('treats a reference-free registered route as provider-native authentication', () => {
     expect(providerUsable(otherRow({ apiKeyEnv: undefined, credential: undefined }))).toBe(true)
+  })
+
+  it('requires at least one authorized model for an organization route', () => {
+    const organization = otherRow({
+      entry: { ...otherRow().entry, management: 'organization', settingsNs: '', settingsPath: [] },
+      apiKeyEnv: undefined,
+      credential: undefined,
+      models: [{ id: 'chat', name: 'Organization Chat' }],
+    })
+    expect(providerUsable(organization)).toBe(true)
+    expect(providerUsable({ ...organization, models: [] })).toBe(false)
   })
 })
 

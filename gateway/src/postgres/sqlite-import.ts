@@ -197,12 +197,23 @@ export async function importSqliteControlPlane(pool: Pool, options: SqliteImport
       }
 
       const sourceModels = rows(db, 'model_catalog')
+      for (const provider of new Set(sourceModels.map(row => String(row.provider)))) {
+        await client.query(`INSERT INTO harness.model_providers(
+          organization_id,provider_key,display_name,auth_mode,status,source
+        ) VALUES($1,$2,$2,'none','draft','legacy-catalog')
+        ON CONFLICT(organization_id,provider_key) DO NOTHING`, [organizationId, provider])
+      }
       for (const row of sourceModels) {
+        const provider = await client.query<{ id: string }>(`SELECT id FROM harness.model_providers
+          WHERE organization_id=$1 AND provider_key=$2`, [organizationId, row.provider])
+        const providerId = provider.rows[0]?.id
+        if (providerId === undefined) throw new Error(`missing imported provider ${String(row.provider)}`)
         await client.query(`INSERT INTO harness.model_catalog(
-          organization_id,provider_key,model_key,display_name,enabled,created_at,updated_at
-        ) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(organization_id,provider_key,model_key) DO UPDATE SET
+          organization_id,provider_id,provider_key,model_key,display_name,enabled,created_at,updated_at
+        ) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(organization_id,provider_key,model_key) DO UPDATE SET
           display_name=excluded.display_name,enabled=excluded.enabled,updated_at=excluded.updated_at`,
-        [organizationId, row.provider, row.model, row.display_name, row.enabled === 1, epoch(row.created_at), epoch(row.updated_at)])
+        [organizationId, providerId, row.provider, row.model, row.display_name, row.enabled === 1,
+          epoch(row.created_at), epoch(row.updated_at)])
       }
       for (const row of rows(db, 'model_role_access')) {
         const id = await modelId(client, organizationId, row.provider, row.model)
@@ -270,6 +281,11 @@ export async function importSqliteControlPlane(pool: Pool, options: SqliteImport
           await idForLegacy(client, 'users', organizationId, row.user_id), `${String(row.month)}-01`, row.metric,
           row.threshold, epoch(row.created_at),
         ])
+      }
+
+      if (sourceModels.length > 0) {
+        await client.query(`UPDATE harness.organizations SET
+          model_configuration_revision=model_configuration_revision+1,updated_at=now() WHERE id=$1`, [organizationId])
       }
 
       const sourceAudits = rows(db, 'audit_log')

@@ -8,6 +8,7 @@ import { stubSettingsScope, type StubSettingsScope } from '@deepseek-ai/dsh-clie
 import { CardForm, numberField, textField } from '../src/client/card-form.ts'
 import { AgentLoopCardController, type AgentLoopSettings } from '../src/client/agent-loop-card-controller.ts'
 import { BashCardController, type BashSettings } from '../src/client/bash-card-controller.ts'
+import { ConfigurablePluginsTabController } from '../src/client/tab-store.ts'
 import { WebSearchCardController, type WebSearchSettings } from '../src/client/web-search-card-controller.ts'
 
 /** Make the stub behave like a Host that accepts every write. */
@@ -380,7 +381,7 @@ describe('AgentLoopCardController', () => {
 })
 
 describe('WebSearchCardController', () => {
-  it('reads the credential state for the reference the section names', async () => {
+  it('reads the credential state for the reference the tab names', async () => {
     const host = stubSettingsScope<WebSearchSettings>()
     const credentials = credentialsApi(true)
     const controller = new WebSearchCardController(host.scope, credentials.api)
@@ -460,7 +461,7 @@ describe('WebSearchCardController', () => {
     })
   })
 
-  it('addresses the reference the section declares rather than the default', async () => {
+  it('addresses the reference the tab declares rather than the default', async () => {
     const host = stubSettingsScope<WebSearchSettings>()
     const credentials = credentialsApi(false)
     const controller = new WebSearchCardController(host.scope, credentials.api)
@@ -536,5 +537,142 @@ describe('WebSearchCardController', () => {
 
     expect(host.set.mock.calls).toEqual([['baseURL', 'https://other.test'], ['maxUses', 3]])
     expect(credentials.set).not.toHaveBeenCalled()
+  })
+})
+
+describe('ConfigurablePluginsTabController', () => {
+  function settingsApi(namespaces: string[]) {
+    const describe = vi.fn(() => Promise.resolve({
+      rpcId: 's-1' as never,
+      result: {
+        ok: true as const,
+        value: {
+          writable: true,
+          hasDocument: true,
+          namespaces: namespaces.map(ns => ({
+            ns, schema: {}, value: {}, applies: 'live' as const, secrets: [], revision: 0,
+          })),
+        },
+      },
+    }))
+    return { api: { settings: { describe } } as never, describe }
+  }
+
+  function ledger(...keys: string[]) {
+    return keys.map(key => ({ component: null, options: { key } }))
+  }
+
+  it('uses card registration order for served namespaces claimed by a card', async () => {
+    const settings = settingsApi(['shell', 'ui-theme', 'agent-loop'])
+    const controller = new ConfigurablePluginsTabController(
+      settings.api,
+      () => ledger('agent-loop', 'shell'),
+    )
+
+    await controller.load()
+
+    expect(controller.inject().hooks.configurablePlugins.getSnapshot().namespaces)
+      .toEqual(['agent-loop', 'shell'])
+  })
+
+  it('omits cards whose namespace the deployment does not serve', async () => {
+    const settings = settingsApi(['shell'])
+    const controller = new ConfigurablePluginsTabController(
+      settings.api,
+      () => ledger('shell', 'web-search-deepseek'),
+    )
+
+    await controller.load()
+
+    expect(controller.inject().hooks.configurablePlugins.getSnapshot().namespaces).toEqual(['shell'])
+  })
+
+  it('adds a card registered after the Host read without another wire call', async () => {
+    const settings = settingsApi(['shell'])
+    let entries = ledger()
+    const controller = new ConfigurablePluginsTabController(settings.api, () => entries)
+    await controller.load()
+
+    entries = ledger('shell')
+    controller.refresh()
+
+    expect(controller.inject().hooks.configurablePlugins.getSnapshot().namespaces).toEqual(['shell'])
+    expect(settings.describe).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the last successful directory when a later read fails', async () => {
+    const settings = settingsApi(['shell'])
+    const controller = new ConfigurablePluginsTabController(settings.api, () => ledger('shell'))
+    await controller.load()
+    settings.describe.mockRejectedValueOnce(new Error('offline'))
+
+    await controller.load()
+
+    expect(controller.inject().hooks.configurablePlugins.getSnapshot().namespaces).toEqual(['shell'])
+  })
+
+  it('does not read or publish after disposal', async () => {
+    const settings = settingsApi(['shell'])
+    const controller = new ConfigurablePluginsTabController(settings.api, () => ledger('shell'))
+
+    controller.dispose()
+    await controller.load()
+
+    expect(controller.inject().hooks.configurablePlugins.getSnapshot())
+      .toEqual({ loaded: false, namespaces: [] })
+    expect(settings.describe).not.toHaveBeenCalled()
+  })
+
+  it('ignores a card registration after disposal', async () => {
+    const settings = settingsApi(['shell'])
+    let entries = ledger()
+    const controller = new ConfigurablePluginsTabController(settings.api, () => entries)
+    await controller.load()
+
+    controller.dispose()
+    entries = ledger('shell')
+    controller.refresh()
+
+    expect(controller.inject().hooks.configurablePlugins.getSnapshot().namespaces).toEqual([])
+  })
+
+  it('drops a read superseded by a newer one', async () => {
+    const settings = settingsApi(['shell'])
+    const controller = new ConfigurablePluginsTabController(
+      settings.api,
+      () => ledger('shell', 'agent-loop'),
+    )
+    const slow = Promise.withResolvers<unknown>()
+    settings.describe.mockReturnValueOnce(slow.promise as never)
+    const stale = controller.load()
+
+    await controller.load()
+    expect(controller.inject().hooks.configurablePlugins.getSnapshot().namespaces).toEqual(['shell'])
+    slow.resolve({
+      rpcId: 's-0',
+      result: {
+        ok: true,
+        value: {
+          writable: true,
+          hasDocument: true,
+          namespaces: [
+            { ns: 'agent-loop', schema: {}, value: {}, applies: 'live', secrets: [], revision: 0 },
+          ],
+        },
+      },
+    })
+    await stale
+
+    expect(controller.inject().hooks.configurablePlugins.getSnapshot().namespaces).toEqual(['shell'])
+  })
+
+  it('records a successful Host answer even when no served namespace has a card', async () => {
+    const settings = settingsApi(['ui-theme'])
+    const controller = new ConfigurablePluginsTabController(settings.api, () => ledger('shell'))
+
+    await controller.load()
+
+    expect(controller.inject().hooks.configurablePlugins.getSnapshot())
+      .toEqual({ loaded: true, namespaces: [] })
   })
 })

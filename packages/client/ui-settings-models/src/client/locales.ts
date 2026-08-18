@@ -1,12 +1,14 @@
 /** Copy dictionaries for the Models settings section. */
 
-import { WELCOME_NOTICE_COPY } from '../onboarding-copy.ts'
-
 /** English strings (the key-set source of truth for this pair). */
 export const en = {
   nav: 'Models',
   title: 'Models',
-  intro: 'Enter your API keys to use models from the following providers.',
+  intro: 'Use models assigned by your organization, or add a personal provider with your own API key.',
+  organizationTitle: 'Organization models',
+  organizationManaged: 'Managed by your organization',
+  organizationNoModels: 'No organization models are assigned to your account.',
+  organizationCatalogFailed: 'The organization model catalog is temporarily unavailable.',
   edit: 'Edit',
   editProvider: 'Edit {provider}',
   remove: 'Delete',
@@ -87,10 +89,6 @@ export const en = {
   customNeedsModels: 'A custom provider needs at least one model.',
   create: 'Create provider',
   creating: 'Creating\u2026',
-  welcomeTitle: WELCOME_NOTICE_COPY.en.title,
-  welcomeBody: WELCOME_NOTICE_COPY.en.body,
-  welcomeContinue: WELCOME_NOTICE_COPY.en.continueLabel,
-  welcomeError: 'The acknowledgement could not be saved. Please try again.',
   onboardingTitle: 'Add an API key to get started',
   onboardingDescription: 'Configure the official DeepSeek provider to start building.',
   onboardingLater: 'Configure later',
@@ -106,7 +104,11 @@ export type ModelsKey = keyof typeof en
 export const zh: { [Key in keyof typeof en]: string } = {
   nav: '模型',
   title: '模型',
-  intro: '填入各提供方的 API 密钥即可使用其模型。',
+  intro: '使用组织分配的模型，或通过自己的 API 密钥添加个人提供方。',
+  organizationTitle: '组织模型',
+  organizationManaged: '由组织管理员管理',
+  organizationNoModels: '暂未向你的账号分配组织模型。',
+  organizationCatalogFailed: '暂时无法加载组织模型目录。',
   edit: '编辑',
   editProvider: '编辑 {provider}',
   remove: '删除',
@@ -187,10 +189,6 @@ export const zh: { [Key in keyof typeof en]: string } = {
   customNeedsModels: '自定义提供方至少需要一个模型。',
   create: '创建提供方',
   creating: '创建中\u2026',
-  welcomeTitle: WELCOME_NOTICE_COPY.zh.title,
-  welcomeBody: WELCOME_NOTICE_COPY.zh.body,
-  welcomeContinue: WELCOME_NOTICE_COPY.zh.continueLabel,
-  welcomeError: '暂时无法保存确认状态，请重试。',
   onboardingTitle: '添加一个 API Key 开始使用',
   onboardingDescription: '配置 DeepSeek 官方模型，即可开始使用。',
   onboardingLater: '稍后配置',

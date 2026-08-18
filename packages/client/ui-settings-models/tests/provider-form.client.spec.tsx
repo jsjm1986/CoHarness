@@ -90,6 +90,7 @@ function scriptedFace(options: {
           displayName: provider,
           settingsNs: 'llm-pi-ai',
           settingsPath: ['providers', provider],
+          management: 'personal' as const,
           active: true,
           declared: options.declaredRoutes?.includes(provider) ?? false,
         })),
@@ -137,7 +138,10 @@ function firstMutate(mutate: ReturnType<typeof vi.fn>): MutateCall {
   return call
 }
 
-async function mountSection(options: Parameters<typeof scriptedFace>[0] = {}) {
+async function mountSection(
+  options: Parameters<typeof scriptedFace>[0] = {},
+  section: Pick<ModelsSectionInjected, 'managementScope' | 'providerIdPattern'> = {},
+) {
   const scripted = scriptedFace(options)
   const controller = new ModelsSettingsStore(scripted.face as unknown as WireFace)
   await controller.load()
@@ -147,7 +151,7 @@ async function mountSection(options: Parameters<typeof scriptedFace>[0] = {}) {
     api: scripted.face as never,
     t,
   }
-  render(<ModelsSection {...injected} />)
+  render(<ModelsSection {...injected} {...section} />)
   return { ...scripted, controller }
 }
 
@@ -634,6 +638,7 @@ describe('provider rows', () => {
         displayName: 'openai',
         settingsNs: 'llm-pi-ai',
         settingsPath: ['providers', 'openai'],
+        management: 'personal',
         active: true,
       }],
     }))) as never
@@ -795,6 +800,7 @@ describe('hand-declared providers', () => {
         displayName: 'Acme 网关',
         settingsNs: 'llm-pi-ai',
         settingsPath: ['providers', 'acme-gateway'],
+        management: 'personal',
         active: true,
         declared: true,
       }],
@@ -1195,6 +1201,19 @@ describe('hand-declared providers', () => {
     fireEvent.click(screen.getByText(en.cancel))
     await waitFor(() => { expect(screen.queryByText(en.customTitle)).toBeNull() })
     expect(screen.getByRole('button', { name: en.customAdd })).toBeTruthy()
+  })
+
+  it('forwards a caller-supplied provider id pattern to the create card', async () => {
+    await mountSection({}, {
+      managementScope: 'organization',
+      providerIdPattern: /^org-[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/,
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: en.customAdd }))
+    fireEvent.change(screen.getByLabelText(en.customRoute), { target: { value: 'acme' } })
+    expect(screen.getByText(en.customRouteInvalid)).toBeTruthy()
+    fireEvent.change(screen.getByLabelText(en.customRoute), { target: { value: 'org-primary' } })
+    expect(screen.queryByText(en.customRouteInvalid)).toBeNull()
   })
 
   it('refuses an unusable key on the field and blocks creation', () => {

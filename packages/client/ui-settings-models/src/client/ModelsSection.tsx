@@ -34,6 +34,10 @@ export interface ModelsSectionInjected {
   api: Pick<IApiClient, 'settings' | 'credentials' | 'llm'>
   /** Section copy. */
   t: (key: keyof typeof en) => string
+  /** Which ownership layer this surface edits. Personal is the default. */
+  managementScope?: 'personal' | 'organization'
+  /** Route pattern used by the custom-provider creation card. */
+  providerIdPattern?: RegExp
 }
 
 /**
@@ -63,7 +67,7 @@ interface EditorTarget extends ProviderIdentity {
 /** Values that vary around the shared provider-editor rendering. */
 interface ProviderEditorRenderProps extends Pick<
   ProviderEditorProps,
-  'namespace' | 'api' | 't' | 'readOnly' | 'onClose'
+  'namespace' | 'api' | 't' | 'readOnly' | 'onClose' | 'credentialScope'
 > {
   target: EditorTarget
 }
@@ -131,12 +135,13 @@ export function needsSetup(row: ProviderRow, anyUsable: boolean): boolean {
   return row.credential?.configured !== true
 }
 
-function targetOf(row: ProviderRow): EditorTarget {
-  const managedRef = deriveKeyRef(row.entry.provider)
-  const credentialRef = row.apiKeyEnv === managedRef
+function targetOf(row: ProviderRow, managementScope: 'personal' | 'organization'): EditorTarget {
+  const managedRef = deriveKeyRef(row.entry.provider, managementScope)
+  const credentialRef = row.apiKeyEnv !== undefined
     && row.credential?.configured === true
     && row.credential.writable
-    ? managedRef
+    && (managementScope === 'organization' || row.apiKeyEnv === managedRef)
+    ? row.apiKeyEnv
     : undefined
   return {
     provider: row.entry.provider,
@@ -171,11 +176,23 @@ export function providerCopy(template: string, target: ProviderIdentity): string
 export function ModelsSection(props: ModelsSectionProps): ReactNode {
   const { controller, useSnapshot, api, t } = props
   if (controller === undefined || useSnapshot === undefined || api === undefined || t === undefined) return null
-  return <Loaded injected={{ controller, useSnapshot, api, t }} />
+  return (
+    <Loaded
+      injected={{
+        controller,
+        useSnapshot,
+        api,
+        t,
+        ...props.managementScope === undefined ? {} : { managementScope: props.managementScope },
+        ...props.providerIdPattern === undefined ? {} : { providerIdPattern: props.providerIdPattern },
+      }}
+    />
+  )
 }
 
 function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
   const { controller, api, t } = injected
+  const managementScope = injected.managementScope ?? 'personal'
   const state = injected.useSnapshot(snapshot => snapshot)
   const [editing, setEditing] = useState<EditorTarget | undefined>(undefined)
   const [adding, setAdding] = useState(false)
@@ -261,9 +278,13 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
 
   // One fact decides both first-run postures on this page and the onboarding
   // step: whether the user already has a provider to talk to.
-  const anyUsable = state.rows.some(providerUsable)
-  const configured = state.rows.filter(row => row.configured)
-  const addable = state.rows.filter(row => !row.configured && row.entry.settingsNs !== '')
+  const scopedRows = state.rows.filter(row => row.entry.management === managementScope)
+  const anyUsable = scopedRows.some(providerUsable)
+  const organization = managementScope === 'personal'
+    ? state.rows.filter(row => row.entry.management === 'organization')
+    : []
+  const configured = scopedRows.filter(row => row.configured)
+  const addable = scopedRows.filter(row => !row.configured)
   const addTarget = adding ? editing : undefined
   const addNamespace = addTarget === undefined ? undefined : state.namespaces.get(addTarget.settingsNs)
   // Hand-declared routes live in the pi-ai namespace, which is also the only
@@ -283,9 +304,43 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
             {providerCopy(t('savedProvider'), savedIdentity)}
           </p>
         )}
+      {organization.length === 0 ? null : (
+        <section className={styles['organizationSection']} aria-labelledby="organization-models-title">
+          <div className={styles['organizationHeading']}>
+            <h3 id="organization-models-title">{t('organizationTitle')}</h3>
+            <span>{t('organizationManaged')}</span>
+          </div>
+          <ul className={styles['organizationRows']}>
+            {organization.map(row => (
+              <li key={row.entry.provider} className={styles['organizationCard']}>
+                <div className={styles['organizationProvider']}>
+                  <span>
+                    <strong>{row.entry.displayName}</strong>
+                    <code>{row.entry.provider}</code>
+                  </span>
+                </div>
+                {row.catalogFailure === undefined ? (
+                  row.models.length === 0
+                    ? <p className={styles['organizationEmpty']}>{t('organizationNoModels')}</p>
+                    : (
+                      <ul className={styles['organizationModels']}>
+                        {row.models.map(model => (
+                          <li key={model.id}>
+                            <span>{model.name}</span>
+                            <code>{model.id}</code>
+                          </li>
+                        ))}
+                      </ul>
+                    )
+                ) : <p className={styles['organizationFailure']}>{t('organizationCatalogFailed')}</p>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <ul className={styles['rows']}>
         {configured.map((row) => {
-          const target = targetOf(row)
+          const target = targetOf(row, managementScope)
           const namespace = state.namespaces.get(target.settingsNs)
           /* v8 ignore next -- the join marks a row configured only when its namespace resolved */
           if (namespace === undefined) return null
@@ -300,6 +355,7 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
                   api,
                   t,
                   readOnly: !state.writable,
+                  credentialScope: managementScope,
                   onClose: (changed) => { closeSetup(changed, target) },
                 })}
               </li>
@@ -384,6 +440,7 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
                   api,
                   t,
                   readOnly: !state.writable,
+                  credentialScope: managementScope,
                   onClose: (changed) => { closeEditor(changed, target) },
                 })
                 : null}
@@ -405,7 +462,7 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
                     const row = addable.find(candidate => candidate.entry.provider === event.target.value)
                     /* v8 ignore next -- the select only lists addable rows */
                     if (row === undefined) return
-                    setEditing(targetOf(row))
+                    setEditing(targetOf(row, managementScope))
                   }}
                 >
                   {addable.map(row => (
@@ -423,6 +480,7 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
                 api={api}
                 t={t}
                 readOnly={!state.writable}
+                credentialScope={managementScope}
                 onClose={(changed) => { closeEditor(changed, addTarget) }}
               />
             </div>
@@ -431,13 +489,15 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
             ? (
               <div className={styles['addCard']}>
                 <CustomProviderCard
-                  taken={state.rows.map(row => row.entry.provider)}
+                  taken={scopedRows.map(row => row.entry.provider)}
                   protocols={protocols}
+                  {...injected.providerIdPattern === undefined ? {} : { routePattern: injected.providerIdPattern }}
                   /* v8 ignore next -- the card only opens from a button disabled without this namespace */
                   revision={state.namespaces.get('llm-pi-ai')?.revision ?? 0}
                   api={api}
                   t={t}
                   readOnly={!state.writable}
+                  credentialScope={managementScope}
                   onClose={(changed) => {
                     setDeclaring(false)
                     if (changed) void controller.load()
@@ -462,7 +522,7 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
                     setSavedTarget(undefined)
                     setDeclaring(false)
                     setAdding(true)
-                    setEditing(targetOf(first))
+                    setEditing(targetOf(first, managementScope))
                   }}
                 >
                   {/* Same glyph as the composer's attach button. */}

@@ -12,11 +12,17 @@ function fail<T>(message: string): RpcResponse<T> {
 }
 
 const DIRECTORY = [
-  { provider: 'deepseek-official', displayName: 'DeepSeek', settingsNs: 'llm-deepseek', settingsPath: [], active: true },
-  { provider: 'openai', displayName: 'openai', settingsNs: 'llm-pi-ai', settingsPath: ['providers', 'openai'], active: true },
-  { provider: 'anthropic', displayName: 'anthropic', settingsNs: 'llm-pi-ai', settingsPath: ['providers', 'anthropic'], active: false },
-  { provider: 'ghost', displayName: 'Ghost', settingsNs: '', settingsPath: [], active: true },
+  { provider: 'deepseek-official', displayName: 'DeepSeek', settingsNs: 'llm-deepseek', settingsPath: [], active: true, management: 'personal' as const },
+  { provider: 'openai', displayName: 'openai', settingsNs: 'llm-pi-ai', settingsPath: ['providers', 'openai'], active: true, management: 'personal' as const },
+  { provider: 'anthropic', displayName: 'anthropic', settingsNs: 'llm-pi-ai', settingsPath: ['providers', 'anthropic'], active: false, management: 'personal' as const },
+  { provider: 'org-primary', displayName: 'Organization', settingsNs: '', settingsPath: [], active: true, management: 'organization' as const },
+  { provider: 'ghost', displayName: 'Ghost', settingsNs: '', settingsPath: [], active: true, management: 'external' as const },
 ]
+
+const MODEL_CATALOG = {
+  groups: [{ id: 'org-primary', name: 'Organization', models: [{ id: 'chat', name: 'Organization Chat' }] }],
+  failures: [{ id: 'ghost', name: 'Ghost', message: 'catalog unavailable' }],
+}
 
 const NAMESPACES = [
   {
@@ -41,6 +47,7 @@ const NAMESPACES = [
 
 function api(overrides: {
   providers?: () => Promise<RpcResponse<{ providers: typeof DIRECTORY }>>
+  models?: () => Promise<RpcResponse<typeof MODEL_CATALOG>>
   describeSettings?: () => Promise<RpcResponse<{ writable: boolean; namespaces: typeof NAMESPACES }>>
   describeCredentials?: (refs: string[]) => Promise<RpcResponse<{ credentials: Record<string, unknown> }>>
 } = {}) {
@@ -48,7 +55,7 @@ function api(overrides: {
   const face = {
     llm: {
       providers: overrides.providers ?? (() => Promise.resolve(ok({ providers: DIRECTORY }))),
-      models: () => Promise.resolve(ok({ groups: [], failures: [] })),
+      models: overrides.models ?? (() => Promise.resolve(ok(MODEL_CATALOG))),
     },
     settings: {
       describe: overrides.describeSettings ?? (() => Promise.resolve(ok({ writable: true, hasDocument: false, namespaces: NAMESPACES }))),
@@ -94,7 +101,12 @@ describe('ModelsSettingsStore', () => {
     })
     expect(byProvider.get('anthropic')).toMatchObject({ configured: false, removable: false })
     expect(byProvider.get('anthropic')?.apiKeyEnv).toBeUndefined()
+    expect(byProvider.get('org-primary')).toMatchObject({
+      configured: false,
+      models: [{ id: 'chat', name: 'Organization Chat' }],
+    })
     expect(byProvider.get('ghost')).toMatchObject({ configured: false, removable: false })
+    expect(byProvider.get('ghost')?.catalogFailure).toBe('catalog unavailable')
     expect(state.namespaces.get('llm-pi-ai')?.ns).toBe('llm-pi-ai')
   })
 
@@ -134,7 +146,7 @@ describe('ModelsSettingsStore', () => {
     const { face } = api()
     const store = new ModelsSettingsStore(face)
     await store.load()
-    expect(store.store.getSnapshot().rows).toHaveLength(4)
+    expect(store.store.getSnapshot().rows).toHaveLength(5)
     const broken = api({ providers: () => Promise.resolve(fail('directory down')) })
     const failing = new ModelsSettingsStore(broken.face)
     await failing.load()
@@ -183,7 +195,7 @@ describe('edge joins', () => {
       })),
       providers: () => Promise.resolve(ok({
         providers: [
-          { provider: 'weird', displayName: 'weird', settingsNs: 'llm-pi-ai', settingsPath: ['providers', 'weird'], active: false },
+          { provider: 'weird', displayName: 'weird', settingsNs: 'llm-pi-ai', settingsPath: ['providers', 'weird'], active: false, management: 'personal' },
         ] as never,
       })),
     })
@@ -203,7 +215,7 @@ describe('edge joins', () => {
       })),
       providers: () => Promise.resolve(ok({
         providers: [
-          { provider: 'anthropic', displayName: 'anthropic', settingsNs: 'llm-pi-ai', settingsPath: ['providers', 'anthropic'], active: false },
+          { provider: 'anthropic', displayName: 'anthropic', settingsNs: 'llm-pi-ai', settingsPath: ['providers', 'anthropic'], active: false, management: 'personal' },
         ] as never,
       })),
     })
@@ -250,7 +262,14 @@ describe('edge joins', () => {
     release?.()
     await first
     // The stale empty directory never overwrote the newer join.
-    expect(store.store.getSnapshot().rows).toHaveLength(4)
+    expect(store.store.getSnapshot().rows).toHaveLength(5)
+  })
+
+  it('surfaces a model catalog response failure as a whole-page load failure', async () => {
+    const { face } = api({ models: () => Promise.resolve(fail('catalog down')) })
+    const store = new ModelsSettingsStore(face)
+    await store.load()
+    expect(store.store.getSnapshot()).toMatchObject({ status: 'error', error: 'catalog down' })
   })
 })
 

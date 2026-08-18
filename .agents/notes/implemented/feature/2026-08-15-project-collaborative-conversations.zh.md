@@ -26,11 +26,11 @@ Gateway 为个人 scope 的每个用户分配一个运行时，并为每个项�
 
 每条获准的人类消息都会附上已认证项目参与者元数据，并存入普通 `user/message` source。`dsh-collaboration-context` 在 `agent/pre-step` waterfall 委托后，立即在该消息前插入一条持久、模型可见的元数据提示，因此模型能够区分贡献者，回放也能重建相同归属。Web Chat transcript 用同一份 source 为每条人类气泡标注发送者，并把该提示从消息流中省略（[发送者归属](2026-08-17-web-chat-sender-attribution.md)）。PostgreSQL 从已提交事件投影参与者和贡献次数；后续账户或成员身份编辑不会重写历史归属。
 
-`dsh-client-ui-collaboration` 负责浏览器 scope 选择器、新根对话可见性选择、对话可见性/创建者/参与者菜单，以及供 `ro` 成员使用的完整只读 composer 替换。它使用已有 Client slot 和 `sessions/prepare-create` waterfall，而不修改对话 shell。New Session 会在考虑空白候选项之前运行该 waterfall，随后 `sessions/confirm-blank-reuse` 会让插件通过 Gateway 重新校验候选项的根可见性；只有可见性完全匹配时才允许复用。切换 scope 会刷新页面，因为个人与项目 scope 指向不同 Host 进程。共享项目运行时把 Host 设置暴露为只读：设置消费方不会尝试修改，欢迎提示只在当前 Client 进程内保留确认，因此整页重新加载后会再次显示。浏览器控件只提供操作入口；签名 principal、Host 授权、内部 API 和 PostgreSQL 事务仍具有权威性。
+`dsh-client-ui-collaboration` 负责浏览器 scope 选择器、新根对话可见性选择、对话可见性/创建者/参与者菜单，以及供 `ro` 成员使用的完整只读 composer 替换。它使用已有 Client slot 和 `sessions/prepare-create` waterfall，而不修改对话 shell。New Session 会在考虑空白候选项之前运行该 waterfall，随后 `sessions/confirm-blank-reuse` 会让插件通过 Gateway 重新校验候选项的根可见性；只有可见性完全匹配时才允许复用。切换 scope 会刷新页面，因为个人与项目 scope 指向不同 Host 进程。Gateway 会等待所选运行时就绪后再持久化 scope Cookie；启动失败会保留先前选择的 scope。若直接代理请求仍遇到已停止的运行时，响应会禁止缓存，HTML 自动刷新元数据会写入文档 head。共享项目运行时把 Host 设置暴露为只读：设置消费方不会尝试修改，欢迎提示只在当前 Client 进程内保留确认，因此整页重新加载后会再次显示。浏览器控件只提供操作入口；签名 principal、Host 授权、内部 API 和 PostgreSQL 事务仍具有权威性。
 
 Linux systemd 单元会先用只读临时文件系统遮蔽用户根、项目运行时根与所有已配置项目数据根，再仅回绑当前运行时 home、`$DSH_HOME` 和获准项目路径。`ProtectHome=tmpfs` 与不含 `CAP_SYS_ADMIN` 的 capability 集合会阻止实例通过 home 目录或挂载操作找回被隐藏的宿主目录树。管理员发起的项目会拒绝与用户、运行时数据、Gateway 目录或另一项目重叠的路径，并要求每个生产项目路径严格位于某个互不重叠的 `HGW_PROJECT_PATH_ROOTS` 条目之下。用户发起的项目在 `HGW_USER_PROJECTS_ROOT` 下分配，受控根必须为 `HGW_PROJECT_RUNTIME_USER` 继承组访问（例如 root 所有、setgid `2770` 的目录，或等效默认 ACL），保证新目录可被项目单元读写。共享单元不得以 root 运行。Gateway 启动会用 PostgreSQL advisory transaction lock 串行化节点本地端口分配，并从 `HGW_INSTANCE_PORT_BASE` 开始创建缺失的活跃项目运行时记录。
 
-项目模型用量、intake 凭据、额度和阈值告警归属于共享项目运行时，而不是发送某条提示的成员。管理端项目详情要求明确选择继承普通成员额度，或使用项目独立 token 加公司成本额度，并使用与全局 Usage 视图相同的计量组件显示项目自然月用量。
+项目模型用量、intake 凭据、额度和阈值告警归属于共享项目运行时，而不是发送某条提示的成员。管理端项目详情的额度弹窗默认使用项目独立且不限的 token 加公司成本额度，也可改为继承普通成员额度；用量区显示已保存的额度来源和配置摘要，并使用与全局 Usage 视图相同的计量组件显示项目自然月用量。
 
 删除项目时会先停止共享运行时，同时继续持有该运行时的串行实例操作槽，再删除 PostgreSQL 项目。外键级联会移除它的运行时行、成员与挂载、对话树与事件、参与者与交互记录、模型用量、额度与告警行、intake token 和内容文件元数据。项目目录本身永远不会被删除。
 
@@ -38,7 +38,7 @@ Linux systemd 单元会先用只读临时文件系统遮蔽用户根、项目运
 
 ## 验证
 
-包测试覆盖 principal 与启动凭据验证、提供方 dispose、严格事件响应解码、根继承 ACL、参与者归属与 invariant、Gateway 持久化行为、Client 状态与组件行为、空白会话可见性兼容性、只读欢迎确认回退，以及 `ro` composer 替换。Gateway 测试覆盖 systemd 遮蔽与回绑、项目根校验、运行时写入 envelope 拒绝、配置端口解析，以及管理员访问尚未物化的私密根对话。Host/API Proxy 测试覆盖各类会话操作拒绝、可读列表过滤、参与者传播、根创建可见性，以及审批/问题原子抢占。真实 PostgreSQL 测试覆盖直到版本 5 的 migration、包含项目邀请的可重复 SQLite 导入、完整 JSON 事件往返、从空节点配置端口基准分配共享运行时、创建者/私密可见性、无项目成员记录时基于当前角色的管理员覆盖、子会话继承、贡献投影、成员移除保护、交互竞态、项目凭据、项目用量和显式项目额度模式。Gateway 与 permission 测试覆盖按来源筛选的 Admin 视图、用户项目与邀请生命周期、管理员在个人和项目 scope 中的 `fullAccess`，以及拒绝管理员专用的新会话默认值。无密钥组装态 Web 浏览器场景通过交付的 Client 组合覆盖项目 scope、可见性控件、参与者展示、拒绝不匹配空白会话与复用匹配空白会话、`ro` 体验、进程内欢迎确认，以及 Chat 发送者标签。生产构建入口会在每个组件构建后验证完整运行时载荷。
+包测试覆盖 principal 与启动凭据验证、提供方 dispose、严格事件响应解码、根继承 ACL、参与者归属与 invariant、Gateway 持久化行为、Client 状态与组件行为、空白会话可见性兼容性、只读欢迎确认回退，以及 `ro` composer 替换。Gateway 测试覆盖 systemd 遮蔽与回绑、项目根校验、运行时写入 envelope 拒绝、配置端口解析、管理员访问尚未物化的私密根对话、持久化 scope 前启动目标运行时、启动失败时保留 scope，以及禁止缓存 HTML 重试响应。Host/API Proxy 测试覆盖各类会话操作拒绝、可读列表过滤、参与者传播、根创建可见性，以及审批/问题原子抢占。真实 PostgreSQL 测试覆盖直到版本 5 的 migration、包含项目邀请的可重复 SQLite 导入、完整 JSON 事件往返、从空节点配置端口基准分配共享运行时、创建者/私密可见性、无项目成员记录时基于当前角色的管理员覆盖、子会话继承、贡献投影、成员移除保护、交互竞态、项目凭据、项目用量和显式项目额度模式。Gateway 与 permission 测试覆盖按来源筛选的 Admin 视图、用户项目与邀请生命周期、管理员在个人和项目 scope 中的 `fullAccess`，以及拒绝管理员专用的新会话默认值。无密钥组装态 Web 浏览器场景通过交付的 Client 组合覆盖项目 scope、可见性控件、参与者展示、拒绝不匹配空白会话与复用匹配空白会话、`ro` 体验、进程内欢迎确认，以及 Chat 发送者标签。生产构建入口会在每个组件构建后验证完整运行时载荷。
 
 ## 曾考虑的替代方案
 

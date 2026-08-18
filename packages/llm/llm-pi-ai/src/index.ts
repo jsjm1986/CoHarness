@@ -59,11 +59,23 @@ import type { Context } from '@deepseek-ai/cordis'
 import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
 import { assertUsableApiKey, LlmError } from '@deepseek-ai/dsh-llm'
 import type { AdapterRegistrationHandle, DirectoryRegistrationHandle, LlmConfigurableProvider } from '@deepseek-ai/dsh-llm'
+import type {
+  ManagedModelCompat,
+  ManagedModelProfile,
+  ManagedModelProviderProfile,
+  ModelProviderConfigSnapshot,
+} from '@deepseek-ai/dsh-model-provider-config'
 import { deepEqualJson, installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
 import { PiAiAdapter } from './adapter.ts'
-import { catalogProviderIds, catalogProviderTakesApiKey } from './catalog.ts'
+import { catalogProviderIds, catalogProviderTakesApiKey, SUPPORTED_THINKING_FORMATS } from './catalog.ts'
 import { assertServiceable, Config, resolveProfiles } from './config.ts'
-import type { ResolvedPiAiProviderProfile } from './config.ts'
+import type {
+  PiAiCompatProfile,
+  PiAiModelProfile,
+  PiAiProviderProfile,
+  PiAiThinkingFormat,
+  ResolvedPiAiProviderProfile,
+} from './config.ts'
 import { discoverModels } from './discovery.ts'
 
 export { PiAiAdapter } from './adapter.ts'
@@ -85,6 +97,77 @@ export const name = 'llm-pi-ai'
 export const inject = ['llm']
 
 const NS = settingsNamespace('llm-pi-ai')
+const ORGANIZATION_PROVIDER_PREFIX = 'org-'
+const ORGANIZATION_CREDENTIAL_PREFIX = 'DSH_'
+
+function managedCompat(compat: ManagedModelCompat | undefined): PiAiCompatProfile | undefined {
+  if (compat === undefined) return undefined
+  const thinkingFormat = compat.thinkingFormat
+  if (thinkingFormat !== undefined
+    && !SUPPORTED_THINKING_FORMATS.includes(thinkingFormat as PiAiThinkingFormat)) {
+    throw new Error(`llm-pi-ai: organization model uses unsupported thinking format "${thinkingFormat}"`)
+  }
+  return {
+    ...thinkingFormat === undefined ? {} : { thinkingFormat: thinkingFormat as PiAiThinkingFormat },
+    ...compat.supportsReasoningEffort === undefined
+      ? {}
+      : { supportsReasoningEffort: compat.supportsReasoningEffort },
+  }
+}
+
+function managedModel(model: ManagedModelProfile): PiAiModelProfile {
+  const compat = managedCompat(model.compat)
+  return {
+    id: model.id,
+    name: model.name,
+    ...model.contextWindow === undefined ? {} : { contextWindow: model.contextWindow },
+    ...model.maxTokens === undefined ? {} : { maxTokens: model.maxTokens },
+    ...model.input === undefined ? {} : { input: [...model.input] },
+    ...model.reasoningEfforts === undefined ? {} : { reasoningEfforts: model.reasoningEfforts },
+    ...compat === undefined ? {} : { compat },
+  }
+}
+
+function managedProfiles(snapshot: ModelProviderConfigSnapshot | undefined): Record<string, PiAiProviderProfile> {
+  return Object.fromEntries((snapshot?.providers ?? []).map((provider: ManagedModelProviderProfile) => [
+    provider.provider,
+    {
+      ...(provider.profile as Partial<PiAiProviderProfile> | undefined),
+      ...provider.defaultContextWindow === undefined ? {} : { defaultContextWindow: provider.defaultContextWindow },
+      ...provider.defaultMaxTokens === undefined ? {} : { defaultMaxTokens: provider.defaultMaxTokens },
+      ...provider.defaultInput === undefined ? {} : { defaultInput: [...provider.defaultInput] },
+      ...provider.headers === undefined ? {} : { headers: { ...provider.headers } },
+      ...provider.reasoning === undefined ? {} : { reasoning: provider.reasoning },
+      ...provider.thinkingBudgets === undefined ? {} : { thinkingBudgets: { ...provider.thinkingBudgets } },
+      ...provider.cacheRetention === undefined ? {} : { cacheRetention: provider.cacheRetention },
+      ...provider.transport === undefined ? {} : { transport: provider.transport },
+      ...provider.timeoutMs === undefined ? {} : { timeoutMs: provider.timeoutMs },
+      ...provider.websocketConnectTimeoutMs === undefined ? {} : { websocketConnectTimeoutMs: provider.websocketConnectTimeoutMs },
+      ...provider.streamIdleTimeoutMs === undefined ? {} : { streamIdleTimeoutMs: provider.streamIdleTimeoutMs },
+      ...provider.retryPolicy === undefined ? {} : { retryPolicy: provider.retryPolicy },
+      displayName: provider.displayName,
+      api: provider.protocol,
+      baseURL: provider.baseURL,
+      ...provider.credentialRef === undefined ? {} : { apiKeyEnv: provider.credentialRef },
+      models: provider.models.map(managedModel),
+    },
+  ]))
+}
+
+function assertPersonalProfiles(config: Config): void {
+  const reserved = Object.keys(config.providers ?? {}).find(provider => provider.startsWith(ORGANIZATION_PROVIDER_PREFIX))
+  if (reserved !== undefined) {
+    throw new Error(`llm-pi-ai: provider route "${reserved}" is reserved for organization configuration`)
+  }
+  const reservedCredential = Object.entries(config.providers ?? {}).find(([, profile]) =>
+    profile.apiKeyEnv?.startsWith(ORGANIZATION_CREDENTIAL_PREFIX) === true)
+  if (reservedCredential !== undefined) {
+    throw new Error(
+      `llm-pi-ai: credential reference "${reservedCredential[1].apiKeyEnv}" is reserved for organization configuration`,
+    )
+  }
+  assertServiceable(config)
+}
 
 /**
  * The registry captures these per route; a change here must re-register.
@@ -142,7 +225,9 @@ function directoryEntries(
   for (const provider of catalog) {
     if (catalogProviderTakesApiKey(provider)) declare(provider, provider)
   }
-  for (const [provider, profile] of profiles) declare(provider, profile.displayName)
+  for (const [provider, profile] of profiles) {
+    if (!provider.startsWith(ORGANIZATION_PROVIDER_PREFIX)) declare(provider, profile.displayName)
+  }
   return [...entries.values()]
 }
 
@@ -150,6 +235,7 @@ function directoryEntries(
 export function apply(ctx: Context, config: Config): void {
   let current: () => Config = () => config
   let lastRaw: Config | undefined
+  let lastManaged: ModelProviderConfigSnapshot | undefined
   let memoized: ReadonlyMap<string, ResolvedPiAiProviderProfile> | undefined
   /**
    * The resolved profiles for the current configuration, memoized by the raw
@@ -164,9 +250,11 @@ export function apply(ctx: Context, config: Config): void {
    */
   const profiles = (): ReadonlyMap<string, ResolvedPiAiProviderProfile> => {
     const raw = current()
-    if (raw === lastRaw && memoized !== undefined) return memoized
-    const next = resolveProfiles(raw.providers)
+    const managed = ctx.get('modelProviderConfig')?.snapshot()
+    if (raw === lastRaw && managed === lastManaged && memoized !== undefined) return memoized
+    const next = resolveProfiles({ ...raw.providers, ...managedProfiles(managed) })
     lastRaw = raw
+    lastManaged = managed
     memoized = next
     return next
   }
@@ -204,6 +292,12 @@ export function apply(ctx: Context, config: Config): void {
     profiles,
     resolveApiKey,
     resolveAttachments: () => ctx.get('attachments'),
+    onReplayDegrade: ({ provider, model, reason }) => {
+      ctx.logger.warn(
+        `llm-pi-ai: unusable replay state on assistant history for route "${provider}/${model}";`
+        + ` sending that message as provider-neutral content (${reason})`,
+      )
+    },
   })
   // The full installed catalog is configurable from the moment the plugin
   // mounts — dormant or not — so configuration surfaces can offer every
@@ -279,11 +373,33 @@ export function apply(ctx: Context, config: Config): void {
   }
   ensureRegistrationFacts()
 
+  const applyProfileChange = (): void => {
+    try {
+      ensureRegistrationFacts()
+    } catch (error) {
+      ctx.logger.error('llm-pi-ai: keeping the previously registered routes after a refused update')
+      ctx.logger.error(error)
+    }
+    try {
+      ensureDirectory()
+    } catch (error) {
+      ctx.logger.error('llm-pi-ai: keeping the previous configurable-provider directory after a refused update')
+      ctx.logger.error(error)
+    }
+  }
+
+  ctx.inject(['modelProviderConfig'], (mctx) => {
+    mctx.on('model-provider-config/updated', () => {
+      applyProfileChange()
+    })
+    applyProfileChange()
+  })
+
   installSettingsSection(ctx, NS, Config, config, {
     // Refuse an unserviceable section where it is written: without this a
     // schema-valid profile the adapter cannot serve would be stored and then
     // silently disable every route in this namespace.
-    validate: assertServiceable,
+    validate: assertPersonalProfiles,
     setSource: (source) => {
       current = source
     },
@@ -294,23 +410,7 @@ export function apply(ctx: Context, config: Config): void {
       // Without its own diagnostic that refusal reaches the operator as a
       // generic "settings: watcher failed", naming neither the route nor why it
       // is not serving. The previous routes keep serving either way.
-      try {
-        ensureRegistrationFacts()
-      } catch (error) {
-        ctx.logger.error('llm-pi-ai: keeping the previously registered routes after a refused update')
-        ctx.logger.error(error)
-      }
-      // The directory follows the profiles the registry accepted, so a route
-      // that failed to register is not advertised as configurable. A refused
-      // directory swap is contained here for the same reason the registry's
-      // is: the previous entries keep serving, and `directoryFacts` stays put
-      // so returning to a working configuration re-applies.
-      try {
-        ensureDirectory()
-      } catch (error) {
-        ctx.logger.error('llm-pi-ai: keeping the previous configurable-provider directory after a refused update')
-        ctx.logger.error(error)
-      }
+      applyProfileChange()
     },
   })
 }

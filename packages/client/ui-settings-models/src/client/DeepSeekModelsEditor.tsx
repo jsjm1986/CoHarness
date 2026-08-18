@@ -138,8 +138,8 @@ export interface DeepSeekModelsEditorProps {
   disabled: boolean
   /** Replace the user-owned array after one visible edit. */
   onChange: (models: DeepSeekModelDraft[]) => void
-  /** Remove the user-owned array and return to inheritance. */
-  onReset: () => void
+  /** Remove the user-owned array and return to inheritance when allowed. */
+  onReset?: () => void
 }
 
 /**
@@ -199,7 +199,7 @@ export function DeepSeekModelsEditor(props: DeepSeekModelsEditorProps): ReactNod
   const reset = (): void => {
     setEditing(new Map())
     setExpanded(new Set())
-    props.onReset()
+    props.onReset?.()
   }
 
   const toggle = (index: number): void => {
@@ -271,7 +271,7 @@ export function DeepSeekModelsEditor(props: DeepSeekModelsEditorProps): ReactNod
             {props.overridden ? props.t('modelsCustomized') : props.t('modelsInherited')}
           </span>
         </div>
-        {props.overridden
+        {props.overridden && props.onReset !== undefined
           ? (
             <button
               type="button"

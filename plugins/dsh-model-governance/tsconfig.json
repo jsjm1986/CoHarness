@@ -15,11 +15,20 @@
       "@deepseek-ai/cordis": [
         "../../vendor/cordis/lib/types/index.d.ts"
       ],
+      "@deepseek-ai/dsh-credentials": [
+        "../../packages/credentials/credentials/src/index.ts"
+      ],
+      "@deepseek-ai/dsh-gateway-runtime": [
+        "../../packages/context/gateway-runtime/src/index.ts"
+      ],
       "@deepseek-ai/dsh-llm": [
         "../../packages/llm/llm/lib/types/index.d.ts"
       ],
       "@deepseek-ai/dsh-model-access": [
         "../../packages/llm/model-access/lib/types/index.d.ts"
+      ],
+      "@deepseek-ai/dsh-model-provider-config": [
+        "../../packages/llm/model-provider-config/src/index.ts"
       ],
       "@deepseek-ai/dsh-agent": [
         "../../packages/core/agent/lib/types/index.d.ts"

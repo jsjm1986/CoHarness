@@ -1,6 +1,7 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import { loadConfig } from '../src/config.ts'
 import { openDb } from '../src/db.ts'
@@ -19,12 +20,43 @@ async function setup(extraEnv: Record<string, string> = {}) {
   // HGW_DSH_REPO_ROOT, and starting fails loud when the patch is absent.
   const guardDir = join(root, 'plugins', 'dsh-directory-guard')
   mkdirSync(guardDir, { recursive: true })
+  writeFileSync(join(guardDir, 'package.json'), JSON.stringify({
+    name: '@deepseek-ai/dsh-directory-guard',
+    type: 'module',
+    main: 'lib/index.js',
+  }))
+  mkdirSync(join(guardDir, 'lib'), { recursive: true })
+  writeFileSync(join(guardDir, 'lib', 'index.js'), [
+    "import peer from '@deepseek-ai/dsh-profile-peer'",
+    'export default `guard:${peer}`',
+    '',
+  ].join('\n'))
+  mkdirSync(join(guardDir, 'src'), { recursive: true })
+  writeFileSync(join(guardDir, 'src', 'not-runtime.ts'), 'export const sourceOnly = true\n')
   writeFileSync(join(guardDir, 'cordis.patch.yml'), '- insert: []\n')
   writeFileSync(join(guardDir, 'cordis.admin.patch.yml'), '- id: permission\n  config:\n    presets:\n      danger-full-access:\n        sandbox: danger-full-access\n        approval: never\n')
   const governanceDir = join(root, 'plugins', 'dsh-model-governance')
   mkdirSync(governanceDir, { recursive: true })
-  writeFileSync(join(governanceDir, 'package.json'), '{}')
-  writeFileSync(join(governanceDir, 'cordis.patch.yml'), '- insert:\n    - id: governance\n')
+  writeFileSync(join(governanceDir, 'package.json'), JSON.stringify({
+    name: '@deepseek-ai/dsh-model-governance',
+    type: 'module',
+    main: 'lib/index.js',
+  }))
+  mkdirSync(join(governanceDir, 'lib'), { recursive: true })
+  writeFileSync(join(governanceDir, 'lib', 'index.js'), [
+    "import peer from '@deepseek-ai/dsh-profile-peer'",
+    'export default `governance:${peer}`',
+    '',
+  ].join('\n'))
+  mkdirSync(join(governanceDir, 'tests'), { recursive: true })
+  writeFileSync(join(governanceDir, 'tests', 'not-runtime.test.js'), 'export const testOnly = true\n')
+  writeFileSync(join(governanceDir, 'cordis.patch.yml'), [
+    '- insert:',
+    '    - id: gateway-runtime',
+    "      name: '@deepseek-ai/dsh-gateway-runtime'",
+    '    - id: governance',
+    '',
+  ].join('\n'))
   const db = openDb(join(root, 'g.sqlite'))
   const cfg = loadConfig({
     HGW_USERS_ROOT: join(root, 'users'),
@@ -130,18 +162,50 @@ describe('InstanceManager', () => {
     await expect(fetch(`http://127.0.0.1:${port}/`)).rejects.toThrow()
   })
 
-  it('mounts the guard: home patch layer written and plugin linked into the profile node_modules', async () => {
+  it('materializes policy packages so profile peers resolve from the compiled runtime', async () => {
     const { root, alice, manager } = await setup()
-    await manager.ensureRunning(alice)
     const dshHome = join(root, 'users', 'alice', 'dsh')
+    const modules = join(dshHome, 'profiles', 'node_modules', '@deepseek-ai')
+    mkdirSync(modules, { recursive: true })
+    for (const plugin of ['dsh-directory-guard', 'dsh-model-governance']) {
+      symlinkSync(join(root, 'plugins', plugin), join(modules, plugin), 'dir')
+    }
+    const peerDir = join(dshHome, 'profiles', 'node_modules', '@deepseek-ai', 'dsh-profile-peer')
+    mkdirSync(peerDir, { recursive: true })
+    writeFileSync(join(peerDir, 'package.json'), JSON.stringify({
+      name: '@deepseek-ai/dsh-profile-peer',
+      type: 'module',
+      main: 'index.js',
+    }))
+    writeFileSync(join(peerDir, 'index.js'), "export default 'profile-peer'\n")
+
+    await manager.ensureRunning(alice)
     // The bundle patch becomes the instance's home-level user layer, applied
     // by dsh over every profile without touching the launch argv.
     expect(readFileSync(join(dshHome, 'cordis.patch.yml'), 'utf8')).toBe(
-      '- insert:\n    - id: governance\n- insert: []\n',
+      '- insert:\n    - id: gateway-runtime\n      name: \'@deepseek-ai/dsh-gateway-runtime\'\n'
+      + '    - id: governance\n- insert: []\n',
     )
-    const modules = join(dshHome, 'profiles', 'node_modules', '@deepseek-ai')
-    expect(readlinkSync(join(modules, 'dsh-directory-guard'))).toBe(join(root, 'plugins', 'dsh-directory-guard'))
-    expect(readlinkSync(join(modules, 'dsh-model-governance'))).toBe(join(root, 'plugins', 'dsh-model-governance'))
+    for (const plugin of ['dsh-directory-guard', 'dsh-model-governance']) {
+      const installed = join(modules, plugin)
+      expect(lstatSync(installed).isSymbolicLink()).toBe(false)
+      expect(lstatSync(installed).isDirectory()).toBe(true)
+      expect(existsSync(join(installed, 'package.json'))).toBe(true)
+      expect(existsSync(join(installed, 'lib', 'index.js'))).toBe(true)
+      expect(existsSync(join(installed, 'src'))).toBe(false)
+      expect(existsSync(join(installed, 'tests'))).toBe(false)
+    }
+    const guard = await import(`${pathToFileURL(join(modules, 'dsh-directory-guard', 'lib', 'index.js')).href}?guard`)
+    const governance = await import(`${pathToFileURL(join(modules, 'dsh-model-governance', 'lib', 'index.js')).href}?governance`)
+    expect(guard.default).toBe('guard:profile-peer')
+    expect(governance.default).toBe('governance:profile-peer')
+
+    writeFileSync(join(root, 'plugins', 'dsh-model-governance', 'lib', 'index.js'), 'export default \'refreshed\'\n')
+    await manager.stop(alice.id)
+    await manager.ensureRunning(alice)
+    expect(readFileSync(join(modules, 'dsh-model-governance', 'lib', 'index.js'), 'utf8')).toBe(
+      "export default 'refreshed'\n",
+    )
   })
 
   it('appends the administrator permission overlay after the restricted guard patch', async () => {
@@ -165,9 +229,12 @@ describe('InstanceManager', () => {
     const { root, alice, manager } = await setup({ HGW_GUARD_PATCH: 'off', HGW_INSTANCE_PORT_BASE: '43140' })
     await manager.ensureRunning(alice)
     const dshHome = join(root, 'users', 'alice', 'dsh')
-    expect(readFileSync(join(dshHome, 'cordis.patch.yml'), 'utf8')).toBe('- insert:\n    - id: governance\n')
+    expect(readFileSync(join(dshHome, 'cordis.patch.yml'), 'utf8')).toContain(
+      "name: '@deepseek-ai/dsh-gateway-runtime'",
+    )
     const modules = join(dshHome, 'profiles', 'node_modules', '@deepseek-ai')
-    expect(readlinkSync(join(modules, 'dsh-model-governance'))).toBe(join(root, 'plugins', 'dsh-model-governance'))
+    expect(lstatSync(join(modules, 'dsh-model-governance')).isSymbolicLink()).toBe(false)
+    expect(lstatSync(join(modules, 'dsh-model-governance')).isDirectory()).toBe(true)
     expect(existsSync(join(modules, 'dsh-directory-guard'))).toBe(false)
   })
 

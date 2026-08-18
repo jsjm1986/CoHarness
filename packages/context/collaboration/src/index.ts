@@ -104,7 +104,13 @@ export interface CollaborationRefusal {
   }
 }
 
-/** Build the stable RPC refusal shared by every collaboration enforcement point. */
+/**
+ * Build the stable RPC refusal shared by every collaboration enforcement point.
+ * @param error - failure raised by the collaboration authority or transport.
+ * @param action - operation the caller attempted.
+ * @param sessionId - optional session associated with the operation.
+ * @returns a wire-safe refusal with a stable code, message, and reason.
+ */
 export function collaborationRefusal(
   error: unknown,
   action: CollaborationAction,

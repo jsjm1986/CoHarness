@@ -17,6 +17,7 @@ import { ConversationRepository } from '../src/postgres/conversation-repository.
 import { createPostgresPool, runMigrations } from '../src/postgres/database.ts'
 import { PostgresInstanceRepository } from '../src/postgres/instance-repository.ts'
 import { PostgresModelGovernanceService } from '../src/postgres/model-governance-service.ts'
+import { OrganizationModelCredentialCipher } from '../src/organization-model-credentials.ts'
 import { PostgresProjectService } from '../src/postgres/project-service.ts'
 import {
   checkPostgresReadiness,
@@ -119,9 +120,17 @@ describePg('PostgreSQL baseline', () => {
     pool = createPostgresPool(DATABASE_URL!, { max: 4 })
     await pool.query('DROP SCHEMA IF EXISTS harness CASCADE')
     const migrated = await runMigrations(pool, MIGRATIONS)
-    expect(migrated).toEqual({ applied: [1, 2, 3, 4, 5], current: 5 })
+    expect(migrated).toEqual({ applied: [1, 2, 3, 4, 5, 6, 7, 8, 9], current: 9 })
     expect(await runMigrations(pool, MIGRATIONS))
-      .toEqual({ applied: [], current: 5 })
+      .toEqual({ applied: [], current: 9 })
+    const pushTables = await pool.query<{ table_name: string }>(`SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema='harness' AND table_name IN ('push_devices','push_deliveries')
+      ORDER BY table_name`)
+    expect(pushTables.rows).toEqual([
+      { table_name: 'push_deliveries' },
+      { table_name: 'push_devices' },
+    ])
     const homeColumns = await pool.query<{ table_name: string; is_nullable: string }>(`SELECT table_name,is_nullable
       FROM information_schema.columns WHERE table_schema='harness' AND column_name='home_path' ORDER BY table_name`)
     expect(homeColumns.rows).toEqual([{ table_name: 'users', is_nullable: 'NO' }])
@@ -147,9 +156,10 @@ describePg('PostgreSQL baseline', () => {
     } finally {
       await pool.query(`UPDATE harness.schema_migrations SET checksum=$1 WHERE version=1`, [original.rows[0]!.checksum])
     }
-    // SQLite's control-plane version is one behind the PostgreSQL ledger;
-    // choose a version beyond both ledgers so this remains genuinely unknown.
-    const unknownVersion = SCHEMA_VERSION + 2
+    // Use the applied PostgreSQL ledger rather than the independent SQLite
+    // control-plane version: PostgreSQL can carry more migrations than SQLite.
+    const latest = await pool.query<{ version: number }>('SELECT max(version) AS version FROM harness.schema_migrations')
+    const unknownVersion = Number(latest.rows[0]?.version ?? SCHEMA_VERSION) + 1
     await pool.query(`INSERT INTO harness.schema_migrations(version,name,checksum) VALUES($1,$2,$3)`, [
       unknownVersion, `${String(unknownVersion).padStart(3, '0')}_unknown.sql`, '0'.repeat(64),
     ])
@@ -160,6 +170,242 @@ describePg('PostgreSQL baseline', () => {
     } finally {
       await pool.query('DELETE FROM harness.schema_migrations WHERE version=$1', [unknownVersion])
     }
+  })
+
+  it('isolates encrypted organization credentials and enforces user and project model access', async () => {
+    const suffix = randomUUID().slice(0, 8)
+    const sharedUserPublicId = 9_000_000 + Number.parseInt(suffix, 16)
+    const sharedProjectPublicId = sharedUserPublicId + 1
+    const createOrganization = async (label: string): Promise<{
+      context: Awaited<ReturnType<typeof resolvePostgresRuntimeContext>>
+      userId: number
+      projectId: number
+    }> => {
+      const slug = `credential-${label}-${suffix}`
+      const nodeName = `credential-node-${label}`
+      const organization = await pool.query<{ id: string }>(`INSERT INTO harness.organizations(
+        slug,display_name
+      ) VALUES($1,$2) RETURNING id`, [slug, `Credential ${label}`])
+      const isolatedOrganizationId = organization.rows[0]!.id
+      await pool.query(`INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,$2)`, [
+        isolatedOrganizationId,
+        nodeName,
+      ])
+      const user = await pool.query<{ id: string }>(`INSERT INTO harness.users(
+        organization_id,public_id,username,display_name,home_path
+      ) VALUES($1,$2,$3,$4,$5) RETURNING id`, [
+        isolatedOrganizationId,
+        sharedUserPublicId,
+        `credential-${label}`,
+        `Credential ${label}`,
+        `/tmp/credential-${label}`,
+      ])
+      await pool.query(`INSERT INTO harness.memberships(organization_id,user_id,role,status)
+        VALUES($1,$2,'member','active')`, [isolatedOrganizationId, user.rows[0]!.id])
+      await pool.query(`INSERT INTO harness.projects(
+        organization_id,public_id,name,created_by
+      ) VALUES($1,$2,$3,$4)`, [
+        isolatedOrganizationId,
+        sharedProjectPublicId,
+        `Credential Project ${label}`,
+        user.rows[0]!.id,
+      ])
+      return {
+        context: await resolvePostgresRuntimeContext(pool, slug, nodeName),
+        userId: sharedUserPublicId,
+        projectId: sharedProjectPublicId,
+      }
+    }
+
+    const first = await createOrganization('first')
+    const second = await createOrganization('second')
+    const cipher = new OrganizationModelCredentialCipher(Buffer.alloc(32, 11))
+    const firstGovernance = new PostgresModelGovernanceService(first.context, cipher)
+    const secondGovernance = new PostgresModelGovernanceService(second.context, cipher)
+    const provider = {
+      provider: 'org-shared',
+      displayName: 'Shared Provider',
+      driver: 'pi-ai' as const,
+      protocol: 'openai-responses' as const,
+      baseURL: 'https://models.example.test/v1',
+      authMode: 'api-key' as const,
+    }
+    const model = {
+      provider: provider.provider,
+      model: 'chat',
+      displayName: 'Chat',
+      enabled: true,
+      adminAllowed: true,
+      userAllowed: false,
+      inputMicrosPerMillion: 0,
+      outputMicrosPerMillion: 0,
+      cacheReadMicrosPerMillion: 0,
+      cacheWriteMicrosPerMillion: 0,
+    }
+    const credentialRef = 'DSH_ORG_SHARED_API_KEY'
+
+    await firstGovernance.upsertProvider({ ...provider, status: 'draft', credential: 'sk-first' })
+    await firstGovernance.upsertModel(model)
+    await firstGovernance.upsertProvider({ ...provider, status: 'enabled' })
+    expect(await firstGovernance.resolveOrganizationCredential(
+      { kind: 'user', id: first.userId },
+      credentialRef,
+    )).toBeNull()
+    await firstGovernance.setUserAccess(first.userId, provider.provider, model.model, true)
+    expect(await firstGovernance.resolveOrganizationCredential(
+      { kind: 'user', id: first.userId },
+      credentialRef,
+    )).toBe('sk-first')
+    expect(await firstGovernance.resolveOrganizationCredential(
+      { kind: 'project', id: first.projectId },
+      credentialRef,
+    )).toBeNull()
+    await firstGovernance.setProjectAccess(first.projectId, provider.provider, model.model, true)
+    expect(await firstGovernance.resolveOrganizationCredential(
+      { kind: 'project', id: first.projectId },
+      credentialRef,
+    )).toBe('sk-first')
+
+    const encryptedBefore = await pool.query<{ nonce: Buffer; ciphertext: Buffer }>(`SELECT
+      credential.nonce,credential.ciphertext
+      FROM harness.organization_model_credentials credential
+      JOIN harness.model_providers provider ON provider.id=credential.provider_id
+      WHERE credential.organization_id=$1 AND provider.provider_key=$2`, [
+      first.context.organizationId,
+      provider.provider,
+    ])
+    expect(encryptedBefore.rows[0]?.ciphertext.equals(Buffer.from('sk-first'))).toBe(false)
+    await firstGovernance.upsertProvider({ ...provider, status: 'enabled', credential: 'sk-replaced' })
+    const encryptedAfter = await pool.query<{ nonce: Buffer; ciphertext: Buffer }>(`SELECT
+      credential.nonce,credential.ciphertext
+      FROM harness.organization_model_credentials credential
+      JOIN harness.model_providers provider ON provider.id=credential.provider_id
+      WHERE credential.organization_id=$1 AND provider.provider_key=$2`, [
+      first.context.organizationId,
+      provider.provider,
+    ])
+    expect(encryptedAfter.rows[0]?.nonce.equals(encryptedBefore.rows[0]!.nonce)).toBe(false)
+    expect(encryptedAfter.rows[0]?.ciphertext.equals(encryptedBefore.rows[0]!.ciphertext)).toBe(false)
+    expect(await firstGovernance.resolveOrganizationCredential(
+      { kind: 'user', id: first.userId },
+      credentialRef,
+    )).toBe('sk-replaced')
+    await firstGovernance.setUserAccess(first.userId, provider.provider, model.model, false)
+    expect(await firstGovernance.resolveOrganizationCredential(
+      { kind: 'user', id: first.userId },
+      credentialRef,
+    )).toBeNull()
+    await firstGovernance.setProjectAccess(first.projectId, provider.provider, model.model, false)
+    expect(await firstGovernance.resolveOrganizationCredential(
+      { kind: 'project', id: first.projectId },
+      credentialRef,
+    )).toBeNull()
+
+    await secondGovernance.upsertProvider({ ...provider, status: 'draft', credential: 'sk-second' })
+    await secondGovernance.upsertModel({ ...model, userAllowed: true })
+    await secondGovernance.upsertProvider({ ...provider, status: 'enabled' })
+    expect(await secondGovernance.resolveOrganizationCredential(
+      { kind: 'user', id: second.userId },
+      credentialRef,
+    )).toBe('sk-second')
+    await firstGovernance.setUserAccess(first.userId, provider.provider, model.model, true)
+    expect(await firstGovernance.resolveOrganizationCredential(
+      { kind: 'user', id: first.userId },
+      credentialRef,
+    )).toBe('sk-replaced')
+
+    await firstGovernance.upsertProvider({ ...provider, status: 'disabled', credential: null })
+    expect((await firstGovernance.listProviders())[0]).toMatchObject({ credentialConfigured: false })
+    const remaining = await pool.query<{ count: string }>(`SELECT COUNT(*)::text count
+      FROM harness.organization_model_credentials WHERE organization_id=$1`, [first.context.organizationId])
+    expect(remaining.rows[0]?.count).toBe('0')
+    expect(await secondGovernance.resolveOrganizationCredential(
+      { kind: 'user', id: second.userId },
+      credentialRef,
+    )).toBe('sk-second')
+  })
+
+  it('drops the old organization credential when a shared profile changes its reference', async () => {
+    const suffix = randomUUID().slice(0, 8)
+    const publicUserId = 10_000_000 + Number.parseInt(suffix, 16)
+    const slug = `credential-rotate-${suffix}`
+    const nodeName = `credential-rotate-node-${suffix}`
+    const organization = await pool.query<{ id: string }>(`INSERT INTO harness.organizations(
+      slug,display_name
+    ) VALUES($1,'Credential Rotation') RETURNING id`, [slug])
+    const isolatedOrganizationId = organization.rows[0]!.id
+    await pool.query(`INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,$2)`, [
+      isolatedOrganizationId,
+      nodeName,
+    ])
+    const user = await pool.query<{ id: string }>(`INSERT INTO harness.users(
+      organization_id,public_id,username,display_name,home_path
+    ) VALUES($1,$2,$3,'Credential Rotation','/tmp/credential-rotation') RETURNING id`, [
+      isolatedOrganizationId,
+      publicUserId,
+      `credential-rotate-${suffix}`,
+    ])
+    await pool.query(`INSERT INTO harness.memberships(organization_id,user_id,role,status)
+      VALUES($1,$2,'member','active')`, [isolatedOrganizationId, user.rows[0]!.id])
+
+    const context = await resolvePostgresRuntimeContext(pool, slug, nodeName)
+    const governance = new PostgresModelGovernanceService(
+      context,
+      new OrganizationModelCredentialCipher(Buffer.alloc(32, 12)),
+    )
+    const provider = 'org-rotate'
+    const model = 'chat'
+    const oldRef = 'DSH_ORG_ROTATE_API_KEY'
+    const newRef = 'DSH_ORG_ROTATED_API_KEY'
+
+    await governance.mutateOrganizationModelSettings([{
+      op: 'set',
+      path: ['providers', provider],
+      value: {
+        displayName: 'Rotation Provider',
+        apiKeyEnv: oldRef,
+        api: 'openai-responses',
+        baseURL: 'https://models.example.test/v1',
+        models: [{ id: model, name: 'Chat' }],
+      },
+    }])
+    await governance.setOrganizationCredential(oldRef, 'sk-old')
+    await governance.setUserAccess(publicUserId, provider, model, true)
+    expect(await governance.resolveOrganizationCredential({ kind: 'user', id: publicUserId }, oldRef)).toBe('sk-old')
+    expect((await governance.listProviders()).find(row => row.provider === provider)).toMatchObject({
+      status: 'enabled',
+      credentialRef: oldRef,
+      credentialConfigured: true,
+    })
+
+    const current = await governance.describeOrganizationModelSettings()
+    await governance.mutateOrganizationModelSettings([{
+      op: 'set',
+      path: ['providers', provider, 'apiKeyEnv'],
+      value: newRef,
+    }], current.namespaces[0]!.revision)
+
+    expect(await governance.resolveOrganizationCredential({ kind: 'user', id: publicUserId }, oldRef)).toBeNull()
+    expect(await governance.resolveOrganizationCredential({ kind: 'user', id: publicUserId }, newRef)).toBeNull()
+    expect((await governance.listProviders()).find(row => row.provider === provider)).toMatchObject({
+      status: 'draft',
+      credentialRef: newRef,
+      credentialConfigured: false,
+    })
+    const remaining = await pool.query<{ count: string }>(`SELECT COUNT(*)::text count
+      FROM harness.organization_model_credentials credential
+      JOIN harness.model_providers provider ON provider.id=credential.provider_id
+      WHERE credential.organization_id=$1 AND provider.provider_key=$2`, [context.organizationId, provider])
+    expect(remaining.rows[0]?.count).toBe('0')
+
+    await governance.setOrganizationCredential(newRef, 'sk-new')
+    expect(await governance.resolveOrganizationCredential({ kind: 'user', id: publicUserId }, oldRef)).toBeNull()
+    expect(await governance.resolveOrganizationCredential({ kind: 'user', id: publicUserId }, newRef)).toBe('sk-new')
+    expect((await governance.listProviders()).find(row => row.provider === provider)).toMatchObject({
+      status: 'enabled',
+      credentialRef: newRef,
+      credentialConfigured: true,
+    })
   })
 
   it('stores arbitrary session ids, full JSON strings, and searchable nested tool results', async () => {
@@ -299,6 +545,65 @@ describePg('PostgreSQL baseline', () => {
         JOIN harness.users u ON u.id=i.user_id WHERE u.organization_id=$1 AND u.public_id=$2`,
       [isolatedOrganizationId, user.id])
       expect(userPort.rows[0]?.port).toBe(47000)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('applies the administrator import path policy in PostgreSQL', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'hgw-postgres-project-paths-'))
+    const suffix = randomUUID().slice(0, 8)
+    try {
+      const organization = await pool.query<{ id: string }>(`INSERT INTO harness.organizations(
+        slug,display_name
+      ) VALUES($1,'Project Path Test') RETURNING id`, [`project-path-${suffix}`])
+      const isolatedOrganizationId = organization.rows[0]!.id
+      const node = await pool.query<{ id: string }>(`INSERT INTO harness.compute_nodes(
+        organization_id,name
+      ) VALUES($1,$2) RETURNING id`, [isolatedOrganizationId, `project-path-node-${suffix}`])
+      const userHome = join(root, 'users', 'creator', 'home')
+      await mkdir(userHome, { recursive: true })
+      const creator = await pool.query<{ public_id: string }>(`INSERT INTO harness.users(
+        organization_id,username,display_name,home_path
+      ) VALUES($1,$2,'Path Creator',$3) RETURNING public_id::text`,
+      [isolatedOrganizationId, `project-path-creator-${suffix}`, userHome])
+      const context = {
+        pool,
+        organizationId: isolatedOrganizationId,
+        organizationSlug: `project-path-${suffix}`,
+        nodeId: node.rows[0]!.id,
+        nodeName: `project-path-node-${suffix}`,
+      }
+      const cfg = loadConfig({
+        HGW_USERS_ROOT: join(root, 'users'),
+        HGW_STATE_ROOT: join(root, 'state'),
+        HGW_PROJECT_RUNTIMES_ROOT: join(root, 'project-runtimes'),
+        HGW_PROJECTS_ROOT: join(root, 'projects', 'admin'),
+        HGW_USER_PROJECTS_ROOT: join(root, 'projects', 'user-projects'),
+        HGW_GATEWAY_DIR: join(root, 'gateway'),
+        HGW_DSH_REPO_ROOT: join(root, 'release'),
+        HGW_GUARD_PATCH: 'off',
+        HGW_MODEL_GOVERNANCE_PACKAGE: join(root, 'model-governance'),
+        HGW_ORGANIZATION_SLUG: context.organizationSlug,
+        HGW_COMPUTE_NODE_NAME: context.nodeName,
+      })
+      const projects = new PostgresProjectService(context, cfg)
+      const creatorId = Number(creator.rows[0]!.public_id)
+
+      await expect(projects.create({ name: 'Relative', path: 'relative/project', createdBy: creatorId }))
+        .rejects.toThrow('project-path-not-absolute')
+      await expect(projects.create({ name: 'Reserved', path: userHome, createdBy: creatorId }))
+        .rejects.toThrow('project-path-reserved')
+
+      const existing = join(root, 'existing')
+      const nested = join(existing, 'nested')
+      await mkdir(nested, { recursive: true })
+      await projects.create({ name: 'Existing', path: existing, createdBy: creatorId })
+      await expect(projects.create({ name: 'Nested', path: nested, createdBy: creatorId }))
+        .rejects.toThrow('project-path-overlap')
+
+      const managed = await projects.createManaged({ name: 'Owned', ownerUserId: creatorId })
+      expect(managed.path.startsWith(await realpath(cfg.userProjectsRoot))).toBe(true)
     } finally {
       await rm(root, { recursive: true, force: true })
     }
@@ -577,6 +882,7 @@ describePg('PostgreSQL baseline', () => {
       conversations: sessions,
       collaboration,
       principals,
+      governance: { resolveOrganizationCredential: async () => null },
     }))
     const issue = (input: {
       id: number
@@ -835,12 +1141,18 @@ describePg('PostgreSQL baseline', () => {
     )
     await pool.query(`INSERT INTO harness.project_members(organization_id,project_id,user_id,access_mode)
       VALUES($1,$2,$3,'rw')`, [otherOrganizationId, otherProject.rows[0]!.id, otherUser.rows[0]!.id])
+    const provider = await pool.query<{ id: string }>(`INSERT INTO harness.model_providers(
+      organization_id,provider_key,display_name,auth_mode,status,source
+    ) VALUES($1,'provider','Provider','none','draft','legacy-catalog') RETURNING id`, [organizationId])
+    const otherProvider = await pool.query<{ id: string }>(`INSERT INTO harness.model_providers(
+      organization_id,provider_key,display_name,auth_mode,status,source
+    ) VALUES($1,'provider','Other Provider','none','draft','legacy-catalog') RETURNING id`, [otherOrganizationId])
     const model = await pool.query<{ id: string }>(`INSERT INTO harness.model_catalog(
-      organization_id,provider_key,model_key,display_name
-    ) VALUES($1,'provider','primary','Primary') RETURNING id`, [organizationId])
+      organization_id,provider_id,provider_key,model_key,display_name
+    ) VALUES($1,$2,'provider','primary','Primary') RETURNING id`, [organizationId, provider.rows[0]!.id])
     const otherModel = await pool.query<{ id: string }>(`INSERT INTO harness.model_catalog(
-      organization_id,provider_key,model_key,display_name
-    ) VALUES($1,'provider','other','Other') RETURNING id`, [otherOrganizationId])
+      organization_id,provider_id,provider_key,model_key,display_name
+    ) VALUES($1,$2,'provider','other','Other') RETURNING id`, [otherOrganizationId, otherProvider.rows[0]!.id])
     const sessions = new ConversationRepository(pool)
     await sessions.create({ id: 'other-organization-session', organizationId: otherOrganizationId,
       creatorUserId: otherUser.rows[0]!.id, projectId: otherProject.rows[0]!.id,
@@ -866,6 +1178,8 @@ describePg('PostgreSQL baseline', () => {
       VALUES($1,'member',$2,true)`, [organizationId, otherModel.rows[0]!.id])
     await foreignKey(`INSERT INTO harness.model_user_access(organization_id,user_id,model_id,allowed)
       VALUES($1,$2,$3,true)`, [organizationId, userId, otherModel.rows[0]!.id])
+    await foreignKey(`INSERT INTO harness.model_project_access(organization_id,project_id,model_id,allowed)
+      VALUES($1,$2,$3,true)`, [organizationId, otherProject.rows[0]!.id, model.rows[0]!.id])
     await foreignKey(`INSERT INTO harness.model_usage(organization_id,event_id,user_id,occurred_at,model_id,
       provider_key,model_key,purpose,credential_source,credential_class,status)
       VALUES($1,'wrong-user',$2,now(),$3,'provider','primary','chat','user-env','company','succeeded')`,
@@ -981,7 +1295,11 @@ describePg('PostgreSQL baseline', () => {
       const projects = new PostgresProjectService(context, cfg)
       const instances = new PostgresInstanceRepository(context, cfg.instancePortBase)
       const audit = new PostgresAuditService(context)
-      const governance = new PostgresModelGovernanceService(context, 'Asia/Shanghai')
+      const governance = new PostgresModelGovernanceService(
+        context,
+        new OrganizationModelCredentialCipher(Buffer.alloc(32, 7)),
+        'Asia/Shanghai',
+      )
 
       const admin = await users.create({ username: 'runtime-admin', password: 'pw-12345678', role: 'admin' })
       const member = await users.create({ username: 'runtime-user', password: 'pw-12345678' })
@@ -1056,8 +1374,27 @@ describePg('PostgreSQL baseline', () => {
         userId: admin.id, username: 'runtime-admin', mode: 'ro',
       })
 
+      await expect(governance.upsertModel({
+        provider: 'org-missing',
+        model: 'chat',
+        displayName: 'Missing Provider Chat',
+        enabled: true,
+        inputMicrosPerMillion: 1_000_000,
+        outputMicrosPerMillion: 0,
+        cacheReadMicrosPerMillion: 0,
+        cacheWriteMicrosPerMillion: 0,
+      })).rejects.toThrow('unknown provider org-missing')
+      await governance.upsertProvider({
+        provider: 'org-runtime',
+        displayName: 'Runtime Provider',
+        driver: 'pi-ai',
+        protocol: 'openai-completions',
+        baseURL: 'https://models.example.test/v1/',
+        authMode: 'none',
+        status: 'draft',
+      })
       await governance.upsertModel({
-        provider: 'runtime',
+        provider: 'org-runtime',
         model: 'chat',
         displayName: 'Runtime Chat',
         enabled: true,
@@ -1068,24 +1405,41 @@ describePg('PostgreSQL baseline', () => {
         cacheReadMicrosPerMillion: 0,
         cacheWriteMicrosPerMillion: 0,
       })
+      expect((await governance.policyFor(member)).models[0]?.allowed).toBe(false)
+      await governance.upsertProvider({
+        provider: 'org-runtime',
+        displayName: 'Runtime Provider',
+        driver: 'pi-ai',
+        protocol: 'openai-completions',
+        baseURL: 'https://models.example.test/v1',
+        authMode: 'none',
+        status: 'enabled',
+      })
+      expect((await governance.listProviders())[0]).toMatchObject({
+        provider: 'org-runtime',
+        baseURL: 'https://models.example.test/v1',
+        status: 'enabled',
+        credentialConfigured: false,
+        modelCount: 1,
+      })
       expect((await governance.listModels())[0]).toMatchObject({
-        provider: 'runtime',
+        provider: 'org-runtime',
         model: 'chat',
         inputMicrosPerMillion: 1_000_000,
         userAllowed: true,
       })
-      await governance.setUserAccess(member.id, 'runtime', 'chat', false)
+      await governance.setUserAccess(member.id, 'org-runtime', 'chat', false)
       expect((await governance.policyFor(member)).models[0]?.allowed).toBe(false)
       expect((await governance.policyFor(member)).defaultAllowed).toBe(false)
       expect((await governance.policyFor(admin)).defaultAllowed).toBe(false)
-      await governance.setUserAccess(member.id, 'runtime', 'chat', null)
+      await governance.setUserAccess(member.id, 'org-runtime', 'chat', null)
       await governance.setQuota('role', 'user', 10, 100)
       const intakeToken = await governance.issueIntakeToken({ kind: 'user', id: member.id })
       expect(await governance.subjectForIntakeToken(intakeToken)).toEqual({ kind: 'user', id: member.id })
       const usage = {
         eventId: randomUUID(),
         occurredAt: Date.now(),
-        provider: 'runtime',
+        provider: 'org-runtime',
         model: 'chat',
         purpose: 'assistant',
         credentialSource: 'user-env',
@@ -1106,7 +1460,38 @@ describePg('PostgreSQL baseline', () => {
 
       expect(await governance.policyForProject(project.id)).toMatchObject({
         defaultAllowed: false,
-        models: [{ provider: 'runtime', model: 'chat', allowed: true }],
+        models: [{ provider: 'org-runtime', model: 'chat', allowed: false }],
+      })
+      await governance.setProjectAccess(project.id, 'org-runtime', 'chat', true)
+      expect(await governance.projectOverrides(project.id)).toEqual([
+        { provider: 'org-runtime', model: 'chat', allowed: true },
+      ])
+      await governance.upsertModel({
+        provider: 'org-runtime',
+        model: 'reasoner',
+        displayName: 'Reasoner',
+        enabled: true,
+        adminAllowed: true,
+        userAllowed: false,
+        inputMicrosPerMillion: 0,
+        outputMicrosPerMillion: 0,
+        cacheReadMicrosPerMillion: 0,
+        cacheWriteMicrosPerMillion: 0,
+      })
+      await governance.setAllProjectAccess(project.id, true)
+      expect(await governance.projectOverrides(project.id)).toEqual([
+        { provider: 'org-runtime', model: 'chat', allowed: true },
+        { provider: 'org-runtime', model: 'reasoner', allowed: true },
+      ])
+      await governance.setAllProjectAccess(project.id, null)
+      expect(await governance.projectOverrides(project.id)).toEqual([])
+      await governance.setProjectAccess(project.id, 'org-runtime', 'chat', true)
+      expect(await governance.policyForProject(project.id)).toMatchObject({
+        defaultAllowed: false,
+        models: [
+          { provider: 'org-runtime', model: 'chat', allowed: true },
+          { provider: 'org-runtime', model: 'reasoner', allowed: false },
+        ],
       })
       const projectPolicyPath = await writeProjectModelGovernanceFile(cfg, governance, {
         kind: 'project',
@@ -1120,10 +1505,19 @@ describePg('PostgreSQL baseline', () => {
         intakeToken: string
         models: Array<{ allowed: boolean }>
       }
-      expect(projectPolicy).toMatchObject({ defaultAllowed: false, userDeclaredAllowed: false, models: [{ allowed: true }] })
+      expect(projectPolicy).toMatchObject({
+        defaultAllowed: false,
+        userDeclaredAllowed: false,
+        models: [{ allowed: true }, { allowed: false }],
+      })
       expect(await governance.subjectForIntakeToken(projectPolicy.intakeToken))
         .toEqual({ kind: 'project', id: project.id })
       await governance.setQuota('project', String(project.id), 10, 100)
+      expect(await governance.projectQuota(project.id)).toEqual({
+        source: 'independent',
+        tokenLimit: 10,
+        companyCostMicrosLimit: 100,
+      })
       const projectIntakeToken = await governance.issueIntakeToken({ kind: 'project', id: project.id })
       expect(await governance.subjectForIntakeToken(projectIntakeToken))
         .toEqual({ kind: 'project', id: project.id })
@@ -1139,11 +1533,21 @@ describePg('PostgreSQL baseline', () => {
         alerts: [{ metric: 'tokens', threshold: 80 }],
       })
       await governance.setQuota('project', String(project.id), 'inherit', 'inherit')
+      expect(await governance.projectQuota(project.id)).toEqual({
+        source: 'inherit',
+        tokenLimit: 10,
+        companyCostMicrosLimit: 100,
+      })
       expect(await governance.summary({ kind: 'project', id: project.id })).toMatchObject({
         tokenLimit: 10,
         companyCostMicrosLimit: 100,
       })
       await governance.setQuota('project', String(project.id), null, null)
+      expect(await governance.projectQuota(project.id)).toEqual({
+        source: 'independent',
+        tokenLimit: null,
+        companyCostMicrosLimit: null,
+      })
       expect(await governance.summary({ kind: 'project', id: project.id })).toMatchObject({
         tokenLimit: null,
         companyCostMicrosLimit: null,

@@ -286,6 +286,29 @@ describe('project collaboration Typert Remote ACL', () => {
 })
 
 describe('project collaboration streams', () => {
+  it('captures a Host increment after open even when the first pull is delayed', async () => {
+    const authority = controlledAuthority().authority
+    authority.readableSessionIds = sessionIds => Promise.resolve(new Set(sessionIds))
+    const { ctx, api } = await harness(authority)
+    const abort = new AbortController()
+    const stream = api.events.host(request({}), abort.signal)[Symbol.asyncIterator]()
+
+    const session = ctx.sessions.create(SessionId('opened-before-pull'))
+    const first = await stream.next()
+
+    expect(first).toMatchObject({
+      done: false,
+      value: {
+        payload: {
+          type: 'host/session-added',
+          sessionId: session.id,
+        },
+      },
+    })
+    abort.abort()
+    await stream.return?.()
+  })
+
   it('filters external Workspaces and private Session ids from Host increments', async () => {
     const visibleId = SessionId('visible-workspace-session')
     const privateId = SessionId('private-workspace-session')
