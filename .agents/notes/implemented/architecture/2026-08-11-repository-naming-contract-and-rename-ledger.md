@@ -18,7 +18,7 @@ The last pre-release window made repository-wide renames cheap. Keeping weak nam
 
 The repository uses every current name in this ledger. This decision changes names only; package responsibilities, service boundaries, behavior, defaults, and data models stay the same. A name that exposes a bad boundary requires a separate proposed Agent Note for that boundary change.
 
-Each renamed family has one vocabulary. Its directory, npm package name, imports, Cordis plugin name, `ctx` key, public types, directly coupled event or tool identifiers, configuration, tests, fixtures, examples, generated references, and current documentation use the current name where the ledger names those interfaces. No alias, compatibility package, duplicate service key, dual event name, or fallback parser remains. The repository rejects the old name.
+Each renamed family has one vocabulary. Its directory, npm package name, imports, Cordis plugin name, `ctx` key, public types, directly coupled event or tool identifiers, configuration, tests, fixtures, examples, generated references, and current documentation use the current name where the ledger names those interfaces. No alias, compatibility package, duplicate service key, dual event name, or fallback parser remains for repository-owned rename targets. The external official Cordis event names retained by the [rc.7 compatibility baseline](2026-08-18-official-plugin-compatibility-baseline.md) are not ledger aliases.
 
 No family exposes two public vocabularies.
 
@@ -363,11 +363,11 @@ The following debated names stay unchanged because the current scope is accurate
 
 **Rename or split boundaries while applying the ledger.** Rejected. Reviewers must be able to see that behavior did not change. A real boundary defect needs its own proposal, tests, and consequences.
 
-**Keep aliases for old names.** Rejected. No released consumer needs them. Aliases would preserve two vocabularies and make the first release carry a migration that never had a user.
+**Keep aliases for repository-owned old names.** Rejected. No released consumer needs them. Aliases would preserve two internal vocabularies and make the first release carry a migration that never had a user. Externally owned upstream identifiers are evaluated separately under the compatibility baseline.
 
 ## Verification
 
-- Every mapping in the ledger appears in the repository. Each family has one public vocabulary; no compatibility package, re-export alias, duplicate `ctx` key within one Cordis context, dual plugin id, dual event id, old tool alias, or fallback parser remains.
+- Every mapping in the ledger appears in the repository. Each family has one public vocabulary; no compatibility package, re-export alias, duplicate `ctx` key within one Cordis context, dual plugin id, ledger-owned dual event id, old tool alias, or fallback parser remains.
 - Runtime behavior, package boundaries, defaults, policy, durable semantics, and model behavior remain equivalent except where an identifier is itself visible.
 - Package directories, npm names, imports, manifests, TypeScript references and paths, Cordis config, plugin ids, service keys, events, tools, RPC names, persisted names named by the ledger, fixtures, snapshots, examples, generated catalogs, and current prose use the current vocabulary.
 - Current implemented Agent Notes carry the factual name and path changes. The package-regrouping note records the group inventory and package targets, the SDK removal note reserves `SDK` for the runtime protocol, and the timeout-policy note records the package-name rationale.

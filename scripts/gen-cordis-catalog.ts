@@ -175,6 +175,7 @@ export const EVENT_SCOPE_PAGE: Record<string, string> = {
   'approval': 'approval.md',
   'commands': 'commands.md',
   '@deepseek-ai': 'extensions.md',
+  'cordis': 'extensions.md',
   'credentials': 'credentials.md',
   'domain': 'storage.md',
   'fs': 'filesystem.md',

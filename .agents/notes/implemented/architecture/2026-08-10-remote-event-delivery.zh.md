@@ -18,13 +18,14 @@ Host 拥有 `agent-preset/selected`、`commands/change`、`credentials/updated`�
 
 - `packages/api/remotes/src/remote-events.ts` 持有一份可转发 host 事件名单，它同时是「消费端能订阅什么」的唯一控制点。旁边的 `src/types.ts` 由它派生类型投影并填充 selection 座位，按包约定保持纯类型。两个文件**都同时列进本包 host 与 client 两个 face 的 `files`**，两侧读同一份。
 - wire 上的事件名 **就是 host cordis 事件原名**（`settings/document-updated`），不加 `host/` 前缀；载荷 **就是 host 的实参列表**，逐元素原样过 JSON，无投影、无脱敏、无改名。
+- 六组动态 Cordis 事件的官方 `cordis/*` 名称与重命名后的 `@deepseek-ai/cordis/*` 名称是一项兼容性例外。两种名称都可选并按原名转发；Client dispatcher 将每对名称作为同一订阅组匹配，同时不会让 Host 双发。[官方插件兼容基线](2026-08-18-official-plugin-compatibility-baseline.md)负责规定范围和理由。
 - 载体**寄生现有 host 流**：`HostFrame` 加一个包裹帧 `host/remote-event`，不新开下行通道。
 - 事件**签名**不另立表：owner 包把自己的 cordis `Events` 声明搬进 client-safe 的 `./types` 纯类型出口，两侧读**同一份**——`$on` 的 listener 类型就是 `Events[Event]` 本身。「原样」不需要证明，是构造性成立的。
 - 但**只借 cordis 的类型形状，不接 cordis 的事件系统**：投递语义、注册表、异常处置全归 Typert 自己。
 
-一条 `Events` 条目若签名里够到了 host-only 符号（Service、`Agent`、Context 等），处理方式是**把代码拆到能干净落进 `./types` 为止**；不接受「一半留 index、一半搬走」的分裂声明，也不接受在 `./types` 里造结构等价的影子类型。这五个包都不需要拆：它们的条目只够到纯类型。agent-presets 把原词汇模块改名为 `preset.ts`，让导出的 `types.ts` 专门承载 client-safe 事件声明。
+一条 `Events` 条目若签名里够到了 host-only 符号（Service、`Agent`、Context 等），处理方式是**把代码拆到能干净落进 `./types` 为止**；不接受「一半留 index、一半搬走」的分裂声明，也不接受在 `./types` 里造结构等价的影子类型。最初五个 owner 包只够到纯类型，`dsh-cordis-host-runner` 也已经通过 `./types` 暴露 Remote 载荷。agent-presets 把原词汇模块改名为 `preset.ts`，让导出的 `types.ts` 专门承载 client-safe 事件声明。
 
-五条事件全部走这条路径，专用帧与 Client 别名都已删除。模型消费方直接订阅 `llm/adapters-updated` 和 `settings/document-updated`；preset 消费方订阅 `agent-preset/selected`。真正需要投影或去重的数据仍保留专用帧。
+最初五条事件全部走这条路径，专用帧与 Client 别名都已删除。模型消费方直接订阅 `llm/adapters-updated` 和 `settings/document-updated`；preset 消费方订阅 `agent-preset/selected`。六组动态 Cordis 事件使用同一个包裹帧，并接受两种名称。真正需要投影或去重的数据仍保留专用帧。
 
 `skills/change`、`tools/change`、`system-prompt/change` 是同形状的纯失效事件但目前**没有任何消费者**，按「每个抽象都要有当前 owner 与需求」不进名单，只作为扩展位记录在此。
 
@@ -62,9 +63,9 @@ $on<Event extends TypertRemoteEvent>(event: Event, listener: Events[Event]): () 
 $dispatch(event: string, args: readonly unknown[]): void
 ```
 
-持有 host 帧 sink 的 client/runtime 直接调用它，帧不经中转事件即到达订阅表。`event` 形参是 `string` 而非 `TypertRemoteEvent`：这是 wire 边界，收到无人订阅的名字即静默丢弃。
+持有 host 帧 sink 的 client/runtime 直接调用它，帧不经中转事件即到达订阅表。`event` 形参是 `string` 而非 `TypertRemoteEvent`：这是 wire 边界。动态 Cordis 别名按同一组名称匹配，其余无人订阅的名称静默丢弃。
 
-投递语义与 cordis 事件系统不共用实现：只有单向投递，没有 waterfall / bail / parallel / serial 模式，也没有 `@mode` 概念（`ReturnType extends void` 是这条纪律的静态表达）；不绑 `this`；没有 `EventOptions`、`prepend`、优先级；按注册顺序逐个调用，单个 listener 抛错就地隔离并记日志——它绝不能拖垮帧泵（沿用 `ConnectionController` 对 sink 异常的既有处置）。
+投递语义与 cordis 事件系统不共用实现：只有单向投递，没有 waterfall / bail / parallel / serial 模式，也没有 `@mode` 概念（`ReturnType extends void` 是这条纪律的静态表达）；不绑 `this`；没有 `EventOptions`、`prepend`、优先级；按全局注册顺序逐个调用。同一个 listener 同时以两个 Cordis 别名注册时每帧只调用一次，同一精确名称的重复注册仍然独立。单个 listener 抛错会就地隔离并记日志——它绝不能拖垮帧泵（沿用 `ConnectionController` 对 sink 异常的既有处置）。
 
 ### 名单：两个 face 共读的同一份声明
 
@@ -128,8 +129,8 @@ zod 侧 `args: z.array(z.unknown())`：帧本身来自 `JSON.parse`，元素必�
 | 位置 | 改动 |
 |---|---|
 | `dsh-typert-protocol` | `src/types.ts` 加 `TypertForwardableEvent`、`TypertRemoteEventSelection`、`TypertRemoteEvent`；`TypertClientRemote` 增 `$on` 与 `$dispatch`。纯类型，零运行时 |
-| `api/gateway` client 半 | `ClientRemoteService` 实现 `$on`（订阅按注册项寻址、`ctx.effect` 归属调用方 fiber）与 `$dispatch`（快照后按注册顺序派发，收容抛出或拒绝的 listener） |
-| `api/remotes` | 新增 `src/remote-events.ts`（名单值）与 `src/types.ts`（类型投影 + 选择座位），两者都双列进两个 face 的 `files`；`./types` 出口 + `files` 补 `lib/types/**/*.js`；host 半加形状断言并 `import type {}` 三个 owner 包的 `./types`；client 半 `export type {}` 那三个 `./types` 与 `@deepseek-ai/dsh-api-gateway/client` |
+| `api/gateway` client 半 | `ClientRemoteService` 实现 `$on`（订阅按注册项寻址、`ctx.effect` 归属调用方 fiber）与 `$dispatch`（快照后按全局注册顺序派发、匹配 Cordis 别名，并收容抛出或拒绝的 listener） |
+| `api/remotes` | `src/remote-events.ts` 持有名单值，`src/types.ts` 持有类型投影与选择座位；两个文件都属于两个编译 face。Host face 断言每个条目并导入各 owner 的 `./types`；Client 半重新导出这些 owner 与 `@deepseek-ai/dsh-api-gateway/client`。动态 Cordis 事件组同时列出两个受支持前缀 |
 | 根 `tsconfig.base.json` | 加 `dsh-settings/types`、`dsh-credentials/types`、`dsh-api-remotes/types` 三条 `paths`，全部指向**源**平面 |
 | `dsh-commands` / `dsh-settings` / `dsh-credentials` | `interface Events` 子块移入各自 client-safe 的 `./types`（settings/credentials 新建该出口，brand 与纯类型一并移入，index 继续 re-export 并留住构造器；`files` 补 `lib/types/**/*.js`） |
 | `host/apiproxy` | `HostFrame` 增 `host/remote-event`、删除五个专用变体及其 zod；`events.host()` 按名单挂监听并通过 `assertJsonArgs` 校验 |
@@ -160,7 +161,7 @@ zod 侧 `args: z.array(z.unknown())`：帧本身来自 `JSON.parse`，元素必�
 - 一个真组合测试：host 每 emit 一次，真实 host 流就出一帧 `host/remote-event`，`event` 为 host 原名、`args` 与实参逐元素相等。
 - 类型层负例拒绝三类候选：不是事件的名字、绑 Scope 的事件（`goal/changed`）、返回值非 `void` 的事件。`$on('slots/changed', …)`（client 本地事件）与 `$on('skills/change', …)`（已声明但未选中）都编译失败——因此 `$on` 的键面恰好等于名单。
 - 消费端 `$on('settings/document-updated', …)` 把 `ns` 解析为 `SettingsNamespace`：brand 穿过 wire 存活。
-- `$on` 的 disposer 归属调用方 fiber；同一个函数对象订阅两次时两条注册各自独立退订——按 listener 身份做键的表会把它们合并，所以订阅按注册项寻址。
+- `$on` 的 disposer 归属调用方 fiber；同一个函数对象在同一精确事件名称下注册两次时，两条注册各自独立退订。Cordis 别名测试还钉住双向匹配、全局顺序，以及同一个 listener 同时以两个别名注册时只调用一次。
 - 投递同时收容抛出的 listener 与拒绝所返回 promise 的 listener：声明返回值是 `void`，没人 await 异步 listener，其拒绝否则会完全逃出这层收容。投递遍历快照，因此派发中订阅或退订都不会改变本帧的接收者集合。
 - `assertJsonArgs` 直接单测，而不是从事件总线造畸形 emit：类型化的 `ctx.emit` 造不出来——名单内每条事件的载荷在静态上都是 JSON-safe 的。
 - 五个专用帧、五条 Client 别名及其桥分支都不存在；各消费方直接观察 owner 事件。

@@ -1,5 +1,5 @@
 import { Context, Service } from '@deepseek-ai/cordis'
-import type { Fiber } from '@deepseek-ai/cordis'
+import type { Events, Fiber } from '@deepseek-ai/cordis'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { z } from 'zod'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
@@ -28,6 +28,16 @@ declare module '@deepseek-ai/cordis' {
      */
     'fixture/idle'(count: number): void
     /**
+     * Test-only official Cordis event outside the supported compatibility baseline.
+     * @param marker - marker payload recorded by listeners.
+     */
+    'cordis/future'(marker: string): void
+    /**
+     * Test-only rescoped Cordis event outside the supported compatibility baseline.
+     * @param marker - marker payload recorded by listeners.
+     */
+    '@deepseek-ai/cordis/future'(marker: string): void
+    /**
      * Test-only event the Host assembly does not forward.
      * @param flag - marker payload never delivered.
      */
@@ -36,7 +46,15 @@ declare module '@deepseek-ai/cordis' {
 }
 
 declare module '@deepseek-ai/dsh-typert-protocol' {
-  interface TypertRemoteEventSelection extends Record<'fixture/changed' | 'fixture/idle', true> {}
+  interface TypertRemoteEventSelection extends Record<
+    | 'fixture/changed'
+    | 'fixture/idle'
+    | 'cordis/request-run'
+    | '@deepseek-ai/cordis/request-run'
+    | 'cordis/future'
+    | '@deepseek-ai/cordis/future',
+    true
+  > {}
 
   interface TypertContextMap {
     fixture: TypertContext<string>
@@ -736,6 +754,72 @@ describe('Client Typert API', () => {
 
     await client.dispose()
     expect(ctx.get('remote')).toBeUndefined()
+  })
+
+  it('delivers official and rescoped Cordis event names across the alias pair', async () => {
+    const ctx = await bench(vi.fn<ConnectionHandle['rpc']['call']>())
+    const seen: string[] = []
+    ctx.remote.$on('@deepseek-ai/cordis/request-run', ({ name }) => { seen.push(`legacy:${name}`) })
+    ctx.remote.$on('cordis/request-run', ({ name }) => { seen.push(`official:${name}`) })
+
+    ctx.remote.$dispatch('cordis/request-run', [{ name: 'canonical-frame' }])
+    ctx.remote.$dispatch('@deepseek-ai/cordis/request-run', [{ name: 'rescoped-frame' }])
+
+    expect(seen).toEqual([
+      'legacy:canonical-frame',
+      'official:canonical-frame',
+      'legacy:rescoped-frame',
+      'official:rescoped-frame',
+    ])
+  })
+
+  it('merges Cordis alias subscriptions in global registration order', async () => {
+    const ctx = await bench(vi.fn<ConnectionHandle['rpc']['call']>())
+    const seen: string[] = []
+    ctx.remote.$on('@deepseek-ai/cordis/request-run', () => { seen.push('first') })
+    ctx.remote.$on('cordis/request-run', () => { seen.push('second') })
+    ctx.remote.$on('@deepseek-ai/cordis/request-run', () => { seen.push('third') })
+
+    ctx.remote.$dispatch('cordis/request-run', [{ name: 'ordered' }])
+
+    expect(seen).toEqual(['first', 'second', 'third'])
+  })
+
+  it('deduplicates one listener across Cordis aliases without merging same-name registrations', async () => {
+    const ctx = await bench(vi.fn<ConnectionHandle['rpc']['call']>())
+    const seen: string[] = []
+    const listener: Events['cordis/request-run'] = ({ name }) => { seen.push(name) }
+    ctx.remote.$on('cordis/request-run', listener)
+    ctx.remote.$on('cordis/request-run', listener)
+    ctx.remote.$on('@deepseek-ai/cordis/request-run', listener)
+
+    ctx.remote.$dispatch('@deepseek-ai/cordis/request-run', [{ name: 'once-per-official-registration' }])
+
+    expect(seen).toEqual(['once-per-official-registration', 'once-per-official-registration'])
+  })
+
+  it('preserves the larger same-name registration count regardless of alias order', async () => {
+    const ctx = await bench(vi.fn<ConnectionHandle['rpc']['call']>())
+    const seen: string[] = []
+    const listener: Events['cordis/request-run'] = ({ name }) => { seen.push(name) }
+    ctx.remote.$on('@deepseek-ai/cordis/request-run', listener)
+    ctx.remote.$on('cordis/request-run', listener)
+    ctx.remote.$on('cordis/request-run', listener)
+
+    ctx.remote.$dispatch('@deepseek-ai/cordis/request-run', [{ name: 'twice' }])
+
+    expect(seen).toEqual(['twice', 'twice'])
+  })
+
+  it('does not alias Cordis event families outside the rc.7 baseline', async () => {
+    const ctx = await bench(vi.fn<ConnectionHandle['rpc']['call']>())
+    const seen: string[] = []
+    ctx.remote.$on('cordis/future', (marker) => { seen.push(marker) })
+
+    ctx.remote.$dispatch('@deepseek-ai/cordis/future', ['rescoped'])
+    ctx.remote.$dispatch('cordis/future', ['official'])
+
+    expect(seen).toEqual(['official'])
   })
 
   it('isolates a throwing listener from the rest of the same event', async () => {
