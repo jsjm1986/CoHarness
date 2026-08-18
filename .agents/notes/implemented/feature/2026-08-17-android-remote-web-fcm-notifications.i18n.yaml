@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-17-android-remote-web-fcm-notifications.md
-2026-08-17-android-remote-web-fcm-notifications.md: 797280e56f75228462b38215e071305bd2a5a289
-2026-08-17-android-remote-web-fcm-notifications.zh.md: d9467e1d7cd56f2e292c726c061ce79212bdd07f
+2026-08-17-android-remote-web-fcm-notifications.md: 8a4cb780d8664569750a0035a5d063e5778cc265
+2026-08-17-android-remote-web-fcm-notifications.zh.md: d7bd4542cb4e2aeba8dcc338bb577749f052ce09

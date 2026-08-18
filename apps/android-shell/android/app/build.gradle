@@ -1,15 +1,57 @@
 apply plugin: 'com.android.application'
 
+def propertyOrEnvironment = { String name, String fallback = '' ->
+    def value = project.findProperty(name)
+    if (value != null && value.toString().trim() != '') return value.toString().trim()
+    def environment = System.getenv(name)
+    return environment != null && environment.trim() != '' ? environment.trim() : fallback
+}
+
+def booleanProperty = { String name, boolean fallback ->
+    def value = propertyOrEnvironment(name, fallback ? 'true' : 'false')
+    return value.equalsIgnoreCase('true')
+}
+
+def jpushVersion = propertyOrEnvironment('JPUSH_VERSION', '6.2.0')
+def fcmMessagingVersion = propertyOrEnvironment('FCM_MESSAGING_VERSION', '25.1.1')
+def jpushAppKey = propertyOrEnvironment('JPUSH_APPKEY')
+def jpushChannel = propertyOrEnvironment('JPUSH_CHANNEL', 'developer-default')
+def enableHuawei = booleanProperty('JPUSH_ENABLE_HUAWEI', file('agconnect-services.json').exists())
+def enableFcm = booleanProperty('JPUSH_ENABLE_FCM', file('google-services.json').exists())
+def enableXiaomi = booleanProperty('JPUSH_ENABLE_XIAOMI', false)
+def enableOppo = booleanProperty('JPUSH_ENABLE_OPPO', false)
+def enableVivo = booleanProperty('JPUSH_ENABLE_VIVO', false)
+def enableMeizu = booleanProperty('JPUSH_ENABLE_MEIZU', false)
+def enableHonor = booleanProperty('JPUSH_ENABLE_HONOR', false)
+
 android {
-    namespace = "com.deepseek.harness"
+    namespace = "com.coharness"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.deepseek.harness"
+        applicationId "com.coharness"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        ndk {
+            abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
+        }
+        manifestPlaceholders = [
+            JPUSH_PKGNAME: applicationId,
+            JPUSH_APPKEY: jpushAppKey,
+            JPUSH_CHANNEL: jpushChannel,
+            MEIZU_APPKEY: propertyOrEnvironment('MEIZU_APPKEY'),
+            MEIZU_APPID: propertyOrEnvironment('MEIZU_APPID'),
+            XIAOMI_APPID: propertyOrEnvironment('XIAOMI_APPID'),
+            XIAOMI_APPKEY: propertyOrEnvironment('XIAOMI_APPKEY'),
+            OPPO_APPKEY: propertyOrEnvironment('OPPO_APPKEY'),
+            OPPO_APPID: propertyOrEnvironment('OPPO_APPID'),
+            OPPO_APPSECRET: propertyOrEnvironment('OPPO_APPSECRET'),
+            VIVO_APPKEY: propertyOrEnvironment('VIVO_APPKEY'),
+            VIVO_APPID: propertyOrEnvironment('VIVO_APPID'),
+            HONOR_APPID: propertyOrEnvironment('HONOR_APPID')
+        ]
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
@@ -40,6 +82,30 @@ dependencies {
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
+    implementation "cn.jiguang.sdk:jpush:${jpushVersion}"
+    if (enableHuawei) {
+        implementation "com.huawei.hms:push:6.13.0.301"
+        implementation "cn.jiguang.sdk.plugin:huawei:${jpushVersion}"
+    }
+    if (enableFcm) {
+        implementation "com.google.firebase:firebase-messaging:${fcmMessagingVersion}"
+        implementation "cn.jiguang.sdk.plugin:fcm:${jpushVersion}"
+    }
+    if (enableXiaomi) {
+        implementation "cn.jiguang.sdk.plugin:xiaomi:${jpushVersion}"
+    }
+    if (enableOppo) {
+        implementation "cn.jiguang.sdk.plugin:oppo:${jpushVersion}"
+    }
+    if (enableVivo) {
+        implementation "cn.jiguang.sdk.plugin:vivo:${jpushVersion}"
+    }
+    if (enableMeizu) {
+        implementation "cn.jiguang.sdk.plugin:meizu:${jpushVersion}"
+    }
+    if (enableHonor) {
+        implementation "cn.jiguang.sdk.plugin:honor:${jpushVersion}"
+    }
 }
 
 apply from: 'capacitor.build.gradle'
@@ -51,4 +117,10 @@ try {
     }
 } catch(Exception e) {
     logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}
+
+if (enableHuawei && file('agconnect-services.json').exists()) {
+    apply plugin: 'com.huawei.agconnect'
+} else if (enableHuawei) {
+    logger.lifecycle('agconnect-services.json not found, Huawei push channel is disabled for this build')
 }

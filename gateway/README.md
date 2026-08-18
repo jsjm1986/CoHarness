@@ -43,6 +43,8 @@ The public-facing portal gateway for DeepSeek Harness: PostgreSQL-backed login/s
 | `HGW_DEFAULT_ENV_FILE` | (empty) | Company default credentials copied to each instance's `$DSH_HOME/.env` on start |
 | `HGW_FCM_PROJECT_ID` | (unset) | Firebase Cloud Messaging project id used for Android completion notifications |
 | `HGW_FCM_SERVICE_ACCOUNT_FILE` | (unset) | Owner-private Firebase service-account JSON file; absent means tokens are stored but no outbound FCM is sent |
+| `HGW_JPUSH_APP_KEY` | (unset) | JPush application key; must be paired with `HGW_JPUSH_MASTER_SECRET` |
+| `HGW_JPUSH_MASTER_SECRET` | (unset) | Owner-private JPush master secret; both JPush variables are required to enable JPush delivery |
 | `HGW_MEMORY_MAX` / `HGW_CPU_QUOTA` | `1G` / `100%` | Per-instance systemd resource limits |
 | `HGW_GATEWAY_DIR` | gateway root | Directory masked from instances (`InaccessiblePaths`) |
 
@@ -60,7 +62,11 @@ The admin console uses one visual system across Users, Projects, Models, Usage, 
 
 ## Android shell and completion notifications
 
-`apps/android-shell` is a Capacitor shell that loads the deployed Web UI through `DSH_ANDROID_WEB_URL`. Publish ordinary Web UI changes to the Gateway without rebuilding the APK. Re-run `pnpm --dir apps/android-shell run cap:sync` and rebuild only when the native project, permissions, package id, icons, or notification handling changes. Register the Firebase Android app and place its generated `google-services.json` at `apps/android-shell/android/app/google-services.json`; keep the Gateway service-account JSON in an owner-private host path and set `HGW_FCM_PROJECT_ID` and `HGW_FCM_SERVICE_ACCOUNT_FILE`. The Gateway stores Android tokens per authenticated user and sends a small creator-scoped notification only after a durable completed turn; the notification contains a session id and opens the existing Web UI rather than exposing reply text.
+`apps/android-shell` is a Capacitor shell that loads the deployed Web UI through `DSH_ANDROID_WEB_URL`. Publish ordinary Web UI changes to the Gateway without rebuilding the APK. Re-run `pnpm --dir apps/android-shell run cap:sync` and rebuild only when the native project, permissions, package id, icons, or notification handling changes. The package id is `com.coharness`.
+
+The shell can register FCM and JPush independently. FCM requires the Firebase client file at `apps/android-shell/android/app/google-services.json`; the Gateway needs `HGW_FCM_PROJECT_ID` and an owner-private `HGW_FCM_SERVICE_ACCOUNT_FILE`. JPush uses the Android JPush AppKey supplied through `JPUSH_APPKEY` (a Gradle property or environment variable) and the Gateway pair `HGW_JPUSH_APP_KEY` / `HGW_JPUSH_MASTER_SECRET`. The JPush RegistrationID is stored with provider `jpush`, while existing clients without a provider remain `fcm`. Huawei and other domestic vendor channels are optional Gradle integrations; Huawei additionally requires `agconnect-services.json` and `JPUSH_ENABLE_HUAWEI=true`. Do not commit any AppKey, secret, Firebase service-account JSON, or vendor configuration file.
+
+The Gateway stores Android tokens per authenticated user and sends a small creator-scoped notification only after a durable completed turn; the notification contains a session id and opens the existing Web UI rather than exposing reply text. PostgreSQL migration 010 adds provider-aware token uniqueness; normal Gateway startup applies it.
 
 ## Project collaborative conversations
 

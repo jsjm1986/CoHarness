@@ -6,8 +6,10 @@ import { describe, expect, it, vi } from 'vitest'
 import { loadConfig } from '../src/config.ts'
 import {
   FcmHttpV1Sender,
+  JpushRestSender,
   PostgresPushService,
   type PushDeviceRegistration,
+  type PushProvider,
 } from '../src/push-notifications.ts'
 
 vi.mock('google-auth-library', () => ({
@@ -36,6 +38,7 @@ interface RecordedQuery {
 
 interface QueryPlan {
   duplicateClaim?: boolean
+  deviceProvider?: PushProvider
 }
 
 function poolFixture(plan: QueryPlan = {}): {
@@ -60,7 +63,7 @@ function poolFixture(plan: QueryPlan = {}): {
       return { rows: [{ organization_id: ORGANIZATION_ID, user_id: INTERNAL_USER_ID }], rowCount: 1 } as unknown as { rows: R[]; rowCount: number }
     }
     if (text.includes('FROM harness.push_devices')) {
-      return { rows: [{ id: DEVICE_ID, token: 'device-token' }], rowCount: 1 } as unknown as { rows: R[]; rowCount: number }
+      return { rows: [{ id: DEVICE_ID, token: 'device-token', provider: plan.deviceProvider ?? 'fcm' }], rowCount: 1 } as unknown as { rows: R[]; rowCount: number }
     }
     if (text.includes('INSERT INTO harness.push_deliveries')) {
       if (plan.duplicateClaim === true && claimed) return { rows: [], rowCount: 0 } as { rows: R[]; rowCount: number }
@@ -99,7 +102,7 @@ describe('PostgresPushService', () => {
     await expect(push.removeDevice(42, DEVICE_ID)).resolves.toBe(true)
 
     const insert = fixture.queries.find(query => query.text.includes('INSERT INTO harness.push_devices'))
-    expect(insert?.text).toContain('ON CONFLICT (organization_id,token)')
+    expect(insert?.text).toContain('ON CONFLICT (organization_id,provider,token)')
     const remove = fixture.queries.at(-1)
     expect(remove?.text).toContain('WHERE organization_id=$1 AND id=$2 AND user_id=$3')
     expect(remove?.values).toEqual([ORGANIZATION_ID, DEVICE_ID, INTERNAL_USER_ID])
@@ -149,6 +152,44 @@ describe('PostgresPushService', () => {
       await rm(directory, { recursive: true, force: true })
     }
   })
+
+  it('deletes a JPush registration when JPush rejects its registration id', async () => {
+    const request = vi.fn(async () => new Response(JSON.stringify({
+      error: { code: 1003, message: 'invalid registration_id' },
+    }), {
+      status: 400,
+      headers: { 'content-type': 'application/json' },
+    }))
+    const sender = new JpushRestSender('app-key', 'master-secret', request)
+    const fixture = poolFixture({ deviceProvider: 'jpush' })
+    const push = new PostgresPushService(
+      { pool: fixture.pool, organizationId: ORGANIZATION_ID },
+      loadConfig({ HGW_JPUSH_APP_KEY: 'app-key', HGW_JPUSH_MASTER_SECRET: 'master-secret' }),
+      fetch,
+      { jpush: sender },
+    )
+
+    await push.notifyCompleted(SESSION_ID, 22)
+
+    expect(request).toHaveBeenCalledOnce()
+    expect(fixture.queries.some(query => query.text.includes('DELETE FROM harness.push_devices'))).toBe(true)
+  })
+
+  it('routes a JPush device through the JPush sender', async () => {
+    const sender = { send: vi.fn(async (_input: { token: string; sessionId: string; eventSeq: number }): Promise<void> => {}) }
+    const fixture = poolFixture({ deviceProvider: 'jpush' })
+    const push = new PostgresPushService(
+      { pool: fixture.pool, organizationId: ORGANIZATION_ID },
+      loadConfig({}),
+      fetch,
+      { jpush: sender },
+    )
+
+    await push.registerDevice(42, { token: 'jpush-registration', platform: 'android', provider: 'jpush' })
+    await push.notifyCompleted(SESSION_ID, 20)
+
+    expect(sender.send).toHaveBeenCalledWith({ token: 'device-token', sessionId: SESSION_ID, eventSeq: 20 })
+  })
 })
 
 describe('FcmHttpV1Sender', () => {
@@ -177,6 +218,38 @@ describe('FcmHttpV1Sender', () => {
     } finally {
       await rm(directory, { recursive: true, force: true })
     }
+    expect(request).toHaveBeenCalledOnce()
+  })
+})
+
+describe('JpushRestSender', () => {
+  it('sends only the session pointer and authenticates with AppKey and Master Secret', async () => {
+    const request = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      expect(init?.headers).toMatchObject({
+        authorization: `Basic ${Buffer.from('app-key:master-secret').toString('base64')}`,
+      })
+      const body = JSON.parse(String(init?.body)) as {
+        platform: string
+        audience: { registration_id: string[] }
+        notification: { android: { title: string; extras: { sessionId: string; eventSeq: string } } }
+      }
+      expect(body).toMatchObject({
+        platform: 'android',
+        audience: { registration_id: ['registration-id'] },
+        notification: {
+          android: {
+            title: 'AI 回复完成',
+            extras: { sessionId: SESSION_ID, eventSeq: '21' },
+          },
+        },
+      })
+      expect(JSON.stringify(body)).not.toContain('reply')
+      return new Response(null, { status: 200 })
+    })
+
+    await new JpushRestSender('app-key', 'master-secret', request).send({
+      token: 'registration-id', sessionId: SESSION_ID, eventSeq: 21,
+    })
     expect(request).toHaveBeenCalledOnce()
   })
 })

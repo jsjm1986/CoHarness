@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">CoHarness</string>
     <string name="title_activity_main">CoHarness</string>
-    <string name="package_name">com.deepseek.harness</string>
-    <string name="custom_url_scheme">com.deepseek.harness</string>
+    <string name="package_name">com.coharness</string>
+    <string name="custom_url_scheme">com.coharness</string>
 </resources>

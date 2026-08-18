@@ -6,7 +6,7 @@ import { CollaborationDeniedError } from './collaboration.ts'
 import type { GatewayConfig } from './config.ts'
 import type { ProjectRuntime } from './instances.ts'
 import type { PrincipalScope } from './principal.ts'
-import type { GatewayPushService } from './push-notifications.ts'
+import type { GatewayPushService, PushProvider } from './push-notifications.ts'
 import { loginPage, passwordPage } from './html.ts'
 import type {
   Awaitable,
@@ -29,7 +29,7 @@ export interface GatewayDeps {
   instances: GatewayInstanceService
   governance?: GatewayModelGovernanceService
   collaboration?: GatewayCollaborationService
-  /** Optional persistent device registry and FCM delivery service. */
+  /** Optional persistent device registry and multi-provider push delivery service. */
   push?: GatewayPushService
   readiness?: () => Awaitable<void>
 }
@@ -295,9 +295,11 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       const input = jsonObject(await readBody(req))
       const token = stringField(input?.token)
       const platform = input?.platform
+      const provider = input?.provider === undefined ? 'fcm' : input.provider
       const deviceId = input?.deviceId === undefined ? undefined : stringField(input.deviceId)
       const appVersion = input?.appVersion === undefined ? undefined : stringField(input.appVersion)
       if (token === undefined || token.length > 4096 || platform !== 'android'
+        || (provider !== 'fcm' && provider !== 'jpush')
         || (input?.deviceId !== undefined && deviceId === undefined)
         || (input?.appVersion !== undefined && appVersion === undefined)) {
         send(res, 400, '{"error":"invalid-push-device"}', 'application/json')
@@ -306,6 +308,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       const device = await deps.push.registerDevice(user.id, {
         token,
         platform,
+        provider: provider as PushProvider,
         ...(deviceId === undefined ? {} : { deviceId }),
         ...(appVersion === undefined ? {} : { appVersion }),
       })

@@ -6,12 +6,17 @@ import { internalUserId, type PostgresRuntimeContext } from './postgres/runtime-
 
 const FCM_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging'
 const FCM_ENDPOINT = 'https://fcm.googleapis.com/v1/projects'
+const JPUSH_ENDPOINT = 'https://api.jpush.cn/v3/push'
 const PUSH_CHANNEL_ID = 'ai-replies'
+
+/** Provider used to address one Android push registration. */
+export type PushProvider = 'fcm' | 'jpush'
 
 /** Android device registration accepted by the authenticated account API. */
 export interface PushDeviceRegistration {
   token: string
   platform: 'android'
+  provider?: PushProvider
   deviceId?: string
   appVersion?: string
 }
@@ -43,9 +48,10 @@ interface ServiceAccount {
 interface DeviceRow {
   id: string
   token: string
+  provider?: PushProvider
 }
 
-class FcmSendError extends Error {
+class PushSendError extends Error {
   constructor(message: string, readonly invalidToken: boolean) {
     super(message)
   }
@@ -130,7 +136,7 @@ export class FcmHttpV1Sender implements PushSender {
     }
     const invalidToken = response.status === 404 || code === 'UNREGISTERED'
       || (code === 'INVALID_ARGUMENT' && /token/i.test(body))
-    throw new FcmSendError(`FCM send failed with HTTP ${String(response.status)}`, invalidToken)
+    throw new PushSendError(`FCM send failed with HTTP ${String(response.status)}`, invalidToken)
   }
 
   private async loadAccount(): Promise<ServiceAccount> {
@@ -151,42 +157,115 @@ export class FcmHttpV1Sender implements PushSender {
   }
 }
 
+/** JPush REST sender addressed by an Android RegistrationID. */
+export class JpushRestSender implements PushSender {
+  constructor(
+    private readonly appKey: string,
+    private readonly masterSecret: string,
+    private readonly request: typeof fetch = fetch,
+    private readonly endpoint = JPUSH_ENDPOINT,
+  ) {}
+
+  async send(input: { token: string; sessionId: string; eventSeq: number }): Promise<void> {
+    const authorization = Buffer.from(`${this.appKey}:${this.masterSecret}`, 'utf8').toString('base64')
+    const response = await this.request(this.endpoint, {
+      method: 'POST',
+      headers: {
+        authorization: `Basic ${authorization}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        platform: 'android',
+        audience: { registration_id: [input.token] },
+        notification: {
+          alert: '点击查看回复',
+          android: {
+            alert: '点击查看回复',
+            title: 'AI 回复完成',
+            extras: {
+              sessionId: input.sessionId,
+              eventSeq: String(input.eventSeq),
+            },
+          },
+        },
+      }),
+    })
+    if (response.ok) return
+    const body = await response.text()
+    const invalidToken = response.status === 400
+      && /(registration[_ -]?id|invalid audience|invalid registration|1003|1004)/i.test(body)
+    throw new PushSendError(`JPush send failed with HTTP ${String(response.status)}`, invalidToken)
+  }
+}
+
 class DisabledPushSender implements PushSender {
   async send(_input: { token: string; sessionId: string; eventSeq: number }): Promise<void> {}
 }
 
-function senderFor(cfg: GatewayConfig, request: typeof fetch): PushSender {
-  if (cfg.fcmServiceAccountFile === undefined) return new DisabledPushSender()
-  return new FcmHttpV1Sender(cfg.fcmProjectId, cfg.fcmServiceAccountFile, request)
+type PushSenderMap = Readonly<Record<PushProvider, PushSender>>
+
+function isPushSender(
+  sender: PushSender | Partial<Record<PushProvider, PushSender>>,
+): sender is PushSender {
+  return 'send' in sender && typeof sender.send === 'function'
 }
 
-/** PostgreSQL-backed device registry and idempotent FCM delivery service. */
+function senderFor(cfg: GatewayConfig, request: typeof fetch): PushSenderMap {
+  const disabled = new DisabledPushSender()
+  const fcm = cfg.fcmServiceAccountFile === undefined
+    ? disabled
+    : new FcmHttpV1Sender(cfg.fcmProjectId, cfg.fcmServiceAccountFile, request)
+  const { jpushAppKey, jpushMasterSecret } = cfg
+  const hasJpushAppKey = jpushAppKey !== undefined
+  const hasJpushMasterSecret = jpushMasterSecret !== undefined
+  if (hasJpushAppKey !== hasJpushMasterSecret) {
+    throw new Error('HGW_JPUSH_APP_KEY and HGW_JPUSH_MASTER_SECRET must be configured together')
+  }
+  const jpush = jpushAppKey !== undefined && jpushMasterSecret !== undefined
+    ? new JpushRestSender(jpushAppKey, jpushMasterSecret, request)
+    : disabled
+  return { fcm, jpush }
+}
+
+/** PostgreSQL-backed device registry and idempotent multi-provider delivery service. */
 export class PostgresPushService implements GatewayPushService {
-  private readonly sender: PushSender
+  private readonly senders: PushSenderMap
 
   constructor(
     private readonly context: Pick<PostgresRuntimeContext, 'pool' | 'organizationId'>,
     cfg: GatewayConfig,
     request: typeof fetch = fetch,
-    sender?: PushSender,
+    sender?: PushSender | Partial<Record<PushProvider, PushSender>>,
   ) {
-    this.sender = sender ?? senderFor(cfg, request)
+    if (sender === undefined) {
+      this.senders = senderFor(cfg, request)
+    } else if (isPushSender(sender)) {
+      this.senders = { fcm: sender, jpush: sender }
+    } else {
+      const disabled = new DisabledPushSender()
+      this.senders = {
+        fcm: sender.fcm ?? disabled,
+        jpush: sender.jpush ?? disabled,
+      }
+    }
   }
 
   async registerDevice(userId: number, input: PushDeviceRegistration): Promise<{ id: string }> {
     const internalId = await internalUserId(this.context.pool, this.context.organizationId, userId)
     if (internalId === null) throw new Error('user-not-found')
+    const provider = input.provider ?? 'fcm'
     const result = await this.context.pool.query<{ id: string }>(`INSERT INTO harness.push_devices(
-      organization_id,user_id,token,platform,device_id,app_version,updated_at,last_seen_at
-    ) VALUES($1,$2,$3,$4,$5,$6,now(),now())
-    ON CONFLICT (organization_id,token) DO UPDATE SET
-      user_id=EXCLUDED.user_id,platform=EXCLUDED.platform,device_id=EXCLUDED.device_id,
+      organization_id,user_id,token,platform,provider,device_id,app_version,updated_at,last_seen_at
+    ) VALUES($1,$2,$3,$4,$5,$6,$7,now(),now())
+    ON CONFLICT (organization_id,provider,token) DO UPDATE SET
+      user_id=EXCLUDED.user_id,platform=EXCLUDED.platform,provider=EXCLUDED.provider,device_id=EXCLUDED.device_id,
       app_version=EXCLUDED.app_version,updated_at=now(),last_seen_at=now()
     RETURNING id::text`, [
       this.context.organizationId,
       internalId,
       input.token,
       input.platform,
+      provider,
       input.deviceId ?? null,
       input.appVersion ?? null,
     ])
@@ -213,7 +292,7 @@ export class PostgresPushService implements GatewayPushService {
     [sessionId, this.context.organizationId])
     const owner = recipient.rows[0]
     if (owner === undefined) return
-    const devices = await this.context.pool.query<DeviceRow>(`SELECT id::text,token
+    const devices = await this.context.pool.query<DeviceRow>(`SELECT id::text,token,provider
       FROM harness.push_devices
       WHERE organization_id=$1 AND user_id=$2
       ORDER BY updated_at DESC`, [owner.organization_id, owner.user_id])
@@ -229,14 +308,15 @@ export class PostgresPushService implements GatewayPushService {
       ])
       if (claimed.rows[0] === undefined) continue
       try {
-        await this.sender.send({ token: device.token, sessionId, eventSeq })
+        const provider = device.provider ?? 'fcm'
+        await this.senders[provider].send({ token: device.token, sessionId, eventSeq })
         await this.context.pool.query(`UPDATE harness.push_deliveries SET
           status='sent',sent_at=now(),updated_at=now(),last_error=NULL
           WHERE organization_id=$1 AND session_id=$2 AND event_seq=$3 AND device_id=$4`, [
           owner.organization_id, sessionId, eventSeq, device.id,
         ])
       } catch (error: unknown) {
-        const invalidToken = error instanceof FcmSendError && error.invalidToken
+        const invalidToken = error instanceof PushSendError && error.invalidToken
         await this.context.pool.query(`UPDATE harness.push_deliveries SET
           status='failed',last_error=$5,updated_at=now()
           WHERE organization_id=$1 AND session_id=$2 AND event_seq=$3 AND device_id=$4`, [

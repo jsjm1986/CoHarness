@@ -1,0 +1,260 @@
+/**
+ * Operator visual audit for compact product chrome. Writes screenshots under
+ * `.playwright-mcp/compact-chrome/` — not a committed golden lane.
+ *
+ * Seeds the navigation-panes fixture so Chat, tool rows, Trajectory, and the
+ * event-details overlay exist without a live model turn. Run after
+ * `pnpm run build:lib:client && pnpm run build:web`.
+ */
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
+import type { Browser, Page } from 'playwright'
+import { chromium } from 'playwright'
+import { afterAll, beforeAll, describe, it } from 'vitest'
+import { launchWebScaffold, seedSession, type WebScaffold } from './scaffold.ts'
+import { ZH_BROWSER_LOCALE } from './support.ts'
+
+const OUT = fileURLToPath(new URL('../../../.playwright-mcp/compact-chrome/', import.meta.url))
+const SEED = fileURLToPath(new URL('./snapshots/navigation-panes/seed.jsonl', import.meta.url))
+const SEED_ID = 'navigation-panes-web-e2e'
+
+const PHONES = [
+  { tag: '390x844', width: 390, height: 844 },
+  { tag: '375x667', width: 375, height: 667 },
+] as const
+
+async function shot(page: Page, name: string): Promise<void> {
+  await page.screenshot({ path: join(OUT, `${name}.png`), fullPage: false })
+}
+
+async function dumpOverflow(page: Page): Promise<unknown> {
+  return await page.evaluate(() => {
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    const small = [...document.querySelectorAll('button, a, [role="button"], [role="tab"]')]
+      .map((el) => {
+        const box = el.getBoundingClientRect()
+        if (box.width === 0 || box.height === 0) return null
+        const onScreen = box.right > 1 && box.left < vw - 1 && box.bottom > 1 && box.top < vh - 1
+        if (!onScreen) return null
+        const label = (el.getAttribute('aria-label') ?? el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 40)
+        return {
+          label,
+          w: Math.round(box.width),
+          h: Math.round(box.height),
+          clipped: box.right > vw + 1 || box.bottom > vh + 1 || box.left < -1 || box.top < -1,
+        }
+      })
+      .filter(row => row !== null)
+    return {
+      viewport: { vw, vh, stamp: document.querySelector('[data-viewport]')?.getAttribute('data-viewport') },
+      pointerCoarse: window.matchMedia('(pointer: coarse)').matches,
+      dsw: getComputedStyle(document.documentElement).getPropertyValue('--dsw-viewport-height'),
+      tiny: small.filter(row => row.h < 40 && row.w < 40).slice(0, 20),
+      clipped: small.filter(row => row.clipped).slice(0, 16),
+      dialog: (() => {
+        const dialog = document.querySelector('[role="dialog"]')
+        if (dialog === null) return null
+        const box = dialog.getBoundingClientRect()
+        return { x: box.x, y: box.y, w: box.width, h: box.height }
+      })(),
+    }
+  })
+}
+
+async function dismissOnboarding(page: Page): Promise<void> {
+  const welcome = page.locator('[class*="onboardingOverlay"]')
+  if (await welcome.count() > 0) {
+    await welcome.getByRole('button').first().click()
+    await welcome.waitFor({ state: 'detached', timeout: 15_000 })
+  }
+}
+
+async function openDrawer(page: Page): Promise<void> {
+  const toggle = page.getByRole('button', { name: /打开侧边栏|Open sidebar/ })
+  if (await toggle.count() === 0) return
+  const expanded = await toggle.getAttribute('aria-expanded')
+  if (expanded !== 'true') await toggle.click()
+  await page.getByRole('button', { name: /设置|Settings/, exact: true }).waitFor({ timeout: 10_000 })
+}
+
+async function closeDrawer(page: Page): Promise<void> {
+  const toggle = page.getByRole('button', { name: /关闭侧边栏|Close sidebar|打开侧边栏|Open sidebar/ })
+  if (await toggle.count() === 0) return
+  if (await toggle.getAttribute('aria-expanded') === 'true') {
+    await toggle.click()
+    await page.waitForTimeout(250)
+  }
+}
+
+async function openSeededChat(page: Page): Promise<void> {
+  await openDrawer(page)
+  await page.getByText(/未分组|Ungrouped/, { exact: true }).waitFor({ timeout: 30_000 })
+  const searchButton = page.getByRole('button', { name: /搜索会话|Search sessions/ })
+  if (await searchButton.count() > 0 && await searchButton.getAttribute('aria-expanded') !== 'true') {
+    await searchButton.click()
+  }
+  const search = page.getByPlaceholder(/搜索会话|Search sessions/)
+  await search.waitFor({ timeout: 10_000 })
+  await search.fill('WATERFALL')
+  const result = page.getByRole('tree', { name: /搜索结果|Search results/ }).getByRole('treeitem')
+  await result.first().waitFor({ timeout: 30_000 })
+  await result.first().click()
+  await page.getByText('FIRST_DONE', { exact: true }).waitFor({ timeout: 15_000 })
+  await closeDrawer(page)
+  const chat = page.getByRole('tab', { name: /对话|Chat/, exact: true })
+  if (await chat.count() > 0) await chat.click()
+}
+
+describe('visual audit: compact product chrome', () => {
+  let scaffold: WebScaffold
+  let browser: Browser
+
+  beforeAll(async () => {
+    mkdirSync(OUT, { recursive: true })
+    scaffold = await launchWebScaffold({})
+    const sessionCwd = join(scaffold.workspaceCwd, 'workspace')
+    await mkdir(sessionCwd, { recursive: true })
+    await writeFile(join(sessionCwd, 'nav-a.md'), '# alpha nav\n')
+    await writeFile(join(sessionCwd, 'nav-b.md'), '# beta nav\n')
+    await seedSession(scaffold, await readFile(SEED, 'utf8'), SEED_ID)
+    browser = await chromium.launch()
+  }, 120_000)
+
+  afterAll(async () => {
+    await browser?.close()
+    await scaffold?.close()
+  })
+
+  it('covers landing, seeded chat, trajectory, settings, and documents on phones', async () => {
+    const findings: Record<string, unknown> = {}
+
+    for (const phone of PHONES) {
+      const prefix = phone.tag
+      const page: Page = await browser.newPage({
+        viewport: { width: phone.width, height: phone.height },
+        locale: ZH_BROWSER_LOCALE,
+        hasTouch: true,
+        isMobile: true,
+      })
+      await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+      await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+      await dismissOnboarding(page)
+      await shot(page, `${prefix}-00-landing`)
+      findings[`${prefix}.landing`] = await dumpOverflow(page)
+
+      const pickWorkspace = page.getByRole('button', { name: /选择工作区|Choose workspace/ })
+      if (await pickWorkspace.count() > 0) {
+        await pickWorkspace.click()
+        await page.getByRole('dialog').waitFor({ timeout: 10_000 })
+        await page.waitForTimeout(300)
+        await shot(page, `${prefix}-01-workspace-dialog`)
+        findings[`${prefix}.workspaceDialog`] = await dumpOverflow(page)
+        await page.keyboard.press('Escape')
+      }
+
+      const preset = page.getByRole('button', { name: /标准模式|Standard/ })
+      if (await preset.count() > 0) {
+        await preset.click()
+        await page.waitForTimeout(300)
+        await shot(page, `${prefix}-02-preset-menu`)
+        findings[`${prefix}.presetMenu`] = await dumpOverflow(page)
+        await page.keyboard.press('Escape')
+      }
+
+      await openSeededChat(page)
+      await shot(page, `${prefix}-03-chat`)
+      findings[`${prefix}.chat`] = await dumpOverflow(page)
+      await page.getByRole('heading', { name: 'Navigation Summary' }).waitFor({ timeout: 10_000 })
+      await shot(page, `${prefix}-04-chat-markdown`)
+
+      const toolRow = page.locator('[data-tool], [class*="ToolRow"]').first()
+      if (await toolRow.count() > 0) {
+        await toolRow.click()
+        await page.waitForTimeout(300)
+        await shot(page, `${prefix}-05-tool-expanded`)
+        findings[`${prefix}.tool`] = await dumpOverflow(page)
+      }
+
+      const commands = page.getByRole('button', { name: '命令' })
+      if (await commands.count() > 0) {
+        await commands.click()
+        await page.waitForTimeout(300)
+        await shot(page, `${prefix}-06-composer-commands`)
+        findings[`${prefix}.commands`] = await dumpOverflow(page)
+        await page.keyboard.press('Escape')
+      }
+
+      const model = page.locator('[data-composer-card] button[aria-haspopup="menu"]').last()
+      if (await model.count() > 0) {
+        await model.click()
+        await page.waitForTimeout(300)
+        await shot(page, `${prefix}-07-model-menu`)
+        findings[`${prefix}.model`] = await dumpOverflow(page)
+        await page.keyboard.press('Escape')
+      }
+
+      await page.getByRole('tab', { name: /轨迹|Trajectory/ }).click()
+      await page.locator('table, [role="table"]').first().waitFor({ timeout: 15_000 })
+      await page.waitForTimeout(400)
+      await shot(page, `${prefix}-08-trajectory`)
+      findings[`${prefix}.trajectory`] = await dumpOverflow(page)
+
+      const toolEvent = page.locator('tr[data-kind="tool"]').first()
+      if (await toolEvent.count() > 0) {
+        await toolEvent.click()
+        const details = page.getByRole('complementary', { name: 'Event details' })
+        await details.waitFor({ timeout: 10_000 })
+        await page.waitForTimeout(300)
+        await shot(page, `${prefix}-09-event-details`)
+        findings[`${prefix}.eventDetails`] = await dumpOverflow(page)
+        const closeDetails = details.getByRole('button', { name: /Close details|关闭详情/ })
+        if (await closeDetails.count() > 0) await closeDetails.click()
+        else await page.keyboard.press('Escape')
+      }
+
+      await openDrawer(page)
+      await shot(page, `${prefix}-10-drawer`)
+      findings[`${prefix}.drawer`] = await dumpOverflow(page)
+
+      await page.getByRole('button', { name: '设置', exact: true }).click()
+      try {
+        await page.getByRole('dialog').waitFor({ timeout: 8_000 })
+        await page.waitForTimeout(400)
+        await shot(page, `${prefix}-11-settings`)
+        findings[`${prefix}.settings`] = await dumpOverflow(page)
+        const modelsTab = page.getByRole('dialog').getByRole('button', { name: '模型', exact: true })
+        if (await modelsTab.count() > 0) {
+          await modelsTab.click()
+          await page.waitForTimeout(400)
+          await shot(page, `${prefix}-12-settings-models`)
+          findings[`${prefix}.settingsModels`] = await dumpOverflow(page)
+        }
+        await page.keyboard.press('Escape')
+      } catch {
+        findings[`${prefix}.settings`] = 'no dialog'
+      }
+
+      await openDrawer(page)
+      const documents = page.getByRole('button', { name: '文档', exact: true })
+      if (await documents.count() > 0) {
+        await documents.click()
+        try {
+          await page.getByRole('dialog').waitFor({ timeout: 8_000 })
+          await page.waitForTimeout(300)
+          await shot(page, `${prefix}-13-documents`)
+          findings[`${prefix}.documents`] = await dumpOverflow(page)
+          await page.keyboard.press('Escape')
+        } catch {
+          findings[`${prefix}.documents`] = 'no dialog'
+        }
+      }
+
+      await page.close()
+    }
+
+    writeFileSync(join(OUT, 'findings.json'), `${JSON.stringify(findings, null, 2)}\n`)
+  }, 360_000)
+})
