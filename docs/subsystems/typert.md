@@ -203,9 +203,10 @@ interface TypertClientRemote extends TypertRemoteNamespaceMap {
   $mount(contribution: TypertRemoteContribution): Promise<TypertDisposer>
   /**
    * Subscribe to one forwarded Host event; delivery is one-way, in registration
-   * order, and isolates a throwing listener from the rest.
+   * order, and isolates a throwing listener from the rest. Official `cordis/*`
+   * names and their `@deepseek-ai/cordis/*` counterparts form one delivery family.
    * @template Event - forwarded event name selected by the Host assembly.
-   * @param event - forwarded Host event name, unchanged on the wire.
+   * @param event - forwarded Host event name or its supported Cordis alias.
    * @param listener - receives the Host's argument list as declared by Cordis `Events`.
    * @returns disposer owned by the calling fiber.
    */
@@ -216,9 +217,9 @@ interface TypertClientRemote extends TypertRemoteNamespaceMap {
    * {@link TypertClientRemote.$on} and never calls it.
    *
    * `event` is a plain string because this is the wire boundary: the name is
-   * whatever the Host assembly's allowlist selected, and one nobody subscribed
-   * to is dropped silently.
-   * @param event - forwarded Host event name, exactly as the Host emitted it.
+   * whatever the Host assembly's allowlist selected. Cordis aliases are matched
+   * as one family, and a name nobody subscribed to is dropped silently.
+   * @param event - forwarded Host event name exactly as the Host emitted it.
    * @param args - the Host argument list, already JSON-decoded.
    */
   $dispatch(event: string, args: readonly unknown[]): void

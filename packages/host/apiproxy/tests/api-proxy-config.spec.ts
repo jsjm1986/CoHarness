@@ -22,6 +22,7 @@ import type { SettingsNamespace } from '@deepseek-ai/dsh-settings'
 import { CredentialProvider } from '@deepseek-ai/dsh-credentials'
 import type { CredentialInfo, CredentialRef, ResolvedCredential } from '@deepseek-ai/dsh-credentials'
 import type { CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
+import type { ApprovalRequestId } from '@deepseek-ai/dsh-cordis-host-runner/types'
 import type { HostFrame } from '../src/api/index.ts'
 import type { RpcRequest, RpcResponse } from '../src/api/rpc.ts'
 import { RpcId } from '../src/api/rpc.ts'
@@ -515,6 +516,24 @@ describe('settings domain', () => {
     // The resolved value never moved: base already said https://base.
     expect(expectOk(await api.settings.describe(request({}))).namespaces[0]!.value)
       .toEqual({ apiKeyEnv: 'DEEPSEEK_API_KEY', baseURL: 'https://base' })
+  })
+
+  it('forwards an official Cordis event name without wire renaming', async () => {
+    const ctx = await harness()
+    const api = createApiProxy(ctx, DEFAULTS)
+    const resolved = {
+      requestId: 'official-request' as ApprovalRequestId,
+      outcome: 'completed' as const,
+    }
+    const frames = await collectHost(api, ['host/remote-event'], 1, async () => {
+      ctx.emit('cordis/request-run-resolved', resolved)
+    })
+
+    expect(frames).toEqual([{
+      type: 'host/remote-event',
+      event: 'cordis/request-run-resolved',
+      args: [resolved],
+    }])
   })
 
   it('broadcasts a permission change without invalidating the model catalog', async () => {

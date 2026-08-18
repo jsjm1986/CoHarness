@@ -82,19 +82,47 @@ type RemoteEventListener = (...args: never[]) => void
  * disposer must retire only its own registration.
  */
 interface RemoteEventSubscription {
+  readonly event: string
   readonly listener: RemoteEventListener
+}
+
+const CORDIS_EVENT_PREFIX = 'cordis/'
+const RESCOPED_CORDIS_EVENT_PREFIX = '@deepseek-ai/cordis/'
+const CORDIS_COMPAT_EVENT_SUFFIXES: ReadonlySet<string> = new Set([
+  'request-run',
+  'request-run-resolved',
+  'dynamic-package',
+  'dynamic-retract',
+  'inspect-query',
+  'inspect-query-resolved',
+])
+
+function remoteEventNames(event: string): readonly string[] {
+  if (event.startsWith(CORDIS_EVENT_PREFIX)) {
+    const suffix = event.slice(CORDIS_EVENT_PREFIX.length)
+    if (CORDIS_COMPAT_EVENT_SUFFIXES.has(suffix)) {
+      return [event, RESCOPED_CORDIS_EVENT_PREFIX + suffix]
+    }
+  }
+  if (event.startsWith(RESCOPED_CORDIS_EVENT_PREFIX)) {
+    const suffix = event.slice(RESCOPED_CORDIS_EVENT_PREFIX.length)
+    if (CORDIS_COMPAT_EVENT_SUFFIXES.has(suffix)) {
+      return [event, CORDIS_EVENT_PREFIX + suffix]
+    }
+  }
+  return [event]
 }
 
 class ClientRemoteService extends Service implements TypertClientRemote {
   private readonly ownerCtx: Context
   private readonly namespaces = new Map<string, RemoteNamespaceHandle>()
-  private readonly subscriptions = new Map<string, RemoteEventSubscription[]>()
+  private readonly subscriptions: RemoteEventSubscription[] = []
   private mutations = Promise.resolve()
 
   constructor(ctx: Context) {
     super(ctx, 'remote')
     this.ownerCtx = ctx
-    ctx.effect(() => () => { this.subscriptions.clear() }, 'api-gateway.client.subscriptions')
+    ctx.effect(() => () => { this.subscriptions.length = 0 }, 'api-gateway.client.subscriptions')
   }
 
   async $mount(contribution: TypertRemoteContribution): ReturnType<TypertClientRemote['$mount']> {
@@ -111,17 +139,15 @@ class ClientRemoteService extends Service implements TypertClientRemote {
     event: Event,
     listener: Events[Event],
   ): ReturnType<TypertClientRemote['$on']> {
-    // The table is keyed by the runtime event name, so the argument list this
-    // signature pins per event cannot survive in it; `$deliver` restores it
-    // from the frame the Host emitted for that same name.
-    const subscription: RemoteEventSubscription = { listener }
+    // The ordered table erases the argument list this signature pins per event;
+    // `$dispatch` restores it from the frame carrying that same event family.
+    const subscription: RemoteEventSubscription = { event, listener }
     const owned = this.ctx.effect(() => {
-      const listeners = this.listeners(event)
-      listeners.push(subscription)
+      this.subscriptions.push(subscription)
       return () => {
-        const at = listeners.indexOf(subscription)
+        const at = this.subscriptions.indexOf(subscription)
         /* v8 ignore next -- listener */
-        if (at >= 0) listeners.splice(at, 1)
+        if (at >= 0) this.subscriptions.splice(at, 1)
       }
     }, `api-gateway.client.$on(${JSON.stringify(event)})`)
     return () => { void owned() }
@@ -133,11 +159,22 @@ class ClientRemoteService extends Service implements TypertClientRemote {
    * {@link TypertClientRemote.$dispatch} for the caller contract.
    */
   $dispatch(event: string, args: readonly unknown[]): void {
-    const listeners = this.subscriptions.get(event)
-    if (listeners === undefined) return
+    const acceptedNames = new Set(remoteEventNames(event))
+    const aliasCountsByListener = new Map<RemoteEventListener, Map<string, number>>()
     // Snapshot: a listener may subscribe or dispose during delivery, and this
     // round's recipients are the ones registered when the frame arrived.
-    for (const { listener } of [...listeners]) {
+    for (const { event: subscriptionEvent, listener } of [...this.subscriptions]) {
+      if (!acceptedNames.has(subscriptionEvent)) continue
+      if (acceptedNames.size > 1) {
+        const counts = aliasCountsByListener.get(listener) ?? new Map<string, number>()
+        const occurrence = (counts.get(subscriptionEvent) ?? 0) + 1
+        counts.set(subscriptionEvent, occurrence)
+        aliasCountsByListener.set(listener, counts)
+        const paired = [...acceptedNames]
+          .filter(name => name !== subscriptionEvent)
+          .some(name => (counts.get(name) ?? 0) >= occurrence)
+        if (paired) continue
+      }
       const report = (error: unknown): void => {
         console.error(`client api: Remote event ${JSON.stringify(event)} listener threw:`, error)
       }
@@ -153,16 +190,6 @@ class ClientRemoteService extends Service implements TypertClientRemote {
         report(error)
       }
     }
-  }
-
-  /** Subscriptions for one event name; empty arrays are retained, bounded by the Host's selection. */
-  private listeners(event: string): RemoteEventSubscription[] {
-    let listeners = this.subscriptions.get(event)
-    if (listeners === undefined) {
-      listeners = []
-      this.subscriptions.set(event, listeners)
-    }
-    return listeners
   }
 
   private enqueue<T>(operation: () => T | Promise<T>): Promise<T> {

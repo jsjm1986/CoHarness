@@ -330,5 +330,5 @@ Authorize a validated Remote request before Context or lookup resolution and bef
 'typert-gateway/authorize'(payload: TypertGatewayAuthorizationRequest): Promise<void> | void
 ```
 
-Source: [`packages/typert/protocol/src/types.ts:515`](../../packages/typert/protocol/src/types.ts)
+Source: [`packages/typert/protocol/src/types.ts:516`](../../packages/typert/protocol/src/types.ts)
 <!-- END GENERATED cordis-surface -->

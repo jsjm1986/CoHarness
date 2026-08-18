@@ -841,6 +841,24 @@ const EVENT_API_METHODS = new Set(['on', 'once', 'emit', 'parallel', 'serial', '
  * separately and are intentionally not merged into the host Context program.
  */
 const CURATED_EVENT_DISPATCHERS: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>> = {
+  'cordis/dynamic-package': {
+    'external official Cordis plugin': ['emit'],
+  },
+  'cordis/dynamic-retract': {
+    'external official Cordis plugin': ['emit'],
+  },
+  'cordis/inspect-query': {
+    'external official Cordis plugin': ['emit'],
+  },
+  'cordis/inspect-query-resolved': {
+    'external official Cordis plugin': ['emit'],
+  },
+  'cordis/request-run': {
+    'external official Cordis plugin': ['emit'],
+  },
+  'cordis/request-run-resolved': {
+    'external official Cordis plugin': ['emit'],
+  },
   'model-provider-config/updated': {
     'model-governance': ['emit'],
   },
@@ -1255,7 +1273,7 @@ function renderEventRelations(pkgs: Pkg[], events: readonly EventEntry[]): strin
   const maintenance = 'generated: Cordis event declarations and producer/listener edges are resolved from the repository TypeScript Program'
   const lines = generatedHeader('Event Producer And Consumer Matrix')
   lines.push(
-    'This matrix shows which packages dispatch each harness-owned event and which packages listen to it. Events are many-to-many, so the dense relation data is presented as a table rather than one large graph. Receiver and event-name types also cover contained dispatch sites that deliberately bypass `ctx.emit`, such as subagent lifecycle containment.',
+    'This matrix shows which packages dispatch each declared event and which packages listen to it. Events are many-to-many, so the dense relation data is presented as a table rather than one large graph. Receiver and event-name types also cover contained dispatch sites that deliberately bypass `ctx.emit`, such as subagent lifecycle containment. Official `cordis/*` compatibility events may originate in loaded plugins outside this repository, so their dispatcher rows identify that external source.',
     '',
     '| Event | Mode | Declared in | Dispatchers | Listeners |',
     '| --- | --- | --- | --- | --- |',
