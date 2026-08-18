@@ -38,7 +38,7 @@ export function parseDocumentsScope(value: unknown): DocumentsWorkspaceScope {
  */
 export async function readDocumentsScope(signal?: AbortSignal): Promise<DocumentsWorkspaceScope> {
   try {
-    const response = await fetch('/account/api/context', { signal })
+    const response = await fetch('/account/api/context', signal === undefined ? {} : { signal })
     if (!response.ok) return { kind: 'personal' }
     return parseDocumentsScope(await response.json() as unknown)
   } catch (_accountContextUnavailable) {

@@ -205,9 +205,9 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t }) =>
         onClose={onClose}
         title={title}
         closeLabel={t('modal.close')}
-        description={limitsText === '' ? undefined : limitsText}
-        className={css.dialog}
-        contentClassName={css.shell}
+        {...(limitsText === '' ? {} : { description: limitsText })}
+        className={css.dialog ?? ''}
+        contentClassName={css.shell ?? ''}
       >
         <div
           className={`${css.panel}${dropActive ? ` ${css.dropActive}` : ''}`}
@@ -221,7 +221,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t }) =>
 
           <div className={css.toolbar}>
             <Input
-              className={css.search}
+              className={css.search ?? ''}
               icon={<IconSearchOutline16 size={16} />}
               placeholder={t('modal.search')}
               value={query}
@@ -348,7 +348,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t }) =>
           onClose={closeDelete}
           title={t('delete.confirm.title')}
           closeLabel={t('modal.close')}
-          className={css.dialog}
+          className={css.dialog ?? ''}
           footer={(
             <>
               <Button type="button" variant="outline" onClick={closeDelete}>
