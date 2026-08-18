@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-18-gateway-startup-resilience.md
+2026-08-18-gateway-startup-resilience.md: a7177ef5d4e9422c84542f46938471f9e769007a
+2026-08-18-gateway-startup-resilience.zh.md: 4bbb6dae306ecd3df47288e2a18c78b70a64ff46

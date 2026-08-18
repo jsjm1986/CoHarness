@@ -73,8 +73,91 @@ Cutover checklist: set `HGW_PUBLIC_ORIGINS=https://harness.maycran.com` (Secure 
 
 ## macOS variant (launchd, tunnel entry)
 
-A macOS host (e.g. an office machine behind a Cloudflare Tunnel) runs the same gateway with `HGW_LAUNCHER=local` and launchd instead of systemd: a `~/Library/LaunchAgents/com.maycran.harness-gateway.plist` (KeepAlive, RunAtLoad) execs `node --import tsx/esm src/index.ts` in the gateway directory with the PostgreSQL and other `HGW_*` variables, and the tunnel config's ingress upstream points at `http://127.0.0.1:8899`. Set explicit writable `HGW_PROJECT_RUNTIMES_ROOT`, `HGW_PRINCIPAL_KEY_DIR`, and `HGW_RUNTIME_CREDENTIAL_DIR` paths owned by the launchd account. The administrator host browser starts at `/`, and mounted external disks appear below `/Volumes`; grant the launchd process the required macOS Privacy & Security file access, including Full Disk Access when the selected directories require it. Kernel directory confinement does not exist on macOS: personal and shared project processes rely on the directory-guard plugin and ordinary account permissions, so treat a macOS deployment as a trusted-team form, not the full Phase 2 boundary. Cutover disables the previous direct-instance LaunchAgent (`launchctl bootout` and rename the plist so RunAtLoad cannot revive it).
+A macOS host behind a tunnel runs the Gateway with `HGW_LAUNCHER=local` and launchd instead of systemd. The launchd job executes a stable copy of [`macos/release-control.sh`](macos/release-control.sh) outside the release tree, and its working directory is the stable releases root. The plist and host environment must not independently reference `current`; the controller resolves `current` once per Gateway start and exports that canonical directory as `HGW_RELEASE_ROOT`. The [atomic macOS release lifecycle](../../.agents/notes/implemented/process/2026-08-18-atomic-macos-gateway-releases.md) records the ordering and rollback decision.
+
+Install the controller outside directories that release cleanup can remove, then create its owner-controlled environment file:
+
+```sh
+install -d -m 700 "$HOME/.local/libexec/harness-gateway" "$HOME/.config/harness-gateway"
+install -m 700 gateway/deploy/macos/release-control.sh "$HOME/.local/libexec/harness-gateway/release-control.sh"
+touch "$HOME/.config/harness-gateway/launch.env"
+chmod 600 "$HOME/.config/harness-gateway/launch.env"
+```
+
+`~/.config/harness-gateway/launch.env` contains the stable host configuration. Keep deployment-specific project, credential, push, and quota variables here as needed, but do not set `HGW_RELEASE_ROOT`, `HGW_DSH_COMMAND`, `HGW_DSH_REPO_ROOT`, `HGW_MODEL_GOVERNANCE_PACKAGE`, or `HGW_GATEWAY_DIR`; the controller and Gateway derive those from one release:
+
+```sh
+HGW_NODE=/Users/ACCOUNT/.nvm/versions/node/v25.8.1/bin/node
+HGW_RELEASES_ROOT=/Users/ACCOUNT/harness-gateway-releases
+HGW_DATABASE_URL_FILE=/Users/ACCOUNT/.config/harness-gateway/database-url
+HGW_DEFAULT_ENV_FILE=/Users/ACCOUNT/harness-gateway-data/company.env
+HGW_COMPUTE_NODE_NAME=mac-mini
+HGW_ORGANIZATION_SLUG=internal
+HGW_PORT=8899
+HGW_INTAKE_PORT=8900
+HGW_PUBLIC_ORIGINS=https://harness.example.com
+HGW_USAGE_TIME_ZONE=Asia/Shanghai
+HGW_USERS_ROOT=/Users/ACCOUNT/harness-users
+HGW_PROJECT_RUNTIMES_ROOT=/Users/ACCOUNT/harness-project-runtimes
+HGW_PRINCIPAL_KEY_DIR=/Users/ACCOUNT/harness-gateway-data/principal-keys
+HGW_RUNTIME_CREDENTIAL_DIR=/Users/ACCOUNT/harness-gateway-data/runtime-credentials
+```
+
+The LaunchAgent uses only stable paths. Replace `ACCOUNT`, load the plist with `launchctl bootstrap`, and keep the tunnel upstream at `http://127.0.0.1:8899`:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.maycran.harness-gateway</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/ACCOUNT/.local/libexec/harness-gateway/release-control.sh</string>
+    <string>run</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/ACCOUNT/harness-gateway-releases</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key>
+    <string>/Users/ACCOUNT</string>
+  </dict>
+  <key>KeepAlive</key>
+  <true/>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>5</integer>
+  <key>StandardOutPath</key>
+  <string>/Users/ACCOUNT/Library/Logs/harness-gateway.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/ACCOUNT/Library/Logs/harness-gateway.err.log</string>
+</dict>
+</plist>
+```
+
+Activate a fully built release only through the controller:
+
+```sh
+CONTROL="$HOME/.local/libexec/harness-gateway/release-control.sh"
+RELEASE_NAME=coharness-REVISION
+"$CONTROL" activate "$HOME/harness-gateway-releases/$RELEASE_NAME"
+"$CONTROL" status
+```
+
+Activation validates the payload, holds an activation lock, atomically replaces `current`, restarts launchd, and accepts the release only when the job has a new PID, its cwd is the target Gateway directory, and `/healthz` reports the target release id. A failed activation switches `current` back and verifies the previous release before returning an error. Activation never deletes a release; cleanup is a separate explicit command that refuses the current directory, the live Gateway cwd, any process command referencing the directory, or any open file below it:
+
+```sh
+OLD_RELEASE_NAME=coharness-OLD-REVISION
+"$CONTROL" prune "$HOME/harness-gateway-releases/$OLD_RELEASE_NAME"
+```
+
+Set explicit writable `HGW_PROJECT_RUNTIMES_ROOT`, `HGW_PRINCIPAL_KEY_DIR`, and `HGW_RUNTIME_CREDENTIAL_DIR` paths owned by the launchd account. The administrator host browser starts at `/`, and mounted external disks appear below `/Volumes`; grant the process the required macOS Privacy & Security file access, including Full Disk Access when selected directories require it. Kernel directory confinement does not exist on macOS, so personal and shared project processes rely on the directory-guard plugin and ordinary account permissions; treat this as a trusted-team deployment. Cutover disables the previous direct-instance LaunchAgent so RunAtLoad cannot revive it.
+
+Gateway startup waits with bounded exponential backoff when PostgreSQL is temporarily unavailable (`HGW_DATABASE_STARTUP_RETRY_INITIAL_MS` and `HGW_DATABASE_STARTUP_RETRY_MAX_MS`). Credential, migration checksum, and inactive-organization errors are not retried. Keep the PostgreSQL container under its `unless-stopped` policy and run `docker compose up -d --wait` after Docker Desktop or host recovery; the Gateway must remain unready until the database and selected organization/node are available.
 
 ## Upgrades and backup
 
-Upgrade dsh: `npm install -g @deepseek-ai/dsh@<next>` on staging, run both acceptance scripts plus the collaboration smoke, then roll production runtimes one by one (`systemctl restart harness-<user>` / `systemctl restart harness-project-<id>`, or let idle runtimes pick the new binary on next access). Gateway upgrades: replace `/srv/harness/gateway`, apply PostgreSQL migrations, then `systemctl restart harness-gateway` (existing runtimes keep running, but a protocol/package change requires their rolling restart). Database: install `deploy/postgres/backup-postgres.sh` under cron, retain its restore-checked dumps, and copy successful dumps to a second machine or NAS.
+Upgrade dsh: `npm install -g @deepseek-ai/dsh@<next>` on Linux staging, run both acceptance scripts plus the collaboration smoke, then roll production runtimes one by one (`systemctl restart harness-<user>` / `systemctl restart harness-project-<id>`, or let idle runtimes pick the new binary on next access). Linux Gateway upgrades replace `/srv/harness/gateway`, apply PostgreSQL migrations, then restart `harness-gateway`; a protocol/package change also requires rolling runtime restarts. macOS release deployments use the controller above so Gateway and local runtimes always come from one immutable directory. Database: install `deploy/postgres/backup-postgres.sh` under cron, retain its restore-checked dumps, and copy successful dumps to a second machine or NAS.

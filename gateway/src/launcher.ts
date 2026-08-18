@@ -9,7 +9,7 @@
  * Per-user system accounts and directory ownership are provisioning concerns
  * (deploy/provision-user.sh), not launch-time work.
  */
-import { spawn } from 'node:child_process'
+import { spawn, type ChildProcess } from 'node:child_process'
 import { execFile } from 'node:child_process'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -17,6 +17,21 @@ import type { Writable } from 'node:stream'
 import { promisify } from 'node:util'
 import type { GatewayConfig } from './config.ts'
 import { renderUserUnit, unitName, type GrantEntry, type SystemdOptions } from './systemd.ts'
+
+const localChildren = new Set<ChildProcess>()
+let localChildCleanupInstalled = false
+
+function installLocalChildCleanup(): void {
+  if (localChildCleanupInstalled) return
+  localChildCleanupInstalled = true
+  process.once('exit', () => {
+    // `exit` is synchronous; kill every tracked local runtime before launchd
+    // can start a replacement Gateway with the same runtime ports.
+    for (const child of localChildren) {
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL')
+    }
+  })
+}
 
 /** Stable process identity and filesystem facts for one runtime. */
 export interface RuntimeProcessIdentity {
@@ -98,6 +113,9 @@ export class LocalLauncher implements Launcher {
       },
       stdio: ['ignore', 'ignore', 'inherit', 'pipe'],
     })
+    installLocalChildCleanup()
+    localChildren.add(child)
+    child.once('exit', () => { localChildren.delete(child) })
     const credentialPipe = child.stdio[3] as Writable | null | undefined
     if (credentialPipe === null || credentialPipe === undefined) {
       child.kill('SIGKILL')

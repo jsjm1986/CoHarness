@@ -8,7 +8,13 @@ import { selectLauncher } from './launcher.ts'
 import { PostgresAuditService } from './postgres/audit-service.ts'
 import { PostgresAuthService } from './postgres/auth-service.ts'
 import { PostgresCollaborationService } from './postgres/collaboration-service.ts'
-import { createPostgresPool, databaseUrlFromFile, runMigrations } from './postgres/database.ts'
+import {
+  createPostgresPool,
+  databaseUrlFromFile,
+  errorCodeForDiagnostics,
+  runMigrations,
+  withDatabaseStartupRetry,
+} from './postgres/database.ts'
 import { ConversationRepository } from './postgres/conversation-repository.ts'
 import { PostgresInstanceRepository } from './postgres/instance-repository.ts'
 import { PostgresModelGovernanceService } from './postgres/model-governance-service.ts'
@@ -28,13 +34,36 @@ import { createGatewayServer, type GatewayDeps } from './server.ts'
 import { createUsageIntakeServer } from './usage-intake.ts'
 
 const cfg = loadConfig()
+if (cfg.releaseId !== undefined) console.log(`[gateway] release ${cfg.releaseId}`)
 const pool = createPostgresPool(await databaseUrlFromFile())
-await runMigrations(pool, join(import.meta.dirname, '../deploy/postgres/migrations'))
-const context = await resolvePostgresRuntimeContext(
-  pool,
-  cfg.organizationSlug,
-  cfg.computeNodeName,
-)
+const startupAbort = new AbortController()
+const onStartupSignal = (): void => { startupAbort.abort() }
+process.once('SIGINT', onStartupSignal)
+process.once('SIGTERM', onStartupSignal)
+const context = await (async () => {
+  try {
+    return await withDatabaseStartupRetry(async () => {
+      await runMigrations(pool, join(import.meta.dirname, '../deploy/postgres/migrations'))
+      return resolvePostgresRuntimeContext(pool, cfg.organizationSlug, cfg.computeNodeName)
+    }, {
+      initialDelayMs: cfg.databaseStartupRetryInitialMs,
+      maxDelayMs: cfg.databaseStartupRetryMaxMs,
+      signal: startupAbort.signal,
+      onRetry: (error, delayMs) => {
+        console.error(
+          `[gateway] PostgreSQL unavailable during startup (${errorCodeForDiagnostics(error)}); retrying in ${String(delayMs)}ms`,
+        )
+      },
+    })
+  } catch (error) {
+    await pool.end().catch(() => { /* preserve the startup failure or signal outcome */ })
+    if (startupAbort.signal.aborted) process.exit(0)
+    throw error
+  } finally {
+    process.removeListener('SIGINT', onStartupSignal)
+    process.removeListener('SIGTERM', onStartupSignal)
+  }
+})()
 const auth = new PostgresAuthService(context, cfg)
 const users = new PostgresUserService(context, cfg)
 const projects = new PostgresProjectService(context, cfg)

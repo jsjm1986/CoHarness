@@ -1,8 +1,13 @@
+import { realpathSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
-import { join, posix, resolve } from 'node:path'
+import { basename, join, posix, resolve } from 'node:path'
 
 export interface GatewayConfig {
+  /** Canonical immutable release directory for managed deployments. */
+  releaseRoot?: string
+  /** Public release identifier derived from the immutable directory name. */
+  releaseId?: string
   port: number
   /** PostgreSQL organization selected by this Gateway process. */
   organizationSlug: string
@@ -30,6 +35,10 @@ export interface GatewayConfig {
   principalAssertionTtlMs: number
   /** Maximum buffered body bytes accepted by one authenticated runtime API call. */
   runtimeApiBodyLimitBytes: number
+  /** Initial delay before retrying a transient PostgreSQL startup failure. */
+  databaseStartupRetryInitialMs: number
+  /** Maximum delay between transient PostgreSQL startup retries. */
+  databaseStartupRetryMaxMs: number
   /** Private host directory used as the source for systemd runtime credentials. */
   runtimeCredentialDir: string
   /** Owner-only AES-GCM master-key file for organization model credentials. */
@@ -83,6 +92,8 @@ export interface GatewayConfig {
 const gatewayRoot = resolve(import.meta.dirname, '..')
 const SYSTEMD_ACCOUNT_RE = /^[a-z][a-z0-9-]{1,30}$/
 export const DEFAULT_RUNTIME_API_BODY_LIMIT_BYTES = 64 * 1024 * 1024
+export const DEFAULT_DATABASE_STARTUP_RETRY_INITIAL_MS = 1_000
+export const DEFAULT_DATABASE_STARTUP_RETRY_MAX_MS = 30_000
 
 function projectPathRoots(value: string | undefined): string[] {
   if (value === undefined) return []
@@ -122,11 +133,43 @@ function pathsOverlap(left: string, right: string): boolean {
   return nested(left, right) || nested(right, left)
 }
 
+function canonicalDirectory(path: string, variable: string): string {
+  try {
+    return realpathSync(path)
+  } catch (error) {
+    throw new Error(`${variable} does not resolve to an existing path: ${path}`, { cause: error })
+  }
+}
+
+function positiveSafeInteger(value: string | undefined, fallback: number, variable: string): number {
+  const resolved = Number(value ?? fallback)
+  if (!Number.isSafeInteger(resolved) || resolved < 1) {
+    throw new Error(`${variable} must be a positive safe integer`)
+  }
+  return resolved
+}
+
+function requireReleasePath(actual: string, expected: string, variable: string): void {
+  if (canonicalDirectory(actual, variable) !== canonicalDirectory(expected, 'HGW_RELEASE_ROOT')) {
+    throw new Error(`${variable} must resolve inside the configured HGW_RELEASE_ROOT release`)
+  }
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig {
   const port = Number(env.HGW_PORT ?? 8899)
   const publicOrigins = (env.HGW_PUBLIC_ORIGINS ?? `http://127.0.0.1:${port}`)
     .split(',').map(s => s.trim()).filter(Boolean)
-  const dshRepoRoot = env.HGW_DSH_REPO_ROOT ?? resolve(gatewayRoot, '..')
+  const configuredReleaseRoot = env.HGW_RELEASE_ROOT?.trim()
+  const releaseRoot = configuredReleaseRoot === undefined || configuredReleaseRoot === ''
+    ? undefined
+    : canonicalDirectory(configuredReleaseRoot, 'HGW_RELEASE_ROOT')
+  if (releaseRoot !== undefined) {
+    requireReleasePath(gatewayRoot, join(releaseRoot, 'gateway'), 'running Gateway directory')
+  }
+  const dshRepoRoot = releaseRoot ?? env.HGW_DSH_REPO_ROOT ?? resolve(gatewayRoot, '..')
+  if (releaseRoot !== undefined && env.HGW_DSH_REPO_ROOT !== undefined) {
+    requireReleasePath(env.HGW_DSH_REPO_ROOT, releaseRoot, 'HGW_DSH_REPO_ROOT')
+  }
   const usersRoot = env.HGW_USERS_ROOT ?? join(homedir(), 'harness-users')
   const stateRoot = env.HGW_STATE_ROOT ?? join(homedir(), '.harness-gateway')
   const launcher = env.HGW_LAUNCHER === 'systemd' ? 'systemd' : 'local'
@@ -151,7 +194,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     throw new Error('HGW_PROJECTS_ROOT must be a strict descendant of HGW_PROJECT_PATH_ROOTS when HGW_LAUNCHER=systemd')
   }
   const projectRuntimesRoot = env.HGW_PROJECT_RUNTIMES_ROOT ?? join(homedir(), 'harness-project-runtimes')
-  const gatewayDir = env.HGW_GATEWAY_DIR ?? gatewayRoot
+  const gatewayDir = releaseRoot === undefined ? env.HGW_GATEWAY_DIR ?? gatewayRoot : join(releaseRoot, 'gateway')
+  if (releaseRoot !== undefined && env.HGW_GATEWAY_DIR !== undefined) {
+    requireReleasePath(env.HGW_GATEWAY_DIR, gatewayDir, 'HGW_GATEWAY_DIR')
+  }
   if (pathsOverlap(userProjectsRoot, usersRoot) || pathsOverlap(userProjectsRoot, projectRuntimesRoot)
     || pathsOverlap(userProjectsRoot, gatewayDir)) {
     throw new Error('HGW_USER_PROJECTS_ROOT overlaps a reserved Gateway directory')
@@ -175,20 +221,53 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
       return 'tsx/esm'
     }
   }
-  const dshCommand = env.HGW_DSH_COMMAND?.split(' ')
-    ?? ['node', '--import', resolveTsx(), join(dshRepoRoot, 'apps/cli/src/bin.ts'), 'web', '--port', '{port}']
+  if (releaseRoot !== undefined && env.HGW_DSH_COMMAND !== undefined) {
+    throw new Error('HGW_DSH_COMMAND must be unset when HGW_RELEASE_ROOT is configured')
+  }
+  const dshCommand = releaseRoot === undefined
+    ? env.HGW_DSH_COMMAND?.split(' ')
+      ?? ['node', '--import', resolveTsx(), join(dshRepoRoot, 'apps/cli/src/bin.ts'), 'web', '--port', '{port}']
+    : [process.execPath, join(releaseRoot, 'apps/cli/lib/bin.js'), 'web', '--port', '{port}']
+  const releaseGuardPatch = releaseRoot === undefined
+    ? undefined
+    : join(releaseRoot, 'plugins/dsh-directory-guard/cordis.patch.yml')
+  if (releaseGuardPatch !== undefined && env.HGW_GUARD_PATCH !== undefined && env.HGW_GUARD_PATCH !== 'off') {
+    requireReleasePath(env.HGW_GUARD_PATCH, releaseGuardPatch, 'HGW_GUARD_PATCH')
+  }
   const guardPatch = env.HGW_GUARD_PATCH === 'off'
     ? ''
-    : env.HGW_GUARD_PATCH ?? join(dshRepoRoot, 'plugins/dsh-directory-guard/cordis.patch.yml')
+    : releaseGuardPatch ?? env.HGW_GUARD_PATCH ?? join(dshRepoRoot, 'plugins/dsh-directory-guard/cordis.patch.yml')
+  const releaseModelGovernancePackage = releaseRoot === undefined
+    ? undefined
+    : join(releaseRoot, 'plugins/dsh-model-governance')
+  if (releaseModelGovernancePackage !== undefined && env.HGW_MODEL_GOVERNANCE_PACKAGE !== undefined) {
+    requireReleasePath(
+      env.HGW_MODEL_GOVERNANCE_PACKAGE,
+      releaseModelGovernancePackage,
+      'HGW_MODEL_GOVERNANCE_PACKAGE',
+    )
+  }
   const projectRuntimeUser = env.HGW_PROJECT_RUNTIME_USER ?? 'harness-project'
   if (!SYSTEMD_ACCOUNT_RE.test(projectRuntimeUser) || projectRuntimeUser === 'root') {
     throw new Error(`HGW_PROJECT_RUNTIME_USER is not a valid systemd account: ${projectRuntimeUser}`)
   }
-  const runtimeApiBodyLimitBytes = Number(
-    env.HGW_RUNTIME_API_BODY_LIMIT_BYTES ?? DEFAULT_RUNTIME_API_BODY_LIMIT_BYTES,
+  const runtimeApiBodyLimitBytes = positiveSafeInteger(
+    env.HGW_RUNTIME_API_BODY_LIMIT_BYTES,
+    DEFAULT_RUNTIME_API_BODY_LIMIT_BYTES,
+    'HGW_RUNTIME_API_BODY_LIMIT_BYTES',
   )
-  if (!Number.isSafeInteger(runtimeApiBodyLimitBytes) || runtimeApiBodyLimitBytes < 1) {
-    throw new Error('HGW_RUNTIME_API_BODY_LIMIT_BYTES must be a positive safe integer')
+  const databaseStartupRetryInitialMs = positiveSafeInteger(
+    env.HGW_DATABASE_STARTUP_RETRY_INITIAL_MS,
+    DEFAULT_DATABASE_STARTUP_RETRY_INITIAL_MS,
+    'HGW_DATABASE_STARTUP_RETRY_INITIAL_MS',
+  )
+  const databaseStartupRetryMaxMs = positiveSafeInteger(
+    env.HGW_DATABASE_STARTUP_RETRY_MAX_MS,
+    DEFAULT_DATABASE_STARTUP_RETRY_MAX_MS,
+    'HGW_DATABASE_STARTUP_RETRY_MAX_MS',
+  )
+  if (databaseStartupRetryMaxMs < databaseStartupRetryInitialMs) {
+    throw new Error('HGW_DATABASE_STARTUP_RETRY_MAX_MS must be at least HGW_DATABASE_STARTUP_RETRY_INITIAL_MS')
   }
   const instancePortBase = Number(env.HGW_INSTANCE_PORT_BASE ?? 42000)
   if (!Number.isSafeInteger(instancePortBase) || instancePortBase < 1024 || instancePortBase > 65535) {
@@ -200,6 +279,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     throw new Error('HGW_JPUSH_APP_KEY and HGW_JPUSH_MASTER_SECRET must be configured together')
   }
   return {
+    releaseRoot,
+    releaseId: releaseRoot === undefined ? undefined : basename(releaseRoot),
     port,
     organizationSlug: env.HGW_ORGANIZATION_SLUG ?? 'default',
     computeNodeName: env.HGW_COMPUTE_NODE_NAME ?? 'local',
@@ -215,6 +296,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     principalKeyDir: env.HGW_PRINCIPAL_KEY_DIR ?? join(stateRoot, 'principal-keys'),
     principalAssertionTtlMs: Number(env.HGW_PRINCIPAL_ASSERTION_TTL_MS ?? 30_000),
     runtimeApiBodyLimitBytes,
+    databaseStartupRetryInitialMs,
+    databaseStartupRetryMaxMs,
     runtimeCredentialDir: env.HGW_RUNTIME_CREDENTIAL_DIR ?? join(stateRoot, 'runtime-credentials'),
     organizationModelCredentialKeyFile: env.HGW_ORGANIZATION_MODEL_CREDENTIAL_KEY_FILE
       ?? join(stateRoot, 'organization-model-credentials.key'),
@@ -232,7 +315,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     gatewayDir,
     systemdUnitDir: env.HGW_SYSTEMD_UNIT_DIR ?? '/etc/systemd/system',
     guardPatch,
-    modelGovernancePackage: env.HGW_MODEL_GOVERNANCE_PACKAGE ?? join(dshRepoRoot, 'plugins/dsh-model-governance'),
+    modelGovernancePackage: releaseModelGovernancePackage
+      ?? env.HGW_MODEL_GOVERNANCE_PACKAGE
+      ?? join(dshRepoRoot, 'plugins/dsh-model-governance'),
     defaultEnvFile: env.HGW_DEFAULT_ENV_FILE ?? '',
     fcmProjectId: env.HGW_FCM_PROJECT_ID?.trim() || undefined,
     fcmServiceAccountFile: env.HGW_FCM_SERVICE_ACCOUNT_FILE?.trim() || undefined,

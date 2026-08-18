@@ -73,8 +73,91 @@ server {
 
 ## macOS 变体（launchd，隧道入口）
 
-macOS 主机（例如挂在 Cloudflare Tunnel 后面的办公机）以 `HGW_LAUNCHER=local` 运行同一网关，用 launchd 取代 systemd：`~/Library/LaunchAgents/com.maycran.harness-gateway.plist`（KeepAlive、RunAtLoad）在网关目录内执行 `node --import tsx/esm src/index.ts` 并带上 PostgreSQL 及其他 `HGW_*` 变量，隧道配置的 ingress 上游指向 `http://127.0.0.1:8899`。为 `HGW_PROJECT_RUNTIMES_ROOT`、`HGW_PRINCIPAL_KEY_DIR` 和 `HGW_RUNTIME_CREDENTIAL_DIR` 设置由 launchd 账户拥有的明确可写路径。管理员宿主机浏览器从 `/` 开始，已挂载外接磁盘显示在 `/Volumes` 下；为 launchd 进程授予所选目录需要的 macOS“隐私与安全性”文件访问权限，必要时包括“完全磁盘访问权限”。macOS 上不存在内核目录约束：个人和共享项目进程依赖 directory-guard 插件与普通账户权限，因此 macOS 部署应视为受信团队形态，而非完整的 Phase 2 边界。切流时停用旧的直连 LaunchAgent（`launchctl bootout` 并重命名 plist，防止 RunAtLoad 再拉起）。
+隧道后的 macOS 主机以 `HGW_LAUNCHER=local` 运行 Gateway，并用 launchd 取代 systemd。launchd 任务执行 release 树外的 [`macos/release-control.sh`](macos/release-control.sh) 稳定副本，工作目录则是稳定的 releases 根目录。plist 与宿主环境不得分别引用 `current`；控制器在每次 Gateway 启动时只解析一次 `current`，并把得到的规范目录作为 `HGW_RELEASE_ROOT` 导出。[macOS release 生命周期原子化](../../.agents/notes/implemented/process/2026-08-18-atomic-macos-gateway-releases.md)记录了操作顺序与回滚决策。
+
+先把控制器安装到 release 清理不会删除的位置，再创建仅所有者控制的环境文件：
+
+```sh
+install -d -m 700 "$HOME/.local/libexec/harness-gateway" "$HOME/.config/harness-gateway"
+install -m 700 gateway/deploy/macos/release-control.sh "$HOME/.local/libexec/harness-gateway/release-control.sh"
+touch "$HOME/.config/harness-gateway/launch.env"
+chmod 600 "$HOME/.config/harness-gateway/launch.env"
+```
+
+`~/.config/harness-gateway/launch.env` 保存稳定的宿主配置。按部署需要把项目、凭据、推送和额度变量放在这里，但不要设置 `HGW_RELEASE_ROOT`、`HGW_DSH_COMMAND`、`HGW_DSH_REPO_ROOT`、`HGW_MODEL_GOVERNANCE_PACKAGE` 或 `HGW_GATEWAY_DIR`；控制器与 Gateway 会从同一个 release 派生这些值：
+
+```sh
+HGW_NODE=/Users/ACCOUNT/.nvm/versions/node/v25.8.1/bin/node
+HGW_RELEASES_ROOT=/Users/ACCOUNT/harness-gateway-releases
+HGW_DATABASE_URL_FILE=/Users/ACCOUNT/.config/harness-gateway/database-url
+HGW_DEFAULT_ENV_FILE=/Users/ACCOUNT/harness-gateway-data/company.env
+HGW_COMPUTE_NODE_NAME=mac-mini
+HGW_ORGANIZATION_SLUG=internal
+HGW_PORT=8899
+HGW_INTAKE_PORT=8900
+HGW_PUBLIC_ORIGINS=https://harness.example.com
+HGW_USAGE_TIME_ZONE=Asia/Shanghai
+HGW_USERS_ROOT=/Users/ACCOUNT/harness-users
+HGW_PROJECT_RUNTIMES_ROOT=/Users/ACCOUNT/harness-project-runtimes
+HGW_PRINCIPAL_KEY_DIR=/Users/ACCOUNT/harness-gateway-data/principal-keys
+HGW_RUNTIME_CREDENTIAL_DIR=/Users/ACCOUNT/harness-gateway-data/runtime-credentials
+```
+
+LaunchAgent 只使用稳定路径。替换 `ACCOUNT`，通过 `launchctl bootstrap` 加载 plist，并让隧道 upstream 继续指向 `http://127.0.0.1:8899`：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.maycran.harness-gateway</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/ACCOUNT/.local/libexec/harness-gateway/release-control.sh</string>
+    <string>run</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/ACCOUNT/harness-gateway-releases</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key>
+    <string>/Users/ACCOUNT</string>
+  </dict>
+  <key>KeepAlive</key>
+  <true/>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>5</integer>
+  <key>StandardOutPath</key>
+  <string>/Users/ACCOUNT/Library/Logs/harness-gateway.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/ACCOUNT/Library/Logs/harness-gateway.err.log</string>
+</dict>
+</plist>
+```
+
+完整构建 release 后，只通过控制器激活：
+
+```sh
+CONTROL="$HOME/.local/libexec/harness-gateway/release-control.sh"
+RELEASE_NAME=coharness-REVISION
+"$CONTROL" activate "$HOME/harness-gateway-releases/$RELEASE_NAME"
+"$CONTROL" status
+```
+
+激活过程会校验产物、持有激活锁、原子替换 `current` 并重启 launchd；只有任务取得新 PID、cwd 指向目标 Gateway 目录且 `/healthz` 报告目标 release id 时，控制器才接受该 release。激活失败时，控制器会把 `current` 切回并验证上一个 release 后再返回错误。激活过程绝不删除 release；清理必须单独显式执行，并且只要目标是当前目录、活动 Gateway cwd、任一进程命令仍引用该目录，或目录下仍有打开的文件，控制器就会拒绝：
+
+```sh
+OLD_RELEASE_NAME=coharness-OLD-REVISION
+"$CONTROL" prune "$HOME/harness-gateway-releases/$OLD_RELEASE_NAME"
+```
+
+请为 `HGW_PROJECT_RUNTIMES_ROOT`、`HGW_PRINCIPAL_KEY_DIR` 和 `HGW_RUNTIME_CREDENTIAL_DIR` 设置由 launchd 账户拥有的明确可写路径。管理员宿主机浏览器从 `/` 开始，已挂载外接磁盘显示在 `/Volumes` 下；请为进程授予所选目录需要的 macOS“隐私与安全性”文件访问权限，必要时包括“完全磁盘访问权限”。macOS 不存在内核目录约束，因此个人与共享项目进程依赖 directory-guard 插件和普通账户权限；该部署应视为受信团队形态。切流时停用旧的直连 LaunchAgent，防止 RunAtLoad 再次拉起它。
+
+Gateway 启动在 PostgreSQL 暂时不可用时采用有界指数退避等待（`HGW_DATABASE_STARTUP_RETRY_INITIAL_MS` 与 `HGW_DATABASE_STARTUP_RETRY_MAX_MS`）。凭据错误、migration 校验和企业/节点未激活不会重试。PostgreSQL 容器保持 `unless-stopped` 策略；Docker Desktop 或主机恢复后执行 `docker compose up -d --wait`，Gateway 在数据库及所选企业/节点可用前必须保持未就绪。
 
 ## 升级与备份
 
-升级 dsh：先在 staging `npm install -g @deepseek-ai/dsh@<next>`，跑两个验收脚本和协作冒烟测试，然后逐个滚动生产运行时（`systemctl restart harness-<user>` / `systemctl restart harness-project-<id>`，或让闲置运行时在下次访问时使用新二进制）。升级网关：替换 `/srv/harness/gateway`、应用 PostgreSQL migration，再执行 `systemctl restart harness-gateway`（既有运行时保持运行，但涉及协议/包变化时需要滚动重启）。数据库：把 `deploy/postgres/backup-postgres.sh` 挂进 cron，保留经过恢复校验的 dump，并把成功备份复制到第二台机器或 NAS。
+升级 dsh：先在 Linux staging `npm install -g @deepseek-ai/dsh@<next>`，跑两个验收脚本和协作冒烟测试，然后逐个滚动生产运行时（`systemctl restart harness-<user>` / `systemctl restart harness-project-<id>`，或让闲置运行时在下次访问时使用新二进制）。Linux Gateway 升级会替换 `/srv/harness/gateway`、应用 PostgreSQL migration，再重启 `harness-gateway`；涉及协议或包变化时还要滚动重启运行时。macOS release 部署使用上面的控制器，使 Gateway 与本地运行时始终来自同一个不可变目录。数据库：把 `deploy/postgres/backup-postgres.sh` 挂进 cron，保留经过恢复校验的 dump，并把成功备份复制到第二台机器或 NAS。

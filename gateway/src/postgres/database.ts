@@ -4,6 +4,26 @@ import { resolve } from 'node:path'
 import { Pool, type PoolClient, type PoolConfig, type QueryResultRow } from 'pg'
 
 const MIGRATION_LOCK_KEY = 0x48475750
+const TRANSIENT_DATABASE_CODES = new Set([
+  'ECONNABORTED',
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'EAI_AGAIN',
+  'EHOSTUNREACH',
+  'ENETUNREACH',
+  'ENOTFOUND',
+  'ETIMEDOUT',
+  '08000',
+  '08001',
+  '08003',
+  '08004',
+  '08006',
+  '08007',
+  '08P01',
+  '57P01',
+  '57P02',
+  '57P03',
+])
 
 export interface Queryable {
   query<R extends QueryResultRow = QueryResultRow>(text: string, values?: readonly unknown[]): Promise<{ rows: R[]; rowCount: number | null }>
@@ -28,6 +48,84 @@ export async function databaseUrlFromFile(env: NodeJS.ProcessEnv = process.env):
 
 export function createPostgresPool(connectionString: string, overrides: PoolConfig = {}): Pool {
   return new Pool({ connectionString, max: 10, idleTimeoutMillis: 30_000, connectionTimeoutMillis: 5_000, ...overrides })
+}
+
+function errorCode(error: unknown): string | undefined {
+  if (error === null || typeof error !== 'object') return undefined
+  const value = (error as { code?: unknown }).code
+  return typeof value === 'string' ? value : undefined
+}
+
+/** Return a non-secret database error code suitable for operational logs. */
+export function errorCodeForDiagnostics(error: unknown): string {
+  return errorCode(error) ?? 'unknown'
+}
+
+/** Whether one startup failure can reasonably clear without changing configuration. */
+export function isTransientDatabaseError(error: unknown): boolean {
+  const seen = new Set<unknown>()
+  let current: unknown = error
+  for (let depth = 0; depth < 8 && current !== undefined && current !== null && !seen.has(current); depth += 1) {
+    seen.add(current)
+    const code = errorCode(current)
+    if (code !== undefined && (TRANSIENT_DATABASE_CODES.has(code) || code.startsWith('08'))) return true
+    current = typeof current === 'object' ? (current as { cause?: unknown }).cause : undefined
+  }
+  return false
+}
+
+export interface DatabaseStartupRetryOptions {
+  /** Initial delay between transient startup failures. */
+  initialDelayMs: number
+  /** Maximum delay between transient startup failures. */
+  maxDelayMs: number
+  /** Optional signal used by a supervisor while replacing the process. */
+  signal?: AbortSignal
+  /** Receives a retry notification without the connection string. */
+  onRetry?: (error: unknown, delayMs: number) => void
+}
+
+function abortedStartup(): Error {
+  const error = new Error('database startup retry aborted')
+  error.name = 'AbortError'
+  return error
+}
+
+function waitForRetry(delayMs: number, signal: AbortSignal | undefined): Promise<void> {
+  if (signal?.aborted) return Promise.reject(abortedStartup())
+  return new Promise<void>((resolve, reject) => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const finish = (): void => {
+      if (timer !== undefined) clearTimeout(timer)
+      signal?.removeEventListener('abort', abort)
+      resolve()
+    }
+    const abort = (): void => {
+      if (timer !== undefined) clearTimeout(timer)
+      signal?.removeEventListener('abort', abort)
+      reject(abortedStartup())
+    }
+    timer = setTimeout(finish, delayMs)
+    signal?.addEventListener('abort', abort, { once: true })
+  })
+}
+
+/** Retry only transient PostgreSQL startup failures until the dependency returns. */
+export async function withDatabaseStartupRetry<T>(
+  operation: () => Promise<T>,
+  options: DatabaseStartupRetryOptions,
+): Promise<T> {
+  let delayMs = options.initialDelayMs
+  while (true) {
+    try {
+      return await operation()
+    } catch (error) {
+      if (!isTransientDatabaseError(error) || options.signal?.aborted) throw error
+      options.onRetry?.(error, delayMs)
+      await waitForRetry(delayMs, options.signal)
+      delayMs = Math.min(options.maxDelayMs, delayMs * 2)
+    }
+  }
 }
 
 export async function transaction<T>(pool: Pool, operation: (client: PoolClient) => Promise<T>): Promise<T> {
