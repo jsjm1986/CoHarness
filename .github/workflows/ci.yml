@@ -72,16 +72,16 @@ jobs:
       DSH_GATE_CONCURRENCY: '8'
     steps:
       # Fetch complete history so the archive gate can read the trusted PR base from a reused shallow checkout.
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6.0.9
         with:
           dest: ${{ runner.temp }}/setup-pnpm
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.PRIMARY_NODE_VERSION }}
 
@@ -128,15 +128,15 @@ jobs:
       DSH_COVERAGE_MAX_WORKERS: ${{ vars.DSH_CI_FAILOVER_LINUX == 'selfhosted' && github.event.pull_request.user.login != 'dependabot[bot]' && '8' || '6' }}
       DSH_GATE_CONCURRENCY: '3'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6.0.9
         with:
           dest: ${{ runner.temp }}/setup-pnpm
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.PRIMARY_NODE_VERSION }}
 
@@ -191,15 +191,15 @@ jobs:
       # Failover halves snapshot concurrency for the shared 64-core VM.
       DSH_SNAPSHOT_MAX_CONCURRENCY: ${{ vars.DSH_CI_FAILOVER_LINUX == 'selfhosted' && github.event.pull_request.user.login != 'dependabot[bot]' && '12' || '32' }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6.0.9
         with:
           dest: ${{ runner.temp }}/setup-pnpm
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.PRIMARY_NODE_VERSION }}
 
@@ -278,13 +278,13 @@ jobs:
             runner: ubuntu-latest
             gate_concurrency: '1'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6.0.9
         with:
           dest: ${{ runner.temp }}/setup-pnpm
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
           cache: pnpm
@@ -300,7 +300,7 @@ jobs:
     runs-on: ubuntu-latest
     name: python 3.10 / keyless SDK
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v6.3.0
         with:
@@ -341,15 +341,15 @@ jobs:
     name: windows node 24 / wine blocking
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6.0.9
         with:
           dest: ${{ runner.temp }}/setup-pnpm
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.PRIMARY_NODE_VERSION }}
 
@@ -461,7 +461,7 @@ jobs:
       DSH_GATE_CONCURRENCY: '2'
       DSH_PUBLINT_CONCURRENCY: '8'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -471,11 +471,11 @@ jobs:
           reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock"
           /t REG_DWORD /f /v "AllowDevelopmentWithoutDevLicense" /d "1"
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6.0.9
         with:
           dest: ${{ runner.temp }}/setup-pnpm
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.PRIMARY_NODE_VERSION }}
 
@@ -500,15 +500,15 @@ jobs:
     name: serial / linux
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 2
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6.0.9
         with:
           dest: ${{ runner.temp }}/setup-pnpm
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.PRIMARY_NODE_VERSION }}
 
@@ -583,15 +583,15 @@ jobs:
       # comparison as serial-linux. Depth 2 would miss github.event.before
       # on multi-commit or force pushes; full fetch is cheap here because
       # checkout resolves against the VM's local mirror.
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6.0.9
         with:
           dest: ${{ runner.temp }}/setup-pnpm
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.PRIMARY_NODE_VERSION }}
 
@@ -625,13 +625,13 @@ jobs:
     name: serial / macos
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6.0.9
         with:
           dest: ${{ runner.temp }}/setup-pnpm
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.PRIMARY_NODE_VERSION }}
 
@@ -664,7 +664,7 @@ jobs:
     runs-on: [self-hosted, dsh-win-ci, windows]
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Enable Developer Mode (symlink support)
         shell: pwsh
@@ -672,11 +672,11 @@ jobs:
           reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock"
           /t REG_DWORD /f /v "AllowDevelopmentWithoutDevLicense" /d "1"
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6.0.9
         with:
           dest: ${{ runner.temp }}/setup-pnpm
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.PRIMARY_NODE_VERSION }}
 
@@ -758,15 +758,15 @@ jobs:
             runner: dsh-windows-2025-96core
             workload: production-site
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6.0.9
         with:
           dest: ${{ runner.temp }}/setup-pnpm
 
       # The benchmark's Windows lanes deliberately skip the store cache like
       # the independent native Windows job; an empty input disables caching.
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.PRIMARY_NODE_VERSION }}
           cache: ${{ matrix.platform == 'linux' && 'pnpm' || '' }}
@@ -849,15 +849,15 @@ jobs:
             runner: dsh-windows-2025-96core
             workers: '2'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6.0.9
         with:
           dest: ${{ runner.temp }}/setup-pnpm
 
       # Unlike the larger-runner suite, both platforms cache the store here:
       # the consolidated topology measures cache mechanics as workload.
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.PRIMARY_NODE_VERSION }}
           cache: pnpm
