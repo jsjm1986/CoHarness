@@ -10,9 +10,11 @@ This package is part of the `@deepseek-ai/dsh-client-ui-documents` bundle and is
 
 ## Usage
 
-The plugin adds a **Documents** button to the sidebar footer (alongside the workspace scope selector). Clicking it opens a modal that shows all documents uploaded in the current scope (personal or project workspace).
+The plugin adds a **Documents** button to the sidebar footer (alongside the workspace scope selector). The rail shows an icon with a tooltip; the expanded sidebar shows the Documents label beside the icon. Clicking it opens a manager dialog for the current scope (personal or project workspace).
 
-Each document row shows the name, size, upload date, and available actions: **Preview**, **Download**, and **Delete**. The preview supports images, PDFs, and text-based files; other types show a "not supported" fallback. Uploading a new document in the manager makes it immediately available for attaching to a conversation message.
+The dialog is a 560px card on viewports at least 768px wide and a full-width bottom sheet below that (the Modal portal cannot see the shell `data-viewport` stamp, so layout branches on `(max-width: 767px)` and `(pointer: coarse)`). Limits appear under the title. The toolbar is a search field, an upload control that opens the system picker and uploads immediately, and a refresh icon. On compact viewports the search occupies a full row and upload stretches beneath it. Desktop fine pointers may drop files onto the list; coarse pointers do not show a drop overlay.
+
+Each row shows a file icon, ellipsized name, size, and Preview / Download / Delete. Compact and coarse pointers hide the action labels and enlarge the controls to the 44px touch target; accessible names still include the file name. Preview supports images, PDFs, and text-based files (text capped at 256 KiB); other types show a download fallback. When Gateway `GET /account/api/context` reports a project, the title uses that project name and delete confirmation adds the all-members warning; a missing collaboration route keeps personal chrome.
 
 ## Scope isolation
 
@@ -49,3 +51,4 @@ The manager reads and writes the same `/api/documents` store that conversation a
 - Text previews are capped at 256 KiB; larger text files require download.
 - Deleting a document does not rewrite session history, so previously sent messages that reference the document can no longer retrieve its content.
 - The document manager operates on the current runtime scope; switching between personal and project scope shows that scope's uploads only.
+- The manager does not offer multi-select, sortable columns, folder trees, or type-filter chips.
