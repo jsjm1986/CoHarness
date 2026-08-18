@@ -2,6 +2,7 @@ import { useEffect, useState, type FC } from 'react'
 import { Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import { createUserDocClient, type UserDocRef } from './documents-client.ts'
 import type { DocumentsKey } from './locales.ts'
+import css from './DocumentPreview.module.css'
 
 export interface DocumentPreviewProps {
   doc: UserDocRef
@@ -26,6 +27,14 @@ function classifyMediaType(mediaType: string): 'image' | 'pdf' | 'text' | 'unsup
   return 'unsupported'
 }
 
+/**
+ * Media preview dialog for one stored document.
+ * @param props.doc - document to preview.
+ * @param props.maxTextBytes - text files larger than this show the download fallback.
+ * @param props.onClose - dismiss the preview.
+ * @param props.t - localized documents dictionary.
+ * @returns a dialog with image, PDF, text, or a fallback message.
+ */
 export const DocumentPreview: FC<DocumentPreviewProps> = ({ doc, maxTextBytes, onClose, t }) => {
   const [state, setState] = useState<PreviewState>('loading')
   const [textContent, setTextContent] = useState('')
@@ -56,19 +65,26 @@ export const DocumentPreview: FC<DocumentPreviewProps> = ({ doc, maxTextBytes, o
   const contentUrl = userDocs.contentUrl(doc.docId)
 
   return (
-    <Modal open onClose={onClose} title={t('preview.title', { name: doc.name })} closeLabel={t('action.preview')}>
-      <div>
-        {state === 'loading' && <div>{t('modal.upload.progress')}</div>}
-        {state === 'too-large' && <div>{t('preview.too.large')}</div>}
-        {state === 'unsupported' && <div>{t('preview.not.supported')}</div>}
+    <Modal
+      open
+      onClose={onClose}
+      title={t('preview.title', { name: doc.name })}
+      closeLabel={t('modal.close')}
+      className={css.dialog ?? ''}
+      contentClassName={css.shell ?? ''}
+    >
+      <div className={css.body}>
+        {state === 'loading' && <p className={css.status}>{t('modal.loading')}</p>}
+        {state === 'too-large' && <p className={css.status}>{t('preview.too.large')}</p>}
+        {state === 'unsupported' && <p className={css.status}>{t('preview.not.supported')}</p>}
         {state === 'ready' && classifyMediaType(doc.mediaType) === 'image' && (
-          <img src={contentUrl} alt={doc.name} />
+          <img className={css.image} src={contentUrl} alt={doc.name} />
         )}
         {state === 'ready' && classifyMediaType(doc.mediaType) === 'pdf' && (
-          <iframe src={contentUrl} title={doc.name} />
+          <iframe className={css.frame} src={contentUrl} title={doc.name} />
         )}
         {state === 'ready' && classifyMediaType(doc.mediaType) === 'text' && (
-          <pre>{textContent}</pre>
+          <pre className={css.text}>{textContent}</pre>
         )}
       </div>
     </Modal>

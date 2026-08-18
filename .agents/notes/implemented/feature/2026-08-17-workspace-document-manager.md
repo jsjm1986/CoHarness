@@ -17,11 +17,12 @@ The backend capability (`ctx.userDocs.list`, `save`, `remove`, `stat`, `read`) a
 ## Design
 
 - **Package**: `packages/client/ui-documents/` follows the pattern of `ui-collaboration`: a `client/` subentry with browser-only plugin code, `tsdown.config.ts` for the client bundle, and `src/client/` for components.
-- **Entry point**: `sidebar.footer.action` slot, alongside the scope selector from `ui-collaboration`. The button uses an inline SVG document icon (no external icon dependency).
-- **Modal**: renders a `Modal` from `@deepseek-ai/dsh-client-ui-primitives` with a search bar, date-grouped document list, upload button, and per-row actions (Preview, Download, Delete).
-- **Preview**: routes by media type — images (`<img>`), PDFs (`<iframe>`), text-based files (fetch + `<pre>`, capped at 256 KiB), others fallback.
-- **Delete**: shows a confirmation dialog with a strong warning about conversation history references; project-scope deletes warn about affecting all members.
+- **Entry point**: `sidebar.footer.action` slot, alongside the scope selector from `ui-collaboration`. The button uses `IconBrowseOutline16` and a tooltip; the expanded sidebar shows the Documents label.
+- **Modal**: a 560px `Modal` (full-width bottom sheet below 768px) with limits in `description`, a search/upload/refresh toolbar, a date-grouped scrolling list, and per-row Preview, Download, and Delete. Choosing files uploads immediately; fine pointers may drop files onto the list. Compact and coarse pointers use 44px icon actions whose accessible names include the file name. Portal CSS branches on `(max-width: 767px)` and `(pointer: coarse)` because the dialog is body-portaled and never sees the shell `data-viewport` stamp.
+- **Preview**: routes by media type — images (`<img>`), PDFs (`<iframe>`), text-based files (fetch + `<pre>`, capped at 256 KiB), others fallback — in a matching-width dialog.
+- **Delete**: confirmation dialog with a conversation-history warning; project-scope chrome (title and all-members extra) comes from fail-open `GET /account/api/context`.
 - **Locale**: bilingual (zh/en) via `locales.ts`.
+- **HTTP client**: this package owns a local `/api/documents` client. The client-bundle purity gate forbids a value import from `ui-conversation`, so the manager does not re-export conversation's client.
 
 ## Consequences
 
@@ -30,8 +31,8 @@ Users can now browse, preview, upload, and delete documents through the conversa
 ## Verification
 
 - Package plugin test: verifies the plugin registers in `sidebar.footer.action` with `id: 'documents'` and `order: -10`.
-- Component test: verifies the button renders and opens the modal on click.
-- Keyless snapshot via e2e browser test is deferred to a follow-up PR.
+- Component tests: button open/close, list grouping, search empty state, picker and drop upload with progress, project title and delete extra, preview routes, and abort-safe load.
+- Keyless Web e2e (`apps/web/tests/document-manager.e2e.ts`): desktop aria golden plus compact 390×844 bottom-sheet geometry (search stacked above upload, 44px row actions, last row inside the dialog).
 
 ## Alternatives considered
 

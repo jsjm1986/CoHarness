@@ -1,0 +1,31 @@
+- dialog "Document Manager":
+  - heading "Document Manager" [level=2]
+  - button "Close":
+    - img
+  - paragraph: Max 100.0 MB per file, 20 per message
+  - img
+  - textbox "Search document name"
+  - button "Upload Document":
+    - img
+    - text: Upload Document
+  - button "Refresh":
+    - img
+  - list "Document Manager":
+    - group "Upload date 2026-08-16":
+      - text: 2026-08-16
+      - listitem:
+        - text: notes.txt 30.0 KB
+        - button "Preview notes.txt": Preview
+        - link "Download notes.txt":
+          - /url: /api/documents/content?id=2026-08-16%2Fnotes.txt
+          - text: Download
+        - button "Delete notes.txt": Delete
+    - group "Upload date 2026-08-14":
+      - text: 2026-08-14
+      - listitem:
+        - text: brief.txt 21 B
+        - button "Preview brief.txt": Preview
+        - link "Download brief.txt":
+          - /url: /api/documents/content?id=2026-08-14%2Fbrief.txt
+          - text: Download
+        - button "Delete brief.txt": Delete

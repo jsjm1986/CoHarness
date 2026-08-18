@@ -1,14 +1,22 @@
 import { useCallback, useState } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import { IconBrowseOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import { DocumentsModal } from './DocumentsModal.tsx'
 import { NS } from './locales.ts'
+import css from './DocumentsButton.module.css'
 
 export type DocumentsButtonProps =
   PropsRuntime<'sidebar.footer.action'>
   & PropsLocale<typeof NS>
 
+/**
+ * Render the sidebar Documents trigger and its manager modal.
+ * @param props.t - localized documents dictionary.
+ * @param props.wide - when true, the expanded sidebar shows the Documents label beside the icon.
+ * @returns the footer trigger and, while open, the document manager dialog.
+ */
 export function DocumentsButton({
-  t,
+  t, wide,
 }: DocumentsButtonProps) {
   const [open, setOpen] = useState(false)
   const handleOpen = useCallback(() => { setOpen(true) }, [])
@@ -16,17 +24,17 @@ export function DocumentsButton({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={handleOpen}
-        aria-label={t('button.label')}
-        title={t('button.label')}
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-          <polyline points="14 2 14 8 20 8" />
-        </svg>
-      </button>
+      <Tooltip label={t('button.label')} side="right" delayMs={500} disabled={wide}>
+        <button
+          type="button"
+          className={css.trigger}
+          aria-label={t('button.label')}
+          onClick={handleOpen}
+        >
+          <IconBrowseOutline16 size={16} />
+          {wide && <span className={css.label}>{t('button.label')}</span>}
+        </button>
+      </Tooltip>
       {open && <DocumentsModal open onClose={handleClose} t={t} />}
     </>
   )

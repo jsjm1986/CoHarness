@@ -28,6 +28,6 @@ describe('ui-documents apply', () => {
     const docEntry = entries.find(entry => entry.component === DocumentsButton)!
     expect(docEntry).toBeDefined()
     expect(docEntry.options).toMatchObject({ id: 'documents', order: -10 })
-    fiber.dispose()
+    void fiber.dispose()
   })
 })
