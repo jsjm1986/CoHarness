@@ -212,6 +212,7 @@ describe('history wire codec', () => {
     expect(decoded.events).toStrictEqual(value.events)
     expect(decoded.projections).toStrictEqual(value.projections)
     expect(decoded.hasMore).toBe(false)
+    expect(decoded.omittedSpans).toBeUndefined()
     const records = (wire as { records: Array<{ chunks?: unknown }> }).records
     expect(records.some(record => record.chunks !== undefined)).toBe(true)
     expect(utf8Bytes(encoded)).toBe(new TextEncoder().encode(JSON.stringify(encoded)).byteLength)
@@ -385,5 +386,32 @@ describe('history wire codec', () => {
     expect(records.some(record => record.chunks !== undefined)).toBe(false)
     expect(records.some(record => record.event?.data !== undefined
       && (record.event.data as { chunk?: { extra?: unknown } }).chunk?.extra === true)).toBe(true)
+  })
+
+  it('round-trips omittedSpans and clips them to a byte-target suffix', () => {
+    const value: HistoryValue = {
+      events: [
+        userEntry(0, 1000, 'older'),
+        assistantEntry(1, 1010, 'kept', []),
+        userEntry(10, 1100, 'newer'),
+        assistantEntry(11, 1110, 'tail', []),
+      ],
+      hasMore: false,
+      omittedSpans: [
+        { startSeq: 2, endSeq: 9 },
+        { startSeq: 12, endSeq: 20 },
+      ],
+    }
+    const { decoded } = roundTrip(value, DEFAULT_HISTORY_PAGE_TARGET_BYTES)
+    expect(decoded.omittedSpans).toEqual(value.omittedSpans)
+    expect(decoded.events).toStrictEqual(value.events)
+
+    const reduced = encodeHistoryServerResponse(RPC, value, 1)
+    const reducedDecoded = historyWireValueSchema.parse(reduced.result.ok ? reduced.result.value : undefined)
+    expect(reducedDecoded.hasMore).toBe(true)
+    const firstSeq = requireEvents(reducedDecoded)[0]!.event.seq
+    expect(firstSeq).toBeGreaterThan(0)
+    expect(reducedDecoded.omittedSpans).toEqual([{ startSeq: 12, endSeq: 20 }])
+    expect(12).toBeGreaterThanOrEqual(firstSeq)
   })
 })

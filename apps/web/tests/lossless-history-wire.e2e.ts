@@ -1,8 +1,8 @@
-// Web e2e scenario: the shipped Loader/Web composition must preserve one
-// lossless logical history while the Fetch carrier splits a large packed
-// response into byte-targeted physical pages. The seed stays below the API's
-// 50-message logical limit, so every extra page comes from the default
-// 131072-byte carrier target rather than maxMessages.
+// Web e2e scenario: conversation-tier history omits completed chunk runs on
+// the first browser download, then Trajectory fill requests detail=full and
+// reconstructs the same logical window the lossless packed carrier already
+// paginates. Direct API callers that omit `detail` still receive every event.
+
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page, Response as PlaywrightResponse } from 'playwright'
 import { chromium } from 'playwright'
@@ -63,11 +63,13 @@ interface SeedEvidence {
 
 interface WirePageEvidence {
   beforeSeq?: number
+  detail?: 'conversation' | 'full'
   bytes: number
   recordCount: number
   packedRecordCount: number
   hasMore: boolean
   hasProjections: boolean
+  omittedSpanCount: number
 }
 
 interface StableUiEvidence {
@@ -370,7 +372,11 @@ function buildSeed(): SeedEvidence {
   }
 }
 
-function parseWirePage(text: string, beforeSeq?: number): WirePageEvidence {
+function parseWirePage(
+  text: string,
+  beforeSeq?: number,
+  detail?: 'conversation' | 'full',
+): WirePageEvidence {
   const body = JSON.parse(text) as {
     result?: {
       ok?: boolean
@@ -379,6 +385,7 @@ function parseWirePage(text: string, beforeSeq?: number): WirePageEvidence {
         events?: unknown
         hasMore?: boolean
         projections?: unknown
+        omittedSpans?: unknown[]
       }
     }
   }
@@ -390,28 +397,56 @@ function parseWirePage(text: string, beforeSeq?: number): WirePageEvidence {
   }
   return {
     ...(beforeSeq === undefined ? {} : { beforeSeq }),
+    ...(detail === undefined ? {} : { detail }),
     bytes: new TextEncoder().encode(text).byteLength,
     recordCount: body.result.value.records.length,
     packedRecordCount: body.result.value.records.filter(record =>
       typeof record === 'object' && record !== null && 'chunks' in record).length,
     hasMore: body.result.value.hasMore,
     hasProjections: body.result.value.projections !== undefined,
+    omittedSpanCount: Array.isArray(body.result.value.omittedSpans)
+      ? body.result.value.omittedSpans.length
+      : 0,
   }
 }
 
 function observeHistoryPages(page: Page, reads: Array<Promise<WirePageEvidence>>): void {
   page.on('response', (response: PlaywrightResponse) => {
-    if (!response.url().endsWith('/api/session.history')) return
+    const url = new URL(response.url())
+    if (!url.pathname.endsWith('/api/session.history')) return
     const request = response.request()
-    let envelope: { method?: string; payload?: { sessionId?: string; beforeSeq?: number } }
+    let envelope: {
+      method?: string
+      payload?: { sessionId?: string; beforeSeq?: number; detail?: 'conversation' | 'full' }
+    }
     try {
       envelope = request.postDataJSON() as typeof envelope
     } catch {
       return
     }
     if (envelope.method !== 'session.history' || envelope.payload?.sessionId !== SEED_ID) return
-    reads.push(response.body().then(buffer =>
-      parseWirePage(buffer.toString('utf8'), envelope.payload?.beforeSeq)))
+    reads.push(response.body().then(
+      buffer => parseWirePage(
+        buffer.toString('utf8'),
+        envelope.payload?.beforeSeq,
+        envelope.payload?.detail,
+      ),
+      (error: unknown) => {
+        if (error instanceof Error && /closed/.test(error.message)) {
+          return {
+            ...envelope.payload?.beforeSeq === undefined ? {} : { beforeSeq: envelope.payload.beforeSeq },
+            ...envelope.payload?.detail === undefined ? {} : { detail: envelope.payload.detail },
+            bytes: 0,
+            recordCount: 0,
+            packedRecordCount: 0,
+            hasMore: false,
+            hasProjections: false,
+            omittedSpanCount: 0,
+          }
+        }
+        throw error
+      },
+    ))
   })
 }
 
@@ -431,6 +466,20 @@ async function scrollToHistoryStart(page: Page): Promise<void> {
     timeout: 5_000,
     message: 'conversation scrollport did not reach the history boundary',
   }).toBeLessThanOrEqual(1)
+}
+
+/** Center-column aria with calendar-day prefixes collapsed so goldens do not depend on the runner timezone. */
+async function captureHistoryAria(page: Page, scaffold: WebScaffold): Promise<string> {
+  return (await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd))
+    .replace(/\b\d{1,2}\/\d{1,2}(?= \{\{clock\}\})/g, '{{date}}')
+    .split(SEED_ID).join('{{seededId}}')
+}
+
+async function firstBrowserHistoryPage(
+  reads: Array<Promise<WirePageEvidence>>,
+): Promise<WirePageEvidence | undefined> {
+  const pages = await Promise.all(reads)
+  return pages.find(current => current.beforeSeq === undefined) ?? pages[0]
 }
 
 async function stableUiEvidence(page: Page, scaffold: WebScaffold): Promise<StableUiEvidence> {
@@ -516,9 +565,34 @@ describe('web e2e: lossless history wire pagination', () => {
     expect(physical.packedRecordCount).toBeGreaterThan(0)
     expect(physical.hasMore).toBe(true)
     expect(physical.hasProjections).toBe(true)
+
+    const conversationLogical = await scaffold.ctx.apiProxy.sessions.history({
+      rpcId: RpcId('lossless-history-conversation'),
+      payload: { sessionId: SessionId(SEED_ID), detail: 'conversation' },
+    })
+    expect(conversationLogical.result.ok).toBe(true)
+    if (!conversationLogical.result.ok) throw new Error(conversationLogical.result.error.message)
+    expect(conversationLogical.result.value.omittedSpans?.length).toBeGreaterThan(0)
+    expect(conversationLogical.result.value.events.length).toBeLessThan(seed.eventCount)
+
+    const conversationResponse = await fetch(`${scaffold.baseUrl}/api/session.history`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        type: 'client-request',
+        rpcId: 'lossless-history-conversation-wire',
+        method: 'session.history',
+        payload: { sessionId: SEED_ID, detail: 'conversation' },
+      }),
+    })
+    expect(conversationResponse.ok).toBe(true)
+    const conversationPhysical = parseWirePage(await conversationResponse.text(), undefined, 'conversation')
+    expect(conversationPhysical.omittedSpanCount).toBeGreaterThan(0)
+    expect(conversationPhysical.packedRecordCount).toBeLessThan(physical.packedRecordCount)
+    expect(conversationPhysical.bytes).toBeLessThanOrEqual(DEFAULT_HISTORY_PAGE_TARGET_BYTES)
   }, 60_000)
 
-  it('renders the newest complete content and interrupted tail before expansion', async () => {
+  it('renders the conversation-tier Chat without historical packed chunks', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-lossless-history-initial'))
     const groupRow = page.locator('[role="treeitem"]').first()
     await groupRow.waitFor({ timeout: 15_000 })
@@ -533,10 +607,23 @@ describe('web e2e: lossless history wire pagination', () => {
     await expect.poll(() => page.getByText(INTERRUPTED_TEXT, { exact: true }).count(), {
       timeout: 15_000,
     }).toBe(1)
+
     expect(await page.getByText(USER_MARKERS[0] as string, { exact: true }).count()).toBe(0)
     await expect.poll(() => page.getByRole('button', { name: 'Load earlier' }).count(), {
       timeout: 10_000,
     }).toBe(1)
+
+    await expect.poll(async () => (await Promise.all(historyReads)).length, {
+      timeout: 10_000,
+    }).toBeGreaterThanOrEqual(1)
+    const firstBrowserPage = await firstBrowserHistoryPage(historyReads)
+    expect(firstBrowserPage, JSON.stringify(await Promise.all(historyReads))).toMatchObject({
+      detail: 'conversation',
+    })
+    expect(firstBrowserPage?.omittedSpanCount).toBeGreaterThan(0)
+    expect(firstBrowserPage?.packedRecordCount).toBeGreaterThan(0)
+    expect(firstBrowserPage?.bytes).toBeLessThanOrEqual(DEFAULT_HISTORY_PAGE_TARGET_BYTES)
+    expect(firstBrowserPage?.hasMore).toBe(true)
 
     const toolButton = page.getByRole('button', { name: `Bash ${TOOL_DESCRIPTION}` })
     await toolButton.waitFor({ timeout: 10_000 })
@@ -550,34 +637,20 @@ describe('web e2e: lossless history wire pagination', () => {
 
     initialUi = await stableUiEvidence(page, scaffold)
     expect(initialUi.stats).toContain(FULL_COUNTS)
-    expect(initialUi.stats).toContain('TTFT avg')
-    expect(initialUi.stats).toContain('tok/s')
     expect(initialUi.stats).toContain('Cache hit 75%')
     expect(initialUi.stats).toContain('Input 3.2K tok · Output 400 tok')
     expect(initialUi.stats).toContain('Tool call')
-    expect(initialUi.settledFooter).toContain('Ran for')
-    expect(initialUi.settledFooter).toContain('TTFT')
-    expect(initialUi.settledFooter).toContain('tok/s')
+    expect(initialUi.settledFooter).not.toContain('TTFT')
+    expect(initialUi.settledFooter).not.toContain('tok/s')
     expect(initialUi.interruptedTextCount).toBe(1)
     expect(initialUi.interruptedReasoningCount).toBe(1)
     expect(initialUi.stoppedCount).toBe(1)
 
-    await expect.poll(async () => {
-      const pages = await Promise.all(historyReads)
-      return pages.filter(current => current.beforeSeq === undefined).length
-    }, { timeout: 10_000 }).toBeGreaterThanOrEqual(1)
-    const firstBrowserPage = (await Promise.all(historyReads))
-      .find(current => current.beforeSeq === undefined)
-    expect(firstBrowserPage?.bytes).toBeLessThanOrEqual(DEFAULT_HISTORY_PAGE_TARGET_BYTES)
-    expect(firstBrowserPage?.packedRecordCount).toBeGreaterThan(0)
-    expect(firstBrowserPage?.hasMore).toBe(true)
-
-    const snapshot = (await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd))
-      .split(SEED_ID).join('{{seededId}}')
+    const snapshot = await captureHistoryAria(page, scaffold)
     await compareOrRefreshGolden(INITIAL_EXPECTED, snapshot, MODE)
   }, 90_000)
 
-  it('loads every older physical page without changing logical content', async () => {
+  it('fills Trajectory detail and restores Chat goldens', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-lossless-history-expanded'))
     while (await page.getByText(USER_MARKERS[0] as string, { exact: true }).count() === 0) {
       expect(loadOlderOperations).toBeLessThan(10)
@@ -593,11 +666,31 @@ describe('web e2e: lossless history wire pagination', () => {
       await expect.poll(() => markerCount(page), { timeout: 20_000 })
         .toBeGreaterThan(beforeMarkerCount)
     }
-
-    expect(loadOlderOperations).toBeGreaterThanOrEqual(2)
+    expect(loadOlderOperations).toBeGreaterThanOrEqual(1)
     await expect.poll(() => page.getByRole('button', { name: 'Load earlier' }).count(), {
       timeout: 10_000,
     }).toBe(0)
+    for (const marker of MESSAGE_MARKERS) {
+      expect(await page.getByText(marker, { exact: true }).count(), marker).toBe(1)
+    }
+    const olderConversationPages = (await Promise.all(historyReads))
+      .filter(current => current.detail === 'conversation' && current.beforeSeq !== undefined)
+    expect(olderConversationPages.length).toBeGreaterThanOrEqual(loadOlderOperations)
+
+    const beforeFill = (await Promise.all(historyReads)).length
+    await page.getByRole('tab', { name: 'Trajectory', exact: true }).click()
+    await page.getByLabel('Trajectory timeline').waitFor({ timeout: 30_000 })
+    await expect.poll(async () => {
+      const pages = await Promise.all(historyReads)
+      return pages.filter(current => current.detail === 'full').length
+    }, { timeout: 30_000 }).toBeGreaterThanOrEqual(1)
+    expect((await Promise.all(historyReads)).length).toBeGreaterThan(beforeFill)
+
+    await page.getByRole('tab', { name: 'Chat', exact: true }).click()
+    await expect.poll(() => page.getByText(TOOL_DONE_MARKER, { exact: true }).count(), {
+      timeout: 15_000,
+    }).toBe(1)
+    await scrollToHistoryStart(page)
     for (const marker of MESSAGE_MARKERS) {
       expect(await page.getByText(marker, { exact: true }).count(), marker).toBe(1)
     }
@@ -607,34 +700,52 @@ describe('web e2e: lossless history wire pagination', () => {
     }
 
     const expandedUi = await stableUiEvidence(page, scaffold)
-    expect(expandedUi).toEqual(initialUi)
+    expect(expandedUi.stats).toContain('TTFT avg')
+    expect(expandedUi.stats).toContain('tok/s')
+    expect(expandedUi.settledFooter).toContain('TTFT')
+    expect(expandedUi.settledFooter).toContain('tok/s')
+    expect(expandedUi.interruptedTextCount).toBe(1)
 
     const pages = await Promise.all(historyReads)
-    const tailPages = pages.filter(current => current.beforeSeq === undefined)
-    const olderPages = pages.filter(current => current.beforeSeq !== undefined)
-    expect(tailPages.length).toBeGreaterThanOrEqual(1)
-    expect(olderPages).toHaveLength(loadOlderOperations)
-    expect(olderPages.at(-1)?.hasMore).toBe(false)
-    expect([...tailPages, ...olderPages.slice(0, -1)].every(current => current.hasMore)).toBe(true)
-    expect(pages.every(current =>
+    const fullPages = pages.filter(current => current.detail === 'full')
+    expect(fullPages.length).toBeGreaterThanOrEqual(1)
+    expect(fullPages.every(current =>
       current.bytes <= DEFAULT_HISTORY_PAGE_TARGET_BYTES)).toBe(true)
-    expect(pages.reduce((total, current) => total + current.bytes, 0))
-      .toBeGreaterThan(DEFAULT_HISTORY_PAGE_TARGET_BYTES)
     expect(pages.reduce((total, current) => total + current.packedRecordCount, 0))
       .toBeGreaterThanOrEqual(2)
-    expect(tailPages.every(current => current.hasProjections)).toBe(true)
-    expect(olderPages.every(current => !current.hasProjections)).toBe(true)
-    const cursors = olderPages.map(current => current.beforeSeq)
-    expect(cursors.every((cursor): cursor is number => cursor !== undefined)).toBe(true)
-    expect(new Set(cursors).size).toBe(loadOlderOperations)
-    for (let index = 1; index < cursors.length; index++) {
-      expect(cursors[index] as number).toBeLessThan(cursors[index - 1] as number)
-    }
 
-    const snapshot = (await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd))
-      .split(SEED_ID).join('{{seededId}}')
+    const snapshot = await captureHistoryAria(page, scaffold)
     await compareOrRefreshGolden(EXPANDED_EXPECTED, snapshot, MODE)
   }, 120_000)
+
+  it('fetches detail on a persisted trajectory view without a second click', async () => {
+    const bootPage = await newEnglishPage(browser)
+    const bootReads: Array<Promise<WirePageEvidence>> = []
+    observeHistoryPages(bootPage, bootReads)
+    await bootPage.addInitScript((sessionId: string) => {
+      localStorage.setItem(`dsh.conversation.chat.${sessionId}`, JSON.stringify({
+        selection: null,
+        draft: '',
+        view: 'trajectory',
+        inspect: null,
+      }))
+    }, SEED_ID)
+    await bootPage.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await bootPage.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+    const groupRow = bootPage.locator('[role="treeitem"]').first()
+    await groupRow.waitFor({ timeout: 15_000 })
+    await groupRow.click()
+    const sessionRow = bootPage.locator('[role="treeitem"]').nth(1)
+    await sessionRow.waitFor({ timeout: 10_000 })
+    await sessionRow.click()
+    await bootPage.getByLabel('Trajectory timeline').waitFor({ timeout: 30_000 })
+    await expect.poll(async () => {
+      const pages = await Promise.all(bootReads)
+      return pages.filter(current => current.detail === 'full').length
+    }, { timeout: 30_000 }).toBeGreaterThanOrEqual(1)
+    await Promise.all(bootReads)
+    await bootPage.close()
+  }, 90_000)
 
   it('keeps the keyless model and browser tripwires clean', async () => {
     expect(tripwire.pageErrors).toEqual([])

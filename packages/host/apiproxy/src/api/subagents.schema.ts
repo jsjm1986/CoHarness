@@ -50,6 +50,7 @@ export const subagentHistoryRequestSchema = z.object({
   mode: z.union([z.literal('one-shot'), z.literal('continuable')]),
   beforeSeq: z.number().int().nonnegative().optional(),
   maxMessages: z.number().int().positive().optional(),
+  detail: z.union([z.literal('conversation'), z.literal('full')]).optional(),
 }) satisfies z.ZodType<Wire<RequestPayload<'subagent.history'>>>
 
 /** subagent.prompt request payload. */

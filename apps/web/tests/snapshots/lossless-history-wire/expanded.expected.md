@@ -7,7 +7,7 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-- text: WIRE_USER_01 {{clock}}
+- text: WIRE_USER_01 {{date}} {{clock}}
 - button "Copy":
   - img
 - button "Think WIRE_REASONING_01":
@@ -24,7 +24,7 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s WIRE_USER_02 {{clock}}
+- text: {{date}} {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s WIRE_USER_02 {{date}} {{clock}}
 - button "Copy":
   - img
 - button "Think WIRE_REASONING_02":
@@ -41,7 +41,7 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s WIRE_USER_03 {{clock}}
+- text: {{date}} {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s WIRE_USER_03 {{date}} {{clock}}
 - button "Copy":
   - img
 - button "Think WIRE_REASONING_03":
@@ -58,7 +58,7 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s WIRE_USER_04 {{clock}}
+- text: {{date}} {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s WIRE_USER_04 {{date}} {{clock}}
 - button "Copy":
   - img
 - button "Think WIRE_REASONING_04":
@@ -75,7 +75,7 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s WIRE_USER_05 {{clock}}
+- text: {{date}} {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s WIRE_USER_05 {{date}} {{clock}}
 - button "Copy":
   - img
 - button "Think WIRE_REASONING_05":
@@ -92,7 +92,7 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s WIRE_USER_06 {{clock}}
+- text: {{date}} {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s WIRE_USER_06 {{date}} {{clock}}
 - button "Copy":
   - img
 - button "Think WIRE_REASONING_06":
@@ -109,7 +109,7 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s WIRE_USER_TOOL {{clock}}
+- text: {{date}} {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s WIRE_USER_TOOL {{date}} {{clock}}
 - button "Copy":
   - img
 - button "Think WIRE_REASONING_TOOL_CALL":
@@ -117,13 +117,10 @@
   - img
   - text: Think WIRE_REASONING_TOOL_CALL
 - paragraph: WIRE_ASSISTANT_TOOL_CALL
-- button "Bash Verify packed history carrier" [expanded]:
+- button "Bash Verify packed history carrier":
+  - img
   - img
   - text: Bash Verify packed history carrier
-- text: Done {{workspace}} printf 'WIRE_TOOL_OUTPUT\n'
-- button "Copy"
-- text: WIRE_TOOL_OUTPUT
-- button "Inspect"
 - button "Think WIRE_REASONING_TOOL_DONE":
   - img
   - img
@@ -137,7 +134,7 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s WIRE_USER_INTERRUPTED {{clock}}
+- text: {{date}} {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s WIRE_USER_INTERRUPTED {{date}} {{clock}}
 - button "Copy":
   - img
 - button "Think WIRE_INTERRUPTED_REASONING":
@@ -150,10 +147,12 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{clock}} Ran for {{duration}}
+- text: {{date}} {{clock}} Ran for {{duration}}
 - button "Back to bottom":
   - img
 - textbox "Message the agent"
+- button "Add images or documents":
+  - img
 - button "Commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write

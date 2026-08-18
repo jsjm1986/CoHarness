@@ -71,6 +71,7 @@ export interface TrajectoryViewInjected {
   }
   loadOlder: () => Promise<boolean>
   setActualDuration: (actualDuration: boolean) => void
+  ensureHistoryDetail: () => Promise<void>
 }
 
 interface UsageLike {
@@ -118,7 +119,7 @@ function addUsage(
 }
 
 export function TrajectoryView({
-  useSession, useDuration, loadOlder, setActualDuration,
+  useSession, useDuration, loadOlder, setActualDuration, ensureHistoryDetail,
   inspect, onInspectDone, t,
 }: ConvViewProps & InjectFace<TrajectoryViewInjected> & PropsLocale<'trajectory'>) {
   const [collapsedTurns, setCollapsedTurns] = useState<ReadonlySet<number>>(EMPTY_TURN_IDS)
@@ -141,9 +142,14 @@ export function TrajectoryView({
   } | null>(null)
   const inspection = useSession(snapshot =>
     snapshot.views.get('trajectory') ?? EMPTY_TRAJECTORY_SNAPSHOT)
-  const historyLoading = useSession(snapshot => snapshot.openState === 'loading')
+  const historyLoading = useSession(snapshot =>
+    snapshot.openState === 'loading' || snapshot.historyDetail === 'filling')
   const olderHistoryLoading = useSession(snapshot => snapshot.loadingOlder)
   const hasOlderHistory = useSession(snapshot => snapshot.hasMore)
+
+  useEffect(() => {
+    void ensureHistoryDetail()
+  }, [ensureHistoryDetail])
   const nodes = inspection.eventNodes
   const eventLocations = inspection.eventLocations
   const historyBaseSeq = nodes[0]?.seq ?? 0

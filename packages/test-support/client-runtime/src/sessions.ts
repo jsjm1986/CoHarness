@@ -131,6 +131,13 @@ export class FixtureSession implements SessionFace {
   }
 
   /**
+   * Default no-op: Trajectory mounts call this, and fixtures without chunk
+   * windows treat the snapshot as already complete.
+   * @returns immediately.
+   */
+  async ensureHistoryDetail(): Promise<void> {}
+
+  /**
    * Fail-loud stub; supply `rename` on the fixture's session face to exercise it.
    * @returns never — always throws.
    */

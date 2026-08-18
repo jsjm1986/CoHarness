@@ -68,7 +68,7 @@ Workspace 列表与 Session 列表是相互独立的重连基线。`workspace.cr
 
 `AbstractApiClient` 持有全部协议不变量：签发 rpcId、包装／解包信封、Zod 解析、SSE 帧解码、一元请求超时，以及按微任务批处理的信封观测（`subscribeEnvelopes`）；平台子类只提供 `doFetch` 传输环节。`InProcessApiClient` 以 `toFetchHandler(api)` 为基础，仍是同构接点：它运行完整的协议序列化与校验路径而不经过网络，供需要该路径的调用方和载体测试使用。产品的 `dsh --profile headless` 是直连 core 的入口，不挂载本包。
 
-直接的 `SessionsApi` / `SubagentsApi` 与 `IApiClient` 历史结果仍是展开后的 `{ events, hasMore, projections? }`。成功的 Fetch `session.history` 与 `subagent.history` 响应使用物理 `records`（含无损打包的 chunk 行）；客户端先校验并展开，再暴露逻辑结果。大小目标按完整未压缩 `server-response` JSON 的 UTF-8 字节计量，且只在完整的追加来源消息组处截断；一个不可分割的消息组可以超过该目标。畸形打包记录会在运行时状态变更前失败；未知的普通或扩展 chunk 事件仍按普通事件处理。持久化、会话格式与 Conversation 组装不变。[`historyPageTargetBytes`](../../client/connection/README.md) 持有部署目标；[无损历史线分页决策](../../../.agents/notes/implemented/architecture/2026-08-14-lossless-history-wire-pagination.md) 记录原委。
+直接的 `SessionsApi` / `SubagentsApi` 与 `IApiClient` 历史结果仍是展开后的 `{ events, hasMore, projections? }`，外加可选的 `omittedSpans`。`detail: 'conversation'` 在分页之后省略已完成追加来源 `assistant/message` 之下的历史 `assistant/chunk` 游程，并报告这些闭区间 seq 范围；缺失的 `detail` 与 `'full'` 保留全部事件。成功的 Fetch `session.history` 与 `subagent.history` 响应使用物理 `records`（含无损打包的剩余 chunk 行），并往返 `omittedSpans`；客户端先校验并展开，再暴露逻辑结果。大小目标按完整未压缩 `server-response` JSON 的 UTF-8 字节计量，且只在完整的追加来源消息组处截断；后缀裁切会把 `omittedSpans` 限制到返回后缀内的 seq。一个不可分割的消息组可以超过该目标。畸形打包记录会在运行时状态变更前失败；未知的普通或扩展 chunk 事件仍按普通事件处理。持久化、会话格式与 Conversation 组装不变。[`historyPageTargetBytes`](../../client/connection/README.md) 持有部署目标；[无损历史线分页决策](../../../.agents/notes/implemented/architecture/2026-08-14-lossless-history-wire-pagination.md) 与 [两档会话历史传输](../../../.agents/notes/implemented/architecture/2026-08-18-conversation-history-tier.md) 记录原委。
 
 ## 模型体验
 

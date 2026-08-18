@@ -86,6 +86,15 @@ export interface HistoryEntry {
   view?: ToolEventView
 }
 
+/** History download gear: omit completed historical chunks, or keep every event. */
+export type HistoryDetail = 'conversation' | 'full'
+
+/** Inclusive seq range of omitted historical `assistant/chunk` events. */
+export interface HistoryOmittedSpan {
+  startSeq: number
+  endSeq: number
+}
+
 /**
  * The projection baseline riding the history tail page: one synchronous cut
  * over every registered projection unit, read from the registry's watermark
@@ -316,9 +325,25 @@ export interface SessionsApi {
    * A deployment without the registry serves histories without the block.
    * Reading history uses an attached Session or persistence inspection and
    * never resumes or publishes an Agent.
+   * `detail` selects the download gear after pagination: `'conversation'`
+   * omits historical `assistant/chunk` runs that sit under a completed
+   * append-origin `assistant/message` and reports them as `omittedSpans`;
+   * omitted or `'full'` returns every event on the page. In-flight and
+   * interrupted streams without that message keep their chunks. Persistence
+   * and model context are unchanged.
    */
-  history(request: RpcRequest<{ sessionId: SessionId; beforeSeq?: number; maxMessages?: number }>):
-  Promise<RpcResponse<{ events: HistoryEntry[]; hasMore: boolean; projections?: SessionProjectionsBlock }>>
+  history(request: RpcRequest<{
+    sessionId: SessionId
+    beforeSeq?: number
+    maxMessages?: number
+    detail?: HistoryDetail
+  }>):
+  Promise<RpcResponse<{
+    events: HistoryEntry[]
+    hasMore: boolean
+    projections?: SessionProjectionsBlock
+    omittedSpans?: readonly HistoryOmittedSpan[]
+  }>>
 
   /**
    * Reads a fresh advisory model directory for an ordinary session. Provider
