@@ -7,13 +7,14 @@ import {
 import { z } from 'zod'
 import {
   contentBlockSchema, sessionCancelRequestSchema, sessionCancelValueSchema, sessionCreateRequestSchema,
-  sessionCreateValueSchema, sessionEventSchema, sessionHistoryRequestSchema, sessionHistoryValueSchema,
+  sessionCreateValueSchema, sessionEventSchema, sessionHistoryRequestSchema,
   sessionIdSchema, sessionListRequestSchema, sessionListValueSchema, sessionModelsRequestSchema,
   sessionModelsValueSchema, sessionPromptRequestSchema, sessionPromptValueSchema,
   sessionSearchRequestSchema, sessionSearchValueSchema, sessionSelectModelRequestSchema,
   sessionSelectModelValueSchema, sessionSummarySchema,
   sessionUpdateQueueRequestSchema, sessionUpdateQueueValueSchema,
 } from '../src/api/sessions.schema.ts'
+import { historyWireValueSchema } from '../src/fetch/history-wire.ts'
 import {
   hostCreateDirectoryRequestSchema, hostCreateDirectoryValueSchema,
   hostDescribeRequestSchema, hostDescribeValueSchema,
@@ -198,11 +199,6 @@ describe('sessions domain schemas', () => {
     expect(sessionCreateValueSchema.parse({ sessionId: 's1' }).sessionId).toBe('s1')
     expect(sessionHistoryRequestSchema.parse({ sessionId: 's1', beforeSeq: 3, maxMessages: 5 }).beforeSeq).toBe(3)
     expect(() => sessionHistoryRequestSchema.parse({ sessionId: 's1', maxMessages: 0 })).toThrow()
-    expect(sessionHistoryValueSchema.parse({
-      events: [],
-      hasMore: false,
-      modelSelection: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
-    }).hasMore).toBe(false)
     expect(sessionModelsRequestSchema.parse({ sessionId: 's1' }).sessionId).toBe('s1')
     expect(sessionModelsValueSchema.parse({
       current: { provider: 'deepseek-official', model: 'deepseek-v4-flash', reasoningEffort: 'max' },
@@ -287,6 +283,32 @@ describe('sessions domain schemas', () => {
     expect(sessionCancelValueSchema.parse({ accepted: true }).accepted).toBe(true)
     expect(sessionUpdateQueueValueSchema.parse({ accepted: true }).accepted).toBe(true)
     expect(contentBlockSchema.parse({ type: 'text', text: 'x', extra: 1 })).toMatchObject({ extra: 1 })
+  })
+})
+
+describe('history wire schema', () => {
+  it('rejects malformed packed records', () => {
+    expect(() => historyWireValueSchema.parse({
+      records: [{ chunks: { type: 'text-chunks' } }],
+      hasMore: false,
+    })).toThrow(/malformed text-chunks storage row/)
+  })
+
+  it('passes an unknown ordinary event through the expanded logical value', () => {
+    const event = {
+      type: 'future/event',
+      seq: 7,
+      time: 1000,
+      data: { future: true },
+    }
+
+    expect(historyWireValueSchema.parse({
+      records: [{ event }],
+      hasMore: true,
+    })).toStrictEqual({
+      events: [{ event }],
+      hasMore: true,
+    })
   })
 })
 

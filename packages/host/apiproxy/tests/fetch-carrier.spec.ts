@@ -1,9 +1,53 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ApiProxy, HostFrame, MuxFrame } from '../src/api/index.ts'
+import type { ResponseValue } from '../src/api/rpc-map.ts'
 import type { ClientResponse, RpcMessage, RpcReceipt, RpcRequest } from '../src/api/rpc.ts'
 import { RpcId } from '../src/api/rpc.ts'
 import { toFetchHandler } from '../src/fetch/handler.ts'
 import { AbstractApiClient, InProcessApiClient } from '../src/fetch/client.ts'
+
+const SCRIPTED_HISTORY_PAGE = {
+  events: [
+    {
+      event: {
+        type: 'assistant/chunk',
+        seq: 1,
+        time: 1000,
+        data: { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'packed ' } },
+      },
+    },
+    {
+      event: {
+        type: 'assistant/chunk',
+        seq: 2,
+        time: 1010,
+        data: { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'history ' } },
+      },
+    },
+    {
+      event: {
+        type: 'assistant/chunk',
+        seq: 3,
+        time: 1020,
+        data: { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'page' } },
+      },
+    },
+    {
+      event: {
+        type: 'tool/call',
+        seq: 4,
+        time: 1030,
+        data: { turn: 1, step: 1, callId: 'call-1' as never, name: 'bash', arguments: '{"command":"pwd"}' },
+      },
+      view: { for: 'call', view: { card: 'terminal', title: 'pwd' } },
+    },
+  ],
+  hasMore: false,
+  projections: {
+    asOfSeq: 4,
+    values: { todos: [{ content: 'preserve projection', status: 'in_progress' }] },
+  },
+} satisfies ResponseValue<'session.history'>
 
 /** Minimal in-memory ApiProxy: echoes rpcIds, scripts one frame per stream. */
 function fakeApi(overrides: Partial<{ muxFrames: MuxFrame[]; hostFrames: HostFrame[]; crashOn: string }> = {}): ApiProxy {
@@ -45,6 +89,12 @@ function fakeApi(overrides: Partial<{ muxFrames: MuxFrame[]; hostFrames: HostFra
         return { rpcId: request.rpcId, result: { ok: true, value: { sessionId: 's-new' as never } } }
       },
       async history(request) {
+        if (request.payload.sessionId === ('scripted-history' as never)) {
+          return {
+            rpcId: request.rpcId,
+            result: { ok: true, value: SCRIPTED_HISTORY_PAGE },
+          }
+        }
         if (request.payload.sessionId === ('with-projections' as never)) {
           return {
             rpcId: request.rpcId,
@@ -114,6 +164,9 @@ function fakeApi(overrides: Partial<{ muxFrames: MuxFrame[]; hostFrames: HostFra
         return { rpcId: request.rpcId, result: { ok: true, value: { entries: [], parentAvailable: false } } }
       },
       async history(request) {
+        if (request.payload.childSessionId === ('scripted-history' as never)) {
+          return { rpcId: request.rpcId, result: { ok: true, value: SCRIPTED_HISTORY_PAGE } }
+        }
         return { rpcId: request.rpcId, result: { ok: true, value: { events: [], hasMore: false } } }
       },
       async prompt(request, signal) {
@@ -314,6 +367,34 @@ describe('unary round trip (handler ⇄ client, no network)', () => {
     expect(response.rpcId).toMatch(/[0-9a-f-]{36}/)
   })
 
+  it('packs session history on Fetch and restores the exact logical page for IApiClient', async () => {
+    const handler = toFetchHandler(fakeApi())
+    const request = {
+      type: 'client-request',
+      rpcId: 'session-history-wire',
+      method: 'session.history',
+      payload: { sessionId: 'scripted-history' },
+    }
+    const directResponse = await handler.fetch(new Request('http://x/api/session.history', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request),
+    }))
+    const directBody = await directResponse.json() as {
+      result: { ok: boolean; value: { records?: Array<{ chunks?: unknown }>; events?: unknown } }
+    }
+
+    expect(directBody.result.ok).toBe(true)
+    expect(directBody.result.value).toHaveProperty('records')
+    expect(directBody.result.value.records?.some(record => record.chunks !== undefined)).toBe(true)
+    expect(directBody.result.value).not.toHaveProperty('events')
+
+    const response = await new InProcessApiClient(handler).sessions.history({
+      sessionId: 'scripted-history' as never,
+    })
+    expect(response.result).toStrictEqual({ ok: true, value: SCRIPTED_HISTORY_PAGE })
+  })
+
   it('carries the tail-page projections block through the wire schema (Zod must not strip it)', async () => {
     const response = await client().sessions.history({ sessionId: 'with-projections' as never })
     expect(response.result.ok).toBe(true)
@@ -481,6 +562,17 @@ describe('unary round trip (handler ⇄ client, no network)', () => {
       childSessionId: 'child' as never,
       mode: 'continuable',
     })).result).toEqual({ ok: true, value: { accepted: true } })
+  })
+
+  it('restores the exact logical subagent history page from packed Fetch records', async () => {
+    const handler = toFetchHandler(fakeApi())
+    const response = await new InProcessApiClient(handler).subagents.history({
+      parentSessionId: 'parent' as never,
+      childSessionId: 'scripted-history' as never,
+      mode: 'one-shot',
+    })
+
+    expect(response.result).toStrictEqual({ ok: true, value: SCRIPTED_HISTORY_PAGE })
   })
 
   it('keeps caller and connection aborts on a deadline-exempt unary', async () => {

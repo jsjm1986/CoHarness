@@ -175,11 +175,11 @@ export type ResponseValue<K> =
 
 其余帧型不在此复写，union 全集见 `api/events.ts` 的 `MuxFrame`/`HostFrame`。语义上须知三点：`session/subscribed` 的 lastSeq 供 history 竞态检测；`approval/question` 的 requested 帧可应答（rpcId 稳定）、resolved 帧是收敛面；`host/agent-error` 是无 turn 位置 live 失败的唯一出口。
 
-**透传纪律**：wire 上的事件/消息/内容块就是 core 类型（`SessionEvent`/`ContentBlock`），不造第二套 DTO；类型经 `import type` 依赖链直达浏览器。`SessionEventMap` merge-extensible：client 对未知 type documented-default（忽略），事件 schema 留「合法信封+未知类型」分支——信封仍严格，不是字段级 passthrough。
+**透传纪律**：wire 上的事件/消息/内容块就是 core 类型（`SessionEvent`/`ContentBlock`），不造第二套 DTO；类型经 `import type` 依赖链直达浏览器。`SessionEventMap` merge-extensible：client 对未知 type documented-default（忽略），事件 schema 留「合法信封+未知类型」分支——信封仍严格，不是字段级 passthrough。逻辑 API 与实时事件帧继续遵守该纪律；只有成功的 Fetch 历史 JSON 会暂时使用物理 `records`，客户端先校验并展开，业务状态才看得到。
 
 ### 会话语义（impl 侧承诺）
 
-- **历史 = 事件回放**：一套 fold（client 侧），历史分页与 live 增量同一条代码路径；server 不做物化快照第二套。history **页边界对齐消息边界**（绝不从消息中间截断；分片随定稿消息归组），尾页含进行中 partial 的分片。
+- **历史 = 事件回放**：一套 fold（client 侧），历史分页与 live 增量同一条代码路径；server 不做物化快照第二套。history **页边界对齐消息边界**（绝不从消息中间截断；分片随定稿消息归组），尾页含进行中 partial 的分片。逻辑 `maxMessages` 分页之后，Fetch 载体再按完整信封字节目标、在同一批完整追加来源消息组处截断；[无损历史线分页决策](2026-08-14-lossless-history-wire-pagination.md) 持有 Fetch 物理 `records` 表示。
 - **提示词关联**：提示词的 rpcId 经 MessageSource（`'user-rpc'`）透传进 `user/message` 事件，client 以此把乐观回显转正。
 - **重连 = 重建**：不做续传 cursor（`mux` 的 `since` 签名留座、传了忽略）；断线重开流 + 重拉 history；`subscribed.lastSeq` 与 history 尾 seq 比对，有缝再补拉一次。
 - **冷会话处理遵循所有权**：`session.history` 与 `session.fork` 的源端读取会在不获取 Agent 的情况下检查持久化存储，而绑定到 Agent 的普通会话方法（如 `prompt`）则通过在途表去重后恢复会话。由会话支撑的 subagent 会拒绝这条通用恢复路径，且附加状态不对客户端暴露（`running` 已经覆盖）。

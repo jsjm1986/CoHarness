@@ -20,7 +20,7 @@ Status: implemented
 
 `session.history` 只把追加来源的消息计入 `maxMessages`。每一页仍是一段连续的原始事件区间，因此压缩的 `compaction/summary` 事件会与引用它的替换留在同一页。
 
-持久事件、RPC 信封、压缩事务与模型可见的 surface 都没有变化，也不需要迁移。
+持久事件、压缩事务与模型可见的 surface 都没有变化，也不需要迁移。逻辑历史值仍是 `{ events, hasMore, projections? }`；只有 Fetch 载体的物理 `server-response` 使用打包 `records`，并在同一批追加来源消息组上按完整信封字节目标截断（[无损历史线分页](../architecture/2026-08-14-lossless-history-wire-pagination.md)）。
 
 ## 延后事项
 

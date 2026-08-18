@@ -70,6 +70,10 @@ import {
   subagentListRequestSchema,
   subagentPromptRequestSchema,
 } from '../api/subagents.schema.ts'
+import {
+  DEFAULT_HISTORY_PAGE_TARGET_BYTES,
+  encodeHistoryServerResponse,
+} from './history-wire.ts'
 
 /**
  * Unary dispatch table, keyed by (and compiler-locked to) RpcMethodMap: a map row without a
@@ -168,15 +172,21 @@ function fullResponse(narrow: RpcResponse<unknown>): Response {
 
 /**
  * Parse the payload and invoke one unary route. Generic over the map key so
- * the row's schema/invoke pairing typechecks; the only cast collapses the
+ * the row's schema/invoke pairing typechecks; the request cast collapses the
  * Wire<> widening back to the exact payload (undefined-valued properties and
- * absent ones are indistinguishable after JSON transport).
+ * absent ones are indistinguishable after JSON transport). Successful history
+ * rows use a separate value assertion because comparing a generic key does not
+ * narrow its mapped response type.
  */
 // K appears once in the signature but ties the UNARY_ROUTES[K] row lookup to its own
 // schema/invoke pairing; a union parameter degrades the row to an uninvokable intersection.
 // oxlint-disable-next-line typescript/no-unnecessary-type-parameters
 async function handleUnary<K extends keyof RpcMethodMap>(
-  api: ApiProxy, method: K, message: ClientRequest, signal: AbortSignal,
+  api: ApiProxy,
+  method: K,
+  message: ClientRequest,
+  signal: AbortSignal,
+  historyPageTargetBytes: number,
 ): Promise<Response> {
   const route = UNARY_ROUTES[method]
   const payload = route.schema.safeParse(message.payload)
@@ -184,7 +194,18 @@ async function handleUnary<K extends keyof RpcMethodMap>(
     return errorResponse(message.rpcId, { code: 'bad-request', message: `invalid payload for ${method}`, details: { issues: payload.error.issues } })
   }
   try {
-    return fullResponse(await route.invoke(api, { rpcId: message.rpcId, payload: payload.data }, signal))
+    const response = await route.invoke(api, { rpcId: message.rpcId, payload: payload.data }, signal)
+    if (
+      response.result.ok
+      && (method === 'session.history' || method === 'subagent.history')
+    ) {
+      return Response.json(encodeHistoryServerResponse(
+        response.rpcId,
+        response.result.value as ResponseValue<'session.history'>,
+        historyPageTargetBytes,
+      ))
+    }
+    return fullResponse(response)
   } catch (error: unknown) {
     // The impl never throws business errors; reaching here means the implementation itself crashed — 500, carrier layer.
     return new Response(`handler failure: ${String(error)}`, { status: 500 })
@@ -235,12 +256,24 @@ function sseResponse(frames: AsyncIterable<RpcRequest<MuxFrame | HostFrame>>): R
   })
 }
 
+/** Construction options for the Fetch carrier handler. */
+export interface FetchHandlerOptions {
+  /** Complete history response target in uncompressed UTF-8 JSON bytes. */
+  historyPageTargetBytes?: number
+}
+
 /**
  * Wraps an ApiProxy into a pure fetch function (isomorphic point: feed the returned fetch straight to InProcessApiClient).
  * @param api - the host-side ApiProxy implementation.
+ * @param options - carrier construction options.
  * @returns an object holding `fetch(Request)`; paths outside /api/ return 404.
  */
-export function toFetchHandler(api: ApiProxy): { fetch: typeof fetch } {
+export function toFetchHandler(
+  api: ApiProxy,
+  options: FetchHandlerOptions = {},
+): { fetch: typeof fetch } {
+  const historyPageTargetBytes = options.historyPageTargetBytes
+    ?? DEFAULT_HISTORY_PAGE_TARGET_BYTES
   return {
     // Signature matches global fetch: the isomorphic point hands this function to InProcessApiClient as its transport aspect,
     // Clients call in (url, init) form — normalize to Request before handling.
@@ -314,7 +347,7 @@ export function toFetchHandler(api: ApiProxy): { fetch: typeof fetch } {
       if (message.method !== method) {
         return errorResponse(message.rpcId, { code: 'bad-request', message: `method "${message.method}" does not match path "${method}"`, details: { issues: [] } })
       }
-      return handleUnary(api, method, message, req.signal)
+      return handleUnary(api, method, message, req.signal, historyPageTargetBytes)
     },
   }
 }

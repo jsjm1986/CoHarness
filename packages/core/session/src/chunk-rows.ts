@@ -18,8 +18,8 @@
  * @module @deepseek-ai/dsh-session/chunk-rows
  */
 
-import { CallId, assertNever } from '@deepseek-ai/dsh-llm'
-import type { StreamChunk } from '@deepseek-ai/dsh-llm'
+import { CallId } from '@deepseek-ai/dsh-llm/brand'
+import type { StreamChunk } from '@deepseek-ai/dsh-llm/types'
 import type { SessionEvent } from './types.ts'
 
 /** The chunk kinds that may pack; block boundaries, usage, and finish chunks always stay one event per line. */
@@ -78,6 +78,28 @@ const MIN_RUN = 3
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
+}
+
+/* v8 ignore start -- closed-union exhaustiveness; local to stay off the Node-facing LLM package root */
+function assertNever(value: never, context?: string): never {
+  const rendered = (JSON.stringify(value) as string | undefined) ?? String(value)
+  throw new Error(`unreachable variant${context ? ` in ${context}` : ''}: ${rendered}`)
+}
+/* v8 ignore stop */
+
+/**
+ * Whether a parsed value carries a packed chunk-row tag (`text-chunks`,
+ * `reasoning-chunks`, or `tool-call-chunks`). Tag-only: does not validate
+ * envelope or payload fields — use {@link decodeChunkRow} (which calls
+ * `validateRow`) for full structural checks before expansion.
+ * @param value - a parsed JSON value (wire or storage vocabulary, not a session event).
+ * @returns true when `value.type` is one of the three packed-row tags.
+ */
+export function isChunkRow(value: unknown): value is ChunkRow {
+  if (!isRecord(value)) return false
+  return value.type === 'text-chunks'
+    || value.type === 'reasoning-chunks'
+    || value.type === 'tool-call-chunks'
 }
 
 /** Exact-key check: `value` has every key in `keys` and nothing else. */
@@ -328,6 +350,20 @@ function expandRow(row: ChunkRow): SessionEvent[] {
 }
 
 /**
+ * Decode one packed chunk row into its exact original events.
+ * A value that is not a `text-chunks`, `reasoning-chunks`, or
+ * `tool-call-chunks` row throws `value is not a packed chunk row` and does
+ * not call the row validator. A row-tagged value that fails validation throws
+ * `malformed <tag> storage row: …` before any event is expanded.
+ * @param value - a parsed row value (typically from JSON).
+ * @returns the expanded session events, in log order.
+ */
+export function decodeChunkRow(value: unknown): SessionEvent[] {
+  if (!isChunkRow(value)) throw new Error('value is not a packed chunk row')
+  return expandRow(validateRow(value, value.type))
+}
+
+/**
  * Decode one parsed JSONL line value into the session event(s) it stores.
  * Chunk-row-tagged values validate and expand (a malformed row throws — it is
  * corrupt storage, and treating it as an event would silently drop a whole
@@ -337,10 +373,5 @@ function expandRow(row: ChunkRow): SessionEvent[] {
  * @returns the stored events, in log order.
  */
 export function decodeStorageRecord(value: unknown): SessionEvent[] {
-  if (!isRecord(value)) return [value as SessionEvent]
-  const tag = value.type
-  if (tag !== 'text-chunks' && tag !== 'reasoning-chunks' && tag !== 'tool-call-chunks') {
-    return [value as SessionEvent]
-  }
-  return expandRow(validateRow(value, tag))
+  return isChunkRow(value) ? decodeChunkRow(value) : [value as SessionEvent]
 }

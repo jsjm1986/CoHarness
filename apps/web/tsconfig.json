@@ -52,6 +52,7 @@
     "tests/project-collaboration.e2e.ts",
     "tests/chat-sender-attribution.e2e.ts",
     "tests/stats-paged-history.e2e.ts",
+    "tests/lossless-history-wire.e2e.ts",
     "tests/sidebar-scrollbar.e2e.ts",
     "tests/conversation-column-overflow.e2e.ts",
     "tests/code-mode-round.e2e.ts",

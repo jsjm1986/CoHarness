@@ -18,7 +18,7 @@ JSONL 存储 seam 可以在不改变逻辑日志的情况下减少这部分封�
 
 ### 逻辑事件与物理行
 
-打包保留在 `dsh-session` 的存储 seam，并通过 `packChunkRuns()` 和 `decodeStorageRecord()` 实现。编码器识别精确的增量事件形态，原样保留无法识别的事件，并且只打包至少包含 3 个事件的连续段。打包行属于存储词汇，不是 `SessionEventMap` 成员：它绝不会进入 `Session.events`，也不会触发 `session/event`。
+打包保留在 `dsh-session` 的存储 seam，并通过 `packChunkRuns()` 和 `decodeStorageRecord()` 实现。JSONL 存储与 Fetch 历史载体都把这些打包行复用为物理记录；它们仍然不会成为 `SessionEventMap` 成员、进入 `Session.events`，或触发 `session/event`。编码器识别精确的增量事件形态，原样保留无法识别的事件，并且只打包至少包含 3 个事件的连续段。[无损历史线分页决策](2026-08-14-lossless-history-wire-pagination.md) 持有 Fetch 载体侧的复用。
 
 JSONL 后端会打包每个持久追加批次。原始模式 `compression: 'none'` 与默认 Zstandard 帧承载相同的逻辑存储记录；为使 fixture 便于评审而选择原始模式，不会禁用打包。仓库中的回放读取器和规范化器会解码共享行格式，而不维护快照专用编解码器。
 

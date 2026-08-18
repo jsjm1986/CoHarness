@@ -31,6 +31,10 @@
     "./surface": {
       "types": "./lib/types/surface.d.ts",
       "default": "./lib/types/surface.js"
+    },
+    "./chunk-rows": {
+      "types": "./lib/types/chunk-rows.d.ts",
+      "default": "./lib/types/chunk-rows.js"
     }
   },
   "files": [

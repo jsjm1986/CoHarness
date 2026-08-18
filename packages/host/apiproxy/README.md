@@ -68,6 +68,8 @@ The `settings.*`, `credentials.*`, and `llm.*` domains are the configuration-pag
 
 `AbstractApiClient` holds every protocol invariant — rpcId minting, envelope wrap/unwrap, zod parsing, SSE frame decoding, unary timeout, microtask-batched envelope observation (`subscribeEnvelopes`) — while platform subclasses supply only the `doFetch` transport aspect. `InProcessApiClient` over `toFetchHandler(api)` remains the isomorphic point for callers and carrier tests that need the full wire serialization/validation path without a network. Product `dsh --profile headless` is a direct core entry point and does not mount this package.
 
+Direct `SessionsApi` / `SubagentsApi` and `IApiClient` history results stay expanded `{ events, hasMore, projections? }`. Successful Fetch `session.history` and `subagent.history` responses use physical `records`, including losslessly packed chunk rows; the client validates and expands them before exposing the logical result. The size target measures the complete uncompressed `server-response` JSON in UTF-8 bytes and cuts only at complete append-origin message groups; one indivisible group may exceed the target. Malformed packed records fail before runtime state changes; unknown ordinary or extended chunk events remain ordinary events. Persistence, the session format, and Conversation assembly are unchanged. [`historyPageTargetBytes`](../../client/connection/README.md) owns the deployment target; the [lossless history wire pagination decision](../../../.agents/notes/implemented/architecture/2026-08-14-lossless-history-wire-pagination.md) records the rationale.
+
 ## Model Experience
 
 None, as the package defines the client↔host wire contract and carriers; nothing here reaches a model request.
