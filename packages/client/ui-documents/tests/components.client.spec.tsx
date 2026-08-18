@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DocumentsButton } from '../src/client/DocumentsButton.tsx'
+import buttonCss from '../src/client/DocumentsButton.module.css'
 import { DocumentsModal } from '../src/client/DocumentsModal.tsx'
 import { zh, type DocumentsKey } from '../src/client/locales.ts'
 
@@ -71,7 +72,7 @@ describe('DocumentsModal', () => {
   it('renders a button with the document label, opens the modal on click, and closes on Escape', () => {
     createUserDocClient.mockReturnValue(makeClient())
     render(<DocumentsButton t={t as never} wide={false} useSessions={undefined as never} useWorkspaces={undefined as never} />)
-    expect(screen.getByRole('button', { name: '文档' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '文档' }).className.split(/\s+/)).toContain(buttonCss.rail)
     fireEvent.click(screen.getByRole('button', { name: '文档' }))
     expect(screen.getByRole('dialog', { name: '文档管理' })).toBeTruthy()
     fireEvent.keyDown(document, { key: 'Escape' })
