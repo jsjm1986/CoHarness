@@ -155,6 +155,13 @@ export interface UsageSummary {
   alerts: Array<{ metric: 'tokens' | 'company-cost'; threshold: 80 | 100; createdAt: number }>
 }
 
+/** Stored project quota source plus the Token and company-cost limits currently in force. */
+export interface ProjectQuotaView {
+  source: 'inherit' | 'independent'
+  tokenLimit: number | null
+  companyCostMicrosLimit: number | null
+}
+
 const nonEmpty = (value: string, name: string): string => {
   const accepted = value.trim()
   if (accepted === '') throw new Error(`${name} must not be empty`)
@@ -350,8 +357,25 @@ export class ModelGovernanceService {
     throw new Error('SQLite model governance has no project runtime support')
   }
 
+  setAllProjectAccess(_projectId: number, _allowed: true | null): void {
+    throw new Error('SQLite model governance has no project runtime support')
+  }
+
   projectOverrides(_projectId: number): Array<{ provider: string; model: string; allowed: boolean }> {
     throw new Error('SQLite model governance has no project runtime support')
+  }
+
+  projectQuota(_projectId: number): ProjectQuotaView {
+    const roleQuota = this.db.prepare(
+      `SELECT * FROM model_quotas WHERE subject_type='role' AND subject_id=?`,
+    ).get('user') as { token_limit: number | null; company_cost_micros_limit: number | null } | undefined
+    const quota = (value: number | null | undefined): number | null =>
+      value === undefined || value === -1 ? null : value
+    return {
+      source: 'inherit',
+      tokenLimit: quota(roleQuota?.token_limit),
+      companyCostMicrosLimit: quota(roleQuota?.company_cost_micros_limit),
+    }
   }
 
   policyFor(user: UserRow): RuntimeModelPolicy {

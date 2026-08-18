@@ -11,6 +11,7 @@ import type {
   RuntimeModelProvider,
   UsageEvent,
   UsageSummary,
+  ProjectQuotaView,
 } from '../model-governance.ts'
 import { ORGANIZATION_PROVIDER_PATTERN } from '../model-governance.ts'
 import { OrganizationModelCredentialCipher } from '../organization-model-credentials.ts'
@@ -704,6 +705,32 @@ export class PostgresModelGovernanceService {
     })
   }
 
+  async setAllProjectAccess(projectId: number, allowed: true | null): Promise<void> {
+    await transaction(this.context.pool, async (client) => {
+      const project = await internalProjectId(client, this.context.organizationId, projectId)
+      if (project === null) throw new Error(`unknown project ${String(projectId)}`)
+      if (allowed === null) {
+        await client.query(
+          'DELETE FROM harness.model_project_access WHERE organization_id=$1 AND project_id=$2',
+          [this.context.organizationId, project],
+        )
+      } else {
+        // Same assignable set as the admin project list: managed, non-archived organization models.
+        await client.query(`INSERT INTO harness.model_project_access(
+          organization_id,project_id,model_id,allowed
+        )
+        SELECT $1,$2,model.id,true
+        FROM harness.model_catalog model
+        JOIN harness.model_providers provider ON provider.id=model.provider_id
+          AND provider.organization_id=model.organization_id
+        WHERE model.organization_id=$1 AND provider.source='managed' AND provider.status <> 'archived'
+        ON CONFLICT(project_id,model_id) DO UPDATE SET
+          allowed=true,updated_at=now()`, [this.context.organizationId, project])
+      }
+      await this.bumpConfigurationRevision(client)
+    })
+  }
+
   async projectOverrides(projectId: number): Promise<Array<{ provider: string; model: string; allowed: boolean }>> {
     const project = await internalProjectId(this.context.pool, this.context.organizationId, projectId)
     if (project === null) throw new Error(`unknown project ${String(projectId)}`)
@@ -932,6 +959,36 @@ export class PostgresModelGovernanceService {
       costMode,
       typeof costLimit === 'number' ? microsToDecimal(nonnegative(costLimit, 'companyCostMicrosLimit')) : null,
     ])
+  }
+
+  async projectQuota(projectId: number): Promise<ProjectQuotaView> {
+    const project = await internalProjectId(this.context.pool, this.context.organizationId, projectId)
+    if (project === null) throw new Error(`unknown project ${String(projectId)}`)
+    const quota = await this.context.pool.query<{ token_limit: string | null; company_cost_limit: string | null }>(`SELECT
+      token_limit::text,company_cost_limit::text FROM harness.project_quotas WHERE project_id=$1`, [project])
+    const projectLimits = quota.rows[0]
+    if (projectLimits !== undefined) {
+      return {
+        source: 'independent',
+        tokenLimit: projectLimits.token_limit === null ? null : safeCount(projectLimits.token_limit, 'project token limit'),
+        companyCostMicrosLimit: projectLimits.company_cost_limit === null
+          ? null
+          : decimalToMicros(projectLimits.company_cost_limit),
+      }
+    }
+    const inherited = await this.context.pool.query<{ token_limit: string | null; company_cost_limit: string | null }>(`SELECT
+      token_limit::text,company_cost_limit::text FROM harness.role_quotas
+      WHERE organization_id=$1 AND role='member'`, [this.context.organizationId])
+    const limits = inherited.rows[0]
+    return {
+      source: 'inherit',
+      tokenLimit: limits?.token_limit === null || limits?.token_limit === undefined
+        ? null
+        : safeCount(limits.token_limit, 'project token limit'),
+      companyCostMicrosLimit: limits?.company_cost_limit === null || limits?.company_cost_limit === undefined
+        ? null
+        : decimalToMicros(limits.company_cost_limit),
+    }
   }
 
   async ingest(subject: ModelUsageSubject, event: UsageEvent): Promise<{ inserted: boolean; alerts: number }> {

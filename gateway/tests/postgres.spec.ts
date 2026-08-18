@@ -1466,9 +1466,32 @@ describePg('PostgreSQL baseline', () => {
       expect(await governance.projectOverrides(project.id)).toEqual([
         { provider: 'org-runtime', model: 'chat', allowed: true },
       ])
+      await governance.upsertModel({
+        provider: 'org-runtime',
+        model: 'reasoner',
+        displayName: 'Reasoner',
+        enabled: true,
+        adminAllowed: true,
+        userAllowed: false,
+        inputMicrosPerMillion: 0,
+        outputMicrosPerMillion: 0,
+        cacheReadMicrosPerMillion: 0,
+        cacheWriteMicrosPerMillion: 0,
+      })
+      await governance.setAllProjectAccess(project.id, true)
+      expect(await governance.projectOverrides(project.id)).toEqual([
+        { provider: 'org-runtime', model: 'chat', allowed: true },
+        { provider: 'org-runtime', model: 'reasoner', allowed: true },
+      ])
+      await governance.setAllProjectAccess(project.id, null)
+      expect(await governance.projectOverrides(project.id)).toEqual([])
+      await governance.setProjectAccess(project.id, 'org-runtime', 'chat', true)
       expect(await governance.policyForProject(project.id)).toMatchObject({
         defaultAllowed: false,
-        models: [{ provider: 'org-runtime', model: 'chat', allowed: true }],
+        models: [
+          { provider: 'org-runtime', model: 'chat', allowed: true },
+          { provider: 'org-runtime', model: 'reasoner', allowed: false },
+        ],
       })
       const projectPolicyPath = await writeProjectModelGovernanceFile(cfg, governance, {
         kind: 'project',
@@ -1482,10 +1505,19 @@ describePg('PostgreSQL baseline', () => {
         intakeToken: string
         models: Array<{ allowed: boolean }>
       }
-      expect(projectPolicy).toMatchObject({ defaultAllowed: false, userDeclaredAllowed: false, models: [{ allowed: true }] })
+      expect(projectPolicy).toMatchObject({
+        defaultAllowed: false,
+        userDeclaredAllowed: false,
+        models: [{ allowed: true }, { allowed: false }],
+      })
       expect(await governance.subjectForIntakeToken(projectPolicy.intakeToken))
         .toEqual({ kind: 'project', id: project.id })
       await governance.setQuota('project', String(project.id), 10, 100)
+      expect(await governance.projectQuota(project.id)).toEqual({
+        source: 'independent',
+        tokenLimit: 10,
+        companyCostMicrosLimit: 100,
+      })
       const projectIntakeToken = await governance.issueIntakeToken({ kind: 'project', id: project.id })
       expect(await governance.subjectForIntakeToken(projectIntakeToken))
         .toEqual({ kind: 'project', id: project.id })
@@ -1501,11 +1533,21 @@ describePg('PostgreSQL baseline', () => {
         alerts: [{ metric: 'tokens', threshold: 80 }],
       })
       await governance.setQuota('project', String(project.id), 'inherit', 'inherit')
+      expect(await governance.projectQuota(project.id)).toEqual({
+        source: 'inherit',
+        tokenLimit: 10,
+        companyCostMicrosLimit: 100,
+      })
       expect(await governance.summary({ kind: 'project', id: project.id })).toMatchObject({
         tokenLimit: 10,
         companyCostMicrosLimit: 100,
       })
       await governance.setQuota('project', String(project.id), null, null)
+      expect(await governance.projectQuota(project.id)).toEqual({
+        source: 'independent',
+        tokenLimit: null,
+        companyCostMicrosLimit: null,
+      })
       expect(await governance.summary({ kind: 'project', id: project.id })).toMatchObject({
         tokenLimit: null,
         companyCostMicrosLimit: null,

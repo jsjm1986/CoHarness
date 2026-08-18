@@ -419,15 +419,30 @@ async function dispatch(
     if (method === 'PUT') {
       const input = parseObject(body)
       const projectId = Number(input.projectId)
-      const provider = str(input, 'provider')
-      const model = str(input, 'model')
       const allowed = input.allowed
-      if (!Number.isSafeInteger(projectId) || provider === undefined || model === undefined
-        || (allowed !== null && typeof allowed !== 'boolean')) {
-        sendError(res, 400, 'projectId, provider, model and boolean|null allowed required')
+      if (!Number.isSafeInteger(projectId) || (allowed !== null && typeof allowed !== 'boolean')) {
+        sendError(res, 400, 'projectId and boolean|null allowed required')
         return true
       }
       if (await deps.projects.getById(projectId) === null) { sendError(res, 404, 'project not found'); return true }
+      if (input.all === true) {
+        if (Object.hasOwn(input, 'provider') || Object.hasOwn(input, 'model')
+          || (allowed !== true && allowed !== null)) {
+          sendError(res, 400, 'all assignment takes only projectId and true|null allowed')
+          return true
+        }
+        await deps.governance.setAllProjectAccess(projectId, allowed)
+        await applyModelGovernanceToProject(deps, projectId)
+        await write('admin.models.project-access-all', { projectId, allowed })
+        sendNoContent(res)
+        return true
+      }
+      const provider = str(input, 'provider')
+      const model = str(input, 'model')
+      if (provider === undefined || model === undefined) {
+        sendError(res, 400, 'projectId, provider, model and boolean|null allowed required')
+        return true
+      }
       await deps.governance.setProjectAccess(projectId, provider, model, allowed as boolean | null)
       await applyModelGovernanceToProject(deps, projectId)
       await write('admin.models.project-access', { projectId, provider, model, allowed })
@@ -544,7 +559,15 @@ async function dispatch(
     const projectId = Number(projectIdPath[1])
     const project = await deps.projects.getById(projectId)
     if (project === null) { sendError(res, 404, 'project not found'); return true }
-    if (method === 'GET') { sendJson(res, 200, project); return true }
+    if (method === 'GET') {
+      sendJson(res, 200, {
+        ...project,
+        quota: deps.governance === undefined
+          ? { source: 'inherit', tokenLimit: null, companyCostMicrosLimit: null }
+          : await deps.governance.projectQuota(projectId),
+      })
+      return true
+    }
     if (method === 'PATCH') {
       const name = str(parseObject(body), 'name')
       if (name === undefined) { sendError(res, 400, 'name required'); return true }

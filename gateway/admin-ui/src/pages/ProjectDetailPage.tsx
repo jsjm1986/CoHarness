@@ -12,6 +12,7 @@ import {
   removeMember,
   renameProject,
   setMember,
+  setAllProjectModelAccess,
   setProjectModelAccess,
   setQuota,
   type AdminUser,
@@ -19,6 +20,7 @@ import {
   type ModelGovernanceRow,
   type ModelProviderRow,
   type ProjectDetail,
+  type ProjectQuota,
   type UsageSummary,
 } from '../api.ts'
 import {
@@ -37,7 +39,7 @@ import {
 import { formatCompact, formatMoney, Metric, QuotaSummary } from '../components/usage.tsx'
 
 type MatrixMode = GrantMode | 'none'
-type ProjectQuotaSource = 'choose' | 'inherit' | 'independent'
+type ProjectQuotaSource = 'inherit' | 'independent'
 type ProjectLimitMode = 'unlimited' | 'custom'
 
 function currentMonth(): string {
@@ -65,7 +67,7 @@ export function ProjectDetailPage() {
   const [quotaOpen, setQuotaOpen] = useState(false)
   const [quotaSaving, setQuotaSaving] = useState(false)
   const [quotaError, setQuotaError] = useState('')
-  const [quotaSource, setQuotaSource] = useState<ProjectQuotaSource>('choose')
+  const [quotaSource, setQuotaSource] = useState<ProjectQuotaSource>('independent')
   const [tokenMode, setTokenMode] = useState<ProjectLimitMode>('unlimited')
   const [costMode, setCostMode] = useState<ProjectLimitMode>('unlimited')
   const [tokenLimit, setTokenLimit] = useState('')
@@ -152,6 +154,16 @@ export function ProjectDetailPage() {
       return provider?.source === 'managed' && provider.status !== 'archived'
     })
   }, [modelProviders, models])
+  const assignableModelKeys = useMemo(() => new Set(assignableModels.map(modelKey)), [assignableModels])
+  const assignedModelCount = useMemo(() => {
+    let count = 0
+    for (const key of modelAssignments) if (assignableModelKeys.has(key)) count += 1
+    return count
+  }, [assignableModelKeys, modelAssignments])
+  const assignedModels = useMemo(
+    () => assignableModels.filter(model => modelAssignments.has(modelKey(model))),
+    [assignableModels, modelAssignments],
+  )
 
   async function applyMode(userId: number, mode: GrantMode) {
     setPending(`member:${userId}`)
@@ -192,6 +204,18 @@ export function ProjectDetailPage() {
     }
   }
 
+  async function changeAllModelAssignments(assigned: boolean) {
+    setModelPending('all')
+    try {
+      await setAllProjectModelAccess(projectId, assigned ? true : null)
+      await reloadModelAccess()
+    } catch (cause) {
+      setModelsError(messageFrom(cause))
+    } finally {
+      setModelPending('')
+    }
+  }
+
   async function onRename(event: FormEvent) {
     event.preventDefault()
     setPending('rename')
@@ -218,7 +242,7 @@ export function ProjectDetailPage() {
   }
 
   function openQuotaDialog() {
-    setQuotaSource('choose')
+    setQuotaSource('independent')
     setTokenMode('unlimited')
     setCostMode('unlimited')
     setTokenLimit('')
@@ -229,10 +253,6 @@ export function ProjectDetailPage() {
 
   async function saveQuota(event: FormEvent) {
     event.preventDefault()
-    if (quotaSource === 'choose') {
-      setQuotaError('请选择项目额度来源')
-      return
-    }
     setQuotaSaving(true)
     setQuotaError('')
     try {
@@ -258,7 +278,7 @@ export function ProjectDetailPage() {
         companyCostMicrosLimit: nextCostLimit,
       })
       setQuotaOpen(false)
-      await reloadUsage()
+      await Promise.all([reload(), reloadUsage()])
     } catch (cause) {
       setQuotaError(messageFrom(cause))
     } finally {
@@ -319,10 +339,31 @@ export function ProjectDetailPage() {
                       <Definition label="缺失计量">{usage.missingUsageCalls.toLocaleString()} 次</Definition>
                     </dl>
                   </div>
-                  <div className="projectUsagePanel projectQuotaPanel">
+                  <div className="projectUsagePanel projectQuotaPanel" aria-label="生效额度">
                     <div className="projectUsagePanelHeading"><h3>生效额度</h3><span>告警不阻断调用</span></div>
                     <QuotaSummary summary={usage} />
-                    <p className="quotaEffectiveNote">这里显示当前生效值；配置时需明确选择继承普通成员额度或使用项目独立额度。</p>
+                    <p className="quotaEffectiveNote">{quotaSourceLabel(project.quota)}</p>
+                  </div>
+                  <div className="projectUsagePanel projectConfigPanel" aria-label="项目配置">
+                    <h3>项目配置</h3>
+                    <dl className="definitionGrid projectConfigDefinitions">
+                      <Definition label="额度来源">{quotaSourceLabel(project.quota)}</Definition>
+                      <Definition label="Token 额度">{formatQuotaTokens(project.quota?.tokenLimit)}</Definition>
+                      <Definition label="成本额度">{formatQuotaCost(project.quota?.companyCostMicrosLimit)}</Definition>
+                      <Definition label="路径">{project.path}</Definition>
+                      <Definition label="来源">{project.origin === 'user' ? '用户发起' : '管理员发起'}</Definition>
+                      <Definition label="所有者">{project.owner?.displayName || project.owner?.username || '组织管理'}</Definition>
+                      <Definition label="创建者">{project.createdBy?.displayName || project.createdBy?.username || '未知'}</Definition>
+                      <Definition label="成员">{`${project.memberCount} 位`}</Definition>
+                      <Definition label="模型权限">
+                        <div className="projectConfigModels">
+                          <span>{`${assignedModelCount} / ${assignableModels.length}`}</span>
+                          {assignedModels.length === 0 ? <span>未分配</span> : assignedModels.map(model => (
+                            <span className="projectConfigModel" key={modelKey(model)}>{model.displayName}</span>
+                          ))}
+                        </div>
+                      </Definition>
+                    </dl>
                   </div>
                 </div>
               </>
@@ -331,7 +372,23 @@ export function ProjectDetailPage() {
           <Section
             className="responsiveSection"
             title="项目模型权限"
-            meta={`${modelAssignments.size} / ${assignableModels.length} 个模型已分配 · 所有成员共享`}
+            meta={`${assignedModelCount} / ${assignableModels.length} 个模型已分配 · 所有成员共享`}
+            actions={assignableModels.length === 0 && modelAssignments.size === 0 ? undefined : (
+              <div className="projectModelAccessToolbar">
+                <Button
+                  disabled={modelPending !== '' || assignableModels.length === 0 || assignedModelCount === assignableModels.length}
+                  onClick={() => { void changeAllModelAssignments(true) }}
+                >
+                  全部开启
+                </Button>
+                <Button
+                  disabled={modelPending !== '' || modelAssignments.size === 0}
+                  onClick={() => { void changeAllModelAssignments(false) }}
+                >
+                  全部关闭
+                </Button>
+              </div>
+            )}
           >
             <ErrorBanner message={modelsError} />
             {modelsLoading ? <LoadingState label="正在加载项目模型权限" /> : assignableModels.length === 0 ? (
@@ -349,7 +406,7 @@ export function ProjectDetailPage() {
                         <tr key={key}>
                           <td><ProjectModelIdentity model={model} /></td>
                           <td><StatusBadge tone={providerEnabled && model.enabled ? 'success' : 'warning'}>{providerEnabled && model.enabled ? '可用' : '暂不可用'}</StatusBadge></td>
-                          <td><Switch label={assignedToProject ? '已分配' : '未分配'} checked={assignedToProject} disabled={modelPending === key} onChange={value => { void changeModelAssignment(model, value) }} /></td>
+                          <td><Switch label={assignedToProject ? '已分配' : '未分配'} checked={assignedToProject} disabled={modelPending !== ''} onChange={value => { void changeModelAssignment(model, value) }} /></td>
                         </tr>
                       )
                     })}</tbody>
@@ -367,7 +424,7 @@ export function ProjectDetailPage() {
                           <StatusBadge tone={providerEnabled && model.enabled ? 'success' : 'warning'}>{providerEnabled && model.enabled ? '可用' : '暂不可用'}</StatusBadge>
                         </div>
                         <div className="mobileItemBody">
-                          <Switch label={assignedToProject ? '已分配给项目' : '未分配给项目'} checked={assignedToProject} disabled={modelPending === key} onChange={value => { void changeModelAssignment(model, value) }} />
+                          <Switch label={assignedToProject ? '已分配给项目' : '未分配给项目'} checked={assignedToProject} disabled={modelPending !== ''} onChange={value => { void changeModelAssignment(model, value) }} />
                         </div>
                       </article>
                     )
@@ -433,7 +490,7 @@ export function ProjectDetailPage() {
         footer={(
           <>
             <Button type="button" disabled={quotaSaving} onClick={() => setQuotaOpen(false)}>取消</Button>
-            <Button type="submit" form="project-quota-form" variant="primary" loading={quotaSaving} disabled={quotaSource === 'choose'}>保存额度</Button>
+            <Button type="submit" form="project-quota-form" variant="primary" loading={quotaSaving}>保存额度</Button>
           </>
         )}
       >
@@ -459,7 +516,7 @@ export function ProjectDetailPage() {
             </div>
           ) : (
             <div className="quotaModeNote projectQuotaModeNote">
-              {quotaSource === 'inherit' ? '此项目将使用普通成员角色的月度额度。' : '请先选择此项目的额度来源。'}
+              此项目将使用普通成员角色的月度额度。
             </div>
           )}
         </form>
@@ -570,6 +627,18 @@ function ProjectQuotaEditor({ label, mode, value, inputLabel, inputMode, onMode,
 
 function Definition({ label, children }: { label: string; children: React.ReactNode }) {
   return <div className="definitionRow"><dt>{label}</dt><dd>{children}</dd></div>
+}
+
+function quotaSourceLabel(quota: ProjectQuota | undefined): string {
+  return quota?.source === 'independent' ? '项目独立额度' : '继承普通成员额度'
+}
+
+function formatQuotaTokens(limit: number | null | undefined): string {
+  return limit === null || limit === undefined ? '不限' : limit.toLocaleString('zh-CN')
+}
+
+function formatQuotaCost(limit: number | null | undefined): string {
+  return limit === null || limit === undefined ? '不限' : formatMoney(limit, 2)
 }
 
 function changeMode(

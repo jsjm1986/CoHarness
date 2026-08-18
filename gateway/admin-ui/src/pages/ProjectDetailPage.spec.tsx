@@ -17,6 +17,7 @@ vi.mock('../api.ts', () => ({
   renameProject: vi.fn(),
   setMember: vi.fn(),
   setProjectModelAccess: vi.fn(),
+  setAllProjectModelAccess: vi.fn(),
   setQuota: vi.fn(),
 }))
 
@@ -121,6 +122,7 @@ describe('ProjectDetailPage', () => {
       overrides: [{ provider: 'org-primary', model: 'deepseek-chat', allowed: true }],
     })
     vi.mocked(api.setProjectModelAccess).mockResolvedValue(undefined)
+    vi.mocked(api.setAllProjectModelAccess).mockResolvedValue(undefined)
     vi.mocked(api.setQuota).mockResolvedValue(undefined)
   })
 
@@ -132,13 +134,66 @@ describe('ProjectDetailPage', () => {
     await waitFor(() => expect(api.getProjectUsage).toHaveBeenLastCalledWith(7, '2026-07'))
   })
 
-  it('requires an explicit source and can restore inherited project quotas', async () => {
+  it('shows stored quota source and a readable project configuration summary', async () => {
+    vi.mocked(api.getProject).mockResolvedValue({
+      ...project,
+      origin: 'admin',
+      owner: { id: 1, username: 'alice', displayName: 'Alice' },
+      createdBy: { id: 2, username: 'boss', displayName: 'Boss' },
+      quota: { source: 'independent', tokenLimit: 10_000, companyCostMicrosLimit: 5_000_000 },
+    })
+    renderPage()
+    const config = within(await screen.findByLabelText('项目配置'))
+    expect(within(screen.getByLabelText('生效额度')).getByText('项目独立额度')).toBeTruthy()
+    expect(config.getByText('项目独立额度')).toBeTruthy()
+    expect(config.getByText('10,000')).toBeTruthy()
+    expect(config.getByText('¥5.00')).toBeTruthy()
+    expect(config.getByText('/srv/people')).toBeTruthy()
+    expect(config.getByText('管理员发起')).toBeTruthy()
+    expect(config.getByText('Alice')).toBeTruthy()
+    expect(config.getByText('Boss')).toBeTruthy()
+    expect(config.getByText('1 位')).toBeTruthy()
+    expect(config.getByText('1 / 2')).toBeTruthy()
+    expect(config.getByText('DeepSeek Chat')).toBeTruthy()
+    expect(config.queryByText('DeepSeek Reasoner')).toBeNull()
+  })
+
+  it('labels inherited project quotas in the usage and configuration panels', async () => {
+    vi.mocked(api.getProject).mockResolvedValue({
+      ...project,
+      quota: { source: 'inherit', tokenLimit: 8_000, companyCostMicrosLimit: null },
+    })
+    renderPage()
+    const config = within(await screen.findByLabelText('项目配置'))
+    expect(within(screen.getByLabelText('生效额度')).getByText('继承普通成员额度')).toBeTruthy()
+    expect(config.getByText('继承普通成员额度')).toBeTruthy()
+    expect(config.getByText('8,000')).toBeTruthy()
+    expect(config.getByText('不限')).toBeTruthy()
+  })
+
+  it('defaults to independent unlimited quotas', async () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByRole('heading', { name: 'People' })
     await user.click(screen.getByRole('button', { name: '配置额度' }))
     const dialog = within(screen.getByRole('dialog', { name: '配置项目额度' }))
-    expect((dialog.getByRole('button', { name: '保存额度' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((dialog.getByLabelText(/项目独立额度/) as HTMLInputElement).checked).toBe(true)
+    expect((dialog.getByRole('button', { name: '保存额度' }) as HTMLButtonElement).disabled).toBe(false)
+    await user.click(dialog.getByRole('button', { name: '保存额度' }))
+    await waitFor(() => expect(api.setQuota).toHaveBeenCalledWith({
+      subjectType: 'project',
+      subjectId: '7',
+      tokenLimit: null,
+      companyCostMicrosLimit: null,
+    }))
+  })
+
+  it('can restore inherited project quotas', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByRole('heading', { name: 'People' })
+    await user.click(screen.getByRole('button', { name: '配置额度' }))
+    const dialog = within(screen.getByRole('dialog', { name: '配置项目额度' }))
     await user.click(dialog.getByLabelText(/继承普通成员额度/))
     await user.click(dialog.getByRole('button', { name: '保存额度' }))
     await waitFor(() => expect(api.setQuota).toHaveBeenCalledWith({
@@ -155,7 +210,6 @@ describe('ProjectDetailPage', () => {
     await screen.findByRole('heading', { name: 'People' })
     await user.click(screen.getByRole('button', { name: '配置额度' }))
     const dialog = within(screen.getByRole('dialog', { name: '配置项目额度' }))
-    await user.click(dialog.getByLabelText(/项目独立额度/))
     const modeSelects = dialog.getAllByLabelText('额度模式')
     await user.selectOptions(modeSelects[0]!, 'custom')
     await user.selectOptions(modeSelects[1]!, 'custom')
@@ -188,5 +242,52 @@ describe('ProjectDetailPage', () => {
     await waitFor(() => expect(api.setProjectModelAccess).toHaveBeenCalledWith(
       7, 'org-primary', 'deepseek-chat', null,
     ))
+  })
+
+  it('assigns every project model in one write', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.getProjectModelAccess).mockResolvedValue({
+      effective: { version: 1, defaultAllowed: false, models: [] },
+      overrides: [
+        { provider: 'org-primary', model: 'deepseek-chat', allowed: true },
+        { provider: 'org-archived', model: 'legacy', allowed: true },
+      ],
+    })
+    renderPage()
+    const enableAll = await screen.findByRole('button', { name: '全部开启' }) as HTMLButtonElement
+    expect(screen.getByText('1 / 2 个模型已分配 · 所有成员共享')).toBeTruthy()
+    expect(enableAll.disabled).toBe(false)
+    vi.mocked(api.getProjectModelAccess).mockResolvedValue({
+      effective: { version: 1, defaultAllowed: false, models: [] },
+      overrides: [
+        { provider: 'org-primary', model: 'deepseek-chat', allowed: true },
+        { provider: 'org-primary', model: 'deepseek-reasoner', allowed: true },
+        { provider: 'org-archived', model: 'legacy', allowed: true },
+      ],
+    })
+    await user.click(enableAll)
+    await waitFor(() => expect(api.setAllProjectModelAccess).toHaveBeenCalledWith(7, true))
+    await waitFor(() => expect(enableAll.disabled).toBe(true))
+  })
+
+  it('clears every project model in one write', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.getProjectModelAccess).mockResolvedValue({
+      effective: { version: 1, defaultAllowed: false, models: [] },
+      overrides: [
+        { provider: 'org-primary', model: 'deepseek-chat', allowed: true },
+        { provider: 'org-primary', model: 'deepseek-reasoner', allowed: true },
+      ],
+    })
+    renderPage()
+    const disableAll = await screen.findByRole('button', { name: '全部关闭' }) as HTMLButtonElement
+    expect((screen.getByRole('button', { name: '全部开启' }) as HTMLButtonElement).disabled).toBe(true)
+    vi.mocked(api.getProjectModelAccess).mockResolvedValue({
+      effective: { version: 1, defaultAllowed: false, models: [] },
+      overrides: [],
+    })
+    await user.click(disableAll)
+    await waitFor(() => expect(api.setAllProjectModelAccess).toHaveBeenCalledWith(7, null))
+    await waitFor(() => expect(disableAll.disabled).toBe(true))
   })
 })

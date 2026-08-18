@@ -91,6 +91,23 @@ describe('admin JSON API', () => {
     expect(await forbidden.json()).toEqual({ error: 'forbidden' })
   })
 
+  it('includes inherited project quota configuration on project detail', async () => {
+    const { base, cookie, root } = await setup()
+    const shared = join(root, 'shared-quota'); mkdirSync(shared)
+    const created = await fetch(`${base}/admin/api/projects`, {
+      method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Quota', path: shared }),
+    })
+    const project = await created.json() as { id: number }
+    const detail = await fetch(`${base}/admin/api/projects/${project.id}`, { headers: { cookie } })
+    expect(detail.status).toBe(200)
+    expect(await detail.json()).toMatchObject({
+      id: project.id,
+      name: 'Quota',
+      quota: { source: 'inherit', tokenLimit: null, companyCostMicrosLimit: null },
+    })
+  })
+
   it('returns a stable error when a project directory is missing', async () => {
     const { base, cookie, root } = await setup()
     const response = await fetch(`${base}/admin/api/projects`, {

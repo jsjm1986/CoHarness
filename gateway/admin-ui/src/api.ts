@@ -22,8 +22,15 @@ export type Project = {
 
 export type GrantMode = 'ro' | 'rw'
 
+export type ProjectQuota = {
+  source: 'inherit' | 'independent'
+  tokenLimit: number | null
+  companyCostMicrosLimit: number | null
+}
+
 export type ProjectDetail = Project & {
   members: Array<{ userId: number; username: string; mode: GrantMode }>
+  quota?: ProjectQuota
 }
 
 export type ProjectDirectoryListing = {
@@ -322,6 +329,12 @@ export function setProjectModelAccess(
 ): Promise<void> {
   return request('/admin/api/project-model-access', {
     method: 'PUT', body: JSON.stringify({ projectId, provider, model, allowed }),
+  })
+}
+
+export function setAllProjectModelAccess(projectId: number, allowed: true | null): Promise<void> {
+  return request('/admin/api/project-model-access', {
+    method: 'PUT', body: JSON.stringify({ projectId, all: true, allowed }),
   })
 }
 

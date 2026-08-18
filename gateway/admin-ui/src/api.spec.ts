@@ -9,6 +9,7 @@ import {
   patchUser,
   saveModelProvider,
   setMember,
+  setAllProjectModelAccess,
   setProjectModelAccess,
   setQuota,
 } from './api.ts'
@@ -116,11 +117,15 @@ describe('admin api URLs', () => {
       .mockResolvedValueOnce(jsonOk(undefined, 204))
       .mockResolvedValueOnce(jsonOk({ effective: {}, overrides: [] }))
       .mockResolvedValueOnce(jsonOk(undefined, 204))
+      .mockResolvedValueOnce(jsonOk(undefined, 204))
+      .mockResolvedValueOnce(jsonOk(undefined, 204))
     vi.stubGlobal('fetch', fetchMock)
     await listModelProviders()
     await saveModelProvider(provider)
     await getProjectModelAccess(11)
     await setProjectModelAccess(11, 'org-primary', 'deepseek-chat', true)
+    await setAllProjectModelAccess(11, true)
+    await setAllProjectModelAccess(11, null)
     expect(fetchMock.mock.calls).toEqual([
       ['/admin/api/model-providers', {
         credentials: 'same-origin',
@@ -139,6 +144,18 @@ describe('admin api URLs', () => {
       ['/admin/api/project-model-access', {
         method: 'PUT',
         body: JSON.stringify({ projectId: 11, provider: 'org-primary', model: 'deepseek-chat', allowed: true }),
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json' },
+      }],
+      ['/admin/api/project-model-access', {
+        method: 'PUT',
+        body: JSON.stringify({ projectId: 11, all: true, allowed: true }),
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json' },
+      }],
+      ['/admin/api/project-model-access', {
+        method: 'PUT',
+        body: JSON.stringify({ projectId: 11, all: true, allowed: null }),
         credentials: 'same-origin',
         headers: { 'content-type': 'application/json' },
       }],

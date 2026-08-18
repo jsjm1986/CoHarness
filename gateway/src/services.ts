@@ -19,6 +19,7 @@ import type {
   RuntimeModelPolicy,
   UsageEvent,
   UsageSummary,
+  ProjectQuotaView,
 } from './model-governance.ts'
 import type {
   EffectiveGrant,
@@ -137,6 +138,7 @@ export interface GatewayModelGovernanceService {
   setUserAccess(userId: number, provider: string, model: string, allowed: boolean | null): Awaitable<void>
   userOverrides(userId: number): Awaitable<Array<{ provider: string; model: string; allowed: boolean }>>
   setProjectAccess(projectId: number, provider: string, model: string, allowed: boolean | null): Awaitable<void>
+  setAllProjectAccess(projectId: number, allowed: true | null): Awaitable<void>
   projectOverrides(projectId: number): Awaitable<Array<{ provider: string; model: string; allowed: boolean }>>
   policyFor(user: UserRow): Awaitable<RuntimeModelPolicy>
   policyForProject(projectId: number): Awaitable<RuntimeModelPolicy>
@@ -162,6 +164,12 @@ export interface GatewayModelGovernanceService {
   ): Awaitable<void>
   ingest(subject: ModelUsageSubject, event: UsageEvent): Awaitable<{ inserted: boolean; alerts: number }>
   summary(subject: ModelUsageSubject, month?: string): Awaitable<UsageSummary>
+  /**
+   * Stored project quota source and the limits currently in force for that source.
+   * @param projectId - public project id
+   * @returns inherit with ordinary-member limits when no project quota row exists; otherwise the stored independent limits
+   */
+  projectQuota(projectId: number): Awaitable<ProjectQuotaView>
 }
 
 /** Instance lifecycle operations used by HTTP, proxy, and policy handlers. */

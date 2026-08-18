@@ -1558,6 +1558,13 @@ a {
   gap: 8px;
 }
 
+.projectModelAccessToolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .projectUsageSection > .errorBanner {
   margin: 16px 16px 0;
 }
@@ -1612,8 +1619,44 @@ a {
 
 .quotaEffectiveNote {
   margin: 12px 0 0;
-  color: var(--text-tertiary);
-  font-size: 11px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.projectConfigPanel {
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--border);
+  border-left: none;
+}
+
+.projectConfigDefinitions {
+  margin: 14px 0 0;
+}
+
+.projectConfigDefinitions .definitionRow:last-child {
+  grid-column: 1 / -1;
+}
+
+.projectConfigModels {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.projectConfigModel {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 2px 8px;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .projectQuotaSource {
@@ -2077,6 +2120,7 @@ a {
     min-height: 42px;
     padding: 0 2px 10px;
     border-bottom: none;
+    flex-wrap: wrap;
   }
 
   .responsiveSection .mobileList {
@@ -2120,6 +2164,10 @@ a {
 
   .projectUsagePanel + .projectUsagePanel {
     border-top: 1px solid var(--border);
+    border-left: none;
+  }
+
+  .projectConfigPanel {
     border-left: none;
   }
 }
@@ -2188,8 +2236,13 @@ a {
   }
 
   .projectUsageSection .sectionActions,
-  .projectUsageToolbar {
+  .projectUsageToolbar,
+  .projectModelAccessToolbar {
     width: 100%;
+  }
+
+  .projectModelAccessToolbar .button {
+    flex: 1;
   }
 
   .projectUsageToolbar .monthPicker {
