@@ -43,12 +43,6 @@ function participantLabel(
   )
 }
 
-function formatParticipantPreview(participants: ConversationParticipant[]) {
-  const visibleParticipants = participants.slice(0, 3)
-  const overflowCount = participants.length - visibleParticipants.length
-  return { visibleParticipants, overflowCount }
-}
-
 /**
  * Render current root visibility, creator, participants, and visibility controls.
  * @param props - composed session-header slot props.
@@ -156,66 +150,44 @@ export function ConversationShareAction({
   )
 
   const triggerTitle = access.canManage ? t('conversation.aria') : t('conversation.manageDenied')
-  const { visibleParticipants, overflowCount } = formatParticipantPreview(participants)
   return (
-    <div className={css.shareAction}>
-      <Menu
-        open={open}
-        onClose={() => { setOpen(false) }}
-        items={entries}
-        selectedId={`visibility:${access.visibility}`}
-        onSelect={(id) => {
-          setOpen(false)
-          void setVisibility(id.slice('visibility:'.length) as CollaborationVisibility)
-        }}
-        align="start"
-        portal
-        anchor={(
-          <button
-            type="button"
-            className={css.trigger}
-            aria-label={t('conversation.aria')}
-            aria-haspopup="menu"
-            aria-expanded={open}
-            title={triggerTitle}
-            onClick={() => {
-              setOpen((value) => {
-                if (!value) void refresh()
-                return !value
-              })
-            }}
-          >
-            {access.visibility === 'project'
-              ? <IconGlobeOutline14 size={14} />
-              : <IconUserOutline16 size={14} />}
-            <span className={css.triggerLabel}>
-              {access.visibility === 'project' ? t('visibility.project') : t('visibility.private')}
-            </span>
-            {participants.length > 0 && <span className={css.count}>{participants.length}</span>}
-            <IconChevronDownOutline14 className={css.chevron} />
-          </button>
-        )}
-      />
-      <div className={css.participantMetaPanel}>
-        <div className={css.participantMetaHeader}>
-          <span className={css.participantMetaTitle}>
-            {t('conversation.participants', { count: participants.length })}
+    <Menu
+      className={css.shareAction ?? ''}
+      open={open}
+      onClose={() => { setOpen(false) }}
+      items={entries}
+      selectedId={`visibility:${access.visibility}`}
+      onSelect={(id) => {
+        setOpen(false)
+        void setVisibility(id.slice('visibility:'.length) as CollaborationVisibility)
+      }}
+      align="start"
+      portal
+      anchor={(
+        <button
+          type="button"
+          className={css.trigger}
+          aria-label={t('conversation.aria')}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          title={triggerTitle}
+          onClick={() => {
+            setOpen((value) => {
+              if (!value) void refresh()
+              return !value
+            })
+          }}
+        >
+          {access.visibility === 'project'
+            ? <IconGlobeOutline14 size={14} />
+            : <IconUserOutline16 size={14} />}
+          <span className={css.triggerLabel}>
+            {access.visibility === 'project' ? t('visibility.project') : t('visibility.private')}
           </span>
-        </div>
-        {participants.length === 0 ? (
-          <span className={css.participantMetaEmpty}>{t('conversation.noParticipants')}</span>
-        ) : (
-          <div className={css.participantList}>
-            {visibleParticipants.map(participant => (
-              <span key={participant.userId} className={css.participantChip}>
-                <span className={css.participantName}>{participant.displayName}</span>
-                <span className={css.participantMetaCount}>{t('conversation.contributions', { count: participant.contributionCount })}</span>
-              </span>
-            ))}
-            {overflowCount > 0 && <span className={css.participantMore}>+{overflowCount}</span>}
-          </div>
-        )}
-      </div>
-    </div>
+          {participants.length > 0 && <span className={css.count}>{participants.length}</span>}
+          <IconChevronDownOutline14 className={css.chevron} />
+        </button>
+      )}
+    />
   )
 }

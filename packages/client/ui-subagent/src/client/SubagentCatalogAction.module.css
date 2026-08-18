@@ -1,5 +1,6 @@
 .root {
   position: relative;
+  flex: none;
 }
 
 .trigger {
@@ -14,6 +15,7 @@
   color: var(--dsw-alias-label-tertiary);
   font-size: 12px;
   line-height: 18px;
+  white-space: nowrap;
   cursor: pointer;
 }
 
