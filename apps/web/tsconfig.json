@@ -50,6 +50,7 @@
     "tests/cold-blank-session.e2e.ts",
     "tests/responsive-shell.e2e.ts",
     "tests/project-collaboration.e2e.ts",
+    "tests/document-manager.e2e.ts",
     "tests/chat-sender-attribution.e2e.ts",
     "tests/stats-paged-history.e2e.ts",
     "tests/lossless-history-wire.e2e.ts",

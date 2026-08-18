@@ -42,7 +42,11 @@ function makeClient() {
   const documents = [doc()]
   return {
     list: vi.fn(async () => ({ documents, limits })),
-    upload: vi.fn(async () => doc()),
+    upload: vi.fn(async (
+      _file: File,
+      _signal?: AbortSignal,
+      _onProgress?: (loaded: number, total: number) => void,
+    ) => doc()),
     remove: vi.fn(async () => undefined),
     contentUrl: vi.fn((id: string) => `/api/documents/content?id=${encodeURIComponent(id)}`),
   }
@@ -135,7 +139,11 @@ describe('DocumentsModal', () => {
     const client = makeClient()
     let release: () => void = () => {}
     const held = new Promise<void>((resolve) => { release = resolve })
-    client.upload.mockImplementation(async (_file, _signal, onProgress?: (loaded: number, total: number) => void) => {
+    client.upload.mockImplementation(async (
+      _file: File,
+      _signal?: AbortSignal,
+      onProgress?: (loaded: number, total: number) => void,
+    ) => {
       onProgress?.(10, 0)
       onProgress?.(40, 80)
       await held
