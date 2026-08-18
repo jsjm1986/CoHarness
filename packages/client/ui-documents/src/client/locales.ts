@@ -1,0 +1,73 @@
+/** Locale namespace key registered by the ui-documents client plugin. */
+export const NS = 'documents'
+
+/** Simplified-Chinese dictionary; the source of truth for the DocumentsKey union. */
+export const zh = {
+  'button.label': '文档',
+  'modal.title': '文档管理',
+  'modal.title.project': '项目文档：{name}',
+  'modal.limits': '单文件上限 {size}，每次最多 {count} 个',
+  'modal.empty': '还没有上传过文档',
+  'modal.upload': '上传文档',
+  'modal.upload.progress': '上传中…',
+  'modal.upload.error': '上传失败',
+  'modal.refresh': '刷新',
+  'modal.search': '搜索文档名称',
+  'listing.date': '上传日期',
+  'listing.name': '名称',
+  'listing.size': '大小',
+  'listing.actions': '操作',
+  'action.preview': '预览',
+  'action.download': '下载',
+  'action.delete': '删除',
+  'preview.title': '预览：{name}',
+  'preview.too.large': '文件过大，无法预览，请下载查看。',
+  'preview.not.supported': '不支持预览该类型，请下载查看。',
+  'delete.confirm.title': '确认删除',
+  'delete.confirm.message': '该文档可能已被历史会话引用，删除后相关内容将无法再读取。{projectExtra}',
+  'delete.confirm.project.extra': '项目文档对所有成员可见，删除影响所有人。',
+  'delete.confirm.button': '确认删除',
+  'delete.error': '删除失败',
+  'size.bytes': 'B',
+  'size.kb': 'KB',
+  'size.mb': 'MB',
+  'size.gb': 'GB',
+  'error.unavailable': '文档服务不可用',
+} as const
+
+/** English dictionary; every key mirrors the Simplified-Chinese source of truth. */
+export const en: Record<keyof typeof zh, string> = {
+  'button.label': 'Documents',
+  'modal.title': 'Document Manager',
+  'modal.title.project': 'Project Documents: {name}',
+  'modal.limits': 'Max {size} per file, {count} per message',
+  'modal.empty': 'No documents uploaded yet',
+  'modal.upload': 'Upload Document',
+  'modal.upload.progress': 'Uploading…',
+  'modal.upload.error': 'Upload failed',
+  'modal.refresh': 'Refresh',
+  'modal.search': 'Search document name',
+  'listing.date': 'Upload date',
+  'listing.name': 'Name',
+  'listing.size': 'Size',
+  'listing.actions': 'Actions',
+  'action.preview': 'Preview',
+  'action.download': 'Download',
+  'action.delete': 'Delete',
+  'preview.title': 'Preview: {name}',
+  'preview.too.large': 'File too large to preview. Please download instead.',
+  'preview.not.supported': 'Preview not supported for this type. Please download instead.',
+  'delete.confirm.title': 'Confirm Deletion',
+  'delete.confirm.message': 'This document may be referenced by conversation history. After deletion, its content will no longer be readable. {projectExtra}',
+  'delete.confirm.project.extra': 'Project documents are visible to all members; deletion affects everyone.',
+  'delete.confirm.button': 'Confirm Delete',
+  'delete.error': 'Deletion failed',
+  'size.bytes': 'B',
+  'size.kb': 'KB',
+  'size.mb': 'MB',
+  'size.gb': 'GB',
+  'error.unavailable': 'Document service unavailable',
+}
+
+/** Union of every locale key defined for the document manager. */
+export type DocumentsKey = keyof typeof zh

@@ -217,6 +217,10 @@
     - id: ui-collaboration
       name: '@deepseek-ai/dsh-client-ui-collaboration'
 
+    # Browse, preview, upload, and delete documents in the current runtime scope.
+    - id: ui-documents
+      name: '@deepseek-ai/dsh-client-ui-documents'
+
     # Tool call tree, generic fallback, and keyed business Tool views.
     - id: ui-tool
       name: '@deepseek-ai/dsh-client-ui-tool'
