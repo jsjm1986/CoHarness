@@ -8,7 +8,7 @@ import { mkdtemp, readFile, realpath, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
-import type { Agent } from '@deepseek-ai/dsh-agent'
+import type { Agent, AgentOptions } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import SandboxedFileSystem from '@deepseek-ai/dsh-fs-sandbox'
@@ -54,12 +54,13 @@ async function setupWalled(script: Script): Promise<{ ctx: Context; parent: Agen
   return { ctx, parent }
 }
 
-function spawnRequest(parent: Agent) {
+function spawnRequest(parent: Agent, agentOptions?: AgentOptions) {
   return {
     label: 'child task',
     prompt: [{ type: 'text' as const, text: 'child task' }],
     parent,
     signal: new AbortController().signal,
+    ...agentOptions === undefined ? {} : { agentOptions },
     descriptor: snapshotSubagentDescriptor({
       mode: 'one-shot',
       provider: 'spawn',
@@ -77,6 +78,37 @@ function toolResultTexts(agent: Agent): string[] {
       .map(block => block.text)
       .join(''))
 }
+
+describe('in-process model inheritance', () => {
+  it('inherits the latest logged parent route and still honors an explicit child override', async () => {
+    const script: Script = [textResponse('child done'), textResponse('override done')]
+    const { parent } = await setupWalled(script)
+    parent.session.append('request/header', {
+      header: { config: { provider: 'mock', model: 'current-model' } },
+      reason: 'initial',
+    })
+
+    const run = await startInProcessRun(spawnRequest(parent), {})
+    try {
+      await run.result
+      const child = run.localAgent as Agent
+      expect(child.options).toMatchObject({ provider: 'mock', model: 'current-model' })
+
+      const overridden = await startInProcessRun(
+        spawnRequest(parent, { model: 'explicit-child-model' }),
+        {},
+      )
+      try {
+        await overridden.result
+        expect((overridden.localAgent as Agent).options.model).toBe('explicit-child-model')
+      } finally {
+        await overridden.dispose()
+      }
+    } finally {
+      await run.dispose()
+    }
+  })
+})
 
 describe('in-process policy inheritance', () => {
   it('records the parent sandbox override and the approval pin before publishing a spawn child', async () => {

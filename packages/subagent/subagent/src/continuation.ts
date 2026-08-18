@@ -408,16 +408,15 @@ export class SubagentContinuationManager {
     assertSubagentMaxDepth(request.maxDepth)
     const childId = SessionId(randomUUID())
     const childDepth = resolveChildDepth(parent, request.maxDepth)
+    const agentOptions = resolveChildAgentOptions(parent, request.agentOptions, childDepth)
     // Snapshot before any await: invalid descriptor JSON rejects the call
     // before a child exists, and the detached value is what reaches the log.
-    const agentProvider = request.agentOptions?.provider ?? parent.options.provider
-    const agentModel = request.agentOptions?.model ?? parent.options.model
     const descriptor = snapshotSubagentDescriptor({
       mode: 'continuable',
       provider: spec.provider,
       label: spec.label,
-      ...agentProvider !== undefined ? { agentProvider } : {},
-      ...agentModel !== undefined ? { agentModel } : {},
+      ...agentOptions.provider !== undefined ? { agentProvider: agentOptions.provider } : {},
+      ...agentOptions.model !== undefined ? { agentModel: agentOptions.model } : {},
       ...request.persona !== undefined ? { persona: request.persona } : {},
       ...request.toolFilter !== undefined ? { toolFilter: request.toolFilter } : {},
     })
@@ -441,7 +440,7 @@ export class SubagentContinuationManager {
         provider: spec.provider,
         parent,
         create: { seed, meta: childSessionMeta(parent, childDepth, lineageSeedLength), delegatedPolicies },
-        agentOptions: resolveChildAgentOptions(parent, request.agentOptions, childDepth),
+        agentOptions,
         composition: { persona: request.persona, toolFilter: request.toolFilter },
         signal: spec.signal,
       })
