@@ -17,6 +17,7 @@ import { newEnglishPage, saveFailureShot } from './support.ts'
 const SEED = fileURLToPath(new URL('./snapshots/seeded-history/seed.jsonl', import.meta.url))
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/project-collaboration', import.meta.url))
 const SHARING_EXPECTED = join(SNAPSHOT_DIR, 'sharing.expected.md')
+const SWITCHING_EXPECTED = join(SNAPSHOT_DIR, 'switching.expected.md')
 const READ_ONLY_EXPECTED = join(SNAPSHOT_DIR, 'read-only.expected.md')
 const HEADER_GEOMETRY_EXPECTED = join(SNAPSHOT_DIR, 'header-geometry.expected.md')
 const SHIPPED_PRESETS = fileURLToPath(new URL('../../cli/config/agent-presets', import.meta.url))
@@ -70,7 +71,9 @@ function conversationDetail(
   }
 }
 
-async function mockGateway(page: Page, mode: ProjectMode): Promise<{
+async function mockGateway(page: Page, mode: ProjectMode, options: {
+  scopeReady?: Promise<void>
+} = {}): Promise<{
   visibilityBodies: string[]
   conversationReads: string[]
   visibilityBySession: Map<string, 'project' | 'private'>
@@ -82,6 +85,7 @@ async function mockGateway(page: Page, mode: ProjectMode): Promise<{
     await route.fulfill({ json: collaborationContext(mode) })
   })
   await page.route('**/account/api/scope', async (route) => {
+    if (options.scopeReady !== undefined) await options.scopeReady
     await route.fulfill({ status: 204, body: '' })
   })
   await page.route('**/account/api/conversations/*', async (route) => {
@@ -241,6 +245,36 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     await expect.poll(() => sharing.textContent(), { timeout: 10_000 }).toContain('Only me')
   }, 60_000)
 
+  it('shows the target and live startup status while a scope switch waits', async () => {
+    page = await newEnglishPage(browser)
+    tripwire = watchConsole(page)
+    let releaseScope!: () => void
+    const scopeReady = new Promise<void>((resolve) => { releaseScope = resolve })
+    await mockGateway(page, 'rw', { scopeReady })
+    onTestFailed(() => saveFailureShot(page!, 'web-e2e-project-collaboration-switching'))
+    try {
+      await openSeededSession(page, scaffold)
+
+      const scope = page.getByRole('button', { name: 'Switch personal or project scope' })
+      await scope.waitFor({ timeout: 10_000 })
+      await scope.click()
+      await page.getByRole('menuitem', { name: /Audit platform/ }).click()
+
+      const dialog = page.getByRole('dialog', { name: 'Switching scope' })
+      await dialog.waitFor({ timeout: 10_000 })
+      expect(await dialog.textContent()).toContain("Opening 'Audit platform'")
+      await page.getByText('The target scope is still being prepared. Please keep waiting.', { exact: true })
+        .waitFor({ timeout: 10_000 })
+      await page.keyboard.press('Escape')
+      expect(await dialog.isVisible()).toBe(true)
+
+      const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
+      await compareOrRefreshGolden(SWITCHING_EXPECTED, snapshot, MODE)
+    } finally {
+      releaseScope()
+    }
+  }, 60_000)
+
   it('keeps project, preset, subagent, and utility actions on one desktop header row', async () => {
     page = await browser.newPage({ viewport: { width: 1024, height: 800 }, locale: 'en-US' })
     await page.emulateMedia({ reducedMotion: 'reduce' })
@@ -355,7 +389,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
 
   it('keeps its snapshot inventory closed', async () => {
     await assertFixtureInventory(SNAPSHOT_DIR, [
-      'header-geometry.expected.md', 'read-only.expected.md', 'sharing.expected.md',
+      'header-geometry.expected.md', 'read-only.expected.md', 'sharing.expected.md', 'switching.expected.md',
     ])
   })
 })

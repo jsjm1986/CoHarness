@@ -22,6 +22,6 @@ The UI does not assemble model requests; the owning Host Consumers determine whe
 
 ## Known Limitations and Deferred Work
 
-- **Full reload on scope change** — personal and project runtimes use independent Host connections and process state, so switching does not preserve the current page draft.
+- **Full reload on scope change** — personal and project runtimes use independent Host connections and process state, so switching does not preserve the current page draft. While the Gateway prepares the target runtime, the client shows a non-dismissible status layer with the target name, startup stage, and elapsed wait; the reload still occurs after the scope mutation succeeds.
 - **Gateway-only transport** — failed or absent `/account/api/context` hides the collaboration controls and leaves the ordinary personal Web UI available.
 - **Browser-staged creation visibility** — the next-conversation choice defaults to project-visible after a page load; it is not stored as an account preference.

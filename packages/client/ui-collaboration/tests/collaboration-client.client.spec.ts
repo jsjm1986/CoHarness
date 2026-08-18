@@ -294,16 +294,22 @@ describe('CollaborationClient', () => {
     const switchScope = vi.fn().mockReturnValueOnce(pending.promise).mockRejectedValueOnce(new Error('denied'))
     const reload = vi.fn()
     const client = new CollaborationClient(transport({ switchScope, reload }))
+    await client.load()
     const first = client.switchScope({ kind: 'project', projectId: 9 })
     await client.switchScope({ kind: 'personal' })
     expect(switchScope).toHaveBeenCalledTimes(1)
-    expect(client.getSnapshot().scopeBusy).toBe(true)
+    expect(client.getSnapshot()).toMatchObject({
+      scopeBusy: true,
+      scopeTarget: { kind: 'project', projectId: 9, projectName: '支付重构' },
+    })
     pending.resolve(undefined)
     await first
     expect(reload).toHaveBeenCalledOnce()
     expect(client.getSnapshot().scopeBusy).toBe(false)
+    expect(client.getSnapshot()).not.toHaveProperty('scopeTarget')
     await client.switchScope({ kind: 'personal' })
     expect(client.getSnapshot()).toMatchObject({ scopeBusy: false, scopeError: 'switch-failed' })
+    expect(client.getSnapshot()).not.toHaveProperty('scopeTarget')
   })
 
   it('loads, coalesces, retries, and rejects conversation detail outside project scope', async () => {
