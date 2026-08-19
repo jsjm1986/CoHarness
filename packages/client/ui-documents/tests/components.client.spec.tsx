@@ -300,7 +300,7 @@ describe('DocumentsModal', () => {
   it('opens a text preview through the modal', async () => {
     const client = makeClient()
     client.browse.mockImplementation(async () => ({
-      directoryId: '',
+      directoryId: '' as UserDocDirectoryIdType,
       directories: [],
       documents: [doc({ docId: '2026-08-17/readme.md', name: 'readme.md', bytes: 10, mediaType: 'text/markdown' })],
       limits,
@@ -323,7 +323,7 @@ describe('DocumentsModal', () => {
   it('previews an image document', async () => {
     const client = makeClient()
     client.browse.mockImplementation(async () => ({
-      directoryId: '',
+      directoryId: '' as UserDocDirectoryIdType,
       directories: [],
       documents: [doc({ docId: '2026-08-17/photo.png', name: 'photo.png', mediaType: 'image/png' })],
       limits,
@@ -339,7 +339,7 @@ describe('DocumentsModal', () => {
   it('previews a PDF document', async () => {
     const client = makeClient()
     client.browse.mockImplementation(async () => ({
-      directoryId: '',
+      directoryId: '' as UserDocDirectoryIdType,
       directories: [],
       documents: [doc()],
       limits,
@@ -355,7 +355,7 @@ describe('DocumentsModal', () => {
   it('shows a too-large fallback for text previews exceeding the limit', async () => {
     const client = makeClient()
     client.browse.mockImplementation(async () => ({
-      directoryId: '',
+      directoryId: '' as UserDocDirectoryIdType,
       directories: [],
       documents: [doc({ docId: '2026-08-17/big.txt', name: 'big.txt', bytes: 1024 * 1024, mediaType: 'text/plain' })],
       limits,
@@ -371,7 +371,7 @@ describe('DocumentsModal', () => {
   it('shows an unsupported fallback for unknown media types', async () => {
     const client = makeClient()
     client.browse.mockImplementation(async () => ({
-      directoryId: '',
+      directoryId: '' as UserDocDirectoryIdType,
       directories: [],
       documents: [doc({ docId: '2026-08-17/data.bin', name: 'data.bin', mediaType: 'application/octet-stream' })],
       limits,
@@ -387,7 +387,7 @@ describe('DocumentsModal', () => {
   it('handles a fetch error during text preview gracefully', async () => {
     const client = makeClient()
     client.browse.mockImplementation(async () => ({
-      directoryId: '',
+      directoryId: '' as UserDocDirectoryIdType,
       directories: [],
       documents: [doc({ docId: '2026-08-17/broken.txt', name: 'broken.txt', bytes: 10, mediaType: 'text/plain' })],
       limits,
@@ -408,7 +408,7 @@ describe('DocumentsModal', () => {
   it('groups multiple documents under the same date', async () => {
     const client = makeClient()
     client.browse.mockImplementation(async () => ({
-      directoryId: '',
+      directoryId: '' as UserDocDirectoryIdType,
       directories: [],
       documents: [
         doc({ docId: '2026-08-17/a.pdf', name: 'a.pdf' }),
@@ -425,7 +425,7 @@ describe('DocumentsModal', () => {
 
   it('shows no limits text when limits are absent', async () => {
     const client = makeClient()
-    client.browse.mockImplementation(async () => ({ directoryId: '', directories: [], documents: [], limits: null as unknown as UserDocLimits }))
+    client.browse.mockImplementation(async () => ({ directoryId: '' as UserDocDirectoryIdType, directories: [], documents: [], limits: null as unknown as UserDocLimits }))
     createUserDocClient.mockReturnValue(client)
     renderModal()
     await screen.findByText(t('modal.empty'))
@@ -471,11 +471,11 @@ describe('DocumentsModal', () => {
 
   it('navigates folders with breadcrumbs and uploads into the current folder', async () => {
     const client = makeClient()
-    client.browse.mockImplementation(async (directoryId = '') => directoryId === ''
-      ? { directoryId: '', directories: [directory('reports')], documents: [], limits }
+    client.browse.mockImplementation(async (directoryId: UserDocDirectoryIdType = '' as UserDocDirectoryIdType) => directoryId === ''
+      ? { directoryId: '' as UserDocDirectoryIdType, directories: [directory('reports')], documents: [], limits }
       : {
-        directoryId: 'reports',
-        parentDirectoryId: '',
+        directoryId: 'reports' as UserDocDirectoryIdType,
+        parentDirectoryId: '' as UserDocDirectoryIdType,
         directories: [],
         documents: [doc({ docId: 'reports/summary.txt', name: 'summary.txt', mediaType: 'text/plain' })],
         limits,
@@ -500,7 +500,7 @@ describe('DocumentsModal', () => {
   it('creates, renames, and deletes an empty folder', async () => {
     const client = makeClient()
     client.browse.mockImplementation(async () => ({
-      directoryId: '', directories: [directory('reports')], documents: [], limits,
+      directoryId: '' as UserDocDirectoryIdType, directories: [directory('reports')], documents: [], limits,
     }))
     createUserDocClient.mockReturnValue(client)
     renderModal()
@@ -545,7 +545,7 @@ describe('DocumentsModal', () => {
       doc({ docId: '2026-08-17/b.pdf', name: 'b.pdf' }),
     ]
     const client = makeClient()
-    client.browse.mockImplementation(async () => ({ directoryId: '', directories: [], documents, limits }))
+    client.browse.mockImplementation(async () => ({ directoryId: '' as UserDocDirectoryIdType, directories: [], documents, limits }))
     client.listDirectories.mockResolvedValue({ directories: [directory('reports')] })
     client.move
       .mockResolvedValueOnce(doc({ docId: 'reports/a.pdf', name: 'a.pdf' }))
@@ -574,7 +574,7 @@ describe('DocumentsModal', () => {
       return doc({ docId: `2026-08-${day}/f-${day}.txt`, name: `f-${day}.txt` })
     })
     const client = makeClient()
-    client.browse.mockImplementation(async () => ({ directoryId: '', directories: [], documents, limits }))
+    client.browse.mockImplementation(async () => ({ directoryId: '' as UserDocDirectoryIdType, directories: [], documents, limits }))
     createUserDocClient.mockReturnValue(client)
     renderModal()
     expect(await screen.findByText('f-21.txt')).toBeTruthy()
@@ -593,7 +593,7 @@ describe('DocumentsModal', () => {
       return doc({ docId: `2026-08-${day}/f-${day}.txt`, name: `f-${day}.txt` })
     })
     const client = makeClient()
-    client.browse.mockImplementation(async () => ({ directoryId: '', directories: [], documents, limits }))
+    client.browse.mockImplementation(async () => ({ directoryId: '' as UserDocDirectoryIdType, directories: [], documents, limits }))
     client.remove.mockImplementation(async (id?: string) => {
       documents = documents.filter(item => item.docId !== id)
     })
@@ -612,7 +612,7 @@ describe('DocumentsModal', () => {
   it('filters by type and sorts by name without date groups', async () => {
     const client = makeClient()
     client.browse.mockImplementation(async () => ({
-      directoryId: '',
+      directoryId: '' as UserDocDirectoryIdType,
       directories: [],
       documents: [
         doc({ docId: '2026-08-17/zeta.pdf', name: 'zeta.pdf', mediaType: 'application/pdf' }),
@@ -639,7 +639,7 @@ describe('DocumentsModal', () => {
   it('selects the current page from the header checkbox and batch-deletes the selection', async () => {
     const client = makeClient()
     client.browse.mockImplementation(async () => ({
-      directoryId: '',
+      directoryId: '' as UserDocDirectoryIdType,
       directories: [],
       documents: [
         doc({ docId: '2026-08-17/a.pdf', name: 'a.pdf' }),
@@ -673,7 +673,7 @@ describe('DocumentsModal', () => {
     })))
     const client = makeClient()
     client.browse.mockImplementation(async () => ({
-      directoryId: '',
+      directoryId: '' as UserDocDirectoryIdType,
       directories: [],
       documents: [
         doc({ docId: '2026-08-17/a.pdf', name: 'a.pdf' }),
@@ -694,7 +694,7 @@ describe('DocumentsModal', () => {
   it('clears a page selection and prunes it when the type filter hides those rows', async () => {
     const client = makeClient()
     client.browse.mockImplementation(async () => ({
-      directoryId: '',
+      directoryId: '' as UserDocDirectoryIdType,
       directories: [],
       documents: [
         doc({ docId: '2026-08-17/pic.png', name: 'pic.png', mediaType: 'image/png' }),
