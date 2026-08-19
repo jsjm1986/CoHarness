@@ -1,0 +1,47 @@
+- dialog "Document Manager":
+  - heading "Document Manager" [level=2]
+  - button "Close":
+    - img
+  - paragraph: Max 100.0 MB per file, 20 per message
+  - navigation "Document path":
+    - button "All Documents" [disabled]
+  - img
+  - textbox "Search document name"
+  - combobox "Type":
+    - option "All types" [selected]
+    - option "Images"
+    - option "PDF"
+    - option "Text"
+    - option "Other"
+  - combobox "Sort":
+    - option "Date newest" [selected]
+    - option "Date oldest"
+    - option "Name A–Z"
+    - option "Name Z–A"
+    - option "Size large–small"
+    - option "Size small–large"
+  - button "New Folder":
+    - img
+    - text: New Folder
+  - button "Upload Document":
+    - img
+    - text: Upload Document
+  - button "Refresh":
+    - img
+  - text: Visible only to you 21 documents
+  - list "Document Manager":
+    - checkbox "Select this page"
+    - group "Upload date 2026-08-01":
+      - text: 2026-08-01
+      - listitem:
+        - checkbox "f-01.txt"
+        - text: f-01.txt 21 B
+        - button "Preview f-01.txt": Preview
+        - button "Move f-01.txt": Move
+        - link "Download f-01.txt":
+          - /url: /api/documents/content?id=2026-08-01%2Ff-01.txt
+          - text: Download
+        - button "Delete f-01.txt": Delete
+  - button "Previous page"
+  - text: Page 2 of 2
+  - button "Next page" [disabled]

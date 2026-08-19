@@ -4,15 +4,23 @@ import { Context, Service } from '@deepseek-ai/cordis'
 import type {
   ResolveUserDocTarget,
   StoredUserDoc,
+  UserDocDirectoryListing,
+  UserDocDirectoryRef,
   UserDocLimits,
   UserDocRef,
   UserDocTarget,
 } from './types.ts'
-import type { UserDocId } from './brand.ts'
+import type { UserDocDirectoryId, UserDocId } from './brand.ts'
 
-export { UserDocId } from './brand.ts'
+export { UserDocDirectoryId, UserDocId } from './brand.ts'
 export {
   DOCUMENT_DELETE_FAILED_CODE,
+  DOCUMENT_DIRECTORY_CONFLICT_CODE,
+  DOCUMENT_DIRECTORY_NOT_EMPTY_CODE,
+  DOCUMENT_DIRECTORY_NOT_FOUND_CODE,
+  DOCUMENT_DIRECTORY_WRITE_FAILED_CODE,
+  DOCUMENT_MIGRATION_FAILED_CODE,
+  DOCUMENT_MOVE_FAILED_CODE,
   DOCUMENT_NAME_EXHAUSTED_CODE,
   DOCUMENT_NOT_FOUND_CODE,
   DOCUMENT_READ_FAILED_CODE,
@@ -22,6 +30,7 @@ export {
   DOCUMENT_TOO_LARGE_CODE,
   DOCUMENT_WRITE_FAILED_CODE,
   INVALID_DOCUMENT_NAME_CODE,
+  INVALID_DOCUMENT_DIRECTORY_CODE,
   INVALID_DOCUMENT_REF_CODE,
   TOO_MANY_DOCUMENTS_CODE,
   UserDocError,
@@ -30,6 +39,9 @@ export type { UserDocErrorCode } from './error.ts'
 export type {
   ResolveUserDocTarget,
   StoredUserDoc,
+  UserDocDirectoryId as UserDocDirectoryIdType,
+  UserDocDirectoryListing,
+  UserDocDirectoryRef,
   UserDocId as UserDocIdType,
   UserDocLimits,
   UserDocRef,
@@ -70,7 +82,7 @@ export abstract class UserDocStore extends Service {
   /**
    * Resolve one untrusted client file name to the absolute path a `save` will
    * create. Implementations sanitize the name, keep the result inside the
-   * upload root, and pick a leaf that no existing entry holds.
+   * document root, and pick a leaf that no existing entry holds.
    * @param input - client-supplied name, treated as untrusted text.
    * @returns the resolved write target.
    * @throws UserDocError when no acceptable free name can be derived from the input.
@@ -105,16 +117,73 @@ export abstract class UserDocStore extends Service {
   abstract list(signal?: AbortSignal): Promise<UserDocRef[]>
 
   /**
+   * List one directory's immediate children.
+   * @param directoryId - store-scoped directory identifier; the empty identifier selects the root.
+   * @param signal - optional cancellation for the directory scan.
+   * @returns immediate directories and documents.
+   * @throws UserDocError when the identifier is invalid or the directory is absent.
+   */
+  abstract listDirectory(
+    directoryId: UserDocDirectoryId,
+    signal?: AbortSignal,
+  ): Promise<UserDocDirectoryListing>
+
+  /**
+   * List every directory below the document root.
+   * @param signal - optional cancellation for the recursive scan.
+   * @returns directory references ordered by identifier.
+   */
+  abstract listDirectories(signal?: AbortSignal): Promise<UserDocDirectoryRef[]>
+
+  /**
+   * Create one directory below an existing parent.
+   * @param parentDirectoryId - parent directory; the empty identifier selects the root.
+   * @param name - untrusted directory leaf name.
+   * @returns the created directory reference.
+   * @throws UserDocError when the name is invalid, the parent is absent, or the target exists.
+   */
+  abstract createDirectory(
+    parentDirectoryId: UserDocDirectoryId,
+    name: string,
+  ): Promise<UserDocDirectoryRef>
+
+  /**
+   * Rename one directory within its current parent.
+   * @param directoryId - non-root directory to rename.
+   * @param name - untrusted replacement leaf name.
+   * @returns the renamed directory reference.
+   * @throws UserDocError when the directory is absent, the name is invalid, or the target exists.
+   */
+  abstract renameDirectory(directoryId: UserDocDirectoryId, name: string): Promise<UserDocDirectoryRef>
+
+  /**
+   * Delete one empty, non-root directory.
+   * @param directoryId - directory to delete.
+   * @returns after the directory is gone.
+   * @throws UserDocError when the directory is absent, non-empty, or identifies the root.
+   */
+  abstract removeDirectory(directoryId: UserDocDirectoryId): Promise<void>
+
+  /**
+   * Move one document into an existing directory without replacing an entry.
+   * @param docId - document to move.
+   * @param directoryId - destination directory; the empty identifier selects the root.
+   * @returns the moved document reference.
+   * @throws UserDocError when either identifier is invalid or the destination is occupied.
+   */
+  abstract move(docId: UserDocId, directoryId: UserDocDirectoryId): Promise<UserDocRef>
+
+  /**
    * Resolve one identifier to its current reference.
    *
    * Every read path takes this identifier rather than a `UserDocRef`, because a
    * reference carries an absolute path and a caller's copy of one is untrusted
    * input. Implementations re-derive the path from the identifier and re-prove
-   * containment, so a tampered path cannot name a file outside the upload root.
+   * containment, so a tampered path cannot name a file outside the document root.
    * @param docId - identifier from a previous `save` or `list`.
    * @param signal - optional cancellation for the filesystem probe.
    * @returns the current reference.
-   * @throws UserDocError when the identifier is malformed, escapes the upload root, or names no file.
+   * @throws UserDocError when the identifier is malformed, escapes the document root, or names no file.
    */
   abstract stat(docId: UserDocId, signal?: AbortSignal): Promise<UserDocRef>
 
@@ -142,7 +211,7 @@ export abstract class UserDocStore extends Service {
    * @param docId - identifier from a previous `save` or `list`.
    * @param signal - optional cancellation.
    * @returns after the entry is gone.
-   * @throws UserDocError when the identifier is malformed or escapes the upload
+   * @throws UserDocError when the identifier is malformed or escapes the document
    * root, or the deletion fails for any reason other than absence.
    */
   abstract remove(docId: UserDocId, signal?: AbortSignal): Promise<void>

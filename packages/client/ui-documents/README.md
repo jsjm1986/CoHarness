@@ -1,6 +1,6 @@
 # @deepseek-ai/dsh-client-ui-documents
 
-Workspace document manager for the CoHarness Web UI. Browse, preview, upload, and delete documents uploaded through the conversation input box.
+Workspace document manager for the CoHarness Web UI. Organize, preview, upload, move, download, and delete documents shared with the conversation input box.
 
 English | [中文](README.zh.md)
 
@@ -12,18 +12,20 @@ This package is part of the `@deepseek-ai/dsh-client-ui-documents` bundle and is
 
 The plugin adds a **Documents** button to the sidebar footer (alongside the workspace scope selector). The rail shows an icon with a tooltip; the expanded sidebar shows the Documents label beside the icon. Clicking it opens a manager dialog for the current scope (personal or project workspace).
 
-The dialog is a 560px card on viewports at least 768px wide and a full-width bottom sheet below that (the Modal portal cannot see the shell `data-viewport` stamp, so layout branches on `(max-width: 767px)` and `(pointer: coarse)`). Limits appear under the title. The toolbar is a search field, an upload control that opens the system picker and uploads immediately, and a refresh icon. On compact viewports the search occupies a full row and upload stretches beneath it. Desktop fine pointers may drop files onto the list; coarse pointers do not show a drop overlay.
+The dialog is 960px wide on viewports at least 768px and a full-width bottom sheet below that. A breadcrumb follows the current folder. The toolbar contains name search, type and sort selects, New Folder, upload, and refresh; uploads and desktop drops land in the current folder. A caption states personal vs project visibility and the filtered document count.
 
-Each row shows a file icon, ellipsized name, size, and Preview / Download / Delete. Compact and coarse pointers hide the action labels and enlarge the controls to the 44px touch target; accessible names still include the file name. Preview supports images, PDFs, and text-based files (text capped at 256 KiB); other types show a download fallback. When Gateway `GET /account/api/context` reports a project, the title uses that project name and delete confirmation adds the all-members warning; a missing collaboration route keeps personal chrome.
+Folder rows open the folder and expose Rename and Delete; deletion is confirmed and succeeds only for an empty folder. Document rows show a checkbox, ellipsized name, size, and Preview / Move / Download / Delete. Move supports one document or the current selection and offers the root plus every folder as destinations. Compact layouts wrap document actions below the name so 44px touch targets and long names cannot overlap.
+
+Documents are filtered by name and type (image, PDF, text, other), sorted by date, name, or size, and paged 20 rows; date groups apply only to date sort. Checkboxes select across pages; batch move and delete execute one request per id. Preview supports images, PDFs, and text-based files (text capped at 256 KiB); other types show a download fallback. When Gateway `GET /account/api/context` reports a project, the title uses that project name, the caption states member sharing, and delete confirmation adds the all-members warning; a missing collaboration route keeps personal chrome.
 
 ## Scope isolation
 
 Documents are stored per-runtime scope:
 
-- **Personal scope**: `$HOME/uploads/<YYYY-MM-DD>/<filename>`
-- **Project scope**: `<project-directory>/uploads/<YYYY-MM-DD>/<filename>`
+- **Personal scope**: `$HOME/documents/`
+- **Project scope**: `<project-directory>/documents/`
 
-The backend API (`/api/documents`) is provided by `@deepseek-ai/dsh-host-userdoc-http` and `@deepseek-ai/dsh-userdoc-local`.
+Folders are real directories that the model can inspect through its ordinary filesystem tools. The backend API (`/api/documents`) is provided by `@deepseek-ai/dsh-host-userdoc-http` and `@deepseek-ai/dsh-userdoc-local`; the local backend documents legacy `uploads` migration in its [README](../../attachment/userdoc-local/README.md).
 
 ## License
 
@@ -35,7 +37,7 @@ MIT
 
 #### What the model sees
 
-The browser shows a Documents button in the sidebar footer. Opening it presents a modal listing every document uploaded in the active scope (personal or project runtime) via the `/api/documents` surface, grouped by upload date, with per-row Preview, Download, and Delete actions, plus an upload control and a name filter.
+The browser shows a Documents button in the sidebar footer. Opening it presents the active scope's document folders through `/api/documents`, with breadcrumb navigation, folder management, name and type filters, sort, 20-row pages, preview, move, download, delete, multi-selection, and upload into the current folder.
 
 #### Token effect
 
@@ -50,5 +52,6 @@ The manager reads and writes the same `/api/documents` store that conversation a
 - Preview is limited to images, PDFs, and text-based files; other media types show a download fallback.
 - Text previews are capped at 256 KiB; larger text files require download.
 - Deleting a document does not rewrite session history, so previously sent messages that reference the document can no longer retrieve its content.
-- The document manager operates on the current runtime scope; switching between personal and project scope shows that scope's uploads only.
-- The manager does not offer multi-select, sortable columns, folder trees, or type-filter chips.
+- The document manager operates on the current runtime scope; switching between personal and project scope shows only that scope's document workspace.
+- Listings have no server-side pagination; each current folder is returned in one response and documents are paged in the browser.
+- Folder deletion is empty-only; the UI does not recursively delete a folder tree.

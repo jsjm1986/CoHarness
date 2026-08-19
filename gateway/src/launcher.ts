@@ -102,6 +102,7 @@ export class LocalLauncher implements Launcher {
       cwd: runtime.homePath,
       env: {
         ...process.env,
+        HOME: runtime.homePath,
         DSH_HOME: runtime.dshHome,
         DSH_GATEWAY_CREDENTIAL_FD: '3',
         // Source-run instances load TypeScript through tsx, which resolves

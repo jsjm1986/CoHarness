@@ -36,10 +36,15 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true })
 })
 
-async function upload(name: string, body: BodyInit, headers: HeadersInit = {}): Promise<Response> {
+async function upload(
+  name: string,
+  body: BodyInit,
+  headers: HeadersInit = {},
+  directory = '',
+): Promise<Response> {
   const requestHeaders = new Headers(headers)
   requestHeaders.set(USERDOC_UPLOAD_HEADER, '1')
-  return fetch(`${origin}${USERDOC_HTTP_PATH}?name=${encodeURIComponent(name)}`, {
+  return fetch(`${origin}${USERDOC_HTTP_PATH}?name=${encodeURIComponent(name)}&directory=${encodeURIComponent(directory)}`, {
     method: 'POST',
     headers: requestHeaders,
     body,
@@ -86,6 +91,47 @@ describe('user-document HTTP consumer', () => {
     })
     expect(response.status).toBe(400)
     expect(await response.json()).toMatchObject({ error: { code: 'UPLOAD_HEADER_REQUIRED' } })
+  })
+
+  it('creates, browses, renames, and deletes folders and moves a document', async () => {
+    const createdFolder = await fetch(`${origin}${USERDOC_HTTP_PATH}/folders?directory=&name=reports`, {
+      method: 'POST',
+    })
+    expect(createdFolder.status).toBe(201)
+    expect(await createdFolder.json()).toMatchObject({ directoryId: 'reports', name: 'reports' })
+
+    const createdDocument = await upload('summary.txt', 'hello', {}, 'reports')
+    expect(createdDocument.status).toBe(201)
+    const document = await createdDocument.json() as { docId: string }
+    expect(document.docId).toBe('reports/summary.txt')
+
+    const rootListing = await fetch(`${origin}${USERDOC_HTTP_PATH}?directory=`)
+    expect(await rootListing.json()).toMatchObject({
+      directoryId: '',
+      directories: [{ directoryId: 'reports', name: 'reports' }],
+      documents: [],
+    })
+    const reportListing = await fetch(`${origin}${USERDOC_HTTP_PATH}?directory=reports`)
+    expect(await reportListing.json()).toMatchObject({
+      directoryId: 'reports',
+      parentDirectoryId: '',
+      documents: [{ docId: 'reports/summary.txt' }],
+    })
+
+    const destinations = await fetch(`${origin}${USERDOC_HTTP_PATH}/directories`)
+    expect(await destinations.json()).toMatchObject({ directories: [{ directoryId: 'reports' }] })
+
+    const moved = await fetch(
+      `${origin}${USERDOC_HTTP_PATH}/move?id=${encodeURIComponent(document.docId)}&directory=`,
+      { method: 'POST' },
+    )
+    expect(moved.status).toBe(200)
+    expect(await moved.json()).toMatchObject({ docId: 'summary.txt' })
+
+    const renamed = await fetch(`${origin}${USERDOC_HTTP_PATH}/folders?id=reports&name=archive`, { method: 'PATCH' })
+    expect(renamed.status).toBe(200)
+    expect(await renamed.json()).toMatchObject({ directoryId: 'archive', name: 'archive' })
+    expect((await fetch(`${origin}${USERDOC_HTTP_PATH}/folders?id=archive`, { method: 'DELETE' })).status).toBe(204)
   })
 
   it('maps declared and streamed byte-limit failures to the stable public code', async () => {

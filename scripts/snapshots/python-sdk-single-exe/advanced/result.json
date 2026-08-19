@@ -2847,28 +2847,8 @@
       "payload": {
         "sessionId": "{{child-1}}",
         "event": {
-          "type": "session/title",
-          "seq": 6,
-          "time": 0,
-          "data": {
-            "title": "Reply with exactly DIRECT_CHILD_OK and",
-            "messageSeqs": [
-              5
-            ],
-            "source": {
-              "kind": "fallback"
-            }
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{child-1}}",
-        "event": {
           "type": "user/message",
-          "seq": 7,
+          "seq": 6,
           "time": 0,
           "data": {
             "content": [
@@ -2892,6 +2872,26 @@
             "id": "{{messageId}}"
           },
           "surfaceOp": "append"
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{child-1}}",
+        "event": {
+          "type": "session/title",
+          "seq": 7,
+          "time": 0,
+          "data": {
+            "title": "Reply with exactly DIRECT_CHILD_OK and",
+            "messageSeqs": [
+              5
+            ],
+            "source": {
+              "kind": "fallback"
+            }
+          }
         }
       }
     },
@@ -3553,28 +3553,8 @@
       "payload": {
         "sessionId": "{{child-2}}",
         "event": {
-          "type": "session/title",
-          "seq": 6,
-          "time": 0,
-          "data": {
-            "title": "Reply with exactly WORKFLOW_CHILD_OK and",
-            "messageSeqs": [
-              5
-            ],
-            "source": {
-              "kind": "fallback"
-            }
-          }
-        }
-      }
-    },
-    {
-      "method": "session.event",
-      "payload": {
-        "sessionId": "{{child-2}}",
-        "event": {
           "type": "user/message",
-          "seq": 7,
+          "seq": 6,
           "time": 0,
           "data": {
             "content": [
@@ -3598,6 +3578,26 @@
             "id": "{{messageId}}"
           },
           "surfaceOp": "append"
+        }
+      }
+    },
+    {
+      "method": "session.event",
+      "payload": {
+        "sessionId": "{{child-2}}",
+        "event": {
+          "type": "session/title",
+          "seq": 7,
+          "time": 0,
+          "data": {
+            "title": "Reply with exactly WORKFLOW_CHILD_OK and",
+            "messageSeqs": [
+              5
+            ],
+            "source": {
+              "kind": "fallback"
+            }
+          }
         }
       }
     },

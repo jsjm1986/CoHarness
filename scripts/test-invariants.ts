@@ -19,6 +19,9 @@ import InvariantRegistry from '@deepseek-ai/dsh-invariants'
 import { UserDocStore } from '@deepseek-ai/dsh-userdoc'
 import type {
   ResolveUserDocTarget,
+  UserDocDirectoryId,
+  UserDocDirectoryListing,
+  UserDocDirectoryRef,
   StoredUserDoc,
   UserDocId,
   UserDocLimits,
@@ -165,6 +168,30 @@ class TestUserDocStore extends UserDocStore {
 
   list(_signal?: AbortSignal): Promise<UserDocRef[]> {
     return Promise.reject(new Error('test invariant user document store does not list documents'))
+  }
+
+  listDirectory(_directoryId: UserDocDirectoryId, _signal?: AbortSignal): Promise<UserDocDirectoryListing> {
+    return Promise.reject(new Error('test invariant user document store does not list directories'))
+  }
+
+  listDirectories(_signal?: AbortSignal): Promise<UserDocDirectoryRef[]> {
+    return Promise.reject(new Error('test invariant user document store does not list directory destinations'))
+  }
+
+  createDirectory(_parentDirectoryId: UserDocDirectoryId, _name: string): Promise<UserDocDirectoryRef> {
+    return Promise.reject(new Error('test invariant user document store does not create directories'))
+  }
+
+  renameDirectory(_directoryId: UserDocDirectoryId, _name: string): Promise<UserDocDirectoryRef> {
+    return Promise.reject(new Error('test invariant user document store does not rename directories'))
+  }
+
+  removeDirectory(_directoryId: UserDocDirectoryId): Promise<void> {
+    return Promise.reject(new Error('test invariant user document store does not remove directories'))
+  }
+
+  move(_docId: UserDocId, _directoryId: UserDocDirectoryId): Promise<UserDocRef> {
+    return Promise.reject(new Error('test invariant user document store does not move documents'))
   }
 
   stat(_docId: UserDocId, _signal?: AbortSignal): Promise<UserDocRef> {

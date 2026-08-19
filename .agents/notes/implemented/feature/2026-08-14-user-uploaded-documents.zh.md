@@ -14,17 +14,17 @@ Status: implemented
 
 新增第二条能力缝，与附件缝并列，而不是塞进它内部。
 
-`ctx.userDocs`（`packages/attachment/userdoc`，抽象类 `UserDocStore`）把上传内容存为**普通命名文件**，并公布携带真实绝对路径的 `UserDocRef`。该路径是机制本身，而非实现细节泄漏：上传的文档因此可以被 agent 已有的文件系统与 shell 工具直接读取，无需为它单独存在一条检索通道。部署方负责把上传根目录放在工具授权策略已经授予的目录之内——在多用户网关下即用户主目录，`gateway/src/projects.ts` 的 `effectiveGrants()` 已将其作为 `rw` 发出，因此公布路径不会授予该会话原本不具备的任何权限。
+`ctx.userDocs`（`packages/attachment/userdoc`，抽象类 `UserDocStore`）把上传内容存为**普通命名文件**，并公布携带真实绝对路径的 `UserDocRef`。该路径是机制本身，而非实现细节泄漏：上传的文档因此可以被 agent 已有的文件系统与 shell 工具直接读取，无需为它单独存在一条检索通道。部署方负责把文档工作区放在工具授权策略已经授予的目录之内——在多用户网关下即运行时主目录，`gateway/src/projects.ts` 的 `effectiveGrants()` 已将其作为 `rw` 发出，因此公布路径不会授予该会话原本不具备的任何权限。
 
-`packages/attachment/userdoc-local`（`LocalUserDocStore`）是本地提供方：上传落在 `<uploadRoot>/YYYY-MM-DD/<name>`，默认根目录为 `<home>/uploads`。
+`packages/attachment/userdoc-local`（`LocalUserDocStore`）是本地提供方。其默认根目录为 `<runtime HOME>/documents`；上传内容进入选中的真实目录，默认部署会在首次使用时迁移 `<home>/uploads`。文件夹与迁移语义由[文档工作区文件夹与迁移](2026-08-19-document-workspace-folders.md)说明。
 
 四项性质是刻意为之：
 
 **没有格式白名单，服务端不做任何解析。** `mediaType` 仅由存储名推导，只用于展示；没有任何环节据此准入、解析、分派或校验。harness 接受用户上传的任何内容，由 agent 判断文件是什么。文本抽取、PDF 解析、缩略图与 OCR 都在本缝之外。
 
-**写入分为两个显式步骤。** `resolveTarget` 净化不可信的客户端文件名、在上传根内解析目标并返回确切路径；`save` 把字节流写入该路径。命名与包含策略因此只有一处可审计的归属，而 `save` 绝不自行兜底目标——这是把 `dsh-shell` 的 request/spec 拆分套用到存储上。
+**写入分为两个显式步骤。** `resolveTarget` 净化不可信的客户端文件名、在文档根目录内解析目标并返回确切路径；`save` 把字节流写入该路径。命名与包含策略因此只有一处可审计的归属，而 `save` 绝不自行兜底目标——这是把 `dsh-shell` 的 request/spec 拆分套用到存储上。
 
-**每条读取路径都接受存储域内的 `docId`，而非 `UserDocRef`。** 引用携带绝对路径，而调用方手中的引用副本属于不可信输入。`stat`、`read`、`openRead`、`remove` 都从标识符重新推导路径并重新证明包含关系，因此被篡改的路径无法指向上传根之外的文件。
+**每条读取路径都接受存储域内的 `docId`，而非 `UserDocRef`。** 引用携带绝对路径，而调用方手中的引用副本属于不可信输入。`stat`、`read`、`openRead`、`remove` 都从标识符重新推导路径并重新证明包含关系，因此被篡改的路径无法指向文档根目录之外的文件。
 
 **限额针对实际接收到的字节强制执行。** `save` 统计真实读入量，超过 `maxFileBytes` 即在流中途中断并删除残件。声明的 `content-length` 从不被信任，因此超限上传无法靠"超出声明继续发送"填满磁盘。
 
@@ -32,7 +32,7 @@ Status: implemented
 
 ### 主机传输与提示准入
 
-`packages/host/userdoc-http` 通过 Host Connection 注册流式 `/api/documents` 子树。既有的 Host／Origin 信任围栏会先于子树处理器运行；随后上传请求体不会进入有缓冲的 JSON bridge。`POST` 要求 `x-dsh-document-upload: 1`，把原始请求体流式写入 `UserDocStore`，并在读取前拒绝超出限额的声明长度。`GET` 列举引用和限额，`GET`／`HEAD` 流式返回文档内容并带 `nosniff` 与附件 disposition，`DELETE` 幂等执行。错误响应只公开稳定的文档错误码，不包含路径或字节。
+`packages/host/userdoc-http` 通过 Host Connection 注册流式 `/api/documents` 子树。既有的 Host／Origin 信任围栏会先于子树处理器运行；随后上传请求体不会进入有缓冲的 JSON bridge。`POST` 要求 `x-dsh-document-upload: 1`，把原始请求体流式写入 `UserDocStore`，并在读取前拒绝超出限额的声明长度。`GET` 列举引用、目录和限额；文件夹与移动路由修改工作区；`GET`／`HEAD` 流式返回文档内容并带 `nosniff` 与附件 disposition；文档 `DELETE` 幂等执行。错误响应只公开稳定的文档错误码，不包含路径或字节。
 
 提示 API 接受与文本、图片并列的文档标识符。`prepareUserDocAttachments` 在提交任何提示前解析全部标识符，强制每条消息的数量与总字节限额，并为每个文档冻结一种表示：不超过 `maxInlineTextBytes` 且能以严格 UTF-8 解码的内容内联，其余文件只以存储路径表示。主机把两种表示都渲染成文本块，并将主机准入后的快照复制进用户消息 source；客户端提交的路径或内联文本从不被信任。web bundle 同时组合本地存储、提示上下文插件与流式 HTTP Consumer。
 
@@ -44,7 +44,7 @@ Conversation controller 持有仅限浏览器的草稿标识与元数据，主�
 
 ### 包含性
 
-`.part` 暂存文件以 `O_EXCL` 创建，该标志绝不跟随既有符号链接，因此预先埋设的链接无法把写入重定向到根目录之外。只有写完并同步的文件才会被重命名就位。列举时跳过非普通文件而不跟随，因此埋在根内的符号链接无法公布指向根外文件的引用。文件名净化手工剥除两种分隔符风格（POSIX 主机把 `\` 当作普通文件名字符，仅用 `basename` 会保留 Windows 客户端的完整本地路径）、拒绝 `..` 与纯点名称、剥除控制字符，并按 255 **字节**而非码元截断——文件系统强制的上限是字节数，而中文文档标题在字符数只有四分之一时就会触及它。
+`.part` 暂存文件以 `O_EXCL` 创建，该标志绝不跟随既有符号链接，因此预先埋设的链接无法把写入重定向到根目录之外。只有写完并同步的文件才会通过排他硬链接发布。列举时跳过非普通文件而不跟随，因此埋在根内的符号链接无法公布指向根外文件的引用。文件名净化手工剥除两种分隔符风格（POSIX 主机把 `\` 当作普通文件名字符，仅用 `basename` 会保留 Windows 客户端的完整本地路径）、拒绝 `..` 与纯点名称、剥除控制字符，并按 255 **字节**而非码元截断——文件系统强制的上限是字节数，而中文文档标题在字符数只有四分之一时就会触及它。
 
 ## 备选方案
 
@@ -64,8 +64,8 @@ Conversation controller 持有仅限浏览器的草稿标识与元数据，主�
 
 ## 测试
 
-存储服务边界与本地提供方仍保留 97 个单元测试，达到仓库要求的按文件 100% 覆盖门槛。HTTP Consumer、提示准入、agent 事件持久化、Connection 分发与浏览器输入区行为都新增了聚焦测试，headless 无密钥 snapshot 覆盖了组装后的用户文档提示路径。包含性测试覆盖 `..` 穿越、绝对路径与 Windows 分隔符标识符、纯点名称、目标处埋设的符号链接、列举过程中的符号链接条目、流中途超限且不留残件，以及标识符篡改。需要非"不存在"类文件系统错误的失败路径通过 mock `node:fs/promises` 覆盖。
+存储 seam 与本地提供方拥有达到仓库按文件覆盖门槛的聚焦单元测试。HTTP Consumer、提示准入、agent 事件持久化、Connection 分发、浏览器输入区与文档管理器都具有聚焦测试，headless 无密钥 snapshot 覆盖了组装后的用户文档提示路径。包含性测试覆盖 `..` 穿越、绝对路径与 Windows 分隔符标识符、纯点名称、符号链接条目与目录、流中途超限且不留残件，以及标识符篡改。需要非"不存在"类文件系统错误的失败路径通过 mock `node:fs/promises` 覆盖。
 
 ## 运行限制
 
-`/api` JSON 信封仍会缓冲请求体，因此不能承载上传；流式子树是有意独立的。存储服务没有每用户磁盘配额或保留策略，部署方必须在本缝之外提供容量与清理策略。浏览器提供当前草稿 rail，而不是第二个历史文档查看器；持久文件仍是普通工作区文件，agent 可以用已有的文件系统工具检查它们。
+`/api` JSON 信封仍会缓冲请求体，因此不能承载上传；流式子树是有意独立的。存储服务没有每用户磁盘配额或保留策略，部署方必须在本 seam 之外提供容量与清理策略。浏览器同时提供当前草稿 rail 和工作区文档管理器；持久文件仍是普通工作区文件，agent 也可以用已有的文件系统工具检查它们。

@@ -3,7 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   createUserDocClient, UserDocHttpError, UserDocServiceUnavailableError,
 } from '../src/client/userdoc-client.ts'
-import type { UserDocIdType } from '@deepseek-ai/dsh-userdoc'
+import { UserDocDirectoryId, type UserDocIdType } from '@deepseek-ai/dsh-userdoc'
+
+const rootDirectoryId = UserDocDirectoryId('')
 
 const ref = {
   docId: '2026-08-17/a.txt' as UserDocIdType,
@@ -66,10 +68,21 @@ describe('createUserDocClient', () => {
     expect(await createUserDocClient().list(signal)).toBeUndefined()
   })
 
-  it('maps 404 to UserDocServiceUnavailableError and structured HTTP errors', async () => {
+  it('maps an unstructured 404 to unavailable and preserves structured document errors', async () => {
     const client = createUserDocClient()
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 404, text: async () => '{}' })))
     await expect(client.list()).rejects.toBeInstanceOf(UserDocServiceUnavailableError)
+
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: false,
+      status: 404,
+      text: async () => JSON.stringify({ error: { message: 'missing folder', code: 'DOCUMENT_DIRECTORY_NOT_FOUND' } }),
+    })))
+    await expect(client.browse(UserDocDirectoryId('missing'))).rejects.toMatchObject({
+      name: 'UserDocHttpError',
+      status: 404,
+      code: 'DOCUMENT_DIRECTORY_NOT_FOUND',
+    })
 
     vi.stubGlobal('fetch', vi.fn(async () => ({
       ok: false,
@@ -124,6 +137,33 @@ describe('createUserDocClient', () => {
     await expect(client.remove(ref.docId)).rejects.toThrow('nope')
   })
 
+  it('uses the directory routes for browsing, folder management, and moves', async () => {
+    const calls: Array<{ url: string; method: string }> = []
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+      calls.push({ url, method: init?.method ?? 'GET' })
+      return { ok: true, text: async () => JSON.stringify({ directories: [], documents: [] }) }
+    }))
+    const client = createUserDocClient()
+    const reports = UserDocDirectoryId('reports')
+
+    await client.browse(reports)
+    await client.listDirectories()
+    await client.createDirectory(rootDirectoryId, 'reports')
+    await client.renameDirectory(reports, 'archive')
+    await client.removeDirectory(reports)
+    await client.move(ref.docId, reports)
+
+    expect(calls).toEqual([
+      { url: '/api/documents?directory=reports', method: 'GET' },
+      { url: '/api/documents/directories', method: 'GET' },
+      { url: '/api/documents/folders?directory=&name=reports', method: 'POST' },
+      { url: '/api/documents/folders?id=reports&name=archive', method: 'PATCH' },
+      { url: '/api/documents/folders?id=reports', method: 'DELETE' },
+      { url: '/api/documents/move?id=2026-08-17%2Fa.txt&directory=reports', method: 'POST' },
+    ])
+  })
+
   it('uploads through XHR with computable and non-computable progress', async () => {
     const loaded: number[] = []
     installXhr((xhr) => {
@@ -133,7 +173,7 @@ describe('createUserDocClient', () => {
         this.onload?.()
       })
     })
-    const result = await createUserDocClient().upload(new File(['hello'], 'a.txt'), undefined, (value) => {
+    const result = await createUserDocClient().upload(new File(['hello'], 'a.txt'), rootDirectoryId, undefined, (value) => {
       loaded.push(value)
     })
     expect(result).toEqual(ref)
@@ -147,12 +187,12 @@ describe('createUserDocClient', () => {
     installXhr((xhr) => {
       xhr.send = vi.fn(function send(this: MockXhr) { this.onerror?.() })
     })
-    await expect(client.upload(file)).rejects.toThrow('Document upload failed.')
+    await expect(client.upload(file, rootDirectoryId)).rejects.toThrow('Document upload failed.')
 
     installXhr((xhr) => {
       xhr.send = vi.fn(function send(this: MockXhr) { this.onabort?.() })
     })
-    await expect(client.upload(file)).rejects.toMatchObject({ name: 'AbortError' })
+    await expect(client.upload(file, rootDirectoryId)).rejects.toMatchObject({ name: 'AbortError' })
 
     const reason = new Error('user-abort')
     const controller = new AbortController()
@@ -160,7 +200,7 @@ describe('createUserDocClient', () => {
       xhr.send = vi.fn()
       xhr.abort = vi.fn(function abort(this: MockXhr) { this.onabort?.() })
     })
-    const pending = client.upload(file, controller.signal)
+    const pending = client.upload(file, rootDirectoryId, controller.signal)
     controller.abort(reason)
     await expect(pending).rejects.toBe(reason)
 
@@ -169,18 +209,18 @@ describe('createUserDocClient', () => {
       xhr.responseText = 'nope'
       xhr.send = vi.fn(function send(this: MockXhr) { this.onload?.() })
     })
-    await expect(client.upload(file)).rejects.toBeInstanceOf(UserDocHttpError)
+    await expect(client.upload(file, rootDirectoryId)).rejects.toBeInstanceOf(UserDocHttpError)
 
     installXhr((xhr) => {
       xhr.responseText = ''
       xhr.send = vi.fn(function send(this: MockXhr) { this.onload?.() })
     })
-    expect(await client.upload(file)).toBeUndefined()
+    expect(await client.upload(file, rootDirectoryId)).toBeUndefined()
 
     installXhr((xhr) => {
       xhr.send = vi.fn(() => { throw 'boom' })
     })
-    await expect(client.upload(file)).rejects.toThrow('boom')
+    await expect(client.upload(file, rootDirectoryId)).rejects.toThrow('boom')
 
     installXhr((xhr) => {
       xhr.send = vi.fn(function send(this: MockXhr) {
@@ -188,19 +228,19 @@ describe('createUserDocClient', () => {
         this.onerror?.()
       })
     })
-    expect(await client.upload(file)).toEqual(ref)
+    expect(await client.upload(file, rootDirectoryId)).toEqual(ref)
 
     const aborted = new AbortController()
     installXhr((xhr) => {
       xhr.send = vi.fn()
     })
-    const waiting = client.upload(file, aborted.signal)
+    const waiting = client.upload(file, rootDirectoryId, aborted.signal)
     aborted.abort()
     await expect(waiting).rejects.toMatchObject({ name: 'AbortError' })
 
     installXhr((xhr) => {
       xhr.send = vi.fn(() => { throw new Error('send-failed') })
     })
-    await expect(client.upload(file)).rejects.toThrow('send-failed')
+    await expect(client.upload(file, rootDirectoryId)).rejects.toThrow('send-failed')
   })
 })

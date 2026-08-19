@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   DOCUMENT_NOT_FOUND_CODE,
   DOCUMENT_WRITE_FAILED_CODE,
+  UserDocDirectoryId,
   UserDocError,
   UserDocId,
   UserDocStore,
@@ -10,6 +11,8 @@ import {
 import type {
   ResolveUserDocTarget,
   StoredUserDoc,
+  UserDocDirectoryListing,
+  UserDocDirectoryRef,
   UserDocLimits,
   UserDocRef,
   UserDocTarget,
@@ -37,6 +40,7 @@ function ref(docId: string): UserDocRef {
 class MemoryUserDocStore extends UserDocStore {
   readonly limits = LIMITS
   readonly saved = new Map<string, Uint8Array>()
+  readonly directories = new Set<string>()
 
   async resolveTarget(input: ResolveUserDocTarget): Promise<UserDocTarget> {
     return { path: `/root/${input.name}`, name: input.name, docId: UserDocId(input.name) }
@@ -56,6 +60,51 @@ class MemoryUserDocStore extends UserDocStore {
 
   async list(): Promise<UserDocRef[]> {
     return [...this.saved.keys()].map(ref)
+  }
+
+  async listDirectory(directoryId: string): Promise<UserDocDirectoryListing> {
+    const prefix = directoryId === '' ? '' : `${directoryId}/`
+    return {
+      directoryId: UserDocDirectoryId(directoryId),
+      directories: [...this.directories]
+        .filter(id => id.startsWith(prefix) && !id.slice(prefix.length).includes('/'))
+        .map(id => this.directoryRef(id)),
+      documents: [...this.saved.keys()]
+        .filter(id => id.startsWith(prefix) && !id.slice(prefix.length).includes('/'))
+        .map(ref),
+    }
+  }
+
+  async listDirectories(): Promise<UserDocDirectoryRef[]> {
+    return [...this.directories].map(id => this.directoryRef(id))
+  }
+
+  async createDirectory(parentDirectoryId: string, name: string): Promise<UserDocDirectoryRef> {
+    const id = parentDirectoryId === '' ? name : `${parentDirectoryId}/${name}`
+    this.directories.add(id)
+    return this.directoryRef(id)
+  }
+
+  async renameDirectory(directoryId: string, name: string): Promise<UserDocDirectoryRef> {
+    const parent = directoryId.split('/').slice(0, -1).join('/')
+    const target = parent === '' ? name : `${parent}/${name}`
+    this.directories.delete(directoryId)
+    this.directories.add(target)
+    return this.directoryRef(target)
+  }
+
+  async removeDirectory(directoryId: string): Promise<void> {
+    this.directories.delete(directoryId)
+  }
+
+  async move(docId: string, directoryId: string): Promise<UserDocRef> {
+    const data = this.saved.get(docId)
+    if (data === undefined) throw new UserDocError('missing', DOCUMENT_NOT_FOUND_CODE)
+    const name = docId.split('/').at(-1) as string
+    const target = directoryId === '' ? name : `${directoryId}/${name}`
+    this.saved.delete(docId)
+    this.saved.set(target, data)
+    return ref(target)
   }
 
   async stat(docId: string): Promise<UserDocRef> {
@@ -84,6 +133,15 @@ class MemoryUserDocStore extends UserDocStore {
 
   async remove(docId: string): Promise<void> {
     this.saved.delete(docId)
+  }
+
+  private directoryRef(directoryId: string): UserDocDirectoryRef {
+    return {
+      directoryId: UserDocDirectoryId(directoryId),
+      path: `/root/${directoryId}`,
+      name: directoryId.split('/').at(-1) ?? '',
+      modifiedAt: 1,
+    }
   }
 }
 

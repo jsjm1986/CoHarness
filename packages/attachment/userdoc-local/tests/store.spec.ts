@@ -5,20 +5,29 @@ import { dirname, join } from 'node:path'
 
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  DOCUMENT_DIRECTORY_CONFLICT_CODE,
+  DOCUMENT_DIRECTORY_NOT_EMPTY_CODE,
   DOCUMENT_NOT_FOUND_CODE,
   DOCUMENT_TARGET_CONFLICT_CODE,
   DOCUMENT_TOO_LARGE_CODE,
   INVALID_DOCUMENT_REF_CODE,
+  UserDocDirectoryId,
   UserDocId,
   UserDocError,
 } from '@deepseek-ai/dsh-userdoc'
 import type { UserDocLimits } from '@deepseek-ai/dsh-userdoc'
 import {
+  createDocDirectory,
   dayDirectory,
+  listDocDirectories,
+  listDocDirectory,
   listDocFiles,
+  moveDocFile,
   openDocFile,
   readDocFile,
   removeDocFile,
+  removeDocDirectory,
+  renameDocDirectory,
   resolveDocTarget,
   saveDocFile,
   statDocFile,
@@ -394,5 +403,74 @@ describe('removeDocFile', () => {
     abort.abort()
 
     await expect(removeDocFile(uploadRoot, UserDocId('x.txt'), abort.signal)).rejects.toThrow(abort.signal.reason as Error)
+  })
+})
+
+describe('document directories', () => {
+  it('creates nested folders, uploads into one, and lists immediate and recursive entries', async () => {
+    const documentRoot = await root()
+    await mkdir(documentRoot)
+    const reports = await createDocDirectory(documentRoot, UserDocDirectoryId(''), 'reports')
+    const annual = await createDocDirectory(documentRoot, reports.directoryId, 'annual')
+    const target = await resolveDocTarget(documentRoot, annual.directoryId, 'summary.txt')
+    await saveDocFile(documentRoot, target, body('hello'), LIMITS)
+
+    await expect(listDocDirectory(documentRoot, UserDocDirectoryId(''))).resolves.toMatchObject({
+      directoryId: '',
+      directories: [{ directoryId: 'reports', name: 'reports' }],
+      documents: [],
+    })
+    await expect(listDocDirectory(documentRoot, annual.directoryId)).resolves.toMatchObject({
+      directoryId: 'reports/annual',
+      parentDirectoryId: 'reports',
+      documents: [{ docId: 'reports/annual/summary.txt', name: 'summary.txt' }],
+    })
+    expect((await listDocDirectories(documentRoot)).map(directory => directory.directoryId)).toEqual([
+      'reports',
+      'reports/annual',
+    ])
+  })
+
+  it('rejects traversal and a directory symlink that escapes the document root', async () => {
+    const documentRoot = await root()
+    const outside = join(documentRoot, '..', 'outside')
+    await mkdir(documentRoot)
+    await mkdir(outside)
+    await symlink(outside, join(documentRoot, 'linked'))
+
+    await expect(listDocDirectory(documentRoot, UserDocDirectoryId('../outside'))).rejects.toMatchObject({
+      code: 'INVALID_DOCUMENT_DIRECTORY',
+    })
+    await expect(listDocDirectory(documentRoot, UserDocDirectoryId('linked'))).rejects.toMatchObject({
+      code: INVALID_DOCUMENT_REF_CODE,
+    })
+  })
+
+  it('moves without replacing, renames folders, and only deletes empty folders', async () => {
+    const documentRoot = await root()
+    await mkdir(documentRoot)
+    const source = await createDocDirectory(documentRoot, UserDocDirectoryId(''), 'source')
+    const destination = await createDocDirectory(documentRoot, UserDocDirectoryId(''), 'destination')
+    const firstTarget = await resolveDocTarget(documentRoot, source.directoryId, 'report.txt')
+    const first = await saveDocFile(documentRoot, firstTarget, body('first'), LIMITS)
+
+    await expect(removeDocDirectory(documentRoot, source.directoryId)).rejects.toMatchObject({
+      code: DOCUMENT_DIRECTORY_NOT_EMPTY_CODE,
+    })
+    const moved = await moveDocFile(documentRoot, first.docId, destination.directoryId)
+    expect(moved.docId).toBe('destination/report.txt')
+
+    const secondTarget = await resolveDocTarget(documentRoot, source.directoryId, 'report.txt')
+    const second = await saveDocFile(documentRoot, secondTarget, body('second'), LIMITS)
+    await expect(moveDocFile(documentRoot, second.docId, destination.directoryId)).rejects.toMatchObject({
+      code: DOCUMENT_DIRECTORY_CONFLICT_CODE,
+    })
+
+    const renamed = await renameDocDirectory(documentRoot, destination.directoryId, 'archive')
+    expect(renamed.directoryId).toBe('archive')
+    await removeDocFile(documentRoot, second.docId)
+    await removeDocDirectory(documentRoot, source.directoryId)
+    await removeDocFile(documentRoot, UserDocId('archive/report.txt'))
+    await expect(removeDocDirectory(documentRoot, renamed.directoryId)).resolves.toBeUndefined()
   })
 })
