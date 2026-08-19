@@ -18,6 +18,8 @@ The Gateway constructs one sender per provider. FCM uses its existing HTTP v1 se
 
 The native shell does not call Firebase registration when no Firebase client configuration is present, so a JPush-only build can initialize without FCM credentials. JPush notification clicks carry only the session id and event sequence. The receiver forwards both cold-start and warm-start intents to the Capacitor plugin, which retains the event until the Web listener opens the authenticated session.
 
+The `diagnostic` build type installs alongside the normal application as `com.coharness.test` and loads the same hosted Web UI. Its manifest removes JPush, JCore, Firebase, and Google Messaging components and permissions; its Capacitor plugin list is empty; and its generated `BuildConfig` disables native push registration. This variant isolates WebView and Web UI startup from the native push path and never registers for notifications.
+
 ## Alternatives considered
 
 **Replace FCM with JPush for every Android build.** Rejected because FCM remains useful on devices with Google Play services and existing registrations must continue to work.
@@ -36,4 +38,4 @@ The shell remains a thin remote Web wrapper, so ordinary Web UI releases do not 
 
 ## Verification
 
-Gateway typecheck and focused configuration, HTTP, sender, and delivery tests pass. Android `:app:assembleDebug` passes with the repository's Gradle wrapper and OpenJDK 21; the build emits upstream JPush D8 stack-map warnings and native-library strip warnings but produces a `com.coharness` APK. Real device delivery still requires deployment credentials and at least one registered JPush or vendor application.
+Gateway typecheck and focused configuration, HTTP, sender, and delivery tests pass. Android `:app:assembleDebug` and `:app:assembleDiagnostic` pass with the repository's Gradle wrapper and OpenJDK 21; the build emits upstream JPush D8 stack-map warnings and native-library strip warnings. The diagnostic APK is checked for its independent application id, empty Capacitor plugin list, push-free merged manifest, debug signature, and 16 KB zip alignment. Real device delivery still requires deployment credentials and at least one registered JPush or vendor application.

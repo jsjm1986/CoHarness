@@ -20,7 +20,7 @@ public class NativePushStatusPlugin extends Plugin {
 
     @PluginMethod
     public void isConfigured(PluginCall call) {
-        boolean configured = isFcmConfigured() || jPushAppKeyConfigured();
+        boolean configured = BuildConfig.NATIVE_PUSH_ENABLED && (isFcmConfigured() || jPushAppKeyConfigured());
 
         JSObject result = new JSObject();
         result.put("configured", configured);
@@ -30,14 +30,14 @@ public class NativePushStatusPlugin extends Plugin {
     @PluginMethod
     public void isFcmConfigured(PluginCall call) {
         JSObject result = new JSObject();
-        result.put("configured", isFcmConfigured());
+        result.put("configured", BuildConfig.NATIVE_PUSH_ENABLED && isFcmConfigured());
         call.resolve(result);
     }
 
     @PluginMethod
     public void getJPushRegistrationId(PluginCall call) {
         String registrationId = "";
-        if (jPushAppKeyConfigured()) {
+        if (BuildConfig.NATIVE_PUSH_ENABLED && jPushAppKeyConfigured()) {
             try {
                 String value = JPushInterface.getRegistrationID(getContext());
                 if (value != null) registrationId = value.trim();
@@ -53,7 +53,7 @@ public class NativePushStatusPlugin extends Plugin {
     @PluginMethod
     public void isJPushConfigured(PluginCall call) {
         JSObject result = new JSObject();
-        result.put("configured", jPushAppKeyConfigured());
+        result.put("configured", BuildConfig.NATIVE_PUSH_ENABLED && jPushAppKeyConfigured());
         call.resolve(result);
     }
 

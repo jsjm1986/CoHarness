@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CoHarness Test</string>
+    <string name="title_activity_main">CoHarness Test</string>
+    <string name="package_name">com.coharness.test</string>
+    <string name="custom_url_scheme">com.coharness.test</string>
+</resources>

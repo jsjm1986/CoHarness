@@ -18,6 +18,8 @@ Gateway 为每个 provider 构造一个 sender。FCM 继续使用现有 HTTP v1 
 
 原生薄壳在没有 Firebase 客户端配置时不会调用 Firebase 注册，因此只使用 JPush 的构建不需要 FCM 凭据。JPush 通知点击只携带会话 id 和事件序号。Receiver 同时把冷启动和热启动 Intent 转给 Capacitor 插件；插件会保留事件，直到 Web listener 打开认证会话。
 
+`diagnostic` 构建类型以 `com.coharness.test` 独立安装，并加载同一个线上 Web UI。它的清单移除 JPush、JCore、Firebase 和 Google Messaging 组件及权限，Capacitor 插件列表为空，生成的 `BuildConfig` 也会禁用原生推送注册。这个变体用于把 WebView 和 Web UI 启动链路与原生推送链路隔离开，并且不会注册通知。
+
 ## Alternatives considered
 
 **所有 Android 构建都用 JPush 替代 FCM。** 否决，因为有 Google Play 服务的设备仍适合 FCM，现有注册也必须继续工作。
@@ -36,4 +38,4 @@ Gateway 为每个 provider 构造一个 sender。FCM 继续使用现有 HTTP v1 
 
 ## Verification
 
-Gateway 类型检查以及配置、HTTP、sender 和投递聚焦测试通过。使用仓库 Gradle wrapper 和 OpenJDK 21 执行 Android `:app:assembleDebug` 通过，构建会产生上游 JPush D8 stack-map 警告和原生库 strip 警告，但成功生成 `com.coharness` APK。真实设备投递仍需要部署凭据以及至少一个已注册的 JPush 或厂商应用。
+Gateway 类型检查以及配置、HTTP、sender 和投递聚焦测试通过。使用仓库 Gradle wrapper 和 OpenJDK 21 执行 Android `:app:assembleDebug` 与 `:app:assembleDiagnostic` 均通过，构建会产生上游 JPush D8 stack-map 警告和原生库 strip 警告。诊断 APK 会检查独立应用 id、空 Capacitor 插件列表、无推送组件的合并清单、Debug 签名和 16 KB zip 对齐。真实设备投递仍需要部署凭据以及至少一个已注册的 JPush 或厂商应用。

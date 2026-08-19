@@ -29,6 +29,10 @@ Ordinary Web UI changes only require publishing the Web assets; they do not requ
 
 The custom CoHarness launcher and splash artwork is kept in `branding/`. Android uses the matching adaptive foreground/background resources, branded splash variants, and `ic_stat_harness` as the monochrome notification icon.
 
+## Crash-isolation build
+
+Run `pnpm run android:diagnostic` to build `android/app/build/outputs/apk/diagnostic/app-diagnostic.apk`. This debug-signed APK installs alongside the normal application as `CoHarness Test` with application id `com.coharness.test`, loads the same hosted Web UI, and removes native push plugins, components, and permissions. It is only for determining whether a startup failure belongs to the WebView/Web UI path or the native push path; notifications are intentionally unavailable.
+
 The Gateway must set `HGW_FCM_PROJECT_ID` and `HGW_FCM_SERVICE_ACCOUNT_FILE` before it can send FCM messages. Keep the server credential in a permission-restricted file on the Gateway host.
 
 ## Push providers
