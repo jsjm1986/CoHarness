@@ -26,11 +26,14 @@ export class UserDocError extends Error {
   }
 }
 
-/** One uploaded name could not be reduced to a safe leaf below the upload root. */
+/** One uploaded name could not be reduced to a safe leaf below the document root. */
 export const INVALID_DOCUMENT_NAME_CODE = 'INVALID_DOCUMENT_NAME'
 
-/** An identifier did not resolve to a path inside the upload root. */
+/** An identifier did not resolve to a path inside the document root. */
 export const INVALID_DOCUMENT_REF_CODE = 'INVALID_DOCUMENT_REF'
+
+/** A directory identifier or name is invalid or escapes the document root. */
+export const INVALID_DOCUMENT_DIRECTORY_CODE = 'INVALID_DOCUMENT_DIRECTORY'
 
 /** A resolved target changed or became occupied before it could be published. */
 export const DOCUMENT_TARGET_CONFLICT_CODE = 'DOCUMENT_TARGET_CONFLICT'
@@ -62,10 +65,29 @@ export const DOCUMENT_READ_FAILED_CODE = 'DOCUMENT_READ_FAILED'
 /** Storage refused a deletion. */
 export const DOCUMENT_DELETE_FAILED_CODE = 'DOCUMENT_DELETE_FAILED'
 
+/** The referenced document directory is absent. */
+export const DOCUMENT_DIRECTORY_NOT_FOUND_CODE = 'DOCUMENT_DIRECTORY_NOT_FOUND'
+
+/** A document-directory create, rename, or move target is occupied. */
+export const DOCUMENT_DIRECTORY_CONFLICT_CODE = 'DOCUMENT_DIRECTORY_CONFLICT'
+
+/** A requested directory deletion targeted a directory that still has children. */
+export const DOCUMENT_DIRECTORY_NOT_EMPTY_CODE = 'DOCUMENT_DIRECTORY_NOT_EMPTY'
+
+/** Storage refused a directory create, rename, or deletion. */
+export const DOCUMENT_DIRECTORY_WRITE_FAILED_CODE = 'DOCUMENT_DIRECTORY_WRITE_FAILED'
+
+/** Storage could not move a document without replacing an existing entry. */
+export const DOCUMENT_MOVE_FAILED_CODE = 'DOCUMENT_MOVE_FAILED'
+
+/** The legacy upload directory could not be migrated into the document root. */
+export const DOCUMENT_MIGRATION_FAILED_CODE = 'DOCUMENT_MIGRATION_FAILED'
+
 /** Closed set of stable user-document failure codes. */
 export type UserDocErrorCode =
   | typeof INVALID_DOCUMENT_NAME_CODE
   | typeof INVALID_DOCUMENT_REF_CODE
+  | typeof INVALID_DOCUMENT_DIRECTORY_CODE
   | typeof DOCUMENT_TARGET_CONFLICT_CODE
   | typeof DOCUMENT_NAME_EXHAUSTED_CODE
   | typeof DOCUMENT_TOO_LARGE_CODE
@@ -76,3 +98,9 @@ export type UserDocErrorCode =
   | typeof DOCUMENT_WRITE_FAILED_CODE
   | typeof DOCUMENT_READ_FAILED_CODE
   | typeof DOCUMENT_DELETE_FAILED_CODE
+  | typeof DOCUMENT_DIRECTORY_NOT_FOUND_CODE
+  | typeof DOCUMENT_DIRECTORY_CONFLICT_CODE
+  | typeof DOCUMENT_DIRECTORY_NOT_EMPTY_CODE
+  | typeof DOCUMENT_DIRECTORY_WRITE_FAILED_CODE
+  | typeof DOCUMENT_MOVE_FAILED_CODE
+  | typeof DOCUMENT_MIGRATION_FAILED_CODE

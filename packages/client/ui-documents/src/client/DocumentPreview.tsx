@@ -70,8 +70,8 @@ export const DocumentPreview: FC<DocumentPreviewProps> = ({ doc, maxTextBytes, o
       onClose={onClose}
       title={t('preview.title', { name: doc.name })}
       closeLabel={t('modal.close')}
-      className={css.dialog ?? ''}
-      contentClassName={css.shell ?? ''}
+      className={css.dialog as string}
+      contentClassName={css.shell as string}
     >
       <div className={css.body}>
         {state === 'loading' && <p className={css.status}>{t('modal.loading')}</p>}

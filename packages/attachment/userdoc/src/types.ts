@@ -1,8 +1,8 @@
 /** User-document vocabulary. @module @deepseek-ai/dsh-userdoc/types */
 
-import type { UserDocId } from './brand.ts'
+import type { UserDocDirectoryId, UserDocId } from './brand.ts'
 
-export type { UserDocId } from './brand.ts'
+export type { UserDocDirectoryId, UserDocId } from './brand.ts'
 
 /**
  * Durable, serializable metadata for one uploaded document.
@@ -10,13 +10,13 @@ export type { UserDocId } from './brand.ts'
  * Deliberately unlike `ImageAttachmentRef`: `path` is a real absolute host
  * path, because the point of this seam is that an uploaded document is an
  * ordinary file the agent's own filesystem and shell tools can reach. The
- * deployment is responsible for rooting uploads somewhere the tool
+ * deployment is responsible for rooting the document workspace somewhere the tool
  * authorization policy already grants (the user's home directory under the
  * multi-user gateway), so publishing the path grants no access the session did
  * not already have.
  */
 export interface UserDocRef {
-  /** Store-scoped identifier; resolves to a path inside the upload root and nowhere else. */
+  /** Store-scoped identifier; resolves to a path inside the document root and nowhere else. */
   docId: UserDocId
   /** Absolute host path of the stored document. */
   path: string
@@ -31,6 +31,30 @@ export interface UserDocRef {
   mediaType: string
   /** Storage modification time in epoch milliseconds. */
   modifiedAt: number
+}
+
+/** Metadata for one ordinary directory below the document root. */
+export interface UserDocDirectoryRef {
+  /** Store-scoped directory identifier; the empty identifier names the root. */
+  directoryId: UserDocDirectoryId
+  /** Absolute host path of the directory. */
+  path: string
+  /** Directory leaf displayed to the user. */
+  name: string
+  /** Directory modification time in epoch milliseconds. */
+  modifiedAt: number
+}
+
+/** Immediate children of one directory in the document store. */
+export interface UserDocDirectoryListing {
+  /** Directory whose immediate children were listed. */
+  directoryId: UserDocDirectoryId
+  /** Parent directory, absent at the document root. */
+  parentDirectoryId?: UserDocDirectoryId
+  /** Immediate subdirectories, ordered by name. */
+  directories: UserDocDirectoryRef[]
+  /** Immediate documents, newest modification first. */
+  documents: UserDocRef[]
 }
 
 /** Deployment-resolved limits used by upload admission and request buffering. */
@@ -56,7 +80,7 @@ export interface UserDocLimits {
  * auditable place rather than defaulted inside `save`.
  */
 export interface UserDocTarget {
-  /** Absolute path to create; guaranteed to lie inside the store's upload root. */
+  /** Absolute path to create; guaranteed to lie inside the store's document root. */
   path: string
   /** Sanitized leaf name of `path`. */
   name: string
@@ -68,6 +92,8 @@ export interface UserDocTarget {
 export interface ResolveUserDocTarget {
   /** Client-supplied file name, treated as untrusted text and never as a path. */
   name: string
+  /** Destination directory; omitted selects the document root. */
+  directoryId?: UserDocDirectoryId
 }
 
 /** Stored document bytes returned with the reference they were read through. */

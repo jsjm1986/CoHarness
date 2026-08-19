@@ -5,14 +5,21 @@ import type { Branded } from '@deepseek-ai/dsh-brand'
 /**
  * Opaque identifier for one document a user uploaded.
  *
- * Structurally the POSIX-style path of the document relative to the upload
- * root (`2026-08-14/report.pdf`), which makes the filesystem itself the index
+ * Structurally the POSIX-style path of the document relative to the document
+ * root (`reports/annual.pdf`), which makes the filesystem itself the index
  * and keeps no sidecar database to fall out of step with the files on disk.
  * Consumers MUST treat it as opaque: it is not a usable filesystem path, and
  * every implementation re-derives and re-validates the absolute path from it,
- * so an id that escapes the upload root is refused rather than resolved.
+ * so an id that escapes the document root is refused rather than resolved.
  */
 export type UserDocId = Branded<'UserDocId'>
+
+/**
+ * Opaque POSIX-style path of one directory relative to the document root.
+ * The empty value identifies the root itself; every other value is validated
+ * by the store before it reaches the filesystem.
+ */
+export type UserDocDirectoryId = Branded<'UserDocDirectoryId'>
 
 /**
  * Brand a backend-produced document identifier.
@@ -21,4 +28,13 @@ export type UserDocId = Branded<'UserDocId'>
  */
 export function UserDocId(value: string): UserDocId {
   return value as UserDocId
+}
+
+/**
+ * Brand a backend-produced directory identifier.
+ * @param value - relative POSIX-style directory identifier produced by the store.
+ * @returns the branded identifier.
+ */
+export function UserDocDirectoryId(value: string): UserDocDirectoryId {
+  return value as UserDocDirectoryId
 }

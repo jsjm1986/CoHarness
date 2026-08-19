@@ -1,8 +1,22 @@
 /** Browser HTTP client for the optional Host user-document service. */
-import type { UserDocIdType, UserDocLimits, UserDocRef } from '@deepseek-ai/dsh-userdoc'
+import type {
+  UserDocDirectoryIdType,
+  UserDocDirectoryListing,
+  UserDocDirectoryRef,
+  UserDocIdType,
+  UserDocLimits,
+  UserDocRef,
+} from '@deepseek-ai/dsh-userdoc'
 import { createUserDocClient, UserDocHttpError, UserDocServiceUnavailableError } from './userdoc-client.ts'
 
-export type { UserDocIdType, UserDocLimits, UserDocRef }
+export type {
+  UserDocDirectoryIdType,
+  UserDocDirectoryListing,
+  UserDocDirectoryRef,
+  UserDocIdType,
+  UserDocLimits,
+  UserDocRef,
+}
 
 export { createUserDocClient, UserDocHttpError, UserDocServiceUnavailableError }
 

@@ -5,12 +5,20 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { Readable } from 'node:stream'
 import type { Context } from '@deepseek-ai/cordis'
 import {
+  DOCUMENT_DIRECTORY_CONFLICT_CODE,
+  DOCUMENT_DIRECTORY_NOT_EMPTY_CODE,
+  DOCUMENT_DIRECTORY_NOT_FOUND_CODE,
+  DOCUMENT_DIRECTORY_WRITE_FAILED_CODE,
+  DOCUMENT_MIGRATION_FAILED_CODE,
+  DOCUMENT_MOVE_FAILED_CODE,
   DOCUMENT_NAME_EXHAUSTED_CODE,
   DOCUMENT_NOT_FOUND_CODE,
   DOCUMENT_TARGET_CONFLICT_CODE,
   DOCUMENT_TOO_LARGE_CODE,
+  INVALID_DOCUMENT_DIRECTORY_CODE,
   INVALID_DOCUMENT_NAME_CODE,
   INVALID_DOCUMENT_REF_CODE,
+  UserDocDirectoryId,
   UserDocError,
   UserDocId,
   type UserDocErrorCode,
@@ -38,9 +46,14 @@ function json(res: ServerResponse, status: number, value: unknown): void {
 
 function errorStatus(code: UserDocErrorCode): number {
   if (code === DOCUMENT_NOT_FOUND_CODE) return 404
+  if (code === DOCUMENT_DIRECTORY_NOT_FOUND_CODE) return 404
   if (code === DOCUMENT_TOO_LARGE_CODE) return 413
-  if (code === DOCUMENT_TARGET_CONFLICT_CODE || code === DOCUMENT_NAME_EXHAUSTED_CODE) return 409
-  if (code === INVALID_DOCUMENT_NAME_CODE || code === INVALID_DOCUMENT_REF_CODE) return 400
+  if (code === DOCUMENT_TARGET_CONFLICT_CODE || code === DOCUMENT_NAME_EXHAUSTED_CODE
+    || code === DOCUMENT_DIRECTORY_CONFLICT_CODE || code === DOCUMENT_DIRECTORY_NOT_EMPTY_CODE) return 409
+  if (code === INVALID_DOCUMENT_NAME_CODE || code === INVALID_DOCUMENT_REF_CODE
+    || code === INVALID_DOCUMENT_DIRECTORY_CODE) return 400
+  if (code === DOCUMENT_DIRECTORY_WRITE_FAILED_CODE || code === DOCUMENT_MOVE_FAILED_CODE
+    || code === DOCUMENT_MIGRATION_FAILED_CODE) return 500
   return 500
 }
 
@@ -62,6 +75,14 @@ function requiredQuery(url: URL, name: string): string {
     throw new UserDocError(`Missing ${name}.`, INVALID_DOCUMENT_REF_CODE)
   }
   return value
+}
+
+function directoryQuery(url: URL): ReturnType<typeof UserDocDirectoryId> {
+  return UserDocDirectoryId(url.searchParams.get('directory') ?? '')
+}
+
+function requiredDirectoryQuery(url: URL, name: string): ReturnType<typeof UserDocDirectoryId> {
+  return UserDocDirectoryId(requiredQuery(url, name))
 }
 
 function abortFor(req: IncomingMessage, res: ServerResponse): AbortController {
@@ -103,7 +124,7 @@ async function upload(ctx: Context, req: IncomingMessage, res: ServerResponse, u
   const abort = abortFor(req, res)
   try {
     // IncomingMessage is consumed directly; no Connection/body-envelope buffer exists on this path.
-    const target = await ctx.userDocs.resolveTarget({ name: filename })
+    const target = await ctx.userDocs.resolveTarget({ name: filename, directoryId: directoryQuery(url) })
     const body = Readable.toWeb(req) as ReadableStream<Uint8Array>
     const ref = await ctx.userDocs.save(target, body, abort.signal)
     json(res, 201, publicRef(ref))
@@ -111,6 +132,30 @@ async function upload(ctx: Context, req: IncomingMessage, res: ServerResponse, u
     req.resume()
     if (!res.writableEnded && !abort.signal.aborted) failure(res, error)
   }
+}
+
+async function createFolder(ctx: Context, res: ServerResponse, url: URL): Promise<void> {
+  const created = await ctx.userDocs.createDirectory(directoryQuery(url), requiredQuery(url, 'name'))
+  json(res, 201, { ...created })
+}
+
+async function renameFolder(ctx: Context, res: ServerResponse, url: URL): Promise<void> {
+  const renamed = await ctx.userDocs.renameDirectory(
+    requiredDirectoryQuery(url, 'id'),
+    requiredQuery(url, 'name'),
+  )
+  json(res, 200, { ...renamed })
+}
+
+async function deleteFolder(ctx: Context, res: ServerResponse, url: URL): Promise<void> {
+  await ctx.userDocs.removeDirectory(requiredDirectoryQuery(url, 'id'))
+  res.writeHead(204, { 'cache-control': 'no-store' })
+  res.end()
+}
+
+async function moveDocument(ctx: Context, res: ServerResponse, url: URL): Promise<void> {
+  const moved = await ctx.userDocs.move(UserDocId(requiredQuery(url, 'id')), directoryQuery(url))
+  json(res, 200, { ...moved })
 }
 
 async function download(ctx: Context, req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
@@ -151,8 +196,26 @@ export async function handleUserDocHttp(ctx: Context, req: IncomingMessage, res:
   try {
     if (url.pathname === USERDOC_HTTP_PATH && req.method === 'GET') {
       const abort = abortFor(req, res)
-      const documents = await ctx.userDocs.list(abort.signal)
-      if (!abort.signal.aborted) json(res, 200, { limits: ctx.userDocs.limits, documents: documents.map(publicRef) })
+      if (url.searchParams.has('directory')) {
+        const listing = await ctx.userDocs.listDirectory(directoryQuery(url), abort.signal)
+        if (!abort.signal.aborted) {
+          json(res, 200, {
+            limits: ctx.userDocs.limits,
+            ...listing,
+            documents: listing.documents.map(publicRef),
+            directories: listing.directories.map(directory => ({ ...directory })),
+          })
+        }
+      } else {
+        const documents = await ctx.userDocs.list(abort.signal)
+        if (!abort.signal.aborted) json(res, 200, { limits: ctx.userDocs.limits, documents: documents.map(publicRef) })
+      }
+      return
+    }
+    if (url.pathname === `${USERDOC_HTTP_PATH}/directories` && req.method === 'GET') {
+      const abort = abortFor(req, res)
+      const directories = await ctx.userDocs.listDirectories(abort.signal)
+      if (!abort.signal.aborted) json(res, 200, { directories: directories.map(directory => ({ ...directory })) })
       return
     }
     if (url.pathname === USERDOC_HTTP_PATH && req.method === 'POST') {
@@ -167,6 +230,22 @@ export async function handleUserDocHttp(ctx: Context, req: IncomingMessage, res:
       await ctx.userDocs.remove(UserDocId(requiredQuery(url, 'id')))
       res.writeHead(204, { 'cache-control': 'no-store' })
       res.end()
+      return
+    }
+    if (url.pathname === `${USERDOC_HTTP_PATH}/folders` && req.method === 'POST') {
+      await createFolder(ctx, res, url)
+      return
+    }
+    if (url.pathname === `${USERDOC_HTTP_PATH}/folders` && req.method === 'PATCH') {
+      await renameFolder(ctx, res, url)
+      return
+    }
+    if (url.pathname === `${USERDOC_HTTP_PATH}/folders` && req.method === 'DELETE') {
+      await deleteFolder(ctx, res, url)
+      return
+    }
+    if (url.pathname === `${USERDOC_HTTP_PATH}/move` && req.method === 'POST') {
+      await moveDocument(ctx, res, url)
       return
     }
     res.writeHead(404)

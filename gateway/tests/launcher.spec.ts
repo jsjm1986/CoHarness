@@ -86,7 +86,10 @@ describe('LocalLauncher', () => {
     expect(spawnMock).toHaveBeenCalledWith('node', ['runtime.js', '--port', '42001'], expect.objectContaining({
       cwd: '/srv/harness/users/alice/home',
       stdio: ['ignore', 'ignore', 'inherit', 'pipe'],
-      env: expect.objectContaining({ DSH_GATEWAY_CREDENTIAL_FD: '3' }),
+      env: expect.objectContaining({
+        HOME: '/srv/harness/users/alice/home',
+        DSH_GATEWAY_CREDENTIAL_FD: '3',
+      }),
     }))
     expect(credential).toBe('{"token":"test"}')
   })

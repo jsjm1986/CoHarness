@@ -74,6 +74,7 @@ export class PostgresUserService {
     if (!USERNAME_RE.test(input.username)) throw new Error(`invalid username: ${input.username}`)
     const homePath = join(this.cfg.usersRoot, input.username, 'home')
     mkdirSync(homePath, { recursive: true })
+    mkdirSync(join(homePath, 'documents'), { recursive: true })
     mkdirSync(join(this.cfg.usersRoot, input.username, 'dsh'), { recursive: true })
     const passwordHash = await hashPassword(input.password)
     let publicId: number
