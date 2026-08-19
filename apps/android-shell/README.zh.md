@@ -29,6 +29,10 @@ cd android
 
 自定义 CoHarness 桌面图标和启动画面的源文件保存在 `branding/`。Android 使用配套的自适应前景/背景资源、横竖屏启动画面，并把 `ic_stat_harness` 作为通知栏单色图标。
 
+## 闪退隔离构建
+
+执行 `pnpm run android:diagnostic` 会生成 `android/app/build/outputs/apk/diagnostic/app-diagnostic.apk`。这个使用 Debug 签名的 APK 以 `CoHarness Test` 和应用 id `com.coharness.test` 独立安装，加载同一个线上 Web UI，并移除原生推送插件、组件和权限。它只用于判断启动失败来自 WebView/Web UI 链路还是原生推送链路，因此不会提供通知功能。
+
 Gateway 需要配置 `HGW_FCM_PROJECT_ID` 和 `HGW_FCM_SERVICE_ACCOUNT_FILE` 才会实际向 FCM 发送消息。服务端凭据必须放在 Gateway 主机的权限受限文件中。
 
 ## 推送通道

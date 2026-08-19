@@ -10,6 +10,7 @@
     "cap:sync": "cap sync android",
     "android:open": "cap open android",
     "android:debug": "cap run android",
+    "android:diagnostic": "cd android && ./gradlew assembleDiagnostic",
     "android:release": "cd android && ./gradlew assembleRelease"
   },
   "dependencies": {

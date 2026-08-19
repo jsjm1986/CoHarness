@@ -21,7 +21,7 @@ public final class CoHarnessApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
-        if (!isMainProcess() || !jPushAppKeyConfigured(this)) return;
+        if (!BuildConfig.NATIVE_PUSH_ENABLED || !isMainProcess() || !jPushAppKeyConfigured(this)) return;
         if (getSharedPreferences(PUSH_PREFERENCES, MODE_PRIVATE)
             .getBoolean(JPUSH_CONSENT, false)) {
             initializeJPush(this);
@@ -31,7 +31,9 @@ public final class CoHarnessApplication extends Application {
     /** Enables JPush after the native notification-consent flow has completed. */
     public static boolean initializeJPush(Context context) {
         Context appContext = context.getApplicationContext();
-        if (!isMainProcess(appContext) || !jPushAppKeyConfigured(appContext)) return false;
+        if (!BuildConfig.NATIVE_PUSH_ENABLED || !isMainProcess(appContext) || !jPushAppKeyConfigured(appContext)) {
+            return false;
+        }
         if (appContext.getSharedPreferences(PUSH_PREFERENCES, Context.MODE_PRIVATE)
             .getBoolean(JPUSH_CONSENT, false)) return true;
         try {

@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-18-android-jpush-multi-provider-delivery.md
-2026-08-18-android-jpush-multi-provider-delivery.md: 5d4317a7bf10c8202a1bc199324c66a4b265f297
-2026-08-18-android-jpush-multi-provider-delivery.zh.md: c9518899ec28e3ae94dcf133d78fce133d79ecaa
+2026-08-18-android-jpush-multi-provider-delivery.md: f5057f902ceaa26863e6ed575f8765e9fd16446a
+2026-08-18-android-jpush-multi-provider-delivery.zh.md: 2a77200995d1c7fa382fcfdb49583048a03ae31d

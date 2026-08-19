@@ -27,6 +27,9 @@ def enableHonor = booleanProperty('JPUSH_ENABLE_HONOR', false)
 android {
     namespace = "com.coharness"
     compileSdk = rootProject.ext.compileSdkVersion
+    buildFeatures {
+        buildConfig = true
+    }
     defaultConfig {
         applicationId "com.coharness"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -34,6 +37,7 @@ android {
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField "boolean", "NATIVE_PUSH_ENABLED", "true"
         ndk {
             abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
         }
@@ -62,6 +66,14 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+        diagnostic {
+            initWith debug
+            applicationIdSuffix ".test"
+            versionNameSuffix "-diagnostic"
+            matchingFallbacks = ['debug']
+            buildConfigField "boolean", "NATIVE_PUSH_ENABLED", "false"
+            manifestPlaceholders = [JPUSH_APPKEY: '']
         }
     }
 }

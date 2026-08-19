@@ -1,0 +1,12 @@
+{
+  "appId": "com.coharness.test",
+  "appName": "CoHarness Test",
+  "webDir": "dist",
+  "server": {
+    "url": "https://harness.maycran.com/",
+    "cleartext": false,
+    "allowNavigation": [
+      "harness.maycran.com"
+    ]
+  }
+}
