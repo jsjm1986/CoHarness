@@ -2,7 +2,14 @@
 /** Browser HTTP client for the optional Host user-document service.
  *  This plugin owns a local copy because the client bundle purity gate
  *  forbids a value import of conversation's HTTP client. */
-import type { UserDocIdType, UserDocLimits, UserDocRef } from '@deepseek-ai/dsh-userdoc'
+import type {
+  UserDocDirectoryIdType,
+  UserDocDirectoryListing,
+  UserDocDirectoryRef,
+  UserDocIdType,
+  UserDocLimits,
+  UserDocRef,
+} from '@deepseek-ai/dsh-userdoc'
 
 /** Stable error surfaced when the deployment does not mount the document route. */
 export class UserDocServiceUnavailableError extends Error {
@@ -39,13 +46,46 @@ export interface UserDocListResponse {
   readonly documents: readonly UserDocRef[]
 }
 
+/** Response from one immediate document-directory listing. */
+export interface UserDocDirectoryResponse extends UserDocDirectoryListing {
+  readonly limits: UserDocLimits
+}
+
+/** Response containing every available move destination. */
+export interface UserDocDirectoriesResponse {
+  readonly directories: readonly UserDocDirectoryRef[]
+}
+
 /** Progress callback for one streaming browser upload. */
 export type UserDocUploadProgress = (loaded: number, total: number) => void
 
 /** Optional document route client; all paths are relative to the current host. */
 export interface UserDocClient {
   list(signal?: AbortSignal): Promise<UserDocListResponse>
-  upload(file: File, signal?: AbortSignal, onProgress?: UserDocUploadProgress): Promise<UserDocRef>
+  browse(directoryId: UserDocDirectoryIdType, signal?: AbortSignal): Promise<UserDocDirectoryResponse>
+  listDirectories(signal?: AbortSignal): Promise<UserDocDirectoriesResponse>
+  upload(
+    file: File,
+    directoryId: UserDocDirectoryIdType,
+    signal?: AbortSignal,
+    onProgress?: UserDocUploadProgress,
+  ): Promise<UserDocRef>
+  createDirectory(
+    parentDirectoryId: UserDocDirectoryIdType,
+    name: string,
+    signal?: AbortSignal,
+  ): Promise<UserDocDirectoryRef>
+  renameDirectory(
+    directoryId: UserDocDirectoryIdType,
+    name: string,
+    signal?: AbortSignal,
+  ): Promise<UserDocDirectoryRef>
+  removeDirectory(directoryId: UserDocDirectoryIdType, signal?: AbortSignal): Promise<void>
+  move(
+    docId: UserDocIdType,
+    directoryId: UserDocDirectoryIdType,
+    signal?: AbortSignal,
+  ): Promise<UserDocRef>
   remove(docId: UserDocIdType, signal?: AbortSignal): Promise<void>
   contentUrl(docId: UserDocIdType): string
 }
@@ -63,12 +103,11 @@ async function parseResponse(response: Response): Promise<unknown> {
   try {
     return JSON.parse(text) as unknown
   } catch {
-    return { error: { message: text } }
+    return text
   }
 }
 
 function errorFrom(status: number, body: unknown): Error {
-  if (status === 404) return new UserDocServiceUnavailableError(status)
   if (typeof body === 'object' && body !== null && 'error' in body) {
     const error = (body as { error?: unknown }).error
     if (typeof error === 'object' && error !== null) {
@@ -78,7 +117,11 @@ function errorFrom(status: number, body: unknown): Error {
       return new UserDocHttpError(status, message, code)
     }
   }
-  return new UserDocHttpError(status, 'Document operation failed.')
+  if (status === 404) return new UserDocServiceUnavailableError(status)
+  return new UserDocHttpError(
+    status,
+    typeof body === 'string' && body !== '' ? body : 'Document operation failed.',
+  )
 }
 
 async function requestJson<T>(input: RequestInfo | URL, init: RequestInit | undefined): Promise<T> {
@@ -104,7 +147,12 @@ function abortError(signal: AbortSignal | undefined): Error {
     : new DOMException('The operation was aborted.', 'AbortError')
 }
 
-function xhrUpload(file: File, signal?: AbortSignal, onProgress?: UserDocUploadProgress): Promise<UserDocRef> {
+function xhrUpload(
+  file: File,
+  directoryId: UserDocDirectoryIdType,
+  signal?: AbortSignal,
+  onProgress?: UserDocUploadProgress,
+): Promise<UserDocRef> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     let settled = false
@@ -119,7 +167,7 @@ function xhrUpload(file: File, signal?: AbortSignal, onProgress?: UserDocUploadP
       finish(() => { reject(abortError(signal)) })
     }
     signal?.addEventListener('abort', abort, { once: true })
-    xhr.open('POST', `${ROOT}?name=${encodeURIComponent(file.name)}`)
+    xhr.open('POST', `${ROOT}?name=${encodeURIComponent(file.name)}&directory=${encodeURIComponent(directoryId)}`)
     xhr.setRequestHeader(UPLOAD_HEADER, '1')
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) onProgress?.(event.loaded, event.total)
@@ -151,7 +199,33 @@ function xhrUpload(file: File, signal?: AbortSignal, onProgress?: UserDocUploadP
 export function createUserDocClient(): UserDocClient {
   return {
     list: signal => requestJson<UserDocListResponse>(ROOT, requestInit('GET', signal)),
-    upload: (file, signal, onProgress) => xhrUpload(file, signal, onProgress),
+    browse: (directoryId, signal) => requestJson<UserDocDirectoryResponse>(
+      `${ROOT}?directory=${encodeURIComponent(directoryId)}`,
+      requestInit('GET', signal),
+    ),
+    listDirectories: signal => requestJson<UserDocDirectoriesResponse>(
+      `${ROOT}/directories`,
+      requestInit('GET', signal),
+    ),
+    upload: (file, directoryId, signal, onProgress) => xhrUpload(file, directoryId, signal, onProgress),
+    createDirectory: (parentDirectoryId, name, signal) => requestJson<UserDocDirectoryRef>(
+      `${ROOT}/folders?directory=${encodeURIComponent(parentDirectoryId)}&name=${encodeURIComponent(name)}`,
+      requestInit('POST', signal),
+    ),
+    renameDirectory: (directoryId, name, signal) => requestJson<UserDocDirectoryRef>(
+      `${ROOT}/folders?id=${encodeURIComponent(directoryId)}&name=${encodeURIComponent(name)}`,
+      requestInit('PATCH', signal),
+    ),
+    removeDirectory: async (directoryId, signal) => {
+      await requestJson<undefined>(
+        `${ROOT}/folders?id=${encodeURIComponent(directoryId)}`,
+        requestInit('DELETE', signal),
+      )
+    },
+    move: (docId, directoryId, signal) => requestJson<UserDocRef>(
+      `${ROOT}/move?id=${encodeURIComponent(docId)}&directory=${encodeURIComponent(directoryId)}`,
+      requestInit('POST', signal),
+    ),
     remove: async (docId, signal) => {
       try {
         await requestJson<undefined>(`${ROOT}?id=${encodeURIComponent(docId)}`, requestInit('DELETE', signal))
@@ -159,7 +233,6 @@ export function createUserDocClient(): UserDocClient {
         // Delete is idempotent; a missing route means there is no durable object
         // to clean up, and a 404 from the route has the same convergence result.
         if (error instanceof UserDocServiceUnavailableError) return
-        /* v8 ignore next -- errorFrom maps HTTP 404 to UserDocServiceUnavailableError */
         if (error instanceof UserDocHttpError && error.status === 404) return
         throw error
       }

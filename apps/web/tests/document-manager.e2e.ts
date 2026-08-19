@@ -1,7 +1,7 @@
 /**
  * Document manager chrome through the shipped Web composition: desktop list
- * dialog and compact bottom sheet. Keyless: the Host document list is routed
- * to a fixture payload; no model turns.
+ * dialog, compact bottom sheet, and a paged 21-file list. Keyless: the Host
+ * document list is routed to a fixture payload; no model turns.
  */
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
@@ -17,29 +17,52 @@ import { saveFailureShot } from './support.ts'
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/document-manager', import.meta.url))
 const DESKTOP_EXPECTED = join(SNAPSHOT_DIR, 'desktop.expected.md')
 const COMPACT_EXPECTED = join(SNAPSHOT_DIR, 'compact.expected.md')
+const PAGED_EXPECTED = join(SNAPSHOT_DIR, 'desktop-paged.expected.md')
 const MODE = webSnapshotMode()
 
+const LIMITS = {
+  maxFileBytes: 104_857_600,
+  maxFilesPerMessage: 20,
+  maxMessageBytes: 100,
+  maxInlineTextBytes: 256,
+}
+
 const LIST_PAYLOAD = {
-  limits: {
-    maxFileBytes: 104_857_600,
-    maxFilesPerMessage: 20,
-    maxMessageBytes: 100,
-    maxInlineTextBytes: 256,
-  },
+  limits: LIMITS,
+  directoryId: '',
+  directories: [
+    { directoryId: 'reports', path: '/workspace/documents/reports', name: 'reports', modifiedAt: 1 },
+  ],
   documents: [
-    { docId: '2026-08-14/brief.txt', name: 'brief.txt', bytes: 21, mediaType: 'text/plain' },
-    { docId: '2026-08-16/notes.txt', name: 'notes.txt', bytes: 30_720, mediaType: 'text/plain' },
+    { docId: '2026-08-14/brief.txt', name: 'brief.txt', bytes: 21, mediaType: 'text/plain', modifiedAt: Date.UTC(2026, 7, 14) },
+    { docId: '2026-08-16/notes.txt', name: 'notes.txt', bytes: 30_720, mediaType: 'text/plain', modifiedAt: Date.UTC(2026, 7, 16) },
   ],
 }
 
-async function mockDocuments(page: Page): Promise<void> {
-  await page.route('**/api/documents', async (route) => {
+const PAGED_PAYLOAD = {
+  limits: LIMITS,
+  directoryId: '',
+  directories: [],
+  documents: Array.from({ length: 21 }, (_, i) => {
+    const day = String(i + 1).padStart(2, '0')
+    return {
+      docId: `2026-08-${day}/f-${day}.txt`,
+      name: `f-${day}.txt`,
+      bytes: 21,
+      mediaType: 'text/plain',
+      modifiedAt: Date.UTC(2026, 7, i + 1),
+    }
+  }),
+}
+
+async function mockDocuments(page: Page, payload: typeof LIST_PAYLOAD = LIST_PAYLOAD): Promise<void> {
+  await page.route(/\/api\/documents(?:\?.*)?$/, async (route) => {
     const pathname = new URL(route.request().url()).pathname
     if (pathname !== '/api/documents' || route.request().method() !== 'GET') {
       await route.continue()
       return
     }
-    await route.fulfill({ json: LIST_PAYLOAD })
+    await route.fulfill({ json: payload })
   })
 }
 
@@ -70,7 +93,7 @@ describe('web e2e: document manager', () => {
     if (failures.length > 1) throw new AggregateError(failures, 'document manager e2e cleanup failed')
   })
 
-  it('desktop: lists date groups with named row actions in a centered dialog', async () => {
+  it('desktop: lists folders and date groups with named row actions in a centered dialog', async () => {
     page = await browser.newPage({ viewport: { width: 1280, height: 800 }, locale: 'en-US' })
     tripwire = watchConsole(page)
     onTestFailed(() => saveFailureShot(page, 'web-e2e-document-manager-desktop'))
@@ -82,8 +105,26 @@ describe('web e2e: document manager', () => {
     await dialog.waitFor({ timeout: 10_000 })
     await dialog.getByText('brief.txt').waitFor({ timeout: 10_000 })
     await dialog.getByText('notes.txt').waitFor({ timeout: 10_000 })
+    await dialog.getByRole('button', { name: 'Open folder reports' }).waitFor({ timeout: 10_000 })
     const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(DESKTOP_EXPECTED, snapshot, MODE)
+  }, 60_000)
+
+  it('desktop: pages a 21-file list and shows the oldest file on page two', async () => {
+    page = await browser.newPage({ viewport: { width: 1280, height: 800 }, locale: 'en-US' })
+    tripwire = watchConsole(page)
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-document-manager-desktop-paged'))
+    await mockDocuments(page, PAGED_PAYLOAD)
+    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+    await page.getByRole('button', { name: 'Documents', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: 'Document Manager' })
+    await dialog.waitFor({ timeout: 10_000 })
+    await dialog.getByText('f-21.txt').waitFor({ timeout: 10_000 })
+    await dialog.getByRole('button', { name: 'Next page' }).click()
+    await dialog.getByText('f-01.txt').waitFor({ timeout: 10_000 })
+    const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
+    await compareOrRefreshGolden(PAGED_EXPECTED, snapshot, MODE)
   }, 60_000)
 
   it('compact: bottom sheet stacks search above upload and keeps row actions inside the dialog', async () => {
@@ -121,6 +162,10 @@ describe('web e2e: document manager', () => {
   }, 60_000)
 
   it('commits exactly the document-manager snapshot inventory', async () => {
-    await assertFixtureInventory(SNAPSHOT_DIR, ['compact.expected.md', 'desktop.expected.md'])
+    await assertFixtureInventory(SNAPSHOT_DIR, [
+      'compact.expected.md',
+      'desktop-paged.expected.md',
+      'desktop.expected.md',
+    ])
   })
 })

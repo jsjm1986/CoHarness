@@ -17,11 +17,11 @@ describe('formatBytes', () => {
 })
 
 describe('getDateGroup', () => {
-  it('extracts the leading date segment of a document id', () => {
-    expect(getDateGroup('2026-08-17/report.pdf')).toBe('2026-08-17')
+  it('formats a modification timestamp as a UTC date', () => {
+    expect(getDateGroup(Date.UTC(2026, 7, 17, 23, 59))).toBe('2026-08-17')
   })
 
-  it('returns Unknown for ids without a date prefix', () => {
-    expect(getDateGroup('notes.txt')).toBe('Unknown')
+  it('returns Unknown for an invalid timestamp', () => {
+    expect(getDateGroup(Number.NaN)).toBe('Unknown')
   })
 })

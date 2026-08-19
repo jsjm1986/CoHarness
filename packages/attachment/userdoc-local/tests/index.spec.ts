@@ -1,6 +1,6 @@
 import { Context } from '@deepseek-ai/cordis'
 import { DOCUMENT_TOO_LARGE_CODE, INVALID_DOCUMENT_REF_CODE, UserDocId } from '@deepseek-ai/dsh-userdoc'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { lstat, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -9,7 +9,7 @@ import LocalUserDocStore, {
   DEFAULT_MAX_FILES_PER_MESSAGE,
   DEFAULT_MAX_INLINE_TEXT_BYTES,
   DEFAULT_MAX_MESSAGE_BYTES,
-  DEFAULT_UPLOAD_DIR_NAME,
+  DEFAULT_DOCUMENT_DIR_NAME,
 } from '../src/index.ts'
 
 const roots: string[] = []
@@ -46,12 +46,25 @@ describe('local user-document service', () => {
 
   it('roots uploads under the operating-system home when no root is configured', () => {
     const service = new LocalUserDocStore(new Context(), {})
-    expect(service.root).toBe(join(homedir(), DEFAULT_UPLOAD_DIR_NAME))
+    expect(service.root).toBe(join(homedir(), DEFAULT_DOCUMENT_DIR_NAME))
   })
 
   it('expands a tilde-prefixed configured root', () => {
     const service = new LocalUserDocStore(new Context(), { uploadRoot: '~/docs-under-test' })
     expect(service.root).toBe(join(homedir(), 'docs-under-test'))
+  })
+
+  it('does not create or migrate storage before the first operation', async () => {
+    const scratch = await mkdtemp(join(tmpdir(), 'dsh-userdoc-lazy-'))
+    roots.push(scratch)
+    const uploadRoot = join(scratch, 'documents')
+    const legacyUploadRoot = join(scratch, 'uploads')
+    const service = new LocalUserDocStore(new Context(), { uploadRoot, legacyUploadRoot })
+
+    await expect(lstat(uploadRoot)).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(service.list()).resolves.toEqual([])
+    const created = await lstat(uploadRoot)
+    expect(created.isDirectory()).toBe(true)
   })
 
   it('carries one document through save, stat, read, list, and remove', async () => {

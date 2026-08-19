@@ -12,14 +12,11 @@ export function formatBytes(bytes: number): string {
 }
 
 /**
- * Group label for the date portion of a document id (`YYYY-MM-DD` prefix).
- * @param docId - store-scoped identifier whose leading date segment groups uploads.
- * @returns the date segment when it matches `YYYY-MM-DD`, otherwise `Unknown`.
+ * UTC date label for a document modification timestamp.
+ * @param modifiedAt - `UserDocRef.modifiedAt` in epoch milliseconds.
+ * @returns the `YYYY-MM-DD` date, or `Unknown` for an invalid timestamp.
  */
-export function getDateGroup(docId: string): string {
-  // docId format: YYYY-MM-DD/filename
-  /* v8 ignore next -- split always returns an entry for a string */
-  const datePart = docId.split('/')[0] ?? ''
-  if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return datePart
-  return 'Unknown'
+export function getDateGroup(modifiedAt: number): string {
+  if (!Number.isFinite(modifiedAt)) return 'Unknown'
+  return new Date(modifiedAt).toISOString().slice(0, 10)
 }

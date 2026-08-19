@@ -19,6 +19,7 @@ describe('UserService', () => {
     const alice = await users.create({ username: 'alice', password: 'pw-123456' })
     await users.create({ username: 'bob', password: 'pw-123456' })
     expect(existsSync(join(cfg.usersRoot, 'alice', 'home'))).toBe(true)
+    expect(existsSync(join(cfg.usersRoot, 'alice', 'home', 'documents'))).toBe(true)
     expect(existsSync(join(cfg.usersRoot, 'alice', 'dsh'))).toBe(true)
     const listed = users.list()
     expect(listed.map(u => u.port)).toEqual([42000, 42001])

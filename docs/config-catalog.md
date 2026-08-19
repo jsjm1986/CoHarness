@@ -2877,13 +2877,15 @@ Source: [`packages/interaction/user-approval/src/index.ts:177`](../packages/inte
 /** Local document backend configuration. */
 export interface Config {
   /**
-   * Absolute upload root, `~`-expanded. Omitted uses `<home>/uploads`.
+   * Absolute document root, `~`-expanded. Omitted uses `<home>/documents`.
    *
    * The deployment must keep this inside a directory the tool authorization
    * policy already grants the session, because every stored reference carries
    * a real path the model is invited to read.
    */
   uploadRoot?: string
+  /** Optional legacy root to migrate into `uploadRoot`; omitted defaults to `<home>/uploads` only when `uploadRoot` is omitted. */
+  legacyUploadRoot?: string
   /** Maximum bytes accepted for one document. */
   maxFileBytes?: number
   /** Maximum document count accepted in one submitted message. */
@@ -2895,7 +2897,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/attachment/userdoc-local/src/index.ts:52`](../packages/attachment/userdoc-local/src/index.ts)
+Source: [`packages/attachment/userdoc-local/src/index.ts:80`](../packages/attachment/userdoc-local/src/index.ts)
 
 <a id="deepseek-aidsh-web"></a>
 

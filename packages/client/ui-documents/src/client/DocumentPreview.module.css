@@ -4,9 +4,9 @@
 .dialog {
   display: flex;
   flex-direction: column;
-  width: min(560px, 100%);
-  max-height: min(720px, calc(100dvh - 48px));
-  min-height: 0;
+  width: min(960px, 100%);
+  min-height: min(640px, calc(100dvh - 48px));
+  max-height: min(860px, calc(100dvh - 48px));
 }
 
 .shell {
@@ -72,6 +72,7 @@
 @media (max-width: 767px) {
   .dialog {
     width: 100%;
+    min-height: 0;
     height: calc(100dvh - var(--dsw-space-8) - var(--dsw-safe-top));
     max-height: calc(100dvh - var(--dsw-space-8) - var(--dsw-safe-top));
   }

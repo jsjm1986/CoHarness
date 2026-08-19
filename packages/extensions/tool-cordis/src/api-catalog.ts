@@ -2138,7 +2138,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'abstract resolveTarget(input: ResolveUserDocTarget): Promise<UserDocTarget>',
-        description: 'Resolve one untrusted client file name to the absolute path a `save` will create. Implementations sanitize the name, keep the result inside the upload root, and pick a leaf that no existing entry holds.',
+        description: 'Resolve one untrusted client file name to the absolute path a `save` will create. Implementations sanitize the name, keep the result inside the document root, and pick a leaf that no existing entry holds.',
         parameters: [{ name: 'input', description: 'client-supplied name, treated as untrusted text.' }],
         returns: 'the resolved write target.',
         throws: ['UserDocError when no acceptable free name can be derived from the input.'],
@@ -2157,11 +2157,52 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'references to all stored documents; empty before the first upload.',
       },
       {
+        signature: 'abstract listDirectory( directoryId: UserDocDirectoryId, signal?: AbortSignal, ): Promise<UserDocDirectoryListing>',
+        description: 'List one directory\'s immediate children.',
+        parameters: [{ name: 'directoryId', description: 'store-scoped directory identifier; the empty identifier selects the root.' }, { name: 'signal', description: 'optional cancellation for the directory scan.' }],
+        returns: 'immediate directories and documents.',
+        throws: ['UserDocError when the identifier is invalid or the directory is absent.'],
+      },
+      {
+        signature: 'abstract listDirectories(signal?: AbortSignal): Promise<UserDocDirectoryRef[]>',
+        description: 'List every directory below the document root.',
+        parameters: [{ name: 'signal', description: 'optional cancellation for the recursive scan.' }],
+        returns: 'directory references ordered by identifier.',
+      },
+      {
+        signature: 'abstract createDirectory( parentDirectoryId: UserDocDirectoryId, name: string, ): Promise<UserDocDirectoryRef>',
+        description: 'Create one directory below an existing parent.',
+        parameters: [{ name: 'parentDirectoryId', description: 'parent directory; the empty identifier selects the root.' }, { name: 'name', description: 'untrusted directory leaf name.' }],
+        returns: 'the created directory reference.',
+        throws: ['UserDocError when the name is invalid, the parent is absent, or the target exists.'],
+      },
+      {
+        signature: 'abstract renameDirectory(directoryId: UserDocDirectoryId, name: string): Promise<UserDocDirectoryRef>',
+        description: 'Rename one directory within its current parent.',
+        parameters: [{ name: 'directoryId', description: 'non-root directory to rename.' }, { name: 'name', description: 'untrusted replacement leaf name.' }],
+        returns: 'the renamed directory reference.',
+        throws: ['UserDocError when the directory is absent, the name is invalid, or the target exists.'],
+      },
+      {
+        signature: 'abstract removeDirectory(directoryId: UserDocDirectoryId): Promise<void>',
+        description: 'Delete one empty, non-root directory.',
+        parameters: [{ name: 'directoryId', description: 'directory to delete.' }],
+        returns: 'after the directory is gone.',
+        throws: ['UserDocError when the directory is absent, non-empty, or identifies the root.'],
+      },
+      {
+        signature: 'abstract move(docId: UserDocId, directoryId: UserDocDirectoryId): Promise<UserDocRef>',
+        description: 'Move one document into an existing directory without replacing an entry.',
+        parameters: [{ name: 'docId', description: 'document to move.' }, { name: 'directoryId', description: 'destination directory; the empty identifier selects the root.' }],
+        returns: 'the moved document reference.',
+        throws: ['UserDocError when either identifier is invalid or the destination is occupied.'],
+      },
+      {
         signature: 'abstract stat(docId: UserDocId, signal?: AbortSignal): Promise<UserDocRef>',
-        description: 'Resolve one identifier to its current reference.\n\nEvery read path takes this identifier rather than a `UserDocRef`, because a reference carries an absolute path and a caller\'s copy of one is untrusted input. Implementations re-derive the path from the identifier and re-prove containment, so a tampered path cannot name a file outside the upload root.',
+        description: 'Resolve one identifier to its current reference.\n\nEvery read path takes this identifier rather than a `UserDocRef`, because a reference carries an absolute path and a caller\'s copy of one is untrusted input. Implementations re-derive the path from the identifier and re-prove containment, so a tampered path cannot name a file outside the document root.',
         parameters: [{ name: 'docId', description: 'identifier from a previous `save` or `list`.' }, { name: 'signal', description: 'optional cancellation for the filesystem probe.' }],
         returns: 'the current reference.',
-        throws: ['UserDocError when the identifier is malformed, escapes the upload root, or names no file.'],
+        throws: ['UserDocError when the identifier is malformed, escapes the document root, or names no file.'],
       },
       {
         signature: 'abstract read(docId: UserDocId, signal?: AbortSignal): Promise<StoredUserDoc>',
@@ -2182,7 +2223,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Delete one stored document. Deleting an already-absent document succeeds, so a client retrying a delete it already completed is not an error.',
         parameters: [{ name: 'docId', description: 'identifier from a previous `save` or `list`.' }, { name: 'signal', description: 'optional cancellation.' }],
         returns: 'after the entry is gone.',
-        throws: ['UserDocError when the identifier is malformed or escapes the upload root, or the deletion fails for any reason other than absence.'],
+        throws: ['UserDocError when the identifier is malformed or escapes the document root, or the deletion fails for any reason other than absence.'],
       },
     ],
   },
@@ -3966,7 +4007,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ResolveUserDocTarget',
-    declaration: 'export interface ResolveUserDocTarget {\n    name: string;\n}',
+    declaration: 'export interface ResolveUserDocTarget {\n    name: string;\n    directoryId?: UserDocDirectoryId;\n}',
   },
   {
     name: 'RestoredSessionOptions',
@@ -4879,6 +4920,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'TypertTypeModel',
     declaration: 'export interface TypertTypeModel {\n    readonly name: string;\n    readonly declaration: string;\n}',
+  },
+  {
+    name: 'UserDocDirectoryId',
+    declaration: 'export type UserDocDirectoryId = Branded<\'UserDocDirectoryId\'>;',
+  },
+  {
+    name: 'UserDocDirectoryListing',
+    declaration: 'export interface UserDocDirectoryListing {\n    directoryId: UserDocDirectoryId;\n    parentDirectoryId?: UserDocDirectoryId;\n    directories: UserDocDirectoryRef[];\n    documents: UserDocRef[];\n}',
+  },
+  {
+    name: 'UserDocDirectoryRef',
+    declaration: 'export interface UserDocDirectoryRef {\n    directoryId: UserDocDirectoryId;\n    path: string;\n    name: string;\n    modifiedAt: number;\n}',
   },
   {
     name: 'UserDocId',

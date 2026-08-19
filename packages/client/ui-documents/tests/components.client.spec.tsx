@@ -15,7 +15,9 @@ vi.mock('../src/client/documents-client.ts', async (importOriginal) => {
   }
 })
 import { UserDocServiceUnavailableError } from '../src/client/documents-client.ts'
-import type { UserDocLimits } from '../src/client/documents-client.ts'
+import type {
+  UserDocDirectoryIdType, UserDocDirectoryRef, UserDocLimits,
+} from '../src/client/documents-client.ts'
 
 function t(key: DocumentsKey, params?: Record<string, string>): string {
   let text = (zh as Record<string, string>)[key] ?? key
@@ -29,13 +31,28 @@ function t(key: DocumentsKey, params?: Record<string, string>): string {
 
 const limits = { maxFileBytes: 10 * 1024 * 1024, maxFilesPerMessage: 5, maxMessageBytes: 100, maxInlineTextBytes: 256 }
 
-function doc(ref: Partial<{ docId: string; name: string; bytes: number; mediaType: string }> = {}) {
+function doc(ref: Partial<{ docId: string; name: string; bytes: number; mediaType: string; modifiedAt: number }> = {}) {
+  const docId = ref.docId ?? '2026-08-17/report.pdf'
+  const date = /^(\d{4})-(\d{2})-(\d{2})(?:\/|$)/.exec(docId)
   return {
-    docId: '2026-08-17/report.pdf',
+    docId,
+    path: `/documents/${docId}`,
     name: 'report.pdf',
     bytes: 2048,
     mediaType: 'application/pdf',
+    modifiedAt: date === null
+      ? Date.UTC(2026, 7, 17)
+      : Date.UTC(Number(date[1]), Number(date[2]) - 1, Number(date[3])),
     ...ref,
+  }
+}
+
+function directory(directoryId: string, name = directoryId.split('/').at(-1) ?? directoryId): UserDocDirectoryRef {
+  return {
+    directoryId: directoryId as UserDocDirectoryIdType,
+    name,
+    path: `/documents/${directoryId}`,
+    modifiedAt: 1,
   }
 }
 
@@ -43,12 +60,34 @@ function makeClient() {
   const documents = [doc()]
   return {
     list: vi.fn(async () => ({ documents, limits })),
+    browse: vi.fn(async (directoryId: UserDocDirectoryIdType = '' as UserDocDirectoryIdType) => ({
+      directoryId,
+      directories: [] as UserDocDirectoryRef[],
+      documents,
+      limits,
+    })),
+    listDirectories: vi.fn(async () => ({ directories: [] as UserDocDirectoryRef[] })),
     upload: vi.fn(async (
       _file: File,
+      _directoryId?: string,
       _signal?: AbortSignal,
       _onProgress?: (loaded: number, total: number) => void,
     ) => doc()),
-    remove: vi.fn(async () => undefined),
+    createDirectory: vi.fn(async (_parentDirectoryId?: string, name: string = '') => ({
+      directoryId: name,
+      name,
+      path: `/documents/${name}`,
+      modifiedAt: 1,
+    })),
+    renameDirectory: vi.fn(async (_directoryId?: string, name: string = '') => ({
+      directoryId: name,
+      name,
+      path: `/documents/${name}`,
+      modifiedAt: 1,
+    })),
+    removeDirectory: vi.fn(async (_directoryId?: string) => undefined),
+    move: vi.fn(async (_docId?: string, _directoryId?: string) => doc()),
+    remove: vi.fn(async (_docId?: string) => undefined),
     contentUrl: vi.fn((id: string) => `/api/documents/content?id=${encodeURIComponent(id)}`),
   }
 }
@@ -57,8 +96,10 @@ function renderModal() {
   return render(<DocumentsModal open onClose={() => {}} t={t} />)
 }
 
-function namedButton(action: 'preview' | 'delete', name: string) {
-  const key = action === 'preview' ? 'action.previewNamed' : 'action.deleteNamed'
+function namedButton(action: 'preview' | 'move' | 'delete', name: string) {
+  const key = action === 'preview'
+    ? 'action.previewNamed'
+    : action === 'move' ? 'action.moveNamed' : 'action.deleteNamed'
   return screen.getByRole('button', { name: t(key, { name }) })
 }
 
@@ -108,7 +149,7 @@ describe('DocumentsModal', () => {
 
   it('shows the unavailable error when the service route is missing', async () => {
     const client = makeClient()
-    client.list.mockRejectedValue(new UserDocServiceUnavailableError())
+    client.browse.mockRejectedValue(new UserDocServiceUnavailableError())
     createUserDocClient.mockReturnValue(client)
     renderModal()
     const alert = await screen.findByRole('alert')
@@ -118,7 +159,7 @@ describe('DocumentsModal', () => {
   it('ignores an aborted load after the modal unmounts', async () => {
     const client = makeClient()
     let rejectList: (error: Error) => void = () => {}
-    client.list.mockImplementation(() => new Promise((_, reject) => { rejectList = reject }))
+    client.browse.mockImplementation(() => new Promise((_, reject) => { rejectList = reject }))
     createUserDocClient.mockReturnValue(client)
     const { unmount } = renderModal()
     unmount()
@@ -129,7 +170,7 @@ describe('DocumentsModal', () => {
 
   it('shows a generic list error for other failures', async () => {
     const client = makeClient()
-    client.list.mockRejectedValue(new Error('boom'))
+    client.browse.mockRejectedValue(new Error('boom'))
     createUserDocClient.mockReturnValue(client)
     renderModal()
     const alert = await screen.findByRole('alert')
@@ -142,6 +183,7 @@ describe('DocumentsModal', () => {
     const held = new Promise<void>((resolve) => { release = resolve })
     client.upload.mockImplementation(async (
       _file: File,
+      _directoryId?: string,
       _signal?: AbortSignal,
       onProgress?: (loaded: number, total: number) => void,
     ) => {
@@ -161,7 +203,7 @@ describe('DocumentsModal', () => {
       current: '1', total: '1', percent: '50',
     }))).toBeTruthy()
     release()
-    await waitFor(() => { expect(client.upload).toHaveBeenCalledWith(file, undefined, expect.any(Function)) })
+    await waitFor(() => { expect(client.upload).toHaveBeenCalledWith(file, '', undefined, expect.any(Function)) })
   })
 
   it('reports an upload failure', async () => {
@@ -187,7 +229,7 @@ describe('DocumentsModal', () => {
     fireEvent.dragEnter(panel)
     fireEvent.dragOver(panel)
     fireEvent.drop(panel, { dataTransfer: { files: [file] } })
-    await waitFor(() => { expect(client.upload).toHaveBeenCalledWith(file, undefined, expect.any(Function)) })
+    await waitFor(() => { expect(client.upload).toHaveBeenCalledWith(file, '', undefined, expect.any(Function)) })
   })
 
   it('clears the drop overlay when the pointer leaves', async () => {
@@ -257,7 +299,9 @@ describe('DocumentsModal', () => {
 
   it('opens a text preview through the modal', async () => {
     const client = makeClient()
-    client.list.mockImplementation(async () => ({
+    client.browse.mockImplementation(async () => ({
+      directoryId: '',
+      directories: [],
       documents: [doc({ docId: '2026-08-17/readme.md', name: 'readme.md', bytes: 10, mediaType: 'text/markdown' })],
       limits,
     }))
@@ -278,7 +322,9 @@ describe('DocumentsModal', () => {
 
   it('previews an image document', async () => {
     const client = makeClient()
-    client.list.mockImplementation(async () => ({
+    client.browse.mockImplementation(async () => ({
+      directoryId: '',
+      directories: [],
       documents: [doc({ docId: '2026-08-17/photo.png', name: 'photo.png', mediaType: 'image/png' })],
       limits,
     }))
@@ -292,7 +338,9 @@ describe('DocumentsModal', () => {
 
   it('previews a PDF document', async () => {
     const client = makeClient()
-    client.list.mockImplementation(async () => ({
+    client.browse.mockImplementation(async () => ({
+      directoryId: '',
+      directories: [],
       documents: [doc()],
       limits,
     }))
@@ -306,7 +354,9 @@ describe('DocumentsModal', () => {
 
   it('shows a too-large fallback for text previews exceeding the limit', async () => {
     const client = makeClient()
-    client.list.mockImplementation(async () => ({
+    client.browse.mockImplementation(async () => ({
+      directoryId: '',
+      directories: [],
       documents: [doc({ docId: '2026-08-17/big.txt', name: 'big.txt', bytes: 1024 * 1024, mediaType: 'text/plain' })],
       limits,
     }))
@@ -320,7 +370,9 @@ describe('DocumentsModal', () => {
 
   it('shows an unsupported fallback for unknown media types', async () => {
     const client = makeClient()
-    client.list.mockImplementation(async () => ({
+    client.browse.mockImplementation(async () => ({
+      directoryId: '',
+      directories: [],
       documents: [doc({ docId: '2026-08-17/data.bin', name: 'data.bin', mediaType: 'application/octet-stream' })],
       limits,
     }))
@@ -334,7 +386,9 @@ describe('DocumentsModal', () => {
 
   it('handles a fetch error during text preview gracefully', async () => {
     const client = makeClient()
-    client.list.mockImplementation(async () => ({
+    client.browse.mockImplementation(async () => ({
+      directoryId: '',
+      directories: [],
       documents: [doc({ docId: '2026-08-17/broken.txt', name: 'broken.txt', bytes: 10, mediaType: 'text/plain' })],
       limits,
     }))
@@ -353,7 +407,9 @@ describe('DocumentsModal', () => {
 
   it('groups multiple documents under the same date', async () => {
     const client = makeClient()
-    client.list.mockImplementation(async () => ({
+    client.browse.mockImplementation(async () => ({
+      directoryId: '',
+      directories: [],
       documents: [
         doc({ docId: '2026-08-17/a.pdf', name: 'a.pdf' }),
         doc({ docId: '2026-08-17/b.pdf', name: 'b.pdf' }),
@@ -369,7 +425,7 @@ describe('DocumentsModal', () => {
 
   it('shows no limits text when limits are absent', async () => {
     const client = makeClient()
-    client.list.mockImplementation(async () => ({ documents: [], limits: null as unknown as UserDocLimits }))
+    client.browse.mockImplementation(async () => ({ directoryId: '', directories: [], documents: [], limits: null as unknown as UserDocLimits }))
     createUserDocClient.mockReturnValue(client)
     renderModal()
     await screen.findByText(t('modal.empty'))
@@ -403,5 +459,263 @@ describe('DocumentsModal', () => {
     const confirm = screen.getByRole('dialog', { name: t('delete.confirm.title') })
     fireEvent.click(within(confirm).getAllByRole('button', { name: t('modal.close') }).at(-1)!)
     expect(screen.queryByRole('dialog', { name: t('delete.confirm.title') })).toBeNull()
+  })
+
+  it('shows personal visibility and a filtered count', async () => {
+    createUserDocClient.mockReturnValue(makeClient())
+    renderModal()
+    await screen.findByText('report.pdf')
+    expect(screen.getByText(t('modal.visibility.personal'))).toBeTruthy()
+    expect(screen.getByText(t('modal.count', { count: '1' }))).toBeTruthy()
+  })
+
+  it('navigates folders with breadcrumbs and uploads into the current folder', async () => {
+    const client = makeClient()
+    client.browse.mockImplementation(async (directoryId = '') => directoryId === ''
+      ? { directoryId: '', directories: [directory('reports')], documents: [], limits }
+      : {
+        directoryId: 'reports',
+        parentDirectoryId: '',
+        directories: [],
+        documents: [doc({ docId: 'reports/summary.txt', name: 'summary.txt', mediaType: 'text/plain' })],
+        limits,
+      })
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+
+    fireEvent.click(await screen.findByRole('button', { name: t('folder.openNamed', { name: 'reports' }) }))
+    expect(await screen.findByText('summary.txt')).toBeTruthy()
+    expect(screen.getByRole('navigation', { name: t('breadcrumb.label') }).textContent).toContain('reports')
+
+    const input = document.querySelector('input[type=file]') as HTMLInputElement
+    const file = new File(['x'], 'inside.txt')
+    Object.defineProperty(input, 'files', { value: [file], configurable: true })
+    fireEvent.change(input)
+    await waitFor(() => { expect(client.upload).toHaveBeenCalledWith(file, 'reports', undefined, expect.any(Function)) })
+
+    fireEvent.click(screen.getByRole('button', { name: t('breadcrumb.root') }))
+    expect(await screen.findByRole('button', { name: t('folder.openNamed', { name: 'reports' }) })).toBeTruthy()
+  })
+
+  it('creates, renames, and deletes an empty folder', async () => {
+    const client = makeClient()
+    client.browse.mockImplementation(async () => ({
+      directoryId: '', directories: [directory('reports')], documents: [], limits,
+    }))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByRole('button', { name: t('folder.openNamed', { name: 'reports' }) })
+
+    fireEvent.click(screen.getByRole('button', { name: t('folder.create') }))
+    const createDialog = screen.getByRole('dialog', { name: t('folder.create.title') })
+    fireEvent.change(within(createDialog).getByLabelText(t('folder.name')), { target: { value: 'drafts' } })
+    fireEvent.click(within(createDialog).getByRole('button', { name: t('folder.create.confirm') }))
+    await waitFor(() => { expect(client.createDirectory).toHaveBeenCalledWith('', 'drafts') })
+
+    fireEvent.click(screen.getByRole('button', { name: t('folder.renameNamed', { name: 'reports' }) }))
+    const renameDialog = screen.getByRole('dialog', { name: t('folder.rename.title') })
+    fireEvent.change(within(renameDialog).getByLabelText(t('folder.name')), { target: { value: 'archive' } })
+    fireEvent.click(within(renameDialog).getByRole('button', { name: t('folder.rename.confirm') }))
+    await waitFor(() => { expect(client.renameDirectory).toHaveBeenCalledWith('reports', 'archive') })
+
+    fireEvent.click(screen.getByRole('button', { name: t('folder.deleteNamed', { name: 'reports' }) }))
+    const deleteDialog = screen.getByRole('dialog', { name: t('folder.delete.title') })
+    fireEvent.click(within(deleteDialog).getByRole('button', { name: t('folder.delete.confirm') }))
+    await waitFor(() => { expect(client.removeDirectory).toHaveBeenCalledWith('reports') })
+  })
+
+  it('moves one document to a selected folder', async () => {
+    const client = makeClient()
+    client.listDirectories.mockResolvedValue({ directories: [directory('reports'), directory('archive')] })
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText('report.pdf')
+
+    fireEvent.click(namedButton('move', 'report.pdf'))
+    const moveDialog = await screen.findByRole('dialog', { name: t('move.title') })
+    await waitFor(() => { expect(within(moveDialog).getByLabelText(t('move.destination'))).toBeTruthy() })
+    fireEvent.change(within(moveDialog).getByLabelText(t('move.destination')), { target: { value: 'archive' } })
+    fireEvent.click(within(moveDialog).getByRole('button', { name: t('move.confirm') }))
+    await waitFor(() => { expect(client.move).toHaveBeenCalledWith('2026-08-17/report.pdf', 'archive') })
+  })
+
+  it('keeps only unfinished documents in the move dialog after a partial failure', async () => {
+    const documents = [
+      doc({ docId: '2026-08-17/a.pdf', name: 'a.pdf' }),
+      doc({ docId: '2026-08-17/b.pdf', name: 'b.pdf' }),
+    ]
+    const client = makeClient()
+    client.browse.mockImplementation(async () => ({ directoryId: '', directories: [], documents, limits }))
+    client.listDirectories.mockResolvedValue({ directories: [directory('reports')] })
+    client.move
+      .mockResolvedValueOnce(doc({ docId: 'reports/a.pdf', name: 'a.pdf' }))
+      .mockRejectedValueOnce(new Error('move failed'))
+      .mockResolvedValueOnce(doc({ docId: 'reports/b.pdf', name: 'b.pdf' }))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText('a.pdf')
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'a.pdf' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'b.pdf' }))
+    fireEvent.click(screen.getByRole('button', { name: t('selection.move') }))
+    const moveDialog = await screen.findByRole('dialog', { name: t('move.title') })
+    fireEvent.click(within(moveDialog).getByRole('button', { name: t('move.confirm') }))
+
+    expect(await within(moveDialog).findByText(t('move.error'))).toBeTruthy()
+    expect(within(moveDialog).getByText(t('move.message', { count: '1' }))).toBeTruthy()
+    fireEvent.click(within(moveDialog).getByRole('button', { name: t('move.confirm') }))
+    await waitFor(() => { expect(screen.queryByRole('dialog', { name: t('move.title') })).toBeNull() })
+    expect(client.move).toHaveBeenNthCalledWith(3, '2026-08-17/b.pdf', 'reports')
+  })
+
+  it('pages 21 documents and keeps the last file on page two', async () => {
+    const documents = Array.from({ length: 21 }, (_, i) => {
+      const day = String(i + 1).padStart(2, '0')
+      return doc({ docId: `2026-08-${day}/f-${day}.txt`, name: `f-${day}.txt` })
+    })
+    const client = makeClient()
+    client.browse.mockImplementation(async () => ({ directoryId: '', directories: [], documents, limits }))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    expect(await screen.findByText('f-21.txt')).toBeTruthy()
+    expect(screen.queryByText('f-01.txt')).toBeNull()
+    expect(screen.getByText(t('pager.status', { page: '1', pages: '2' }))).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: t('pager.next') }))
+    expect(await screen.findByText('f-01.txt')).toBeTruthy()
+    expect(screen.queryByText('f-21.txt')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: t('pager.prev') }))
+    expect(await screen.findByText('f-21.txt')).toBeTruthy()
+  })
+
+  it('clamps to page one after the only document on page two is deleted', async () => {
+    let documents = Array.from({ length: 21 }, (_, i) => {
+      const day = String(i + 1).padStart(2, '0')
+      return doc({ docId: `2026-08-${day}/f-${day}.txt`, name: `f-${day}.txt` })
+    })
+    const client = makeClient()
+    client.browse.mockImplementation(async () => ({ directoryId: '', directories: [], documents, limits }))
+    client.remove.mockImplementation(async (id?: string) => {
+      documents = documents.filter(item => item.docId !== id)
+    })
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText('f-21.txt')
+    fireEvent.click(screen.getByRole('button', { name: t('pager.next') }))
+    expect(await screen.findByText('f-01.txt')).toBeTruthy()
+    fireEvent.click(namedButton('delete', 'f-01.txt'))
+    const confirm = screen.getByRole('dialog', { name: t('delete.confirm.title') })
+    fireEvent.click(within(confirm).getByRole('button', { name: t('delete.confirm.button') }))
+    await waitFor(() => { expect(screen.getByText('f-21.txt')).toBeTruthy() })
+    expect(screen.queryByRole('button', { name: t('pager.next') })).toBeNull()
+  })
+
+  it('filters by type and sorts by name without date groups', async () => {
+    const client = makeClient()
+    client.browse.mockImplementation(async () => ({
+      directoryId: '',
+      directories: [],
+      documents: [
+        doc({ docId: '2026-08-17/zeta.pdf', name: 'zeta.pdf', mediaType: 'application/pdf' }),
+        doc({ docId: '2026-08-18/alpha.png', name: 'alpha.png', mediaType: 'image/png' }),
+        doc({ docId: '2026-08-19/beta.txt', name: 'beta.txt', mediaType: 'text/plain' }),
+      ],
+      limits,
+    }))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText('alpha.png')
+    fireEvent.change(screen.getByRole('combobox', { name: t('modal.type') }), { target: { value: 'image' } })
+    expect(screen.getByText('alpha.png')).toBeTruthy()
+    expect(screen.queryByText('beta.txt')).toBeNull()
+    fireEvent.change(screen.getByRole('combobox', { name: t('modal.type') }), { target: { value: 'all' } })
+    fireEvent.change(screen.getByRole('combobox', { name: t('modal.sort') }), { target: { value: 'name:asc' } })
+    expect(screen.queryByRole('group', { name: `${t('listing.date')} 2026-08-18` })).toBeNull()
+    const names = screen.getAllByRole('listitem').map(row => row.textContent ?? '')
+    expect(names[0]).toContain('alpha.png')
+    expect(names[1]).toContain('beta.txt')
+    expect(names[2]).toContain('zeta.pdf')
+  })
+
+  it('selects the current page from the header checkbox and batch-deletes the selection', async () => {
+    const client = makeClient()
+    client.browse.mockImplementation(async () => ({
+      directoryId: '',
+      directories: [],
+      documents: [
+        doc({ docId: '2026-08-17/a.pdf', name: 'a.pdf' }),
+        doc({ docId: '2026-08-17/b.pdf', name: 'b.pdf' }),
+      ],
+      limits,
+    }))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText('a.pdf')
+    fireEvent.click(screen.getByRole('checkbox', { name: 'a.pdf' }))
+    expect(screen.getByText(t('selection.selected', { count: '1' }))).toBeTruthy()
+    fireEvent.click(screen.getByRole('checkbox', { name: t('selection.selectPage') }))
+    expect(screen.getByText(t('selection.selected', { count: '2' }))).toBeTruthy()
+    fireEvent.click(screen.getByRole('checkbox', { name: t('selection.selectPage') }))
+    expect(screen.queryByText(t('selection.selected', { count: '2' }))).toBeNull()
+    fireEvent.click(screen.getByRole('checkbox', { name: t('selection.selectPage') }))
+    fireEvent.click(screen.getByRole('button', { name: t('selection.delete') }))
+    const confirm = screen.getByRole('dialog', { name: t('delete.confirm.title') })
+    expect(confirm.textContent).toContain(t('delete.confirm.message.many', { count: '2', projectExtra: '' }))
+    fireEvent.click(within(confirm).getByRole('button', { name: t('delete.confirm.button') }))
+    await waitFor(() => { expect(client.remove).toHaveBeenCalledTimes(2) })
+    expect(client.remove).toHaveBeenCalledWith('2026-08-17/a.pdf')
+    expect(client.remove).toHaveBeenCalledWith('2026-08-17/b.pdf')
+  })
+
+  it('warns that a project batch delete affects every member', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ scope: { kind: 'project', projectName: '支付重构' } }),
+    })))
+    const client = makeClient()
+    client.browse.mockImplementation(async () => ({
+      directoryId: '',
+      directories: [],
+      documents: [
+        doc({ docId: '2026-08-17/a.pdf', name: 'a.pdf' }),
+        doc({ docId: '2026-08-17/b.pdf', name: 'b.pdf' }),
+      ],
+      limits,
+    }))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    expect(await screen.findByText(t('modal.visibility.project'))).toBeTruthy()
+    fireEvent.click(screen.getByRole('checkbox', { name: 'a.pdf' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'b.pdf' }))
+    fireEvent.click(screen.getByRole('button', { name: t('selection.delete') }))
+    const confirm = screen.getByRole('dialog', { name: t('delete.confirm.title') })
+    expect(confirm.textContent).toContain(t('delete.confirm.project.extra'))
+  })
+
+  it('clears a page selection and prunes it when the type filter hides those rows', async () => {
+    const client = makeClient()
+    client.browse.mockImplementation(async () => ({
+      directoryId: '',
+      directories: [],
+      documents: [
+        doc({ docId: '2026-08-17/pic.png', name: 'pic.png', mediaType: 'image/png' }),
+        doc({ docId: '2026-08-17/note.txt', name: 'note.txt', mediaType: 'text/plain' }),
+      ],
+      limits,
+    }))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText('pic.png')
+    fireEvent.click(screen.getByRole('checkbox', { name: 'pic.png' }))
+    expect(screen.getByText(t('selection.selected', { count: '1' }))).toBeTruthy()
+    fireEvent.click(screen.getByRole('checkbox', { name: 'pic.png' }))
+    expect(screen.queryByText(t('selection.selected', { count: '1' }))).toBeNull()
+    fireEvent.click(screen.getByRole('checkbox', { name: 'pic.png' }))
+    fireEvent.click(screen.getByRole('button', { name: t('selection.clear') }))
+    expect(screen.queryByText(t('selection.selected', { count: '1' }))).toBeNull()
+    fireEvent.click(screen.getByRole('checkbox', { name: 'pic.png' }))
+    fireEvent.change(screen.getByRole('combobox', { name: t('modal.type') }), { target: { value: 'text' } })
+    await waitFor(() => {
+      expect(screen.queryByText(t('selection.selected', { count: '1' }))).toBeNull()
+    })
   })
 })
