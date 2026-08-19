@@ -7,7 +7,7 @@
 ## 前置条件
 
 - 带 systemd 的 Linux、root 权限、Docker Compose、供一次性导入/回滚使用的 `sqlite3`，以及 Node 25（`/usr/local/bin/node`；nvm 布局需调整单元内路径）。创建共享项目单元使用的不可登录 `harness-project` 账户，创建各个 `HGW_PROJECT_PATH_ROOTS` 目录，并授予该账户这些根目录下每个项目目录所需的 Unix 读写权限。每个配置根都会成为管理员宿主机浏览器的一项顶层入口；根本身只能导航，导入项目必须是其严格后代。两个受控根都必须让后续创建的目录继承运行时访问权，例如执行 `install -d -o root -g harness-project -m 2770 /srv/harness/projects/admin /srv/harness/projects/user-projects`（无法使用组继承时改用等效默认 ACL）。setgid 父目录会让 Gateway 以 `0770` 创建的项目目录带上共享运行时组。
-- 钉死版本的 dsh：`npm install -g @deepseek-ai/dsh@0.1.0-rc.5`（升级 = 改版本号 + 滚动重启，绝不检出源码）。注意：开发 clone 里未提交的本地工作（例如 UI 改动）在合入上游前不在 npm 发行版内。
+- 钉死版本的 dsh：`npm install -g @deepseek-ai/dsh@0.1.0-rc.8`（升级 = 改版本号 + 滚动重启，绝不检出源码）。注意：开发 clone 里未提交的本地工作（例如 UI 改动）在合入上游前不在 npm 发行版内。
 - 公网域名的 DNS/入口控制权（Nginx 或 Cloudflare Tunnel）。
 
 ## 安装

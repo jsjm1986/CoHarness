@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-collaboration-gateway",
   "description": "Gateway-backed project collaboration provider for DeepSeek Harness",
-  "version": "0.1.0-rc.5",
+  "version": "0.1.0-rc.8",
   "publishConfig": { "access": "public" },
   "repository": {
     "type": "git",

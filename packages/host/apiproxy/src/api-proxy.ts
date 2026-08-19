@@ -5,12 +5,13 @@
 
 import { randomUUID } from 'node:crypto'
 import { mkdir, realpath, stat } from 'node:fs/promises'
+import { homedir } from 'node:os'
 import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import { installModelSelection } from '@deepseek-ai/dsh-agent'
 import type { Agent, ModelSelection, ModelSelectionRef, AgentOptions, AgentStatus } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-presets/types'
-import { AttachmentError } from '@deepseek-ai/dsh-attachment'
+import { AttachmentError, admitEncodedImages } from '@deepseek-ai/dsh-attachment'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import {
   DOCUMENT_STORE_UNAVAILABLE_CODE,
@@ -252,16 +253,7 @@ export async function authorizeTypertRemote(
 /** Conversation message event types (the pagination counting unit). */
 const MESSAGE_TYPES = new Set(['user/message', 'assistant/message'])
 
-/** Decode the browser payload while rejecting non-canonical base64 forms. */
-function decodeBase64(data: string): Uint8Array {
-  const decoded = Buffer.from(data, 'base64')
-  if (data.length === 0 || decoded.toString('base64') !== data) {
-    throw new AttachmentError('Image upload is not canonical base64.', 'INVALID_IMAGE_BASE64')
-  }
-  return new Uint8Array(decoded)
-}
-
-/** Read one admitted document while preserving the prompt's source order. */
+/** Read the document admitted for one prompt part. */
 function admittedDocumentAt(
   documents: readonly UserDocPromptAttachment[],
   index: number,
@@ -286,41 +278,20 @@ async function durablePromptContent(
     }
     documents = await prepareUserDocAttachments(store, documentParts.map(part => part.docId))
   }
-  if (content.every(part => part.type === 'text' || part.type === 'document')) {
-    let documentIndex = 0
-    return {
-      blocks: content.map((part) => {
-        if (part.type === 'text') return { type: 'text', text: part.text }
-        return { type: 'text', text: renderUserDocAttachment(admittedDocumentAt(documents, documentIndex++)) }
-      }),
-      documents,
-    }
-  }
-  const prepared = content.map(part => part.type === 'image'
-    ? { part, data: decodeBase64(part.data) }
-    : part)
-  const images = prepared.filter((part): part is Extract<typeof part, { data: Uint8Array }> => 'data' in part)
-  const refs = await ctx.attachments.saveImages(images.map(image => ({
-    data: image.data,
-    mediaType: image.part.mediaType,
-    ...image.part.name === undefined ? {} : { name: image.part.name },
-  })))
-  const blocks: ContentBlock[] = []
+  const refs = await admitEncodedImages(ctx.attachments, content.filter(part => part.type === 'image'))
   let documentIndex = 0
   let imageIndex = 0
-  for (const item of prepared) {
-    if (!('data' in item)) {
-      blocks.push(item.type === 'text'
-        ? { type: 'text', text: item.text }
-        : { type: 'text', text: renderUserDocAttachment(admittedDocumentAt(documents, documentIndex++)) })
-      continue
-    }
-    const attachment = refs[imageIndex++]
-    /* v8 ignore next -- each prepared image supplied exactly one saveImages input and therefore one ordered ref. */
-    if (attachment === undefined) throw new Error('attachment batch result did not preserve input cardinality')
-    blocks.push({ type: 'image', attachment })
+  return {
+    blocks: content.map((part) => {
+      if (part.type === 'text') return { type: 'text', text: part.text }
+      if (part.type === 'document') {
+        return { type: 'text', text: renderUserDocAttachment(admittedDocumentAt(documents, documentIndex++)) }
+      }
+      // admitEncodedImages returns one reference per image part in order.
+      return { type: 'image', attachment: refs[imageIndex++] as ImageAttachmentRef }
+    }),
+    documents,
   }
-  return { blocks, documents }
 }
 
 /** Search durable content for an image reference, including nested tool results. */
@@ -381,14 +352,7 @@ function referencedImage(events: readonly SessionEvent[], attachmentId: string):
   return undefined
 }
 
-/**
- * Product settings intentionally exposed beside model-provider namespaces.
- *
- * The agent-preset namespace carries one field — which preset a session with
- * no explicit choice is composed from — and both browser surfaces that offer
- * that choice write it through `settings.update`, so it has to cross the
- * configuration boundary or the pickers silently fail to persist.
- */
+/** Product settings intentionally exposed beside model-provider namespaces. */
 const PRODUCT_SETTINGS_NAMESPACES = new Set(['ui-onboarding', AGENT_PRESET_SETTINGS_NAMESPACE])
 
 /** Strict browser-zone profile: UTC or an IANA Area/Location-style identifier. */
@@ -3560,6 +3524,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           provider: selection.provider,
           model: selection.model,
           attachedSessions,
+          home: homedir(),
           canOpenPath: !projectScope && canOpenPaths(),
         })
       },

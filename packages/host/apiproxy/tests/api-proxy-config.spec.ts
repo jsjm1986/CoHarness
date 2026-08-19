@@ -361,7 +361,11 @@ describe('settings domain', () => {
     expect(opened).toEqual([])
   })
 
-  it('serves every registered namespace in personal scope', async () => {
+  it('serves every registered namespace, including one this repository never named', async () => {
+    // Registering IS the exposure: a plugin distributed outside this
+    // repository configures itself from the browser without a change here.
+    // The plane stays loopback-only and secret-redacted, and which surface
+    // renders a namespace is the browser's decision, not this proxy's.
     const ctx = await harness()
     ctx.settings.register(NS, AdapterConfig)
     ctx.settings.register(settingsNamespace('some-other-plugin'), z.object({ secretPath: z.string() }))
@@ -440,18 +444,6 @@ describe('settings domain', () => {
       .toEqual({ secretPath: '/etc/shadow' })
   })
 
-  it.each(['ro', 'rw'] as const)('filters arbitrary plugin namespaces from %s project scope', async (mode) => {
-    const ctx = await harness({ projectScope: mode })
-    ctx.settings.register(settingsNamespace('some-other-plugin'), z.object({ token: z.string() }))
-    ctx.settings.register(settingsNamespace('shell'), z.object({ timeoutMs: z.number() }))
-    const api = createApiProxy(ctx, DEFAULTS)
-
-    const value = expectOk(await api.settings.describe(request({})))
-
-    expect(value.writable).toBe(false)
-    expect(value.namespaces.map(view => view.ns)).toEqual(['shell'])
-  })
-
   it('serves product preference namespaces without invalidating the model catalog', async () => {
     const ctx = await harness()
     ctx.settings.register(settingsNamespace('ui-onboarding'), z.object({ welcomeNoticeVersion: z.string() }))
@@ -489,15 +481,17 @@ describe('settings domain', () => {
       .toEqual({ default: 'minimal' })
   })
 
-  it('keeps serving a provider namespace after its directory entry is gone', async () => {
+  it('keeps serving a provider namespace whose directory entry is gone', async () => {
+    // The configurable-provider directory says what the Models page can offer,
+    // not what a user may configure: a dormant route's stored section is still
+    // theirs to edit, and losing the entry must not strand it.
     const ctx = await harness({ configurableProviders: false })
     ctx.settings.register(NS, AdapterConfig)
     const api = createApiProxy(ctx, DEFAULTS)
     expect(expectOk(await api.settings.describe(request({}))).namespaces.map(view => view.ns))
       .toEqual(['llm-deepseek'])
-    expect(expectOk(await api.settings.update(request({
-      ns: 'llm-deepseek', patch: { baseURL: 'https://x' },
-    }))).value).toMatchObject({ baseURL: 'https://x' })
+    expect(expectOk(await api.settings.update(request({ ns: 'llm-deepseek', patch: { baseURL: 'https://x' } }))).value)
+      .toMatchObject({ baseURL: 'https://x' })
   })
 
   it('forwards a provider settings change for model-catalog consumers', async () => {
@@ -615,7 +609,10 @@ describe('settings domain', () => {
     expect(error.details).toEqual({ ns })
   })
 
-  it('maps unregistered and malformed namespaces to settings-rejected', async () => {
+  it('answers an unregistered namespace as the seam does, and a malformed one alike', async () => {
+    // A name no registration answers and a name no registration could answer
+    // fold into the same rejection: the proxy adds no boundary of its own, so
+    // the seam's own refusal is the whole answer.
     const ctx = await harness()
     ctx.settings.register(NS, AdapterConfig)
     const api = createApiProxy(ctx, DEFAULTS)

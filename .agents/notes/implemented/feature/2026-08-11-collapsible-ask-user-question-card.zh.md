@@ -16,7 +16,7 @@ Status: implemented
 - 切换按钮使用 `IconChevronDownOutline14` / `IconChevronUpOutline14`，复用现有 24px 图标按钮网格；`aria-expanded` 反映卡片状态，文案在 `nav.minimize` / `nav.maximize` 之间切换（收起后按钮对读屏器显示为"展开"）。
 - 收起时选项主体和底部通过 `{!minimized && ...}` 卸载，a11y 树中不残留隐藏的可交互面。
 - 提交/取消进行中（`busy !== null`）时收起按钮禁用，与现有放弃按钮的守卫一致。
-- CSS：`.cardMinimized` 去掉 `max-height` 上限，其 `.header` 增加底部 padding，避免折叠后过于局促。
+- CSS：`.cardMinimized` 去掉 `max-height` 上限并隐藏 `.body` / `.footer`；`.header` 增加底部 padding，避免折叠后过于局促。
 - 范围：只有通用提问流（`QuestionFlow`）获得该切换。计划评审卡片（`PlanReviewPanel`）是另一种形态（对一个计划做一次决策），保持现有布局。
 
 ## Consequences

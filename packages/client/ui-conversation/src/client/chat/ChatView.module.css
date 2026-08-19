@@ -200,3 +200,8 @@
 :global([data-viewport='compact']) .scroll {
   padding-inline: calc(var(--dsh-composer-side-clearance) + 8px);
 }
+
+/* Host open-path refusal: same dialog family as the workspace folder error. */
+.modalAction {
+  min-width: 72px;
+}

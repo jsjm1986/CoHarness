@@ -9,10 +9,10 @@
   flex: none;
   display: flex;
   align-items: center;
-  gap: var(--dsw-space-2);
+  gap: 8px;
   width: calc(100% + 4px);
   height: 42px;
-  margin: var(--dsw-space-1) -2px;
+  margin: 4px -2px;
   padding: 0 10px 0 8px;
   box-sizing: border-box;
   border: none;

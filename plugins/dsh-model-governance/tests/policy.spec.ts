@@ -126,7 +126,11 @@ describe('model-governance policy projection', () => {
     ['oversized stream timeout', { providers: [completeProvider({ streamIdleTimeoutMs: 2_147_483_648 })] }],
     ['invalid retry policy', { providers: [completeProvider({ retryPolicy: { mode: 'normal', backoff: { initialDelayMs: 0 } } })] }],
     ['unknown retry field', { providers: [completeProvider({ retryPolicy: { mode: 'normal', maxRetires: 1 } })] }],
-    ['invalid embedded retry policy', { providers: [completeProvider({ profile: completeProfile({ retryPolicy: { mode: 'always', maxRetries: 1 } }) })] }],
+    ['invalid embedded retry policy', {
+      providers: [completeProvider({
+        profile: completeProfile({ retryPolicy: { mode: 'always', backoff: { maxDelayMs: 0 } } }),
+      })],
+    }],
     ['unsupported thinking format', { providers: [completeProvider({ profile: completeProfile({ compat: { thinkingFormat: 'chat-template' } }) })] }],
     ['unmanaged compat field', { providers: [completeProvider({ profile: completeProfile({ compat: { supportsStore: true } }) })] }],
     ['empty reasoning efforts', { providers: [completeProvider({ models: [completeModel({ reasoningEfforts: {} })] })] }],

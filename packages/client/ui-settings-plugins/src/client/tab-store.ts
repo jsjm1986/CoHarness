@@ -4,97 +4,99 @@
  * The tab dispatches its slot by settings namespace, so what it renders is
  * the intersection of two ledgers: the namespaces the Host serves and the
  * cards registered into `settings.plugin.item`. A served namespace no card
- * claims renders nothing, and a card whose namespace the Host does not serve
- * is never dispatched.
+ * claims renders nothing — another surface owns it, or this deployment ships
+ * no browser half for it — and a card whose namespace the Host does not serve
+ * is never dispatched, so a plugin this deployment did not compose leaves no
+ * trace and does not count toward the empty line.
  */
 
-import type { IApiClient } from '@deepseek-ai/dsh-client-connection/client'
+import type { SettingsDescribeFace } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { StoredEntry } from '@deepseek-ai/dsh-client-ui-slots'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 
 /** What the section renders. */
 export interface ConfigurablePluginsTabState {
-  /** Whether the Host has answered at least once. */
+  /**
+   * Whether the Host has answered once. The empty line waits for it: an
+   * unanswered read is not the same statement as "this deployment configures
+   * no plugin", and saying the second while the first is true would flash a
+   * wrong answer on every open.
+   */
   loaded: boolean
-  /** Served namespaces in card registration order. */
+  /**
+   * Namespaces to dispatch, in the order their cards registered, narrowed to
+   * those the Host serves. Card registration order rather than the Host's
+   * description order: the latter follows plugin activation, which async
+   * settings injection can reorder between boots, and a settings page whose
+   * cards move between visits is worse than one whose order a registrant
+   * chose.
+   */
   namespaces: string[]
 }
 
 /** The registration-side face the tab's slot entry injects. */
 export interface ConfigurablePluginsTabFace {
   hooks: {
-    /** Configurable plugin directory snapshot. */
+    /** Section snapshot bound by the renderer as usePluginConfigSection. */
     configurablePlugins: SnapshotStore<ConfigurablePluginsTabState>
   }
 }
 
-/** Reads served namespaces and pairs them with cards that claim them. */
+/** Derives the served namespaces from the shared describe mirror and pairs them with the cards that claim them. */
 export class ConfigurablePluginsTabController {
   private readonly store = createSnapshotStore<ConfigurablePluginsTabState>({ loaded: false, namespaces: [] })
-  private served: readonly string[] = []
-  private loaded = false
-  private generation = 0
   private disposed = false
+  private readonly unsubscribe: () => void
 
   /**
-   * @param api - settings wire face.
-   * @param entries - cards currently registered into the section's slot.
+   * @param describeFace - the shared mirror's describe face; its refreshes
+   * (document commits, reconnects) are what keep the served set current.
+   * @param entries - reads the cards currently registered into the section's slot.
    */
   constructor(
-    private readonly api: Pick<IApiClient, 'settings'>,
+    private readonly describeFace: SettingsDescribeFace,
     private readonly entries: () => readonly StoredEntry[],
-  ) {}
-
-  /** Opaque read because control flow cannot narrow a property across awaits. */
-  private isDisposed(): boolean {
-    return this.disposed
-  }
-
-  /** Re-read served namespaces and publish their registered cards. */
-  async load(): Promise<void> {
-    if (this.isDisposed()) return
-    const generation = ++this.generation
-    let response: Awaited<ReturnType<IApiClient['settings']['describe']>>
-    try {
-      response = await this.api.settings.describe({})
-    } catch (_settingsReadFailure) {
-      return
-    }
-    if (this.isDisposed() || generation !== this.generation || !response.result.ok) return
-    this.served = response.result.value.namespaces.map(view => view.ns)
-    this.loaded = true
+  ) {
+    this.unsubscribe = describeFace.subscribe(() => { this.publish() })
+    void describeFace.ensure()
     this.publish()
   }
 
-  /** Republish after the slot ledger changed without another wire read. */
+  /** Republish after the slot ledger changed; a card registered late joins here. */
   refresh(): void {
     if (this.disposed) return
     this.publish()
   }
 
-  /** Stop publishing and invalidate any in-flight read. */
+  /** Stop publishing and stop following the mirror. */
   dispose(): void {
     this.disposed = true
-    this.generation += 1
+    this.unsubscribe()
   }
 
   /**
-   * Build the face injected into the tab registration.
-   *
-   * @returns The registration face backed by the controller's snapshot store.
+   * Build the face the tab's slot registration injects.
+   * @returns the tab's snapshot source.
    */
   inject(): ConfigurablePluginsTabFace {
     return { hooks: { configurablePlugins: this.store } }
   }
 
   private publish(): void {
-    const served = new Set(this.served)
+    if (this.disposed) return
+    const mirrored = this.describeFace.getSnapshot()
+    const loaded = mirrored.view !== undefined
+    const served = new Set(mirrored.view?.namespaces.map(view => view.ns) ?? [])
     const namespaces = this.entries().flatMap(entry =>
       entry.options.key !== undefined && served.has(entry.options.key) ? [entry.options.key] : [])
     const previous = this.store.getSnapshot()
-    if (previous.loaded === this.loaded
+    // Every settings-document commit refreshes the mirror, and most commits
+    // change nothing this section shows. An observable source must keep its
+    // snapshot reference until the fact moves, or each unrelated save
+    // re-renders the whole card list (packages/client/AGENTS.md reactive rule 5).
+    if (previous.loaded === loaded
       && previous.namespaces.length === namespaces.length
       && previous.namespaces.every((ns, index) => ns === namespaces[index])) return
-    this.store.set({ loaded: this.loaded, namespaces })
+    this.store.set({ loaded, namespaces })
   }
 }

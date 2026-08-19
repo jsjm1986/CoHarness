@@ -20,7 +20,15 @@ CoHarness is under active pre-release development. Configuration, APIs, and pers
 
 ## Run
 
-Requirements: Node.js `^22.19.0` or `>=24.0.0`, plus pnpm.
+### Run from `npm`
+
+Install `Node.js`, then run:
+
+```sh
+npx @deepseek-ai/dsh web
+```
+
+The command starts the Web UI at `http://127.0.0.1:3080` by default and opens it in the default browser for a local launch. An SSH launch only prints the host URL because the SSH client or editor owns the local forwarded address. Pass `--no-open` to run the server without opening a browser. See [Web UI guide](docs/user/guide/index.md).
 
 ### Run from source
 
@@ -33,7 +41,17 @@ pnpm run build
 pnpm dsh web
 ```
 
-The Web UI is available at `http://127.0.0.1:3080` by default. See the [Web UI guide](docs/user/guide/index.md) for usage and the [production deployment runbook](gateway/deploy/README.md) for a multi-user Gateway deployment.
+`pnpm run build` prepares the repository artifacts. `pnpm dsh web` uses those built artifacts without rebuilding.
+
+## Community and support
+
+- Feel free to submit feedback or bug reports through [GitHub Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions).
+- Add the [`dsh-plugin`](https://github.com/topics/dsh-plugin) topic to your plugin repository for discoverability.
+- Join <a href="https://discord.gg/Ycq5dCaS4">DeepSeek Harness Discord community</a>.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Development
 

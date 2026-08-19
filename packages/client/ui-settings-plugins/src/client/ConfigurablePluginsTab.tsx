@@ -32,6 +32,8 @@ export function ConfigurablePluginsTab(props: ConfigurablePluginsTabProps) {
     return (
       <ul className={css.cards}>
         {namespaces.map(ns => (
+          // One dispatch per namespace, so the list identity is the namespace
+          // rather than a position that shifts as cards arrive.
           <Fragment key={ns}>{renderSlot('settings.plugin.item', {}, { entryKey: ns })}</Fragment>
         ))}
       </ul>
