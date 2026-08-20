@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-20-gateway-logout-entrypoints.md
+2026-08-20-gateway-logout-entrypoints.md: 452d64dbfbe8eb5a13e8f7b0f8c300282670f44e
+2026-08-20-gateway-logout-entrypoints.zh.md: 6d8f1303cd1968bb48ae229dd2416ca1069de3fe

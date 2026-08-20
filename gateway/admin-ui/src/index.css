@@ -262,9 +262,32 @@ a {
 }
 
 .sidebarFooter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   padding: 12px;
   color: var(--text-tertiary);
   font-size: 12px;
+}
+
+.logoutForm {
+  margin: 0;
+}
+
+.logoutButton {
+  justify-content: flex-start;
+  width: 100%;
+  color: var(--text-secondary);
+}
+
+.logoutButton:hover:not(:disabled) {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.logoutButtonCompact {
+  width: 40px;
+  padding: 0;
 }
 
 .mobileHeader,
@@ -2019,6 +2042,8 @@ a {
     z-index: 8;
     display: flex;
     align-items: center;
+    justify-content: space-between;
+    gap: 12px;
     height: calc(56px + env(safe-area-inset-top, 0px));
     padding: env(safe-area-inset-top, 0px) 12px 0;
     border-bottom: 1px solid var(--border);

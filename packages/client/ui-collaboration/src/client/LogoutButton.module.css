@@ -1,0 +1,65 @@
+.form {
+  display: block;
+  width: 100%;
+  margin: 0;
+}
+
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--dsw-space-2);
+  box-sizing: border-box;
+  width: calc(100% + 4px);
+  height: 42px;
+  min-width: 0;
+  margin: var(--dsw-space-1) -2px;
+  padding: 0 10px 0 8px;
+  border: 0;
+  border-radius: var(--dsw-radius-lg);
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  line-height: 22px;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.trigger:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.trigger:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: 1px;
+}
+
+.trigger.rail {
+  width: 36px;
+  height: 36px;
+  margin: var(--dsw-space-2) 0 10px;
+  justify-content: center;
+  gap: 0;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (pointer: coarse) {
+  .trigger:not(.rail) {
+    height: auto;
+    min-height: var(--dsw-touch-target);
+  }
+}
+
+:global([data-viewport='compact']) .trigger:not(.rail) {
+  height: auto;
+  min-height: var(--dsw-touch-target);
+}

@@ -14,6 +14,7 @@ import {
 import {
   ConversationShareAction, type ConversationShareInjected,
 } from './ConversationShareAction.tsx'
+import { LogoutButton, type LogoutButtonInjected } from './LogoutButton.tsx'
 import {
   ReadOnlyComposer, type ProjectReadOnlyMatch,
 } from './ReadOnlyComposer.tsx'
@@ -26,6 +27,7 @@ export type {
   ConversationDetail, ConversationParticipant, ProjectInvitation, ProjectMembership, UserSummary,
 } from './collaboration-client.ts'
 export type { ConversationShareActionProps, ConversationShareInjected } from './ConversationShareAction.tsx'
+export type { LogoutButtonInjected, LogoutButtonProps } from './LogoutButton.tsx'
 export type { ProjectReadOnlyMatch, ReadOnlyComposerProps } from './ReadOnlyComposer.tsx'
 export type { ScopeControlInjected, ScopeControlProps } from './ScopeControl.tsx'
 export type { ProjectManagerMode, ProjectManagerModalProps } from './ProjectManagerModal.tsx'
@@ -87,6 +89,7 @@ export function apply(ctx: ClientContext): void {
   })
 
   const hooks = { collaboration }
+  const logoutInjected = (): LogoutButtonInjected => ({ hooks })
   const scopeInjected = (): ScopeControlInjected => ({
     hooks,
     switchScope: scope => collaboration.switchScope(scope),
@@ -112,6 +115,14 @@ export function apply(ctx: ClientContext): void {
     locale: NS,
     inject: scopeInjected,
   }, ScopeControl))
+
+  ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
+    name: 'sidebar.footer.action',
+    id: 'collaboration-logout',
+    order: 0,
+    locale: NS,
+    inject: logoutInjected,
+  }, LogoutButton))
 
   ctx.slots.inject('conversation.session.header.actions', () => ctx.slots.register({
     name: 'conversation.session.header.actions',
