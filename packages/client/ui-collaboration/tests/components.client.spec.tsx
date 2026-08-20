@@ -2,6 +2,8 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ConversationShareAction, type ConversationShareActionProps } from '../src/client/ConversationShareAction.tsx'
+import { LogoutButton, type LogoutButtonProps } from '../src/client/LogoutButton.tsx'
+import logoutCss from '../src/client/LogoutButton.module.css'
 import { ReadOnlyComposer, type ReadOnlyComposerProps } from '../src/client/ReadOnlyComposer.tsx'
 import { ScopeControl, type ScopeControlProps } from '../src/client/ScopeControl.tsx'
 import css from '../src/client/ScopeControl.module.css'
@@ -87,6 +89,38 @@ function conversationProps(
     ...overrides,
   } as ConversationShareActionProps
 }
+
+function logoutProps(
+  state: CollaborationSnapshot,
+  overrides: Partial<LogoutButtonProps> = {},
+): LogoutButtonProps {
+  return {
+    wide: true,
+    useCollaboration: selector => selector(state),
+    t,
+    ...overrides,
+  } as LogoutButtonProps
+}
+
+describe('LogoutButton', () => {
+  it('hides outside an authenticated Gateway context', () => {
+    const view = render(<LogoutButton {...logoutProps(snapshot({ status: 'unavailable' }))} />)
+    expect(view.container.textContent).toBe('')
+  })
+
+  it('uses the Gateway POST logout form in wide and rail states', () => {
+    const view = render(<LogoutButton {...logoutProps(snapshot())} />)
+    const form = view.container.querySelector('form')!
+    expect(form.getAttribute('method')).toBe('post')
+    expect(form.getAttribute('action')).toBe('/logout')
+    expect(screen.getByRole('button', { name: '退出登录' }).textContent).toContain('退出登录')
+
+    view.rerender(<LogoutButton {...logoutProps(snapshot(), { wide: false })} />)
+    const button = screen.getByRole('button', { name: '退出登录' })
+    expect(button.textContent).toBe('')
+    expect(button.className.split(/\s+/)).toContain(logoutCss.rail)
+  })
+})
 
 describe('ScopeControl', () => {
   it('hides before collaboration is ready and for personal users without projects', () => {
