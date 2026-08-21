@@ -5,12 +5,14 @@
 
 import { randomUUID } from 'node:crypto'
 import { mkdir, realpath, stat } from 'node:fs/promises'
+import { homedir } from 'node:os'
 import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path'
+import { z as zod } from 'zod'
 import type { Context } from '@deepseek-ai/cordis'
 import { installModelSelection } from '@deepseek-ai/dsh-agent'
 import type { Agent, ModelSelection, ModelSelectionRef, AgentOptions, AgentStatus } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-presets/types'
-import { AttachmentError } from '@deepseek-ai/dsh-attachment'
+import { AttachmentError, admitEncodedImages } from '@deepseek-ai/dsh-attachment'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import {
   DOCUMENT_STORE_UNAVAILABLE_CODE,
@@ -44,7 +46,8 @@ import {
 import type { PresetBearingSession } from '@deepseek-ai/dsh-agent-presets'
 import type {} from '@deepseek-ai/dsh-tools'
 import type {
-  ApiProxy, ConfigurableProviderView, CredentialView, GoalRef, HistoryDetail, HistoryEntry, HistoryOmittedSpan, HostFrame,
+  ApiProxy, ConfigurableProviderView, CredentialView, DiscoveredModelView, GoalRef, HistoryDetail, HistoryEntry, HistoryOmittedSpan,
+  HostFrame,
   ModelCatalogFailure, ModelProviderGroup,
   ModelReasoning, MuxFrame, PromptContentPart, QuestionResponsePayload, SessionListMetadata, SessionProjectionsBlock, SessionSearchItem,
   QueuedInboxItem, SessionSummary, SettingsNamespaceView, SubagentAddress, JobView, ToolEventView,
@@ -252,16 +255,7 @@ export async function authorizeTypertRemote(
 /** Conversation message event types (the pagination counting unit). */
 const MESSAGE_TYPES = new Set(['user/message', 'assistant/message'])
 
-/** Decode the browser payload while rejecting non-canonical base64 forms. */
-function decodeBase64(data: string): Uint8Array {
-  const decoded = Buffer.from(data, 'base64')
-  if (data.length === 0 || decoded.toString('base64') !== data) {
-    throw new AttachmentError('Image upload is not canonical base64.', 'INVALID_IMAGE_BASE64')
-  }
-  return new Uint8Array(decoded)
-}
-
-/** Read one admitted document while preserving the prompt's source order. */
+/** Read the document admitted for one prompt part. */
 function admittedDocumentAt(
   documents: readonly UserDocPromptAttachment[],
   index: number,
@@ -276,6 +270,8 @@ async function durablePromptContent(
   ctx: Context,
   content: readonly PromptContentPart[],
 ): Promise<{ blocks: ContentBlock[]; documents: UserDocPromptAttachment[] }> {
+  const imageParts = content.filter((part): part is Extract<PromptContentPart, { type: 'image' }> =>
+    part.type === 'image')
   const documentParts = content.filter((part): part is Extract<PromptContentPart, { type: 'document' }> =>
     part.type === 'document')
   let documents: UserDocPromptAttachment[] = []
@@ -286,41 +282,22 @@ async function durablePromptContent(
     }
     documents = await prepareUserDocAttachments(store, documentParts.map(part => part.docId))
   }
-  if (content.every(part => part.type === 'text' || part.type === 'document')) {
-    let documentIndex = 0
-    return {
-      blocks: content.map((part) => {
-        if (part.type === 'text') return { type: 'text', text: part.text }
-        return { type: 'text', text: renderUserDocAttachment(admittedDocumentAt(documents, documentIndex++)) }
-      }),
-      documents,
-    }
-  }
-  const prepared = content.map(part => part.type === 'image'
-    ? { part, data: decodeBase64(part.data) }
-    : part)
-  const images = prepared.filter((part): part is Extract<typeof part, { data: Uint8Array }> => 'data' in part)
-  const refs = await ctx.attachments.saveImages(images.map(image => ({
-    data: image.data,
-    mediaType: image.part.mediaType,
-    ...image.part.name === undefined ? {} : { name: image.part.name },
-  })))
-  const blocks: ContentBlock[] = []
+  const refs = imageParts.length === 0
+    ? []
+    : await admitEncodedImages(ctx.attachments, imageParts)
   let documentIndex = 0
   let imageIndex = 0
-  for (const item of prepared) {
-    if (!('data' in item)) {
-      blocks.push(item.type === 'text'
-        ? { type: 'text', text: item.text }
-        : { type: 'text', text: renderUserDocAttachment(admittedDocumentAt(documents, documentIndex++)) })
-      continue
-    }
-    const attachment = refs[imageIndex++]
-    /* v8 ignore next -- each prepared image supplied exactly one saveImages input and therefore one ordered ref. */
-    if (attachment === undefined) throw new Error('attachment batch result did not preserve input cardinality')
-    blocks.push({ type: 'image', attachment })
+  return {
+    blocks: content.map((part) => {
+      if (part.type === 'text') return { type: 'text', text: part.text }
+      if (part.type === 'document') {
+        return { type: 'text', text: renderUserDocAttachment(admittedDocumentAt(documents, documentIndex++)) }
+      }
+      // admitEncodedImages returns one reference per image part in order.
+      return { type: 'image', attachment: refs[imageIndex++] as ImageAttachmentRef }
+    }),
+    documents,
   }
-  return { blocks, documents }
 }
 
 /** Search durable content for an image reference, including nested tool results. */
@@ -381,14 +358,7 @@ function referencedImage(events: readonly SessionEvent[], attachmentId: string):
   return undefined
 }
 
-/**
- * Product settings intentionally exposed beside model-provider namespaces.
- *
- * The agent-preset namespace carries one field — which preset a session with
- * no explicit choice is composed from — and both browser surfaces that offer
- * that choice write it through `settings.update`, so it has to cross the
- * configuration boundary or the pickers silently fail to persist.
- */
+/** Product settings intentionally exposed beside model-provider namespaces. */
 const PRODUCT_SETTINGS_NAMESPACES = new Set(['ui-onboarding', AGENT_PRESET_SETTINGS_NAMESPACE])
 
 /** Strict browser-zone profile: UTC or an IANA Area/Location-style identifier. */
@@ -495,6 +465,9 @@ async function buildModelCatalog(ctx: Context): Promise<{
           id: model.id,
           name: model.name,
           ...model.description === undefined ? {} : { description: model.description },
+          ...model.inputModalities === undefined
+            ? {}
+            : { inputModalities: [...model.inputModalities] },
           ...reasoning === undefined ? {} : { reasoning },
         }
       }))
@@ -1716,10 +1689,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   ctx.inject(['sessionProjections'], (projectionCtx) => {
     projectionCtx.sessionProjections.register<'sessionListMetadata', SessionListMetadata>({
       key: 'sessionListMetadata',
-      schema: sessionListMetadataProjectionSchema,
+      stateSchema: sessionListMetadataProjectionSchema,
       init: () => ({ blank: true, lastPromptAt: null }),
       apply: applySessionListMetadata,
-      view: state => state,
+      wire: { viewSchema: sessionListMetadataProjectionSchema, view: state => state },
       stateVersion: 1,
     })
   })
@@ -1740,10 +1713,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   ctx.inject(['sessionProjections', 'attachments'], (projectionCtx) => {
     projectionCtx.sessionProjections.register<'imageLimits', null>({
       key: 'imageLimits',
-      schema: imageLimitsProjectionSchema,
+      stateSchema: zod.null(),
       init: () => null,
       apply: state => state,
-      view: () => projectionCtx.attachments.imageLimits,
+      wire: { viewSchema: imageLimitsProjectionSchema, view: () => projectionCtx.attachments.imageLimits },
       stateVersion: 1,
     })
   })
@@ -2015,13 +1988,16 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
    * made of.
    * @param sessionId - the transcript being read.
    * @param session - that session's header and log (attached or inspected).
+   * @param options - whether this read may inspect an already-attached Agent;
+   * cold reads disable that lookup and use the recorded preset's standing key.
    * @returns the scope to pass to presenter lookups, or undefined for global.
    */
   async function presenterScopeFor(
     sessionId: SessionId,
     session: PresetBearingSession,
+    options: { readonly lookupLiveAgent?: boolean } = {},
   ): Promise<ScopeKey | undefined> {
-    const live = ctx.get('agents')?.get(sessionId)
+    const live = options.lookupLiveAgent === false ? undefined : ctx.get('agents')?.get(sessionId)
     if (live !== undefined) return live
     const presets = ctx.get('agentPresets')
     if (presets === undefined) return undefined
@@ -3242,7 +3218,21 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             details: { childSessionId },
           })
         }
-        const page = historyPage(ctx, events, beforeSeq, maxMessages)
+        // A cold child cannot be resumed just to render cards. Resolve its
+        // recorded standing preset instead; an attached child may use its
+        // already-published Agent scope so child-local presenters (for
+        // example `report`) remain visible without activating anything.
+        const scope = await presenterScopeFor(childSessionId, { header, events }, {
+          lookupLiveAgent: attached !== undefined,
+        })
+        if (signal?.aborted) {
+          return err(request, {
+            code: 'cancelled',
+            message: 'subagent history read was cancelled',
+            details: {},
+          })
+        }
+        const page = historyPage(ctx, events, beforeSeq, maxMessages, scope)
         return ok(request, historyValue(page, detail, projections))
       },
 
@@ -3560,6 +3550,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           provider: selection.provider,
           model: selection.model,
           attachedSessions,
+          home: homedir(),
           canOpenPath: !projectScope && canOpenPaths(),
         })
       },
@@ -4097,7 +4088,14 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             ...apiKey === undefined ? {} : { apiKey },
             ...signal === undefined ? {} : { signal },
           })
-          return ok(request, { models })
+          const views: DiscoveredModelView[] = models.map(model => ({
+            id: model.id,
+            ...model.name === undefined ? {} : { name: model.name },
+            ...model.contextWindow === undefined ? {} : { contextWindow: model.contextWindow },
+            ...model.maxTokens === undefined ? {} : { maxTokens: model.maxTokens },
+            ...model.inputModalities === undefined ? {} : { inputModalities: [...model.inputModalities] },
+          }))
+          return ok(request, { models: views })
         } catch (error: unknown) {
           // Every failure here is the user's next move, not a transport fault:
           // a wrong endpoint, a rejected key, or a protocol with no listing all

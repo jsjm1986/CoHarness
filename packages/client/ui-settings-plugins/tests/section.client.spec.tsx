@@ -7,7 +7,7 @@
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-web-react'
+import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import { AgentLoopCard } from '../src/client/AgentLoopCard.tsx'
 import type { AgentLoopCardProps } from '../src/client/AgentLoopCard.tsx'
@@ -60,7 +60,11 @@ function renderSection(rows: readonly PluginsSettingsTabEntry[]) {
   render(<PluginsSettingsSection {...props} />)
 }
 
-/** Render the card slot for the namespaces selected by the directory. */
+/**
+ * Render the tab over the namespaces it was told to dispatch, with `cards`
+ * standing in for the slot ledger: a key it names renders that text, and one
+ * it does not renders nothing, exactly as an unclaimed key does.
+ */
 function renderConfigurable(namespaces: string[], cards: Record<string, string> = {}, loaded = true) {
   const store = createSnapshotStore<ConfigurablePluginsTabState>({ loaded, namespaces })
   const props = {
@@ -159,20 +163,22 @@ describe('PluginsSettingsSection', () => {
 
 describe('ConfigurablePluginsTab', () => {
   it('says so when no plugin contributed a card', () => {
-    renderConfigurable([], { shell: 'shell' })
+    renderConfigurable([], { bash: 'shell' })
 
     expect(screen.getByText(en.empty)).toBeTruthy()
     expect(screen.queryByText('shell')).toBeNull()
   })
 
-  it('withholds the empty line until the Host answers', () => {
-    renderConfigurable([], { shell: 'shell' }, false)
+  it('withholds the empty line until the Host has answered once', () => {
+    // An unanswered read is not the statement that this deployment configures
+    // no plugin; saying it anyway would flash a wrong answer on every open.
+    renderConfigurable([], { bash: 'shell' }, false)
 
     expect(screen.queryByText(en.empty)).toBeNull()
   })
 
-  it('dispatches one card per namespace using that namespace as the key', () => {
-    renderConfigurable(['shell', 'agent-loop'], { shell: 'shell', 'agent-loop': 'loop' })
+  it('dispatches one card per namespace, keyed by it', () => {
+    renderConfigurable(['bash', 'agent-loop'], { bash: 'shell', 'agent-loop': 'loop' })
 
     expect(screen.getAllByRole('listitem').map(item => item.textContent)).toEqual(['shell', 'loop'])
     expect(screen.queryByText(en.empty)).toBeNull()

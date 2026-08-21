@@ -7,6 +7,8 @@
 
 import { DEFAULT_PREFERENCE, type ThemePreference } from './theme-settings.ts'
 
+import type { IndexInjection } from '@deepseek-ai/dsh-host-webserver'
+
 /** Build the inline script for one schema-validated built-in preference. */
 function bootThemeScript(preference: ThemePreference): string {
   return `<script>(() => {
@@ -37,4 +39,17 @@ export function injectBootTheme(
   if (body === null) return `${html}${script}`
   const at = body.index + body[0].length
   return `${html.slice(0, at)}${script}${html.slice(at)}`
+}
+
+/**
+ * Build the structured body-row form used by the shared webserver renderer.
+ * @param preference - the schema-validated persisted theme preference.
+ * @returns one body script injection for the shared renderer.
+ */
+export function bootThemeInjection(preference: ThemePreference = DEFAULT_PREFERENCE): IndexInjection {
+  const html = injectBootTheme('<body></body>', preference)
+  const body = /<body>([\s\S]*)<\/body>/i.exec(html)?.[1]
+  if (body === undefined) throw new Error('client-ui-theme: failed to build theme injection')
+  const text = body.replace(/^<script>|<\/script>$/g, '')
+  return { kind: 'script', placement: 'body', text }
 }

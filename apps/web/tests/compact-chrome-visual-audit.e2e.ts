@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
-import { afterAll, beforeAll, describe, it } from 'vitest'
+import { afterAll, beforeAll, describe, it, vi } from 'vitest'
 import { launchWebScaffold, seedSession, type WebScaffold } from './scaffold.ts'
 import { ZH_BROWSER_LOCALE } from './support.ts'
 
@@ -130,129 +130,141 @@ describe('visual audit: compact product chrome', () => {
 
   it('covers landing, seeded chat, trajectory, settings, and documents on phones', async () => {
     const findings: Record<string, unknown> = {}
+    // The visual audit is a keyless, cross-platform fixture. Native opener
+    // availability varies by runner, so keep this lane focused on browser
+    // geometry; seeded-history covers the refusal dialog separately.
+    const openPath = vi.spyOn(scaffold.ctx.apiProxy.host, 'openPath')
+      .mockImplementation(async (request, _signal) => ({
+        rpcId: request.rpcId,
+        result: { ok: true, value: { opened: true as const } },
+      }))
 
-    for (const phone of PHONES) {
-      const prefix = phone.tag
-      const page: Page = await browser.newPage({
-        viewport: { width: phone.width, height: phone.height },
-        locale: ZH_BROWSER_LOCALE,
-        hasTouch: true,
-        isMobile: true,
-      })
-      await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
-      await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
-      await dismissOnboarding(page)
-      await shot(page, `${prefix}-00-landing`)
-      findings[`${prefix}.landing`] = await dumpOverflow(page)
+    try {
+      for (const phone of PHONES) {
+        const prefix = phone.tag
+        const page: Page = await browser.newPage({
+          viewport: { width: phone.width, height: phone.height },
+          locale: ZH_BROWSER_LOCALE,
+          hasTouch: true,
+          isMobile: true,
+        })
+        await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+        await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+        await dismissOnboarding(page)
+        await shot(page, `${prefix}-00-landing`)
+        findings[`${prefix}.landing`] = await dumpOverflow(page)
 
-      const pickWorkspace = page.getByRole('button', { name: /选择工作区|Choose workspace/ })
-      if (await pickWorkspace.count() > 0) {
-        await pickWorkspace.click()
-        await page.getByRole('dialog').waitFor({ timeout: 10_000 })
-        await page.waitForTimeout(300)
-        await shot(page, `${prefix}-01-workspace-dialog`)
-        findings[`${prefix}.workspaceDialog`] = await dumpOverflow(page)
-        await page.keyboard.press('Escape')
-      }
-
-      const preset = page.getByRole('button', { name: /标准模式|Standard/ })
-      if (await preset.count() > 0) {
-        await preset.click()
-        await page.waitForTimeout(300)
-        await shot(page, `${prefix}-02-preset-menu`)
-        findings[`${prefix}.presetMenu`] = await dumpOverflow(page)
-        await page.keyboard.press('Escape')
-      }
-
-      await openSeededChat(page)
-      await shot(page, `${prefix}-03-chat`)
-      findings[`${prefix}.chat`] = await dumpOverflow(page)
-      await page.getByRole('heading', { name: 'Navigation Summary' }).waitFor({ timeout: 10_000 })
-      await shot(page, `${prefix}-04-chat-markdown`)
-
-      const toolRow = page.locator('[data-tool], [class*="ToolRow"]').first()
-      if (await toolRow.count() > 0) {
-        await toolRow.click()
-        await page.waitForTimeout(300)
-        await shot(page, `${prefix}-05-tool-expanded`)
-        findings[`${prefix}.tool`] = await dumpOverflow(page)
-      }
-
-      const commands = page.getByRole('button', { name: '命令' })
-      if (await commands.count() > 0) {
-        await commands.click()
-        await page.waitForTimeout(300)
-        await shot(page, `${prefix}-06-composer-commands`)
-        findings[`${prefix}.commands`] = await dumpOverflow(page)
-        await page.keyboard.press('Escape')
-      }
-
-      const model = page.locator('[data-composer-card] button[aria-haspopup="menu"]').last()
-      if (await model.count() > 0) {
-        await model.click()
-        await page.waitForTimeout(300)
-        await shot(page, `${prefix}-07-model-menu`)
-        findings[`${prefix}.model`] = await dumpOverflow(page)
-        await page.keyboard.press('Escape')
-      }
-
-      await page.getByRole('tab', { name: /轨迹|Trajectory/ }).click()
-      await page.locator('table, [role="table"]').first().waitFor({ timeout: 15_000 })
-      await page.waitForTimeout(400)
-      await shot(page, `${prefix}-08-trajectory`)
-      findings[`${prefix}.trajectory`] = await dumpOverflow(page)
-
-      const toolEvent = page.locator('tr[data-kind="tool"]').first()
-      if (await toolEvent.count() > 0) {
-        await toolEvent.click()
-        const details = page.getByRole('complementary', { name: 'Event details' })
-        await details.waitFor({ timeout: 10_000 })
-        await page.waitForTimeout(300)
-        await shot(page, `${prefix}-09-event-details`)
-        findings[`${prefix}.eventDetails`] = await dumpOverflow(page)
-        const closeDetails = details.getByRole('button', { name: /Close details|关闭详情/ })
-        if (await closeDetails.count() > 0) await closeDetails.click()
-        else await page.keyboard.press('Escape')
-      }
-
-      await openDrawer(page)
-      await shot(page, `${prefix}-10-drawer`)
-      findings[`${prefix}.drawer`] = await dumpOverflow(page)
-
-      await page.getByRole('button', { name: '设置', exact: true }).click()
-      try {
-        await page.getByRole('dialog').waitFor({ timeout: 8_000 })
-        await page.waitForTimeout(400)
-        await shot(page, `${prefix}-11-settings`)
-        findings[`${prefix}.settings`] = await dumpOverflow(page)
-        const modelsTab = page.getByRole('dialog').getByRole('button', { name: '模型', exact: true })
-        if (await modelsTab.count() > 0) {
-          await modelsTab.click()
-          await page.waitForTimeout(400)
-          await shot(page, `${prefix}-12-settings-models`)
-          findings[`${prefix}.settingsModels`] = await dumpOverflow(page)
+        const pickWorkspace = page.getByRole('button', { name: /选择工作区|Choose workspace/ })
+        if (await pickWorkspace.count() > 0) {
+          await pickWorkspace.click()
+          await page.getByRole('dialog').waitFor({ timeout: 10_000 })
+          await page.waitForTimeout(300)
+          await shot(page, `${prefix}-01-workspace-dialog`)
+          findings[`${prefix}.workspaceDialog`] = await dumpOverflow(page)
+          await page.keyboard.press('Escape')
         }
-        await page.keyboard.press('Escape')
-      } catch {
-        findings[`${prefix}.settings`] = 'no dialog'
-      }
 
-      await openDrawer(page)
-      const documents = page.getByRole('button', { name: '文档', exact: true })
-      if (await documents.count() > 0) {
-        await documents.click()
+        const preset = page.getByRole('button', { name: /标准模式|Standard/ })
+        if (await preset.count() > 0) {
+          await preset.click()
+          await page.waitForTimeout(300)
+          await shot(page, `${prefix}-02-preset-menu`)
+          findings[`${prefix}.presetMenu`] = await dumpOverflow(page)
+          await page.keyboard.press('Escape')
+        }
+
+        await openSeededChat(page)
+        await shot(page, `${prefix}-03-chat`)
+        findings[`${prefix}.chat`] = await dumpOverflow(page)
+        await page.getByRole('heading', { name: 'Navigation Summary' }).waitFor({ timeout: 10_000 })
+        await shot(page, `${prefix}-04-chat-markdown`)
+
+        const toolRow = page.locator('[data-tool], [class*="ToolRow"]').first()
+        if (await toolRow.count() > 0) {
+          await toolRow.click()
+          await page.waitForTimeout(300)
+          await shot(page, `${prefix}-05-tool-expanded`)
+          findings[`${prefix}.tool`] = await dumpOverflow(page)
+        }
+
+        const commands = page.getByRole('button', { name: '命令' })
+        if (await commands.count() > 0) {
+          await commands.click()
+          await page.waitForTimeout(300)
+          await shot(page, `${prefix}-06-composer-commands`)
+          findings[`${prefix}.commands`] = await dumpOverflow(page)
+          await page.keyboard.press('Escape')
+        }
+
+        const model = page.locator('[data-composer-card] button[aria-haspopup="menu"]').last()
+        if (await model.count() > 0) {
+          await model.click()
+          await page.waitForTimeout(300)
+          await shot(page, `${prefix}-07-model-menu`)
+          findings[`${prefix}.model`] = await dumpOverflow(page)
+          await page.keyboard.press('Escape')
+        }
+
+        await page.getByRole('tab', { name: /轨迹|Trajectory/ }).click()
+        await page.locator('table, [role="table"]').first().waitFor({ timeout: 15_000 })
+        await page.waitForTimeout(400)
+        await shot(page, `${prefix}-08-trajectory`)
+        findings[`${prefix}.trajectory`] = await dumpOverflow(page)
+
+        const toolEvent = page.locator('tr[data-kind="tool"]').first()
+        if (await toolEvent.count() > 0) {
+          await toolEvent.click()
+          const details = page.getByRole('complementary', { name: 'Event details' })
+          await details.waitFor({ timeout: 10_000 })
+          await page.waitForTimeout(300)
+          await shot(page, `${prefix}-09-event-details`)
+          findings[`${prefix}.eventDetails`] = await dumpOverflow(page)
+          const closeDetails = details.getByRole('button', { name: /Close details|关闭详情/ })
+          if (await closeDetails.count() > 0) await closeDetails.click()
+          else await page.keyboard.press('Escape')
+        }
+
+        await openDrawer(page)
+        await shot(page, `${prefix}-10-drawer`)
+        findings[`${prefix}.drawer`] = await dumpOverflow(page)
+
+        await page.getByRole('button', { name: '设置', exact: true }).click()
         try {
           await page.getByRole('dialog').waitFor({ timeout: 8_000 })
-          await page.waitForTimeout(300)
-          await shot(page, `${prefix}-13-documents`)
-          findings[`${prefix}.documents`] = await dumpOverflow(page)
+          await page.waitForTimeout(400)
+          await shot(page, `${prefix}-11-settings`)
+          findings[`${prefix}.settings`] = await dumpOverflow(page)
+          const modelsTab = page.getByRole('dialog').getByRole('button', { name: '模型', exact: true })
+          if (await modelsTab.count() > 0) {
+            await modelsTab.click()
+            await page.waitForTimeout(400)
+            await shot(page, `${prefix}-12-settings-models`)
+            findings[`${prefix}.settingsModels`] = await dumpOverflow(page)
+          }
           await page.keyboard.press('Escape')
         } catch {
-          findings[`${prefix}.documents`] = 'no dialog'
+          findings[`${prefix}.settings`] = 'no dialog'
         }
-      }
 
-      await page.close()
+        await openDrawer(page)
+        const documents = page.getByRole('button', { name: '文档', exact: true })
+        if (await documents.count() > 0) {
+          await documents.click()
+          try {
+            await page.getByRole('dialog').waitFor({ timeout: 8_000 })
+            await page.waitForTimeout(300)
+            await shot(page, `${prefix}-13-documents`)
+            findings[`${prefix}.documents`] = await dumpOverflow(page)
+            await page.keyboard.press('Escape')
+          } catch {
+            findings[`${prefix}.documents`] = 'no dialog'
+          }
+        }
+
+        await page.close()
+      }
+    } finally {
+      openPath.mockRestore()
     }
 
     writeFileSync(join(OUT, 'findings.json'), `${JSON.stringify(findings, null, 2)}\n`)

@@ -1,4 +1,4 @@
-# Agent Note: 具有项目隔离的插件自有设置
+# Agent Note: 由插件自己拥有的设置表层
 
 Status: implemented
 
@@ -6,50 +6,56 @@ Status: implemented
 
 ## Problem
 
-插件可以注册 settings 命名空间，却无法在不修改 `packages/host/apiproxy` 的情况下把配置放到浏览器设置页。代理通过硬编码命名空间清单过滤读写，因此清单之外的有效注册只能得到 `settings-not-exposed`。
+注册了 settings 命名空间的插件到不了浏览器配置页，而拦住它的两道门都在本仓库里。
 
-「插件」分区还把 `settings.plugin.item` 注册为无键列表。卡片携带不透明 id，而不是它所编辑的命名空间，因此分区无法推导哪些 Host 注册拥有浏览器界面、无法在渲染前抑制未组装插件的卡片，也无法依据可见卡片计算空态。
+`packages/host/apiproxy` 持有两份硬编码的命名空间清单。`settings.describe` 用它们过滤答复，每次写入也先对照它们，因此清单之外的命名空间即便其拥有方已注册，也只会得到 `settings-not-exposed`。于是把一个插件加进配置页，意味着要改一个插件作者并不拥有的包。
 
-本仓库还服务共享项目运行时。Host 进程注册了某个命名空间，不代表项目参与者就应看到任意个人或第三方插件配置。因此，单用户行为不能原样应用于每一种 collaboration authority。
+插件配置分区渲染的是注册进 `settings.plugin.item` 的卡片列表，无序。卡片携带的是不透明的 `id`，从不是它所编辑的命名空间，因此分区无从判断哪些被服务的命名空间已经有了归属。凡是"这个命名空间由谁渲染"的问题，都无法从分区看得见的账本里得到答案。
+
+两者相加，用户自己写的插件就只能靠手改 `settings.yaml` 来配置。[web 插件配置 note](../feature/2026-08-10-web-plugin-configuration.md) 把白名单记为刻意为之，[配置面边界 note](2026-07-30-config-plane-boundaries.md) 则把「可在 Web 上配置」绑定到可配置提供方目录的成员资格。这两条结论恰恰挡住了那个通用 seam 本来要服务的插件作者。
 
 ## Decision
 
-**个人设置注册会暴露给个人配置客户端。** 在个人 scope 中，`settings.describe` 返回 `ctx.settings.describe({ redactSecrets: true })` 的全部 descriptor，`settings.update`、`replace` 与 `mutate` 可以寻址任意已注册命名空间。代理不再拥有 `WEB_SETTINGS_NAMESPACES`、提供方目录准入检查或 `settings-not-exposed` 错误。格式非法和未注册名称统一使用 settings 服务的 `settings-rejected` 响应。
+**注册即暴露。** api-proxy 服务 `ctx.settings.describe()` 返回的每一个命名空间，写入不设门禁。`WEB_SETTINGS_NAMESPACES`、`PRODUCT_SETTINGS_NAMESPACES`、与 `ctx.llm.listConfigurableProviders()` 的并集，以及 `settings-not-exposed` 错误码，全部删除。没有任何注册应答的名字——未知的，或格式非法因而根本无法寻址到注册的——都折叠为 seam 自己的 `settings-rejected`，于是代理既不贡献边界，也不贡献自己的词汇。
 
-**共享项目设置继续只读并经过过滤。** 在项目 scope 中，`settings.describe` 只返回已注册可配置提供方命名空间、产品设置以及共享运行时批准的显式非模型命名空间。任意第三方命名空间会被省略。`writable` 与 `hasDocument` 为 false，所有 settings 写入和文档打开操作都由 `authorizePersonalConfiguration()` 拒绝。这样既保留插件自有配置，也不会扩大项目成员可检查或修改的范围。
+**settings seam 不动。** 哪个客户端可以读某个命名空间、哪个页面渲染它，都是关于 Consumer 的事实；Service Definition 只要携带其中之一，就等于让一个 Consumer 决定它的契约。`SettingsRegisterOptions` 一个字段都没加。
 
-**settings 服务定义不携带浏览器元数据。** 客户端可见性与页面归属属于 Consumer。`SettingsRegisterOptions` 不新增页面名、标签或暴露标志。
+**`settings.plugin.item` 以 settings 命名空间为键。** 该 slot 从 `list` 改为 `keyed`，键就是卡片所编辑的命名空间，沿用 `tool.call.toolview` 的先例——每个工具插件把自己的渲染器注册在工具名这个键上。卡片声明 `key`，不再声明 `id`/`order`。该 slot 由「插件」分区的 `configurable` 标签页声明，卡片列表归它所有。
 
-**`settings.plugin.item` 以 settings 命名空间为键。** 浏览器插件用等于其编辑命名空间的 `key` 注册卡片。「插件」分区的可配置标签页声明 keyed slot 并拥有卡片列表；卡片拥有自己的外观、控件、文案、暂存与写入行为。
+**标签页以被服务的命名空间驱动派发。** 它从 `ctx.settingsScope.describe()` 派生当前被服务的集合并跟随该共享 settings 镜像，自身的监听器只跟随卡片 slot 账本；随后为每个被服务的命名空间派发一个键。渲染出来的是两份账本的交集——存活 Host 插件注册的命名空间，以及注册在这些键上的卡片——由标签页的 controller 从 slot 账本（`ctx.slots.entries`、`ctx.slots.subscribe`）与镜像应答算出。后续的 [settings describe 镜像决策](2026-08-17-settings-describe-mirror.md)持有浏览器全局的读取与失效生命周期。
 
-**标签页渲染两个注册表的交集。** controller 读取 `settings.describe`，保留当前 authority 可见的命名空间，并与当前 keyed 卡片注册取交集。它在 `settings/document-updated`、连接重置或卡片账本变化后刷新。被服务但没有卡片的命名空间属于其他页面或没有浏览器半侧，因此不渲染；命名空间未被服务的卡片不会被派发。
+以命名空间为键，让「缺席」本身成为信号，而这正是它消掉旧形态所需簿记的原因。归别的界面所有的命名空间（`ui-theme`、`permission`、`llm-*`、`agent-presets`）在其键上没有卡片，于是什么都不渲染，且无需在任何地方声明任何东西。命名空间未被本部署服务的卡片根本不会被派发，这同时修掉了旧的空态缺陷：标签页数的是已注册卡片，其中包含那些什么都不渲染的，因此一个都不暴露的部署看到的是空列表，而不是它那行空态文案。
 
-**标签页没有 schema 生成的 fallback。** keyed 卡片是否存在就是完整的渲染决定。浏览器不会从不归自己拥有的命名空间 schema 中发明控件、校验或呈现。
+**不渲染任何未被交给它的表单。** 标签页不提供兜底卡片。插件的浏览器半侧完整拥有自己的卡片——外观、控件与文案——而这正是 slot 的 `fallback` 选项会用一份 schema 反向渲染的表单取代掉的东西。
 
-## 安全属性
+## 白名单实际护住了什么
 
-所有配置方法继续受载体的回环与同源限制。secret 角色字段在序列化前仍会从 resolved、base 和 user 值中移除。项目过滤是额外的多用户保密规则，不替代传输准入或字段脱敏。
+这道门确实挡住了一样东西，本 note 如实写出，因为这个决策必须在准确版本下也站得住：不在名单上的已注册命名空间，其 resolved、`base` 与 `user` 值根本不会抵达浏览器。插件清单页不能替代它——`PluginInventoryEntry` 携带的是 `entryId`、`moduleName`、`enabled` 与 `fiberPhase`，它那一行「configuration」渲染的是启用／停用标签，从不是任何已存值。
 
-项目过滤刻意比个人注册暴露更窄。若部署希望项目成员使用某个第三方命名空间，必须把它作为经过审查的产品决策加入项目可见集合；仅注册不足以开放它。
+这道门不是的，是它所处位置暗示的那种边界。每个 `settings.*` 方法都在 `PRIVILEGED_METHODS` 里（`packages/client/connection`），非回环或跨源请求在到达这段代码之前就以 403 被拒；`role('secret')` 字段在每种响应的每一层都被结构性剥离；而这个面所编辑的文档，本就是用户自己的 `settings.yaml`，同一个设置页还提供了打开它的入口。它没有挡住的写入，恰恰是有分量的那些：`permission`（能放宽审批预设）与 `agent-presets`（决定一个会话挂载什么）本来就已被服务。
+
+因此本次改动在本仓库实际新增的暴露面是一个命名空间：`agent-default-model`——它的两个字段指明一个提供方与一个模型，且没有任何浏览器半侧渲染它。将来若某个命名空间的值确实不该跨越协议，由 `role('secret')` 逐字段作答：比整命名空间开关更精细，而且已经在执行。
 
 ## Alternatives considered
 
-**在项目 scope 中暴露每个已注册命名空间。** 否决，因为项目参与者共享 Host 运行时，但不拥有每个插件的个人配置。即使响应只读，仍可能泄露端点、路径、功能标志或其他非 secret 字段。
+**在 `settings.register()` 上加声明**（`client: { surface: 'plugin-config' | 'custom', title, description }`），这也是被删掉的 `WEB_SETTINGS_NAMESPACES` 注释所点名的既定方向。它让注册默认不跨越传输边界，并让插件作者一行代码自助。否决的原因是 `surface` 是浏览器页面的词汇，而 `title`/`description` 属于呈现：Service Definition 一旦携带它们，就成了被单个 Consumer 塑形的 seam。它那条 fail-closed 性质的价值也不如读起来那么高——见上文「白名单实际护住了什么」。
 
-**给 `settings.register()` 增加浏览器暴露元数据。** 否决，因为页面名、标签和渲染归属是客户端关注点；它还会把一个命名空间注册拆成可能独立演化的校验与呈现职责。
+**另设一份暴露目录**，插件在注册 settings 之外再加入这份自有注册表，即把 `ctx.llm.registerConfigurableProviders()` 一般化。否决的原因是它把一件事实拆成两处可能脱节的注册：注册了命名空间却忘了目录条目，产出的是一个谁都编辑不了的分节，而没有任何门禁看得见这个错误。
 
-**在 settings 注册之外新增第二个暴露注册表。** 否决，因为两项注册可能脱节，使有效 settings 分节无法访问，并且任何拥有方都无法在本地检测缺少目录条目。
+**给 api-proxy 加一个 deny-list `Config` 字段**，让部署方能扣下某个命名空间。因为没有消费者而否决：当前每一个已注册的命名空间都是用户可以编辑的，而真正敏感的字段由 `role('secret')` 逐字段作答，那是更精细的工具。在第一个用例出现之前就发明出来的整命名空间开关，正是包规则所禁止的投机选项。
 
-**依据序列化 schema 生成通用卡片。** 否决，因为 schema 不定义可用的布局、文案、凭据处理、暂存保存行为或全部语义校验规则。能交付浏览器半侧的插件可以提供正确控件。
+**把 schema 驱动的通用卡片作为该 slot 的 `fallback`**，让没有浏览器半侧的插件也能从 `schema.toJSON()` 得到一份表单（schemastery 本就携带 `description`、`role`、`min`/`max`/`step` 并将其序列化）。否决的原因是客户端插件按已挂载的 Loader entries 在运行时加载，插件作者完全可以交付一张真正的卡片；而反向渲染的表单在模型页那次已被判定不如手写。若这个判断日后改变，`fallback` 选项无需改动契约即可启用。
 
-**保留 list slot 并增加命名空间 option。** 否决，因为标签页仍然枚举卡片而不是可见命名空间，空态错误会保留，每张未被服务的卡片也仍需自行抑制。
+**客户端认领注册表**，让每个拥有某命名空间的界面声明它，好让通用卡片知道哪些已经有人管。与通用卡片一并否决：keyed 派发本就让无人认领的键什么都不渲染，这份注册表只会把 slot 账本已经说过的话再说一遍。
+
+**保留 list slot，只给它的 options 加一个命名空间字段。** 否决的原因是分区枚举的仍是 entry 而非命名空间，空态缺陷照旧，未组装插件的卡片也仍需自我抑制。
 
 ## Consequences
 
-外部插件无需修改本仓库即可出现在个人设置页：Host 半侧注册命名空间，浏览器半侧在同一键下注册卡片。[设置卡片 cookbook](../../../../docs/cookbook/adding-a-settings-card.md)定义了所需打包和验证路径。
+在本仓库之外分发的插件无需改动这里即可从设置页配置：它在 Host 上注册自己的命名空间、在浏览器里把卡片注册在该键上，由分区把两者配对。卡片现在按卡片注册顺序出现，而不再依赖手工指定的 `order`。对本包注册的这几张卡它是稳定的——它们从同一个 generator 安装；对**跨插件**的卡片它并不稳定：包与包之间的 apply 顺序是无约束的（`packages/client/AGENTS.md`），因此多个外部卡片仍可能在不同次启动之间重排。要为它们定序，需要一个 section 可排序的显式键，而 keyed 注册今天并不携带。
 
-项目成员继续只看到经过批准的只读设置子集。个人与项目 scope 的刻意差异由 `api-proxy-config.spec.ts` 覆盖；删除过滤或让项目设置可写会改变协作安全模型，需要新的决策。
+以下延后，且都大于本次改动：脱敏器对只能经由 union、intersection 或 transform 抵达的 `role('secret')` 原样返回（其自身的 `TODO(settings-wire-redaction)`），而 `schema.toJSON()` 会携带 secret 的默认值。该缺口早于本次改动，但服务每一个已注册命名空间，把它的影响面从本仓库内经审计的 schema 扩大到任意第三方 schema，因此协议应当拒绝服务它无法证明可安全脱敏的命名空间。同样延后的还有：对本次头号能力的组装态测试——用 overlay 挂载一个 fixture 插件（Host 半注册命名空间、`dsh.client` 半注册卡片）并在端到端断言。当前覆盖分别证明了两个半侧；已发卡片输出未变这一点，证明不了新路径。
 
-卡片按注册顺序出现。同一处安装的卡片顺序稳定，但跨包注册顺序没有保证。协议没有命名空间注册事件，因此在标签页完成 Host 读取之后注册的命名空间，要等下一次 settings 文档更新或重连后才会出现。
+分区与其中的卡片都不再新增 `settings.describe` 读取：两者都从浏览器全局的镜像派生。它的失效通知在一个方向上不精确：协议通告的是文档提交与连接重置，而非注册行为，因此在镜像当前应答之后才被注册的命名空间，要等下一次提交或重连才会加入。
 
-服务任意个人命名空间提高了 fail-closed wire 脱敏的重要性。只能通过脱敏器无法检查的 schema 结构抵达的 secret 仍是已知缺口；代理最终必须拒绝无法证明可安全序列化的 descriptor。除两个半侧各自的单元覆盖外，仍需一项组装态 fixture 插件覆盖 Host 注册、客户端卡片注册、保存以及运行时使用生效值。
+对仓库之外的作者仍留有两处摩擦，均记在该分区的 README 里。浏览器半侧必须是按客户端模块系统的 lazy-CJS factory 格式构建的 `dsh.client` 包，而产出它的 `clientBundle` 预设位于 `packages/client/tsdown.client.ts`，并非已发布的包。bundle 纯净度门禁禁止以值的形式导入本包的卡片外观与暂存表单模型，因此这样的卡片要重新实现暂存与 revision 设栅。要共享它们，要么发布该预设，要么在卡片内部声明一层子 slot 让分区提供外观；两者都尚未构建。

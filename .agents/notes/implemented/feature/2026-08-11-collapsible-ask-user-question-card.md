@@ -16,7 +16,7 @@ Add a minimize/maximize toggle to the question card header, next to the existing
 - The toggle is a plain `IconChevronDownOutline14` / `IconChevronUpOutline14` pair on the existing 24px icon-button grid; `aria-expanded` reflects the card state and the label flips between `nav.minimize` / `nav.maximize` (the collapsed button reads "expand" for screen readers).
 - While minimized the option body and footer are unmounted (`{!minimized && ...}`), so no hidden interactive surface remains in the a11y tree.
 - The collapse button is disabled while a submit/cancel is in flight (`busy !== null`), matching the dismiss button's existing guard.
-- CSS: `.cardMinimized` drops the `max-height` cap, and its `.header` gains bottom padding so the strip is not cramped.
+- CSS: `.cardMinimized` drops the `max-height` cap and hides `.body` / `.footer`; `.header` gains bottom padding so the strip is not cramped.
 - Scope: only the generic question flow (`QuestionFlow`) gets the toggle. The plan-review card (`PlanReviewPanel`) is a different shape (one decision over one plan) and keeps its current layout.
 
 ## Consequences

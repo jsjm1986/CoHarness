@@ -56,6 +56,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import { authContextFrom, credentialStoreFrom } from './auth.ts'
 import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
 import { assertUsableApiKey, LlmError } from '@deepseek-ai/dsh-llm'
 import type { AdapterRegistrationHandle, DirectoryRegistrationHandle, LlmConfigurableProvider } from '@deepseek-ai/dsh-llm'
@@ -67,7 +68,7 @@ import type {
 } from '@deepseek-ai/dsh-model-provider-config'
 import { deepEqualJson, installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
 import { PiAiAdapter } from './adapter.ts'
-import { catalogProviderIds, catalogProviderTakesApiKey, SUPPORTED_THINKING_FORMATS } from './catalog.ts'
+import { catalogProviderIds, SUPPORTED_THINKING_FORMATS } from './catalog.ts'
 import { assertServiceable, Config, resolveProfiles } from './config.ts'
 import type {
   PiAiCompatProfile,
@@ -77,6 +78,7 @@ import type {
   ResolvedPiAiProviderProfile,
 } from './config.ts'
 import { discoverModels } from './discovery.ts'
+import { registerPiAiFlows } from './login.ts'
 
 export { PiAiAdapter } from './adapter.ts'
 export type { PiAiAdapterOptions } from './adapter.ts'
@@ -91,6 +93,7 @@ export type {
   PiAiThinkingFormat,
   ResolvedPiAiProviderProfile,
 } from './config.ts'
+export { recordKeyFor } from './auth.ts'
 export { supportedProtocols } from './provider.ts'
 
 export const name = 'llm-pi-ai'
@@ -222,9 +225,7 @@ function directoryEntries(
   // whose own posture — no key, credentials discovered by the provider — fails
   // every request. Catalog *membership* is unaffected, so `declare` above still
   // answers what pi-ai ships.
-  for (const provider of catalog) {
-    if (catalogProviderTakesApiKey(provider)) declare(provider, provider)
-  }
+  for (const provider of catalog) declare(provider, provider)
   for (const [provider, profile] of profiles) {
     if (!provider.startsWith(ORGANIZATION_PROVIDER_PREFIX)) declare(provider, profile.displayName)
   }
@@ -288,9 +289,11 @@ export function apply(ctx: Context, config: Config): void {
     )
   }
 
+  const auth = { credentials: credentialStoreFrom(ctx), authContext: authContextFrom(ctx) }
   const adapter = new PiAiAdapter({
     profiles,
     resolveApiKey,
+    auth,
     resolveAttachments: () => ctx.get('attachments'),
     onReplayDegrade: ({ provider, model, reason }) => {
       ctx.logger.warn(
@@ -299,6 +302,7 @@ export function apply(ctx: Context, config: Config): void {
       )
     },
   })
+  ctx.inject(['authorization'], (authorized) => { registerPiAiFlows(authorized, auth) })
   // The full installed catalog is configurable from the moment the plugin
   // mounts — dormant or not — so configuration surfaces can offer every
   // pi-ai provider before any route exists. Hand-declared routes join it as

@@ -1432,6 +1432,22 @@ describePg('PostgreSQL baseline', () => {
         inputMicrosPerMillion: 1_000_000,
         userAllowed: true,
       })
+      await governance.upsertModel({
+        provider: 'org-runtime',
+        model: 'retired',
+        displayName: 'Retired Model',
+        enabled: false,
+        adminAllowed: true,
+        userAllowed: true,
+        inputMicrosPerMillion: 0,
+        outputMicrosPerMillion: 0,
+        cacheReadMicrosPerMillion: 0,
+        cacheWriteMicrosPerMillion: 0,
+      })
+      const runtimeProvider = (await governance.policyFor(admin)).providers.find(
+        providerView => providerView.provider === 'org-runtime',
+      )
+      expect(runtimeProvider?.models.map(model => model.id)).toEqual(['chat'])
       await governance.setUserAccess(member.id, 'org-runtime', 'chat', false)
       expect((await governance.policyFor(member)).models[0]?.allowed).toBe(false)
       expect((await governance.policyFor(member)).defaultAllowed).toBe(false)

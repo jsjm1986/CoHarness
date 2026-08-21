@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-model-provider-config",
   "description": "Organization-managed model Provider configuration Service Definition for DeepSeek Harness",
-  "version": "0.1.0-rc.5",
+  "version": "0.1.1-rc.1",
   "publishConfig": {
     "access": "public"
   },

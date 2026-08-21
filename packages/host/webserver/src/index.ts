@@ -14,10 +14,24 @@ import type { AddressInfo } from 'node:net'
 import type { Duplex } from 'node:stream'
 import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
+import { renderIndexInjections, type IndexInjection } from './injections.ts'
+
+export { renderIndexInjections } from './injections.ts'
+export type { IndexInjection, IndexInjectionPlacement } from './injections.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
     webServer: WebServer
+  }
+  interface Events {
+    /**
+     * Collect structured index rows for one fresh index render. Listeners append
+     * JSON-safe rows to the mutable table; the fallback owner renders the
+     * completed table before applying legacy raw HTML transforms.
+     * @param table - the fresh row table for this index response.
+     * @mode emit
+     */
+    'webserver/index-inject'(table: IndexInjection[]): void
   }
 }
 
@@ -260,6 +274,25 @@ export class WebServer extends Service {
     let out = html
     for (const transform of this.indexTaps) out = transform(out)
     return out
+  }
+
+  /**
+   * Collect live structured index rows in listener activation order.
+   * @returns the fresh mutable row table after all listeners have appended.
+   */
+  collectIndexInjections(): IndexInjection[] {
+    const table: IndexInjection[] = []
+    this.ctx.emit('webserver/index-inject', table)
+    return table
+  }
+
+  /**
+   * Render structured rows first, then legacy raw HTML transforms.
+   * @param html - the raw index.html body.
+   * @returns the rendered body with current injections and transforms applied.
+   */
+  renderIndex(html: string): string {
+    return this.applyIndexTaps(renderIndexInjections(html, this.collectIndexInjections()))
   }
 }
 

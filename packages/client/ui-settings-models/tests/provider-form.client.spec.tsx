@@ -3,14 +3,16 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import Schema from '@deepseek-ai/schemastery'
-import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-web-react'
+import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import type { RpcResponse, SettingsNamespaceView } from '@deepseek-ai/dsh-api-remotes/client'
 import { ModelsSection, providerCopy } from '../src/client/ModelsSection.tsx'
-import type { ModelsSectionInjected } from '../src/client/ModelsSection.tsx'
+import type { ModelsSectionInjected, ModelsSectionProps } from '../src/client/ModelsSection.tsx'
 import { CustomProviderCard } from '../src/client/CustomProviderCard.tsx'
 import { formatCapacity, parseCapacity } from '../src/client/DeepSeekModelsEditor.tsx'
+import { SettingsDescribeMirror } from '@deepseek-ai/dsh-client-ui-settings/src/client/settings-mirror.ts'
 import { ModelsSettingsStore, deriveKeyRef, protocolChoices } from '../src/client/store.ts'
 import { en } from '../src/client/locales.ts'
+import { settingsSchema } from './settings-schema.client.ts'
 
 afterEach(cleanup)
 
@@ -31,6 +33,12 @@ const PiAiConfig = Schema.object({
       name: Schema.string(),
       contextWindow: Schema.number(),
       maxTokens: Schema.number(),
+      input: Schema.array(Schema.union(['text', 'image'])),
+      reasoningEfforts: Schema.union([
+        Schema.const(false),
+        Schema.dict(Schema.union([Schema.string(), Schema.const(null)]),
+          Schema.union(['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])),
+      ]),
     })),
     reasoning: Schema.union(['off', 'high']),
   })),
@@ -143,12 +151,14 @@ async function mountSection(
   section: Pick<ModelsSectionInjected, 'managementScope' | 'providerIdPattern'> = {},
 ) {
   const scripted = scriptedFace(options)
-  const controller = new ModelsSettingsStore(scripted.face as unknown as WireFace)
+  const controller = new ModelsSettingsStore(
+    scripted.face as unknown as WireFace, settingsSchema, new SettingsDescribeMirror(scripted.face as never))
   await controller.load()
-  const injected: ModelsSectionInjected = {
+  const injected: ModelsSectionProps = {
     controller,
     useSnapshot: bindSnapshotSelector(controller.store),
     api: scripted.face as never,
+    schema: settingsSchema,
     t,
   }
   render(<ModelsSection {...injected} {...section} />)
@@ -187,10 +197,10 @@ function within_(scope: HTMLElement, label: string): HTMLElement {
 describe('protocolChoices', () => {
   it('reads the protocols out of the namespace schema and nothing else', async () => {
     const { namespace } = scriptedFace()
-    expect(protocolChoices(namespace)).toEqual(PROTOCOLS)
-    expect(protocolChoices(undefined)).toEqual([])
+    expect(protocolChoices(namespace, settingsSchema)).toEqual(PROTOCOLS)
+    expect(protocolChoices(undefined, settingsSchema)).toEqual([])
     const plain = { ...namespace, schema: JSON.parse(JSON.stringify(Schema.object({}).toJSON())) as unknown }
-    expect(protocolChoices(plain)).toEqual([])
+    expect(protocolChoices(plain, settingsSchema)).toEqual([])
     await Promise.resolve()
   })
 })
@@ -215,6 +225,71 @@ describe('model list editing', () => {
       expectedRevision: 3,
       ops: [{ op: 'set', path: ['providers', 'openai', 'models'], value: [{ id: 'acme-large', contextWindow: 65_536 }] }],
     })
+  })
+
+  it('writes explicit image input and per-model reasoning wire values', async () => {
+    const { mutate } = await mountSection({
+      providers: { openai: { baseURL: 'https://proxy.example/v1', models: [{ id: 'vision-think' }] } },
+    })
+    openEditor('openai')
+    expandModel(1)
+
+    fireEvent.click(screen.getByLabelText(`${en.modelAcceptsImages} 1`))
+    fireEvent.change(screen.getByLabelText(`${en.modelReasoning} 1`), { target: { value: 'custom' } })
+    fireEvent.click(screen.getByLabelText(`${en.reasoningOff} 1`))
+    fireEvent.click(screen.getByLabelText(`${en.reasoningHigh} 1`))
+    fireEvent.click(screen.getByLabelText(`${en.reasoningMax} 1`))
+    fireEvent.change(screen.getByLabelText(`${en.reasoningWire} ${en.reasoningMax} 1`), {
+      target: { value: 'ultra' },
+    })
+
+    fireEvent.click(screen.getByText(en.apply))
+    await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
+    expect(firstMutate(mutate).ops[0]?.value).toEqual([{
+      id: 'vision-think',
+      input: ['text', 'image'],
+      reasoningEfforts: { off: null, high: 'high', max: 'ultra' },
+    }])
+  })
+
+  it('does not invent a reasoning capability when custom mode is selected', async () => {
+    const { mutate } = await mountSection({
+      providers: { openai: { baseURL: 'https://proxy.example/v1', models: [{ id: 'explicit-only' }] } },
+    })
+    openEditor('openai')
+    expandModel(1)
+    fireEvent.change(screen.getByLabelText(`${en.modelReasoning} 1`), { target: { value: 'custom' } })
+
+    expect(screen.getByText(`${en.model} 1: ${en.modelReasoningInvalid}`)).toBeTruthy()
+    expect(buttonNamed(en.apply).disabled).toBe(true)
+    expect(mutate).not.toHaveBeenCalled()
+
+    fireEvent.change(screen.getByLabelText(`${en.modelReasoning} 1`), { target: { value: 'disabled' } })
+    expect(buttonNamed(en.apply).disabled).toBe(false)
+    fireEvent.click(screen.getByText(en.apply))
+    await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
+    expect(firstMutate(mutate).ops[0]?.value).toEqual([{
+      id: 'explicit-only',
+      reasoningEfforts: false,
+    }])
+  })
+
+  it('removes a per-model reasoning declaration when inheritance is restored', async () => {
+    const { mutate } = await mountSection({
+      providers: {
+        openai: {
+          baseURL: 'https://proxy.example/v1',
+          models: [{ id: 'cataloged', reasoningEfforts: { off: null, high: 'high' } }],
+        },
+      },
+    })
+    openEditor('openai')
+    expandModel(1)
+    fireEvent.change(screen.getByLabelText(`${en.modelReasoning} 1`), { target: { value: 'inherit' } })
+    fireEvent.click(screen.getByText(en.apply))
+
+    await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
+    expect(firstMutate(mutate).ops[0]?.value).toEqual([{ id: 'cataloged' }])
   })
 
   it('names a duplicate model id in the edit flow too', async () => {
@@ -469,7 +544,10 @@ describe('endpoint interrogation', () => {
 
   it('adopts only the picked candidates, keeping a row the user already tuned', async () => {
     const discover = vi.fn(() => Promise.resolve(ok({
-      models: [{ id: 'kept', contextWindow: 999 }, { id: 'fresh', contextWindow: 4096, name: 'Fresh' }],
+      models: [
+        { id: 'kept', contextWindow: 999 },
+        { id: 'fresh', contextWindow: 4096, name: 'Fresh', inputModalities: ['text', 'image'] },
+      ],
     })))
     const { mutate } = await mountSection({
       discover,
@@ -488,7 +566,7 @@ describe('endpoint interrogation', () => {
     await waitFor(() => { expect(mutate).toHaveBeenCalled() })
     expect(firstMutate(mutate).ops[0]?.value).toEqual([
       { id: 'kept', contextWindow: 111 },
-      { id: 'fresh', contextWindow: 4096, name: 'Fresh' },
+      { id: 'fresh', contextWindow: 4096, name: 'Fresh', input: ['text', 'image'] },
     ])
   })
 
@@ -607,6 +685,27 @@ describe('endpoint interrogation', () => {
     // A disclosed output cap rides along with the candidate that has one.
     expect(firstMutate(mutate).ops[0]?.value).toEqual([{ id: 'a' }, { id: 'b', maxTokens: 2048 }])
   })
+
+  it('selects and clears every discovered candidate in one action', async () => {
+    const discover = vi.fn(() => Promise.resolve(ok({
+      models: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+    })))
+    await mountSection({ discover })
+    openEditor('openai')
+
+    fireEvent.click(screen.getByText(en.fetchModels))
+    const dialog = await screen.findByRole('dialog')
+    const boxes = [...dialog.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')]
+    expect(boxes.map(box => box.checked)).toEqual([true, true, true])
+
+    fireEvent.click(within_(dialog, en.fetchDeselectAll))
+    expect(boxes.map(box => box.checked)).toEqual([false, false, false])
+    expect(within_(dialog, en.fetchSelectAll)).toBeTruthy()
+
+    fireEvent.click(within_(dialog, en.fetchSelectAll))
+    expect(boxes.map(box => box.checked)).toEqual([true, true, true])
+    expect(within_(dialog, en.fetchDeselectAll)).toBeTruthy()
+  })
 })
 
 describe('provider rows', () => {
@@ -642,12 +741,14 @@ describe('provider rows', () => {
         active: true,
       }],
     }))) as never
-    const controller = new ModelsSettingsStore(scripted.face as unknown as WireFace)
+    const controller = new ModelsSettingsStore(
+      scripted.face as unknown as WireFace, settingsSchema, new SettingsDescribeMirror(scripted.face as never))
     await controller.load()
     render(<ModelsSection
       controller={controller}
       useSnapshot={bindSnapshotSelector(controller.store)}
       api={scripted.face as never}
+      schema={settingsSchema}
       t={t}
     />)
 

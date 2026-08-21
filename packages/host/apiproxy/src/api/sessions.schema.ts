@@ -182,6 +182,7 @@ export const modelCatalogModelSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   description: z.string().optional(),
+  inputModalities: z.array(z.enum(['text', 'image'])).optional(),
   reasoning: modelReasoningSchema.optional(),
 }) satisfies z.ZodType<Wire<ModelCatalogModel>>
 
@@ -243,6 +244,7 @@ export const imageLimitsProjectionSchema = z.object({
   maxImagesPerMessage: z.number().int().positive(),
   maxMessageImageBytes: z.number().int().positive(),
   maxImagePixels: z.number().int().positive(),
+  maxImageDimension: z.number().int().positive(),
   mediaTypes: z.array(z.string()),
 }) as unknown as z.ZodType<ImageAttachmentLimits>
 

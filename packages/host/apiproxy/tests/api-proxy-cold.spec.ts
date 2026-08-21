@@ -15,6 +15,7 @@ import { TypertLookupFailure } from '@deepseek-ai/dsh-typert-protocol'
 import TypertRegistry from '@deepseek-ai/dsh-typert-registry'
 import { createUserMessage, MessageId } from '@deepseek-ai/dsh-llm'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+import { UserDocId, type UserDocPromptAttachment } from '@deepseek-ai/dsh-userdoc'
 import UserQuestionService from '@deepseek-ai/dsh-user-questions'
 import type { SessionEvent, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
 import {
@@ -723,6 +724,62 @@ describe('degenerate composition (no persistence, no factory)', () => {
     expect(response.result.ok).toBe(false)
     if (!response.result.ok) expect(response.result.error.code).toBe('session-not-found')
     expect(inspect).not.toHaveBeenCalled()
+  })
+})
+
+describe('sessions.prompt storage service selection', () => {
+  it('admits a document-only prompt without an image attachment store', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(AgentRegistry)
+    await ctx.plugin(UserQuestionService)
+    const document = {
+      docId: UserDocId('report'),
+      path: '/proj/report.txt',
+      name: 'report.txt',
+      bytes: 5,
+      mediaType: 'text/plain',
+      modifiedAt: 1,
+    }
+    ctx.provide('userDocs', {
+      limits: {
+        maxFileBytes: 100,
+        maxFilesPerMessage: 2,
+        maxMessageBytes: 100,
+        maxInlineTextBytes: 10,
+      },
+      stat: () => Promise.resolve(document),
+      read: () => Promise.resolve({ ref: document, data: new TextEncoder().encode('hello') }),
+    } as never)
+    const session = ctx.sessions.create(sid('session-document-only'), { meta: { cwd: '/proj' } })
+    const followup = vi.fn<Agent['followup']>()
+    ctx.agents.register({ id: session.id, session, status: 'idle', ctx, followup } as unknown as Agent)
+    const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })
+
+    const response = await api.sessions.prompt(request({
+      sessionId: session.id,
+      mode: 'queue' as const,
+      content: [{ type: 'document' as const, docId: document.docId }],
+    }))
+
+    expect(ctx.get('attachments')).toBeUndefined()
+    expect(response.result.ok).toBe(true)
+    expect(followup).toHaveBeenCalledTimes(1)
+    const message = followup.mock.calls[0]?.[0]
+    expect(message).toBeDefined()
+    if (message === undefined) throw new Error('document prompt was not delivered')
+    expect(message.content).toHaveLength(1)
+    const [block] = message.content
+    expect(block?.type).toBe('text')
+    if (block?.type !== 'text') throw new Error('document prompt did not render as text')
+    expect(block.text).toContain('hello')
+    const source = message.source as typeof message.source & {
+      readonly documents: readonly UserDocPromptAttachment[]
+    }
+    expect(source.documents).toEqual([{
+      ref: document,
+      representation: { kind: 'inline', text: 'hello' },
+    }])
   })
 })
 

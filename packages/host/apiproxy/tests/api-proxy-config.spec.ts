@@ -20,7 +20,15 @@ import type { ModelProviderConfigSnapshot } from '@deepseek-ai/dsh-model-provide
 import { SettingsProvider, settingsNamespace } from '@deepseek-ai/dsh-settings'
 import type { SettingsNamespace } from '@deepseek-ai/dsh-settings'
 import { CredentialProvider } from '@deepseek-ai/dsh-credentials'
-import type { CredentialInfo, CredentialRef, ResolvedCredential } from '@deepseek-ai/dsh-credentials'
+import type {
+  CredentialInfo,
+  CredentialKey,
+  CredentialRecord,
+  CredentialRecordEntry,
+  CredentialRecordInfo,
+  CredentialRef,
+  ResolvedCredential,
+} from '@deepseek-ai/dsh-credentials'
 import type { CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
 import type { ApprovalRequestId } from '@deepseek-ai/dsh-cordis-host-runner/types'
 import type { HostFrame } from '../src/api/index.ts'
@@ -102,33 +110,58 @@ class MemoryCredentials extends CredentialProvider {
 
   private readonly shadowed: Set<string>
 
-  protected resolveOwned(ref: CredentialRef): Promise<ResolvedCredential | undefined> {
+  protected override resolveOwned(ref: CredentialRef): Promise<ResolvedCredential | undefined> {
     if (this.shadowed.has(ref)) return Promise.resolve({ value: 'from-env', source: 'env' })
     const value = this.values.get(ref)
     return Promise.resolve(value === undefined ? undefined : { value, source: 'file' })
   }
 
-  protected describeOwned(ref: CredentialRef): Promise<CredentialInfo> {
+  protected override describeOwned(ref: CredentialRef): Promise<CredentialInfo> {
     if (this.shadowed.has(ref)) return Promise.resolve({ configured: true, source: 'env', writable: false })
     const configured = this.values.has(ref)
     return Promise.resolve({ configured, ...configured ? { source: 'file' } : {}, writable: true })
   }
 
-  protected setOwned(ref: CredentialRef, value: string): Promise<void> {
+  protected override setOwned(ref: CredentialRef, value: string): Promise<void> {
     if (this.shadowed.has(ref)) {
       return Promise.reject(new Error(`credentials: ${ref} is shadowed by the read-only environment`))
     }
     this.values.set(ref, value)
-    this.ctx.emit('credentials/updated', ref)
+    this.ctx.emit('credentials/reference-updated', ref)
     return Promise.resolve()
   }
 
-  protected unsetOwned(ref: CredentialRef): Promise<void> {
+  protected override unsetOwned(ref: CredentialRef): Promise<void> {
     if (this.shadowed.has(ref)) {
       return Promise.reject(new Error(`credentials: ${ref} is shadowed by the read-only environment`))
     }
     this.values.delete(ref)
-    this.ctx.emit('credentials/updated', ref)
+    this.ctx.emit('credentials/reference-updated', ref)
+    return Promise.resolve()
+  }
+
+  // The record half has no wire face on this proxy, so this double answers
+  // the empty store rather than modelling storage the tests never exercise.
+  override readRecord(): Promise<CredentialRecord | undefined> {
+    return Promise.resolve(undefined)
+  }
+
+  override describeRecord(): Promise<CredentialRecordInfo> {
+    return Promise.resolve({ configured: false, writable: true })
+  }
+
+  override listRecords(): Promise<readonly CredentialRecordEntry[]> {
+    return Promise.resolve([])
+  }
+
+  override modifyRecord(
+    _key: CredentialKey,
+    mutate: (current: CredentialRecord | undefined) => Promise<CredentialRecord | undefined>,
+  ): Promise<CredentialRecord | undefined> {
+    return mutate(undefined)
+  }
+
+  override deleteRecord(): Promise<void> {
     return Promise.resolve()
   }
 }
@@ -361,7 +394,11 @@ describe('settings domain', () => {
     expect(opened).toEqual([])
   })
 
-  it('serves every registered namespace in personal scope', async () => {
+  it('serves every registered namespace, including one this repository never named', async () => {
+    // Registering IS the exposure: a plugin distributed outside this
+    // repository configures itself from the browser without a change here.
+    // The plane stays loopback-only and secret-redacted, and which surface
+    // renders a namespace is the browser's decision, not this proxy's.
     const ctx = await harness()
     ctx.settings.register(NS, AdapterConfig)
     ctx.settings.register(settingsNamespace('some-other-plugin'), z.object({ secretPath: z.string() }))
@@ -440,18 +477,6 @@ describe('settings domain', () => {
       .toEqual({ secretPath: '/etc/shadow' })
   })
 
-  it.each(['ro', 'rw'] as const)('filters arbitrary plugin namespaces from %s project scope', async (mode) => {
-    const ctx = await harness({ projectScope: mode })
-    ctx.settings.register(settingsNamespace('some-other-plugin'), z.object({ token: z.string() }))
-    ctx.settings.register(settingsNamespace('shell'), z.object({ timeoutMs: z.number() }))
-    const api = createApiProxy(ctx, DEFAULTS)
-
-    const value = expectOk(await api.settings.describe(request({})))
-
-    expect(value.writable).toBe(false)
-    expect(value.namespaces.map(view => view.ns)).toEqual(['shell'])
-  })
-
   it('serves product preference namespaces without invalidating the model catalog', async () => {
     const ctx = await harness()
     ctx.settings.register(settingsNamespace('ui-onboarding'), z.object({ welcomeNoticeVersion: z.string() }))
@@ -489,15 +514,17 @@ describe('settings domain', () => {
       .toEqual({ default: 'minimal' })
   })
 
-  it('keeps serving a provider namespace after its directory entry is gone', async () => {
+  it('keeps serving a provider namespace whose directory entry is gone', async () => {
+    // The configurable-provider directory says what the Models page can offer,
+    // not what a user may configure: a dormant route's stored section is still
+    // theirs to edit, and losing the entry must not strand it.
     const ctx = await harness({ configurableProviders: false })
     ctx.settings.register(NS, AdapterConfig)
     const api = createApiProxy(ctx, DEFAULTS)
     expect(expectOk(await api.settings.describe(request({}))).namespaces.map(view => view.ns))
       .toEqual(['llm-deepseek'])
-    expect(expectOk(await api.settings.update(request({
-      ns: 'llm-deepseek', patch: { baseURL: 'https://x' },
-    }))).value).toMatchObject({ baseURL: 'https://x' })
+    expect(expectOk(await api.settings.update(request({ ns: 'llm-deepseek', patch: { baseURL: 'https://x' } }))).value)
+      .toMatchObject({ baseURL: 'https://x' })
   })
 
   it('forwards a provider settings change for model-catalog consumers', async () => {
@@ -615,7 +642,10 @@ describe('settings domain', () => {
     expect(error.details).toEqual({ ns })
   })
 
-  it('maps unregistered and malformed namespaces to settings-rejected', async () => {
+  it('answers an unregistered namespace as the seam does, and a malformed one alike', async () => {
+    // A name no registration answers and a name no registration could answer
+    // fold into the same rejection: the proxy adds no boundary of its own, so
+    // the seam's own refusal is the whole answer.
     const ctx = await harness()
     ctx.settings.register(NS, AdapterConfig)
     const api = createApiProxy(ctx, DEFAULTS)
@@ -684,8 +714,8 @@ describe('credentials domain', () => {
       expectOk(await api.credentials.unset(request({ ref: 'OPENAI_API_KEY' })))
     })
     expect(frames).toEqual([
-      { type: 'host/remote-event', event: 'credentials/updated', args: ['OPENAI_API_KEY'] },
-      { type: 'host/remote-event', event: 'credentials/updated', args: ['OPENAI_API_KEY'] },
+      { type: 'host/remote-event', event: 'credentials/reference-updated', args: ['OPENAI_API_KEY'] },
+      { type: 'host/remote-event', event: 'credentials/reference-updated', args: ['OPENAI_API_KEY'] },
     ])
   })
 
@@ -810,7 +840,7 @@ describe('llm.discoverModels', () => {
       seen.push({ baseURL: probe.baseURL, api: probe.api, apiKey: probe.apiKey })
       return Promise.resolve([
         { id: 'acme-large', name: 'Acme Large', contextWindow: 65_536, maxTokens: 4096 },
-        { id: 'acme-small' },
+        { id: 'acme-small', inputModalities: ['text', 'image'] },
       ])
     })
     const api = createApiProxy(ctx, DEFAULTS)
@@ -824,7 +854,7 @@ describe('llm.discoverModels', () => {
 
     expect(value.models).toEqual([
       { id: 'acme-large', name: 'Acme Large', contextWindow: 65_536, maxTokens: 4096 },
-      { id: 'acme-small' },
+      { id: 'acme-small', inputModalities: ['text', 'image'] },
     ])
     expect(seen).toEqual([{
       baseURL: 'https://gateway.acme.example/v1',

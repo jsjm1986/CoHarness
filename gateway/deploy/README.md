@@ -7,7 +7,7 @@ Brings the gateway online on a Linux host with systemd kernel confinement and sw
 ## Prerequisites
 
 - Linux with systemd, root access, Docker Compose, `sqlite3` for one-time import/rollback, and Node 25 (`/usr/local/bin/node`; adjust unit paths for nvm layouts). Create the non-login `harness-project` account used by shared project units, create each `HGW_PROJECT_PATH_ROOTS` directory, and grant the account the required Unix read/write access to every project directory below those roots. Each configured root becomes one top-level entry in the administrator host browser; the root itself is navigation-only, and imported projects must be strict descendants. Both managed roots must preserve runtime access for directories created later; for example: `install -d -o root -g harness-project -m 2770 /srv/harness/projects/admin /srv/harness/projects/user-projects` (use an equivalent default ACL when group inheritance is not available). The setgid parent gives Gateway-created `0770` project folders the shared runtime group.
-- The pinned dsh release: `npm install -g @deepseek-ai/dsh@0.1.0-rc.5` (upgrades are a version bump + rolling restarts, never a source checkout). Note: locally uncommitted work in a dev clone (for example UI changes) is not in the npm release until it lands upstream.
+- The pinned dsh release: `npm install -g @deepseek-ai/dsh@0.1.0-rc.8` (upgrades are a version bump + rolling restarts, never a source checkout). Note: locally uncommitted work in a dev clone (for example UI changes) is not in the npm release until it lands upstream.
 - DNS/entry control for the public domain (Nginx or Cloudflare Tunnel).
 
 ## Install

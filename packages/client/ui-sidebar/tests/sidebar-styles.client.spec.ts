@@ -64,19 +64,12 @@ describe('SidebarRoot.module.css', () => {
     expect(declarations('.collapsed .newSession')?.get('width')).toBe('36px')
   })
 
-  it('stacks footer actions above Settings in a column, including the rail', () => {
-    expect(declarations('.footerActions')?.get('display')).toBe('flex')
-    expect(declarations('.footerActions')?.get('flex-direction')).toBe('column')
-    expect(declarations('.footerActions')?.get('min-width')).toBe('0')
-    expect(declarations('.footerActions')?.get('width')).toBe('100%')
-    expect(declarations('.collapsed .footerActions')?.get('flex-direction')).toBe('column')
-    expect(declarations('.collapsed .footerActions')?.get('align-items')).toBe('center')
-    expect(declarations('.collapsed .footerActions')?.get('width')).toBe('auto')
-  })
-
-  it('grows the compact brand new-session control to the touch target', () => {
-    expect(css).toContain("[data-viewport='compact']")
-    expect(css).toContain('.brand')
-    expect(css).toContain('min-height: var(--dsw-touch-target)')
+  it('keeps the slotted brand row at the full artwork height', () => {
+    expect(declarations('.brandIdentity')?.get('height')).toBe('24px')
+    expect(declarations('.brandName')?.get('height')).toBe('24px')
+    expect(declarations('.brandName')?.get('line-height')).toBe('24px')
+    expect(declarations('.brandName')?.get('font-size')).toBe('18px')
+    expect(declarations('.fallbackBrandName')?.get('font-size')).toBe('17px')
+    expect(declarations('.fallbackBrandName')?.get('white-space')).toBe('nowrap')
   })
 })

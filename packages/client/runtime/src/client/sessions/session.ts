@@ -195,7 +195,11 @@ export class Session implements SessionFace {
    * @param mode - queue appends after the current turn; steer interrupts it.
    * @returns the prompt result (also mirrored into promptError on failure).
    */
-  async prompt(content: PromptContentPart[], mode: 'queue' | 'steer'): Promise<RpcResult<{ accepted: true }>> {
+  async prompt(
+    content: PromptContentPart[],
+    mode: 'queue' | 'steer',
+    signal?: AbortSignal,
+  ): Promise<RpcResult<{ accepted: true }>> {
     this.promptError = null
     this.lastAgentError = null
     // Synchronous, before the first await: the blank → engaging edge must be
@@ -212,7 +216,7 @@ export class Session implements SessionFace {
           mode,
           content,
           clientTimeZone: resolvedClientTimeZone(),
-        })).result
+        }, signal)).result
       } else if (this.address.mode === 'one-shot') {
         result = {
           ok: false,
@@ -239,7 +243,7 @@ export class Session implements SessionFace {
               ? [{ type: 'text' as const, text: part.text }]
               : []),
             clientTimeZone: resolvedClientTimeZone(),
-          })).result
+          }, signal)).result
           result = routed.ok ? { ok: true, value: { accepted: true } } : routed
         }
       }
@@ -364,7 +368,7 @@ export class Session implements SessionFace {
    * @returns the admission result, or the error branch on transport failure.
    */
   async command(line: string): Promise<RemoteResult<{ matched: boolean }>> {
-    const result = await this.remote.commands.execute(this.sessionId, line)
+    const result = await this.remote.commands.execute(this.sessionId, line, [])
     if (!result.ok) return result
     return { ok: true, value: { matched: result.value !== undefined } }
   }
@@ -427,7 +431,9 @@ export class Session implements SessionFace {
     if (this.historyDetail === 'full') return
     if (this.fillPromise !== null) return this.fillPromise
     if (this.openState !== 'open') await this.open()
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- another caller can start the fill while open() yields.
     if (this.fillPromise !== null) return this.fillPromise
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- open() can settle the mutable detail state while awaited.
     if (this.historyDetail !== 'conversation' && this.historyDetail !== 'filling') return
     const promise = this.fillHistoryDetail()
     this.fillPromise = promise
@@ -853,12 +859,14 @@ export class Session implements SessionFace {
       let beforeSeq: number | undefined
       let previousOldest = Number.POSITIVE_INFINITY
       for (let guard = 0; guard < 64; guard++) {
+        // oxlint-disable-next-line typescript/no-unnecessary-condition -- later iterations follow an awaited history request.
         if (generation !== this.openGeneration || this.openState !== 'open') return
         if (this.omittedSpans.length === 0) break
         const { result } = await this.history({
           ...beforeSeq === undefined ? {} : { beforeSeq },
           maxMessages: PAGE_MESSAGES,
         })
+        // oxlint-disable-next-line typescript/no-unnecessary-condition -- callbacks can replace the generation while history() yields.
         if (generation !== this.openGeneration || this.openState !== 'open') return
         if (!result.ok || result.value.events.length === 0) break
         const oldest = result.value.events.reduce(

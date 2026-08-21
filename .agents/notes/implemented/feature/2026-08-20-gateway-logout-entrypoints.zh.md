@@ -12,6 +12,8 @@ Status: implemented
 
 两个浏览器界面都提交原生的同源 `POST /logout` 表单。`/admin` SPA 在桌面侧栏和紧凑移动端顶部渲染该表单。Web 工作台从 Gateway-only 的 `dsh-client-ui-collaboration` 侧栏 footer slot 渲染退出入口，并且只在账户上下文可用后显示，因此本地未认证 Web 模式不会暴露无效路由。浏览器不重复实现令牌撤销或 Cookie 处理；Gateway 仍是唯一会话所有者。
 
+默认 Web bundle 同时恢复 rc.8 合并时丢失的 `ui-collaboration` roster 行和包依赖，使项目空间控件与退出入口都进入实际发布的装配。
+
 ## Consequences
 
 用户端和管理端的退出行为一致，包括审计和重定向语义。原生表单导航不需要客户端 fetch 竞态或第二套 Cookie 清理实现。若账户上下文请求暂时失败或不可用，Web 入口会在协作状态 ready 前隐藏；`/admin` 仍通过自己的认证文档可用。

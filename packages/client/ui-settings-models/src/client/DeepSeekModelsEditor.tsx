@@ -10,6 +10,9 @@ import type { ReactNode } from 'react'
 import {
   IconChevronDownOutline14, IconChevronRightOutline14, IconPlusOutline16, IconTrashOutline16,
 } from '@deepseek-ai/dsh-client-ui-primitives'
+import {
+  acceptsImages, validDeepSeekInputModalities, validInputModalities, validReasoningEfforts,
+} from './model-capabilities.ts'
 import type { en } from './locales.ts'
 import styles from './ModelsSection.module.css'
 
@@ -17,7 +20,7 @@ import styles from './ModelsSection.module.css'
 export type DeepSeekModelDraft = Record<string, unknown>
 
 /** The catalog fields this editor writes. */
-type CatalogField = 'id' | 'name' | 'contextWindow' | 'maxTokens'
+type CatalogField = 'id' | 'name' | 'contextWindow' | 'maxTokens' | 'inputModalities'
 
 /** The two token counts edited as K/M-suffixed text behind a row's disclosure. */
 type CapacityField = 'contextWindow' | 'maxTokens'
@@ -74,7 +77,7 @@ export interface DeepSeekModelsValidationFailure {
   index: number
   /** Message key owned by the Models settings section. */
   key: 'modelIdRequired' | 'modelIdDuplicate' | 'modelNameInvalid' | 'modelContextInvalid'
-  | 'modelMaxTokensInvalid'
+  | 'modelMaxTokensInvalid' | 'modelModalitiesInvalid' | 'modelReasoningInvalid'
 }
 
 /** Convert a schema-validated catalog value into records without dropping hidden fields. */
@@ -91,7 +94,10 @@ export function modelDrafts(value: unknown): DeepSeekModelDraft[] {
  * @param value - user-owned `models` value, or undefined while inherited.
  * @returns the first invalid row, or undefined when the adapter will accept it.
  */
-export function validateDeepSeekModels(value: unknown): DeepSeekModelsValidationFailure | undefined {
+function validateModelRows(
+  value: unknown,
+  capabilityFailure: (model: DeepSeekModelDraft) => DeepSeekModelsValidationFailure['key'] | undefined,
+): DeepSeekModelsValidationFailure | undefined {
   if (value === undefined) return undefined
   const models = modelDrafts(value)
   const seen = new Set<string>()
@@ -118,8 +124,35 @@ export function validateDeepSeekModels(value: unknown): DeepSeekModelsValidation
       && (typeof maxTokens !== 'number' || !Number.isInteger(maxTokens) || maxTokens <= 0)) {
       return { index, key: 'modelMaxTokensInvalid' }
     }
+    const failure = capabilityFailure(model)
+    if (failure !== undefined) return { index, key: failure }
   }
   return undefined
+}
+
+/**
+ * Validate the direct DeepSeek catalog's model fields and modalities.
+ * @param value - user-owned `models` value, or undefined while inherited.
+ * @returns the first invalid row, or undefined when the adapter will accept it.
+ */
+export function validateDeepSeekModels(value: unknown): DeepSeekModelsValidationFailure | undefined {
+  return validateModelRows(value, model =>
+    validDeepSeekInputModalities(model['inputModalities'])
+      ? undefined
+      : 'modelModalitiesInvalid')
+}
+
+/**
+ * Validate a pi-ai provider's model fields, input modalities, and reasoning declarations.
+ * @param value - user-owned `models` value, or undefined while inherited.
+ * @returns the first invalid row, or undefined when the adapter will accept it.
+ */
+export function validatePiAiModels(value: unknown): DeepSeekModelsValidationFailure | undefined {
+  return validateModelRows(value, (model) => {
+    if (!validInputModalities(model['input'])) return 'modelModalitiesInvalid'
+    if (!validReasoningEfforts(model['reasoningEfforts'])) return 'modelReasoningInvalid'
+    return undefined
+  })
 }
 
 /** Props of {@link DeepSeekModelsEditor}. */
@@ -343,6 +376,18 @@ export function DeepSeekModelsEditor(props: DeepSeekModelsEditorProps): ReactNod
                     <div className={styles['modelAdvanced']}>
                       {capacityField(model, index, 'contextWindow', props.defaultContextWindow)}
                       {capacityField(model, index, 'maxTokens', props.defaultMaxTokens)}
+                      <label className={styles['modelCheckboxField']}>
+                        <input
+                          type="checkbox"
+                          checked={acceptsImages(model['inputModalities'])}
+                          aria-label={`${props.t('modelAcceptsImages')} ${String(index + 1)}`}
+                          disabled={props.disabled}
+                          onChange={(event) => {
+                            update(index, 'inputModalities', event.target.checked ? ['text', 'image'] : ['text'])
+                          }}
+                        />
+                        <span className={styles['modelFieldLabel']}>{props.t('modelAcceptsImages')}</span>
+                      </label>
                     </div>
                   )
                   : null}

@@ -4,7 +4,7 @@ Status: implemented
 
 English | [中文](2026-08-10-web-plugin-configuration.zh.md)
 
-> The three settings sections, layered values, and staged-save forms remain current. The Host allowlist and unkeyed card list are superseded by [plugin-owned settings with project isolation](../architecture/2026-08-12-plugin-owned-settings-surface.md): personal cards are keyed by namespace, while project scope keeps an approved read-only subset.
+> The three sections, the layering, and the staged-save form remain current. The Host allowlist and the unkeyed card list are superseded by the [plugin-owned settings surface](../architecture/2026-08-12-plugin-owned-settings-surface.md): every registered namespace is served, and cards are keyed on the namespace they edit.
 
 ## Problem
 

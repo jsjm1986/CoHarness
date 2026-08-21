@@ -4,7 +4,7 @@ Status: implemented
 
 [English](2026-08-10-web-plugin-configuration.md) | 中文
 
-> 三个 settings 分节、分层值和暂存保存表单依然有效。Host 白名单与无键卡片列表已被[具有项目隔离的插件自有设置](../architecture/2026-08-12-plugin-owned-settings-surface.md)取代：个人卡片以命名空间为键，项目 scope 保留经过批准的只读子集。
+> 三个分节、分层解析与暂存保存表单依然有效。Host 白名单与无键卡片列表已被[由插件自己拥有的设置表层](../architecture/2026-08-12-plugin-owned-settings-surface.md)取代：每一个已注册的命名空间都被服务，卡片以它所编辑的命名空间为键。
 
 ## 问题
 

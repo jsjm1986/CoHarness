@@ -34,7 +34,7 @@ Status: implemented
 
 `packages/host/userdoc-http` 通过 Host Connection 注册流式 `/api/documents` 子树。既有的 Host／Origin 信任围栏会先于子树处理器运行；随后上传请求体不会进入有缓冲的 JSON bridge。`POST` 要求 `x-dsh-document-upload: 1`，把原始请求体流式写入 `UserDocStore`，并在读取前拒绝超出限额的声明长度。`GET` 列举引用、目录和限额；文件夹与移动路由修改工作区；`GET`／`HEAD` 流式返回文档内容并带 `nosniff` 与附件 disposition；文档 `DELETE` 幂等执行。错误响应只公开稳定的文档错误码，不包含路径或字节。
 
-提示 API 接受与文本、图片并列的文档标识符。`prepareUserDocAttachments` 在提交任何提示前解析全部标识符，强制每条消息的数量与总字节限额，并为每个文档冻结一种表示：不超过 `maxInlineTextBytes` 且能以严格 UTF-8 解码的内容内联，其余文件只以存储路径表示。主机把两种表示都渲染成文本块，并将主机准入后的快照复制进用户消息 source；客户端提交的路径或内联文本从不被信任。web bundle 同时组合本地存储、提示上下文插件与流式 HTTP Consumer。
+提示 API 接受与文本、图片并列的文档标识符。准入只在出现对应内容项时解析相应存储：纯文本提示不需要任一存储缝，纯文档提示也不依赖图片附件存储。`prepareUserDocAttachments` 在提交任何提示前解析全部标识符，强制每条消息的数量与总字节限额，并为每个文档冻结一种表示：不超过 `maxInlineTextBytes` 且能以严格 UTF-8 解码的内容内联，其余文件只以存储路径表示。主机把两种表示都渲染成文本块，并将主机准入后的快照复制进用户消息 source；客户端提交的路径或内联文本从不被信任。web bundle 同时组合本地存储、提示上下文插件与流式 HTTP Consumer。
 
 `userdoc-context` 插件在确切的 `user/message` 事件追加之后监听，并为每个文档记录一个 `userdoc/attached` 事件，包含消息标识、顺序、元数据与冻结表示。这样所有到达模型的文档细节都能从会话日志重建，无需新增核心 `ContentBlock` 类型。
 

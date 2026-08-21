@@ -617,6 +617,15 @@
   padding: var(--dsw-space-2) var(--dsw-space-1) 2px;
 }
 
+.modelCheckboxField {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: end;
+  min-height: 32px;
+  padding-bottom: 6px;
+}
+
 .modelField {
   display: flex;
   flex-direction: column;
@@ -627,6 +636,38 @@
   color: var(--dsw-alias-label-tertiary);
   font-size: 12px;
   line-height: 18px;
+}
+
+.modelReasoning {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--dsw-space-2);
+  grid-column: 1 / -1;
+}
+
+.reasoningLevels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: var(--dsw-space-2);
+  margin: 0;
+  padding: var(--dsw-space-2);
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-md);
+}
+
+.reasoningLevels legend {
+  padding: 0 4px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.reasoningLevel {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--dsw-space-1);
 }
 
 .modelEmpty {
@@ -753,6 +794,12 @@ select.input {
      ui-theme styles/scrollbar.css for the contract). */
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+}
+
+.candidateActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 6px;
 }
 
 .candidateList {

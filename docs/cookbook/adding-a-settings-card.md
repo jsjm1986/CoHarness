@@ -2,15 +2,15 @@
 
 English | [中文](adding-a-settings-card.zh.md)
 
-This tutorial adds a plugin-owned card to the web settings page. In a personal Host scope, the api-proxy serves every registered settings namespace and the **Plugin configuration** tab keys cards on the namespace they edit, so registering both halves pairs them automatically. Shared project scopes remain read-only and expose only the repository's approved project settings namespaces; an external plugin card therefore appears in personal settings, not in a project member's settings view.
+How a plugin puts its own configuration on the web settings page. Nothing in this path needs a change inside this repository: the Host serves every registered settings namespace, and the **Plugins** section keys its cards on the namespace they edit, so a plugin that registers both halves is paired up automatically.
 
-The Host half lives under `src/`; the browser half lives under `src/client/`, is exported as `./client`, and is declared with `dsh.client`. [`packages/client/ui-theme`](../../packages/client/ui-theme) demonstrates that packaging, while the built-in cards live in [`packages/client/ui-settings-plugins`](../../packages/client/ui-settings-plugins).
+The two halves live in one package — the Host half under `src/`, the browser half under `src/client/`, exported as `./client` and declared with `dsh.client`. [`packages/client/ui-theme`](../../packages/client/ui-theme) is a worked example of that packaging; the cards this section ships live in [`packages/client/ui-settings-plugins`](../../packages/client/ui-settings-plugins).
 
-## 1. Register the namespace
+## 1. Register the namespace (Host half)
 
-The namespace is the join key, so define it once and use the same value in both halves. A plugin with a `cordis.yml` entry should register through `installSettingsSection`, which layers the entry below the user document and keeps the composition entry active when no settings provider is mounted:
+The namespace is the join key, so pick it once and spell it in both halves. A consumer that already has a `cordis.yml` entry should register through `installSettingsSection`, which layers the entry under the user document and keeps working when no settings provider is mounted:
 
-```ts ignore-check
+```ts
 import type { Context } from '@deepseek-ai/cordis'
 import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
 import z from '@deepseek-ai/schemastery'
@@ -30,24 +30,27 @@ export const Config: z<Config> = z.object({
   retries: z.number().step(1).min(0).default(3),
 })
 
-export function apply(ctx: Context, config: Config): void {
+export function apply(ctx: Context, config: Config) {
   let source = () => config
   installSettingsSection(ctx, MY_PLUGIN_NS, Config, config, {
+    // Constraints the schema cannot express refuse the write, not the next use.
     validate: value => void assertReachable(value.endpoint),
-    setSource: current => { source = current },
+    setSource: (current) => { source = current },
     onChange: () => { rebuildFromSettings(source()) },
   })
 }
 ```
 
-Marking a field with `role('secret')` removes its value from every response. The card writes such a field through a settings `update`/`mutate` request or addresses a credential reference through the `credentials` domain. Set `applies: 'restart'` when the plugin applies stored changes only on its next start.
+`role('secret')` on a field keeps its value off every response; the card writes such a field into an `update`/`mutate` payload, or addresses a credential reference through the `credentials` domain instead. `applies: 'restart'` tells a configuration surface the owner acts on a change only at the next start.
 
-## 2. Register the card
+## 2. Register the card (browser half)
 
-The browser half registers into `settings.plugin.item` with the same namespace as its key. The card owns its chrome, controls, copy, staging, and validation feedback. It reads and writes through `ctx.settingsScope`, which fences writes with the revision previously read:
+The card registers into `settings.plugin.item` under its namespace and owns everything inside it — chrome, controls, and copy. It reads and writes through `ctx.settingsScope`, which fences each write with the revision it read:
 
 ```ts ignore-check
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+// Type-only: the keyed slot's declaration. Cross-plugin collaboration goes
+// through cordis services; a value import fails the client bundle-purity gate.
 import type {} from '@deepseek-ai/dsh-client-ui-settings-plugins/client'
 
 export const inject = ['slots', 'locale', 'connection', 'remote', 'settingsScope']
@@ -59,23 +62,22 @@ export function apply(ctx: ClientContext): void {
     key: 'my-plugin',
     locale: 'settings.myPlugin',
     inject: () => card.inject(),
-  }, MyPluginCard))
+  }, MyPluginCard),
+  )
 }
 ```
 
-The scope snapshot carries the resolved `value`, composition `base`, and raw `user` layer. A field is overridden when its key is present in `user`, regardless of whether its value equals the base. `scope.set(field, value)` stores one field; `scope.unset(field)` clears it back to the composition layer.
+The scope snapshot carries what a form needs: the resolved `value`, the composition `base`, and the raw `user` layer, whose key **presence** — not its value — is what marks a field overridden. `scope.set(field, value)` stores one field and `scope.unset(field)` clears it back to the composition layer.
 
-## 3. Verify namespace dispatch
+## 3. What the tab does with it
 
-The tab reads `settings.describe` and dispatches one slot key per served namespace. A card renders only when the current authority can see its namespace and the slot ledger contains a card under that key. A deployment without the Host half leaves no card trace; a served namespace claimed by another page (`ui-theme`, `permission`, `llm-*`) renders nothing here.
+The **Plugin configuration** tab reads which namespaces the Host serves and dispatches one slot key per namespace. A card is rendered when the Host serves its key and skipped when it does not, so a deployment that never composed the Host half shows no trace of the card. A served namespace no card claims renders nothing — that is how the namespaces owned by other pages (`ui-theme`, `permission`, `llm-*`) stay off this tab.
 
-Cards appear in registration order. A keyed card entry has no independent `order` field.
-
-Run the plugin's Host settings tests, its browser registration and rendering tests, and one assembled web test that mounts both halves. The assembled check should open personal settings, confirm the card appears, save a value, and observe the owning plugin use the stored value. If the deployment also supports project collaboration, assert that the external namespace is absent and writes remain forbidden in project scope.
+Cards appear in the order they registered into the slot; a keyed entry declares no `order` of its own.
 
 ## Packaging
 
-The [client module system](../../packages/client/modules) scans enabled Loader entries for packages declaring `dsh.client` and serves each built `./client` export. Mounting the package in `cordis.yml` therefore activates the browser half without rebuilding the web application:
+The browser half is served to the page by the [client module system](../../packages/client/modules), which scans the enabled Loader entries for packages declaring `dsh.client` and serves each one's built `./client` export. So the plugin appears on the page as soon as a `cordis.yml` mounts it — no rebuild of the web application.
 
 ```jsonc
 {
@@ -87,4 +89,12 @@ The [client module system](../../packages/client/modules) scans enabled Loader e
 }
 ```
 
-The browser artifact must use the Loader's lazy-CJS factory format. This repository's packages build it through `clientBundle` in `packages/client/tsdown.client.ts`; that preset is not published, so an external package must reproduce the output format. The bundle-purity check also rejects cross-plugin value imports, so an external card cannot import this package's card chrome or staged form implementation. See the [known limitations](../../packages/client/ui-settings-plugins/README.md#known-limitations-and-deferred-work).
+The bundle must be the loader's lazy-CJS factory artifact. Inside this repository `tsdown.config.ts` is three lines over the shared preset:
+
+```ts ignore-check
+import { clientBundle } from '../tsdown.client.ts'
+
+export default clientBundle('@deepseek-ai/dsh-client-my-plugin', ['lib/types/index.js', 'lib/types/invariant.js'])
+```
+
+That preset is not published today, so a package outside this repository has to reproduce the same output format itself. The bundle-purity gate also rejects value imports across plugins, so a card cannot import this section's card chrome or its staged-form model — it renders its own, and owns its own staging and revision fencing. Both limits are recorded under [the section's known limitations](../../packages/client/ui-settings-plugins/README.md#known-limitations-and-deferred-work).

@@ -7,9 +7,15 @@
 
 import { describe, expect, it } from 'vitest'
 import type { IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
+import { SettingsDescribeMirror } from '@deepseek-ai/dsh-client-ui-settings/src/client/settings-mirror.ts'
 import {
   AGENT_PRESET_SETTINGS_NS, AgentPresetSettingsController, messageOf,
 } from '../src/client/settings-store.ts'
+
+/** Controller over a real mirror derived from the same fake wire. */
+function derivedController(api: IApiClient) {
+  return new AgentPresetSettingsController(api, new SettingsDescribeMirror(api))
+}
 import { AgentPresetSeatController } from '../src/client/seat-store.ts'
 import type { SeatSessionSummary } from '../src/client/seat-store.ts'
 
@@ -60,20 +66,21 @@ function fakeApi(
 
 describe('the agent-preset settings controller', () => {
   it('disables the control when this browser may not write settings', async () => {
-    const controller = new AgentPresetSettingsController(fakeApi([
+    const controller = derivedController(fakeApi([
       { id: 'standard', trust: 'system', isDefault: true },
     ], { readOnly: true }))
 
     await controller.load()
 
-    // `settings.describe` reports whether this scope may write the choice;
-    // presenting an enabled control when it cannot would promise a refused switch.
+    // `settings.describe` is loopback-only and reports a read-only provider;
+    // offering a control whose write answers `settings-rejected` would promise
+    // a switch the host refuses.
     expect(controller.store.getSnapshot().writable).toBe(false)
     expect(controller.store.getSnapshot().currentValue).toBe('standard')
   })
 
   it('derives options and the current default from one roster call', async () => {
-    const controller = new AgentPresetSettingsController(fakeApi([
+    const controller = derivedController(fakeApi([
       { id: 'standard', trust: 'system', isDefault: true },
       { id: 'mine', trust: 'user', isDefault: false },
     ]))
@@ -90,7 +97,7 @@ describe('the agent-preset settings controller', () => {
   })
 
   it('offers no broken preset: the pickers choose the NEXT session\'s composition', async () => {
-    const controller = new AgentPresetSettingsController(fakeApi([
+    const controller = derivedController(fakeApi([
       { id: 'standard', trust: 'system', isDefault: true },
       { id: 'damaged', trust: 'user', isDefault: false, broken: 'the composition is not valid YAML' },
     ] as never))
@@ -104,7 +111,7 @@ describe('the agent-preset settings controller', () => {
   })
 
   it('carries the display metadata a preset published', async () => {
-    const controller = new AgentPresetSettingsController(fakeApi([
+    const controller = derivedController(fakeApi([
       { id: 'standard', trust: 'system', isDefault: true, name: '标准模式', description: '完整的编码 agent。' },
     ] as never))
 
@@ -118,7 +125,7 @@ describe('the agent-preset settings controller', () => {
   })
 
   it('reports an empty roster as unavailable, not as an error', async () => {
-    const controller = new AgentPresetSettingsController(fakeApi([]))
+    const controller = derivedController(fakeApi([]))
 
     await controller.load()
 
@@ -130,7 +137,7 @@ describe('the agent-preset settings controller', () => {
 
   it('writes only the default field, into the agent-presets namespace', async () => {
     const writes: Recorded[] = []
-    const controller = new AgentPresetSettingsController(fakeApi([
+    const controller = derivedController(fakeApi([
       { id: 'standard', trust: 'system', isDefault: true },
       { id: 'minimal', trust: 'system', isDefault: false },
     ], { writes }))
@@ -143,7 +150,7 @@ describe('the agent-preset settings controller', () => {
   })
 
   it('restores the previous value and surfaces the message when the write fails', async () => {
-    const controller = new AgentPresetSettingsController(fakeApi([
+    const controller = derivedController(fakeApi([
       { id: 'standard', trust: 'system', isDefault: true },
       { id: 'minimal', trust: 'system', isDefault: false },
     ], { failWrite: 'read-only settings' }))
@@ -159,7 +166,7 @@ describe('the agent-preset settings controller', () => {
 
   it('ignores a pick that is already the default', async () => {
     const writes: Recorded[] = []
-    const controller = new AgentPresetSettingsController(fakeApi([
+    const controller = derivedController(fakeApi([
       { id: 'standard', trust: 'system', isDefault: true },
     ], { writes }))
     await controller.load()
@@ -170,7 +177,7 @@ describe('the agent-preset settings controller', () => {
   })
 
   it('surfaces a roster failure without claiming the deployment has no presets', async () => {
-    const controller = new AgentPresetSettingsController(fakeApi([], { failList: 'host down' }))
+    const controller = derivedController(fakeApi([], { failList: 'host down' }))
 
     await controller.load()
 
@@ -182,7 +189,7 @@ describe('the agent-preset settings controller', () => {
   it('shows the first preset when the roster marks none default', async () => {
     // Settings can name a preset that was since deleted; the picker still has
     // to show something rather than an empty control.
-    const controller = new AgentPresetSettingsController(fakeApi([
+    const controller = derivedController(fakeApi([
       { id: 'standard', trust: 'system', isDefault: false },
       { id: 'mine', trust: 'user', isDefault: false },
     ]))
@@ -194,7 +201,7 @@ describe('the agent-preset settings controller', () => {
 
   it('ignores a load while one is already in flight', async () => {
     const writes: Recorded[] = []
-    const controller = new AgentPresetSettingsController(fakeApi(
+    const controller = derivedController(fakeApi(
       [{ id: 'standard', trust: 'system', isDefault: true }], { writes }))
 
     await Promise.all([controller.load(), controller.load()])
@@ -210,7 +217,7 @@ describe('the agent-preset settings controller', () => {
   })
 
   it('reports a transport that rejects rather than answering', async () => {
-    const controller = new AgentPresetSettingsController({
+    const controller = derivedController({
       agentPresets: { list: () => Promise.reject(new Error('socket closed')) },
     } as unknown as IApiClient)
 
@@ -220,7 +227,7 @@ describe('the agent-preset settings controller', () => {
   })
 
   it('reports a transport that rejects mid-write and keeps the old default showing', async () => {
-    const controller = new AgentPresetSettingsController(fakeApi([
+    const controller = derivedController(fakeApi([
       { id: 'standard', trust: 'system', isDefault: true },
       { id: 'mine', trust: 'user', isDefault: false },
     ], { failWriteWith: new Error('socket closed') }))
@@ -433,7 +440,7 @@ describe('the new-session chip controller', () => {
     expect(controller.store.getSnapshot().error).toBe('socket closed')
   })
 
-  it('reports a refused describe as a failure rather than a half-read row', async () => {
+  it('degrades to a read-only row while the mirror holds no answer', async () => {
     const api = {
       agentPresets: {
         list: () => Promise.resolve({
@@ -441,16 +448,19 @@ describe('the new-session chip controller', () => {
           result: { ok: true as const, value: { presets: [{ id: 'standard', trust: 'system', isDefault: true }], authorable: true } },
         }),
       },
-      // The roster answered; `settings.describe` is what rejected, and the row
-      // cannot claim a writable default it never confirmed.
+      // The roster answered; the mirror's read is what failed, so the row
+      // shows the current default without offering a write it never confirmed.
       settings: { describe: () => Promise.reject(new Error('socket closed')) },
     } as unknown as IApiClient
-    const controller = new AgentPresetSettingsController(api)
+    const controller = derivedController(api)
 
     await controller.load()
 
-    expect(controller.store.getSnapshot().status).toBe('error')
-    expect(controller.store.getSnapshot().error).toBe('socket closed')
+    expect(controller.store.getSnapshot()).toMatchObject({
+      status: 'ready',
+      writable: false,
+      currentValue: 'standard',
+    })
   })
 
 

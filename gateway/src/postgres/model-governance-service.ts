@@ -1396,6 +1396,7 @@ export class PostgresModelGovernanceService {
       FROM harness.model_providers provider
       JOIN harness.model_catalog model ON model.organization_id=provider.organization_id
         AND model.provider_id=provider.id
+        AND model.enabled
       WHERE provider.organization_id=$1 AND provider.source='managed' AND provider.status='enabled'
       ORDER BY provider.provider_key,model.model_key`, [this.context.organizationId])
     const providers = new Map<string, RuntimeModelProvider>()

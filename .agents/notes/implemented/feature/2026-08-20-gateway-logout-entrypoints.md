@@ -12,6 +12,8 @@ Authenticated users could not end their Gateway session from either the Web work
 
 Both browser surfaces submit a native same-origin `POST /logout` form. The `/admin` SPA renders the form in its desktop sidebar and compact mobile header. The Web workbench renders it from the Gateway-only `dsh-client-ui-collaboration` sidebar footer slot and only after the account context is available, so local unauthenticated Web mode does not expose a dead route. The browser does not duplicate token revocation or cookie handling; Gateway remains the sole session owner.
 
+The default Web bundle also restores the `ui-collaboration` roster row and package dependency that were lost during the rc.8 merge. This keeps project-scope controls and the logout entry in the shipped composition.
+
 ## Consequences
 
 Logout behavior is identical in the user and admin applications, including audit and redirect semantics. Native form navigation works without a client-side fetch race or a second cookie-clearing implementation. A transient or unavailable account-context response hides the Web entry until the collaboration state is ready; `/admin` remains available through its own authenticated document.

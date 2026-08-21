@@ -205,8 +205,12 @@ class ClientRemoteService extends Service implements TypertClientRemote {
     this.validateContribution(contribution)
     const disposeRemote = callerCtx.typert.remotes.register(contribution)
     const installed: TypertDisposer[] = []
+    const touchedNamespaces = new Set<RemoteNamespaceService>()
     try {
-      for (const descriptor of contribution.descriptors) installed.push(await this.install(descriptor))
+      for (const descriptor of contribution.descriptors) {
+        installed.push(await this.install(descriptor, touchedNamespaces))
+      }
+      for (const namespace of touchedNamespaces) namespace.publishMethods()
     } catch (error) {
       for (const dispose of installed.reverse()) await dispose()
       await disposeRemote()
@@ -262,15 +266,20 @@ class ClientRemoteService extends Service implements TypertClientRemote {
     }
   }
 
-  private async install(descriptor: InvocationDescriptor): Promise<TypertDisposer> {
+  private async install(
+    descriptor: InvocationDescriptor,
+    touchedNamespaces: Set<RemoteNamespaceService>,
+  ): Promise<TypertDisposer> {
     const token: MountToken = { active: true, abort: new AbortController() }
     const installed: TypertDisposer[] = []
     try {
       if (descriptor.invocation.kind === 'direct') {
-        installed.push(await this.installDirect(descriptor, token))
+        installed.push(await this.installDirect(descriptor, token, touchedNamespaces))
       }
       const projection = scopedProjection(descriptor)
-      if (projection !== undefined) installed.push(await this.installScoped(descriptor, projection, token))
+      if (projection !== undefined) {
+        installed.push(await this.installScoped(descriptor, projection, token, touchedNamespaces))
+      }
     } catch (error) {
       token.active = false
       token.abort.abort()
@@ -286,10 +295,15 @@ class ClientRemoteService extends Service implements TypertClientRemote {
     }
   }
 
-  private async installDirect(descriptor: InvocationDescriptor, token: MountToken): Promise<TypertDisposer> {
+  private async installDirect(
+    descriptor: InvocationDescriptor,
+    token: MountToken,
+    touchedNamespaces: Set<RemoteNamespaceService>,
+  ): Promise<TypertDisposer> {
     const namespace = await this.namespace(descriptor.namespace)
     try {
       namespace.service.installDirect(descriptor, token)
+      touchedNamespaces.add(namespace.service)
     } catch (error) {
       await this.disposeNamespace(descriptor.namespace, namespace)
       throw error
@@ -304,10 +318,12 @@ class ClientRemoteService extends Service implements TypertClientRemote {
     descriptor: InvocationDescriptor,
     projection: ScopedProjection,
     token: MountToken,
+    touchedNamespaces: Set<RemoteNamespaceService>,
   ): Promise<TypertDisposer> {
     const namespace = await this.namespace(descriptor.namespace)
     try {
       namespace.service.installScoped(descriptor, projection, token)
+      touchedNamespaces.add(namespace.service)
     } catch (error) {
       await this.disposeNamespace(descriptor.namespace, namespace)
       throw error
@@ -452,6 +468,8 @@ type InvokeRemote = (
 class RemoteNamespaceService extends Service {
   private readonly methods = new Map<string, RemoteMethodRecord>()
   private readonly namespace: string
+  // Injecting fibers remain pending until one complete contribution commits.
+  private methodsPublished = false
 
   static assertMethodAvailable(namespace: string, method: string): void {
     if (REMOTE_NAMESPACE_FIELDS.has(method) || method in RemoteNamespaceService.prototype) {
@@ -466,6 +484,16 @@ class RemoteNamespaceService extends Service {
   ) {
     super(ctx, remoteServiceKey(name))
     this.namespace = name
+  }
+
+  [Service.check](): boolean {
+    return this.methodsPublished
+  }
+
+  publishMethods(): void {
+    if (this.methodsPublished) return
+    this.methodsPublished = true
+    this.ctx.reflect.notify([this.name])
   }
 
   assertMethodAvailable(method: string): void {
@@ -531,7 +559,15 @@ class RemoteNamespaceService extends Service {
   }
 }
 
-const REMOTE_NAMESPACE_FIELDS = new Set(['ctx', 'empty', 'invokeRemote', 'methods', 'name', 'namespace'])
+const REMOTE_NAMESPACE_FIELDS = new Set([
+  'ctx',
+  'empty',
+  'invokeRemote',
+  'methods',
+  'methodsPublished',
+  'name',
+  'namespace',
+])
 
 function remoteServiceKey(namespace: string): string {
   return `remote.${namespace}`
