@@ -8,6 +8,9 @@
   width: min(960px, 100%);
   min-height: min(640px, calc(100dvh - 48px));
   max-height: min(860px, calc(100dvh - 48px));
+  /* Modal paints this card at layer 2; these tokens inherit to the scrolling list. */
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 }
 
 .shell {

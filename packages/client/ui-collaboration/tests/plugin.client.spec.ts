@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { SlotRegistry, type SessionCreateOptions, type SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ComposerChainProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { ConversationShareAction, type ConversationShareInjected } from '../src/client/ConversationShareAction.tsx'
+import { LogoutButton } from '../src/client/LogoutButton.tsx'
 import { ReadOnlyComposer } from '../src/client/ReadOnlyComposer.tsx'
 import { ScopeControl, type ScopeControlInjected } from '../src/client/ScopeControl.tsx'
 import type { CollaborationContext } from '../src/client/collaboration-client.ts'
@@ -92,6 +93,9 @@ describe('ui-collaboration apply', () => {
       const scopeEntry = b.ctx.slots.entries('sidebar.footer.action')
         .find(entry => entry.component === ScopeControl)!
       expect(scopeEntry.options).toMatchObject({ id: 'collaboration-scope', order: -20 })
+      const logoutEntry = b.ctx.slots.entries('sidebar.footer.action')
+        .find(entry => entry.component === LogoutButton)!
+      expect(logoutEntry.options).toMatchObject({ id: 'collaboration-logout', order: 0 })
       const shareEntry = b.ctx.slots.entries('conversation.session.header.actions')
         .find(entry => entry.component === ConversationShareAction)!
       expect(shareEntry.options).toMatchObject({ id: 'collaboration-sharing', order: -20 })

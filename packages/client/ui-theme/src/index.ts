@@ -3,7 +3,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import { settingsNamespace } from '@deepseek-ai/dsh-settings'
-import { injectBootTheme } from './boot-theme.ts'
+import { bootThemeInjection, injectBootTheme } from './boot-theme.ts'
 import {
   DEFAULT_PREFERENCE, THEME_SETTINGS_NAMESPACE, ThemeSettingsSchema,
   type ThemePreference, type ThemeSettings,
@@ -35,9 +35,15 @@ export function apply(ctx: Context): void {
     settingsCtx.settings.register(THEME_NAMESPACE, ThemeSettingsSchema)
   })
   ctx.inject(['webServer'], (httpCtx) => {
-    httpCtx.effect(
-      () => httpCtx.webServer.tapIndex(html => injectBootTheme(html, readPreference(ctx))),
-      'client-ui-theme: initial theme bootstrap',
-    )
+    if (typeof httpCtx.webServer.renderIndex === 'function') {
+      httpCtx.on('webserver/index-inject', (table) => {
+        table.push(bootThemeInjection(readPreference(ctx)))
+      })
+    } else {
+      httpCtx.effect(
+        () => httpCtx.webServer.tapIndex(html => injectBootTheme(html, readPreference(ctx))),
+        'client-ui-theme: legacy initial theme bootstrap',
+      )
+    }
   })
 }

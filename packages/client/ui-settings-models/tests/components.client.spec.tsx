@@ -12,6 +12,7 @@ import type { ModelsSectionInjected, ModelsSectionProps } from '../src/client/Mo
 import { pathOps } from '../src/client/ProviderEditor.tsx'
 import {
   DeepSeekModelsEditor, formatCapacity, modelDrafts, parseCapacity, validateDeepSeekModels,
+  validatePiAiModels,
 } from '../src/client/DeepSeekModelsEditor.tsx'
 import { apiKeyFailure } from '../src/client/apiKey.ts'
 import { SettingsDescribeMirror } from '@deepseek-ai/dsh-client-ui-settings/src/client/settings-mirror.ts'
@@ -57,6 +58,7 @@ const DeepSeekConfig = Schema.object({
     name: Schema.string(),
     description: Schema.string(),
     contextWindow: Schema.number().step(1).min(1),
+    inputModalities: Schema.array(Schema.union(['text', 'image'])),
   // The adapter declares its catalog as a schema default rather than a
   // composition entry, which is what the restore-defaults path has to read.
   })).default([
@@ -65,12 +67,14 @@ const DeepSeekConfig = Schema.object({
       name: 'DeepSeek-V4-Flash',
       description: '',
       contextWindow: 1_000_000,
+      inputModalities: ['text'],
     },
     {
       id: 'deepseek-v4-pro',
       name: 'DeepSeek-V4-Pro',
       description: '',
       contextWindow: 1_000_000,
+      inputModalities: ['text'],
     },
   ]),
 })
@@ -81,8 +85,14 @@ const DEFAULT_DEEPSEEK_MODELS = [
     name: 'DeepSeek-V4-Flash',
     description: 'Preserved hidden detail',
     contextWindow: 1_000_000,
+    inputModalities: ['text'],
   },
-  { id: 'deepseek-v4-pro', name: 'DeepSeek-V4-Pro', contextWindow: 1_000_000 },
+  {
+    id: 'deepseek-v4-pro',
+    name: 'DeepSeek-V4-Pro',
+    contextWindow: 1_000_000,
+    inputModalities: ['text'],
+  },
 ]
 
 function wireNamespaces(): SettingsNamespaceView[] {
@@ -569,6 +579,20 @@ describe('ModelsSection', () => {
     expect(validateDeepSeekModels([{ id: 'model', maxTokens: 0 }]))
       .toEqual({ index: 0, key: 'modelMaxTokensInvalid' })
     expect(validateDeepSeekModels([{ id: 'model', maxTokens: 8192 }])).toBeUndefined()
+    expect(validateDeepSeekModels([{ id: 'model', inputModalities: ['text', 'image'] }])).toBeUndefined()
+    expect(validateDeepSeekModels([{ id: 'model', inputModalities: ['image', 'image'] }]))
+      .toEqual({ index: 0, key: 'modelModalitiesInvalid' })
+    // Fields owned by pi-ai must not make the direct DeepSeek catalog invalid.
+    expect(validateDeepSeekModels([{ id: 'model', input: ['image', 'image'], reasoningEfforts: { off: null } }]))
+      .toBeUndefined()
+    expect(validatePiAiModels([{ id: 'model', input: ['text', 'image'] }])).toBeUndefined()
+    expect(validatePiAiModels([{ id: 'model', input: ['image', 'image'] }]))
+      .toEqual({ index: 0, key: 'modelModalitiesInvalid' })
+    expect(validatePiAiModels([{ id: 'model', reasoningEfforts: false }])).toBeUndefined()
+    expect(validatePiAiModels([{ id: 'model', reasoningEfforts: { off: null } }]))
+      .toEqual({ index: 0, key: 'modelReasoningInvalid' })
+    expect(validatePiAiModels([{ id: 'model', reasoningEfforts: { high: 'high', max: 'ultra' } }]))
+      .toBeUndefined()
   })
 
   it('reads context windows written as counts, thousands, or millions', () => {
@@ -844,6 +868,27 @@ describe('ModelsSection', () => {
     })
   })
 
+  it('writes the direct DeepSeek model image capability without changing reasoning policy', async () => {
+    const { mutate } = await mountDeepSeekCard({
+      mutate: vi.fn(() => Promise.resolve(ok(wireNamespaces()[0]))),
+    })
+    fireEvent.click(screen.getByText(en.customized))
+    expandRow(1)
+    fireEvent.click(screen.getByLabelText(`${en.modelAcceptsImages} 1`))
+    fireEvent.click(screen.getByText(en.apply))
+
+    await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
+    expect(mutate.mock.calls[0]?.[0]).toEqual({
+      ns: 'llm-deepseek',
+      ops: [{
+        op: 'set',
+        path: ['models'],
+        value: [{ ...DEFAULT_DEEPSEEK_MODELS[0], inputModalities: ['text', 'image'] }, DEFAULT_DEEPSEEK_MODELS[1]],
+      }],
+      expectedRevision: 0,
+    })
+  })
+
   it('settles a pasted id and refuses whitespace that would never match', async () => {
     await mountDeepSeekCard()
     fireEvent.click(screen.getByText(en.customized))
@@ -906,7 +951,7 @@ describe('ModelsSection', () => {
         op: 'set',
         path: ['models'],
         value: [
-          { id: 'deepseek-v4-flash', description: 'Preserved hidden detail' },
+          { id: 'deepseek-v4-flash', description: 'Preserved hidden detail', inputModalities: ['text'] },
           DEFAULT_DEEPSEEK_MODELS[1],
         ],
       }],

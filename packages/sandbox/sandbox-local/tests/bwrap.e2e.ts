@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, readFileSync, readlinkSync, rmSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -90,6 +90,40 @@ describe.skipIf(!bwrapUsable)('sandbox-local: real bwrap confinement', () => {
     const denied = runConfined(sandbox, `echo hi > ${outside}/denied.txt`, { mode: 'workspace-write', workspaceRoot: workdir })
     expect(denied.result.status).not.toBe(0)
     expect(existsSync(join(outside, 'denied.txt'))).toBe(false)
+  })
+
+  it.each(['read-only', 'workspace-write'] as const)(
+    '%s runs in a private PID namespace and blocks writes through procfs root magic links',
+    async (mode) => {
+      const workdir = await tempDir(homedir())
+      const outside = await tempDir(homedir())
+      const target = join(outside, 'escaped.txt')
+      const sandbox = await provider()
+      const hostPidNamespace = readlinkSync('/proc/self/ns/pid')
+      const visibility = runConfined(sandbox, 'readlink /proc/self/ns/pid', { mode, workspaceRoot: workdir })
+      expect(visibility.result.status).toBe(0)
+      expect(visibility.result.stdout.trim()).not.toBe('')
+      expect(visibility.result.stdout.trim()).not.toBe(hostPidNamespace)
+
+      const escape = runConfined(
+        sandbox,
+        `printf escaped > /proc/1/root${target}`,
+        { mode, workspaceRoot: workdir },
+      )
+      expect(escape.result.status).not.toBe(0)
+      expect(existsSync(target)).toBe(false)
+    },
+  )
+
+  it('keeps descendants observable and controllable inside the private PID namespace', async () => {
+    const workdir = await tempDir(homedir())
+    const sandbox = await provider()
+    const { result } = runConfined(
+      sandbox,
+      'sleep 30 & child=$!; kill -0 "$child" && kill "$child"; wait "$child"; status=$?; test "$status" -ge 128',
+      { mode: 'read-only', workspaceRoot: workdir },
+    )
+    expect(result.status).toBe(0)
   })
 
   it('workspace-write mounts an EPHEMERAL /tmp: the write succeeds inside, the host /tmp stays untouched', async () => {

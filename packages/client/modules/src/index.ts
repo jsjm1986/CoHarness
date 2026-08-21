@@ -30,7 +30,7 @@ import { dirname, join } from 'node:path'
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/cordis-plugin-loader'
-import type {} from '@deepseek-ai/dsh-host-webserver'
+import { renderIndexInjections, type IndexInjection } from '@deepseek-ai/dsh-host-webserver'
 import { optionalStringArray, stripClientSuffix } from './client/manifest.ts'
 import type { WebBootEntry, WebBootGraph } from './client/manifest.ts'
 
@@ -228,31 +228,18 @@ const CLIENT_RUNTIME_ID = '@deepseek-ai/dsh-client-runtime'
 /** Ordinary dynamic bundles the HTML parser executes before the Vite shell. */
 const PARSER_PRELOAD_IDS = [CLIENT_MODULES_ID, CLIENT_RUNTIME_ID] as const
 
-/** Escape a graph URL before placing it in a quoted HTML attribute. */
-function escapeHtmlAttribute(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('"', '&quot;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-}
-
 /**
- * Inject the boot protocol into index.html. The inline registration queue precedes
+ * Build the boot protocol as structured rows. The inline registration queue precedes
  * blocking classic scripts for modules' and runtime's ordinary
  * `lib/client.js` artifacts. Its `create()` method materializes the modules
  * bundle, delegates construction to that bundle, and leaves the same facade
- * in live-registration mode. The graph script follows before the shell reads
- * it. `<` is escaped in JSON so a plugin-controlled string cannot break out
- * of the script element.
- * @param html - the index.html source.
+ * in live-registration mode. The graph global follows before the shell reads it.
  * @param graph - the composed entry graph.
- * @returns the html with the graph script injected.
+ * @returns head injection rows in execution order.
  */
-export function injectBootManifest(html: string, graph: WebBootGraph): string {
-  const json = JSON.stringify(graph).replaceAll('<', '\\u003c')
+export function bootInjections(graph: WebBootGraph): IndexInjection[] {
   const bootstrapId = JSON.stringify(CLIENT_MODULES_ID)
-  const queue = `<script>(()=>{
+  const queue = `(()=>{
 const pendingQueue=[]
 window.__ModuleLoader__={
   mode:"queue",
@@ -273,21 +260,30 @@ window.__ModuleLoader__={
     return exports.createClientModuleSystem(this,{id:registration.id,exports},options)
   }
 }
-})()</script>`
+})()`
   const preload = PARSER_PRELOAD_IDS.map(id => graph.entries.find(entry => entry.id === id))
     .filter((entry): entry is WebBootEntry => entry !== undefined)
-    .map(entry => `<script src="${escapeHtmlAttribute(entry.url)}"></script>`)
-    .join('')
-  const script = `${queue}${preload}<script>window.__DSH_BOOT__ = ${json}</script>`
-  const head = html.indexOf('<head>')
-  if (head !== -1) return `${html.slice(0, head + 6)}${script}${html.slice(head + 6)}`
-  // Headless fixture pages may lack <head>; prepending keeps the read-before-shell ordering.
-  return `${script}${html}`
+    .map(entry => ({ kind: 'script-src', placement: 'head', src: entry.url } satisfies IndexInjection))
+  return [
+    { kind: 'script', placement: 'head', text: queue },
+    ...preload,
+    { kind: 'global', name: '__DSH_BOOT__', value: graph },
+  ]
+}
+
+/**
+ * Inject the boot protocol into an index body for legacy callers and tests.
+ * @param html - the raw application index HTML.
+ * @param graph - the resolved browser module boot graph.
+ * @returns the HTML with the module loader bootstrap, preload rows, and boot global.
+ */
+export function injectBootManifest(html: string, graph: WebBootGraph): string {
+  return renderIndexInjections(html, bootInjections(graph))
 }
 
 /**
  * The web plugin table service: incremental `dsh.client` scan + wire composition
- * + bundle route + index tap. Construction runs the activation scan
+ * + bundle route + structured index injection. Construction runs the activation scan
  * synchronously — a malformed declaration or missing bundle among the
  * already-loaded entries aggregates into one loud throw (FAILED fiber; the
  * boot activation audit reports it).
@@ -353,10 +349,18 @@ export class ClientModuleRegistry extends Service {
       () => ctx.webServer.register({ kind: 'prefix', path: '/plugins', handler: this.serveBundle }),
       'client-modules: bundle route',
     )
-    ctx.effect(
-      () => ctx.webServer.tapIndex(html => injectBootManifest(html, this.composed)),
-      'client-modules: boot manifest injection',
-    )
+    if (typeof ctx.webServer.renderIndex === 'function') {
+      ctx.on('webserver/index-inject', (table) => {
+        table.push(...bootInjections(this.composed))
+      })
+    } else {
+      // Compatibility for older host test doubles and embedded hosts that have
+      // not adopted the structured injection service yet.
+      ctx.effect(
+        () => ctx.webServer.tapIndex(html => injectBootManifest(html, this.composed)),
+        'client-modules: legacy boot manifest injection',
+      )
+    }
   }
 
   /**

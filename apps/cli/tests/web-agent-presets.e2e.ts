@@ -84,6 +84,9 @@ async function bootWeb(
     { id: 'skill-badge', disabled: false },
     { id: 'modules', disabled: true },
     { id: 'connection', disabled: true },
+    // The document HTTP consumer only registers routes through Connection;
+    // without that transport it would remain pending during this host-only boot.
+    { id: 'userdoc-http', disabled: true },
     // The always-on reload chain waits for the browser roster and bound port
     // disabled above.
     { id: 'client-hmr', disabled: true },

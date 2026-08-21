@@ -20,6 +20,10 @@ import type { DiscoveredModelView, IApiClient } from '@deepseek-ai/dsh-api-remot
 import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import { formatCapacity, parseCapacity } from './DeepSeekModelsEditor.tsx'
 import type { DeepSeekModelDraft } from './DeepSeekModelsEditor.tsx'
+import {
+  acceptsImages, reasoningEffortsOf, reasoningModeOf, THINKING_LEVELS,
+} from './model-capabilities.ts'
+import type { ReasoningEfforts, ReasoningMode, ThinkingLevel } from './model-capabilities.ts'
 import { messageOf } from './store.ts'
 import type { en } from './locales.ts'
 import styles from './ModelsSection.module.css'
@@ -150,7 +154,26 @@ function adopt(candidate: DiscoveredModelView): ModelDraft {
     ...candidate.name === undefined ? {} : { name: candidate.name },
     ...candidate.contextWindow === undefined ? {} : { contextWindow: candidate.contextWindow },
     ...candidate.maxTokens === undefined ? {} : { maxTokens: candidate.maxTokens },
+    // Preserve a modality declaration when the endpoint or installed catalog
+    // disclosed one; silence leaves the field inherited from the route.
+    ...candidate.inputModalities === undefined ? {} : { input: [...candidate.inputModalities] },
   }
+}
+
+/** Read a model's generic-provider reasoning mode. */
+function modelReasoningMode(model: ModelDraft): ReasoningMode {
+  return reasoningModeOf(model['reasoningEfforts'])
+}
+
+/** Read one canonical effort's wire spelling, or an empty field when absent. */
+function effortText(model: ModelDraft, level: ThinkingLevel): string {
+  const value = reasoningEffortsOf(model['reasoningEfforts'])[level]
+  return value === null || value === undefined ? '' : value
+}
+
+/** Copy one effort map before changing a row, without mutating the draft. */
+function copyEfforts(model: ModelDraft): ReasoningEfforts {
+  return { ...reasoningEffortsOf(model['reasoningEfforts']) }
 }
 
 /**
@@ -210,7 +233,7 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
     })
   }
 
-  const patch = (index: number, next: Record<string, string | number | undefined>): void => {
+  const patch = (index: number, next: Record<string, unknown>): void => {
     onChange(models.map((model, at) => {
       if (at !== index) return model
       // Rebuilt rather than spread over: an emptied optional field has to leave
@@ -225,6 +248,107 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
         Object.entries({ ...model, ...next }).filter(([key]) => !cleared.has(key)),
       )
     }))
+  }
+
+  /** Change the whole reasoning declaration while keeping row fields intact. */
+  const setReasoningMode = (index: number, mode: ReasoningMode): void => {
+    if (mode === 'inherit') {
+      patch(index, { reasoningEfforts: undefined })
+      return
+    }
+    if (mode === 'disabled') {
+      patch(index, { reasoningEfforts: false })
+      return
+    }
+    // Keep the declaration empty until the user chooses a level. The adapter
+    // rejects an empty declaration, so Apply stays blocked rather than the UI
+    // inventing a provider capability or wire spelling.
+    patch(index, { reasoningEfforts: copyEfforts(models[index] ?? {}) })
+  }
+
+  /** Add/remove one canonical effort from a model's declaration. */
+  const toggleReasoningLevel = (index: number, level: ThinkingLevel, checked: boolean): void => {
+    const next = copyEfforts(models[index] ?? {})
+    if (checked) next[level] = level === 'off' ? null : level
+    else Reflect.deleteProperty(next, level)
+    patch(index, { reasoningEfforts: next })
+  }
+
+  /** Replace one level's provider-specific wire spelling. */
+  const editReasoningWire = (index: number, level: ThinkingLevel, value: string): void => {
+    const next = copyEfforts(models[index] ?? {})
+    next[level] = level === 'off' && value.length === 0 ? null : value
+    patch(index, { reasoningEfforts: next })
+  }
+
+  /** Render the per-model reasoning declaration and gateway wire spellings. */
+  const reasoningField = (model: ModelDraft, index: number): ReactNode => {
+    const mode = modelReasoningMode(model)
+    const efforts = reasoningEffortsOf(model['reasoningEfforts'])
+    const hasLevel = (level: ThinkingLevel): boolean => Object.prototype.hasOwnProperty.call(efforts, level)
+    const levelLabel = (level: ThinkingLevel): string => {
+      switch (level) {
+        case 'off': return t('reasoningOff')
+        case 'minimal': return t('reasoningMinimal')
+        case 'low': return t('reasoningLow')
+        case 'medium': return t('reasoningMedium')
+        case 'high': return t('reasoningHigh')
+        case 'xhigh': return t('reasoningXHigh')
+        case 'max': return t('reasoningMax')
+      }
+    }
+    return (
+      <div className={styles['modelReasoning']}>
+        <label className={styles['modelField']}>
+          <span className={styles['modelFieldLabel']}>{t('modelReasoning')}</span>
+          <select
+            className={`${styles['input']} ${styles['selectInput']}`}
+            value={mode}
+            aria-label={`${t('modelReasoning')} ${index + 1}`}
+            disabled={disabled}
+            onChange={(event) => { setReasoningMode(index, event.target.value as ReasoningMode) }}
+          >
+            <option value="inherit">{t('reasoningInherit')}</option>
+            <option value="disabled">{t('reasoningDisabled')}</option>
+            <option value="custom">{t('reasoningCustom')}</option>
+          </select>
+        </label>
+        {mode !== 'custom'
+          ? null
+          : (
+            <fieldset className={styles['reasoningLevels']}>
+              <legend>{t('reasoningLevels')}</legend>
+              {THINKING_LEVELS.map(level => (
+                <div className={styles['reasoningLevel']} key={level}>
+                  <label className={styles['modelCheckboxField']}>
+                    <input
+                      type="checkbox"
+                      checked={hasLevel(level)}
+                      aria-label={`${levelLabel(level)} ${index + 1}`}
+                      disabled={disabled}
+                      onChange={(event) => { toggleReasoningLevel(index, level, event.target.checked) }}
+                    />
+                    <span className={styles['modelFieldLabel']}>{levelLabel(level)}</span>
+                  </label>
+                  {hasLevel(level)
+                    ? (
+                      <input
+                        className={styles['input']}
+                        type="text"
+                        value={effortText(model, level)}
+                        placeholder={level === 'off' ? t('reasoningOffWirePlaceholder') : level}
+                        aria-label={`${t('reasoningWire')} ${levelLabel(level)} ${index + 1}`}
+                        disabled={disabled}
+                        onChange={(event) => { editReasoningWire(index, level, event.target.value) }}
+                      />
+                    )
+                    : null}
+                </div>
+              ))}
+            </fieldset>
+          )}
+      </div>
+    )
   }
 
   const fetchModels = async (): Promise<void> => {
@@ -429,6 +553,19 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
                     onChange={(event) => { editCapacity(index, 'maxTokens', event.target.value) }}
                   />
                 </label>
+                <label className={styles['modelCheckboxField']}>
+                  <input
+                    type="checkbox"
+                    checked={acceptsImages(model['input'])}
+                    aria-label={`${t('modelAcceptsImages')} ${index + 1}`}
+                    disabled={disabled}
+                    onChange={(event) => {
+                      patch(index, { input: event.target.checked ? ['text', 'image'] : ['text'] })
+                    }}
+                  />
+                  <span className={styles['modelFieldLabel']}>{t('modelAcceptsImages')}</span>
+                </label>
+                {reasoningField(model, index)}
               </div>
             )
             : null}

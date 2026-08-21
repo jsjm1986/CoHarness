@@ -149,7 +149,7 @@ describe('PermissionPresetService', () => {
     const session = freshSession('sess-set')
     ctx.permissionPresets.set(session, 'danger-full-access')
     expect(session.events.map(e => [e.type, e.data])).toEqual([
-      ['permission/preset', { preset: 'danger-full-access' }],
+      ['permission/preset', { preset: 'danger-full-access', origin: 'selection' }],
       ['sandbox/mode', { mode: 'danger-full-access' }],
       ['approval/policy', { policy: 'never' }],
     ])
@@ -172,7 +172,7 @@ describe('PermissionPresetService', () => {
     ctx.permissionPresets.set(session, 'danger-full-access')
     const tail = session.events.slice(4)
     expect(tail.map(e => [e.type, e.data])).toEqual([
-      ['permission/preset', { preset: 'danger-full-access' }],
+      ['permission/preset', { preset: 'danger-full-access', origin: 'selection' }],
       ['sandbox/mode', { mode: 'danger-full-access' }],
     ])
   })
@@ -215,7 +215,7 @@ describe('new-session default', () => {
     const ctx = await mountedStore()
     const first = ctx.sessions.create(SessionId('first'))
     expect(first.events.map(event => [event.type, event.data])).toEqual([
-      ['permission/preset', { preset: 'workspace-write' }],
+      ['permission/preset', { preset: 'workspace-write', origin: 'default' }],
       ['sandbox/mode', { mode: 'workspace-write' }],
       ['approval/policy', { policy: 'ask' }],
     ])

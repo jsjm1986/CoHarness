@@ -13,12 +13,10 @@
  * display name and wire protocol of a pi-ai route the adapter does not ship —
  * the two fields the create card asked that route for, editable here for the
  * same reason).
- * Reasoning effort is deliberately absent: it is a per-MODEL capability, and
- * the models under one provider disagree about it, so a provider-scoped
- * control can only be set to a value some of them reject. The composer's
- * model picker offers each model its own levels; `settings.yaml` keeps the
- * profile field for a deployment that knows its route. Everything else stays
- * owned by `settings.yaml`. Profile edits land as minimal `settings.mutate`
+ * Reasoning effort is edited per model in the pi-ai model rows, because the
+ * models under one provider may expose different levels. The editor writes
+ * the profile's `reasoningEfforts` declarations while preserving fields that
+ * remain owned by `settings.yaml`. Profile edits land as minimal `settings.mutate`
  * path ops against the stored section — the card names only the fields it can
  * see instead of rebuilding the whole subtree from a partial descriptor.
  */
@@ -27,7 +25,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { CredentialView, IApiClient, SettingsNamespaceView, SettingsPathOpView } from '@deepseek-ai/dsh-api-remotes/client'
 import {
-  DeepSeekModelsEditor, modelDrafts, validateDeepSeekModels,
+  DeepSeekModelsEditor, modelDrafts, validateDeepSeekModels, validatePiAiModels,
 } from './DeepSeekModelsEditor.tsx'
 import { apiKeyFailure } from './apiKey.ts'
 import { EditorFooter } from './EditorFooter.tsx'
@@ -217,9 +215,15 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
       : schema.setPath(current, [key], value))
   }
 
-  // The model list is validated by the same per-row checker for both families,
-  // so a bad row is named by its position rather than by a blanket message.
-  const modelFailure = validateDeepSeekModels(schema.getPath(draft, ['models']))
+  // Each adapter owns a different capability vocabulary: direct DeepSeek
+  // catalogs declare `inputModalities`, while pi-ai rows declare `input` and
+  // `reasoningEfforts`. Shared id/name/capacity checks remain in both paths,
+  // but an unrelated family's fields must not block this card.
+  const modelFailure = layout === 'deepseek'
+    ? validateDeepSeekModels(schema.getPath(draft, ['models']))
+    : layout === 'pi-ai'
+      ? validatePiAiModels(schema.getPath(draft, ['models']))
+      : undefined
   const keyFailure = apiKeyFailure(keyDraft)
   // What a probe or a write must carry: the typed key with paste whitespace
   // removed. A blank field yields an empty string, which both call sites read
@@ -262,11 +266,15 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
       ? schema.setPath(draft, ['apiKeyEnv'], keyRef)
       : draft
     if (props.credentialOnly !== true) {
-      // The same checker gates the submit button, so a card cannot reach this
-      // with a bad row; it stays because the schema check below would refuse
-      // the write with a message naming a path instead of the row, and because
-      // nothing but this function decides what is written.
-      const failure = validateDeepSeekModels(schema.getPath(next, ['models']))
+      // The same family-specific checker gates the submit button, so a card
+      // cannot reach this with a bad row; it stays because the schema check
+      // below would refuse the write with a message naming a path instead of
+      // the row, and because nothing but this function decides what is written.
+      const failure = layout === 'deepseek'
+        ? validateDeepSeekModels(schema.getPath(next, ['models']))
+        : layout === 'pi-ai'
+          ? validatePiAiModels(schema.getPath(next, ['models']))
+          : undefined
       /* v8 ignore next 3 -- unreachable from the card: the same failure disables submit */
       if (failure !== undefined) {
         return `${t('model')} ${String(failure.index + 1)}: ${t(failure.key)}`

@@ -28,6 +28,9 @@ function bench(options: {
   /** Every registered projection unit throws on this child's payloads. */
   projectionsThrow?: true
   historyParent?: SessionId
+  /** Record a preset id and one tool call so history presentation can be checked. */
+  presenterHistory?: true
+  agentPreset?: string
 } = {}) {
   const parent = { id: PARENT }
   const child = options.childStatus === undefined
@@ -65,13 +68,24 @@ function bench(options: {
   })
   const childHeader = {
     version: 0, id: CHILD, createdAt: 1, cwd: '/proj', parentSession: options.historyParent ?? PARENT,
+    ...options.agentPreset === undefined ? {} : { agentPreset: options.agentPreset },
   } satisfies SessionHeader
-  const childEvents = [
-    { type: 'user/message', seq: 0, time: 1, data: { content: [{ type: 'text', text: 'work' }], source: { kind: 'user' } } },
-  ] as unknown as SessionEvent[]
+  const childEvents = (options.presenterHistory === true
+    ? [
+      { type: 'tool/call', seq: 0, time: 1, data: { turn: 1, step: 1, callId: 'child-call', name: 'child-tool', arguments: '{}' } },
+      { type: 'user/message', seq: 1, time: 2, data: { content: [{ type: 'text', text: 'work' }], source: { kind: 'user' } } },
+    ]
+    : [
+      { type: 'user/message', seq: 0, time: 1, data: { content: [{ type: 'text', text: 'work' }], source: { kind: 'user' } } },
+    ]) as unknown as SessionEvent[]
   const inspect = vi.fn(() => Promise.resolve({ meta: childHeader, events: childEvents }))
   const liveBlock = { values: {}, asOfSeq: 3 }
   const coldBlock = { values: {}, asOfSeq: 0 }
+  const standingScope = { agentPreset: options.agentPreset ?? 'default' }
+  const standingKeyFor = vi.fn(() => Promise.resolve(standingScope))
+  const toolDefinition = {
+    presentCall: () => ({ card: 'generic', title: 'child tool' }),
+  }
   const snapshot = vi.fn(() => {
     if (options.projectionsThrow === true) throw new Error('hostile unit')
     return liveBlock
@@ -101,11 +115,19 @@ function bench(options: {
     onChanged: () => () => {},
     register: () => () => {},
   })
+  ctx.provide('agentPresets', { standingKeyFor })
+  ctx.provide('tools', {
+    get: (name: string, scope: object | undefined) => {
+      if (name !== 'child-tool') return undefined
+      if (scope === standingScope || scope === child) return toolDefinition
+      return undefined
+    },
+  })
   ctx.provide('userQuestions', { registerProvider: () => () => {} })
   const api = createApiProxy(ctx, {
     defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp',
   })
-  return { api, getAgent, listChildren, inspect, snapshot, restore, followup, interrupt, parent }
+  return { api, getAgent, listChildren, inspect, snapshot, restore, followup, interrupt, standingKeyFor, parent }
 }
 
 describe('subagent gateway', () => {
@@ -176,6 +198,44 @@ describe('subagent gateway', () => {
     expect(snapshot).toHaveBeenCalledTimes(1)
     expect(restore).not.toHaveBeenCalled()
     expect(inspect).not.toHaveBeenCalled()
+  })
+
+  it('renders cold history through the recorded preset without looking up an Agent', async () => {
+    const { api, getAgent, standingKeyFor } = bench({
+      presenterHistory: true,
+      agentPreset: 'coding',
+    })
+    const response = await api.subagents.history(request({
+      parentSessionId: PARENT, childSessionId: CHILD, mode: 'continuable',
+    }))
+    expect(response.result.ok).toBe(true)
+    if (!response.result.ok) throw new Error('unreachable')
+    expect(response.result.value.events[0]).toMatchObject({
+      event: { type: 'tool/call' },
+      view: { for: 'call', view: { card: 'generic', title: 'child tool' } },
+    })
+    expect(getAgent).not.toHaveBeenCalled()
+    expect(standingKeyFor).toHaveBeenCalledWith('coding')
+  })
+
+  it('uses the attached child Agent scope for child-local history presenters', async () => {
+    const { api, getAgent, standingKeyFor } = bench({
+      presenterHistory: true,
+      agentPreset: 'coding',
+      liveChild: true,
+      childStatus: 'idle',
+    })
+    const response = await api.subagents.history(request({
+      parentSessionId: PARENT, childSessionId: CHILD, mode: 'continuable',
+    }))
+    expect(response.result.ok).toBe(true)
+    if (!response.result.ok) throw new Error('unreachable')
+    expect(response.result.value.events[0]).toMatchObject({
+      event: { type: 'tool/call' },
+      view: { for: 'call', view: { card: 'generic', title: 'child tool' } },
+    })
+    expect(getAgent).toHaveBeenCalledWith(CHILD)
+    expect(standingKeyFor).not.toHaveBeenCalled()
   })
 
   it('serves the page without projections when a hostile unit breaks the fold', async () => {

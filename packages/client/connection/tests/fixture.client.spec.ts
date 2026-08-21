@@ -999,6 +999,14 @@ describe('FixtureApiClient (protocol-level fake carrier)', () => {
     expect(() => (client as unknown as { doFetch(): Promise<Response> }).doFetch()).toThrow(/doFetch must be unreachable/)
   })
 
+  it('answers the Dynamic Cordis bootstrap remotes without Host plugin state', async () => {
+    const client = new FixtureApiClient()
+    await expect(client.rpc.call('/api', 'dynamicCordisRunner/inventory', { args: {} }))
+      .resolves.toEqual({ ok: true, value: [] })
+    await expect(client.rpc.call('/api', 'dynamicCordisRunner/syncInspectManifest', { args: { providers: [] } }))
+      .resolves.toEqual({ ok: true, value: null })
+  })
+
   it('mints request ids, taps all four full forms, and never touches doFetch', async () => {
     const client = new FixtureApiClient()
     const tapped: RpcMessage[] = []

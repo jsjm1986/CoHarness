@@ -1677,6 +1677,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     declaredBy: 'an entry in \'sidebar\' (client-ui-sidebar), so it exists while that entry is mounted',
     occupants: [
       'client-ui-collaboration ScopeControl id \'collaboration-scope\'',
+      'client-ui-collaboration LogoutButton id \'collaboration-logout\'',
       'client-ui-documents DocumentsButton id \'documents\'',
       'client-ui-cordis CordisPanel id \'cordis-panel\'',
     ],

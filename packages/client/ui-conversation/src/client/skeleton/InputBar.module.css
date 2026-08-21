@@ -491,9 +491,12 @@
   row-gap: var(--dsw-space-2);
 }
 
-:global([data-viewport='compact']) .tools,
+:global([data-viewport='compact']) .tools {
+  flex: 0 0 auto;
+}
+
 :global([data-viewport='compact']) .trailing {
-  flex: 1 1 auto;
+  flex: 1 1 0;
 }
 
 :global([data-viewport='compact']) .add,

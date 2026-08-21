@@ -32,6 +32,7 @@ const clientBuildEnvironment: unknown = Reflect.get(record, 'environment')
 if (typeof clientBuildEnvironment !== 'object' || clientBuildEnvironment === null) {
   throw new TypeError('client build record environment must be an object')
 }
+const officialBuild = Reflect.get(clientBuildEnvironment, 'DSH_CLIENT_BUILD_PROFILE') === 'official'
 
 function isBuildRecordReader(value: unknown): value is (root: string) => unknown {
   return typeof value === 'function'
@@ -42,8 +43,15 @@ it('boots the built plugin graph and renders a fixture session end to end', asyn
 
   // The sidebar renders from the boot graph: every inject layer activated.
   const tree = await screen.findByRole('tree', { name: 'Sessions' }, { timeout: 10_000 })
-  expect(document.querySelector('svg[viewBox="26 0 156 24"]')).not.toBeNull()
-  expect(screen.queryByText('DSH Local Build')).toBeNull()
+  if (officialBuild) {
+    await waitFor(() => {
+      expect(document.querySelector('svg[viewBox="26 0 156 24"]')).not.toBeNull()
+    }, { timeout: 10_000 })
+    expect(screen.queryByText('DSH Local Build')).toBeNull()
+  } else {
+    expect(await screen.findByText('DSH Local Build')).toBeTruthy()
+    expect(document.querySelector('svg[viewBox="26 0 156 24"]')).toBeNull()
+  }
   // The compact layout dropped group session counts; the fixture workspace
   // group row renders immediately with its sessions beneath it.
   const fixtureGroup = (await within(tree).findAllByText('fixture'))

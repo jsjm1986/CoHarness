@@ -14,6 +14,7 @@ import { createModels, getSupportedThinkingLevels } from '@earendil-works/pi-ai'
 import type { Api, Model, OpenAICompletionsCompat, Provider } from '@earendil-works/pi-ai'
 import { resolveProfiles } from '../src/config.ts'
 import { buildProvider, supportedProtocols } from '../src/provider.ts'
+import { memoryAuth } from './auth-double.ts'
 import { assemble } from './assemble.ts'
 import { closeMockServers, mockServer, textEvents } from './mock-server.ts'
 
@@ -1065,6 +1066,7 @@ describe('resolution snapshots', () => {
       // Credential resolution is the real await inside a stream call, and the
       // window a configuration change has to land in.
       resolveApiKey: async () => { await held; return 'k' },
+      auth: memoryAuth(),
     })
 
     const chunks: StreamChunk[] = []
@@ -1093,7 +1095,7 @@ describe('resolution snapshots', () => {
     const first = await mockServer([{ events: textEvents }])
     const second = await mockServer([{ events: textEvents }])
     let current = resolveProfiles({ deepseek: { baseURL: `${first.url}/v1` } })
-    const adapter = new PiAiAdapter({ profiles: () => current, resolveApiKey: () => Promise.resolve('k') })
+    const adapter = new PiAiAdapter({ profiles: () => current, resolveApiKey: () => Promise.resolve('k'), auth: memoryAuth() })
     const drain = async (): Promise<void> => {
       for await (const _chunk of adapter.stream({
         provider: 'deepseek', model: 'deepseek-v4-flash', messages: [],
@@ -1160,7 +1162,7 @@ describe('configurable-provider directory', () => {
     expect(ctx.llm.listConfigurableProviders()).toHaveLength(catalogOnly)
   })
 
-  it('withholds a catalog route this adapter cannot authenticate', async () => {
+  it('offers every installed catalog route, including one that only signs in', async () => {
     const ctx = await harness({})
     const offered = ctx.llm.listConfigurableProviders().map(entry => entry.provider)
 
@@ -1171,14 +1173,14 @@ describe('configurable-provider directory', () => {
     // `Provider is not configured` before it goes out. Offering it would put a
     // provider on the settings page that no amount of configuration can make
     // work.
-    expect(offered).not.toContain('openai-codex')
+    expect(offered).toContain('openai-codex')
     // A provider that offers OAuth *beside* an api-key method keeps its entry:
     // the key is a path this adapter can serve.
     expect(offered).toContain('anthropic')
     expect(offered).toContain('openai')
   })
 
-  it('still lists a withheld route a stored profile names, as a catalog route', async () => {
+  it('lists a route a stored profile names as a catalog route, not a declared one', async () => {
     // Withholding the offer must not strand a profile someone already stored:
     // the route keeps its entry so a configuration surface can edit or delete
     // it, and `declared` still answers catalog membership rather than the

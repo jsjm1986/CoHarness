@@ -8,7 +8,7 @@ import type { HostDescription, IApiClient } from './api.ts'
 import { ConnectionController, type ConnectionConfig, type ConnectionSinks, type ConnectionState } from './connection.ts'
 import { FixtureApiClient } from './fixture.ts'
 import { WebApiClient } from './web-api-client.ts'
-import { createWebConnectionRpc } from './rpc.ts'
+import { createWebConnectionRpc, type RpcFetch } from './rpc.ts'
 import { isLoopbackHostname } from '../loopback-hostname.ts'
 import type { ClientConnectionRpc } from '../rpc.ts'
 
@@ -40,6 +40,7 @@ export {
 // controller remains package-internal.
 export type { ConnectionConfig, ConnectionSinks, ConnectionState }
 export type { ClientConnectionRpc } from '../rpc.ts'
+export type { RpcFetch } from './rpc.ts'
 
 /** Observable Host description published by each completed connection handshake. */
 export interface HostDescriptionSource {
@@ -51,6 +52,24 @@ export interface HostDescriptionSource {
 
 /** Required services (none — this is the wire root). */
 export const inject: string[] = []
+
+/**
+ * Optional carrier override installed before client plugin boot. The ordinary
+ * web page leaves it unset and uses HTTP/WebSocket; embedded or worker hosts
+ * can provide their own API, RPC, and bundle transports.
+ */
+export interface ClientTransportHooks {
+  /** Build the API carrier, including its downstream event streams. */
+  createApiClient(): IApiClient
+  /** Transport for generic unary RPC channels. */
+  fetch: RpcFetch
+  /** Bundle transport for hosts whose carrier owns plugin bundle bytes. */
+  loadBundle?(url: string): Promise<void>
+}
+
+interface ClientTransportGlobal {
+  __DSH_TRANSPORT__?: ClientTransportHooks
+}
 
 /**
  * The ctx.connection service API: the API client plus a one-shot
@@ -85,8 +104,9 @@ export function apply(ctx: Context): void {
   const pageLocation = typeof location === 'undefined' ? undefined : location
   const fixture = pageLocation !== undefined && new URLSearchParams(pageLocation.search).has('fixture')
   const fixtureClient = fixture ? new FixtureApiClient() : undefined
-  const api: IApiClient = fixtureClient ?? new WebApiClient()
-  const rpc = fixtureClient?.rpc ?? createWebConnectionRpc()
+  const transport = (globalThis as ClientTransportGlobal).__DSH_TRANSPORT__
+  const api: IApiClient = fixtureClient ?? transport?.createApiClient() ?? new WebApiClient()
+  const rpc = fixtureClient?.rpc ?? createWebConnectionRpc(transport?.fetch)
   let started = false
   let description: HostDescription | undefined
   const descriptionListeners = new Set<() => void>()

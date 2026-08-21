@@ -10,6 +10,9 @@ export default defineConfig({
     // source. These aliases keep its value imports on the same React instance
     // while reusing the real runtime, schema form, and primitive components.
     alias: {
+      '@deepseek-ai/cordis': resolve(__dirname, '../../vendor/cordis/src/index.ts'),
+      '@deepseek-ai/cosmokit': resolve(__dirname, '../../vendor/cosmokit/src/index.ts'),
+      '@deepseek-ai/schemastery': resolve(__dirname, '../../vendor/schemastery/src/index.ts'),
       '@deepseek-ai/dsh-client-runtime/client': resolve(__dirname, '../../packages/client/runtime/src/client/contract/store.ts'),
       '@deepseek-ai/dsh-client-schema-form': resolve(__dirname, '../../packages/client/schema-form/src/index.ts'),
       '@deepseek-ai/dsh-client-ui-primitives': resolve(__dirname, 'src/model-settings-primitives.ts'),

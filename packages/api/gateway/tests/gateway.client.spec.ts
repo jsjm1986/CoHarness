@@ -450,6 +450,36 @@ describe('Client Typert API', () => {
     await retry()
   })
 
+  it('publishes a new namespace after every contribution method is installed', async () => {
+    const ctx = await bench(vi.fn<ConnectionHandle['rpc']['call']>())
+    const observed: Array<readonly [unknown, unknown]> = []
+    const consumer = ctx.plugin(Object.assign(
+      (scope: Context) => {
+        const namespace = scope.remote.probe as unknown as Record<string, unknown>
+        observed.push([namespace.create, namespace.archive])
+      },
+      { inject: ['remote', 'remote.probe'] },
+    ))
+    const { scope: _scope, ...first } = directDescriptor()
+    const second: InvocationDescriptor = {
+      ...first,
+      id: '@fixture/probe#probe/archive',
+      method: 'archive',
+    }
+
+    const dispose = await ctx.remote.$mount({
+      package: '@fixture/atomic-namespace',
+      descriptors: [first, second],
+    })
+    await consumer
+
+    expect(observed).toHaveLength(1)
+    expect(observed[0]?.[0]).toBeTypeOf('function')
+    expect(observed[0]?.[1]).toBeTypeOf('function')
+    await dispose()
+    await consumer.dispose()
+  })
+
   it('rolls back a direct projection when its scoped projection fails to install', async () => {
     const ctx = await bench(vi.fn<ConnectionHandle['rpc']['call']>())
     const disposeContext = await ctx.remote.$mount({

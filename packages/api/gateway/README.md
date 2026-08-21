@@ -16,7 +16,7 @@ A cancellation-aware Remote method declares `signal: AbortSignal` as its final H
 
 ## Client service: `ClientRemote` (ctx key: `remote`)
 
-`ctx.remote.$mount()` validates and registers a generated Host-for-Client contribution, then installs concrete direct and scoped methods for the calling Cordis fiber. Each namespace is a traced `remote.<namespace>` child Service and unloads after its last method is withdrawn. Duplicate endpoints, namespace collisions, and descriptors without strict generated codecs fail before methods become callable.
+`ctx.remote.$mount()` validates and registers a generated Host-for-Client contribution, then installs concrete direct and scoped methods for the calling Cordis fiber. Each namespace is a traced `remote.<namespace>` child Service and unloads after its last method is withdrawn. A newly created namespace remains unavailable to injecting fibers until every method in that mounted contribution is installed; a failed batch rolls back without activating dependents. Duplicate endpoints, namespace collisions, and descriptors without strict generated codecs fail before methods become callable.
 
 Each call validates positional inputs, constructs the descriptor's exact named `args`, and sends it through `ctx.connection.rpc.call('/api', endpoint, ...)`. Generated cancellation-aware methods accept a final optional `AbortSignal`; the Client combines it with the contribution mount lifetime before calling Connection. The returned value is validated before reaching application code. Withdrawing a contribution removes its descriptors and methods together, aborts in-flight calls, and makes retained method handles reject.
 

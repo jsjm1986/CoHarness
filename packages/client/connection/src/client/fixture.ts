@@ -3109,6 +3109,10 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
       }).args
       const sessionId = args.agentId
       switch (endpoint) {
+        // The fixture has no Host dynamic-plugin state. These bootstrap
+        // answers let the assembled Client graph activate deterministically.
+        case 'dynamicCordisRunner/inventory': return Promise.resolve({ ok: true, value: [] })
+        case 'dynamicCordisRunner/syncInspectManifest': return Promise.resolve({ ok: true, value: null })
         case 'commands/list': return Promise.resolve(commandRemotes.list(sessionId))
         case 'commands/execute': return Promise.resolve(commandRemotes.execute(sessionId, args.line as string, args.images ?? []))
         case 'fileReferences/list': return Promise.resolve(referenceRemotes.files(sessionId, args.query ?? ''))

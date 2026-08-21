@@ -20,6 +20,10 @@ describe('App', () => {
   it('exposes matching desktop and mobile navigation and changes routes', async () => {
     render(<App />)
     expect(screen.getByTestId('admin-app')).toBeTruthy()
+    const logoutForms = document.querySelectorAll('form[action="/logout"]')
+    expect(logoutForms).toHaveLength(2)
+    for (const form of logoutForms) expect(form.getAttribute('method')).toBe('post')
+    expect(screen.getAllByRole('button', { name: '退出登录' })).toHaveLength(2)
     expect(screen.getAllByRole('navigation', { name: '管理导航' })).toHaveLength(2)
     expect(screen.getAllByRole('link', { name: '用户' })).toHaveLength(2)
     expect(screen.getByRole('heading', { name: '用户页面' })).toBeTruthy()

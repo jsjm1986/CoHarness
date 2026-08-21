@@ -33,6 +33,12 @@ const PiAiConfig = Schema.object({
       name: Schema.string(),
       contextWindow: Schema.number(),
       maxTokens: Schema.number(),
+      input: Schema.array(Schema.union(['text', 'image'])),
+      reasoningEfforts: Schema.union([
+        Schema.const(false),
+        Schema.dict(Schema.union([Schema.string(), Schema.const(null)]),
+          Schema.union(['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])),
+      ]),
     })),
     reasoning: Schema.union(['off', 'high']),
   })),
@@ -219,6 +225,71 @@ describe('model list editing', () => {
       expectedRevision: 3,
       ops: [{ op: 'set', path: ['providers', 'openai', 'models'], value: [{ id: 'acme-large', contextWindow: 65_536 }] }],
     })
+  })
+
+  it('writes explicit image input and per-model reasoning wire values', async () => {
+    const { mutate } = await mountSection({
+      providers: { openai: { baseURL: 'https://proxy.example/v1', models: [{ id: 'vision-think' }] } },
+    })
+    openEditor('openai')
+    expandModel(1)
+
+    fireEvent.click(screen.getByLabelText(`${en.modelAcceptsImages} 1`))
+    fireEvent.change(screen.getByLabelText(`${en.modelReasoning} 1`), { target: { value: 'custom' } })
+    fireEvent.click(screen.getByLabelText(`${en.reasoningOff} 1`))
+    fireEvent.click(screen.getByLabelText(`${en.reasoningHigh} 1`))
+    fireEvent.click(screen.getByLabelText(`${en.reasoningMax} 1`))
+    fireEvent.change(screen.getByLabelText(`${en.reasoningWire} ${en.reasoningMax} 1`), {
+      target: { value: 'ultra' },
+    })
+
+    fireEvent.click(screen.getByText(en.apply))
+    await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
+    expect(firstMutate(mutate).ops[0]?.value).toEqual([{
+      id: 'vision-think',
+      input: ['text', 'image'],
+      reasoningEfforts: { off: null, high: 'high', max: 'ultra' },
+    }])
+  })
+
+  it('does not invent a reasoning capability when custom mode is selected', async () => {
+    const { mutate } = await mountSection({
+      providers: { openai: { baseURL: 'https://proxy.example/v1', models: [{ id: 'explicit-only' }] } },
+    })
+    openEditor('openai')
+    expandModel(1)
+    fireEvent.change(screen.getByLabelText(`${en.modelReasoning} 1`), { target: { value: 'custom' } })
+
+    expect(screen.getByText(`${en.model} 1: ${en.modelReasoningInvalid}`)).toBeTruthy()
+    expect(buttonNamed(en.apply).disabled).toBe(true)
+    expect(mutate).not.toHaveBeenCalled()
+
+    fireEvent.change(screen.getByLabelText(`${en.modelReasoning} 1`), { target: { value: 'disabled' } })
+    expect(buttonNamed(en.apply).disabled).toBe(false)
+    fireEvent.click(screen.getByText(en.apply))
+    await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
+    expect(firstMutate(mutate).ops[0]?.value).toEqual([{
+      id: 'explicit-only',
+      reasoningEfforts: false,
+    }])
+  })
+
+  it('removes a per-model reasoning declaration when inheritance is restored', async () => {
+    const { mutate } = await mountSection({
+      providers: {
+        openai: {
+          baseURL: 'https://proxy.example/v1',
+          models: [{ id: 'cataloged', reasoningEfforts: { off: null, high: 'high' } }],
+        },
+      },
+    })
+    openEditor('openai')
+    expandModel(1)
+    fireEvent.change(screen.getByLabelText(`${en.modelReasoning} 1`), { target: { value: 'inherit' } })
+    fireEvent.click(screen.getByText(en.apply))
+
+    await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
+    expect(firstMutate(mutate).ops[0]?.value).toEqual([{ id: 'cataloged' }])
   })
 
   it('names a duplicate model id in the edit flow too', async () => {
@@ -473,7 +544,10 @@ describe('endpoint interrogation', () => {
 
   it('adopts only the picked candidates, keeping a row the user already tuned', async () => {
     const discover = vi.fn(() => Promise.resolve(ok({
-      models: [{ id: 'kept', contextWindow: 999 }, { id: 'fresh', contextWindow: 4096, name: 'Fresh' }],
+      models: [
+        { id: 'kept', contextWindow: 999 },
+        { id: 'fresh', contextWindow: 4096, name: 'Fresh', inputModalities: ['text', 'image'] },
+      ],
     })))
     const { mutate } = await mountSection({
       discover,
@@ -492,7 +566,7 @@ describe('endpoint interrogation', () => {
     await waitFor(() => { expect(mutate).toHaveBeenCalled() })
     expect(firstMutate(mutate).ops[0]?.value).toEqual([
       { id: 'kept', contextWindow: 111 },
-      { id: 'fresh', contextWindow: 4096, name: 'Fresh' },
+      { id: 'fresh', contextWindow: 4096, name: 'Fresh', input: ['text', 'image'] },
     ])
   })
 

@@ -10,7 +10,7 @@ DeepSeek 视觉部署使用 chat-completions 图片协议，但直接 `deepseek-
 
 ## Decision
 
-直接适配器允许已配置模型通过 `inputModalities: [text, image]` 选择加入；校验会拒绝空列表、未知模态或重复模态。Flash、Pro、未列出 id，以及省略 `inputModalities` 的已配置模型仍明确仅支持文本。在模型端点就绪前，随附目录不会公布 `deepseek-v4-flash-vision-exp`，因此模型选择器不会提供不可用路由；部署与 snapshot 目录可以独立启用其确切视觉模型。
+直接适配器允许已配置模型通过 `inputModalities: [text, image]` 选择加入；校验会拒绝空列表、未知模态或重复模态。其默认目录包含带有该能力的 `deepseek-v4-flash-vision-exp`，而 Flash、Pro、未列出 id 以及省略 `inputModalities` 的已配置模型仍明确仅支持文本。组织托管配置必须显式声明确切的视觉模型，因为显式 `models` 列表会替换该路由目录。
 
 适配器会对每个图片请求解析 `ctx.attachments`，用请求 signal 读取每个保留的持久引用，并将校验后的字节按顺序序列化为 OpenAI 兼容的 `image_url` data URL。纯文本 user 消息保留字符串内容。工具结果保留仅字符串的 `tool` 消息；仅含图片的结果使用 `(see attached image)`，连续工具结果中保留的图片随后合并进一条以 `Attached image(s) from tool result:` 开头的 `user` 消息。System 与 assistant 历史图片会在附件或网络 I/O 前以 `UNSUPPORTED_CONTENT` 失败。
 

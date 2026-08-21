@@ -92,7 +92,13 @@ async function harness(logged?: {
   await ctx.plugin(AgentRegistry)
   ctx.llm.registerAdapter(['deepseek-official'], new CatalogAdapter('DeepSeek', [
     { provider: 'deepseek-official', id: 'deepseek-chat', name: 'DeepSeek Chat' },
-    { provider: 'deepseek-official', id: 'deepseek-reasoner', name: 'DeepSeek Reasoner', description: 'Reasoning model' },
+    {
+      provider: 'deepseek-official',
+      id: 'deepseek-reasoner',
+      name: 'DeepSeek Reasoner',
+      description: 'Reasoning model',
+      inputModalities: ['text', 'image'],
+    },
   ], REASONING))
   ctx.llm.registerAdapter(['broken'], new CatalogAdapter('Broken Provider', new Error('catalog offline')))
   ctx.llm.registerAdapter(['metadata-broken'], new CatalogAdapter('Metadata Broken', [
@@ -301,10 +307,14 @@ describe('Web session model selection', () => {
           id: 'deepseek-reasoner',
           name: 'DeepSeek Reasoner',
           description: 'Reasoning model',
+          inputModalities: ['text', 'image'],
           reasoning: REASONING,
         },
       ],
     }])
+    const hostCatalog = expectValue(await api.llm.models(request({})))
+    expect(hostCatalog.groups).toEqual(catalog.groups)
+    expect(hostCatalog.failures).toEqual(catalog.failures)
     expect(catalog.failures).toEqual([
       { id: 'broken', name: 'Broken Provider', message: 'catalog offline' },
       { id: 'metadata-broken', name: 'Metadata Broken', message: 'reasoning metadata offline' },

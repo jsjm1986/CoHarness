@@ -10,7 +10,7 @@ DeepSeek vision deployments use the chat-completions image protocol, but the dir
 
 ## Decision
 
-The direct adapter lets a configured model opt in with `inputModalities: [text, image]`; validation rejects empty, unknown, or duplicate modalities. Flash, Pro, unlisted ids, and configured models that omit `inputModalities` remain explicitly text-only. The shipped catalog does not advertise `deepseek-v4-flash-vision-exp` until its model endpoint is ready, so the model selector cannot offer an unavailable route; deployment and snapshot catalogs can enable their exact vision model independently.
+The direct adapter lets a configured model opt in with `inputModalities: [text, image]`; validation rejects empty, unknown, or duplicate modalities. Its default catalog includes `deepseek-v4-flash-vision-exp` with that capability, while Flash, Pro, unlisted ids, and configured models that omit `inputModalities` remain explicitly text-only. Organization-managed profiles must declare the exact vision model because their explicit `models` list replaces the route catalog.
 
 The adapter resolves `ctx.attachments` per image request, reads each retained durable reference with the request signal, and serializes verified bytes as ordered OpenAI-compatible `image_url` data URLs. Text-only user messages retain string content. Tool results retain string-only `tool` messages; image-only results use `(see attached image)`, and consecutive retained tool-result images follow in one `user` message beginning `Attached image(s) from tool result:`. System and assistant history images fail with `UNSUPPORTED_CONTENT` before attachment or network I/O.
 

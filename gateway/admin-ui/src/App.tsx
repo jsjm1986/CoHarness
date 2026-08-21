@@ -1,6 +1,7 @@
 import {
   ChartNoAxesCombined,
   FolderKanban,
+  LogOut,
   PanelsTopLeft,
   ScrollText,
   Sparkles,
@@ -22,10 +23,14 @@ export function App() {
         <aside className="sidebar">
           <Brand />
           <AdminNav className="sidebarNav" />
-          <div className="sidebarFooter">管理中心</div>
+          <div className="sidebarFooter">
+            <span>管理中心</span>
+            <LogoutButton />
+          </div>
         </aside>
         <header className="mobileHeader">
           <Brand compact />
+          <LogoutButton compact />
         </header>
         <main className="mainContent">
           <Routes>
@@ -60,6 +65,22 @@ function Brand({ compact = false }: { compact?: boolean }) {
         {compact ? null : <span>Admin</span>}
       </span>
     </div>
+  )
+}
+
+function LogoutButton({ compact = false }: { compact?: boolean }) {
+  return (
+    <form className={`logoutForm ${compact ? 'logoutFormCompact' : ''}`} method="post" action="/logout">
+      <button
+        type="submit"
+        className={`button button-ghost logoutButton ${compact ? 'logoutButtonCompact' : ''}`}
+        aria-label="退出登录"
+        title="退出登录"
+      >
+        <LogOut aria-hidden="true" />
+        {compact ? null : <span>退出登录</span>}
+      </button>
+    </form>
   )
 }
 

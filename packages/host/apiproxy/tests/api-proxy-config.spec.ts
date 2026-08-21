@@ -20,7 +20,15 @@ import type { ModelProviderConfigSnapshot } from '@deepseek-ai/dsh-model-provide
 import { SettingsProvider, settingsNamespace } from '@deepseek-ai/dsh-settings'
 import type { SettingsNamespace } from '@deepseek-ai/dsh-settings'
 import { CredentialProvider } from '@deepseek-ai/dsh-credentials'
-import type { CredentialInfo, CredentialRef, ResolvedCredential } from '@deepseek-ai/dsh-credentials'
+import type {
+  CredentialInfo,
+  CredentialKey,
+  CredentialRecord,
+  CredentialRecordEntry,
+  CredentialRecordInfo,
+  CredentialRef,
+  ResolvedCredential,
+} from '@deepseek-ai/dsh-credentials'
 import type { CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
 import type { ApprovalRequestId } from '@deepseek-ai/dsh-cordis-host-runner/types'
 import type { HostFrame } from '../src/api/index.ts'
@@ -102,33 +110,58 @@ class MemoryCredentials extends CredentialProvider {
 
   private readonly shadowed: Set<string>
 
-  protected resolveOwned(ref: CredentialRef): Promise<ResolvedCredential | undefined> {
+  protected override resolveOwned(ref: CredentialRef): Promise<ResolvedCredential | undefined> {
     if (this.shadowed.has(ref)) return Promise.resolve({ value: 'from-env', source: 'env' })
     const value = this.values.get(ref)
     return Promise.resolve(value === undefined ? undefined : { value, source: 'file' })
   }
 
-  protected describeOwned(ref: CredentialRef): Promise<CredentialInfo> {
+  protected override describeOwned(ref: CredentialRef): Promise<CredentialInfo> {
     if (this.shadowed.has(ref)) return Promise.resolve({ configured: true, source: 'env', writable: false })
     const configured = this.values.has(ref)
     return Promise.resolve({ configured, ...configured ? { source: 'file' } : {}, writable: true })
   }
 
-  protected setOwned(ref: CredentialRef, value: string): Promise<void> {
+  protected override setOwned(ref: CredentialRef, value: string): Promise<void> {
     if (this.shadowed.has(ref)) {
       return Promise.reject(new Error(`credentials: ${ref} is shadowed by the read-only environment`))
     }
     this.values.set(ref, value)
-    this.ctx.emit('credentials/updated', ref)
+    this.ctx.emit('credentials/reference-updated', ref)
     return Promise.resolve()
   }
 
-  protected unsetOwned(ref: CredentialRef): Promise<void> {
+  protected override unsetOwned(ref: CredentialRef): Promise<void> {
     if (this.shadowed.has(ref)) {
       return Promise.reject(new Error(`credentials: ${ref} is shadowed by the read-only environment`))
     }
     this.values.delete(ref)
-    this.ctx.emit('credentials/updated', ref)
+    this.ctx.emit('credentials/reference-updated', ref)
+    return Promise.resolve()
+  }
+
+  // The record half has no wire face on this proxy, so this double answers
+  // the empty store rather than modelling storage the tests never exercise.
+  override readRecord(): Promise<CredentialRecord | undefined> {
+    return Promise.resolve(undefined)
+  }
+
+  override describeRecord(): Promise<CredentialRecordInfo> {
+    return Promise.resolve({ configured: false, writable: true })
+  }
+
+  override listRecords(): Promise<readonly CredentialRecordEntry[]> {
+    return Promise.resolve([])
+  }
+
+  override modifyRecord(
+    _key: CredentialKey,
+    mutate: (current: CredentialRecord | undefined) => Promise<CredentialRecord | undefined>,
+  ): Promise<CredentialRecord | undefined> {
+    return mutate(undefined)
+  }
+
+  override deleteRecord(): Promise<void> {
     return Promise.resolve()
   }
 }
@@ -681,8 +714,8 @@ describe('credentials domain', () => {
       expectOk(await api.credentials.unset(request({ ref: 'OPENAI_API_KEY' })))
     })
     expect(frames).toEqual([
-      { type: 'host/remote-event', event: 'credentials/updated', args: ['OPENAI_API_KEY'] },
-      { type: 'host/remote-event', event: 'credentials/updated', args: ['OPENAI_API_KEY'] },
+      { type: 'host/remote-event', event: 'credentials/reference-updated', args: ['OPENAI_API_KEY'] },
+      { type: 'host/remote-event', event: 'credentials/reference-updated', args: ['OPENAI_API_KEY'] },
     ])
   })
 
@@ -807,7 +840,7 @@ describe('llm.discoverModels', () => {
       seen.push({ baseURL: probe.baseURL, api: probe.api, apiKey: probe.apiKey })
       return Promise.resolve([
         { id: 'acme-large', name: 'Acme Large', contextWindow: 65_536, maxTokens: 4096 },
-        { id: 'acme-small' },
+        { id: 'acme-small', inputModalities: ['text', 'image'] },
       ])
     })
     const api = createApiProxy(ctx, DEFAULTS)
@@ -821,7 +854,7 @@ describe('llm.discoverModels', () => {
 
     expect(value.models).toEqual([
       { id: 'acme-large', name: 'Acme Large', contextWindow: 65_536, maxTokens: 4096 },
-      { id: 'acme-small' },
+      { id: 'acme-small', inputModalities: ['text', 'image'] },
     ])
     expect(seen).toEqual([{
       baseURL: 'https://gateway.acme.example/v1',

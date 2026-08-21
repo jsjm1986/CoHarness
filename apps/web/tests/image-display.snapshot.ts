@@ -142,12 +142,17 @@ it('accepts pasted images in order and routes pasted documents through their rai
       getData: () => '',
     },
   })
-  const unsupportedMessage = 'Only PNG, JPG, WebP, and GIF images are supported'
-  const toast = await screen.findByText(unsupportedMessage)
-  expect(toast.closest('[role="alert"]')).not.toBeNull()
+  const documentRail = await screen.findByRole('list', { name: 'Pending documents' })
+  const documentItem = within(documentRail).getByRole('listitem')
   await waitFor(() => {
-    expect(screen.queryByText(unsupportedMessage)).toBeNull()
-  }, { timeout: 6_000 })
+    expect(documentItem.getAttribute('data-document-status')).toBe('failed')
+  }, { timeout: 5_000 })
+  expect(documentItem.textContent).toContain('notes.txt')
+  expect(within(documentRail).getByRole('button', { name: 'Retry upload notes.txt' })).toBeTruthy()
+  fireEvent.click(within(documentRail).getByRole('button', { name: 'Remove document notes.txt' }))
+  await waitFor(() => {
+    expect(screen.queryByRole('list', { name: 'Pending documents' })).toBeNull()
+  })
 })
 
 it('accepts a whole-page drop under the limits-labeled overlay and refuses an over-limit batch at intake', async () => {

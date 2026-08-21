@@ -221,6 +221,11 @@
     - id: ui-conversation
       name: '@deepseek-ai/dsh-client-ui-conversation'
 
+    # Gateway project scope, shared-conversation visibility, read-only role UI,
+    # and the authenticated user logout form.
+    - id: ui-collaboration
+      name: '@deepseek-ai/dsh-client-ui-collaboration'
+
     # Official occupants for the generic sidebar and conversation brand slots.
     - id: ui-brand-official
       name: '@deepseek-ai/dsh-client-ui-brand-official'
