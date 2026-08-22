@@ -21,7 +21,7 @@ const PAGED_EXPECTED = join(SNAPSHOT_DIR, 'desktop-paged.expected.md')
 const MODE = webSnapshotMode()
 
 const LIMITS = {
-  maxFileBytes: 104_857_600,
+  maxFileBytes: null,
   maxFilesPerMessage: 20,
   maxMessageBytes: 100,
   maxInlineTextBytes: 256,

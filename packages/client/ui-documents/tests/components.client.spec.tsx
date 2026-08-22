@@ -29,7 +29,8 @@ function t(key: DocumentsKey, params?: Record<string, string>): string {
   return text
 }
 
-const limits = { maxFileBytes: 10 * 1024 * 1024, maxFilesPerMessage: 5, maxMessageBytes: 100, maxInlineTextBytes: 256 }
+const limits: UserDocLimits = { maxFileBytes: 10 * 1024 * 1024, maxFilesPerMessage: 5, maxMessageBytes: 100, maxInlineTextBytes: 256 }
+const unlimitedLimits: UserDocLimits = { maxFileBytes: null, maxFilesPerMessage: 5, maxMessageBytes: 100, maxInlineTextBytes: 256 }
 
 function doc(ref: Partial<{ docId: string; name: string; bytes: number; mediaType: string; modifiedAt: number }> = {}) {
   const docId = ref.docId ?? '2026-08-17/report.pdf'
@@ -136,6 +137,21 @@ describe('DocumentsModal', () => {
     expect(namedButton('preview', 'report.pdf')).toBeTruthy()
     expect(namedButton('delete', 'report.pdf')).toBeTruthy()
     expect(screen.getByRole('link', { name: t('action.downloadNamed', { name: 'report.pdf' }) })).toBeTruthy()
+  })
+
+  it('shows that the default document size is unlimited', async () => {
+    const client = makeClient()
+    client.browse.mockImplementation(async () => ({
+      directoryId: '' as UserDocDirectoryIdType,
+      directories: [],
+      documents: [doc()],
+      limits: unlimitedLimits,
+    }))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+
+    await screen.findByText('report.pdf')
+    expect(screen.getByText(t('modal.limits.unlimited', { count: '5' }))).toBeTruthy()
   })
 
   it('filters documents by name query and shows a no-match empty state', async () => {

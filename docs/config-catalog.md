@@ -3048,7 +3048,7 @@ export interface Config {
   uploadRoot?: string
   /** Optional legacy root to migrate into `uploadRoot`; omitted defaults to `<home>/uploads` only when `uploadRoot` is omitted. */
   legacyUploadRoot?: string
-  /** Maximum bytes accepted for one document. */
+  /** Maximum bytes accepted for one document; omitted leaves the document size unlimited. */
   maxFileBytes?: number
   /** Maximum document count accepted in one submitted message. */
   maxFilesPerMessage?: number

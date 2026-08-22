@@ -411,9 +411,11 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t }) =>
     })
   }
 
-  const limitsText = limits !== null
-    ? t('modal.limits', { size: formatBytes(limits.maxFileBytes), count: String(limits.maxFilesPerMessage) })
-    : ''
+  const limitsText = limits === null
+    ? ''
+    : limits.maxFileBytes === null
+      ? t('modal.limits.unlimited', { count: String(limits.maxFilesPerMessage) })
+      : t('modal.limits', { size: formatBytes(limits.maxFileBytes), count: String(limits.maxFilesPerMessage) })
 
   const closeDelete = () => {
     setDeleteTargets(null)

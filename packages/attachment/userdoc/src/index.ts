@@ -92,16 +92,17 @@ export abstract class UserDocStore extends Service {
   /**
    * Stream one document to a resolved target and publish its reference.
    *
-   * Implementations enforce `maxFileBytes` while streaming, so an oversized
-   * upload is cut off rather than buffered, and leave no partial file behind on
-   * failure or cancellation. The recorded `mediaType` is derived from the stored
-   * name, never taken from a client header: a declared type is unverifiable
-   * here, and nothing in this seam acts on the value anyway.
+   * Implementations enforce a finite `maxFileBytes` while streaming, so an
+   * oversized upload is cut off rather than buffered; `null` accepts every
+   * document size supported by the transport and filesystem. Failed or
+   * cancelled writes leave no partial file behind. The recorded `mediaType` is
+   * derived from the stored name, never taken from a client header: a declared
+   * type is unverifiable here, and nothing in this seam acts on the value anyway.
    * @param target - a target from this store's own `resolveTarget`.
    * @param body - the upload byte stream.
    * @param signal - optional cancellation for the streaming write.
    * @returns the durable reference to the stored document.
-   * @throws UserDocError when the stream exceeds `maxFileBytes` or the write fails.
+   * @throws UserDocError when a finite `maxFileBytes` is exceeded or the write fails.
    */
   abstract save(
     target: UserDocTarget,

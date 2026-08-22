@@ -113,4 +113,13 @@ describe('local user-document service', () => {
     await expect(service.save(target, stream('12345'))).rejects.toMatchObject({ code: DOCUMENT_TOO_LARGE_CODE })
     await expect(service.list()).resolves.toEqual([])
   })
+
+  it('does not impose a default single-file limit', async () => {
+    const service = await store()
+    const target = await service.resolveTarget({ name: 'large.txt' })
+    const ref = await service.save(target, stream('x'.repeat(96)))
+
+    expect(service.limits.maxFileBytes).toBeNull()
+    expect(ref.bytes).toBe(96)
+  })
 })

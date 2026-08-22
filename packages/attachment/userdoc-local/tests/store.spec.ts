@@ -40,6 +40,11 @@ const LIMITS: UserDocLimits = {
   maxInlineTextBytes: 32,
 }
 
+const UNLIMITED_LIMITS: UserDocLimits = {
+  ...LIMITS,
+  maxFileBytes: null,
+}
+
 const temporaries: string[] = []
 
 async function root(): Promise<string> {
@@ -140,6 +145,15 @@ describe('saveDocFile', () => {
       expect.objectContaining({ code: DOCUMENT_TOO_LARGE_CODE }) as Error,
     )
     expect(await readdir(join(uploadRoot, dayDirectory(new Date())))).toEqual([])
+  })
+
+  it('accepts a stream of any size when the per-document limit is unset', async () => {
+    const uploadRoot = await root()
+    const target = await resolveDocTarget(uploadRoot, 'large.bin', new Date())
+    const accepted = await saveDocFile(uploadRoot, target, chunked(['x'.repeat(32), 'x'.repeat(32), 'x'.repeat(32)]), UNLIMITED_LIMITS)
+
+    expect(accepted.bytes).toBe(96)
+    expect(await readFile(accepted.path, 'utf8')).toBe('x'.repeat(96))
   })
 
   it('refuses a target outside the upload root', async () => {
