@@ -45,6 +45,6 @@ The request and snapshot are consecutive append-only target messages and preserv
 ## Known Limitations and Deferred Work
 
 - **No body discovery** — candidate queries inspect folded titles but do not search message bodies. A non-empty query may inspect every visible persisted session log through the session-query service's bounded, cancellable batch; a dedicated title index may replace that discovery path without changing URI, snapshot, or persistence contracts.
-- **Trusted caller boundary** — the service assumes its host is authorized to read every session exposed by `ctx.sessionQuery`; it is not a model-facing search tool.
+- **Collaboration filtering** — when `ctx.collaboration` is composed, candidate discovery and snapshot preparation retain only sessions admitted by its readable-session authority. Compositions without that service retain the trusted-caller contract; this is not a model-facing search tool.
 - **Text projection only** — non-text user and assistant blocks are not propagated across sessions.
 - **No live link** — references are snapshots, not forks, resumes, subscriptions, or source-session mutations.

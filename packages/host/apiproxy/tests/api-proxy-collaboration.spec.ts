@@ -178,6 +178,10 @@ describe('project collaboration Typert Remote ACL', () => {
       action: 'read' | 'write' | 'approve'
       args: Readonly<Record<string, unknown>>
     }> = [
+      { endpoint: 'commands/list', action: 'read', args: { agentId: sessionId } },
+      { endpoint: 'commands/execute', action: 'write', args: { agentId: sessionId, line: '/permission danger-full-access', images: [] } },
+      { endpoint: 'fileReferences/list', action: 'read', args: { agentId: sessionId, query: '' } },
+      { endpoint: 'sessionReferenceResolver/candidates', action: 'read', args: { agentId: sessionId, query: '' } },
       ...['create', 'edit', 'pause', 'resume', 'complete', 'clear'].map(method => ({
         endpoint: `goals/${method}`,
         action: 'write' as const,
@@ -217,12 +221,54 @@ describe('project collaboration Typert Remote ACL', () => {
     })
   })
 
-  it('denies unclassified process-wide Remotes in project scope', async () => {
+  it('allows read-only members to discover session UI data but not execute commands', async () => {
+    const base = controlledAuthority().authority
+    const authority: CollaborationAuthority = {
+      ...base,
+      participant: {
+        ...base.participant,
+        scope: { kind: 'project', projectId: 41, projectName: 'Compiler', mode: 'ro' },
+      },
+      authorize: (sessionId, action) => action === 'read'
+        ? Promise.resolve({
+          sessionId,
+          rootSessionId: sessionId,
+          mode: 'ro',
+          canRead: true,
+          canWrite: false,
+          canManage: false,
+          projectId: 41,
+          visibility: 'project',
+          creatorUserId: 7,
+        })
+        : Promise.reject(new CollaborationError('forbidden')),
+    }
+    const { ctx } = await harness(authority)
+    const sessionId = SessionId('read-only-session')
+
+    for (const endpoint of ['commands/list', 'fileReferences/list', 'sessionReferenceResolver/candidates']) {
+      await expect(authorizeTypertRemote(
+        ctx,
+        typertRequest(endpoint, { agentId: sessionId }),
+      )).resolves.toBeUndefined()
+    }
+
+    const failure = await expectTypertCollaborationFailure(authorizeTypertRemote(
+      ctx,
+      typertRequest('commands/execute', { agentId: sessionId, line: '/permission danger-full-access', images: [] }),
+    ))
+    expect(failure.failure).toMatchObject({
+      code: 'collaboration-forbidden',
+      details: { action: 'write', reason: 'forbidden', sessionId },
+    })
+  })
+
+  it('denies unclassified Remotes in project scope', async () => {
     const { ctx } = await harness(controlledAuthority().authority)
 
     const failure = await expectTypertCollaborationFailure(authorizeTypertRemote(
       ctx,
-      typertRequest('commands/execute', {}),
+      typertRequest('unclassified/processWide', {}),
     ))
 
     expect(failure.failure).toMatchObject({

@@ -153,7 +153,7 @@ interface CollaborationAccess {
 }
 ```
 
-Host 消费方会在分发前分类每项项目 scope 操作。Session 读写使用 `authorize()`，列表与发布使用 `readableSessionIds()`，项目 scope 下的 Typert Remote 只接受按 Session 寻址的 allowlist：`goals/*` 需要 `write`，`messageFeedback/list` 需要 `read`，`messageFeedback/put` 与 `messageFeedback/delete` 需要 `write`。未分类或进程级 Remote 会被拒绝。
+Host 消费方会在分发前分类每项项目 scope 操作。Session 读写使用 `authorize()`，列表与发布使用 `readableSessionIds()`，项目 scope 下的 Typert Remote 只接受按 Session 寻址的 allowlist：`commands/list`、`fileReferences/list` 与 `sessionReferenceResolver/candidates` 需要 `read`；`commands/execute`、`goals/*`、`messageFeedback/put` 与 `messageFeedback/delete` 需要 `write`；`messageFeedback/list` 需要 `read`。未分类或进程级 Remote 会被拒绝。
 
 新项目根对话在异步创建操作中携带一项明确可见性。PostgreSQL 持久化提供方将这项选择与已认证创建者一起物化；注册子会话时复制根 ACL。
 
