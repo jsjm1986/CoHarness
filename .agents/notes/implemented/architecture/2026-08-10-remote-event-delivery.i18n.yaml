@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-10-remote-event-delivery.md
 2026-08-10-remote-event-delivery.md: 888c710c7d32ab9825d4a2ad08dfe6ea1eaa7155
-2026-08-10-remote-event-delivery.zh.md: e29d1d1e5c90de71634df1ecd57b4a57d5be7303
+2026-08-10-remote-event-delivery.zh.md: 2977743cba0ba3702aa4dcd26eecf97c27b6d6d2

@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/permission-presets.md
 permission-presets.md: f007fb7b6c546b496c7e44de49778a228deccea4
-permission-presets.zh.md: 4fd3c94b2368ca7545c04c86aed0b26e52921afd
+permission-presets.zh.md: bb9c47df1a478a2c35a2e750ece89168193ad289

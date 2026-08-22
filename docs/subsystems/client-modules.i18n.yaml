@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/client-modules.md
 client-modules.md: 6ac0140039de008bc22e6cc5f7dae75a1f146566
-client-modules.zh.md: 8c0e689b8255d7e089f119e567519d369cf9d172
+client-modules.zh.md: aee664ea7d8062ebb2c2c58cb290735273df583c

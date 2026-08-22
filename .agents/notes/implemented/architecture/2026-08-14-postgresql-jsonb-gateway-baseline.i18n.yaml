@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-14-postgresql-jsonb-gateway-baseline.md
 2026-08-14-postgresql-jsonb-gateway-baseline.md: 9acd89e9c67d01e128cc91e5c2a5f84f6d5c8f0a
-2026-08-14-postgresql-jsonb-gateway-baseline.zh.md: a02203668905afb6dbfc00a920f504b2ae0de6a8
+2026-08-14-postgresql-jsonb-gateway-baseline.zh.md: b46c83a309d461f07c3a06e62a72e422bac36460

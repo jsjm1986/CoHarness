@@ -1,26 +1,64 @@
 .root {
   position: relative;
-  flex: none;
-}
-
-.trigger {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 10px;
+  min-width: 0;
+}
+
+.switcherRoot {
+  min-width: 0;
+  margin-left: 6px;
+}
+
+.trigger,
+.switcherTrigger {
+  display: inline-flex;
+  align-items: center;
   min-height: 28px;
   padding: 3px 2px;
   border: 0;
-  border-radius: var(--dsw-radius-sm);
+  border-radius: 6px;
   background: transparent;
   color: var(--dsw-alias-label-tertiary);
   font-size: 12px;
   line-height: 18px;
-  white-space: nowrap;
   cursor: pointer;
 }
 
-.count {
-  margin: 0 5px;
+.trigger {
+  gap: 4px;
+}
+
+.switcherTrigger {
+  gap: 4px;
+  min-width: 0;
+  max-width: 244px;
+  color: var(--dsw-alias-label-primary);
+  font-weight: 500;
+}
+
+.ancestorSwitcherTrigger {
+  color: var(--dsw-alias-label-tertiary);
+  font-weight: 400;
+}
+
+.switcherTitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.switcherTrigger svg {
+  flex: none;
+}
+
+.separator {
+  color: var(--dsw-alias-label-caption);
+  font-size: 14px;
+  line-height: 20px;
 }
 
 .activitySlot {
@@ -35,7 +73,18 @@
   color: var(--dsw-alias-label-secondary);
 }
 
-.trigger svg {
+.switcherTrigger:hover,
+.switcherTrigger:focus-visible {
+  color: var(--dsw-alias-label-primary);
+}
+
+.ancestorSwitcherTrigger:hover,
+.ancestorSwitcherTrigger:focus-visible {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.trigger svg,
+.switcherTrigger svg {
   transition: transform 120ms ease;
 }
 
@@ -44,9 +93,7 @@
 }
 
 .menu {
-  position: absolute;
-  top: calc(100% + 5px);
-  left: 0;
+  position: fixed;
   z-index: 100;
   box-sizing: border-box;
   display: flex;
@@ -54,9 +101,9 @@
   width: 336px;
   max-width: min(400px, calc(100vw - 32px));
   max-height: min(560px, calc(100vh - 140px));
-  padding: var(--dsw-space-1);
+  padding: 4px;
   overflow: auto;
-  border-radius: var(--dsw-radius-lg);
+  border-radius: 12px;
   background: var(--dsw-specific-menu);
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
@@ -75,13 +122,13 @@
   position: relative;
   display: flex;
   align-items: flex-start;
-  gap: var(--dsw-space-2);
+  gap: 8px;
   box-sizing: border-box;
   width: 100%;
   min-height: 50px;
-  padding: 7px var(--dsw-space-2) 7px 11px;
+  padding: 7px 8px 7px 11px;
   border: 0;
-  border-radius: var(--dsw-radius-md);
+  border-radius: 8px;
   background: transparent;
   color: var(--dsw-alias-label-primary);
   font-size: 13px;
@@ -102,16 +149,16 @@
   flex: 1;
   align-self: stretch;
   align-items: flex-start;
-  gap: var(--dsw-space-2);
+  gap: 8px;
   min-width: 0;
   margin: -7px -8px -7px;
-  padding: 7px var(--dsw-space-2);
-  border-radius: var(--dsw-radius-md);
+  padding: 7px 8px;
+  border-radius: 8px;
 }
 
 .row > :global([data-state]),
 .clickarea > :global([data-state]) {
-  margin-top: var(--dsw-space-1);
+  margin-top: 4px;
 }
 
 .disabled {
@@ -173,6 +220,10 @@
   font-weight: 400;
 }
 
+.currentLabel {
+  font-weight: 600;
+}
+
 .summary,
 .metrics {
   color: var(--dsw-alias-label-tertiary);
@@ -201,7 +252,7 @@
 .children {
   position: relative;
   margin-left: 18px;
-  padding-left: var(--dsw-space-1);
+  padding-left: 4px;
 }
 
 .children::before,
@@ -243,7 +294,7 @@
 
 .notice,
 .error {
-  padding: 10px var(--dsw-space-3);
+  padding: 10px 12px;
   color: var(--dsw-alias-label-tertiary);
   font-size: 12px;
   line-height: 18px;
@@ -253,7 +304,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--dsw-space-3);
+  gap: 12px;
   color: var(--dsw-alias-state-error-primary);
 }
 
@@ -261,10 +312,10 @@
   display: inline-flex;
   flex: none;
   align-items: center;
-  gap: var(--dsw-space-1);
-  padding: var(--dsw-space-1) 6px;
+  gap: 4px;
+  padding: 4px 6px;
   border: 0;
-  border-radius: var(--dsw-radius-sm);
+  border-radius: 6px;
   background: transparent;
   color: inherit;
   cursor: pointer;
@@ -272,15 +323,4 @@
 
 .refresh:hover {
   background: var(--dsw-alias-interactive-bg-hover);
-}
-
-@media (pointer: coarse) {
-  .trigger {
-    min-height: var(--dsw-touch-target);
-  }
-}
-
-:global([data-viewport='compact']) .trigger,
-:global([data-viewport='compact']) .refresh {
-  min-height: var(--dsw-touch-target);
 }

@@ -234,7 +234,7 @@ describe('edge joins', () => {
     expect(store.store.getSnapshot()).toMatchObject({ status: 'error', error: 'settings down' })
   })
 
-  it('reports a terminally unavailable settings mirror precisely', async () => {
+  it('reports an explicitly unavailable settings mirror precisely', async () => {
     const { face } = api()
     const store = new ModelsSettingsStore(
       face,

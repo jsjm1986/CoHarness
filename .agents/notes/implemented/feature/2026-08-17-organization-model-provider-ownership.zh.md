@@ -14,7 +14,7 @@ Gateway 模型目录最初只授权和计价 `(provider, model)` 路由，并不
 
 **管理端复用共享模型设置插件。** Gateway 管理端把 `ui-settings-models` 挂载到组织模型 REST facade，因此管理员可以通过与个人设置相同的编辑器维护完整 pi-ai Provider profile、模型列表、发现字段和只写凭据。组织凭据引用使用保留的 `DSH_` 前缀，个人 pi-ai 设置会拒绝该前缀，从而隔离两种所有权，同时允许组织 profile 轮换到另一个 `DSH_` 引用。
 
-**个人运行时组合组织与个人配置。** 运行时策略通过 `ctx.modelProviderConfig` 投影已启用的组织 Provider 配置。组织模型授权遵循角色默认值与用户覆盖。个人 settings user 层还可以按[模型治理 default-deny 与用户声明路由授权](2026-08-17-model-governance-byok.md)中记录的既有规则声明 BYOK Provider。组织配置绝不进入可编辑的用户设置，个人配置也不能使用保留的 `org-*` 命名空间。
+**个人运行时组合组织与个人配置。** 运行时策略通过 `ctx.modelProviderConfig` 投影已启用的组织 Provider 配置。组织模型授权遵循角色默认值与用户覆盖。个人 settings user 层还可以按[模型治理 default-deny 与用户声明路由授权](2026-08-17-model-governance-byok.zh.md)中记录的既有规则声明 BYOK Provider。组织配置绝不进入可编辑的用户设置，个人配置也不能使用保留的 `org-*` 命名空间。
 
 **项目运行时只使用组织 Provider。** 项目模型集合只来自显式 `model_project_access` 分配，不继承角色默认值、用户覆盖或个人 BYOK Provider。所有成员连接同一个项目运行时，因此共享一份 Provider 快照与一套项目模型权限；未分配模型一律拒绝。管理员可以一次写入为项目分配或清除当前全部受管目录模型；Gateway 只重写该项目的 `model-governance.json` 一次。
 

@@ -532,15 +532,18 @@ export class SessionManager {
    * wait for the next refresh). A created session is blank by definition
    * (entity birth precedes the first message).
    * @param opts - target workspace or working directory, plus an optional caller-owned id.
+   * @param reuseWorkspaceBlank - reuse the existing blank session for the workspace when one is available.
    * @returns the create result.
    */
   async create(
     opts: SessionCreateOptions = {},
+    reuseWorkspaceBlank = false,
   ): Promise<RpcResult<{ sessionId: SessionId }>> {
     try {
       const shared = {
         ...(opts.sessionId === undefined ? {} : { sessionId: opts.sessionId }),
         ...(opts.visibility === undefined ? {} : { visibility: opts.visibility }),
+        ...(reuseWorkspaceBlank ? { reuseWorkspaceBlank: true as const } : {}),
       }
       const payload = opts.workspaceId !== undefined
         ? { workspaceId: opts.workspaceId, ...shared }

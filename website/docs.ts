@@ -303,7 +303,6 @@ const subsystemGroups = [
     ['schedule.md', '定时提醒', 'Scheduled reminders'],
   ]],
   ['平台与接入', 'Platform and access', [
-    ['collaboration.md', '项目协作', 'Project collaboration'],
     ['web-server.md', 'HTTP 服务器', 'HTTP server'],
     ['typert.md', 'Typert', 'Typert'],
     ['client-modules.md', '客户端模块', 'Client modules'],
@@ -412,6 +411,16 @@ const reference = [
     order: 5,
   }]),
 ]
+
+/**
+ * Sidebar collections of each locale, in the order the site's navigation
+ * presents them. The navigation bar and the llms.txt index both read this
+ * sequence, so a new collection lands in both surfaces together.
+ */
+export const localeCollections = {
+  root: ['zh-guide', 'zh-develop', 'zh-reference'],
+  en: ['en-guide', 'en-develop', 'en-reference'],
+} as const satisfies Record<DocsLocale, readonly DocsSidebar[]>
 
 /** A sidebar group, matched to pages by `label`. */
 export interface DocsSection {

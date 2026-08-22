@@ -12,7 +12,7 @@ Status: implemented
 
 `.footerActions` 是全宽行组成的一列。每个占用者使用 Settings 脚注、Cordis 徽章已共用的几何：`wide` 时为 42px 行（`width: calc(100% + 4px)`，内边距 `0 10px 0 8px`），否则为 36px 圆。空间名（以及 Cordis 文案）是 `flex: 1 1 auto; min-width: 0` 并可省略；模式徽章、箭头和运行计数保持 `flex: none`。compact 树内外壳通过 `[data-viewport='compact']` 把通栏行升到 `--dsw-touch-target`；rail 圆不升。返回 null 的占用者不留空位。slot 契约、inject 工厂和文案未改。
 
-相关：[compact 外壳密度](2026-08-19-compact-chrome-density.md)。
+相关：[compact 外壳密度](2026-08-19-compact-chrome-density.zh.md)。
 
 ## Alternatives considered
 

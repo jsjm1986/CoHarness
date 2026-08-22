@@ -10,7 +10,7 @@
 - 每条插入的 `user/message` 使用插件来源 `collaboration-context`，引用紧随其后的参与者消息 id，并保存同一份参与者快照。包 invariant 要求两者保持相邻、文本与 renderer 完全一致，且参与者必须属于项目 scope。
 - 格式错误的参与者元数据会在模型准入前抛错，而不会静默丢弃归属信息。个人消息和不含参与者元数据的消息保持不变。
 - 监听器先通过 `agent/pre-step` waterfall 委托，再转换最终获准的消息，因此后续策略不能把提示与参与者消息分开。
-- Web Chat transcript 不渲染这条提示；它用同一份参与者快照为随后的人类气泡标注发送者（[决策](../../../.agents/notes/implemented/feature/2026-08-17-web-chat-sender-attribution.md)）。
+- Web Chat transcript 不渲染这条提示；它用同一份参与者快照为随后的人类气泡标注发送者（[决策](../../../.agents/notes/implemented/feature/2026-08-17-web-chat-sender-attribution.zh.md)）。
 
 ## 模型体验
 

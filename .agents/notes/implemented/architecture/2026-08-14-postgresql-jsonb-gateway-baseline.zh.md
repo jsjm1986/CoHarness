@@ -10,9 +10,9 @@ Status: implemented
 
 ## 决策
 
-Migration 系列只使用一个钉死版本的 PostgreSQL 17 数据库。关系控制数据使用类型化列、保证企业归属一致的复合外键，以及企业范围内的幂等键；完整的结构化 Harness 会话事件存入 PostgreSQL `json`，同时保留固定的顺序和查询列；[完整 JSON 事件决策](../bug-fix/2026-08-15-postgresql-session-event-full-json.md)只取代本基线为该列选择 JSONB 的部分。大型二进制文件、附件、生成物和超大工具输出继续放在本机文件系统中，PostgreSQL 记录其元数据与校验和。
+Migration 系列只使用一个钉死版本的 PostgreSQL 17 数据库。关系控制数据使用类型化列、保证企业归属一致的复合外键，以及企业范围内的幂等键；完整的结构化 Harness 会话事件存入 PostgreSQL `json`，同时保留固定的顺序和查询列；[完整 JSON 事件决策](../bug-fix/2026-08-15-postgresql-session-event-full-json.zh.md)只取代本基线为该列选择 JSONB 的部分。大型二进制文件、附件、生成物和超大工具输出继续放在本机文件系统中，PostgreSQL 记录其元数据与校验和。
 
-本记录负责 PostgreSQL schema 与 migration 机制。[PostgreSQL Gateway 运行时切换](2026-08-14-postgresql-gateway-runtime-cutover.md)负责异步控制面服务和生产数据库选择，[项目协作对话](../feature/2026-08-15-project-collaborative-conversations.md)负责经过认证的项目 `SessionPersistence` 提供方。既有 JSONL/Zstd 会话日志不会导入。现有 [SessionPersistence 决策](2026-06-14-session-persistence.md)继续拥有在线会话语义；个人运行时保留其配置的提供方，项目运行时通过同一接口使用 PostgreSQL。范围更广的 [storage domain 提案](../../proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md)仍是独立的未来工作；Gateway schema 不实现其中的通用 log facet。
+本记录负责 PostgreSQL schema 与 migration 机制。[PostgreSQL Gateway 运行时切换](2026-08-14-postgresql-gateway-runtime-cutover.zh.md)负责异步控制面服务和生产数据库选择，[项目协作对话](../feature/2026-08-15-project-collaborative-conversations.zh.md)负责经过认证的项目 `SessionPersistence` 提供方。既有 JSONL/Zstd 会话日志不会导入。现有 [SessionPersistence 决策](2026-06-14-session-persistence.zh.md)继续拥有在线会话语义；个人运行时保留其配置的提供方，项目运行时通过同一接口使用 PostgreSQL。范围更广的 [storage domain 提案](../../proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.zh.md)仍是独立的未来工作；Gateway schema 不实现其中的通用 log facet。
 
 SQL migration 是不可变编号文件。Migration ledger 保存 SHA-256 checksum，并用 PostgreSQL advisory lock 保证同一时间只有一个迁移者。Migration 3 加入共享项目运行时归属、根继承的 `project`/`private` 可见性、参与者投影、审批/问题原子抢占，以及项目额度/用量主体。Migration 4 把完整事件列改为 PostgreSQL `json`，并移除 payload 表达式索引。本机 Docker 部署同时钉死 PostgreSQL tag 和镜像 digest，只绑定回环地址，使用 named volume，并从 Compose secret 文件读取密码。
 

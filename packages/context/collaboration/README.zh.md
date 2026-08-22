@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-经认证[项目协作](../../../.agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.md)的服务定义。消费者捕获一份绑定请求的 authority，而不是从进程全局服务读取可变账户状态。
+经认证[项目协作](../../../.agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.zh.md)的服务定义。消费者捕获一份绑定请求的 authority，而不是从进程全局服务读取可变账户状态。
 
 ## 运行时约定
 

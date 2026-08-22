@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-14-gateway-model-governance-and-usage.md
 2026-08-14-gateway-model-governance-and-usage.md: 67b13b00aed968f4c69a0ab50737c5606036fcd3
-2026-08-14-gateway-model-governance-and-usage.zh.md: eb49b3881d16a6195a51eed2358336a53831ac67
+2026-08-14-gateway-model-governance-and-usage.zh.md: e2e3eb9bdd5abe30b98e24986be6c67d45a3e733

@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-17-workspace-document-manager.md
 2026-08-17-workspace-document-manager.md: 53ee9c0c2d8f51920ffe06f5ee2fe14cc40eb45d
-2026-08-17-workspace-document-manager.zh.md: 8e3ccee1b686e0a9d6238f0139d3d6e26efa1e3a
+2026-08-17-workspace-document-manager.zh.md: 176e156c45484235a8fba270273bf1a5aea39251

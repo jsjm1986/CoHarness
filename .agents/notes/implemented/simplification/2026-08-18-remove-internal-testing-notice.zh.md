@@ -12,7 +12,7 @@ GUI 首次启动仍会先弹出版本化的「内测声明」弹窗（`welcome-n
 
 从组装后的产品中删除 `welcome-notice` 引导步骤。`ui-settings-models` 不再注册它；组件、确认 store、文案所有者、locale 键，以及对应的单元、store 与浏览器测试均已删除。剩余的 `deepseek-official` 步骤仍使用 `OnboardingModal`，且仅在没有任何可用提供方时出现。
 
-保留 Host 的 `ui-onboarding` namespace 及其 `welcomeNoticeVersion` 字段，使既有 `settings.yaml` 文档继续有效。GUI 不读写该字段。这与此前[全屏声明移除](2026-08-13-remove-first-run-beta-notice.md)保留注册的原因相同，并取代后续[共用弹窗恢复](../feature/2026-08-13-shared-modal-product-onboarding.md)的简洁测试阶段声明。[版本化 GUI 欢迎引导](../feature/2026-07-30-versioned-gui-welcome-onboarding.md)中的设置外壳协调器保持不变。
+保留 Host 的 `ui-onboarding` namespace 及其 `welcomeNoticeVersion` 字段，使既有 `settings.yaml` 文档继续有效。GUI 不读写该字段。这与此前[全屏声明移除](2026-08-13-remove-first-run-beta-notice.zh.md)保留注册的原因相同，并取代后续[共用弹窗恢复](../feature/2026-08-13-shared-modal-product-onboarding.zh.md)的简洁测试阶段声明。[版本化 GUI 欢迎引导](../feature/2026-07-30-versioned-gui-welcome-onboarding.zh.md)中的设置外壳协调器保持不变。
 
 ## 曾考虑的替代方案
 

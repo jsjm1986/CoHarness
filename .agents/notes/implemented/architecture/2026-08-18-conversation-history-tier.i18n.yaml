@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-18-conversation-history-tier.md
 2026-08-18-conversation-history-tier.md: 6b9fb1a7d8f94537a6454ffd64e956f6f4b7ba3a
-2026-08-18-conversation-history-tier.zh.md: 90e1f977f99e2617299d868ffee3d0bc5e935131
+2026-08-18-conversation-history-tier.zh.md: f779b07aefc2deb3cd3bd2ee18786294e36be90d

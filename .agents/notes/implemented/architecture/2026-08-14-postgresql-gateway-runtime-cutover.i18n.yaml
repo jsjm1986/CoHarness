@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-14-postgresql-gateway-runtime-cutover.md
 2026-08-14-postgresql-gateway-runtime-cutover.md: 9eebbcd3e4788ab20e73f9cd2cd6c702bbbaa167
-2026-08-14-postgresql-gateway-runtime-cutover.zh.md: 7f16085a4b5cdf5dde69f43b0f4017b85afb72e6
+2026-08-14-postgresql-gateway-runtime-cutover.zh.md: 7c38dd6bb22d2e72c126a0df24aad381e0daf615

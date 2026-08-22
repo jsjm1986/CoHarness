@@ -513,7 +513,7 @@ export class SessionRuntime implements ISessions {
         { sessionId, options: prepared },
         () => Promise.resolve(true),
       )
-      if (reusable) return sessionId
+      if (reusable) return this.createPrepared(prepared, sessionId)
     }
     return this.createPrepared(prepared)
   }
@@ -524,9 +524,13 @@ export class SessionRuntime implements ISessions {
     )
   }
 
-  private async createPrepared(prepared: SessionCreateOptions): Promise<SessionId> {
-    const result = await this.manager.create(prepared)
-    if (!result.ok) throw new SessionCreateError(result.error, prepared.sessionId)
+  private async createPrepared(prepared: SessionCreateOptions, reuseSessionId?: SessionId): Promise<SessionId> {
+    const sessionId = reuseSessionId ?? prepared.sessionId
+    const result = await this.manager.create(
+      sessionId === undefined ? prepared : { ...prepared, sessionId },
+      reuseSessionId !== undefined,
+    )
+    if (!result.ok) throw new SessionCreateError(result.error, sessionId)
     this.projectList()
     return result.value.sessionId
   }

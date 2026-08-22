@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-26-packed-chunk-rows-by-default.md
 2026-07-26-packed-chunk-rows-by-default.md: 58107e7debc3c821fba4a186fa937ab076d5cded
-2026-07-26-packed-chunk-rows-by-default.zh.md: 825cb14e4c463ef75edfede78140ddc9e589ddd1
+2026-07-26-packed-chunk-rows-by-default.zh.md: 528d94d7ed37319dbe6fd1723f31a51ed47ad60a

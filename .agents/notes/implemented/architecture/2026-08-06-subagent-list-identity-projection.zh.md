@@ -10,7 +10,7 @@ Status: implemented
 
 同一根因还有第二个症状：host 侧的 `hasSubagentDescriptor()` 在每次 Agent（智能体）绑定 RPC 的属主判定上扫描目标会话的 own suffix，即便 `SessionHeader.origin` 已经回答了同一个问题的绝大部分。
 
-根因在于 [durable-subagent-catalog 决策](../feature/2026-07-22-durable-subagent-catalog-and-list-agents.md)把描述符事件（`subagent/descriptor`）定为目录的唯一持久权威，却没有为描述符读取配任何缓存层，并把逐 child 双读明确接受为「无索引的正确性基线」。[web subagent conversations](../feature/2026-07-27-web-subagent-conversations.md)（#1569）已把「是不是 subagent」放进了 header（`SessionHeader.origin`），身份判定不再读日志；mode 与 label 仍然要扫。
+根因在于 [durable-subagent-catalog 决策](../feature/2026-07-22-durable-subagent-catalog-and-list-agents.zh.md)把描述符事件（`subagent/descriptor`）定为目录的唯一持久权威，却没有为描述符读取配任何缓存层，并把逐 child 双读明确接受为「无索引的正确性基线」。[web subagent conversations](../feature/2026-07-27-web-subagent-conversations.zh.md)（#1569）已把「是不是 subagent」放进了 header（`SessionHeader.origin`），身份判定不再读日志；mode 与 label 仍然要扫。
 
 ## 决策
 
@@ -27,8 +27,8 @@ mode 与 label 由新的 `subagent` projection unit（纯身份两臂）折叠�
 
 与既有记录的关系：
 
-- 本记录取代 [durable-subagent-catalog](../feature/2026-07-22-durable-subagent-catalog-and-list-agents.md) 中列表读路径的两项设计：经 `sessionQuery.traceSession` 枚举，与逐 child 读取描述符事件（`listEvents` 加精确 `readEvent` 双读、就地诊断分类）。diagnostic 行语义保留，分类改由列表按投影值缺席与 activity 派生；描述符事件仍是 mode/label 的唯一持久权威与折叠输入，恢复鉴权与激活约定不动。属部分取代，两记录保持交叉链接。
-- [session-projection RFC](../../proposed/architecture/2026-07-27-session-projection-and-command-log.md) 的 registry 约定（`ProjectionDefinition`、`snapshot`、`restore`）零改动，本记录只为其新增 `subagent` 身份 unit 一个注册项，并成为 snapshot（live）与 restore（cold）两处既有读法的又一消费实例——GUI history 的冷读已是同款。折叠规则只在 registry 注册一份；任何消费面都经 registry 计算，不存在第二份折叠逻辑。
+- 本记录取代 [durable-subagent-catalog](../feature/2026-07-22-durable-subagent-catalog-and-list-agents.zh.md) 中列表读路径的两项设计：经 `sessionQuery.traceSession` 枚举，与逐 child 读取描述符事件（`listEvents` 加精确 `readEvent` 双读、就地诊断分类）。diagnostic 行语义保留，分类改由列表按投影值缺席与 activity 派生；描述符事件仍是 mode/label 的唯一持久权威与折叠输入，恢复鉴权与激活约定不动。属部分取代，两记录保持交叉链接。
+- [session-projection RFC](../../proposed/architecture/2026-07-27-session-projection-and-command-log.zh.md) 的 registry 约定（`ProjectionDefinition`、`snapshot`、`restore`）零改动，本记录只为其新增 `subagent` 身份 unit 一个注册项，并成为 snapshot（live）与 restore（cold）两处既有读法的又一消费实例——GUI history 的冷读已是同款。折叠规则只在 registry 注册一份；任何消费面都经 registry 计算，不存在第二份折叠逻辑。
 
 ### `subagent` projection unit
 
@@ -77,7 +77,7 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
 - per-child 隔离：单 child 的 cold 整读失败只使该行成为 `unavailable` diagnostic，下次列表自然重试，不影响 sibling（见四态映射）。
 - 冷路径的生命周期见证：preparation 的结果必须仍指向枚举时的那个生命周期——见证字段集与旧 SOURCE_CONFLICT 检查同款七字段（version、id、createdAt、cwd、parentSession、seedLength、delegationDepth）；同 id 删除后重新发布的会话对旧 parent 的目录降级为 `corrupt` 行，不外漏新 owner 的 child。
 - 冷读并发以常数 4 有界——它约束的是本地介质的一次只读扫描而非部署行为；出现联网 persistence backend 时提升为验证过的 `Config` 字段。
-- 冷读成本如实记录：cache 未挂载或未命中时，cold child 每次列表才付一次整读，成本与其 transcript 大小成正比；定案「算完即止」，不自建缓存。整读经 `inspect()` 走 [Session 准备阶段](2026-08-05-session-preparation.md)的冷读，同 id 短期重复读取可命中其 LRU 复用，但列表不依赖此。live child 全程零日志读。
+- 冷读成本如实记录：cache 未挂载或未命中时，cold child 每次列表才付一次整读，成本与其 transcript 大小成正比；定案「算完即止」，不自建缓存。整读经 `inspect()` 走 [Session 准备阶段](2026-08-05-session-preparation.zh.md)的冷读，同 id 短期重复读取可命中其 LRU 复用，但列表不依赖此。live child 全程零日志读。
 - 取消：每次 persistence 读前后检查调用方 signal，abort 之后才结算的读拒绝归一化为稳定错误码 `CANCELLED`。
 
 ### 权威模型
@@ -130,7 +130,7 @@ export type SubagentListEntry =
 - 未知 parent，旧实现经 session-query 抛 not-found（「parent session … was not found」）；现自管合并对不存在的 parent 得到空子集，枚举返回空列表，wire 上后续操作落到 child 级 subagent-not-found——语义与文案的静默变化，显式接受。
 - rung 2 的更晚事件窗口：cache 行恰在首个自有描述符之后落盘，日志随后追加第二个自有描述符（或 malformed 载荷置 null 哨兵），且进程在下一次 checkpoint 前崩溃——此后冷列表的 rung 2 凭 seq≥seedLength 门持续供出行内旧身份（第一个自有描述符的值），与权威重折（last-wins 第二个）分歧，且 rung 2 命中期间不触发重折、无从察觉。边界三条：①前提是同一 child 出现第二个自有描述符，违反建档提供方「恰追加一次」约定，属损坏类数据，与多描述符偏差同族同源；②需「损坏 + 崩溃错过 checkpoint（turn/end 与 disposal 两个 mandatory 点及 count/interval 节流点全部未及）」双条件同时成立；③健康 child（恰一自有描述符）不受影响——seq 门放行的正是唯一真身份。自愈条件：该 child 任一次 live 运行（turn/end mandatory checkpoint）或任何触发 cache.write 的时点，都会以新 fold 整行覆写（whole-record replace），rung 2 随即供正；权威路径（rung 3 重折、live snapshot、resume 折叠）自始正确，分歧只存在于持续冷、行未再更新期间的列表读。机制修法不采：gate 对账需知日志末端 seq，冷路径零读不可得；cache 行携 revision 是 opaque token，无法比较且跨域改 schema——按「cache 永不为权威」总纲归档为接受项。
 
-消费面：wire、tool、GUI 的 diagnostic 处理**全部保持原状零改动**（`list_agents` 的 description 与 output schema 未动；该插件仅加载要求收窄——inject 去掉 `sessionQuery`）。行为上动的只有 apiproxy：路由段的 `hasSubagentDescriptor()` 扫描已删除，`hasSubagentOwner` 只看 `header.origin`——pre-#1569 的无 `origin` 存量不再被认作 subagent 属主，其本就不进目录，pre-release 立场接受；`subagents.history` 与 `session.history` 同源对齐——live child 用内存事件与注册表水位快照，cold child 用 `inspectServable` 直读持久化并 detached 折叠，不经查询服务，SESSION_QUERY_* 错误臂随之退役，逻辑历史值不变（`history` 的 JSDoc 措辞改为 live 内存快照／cold 持久日志双臂）。共享 Fetch 载体对 `session.history` 与 `subagent.history` 的物理响应做打包与字节目标截断（[无损历史线分页](2026-08-14-lossless-history-wire-pagination.md)）。
+消费面：wire、tool、GUI 的 diagnostic 处理**全部保持原状零改动**（`list_agents` 的 description 与 output schema 未动；该插件仅加载要求收窄——inject 去掉 `sessionQuery`）。行为上动的只有 apiproxy：路由段的 `hasSubagentDescriptor()` 扫描已删除，`hasSubagentOwner` 只看 `header.origin`——pre-#1569 的无 `origin` 存量不再被认作 subagent 属主，其本就不进目录，pre-release 立场接受；`subagents.history` 与 `session.history` 同源对齐——live child 用内存事件与注册表水位快照，cold child 用 `inspectServable` 直读持久化并 detached 折叠，不经查询服务，SESSION_QUERY_* 错误臂随之退役，逻辑历史值不变（`history` 的 JSDoc 措辞改为 live 内存快照／cold 持久日志双臂）。共享 Fetch 载体对 `session.history` 与 `subagent.history` 的物理响应做打包与字节目标截断（[无损历史线分页](2026-08-14-lossless-history-wire-pagination.zh.md)）。
 
 ### 改动落点
 
@@ -178,7 +178,7 @@ export type SubagentListEntry =
 
 ## 相关
 
-- [durable-subagent-catalog 与 list_agents](../feature/2026-07-22-durable-subagent-catalog-and-list-agents.md)——被本记录部分取代：描述符仍是 mode/label 的持久权威与折叠输入，列表的枚举与取值改为自管合并加投影阶梯。
-- [session projections 与命令生命周期日志](../../proposed/architecture/2026-07-27-session-projection-and-command-log.md)——registry 约定的权威；本记录为其新增 `subagent` 身份 unit，并成为 snapshot/restore 两处既有读法的消费实例。
-- [web subagent conversations](../feature/2026-07-27-web-subagent-conversations.md)——`SessionHeader.origin` 的出处（#1569），身份判定去日志化的前半步；其 history 冷读（inspect 前缀加 registry 折叠）是本记录取值阶梯的同款先例。
-- [发布前可复用的 Session 准备阶段](2026-08-05-session-preparation.md)——`inspect()` 冷读与 LRU 复用；cold child 整读的成本模型建立其上。
+- [durable-subagent-catalog 与 list_agents](../feature/2026-07-22-durable-subagent-catalog-and-list-agents.zh.md)——被本记录部分取代：描述符仍是 mode/label 的持久权威与折叠输入，列表的枚举与取值改为自管合并加投影阶梯。
+- [session projections 与命令生命周期日志](../../proposed/architecture/2026-07-27-session-projection-and-command-log.zh.md)——registry 约定的权威；本记录为其新增 `subagent` 身份 unit，并成为 snapshot/restore 两处既有读法的消费实例。
+- [web subagent conversations](../feature/2026-07-27-web-subagent-conversations.zh.md)——`SessionHeader.origin` 的出处（#1569），身份判定去日志化的前半步；其 history 冷读（inspect 前缀加 registry 折叠）是本记录取值阶梯的同款先例。
+- [发布前可复用的 Session 准备阶段](2026-08-05-session-preparation.zh.md)——`inspect()` 冷读与 LRU 复用；cold child 整读的成本模型建立其上。

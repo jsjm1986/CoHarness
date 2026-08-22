@@ -10,11 +10,11 @@ Status: implemented
 
 ## 决策
 
-**由同一个既有 client Cordis 插件持有已发布的引导步骤。** `ui-settings-models` 在 `settings.onboarding` 中以顺序 `0` 注册 `deepseek-official`。外壳仍然只挂载第一个未完成条目，因此弹窗不会堆叠。不新增 client 包或插件配置行。此前的 `welcome-notice` 占用者已不存在；[移除内测声明](../simplification/2026-08-18-remove-internal-testing-notice.md)持有这次删除。
+**由同一个既有 client Cordis 插件持有已发布的引导步骤。** `ui-settings-models` 在 `settings.onboarding` 中以顺序 `0` 注册 `deepseek-official`。外壳仍然只挂载第一个未完成条目，因此弹窗不会堆叠。不新增 client 包或插件配置行。此前的 `welcome-notice` 占用者已不存在；[移除内测声明](../simplification/2026-08-18-remove-internal-testing-notice.zh.md)持有这次删除。
 
 **剩余凭据步骤以及未来的注册方共用同一个弹窗组件。** `OnboardingModal` 包装既有 ui-primitives `Modal`，提供统一的标题和内容布局，并只在可见期间持有 `#root` 的 inert 状态。Escape 和遮罩点击不会静默完成强制引导；每个步骤只暴露自己的明确操作。步骤仍在加载私有事实时返回 `null`，因此不会绘制或阻塞界面。
 
-**Host 仍注册 `ui-onboarding` namespace。** 既有文档仍可能携带 `welcomeNoticeVersion`。没有任何 GUI 步骤读写该字段；[移除内测声明](../simplification/2026-08-18-remove-internal-testing-notice.md)持有这条规则。Host 特权方法栅栏仍要求回环 `Host` 头。不改变 Host schema、API Proxy 允许列表或持久化实现。
+**Host 仍注册 `ui-onboarding` namespace。** 既有文档仍可能携带 `welcomeNoticeVersion`。没有任何 GUI 步骤读写该字段；[移除内测声明](../simplification/2026-08-18-remove-internal-testing-notice.zh.md)持有这条规则。Host 特权方法栅栏仍要求回环 `Host` 头。不改变 Host schema、API Proxy 允许列表或持久化实现。
 
 **凭据弹窗复用既有编辑器与写入边界。** Models 联接仍负责判断是否已有任意可用提供方。当 DeepSeek 官方引用可写但缺失时，`ProviderEditor` 以仅凭据模式渲染在共用弹窗中。它校验密钥并调用既有 `credentials.set`，不会修改提供方设置。「保存并继续」会等待写入与就绪状态刷新；「稍后配置」只完成协调器当前这一轮。
 
@@ -30,4 +30,4 @@ Status: implemented
 
 ## 后果
 
-新的回环 profile 仅在没有任何可用提供方时才会出现行内 DeepSeek 密钥弹窗。secret 仍以只写方式存入 `.credentials.yaml`，已就绪或无法修复的部署在加载判定期间不会渲染任何引导框架。Models 包同时持有产品引导展示与提供方配置。本决策曾恢复的简洁测试阶段声明现已不存在；[移除内测声明](../simplification/2026-08-18-remove-internal-testing-notice.md)持有这次删除，并且不会恢复历史上[全屏内测声明移除](../simplification/2026-08-13-remove-first-run-beta-notice.md)中的遥测文案或接管式布局。
+新的回环 profile 仅在没有任何可用提供方时才会出现行内 DeepSeek 密钥弹窗。secret 仍以只写方式存入 `.credentials.yaml`，已就绪或无法修复的部署在加载判定期间不会渲染任何引导框架。Models 包同时持有产品引导展示与提供方配置。本决策曾恢复的简洁测试阶段声明现已不存在；[移除内测声明](../simplification/2026-08-18-remove-internal-testing-notice.zh.md)持有这次删除，并且不会恢复历史上[全屏内测声明移除](../simplification/2026-08-13-remove-first-run-beta-notice.zh.md)中的遥测文案或接管式布局。

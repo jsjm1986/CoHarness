@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-08-13-remove-first-run-beta-notice.md
 2026-08-13-remove-first-run-beta-notice.md: cf3ab95b367ef06feee46bf09743e64713548f84
-2026-08-13-remove-first-run-beta-notice.zh.md: 0b89a24e5c60d7e4efa4ba9bd987932bfd123e1e
+2026-08-13-remove-first-run-beta-notice.zh.md: 9d74dd086583fad408cb630397d6d53d16e115fd

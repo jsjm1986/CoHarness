@@ -6,7 +6,7 @@ Status: implemented
 
 ## 问题
 
-[PostgreSQL JSONB 基线](2026-08-14-postgresql-jsonb-gateway-baseline.md) 已经提供 schema、导入器、备份和会话 Repository，但在线 Gateway 服务最初同步调用 `better-sqlite3`。如果只提供 PostgreSQL URL 而不替换认证、用户、项目、实例状态、审计、模型治理和用量，SQLite 仍会是真源，或进程会在启动时停止。
+[PostgreSQL JSONB 基线](2026-08-14-postgresql-jsonb-gateway-baseline.zh.md) 已经提供 schema、导入器、备份和会话 Repository，但在线 Gateway 服务最初同步调用 `better-sqlite3`。如果只提供 PostgreSQL URL 而不替换认证、用户、项目、实例状态、审计、模型治理和用量，SQLite 仍会是真源，或进程会在启动时停止。
 
 ## 决策
 

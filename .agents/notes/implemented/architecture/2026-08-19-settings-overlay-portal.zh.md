@@ -12,7 +12,7 @@ compact 视口下设置浮层是侧栏抽屉的 `position: fixed` 后代。抽�
 
 `SettingsPanel` portal 到 `document.body`，并在其生命周期内把 `#root` 设为 inert，关闭时恢复先前的 inert 标志（OnboardingSurface / Modal 先例）。compact（max-width 767px；浮层看不到 `data-viewport`，因此用媒体查询）是全视口页，高度用 `--dsw-viewport-height` / `100dvh` 与 `--dsw-safe-*`。CSS grid 加上 `.nav` / `.content` 的 `display: contents` 让标题与关闭同一行、分区标签第二行、仅 `.options` 滚动。标签单元格与粗指针关闭控件使用 `--dsw-touch-target`。桌面仍是 800px 双栏卡片。各分区包自有 compact 叠行（模型名称/id、通用行、插件标签、库存搜索、预设卡片），不导入外壳。
 
-相关：[响应式外壳视口模式](2026-08-14-responsive-shell-viewport-modes.md)。
+相关：[响应式外壳视口模式](2026-08-14-responsive-shell-viewport-modes.zh.md)。
 
 ## Alternatives considered
 

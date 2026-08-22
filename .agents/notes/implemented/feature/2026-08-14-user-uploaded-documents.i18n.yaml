@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-14-user-uploaded-documents.md
 2026-08-14-user-uploaded-documents.md: 7033640822dc07b10a56bc018a9df50c8e9b3772
-2026-08-14-user-uploaded-documents.zh.md: f15a8e0c380bc266d084c20f9d00c879a047a963
+2026-08-14-user-uploaded-documents.zh.md: c33fb22ec1ba4757289498082537e5b2ee0c57bc

@@ -31,9 +31,9 @@ function resultFor(subject: Gate, status: GateResult['status'] = 'passed'): Gate
   }
 }
 
-function withPnpmEntrypoint<T>(action: () => T): T {
+function withPnpmEntrypoint<T>(action: () => T, entrypoint = '/private/pnpm.cjs'): T {
   const previous = process.env.npm_execpath
-  process.env.npm_execpath = '/private/pnpm.cjs'
+  process.env.npm_execpath = entrypoint
   try {
     return action()
   } finally {
@@ -55,6 +55,16 @@ function withEnv<T>(name: string, value: string | undefined, action: () => T): T
 }
 
 describe('gate graph validation', () => {
+  it('launches a native pnpm entrypoint directly', () => {
+    const entrypoint = String.raw`C:\Program Files\pnpm\pnpm.exe`
+    const subject = withPnpmEntrypoint(() => gatesForMode('ci-windows-blocking')[0], entrypoint)
+
+    expect(subject).toMatchObject({
+      command: entrypoint,
+      args: ['run', 'build'],
+    })
+  })
+
   it.each([
     'ci-primary',
     'ci-linux-primary',

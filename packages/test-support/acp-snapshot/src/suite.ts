@@ -30,6 +30,7 @@ import {
   normalizeSessionLog,
   normalizeStdout,
   scrubRequestHeaders,
+  scrubSessionSnapshot,
   scrubSystemPrompts,
   scrubToolSchemas,
   tokenizeSessionFixtureCwd,
@@ -691,8 +692,8 @@ export function stabilizeFixtureMessageIds(logs: readonly string[], fixtures: re
 /** One packed row's member times, or `undefined` for an ordinary record. */
 function packedTimes(record: Record<string, unknown>): number[] | undefined {
   if (!PACKED_CHUNK_ROW_TYPES.has(record.type as string)) return undefined
-  const row = record as unknown as { time0: number; data: { dt: number[] } }
-  const times = [row.time0]
+  const row = record as unknown as { time0?: number; data: { dt: number[] } }
+  const times = [row.time0 ?? 0]
   for (const gap of row.data.dt) times.push((times[times.length - 1] as number) + gap)
   return times
 }
@@ -1221,8 +1222,8 @@ export function defineAcpSnapshotSuite(options: SnapshotSuiteOptions): void {
         // Record writes live model fixtures; keyless refresh writes every comparable replayed
         // fixture. Pinning JSONL keeps prefixes but moves prompts and schemas into sidecars.
         const scrub = scenario.pinsHeader === true
-          ? (log: string): string => scrubToolSchemas(scrubSystemPrompts(log))
-          : scrubRequestHeaders
+          ? (log: string): string => scrubSessionSnapshot(scrubToolSchemas(scrubSystemPrompts(log)))
+          : scrubSessionSnapshot
         const portableFixture = scenario.workspaceParent === undefined
           ? tokenizeSessionFixtureCwd
           : (log: string): string => log

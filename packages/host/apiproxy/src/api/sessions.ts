@@ -313,6 +313,7 @@ export interface SessionsApi {
     sessionId?: SessionId
     agentPreset?: string
     visibility?: 'project' | 'private'
+    reuseWorkspaceBlank?: true
   }>):
   Promise<RpcResponse<{ sessionId: SessionId; agentPreset?: string }>>
 

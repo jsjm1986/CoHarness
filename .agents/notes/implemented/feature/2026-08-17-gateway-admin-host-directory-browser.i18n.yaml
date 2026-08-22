@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-17-gateway-admin-host-directory-browser.md
 2026-08-17-gateway-admin-host-directory-browser.md: 7d9842f74670b1b50dcc834a4ef3882ef169214b
-2026-08-17-gateway-admin-host-directory-browser.zh.md: 6dbd7f6246ed1660105c4e6f72d72d11c7455ec8
+2026-08-17-gateway-admin-host-directory-browser.zh.md: 129113796b627ba5574ac91b3299607756d81a8b

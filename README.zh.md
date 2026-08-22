@@ -18,6 +18,8 @@ CoHarness 是基于 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-h
 
 CoHarness 目前处于发布前的持续开发阶段，配置、API 和持久化格式可能发生不兼容变更。
 
+<a id="run"></a>
+
 ## 运行
 
 ### 通过 `npm` 运行
@@ -28,7 +30,9 @@ CoHarness 目前处于发布前的持续开发阶段，配置、API 和持久化
 npx @deepseek-ai/dsh web
 ```
 
-该命令默认会在 `http://127.0.0.1:3080` 启动 Web UI，本机启动时还会用默认浏览器打开页面。通过 SSH 启动时只打印宿主机 URL，因为本地转发地址由 SSH 客户端或编辑器持有。传入 `--no-open` 可仅运行服务器而不打开浏览器。详见 [Web UI 指南](docs/user/guide/index.md)。
+该命令默认会在 `http://127.0.0.1:3080` 启动 Web UI，本机启动时还会用默认浏览器打开页面。通过 SSH 启动时只打印宿主机 URL，因为本地转发地址由 SSH 客户端或编辑器持有。传入 `--no-open` 可仅运行服务器而不打开浏览器。详见 [Web UI 指南](docs/user/guide/index.zh.md)。
+
+<a id="run-from-source"></a>
 
 ### 从源码运行
 
@@ -68,11 +72,11 @@ pnpm dsh web
 
 ## 参与贡献
 
-参见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+参见 [CONTRIBUTING.md](CONTRIBUTING.zh.md)。
 
 ## 开发
 
-修改运行时软件包前请阅读[架构文档](docs/architecture.md)。开发环境和仓库命令参见[开发指南](docs/development.md)，智能体贡献者必须遵循 [AGENTS.md](AGENTS.md)。
+修改运行时软件包前请阅读[架构文档](docs/architecture.zh.md)。开发环境和仓库命令参见[开发指南](docs/development.zh.md)，智能体贡献者必须遵循 [AGENTS.md](AGENTS.md)。
 
 ## 上游与许可证
 

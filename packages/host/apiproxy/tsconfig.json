@@ -96,6 +96,9 @@
       "path": "../../interaction/commands"
     },
     {
+      "path": "../../interaction/permission-presets"
+    },
+    {
       "path": "../../interaction/user-approval"
     },
     {

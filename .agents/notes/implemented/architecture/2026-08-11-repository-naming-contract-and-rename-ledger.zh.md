@@ -18,7 +18,7 @@ Status: implemented
 
 仓库使用本清单中的全部当前名称。本决策只更改名称；包职责、服务边界、行为、默认值和数据模型保持不变。如果某个名称暴露出不合理的边界，需要另写一份 proposed Agent Note，专门提议边界变更。
 
-每个已重命名系列只有一套词汇。清单点名某一接口时，其目录、NPM 包名、导入、Cordis 插件名称、`ctx` 键、公开类型、直接耦合的事件或工具标识符、配置、测试、fixture（测试前置数据）、示例、生成的参考资料以及当前文档都使用当前名称。仓库自有的重命名目标不保留别名、兼容包、重复的服务键、双重事件名称或回退解析器。[rc.7 兼容基线](2026-08-18-official-plugin-compatibility-baseline.md)保留的外部官方 Cordis 事件名称不属于本清单的别名。
+每个已重命名系列只有一套词汇。清单点名某一接口时，其目录、NPM 包名、导入、Cordis 插件名称、`ctx` 键、公开类型、直接耦合的事件或工具标识符、配置、测试、fixture（测试前置数据）、示例、生成的参考资料以及当前文档都使用当前名称。仓库自有的重命名目标不保留别名、兼容包、重复的服务键、双重事件名称或回退解析器。[rc.7 兼容基线](2026-08-18-official-plugin-compatibility-baseline.zh.md)保留的外部官方 Cordis 事件名称不属于本清单的别名。
 
 同一系列不会公开两套词汇。
 
@@ -26,7 +26,7 @@ Status: implemented
 
 `SDK` 表示受支持的 Python 和 TypeScript SDK 所使用、基于 JSON-RPC 的客户端／服务器协议。仓库保留 `@deepseek-ai/dsh-sdk-client`、`@deepseek-ai/dsh-sdk-protocol` 和协议身份 `deepseek-harness-sdk-runtime`；JSON-RPC 服务器属于同一系列。DeepSeek Harness 本身不是 SDK，已移除的项目生成器、启动器、辅助工具和启动器遥测包继续保持不存在。
 
-本决策部分取代三项现行决策。它替换[包重新分组决策](2026-07-29-package-regrouping.md)中保留的 `bash/`、`pty/` 和 `self-modification/` 组名，以及两项暂定包名。它只替换[移除 SDK 项目工具链](../simplification/2026-08-11-remove-sdk-project-toolchain.md)中将整个仓库称为 SDK 的说法；后者仍负责说明删除范围和保留的运行时 SDK。它只替换[工具调用超时策略](2026-07-07-tool-call-timeout-policy.md)中的包名理由；超时机制及其 `guard/timeout-policy/` 归属保持不变。
+本决策部分取代三项现行决策。它替换[包重新分组决策](2026-07-29-package-regrouping.zh.md)中保留的 `bash/`、`pty/` 和 `self-modification/` 组名，以及两项暂定包名。它只替换[移除 SDK 项目工具链](../simplification/2026-08-11-remove-sdk-project-toolchain.zh.md)中将整个仓库称为 SDK 的说法；后者仍负责说明删除范围和保留的运行时 SDK。它只替换[工具调用超时策略](2026-07-07-tool-call-timeout-policy.zh.md)中的包名理由；超时机制及其 `guard/timeout-policy/` 归属保持不变。
 
 如果其他已实现说明中的包、路径或类型被重命名，而其边界和理由保持不变，则本决策不会取代这些说明。这些说明使用已实现的事实名称。三项被部分取代的决策都链接回本决策。
 

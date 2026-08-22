@@ -28,6 +28,9 @@ import type {} from '@deepseek-ai/dsh-model-provider-config'
 import { isAppendSurfaceEvent, isJsonValue, SessionId as brandSessionId } from '@deepseek-ai/dsh-session'
 import type { JsonValue, Session, SessionEvent, SessionEventMap, SessionHeader, SessionId, UserMessage } from '@deepseek-ai/dsh-session'
 import type { SessionPersistence } from '@deepseek-ai/dsh-session-persistence'
+// Type-only: resolves the optional permission-default owner notified after
+// the browser confirms and the Host verifies a Workspace blank reuse target.
+import type {} from '@deepseek-ai/dsh-permission-presets'
 import { SessionQueryError, type SessionSearchCursor } from '@deepseek-ai/dsh-session-query'
 import { SubagentError } from '@deepseek-ai/dsh-subagent'
 import type { SubagentListEntry as CatalogSubagentListEntry } from '@deepseek-ai/dsh-subagent'
@@ -2624,6 +2627,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         }
         const requestedPreset = request.payload.agentPreset
         const visibility = request.payload.visibility ?? 'project'
+        const refreshDefaultAfterReuse = request.payload.reuseWorkspaceBlank === true
+          && workspace !== undefined
+          && workspace.sessionIds.includes(sessionId)
+          && !ctx.workspaceRegistry.archivedSessionIds.includes(sessionId)
         try {
           await withSessionCreation(
             visibility,
@@ -2675,6 +2682,12 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               message: `session "${sessionId}" was created but could not attach to workspace "${workspace.id}": ${String(error)}`,
               details: { sessionId, workspaceId: workspace.id },
             })
+          }
+        }
+        if (refreshDefaultAfterReuse) {
+          const adopted = ctx.agents.get(sessionId)
+          if (adopted !== undefined && sessionBlank(adopted.session)) {
+            ctx.get('permissionPresets')?.refreshDefaultForReuse(adopted.session)
           }
         }
         // Echo the composition the session RUNS so a client can label it

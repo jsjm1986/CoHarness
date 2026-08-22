@@ -4,7 +4,7 @@ Status: implemented
 
 [English](2026-08-17-android-remote-web-fcm-notifications.md) | 中文
 
-JPush 与国内厂商通道的扩展记录在[Android JPush 多通道通知](2026-08-18-android-jpush-multi-provider-delivery.md)。
+JPush 与国内厂商通道的扩展记录在[Android JPush 多通道通知](2026-08-18-android-jpush-multi-provider-delivery.zh.md)。
 
 ## Problem
 

@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-18-official-plugin-compatibility-baseline.md
 2026-08-18-official-plugin-compatibility-baseline.md: e5640f72890771504249f9825239534431ab9868
-2026-08-18-official-plugin-compatibility-baseline.zh.md: 8bbf618ae4fc25c989f83755fdb2d51908f5864f
+2026-08-18-official-plugin-compatibility-baseline.zh.md: bc99f432df88b3313f48f20c0b0f2785d47e767a

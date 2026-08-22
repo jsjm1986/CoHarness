@@ -126,7 +126,7 @@ describe('ui-theme apply', () => {
     await vi.waitFor(() => { expect(b.mutate).toHaveBeenCalledTimes(2) })
   })
 
-  it('loads Host settings at boot, refreshes its namespace, and keeps remote browsers process-local', async () => {
+  it('loads Host settings at boot and refreshes its namespace through the shared mirror', async () => {
     const b = await bench()
     // The shared mirror read once at bench time; a Host-side change reaches it
     // through the document invalidation, exactly as production announces one.
@@ -148,14 +148,13 @@ describe('ui-theme apply', () => {
     b.ctx.emit('connection/reset')
     await vi.waitFor(() => { expect(theme.getTheme().preference).toBe('dark') })
 
-    const remote = await bench(false)
-    declareItems(remote.slots)
-    await remote.ctx.plugin({ inject: [...inject], apply }).await()
-    const remoteTheme = remote.ctx.get('theme') as ThemeRuntime
-    remoteTheme.setTheme('dark')
-    await Promise.resolve()
-    expect(remote.describe).not.toHaveBeenCalled()
-    expect(remote.mutate).not.toHaveBeenCalled()
+    const gateway = await bench(false)
+    declareItems(gateway.slots)
+    await gateway.ctx.plugin({ inject: [...inject], apply }).await()
+    const gatewayTheme = gateway.ctx.get('theme') as ThemeRuntime
+    await vi.waitFor(() => { expect(gateway.describe).toHaveBeenCalledOnce() })
+    gatewayTheme.setTheme('dark')
+    await vi.waitFor(() => { expect(gateway.mutate).toHaveBeenCalledOnce() })
   })
 
   it('activates before a slow settings refresh and converges when it settles', async () => {

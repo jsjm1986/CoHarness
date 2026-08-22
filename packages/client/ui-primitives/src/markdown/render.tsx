@@ -18,6 +18,7 @@
 
 import { Fragment, createElement } from 'react'
 import type { Key, ReactNode } from 'react'
+import clsx from 'clsx'
 import type * as Md from 'mdast'
 import type {} from 'mdast-util-math'
 import { normalizeUri } from 'micromark-util-sanitize-uri'
@@ -123,6 +124,8 @@ export interface MarkdownRenderContext {
   readonly streaming: boolean
   /** Localized fence copy-button labels. */
   readonly codeLabels: MarkdownCodeLabels | undefined
+  /** Inside a blockquote's children: tables there always fill the quote's width. */
+  readonly inBlockquote?: boolean
   /** Inline-code file mentions; absent wherever no opener vocabulary exists. */
   readonly fileMentions: MarkdownFileMentions | undefined
   /** Inside an anchor's children: interactive mentions must not nest there. */
@@ -213,7 +216,10 @@ function renderNode(node: Md.RootContent, key: Key, context: MarkdownRenderConte
     case 'blockquote':
       return (
         <blockquote key={key}>
-          {wrapBlockChildren(renderChildren(node.children, context).filter(child => child !== null), true)}
+          {wrapBlockChildren(
+            renderChildren(node.children, { ...context, inBlockquote: true }).filter(child => child !== null),
+            true,
+          )}
         </blockquote>
       )
     case 'thematicBreak':
@@ -393,8 +399,14 @@ function renderListItem(
 function renderTable(node: Md.Table, key: Key, context: MarkdownRenderContext): ReactNode {
   const align = node.align ?? null
   const [headRow, ...bodyRows] = node.children
+  const columns = align === null ? headRow?.children.length ?? 0 : align.length
+  const wide = columns >= 4 && context.inBlockquote !== true
   return (
-    <div key={key} className={css.tableScroll}>
+    <div
+      key={key}
+      className={clsx(css.tableScroll, wide ? 'md-table-wide' : css.tableFill)}
+      tabIndex={wide ? 0 : undefined}
+    >
       <table>
         {headRow !== undefined && <thead>{renderTableRow(headRow, 'th', align, 0, context)}</thead>}
         {bodyRows.length > 0 && (

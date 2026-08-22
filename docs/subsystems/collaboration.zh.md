@@ -2,7 +2,7 @@
 
 [English](collaboration.md) | 中文
 
-项目协作子系统把每次浏览器操作绑定到一位已认证参与者，依据根对话授权每项共享对话操作，并让项目会话使用同一套 Gateway 后端运行时与持久化域。[项目协作对话 Agent Note](../../.agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.md)负责安全与存储决策；本页记录 [`dsh-client-connection`](../../packages/client/connection)、[`dsh-gateway-runtime`](../../packages/context/gateway-runtime) 和 [`dsh-collaboration`](../../packages/context/collaboration) 的公共类型与 Cordis 服务。
+项目协作子系统把每次浏览器操作绑定到一位已认证参与者，依据根对话授权每项共享对话操作，并让项目会话使用同一套 Gateway 后端运行时与持久化域。[项目协作对话 Agent Note](../../.agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.zh.md)负责安全与存储决策；本页记录 [`dsh-client-connection`](../../packages/client/connection)、[`dsh-gateway-runtime`](../../packages/context/gateway-runtime) 和 [`dsh-collaboration`](../../packages/context/collaboration) 的公共类型与 Cordis 服务。
 
 ## 运行时身份
 
@@ -116,7 +116,7 @@ type CollaborationInteractionKind = 'approval' | 'question'
 type CollaborationVisibility = 'project' | 'private'
 ```
 
-参与者快照是经请求认证的数据。`dsh-collaboration-context` 把项目参与者元数据与每条获准的人类消息一起存储，并渲染其[包 README](../../packages/context/collaboration-context/README.md)描述的持久、模型可见归属信息。Web Chat transcript 用该 source 为每条人类气泡标注发送者，并把提示从消息流中省略（[发送者归属](../../.agents/notes/implemented/feature/2026-08-17-web-chat-sender-attribution.md)）。
+参与者快照是经请求认证的数据。`dsh-collaboration-context` 把项目参与者元数据与每条获准的人类消息一起存储，并渲染其[包 README](../../packages/context/collaboration-context/README.zh.md)描述的持久、模型可见归属信息。Web Chat transcript 用该 source 为每条人类气泡标注发送者，并把提示从消息流中省略（[发送者归属](../../.agents/notes/implemented/feature/2026-08-17-web-chat-sender-attribution.zh.md)）。
 
 ```ts type-equiv
 /** Authenticated human participant attached to one request. */
@@ -221,7 +221,7 @@ type CollaborationErrorCode =
   | 'gateway-unavailable'
 ```
 
-项目运行时通过 [`dsh-session-persistence-gateway`](../../packages/session/session-persistence-gateway) 持久化共享会话 header 与事件；个人运行时保留其配置的本地提供方。公共持久化生命周期与崩溃修复行为仍由 [persistence.md](persistence.md) 负责。
+项目运行时通过 [`dsh-session-persistence-gateway`](../../packages/session/session-persistence-gateway) 持久化共享会话 header 与事件；个人运行时保留其配置的本地提供方。公共持久化生命周期与崩溃修复行为仍由 [persistence.md](persistence.zh.md) 负责。
 
 删除项目时，Gateway 会在保持该运行时串行操作槽的同时停止共享运行时，再移除项目行。PostgreSQL 会级联删除运行时、成员、挂载、对话树与事件、参与者与交互记录、项目模型用量与额度数据、intake token、告警和内容文件元数据。文件系统中的项目目录会被保留。
 
@@ -231,7 +231,7 @@ type CollaborationErrorCode =
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.zh.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
 <a id="ctxcollaboration--collaboration-abstract-seam"></a>
 
@@ -306,7 +306,7 @@ sessionCreation(sessionId: SessionId): Promise<GatewaySessionCreationAuthorizati
 request(path: string, options: GatewayRuntimeRequestInit = {}): Promise<Response>
 ```
 
-Types: [SessionId](core.md)
+Types: [SessionId](core.zh.md)
 
 Source: [`packages/context/gateway-runtime/src/index.ts:234`](../../packages/context/gateway-runtime/src/index.ts)
 
