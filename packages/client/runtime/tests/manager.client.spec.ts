@@ -1005,11 +1005,42 @@ describe('pending-interaction list status', () => {
     // Generation death clears (resolved-while-disconnected questions send no frame)…
     manager.handleDisconnected()
     expect(manager.getListSnapshot().items[0]?.pendingInteraction).toBeUndefined()
-    // …and a replayed frame arriving before onConnected (stream open precedes
-    // the readiness handshake) survives the later handleConnected untouched.
+    // …and a replayed frame released after the readiness callback survives the
+    // later handleConnected resync untouched.
     manager.handleMuxEnvelope({ rpcId: 'ra' as never, payload: { type: 'approval/requested', sessionId: S1, approvalId: 'ap1' as never, toolName: 'rm' } })
     manager.handleConnected()
     expect(manager.getListSnapshot().items[0]?.pendingInteraction).toBe('approval')
+  })
+
+  it('keeps an opened question when replay is released after reconnect resync', async () => {
+    const api = new FakeApiClient()
+    api.onList = () => Promise.resolve(ok({ items: [summary(S1)] as never[] }))
+    api.onHistory = () => Promise.resolve(ok({
+      events: entries(plainTurn(0, 0, 'a', 'b')) as never[],
+      hasMore: false,
+      modelSelection: { provider: 'deepseek-official', model: 'deepseek-chat' },
+    }))
+    const manager = new SessionManager(api, fakeRemote())
+    await manager.refreshList()
+    const session = manager.get(S1)
+    await session.open()
+
+    const question = {
+      type: 'question/requested' as const,
+      sessionId: S1,
+      questions: [{ id: 'choice', question: 'Continue?' }],
+    }
+    manager.handleMuxEnvelope({ rpcId: 'q1' as never, payload: question })
+    expect(session.getSnapshot().pending).toHaveLength(1)
+
+    manager.handleDisconnected()
+    manager.handleConnected() // synchronously starts resync and clears the old wait
+    expect(session.getSnapshot().pending).toEqual([])
+
+    // This is the order guaranteed by ConnectionController's readiness gate.
+    manager.handleMuxEnvelope({ rpcId: 'q1' as never, payload: question })
+    await vi.waitFor(() => { expect(session.getSnapshot().pending).toHaveLength(1) })
+    expect(session.getSnapshot().pending[0]).toMatchObject({ kind: 'question', key: 'q:q1' })
   })
 
   it('generation death drops buffered answerable frames (a dead generation cannot be answered)', () => {

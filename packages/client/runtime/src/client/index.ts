@@ -246,9 +246,10 @@ export function apply(ctx: Context): void {
       ctx.emit('connection/reset')
     },
     onStateChange: (state) => {
-      // Generation death fires before any next-generation frame can arrive
-      // (reconnect replays flow from stream open, ahead of onConnected):
-      // the only safe moment to drop generation-scoped interaction state.
+      // Generation death fires before the next generation's business frames
+      // are released: ConnectionController buffers stream replay until after
+      // onConnected, so this is the safe moment to drop generation-scoped
+      // interaction state.
       if (state === 'reconnecting') {
         sessions.handleDisconnected()
       }
