@@ -2,7 +2,7 @@
   - heading "Document Manager" [level=2]
   - button "Close":
     - img
-  - paragraph: Max 100.0 MB per file, 20 per message
+  - paragraph: No per-file size limit, 20 per message
   - navigation "Document path":
     - button "All Documents" [disabled]
   - img

@@ -185,9 +185,10 @@ describe('createUserDocClient', () => {
     const file = new File(['x'], 'a.txt')
 
     installXhr((xhr) => {
+      xhr.status = 0
       xhr.send = vi.fn(function send(this: MockXhr) { this.onerror?.() })
     })
-    await expect(client.upload(file, rootDirectoryId)).rejects.toThrow('Document upload failed.')
+    await expect(client.upload(file, rootDirectoryId)).rejects.toThrow('connection was interrupted')
 
     installXhr((xhr) => {
       xhr.send = vi.fn(function send(this: MockXhr) { this.onabort?.() })

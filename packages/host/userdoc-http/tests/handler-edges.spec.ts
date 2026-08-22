@@ -33,6 +33,11 @@ const LIMITS = {
   maxInlineTextBytes: 8,
 }
 
+const UNLIMITED_LIMITS = {
+  ...LIMITS,
+  maxFileBytes: null,
+}
+
 const REF: UserDocRef = {
   docId: UserDocId('2026-08-15/report.txt'),
   path: '/uploads/2026-08-15/report.txt',
@@ -147,6 +152,23 @@ describe('user-document HTTP handler edges', () => {
 
     expect(state.status).toBe(400)
     expect(JSON.parse(state.body)).toMatchObject({ error: { code } })
+  })
+
+  it('does not reject a large declared body when the store has no per-document limit', async () => {
+    const req = request('POST', `${USERDOC_HTTP_PATH}?name=large.bin`, {
+      [USERDOC_UPLOAD_HEADER]: '1',
+      'content-length': '1000000000000',
+    })
+    const { res, state } = response()
+    let saved = false
+    const userDocs = Object.assign(store({ save: async () => { saved = true; return REF } }), {
+      limits: UNLIMITED_LIMITS,
+    }) as unknown as UserDocStore
+
+    await handleUserDocHttp(context(userDocs), req, res)
+
+    expect(saved).toBe(true)
+    expect(state.status).toBe(201)
   })
 
   it('rejects an upload with no name query parameter', async () => {

@@ -2334,10 +2334,10 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'abstract save( target: UserDocTarget, body: ReadableStream<Uint8Array>, signal?: AbortSignal, ): Promise<UserDocRef>',
-        description: 'Stream one document to a resolved target and publish its reference.\n\nImplementations enforce `maxFileBytes` while streaming, so an oversized upload is cut off rather than buffered, and leave no partial file behind on failure or cancellation. The recorded `mediaType` is derived from the stored name, never taken from a client header: a declared type is unverifiable here, and nothing in this seam acts on the value anyway.',
+        description: 'Stream one document to a resolved target and publish its reference.\n\nImplementations enforce a finite `maxFileBytes` while streaming, so an oversized upload is cut off rather than buffered; `null` accepts every document size supported by the transport and filesystem. Failed or cancelled writes leave no partial file behind. The recorded `mediaType` is derived from the stored name, never taken from a client header: a declared type is unverifiable here, and nothing in this seam acts on the value anyway.',
         parameters: [{ name: 'target', description: 'a target from this store\'s own `resolveTarget`.' }, { name: 'body', description: 'the upload byte stream.' }, { name: 'signal', description: 'optional cancellation for the streaming write.' }],
         returns: 'the durable reference to the stored document.',
-        throws: ['UserDocError when the stream exceeds `maxFileBytes` or the write fails.'],
+        throws: ['UserDocError when a finite `maxFileBytes` is exceeded or the write fails.'],
       },
       {
         signature: 'abstract list(signal?: AbortSignal): Promise<UserDocRef[]>',
@@ -5312,7 +5312,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'UserDocLimits',
-    declaration: 'export interface UserDocLimits {\n    maxFileBytes: number;\n    maxFilesPerMessage: number;\n    maxMessageBytes: number;\n    maxInlineTextBytes: number;\n}',
+    declaration: 'export interface UserDocLimits {\n    maxFileBytes: number | null;\n    maxFilesPerMessage: number;\n    maxMessageBytes: number;\n    maxInlineTextBytes: number;\n}',
   },
   {
     name: 'UserDocRef',

@@ -109,7 +109,7 @@ async function upload(ctx: Context, req: IncomingMessage, res: ServerResponse, u
       json(res, 400, { error: { code: 'INVALID_CONTENT_LENGTH', message: 'Content-Length must be a non-negative integer.' } } satisfies ErrorBody)
       return
     }
-    if (bytes > ctx.userDocs.limits.maxFileBytes) {
+    if (ctx.userDocs.limits.maxFileBytes !== null && bytes > ctx.userDocs.limits.maxFileBytes) {
       req.resume()
       json(res, 413, { error: { code: DOCUMENT_TOO_LARGE_CODE, message: 'Document exceeds the configured byte limit.' } } satisfies ErrorBody)
       return

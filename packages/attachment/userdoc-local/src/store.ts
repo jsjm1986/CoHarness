@@ -198,7 +198,7 @@ export async function saveDocFile(
         const { done, value } = await reader.read()
         if (done) break
         bytes += value.byteLength
-        if (bytes > limits.maxFileBytes) {
+        if (limits.maxFileBytes !== null && bytes > limits.maxFileBytes) {
           throw new UserDocError('Document exceeds the configured byte limit.', DOCUMENT_TOO_LARGE_CODE)
         }
         await handle.write(value)

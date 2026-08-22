@@ -67,8 +67,8 @@ export {
 export const DEFAULT_DOCUMENT_DIR_NAME = 'documents'
 /** Previous document directory name used for one-time migration. */
 export const LEGACY_UPLOAD_DIR_NAME = 'uploads'
-/** Default maximum bytes for one document. */
-export const DEFAULT_MAX_FILE_BYTES = 100 * 1024 * 1024
+/** Default per-document byte limit; `null` accepts every transport-supported size. */
+export const DEFAULT_MAX_FILE_BYTES: number | null = null
 /** Default maximum documents in one prompt. */
 export const DEFAULT_MAX_FILES_PER_MESSAGE = 20
 /** Default maximum aggregate document bytes in one prompt. */
@@ -88,7 +88,7 @@ export interface Config {
   uploadRoot?: string
   /** Optional legacy root to migrate into `uploadRoot`; omitted defaults to `<home>/uploads` only when `uploadRoot` is omitted. */
   legacyUploadRoot?: string
-  /** Maximum bytes accepted for one document. */
+  /** Maximum bytes accepted for one document; omitted leaves the document size unlimited. */
   maxFileBytes?: number
   /** Maximum document count accepted in one submitted message. */
   maxFilesPerMessage?: number
@@ -103,7 +103,7 @@ export class LocalUserDocStore extends UserDocStore {
   static Config: z<Config> = z.object({
     uploadRoot: z.string(),
     legacyUploadRoot: z.string(),
-    maxFileBytes: z.number().step(1).min(1).default(DEFAULT_MAX_FILE_BYTES),
+    maxFileBytes: z.number().step(1).min(1),
     maxFilesPerMessage: z.number().step(1).min(1).default(DEFAULT_MAX_FILES_PER_MESSAGE),
     maxMessageBytes: z.number().step(1).min(1).default(DEFAULT_MAX_MESSAGE_BYTES),
     maxInlineTextBytes: z.number().step(1).min(1).default(DEFAULT_MAX_INLINE_TEXT_BYTES),

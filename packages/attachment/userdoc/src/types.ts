@@ -59,8 +59,8 @@ export interface UserDocDirectoryListing {
 
 /** Deployment-resolved limits used by upload admission and request buffering. */
 export interface UserDocLimits {
-  /** Maximum bytes accepted for one document. */
-  maxFileBytes: number
+  /** Maximum bytes accepted for one document; `null` means no per-document limit. */
+  maxFileBytes: number | null
   /** Maximum documents accepted in one submitted message. */
   maxFilesPerMessage: number
   /** Maximum aggregate bytes accepted in one submitted message. */

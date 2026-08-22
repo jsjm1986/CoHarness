@@ -147,6 +147,12 @@ function abortError(signal: AbortSignal | undefined): Error {
     : new DOMException('The operation was aborted.', 'AbortError')
 }
 
+function uploadNetworkError(status: number): Error {
+  return status === 0
+    ? new Error('Document upload failed because the connection was interrupted before the server responded. Check the network or tunnel and retry.')
+    : new Error('Document upload failed.')
+}
+
 function xhrUpload(
   file: File,
   directoryId: UserDocDirectoryIdType,
@@ -173,7 +179,7 @@ function xhrUpload(
       if (event.lengthComputable) onProgress?.(event.loaded, event.total)
       else onProgress?.(event.loaded, file.size)
     }
-    xhr.onerror = () => { finish(() => { reject(new Error('Document upload failed.')) }) }
+    xhr.onerror = () => { finish(() => { reject(uploadNetworkError(xhr.status)) }) }
     xhr.onabort = () => { finish(() => { reject(abortError(signal)) }) }
     xhr.onload = () => {
       let body: unknown
