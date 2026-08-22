@@ -153,7 +153,7 @@ interface CollaborationAccess {
 }
 ```
 
-Host Consumers classify every project-scoped operation before dispatch. Session reads and writes use `authorize()`, listings and publications use `readableSessionIds()`, and project-scoped Typert Remotes accept only the session-addressed allowlist: `goals/*` requires `write`, `messageFeedback/list` requires `read`, and `messageFeedback/put` plus `messageFeedback/delete` require `write`. An unclassified or process-wide Remote is denied.
+Host Consumers classify every project-scoped operation before dispatch. Session reads and writes use `authorize()`, listings and publications use `readableSessionIds()`, and project-scoped Typert Remotes accept only the session-addressed allowlist: `commands/list`, `fileReferences/list`, and `sessionReferenceResolver/candidates` require `read`; `commands/execute`, `goals/*`, `messageFeedback/put`, and `messageFeedback/delete` require `write`; `messageFeedback/list` requires `read`. An unclassified or process-wide Remote is denied.
 
 New project roots carry one explicit visibility through the asynchronous creation operation. The PostgreSQL persistence provider materializes that choice with the authenticated creator; child registration copies the root ACL.
 

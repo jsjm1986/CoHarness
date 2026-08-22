@@ -161,6 +161,10 @@ interface TypertSessionAuthorization {
 
 /** Project-scope Remote methods whose resource and mutation class are explicit. */
 const PROJECT_TYPERT_SESSION_AUTHORIZATION: Readonly<Record<string, TypertSessionAuthorization>> = Object.freeze({
+  'commands/list': { action: 'read', sessionId: args => typertSessionId(args.agentId) },
+  'commands/execute': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
+  'fileReferences/list': { action: 'read', sessionId: args => typertSessionId(args.agentId) },
+  'sessionReferenceResolver/candidates': { action: 'read', sessionId: args => typertSessionId(args.agentId) },
   'goals/create': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
   'goals/edit': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
   'goals/pause': { action: 'write', sessionId: args => typertSessionId(args.agentId) },

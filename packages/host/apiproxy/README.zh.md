@@ -22,7 +22,7 @@ Settings 分节中的 `reasoningEffort` 在 agent-default-model 插件配置中�
 
 分层与协议决策记录在 [GUI 分层与 RPC 协议 RFC](../../../.agents/notes/implemented/architecture/2026-07-19-gui-layering-and-rpc-protocol.zh.md) 中；浏览器侧消费架构记录在 [Web 客户端架构 RFC](../../../.agents/notes/implemented/architecture/2026-07-19-gui-web-client-architecture.zh.md) 中。
 
-组合 `ctx.collaboration` 后，项目 scope 下的 Session 操作会在观察或修改对话前授权被寻址的根对话，而列表、搜索结果、stream 发布、workspace 引用和已附加 Session 数量会过滤不可读 Session id。只依赖 scope 的写操作要求已捕获的 `rw` 模式，且项目路径会保持在已配置项目根内。Typert Remote 分发使用明确的项目 allowlist：`goals/*` 需要 Session `write`，`messageFeedback/list` 需要 `read`，`messageFeedback/put` 与 `messageFeedback/delete` 需要 `write`，所有未分类或进程级 Remote 都会被拒绝。个人 principal 与未组合协作能力的组合保留普通 API 行为。
+组合 `ctx.collaboration` 后，项目 scope 下的 Session 操作会在观察或修改对话前授权被寻址的根对话，而列表、搜索结果、stream 发布、workspace 引用和已附加 Session 数量会过滤不可读 Session id。只依赖 scope 的写操作要求已捕获的 `rw` 模式，且项目路径会保持在已配置项目根内。Typert Remote 分发使用明确的项目 allowlist：`commands/list`、`fileReferences/list` 与 `sessionReferenceResolver/candidates` 需要 Session `read`；`commands/execute`、`goals/*`、`messageFeedback/put` 与 `messageFeedback/delete` 需要 `write`；`messageFeedback/list` 需要 `read`；所有未分类或进程级 Remote 都会被拒绝。个人 principal 与未组合协作能力的组合保留普通 API 行为。
 
 调用任一事件流开启方法时都会立即安装监听器，不会等到首次拉取返回的 async iterable。这样可保留连接获准到载体开始消费之间的每一项已提交增量；迭代只负责排空已经开启的订阅，中止或 iterator return 会移除其监听器。
 

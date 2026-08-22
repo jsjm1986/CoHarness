@@ -9,6 +9,7 @@
     { "path": "../../../vendor/cosmokit" },
     { "path": "../../../vendor/cordis" },
     { "path": "../../../vendor/schemastery" },
+    { "path": "../collaboration" },
     { "path": "../../util/output-retention" },
     { "path": "../../llm/llm" },
     { "path": "../../core/session" },

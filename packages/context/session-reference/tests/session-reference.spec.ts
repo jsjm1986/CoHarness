@@ -40,6 +40,17 @@ async function harness(config: Config = {}): Promise<Context> {
   return ctx
 }
 
+function installReadableSessionFilter(ctx: Context, readable: readonly SessionId[]): void {
+  const allowed = new Set(readable)
+  ctx.provide('collaboration', {
+    capture: () => ({
+      readableSessionIds: (sessionIds: readonly SessionId[]) => Promise.resolve(
+        new Set(sessionIds.filter(sessionId => allowed.has(sessionId))),
+      ),
+    }),
+  } as never)
+}
+
 function fakeAgent(session: Session): Agent {
   return { id: session.id, session } as Agent
 }
@@ -299,6 +310,36 @@ describe('session reference discovery and preparation', () => {
       createdAt: 20,
       mention: formatSessionReferenceMention({ sessionId: SessionId('source]'), label: 'source]' }),
     }])
+  })
+
+  it('filters candidates through the active collaboration readable-session ACL', async () => {
+    const ctx = await harness()
+    const target = ctx.sessions.create(SessionId('target'), { meta: { cwd: '/same', createdAt: 10 } })
+    const visible = ctx.sessions.create(SessionId('visible'), { meta: { cwd: '/same', createdAt: 20 } })
+    ctx.sessions.create(SessionId('private'), { meta: { cwd: '/same', createdAt: 30 } })
+    installReadableSessionFilter(ctx, [target.id, visible.id])
+
+    await expect(ctx.sessionReferenceResolver.listCandidates(fakeAgent(target))).resolves.toEqual([{
+      sessionId: visible.id,
+      label: visible.id,
+      cwd: '/same',
+      createdAt: 20,
+    }])
+  })
+
+  it('rejects direct references that the active collaboration ACL cannot read', async () => {
+    const ctx = await harness()
+    const target = ctx.sessions.create(SessionId('target'))
+    const privateSession = ctx.sessions.create(SessionId('private'))
+    installReadableSessionFilter(ctx, [target.id])
+    const readSurface = vi.spyOn(ctx.sessionQuery, 'readSurface')
+
+    await expect(ctx.sessionReferenceResolver.prepare(
+      fakeAgent(target),
+      [{ type: 'text', text: 'go' }],
+      [{ sessionId: privateSession.id }],
+    )).rejects.toMatchObject({ code: 'SESSION_REFERENCE_READ_FAILED' })
+    expect(readSurface).not.toHaveBeenCalled()
   })
 
   it('prepares direct mentions at pre-step and keeps ordinary and plugin messages unchanged', async () => {

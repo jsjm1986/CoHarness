@@ -8,6 +8,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
+import type {} from '@deepseek-ai/dsh-collaboration'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import { createUserMessage, freezeMessage } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, UserMessage } from '@deepseek-ai/dsh-llm'
@@ -167,9 +168,12 @@ export class SessionReferenceResolver extends TypertRemoteService {
     const needle = query.toLocaleLowerCase()
     const targetCwd = agent.session.header.cwd
     assertNotCancelled(signal)
-    const records = (await settleWithCancellation(this.ctx.sessionQuery.listSessions(signal), signal))
+    const listed = (await settleWithCancellation(this.ctx.sessionQuery.listSessions(signal), signal))
       .filter(record => record.header.id !== agent.id)
       .map((record, index) => ({ record, index }))
+    const readable = await this.readableSessionIds(listed.map(({ record }) => record.header.id), signal)
+    assertNotCancelled(signal)
+    const records = listed.filter(({ record }) => readable.has(record.header.id))
     const inspected = needle === ''
       ? records
         .sort((a, b) => candidateRank(a.record.header.cwd, targetCwd) - candidateRank(b.record.header.cwd, targetCwd)
@@ -247,6 +251,13 @@ export class SessionReferenceResolver extends TypertRemoteService {
     assertNotCancelled(signal)
     let prepared: PreparedSource[]
     try {
+      const readable = await this.readableSessionIds(inputs.map(input => input.sessionId), signal)
+      if (!inputs.every(input => readable.has(input.sessionId))) {
+        throw new SessionReferenceError(
+          'one or more referenced sessions are not readable',
+          'SESSION_REFERENCE_READ_FAILED',
+        )
+      }
       prepared = await settleWithCancellation(
         Promise.all(inputs.map(async input => ({
           input,
@@ -256,6 +267,7 @@ export class SessionReferenceResolver extends TypertRemoteService {
       )
     } catch (error: unknown) {
       if (signal?.aborted === true) throw cancelled(signal)
+      if (error instanceof SessionReferenceError && error.code === 'SESSION_REFERENCE_READ_FAILED') throw error
       throw new SessionReferenceError(
         `failed to read referenced session: ${error instanceof Error ? error.message : String(error)}`,
         'SESSION_REFERENCE_READ_FAILED',
@@ -298,6 +310,16 @@ export class SessionReferenceResolver extends TypertRemoteService {
       rendered.push(retained)
     }
     return rendered
+  }
+
+  private async readableSessionIds(
+    sessionIds: readonly SessionId[],
+    signal?: AbortSignal,
+  ): Promise<ReadonlySet<SessionId>> {
+    assertNotCancelled(signal)
+    const collaboration = this.ctx.get('collaboration')
+    if (collaboration === undefined || sessionIds.length === 0) return new Set(sessionIds)
+    return settleWithCancellation(collaboration.capture().readableSessionIds(sessionIds), signal)
   }
 }
 
