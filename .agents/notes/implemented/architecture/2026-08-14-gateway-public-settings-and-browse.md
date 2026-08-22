@@ -10,7 +10,7 @@ A browser on the tunneled public origin (`harness.maycran.com`) is the same sing
 
 ## Decision
 
-`SettingsScopeBinder.bind` always uses Host persistence. A thrown or non-ok `settings.describe` publishes `unavailable` so cards hide instead of hanging on `loading`. The Host `PRIVILEGED_METHODS` fence is unchanged: it still requires a loopback `Host` header. The gateway's existing rewrite is what makes those RPCs succeed for a logged-in public page. `settings.openDocument` and `host.openPath` remain loopback-page actions because they drive the host desktop.
+The browser's shared settings mirror and `SettingsScopeBinder.bind` always use Host persistence. A thrown or non-ok `settings.describe` publishes `unavailable` so cards hide instead of hanging on `loading`. The Host `PRIVILEGED_METHODS` fence is unchanged: it still requires a loopback `Host` header. The gateway's existing rewrite is what makes those RPCs succeed for a logged-in public page. `settings.openDocument` and `host.openPath` remain loopback-page actions because they drive the host desktop.
 
 The directory-guard home patch disables `directory-picker-auto` and inserts the browse host/client pair, the same disable+insert used by `apps/web/tests/pin-browse-picker.overlay.yml`. Every gateway-launched instance therefore serves the in-app Select Workspace Directory dialog. A direct `dsh web` without that patch still resolves `-auto` from bind host, SSH, and display.
 
