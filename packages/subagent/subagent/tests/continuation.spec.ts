@@ -2441,6 +2441,35 @@ describe('continuable errors', () => {
     await waitNoActivation(ctx, started.childId)
   })
 
+  it('snapshots the parent current route for a continuable child before a later parent switch', async () => {
+    const { ctx, parent } = await setup([textResponse('first'), textResponse('resumed')])
+    parent.session.append('request/header', {
+      header: { config: { provider: 'mock', model: 'current-model' } },
+      reason: 'initial',
+    })
+
+    const started = await ctx.subagents.startContinuable(startSpec(parent))
+    await waitNoActivation(ctx, started.childId)
+    const loaded = await ctx.sessionPersistence.load(started.childId)
+    expect(loaded.events.find(event => event.type === 'subagent/descriptor')?.data)
+      .toMatchObject({ agentProvider: 'mock', agentModel: 'current-model' })
+
+    // A parent route change after delegation belongs to the parent's future;
+    // cold resume must keep the route captured in the child descriptor.
+    parent.session.append('request/header', {
+      header: { config: { provider: 'mock', model: 'later-model' } },
+      reason: 'change',
+    })
+    await followup(ctx, parent, started.childId, message('resume it'))
+    const resumed = await vi.waitFor(() => {
+      const found = ctx.agents.get(started.childId)
+      expect(found).toBeDefined()
+      return found!
+    })
+    expect(resumed.options).toMatchObject({ provider: 'mock', model: 'current-model' })
+    await waitNoActivation(ctx, started.childId)
+  })
+
   it('unloading the manager drains its live activations', async () => {
     const hold = Promise.withResolvers<undefined>()
     const adapter = new GatedAdapter([{ chunks: textResponse('child'), gate: hold.promise }])
