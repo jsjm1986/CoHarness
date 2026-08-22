@@ -242,20 +242,28 @@ describe('WorkspaceRuntime', () => {
         { sessionId: sid('s-stray'), updatedAt: 4, running: false, blank: true, cwd: '/w/gamma' },
       ] as never[],
     }))
+    api.onCreate = payload => Promise.resolve(ok({
+      sessionId: (payload as { sessionId?: SessionId }).sessionId ?? sid('s-unexpected'),
+    }))
     await Promise.all([workspaces.refresh(), sessions.refresh()])
     await Promise.resolve()
 
-    // Hit: same workspace → the parked member blank comes back (the earlier
-    // cwd-matching non-member stray is skipped), no create RPC.
+    // Hit: same workspace → the parked member blank is explicitly adopted
+    // after the earlier cwd-matching non-member stray is skipped.
     await expect(workspaces.connectWorkspace(wid('alpha'))).resolves.toBe('s-blank')
-    expect(api.callsOf('session.create')).toEqual([])
+    expect(api.callsOf('session.create')).toEqual([{
+      workspaceId: 'alpha', sessionId: 's-blank', reuseWorkspaceBlank: true,
+    }])
     // Resolution guarantee: the id is binding-resolvable synchronously.
     expect(sessions.binding(sid('s-blank'))).toBeDefined()
 
     // Miss: beta has only a non-blank session → host create with workspaceId.
     api.onCreate = () => Promise.resolve(ok({ sessionId: sid('s-fresh') }))
     await expect(workspaces.connectWorkspace(wid('beta'))).resolves.toBe('s-fresh')
-    expect(api.callsOf('session.create')).toEqual([{ workspaceId: 'beta' }])
+    expect(api.callsOf('session.create')).toEqual([
+      { workspaceId: 'alpha', sessionId: 's-blank', reuseWorkspaceBlank: true },
+      { workspaceId: 'beta' },
+    ])
     // Same guarantee on the create arm (draft hand-off writes the machine pre-open).
     expect(sessions.binding(sid('s-fresh'))).toBeDefined()
 
@@ -263,7 +271,11 @@ describe('WorkspaceRuntime', () => {
     // never reused, a fresh accounted session is created instead.
     api.onCreate = () => Promise.resolve(ok({ sessionId: sid('s-fresh-3') }))
     await expect(workspaces.connectWorkspace(wid('gamma'))).resolves.toBe('s-fresh-3')
-    expect(api.callsOf('session.create')).toEqual([{ workspaceId: 'beta' }, { workspaceId: 'gamma' }])
+    expect(api.callsOf('session.create')).toEqual([
+      { workspaceId: 'alpha', sessionId: 's-blank', reuseWorkspaceBlank: true },
+      { workspaceId: 'beta' },
+      { workspaceId: 'gamma' },
+    ])
 
     // Unknown workspace fails loud instead of silently creating in nowhere.
     await expect(workspaces.connectWorkspace(wid('ghost'))).rejects.toThrow(/unknown workspace ghost/)
@@ -303,16 +315,32 @@ describe('WorkspaceRuntime', () => {
       checked.push(`${request.sessionId}:${String(request.options.visibility)}`)
       return reusable && request.sessionId === sid('s-private')
     })
+    api.onCreate = payload => Promise.resolve(ok({
+      sessionId: (payload as { sessionId?: SessionId }).sessionId ?? sid('s-unexpected'),
+    }))
     await Promise.all([workspaces.refresh(), sessions.refresh()])
     await Promise.resolve()
 
     await expect(workspaces.connectWorkspace(wid('alpha'))).resolves.toBe('s-private')
     expect(checked).toEqual(['s-project:private', 's-private:private'])
-    expect(api.callsOf('session.create')).toEqual([])
+    expect(api.callsOf('session.create')).toEqual([{
+      workspaceId: 'alpha',
+      sessionId: 's-private',
+      visibility: 'private',
+      reuseWorkspaceBlank: true,
+    }])
 
     api.onCreate = () => Promise.resolve(ok({ sessionId: sid('s-beta-private') }))
     await expect(workspaces.connectWorkspace(wid('beta'))).resolves.toBe('s-beta-private')
-    expect(api.callsOf('session.create')).toEqual([{ workspaceId: 'beta', visibility: 'private' }])
+    expect(api.callsOf('session.create')).toEqual([
+      {
+        workspaceId: 'alpha',
+        sessionId: 's-private',
+        visibility: 'private',
+        reuseWorkspaceBlank: true,
+      },
+      { workspaceId: 'beta', visibility: 'private' },
+    ])
   })
 
   it('runs create rejection before returning an otherwise reusable blank', async () => {
@@ -348,6 +376,9 @@ describe('WorkspaceRuntime', () => {
     api.onList = () => Promise.resolve(ok({
       items: [{ sessionId: sid('s-blank'), updatedAt: 2, running: false, blank: true, cwd: '/w/alpha' }] as never[],
     }))
+    api.onCreate = payload => Promise.resolve(ok({
+      sessionId: (payload as { sessionId?: SessionId }).sessionId ?? sid('s-unexpected'),
+    }))
     await Promise.all([workspaces.refresh(), sessions.refresh()])
     await Promise.resolve()
     const session = sessions.binding(sid('s-blank'))!.session
@@ -356,7 +387,9 @@ describe('WorkspaceRuntime', () => {
     await Promise.resolve()
     // Failure leaves blank intact, so the same session is still the reuse hit.
     await expect(workspaces.connectWorkspace(wid('alpha'))).resolves.toBe('s-blank')
-    expect(api.callsOf('session.create')).toEqual([])
+    expect(api.callsOf('session.create')).toEqual([{
+      workspaceId: 'alpha', sessionId: 's-blank', reuseWorkspaceBlank: true,
+    }])
   })
 
   it('returns created Workspaces and preserves Host business errors', async () => {

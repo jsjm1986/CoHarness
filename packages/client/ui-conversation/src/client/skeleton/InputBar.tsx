@@ -23,7 +23,7 @@ import type {} from '@deepseek-ai/dsh-goal/client'
 // api-remotes import already places it in every client program.
 import type { Translate } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ComposerBarProps, ComposerDocument } from '../contract/slots.ts'
-import type { DraftDocumentId } from '../input/contract.ts'
+import type { DraftDocumentId, EditRange } from '../input/contract.ts'
 import { deriveDecorations } from '../input/decorations.ts'
 import type { DraftDecorations } from '../input/decorations.ts'
 import { attachmentErrorText, imageSizeText } from '../image-labels.ts'
@@ -35,6 +35,42 @@ import css from './InputBar.module.css'
 
 /** Decoration product of the no-session state (no machine, empty draft). */
 const INERT_DECORATIONS: DraftDecorations = { token: null, chips: [], textRefs: [], hint: null }
+
+/** Selection and edit family captured before a controlled textarea mutates. */
+interface PendingEdit {
+  readonly start: number
+  readonly end: number
+  readonly draftLength: number
+  readonly inputType: string
+}
+
+/**
+ * Recover the occurrence-aware range for one native edit.
+ * @param pending - selection captured by beforeinput.
+ * @param prevLength - draft length before the edit.
+ * @param nextLength - draft length after the edit.
+ * @returns the edit range when the browser record is internally consistent.
+ */
+function editRangeOf(
+  pending: PendingEdit | null,
+  prevLength: number,
+  nextLength: number,
+): EditRange | undefined {
+  if (pending === null || pending.draftLength !== prevLength) return undefined
+  const { start, end, inputType } = pending
+  if (start > end || end > prevLength) return undefined
+  const insertedLength = nextLength - prevLength + (end - start)
+  if (insertedLength >= 0) return { start, end, insertedLength }
+  if (start !== end) return undefined
+  const removed = prevLength - nextLength
+  if (inputType.endsWith('Backward')) {
+    return removed <= start ? { start: start - removed, end: start, insertedLength: 0 } : undefined
+  }
+  if (inputType.endsWith('Forward')) {
+    return start + removed <= prevLength ? { start, end: start + removed, insertedLength: 0 } : undefined
+  }
+  return undefined
+}
 
 function documentStatusText(document: ComposerDocument, t: InputBarProps['t']): string {
   switch (document.status) {
@@ -369,6 +405,29 @@ export function InputBar({
   })
   /* oxlint-enable typescript/no-unnecessary-condition */
 
+  // change carries only the resulting string. Keep the pre-edit selection so
+  // repeated text around a reference cannot make the fallback diff attribute
+  // the edit to the wrong occurrence.
+  const pendingEditRef = useRef<PendingEdit | null>(null)
+  useEffect(() => {
+    const el = inputRef.current
+    if (el === null) return
+    const onBeforeInput = (event: InputEvent): void => {
+      if (!event.inputType.startsWith('insert') && !event.inputType.startsWith('delete')) {
+        pendingEditRef.current = null
+        return
+      }
+      const selection = selectionOf(el)
+      pendingEditRef.current = {
+        ...selection,
+        draftLength: el.value.length,
+        inputType: event.inputType,
+      }
+    }
+    el.addEventListener('beforeinput', onBeforeInput)
+    return () => { el.removeEventListener('beforeinput', onBeforeInput) }
+  }, [])
+
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>): void => {
     if (workspaceTrigger) {
       if (e.key === 'Enter' || e.key === ' ') {
@@ -463,8 +522,10 @@ export function InputBar({
     if (keyboard === undefined || locked) return // disabled/read-only states cannot edit the draft
     if (machineBusy) return // submitting is the read-only span; adjudicating holds the pending lock
     const next = e.target.value
+    const pending = pendingEditRef.current
+    pendingEditRef.current = null
     safariNativeShrinkRef.current = safari && next.length < draft.length
-    keyboard.setDraft(next)
+    keyboard.setDraft(next, editRangeOf(pending, draft.length, next.length))
     // selectionStart is number|null in lib.dom; the type-aware lint program narrows it.
     // oxlint-disable-next-line typescript/no-unnecessary-condition
     keyboard.track(next, e.target.selectionStart ?? next.length)

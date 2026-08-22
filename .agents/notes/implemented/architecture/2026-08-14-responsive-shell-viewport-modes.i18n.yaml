@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-14-responsive-shell-viewport-modes.md
 2026-08-14-responsive-shell-viewport-modes.md: f3095f7f22fdb05ec7cceee400e0198dc5e23f8d
-2026-08-14-responsive-shell-viewport-modes.zh.md: b3bc6011b45f30025eaa2e71711d60847da39111
+2026-08-14-responsive-shell-viewport-modes.zh.md: 6a11885d444c43bac95b3807d06f1258651eb841

@@ -14,7 +14,7 @@ API Proxy 原本会在调用 `events.mux` 和 `events.host` 方法时安装监�
 
 两种流实现共用同一个适配器。ACL 过滤、初始化队列、principal 过期、中止处理和清理仍由现有 generator 负责；适配器只改变这些工作开始的时点。调用方 return iterator 时仍会进入 generator 的清理路径。
 
-该时序规则扩展了[项目协作对话](../feature/2026-08-15-project-collaborative-conversations.md)决策：授权可以延迟发布，但不能在 Host 已接纳流之后产生一段无人观察的间隔。
+该时序规则扩展了[项目协作对话](../feature/2026-08-15-project-collaborative-conversations.zh.md)决策：授权可以延迟发布，但不能在 Host 已接纳流之后产生一段无人观察的间隔。
 
 ## 验证
 

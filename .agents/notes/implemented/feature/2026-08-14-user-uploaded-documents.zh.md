@@ -16,7 +16,7 @@ Status: implemented
 
 `ctx.userDocs`（`packages/attachment/userdoc`，抽象类 `UserDocStore`）把上传内容存为**普通命名文件**，并公布携带真实绝对路径的 `UserDocRef`。该路径是机制本身，而非实现细节泄漏：上传的文档因此可以被 agent 已有的文件系统与 shell 工具直接读取，无需为它单独存在一条检索通道。部署方负责把文档工作区放在工具授权策略已经授予的目录之内——在多用户网关下即运行时主目录，`gateway/src/projects.ts` 的 `effectiveGrants()` 已将其作为 `rw` 发出，因此公布路径不会授予该会话原本不具备的任何权限。
 
-`packages/attachment/userdoc-local`（`LocalUserDocStore`）是本地提供方。其默认根目录为 `<runtime HOME>/documents`；上传内容进入选中的真实目录，默认部署会在首次使用时迁移 `<home>/uploads`。文件夹与迁移语义由[文档工作区文件夹与迁移](2026-08-19-document-workspace-folders.md)说明。
+`packages/attachment/userdoc-local`（`LocalUserDocStore`）是本地提供方。其默认根目录为 `<runtime HOME>/documents`；上传内容进入选中的真实目录，默认部署会在首次使用时迁移 `<home>/uploads`。文件夹与迁移语义由[文档工作区文件夹与迁移](2026-08-19-document-workspace-folders.zh.md)说明。
 
 四项性质是刻意为之：
 

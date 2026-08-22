@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-14-provider-routed-llm-adapters.md
 2026-07-14-provider-routed-llm-adapters.md: 7216406f5c49fbec1f6e814fb7fd271759da98bd
-2026-07-14-provider-routed-llm-adapters.zh.md: 72f81978511a5b084d4bd2e49f1ceba928045ff8
+2026-07-14-provider-routed-llm-adapters.zh.md: a9c9bfd0e4c6ed48ca0bc0c0f5e835017ca89324

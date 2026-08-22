@@ -3,6 +3,7 @@
 import { spawnSync } from 'node:child_process'
 import { existsSync, readdirSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { pnpmInvocation } from './pnpm-invocation.ts'
 
 interface BuildStep {
   label: string
@@ -11,14 +12,10 @@ interface BuildStep {
 }
 
 const root = resolve(import.meta.dirname, '..')
-const packageRunner = process.env.npm_execpath
-
 function run(step: BuildStep): void {
-  if (packageRunner === undefined) {
-    throw new Error('build-production: invoke this script through `pnpm run build:production`')
-  }
   console.log(`build-production: ${step.label}`)
-  const result = spawnSync(process.execPath, [packageRunner, ...step.args], {
+  const invocation = pnpmInvocation(step.args)
+  const result = spawnSync(invocation.command, invocation.args, {
     cwd: step.cwd,
     env: process.env,
     stdio: 'inherit',

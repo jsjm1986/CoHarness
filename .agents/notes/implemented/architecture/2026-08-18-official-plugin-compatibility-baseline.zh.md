@@ -10,7 +10,7 @@ Status: implemented
 
 ## Decision
 
-兼容基线覆盖已观察到的 rc.7 插件和事件格式，同时不改变 fork 当前的运行时词汇。它是[命名约定](2026-08-11-repository-naming-contract-and-rename-ledger.md)中「仓库自有名称使用单一词汇」规则的一项窄例外，并且只在外部 Cordis 事件边界扩展 [Remote 事件投递](2026-08-10-remote-event-delivery.md)机制。
+兼容基线覆盖已观察到的 rc.7 插件和事件格式，同时不改变 fork 当前的运行时词汇。它是[命名约定](2026-08-11-repository-naming-contract-and-rename-ledger.zh.md)中「仓库自有名称使用单一词汇」规则的一项窄例外，并且只在外部 Cordis 事件边界扩展 [Remote 事件投递](2026-08-10-remote-event-delivery.zh.md)机制。
 
 - Host 和 Remote 名单为六条动态 Cordis 事件声明两个前缀。Host 继续只发出已有的 `@deepseek-ai/cordis/*` 名称，因此一条 Host 通知只产生一个帧。
 - Client Remote dispatcher 只将明确列出的六组 `cordis/name` 与 `@deepseek-ai/cordis/name` 视为同一组名称，按全局注册顺序合并匹配的订阅；同一个 listener 同时以两个别名注册时每帧只调用一次；同一精确名称的重复注册仍保留。其他 Cordis 名称继续精确匹配。listener 失败继续隔离。

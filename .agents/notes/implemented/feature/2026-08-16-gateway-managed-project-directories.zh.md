@@ -10,7 +10,7 @@ Status: implemented
 
 ## 决策
 
-管理端创建流程的默认目录模式只接收项目名称。Gateway 去除名称首尾空白，要求名称是单个文件系统目录段，创建或复用 `<HGW_PROJECTS_ROOT>/<名称>`，把新建目录权限强制设为 `0770`，解析其规范路径，并将该路径保存为项目挂载。`HGW_PROJECTS_ROOT` 默认是 `~/harness-projects`；生产单元使用 `/srv/harness/projects/admin`。独立的[管理员宿主机目录浏览器](2026-08-17-gateway-admin-host-directory-browser.md)负责现有目录模式。
+管理端创建流程的默认目录模式只接收项目名称。Gateway 去除名称首尾空白，要求名称是单个文件系统目录段，创建或复用 `<HGW_PROJECTS_ROOT>/<名称>`，把新建目录权限强制设为 `0770`，解析其规范路径，并将该路径保存为项目挂载。`HGW_PROJECTS_ROOT` 默认是 `~/harness-projects`；生产单元使用 `/srv/harness/projects/admin`。独立的[管理员宿主机目录浏览器](2026-08-17-gateway-admin-host-directory-browser.zh.md)负责现有目录模式。
 
 受管名称拒绝空值、`.`、`..`、路径分隔符、控制字符，以及规范路径不同于直接子目录路径的结果。这会阻止路径穿越和既有符号链接逃出配置根目录。既有非目录项会得到与显式项目路径相同的稳定路径诊断。
 
@@ -20,7 +20,7 @@ Linux 部署会用 `root:harness-project` 和 `2770` 权限预创建 `HGW_PROJEC
 
 ## 验证
 
-SQLite 服务测试覆盖自动创建目录、Unicode 名称、`0770` 组权限、路径穿越拒绝和既有显式路径诊断。管理 API 测试证明 `{ "name": "产品文档" }` 会创建并返回规范目录。管理端 UI 测试证明默认目录模式只提交去除首尾空白后的名称；现有目录覆盖由[宿主机目录浏览器 Note](2026-08-17-gateway-admin-host-directory-browser.md)负责。配置 `HGW_TEST_DATABASE_URL` 时，PostgreSQL 集成测试会执行同一受管目录辅助函数。
+SQLite 服务测试覆盖自动创建目录、Unicode 名称、`0770` 组权限、路径穿越拒绝和既有显式路径诊断。管理 API 测试证明 `{ "name": "产品文档" }` 会创建并返回规范目录。管理端 UI 测试证明默认目录模式只提交去除首尾空白后的名称；现有目录覆盖由[宿主机目录浏览器 Note](2026-08-17-gateway-admin-host-directory-browser.zh.md)负责。配置 `HGW_TEST_DATABASE_URL` 时，PostgreSQL 集成测试会执行同一受管目录辅助函数。
 
 ## 曾考虑的替代方案
 

@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.md
 2026-08-15-project-collaborative-conversations.md: 911330d058b490fe2a41617fc36ebe34d449ca0d
-2026-08-15-project-collaborative-conversations.zh.md: 1324e37bea0503092b7ddd14d1c701aea98176c2
+2026-08-15-project-collaborative-conversations.zh.md: de987098a0d744db5649c8d6506ffae8ab051d72

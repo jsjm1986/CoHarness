@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-14-gateway-public-settings-and-browse.md
-2026-08-14-gateway-public-settings-and-browse.md: dcbfff054eb9df9d9f2d19496db83a1cae2c6277
-2026-08-14-gateway-public-settings-and-browse.zh.md: b65cbbc93a72a6d6dd77e30bd2ba3e0e9a6038aa
+2026-08-14-gateway-public-settings-and-browse.md: d3fb6248261f0310258d351cfd8c62fed315a743
+2026-08-14-gateway-public-settings-and-browse.zh.md: a65a59600c13b49856785d742312b7eb05ddaf56

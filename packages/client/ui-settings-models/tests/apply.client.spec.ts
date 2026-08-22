@@ -218,7 +218,7 @@ describe('pushed invalidations', () => {
       rpcId: 'apply-models-catalog' as never,
       result: { ok: true as const, value: { groups: [], failures: [] } },
     }))
-    const b = await bench(true, { describe }, { llm: { providers, models } })
+    const b = await bench(false, { describe }, { llm: { providers, models } })
     declare(b.slots)
     await b.ctx.plugin({ inject: [...inject], apply }).await()
     const entry = b.slots.entries('settings.section')

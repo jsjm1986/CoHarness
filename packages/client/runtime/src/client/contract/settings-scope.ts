@@ -11,8 +11,8 @@
 export interface SettingsScopeSnapshot<T> {
   /**
    * `loading` until the first accepted section, `ready` while one stands, and
-   * `unavailable` when the namespace is not exposed, the describe call failed,
-   * or the scope is in memory mode.
+   * `unavailable` when the namespace is not exposed or the scope is explicitly
+   * memory-backed. A Host describe failure remains loading until a view arrives.
    */
   status: 'loading' | 'ready' | 'unavailable'
   /** Last accepted schema-resolved section; undefined before the first acceptance. */
@@ -32,7 +32,7 @@ export interface SettingsScopeSnapshot<T> {
   revision: number | undefined
   /** Whether the Host document accepts writes; memory mode never does. */
   writable: boolean
-  /** `host` syncs with the Host document; `memory` keeps a remote browser process-local. */
+  /** `host` syncs with the Host document; `memory` is an explicit process-local mode. */
   mode: 'host' | 'memory'
 }
 

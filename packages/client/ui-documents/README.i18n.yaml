@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-documents/README.md
 README.md: 6254ddfe3ea22be21157c784eb5add3f9e0f8341
-README.zh.md: a2da0119dbd0511e0fdd0aab31477b171f14e9fd
+README.zh.md: 50afb1e676bea42bfb900acb8fc77985dcf7f41c

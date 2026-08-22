@@ -6,7 +6,7 @@ Status: implemented
 
 ## 问题
 
-公开 Web 会话第一次 `session.history`（`maxMessages: 50`）可能返回数万条展开事件，几乎全是 `assistant/chunk`，在 Cloudflare 路径上要数十秒。[无损 history 线路分页](2026-08-14-lossless-history-wire-pagination.md) 会打包这些 chunk，并把 Fetch 信封裁到约 128 KiB，但浏览器仍要在 Chat 渲染前展开全部历史 chunk。Chat 从 `assistant/message` 定稿；Trajectory 与 inspect 计时需要这些 chunk。持久化、`deriveMessages()`、压缩和 `session.prompt` 已经使用完整 Host 日志，并不等待浏览器下载。
+公开 Web 会话第一次 `session.history`（`maxMessages: 50`）可能返回数万条展开事件，几乎全是 `assistant/chunk`，在 Cloudflare 路径上要数十秒。[无损 history 线路分页](2026-08-14-lossless-history-wire-pagination.zh.md) 会打包这些 chunk，并把 Fetch 信封裁到约 128 KiB，但浏览器仍要在 Chat 渲染前展开全部历史 chunk。Chat 从 `assistant/message` 定稿；Trajectory 与 inspect 计时需要这些 chunk。持久化、`deriveMessages()`、压缩和 `session.prompt` 已经使用完整 Host 日志，并不等待浏览器下载。
 
 ## 决策
 
@@ -24,7 +24,7 @@ Host 测试钉住 conversation 省略、进行中与中断保留、`full`／缺�
 
 ## 考虑过的替代方案
 
-**在服务器上删除、跳过持久化或压缩掉 `assistant/chunk`。** 否决：高保真回放、失败的不完整流和快照仍依赖已持久化的 chunk（[assembled-assistant-messages-only](../../rejected/simplification/2026-06-20-assembled-assistant-messages-only.md)）。本次只改传输。
+**在服务器上删除、跳过持久化或压缩掉 `assistant/chunk`。** 否决：高保真回放、失败的不完整流和快照仍依赖已持久化的 chunk（[assembled-assistant-messages-only](../../rejected/simplification/2026-06-20-assembled-assistant-messages-only.zh.md)）。本次只改传输。
 
 **流式传输 6 MB 展开页，指望压缩或转圈足够。** 否决：测到的延迟是公开路径上的 UTF-8 JSON 体积；Chat 渲染已定稿消息不需要历史 chunk。
 
@@ -38,4 +38,4 @@ Host 测试钉住 conversation 省略、进行中与中断保留、`full`／缺�
 
 Chat 在 conversation 档页面上打开，而不再展开全部历史 chunk。Trajectory、inspect 交接和持久化的 Trajectory 视图为 `detail: 'full'` 付费并按 seq 合并；span 已空时第二次打开是空操作。补全仍会在 128 KiB 目标下走打包的 `full` 页，因此在巨大窗口上打开 Trajectory 会发出若干次 history RPC，而不是一次 6 MB 信封。Conversation 档 Chat 在补全前省略 TTFT。若把省略 span 当成 mux 缺口，会重新引入原来的下载。持久化、`SESSION_FORMAT_VERSION`、prompt 和模型上下文不变。Python SDK 没有 `session.history` 面，不在范围内。
 
-相关所有者：[无损 history 线路分页](2026-08-14-lossless-history-wire-pagination.md)、[打包 chunk 行](2026-07-26-packed-chunk-rows-by-default.md)、[人类转写的追加来源分页](../bug-fix/2026-07-29-human-transcript-append-origin.md)，以及 [Conversation 组装](2026-08-09-client-conversation-node-assembly.md)。
+相关所有者：[无损 history 线路分页](2026-08-14-lossless-history-wire-pagination.zh.md)、[打包 chunk 行](2026-07-26-packed-chunk-rows-by-default.zh.md)、[人类转写的追加来源分页](../bug-fix/2026-07-29-human-transcript-append-origin.zh.md)，以及 [Conversation 组装](2026-08-09-client-conversation-node-assembly.zh.md)。

@@ -12,7 +12,7 @@ Status: implemented
 
 管理器对当前目录返回的文档执行筛选、排序和每页 20 行分页。桌面弹窗为 960px 卡片（`min-height` 640px，`max-height` 860px）；紧凑视口仍是全宽底部抽屉。复选框跨页选择；**删除所选**确认后对每个 id 调用一次 `remove`。可见性文案区分个人与项目共享。预览弹窗与管理器同宽。列表辅助函数在 `listing.ts`；`PAGE_SIZE` 是模块常量，不是 cordis.yml 字段。
 
-这是对[工作区文档管理器](2026-08-17-workspace-document-manager.md)的扩展。文件夹存储和 HTTP 行为由[文档工作区文件夹与迁移](2026-08-19-document-workspace-folders.md)负责。
+这是对[工作区文档管理器](2026-08-17-workspace-document-manager.zh.md)的扩展。文件夹存储和 HTTP 行为由[文档工作区文件夹与迁移](2026-08-19-document-workspace-folders.zh.md)负责。
 
 ## 设计
 

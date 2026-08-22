@@ -12,7 +12,7 @@ Status: implemented
 
 Migration 4 把 `harness.conversation_events.event` 从 `jsonb` 转成 PostgreSQL `json`，Gateway appender 也把序列化事件转换为 `json`。PostgreSQL 仍会验证每个完整事件是合法 JSON，同时文本式 JSON 表示会保留转义 NUL，Node PostgreSQL driver 随后可将其解析回原始 JavaScript 值。
 
-Migration 会移除 `conversation_events_tool_call`。该表达式索引会让任意事件 payload 经 PostgreSQL text 转换解析，因此可能再次触发同一拒绝。可查询的顺序、类型、时间、搜索文本、ACL 与参与者事实继续存放在专用列和投影表中；运行时代码不会通过已移除索引查询 tool call id。本决定只取代 [PostgreSQL Gateway baseline](../architecture/2026-08-14-postgresql-jsonb-gateway-baseline.md) 中事件列采用 JSONB 的选择。
+Migration 会移除 `conversation_events_tool_call`。该表达式索引会让任意事件 payload 经 PostgreSQL text 转换解析，因此可能再次触发同一拒绝。可查询的顺序、类型、时间、搜索文本、ACL 与参与者事实继续存放在专用列和投影表中；运行时代码不会通过已移除索引查询 tool call id。本决定只取代 [PostgreSQL Gateway baseline](../architecture/2026-08-14-postgresql-jsonb-gateway-baseline.zh.md) 中事件列采用 JSONB 的选择。
 
 ## Alternatives considered
 

@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/attachment.md
 attachment.md: 1239120bacb092e85c422f40c39bd1ca55612011
-attachment.zh.md: dce0218d82309087b9535f1829a5178590f342a6
+attachment.zh.md: c46e3ed6ca358fc54c78b421282894c310fd615c

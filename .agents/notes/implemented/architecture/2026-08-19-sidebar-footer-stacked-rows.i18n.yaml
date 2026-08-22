@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-19-sidebar-footer-stacked-rows.md
 2026-08-19-sidebar-footer-stacked-rows.md: c4e00029bc1edead90f400a0fdad4199040eb40d
-2026-08-19-sidebar-footer-stacked-rows.zh.md: e009c3edcc2f68c8e2a63a56c8272fe80d564a76
+2026-08-19-sidebar-footer-stacked-rows.zh.md: 5daf2056b213148bbe2b40e1c282850cc54ed18d

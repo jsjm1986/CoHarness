@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-17-event-stream-open-subscription.md
 2026-08-17-event-stream-open-subscription.md: 4b9f2df3babf853982a2116f12ed09126e6b889f
-2026-08-17-event-stream-open-subscription.zh.md: 30719092dfdf5a00f8dc846223f260778fd6449c
+2026-08-17-event-stream-open-subscription.zh.md: 129c7f2dcf02b7ea31cae2f9bce9e510f0159c34

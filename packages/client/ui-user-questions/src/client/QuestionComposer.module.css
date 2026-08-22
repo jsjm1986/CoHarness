@@ -321,52 +321,64 @@
   border-color: var(--dsw-alias-border-l2);
 }
 
-.customInput {
-  flex: 1;
+/* Auto-growing free-text answer: mirror and textarea share one grid cell. */
+.field {
+  display: grid;
   min-width: 0;
-  padding: 0;
+  --dsh-answer-field-padding: 0;
+}
+
+.field > * {
+  grid-area: 1 / 1;
+  min-width: 0;
+  padding: var(--dsh-answer-field-padding);
+  font: inherit;
+  font-size: 14px;
+  line-height: 24px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.fieldMirror {
+  box-sizing: content-box;
+  max-height: 144px;
+  overflow: hidden;
+  visibility: hidden;
+}
+
+.fieldInput {
+  resize: none;
+  overflow-y: auto;
   border: none;
   outline: none;
   background: transparent;
   color: var(--dsw-alias-label-primary);
   caret-color: var(--dsw-alias-state-business-primary);
-  font: inherit;
-  font-size: 14px;
-  line-height: 24px;
 }
 
-.customInput::placeholder {
+.fieldInput::placeholder {
   color: var(--dsw-alias-label-caption);
 }
 
-/* Optionless question: the free-form answer is the whole body. The 12px side
-   margins add to the .options 12px padding so both edges align with the
-   title's 24px inset; type matches the option rows, no resize handle. */
-.customTextarea {
-  display: block;
+/* Inline custom answer shares the row's available copy width. */
+.customInline {
+  flex: 1;
+}
+
+/* Optionless question: the free-form answer is the whole body. */
+.customBlock {
   min-height: 64px;
-  max-height: 140px;
   flex-shrink: 0;
-  margin: 0 var(--dsw-space-3);
-  padding: var(--dsw-space-2) var(--dsw-space-3);
-  resize: none;
+  margin: 0 12px;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 10px;
-  outline: none;
   background: var(--dsw-alias-bg-module-platform);
-  color: var(--dsw-alias-label-primary);
-  caret-color: var(--dsw-alias-state-business-primary);
-  font: inherit;
-  font-size: 14px;
-  line-height: 24px;
+  --dsh-answer-field-padding: 8px 12px;
 }
 
-.customTextarea:focus {
+.customBlock:focus-within {
   border-color: var(--dsw-alias-state-business-primary);
-}
-
-.customTextarea::placeholder {
-  color: var(--dsw-alias-label-caption);
 }
 
 .footer {

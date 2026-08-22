@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-06-subagent-list-identity-projection.md
 2026-08-06-subagent-list-identity-projection.md: 80c399d6a569731c95bd0d598d9bee37d4187278
-2026-08-06-subagent-list-identity-projection.zh.md: d62a1e6cefd6be0e5fa5233bb332d9dab7b8fb61
+2026-08-06-subagent-list-identity-projection.zh.md: e29f59d3a7a3e8f660207cb131057820cdc6aa56

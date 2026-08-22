@@ -206,7 +206,7 @@ describe('permission settings store', () => {
     })
   })
 
-  it('hides the row in a remote browser instead of loading forever', async () => {
+  it('hides the row for an explicitly memory-backed mirror', async () => {
     const describeCall = vi.fn()
     const mutate = vi.fn()
     const wire = { settings: { describe: describeCall, mutate } } as never

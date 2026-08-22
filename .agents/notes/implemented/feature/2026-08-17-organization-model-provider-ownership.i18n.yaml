@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-17-organization-model-provider-ownership.md
 2026-08-17-organization-model-provider-ownership.md: 85a6bad51b640971b05f0b3c5943ad518e30bc7d
-2026-08-17-organization-model-provider-ownership.zh.md: 7c62e7909f1157bfd1d169bd8f83b4e3a3e94e66
+2026-08-17-organization-model-provider-ownership.zh.md: 3f7a6966036ec7399b1121484b87e51f5092e5e3

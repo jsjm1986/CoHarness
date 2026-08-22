@@ -8,7 +8,7 @@ Status: implemented
 
 网关用户通过应用内目录浏览器在实例文件系统上添加工作区。默认列举若不知晓授权，对话框会从操作系统家目录起遍历整盘。管理员撤掉项目成员后，工作区菜单仍列出旧路径，`onPick` 仍会打开它，被撤权的项目会继续作为当前工作区，直到别处失败。
 
-授权文件已带可选 `label` 供显示；[directory-guard](../feature/2026-08-14-directory-guard.md) 忽略未知字段，只按 `path`／`mode` 强制。独立 `dsh web` 没有授权文件，必须仍从操作系统家目录列举。
+授权文件已带可选 `label` 供显示；[directory-guard](../feature/2026-08-14-directory-guard.zh.md) 忽略未知字段，只按 `path`／`mode` 强制。独立 `dsh web` 没有授权文件，必须仍从操作系统家目录列举。
 
 ## 决策
 
@@ -16,7 +16,7 @@ browse 后端（`BrowseDirectoryPicker`）在构造时读取一次 `$DSH_DIRECTO
 
 `WorkspacePickFlow.handleSelect` 对已有工作区调用可选的无路径 `listDirectory()`。空 crumbs 表示授权根列举：若 `workspace.path` 不是某根或其子孙，流程把 `menu.workspaceUnauthorized` 放到文件夹错误对话框且不 `onPick`。没有 `listDirectory`、`DirectoryBrowseError` 且 code 为 `directory-picker-unavailable`（native Host；生产仍会注入该回调）、或列举仍带祖先 crumbs（操作系统家目录），则跳过检查，以免独立 dsh web 拒绝工作区。并发点选递增 generation；较慢的未授权结果不得在随后的已授权 `onPick` 之后再打开对话框。该可选回调是 inject 成员，不改 SlotMap。`ui-workspace` 在 zh 与 en 注册 `menu.workspaceUnauthorized`。
 
-相关所有者：[目录选择 seam](2026-07-28-directory-picker-capability-seam.md)、[directory-guard](../feature/2026-08-14-directory-guard.md)、[网关公网设置与 browse](2026-08-14-gateway-public-settings-and-browse.md)。
+相关所有者：[目录选择 seam](2026-07-28-directory-picker-capability-seam.zh.md)、[directory-guard](../feature/2026-08-14-directory-guard.zh.md)、[网关公网设置与 browse](2026-08-14-gateway-public-settings-and-browse.zh.md)。
 
 ## 考虑过的替代方案
 

@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write gateway/README.md
 README.md: a09d8c1bca648811c22fe1bfc693684f9d98f40a
-README.zh.md: 5434f2fd1d7c77f8b1a2136940d47aa038a1a737
+README.zh.md: 8354c934e8e40a640017d173cdd7d2a676018c3a

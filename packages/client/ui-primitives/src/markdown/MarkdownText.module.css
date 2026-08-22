@@ -177,10 +177,31 @@
   overscroll-behavior-x: contain;
 }
 
+.tableScroll:global(.md-table-wide) {
+  overflow-x: hidden;
+  padding-bottom: var(--dsh-scrollbar-width, 8px);
+}
+
+.tableScroll:global(.md-table-wide):hover,
+.tableScroll:global(.md-table-wide):focus-visible {
+  overflow-x: auto;
+  padding-bottom: 0;
+}
+
+.tableScroll:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--dsw-alias-state-business-primary);
+}
+
 .tableScroll table {
   border-collapse: collapse;
   width: max-content;
   max-width: max-content;
+}
+
+.tableFill table {
+  width: 100%;
+  max-width: none;
 }
 
 .tableScroll th {

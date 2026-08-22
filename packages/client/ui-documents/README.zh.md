@@ -25,7 +25,7 @@ CoHarness Web UI 的工作区文档管理器。整理、预览、上传、移动
 - **个人空间**：`$HOME/documents/`
 - **项目空间**：`<项目目录>/documents/`
 
-文件夹是真实目录，模型可通过常规文件系统工具查看。后端 API（`/api/documents`）由 `@deepseek-ai/dsh-host-userdoc-http` 和 `@deepseek-ai/dsh-userdoc-local` 提供；旧 `uploads` 的迁移规则见本地后端 [README](../../attachment/userdoc-local/README.md)。
+文件夹是真实目录，模型可通过常规文件系统工具查看。后端 API（`/api/documents`）由 `@deepseek-ai/dsh-host-userdoc-http` 和 `@deepseek-ai/dsh-userdoc-local` 提供；旧 `uploads` 的迁移规则见本地后端 [README](../../attachment/userdoc-local/README.zh.md)。
 
 ## 许可证
 

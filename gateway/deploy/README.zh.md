@@ -17,7 +17,7 @@
 1. 把构建完成的 `gateway/` 目录复制到 `/srv/harness/gateway`；用生产 Node 在该目录执行 `npm install && npm rebuild better-sqlite3 argon2`。`public/admin` 已被 gitignore，因此只能在 `build:production` 生成该目录后再从 checkout 复制。
 2. 把构建完成的 `plugins/dsh-directory-guard/` 目录复制到 `/srv/harness/plugins/dsh-directory-guard`，把 `plugins/dsh-model-governance/` 复制到 `/srv/harness/plugins/dsh-model-governance`。钉死的 npm dsh 以纯 Node 运行插件 `lib/`，不使用 tsx。即使 `HGW_GUARD_PATCH=off`，模型治理仍是强制项。
 3. 把公司默认凭据写入 `/srv/harness/gateway-data/company.env`（`DEEPSEEK_API_KEY=...`，权限 600）。每次运行时启动都会把它复制到 `$DSH_HOME/.env`；用户在 Settings 里设置的个人 key 存放于 `.credentials.yaml`，优先级更高，共享项目运行时则把凭据设置暴露为只读并使用公司来源。
-4. 启动 [`deploy/postgres/`](postgres/README.md)，应用 migration，并创建权限为 `0600` 的数据库 URL 文件。在启动 Gateway 前，导入冻结的 SQLite 控制面，或创建配置的企业与计算节点。
+4. 启动 [`deploy/postgres/`](postgres/README.zh.md)，应用 migration，并创建权限为 `0600` 的数据库 URL 文件。在启动 Gateway 前，导入冻结的 SQLite 控制面，或创建配置的企业与计算节点。
 5. 创建仅所有者可访问的 `/srv/harness/gateway-data/principal-keys` 和 `/srv/harness/gateway-data/runtime-credentials`，以及 `/srv/harness/project-runtimes` 和项目根目录。为两个受控根配置组继承，例如执行 `install -d -o root -g harness-project -m 2770 /srv/harness/projects/admin /srv/harness/projects/user-projects`；通过显式路径导入的目录仍需显式授予 `harness-project` 读写权限。把 `deploy/harness-gateway.service` 复制到 `/etc/systemd/system/`；调整数据库 URL 文件、`HGW_ORGANIZATION_SLUG`、`HGW_COMPUTE_NODE_NAME`、`HGW_PUBLIC_ORIGINS`、`HGW_PROJECT_PATH_ROOTS`、`HGW_PROJECTS_ROOT`、`HGW_USER_PROJECTS_ROOT`、项目运行时账户/根目录、principal/凭据目录、插件路径和其他宿主机路径，然后执行 `systemctl daemon-reload && systemctl enable --now harness-gateway`。
 6. 数据库中没有用户时，首次启动会把引导管理员密码打进 journal：`journalctl -u harness-gateway | grep 'bootstrap admin'`。
 
@@ -73,7 +73,7 @@ server {
 
 ## macOS 变体（launchd，隧道入口）
 
-隧道后的 macOS 主机以 `HGW_LAUNCHER=local` 运行 Gateway，并用 launchd 取代 systemd。launchd 任务执行 release 树外的 [`macos/release-control.sh`](macos/release-control.sh) 稳定副本，工作目录则是稳定的 releases 根目录。plist 与宿主环境不得分别引用 `current`；控制器在每次 Gateway 启动时只解析一次 `current`，并把得到的规范目录作为 `HGW_RELEASE_ROOT` 导出。[macOS release 生命周期原子化](../../.agents/notes/implemented/process/2026-08-18-atomic-macos-gateway-releases.md)记录了操作顺序与回滚决策。
+隧道后的 macOS 主机以 `HGW_LAUNCHER=local` 运行 Gateway，并用 launchd 取代 systemd。launchd 任务执行 release 树外的 [`macos/release-control.sh`](macos/release-control.sh) 稳定副本，工作目录则是稳定的 releases 根目录。plist 与宿主环境不得分别引用 `current`；控制器在每次 Gateway 启动时只解析一次 `current`，并把得到的规范目录作为 `HGW_RELEASE_ROOT` 导出。[macOS release 生命周期原子化](../../.agents/notes/implemented/process/2026-08-18-atomic-macos-gateway-releases.zh.md)记录了操作顺序与回滚决策。
 
 先把控制器安装到 release 清理不会删除的位置，再创建仅所有者控制的环境文件：
 

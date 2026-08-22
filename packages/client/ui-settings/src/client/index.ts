@@ -49,10 +49,11 @@ export const inject = ['connection', 'remote']
 export function apply(ctx: ClientContext): void {
   const schema = new SettingsSchemaService(ctx)
   const connection = ctx.get('connection') as ConnectionHandle
-  const mirror = new SettingsDescribeMirror(
-    connection.api,
-    connection.isLoopback ? 'host' : 'memory',
-  )
+  // The authenticated Gateway rewrites the upstream request to the instance's
+  // loopback authority. Keep the browser mirror Host-backed even when the page
+  // itself is served from a public origin; the Host privileged-method fence is
+  // the authority for rejecting direct, unauthenticated remote requests.
+  const mirror = new SettingsDescribeMirror(connection.api)
   ctx.effect(() => {
     const disposers = [
       (ctx.get('remote') as ClientContext['remote']).$on('settings/document-updated', () => { void mirror.load() }),

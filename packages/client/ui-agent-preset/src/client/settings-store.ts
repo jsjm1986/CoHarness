@@ -221,9 +221,9 @@ export class AgentPresetSettingsController {
       return
     }
     // The roster says what may be chosen; the shared mirror says whether this
-    // browser may write the choice down. A non-loopback browser's mirror never
-    // answers, so the row stays read-only rather than offering a control
-    // whose write the Host would refuse.
+    // browser may write the choice down. An authenticated Gateway can provide
+    // that Host view to a public page; a refused or read-only response keeps
+    // the row non-interactive.
     await this.describeFace.ensure()
     this.set({
       status: 'ready',

@@ -12,13 +12,13 @@ Status: implemented
 
 新增 Cordis 插件包 `@deepseek-ai/dsh-client-ui-documents`，在 `sidebar.footer.action` 插槽注册一个**文档**按钮。点击打开文档管理器弹窗，展示当前工作区（个人或项目运行时）中的所有文档，由现有的 `/api/documents` HTTP 接口提供支持。`dsh-web-app` 在 `cordis.patch.yml` 中挂载该插件，并把它列入组合包 `dependencies`，以便 `verify-cordis-config` 能解析这个裸插件名。
 
-目录操作和 `documents` 存储布局由[文档工作区文件夹与迁移](2026-08-19-document-workspace-folders.md)负责，管理器直接使用这些能力。
+目录操作和 `documents` 存储布局由[文档工作区文件夹与迁移](2026-08-19-document-workspace-folders.zh.md)负责，管理器直接使用这些能力。
 
 ## 设计
 
 - **包结构**：`packages/client/ui-documents/` 仿照 `ui-collaboration`：`client/` 子入口承载纯浏览器插件代码，`tsdown.config.ts` 打包客户端 bundle，组件位于 `src/client/`。
 - **入口**：`sidebar.footer.action` 插槽，与 `ui-collaboration` 的工作区切换按钮并列。按钮使用 `IconBrowseOutline16` 和工具提示；展开侧边栏时显示「文档」文字。
-- **弹窗**：960px 的 `Modal`（小于 768px 时为全宽底部抽屉），限额放在 `description`，提供文件夹面包屑和目录行、当前文件夹上传，以及创建、重命名、移动和空文件夹删除流程。搜索、类型、排序、分页和批量删除见[文档管理器筛选、分页与批量删除](2026-08-19-document-manager-filter-pages-batch.md)。紧凑布局把文档操作换到名称下方，并保持 44px 热区。
+- **弹窗**：960px 的 `Modal`（小于 768px 时为全宽底部抽屉），限额放在 `description`，提供文件夹面包屑和目录行、当前文件夹上传，以及创建、重命名、移动和空文件夹删除流程。搜索、类型、排序、分页和批量删除见[文档管理器筛选、分页与批量删除](2026-08-19-document-manager-filter-pages-batch.zh.md)。紧凑布局把文档操作换到名称下方，并保持 44px 热区。
 - **预览**：按媒体类型路由 —— 图片用 `<img>`，PDF 用 `<iframe>`，文本类文件 fetch 后用 `<pre>` 渲染（上限 256 KiB），其他类型回退到下载提示；预览弹窗与管理器同宽。
 - **删除**：二次确认带会话历史引用警告；项目标题与全员影响说明来自 fail-open 的 `GET /account/api/context`。
 - **文案**：通过 `locales.ts` 提供中英双语。

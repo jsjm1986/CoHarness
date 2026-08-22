@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-16-gateway-managed-project-directories.md
 2026-08-16-gateway-managed-project-directories.md: 69bafabd95f6cf3b8632337577f703fb82e0bf1f
-2026-08-16-gateway-managed-project-directories.zh.md: e749a59b7eb18785d58f40717c8d9544e69e3a8b
+2026-08-16-gateway-managed-project-directories.zh.md: a5f57e4911ee308252d6fbb772c1a184f2361686

@@ -12,7 +12,7 @@ Status: implemented
 
 只改 CSS 的 compact 与粗指针规则，不动 JS 或 slot 契约。portal 稿（`DirectoryBrowser`、Menu、Modal、引导内容最大高度）用 `@media (max-width: 767px)`。树内外壳用 `:global([data-viewport='compact'])` 跟随外壳戳记。compact 与粗指针都把不足 40px 的控件升到 `--dsw-touch-target`，并让只在 hover 出现的行操作保持可见：部分手机 WebView 会报 `pointer: fine`，所以密度必须跟 compact 戳记走，不能只靠粗指针媒体查询。compact 下 Miller 每列铺满宽度并可横向吸附，保证打开/取消够得着并共用页脚一行。中等及以上视口上，细指针仍保持桌面双列 Miller 与 28px 输入芯片。
 
-相关：[响应式外壳视口模式](2026-08-14-responsive-shell-viewport-modes.md)，[设置浮层 portal](2026-08-19-settings-overlay-portal.md)，[侧栏脚注竖排](2026-08-19-sidebar-footer-stacked-rows.md)。
+相关：[响应式外壳视口模式](2026-08-14-responsive-shell-viewport-modes.zh.md)，[设置浮层 portal](2026-08-19-settings-overlay-portal.zh.md)，[侧栏脚注竖排](2026-08-19-sidebar-footer-stacked-rows.zh.md)。
 
 ## Alternatives considered
 

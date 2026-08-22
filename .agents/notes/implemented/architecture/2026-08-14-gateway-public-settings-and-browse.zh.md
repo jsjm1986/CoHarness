@@ -10,11 +10,11 @@ Status: implemented
 
 ## 决策
 
-`SettingsScopeBinder.bind` 一律使用 Host 持久化。抛错或非 ok 的 `settings.describe` 发布 `unavailable`，卡片隐藏而不是停在 `loading`。Host `PRIVILEGED_METHODS` 栅栏不变：仍要求回环 `Host` 头。登录后的公网页能打通这些 RPC，靠的是网关既有的头改写。`settings.openDocument` 和 `host.openPath` 仍只在 loopback 页面出现，因为它们驱动的是宿主桌面。
+浏览器共享设置镜像与 `SettingsScopeBinder.bind` 一律使用 Host 持久化。抛错或非 ok 的 `settings.describe` 发布 `unavailable`，卡片隐藏而不是停在 `loading`。Host `PRIVILEGED_METHODS` 栅栏不变：仍要求回环 `Host` 头。登录后的公网页能打通这些 RPC，靠的是网关既有的头改写。`settings.openDocument` 和 `host.openPath` 仍只在 loopback 页面出现，因为它们驱动的是宿主桌面。
 
 directory-guard 的 home 补丁停用 `directory-picker-auto` 并插入 browse 的 Host/客户端组合，与 `apps/web/tests/pin-browse-picker.overlay.yml` 的 disable+insert 相同。每个网关拉起的实例因此提供应用内「选择工作区目录」对话框。不带该补丁的直接 `dsh web` 仍按绑定地址、SSH 和显示解析 `-auto`。
 
-相关所有者：[directory-picker seam](2026-07-28-directory-picker-capability-seam.md)、[配置面边界](2026-07-30-config-plane-boundaries.md)、[Host 支撑的 Web 偏好](../bug-fix/2026-08-06-host-backed-web-preferences.md)、[产品 onboarding](../feature/2026-08-13-shared-modal-product-onboarding.md)。
+相关所有者：[directory-picker seam](2026-07-28-directory-picker-capability-seam.zh.md)、[配置面边界](2026-07-30-config-plane-boundaries.zh.md)、[Host 支撑的 Web 偏好](../bug-fix/2026-08-06-host-backed-web-preferences.zh.md)、[产品 onboarding](../feature/2026-08-13-shared-modal-product-onboarding.zh.md)。
 
 ## 考虑过的替代方案
 

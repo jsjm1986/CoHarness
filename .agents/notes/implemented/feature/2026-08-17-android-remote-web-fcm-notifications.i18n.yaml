@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-17-android-remote-web-fcm-notifications.md
 2026-08-17-android-remote-web-fcm-notifications.md: 8a4cb780d8664569750a0035a5d063e5778cc265
-2026-08-17-android-remote-web-fcm-notifications.zh.md: d7bd4542cb4e2aeba8dcc338bb577749f052ce09
+2026-08-17-android-remote-web-fcm-notifications.zh.md: 709da728a59614ad27cb346b0c7645748a753d39

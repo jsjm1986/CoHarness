@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-10-npm-release-sequences.md
 2026-08-10-npm-release-sequences.md: efeda91b6a85e1316c563cc04411878122096953
-2026-08-10-npm-release-sequences.zh.md: d905ac4b58691890d2aad955b87713a278dcb4f8
+2026-08-10-npm-release-sequences.zh.md: 9c6c928bdb9ee53b770a7c3cefc4595dd3be89ac

@@ -6,7 +6,7 @@ Status: implemented
 
 ## 问题
 
-[Typert Remote 方法调用](../../implemented/architecture/2026-08-02-typert-remote-method-calls.md)只覆盖「一次请求一个结果」的定向调用，明确把 Session 事件流与有状态交互留在别处；Host 向消费端的**单向事件推送**因此仍然全部压在遗留的 API Proxy 上。
+[Typert Remote 方法调用](../../implemented/architecture/2026-08-02-typert-remote-method-calls.zh.md)只覆盖「一次请求一个结果」的定向调用，明确把 Session 事件流与有状态交互留在别处；Host 向消费端的**单向事件推送**因此仍然全部压在遗留的 API Proxy 上。
 
 Host 拥有 `agent-preset/selected`、`commands/change`、`credentials/reference-updated`、`llm/adapters-updated`、`settings/document-updated` 这五条单向事件；它们既不依赖 AgentScope，载荷也本来就是 JSON。过去每条都要穿过 host cordis 事件、apiproxy 手写帧、client/runtime 手写桥和 Client 事件别名才能抵达 UI，而这些层没有陈述 owner 事件之外的新事实。
 
@@ -18,7 +18,7 @@ Host 拥有 `agent-preset/selected`、`commands/change`、`credentials/reference
 
 - `packages/api/remotes/src/remote-events.ts` 持有一份可转发 host 事件名单，它同时是「消费端能订阅什么」的唯一控制点。旁边的 `src/types.ts` 由它派生类型投影并填充 selection 座位，按包约定保持纯类型。两个文件**都同时列进本包 host 与 client 两个 face 的 `files`**，两侧读同一份。
 - wire 上的事件名 **就是 host cordis 事件原名**（`settings/document-updated`），不加 `host/` 前缀；载荷 **就是 host 的实参列表**，逐元素原样过 JSON，无投影、无脱敏、无改名。
-- 六组动态 Cordis 事件的官方 `cordis/*` 名称与重命名后的 `@deepseek-ai/cordis/*` 名称是一项兼容性例外。两种名称都可选并按原名转发；Client dispatcher 将每对名称作为同一订阅组匹配，同时不会让 Host 双发。[官方插件兼容基线](2026-08-18-official-plugin-compatibility-baseline.md)负责规定范围和理由。
+- 六组动态 Cordis 事件的官方 `cordis/*` 名称与重命名后的 `@deepseek-ai/cordis/*` 名称是一项兼容性例外。两种名称都可选并按原名转发；Client dispatcher 将每对名称作为同一订阅组匹配，同时不会让 Host 双发。[官方插件兼容基线](2026-08-18-official-plugin-compatibility-baseline.zh.md)负责规定范围和理由。
 - 载体**寄生现有 host 流**：`HostFrame` 加一个包裹帧 `host/remote-event`，不新开下行通道。
 - 事件**签名**不另立表：owner 包把自己的 cordis `Events` 声明搬进 client-safe 的 `./types` 纯类型出口，两侧读**同一份**——`$on` 的 listener 类型就是 `Events[Event]` 本身。「原样」不需要证明，是构造性成立的。
 - 但**只借 cordis 的类型形状，不接 cordis 的事件系统**：投递语义、注册表、异常处置全归 Typert 自己。

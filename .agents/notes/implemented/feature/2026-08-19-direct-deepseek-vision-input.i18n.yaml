@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-19-direct-deepseek-vision-input.md
 2026-08-19-direct-deepseek-vision-input.md: e40a4947ffebcd3abf1bff1fa9762cb478a68595
-2026-08-19-direct-deepseek-vision-input.zh.md: b4737f0192fbb0904b7d3faf4f32579c0e1885f7
+2026-08-19-direct-deepseek-vision-input.zh.md: d9182ff1e064dc17b5d8227768d7f7b4922d88e5

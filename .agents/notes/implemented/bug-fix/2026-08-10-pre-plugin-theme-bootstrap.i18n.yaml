@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-10-pre-plugin-theme-bootstrap.md
 2026-08-10-pre-plugin-theme-bootstrap.md: 7f5c57316d7dd022b08918459282a6f6128eb93b
-2026-08-10-pre-plugin-theme-bootstrap.zh.md: 7152bf8dc2bbfae2a671c4da899cbebda0bd4b39
+2026-08-10-pre-plugin-theme-bootstrap.zh.md: 258a6ce415f2fb4b6c425b62f71d7f249e3523b9
