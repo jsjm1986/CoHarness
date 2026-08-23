@@ -3,7 +3,9 @@ import { describe, expect, it, vi } from 'vitest'
 import type { UserRow } from '../src/auth.ts'
 import {
   createDocumentTransferCapabilitiesHandler,
+  createDocumentTransferCommitHandler,
   createDocumentTransferListHandler,
+  createDocumentTransferPlanHandler,
   createDocumentTransferHandler,
   DocumentTransferError,
 } from '../src/document-transfer.ts'
@@ -49,6 +51,8 @@ function fixture() {
     ? { projectId, name: 'Compiler', path: '/tmp/compiler', mode: 'rw' as const, administrator: false }
     : projectId === 42
       ? { projectId, name: 'Read only', path: '/tmp/readonly', mode: 'ro' as const, administrator: false }
+      : projectId === 43
+        ? { projectId, name: 'Runtime', path: '/tmp/runtime', mode: 'rw' as const, administrator: false }
       : null)
   const ensureRunning = vi.fn(async (subject: UserRow | { kind: 'project'; id: number; name: string; path: string }) =>
     'username' in subject ? { port: 41001, generation: 1 } : { port: subject.id === 41 ? 41041 : 41042, generation: 2 })
@@ -63,16 +67,34 @@ function fixture() {
       projectsForUser: async () => [
         { projectId: 41, name: 'Compiler', path: '/tmp/compiler', mode: 'rw' as const },
         { projectId: 42, name: 'Read only', path: '/tmp/readonly', mode: 'ro' as const },
+        { projectId: 43, name: 'Runtime', path: '/tmp/runtime', mode: 'rw' as const },
       ],
     },
     principals,
     audit: { write: audit },
   })
+  const dependencies = {
+    instances: { ensureRunning },
+    users: { getById: async () => USER },
+    projects: { getById: async (id: number) => id === 41
+      ? { id, name: 'Compiler', path: '/tmp/compiler', memberCount: 1, members: [] }
+      : { id, name: id === 43 ? 'Runtime' : 'Read only', path: '/tmp/readonly', memberCount: 1, members: [] } },
+    collaboration: {
+      projectForUser,
+      projectsForUser: async () => [
+        { projectId: 41, name: 'Compiler', path: '/tmp/compiler', mode: 'rw' as const },
+        { projectId: 42, name: 'Read only', path: '/tmp/readonly', mode: 'ro' as const },
+        { projectId: 43, name: 'Runtime', path: '/tmp/runtime', mode: 'rw' as const },
+      ],
+    },
+    principals,
+  }
   const collaboration = {
     projectForUser,
     projectsForUser: async () => [
       { projectId: 41, name: 'Compiler', path: '/tmp/compiler', mode: 'rw' as const },
       { projectId: 42, name: 'Read only', path: '/tmp/readonly', mode: 'ro' as const },
+      { projectId: 43, name: 'Runtime', path: '/tmp/runtime', mode: 'rw' as const },
     ],
   }
   const capabilities = createDocumentTransferCapabilitiesHandler({ collaboration })
@@ -83,7 +105,7 @@ function fixture() {
     collaboration,
     principals,
   })
-  return { handler, capabilities, list, audit, ensureRunning, projectForUser }
+  return { handler, capabilities, list, audit, ensureRunning, projectForUser, plan: createDocumentTransferPlanHandler(dependencies), commit: createDocumentTransferCommitHandler(dependencies) }
 }
 
 function responseForTarget(docId: string, name = 'report.txt'): Response {
@@ -195,7 +217,7 @@ describe('Gateway document transfer broker', () => {
     expect(result.items.map(item => item.status)).toEqual(['failed', 'copied'])
   })
 
-  it('rejects project-to-project and malformed ids', async () => {
+  it('rejects read-only project targets and malformed ids', async () => {
     const runtime = fixture()
     await expect(runtime.handler({
       request: {} as never, subject: SUBJECT, principal: PRINCIPAL,
@@ -219,6 +241,66 @@ describe('Gateway document transfer broker', () => {
     })).rejects.toMatchObject({ code: 'INVALID_DOCUMENT_TRANSFER' })
   })
 
+  it('copies a snapshot between two writable projects without requiring a scope switch', async () => {
+    const runtime = fixture()
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(new Response('hello', { status: 200, headers: { 'content-length': '5' } }))
+      .mockResolvedValueOnce(responseForTarget('report.txt'))
+    vi.stubGlobal('fetch', fetch)
+    await expect(runtime.handler({
+      request: {} as never,
+      subject: SUBJECT,
+      principal: PRINCIPAL,
+      payload: {
+        version: 1,
+        source: { kind: 'project', projectId: 41 },
+        target: { kind: 'project', projectId: 43 },
+        documents: [{ docId: 'report.txt' }],
+      },
+      signal: new AbortController().signal,
+    })).resolves.toMatchObject({ source: { kind: 'project' }, target: { kind: 'project' }, items: [{ status: 'copied' }] })
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('requires and consumes a metadata-only transfer plan before commit', async () => {
+    const runtime = fixture()
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ documents: [{
+        docId: 'report.txt', name: 'report.txt', bytes: 5, mediaType: 'text/plain', modifiedAt: 1,
+      }] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response('hello', { status: 200, headers: { 'content-length': '5' } }))
+      .mockResolvedValueOnce(responseForTarget('report.txt')))
+    const plan = await runtime.plan({
+      subject: SUBJECT,
+      principal: PRINCIPAL,
+      payload: {
+        version: 1,
+        source: { kind: 'project', projectId: 41 },
+        target: { kind: 'project', projectId: 43 },
+        documents: [{ docId: 'report.txt' }],
+      },
+    })
+    expect(plan.documents).toHaveLength(1)
+    await expect(runtime.commit({
+      request: {} as never,
+      subject: SUBJECT,
+      principal: PRINCIPAL,
+      payload: {
+        version: 1,
+        planId: plan.planId,
+        source: { kind: 'project', projectId: 41 },
+        target: { kind: 'project', projectId: 43 },
+        documents: [{ docId: 'report.txt' }],
+      },
+      signal: new AbortController().signal,
+    })).resolves.toMatchObject({ items: [{ status: 'copied' }] })
+    await expect(runtime.commit({
+      request: {} as never, subject: SUBJECT, principal: PRINCIPAL,
+      payload: { version: 1, planId: plan.planId, source: { kind: 'project', projectId: 41 }, target: { kind: 'project', projectId: 43 }, documents: [{ docId: 'report.txt' }] },
+      signal: new AbortController().signal,
+    })).rejects.toMatchObject({ code: 'DOCUMENT_TRANSFER_PLAN_EXPIRED' })
+  })
+
   it('projects only safe target labels and writable modes', async () => {
     const runtime = fixture()
     await expect(runtime.capabilities({ subject: SUBJECT, principal: PRINCIPAL })).resolves.toEqual({
@@ -227,6 +309,7 @@ describe('Gateway document transfer broker', () => {
       targets: [
         { scope: { kind: 'project', projectId: 41 }, label: 'Compiler', canRead: true, canWrite: true },
         { scope: { kind: 'project', projectId: 42 }, label: 'Read only', canRead: true, canWrite: false },
+        { scope: { kind: 'project', projectId: 43 }, label: 'Runtime', canRead: true, canWrite: true },
       ],
     })
   })

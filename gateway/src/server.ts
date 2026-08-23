@@ -13,6 +13,7 @@ import type {
   GatewayAuditService,
   GatewayAuthService,
   GatewayCollaborationService,
+  GatewayDocumentCatalogService,
   GatewayInstanceService,
   GatewayModelGovernanceService,
   GatewayProjectService,
@@ -29,6 +30,8 @@ export interface GatewayDeps {
   instances: GatewayInstanceService
   governance?: GatewayModelGovernanceService
   collaboration?: GatewayCollaborationService
+  /** Optional organization-level document metadata catalog. */
+  documents?: GatewayDocumentCatalogService
   /** Optional persistent device registry and multi-provider push delivery service. */
   push?: GatewayPushService
   readiness?: () => Awaitable<void>
@@ -406,6 +409,29 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         // this flag only advertises the administrator-only preset choice.
         fullAccess: user.role === 'admin',
       }), 'application/json')
+      return
+    }
+
+    const documentOwnership = /^\/account\/api\/documents\/([^/]+)\/ownership$/.exec(pathname)
+    if (documentOwnership !== null && req.method === 'POST') {
+      if (deps.documents === undefined) { send(res, 503, '{"error":"document-catalog-unavailable"}', 'application/json'); return }
+      let catalogId: string
+      try { catalogId = decodeURIComponent(documentOwnership[1] ?? '') } catch { send(res, 400, '{"error":"invalid-document-id"}', 'application/json'); return }
+      const input = jsonObject(await readBody(req))
+      const ownerUserId = input?.ownerUserId
+      if (!/^[0-9a-f-]{36}$/iu.test(catalogId) || typeof ownerUserId !== 'number'
+        || !Number.isSafeInteger(ownerUserId) || ownerUserId <= 0) {
+        send(res, 400, '{"error":"invalid-ownership-request"}', 'application/json'); return
+      }
+      try {
+        await deps.documents.transferOwnership(user.id, catalogId, ownerUserId)
+        await audit.write({ userId: user.id, action: 'documents.ownership-transfer', detail: JSON.stringify({ catalogId, ownerUserId }), ip: clientIp(req) })
+        res.writeHead(204); res.end()
+      } catch (error) {
+        const status = error instanceof Error && 'status' in error && typeof (error as { status?: unknown }).status === 'number'
+          ? (error as { status: number }).status : 400
+        send(res, status, JSON.stringify({ error: error instanceof Error && 'code' in error ? (error as { code: string }).code : 'ownership-failed' }), 'application/json')
+      }
       return
     }
 

@@ -12,6 +12,7 @@ import type {
 import { listProjectDirectories } from './project-directories.ts'
 import type { GrantMode } from './projects.ts'
 import type { GatewayDeps, GatewayHandlers } from './server.ts'
+import { DocumentCatalogError } from './postgres/document-catalog-service.ts'
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, { 'content-type': 'application/json' })
@@ -44,6 +45,7 @@ function isCodedError(error: unknown): error is Error & { code: string } {
 }
 
 function mapError(error: unknown): { status: number; error: string } {
+  if (error instanceof DocumentCatalogError) return { status: error.status, error: error.code }
   if (error instanceof Error && error.message === 'cannot-remove-last-admin') {
     return { status: 409, error: 'cannot-remove-last-admin' }
   }
@@ -111,6 +113,82 @@ async function dispatch(
     if (deps.governance === undefined) return
     for (const target of await deps.users.list()) await applyModelGovernanceToUser(deps, target.id)
     for (const project of await deps.projects.list()) await applyModelGovernanceToProject(deps, project.id)
+  }
+
+  if (pathname === '/admin/api/documents/metrics' && method === 'GET') {
+    if (deps.documents === undefined) { sendError(res, 503, 'document-catalog-unavailable'); return true }
+    sendJson(res, 200, await deps.documents.adminMetrics())
+    return true
+  }
+
+  if (pathname === '/admin/api/documents' && method === 'GET') {
+    if (deps.documents === undefined) { sendError(res, 503, 'document-catalog-unavailable'); return true }
+    const query = new URL(req.url ?? pathname, 'http://admin').searchParams
+    const scopeKind = query.get('scope')
+    const state = query.get('state')
+    const projectId = query.get('projectId')
+    const ownerUserId = query.get('ownerUserId')
+    const limit = query.get('limit')
+    const offset = query.get('offset')
+    const positive = (value: string | null): number | undefined => {
+      if (value === null || value === '') return undefined
+      const number = Number(value)
+      return Number.isSafeInteger(number) && number > 0 ? number : undefined
+    }
+    if (scopeKind !== null && scopeKind !== 'personal' && scopeKind !== 'project') { sendError(res, 400, 'invalid scope'); return true }
+    if (state !== null && state !== 'active' && state !== 'deleted' && state !== 'all') { sendError(res, 400, 'invalid state'); return true }
+    const project = positive(projectId); const owner = positive(ownerUserId)
+    const requestedLimit = positive(limit)
+    const requestedOffset = offset === null ? undefined : Number(offset)
+    if ((projectId !== null && project === undefined) || (ownerUserId !== null && owner === undefined)
+      || (limit !== null && requestedLimit === undefined)
+      || (offset !== null && (requestedOffset === undefined || !Number.isSafeInteger(requestedOffset) || requestedOffset < 0))) {
+      sendError(res, 400, 'invalid document filter'); return true
+    }
+    sendJson(res, 200, await deps.documents.adminList({
+      ...(scopeKind === null ? {} : { scopeKind }), ...(project === undefined ? {} : { projectId: project }),
+      ...(owner === undefined ? {} : { ownerUserId: owner }), ...(state === null ? {} : { state }),
+      ...(query.get('q') === null ? {} : { query: query.get('q') ?? '' }),
+      ...(requestedLimit === undefined ? {} : { limit: requestedLimit }),
+      ...(requestedOffset === undefined || Number.isNaN(requestedOffset) ? {} : { offset: requestedOffset }),
+    }))
+    return true
+  }
+
+  const documentPath = /^\/admin\/api\/documents\/([^/]+)$/.exec(pathname)
+  if (documentPath !== null) {
+    if (deps.documents === undefined) { sendError(res, 503, 'document-catalog-unavailable'); return true }
+    const catalogId = decodeURIComponent(documentPath[1] ?? '')
+    if (!/^[0-9a-f-]{36}$/iu.test(catalogId)) { sendError(res, 400, 'invalid document id'); return true }
+    if (method === 'GET') {
+      const detail = await deps.documents.detail(catalogId)
+      if (detail === null) { sendError(res, 404, 'document not found'); return true }
+      sendJson(res, 200, detail)
+      return true
+    }
+    if (method === 'DELETE') {
+      await deps.documents.adminDelete(admin.id, catalogId)
+      await write('admin.documents.delete', { catalogId })
+      sendNoContent(res)
+      return true
+    }
+    return false
+  }
+
+  const documentOwnership = /^\/admin\/api\/documents\/([^/]+)\/ownership$/.exec(pathname)
+  if (documentOwnership !== null) {
+    if (deps.documents === undefined) { sendError(res, 503, 'document-catalog-unavailable'); return true }
+    if (method !== 'POST') return false
+    const catalogId = decodeURIComponent(documentOwnership[1] ?? '')
+    const ownerUserId = parseObject(body).ownerUserId
+    if (!/^[0-9a-f-]{36}$/iu.test(catalogId) || typeof ownerUserId !== 'number'
+      || !Number.isSafeInteger(ownerUserId) || ownerUserId <= 0) {
+      sendError(res, 400, 'invalid ownership request'); return true
+    }
+    await deps.documents.transferOwnership(admin.id, catalogId, ownerUserId)
+    await write('admin.documents.ownership-transfer', { catalogId, ownerUserId })
+    sendNoContent(res)
+    return true
   }
 
   const settingsOps = (value: unknown): ModelSettingsPathOp[] => {

@@ -23,8 +23,18 @@ import {
   DocumentTransferError,
   type RuntimeDocumentTransferHandler,
   type RuntimeDocumentTransferCapabilitiesHandler,
+  type RuntimeDocumentTransferDirectoriesHandler,
+  type RuntimeDocumentTransferDirectoryCreateHandler,
+  type RuntimeDocumentTransferPlanHandler,
   type RuntimeDocumentTransferListHandler,
 } from './document-transfer.ts'
+import {
+  DocumentCatalogError,
+  type RuntimeDocumentCatalogAuthorizeHandler,
+  type RuntimeDocumentCatalogOverviewHandler,
+  type RuntimeDocumentCatalogHistoryHandler,
+  type RuntimeDocumentCatalogSyncHandler,
+} from './document-catalog.ts'
 
 export interface RuntimeCredentialSubject {
   organizationId: string
@@ -70,6 +80,17 @@ interface RuntimeApiDependencies {
   documentTransferCapabilities?: RuntimeDocumentTransferCapabilitiesHandler
   /** Optional authorized alternate-scope document listing. */
   documentTransferList?: RuntimeDocumentTransferListHandler
+  documentTransferDirectories?: RuntimeDocumentTransferDirectoriesHandler
+  documentTransferDirectoryCreate?: RuntimeDocumentTransferDirectoryCreateHandler
+  documentTransferPlan?: RuntimeDocumentTransferPlanHandler
+  /** Commit and retry deliberately share the transfer implementation; each rechecks ACLs. */
+  documentTransferCommit?: RuntimeDocumentTransferHandler
+  documentTransferRetry?: RuntimeDocumentTransferHandler
+  /** Optional organization document metadata catalog handlers. */
+  documentCatalogSync?: RuntimeDocumentCatalogSyncHandler
+  documentCatalogAuthorize?: RuntimeDocumentCatalogAuthorizeHandler
+  documentCatalogOverview?: RuntimeDocumentCatalogOverviewHandler
+  documentCatalogHistory?: RuntimeDocumentCatalogHistoryHandler
 }
 
 function send(res: ServerResponse, status: number, value: unknown): void {
@@ -401,6 +422,30 @@ export function createRuntimeApiHandler(
         return true
       }
 
+      if ((pathname === '/internal/runtime/documents/transfer/commit' || pathname === '/internal/runtime/documents/transfer/retry')
+        && req.method === 'POST') {
+        const claims = assertionFor(req, deps.principals, subject, true)!
+        const handler = pathname.endsWith('/retry') ? deps.documentTransferRetry : deps.documentTransferCommit
+        if (handler === undefined) {
+          send(res, 503, { error: 'document-transfer-unavailable' })
+          return true
+        }
+        send(res, 200, await handler({
+          request: req, subject, principal: claims, payload: JSON.parse(body), signal: requestSignal(req),
+        }))
+        return true
+      }
+
+      if (pathname === '/internal/runtime/documents/transfer/plan' && req.method === 'POST') {
+        const claims = assertionFor(req, deps.principals, subject, true)!
+        if (deps.documentTransferPlan === undefined) {
+          send(res, 503, { error: 'document-transfer-unavailable' })
+          return true
+        }
+        send(res, 200, await deps.documentTransferPlan({ subject, principal: claims, payload: JSON.parse(body) }))
+        return true
+      }
+
       if (pathname === '/internal/runtime/documents/transfer/capabilities' && req.method === 'GET') {
         const claims = assertionFor(req, deps.principals, subject, true)!
         if (deps.documentTransferCapabilities === undefined) {
@@ -422,6 +467,66 @@ export function createRuntimeApiHandler(
           principal: claims,
           payload: JSON.parse(body),
         }))
+        return true
+      }
+
+      if (pathname === '/internal/runtime/documents/transfer/directories' && req.method === 'POST') {
+        const claims = assertionFor(req, deps.principals, subject, true)!
+        if (deps.documentTransferDirectories === undefined) {
+          send(res, 503, { error: 'document-transfer-unavailable' })
+          return true
+        }
+        send(res, 200, await deps.documentTransferDirectories({ subject, principal: claims, payload: JSON.parse(body) }))
+        return true
+      }
+
+      if (pathname === '/internal/runtime/documents/transfer/directories/create' && req.method === 'POST') {
+        const claims = assertionFor(req, deps.principals, subject, true)!
+        if (deps.documentTransferDirectoryCreate === undefined) {
+          send(res, 503, { error: 'document-transfer-unavailable' })
+          return true
+        }
+        send(res, 201, await deps.documentTransferDirectoryCreate({ subject, principal: claims, payload: JSON.parse(body) }))
+        return true
+      }
+
+      if (pathname === '/internal/runtime/documents/catalog/sync' && req.method === 'POST') {
+        const claims = assertionFor(req, deps.principals, subject, true)!
+        if (deps.documentCatalogSync === undefined) {
+          send(res, 503, { error: 'document-catalog-unavailable' })
+          return true
+        }
+        send(res, 200, await deps.documentCatalogSync({ subject, principal: claims, payload: JSON.parse(body) }))
+        return true
+      }
+
+      if (pathname === '/internal/runtime/documents/catalog/authorize' && req.method === 'POST') {
+        const claims = assertionFor(req, deps.principals, subject, true)!
+        if (deps.documentCatalogAuthorize === undefined) {
+          send(res, 503, { error: 'document-catalog-unavailable' })
+          return true
+        }
+        send(res, 200, await deps.documentCatalogAuthorize({ subject, principal: claims, payload: JSON.parse(body) }))
+        return true
+      }
+
+      if (pathname === '/internal/runtime/documents/catalog/overview' && req.method === 'GET') {
+        const claims = assertionFor(req, deps.principals, subject, true)!
+        if (deps.documentCatalogOverview === undefined) {
+          send(res, 503, { error: 'document-catalog-unavailable' })
+          return true
+        }
+        send(res, 200, await deps.documentCatalogOverview({ subject, principal: claims }))
+        return true
+      }
+
+      if (pathname === '/internal/runtime/documents/catalog/history' && req.method === 'GET') {
+        const claims = assertionFor(req, deps.principals, subject, true)!
+        if (deps.documentCatalogHistory === undefined) {
+          send(res, 503, { error: 'document-catalog-unavailable' })
+          return true
+        }
+        send(res, 200, await deps.documentCatalogHistory({ subject, principal: claims }))
         return true
       }
 
@@ -673,6 +778,10 @@ export function createRuntimeApiHandler(
 
       return false
     } catch (error) {
+      if (error instanceof DocumentCatalogError) {
+        send(res, error.status, { error: error.code, message: error.message })
+        return true
+      }
       if (error instanceof DocumentTransferError) {
         send(res, error.status, { error: error.code, message: error.message })
         return true

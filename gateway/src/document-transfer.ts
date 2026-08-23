@@ -1,4 +1,4 @@
-/** Gateway broker for copying document snapshots between a user's personal scope and one project scope. */
+/** Gateway broker for copying document snapshots between authorized personal and project scopes. */
 
 import { randomUUID } from 'node:crypto'
 import type { IncomingMessage } from 'node:http'
@@ -15,10 +15,23 @@ import type {
 } from './services.ts'
 import type { ProjectRuntime, RuntimeTarget } from './instances.ts'
 import type { RuntimeCredentialSubject } from './runtime-api.ts'
+import type { PostgresDocumentCatalogService } from './postgres/document-catalog-service.ts'
 
 const MAX_TRANSFER_FILES = 50
 const MAX_DOCUMENT_ID_BYTES = 4096
 const DOCUMENT_UPLOAD_HEADER = 'x-dsh-document-upload'
+const TRANSFER_PLAN_TTL_MS = 300_000
+
+interface TransferPlanRecord {
+  readonly actorId: number
+  readonly source: DocumentTransferScope
+  readonly target: DocumentTransferScope
+  readonly targets?: readonly DocumentTransferScope[]
+  readonly documents: readonly DocumentTransferSelection[]
+  readonly expiresAt: number
+}
+
+const transferPlans = new Map<string, TransferPlanRecord>()
 
 /** Versioned scope selector accepted by the document transfer endpoint. */
 export type DocumentTransferScope =
@@ -33,8 +46,11 @@ export interface DocumentTransferSelection {
 /** Validated transfer request after JSON decoding. */
 export interface DocumentTransferRequest {
   readonly version: 1
+  readonly planId?: string
   readonly source: DocumentTransferScope
   readonly target: DocumentTransferScope
+  /** Administrator-only fan-out targets; absent for the ordinary one-target form. */
+  readonly targets?: readonly DocumentTransferScope[]
   readonly directory?: string
   readonly documents: readonly DocumentTransferSelection[]
 }
@@ -74,6 +90,12 @@ export interface DocumentTransferResponse {
   readonly source: DocumentTransferScopeSummary
   readonly target: DocumentTransferScopeSummary
   readonly items: readonly DocumentTransferItem[]
+  /** Per-target results for an administrator fan-out operation. */
+  readonly targets?: readonly {
+    readonly transferId: string
+    readonly target: DocumentTransferScopeSummary
+    readonly items: readonly DocumentTransferItem[]
+  }[]
 }
 
 /** Safe scope capability returned before a copy is started. */
@@ -132,6 +154,45 @@ export interface RuntimeDocumentTransferListHandler {
   }>
 }
 
+/** Runtime callback for target-folder metadata in an authorized scope. */
+export interface RuntimeDocumentTransferDirectoriesHandler {
+  (input: {
+    readonly subject: RuntimeCredentialSubject
+    readonly principal: GatewayPrincipalClaims
+    readonly payload: unknown
+  }): Promise<{
+    readonly version: 1
+    readonly scope: DocumentTransferScopeSummary
+    readonly directories: readonly { readonly directoryId: string; readonly name: string }[]
+  }>
+}
+
+/** Runtime callback for creating a folder in a writable target scope. */
+export interface RuntimeDocumentTransferDirectoryCreateHandler {
+  (input: {
+    readonly subject: RuntimeCredentialSubject
+    readonly principal: GatewayPrincipalClaims
+    readonly payload: unknown
+  }): Promise<{ readonly version: 1; readonly scope: DocumentTransferScopeSummary; readonly directory: { readonly directoryId: string; readonly name: string } }>
+}
+
+/** Runtime callback for a metadata-only copy plan. */
+export interface RuntimeDocumentTransferPlanHandler {
+  (input: {
+    readonly subject: RuntimeCredentialSubject
+    readonly principal: GatewayPrincipalClaims
+    readonly payload: unknown
+  }): Promise<{
+    readonly version: 1
+    readonly planId: string
+    readonly source: DocumentTransferScopeSummary
+    readonly target: DocumentTransferScopeSummary
+    readonly documents: readonly DocumentTransferTargetRef[]
+    readonly expiresAt: number
+    readonly targets?: readonly { readonly target: DocumentTransferScopeSummary; readonly documents: readonly DocumentTransferTargetRef[] }[]
+  }>
+}
+
 /** Dependencies needed to authorize and stream one cross-scope transfer. */
 export interface DocumentTransferDependencies {
   readonly instances: Pick<GatewayInstanceService, 'ensureRunning'>
@@ -141,6 +202,8 @@ export interface DocumentTransferDependencies {
     & Partial<Pick<GatewayCollaborationService, 'projectsForUser'>>
   readonly principals: GatewayPrincipalSigner
   readonly audit?: Pick<GatewayAuditService, 'write'>
+  /** Optional metadata catalog; transfer remains functional during catalog maintenance. */
+  readonly catalog?: Pick<PostgresDocumentCatalogService, 'recordCopy'>
 }
 
 interface ScopeIdentity {
@@ -196,12 +259,17 @@ function requestValue(value: unknown): DocumentTransferRequest {
     throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document transfer request.')
   }
   const source = scope(candidate.source)
-  const target = scope(candidate.target)
+  if (candidate.planId !== undefined && (typeof candidate.planId !== 'string' || candidate.planId === '' || candidate.planId.length > 128)) {
+    throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid transfer plan id.')
+  }
+  const rawTargets = candidate.targets
+  if (rawTargets !== undefined && (!Array.isArray(rawTargets) || rawTargets.length < 2 || rawTargets.length > 20)) {
+    throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document transfer targets.')
+  }
+  const targets = rawTargets === undefined ? undefined : rawTargets.map(scope)
+  const target = scope(candidate.target ?? targets?.[0])
   if (sameScope(source, target)) {
     throw new DocumentTransferError('DOCUMENT_TRANSFER_SAME_SCOPE', 409, 'The source and target scopes must differ.')
-  }
-  if (source.kind === 'project' && target.kind === 'project') {
-    throw new DocumentTransferError('DOCUMENT_TRANSFER_PROJECT_TO_PROJECT_UNSUPPORTED', 400, 'Project-to-project document transfer is not supported.')
   }
   const directory = candidate.directory
   if (directory !== undefined && !validRelativeId(directory, true)) {
@@ -218,17 +286,13 @@ function requestValue(value: unknown): DocumentTransferRequest {
   })
   return {
     version: 1,
+    ...(typeof candidate.planId === 'string' && candidate.planId !== '' ? { planId: candidate.planId } : {}),
     source,
     target,
+    ...(targets === undefined ? {} : { targets }),
     ...(directory === undefined ? {} : { directory }),
     documents,
   }
-}
-
-function currentScope(subject: RuntimeCredentialSubject): DocumentTransferScope {
-  return subject.target.kind === 'user'
-    ? { kind: 'personal' }
-    : { kind: 'project', projectId: subject.target.id }
 }
 
 function sameScope(left: DocumentTransferScope, right: DocumentTransferScope): boolean {
@@ -384,16 +448,14 @@ async function audit(
 }
 
 /** Create the authenticated Gateway broker used by runtime document consumers. */
-export function createDocumentTransferHandler(
+function createSingleDocumentTransferHandler(
   deps: DocumentTransferDependencies,
 ): RuntimeDocumentTransferHandler {
   return async ({ subject, principal, payload, signal }) => {
     const input = requestValue(payload)
     const actor = syntheticUser(principal)
-    const active = currentScope(subject)
-    if (!sameScope(active, input.source) && !sameScope(active, input.target)) {
-      throw new DocumentTransferError('COLLABORATION_FORBIDDEN', 403, 'The transfer must involve the active runtime scope.')
-    }
+    // The signed principal identifies the actor; scope membership checks below
+    // authorize arbitrary project pairs without requiring a scope switch first.
 
     let sourceMembership: Awaited<ReturnType<GatewayCollaborationService['projectForUser']>> = null
     if (input.source.kind === 'project') {
@@ -507,6 +569,15 @@ export function createDocumentTransferHandler(
         if (!targetResponse.ok) {
           const error = responseError(targetBody)
           items.push({ status: 'failed', source: { name }, error })
+          await deps.catalog?.recordCopy({
+            actorUserId: principal.user.id,
+            source: input.source.kind === 'personal' ? { kind: 'personal', userId: principal.user.id } : { kind: 'project', projectId: input.source.projectId },
+            targetScope: input.target.kind === 'personal' ? { kind: 'personal', userId: principal.user.id } : { kind: 'project', projectId: input.target.projectId },
+            sourceDocId: document.docId,
+            sourceName: name,
+            error,
+            operationId: transferId,
+          }).catch(() => {})
           await audit(deps, principal, transferId, sourceIdentity, targetIdentity, {
             docId: document.docId, name, status: 'failed', code: error.code,
           })
@@ -517,6 +588,15 @@ export function createDocumentTransferHandler(
           ? declaredBytes
           : ref.bytes
         items.push({ status: 'copied', source: { name, bytes, mediaType }, target: ref })
+        await deps.catalog?.recordCopy({
+          actorUserId: principal.user.id,
+          source: input.source.kind === 'personal' ? { kind: 'personal', userId: principal.user.id } : { kind: 'project', projectId: input.source.projectId },
+          targetScope: input.target.kind === 'personal' ? { kind: 'personal', userId: principal.user.id } : { kind: 'project', projectId: input.target.projectId },
+          sourceDocId: document.docId,
+          sourceName: name,
+          target: { docId: ref.docId, name: ref.name, bytes: ref.bytes, mediaType: ref.mediaType, modifiedAt: ref.modifiedAt },
+          operationId: transferId,
+        }).catch(() => {})
         await audit(deps, principal, transferId, sourceIdentity, targetIdentity, {
           docId: document.docId, name, status: 'copied', targetDocId: ref.docId, bytes,
         })
@@ -524,6 +604,15 @@ export function createDocumentTransferHandler(
         if (error instanceof DocumentTransferError && error.status === 404) {
           const item = { status: 'failed' as const, source: { name }, error: { code: error.code, message: error.message } }
           items.push(item)
+          await deps.catalog?.recordCopy({
+            actorUserId: principal.user.id,
+            source: input.source.kind === 'personal' ? { kind: 'personal', userId: principal.user.id } : { kind: 'project', projectId: input.source.projectId },
+            targetScope: input.target.kind === 'personal' ? { kind: 'personal', userId: principal.user.id } : { kind: 'project', projectId: input.target.projectId },
+            sourceDocId: document.docId,
+            sourceName: name,
+            error: item.error,
+            operationId: transferId,
+          }).catch(() => {})
           await audit(deps, principal, transferId, sourceIdentity, targetIdentity, {
             docId: document.docId, name, status: 'failed', code: error.code,
           })
@@ -538,6 +627,15 @@ export function createDocumentTransferHandler(
             : { code: 'DOCUMENT_TRANSFER_FAILED', message: 'Document transfer failed.' },
         }
         items.push(item)
+        await deps.catalog?.recordCopy({
+          actorUserId: principal.user.id,
+          source: input.source.kind === 'personal' ? { kind: 'personal', userId: principal.user.id } : { kind: 'project', projectId: input.source.projectId },
+          targetScope: input.target.kind === 'personal' ? { kind: 'personal', userId: principal.user.id } : { kind: 'project', projectId: input.target.projectId },
+          sourceDocId: document.docId,
+          sourceName: name,
+          error: item.error,
+          operationId: transferId,
+        }).catch(() => {})
         await audit(deps, principal, transferId, sourceIdentity, targetIdentity, {
           docId: document.docId, name, status: 'failed', code: item.error.code,
         })
@@ -550,6 +648,95 @@ export function createDocumentTransferHandler(
       target: { kind: targetIdentity.kind, label: targetIdentity.label },
       items,
     }
+  }
+}
+
+/** Create the transfer broker, including administrator fan-out targets. */
+export function createDocumentTransferHandler(
+  deps: DocumentTransferDependencies,
+): RuntimeDocumentTransferHandler {
+  const single = createSingleDocumentTransferHandler(deps)
+  return async (input) => {
+    const request = requestValue(input.payload)
+    if (request.targets === undefined || request.targets.length <= 1) return single(input)
+    if (input.principal.user.role !== 'admin') {
+      throw new DocumentTransferError('DOCUMENT_TRANSFER_MULTI_TARGET_FORBIDDEN', 403, 'Only organization administrators can copy to multiple project targets.')
+    }
+    const seenTargets = new Set(request.targets.map(target => target.kind === 'personal' ? 'personal' : `project:${String(target.projectId)}`))
+    if (seenTargets.size !== request.targets.length) {
+      throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Duplicate document transfer target.')
+    }
+    const results: Array<{
+      readonly transferId: string
+      readonly source: DocumentTransferScopeSummary
+      readonly target: DocumentTransferScopeSummary
+      readonly items: readonly DocumentTransferItem[]
+    }> = []
+    for (const target of request.targets) {
+      try {
+        const result = await single({
+          ...input,
+          payload: {
+            version: 1,
+            source: request.source,
+            target,
+            ...(request.directory === undefined ? {} : { directory: request.directory }),
+            documents: request.documents,
+          },
+        })
+        results.push({ transferId: result.transferId, source: result.source, target: result.target, items: result.items })
+      } catch (error) {
+        if (input.signal.aborted) throw input.signal.reason
+        if (!(error instanceof DocumentTransferError)) throw error
+        const targetLabel = target.kind === 'personal' ? 'Personal documents' : 'Project documents'
+        results.push({
+          transferId: randomUUID(),
+          source: { kind: request.source.kind, label: request.source.kind === 'personal' ? 'Personal documents' : 'Project documents' },
+          target: { kind: target.kind, label: targetLabel },
+          items: request.documents.map(document => ({
+            status: 'failed' as const,
+            source: { name: sourceName(document.docId) },
+            error: { code: error.code, message: error.message },
+          })),
+        })
+      }
+    }
+    const first = results[0]
+    if (first === undefined) throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'No transfer target was supplied.')
+    return {
+      version: 1,
+      transferId: randomUUID(),
+      source: first.source,
+      target: first.target,
+      items: first.items,
+      targets: results,
+    }
+  }
+}
+
+/** Create a commit wrapper that consumes a metadata-only plan token. */
+export function createDocumentTransferCommitHandler(
+  deps: DocumentTransferDependencies,
+): RuntimeDocumentTransferHandler {
+  const transfer = createDocumentTransferHandler(deps)
+  return async (input) => {
+    const request = requestValue(input.payload)
+    if (request.planId === undefined) {
+      throw new DocumentTransferError('DOCUMENT_TRANSFER_PLAN_REQUIRED', 400, 'A transfer plan is required before commit.')
+    }
+    const plan = transferPlans.get(request.planId)
+    if (plan === undefined || plan.expiresAt <= Date.now() || plan.actorId !== input.principal.user.id) {
+      transferPlans.delete(request.planId)
+      throw new DocumentTransferError('DOCUMENT_TRANSFER_PLAN_EXPIRED', 409, 'The transfer plan has expired or belongs to another actor.')
+    }
+    if (JSON.stringify(plan.source) !== JSON.stringify(request.source)
+      || JSON.stringify(plan.target) !== JSON.stringify(request.target)
+      || JSON.stringify(plan.targets) !== JSON.stringify(request.targets)
+      || JSON.stringify(plan.documents) !== JSON.stringify(request.documents)) {
+      throw new DocumentTransferError('DOCUMENT_TRANSFER_PLAN_MISMATCH', 409, 'The transfer request does not match its plan.')
+    }
+    transferPlans.delete(request.planId)
+    return transfer({ ...input, payload: { ...record(input.payload), planId: undefined } })
   }
 }
 
@@ -579,14 +766,15 @@ export function createDocumentTransferCapabilitiesHandler(
     } catch {
       throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document scope capabilities are unavailable.')
     }
+    const projectTargets = projects.filter(project => subject.target.kind !== 'project' || project.projectId !== subject.target.id).map(project => ({
+      scope: { kind: 'project' as const, projectId: project.projectId },
+      label: project.name,
+      canRead: true,
+      canWrite: project.mode === 'rw',
+    }))
     const targets: DocumentTransferCapability[] = subject.target.kind === 'user'
-      ? projects.map(project => ({
-        scope: { kind: 'project' as const, projectId: project.projectId },
-        label: project.name,
-        canRead: true,
-        canWrite: project.mode === 'rw',
-      }))
-      : [{ scope: { kind: 'personal' as const }, label: 'Personal documents', canRead: true, canWrite: true }]
+      ? projectTargets
+      : [{ scope: { kind: 'personal' as const }, label: 'Personal documents', canRead: true, canWrite: true }, ...projectTargets]
     return {
       version: 1,
       current,
@@ -662,6 +850,161 @@ export function createDocumentTransferListHandler(
       version: 1,
       scope: { kind: identity.kind, label: identity.label },
       documents,
+    }
+  }
+}
+
+/** Create a safe target-folder listing for one authorized alternate scope. */
+export function createDocumentTransferDirectoriesHandler(
+  deps: DocumentTransferDependencies,
+): RuntimeDocumentTransferDirectoriesHandler {
+  return async ({ principal, payload }) => {
+    const candidate = record(payload)
+    if (candidate?.version !== 1) throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document directory request.')
+    const requested = scope(candidate.scope)
+    const actor = syntheticUser(principal)
+    let membership: Awaited<ReturnType<GatewayCollaborationService['projectForUser']>> = null
+    if (requested.kind === 'project') {
+      try { membership = await deps.collaboration.projectForUser(requested.projectId, actor.id) } catch {
+        throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document scope authorization is unavailable.')
+      }
+      if (membership === null) throw new DocumentTransferError('COLLABORATION_FORBIDDEN', 403, 'You cannot read this project document scope.')
+    }
+    const identity: ScopeIdentity = requested.kind === 'personal'
+      ? { kind: 'personal', id: actor.id, label: 'Personal documents' }
+      : { kind: 'project', id: requested.projectId, label: membership?.name ?? 'Project documents', projectName: membership?.name, mode: membership?.mode }
+    const runtime = await runtimeFor(deps, identity, actor)
+    const assertion = deps.principals.issue({
+      user: actor,
+      scope: identity.kind === 'personal' ? { kind: 'personal' } : {
+        kind: 'project', projectId: identity.id, projectName: identity.projectName ?? identity.label, mode: identity.mode ?? 'ro',
+      },
+      runtime: { kind: runtime.target.kind, id: runtime.target.id, generation: runtime.generation },
+    })
+    let response: Response
+    try {
+      response = await fetch(`http://127.0.0.1:${String(runtime.port)}/api/documents/directories`, {
+        method: 'GET', headers: headersFor(runtime, assertion),
+      })
+    } catch {
+      throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document directory listing is unavailable.')
+    }
+    const body = await responseJson(response)
+    if (!response.ok) throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document directory listing is unavailable.')
+    const value = record(body)
+    if (!Array.isArray(value?.directories)) throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned an invalid directory listing.')
+    const directories = value.directories.flatMap(entry => {
+      const item = record(entry)
+      return validRelativeId(item?.directoryId, true) && nonEmptyString(item?.name)
+        ? [{ directoryId: item.directoryId, name: item.name }] : []
+    })
+    return { version: 1, scope: { kind: identity.kind, label: identity.label }, directories }
+  }
+}
+
+/** Create one folder after checking target project write authority. */
+export function createDocumentTransferDirectoryCreateHandler(
+  deps: DocumentTransferDependencies,
+): RuntimeDocumentTransferDirectoryCreateHandler {
+  return async ({ principal, payload }) => {
+    const candidate = record(payload)
+    if (candidate?.version !== 1 || typeof candidate.name !== 'string' || candidate.name === ''
+      || candidate.name.length > 255 || !validRelativeId(candidate.directory, true)) {
+      throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid target document directory.')
+    }
+    const requested = scope(candidate.scope)
+    const actor = syntheticUser(principal)
+    let membership: Awaited<ReturnType<GatewayCollaborationService['projectForUser']>> = null
+    if (requested.kind === 'project') {
+      try { membership = await deps.collaboration.projectForUser(requested.projectId, actor.id) } catch {
+        throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Target project authorization is unavailable.')
+      }
+      if (membership === null || (membership.mode !== 'rw' && !membership.administrator)) {
+        throw new DocumentTransferError('COLLABORATION_FORBIDDEN', 403, 'You cannot create folders in this project scope.')
+      }
+    }
+    const identity: ScopeIdentity = requested.kind === 'personal'
+      ? { kind: 'personal', id: actor.id, label: 'Personal documents' }
+      : { kind: 'project', id: requested.projectId, label: membership?.name ?? 'Project documents', projectName: membership?.name, mode: 'rw' }
+    const runtime = await runtimeFor(deps, identity, actor)
+    const assertion = deps.principals.issue({
+      user: actor,
+      scope: identity.kind === 'personal' ? { kind: 'personal' } : { kind: 'project', projectId: identity.id, projectName: identity.projectName ?? identity.label, mode: 'rw' },
+      runtime: { kind: runtime.target.kind, id: runtime.target.id, generation: runtime.generation },
+    })
+    let response: Response
+    try {
+      response = await fetch(`http://127.0.0.1:${String(runtime.port)}/api/documents/folders?directory=${encodeURIComponent(candidate.directory)}&name=${encodeURIComponent(candidate.name)}`, {
+        method: 'POST', headers: headersFor(runtime, assertion),
+      })
+    } catch {
+      throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Target folder creation is unavailable.')
+    }
+    const body = await responseJson(response)
+    if (!response.ok) {
+      const error = responseError(body)
+      throw new DocumentTransferError(error.code, response.status, error.message)
+    }
+    const row = record(body)
+    if (!validRelativeId(row?.directoryId, false) || !nonEmptyString(row.name)) {
+      throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned invalid folder metadata.')
+    }
+    return { version: 1, scope: { kind: identity.kind, label: identity.label }, directory: { directoryId: row.directoryId, name: row.name } }
+  }
+}
+
+/** Build a short-lived metadata-only plan; commit rechecks every permission. */
+export function createDocumentTransferPlanHandler(
+  deps: DocumentTransferDependencies,
+): RuntimeDocumentTransferPlanHandler {
+  const list = createDocumentTransferListHandler(deps)
+  return async ({ subject, principal, payload }) => {
+    const input = requestValue(payload)
+    if (input.targets !== undefined && input.targets.length > 1 && principal.user.role !== 'admin') {
+      throw new DocumentTransferError('DOCUMENT_TRANSFER_MULTI_TARGET_FORBIDDEN', 403, 'Only organization administrators can create multi-target plans.')
+    }
+    const targetScopes = input.targets ?? [input.target]
+    const targetSummaries: DocumentTransferScopeSummary[] = []
+    for (const target of targetScopes) {
+      if (target.kind === 'personal') {
+        targetSummaries.push({ kind: 'personal', label: 'Personal documents' })
+        continue
+      }
+      let membership: Awaited<ReturnType<GatewayCollaborationService['projectForUser']>>
+      try { membership = await deps.collaboration.projectForUser(target.projectId, principal.user.id) } catch {
+        throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Target project authorization is unavailable.')
+      }
+      if (membership === null || (membership.mode !== 'rw' && !membership.administrator)) {
+        throw new DocumentTransferError('COLLABORATION_FORBIDDEN', 403, 'You cannot add documents to this project scope.')
+      }
+      targetSummaries.push({ kind: 'project', label: membership.name })
+    }
+    const listed = await list({ subject, principal, payload: { version: 1, scope: input.source } })
+    const wanted = new Set(input.documents.map(document => document.docId))
+    const documents = listed.documents.filter(document => wanted.has(document.docId))
+    const now = Date.now()
+    for (const [id, record] of transferPlans) {
+      if (record.expiresAt <= now) transferPlans.delete(id)
+    }
+    const planId = randomUUID()
+    const expiresAt = now + TRANSFER_PLAN_TTL_MS
+    transferPlans.set(planId, {
+      actorId: principal.user.id,
+      source: input.source,
+      target: input.target,
+      ...(input.targets === undefined ? {} : { targets: input.targets }),
+      ...(input.targets === undefined ? {} : { targets: input.targets }),
+      documents: input.documents,
+      expiresAt,
+    })
+    return {
+      version: 1,
+      planId,
+      source: listed.scope,
+      target: targetSummaries[0]!,
+      documents,
+      expiresAt,
+      ...(targetSummaries.length <= 1 ? {} : { targets: targetSummaries.map(target => ({ target, documents })) }),
     }
   }
 }

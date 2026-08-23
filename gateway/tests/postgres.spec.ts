@@ -120,9 +120,9 @@ describePg('PostgreSQL baseline', () => {
     pool = createPostgresPool(DATABASE_URL!, { max: 4 })
     await pool.query('DROP SCHEMA IF EXISTS harness CASCADE')
     const migrated = await runMigrations(pool, MIGRATIONS)
-    expect(migrated).toEqual({ applied: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], current: 10 })
+    expect(migrated).toEqual({ applied: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], current: 11 })
     expect(await runMigrations(pool, MIGRATIONS))
-      .toEqual({ applied: [], current: 10 })
+      .toEqual({ applied: [], current: 11 })
     const pushTables = await pool.query<{ table_name: string }>(`SELECT table_name
       FROM information_schema.tables
       WHERE table_schema='harness' AND table_name IN ('push_devices','push_deliveries')
@@ -130,6 +130,14 @@ describePg('PostgreSQL baseline', () => {
     expect(pushTables.rows).toEqual([
       { table_name: 'push_deliveries' },
       { table_name: 'push_devices' },
+    ])
+    const documentTables = await pool.query<{ table_name: string }>(`SELECT table_name
+      FROM information_schema.tables WHERE table_schema='harness' AND table_name LIKE 'document_%' ORDER BY table_name`)
+    expect(documentTables.rows).toEqual([
+      { table_name: 'document_catalog' },
+      { table_name: 'document_history' },
+      { table_name: 'document_operation_items' },
+      { table_name: 'document_operations' },
     ])
     const providerColumn = await pool.query<{ is_nullable: string; column_default: string | null }>(`SELECT is_nullable,column_default
       FROM information_schema.columns

@@ -28,6 +28,7 @@ import type {
   ProjectInvitation,
   ProjectRow,
 } from './projects.ts'
+import type { PostgresDocumentCatalogService } from './postgres/document-catalog-service.ts'
 
 /** A service result that may come from an in-process store or an asynchronous database. */
 export type Awaitable<T> = T | Promise<T>
@@ -125,6 +126,12 @@ export interface GatewayAuditService {
     limit?: number
   }): Awaitable<AuditRow[]>
 }
+
+/** Organization document metadata and audited ownership operations. */
+export type GatewayDocumentCatalogService = Pick<
+  PostgresDocumentCatalogService,
+  'adminList' | 'adminMetrics' | 'detail' | 'transferOwnership' | 'adminDelete'
+>
 
 /** Model authorization, pricing, quota, and usage operations consumed by the Gateway. */
 export interface GatewayModelGovernanceService {

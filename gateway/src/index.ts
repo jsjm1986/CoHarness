@@ -31,9 +31,15 @@ import { createPostgresPushService } from './push-notifications.ts'
 import { createRuntimeApiHandler } from './runtime-api.ts'
 import {
   createDocumentTransferCapabilitiesHandler,
+  createDocumentTransferDirectoriesHandler,
+  createDocumentTransferDirectoryCreateHandler,
+  createDocumentTransferCommitHandler,
+  createDocumentTransferPlanHandler,
   createDocumentTransferListHandler,
   createDocumentTransferHandler,
 } from './document-transfer.ts'
+import { createDocumentCatalogHandlers } from './document-catalog.ts'
+import { PostgresDocumentCatalogService } from './postgres/document-catalog-service.ts'
 import { runtimeDirectoryGrants } from './runtime-directory-grants.ts'
 import { createGatewayServer, type GatewayDeps } from './server.ts'
 import { createUsageIntakeServer } from './usage-intake.ts'
@@ -81,6 +87,8 @@ const governance = new PostgresModelGovernanceService(
   cfg.usageTimeZone,
 )
 const collaboration = new PostgresCollaborationService(context)
+const documentCatalog = new PostgresDocumentCatalogService(context)
+const documentCatalogHandlers = createDocumentCatalogHandlers(documentCatalog, audit)
 const push = createPostgresPushService(context, cfg)
 const principalKeys = loadPrincipalKeys(cfg.principalKeyDir, cfg.organizationSlug, cfg.principalAssertionTtlMs)
 const instanceRepository = new PostgresInstanceRepository(context, cfg.instancePortBase)
@@ -114,6 +122,7 @@ const deps: GatewayDeps = {
   audit,
   governance,
   collaboration,
+  documents: documentCatalog,
   push,
   instances: new InstanceManager(instanceRepository, cfg, launcher, {
     principalPublicKey: principalKeys.publicKeyPem,
@@ -147,6 +156,34 @@ const server = createGatewayServer(deps, {
       collaboration,
       principals: principalKeys.signer,
       audit,
+      catalog: documentCatalog,
+    }),
+    documentTransferCommit: createDocumentTransferCommitHandler({
+      instances: deps.instances,
+      users,
+      projects,
+      collaboration,
+      principals: principalKeys.signer,
+      audit,
+      catalog: documentCatalog,
+    }),
+    documentTransferRetry: createDocumentTransferHandler({
+      instances: deps.instances,
+      users,
+      projects,
+      collaboration,
+      principals: principalKeys.signer,
+      audit,
+      catalog: documentCatalog,
+    }),
+    documentTransferPlan: createDocumentTransferPlanHandler({
+      instances: deps.instances,
+      users,
+      projects,
+      collaboration,
+      principals: principalKeys.signer,
+      audit,
+      catalog: documentCatalog,
     }),
     documentTransferCapabilities: createDocumentTransferCapabilitiesHandler({ collaboration }),
     documentTransferList: createDocumentTransferListHandler({
@@ -157,6 +194,26 @@ const server = createGatewayServer(deps, {
       principals: principalKeys.signer,
       audit,
     }),
+    documentTransferDirectories: createDocumentTransferDirectoriesHandler({
+      instances: deps.instances,
+      users,
+      projects,
+      collaboration,
+      principals: principalKeys.signer,
+      audit,
+    }),
+    documentTransferDirectoryCreate: createDocumentTransferDirectoryCreateHandler({
+      instances: deps.instances,
+      users,
+      projects,
+      collaboration,
+      principals: principalKeys.signer,
+      audit,
+    }),
+    documentCatalogSync: documentCatalogHandlers.sync,
+    documentCatalogAuthorize: documentCatalogHandlers.authorize,
+    documentCatalogOverview: documentCatalogHandlers.overview,
+    documentCatalogHistory: documentCatalogHandlers.history,
   }),
 })
 // Bind loopback only: the gateway is reached through the TLS entry (Cloudflare

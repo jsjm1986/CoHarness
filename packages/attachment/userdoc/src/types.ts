@@ -115,10 +115,22 @@ export interface UserDocTransferSelection {
 /** Browser/runtime request for a one-way document snapshot copy. */
 export interface UserDocTransferRequest {
   readonly version: 1
+  readonly planId?: string
   readonly source: UserDocScope
   readonly target: UserDocScope
   readonly directory?: UserDocDirectoryId
   readonly documents: readonly UserDocTransferSelection[]
+}
+
+/** Metadata-only transfer plan returned before bytes are streamed. */
+export interface UserDocTransferPlanResponse {
+  readonly version: 1
+  readonly planId: string
+  readonly source: UserDocTransferScopeSummary
+  readonly target: UserDocTransferScopeSummary
+  readonly documents: readonly UserDocTransferTargetRef[]
+  readonly expiresAt: number
+  readonly targets?: readonly { readonly target: UserDocTransferScopeSummary; readonly documents: readonly UserDocTransferTargetRef[] }[]
 }
 
 /** Safe target metadata returned after a document snapshot is copied. */
@@ -156,6 +168,12 @@ export interface UserDocTransferResponse {
   readonly source: UserDocTransferScopeSummary
   readonly target: UserDocTransferScopeSummary
   readonly items: readonly UserDocTransferItem[]
+  /** Per-target results for administrator fan-out copies. */
+  readonly targets?: readonly {
+    readonly transferId: string
+    readonly target: UserDocTransferScopeSummary
+    readonly items: readonly UserDocTransferItem[]
+  }[]
 }
 
 /** Safe scope capability advertised by a Gateway-backed document runtime. */
@@ -181,6 +199,72 @@ export interface UserDocTransferListResponse {
   readonly version: 1
   readonly scope: UserDocTransferScopeSummary
   readonly documents: readonly UserDocTransferListedDocument[]
+}
+
+/** Safe directory metadata returned for an authorized target scope. */
+export interface UserDocTransferDirectoriesResponse {
+  readonly version: 1
+  readonly scope: UserDocTransferScopeSummary
+  readonly directories: readonly { readonly directoryId: UserDocDirectoryId; readonly name: string }[]
+}
+
+/** Metadata-only row from the organization document catalog. */
+export interface UserDocCatalogRow {
+  readonly catalogId: string
+  readonly scope: {
+    readonly kind: 'personal' | 'project'
+    readonly id?: number
+    readonly label: string
+    readonly mode?: 'ro' | 'rw'
+  }
+  readonly docId: UserDocId
+  readonly directoryId: string
+  readonly name: string
+  readonly bytes: number
+  readonly mediaType: string
+  readonly modifiedAt: number
+  readonly owner: { readonly id: number; readonly displayName: string } | null
+  readonly ownerSource: 'upload' | 'transfer' | 'legacy' | 'admin'
+  readonly state: 'active' | 'deleted'
+  readonly legacy: boolean
+  readonly lineageRootId: string | null
+}
+
+/** Aggregate counters for one metadata-only organization overview. */
+export interface UserDocCatalogMetrics {
+  readonly total: number
+  readonly active: number
+  readonly deleted: number
+  readonly personal: number
+  readonly project: number
+  readonly bytes: number
+  readonly operations24h: number
+  readonly failures24h: number
+}
+
+/** Metadata-only organization document overview. */
+export interface UserDocCatalogOverview {
+  readonly version: 1
+  readonly documents: readonly UserDocCatalogRow[]
+  readonly metrics: UserDocCatalogMetrics
+}
+
+/** One audited metadata operation in the current scope. */
+export interface UserDocCatalogHistoryItem {
+  readonly id: number
+  readonly eventKind: string
+  readonly actor: { readonly id: number; readonly displayName: string } | null
+  readonly operationId: string | null
+  readonly detail: unknown
+  readonly createdAt: number
+  readonly catalogId: string | null
+  readonly documentName: string | null
+}
+
+/** Current-scope metadata history response. */
+export interface UserDocCatalogHistory {
+  readonly version: 1
+  readonly items: readonly UserDocCatalogHistoryItem[]
 }
 
 /** Exact model-facing representation frozen when a document prompt is admitted. */

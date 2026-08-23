@@ -14,7 +14,7 @@ This is deliberately the opposite of [`dsh-attachment`](../attachment/README.md)
 
 Storage is not content-addressed, so two uploads of identical bytes are two files with two identifiers. Deleting one cannot affect the other, which is what a person expects of files in their own directory.
 
-Personal and project stores are isolated runtime stores. The Gateway document broker can copy a snapshot between them without making a document id or path portable; the target store resolves a new id and name. Transfer provenance belongs to the Gateway audit record rather than to a live cross-runtime reference.
+Personal and project stores are isolated runtime stores. The Gateway document broker can copy a snapshot between any two authorized scopes, including project-to-project, without making a document id or path portable; the target store resolves a new id and name. An organization-level metadata catalog records ownership, snapshot lineage, retries, and audited operations while file bytes remain in the runtime store.
 
 ## Model Experience
 

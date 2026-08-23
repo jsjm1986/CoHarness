@@ -1450,6 +1450,136 @@ a {
   color: var(--text);
 }
 
+.documentsTable td {
+  vertical-align: middle;
+}
+
+.tableLink {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.tableLink:hover strong {
+  color: var(--accent);
+}
+
+.documentIdentity {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 2px 8px;
+  min-width: 0;
+}
+
+.documentIdentity svg {
+  grid-row: span 2;
+  color: var(--text-tertiary);
+}
+
+.documentIdentity strong,
+.documentIdentity small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.documentIdentity small {
+  color: var(--text-tertiary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+
+.metricWarning {
+  color: var(--warning);
+}
+
+.inputWithIcon {
+  position: relative;
+}
+
+.inputWithIcon > svg {
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  width: 16px;
+  height: 16px;
+  color: var(--text-tertiary);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.inputWithIcon .input {
+  padding-left: 34px;
+}
+
+.documentDetail {
+  display: grid;
+  gap: 18px;
+}
+
+.ownershipForm {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.ownershipForm .field {
+  flex: 1;
+}
+
+.detailDivider {
+  height: 1px;
+  background: var(--border);
+}
+
+.documentDetail h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: 14px;
+}
+
+.documentDetail h3 svg {
+  width: 16px;
+  height: 16px;
+  color: var(--accent);
+}
+
+.historyList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.historyList li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-subtle);
+}
+
+.historyList li > span:first-child {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.historyList small {
+  color: var(--text-secondary);
+}
+
 .mobileActions {
   display: flex;
   align-items: center;

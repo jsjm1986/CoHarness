@@ -12,13 +12,13 @@ This package is part of the `@deepseek-ai/dsh-client-ui-documents` bundle and is
 
 The plugin adds a **Documents** button to the sidebar footer (alongside the workspace scope selector). The rail shows an icon with a tooltip; the expanded sidebar shows the Documents label beside the icon. Clicking it opens a manager dialog for the current scope (personal or project workspace).
 
-The dialog is 960px wide on viewports at least 768px and a full-width bottom sheet below that. A breadcrumb follows the current folder. The toolbar contains name search, type and sort selects, New Folder, upload, and refresh; uploads and desktop drops land in the current folder. A caption states personal vs project visibility and the filtered document count.
+The dialog is a full-height workbench on desktop and a responsive sheet on small screens. A scope rail switches between personal documents, every joined project, and a metadata-only **All authorized scopes** view while preserving the conversation behind the overlay. A breadcrumb follows the current folder. The toolbar contains name search, type and sort selects, New Folder, upload, refresh, and current-scope history; uploads and desktop drops land in the current folder. A caption states personal vs project visibility and the filtered document count. Copy uses a metadata plan, target-folder selector, and per-file retry controls.
 
 Select one or more rows and choose **Copy to another scope** to create a snapshot in a writable project or in personal documents. The manager shows only safe scope labels; Gateway performs authorization and streaming, resolves target name conflicts without overwriting, and reports each file independently. A successful copy can be attached to the active composer as a durable, non-owning draft.
 
 The composer’s Documents control opens the same manager, so a copy started from the input bar returns to that draft through the manager attach command.
 
-The manager can browse an authorized alternate personal/project source as metadata-only rows. Alternate rows expose selection and copy, while preview, download, move, and delete stay bound to the active runtime store.
+The manager can browse an authorized alternate personal/project source as metadata-only rows. Alternate rows expose selection and copy, while preview, download, move, and delete stay bound to the active runtime store. The all-scope view never exposes file bytes or host paths; each row can be copied into a writable target, with target-folder selection and folder creation.
 
 Folder rows open the folder and expose Rename and Delete; deletion is confirmed and succeeds only for an empty folder. Document rows show a checkbox, ellipsized name, size, and Add to conversation / Preview / Move / Download / Delete. Add to conversation references the stored document directly, so it does not upload a duplicate. Move supports one document or the current selection and offers the root plus every folder as destinations. Compact layouts wrap document actions below the name so 44px touch targets and long names cannot overlap.
 
@@ -58,6 +58,6 @@ The manager reads and writes the same `/api/documents` store that conversation a
 - Preview is limited to images, PDFs, and text-based files; other media types show a download fallback.
 - Text previews are capped at 256 KiB; larger text files require download.
 - Deleting a document does not rewrite session history, so previously sent messages that reference the document can no longer retrieve its content.
-- Cross-scope copies are snapshots, not live synchronization; the manager does not offer project-to-project transfers.
+- Cross-scope copies are snapshots, not live synchronization; project-to-project transfers are supported when both scopes are authorized.
 - Listings have no server-side pagination; each current folder is returned in one response and documents are paged in the browser.
 - Folder deletion is empty-only; the UI does not recursively delete a folder tree.
