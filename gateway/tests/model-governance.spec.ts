@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { loadConfig } from '../src/config.ts'
 import { openDb } from '../src/db.ts'
-import { ModelGovernanceService, type UsageEvent } from '../src/model-governance.ts'
+import { ModelGovernanceService, type ModelRegistrationEvent, type UsageEvent } from '../src/model-governance.ts'
 import { UserService } from '../src/users.ts'
 
 async function setup() {
@@ -69,5 +69,28 @@ describe('ModelGovernanceService', () => {
     expect(() => governance.setUserAccess(user.id, 'missing', 'm', true)).toThrow(/unknown model/)
     expect(() => governance.ingest({ kind: 'user', id: user.id }, event({ occurredAt: -1 }))).toThrow(/occurredAt/)
     expect(() => governance.setQuota('role', 'owner', 1, null)).toThrow(/admin or user/)
+  })
+
+  it('deduplicates personal registration events and derives current counts', async () => {
+    const { governance, user } = await setup()
+    const registration = (overrides: Partial<ModelRegistrationEvent> = {}): ModelRegistrationEvent => ({
+      kind: 'model-registration', eventId: 'registration-1', occurredAt: 100, provider: 'custom',
+      action: 'provider-created', scope: 'personal', ...overrides,
+    })
+    expect(governance.ingestRegistration({ kind: 'user', id: user.id }, registration())).toEqual({ inserted: true })
+    expect(governance.ingestRegistration({ kind: 'user', id: user.id }, registration())).toEqual({ inserted: false })
+    governance.ingestRegistration({ kind: 'user', id: user.id }, registration({
+      eventId: 'registration-2', model: 'model-a', action: 'model-created', occurredAt: 101,
+    }))
+    expect(governance.registrationReport({ userId: user.id }).summary).toMatchObject({
+      providerCount: 1, modelCount: 1, eventCount: 2, createdCount: 2,
+    })
+    governance.ingestRegistration({ kind: 'user', id: user.id }, registration({
+      eventId: 'registration-3', action: 'model-deleted', model: 'model-a', occurredAt: 102,
+    }))
+    governance.ingestRegistration({ kind: 'user', id: user.id }, registration({
+      eventId: 'registration-4', action: 'provider-deleted', occurredAt: 103,
+    }))
+    expect(governance.registrationReport({ userId: user.id }).summary).toMatchObject({ providerCount: 0, modelCount: 0, deletedCount: 2 })
   })
 })

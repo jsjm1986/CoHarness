@@ -1310,6 +1310,20 @@ a {
   font-size: 12px;
 }
 
+.registrationFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.roleDefaults.registrationSummary {
+  margin-bottom: 16px;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
 .roleDefaults {
   align-items: flex-start;
   flex-direction: column;
@@ -2181,6 +2195,12 @@ a {
 
   .modelUserPicker > span {
     display: none;
+  }
+
+  .registrationFilters > .input,
+  .registrationFilters > .select {
+    min-width: 0;
+    flex: 1 1 150px;
   }
 
   .projectUsageDetails {

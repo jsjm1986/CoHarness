@@ -10,13 +10,13 @@ function tables(db: Database.Database): string[] {
     .map(r => r.name)
 }
 
-describe('schema v4 migration', () => {
-  it('creates project tables on a fresh database and records schema_version=5', () => {
+describe('SQLite schema migration', () => {
+  it('creates project tables on a fresh database and records schema_version=6', () => {
     const file = join(mkdtempSync(join(tmpdir(), 'hgw-')), 'g.sqlite')
     const db = openDb(file)
-    expect(tables(db)).toEqual(expect.arrayContaining(['projects', 'project_members', 'schema_meta']))
+    expect(tables(db)).toEqual(expect.arrayContaining(['projects', 'project_members', 'model_registration_events', 'schema_meta']))
     expect(tables(db)).not.toEqual(expect.arrayContaining(['groups', 'dir_grants']))
-    expect((db.prepare(`SELECT version FROM schema_meta`).get() as { version: number }).version).toBe(5)
+    expect((db.prepare(`SELECT version FROM schema_meta`).get() as { version: number }).version).toBe(6)
   })
 
   it('folds dir_grants and group members into projects; rw beats ro; then drops old tables', () => {

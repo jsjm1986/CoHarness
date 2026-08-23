@@ -6,6 +6,10 @@ import type {
   ModelProviderProtocol,
   ModelProviderRow,
   ModelUsageSubject,
+  ModelRegistrationEvent,
+  ModelRegistrationFilter,
+  ModelRegistrationReport,
+  ModelRegistrationRow,
   ModelRow,
   RuntimeModelPolicy,
   RuntimeModelProvider,
@@ -1076,6 +1080,104 @@ export class PostgresModelGovernanceService {
         alerts: await this.evaluateAlerts(client, subject, monthOf(event.occurredAt, this.timeZone)),
       }
     })
+  }
+
+  async ingestRegistration(subject: ModelUsageSubject, event: ModelRegistrationEvent): Promise<{ inserted: boolean }> {
+    if (subject.kind !== 'user') throw new Error('model registration events require a personal user runtime')
+    if (event === null || typeof event !== 'object' || event.kind !== 'model-registration') {
+      throw new Error('model registration event must have kind model-registration')
+    }
+    nonEmpty(event.eventId, 'eventId')
+    if (!Number.isSafeInteger(event.occurredAt) || event.occurredAt < 0) {
+      throw new Error('occurredAt must be a non-negative safe integer')
+    }
+    const actions: ModelRegistrationEvent['action'][] = [
+      'provider-created', 'provider-modified', 'provider-deleted',
+      'model-created', 'model-modified', 'model-deleted',
+    ]
+    if (!actions.includes(event.action)) throw new Error('invalid model registration action')
+    if (event.scope !== 'personal') throw new Error('model registration scope must be personal')
+    const provider = nonEmpty(event.provider, 'provider')
+    const modelAction = event.action.startsWith('model-')
+    const model = modelAction ? nonEmpty(event.model ?? '', 'model') : null
+    if (!modelAction && event.model !== undefined) throw new Error('provider registration events cannot name a model')
+    const user = await internalUserId(this.context.pool, this.context.organizationId, subject.id)
+    if (user === null) throw new Error(`unknown user ${String(subject.id)}`)
+    const inserted = await this.context.pool.query<{ event_id: string }>(`INSERT INTO harness.model_registration_events(
+      event_id,organization_id,user_id,occurred_at,received_at,provider_key,model_key,action,scope
+    ) VALUES($1,$2,$3,to_timestamp($4/1000.0),now(),$5,$6,$7,$8)
+      ON CONFLICT(organization_id,event_id) DO NOTHING RETURNING event_id`, [
+      event.eventId, this.context.organizationId, user, event.occurredAt, provider, model, event.action, event.scope,
+    ])
+    return { inserted: inserted.rows.length !== 0 }
+  }
+
+  async registrationReport(filter: ModelRegistrationFilter = {}): Promise<ModelRegistrationReport> {
+    const offset = filter.offset ?? 0
+    const limit = filter.limit ?? 100
+    if (!Number.isSafeInteger(offset) || offset < 0) throw new Error('registration offset must be a non-negative safe integer')
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 500) throw new Error('registration limit must be from 1 through 500')
+    const values: unknown[] = [this.context.organizationId]
+    const clauses = ['e.organization_id=$1']
+    const add = (sql: string, value: unknown): void => { values.push(value); clauses.push(sql.replace('?', `$${String(values.length)}`)) }
+    if (filter.userId !== undefined) {
+      if (!Number.isSafeInteger(filter.userId) || filter.userId <= 0) throw new Error('userId must be a positive safe integer')
+      add('u.public_id=?', filter.userId)
+    }
+    if (filter.provider !== undefined) add('e.provider_key=?', nonEmpty(filter.provider, 'provider'))
+    if (filter.model !== undefined) add('e.model_key=?', nonEmpty(filter.model, 'model'))
+    if (filter.action !== undefined) {
+      const actions: readonly ModelRegistrationEvent['action'][] = [
+        'provider-created', 'provider-modified', 'provider-deleted',
+        'model-created', 'model-modified', 'model-deleted',
+      ]
+      if (!actions.includes(filter.action)) throw new Error('invalid model registration action')
+      add('e.action=?', filter.action)
+    }
+    if (filter.fromMs !== undefined) {
+      if (!Number.isSafeInteger(filter.fromMs) || filter.fromMs < 0) throw new Error('fromMs must be a non-negative safe integer')
+      add('e.occurred_at>=to_timestamp(?/1000.0)', filter.fromMs)
+    }
+    if (filter.toMs !== undefined) {
+      if (!Number.isSafeInteger(filter.toMs) || filter.toMs < 0) throw new Error('toMs must be a non-negative safe integer')
+      add('e.occurred_at<to_timestamp(?/1000.0)', filter.toMs)
+    }
+    const result = await this.context.pool.query<{
+      event_id: string; user_id: string; occurred_at: Date; received_at: Date; provider_key: string;
+      model_key: string | null; action: ModelRegistrationEvent['action']; scope: 'personal'
+    }>(`SELECT e.event_id,u.public_id::text user_id,e.occurred_at,e.received_at,e.provider_key,e.model_key,e.action,e.scope
+      FROM harness.model_registration_events e JOIN harness.users u
+        ON u.id=e.user_id AND u.organization_id=e.organization_id
+      WHERE ${clauses.join(' AND ')} ORDER BY e.occurred_at DESC,e.event_id DESC`, values)
+    const all: ModelRegistrationRow[] = result.rows.map(row => ({
+      eventId: row.event_id, userId: safeCount(row.user_id, 'user id'), occurredAt: row.occurred_at.getTime(),
+      receivedAt: row.received_at.getTime(), provider: row.provider_key, model: row.model_key,
+      action: row.action, scope: row.scope,
+    }))
+    const providerState = new Map<string, ModelRegistrationEvent['action']>()
+    const modelState = new Map<string, ModelRegistrationEvent['action']>()
+    for (const row of [...all].sort((a, b) => a.occurredAt - b.occurredAt
+      || a.receivedAt - b.receivedAt || a.eventId.localeCompare(b.eventId))) {
+      if (row.model === null) providerState.set(`${row.userId}\0${row.provider}`, row.action)
+      else modelState.set(`${row.userId}\0${row.provider}\0${row.model}`, row.action)
+    }
+    for (const [key, action] of modelState) {
+      if (action === 'model-deleted') continue
+      const providerKey = key.slice(0, key.lastIndexOf('\0'))
+      if (!providerState.has(providerKey)) providerState.set(providerKey, 'provider-created')
+    }
+    const actionCount = (prefix: string): number => all.filter(row => row.action.startsWith(prefix)).length
+    return {
+      summary: {
+        providerCount: [...providerState.values()].filter(action => action !== 'provider-deleted').length,
+        modelCount: [...modelState.values()].filter(action => action !== 'model-deleted').length,
+        eventCount: all.length,
+        createdCount: actionCount('provider-created') + actionCount('model-created'),
+        modifiedCount: actionCount('provider-modified') + actionCount('model-modified'),
+        deletedCount: actionCount('provider-deleted') + actionCount('model-deleted'),
+      },
+      rows: all.slice(offset, offset + limit),
+    }
   }
 
   async summary(subject: ModelUsageSubject, month = monthOf(Date.now(), this.timeZone)): Promise<UsageSummary> {

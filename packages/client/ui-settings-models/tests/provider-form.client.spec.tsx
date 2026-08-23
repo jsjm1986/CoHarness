@@ -1034,7 +1034,7 @@ describe('hand-declared providers', () => {
   it('never contradicts a filled-in field with the next gate\u2019s copy', () => {
     mountCard()
     const routeField = screen.getByLabelText(en.customRoute)
-    fireEvent.change(routeField, { target: { value: '2' } })
+    fireEvent.change(routeField, { target: { value: '\u0001' } })
     fireEvent.change(screen.getByLabelText(en.baseUrl), { target: { value: 'https://acme.test/v1' } })
     fireEvent.click(screen.getByRole('button', { name: en.addModel }))
     fireEvent.change(screen.getByLabelText(`${en.modelId} 1`), { target: { value: 'm' } })
@@ -1051,21 +1051,22 @@ describe('hand-declared providers', () => {
     expect(buttonNamed(en.create).disabled).toBe(false)
   })
 
-  it('refuses a route id whose derived credential reference would be illegal', () => {
+  it('accepts arbitrary route ids while deriving a safe credential reference', () => {
     mountCard()
     const routeField = screen.getByLabelText(en.customRoute)
     fireEvent.change(routeField, { target: { value: 'https://acme.test/v1' } })
-
-    // Without this check a digit-leading id passes the card and fails at the
-    // credential seam with a raw regular expression: the
-    // reference derives as `123_API_KEY`, and a credential reference is a
-    // POSIX shell identifier, which cannot start with a digit.
     fireEvent.change(routeField, { target: { value: '123' } })
-    expect(screen.getByText(en.customRouteInvalid)).toBeTruthy()
-    expect(buttonNamed(en.create).disabled).toBe(true)
+    expect(screen.queryByText(en.customRouteInvalid)).toBeNull()
 
     fireEvent.change(routeField, { target: { value: 'a1' } })
     expect(screen.queryByText(en.customRouteInvalid)).toBeNull()
+  })
+
+  it('keeps the organization namespace out of personal Provider creation', () => {
+    mountCard()
+    fireEvent.change(screen.getByLabelText(en.customRoute), { target: { value: 'org-private' } })
+    expect(screen.getByText(en.customRouteReserved)).toBeTruthy()
+    expect(buttonNamed(en.create).disabled).toBe(true)
   })
 
   it('styles a rejected route id as a fault and its guidance as a hint', () => {
@@ -1075,7 +1076,7 @@ describe('hand-declared providers', () => {
     // fault, what they have yet to do reads as guidance.
     expect(screen.getByText(en.customRouteHint).className).toMatch(/advancedHint/)
 
-    fireEvent.change(routeField, { target: { value: '2' } })
+    fireEvent.change(routeField, { target: { value: '\u0001' } })
     expect(screen.getByText(en.customRouteInvalid).className).toMatch(/error/)
 
     fireEvent.change(routeField, { target: { value: 'openai' } })
@@ -1086,9 +1087,10 @@ describe('hand-declared providers', () => {
     // The two rules have to stay in step; this is the relation, checked
     // directly rather than through the DOM.
     const CREDENTIAL_REF = /^[A-Za-z_][A-Za-z0-9_]*$/
-    for (const id of ['a', 'ds', 'a1', 'acme-gateway', 'x-1-y', 'zz9']) {
+    for (const id of ['a', 'ds', 'a1', 'acme-gateway', 'x-1-y', 'zz9', '123', 'Acme Gateway', 'a_b']) {
       expect(CREDENTIAL_REF.test(deriveKeyRef(id))).toBe(true)
     }
+    expect(deriveKeyRef('a-b')).not.toBe(deriveKeyRef('a_b'))
   })
 
   it('names the blocked gate under the form, and nothing once it is satisfied', () => {
@@ -1182,7 +1184,7 @@ describe('hand-declared providers', () => {
     expect(buttonNamed(en.create).disabled).toBe(true)
 
     fireEvent.change(screen.getByLabelText(en.customRoute), { target: { value: 'Acme Gateway' } })
-    expect(screen.getByText(en.customRouteInvalid)).toBeTruthy()
+    expect(screen.queryByText(en.customRouteInvalid)).toBeNull()
     fireEvent.change(screen.getByLabelText(en.customRoute), { target: { value: 'openai' } })
     expect(screen.getByText(en.customRouteTaken)).toBeTruthy()
 

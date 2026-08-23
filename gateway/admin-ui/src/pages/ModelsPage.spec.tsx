@@ -14,6 +14,7 @@ vi.mock('../api.ts', async (importOriginal) => {
     discoverOrganizationModels: vi.fn(),
     getModelAccess: vi.fn(),
     listModelProviders: vi.fn(),
+    listModelRegistrations: vi.fn(),
     listModels: vi.fn(),
     listUsers: vi.fn(),
     mutateOrganizationModelSettings: vi.fn(),
@@ -116,6 +117,14 @@ describe('ModelsPage', () => {
     vi.mocked(api.unsetOrganizationCredential).mockResolvedValue(undefined)
     vi.mocked(api.discoverOrganizationModels).mockResolvedValue({ models: [] })
     vi.mocked(api.listModelProviders).mockResolvedValue(providers)
+    vi.mocked(api.listModelRegistrations).mockResolvedValue({
+      summary: { providerCount: 1, modelCount: 1, eventCount: 2, createdCount: 2, modifiedCount: 0, deletedCount: 0 },
+      rows: [{
+        eventId: 'registration-1', userId: 7, occurredAt: Date.parse('2026-08-24T00:00:00Z'),
+        receivedAt: Date.parse('2026-08-24T00:00:00Z'), provider: 'custom', model: 'chat',
+        action: 'model-created', scope: 'personal',
+      }],
+    })
     vi.mocked(api.listModels).mockResolvedValue(models)
     vi.mocked(api.listUsers).mockResolvedValue(users)
     vi.mocked(api.getModelAccess).mockResolvedValue({
@@ -141,6 +150,17 @@ describe('ModelsPage', () => {
     expect(screen.getByRole('button', { name: '获取可用模型' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '恢复默认模型' })).toBeNull()
     expect(screen.queryByRole('button', { name: '登记模型' })).toBeNull()
+  })
+
+  it('shows personal registration history without exposing an organization write action', async () => {
+    const user = userEvent.setup()
+    render(<ModelsPage />)
+    await screen.findByText('组织主连接')
+    await user.click(screen.getByRole('button', { name: '个人登记' }))
+    expect(await screen.findByText('个人 Provider/model 登记')).toBeTruthy()
+    expect(screen.getAllByText('新增 model').length).toBeGreaterThan(0)
+    expect(screen.getByText('custom')).toBeTruthy()
+    expect(api.listModelRegistrations).toHaveBeenCalled()
   })
 
   it('creates an org-prefixed Provider with a complete model profile and credential', async () => {

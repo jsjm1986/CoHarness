@@ -7,7 +7,7 @@ import { applyModelGovernanceToUser, writeModelGovernanceFile } from '../src/app
 import { AuditService } from '../src/audit.ts'
 import { loadConfig } from '../src/config.ts'
 import { openDb } from '../src/db.ts'
-import { ModelGovernanceService, type UsageEvent } from '../src/model-governance.ts'
+import { ModelGovernanceService, type ModelRegistrationEvent, type UsageEvent } from '../src/model-governance.ts'
 import { createUsageIntakeServer } from '../src/usage-intake.ts'
 import { UserService } from '../src/users.ts'
 
@@ -50,6 +50,25 @@ describe('model governance integration', () => {
     expect(audit.query({ action: 'model.denied' })).toHaveLength(1)
     const spoofed = { ...deniedEvent('spoof'), status: 'succeeded', credentialSource: 'file', credentialClass: 'company' }
     expect((await post(spoofed)).status).toBe(400)
+  })
+
+  it('accepts and deduplicates personal model registration records on the same intake', async () => {
+    const { user, governance } = await fixture()
+    const token = governance.issueIntakeToken({ kind: 'user', id: user.id })
+    const server = createUsageIntakeServer(governance)
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+    closers.push(() => new Promise(resolve => server.close(() => resolve())))
+    const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+    const registration: ModelRegistrationEvent = {
+      kind: 'model-registration', eventId: 'registration-intake-1', occurredAt: Date.now(),
+      provider: 'custom', model: 'chat', action: 'model-created', scope: 'personal',
+    }
+    const post = () => fetch(`${base}/usage`, { method: 'POST', headers: {
+      authorization: `Bearer ${token}`, 'content-type': 'application/json',
+    }, body: JSON.stringify(registration) })
+    expect((await post()).status).toBe(200)
+    expect((await post()).status).toBe(200)
+    expect(governance.registrationReport({ userId: user.id }).summary).toMatchObject({ eventCount: 1, modelCount: 1 })
   })
 
   it('writes a private policy, reuses its valid token, and reflects changed access', async () => {
