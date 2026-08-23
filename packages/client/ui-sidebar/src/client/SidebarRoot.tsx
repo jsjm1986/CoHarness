@@ -5,11 +5,12 @@
  * mid-slide. At settle the wide-only content unmounts and the four upper
  * controls enter the 56px rail from the same horizontal offset (one icon each,
  * same top-down order) on one fade that ends with the slide. The bottom-pinned
- * settings control only fades. The workspace/session browsing region between
+ * settings group only fades. The workspace/session browsing region between
  * the New Session button and the foot is the `sidebar.workspaces` registrant's.
- * The foot holds `sidebar.footer.action` as the workspace/account action group
- * and `sidebar.settings` as a separate account-settings group; the shell hands
- * them the wide flag (plus an expand request callback for the browser).
+ * The foot holds `sidebar.footer.action` as the workspace action group,
+ * `sidebar.settings` as the account-settings trigger, and
+ * `sidebar.settings.action` as its compact adjacent action group; the shell
+ * hands them the wide flag (plus an expand request callback for the browser).
  *
  * The column also owns whether the scroll regions nested in it draw a
  * scrollbar at all: the shell tracks the pointer and rebinds ui-theme's
@@ -204,7 +205,14 @@ export function SidebarRoot({
           {renderSlot('sidebar.footer.action', { wide })}
         </div>
         <div className={css.settingsArea}>
-          {renderSlot('sidebar.settings', { wide })}
+          <div className={css.settingsRow}>
+            <div className={css.settingsTrigger}>
+              {renderSlot('sidebar.settings', { wide })}
+            </div>
+            <div className={css.settingsActions}>
+              {renderSlot('sidebar.settings.action', { wide })}
+            </div>
+          </div>
         </div>
       </div>
     </div>

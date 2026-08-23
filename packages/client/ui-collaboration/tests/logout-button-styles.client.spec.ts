@@ -1,4 +1,4 @@
-/** Logout footer stylesheet contract, asserted against the CSS text. */
+/** Logout Settings-side stylesheet contract, asserted against the CSS text. */
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -7,7 +7,7 @@ const css = readFileSync(fileURLToPath(new URL('../src/client/LogoutButton.modul
 
 describe('LogoutButton.module.css', () => {
   it('uses the compact shared row and secondary default ink', () => {
-    expect(css).toMatch(/\.trigger\s*\{[^}]*height:\s*var\(--dsh-sidebar-footer-row-height,\s*36px\)/)
+    expect(css).toMatch(/\.trigger\s*\{[^}]*min-width:\s*58px/)
     expect(css).toMatch(/\.trigger\s*\{[^}]*color:\s*var\(--dsw-alias-label-secondary\)/)
     expect(css).toMatch(
       new RegExp([
@@ -28,6 +28,7 @@ describe('LogoutButton.module.css', () => {
   it('keeps the rail hover neutral and the touch target intact', () => {
     expect(css).toMatch(/\.trigger\.rail\s*\{[^}]*width:\s*36px/)
     expect(css).toMatch(/\.trigger\.rail:hover\s*\{[\s\S]*background:\s*var\(--dsw-alias-interactive-bg-hover\)/)
-    expect(css).toContain('min-height: var(--dsw-touch-target)')
+    expect(css).toContain('width: var(--dsw-touch-target)')
+    expect(css).toContain('height: var(--dsw-touch-target)')
   })
 })

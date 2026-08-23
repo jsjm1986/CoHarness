@@ -116,8 +116,8 @@ export function apply(ctx: ClientContext): void {
     inject: scopeInjected,
   }, ScopeControl))
 
-  ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
-    name: 'sidebar.footer.action',
+  ctx.slots.inject('sidebar.settings.action', () => ctx.slots.register({
+    name: 'sidebar.settings.action',
     id: 'collaboration-logout',
     order: 0,
     locale: NS,

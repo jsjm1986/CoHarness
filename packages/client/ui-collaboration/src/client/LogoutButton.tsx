@@ -1,5 +1,5 @@
 import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { IconRightUpOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconLogoutOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { CollaborationSnapshot } from './collaboration-client.ts'
 import type { NS } from './locales.ts'
@@ -13,14 +13,14 @@ export interface LogoutButtonInjected {
   }
 }
 
-/** Full props for the Gateway-only sidebar logout action. */
+/** Full props for the compact action beside the sidebar Settings trigger. */
 export type LogoutButtonProps =
-  PropsRuntime<'sidebar.footer.action'>
+  PropsRuntime<'sidebar.settings.action'>
   & InjectFace<LogoutButtonInjected>
   & PropsLocale<typeof NS>
 
 /**
- * Render the Gateway logout form in the sidebar footer.
+ * Render the Gateway logout form beside the sidebar Settings trigger.
  *
  * The native form submission deliberately lets Gateway own cookie revocation,
  * audit logging, and the redirect to `/login`.
@@ -33,14 +33,14 @@ export function LogoutButton({ wide, useCollaboration, t }: LogoutButtonProps) {
 
   return (
     <form className={css.form} method="post" action="/logout">
-      <Tooltip label={t('logout.label')} side="right" delayMs={500} disabled={wide}>
+      <Tooltip label={t('logout.label')} side={wide ? 'top' : 'right'} delayMs={500} disabled={wide}>
         <button
           type="submit"
           className={wide ? css.trigger : `${css.trigger} ${css.rail}`}
           aria-label={t('logout.label')}
         >
-          <IconRightUpOutline16 size={wide ? 14 : 16} />
-          {wide && <span className={css.label}>{t('logout.label')}</span>}
+          <IconLogoutOutline16 size={wide ? 14 : 16} />
+          {wide && <span className={css.label}>{t('logout.short')}</span>}
         </button>
       </Tooltip>
     </form>

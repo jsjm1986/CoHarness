@@ -12,7 +12,7 @@ The sidebar footer rendered scope, Documents, Sign out, and Settings as independ
 
 `SidebarRoot` owns the footer rhythm through inherited custom properties. Expanded footer rows use a 36px visual height, a shared radius, and a two-pixel stack gap; coarse pointers and compact viewports raise each row to the existing 44px touch target. Rail controls remain 36px circles and use the shell's rail gap.
 
-The scope selector is the context row and receives a quiet layer fill with a border cue. Documents and Settings use flat rows. Settings begins a separate account group with a divider. Sign out keeps the native Gateway form and accessible name, but uses secondary ink and a 14px desktop glyph; hover and focus expose the danger color. The rail keeps a neutral hover treatment so the destructive cue is not shown merely because the sidebar is collapsed.
+The scope selector is the context row and receives a quiet layer fill with a border cue. Documents use a flat row. Settings begins a separate account group with a divider and owns a `sidebar.settings.action` list beside its trigger. Sign out registers in that list as a compact native Gateway form with a door-and-arrow icon, a short expanded-row label, and a full accessible name; it uses secondary ink and exposes the danger color only on hover and focus. The rail stacks the icon action below Settings and keeps a neutral hover treatment so the destructive cue is not shown merely because the sidebar is collapsed.
 
 The document manager toolbar has a filter group and an action group with independent responsive rules. Desktop keeps the groups side by side; compact layouts stack them and preserve touch targets. Document rows have stable horizontal padding, a light hover state, and the existing wrapped action layout so long names cannot push controls out of view.
 
@@ -26,7 +26,7 @@ The document manager toolbar has a filter group and an action group with indepen
 
 ## Consequences
 
-The footer packages continue to own their content, registration order, forms, and tooltips; they consume only inherited geometry variables and keep package boundaries intact. Existing 44px coarse-pointer guarantees remain in force even though desktop rows are shorter. The document manager adds two localized group names for assistive technology without adding explanatory copy to the visual layout.
+The footer packages continue to own their content, registration order, forms, and tooltips; the shell owns only the Settings-side action seat and inherited geometry variables. Existing 44px coarse-pointer guarantees remain in force even though desktop rows are shorter. The document manager adds two localized group names for assistive technology without adding explanatory copy to the visual layout.
 
 ## Verification
 

@@ -84,9 +84,25 @@ exports[`sidebar shell snapshots > renders the collapsed rail after the crossfad
         class="settingsArea"
       >
         <div
-          data-slot="sidebar.settings"
-          style="display: contents;"
-        />
+          class="settingsRow"
+        >
+          <div
+            class="settingsTrigger"
+          >
+            <div
+              data-slot="sidebar.settings"
+              style="display: contents;"
+            />
+          </div>
+          <div
+            class="settingsActions"
+          >
+            <div
+              data-slot="sidebar.settings.action"
+              style="display: contents;"
+            />
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -211,9 +227,25 @@ exports[`sidebar shell snapshots > renders the expanded column (wordmark, capsul
         class="settingsArea"
       >
         <div
-          data-slot="sidebar.settings"
-          style="display: contents;"
-        />
+          class="settingsRow"
+        >
+          <div
+            class="settingsTrigger"
+          >
+            <div
+              data-slot="sidebar.settings"
+              style="display: contents;"
+            />
+          </div>
+          <div
+            class="settingsActions"
+          >
+            <div
+              data-slot="sidebar.settings.action"
+              style="display: contents;"
+            />
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -338,9 +370,25 @@ exports[`sidebar shell snapshots > renders the expanded column in the default lo
         class="settingsArea"
       >
         <div
-          data-slot="sidebar.settings"
-          style="display: contents;"
-        />
+          class="settingsRow"
+        >
+          <div
+            class="settingsTrigger"
+          >
+            <div
+              data-slot="sidebar.settings"
+              style="display: contents;"
+            />
+          </div>
+          <div
+            class="settingsActions"
+          >
+            <div
+              data-slot="sidebar.settings.action"
+              style="display: contents;"
+            />
+          </div>
+        </div>
       </div>
     </div>
   </div>
