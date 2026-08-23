@@ -4,6 +4,7 @@ import {
   getProjectModelAccess,
   getProjectUsage,
   listAudit,
+  listModelRegistrations,
   listModelProviders,
   listUsers,
   patchUser,
@@ -99,6 +100,13 @@ describe('admin api URLs', () => {
         headers: { 'content-type': 'application/json' },
       },
     ])
+  })
+
+  it('GETs filtered personal model registration history', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonOk({ summary: {}, rows: [] }))
+    vi.stubGlobal('fetch', fetchMock)
+    await listModelRegistrations({ userId: 7, provider: 'custom', model: 'chat', action: 'model-created', limit: 25 })
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/admin/api/model-registrations?userId=7&provider=custom&model=chat&action=model-created&limit=25')
   })
 
   it('reads and writes organization providers and project model assignments', async () => {

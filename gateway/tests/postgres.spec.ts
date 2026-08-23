@@ -99,6 +99,8 @@ async function sqliteFixture(): Promise<{ file: string; cleanup: () => Promise<v
       VALUES('usage-1',2,?,?,'deepseek','chat','chat','session-1','user-env','company','succeeded',10,20,3,4,123456,100000)`).run(now, now)
     db.prepare(`INSERT INTO model_usage_alerts(user_id,month,metric,threshold,created_at)
       VALUES(2,'2026-08','tokens',80,?)`).run(now)
+    db.prepare(`INSERT INTO model_registration_events(event_id,user_id,occurred_at,received_at,provider,model,action,scope)
+      VALUES('registration-1',2,?,?, 'personal-gateway',NULL,'provider-created','personal')`).run(now, now)
     db.prepare(`INSERT INTO audit_log(id,ts,user_id,action,method_path,status,ip,detail)
       VALUES(1,?,1,'login','POST /login',200,'127.0.0.1','ok')`).run(now)
     db.prepare(`INSERT INTO auth_sessions(id,user_id,token_hash,created_at,expires_at,absolute_expires_at,last_seen_at)
@@ -120,9 +122,9 @@ describePg('PostgreSQL baseline', () => {
     pool = createPostgresPool(DATABASE_URL!, { max: 4 })
     await pool.query('DROP SCHEMA IF EXISTS harness CASCADE')
     const migrated = await runMigrations(pool, MIGRATIONS)
-    expect(migrated).toEqual({ applied: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], current: 10 })
+    expect(migrated).toEqual({ applied: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], current: 11 })
     expect(await runMigrations(pool, MIGRATIONS))
-      .toEqual({ applied: [], current: 10 })
+      .toEqual({ applied: [], current: 11 })
     const pushTables = await pool.query<{ table_name: string }>(`SELECT table_name
       FROM information_schema.tables
       WHERE table_schema='harness' AND table_name IN ('push_devices','push_deliveries')
@@ -1229,7 +1231,7 @@ describePg('PostgreSQL baseline', () => {
         organizationSlug: `fixture-${randomUUID()}`, organizationName: 'Fixture', nodeName: 'fixture-node' })
       expect(first).toMatchObject({ users: 2, projects: 1, projectMembers: 1, instances: 1,
         projectInvitations: 1,
-        models: 1, prices: 1, usageEvents: 1, usageAlerts: 1, auditEvents: 1,
+        models: 1, prices: 1, usageEvents: 1, usageAlerts: 1, registrationEvents: 1, auditEvents: 1,
         skippedSessions: 1, skippedLoginAttempts: 1, skippedIntakeTokens: 1 })
       const imported = await pool.query<{
         password_hash: string; role: string; access_mode: string; desired_state: string; model_allowed: boolean
@@ -1476,6 +1478,20 @@ describePg('PostgreSQL baseline', () => {
         tokenLimit: 10,
         companyCostMicrosLimit: 100,
         alerts: [{ metric: 'tokens', threshold: 80 }],
+      })
+      const registration = {
+        kind: 'model-registration' as const,
+        eventId: randomUUID(),
+        occurredAt: Date.now(),
+        provider: 'personal-gateway',
+        action: 'provider-created' as const,
+        scope: 'personal' as const,
+      }
+      expect(await governance.ingestRegistration({ kind: 'user', id: member.id }, registration)).toEqual({ inserted: true })
+      expect(await governance.ingestRegistration({ kind: 'user', id: member.id }, registration)).toEqual({ inserted: false })
+      expect(await governance.registrationReport({ userId: member.id })).toMatchObject({
+        summary: { providerCount: 1, eventCount: 1 },
+        rows: [{ provider: 'personal-gateway', userId: member.id, action: 'provider-created' }],
       })
 
       expect(await governance.policyForProject(project.id)).toMatchObject({

@@ -2,7 +2,7 @@ import { mkdirSync } from 'node:fs'
 import { basename, dirname } from 'node:path'
 import Database from 'better-sqlite3'
 
-export const SCHEMA_VERSION = 5
+export const SCHEMA_VERSION = 6
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -164,6 +164,21 @@ CREATE TABLE IF NOT EXISTS model_usage_alerts (
   created_at INTEGER NOT NULL,
   PRIMARY KEY (user_id, month, metric, threshold)
 );
+CREATE TABLE IF NOT EXISTS model_registration_events (
+  event_id TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  occurred_at INTEGER NOT NULL,
+  received_at INTEGER NOT NULL,
+  provider TEXT NOT NULL,
+  model TEXT,
+  action TEXT NOT NULL CHECK (action IN ('provider-created','provider-modified','provider-deleted',
+    'model-created','model-modified','model-deleted')),
+  scope TEXT NOT NULL CHECK (scope = 'personal')
+);
+CREATE INDEX IF NOT EXISTS idx_model_registration_user_time
+  ON model_registration_events(user_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_model_registration_route
+  ON model_registration_events(provider, model, occurred_at DESC);
 `
 
 type ProjectMode = 'ro' | 'rw'
