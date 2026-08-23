@@ -14,7 +14,7 @@
  * rows the user can still fill in by hand.
  */
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { DiscoveredModelView, IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
 import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -187,6 +187,7 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
   const [failure, setFailure] = useState<string | undefined>(undefined)
   const [candidates, setCandidates] = useState<readonly DiscoveredModelView[] | undefined>(undefined)
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set())
+  const capacityHelpPrefix = useId()
   // Rows carry an id and a name; capacities are the exception, so they stay
   // folded until asked for rather than crowding every row with four inputs.
   const [expanded, setExpanded] = useState<ReadonlySet<number>>(new Set())
@@ -527,6 +528,12 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
           {expanded.has(index)
             ? (
               <div className={styles['modelAdvanced']}>
+                <p
+                  id={`${capacityHelpPrefix}-capacity-${String(index)}`}
+                  className={styles['capacityHelp']}
+                >
+                  {t('modelCapacityHelp')}
+                </p>
                 <label className={styles['modelField']}>
                   <span className={styles['modelFieldLabel']}>{t('modelContextWindow')}</span>
                   <input
@@ -536,6 +543,7 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
                     value={capacityText(model, index, 'contextWindow')}
                     placeholder={CAPACITY_HINT.contextWindow}
                     aria-label={`${t('modelContextWindow')} ${index + 1}`}
+                    aria-describedby={`${capacityHelpPrefix}-capacity-${String(index)}`}
                     disabled={disabled}
                     onChange={(event) => { editCapacity(index, 'contextWindow', event.target.value) }}
                   />
@@ -549,6 +557,7 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
                     value={capacityText(model, index, 'maxTokens')}
                     placeholder={CAPACITY_HINT.maxTokens}
                     aria-label={`${t('modelMaxTokens')} ${index + 1}`}
+                    aria-describedby={`${capacityHelpPrefix}-capacity-${String(index)}`}
                     disabled={disabled}
                     onChange={(event) => { editCapacity(index, 'maxTokens', event.target.value) }}
                   />
