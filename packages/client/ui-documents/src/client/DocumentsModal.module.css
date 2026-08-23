@@ -303,6 +303,12 @@
   color: var(--dsw-alias-label-danger);
 }
 
+/* Primary-fill actions need the foreground label token; row deletes use danger
+   text on a transparent fill. */
+.selectionDelete {
+  color: var(--dsw-alias-label-primary-foreground);
+}
+
 .download {
   display: inline-flex;
   align-items: center;

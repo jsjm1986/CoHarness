@@ -975,7 +975,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
                 {t('selection.copy')}
               </Button>
               <Button
-                className={css.delete}
+                className={css.selectionDelete}
                 type="button"
                 variant="primary"
                 disabled={busy || writeLocked}

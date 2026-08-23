@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DocumentsButton } from '../src/client/DocumentsButton.tsx'
 import buttonCss from '../src/client/DocumentsButton.module.css'
 import { DocumentsModal } from '../src/client/DocumentsModal.tsx'
+import modalCss from '../src/client/DocumentsModal.module.css'
 import { zh, type DocumentsKey } from '../src/client/locales.ts'
 
 const { createUserDocClient } = vi.hoisted(() => ({ createUserDocClient: vi.fn() }))
@@ -369,6 +370,8 @@ describe('DocumentsModal', () => {
     render(<DocumentsModal open onClose={() => {}} t={t} onAttachDocument={attach} />)
     await screen.findByText('report.pdf')
     fireEvent.click(screen.getByRole('checkbox', { name: 'report.pdf' }))
+    expect(screen.getByRole('button', { name: t('selection.delete') }).className.split(/\s+/))
+      .toContain(modalCss.selectionDelete)
     fireEvent.click(screen.getByRole('button', { name: t('selection.copy') }))
     const copyDialog = await screen.findByRole('dialog', { name: t('copy.title') })
     fireEvent.click(within(copyDialog).getByRole('button', { name: t('copy.confirm') }))
