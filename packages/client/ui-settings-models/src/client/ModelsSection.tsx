@@ -296,6 +296,10 @@ function Loaded({ injected }: { injected: ModelsSectionFace }): ReactNode {
     : []
   const configured = scopedRows.filter(row => row.configured)
   const addable = scopedRows.filter(row => !row.configured)
+  // Organization routes are created as new `org-*` profiles. The shared
+  // personal directory may still expose dormant adapter routes, but when no
+  // such route is addable there is no valid target for the generic action.
+  const canAdoptProvider = addable.length > 0
   const addTarget = adding ? editing : undefined
   const addNamespace = addTarget === undefined ? undefined : state.namespaces.get(addTarget.settingsNs)
   // Hand-declared routes live in the pi-ai namespace, which is also the only
@@ -520,32 +524,33 @@ function Loaded({ injected }: { injected: ModelsSectionFace }): ReactNode {
               </div>
             )
             : (
-              // One row for the two ways to gain a provider: adopt one the
-              // adapter already knows, or declare one it does not. Side by side
-              // and equal-width so they read as siblings and line up with the
-              // rows above, rather than two pills of different lengths.
-              <div className={styles['addActions']}>
+              // When a dormant adapter route exists, the user can adopt it or
+              // declare a new route. Organization facades expose only the
+              // latter, so do not paint an unreachable disabled sibling.
+              <div className={`${styles['addActions']} ${canAdoptProvider ? '' : styles['addActionsSingle']}`}>
+                {canAdoptProvider && (
+                  <button
+                    type="button"
+                    className={styles['addButton']}
+                    disabled={!state.writable}
+                    onClick={() => {
+                      const first = addable[0]
+                      /* v8 ignore next -- the button is rendered only while an entry is addable */
+                      if (first === undefined) return
+                      setSavedTarget(undefined)
+                      setDeclaring(false)
+                      setAdding(true)
+                      setEditing(targetOf(first, managementScope))
+                    }}
+                  >
+                    {/* Same glyph as the composer's attach button. */}
+                    <IconPlusOutline16 size={14} />
+                    {t('add')}
+                  </button>
+                )}
                 <button
                   type="button"
-                  className={styles['addButton']}
-                  disabled={addable.length === 0 || !state.writable}
-                  onClick={() => {
-                    const first = addable[0]
-                    /* v8 ignore next -- the button is disabled while nothing is addable */
-                    if (first === undefined) return
-                    setSavedTarget(undefined)
-                    setDeclaring(false)
-                    setAdding(true)
-                    setEditing(targetOf(first, managementScope))
-                  }}
-                >
-                  {/* Same glyph as the composer's attach button. */}
-                  <IconPlusOutline16 size={14} />
-                  {t('add')}
-                </button>
-                <button
-                  type="button"
-                  className={styles['addButton']}
+                  className={`${styles['addButton']} ${canAdoptProvider ? '' : styles['addButtonFull']}`}
                   disabled={protocols.length === 0 || !state.writable}
                   onClick={() => {
                     setSavedTarget(undefined)
