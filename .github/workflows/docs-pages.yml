@@ -1,17 +1,9 @@
 name: Deploy documentation
 
+# Publish the documentation website only as an explicit release action. The
+# release verifier rejects non-release refs, while CI builds the site on PRs
+# and master independently.
 on:
-  push:
-    branches: [master]
-    paths:
-      - '.github/workflows/docs-pages.yml'
-      - 'docs/**'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
-      - 'scripts/project-doc-site.ts'
-      - 'scripts/project-doc-site.spec.ts'
-      - 'website/**'
   workflow_dispatch:
 
 concurrency:
@@ -37,7 +29,11 @@ jobs:
       contents: read
       pages: read
     steps:
+      # Complete history: the release scripts read tags.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - uses: pnpm/action-setup@v6.0.9
 
@@ -48,6 +44,11 @@ jobs:
 
       - name: Install (immutable)
         run: pnpm install --frozen-lockfile
+
+      - name: Verify release version
+        env:
+          RELEASE_PUBLISH: 'true'
+        run: pnpm run release:verify --family dsh
 
       - name: Configure Pages
         id: pages
