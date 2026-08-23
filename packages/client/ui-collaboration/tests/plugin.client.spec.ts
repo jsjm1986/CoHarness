@@ -49,6 +49,7 @@ async function bench(context: CollaborationContext) {
     name: 'root',
     children: {
       'sidebar.footer.action': { kind: 'list', scope: 'root' },
+      'sidebar.settings.action': { kind: 'list', scope: 'root' },
       'conversation.session.header.actions': { kind: 'list', scope: 'session' },
       'conversation.composer': { kind: 'chain', scope: 'session' },
     },
@@ -93,9 +94,10 @@ describe('ui-collaboration apply', () => {
       const scopeEntry = b.ctx.slots.entries('sidebar.footer.action')
         .find(entry => entry.component === ScopeControl)!
       expect(scopeEntry.options).toMatchObject({ id: 'collaboration-scope', order: -20 })
-      const logoutEntry = b.ctx.slots.entries('sidebar.footer.action')
+      const logoutEntry = b.ctx.slots.entries('sidebar.settings.action')
         .find(entry => entry.component === LogoutButton)!
       expect(logoutEntry.options).toMatchObject({ id: 'collaboration-logout', order: 0 })
+      expect(b.ctx.slots.entries('sidebar.footer.action').some(entry => entry.component === LogoutButton)).toBe(false)
       const shareEntry = b.ctx.slots.entries('conversation.session.header.actions')
         .find(entry => entry.component === ConversationShareAction)!
       expect(shareEntry.options).toMatchObject({ id: 'collaboration-sharing', order: -20 })
@@ -194,6 +196,7 @@ describe('ui-collaboration apply', () => {
       await vi.waitFor(() => { expect(b.fetcher).toHaveBeenCalledTimes(2) })
       await b.fiber.dispose()
       expect(b.ctx.slots.entries('sidebar.footer.action')).toHaveLength(0)
+      expect(b.ctx.slots.entries('sidebar.settings.action')).toHaveLength(0)
       expect(b.ctx.slots.entries('conversation.session.header.actions')).toHaveLength(0)
       expect(b.ctx.slots.entries('conversation.composer')).toHaveLength(0)
     } finally {

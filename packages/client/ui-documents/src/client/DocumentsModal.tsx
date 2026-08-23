@@ -77,6 +77,13 @@ interface SourceOption {
   scope: UserDocScope
 }
 
+/** Metadata-only view selected from the workbench scope rail. */
+interface ScopeView {
+  value: string
+  label: string
+  scope: UserDocScope
+}
+
 interface OverviewCopyTarget {
   readonly row: UserDocCatalogRow
   readonly source: UserDocScope
@@ -146,6 +153,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
   const [currentDirectoryId, setCurrentDirectoryId] = useState<UserDocDirectoryIdType>(ROOT_DIRECTORY_ID)
   const [limits, setLimits] = useState<UserDocLimits | null>(null)
   const [scope, setScope] = useState<DocumentsWorkspaceScope>({ kind: 'personal' })
+  const [scopeView, setScopeView] = useState<ScopeView | null>(null)
   const [alternateSource, setAlternateSource] = useState<SourceOption | null>(null)
   const [sourcePickerOpen, setSourcePickerOpen] = useState(false)
   const [sourcePickerValue, setSourcePickerValue] = useState('')
@@ -200,6 +208,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     setLoading(true)
     setError('')
     setOverviewMode(false)
+    setScopeView(null)
     setAlternateSource(null)
     try {
       const [response, nextScope] = await Promise.all([
@@ -231,6 +240,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
       const response = await userDocs.current.overview()
       setOverviewRows([...response.documents])
       setOverviewMode(true)
+      setScopeView(null)
       setAlternateSource(null)
       setSelected(new Set())
     } catch (cause) {
@@ -269,7 +279,8 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
       setDocuments(nextDocuments)
       setDirectories([])
       setCurrentDirectoryId(ROOT_DIRECTORY_ID)
-      setAlternateSource({ value: target.kind === 'personal' ? 'personal' : `project:${String(target.projectId)}`, label, scope: target })
+      setScopeView({ value: target.kind === 'personal' ? 'personal' : `project:${String(target.projectId)}`, label, scope: target })
+      setAlternateSource(null)
       setOverviewMode(false)
       setSelected(new Set())
       setQuery('')
@@ -553,7 +564,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
 
   const openCopy = (targets: UserDocRef[]) => {
     if (targets.length === 0) return
-    const source = alternateSource?.scope ?? currentScopeDescriptor()
+    const source = scopeView?.scope ?? alternateSource?.scope ?? currentScopeDescriptor()
     const options: CopyTargetOption[] = (scope.projects ?? [])
       .filter(project => project.mode === 'rw' && !(source.kind === 'project' && source.projectId === project.projectId))
       .map(project => ({
@@ -606,6 +617,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
       setDocuments(documents)
       setDirectories([])
       setCurrentDirectoryId(ROOT_DIRECTORY_ID)
+      setScopeView(null)
       setAlternateSource(option)
       setSelected(new Set())
       setQuery('')
@@ -678,7 +690,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     setModalError('')
     setProgress({ current: 0, total: targets.length, percent: 0 })
     try {
-      const source: UserDocScope = overviewCopyRow?.source ?? alternateSource?.scope ?? currentScopeDescriptor()
+      const source: UserDocScope = overviewCopyRow?.source ?? scopeView?.scope ?? alternateSource?.scope ?? currentScopeDescriptor()
       const target = alternateSource === null
         ? option.target
         : currentScopeDescriptor()
@@ -812,20 +824,22 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     setModalError('')
   }
 
-  const title = scope.kind === 'project'
+  const title = scopeView === null && alternateSource === null && scope.kind === 'project'
     ? t('modal.title.project', { name: scope.projectName })
     : t('modal.title')
-  const directoryTrail = breadcrumbs(currentDirectoryId, alternateSource?.label ?? t('breadcrumb.root'))
+  const directoryTrail = breadcrumbs(currentDirectoryId, scopeView?.label ?? alternateSource?.label ?? t('breadcrumb.root'))
   const readOnlyProject = scope.kind === 'project' && scope.mode === 'ro'
-  const writeLocked = alternateSource !== null || readOnlyProject
+  const writeLocked = scopeView !== null || alternateSource !== null || readOnlyProject
 
   const projectExtra = scope.kind === 'project' ? t('delete.confirm.project.extra') : ''
   const visibility = scope.kind === 'project'
     ? t('modal.visibility.project')
     : t('modal.visibility.personal')
-  const visibleScope = alternateSource === null
-    ? visibility
-    : t('copy.source.viewing', { name: alternateSource.label })
+  const visibleScope = scopeView !== null
+    ? t('scope.viewing', { name: scopeView.label })
+    : alternateSource === null
+      ? visibility
+      : t('copy.source.viewing', { name: alternateSource.label })
 
   const onDragEnter = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault()
@@ -941,7 +955,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
         </span>
       </div>
       <span className={css.actions}>
-        {alternateSource === null && (
+        {scopeView === null && alternateSource === null && (
           <>
             <Button
               type="button"
@@ -1057,17 +1071,17 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
         <div className={css.workbench}>
           <aside className={css.scopeRail} aria-label={t('scope.rail.label')}>
             <div className={css.scopeRailHeading}>{t('scope.rail.title')}</div>
-            <button type="button" className={`${css.scopeItem} ${overviewMode ? css.scopeItemActive : ''}`} onClick={() => { void openOverview() }} disabled={overviewLoading}>
+            <button type="button" className={`${css.scopeItem} ${overviewMode ? css.scopeItemActive : ''}`} onClick={() => { void openOverview() }} disabled={overviewLoading || loading}>
               <span className={css.scopeItemIcon} aria-hidden="true"><IconBrowseOutline16 size={16} /></span>
               <span><strong>{t('scope.all')}</strong><small>{t('scope.all.description')}</small></span>
             </button>
-            <button type="button" className={`${css.scopeItem} ${!overviewMode && alternateSource === null && scope.kind === 'personal' ? css.scopeItemActive : ''}`} onClick={() => { void openScopeView({ kind: 'personal' }, t('copy.target.personal')) }} disabled={loading}>
+            <button type="button" className={`${css.scopeItem} ${!overviewMode && alternateSource === null && (scopeView?.scope.kind === 'personal' || (scopeView === null && scope.kind === 'personal')) ? css.scopeItemActive : ''}`} onClick={() => { void openScopeView({ kind: 'personal' }, t('copy.target.personal')) }} disabled={loading || overviewLoading}>
               <span className={css.scopeItemIcon} aria-hidden="true"><IconPaperclipOutline16 size={16} /></span>
               <span><strong>{t('copy.target.personal')}</strong><small>{t('scope.personal.description')}</small></span>
             </button>
             {(scope.projects ?? []).map((project) => {
-              const isCurrent = scope.kind === 'project' && scope.projectId === project.projectId && alternateSource === null && !overviewMode
-              return <button key={project.projectId} type="button" className={`${css.scopeItem} ${isCurrent ? css.scopeItemActive : ''}`} onClick={() => { void openScopeView({ kind: 'project', projectId: project.projectId }, project.name) }} disabled={loading}>
+              const isCurrent = !overviewMode && alternateSource === null && ((scopeView?.scope.kind === 'project' && scopeView.scope.projectId === project.projectId) || (scopeView === null && scope.kind === 'project' && scope.projectId === project.projectId))
+              return <button key={project.projectId} type="button" className={`${css.scopeItem} ${isCurrent ? css.scopeItemActive : ''}`} onClick={() => { void openScopeView({ kind: 'project', projectId: project.projectId }, project.name) }} disabled={loading || overviewLoading}>
                 <span className={css.scopeItemIcon} aria-hidden="true"><IconFolderClose16 size={16} /></span>
                 <span><strong>{project.name}</strong><small>{project.mode.toUpperCase()} · {t('scope.project.description')}</small></span>
               </button>
@@ -1161,7 +1175,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
                       if (files !== null) void uploadFiles(files)
                     }}
                   />
-                  {alternateSource === null && sourceOptions.length > 0 && (
+                  {scopeView === null && alternateSource === null && sourceOptions.length > 0 && (
                     <Button
                       type="button"
                       variant="outline"
@@ -1172,7 +1186,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
                       {t('copy.source')}
                     </Button>
                   )}
-                  {alternateSource !== null && (
+                  {(scopeView !== null || alternateSource !== null) && (
                     <Button
                       type="button"
                       variant="outline"
@@ -1196,7 +1210,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
                     className={css.upload}
                     type="button"
                     variant="primary"
-                    disabled={busy}
+                    disabled={busy || writeLocked}
                     icon={<IconPlusOutline16 size={16} />}
                     onClick={() => fileInputRef.current?.click()}
                   >

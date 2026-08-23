@@ -108,12 +108,12 @@ describe('LogoutButton', () => {
     expect(view.container.textContent).toBe('')
   })
 
-  it('uses the Gateway POST logout form in wide and rail states', () => {
+  it('uses a compact Gateway POST logout action in wide and rail states', () => {
     const view = render(<LogoutButton {...logoutProps(snapshot())} />)
     const form = view.container.querySelector('form')!
     expect(form.getAttribute('method')).toBe('post')
     expect(form.getAttribute('action')).toBe('/logout')
-    expect(screen.getByRole('button', { name: '退出登录' }).textContent).toContain('退出登录')
+    expect(screen.getByRole('button', { name: '退出登录' }).textContent).toContain('退出')
 
     view.rerender(<LogoutButton {...logoutProps(snapshot(), { wide: false })} />)
     const button = screen.getByRole('button', { name: '退出登录' })
@@ -121,7 +121,7 @@ describe('LogoutButton', () => {
     expect(button.className.split(/\s+/)).toContain(logoutCss.rail)
   })
 
-  it('keeps the expanded account action visually secondary', () => {
+  it('keeps the expanded Settings-side action visually secondary', () => {
     const view = render(<LogoutButton {...logoutProps(snapshot())} />)
     const button = screen.getByRole('button', { name: '退出登录' })
     expect(button.className.split(/\s+/)).toContain(logoutCss.trigger)

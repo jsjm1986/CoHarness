@@ -450,6 +450,20 @@ export const IconRightUpOutline16 = ({ size = 16, className }: IconProps) => (
   </svg>
 )
 
+/** ic_ds_logout_outline_16 — door outline with a right-facing exit arrow. */
+export const IconLogoutOutline16 = ({ size = 16, className }: IconProps) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      d="M2.25 1.5H8v1.5H3.75v10H8v1.5H2.25A1.75 1.75 0 0 1 .5 12.75v-9.5A1.75 1.75 0 0 1 2.25 1.5Z"
+      fill="currentColor"
+    />
+    <path
+      d="M8 7.25h4.19l-1.47-1.47 1.06-1.06 3.28 3.28-3.28 3.28-1.06-1.06 1.47-1.47H8v-1.5Z"
+      fill="currentColor"
+    />
+  </svg>
+)
+
 /** ic_ds_enhance_outline_16 */
 export const IconEnhanceOutline16 = ({ size = 16, className }: IconProps) => (
   <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">

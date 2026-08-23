@@ -157,6 +157,29 @@ describe('DocumentsModal', () => {
     expect(screen.getByRole('button', { name: '文档' }).textContent).toContain('文档')
   })
 
+  it('switches scopes inside the existing manager dialog as a metadata-only view', async () => {
+    const client = makeClient()
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        scope: { kind: 'personal' },
+        projects: [{ projectId: 41, name: 'Compiler', mode: 'ro' }],
+      }),
+    })))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    const manager = await screen.findByRole('dialog', { name: t('modal.title') })
+    const project = screen.getByRole('button', { name: /Compiler/ })
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    fireEvent.click(project)
+    await waitFor(() => { expect(client.listScope).toHaveBeenCalledWith({ kind: 'project', projectId: 41 }) })
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(screen.getByRole('dialog', { name: t('modal.title') })).toBe(manager)
+    expect(screen.getByText(t('scope.viewing', { name: 'Compiler' }))).toBeTruthy()
+    expect(screen.getByRole('button', { name: t('modal.upload') }).hasAttribute('disabled')).toBe(true)
+    expect(screen.queryByRole('button', { name: t('action.previewNamed', { name: 'report.pdf' }) })).toBeNull()
+  })
+
   it('loads and groups documents by date with limits and actions', async () => {
     createUserDocClient.mockReturnValue(makeClient())
     renderModal()
