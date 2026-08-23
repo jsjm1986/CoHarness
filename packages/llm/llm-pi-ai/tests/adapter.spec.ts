@@ -15,7 +15,7 @@ import { getBuiltinModels } from '@earendil-works/pi-ai/providers/all'
 import { DEFAULT_MAX_REQUEST_IMAGE_BYTES, resolveProfiles } from '../src/config.ts'
 import { memoryAuth } from './auth-double.ts'
 import { assemble } from './assemble.ts'
-import { closeMockServers, mockServer, textEvents } from './mock-server.ts'
+import { closeMockServers, mockServer, taggedThinkingEvents, textEvents } from './mock-server.ts'
 
 afterEach(async () => {
   vi.unstubAllEnvs()
@@ -73,6 +73,34 @@ describe('PiAiAdapter provider routing', () => {
     expect(result.finish).toEqual({ kind: 'stop' })
     expect(result.usage).toEqual({ inputTokens: 3, outputTokens: 1 })
     expect(server.paths).toEqual(['/chat/completions'])
+  })
+
+  it('assembles tagged reasoning emitted in ordinary content', async () => {
+    const server = await mockServer([{ events: taggedThinkingEvents }])
+    const ctx = await harness(server.url)
+    const result = await assemble(ctx, {
+      model: 'deepseek-v4-flash',
+      messages: [],
+    })
+    expect(result.message.content).toEqual([
+      { type: 'reasoning', text: 'plan' },
+      { type: 'text', text: 'answer' },
+    ])
+    expect(result.finish).toEqual({ kind: 'stop' })
+  })
+
+  it('parses tagged reasoning for a custom model without reasoning metadata', async () => {
+    const server = await mockServer([{ events: taggedThinkingEvents }])
+    const ctx = await harness(server.url, {
+      models: [{ id: 'gateway-model', name: 'Gateway model' }],
+    })
+    const info = await ctx.llm.resolveModelInfo('deepseek', 'gateway-model')
+    expect(info).not.toHaveProperty('reasoning')
+    const result = await assemble(ctx, { model: 'gateway-model', messages: [] })
+    expect(result.message.content).toEqual([
+      { type: 'reasoning', text: 'plan' },
+      { type: 'text', text: 'answer' },
+    ])
   })
 
   it('adds the non-secret credential source to usage chunks', async () => {

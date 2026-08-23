@@ -39,6 +39,9 @@ const compactionStreamExpected = join(compactionScenarioDir, 'stream-json.expect
 const compactionConfigPath = fileURLToPath(new URL('../compaction.cordis.snapshot.yml', import.meta.url))
 const credentialsScenarioDir = join(snapshotsDir, 'missing-credential')
 const credentialsConfigPath = fileURLToPath(new URL('../credentials.cordis.snapshot.yml', import.meta.url))
+const taggedThinkingScenarioDir = join(snapshotsDir, 'tagged-thinking')
+const taggedThinkingStreamExpected = join(taggedThinkingScenarioDir, 'stream-json.expected.jsonl')
+const taggedThinkingSessionExpected = join(taggedThinkingScenarioDir, 'session.expected.jsonl')
 // Same keyless composition as the missing-credential scenario: the endpoint is
 // never dialed either way, because a supplied-but-unusable key fails credential
 // resolution exactly where an absent one does.
@@ -55,6 +58,7 @@ const dshBinScript = fileURLToPath(new URL('../../../apps/cli/src/bin.ts', impor
 const tsconfigPath = fileURLToPath(new URL('../../../tsconfig.json', import.meta.url))
 const reasoningConfigPath = fileURLToPath(new URL('./fixtures/cli.cordis.yml', import.meta.url))
 const deepseekDefaultsConfigPath = fileURLToPath(new URL('./fixtures/deepseek-defaults.cordis.yml', import.meta.url))
+const taggedThinkingConfigPath = fileURLToPath(new URL('../tagged-thinking.cordis.snapshot.yml', import.meta.url))
 const headlessOverlayPath = fileURLToPath(new URL('./fixtures/headless-profile.cordis.yml', import.meta.url))
 const headlessSessionExpected = join(snapshotsDir, 'headless-profile', 'session.expected.jsonl')
 const headlessFailureExpected = join(snapshotsDir, 'headless-profile', 'stderr.expected.txt')
@@ -71,6 +75,12 @@ interface PersistedLog {
 }
 
 interface DeepSeekDefaultsServer {
+  readonly url: string
+  readonly requests: JsonObject[]
+  close(): Promise<void>
+}
+
+interface TaggedThinkingServer {
   readonly url: string
   readonly requests: JsonObject[]
   close(): Promise<void>
@@ -106,6 +116,47 @@ async function deepseekDefaultsServer(): Promise<DeepSeekDefaultsServer> {
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   const address = server.address()
   if (address === null || typeof address === 'string') throw new Error('DeepSeek defaults snapshot server has no port')
+  return {
+    url: `http://127.0.0.1:${address.port}`,
+    requests,
+    close: () => new Promise(resolve => server.close(() => { resolve() })),
+  }
+}
+
+/** Serve one OpenAI-compatible response whose reasoning is ordinary content. */
+async function taggedThinkingServer(): Promise<TaggedThinkingServer> {
+  const requests: JsonObject[] = []
+  const server = createServer((request: IncomingMessage, response: ServerResponse) => {
+    let body = ''
+    request.setEncoding('utf8')
+    request.on('data', (chunk: string) => { body += chunk })
+    request.on('end', () => {
+      requests.push(JSON.parse(body) as JsonObject)
+      response.writeHead(200, { 'content-type': 'text/event-stream' })
+      const events = [
+        'data: {"choices":[{"delta":{"role":"assistant","content":""}}]}',
+        'data: {"choices":[{"delta":{"content":"<thinking>"}}]}',
+        'data: {"choices":[{"delta":{"content":"plan</thinking>answer"}}]}',
+        'data: {"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":5,"completion_tokens":3}}',
+        'data: [DONE]',
+        '',
+      ]
+      let index = 0
+      const write = (): void => {
+        const event = events[index++]
+        if (event === undefined) {
+          response.end()
+          return
+        }
+        response.write(`${event}\n\n`)
+        setTimeout(write, 5)
+      }
+      write()
+    })
+  })
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  if (address === null || typeof address === 'string') throw new Error('Tagged-thinking snapshot server has no port')
   return {
     url: `http://127.0.0.1:${address.port}`,
     requests,
@@ -514,6 +565,62 @@ describe('headless stream-json snapshots', () => {
         },
       ]
     `)
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
+  it('assembles tagged reasoning from ordinary OpenAI-compatible content', async () => {
+    const server = await taggedThinkingServer()
+    let runCwd = ''
+    try {
+      const result = await runLoaderSmoke({
+        label: 'tagged-thinking headless stream-json snapshot',
+        tempDirPrefix: 'headless-snapshot-tagged-thinking-',
+        binScript,
+        libBinScript: binScript,
+        configPath: taggedThinkingConfigPath,
+        binArgs: [taggedThinkingConfigPath, 'return the tagged answer'],
+        tsconfigPath,
+        env: {
+          TAGGED_THINKING_KEY: 'snapshot-key',
+          DSH_TAGGED_THINKING_BASE_URL: server.url,
+          NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
+        },
+        prepare: (cwd) => { runCwd = cwd },
+        inspect: async (cwd) => {
+          const logs = await persistedLogs(cwd)
+          expect(logs).toHaveLength(1)
+          const actual = logs[0]
+          if (actual === undefined) throw new Error('tagged-thinking snapshot did not persist its session')
+          const records = parseJsonl(actual.content)
+          const assistants = records.filter(record => record.type === 'assistant/message')
+          const final = assistants.at(-1)?.data as JsonObject | undefined
+          const message = final?.message as JsonObject | undefined
+          expect(message?.content).toEqual([
+            { type: 'reasoning', text: 'plan' },
+            { type: 'text', text: 'answer' },
+          ])
+
+          const context = contextFromLogs([actual.content])
+          const session = scrubRequestHeaders(normalizeSessionLog(actual.content, context))
+            .replaceAll(server.url, 'http://127.0.0.1:TAGGED_THINKING')
+          if (refreshing) {
+            await mkdir(taggedThinkingScenarioDir, { recursive: true })
+            await writeFile(taggedThinkingSessionExpected, session)
+          }
+          expect(session).toBe(await readFile(taggedThinkingSessionExpected, 'utf8'))
+        },
+      })
+
+      expect(result.stderr).toBe('')
+      expect(server.requests).toHaveLength(1)
+      expect(server.requests[0]).toMatchObject({ model: 'tagged-model', stream: true })
+      const normalized = normalizeHeadlessStream(result.stdout, runCwd)
+      if (refreshing) await writeFile(taggedThinkingStreamExpected, normalized)
+      expect(normalized).toBe(await readFile(taggedThinkingStreamExpected, 'utf8'))
+      expect(normalized).toContain('"type":"reasoning","text":"plan"')
+      expect(normalized).toContain('"type":"text","text":"answer"')
+    } finally {
+      await server.close()
+    }
   }, LOADER_SMOKE_TEST_TIMEOUT_MS)
 
   it('keeps provider comments alive and sends DeepSeek defaults through the one-shot app', async () => {

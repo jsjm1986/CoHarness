@@ -7,8 +7,9 @@ import a11yCss from './accessibility.module.css'
 import css from './ReasoningRow.module.css'
 
 function firstLine(text: string): string {
-  const newline = text.indexOf('\n')
-  return newline === -1 ? text : text.slice(0, newline)
+  const visible = text.trimStart()
+  const newline = visible.indexOf('\n')
+  return newline === -1 ? visible : visible.slice(0, newline)
 }
 
 function latestLine(text: string): string {
