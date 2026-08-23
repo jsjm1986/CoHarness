@@ -89,6 +89,33 @@ function makeClient() {
     removeDirectory: vi.fn(async (_directoryId?: string) => undefined),
     move: vi.fn(async (_docId?: string, _directoryId?: string) => doc()),
     remove: vi.fn(async (_docId?: string) => undefined),
+    transfer: vi.fn(async () => ({
+      version: 1,
+      transferId: 'transfer-1',
+      source: { kind: 'personal', label: 'Personal documents' },
+      target: { kind: 'project', label: 'Compiler' },
+      items: [{
+        status: 'copied' as const,
+        source: { name: 'report.pdf', bytes: 2048, mediaType: 'application/pdf' },
+        target: {
+          docId: 'report.pdf', name: 'report.pdf', bytes: 2048,
+          mediaType: 'application/pdf', modifiedAt: 1,
+        },
+      }],
+    })),
+    capabilities: vi.fn(async () => ({
+      version: 1,
+      current: { kind: 'personal' as const, label: 'Personal documents' },
+      targets: [],
+    })),
+    listScope: vi.fn(async () => ({
+      version: 1,
+      scope: { kind: 'project' as const, label: 'Compiler' },
+      documents: [{
+        docId: 'project/report.pdf', name: 'report.pdf', bytes: 2048,
+        mediaType: 'application/pdf', modifiedAt: 1,
+      }],
+    })),
     contentUrl: vi.fn((id: string) => `/api/documents/content?id=${encodeURIComponent(id)}`),
   }
 }
@@ -287,6 +314,61 @@ describe('DocumentsModal', () => {
     fireEvent.click(namedButton('delete', 'report.pdf'))
     const confirm = screen.getByRole('dialog', { name: t('delete.confirm.title') })
     expect(confirm.textContent).toContain(t('delete.confirm.project.extra'))
+  })
+
+  it('copies selected personal documents to a writable project and offers attach-to-composer', async () => {
+    const client = makeClient()
+    const attach = vi.fn()
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        scope: { kind: 'personal' },
+        projects: [{ projectId: 41, name: 'Compiler', mode: 'rw' }],
+      }),
+    })))
+    createUserDocClient.mockReturnValue(client)
+    render(<DocumentsModal open onClose={() => {}} t={t} onAttach={attach} />)
+    await screen.findByText('report.pdf')
+    fireEvent.click(screen.getByRole('checkbox', { name: 'report.pdf' }))
+    fireEvent.click(screen.getByRole('button', { name: t('selection.copy') }))
+    const copyDialog = await screen.findByRole('dialog', { name: t('copy.title') })
+    fireEvent.click(within(copyDialog).getByRole('button', { name: t('copy.confirm') }))
+    await waitFor(() => { expect(client.transfer).toHaveBeenCalledOnce() })
+    expect(client.transfer).toHaveBeenCalledWith(expect.objectContaining({
+      source: { kind: 'personal' },
+      target: { kind: 'project', projectId: 41 },
+      documents: [{ docId: '2026-08-17/report.pdf' }],
+    }))
+    expect(attach).toHaveBeenCalledWith([expect.objectContaining({ docId: 'report.pdf' })])
+  })
+
+  it('browses a project source from a personal composer and copies it back to personal documents', async () => {
+    const client = makeClient()
+    const attach = vi.fn()
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        scope: { kind: 'personal' },
+        projects: [{ projectId: 41, name: 'Compiler', mode: 'ro' }],
+      }),
+    })))
+    createUserDocClient.mockReturnValue(client)
+    render(<DocumentsModal open onClose={() => {}} t={t} onAttach={attach} />)
+    await screen.findByText('report.pdf')
+    fireEvent.click(screen.getByRole('button', { name: t('copy.source') }))
+    const sourceDialog = await screen.findByRole('dialog', { name: t('copy.source.title') })
+    fireEvent.click(within(sourceDialog).getByRole('button', { name: t('copy.source.open') }))
+    await waitFor(() => { expect(client.listScope).toHaveBeenCalledWith({ kind: 'project', projectId: 41 }) })
+    await screen.findByText('report.pdf')
+    fireEvent.click(screen.getByRole('checkbox', { name: 'report.pdf' }))
+    fireEvent.click(screen.getByRole('button', { name: t('selection.copy') }))
+    const copyDialog = await screen.findByRole('dialog', { name: t('copy.title') })
+    fireEvent.click(within(copyDialog).getByRole('button', { name: t('copy.confirm') }))
+    await waitFor(() => { expect(client.transfer).toHaveBeenCalledWith(expect.objectContaining({
+      source: { kind: 'project', projectId: 41 },
+      target: { kind: 'personal' },
+    })) })
+    expect(attach).toHaveBeenCalled()
   })
 
   it('deletes a document after confirmation and refreshes', async () => {

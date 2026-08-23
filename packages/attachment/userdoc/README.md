@@ -14,6 +14,8 @@ This is deliberately the opposite of [`dsh-attachment`](../attachment/README.md)
 
 Storage is not content-addressed, so two uploads of identical bytes are two files with two identifiers. Deleting one cannot affect the other, which is what a person expects of files in their own directory.
 
+Personal and project stores are isolated runtime stores. The Gateway document broker can copy a snapshot between them without making a document id or path portable; the target store resolves a new id and name. Transfer provenance belongs to the Gateway audit record rather than to a live cross-runtime reference.
+
 ## Model Experience
 
 Indirectly, through the host prompt-assembly consumer that either inlines a small decodable document as text or passes its path for the agent's ordinary file tools to read, using the reference and the `maxInlineTextBytes` threshold this seam supplies.
@@ -27,3 +29,4 @@ None; this package neither assembles nor sends a provider request.
 - **No retention, quota accounting, or garbage collection** — uploads accumulate under the user's own directory until removed. A multi-user deployment enforces disk quota at its own layer, because this seam cannot see the other users sharing the volume.
 - **`list` walks one document root** — there is no index or cross-root view, so a very large workspace is scanned in full for recursive consumers.
 - **No content verification on read** — unlike the content-addressed attachment path, a document is an ordinary file that anything with filesystem access may have changed since upload, and `bytes` is the length recorded at upload time.
+- **Snapshot copies are not synchronized** — a cross-scope transfer is one-way and independent after the target file commits.

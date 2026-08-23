@@ -18,7 +18,8 @@ import {
 import {
   createUserDocClient, readDocumentsScope, UserDocServiceUnavailableError,
   type DocumentsWorkspaceScope, type UserDocDirectoryIdType, type UserDocDirectoryRef,
-  type UserDocLimits, type UserDocRef,
+  type UserDocLimits, type UserDocRef, type UserDocScope, type UserDocTransferListedDocument,
+  type UserDocTransferTargetRef,
 } from './documents-client.ts'
 import { DocumentPreview } from './DocumentPreview.tsx'
 import { formatBytes, getDateGroup } from './format.ts'
@@ -44,6 +45,8 @@ export interface DocumentsModalProps {
   open: boolean
   onClose: () => void
   t: (key: DocumentsKey, params?: Record<string, string>) => string
+  /** Attach copied target snapshots to the currently selected conversation. */
+  onAttach?: (documents: readonly UserDocTransferTargetRef[]) => Promise<void> | void
 }
 
 interface UploadProgress {
@@ -61,10 +64,23 @@ interface Breadcrumb {
   name: string
 }
 
+interface CopyTargetOption {
+  value: string
+  label: string
+  target: UserDocScope
+}
+
+interface SourceOption {
+  value: string
+  label: string
+  scope: UserDocScope
+}
+
 const MAX_PREVIEW_TEXT_BYTES = 256 * 1024
 const ROOT_DIRECTORY_ID = '' as UserDocDirectoryIdType
 
 const DEFAULT_SORT: DocumentSort = { key: 'date', dir: 'desc' }
+const DOCUMENT_ATTACH_EVENT = 'dsh-documents-attach'
 
 const SORT_OPTIONS: readonly { value: string; key: DocumentSortKey; dir: DocumentSortDir; label: DocumentsKey }[] = [
   { value: 'date:desc', key: 'date', dir: 'desc', label: 'modal.sort.dateDesc' },
@@ -111,12 +127,16 @@ function breadcrumbs(directoryId: UserDocDirectoryIdType, rootName: string): Bre
  * @param props.t - localized documents dictionary.
  * @returns the manager dialog plus nested delete-confirm and preview dialogs.
  */
-export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t }) => {
+export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAttach }) => {
   const [documents, setDocuments] = useState<UserDocRef[]>([])
   const [directories, setDirectories] = useState<UserDocDirectoryRef[]>([])
   const [currentDirectoryId, setCurrentDirectoryId] = useState<UserDocDirectoryIdType>(ROOT_DIRECTORY_ID)
   const [limits, setLimits] = useState<UserDocLimits | null>(null)
   const [scope, setScope] = useState<DocumentsWorkspaceScope>({ kind: 'personal' })
+  const [alternateSource, setAlternateSource] = useState<SourceOption | null>(null)
+  const [sourcePickerOpen, setSourcePickerOpen] = useState(false)
+  const [sourcePickerValue, setSourcePickerValue] = useState('')
+  const [sourcePickerLoading, setSourcePickerLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [modalError, setModalError] = useState('')
@@ -136,6 +156,9 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t }) =>
   const [moveDirectories, setMoveDirectories] = useState<UserDocDirectoryRef[]>([])
   const [moveDirectoryId, setMoveDirectoryId] = useState<UserDocDirectoryIdType>(ROOT_DIRECTORY_ID)
   const [moveLoading, setMoveLoading] = useState(false)
+  const [copyTargets, setCopyTargets] = useState<CopyTargetOption[] | null>(null)
+  const [copyTarget, setCopyTarget] = useState<string>('personal')
+  const [copyLoading, setCopyLoading] = useState(false)
   const [previewDoc, setPreviewDoc] = useState<UserDocRef | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const headerCheckRef = useRef<HTMLInputElement>(null)
@@ -148,6 +171,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t }) =>
     loadGeneration.current = generation
     setLoading(true)
     setError('')
+    setAlternateSource(null)
     try {
       const [response, nextScope] = await Promise.all([
         userDocs.current.browse(directoryId, signal),
@@ -219,6 +243,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t }) =>
   }, [headerState])
 
   const uploadFiles = async (list: FileList | readonly File[]) => {
+    if (writeLocked) return
     const files = fileListOf(list)
     if (files.length === 0) return
     setUploading(true)
@@ -246,6 +271,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t }) =>
   }
 
   const handleDelete = async () => {
+    if (writeLocked) return
     /* v8 ignore next -- only called when deleteTargets is set */
     if (deleteTargets === null || deleteTargets.length === 0) return
     const targets = deleteTargets
@@ -300,6 +326,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t }) =>
 
   const handleFolderSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (writeLocked) return
     if (folderEditor === null || folderName.trim() === '') return
     setUploading(true)
     setModalError('')
@@ -319,6 +346,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t }) =>
   }
 
   const handleDeleteDirectory = async () => {
+    if (writeLocked) return
     if (deleteDirectory === null) return
     setUploading(true)
     setModalError('')
@@ -334,6 +362,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t }) =>
   }
 
   const openMove = async (targets: UserDocRef[]) => {
+    if (writeLocked) return
     if (targets.length === 0) return
     setMoveTargets(targets)
     setMoveDirectories([])
@@ -357,6 +386,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t }) =>
   }
 
   const handleMove = async () => {
+    if (writeLocked) return
     if (moveTargets === null || moveTargets.length === 0 || moveDirectoryId === currentDirectoryId) return
     const targets = moveTargets
     setUploading(true)
@@ -385,6 +415,123 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t }) =>
       await load(currentDirectoryId)
       setModalError(t('move.error'))
     } finally {
+      setUploading(false)
+      setProgress(null)
+    }
+  }
+
+  const openCopy = (targets: UserDocRef[]) => {
+    if (targets.length === 0) return
+    const options: CopyTargetOption[] = alternateSource !== null && !(scope.kind === 'project' && scope.mode === 'ro')
+      ? [{
+        value: 'current',
+        label: scope.kind === 'project' ? scope.projectName : t('copy.target.personal'),
+        target: currentScopeDescriptor(),
+      }]
+      : scope.kind === 'personal'
+        ? (scope.projects ?? [])
+          .filter(project => project.mode === 'rw')
+          .map(project => ({
+            value: `project:${String(project.projectId)}`,
+            label: project.name,
+            target: { kind: 'project', projectId: project.projectId } as const,
+          }))
+        : [{ value: 'personal', label: t('copy.target.personal'), target: { kind: 'personal' } as const }]
+    if (options.length === 0) {
+      setError(t('copy.unavailable'))
+      return
+    }
+    setCopyTargets(options)
+    setCopyTarget(options[0]?.value ?? '')
+    setMoveTargets(null)
+    setModalError('')
+  }
+
+  const currentScopeDescriptor = (): UserDocScope => scope.kind === 'project' && scope.projectId !== undefined
+    ? { kind: 'project', projectId: scope.projectId }
+    : { kind: 'personal' }
+
+  const sourceOptions: SourceOption[] = scope.kind === 'personal'
+    ? (scope.projects ?? []).map(project => ({
+      value: `project:${String(project.projectId)}`,
+      label: project.name,
+      scope: { kind: 'project', projectId: project.projectId } as const,
+    }))
+    : [{ value: 'personal', label: t('copy.target.personal'), scope: { kind: 'personal' } as const }]
+
+  const browseSource = async () => {
+    const option = sourceOptions.find(candidate => candidate.value === sourcePickerValue)
+    if (option === undefined) return
+    setSourcePickerLoading(true)
+    setError('')
+    try {
+      const response = await userDocs.current.listScope(option.scope)
+      const documents: UserDocRef[] = response.documents.map((document: UserDocTransferListedDocument) => ({
+        ...document,
+        path: '',
+      }))
+      setDocuments(documents)
+      setDirectories([])
+      setCurrentDirectoryId(ROOT_DIRECTORY_ID)
+      setAlternateSource(option)
+      setSelected(new Set())
+      setQuery('')
+      setPage(1)
+      setSourcePickerOpen(false)
+    } catch (error) {
+      setError(error instanceof Error ? error.message : t('copy.error'))
+    } finally {
+      setSourcePickerLoading(false)
+    }
+  }
+
+  const openSourcePicker = () => {
+    if (sourceOptions.length === 0) {
+      setError(t('copy.source.unavailable'))
+      return
+    }
+    setSourcePickerValue(sourceOptions[0]?.value ?? '')
+    setSourcePickerOpen(true)
+    setModalError('')
+  }
+
+  const handleCopy = async () => {
+    if (copyTargets === null || selected.size === 0) return
+    const option = copyTargets.find(candidate => candidate.value === copyTarget)
+    if (option === undefined) return
+    const targets = documents.filter(doc => selected.has(doc.docId))
+    if (targets.length === 0) return
+    setCopyLoading(true)
+    setUploading(true)
+    setModalError('')
+    setProgress({ current: 0, total: targets.length, percent: 0 })
+    try {
+      const source: UserDocScope = alternateSource?.scope ?? currentScopeDescriptor()
+      const target = alternateSource === null
+        ? option.target
+        : currentScopeDescriptor()
+      const response = await userDocs.current.transfer({
+        version: 1,
+        source,
+        target,
+        documents: targets.map(doc => ({ docId: doc.docId })),
+      })
+      const copied = response.items.flatMap(item => item.status === 'copied' ? [item.target] : [])
+      const failed = response.items.filter(item => item.status === 'failed').length
+      if (copied.length > 0) {
+        if (onAttach !== undefined) await onAttach(copied)
+        else if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent(DOCUMENT_ATTACH_EVENT, { detail: copied }))
+        }
+      }
+      if (failed > 0) setModalError(t('copy.partial', { count: String(failed) }))
+      else setCopyTargets(null)
+      setSelected(new Set())
+      await load(currentDirectoryId)
+    } catch (error) {
+      setModalError(error instanceof Error ? error.message : t('copy.error'))
+    } finally {
+      setCopyLoading(false)
       setUploading(false)
       setProgress(null)
     }
@@ -425,12 +572,17 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t }) =>
   const title = scope.kind === 'project'
     ? t('modal.title.project', { name: scope.projectName })
     : t('modal.title')
-  const directoryTrail = breadcrumbs(currentDirectoryId, t('breadcrumb.root'))
+  const directoryTrail = breadcrumbs(currentDirectoryId, alternateSource?.label ?? t('breadcrumb.root'))
+  const readOnlyProject = scope.kind === 'project' && scope.mode === 'ro'
+  const writeLocked = alternateSource !== null || readOnlyProject
 
   const projectExtra = scope.kind === 'project' ? t('delete.confirm.project.extra') : ''
   const visibility = scope.kind === 'project'
     ? t('modal.visibility.project')
     : t('modal.visibility.personal')
+  const visibleScope = alternateSource === null
+    ? visibility
+    : t('copy.source.viewing', { name: alternateSource.label })
 
   const onDragEnter = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault()
@@ -501,6 +653,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t }) =>
           variant="ghost"
           aria-label={t('folder.renameNamed', { name: directory.name })}
           title={t('folder.rename')}
+          disabled={busy || writeLocked}
           onClick={() => { openRenameDirectory(directory) }}
         >
           <span className={css.actionIcon} aria-hidden="true"><IconEditOutline16 size={16} /></span>
@@ -513,6 +666,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t }) =>
           variant="ghost"
           aria-label={t('folder.deleteNamed', { name: directory.name })}
           title={t('folder.delete')}
+          disabled={busy || writeLocked}
           onClick={() => { setDeleteDirectory(directory) }}
         >
           <span className={css.actionIcon} aria-hidden="true"><IconTrashOutline16 size={16} /></span>
@@ -544,59 +698,65 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t }) =>
         </span>
       </div>
       <span className={css.actions}>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          aria-label={t('action.previewNamed', { name: doc.name })}
-          title={t('action.preview')}
-          onClick={() => { setPreviewDoc(doc) }}
-        >
-          <span className={css.actionIcon} aria-hidden="true">
-            <IconInspectOutline12 size={16} />
-          </span>
-          <span className={css.actionLabel}>{t('action.preview')}</span>
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          aria-label={t('action.moveNamed', { name: doc.name })}
-          title={t('action.move')}
-          onClick={() => { void openMove([doc]) }}
-        >
-          <span className={css.actionIcon} aria-hidden="true">
-            <IconFolderOpenOutline16 size={16} />
-          </span>
-          <span className={css.actionLabel}>{t('action.move')}</span>
-        </Button>
-        <a
-          className={css.download}
-          href={userDocs.current.contentUrl(doc.docId)}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={t('action.downloadNamed', { name: doc.name })}
-          title={t('action.download')}
-        >
-          <span className={css.actionIcon} aria-hidden="true">
-            <IconDownloadOutline16 size={16} />
-          </span>
-          <span className={css.actionLabel}>{t('action.download')}</span>
-        </a>
-        <Button
-          className={css.delete}
-          type="button"
-          size="sm"
-          variant="ghost"
-          aria-label={t('action.deleteNamed', { name: doc.name })}
-          title={t('action.delete')}
-          onClick={() => { setDeleteTargets([doc]) }}
-        >
-          <span className={css.actionIcon} aria-hidden="true">
-            <IconTrashOutline16 size={16} />
-          </span>
-          <span className={css.actionLabel}>{t('action.delete')}</span>
-        </Button>
+        {alternateSource === null && (
+          <>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              aria-label={t('action.previewNamed', { name: doc.name })}
+              title={t('action.preview')}
+              onClick={() => { setPreviewDoc(doc) }}
+            >
+              <span className={css.actionIcon} aria-hidden="true">
+                <IconInspectOutline12 size={16} />
+              </span>
+              <span className={css.actionLabel}>{t('action.preview')}</span>
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              aria-label={t('action.moveNamed', { name: doc.name })}
+              title={t('action.move')}
+              disabled={busy || writeLocked}
+              onClick={() => { void openMove([doc]) }}
+            >
+              <span className={css.actionIcon} aria-hidden="true">
+                <IconFolderOpenOutline16 size={16} />
+              </span>
+              <span className={css.actionLabel}>{t('action.move')}</span>
+            </Button>
+            <a
+              className={css.download}
+              href={userDocs.current.contentUrl(doc.docId)}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={t('action.downloadNamed', { name: doc.name })}
+              title={t('action.download')}
+            >
+              <span className={css.actionIcon} aria-hidden="true">
+                <IconDownloadOutline16 size={16} />
+              </span>
+              <span className={css.actionLabel}>{t('action.download')}</span>
+            </a>
+            <Button
+              className={css.delete}
+              type="button"
+              size="sm"
+              variant="ghost"
+              aria-label={t('action.deleteNamed', { name: doc.name })}
+              title={t('action.delete')}
+              disabled={busy || writeLocked}
+              onClick={() => { setDeleteTargets([doc]) }}
+            >
+              <span className={css.actionIcon} aria-hidden="true">
+                <IconTrashOutline16 size={16} />
+              </span>
+              <span className={css.actionLabel}>{t('action.delete')}</span>
+            </Button>
+          </>
+        )}
       </span>
     </div>
   )
@@ -703,11 +863,32 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t }) =>
                 if (files !== null) void uploadFiles(files)
               }}
             />
+            {alternateSource === null && sourceOptions.length > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy}
+                icon={<IconBrowseOutline16 size={16} />}
+                onClick={openSourcePicker}
+              >
+                {t('copy.source')}
+              </Button>
+            )}
+            {alternateSource !== null && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy}
+                onClick={() => { void load(ROOT_DIRECTORY_ID) }}
+              >
+                {t('copy.source.current')}
+              </Button>
+            )}
             <Button
               className={css.newFolder}
               type="button"
               variant="outline"
-              disabled={busy}
+              disabled={busy || writeLocked}
               icon={<IconFolderClose16 size={16} />}
               onClick={openCreateDirectory}
             >
@@ -735,7 +916,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t }) =>
           </div>
 
           <div className={css.caption}>
-            <span>{visibility}</span>
+            <span>{visibleScope}</span>
             {!loading && <span>{t('modal.count', { count: String(filtered.length) })}</span>}
           </div>
 
@@ -752,16 +933,24 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t }) =>
               <Button
                 type="button"
                 variant="ghost"
-                disabled={busy}
+                disabled={busy || writeLocked}
                 onClick={() => { void openMove(documents.filter(doc => selected.has(doc.docId))) }}
               >
                 {t('selection.move')}
               </Button>
               <Button
+                type="button"
+                variant="ghost"
+                disabled={busy}
+                onClick={() => { openCopy(documents.filter(doc => selected.has(doc.docId))) }}
+              >
+                {t('selection.copy')}
+              </Button>
+              <Button
                 className={css.delete}
                 type="button"
                 variant="primary"
-                disabled={busy}
+                disabled={busy || writeLocked}
                 onClick={() => {
                   setDeleteTargets(documents.filter(doc => selected.has(doc.docId)))
                 }}
@@ -830,7 +1019,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t }) =>
               <Button type="button" variant="outline" onClick={closeDelete}>
                 {t('modal.cancel')}
               </Button>
-              <Button type="button" variant="primary" disabled={busy} onClick={() => { void handleDelete() }}>
+              <Button type="button" variant="primary" disabled={busy || writeLocked} onClick={() => { void handleDelete() }}>
                 {t('delete.confirm.button')}
               </Button>
             </>
@@ -872,7 +1061,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t }) =>
               }}>
                 {t('modal.cancel')}
               </Button>
-              <Button type="submit" variant="primary" disabled={busy || folderName.trim() === ''}>
+              <Button type="submit" variant="primary" disabled={busy || writeLocked || folderName.trim() === ''}>
                 {t(folderEditor.mode === 'create' ? 'folder.create.confirm' : 'folder.rename.confirm')}
               </Button>
             </div>
@@ -900,7 +1089,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t }) =>
               }}>
                 {t('modal.cancel')}
               </Button>
-              <Button type="button" variant="primary" disabled={busy} onClick={() => { void handleDeleteDirectory() }}>
+              <Button type="button" variant="primary" disabled={busy || writeLocked} onClick={() => { void handleDeleteDirectory() }}>
                 {t('folder.delete.confirm')}
               </Button>
             </>
@@ -934,7 +1123,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t }) =>
               <Button
                 type="button"
                 variant="primary"
-                disabled={busy || moveLoading || moveOptions.length === 0 || moveDirectoryId === currentDirectoryId}
+                disabled={busy || writeLocked || moveLoading || moveOptions.length === 0 || moveDirectoryId === currentDirectoryId}
                 onClick={() => { void handleMove() }}
               >
                 {t('move.confirm')}
@@ -964,6 +1153,85 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t }) =>
                 </select>
               </>
             )}
+          </div>
+        </Modal>
+      )}
+
+      {copyTargets !== null && (
+        <Modal
+          open
+          onClose={() => {
+            if (!busy) {
+              setCopyTargets(null)
+              setModalError('')
+            }
+          }}
+          title={t('copy.title')}
+          closeLabel={t('modal.close')}
+          className={css.confirmDialog as string}
+          footer={(
+            <>
+              <Button type="button" variant="outline" disabled={busy} onClick={() => {
+                setCopyTargets(null)
+                setModalError('')
+              }}>
+                {t('modal.cancel')}
+              </Button>
+              <Button type="button" variant="primary" disabled={busy || copyTarget === ''} onClick={() => { void handleCopy() }}>
+                {t('copy.confirm')}
+              </Button>
+            </>
+          )}
+        >
+          {modalError !== '' && <div className={css.error} role="alert">{modalError}</div>}
+          <div className={css.form}>
+            <p className={css.confirm}>{t('copy.message', { count: String(selected.size) })}</p>
+            <label className={css.formLabel} htmlFor="documents-copy-target">{t('copy.target')}</label>
+            <select
+              id="documents-copy-target"
+              className={`${css.select} ${css.moveSelect}`}
+              value={copyTarget}
+              onChange={(event) => { setCopyTarget(event.currentTarget.value) }}
+            >
+              {copyTargets.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+            {copyLoading && <p className={css.status}>{t('copy.loading')}</p>}
+          </div>
+        </Modal>
+      )}
+
+      {sourcePickerOpen && (
+        <Modal
+          open
+          onClose={() => {
+            if (!sourcePickerLoading) setSourcePickerOpen(false)
+          }}
+          title={t('copy.source.title')}
+          closeLabel={t('modal.close')}
+          className={css.confirmDialog as string}
+          footer={(
+            <>
+              <Button type="button" variant="outline" disabled={sourcePickerLoading} onClick={() => { setSourcePickerOpen(false) }}>
+                {t('modal.cancel')}
+              </Button>
+              <Button type="button" variant="primary" disabled={sourcePickerLoading || sourcePickerValue === ''} onClick={() => { void browseSource() }}>
+                {t('copy.source.open')}
+              </Button>
+            </>
+          )}
+        >
+          <div className={css.form}>
+            <p className={css.confirm}>{t('copy.source.message')}</p>
+            <label className={css.formLabel} htmlFor="documents-source-scope">{t('copy.source.label')}</label>
+            <select
+              id="documents-source-scope"
+              className={`${css.select} ${css.moveSelect}`}
+              value={sourcePickerValue}
+              onChange={(event) => { setSourcePickerValue(event.currentTarget.value) }}
+            >
+              {sourceOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+            {sourcePickerLoading && <p className={css.status}>{t('copy.source.loading')}</p>}
           </div>
         </Modal>
       )}

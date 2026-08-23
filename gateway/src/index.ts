@@ -29,6 +29,11 @@ import { loadPrincipalKeys } from './principal.ts'
 import { createProxyHandlers } from './proxy.ts'
 import { createPostgresPushService } from './push-notifications.ts'
 import { createRuntimeApiHandler } from './runtime-api.ts'
+import {
+  createDocumentTransferCapabilitiesHandler,
+  createDocumentTransferListHandler,
+  createDocumentTransferHandler,
+} from './document-transfer.ts'
 import { runtimeDirectoryGrants } from './runtime-directory-grants.ts'
 import { createGatewayServer, type GatewayDeps } from './server.ts'
 import { createUsageIntakeServer } from './usage-intake.ts'
@@ -135,6 +140,23 @@ const server = createGatewayServer(deps, {
     principals: principalKeys.signer,
     governance,
     push,
+    documentTransfer: createDocumentTransferHandler({
+      instances: deps.instances,
+      users,
+      projects,
+      collaboration,
+      principals: principalKeys.signer,
+      audit,
+    }),
+    documentTransferCapabilities: createDocumentTransferCapabilitiesHandler({ collaboration }),
+    documentTransferList: createDocumentTransferListHandler({
+      instances: deps.instances,
+      users,
+      projects,
+      collaboration,
+      principals: principalKeys.signer,
+      audit,
+    }),
   }),
 })
 // Bind loopback only: the gateway is reached through the TLS entry (Cloudflare

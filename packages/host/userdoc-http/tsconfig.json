@@ -5,6 +5,8 @@
   "references": [
     { "path": "../../../vendor/cordis" },
     { "path": "../../client/connection/tsconfig.host.json" },
+    { "path": "../../context/collaboration" },
+    { "path": "../../context/gateway-runtime" },
     { "path": "../../attachment/userdoc" },
     { "path": "../../runtime-diagnostics/invariants" }
   ]

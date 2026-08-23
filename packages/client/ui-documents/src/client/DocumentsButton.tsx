@@ -1,13 +1,15 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { IconBrowseOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import { DocumentsModal } from './DocumentsModal.tsx'
+import type { UserDocTransferTargetRef } from './documents-client.ts'
 import { NS } from './locales.ts'
 import css from './DocumentsButton.module.css'
 
 export type DocumentsButtonProps =
   PropsRuntime<'sidebar.footer.action'>
   & PropsLocale<typeof NS>
+  & { onAttach?: (documents: readonly UserDocTransferTargetRef[]) => Promise<void> | void }
 
 /**
  * Render the sidebar Documents trigger and its manager modal.
@@ -16,11 +18,18 @@ export type DocumentsButtonProps =
  * @returns the footer trigger and, while open, the document manager dialog.
  */
 export function DocumentsButton({
-  t, wide,
+  t, wide, onAttach,
 }: DocumentsButtonProps) {
   const [open, setOpen] = useState(false)
   const handleOpen = useCallback(() => { setOpen(true) }, [])
   const handleClose = useCallback(() => { setOpen(false) }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const openPicker = (): void => { setOpen(true) }
+    window.addEventListener('dsh-documents-open-picker', openPicker)
+    return () => { window.removeEventListener('dsh-documents-open-picker', openPicker) }
+  }, [])
 
   return (
     <>
@@ -35,7 +44,14 @@ export function DocumentsButton({
           {wide && <span className={css.label}>{t('button.label')}</span>}
         </button>
       </Tooltip>
-      {open && <DocumentsModal open onClose={handleClose} t={t} />}
+      {open && (
+        <DocumentsModal
+          open
+          onClose={handleClose}
+          t={t}
+          {...(onAttach === undefined ? {} : { onAttach })}
+        />
+      )}
     </>
   )
 }
