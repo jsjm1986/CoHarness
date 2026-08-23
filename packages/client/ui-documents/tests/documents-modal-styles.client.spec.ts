@@ -24,6 +24,10 @@ describe('DocumentsModal.module.css', () => {
     expect(modal).toMatch(/@media \(max-width: 767px\)[\s\S]*\.dialog\s*\{[\s\S]*width:\s*100%/)
     expect(modal).toMatch(/@media \(max-width: 767px\)[\s\S]*\.dialog\s*\{[\s\S]*min-height:\s*0/)
   })
+
+  it('keeps the selected destructive action readable on its primary fill', () => {
+    expect(modal).toMatch(/\.selectionDelete\s*\{[\s\S]*color:\s*var\(--dsw-alias-label-primary-foreground\)/)
+  })
 })
 
 describe('DocumentPreview.module.css', () => {
