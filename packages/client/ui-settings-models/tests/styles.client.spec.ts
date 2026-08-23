@@ -98,6 +98,11 @@ describe('ModelsSection theme styles', () => {
     expect(compact).toContain('max-width: none')
   })
 
+  it('allows a single declaration action to occupy the add row', () => {
+    expect(block('.addActionsSingle')).toContain('display: block')
+    expect(block('.addButtonFull')).toContain('width: 100%')
+  })
+
   it('gives dense model controls the touch target on coarse pointers', () => {
     const coarse = mediaBody(css, '(pointer: coarse)')
     expect(coarse).toContain('var(--dsw-touch-target)')

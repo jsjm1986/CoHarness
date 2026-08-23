@@ -12,7 +12,7 @@ This package is part of the `@deepseek-ai/dsh-client-ui-documents` bundle and is
 
 The plugin adds a **Documents** button to the sidebar footer (alongside the workspace scope selector). The rail shows an icon with a tooltip; the expanded sidebar shows the Documents label beside the icon. Clicking it opens a manager dialog for the current scope (personal or project workspace).
 
-The dialog is 960px wide on viewports at least 768px and a full-width bottom sheet below that. A breadcrumb follows the current folder. The toolbar contains name search, type and sort selects, New Folder, upload, and refresh; uploads and desktop drops land in the current folder. A caption states personal vs project visibility and the filtered document count.
+The dialog is 960px wide on viewports at least 768px and a full-width bottom sheet below that. A breadcrumb follows the current folder. The toolbar separates name/type/sort filters from folder, upload, and refresh actions on desktop, then stacks those groups on compact screens; uploads and desktop drops land in the current folder. A caption states personal vs project visibility and the filtered document count, and list rows use a stable padded rhythm so long names and actions remain readable.
 
 Select one or more rows and choose **Copy to another scope** to create a snapshot in a writable project or in personal documents. The manager shows only safe scope labels; Gateway performs authorization and streaming, resolves target name conflicts without overwriting, and reports each file independently. A successful copy can be attached to the active composer as a durable, non-owning draft.
 

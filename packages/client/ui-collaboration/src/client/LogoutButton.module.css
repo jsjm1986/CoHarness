@@ -10,15 +10,15 @@
   gap: var(--dsw-space-2);
   box-sizing: border-box;
   width: calc(100% + 4px);
-  height: 42px;
+  height: var(--dsh-sidebar-footer-row-height, 36px);
   min-width: 0;
-  margin: var(--dsw-space-1) -2px;
-  padding: 0 10px 0 8px;
+  margin: 0 -2px;
+  padding: 0 8px;
   border: 0;
-  border-radius: var(--dsw-radius-lg);
+  border-radius: var(--dsh-sidebar-footer-row-radius, var(--dsw-radius-md));
   background: transparent;
-  color: var(--dsw-alias-label-primary);
-  font-size: 14px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
   line-height: 22px;
   text-align: left;
   cursor: pointer;
@@ -26,22 +26,36 @@
 }
 
 .trigger:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
+  background: var(--dsw-alias-interactive-bg-hover-danger);
+  color: var(--dsw-alias-label-danger);
 }
 
 .trigger:focus-visible {
   outline: 2px solid var(--dsw-alias-brand-primary);
   outline-offset: 1px;
+  background: var(--dsw-alias-interactive-bg-hover-danger);
+  color: var(--dsw-alias-label-danger);
 }
 
 .trigger.rail {
   width: 36px;
   height: 36px;
-  margin: var(--dsw-space-2) 0 10px;
+  margin: 0;
   justify-content: center;
   gap: 0;
   padding: 0;
   border-radius: 50%;
+  color: var(--dsw-alias-label-primary);
+}
+
+.trigger.rail:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.trigger.rail:focus-visible {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
 }
 
 .label {
