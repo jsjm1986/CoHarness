@@ -285,10 +285,16 @@
 
 .tools,
 .modes,
-.trailing {
+.trailing,
+.extensionItems {
   display: flex;
   align-items: center;
   min-width: 0;
+}
+
+.extensionItems {
+  flex: 0 1 auto;
+  gap: var(--dsw-space-1);
 }
 
 /* figma 75:8208 drew 16 between + and the mode chips and 4 between Plan /
@@ -495,8 +501,30 @@
   flex: 0 0 auto;
 }
 
+:global([data-viewport='compact']) .extensionItems {
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+:global([data-viewport='compact']) .extensionItems::-webkit-scrollbar {
+  display: none;
+}
+
 :global([data-viewport='compact']) .trailing {
   flex: 1 1 0;
+}
+
+/* At the smallest phone width, give the model/send group its own row. Keeping
+   both controls inside the card is preferable to squeezing the model label to
+   zero and pushing Send past the rounded edge. */
+@media (max-width: 359px) {
+  :global([data-viewport='compact']) .trailing {
+    flex-basis: 100%;
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-end;
+  }
 }
 
 :global([data-viewport='compact']) .add,
@@ -514,6 +542,17 @@
   height: var(--dsw-touch-target);
 }
 
+:global([data-viewport-short]) .card {
+  gap: var(--dsw-space-2);
+  padding-top: 6px;
+  border-radius: 18px;
+}
+
+:global([data-viewport-short]) .row {
+  gap: var(--dsw-space-2);
+  padding-bottom: 4px;
+}
+
 @media (pointer: coarse) {
   .add {
     width: var(--dsw-touch-target);
@@ -524,5 +563,104 @@
     width: var(--dsw-touch-target);
     height: var(--dsw-touch-target);
     transform: none;
+  }
+}
+
+/* Compact composer hierarchy: the left rail owns attach/command/accessory
+   actions, while the model and send controls form one readable trailing group.
+   Grid keeps the two groups aligned instead of letting flex-wrap create a
+   third accidental line when a provider name or extension is long. */
+@media (max-width: 767px) {
+  :global([data-viewport='compact']) .card {
+    gap: var(--dsw-space-2);
+    padding-top: 8px;
+    border-radius: var(--dsw-mobile-card-radius);
+  }
+
+  :global([data-viewport='compact']) .row {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    gap: var(--dsw-space-1);
+    padding: 0 var(--dsw-space-2) 6px;
+  }
+
+  :global([data-viewport='compact']) .tools {
+    min-width: max-content;
+    gap: var(--dsw-space-1);
+    overflow: hidden;
+  }
+
+  :global([data-viewport='compact']) .modes {
+    min-width: 0;
+    gap: var(--dsw-space-1);
+    overflow: hidden;
+  }
+
+  :global([data-viewport='compact']) .trailing {
+    min-width: 0;
+    flex: 0 1 auto;
+    gap: var(--dsw-space-1);
+    margin-left: 0;
+  }
+
+  :global([data-viewport='compact']) .trailing [data-model-select] {
+    min-width: 0;
+    flex: 1 1 auto;
+    max-width: none;
+  }
+
+  :global([data-viewport='compact']) .trailing [data-model-trigger] {
+    max-width: 100%;
+    padding-inline: var(--dsw-space-1);
+    font: var(--dsw-mobile-font-secondary);
+  }
+
+  :global([data-viewport='compact']) .trailing [data-model-trigger] svg {
+    width: var(--dsw-mobile-icon-secondary);
+    height: var(--dsw-mobile-icon-secondary);
+  }
+
+  :global([data-viewport='compact']) .add svg,
+  :global([data-viewport='compact']) .primary svg {
+    width: var(--dsw-mobile-icon-primary);
+    height: var(--dsw-mobile-icon-primary);
+  }
+}
+
+@media (max-width: 359px) {
+  :global([data-viewport='compact']) .row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 2px;
+  }
+
+  :global([data-viewport='compact']) .trailing {
+    width: auto;
+    justify-content: flex-end;
+  }
+
+  /* A live session carries a model seat and needs the second row; the blank
+     hero only has Send, so keeping it in the first row avoids an orphaned
+     arrow at the left edge. */
+  :global([data-viewport='compact']) .row:has([data-model-select]) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  :global([data-viewport='compact']) .row:has([data-model-select]) .trailing {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  :global([data-viewport='compact']) .tools {
+    min-width: 0;
+  }
+
+  :global([data-viewport='compact']) .trailing [data-model-select] {
+    max-width: calc(100% - var(--dsw-touch-target) - var(--dsw-space-1));
+  }
+
+  :global([data-viewport='compact']) .trailing [data-model-trigger] {
+    justify-content: flex-start;
+    text-align: left;
   }
 }

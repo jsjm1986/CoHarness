@@ -94,6 +94,7 @@ export class SqliteSessionPersistence extends SessionPersistence {
     return undefined
   }
 
+  /* jscpd:ignore-start -- each persistence provider repeats the narrow Service Definition adapter. */
   create(meta: SessionHeader): Promise<void> {
     return this.coordinator.create(meta)
   }
@@ -121,6 +122,7 @@ export class SqliteSessionPersistence extends SessionPersistence {
   ): Promise<{ meta: SessionHeader; events: SessionEvent[] }> {
     return this.coordinator.readFrom(id, fromSeq, signal)
   }
+  /* jscpd:ignore-end */
 
   list(signal?: AbortSignal): Promise<SessionHeader[]> {
     return this.store.list(signal)

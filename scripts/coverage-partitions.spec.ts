@@ -28,6 +28,22 @@ async function temporaryRoot(): Promise<string> {
   return await mkdtemp(join(tmpdir(), 'dsh-coverage-partitions-'))
 }
 
+/** Shared command recorder for coordinator tests that inspect emitted argv. */
+async function recordingCommands(): Promise<{
+  root: string
+  commands: CoverageCommand[]
+  runCommand: (command: CoverageCommand) => Promise<CoverageCommandResult>
+}> {
+  const root = await temporaryRoot()
+  const commands: CoverageCommand[] = []
+  const runCommand = vi.fn(async (command: CoverageCommand) => {
+    commands.push(command)
+    await writeBlob(command)
+    return passed
+  })
+  return { root, commands, runCommand }
+}
+
 describe('coverage partition count', () => {
   it.each([
     [undefined, undefined],
@@ -75,13 +91,7 @@ describe('coverage forwarded arguments', () => {
 
 describe('coverage partition coordinator', () => {
   it('runs every single-worker partition before one merged threshold check', async () => {
-    const root = await temporaryRoot()
-    const commands: CoverageCommand[] = []
-    const runCommand = vi.fn(async (command: CoverageCommand) => {
-      commands.push(command)
-      await writeBlob(command)
-      return passed
-    })
+    const { root, commands, runCommand } = await recordingCommands()
     const coordinator = new CoveragePartitionCoordinator({
       root,
       partitions: 3,
@@ -126,13 +136,7 @@ describe('coverage partition coordinator', () => {
   })
 
   it('runs a native pnpm entrypoint directly', async () => {
-    const root = await temporaryRoot()
-    const commands: CoverageCommand[] = []
-    const runCommand = vi.fn(async (command: CoverageCommand) => {
-      commands.push(command)
-      await writeBlob(command)
-      return passed
-    })
+    const { root, commands, runCommand } = await recordingCommands()
     const coordinator = new CoveragePartitionCoordinator({
       root,
       partitions: 2,

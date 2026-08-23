@@ -43,6 +43,7 @@
 
 .triggerLabel {
   overflow: hidden;
+  text-align: left;
   white-space: nowrap;
 }
 
@@ -164,6 +165,10 @@
   text-overflow: ellipsis;
 }
 
+.navLabelCompact {
+  display: none;
+}
+
 /* Content column (figma Content 501:29980): header + options. */
 .content {
   flex: 1;
@@ -279,6 +284,7 @@
   }
 
   .navList {
+    position: relative;
     grid-column: 1 / -1;
     grid-row: 2;
     flex-direction: row;
@@ -288,6 +294,27 @@
        become a second vertical scroller. */
     overflow-y: hidden;
     padding: var(--dsw-space-2) var(--dsw-space-2) 0;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  /* Four feature-owned sections do not always fit on a 320px phone. Keep the
+     clipped edge legible as an intentional horizontal affordance instead of
+     leaving a label cut off against a hard viewport edge. The fade stays over
+     the scrollport while the tab buttons remain fully tappable underneath. */
+  .navList::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 20px;
+    pointer-events: none;
+    background: linear-gradient(to right, transparent, var(--dsw-alias-bg-layer-2));
+  }
+
+  .navList::-webkit-scrollbar {
+    display: none;
   }
 
   .navCell {
@@ -297,12 +324,38 @@
     white-space: nowrap;
   }
 
+  .navIcon :global(svg) {
+    width: var(--dsw-mobile-icon-secondary);
+    height: var(--dsw-mobile-icon-secondary);
+  }
+
   .options {
     grid-column: 1 / -1;
     grid-row: 3;
     min-height: 0;
     padding: 0 var(--dsw-space-4) calc(var(--dsw-space-4) + var(--dsw-safe-bottom));
     overscroll-behavior: contain;
+  }
+}
+
+@media (max-width: 359px) {
+  .navList {
+    justify-content: space-between;
+    gap: var(--dsw-space-1);
+  }
+
+  .navCell {
+    flex: 1 1 0;
+    justify-content: center;
+    padding-inline: var(--dsw-space-1);
+  }
+
+  .navLabelFull {
+    display: none;
+  }
+
+  .navLabelCompact {
+    display: inline;
   }
 }
 

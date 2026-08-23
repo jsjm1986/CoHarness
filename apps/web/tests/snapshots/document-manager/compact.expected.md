@@ -40,6 +40,7 @@
       - listitem:
         - checkbox "notes.txt"
         - text: notes.txt 30.0 KB
+        - button "Add notes.txt to conversation"
         - button "Preview notes.txt"
         - button "Move notes.txt"
         - link "Download notes.txt":
@@ -50,6 +51,7 @@
       - listitem:
         - checkbox "brief.txt"
         - text: brief.txt 21 B
+        - button "Add brief.txt to conversation"
         - button "Preview brief.txt"
         - button "Move brief.txt"
         - link "Download brief.txt":

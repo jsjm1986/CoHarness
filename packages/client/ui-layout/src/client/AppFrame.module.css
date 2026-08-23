@@ -4,6 +4,7 @@
   grid-template-rows: 100%;
   height: 100%;
   overflow: hidden;
+  scrollbar-gutter: auto;
   background: var(--dsw-alias-bg-base);
   /* Collapse/expand animates the tracks on the deepsuite sider curve
      (--ds-ease-in-out / --ds-transition-duration-slow, ui-theme base.css). */
@@ -20,18 +21,55 @@
   height: var(--dsw-viewport-height, 100%);
 }
 
+.frame[data-viewport='compact'][data-viewport-short] .topbar {
+  min-height: 48px;
+}
+
 .topbar {
   display: flex;
+  grid-column: 1;
+  justify-self: start;
+  align-self: stretch;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
   align-items: center;
   gap: var(--dsw-space-2);
+  min-height: 52px;
   padding: calc(var(--dsw-space-1) + var(--dsw-safe-top)) var(--dsw-space-2) var(--dsw-space-1)
     calc(var(--dsw-space-2) + var(--dsw-safe-left));
   border-bottom: 1px solid var(--dsw-alias-border-l1);
   background: var(--dsw-alias-bg-base);
 }
 
+.topbarContext {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--dsw-space-2);
+}
+
+.topbarTitle {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-mobile-font-title);
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbarToggle :global(svg) {
+  width: var(--dsw-mobile-icon-primary);
+  height: var(--dsw-mobile-icon-primary);
+}
+
 .topbarToggle {
   display: flex;
+  flex: none;
   align-items: center;
   justify-content: center;
   width: var(--dsw-touch-target);
@@ -49,9 +87,29 @@
   color: var(--dsw-alias-label-primary);
 }
 
+.topbarToggle[aria-expanded='true'] {
+  background: var(--dsw-alias-interactive-bg-active);
+  color: var(--dsw-alias-label-primary);
+}
+
 .topbarToggle:focus-visible {
   outline: 2px solid var(--dsw-alias-border-l3);
   outline-offset: -2px;
+}
+
+@media (max-width: 359px) {
+  /* Chromium's narrow mobile layout can place the grid row behind its
+     reserved left scrollbar gutter after a Session mounts. Keep the control
+     inside the visual viewport; the title remains centered by the flex context. */
+  .topbarToggle {
+    position: relative;
+    left: 24px;
+    z-index: 1;
+  }
+
+  .topbarContext {
+    transform: translateX(16px);
+  }
 }
 
 /* Scrim behind the compact drawer and the overlay details panel: hidden
@@ -61,6 +119,7 @@
   inset: 0;
   z-index: 14;
   background: var(--dsw-alias-bg-mask-1);
+  backdrop-filter: var(--dsw-mask-blur);
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--ds-transition-duration) var(--ds-ease-in-out);
@@ -79,13 +138,17 @@
   bottom: 0;
   left: 0;
   z-index: 15;
-  width: min(85%, 320px);
+  width: min(88%, 360px);
+  box-sizing: border-box;
+  padding-top: var(--dsw-safe-top);
+  padding-bottom: var(--dsw-safe-bottom);
   padding-left: var(--dsw-safe-left);
   transform: translateX(-100%);
   visibility: hidden;
   overflow: hidden;
   background: var(--dsw-specific-sidebar-fill);
   border-right: 1px solid var(--dsw-alias-border-l1);
+  box-shadow: var(--dsw-shadow-lv3);
   transition:
     transform var(--ds-transition-duration-slow) var(--ds-ease-in-out),
     visibility var(--ds-transition-duration-slow) step-end;
@@ -129,6 +192,12 @@
 
 .frame[data-viewport='medium'] .detailsOverlay {
   width: min(var(--frame-details-overlay-width), calc(100% - var(--dsw-space-8)));
+}
+
+.frame[data-viewport='compact'] .detailsOverlay {
+  top: var(--dsw-safe-top);
+  box-sizing: border-box;
+  padding-bottom: var(--dsw-safe-bottom);
 }
 
 @media (prefers-reduced-motion: reduce) {

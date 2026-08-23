@@ -44,8 +44,8 @@ export type { SubagentDescendantSummary } from './sessions/subagent-lineage.ts'
 // materialization/projection implementation; no test-side mirror to drift).
 export { SessionProvideChannel } from './sessions/provide.ts'
 export type { SessionProvideChannelHost } from './sessions/provide.ts'
-export { createScope } from './agents/scope.ts'
-export type { AgentScopeHandle } from './agents/scope.ts'
+export { createScope } from './scope.ts'
+export type { AgentScopeHandle } from './scope.ts'
 export { DirectoryBrowseError, WorkspaceCreateError, WorkspaceRuntime } from './workspaces/service.ts'
 export { abbreviateHomePath, resolveWorkspacePath } from './workspaces/path.ts'
 // Contract only: the scope implementation and its Host transport belong to
@@ -246,9 +246,10 @@ export function apply(ctx: Context): void {
       ctx.emit('connection/reset')
     },
     onStateChange: (state) => {
-      // Generation death fires before any next-generation frame can arrive
-      // (reconnect replays flow from stream open, ahead of onConnected):
-      // the only safe moment to drop generation-scoped interaction state.
+      // Generation death fires before the next generation's business frames
+      // are released: ConnectionController buffers stream replay until after
+      // onConnected, so this is the safe moment to drop generation-scoped
+      // interaction state.
       if (state === 'reconnecting') {
         sessions.handleDisconnected()
       }

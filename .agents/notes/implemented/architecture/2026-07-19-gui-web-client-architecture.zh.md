@@ -103,7 +103,7 @@ src/client/
   index.ts     public contract surface
 ```
 
-各领域实现文件不 import 兄弟领域；共享面统一经过 `contract/`。`scripts/verify-client-domain-graph.ts` 把守分层（contract=0、domain=1、apply/index=2；import 只准指向不高于自身的层级；兄弟领域依赖会失败）。Tool 展示已经拆为独立 `ui-tool` 包，只通过 ui-conversation 声明的 slot 到达 chat 与 details。
+各领域实现文件不得对兄弟领域进行运行时/值导入；共享面统一经过 `contract/`。擦除后的 type-only 投影引用不会创建浏览器模块边或运行时开销，因此可以保留。`scripts/verify-client-domain-graph.ts` 把守分层（contract=0、domain=1、apply/index=2；import 只准指向不高于自身的层级；活跃的兄弟领域边会失败）。Tool 展示已经拆为独立 `ui-tool` 包，只通过 ui-conversation 声明的 slot 到达 chat 与 details。
 
 ## 怎么开发
 

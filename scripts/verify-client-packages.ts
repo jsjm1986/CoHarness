@@ -10,7 +10,7 @@ import ts from 'typescript'
 import { TypeScriptProject } from './ts-project.ts'
 
 const GATE = 'verify-client-packages'
-const CLIENT_MANIFEST_GLOB = 'packages/client/*/package.json'
+const CLIENT_MANIFEST_GLOB = 'packages/*/*/package.json'
 const MANIFEST_GLOBS = ['packages/*/*/package.json', 'apps/*/package.json', 'vendor/*/package.json']
 const CONFIG_GLOB = 'packages/*/*/tsdown.config.ts'
 const PLATFORM_SOURCE = 'packages/client/web/src/platform.ts'
@@ -34,7 +34,7 @@ export interface ClientDeclaration {
   readonly inject: readonly string[]
 }
 
-/** One package directly under packages/client. */
+/** One package with a dynamic browser declaration or statically linked build. */
 export interface ClientPackage extends ClientDeclaration {
   /** Whether its build config uses the staticLinked preset. */
   readonly staticLinked: boolean
@@ -52,7 +52,7 @@ export interface ClientPackage extends ClientDeclaration {
 
 /** Complete source-plane input to the client package verifier. */
 export interface ClientPackageFacts {
-  /** Packages directly under packages/client. */
+  /** Packages with a dynamic browser declaration or statically linked build. */
   readonly packages: readonly ClientPackage[]
   /** Every workspace package, including packages without a browser row. */
   readonly declarations: readonly ClientDeclaration[]
@@ -772,7 +772,14 @@ async function readFacts(root: string): Promise<ClientPackageFacts> {
   const project = new TypeScriptProject(root, 'client')
   const packages: ClientPackage[] = []
 
-  for (const manifestPath of globSync(CLIENT_MANIFEST_GLOB, { cwd: root }).map(normalizePath).sort()) {
+  const browserManifestPaths = globSync(CLIENT_MANIFEST_GLOB, { cwd: root })
+    .map(normalizePath)
+    .sort()
+    .filter((manifestPath) => {
+      const declaration = byManifest.get(manifestPath)
+      return declaration?.dynamic === true || staticLinkedPackages.has(declaration?.name ?? '')
+    })
+  for (const manifestPath of browserManifestPaths) {
     const declaration = byManifest.get(manifestPath)
     if (declaration === undefined) throw new Error(GATE + ': no declaration facts for ' + manifestPath)
     const manifest = JSON.parse(readFileSync(resolve(root, manifestPath), 'utf8')) as Manifest

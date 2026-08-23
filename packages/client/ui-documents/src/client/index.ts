@@ -8,8 +8,10 @@
 
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
+import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import { DocumentsButton } from './DocumentsButton.tsx'
+import type { DocumentsButtonInjected } from './DocumentsButton.tsx'
 import { DocumentsModal } from './DocumentsModal.tsx'
 import { DocumentPreview } from './DocumentPreview.tsx'
 import { NS, en, zh } from './locales.ts'
@@ -26,16 +28,25 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 
-export const inject = ['slots', 'locale']
+export const inject = ['slots', 'locale', 'sessions', 'conversation']
 
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-documents: dictionaries')
+
+  const injected = (): DocumentsButtonInjected => ({
+    attachDocument: (document) => {
+      const sessionId = ctx.sessions.list.getSnapshot().current
+      if (sessionId === undefined) return false
+      return ctx.get('conversation')?.attachDocument(sessionId, document) ?? false
+    },
+  })
 
   ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
     name: 'sidebar.footer.action',
     id: 'documents',
     order: -10,
     locale: NS,
+    inject: injected,
   }, DocumentsButton))
 }
 

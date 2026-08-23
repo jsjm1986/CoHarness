@@ -20,6 +20,46 @@ function subscribedFrame(lastSeq = 0) {
 }
 
 describe('connection lifecycle', () => {
+  it('releases replayed frames only after the readiness callback', async () => {
+    const api = new FakeApiClient()
+    const describe = deferred<Awaited<ReturnType<FakeApiClient['onDescribe']>>>()
+    api.onDescribe = () => describe.promise
+    const order: string[] = []
+    const controller = new ConnectionController(api, {
+      onMuxEnvelope: (envelope) => { order.push(envelope.payload.type) },
+      onConnected: () => { order.push('connected') },
+    }, FAST)
+    controller.start()
+    try {
+      await vi.waitFor(() => { expect(api.openMuxCount).toBe(1) })
+      api.pushMux(subscribedFrame())
+      describe.resolve(ok({ version: '0', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true }))
+      await vi.waitFor(() => { expect(order).toEqual(['connected', 'session/subscribed']) })
+    } finally {
+      controller.stop()
+    }
+  })
+
+  it('stops releasing a buffered generation when a sink stops the controller', async () => {
+    const api = new FakeApiClient()
+    const describe = deferred<Awaited<ReturnType<FakeApiClient['onDescribe']>>>()
+    api.onDescribe = () => describe.promise
+    const order: string[] = []
+    const controller = new ConnectionController(api, {
+      onMuxEnvelope: (envelope) => {
+        order.push(`${envelope.payload.type}:${envelope.rpcId}`)
+        controller.stop()
+      },
+      onConnected: () => { order.push('connected') },
+    }, FAST)
+    controller.start()
+    await vi.waitFor(() => { expect(api.openMuxCount).toBe(1) })
+    api.pushMux(subscribedFrame(1), 'first')
+    api.pushMux(subscribedFrame(2), 'second')
+    describe.resolve(ok({ version: '0', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true }))
+    await vi.waitFor(() => { expect(order).toEqual(['connected', 'session/subscribed:first']) })
+  })
+
   it('announces connected after describe + both streams open, then pumps frames to sinks', async () => {
     const api = new FakeApiClient()
     const muxSeen: string[] = []

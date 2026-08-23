@@ -55,14 +55,12 @@
     "lib/types/**/*.d.ts"
   ],
   "license": "MIT",
-  "dependencies": {
-    "@deepseek-ai/dsh-typert-protocol": "workspace:^"
-  },
   "peerDependencies": {
     "@deepseek-ai/dsh-client-connection": "workspace:^",
     "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/dsh-typert-registry": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
+    "@deepseek-ai/cordis": "workspace:^",
+    "@deepseek-ai/dsh-typert-protocol": "workspace:^"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-client-connection": "workspace:^",
@@ -70,6 +68,7 @@
     "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/dsh-typert-registry": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "@deepseek-ai/dsh-typert-protocol": "workspace:^"
   }
 }

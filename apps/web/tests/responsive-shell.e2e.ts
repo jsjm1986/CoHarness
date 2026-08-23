@@ -64,10 +64,38 @@ describe('web e2e: responsive shell modes', () => {
     expect(await frame.evaluate(node => (node as HTMLElement).style.gridTemplateColumns)).toBe('')
     expect(await page.locator('[class*="handle"]').count()).toBe(0)
 
+    const coldGeometry = await page.evaluate(() => {
+      const viewportWidth = window.innerWidth
+      const viewportHeight = window.innerHeight
+      const actionable = [...document.querySelectorAll<HTMLElement>('button, [role="button"]')]
+        .map((element) => {
+          const rect = element.getBoundingClientRect()
+          const style = getComputedStyle(element)
+          return {
+            visible: rect.width > 0 && rect.height > 0
+              && rect.right > 0 && rect.left < viewportWidth
+              && rect.bottom > 0 && rect.top < viewportHeight
+              && style.display !== 'none' && style.visibility !== 'hidden',
+            inside: rect.left >= -1 && rect.right <= viewportWidth + 1
+              && rect.top >= -1 && rect.bottom <= viewportHeight + 1,
+          }
+        })
+        .filter(item => item.visible)
+      return {
+        documentWidth: document.documentElement.scrollWidth,
+        bodyWidth: document.body.scrollWidth,
+        actionableInside: actionable.every(item => item.inside),
+      }
+    })
+    expect(coldGeometry.documentWidth).toBeLessThanOrEqual(390)
+    expect(coldGeometry.bodyWidth).toBeLessThanOrEqual(390)
+    expect(coldGeometry.actionableInside).toBe(true)
+
     // Stable class anchor: the toggle's accessible name flips between
     // Open/Close sidebar with the drawer state.
     const toggle = page.locator('[class*="topbarToggle"]').first()
     await toggle.waitFor({ timeout: 10_000 })
+    expect(await page.locator('[data-mobile-app-header]').textContent()).toBe('DeepSeek Harness')
     expect(await toggle.getAttribute('aria-label')).toBe('Open sidebar')
     const drawer = page.locator('[class*="drawer"]').first()
     expect(await drawer.getAttribute('data-open')).toBeNull()
@@ -85,6 +113,20 @@ describe('web e2e: responsive shell modes', () => {
     const scrim = page.locator('[class*="scrim"][data-open]').first()
     await scrim.click({ position: { x: 370, y: 420 } })
     await expect.poll(() => drawer.getAttribute('data-open'), { timeout: 5_000 }).toBeNull()
+  }, 60_000)
+
+  it('short compact: stamps the short-height profile without horizontal overflow', async () => {
+    page = await openAt(375, 667)
+    const frame = page.locator('[class*="frame"]').first()
+    expect(await frame.getAttribute('data-viewport')).toBe('compact')
+    expect(await frame.getAttribute('data-viewport-short')).toBe('true')
+    const geometry = await page.evaluate(() => ({
+      documentWidth: document.documentElement.scrollWidth,
+      bodyWidth: document.body.scrollWidth,
+      viewportWidth: innerWidth,
+    }))
+    expect(geometry.documentWidth).toBeLessThanOrEqual(geometry.viewportWidth)
+    expect(geometry.bodyWidth).toBeLessThanOrEqual(geometry.viewportWidth)
   }, 60_000)
 
   it('medium: rail column with two grid tracks and no drag handles while collapsed', async () => {

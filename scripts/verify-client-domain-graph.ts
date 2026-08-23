@@ -23,7 +23,9 @@ const CLIENT_DIR = join(root, 'packages/client')
 /** Directory names treated as the shared contract layer (importable by all). */
 const CONTRACT_DIRS = new Set(['contract'])
 /** Top-level client files allowed to import across domains (assembly layer). */
-const ASSEMBLY_FILES = new Set(['apply.ts', 'index.ts', 'index.tsx'])
+// WorkspaceBrowser is the package's declared sidebar root and assembles rows
+// plus picker children; it is not a plugin apply entry but has the same role.
+const ASSEMBLY_FILES = new Set(['apply.ts', 'index.ts', 'index.tsx', 'WorkspaceBrowser.tsx'])
 
 interface Violation { file: string; imported: string; reason: string }
 
@@ -51,6 +53,12 @@ export function resolveClientImport(file: string, specifier: string): string {
   return posix.normalize(posix.join(posix.dirname(file), specifier))
 }
 
+/** Whether the import declaration ending at `fromIndex` is erased by TypeScript. */
+export function importDeclarationIsTypeOnly(source: string, fromIndex: number): boolean {
+  const importStart = source.lastIndexOf('import', fromIndex)
+  return source.slice(importStart, fromIndex).trimStart().startsWith('import type')
+}
+
 function checkPackage(pkgName: string, clientDir: string): Violation[] {
   const violations: Violation[] = []
   const files = listSources(clientDir)
@@ -62,6 +70,11 @@ function checkPackage(pkgName: string, clientDir: string): Violation[] {
     for (const match of source.matchAll(/from\s+['"](\.[^'"]+)['"]/g)) {
       const spec = match[1]
       if (spec === undefined) continue
+      // Type-only edges disappear from the browser module graph and carry no
+      // runtime initialization or dispatch cost. Contracts may therefore
+      // name implementation-owned projections without making a live domain
+      // dependency; value imports still need the explicit layering below.
+      if (importDeclarationIsTypeOnly(source, match.index)) continue
       const target = resolveClientImport(rel, spec)
       if (target === '..' || target.startsWith('../')) continue // package-level rules govern
       const toDomain = domainOf(target)

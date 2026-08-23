@@ -138,3 +138,44 @@
   max-width: none;
   white-space: normal;
 }
+
+@media (max-width: 767px) {
+  .menu {
+    position: fixed;
+    top: auto !important;
+    right: max(var(--dsw-mobile-sheet-edge), var(--dsw-safe-right));
+    bottom: var(--dsw-mobile-sheet-bottom);
+    left: max(var(--dsw-mobile-sheet-edge), var(--dsw-safe-left));
+    z-index: 1091;
+    width: auto;
+    max-width: none;
+    max-height: var(--dsw-mobile-sheet-max-height);
+    border-radius: var(--dsw-mobile-sheet-radius);
+    animation: job-list-sheet-in var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+  }
+
+  .menu::before {
+    content: '';
+    display: block;
+    width: 36px;
+    height: 4px;
+    margin: 2px auto 6px;
+    border-radius: var(--dsw-radius-full);
+    background: var(--dsw-alias-label-caption);
+    opacity: 0.7;
+  }
+
+  .row {
+    min-height: var(--dsw-touch-target);
+  }
+}
+
+@keyframes job-list-sheet-in {
+  from { opacity: 0; transform: translateY(10px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu {
+    animation: none;
+  }
+}

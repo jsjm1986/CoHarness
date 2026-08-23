@@ -11,7 +11,7 @@
  * resizes are driven through the ResizeObserver stub.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, render } from '@testing-library/react'
+import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { useSyncExternalStore } from 'react'
 import { AppFrame } from '@deepseek-ai/dsh-client-ui-layout/src/client/AppFrame.tsx'
 import type { AppFrameProps } from '@deepseek-ai/dsh-client-ui-layout/src/client/AppFrame.tsx'
@@ -46,6 +46,7 @@ class ResizeObserverStub {
 }
 
 let frameWidth = 1920
+let frameHeight = 1080
 
 /** Test-local selector hook over a framework-neutral store instance. */
 function hookOf<T>(inst: { subscribe: (fn: () => void) => () => void; getSnapshot: () => T }) {
@@ -119,6 +120,7 @@ function drag(handle: Element, fromX: number, toX: number): void {
 
 beforeEach(() => {
   frameWidth = 1920
+  frameHeight = 1080
   selectedSession.current = 's-test' as SessionId
   selectedSessionBlank.current = false
   baselinesReady.current = true
@@ -128,7 +130,17 @@ beforeEach(() => {
   vi.stubGlobal('cancelAnimationFrame', (h: number) => { clearTimeout(h) })
   window.innerWidth = frameWidth
   Element.prototype.getBoundingClientRect = function () {
-    return { width: frameWidth, height: 1080, top: 0, left: 0, right: frameWidth, bottom: 1080, x: 0, y: 0, toJSON: () => ({}) }
+    return {
+      width: frameWidth,
+      height: frameHeight,
+      top: 0,
+      left: 0,
+      right: frameWidth,
+      bottom: frameHeight,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    }
   }
   // jsdom lacks pointer capture: emulate per-element so hasPointerCapture gates pass.
   const captured = new WeakSet<Element>()
@@ -361,6 +373,15 @@ describe('AppFrame — compact drawer and overlay details', () => {
     const toggle = frame.querySelector('[class*="topbarToggle"]')!
     expect(toggle.getAttribute('aria-label')).toBe('drawer.open')
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    expect(frame.querySelector('[data-mobile-app-header]')?.textContent).toBe('Test')
+  })
+
+  it('marks a short compact frame for reduced vertical density', () => {
+    frameWidth = 390
+    frameHeight = 667
+    const { frame } = mountFrame()
+    act(() => { fireResize?.(); vi.advanceTimersByTime(20) })
+    expect(frame.hasAttribute('data-viewport-short')).toBe(true)
   })
 
   it('toggle opens the drawer with the expanded sidebar and the scrim closes it', () => {
@@ -378,6 +399,17 @@ describe('AppFrame — compact drawer and overlay details', () => {
     expect(drawerScrim.hasAttribute('data-open')).toBe(true)
     act(() => { drawerScrim.click() })
     expect(drawer.hasAttribute('data-open')).toBe(false)
+  })
+
+  it('Escape closes the drawer and restores focus to the topbar toggle', () => {
+    frameWidth = 390
+    const { frame } = mountFrame()
+    const toggle = frame.querySelector('[class*="topbarToggle"]') as HTMLButtonElement
+    act(() => { toggle.click() })
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+    act(() => { fireEvent.keyDown(document, { key: 'Escape' }) })
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    expect(document.activeElement).toBe(toggle)
   })
 
   it('session navigation dismisses the open drawer', () => {

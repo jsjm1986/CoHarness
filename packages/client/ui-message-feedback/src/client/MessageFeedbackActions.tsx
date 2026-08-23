@@ -16,7 +16,7 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import {
-  IconDislikeOutline16, IconLikeOutline16, Tooltip, useAnchoredPosition,
+  IconDislikeOutline16, IconLikeOutline16, MobileSheetBackdrop, Tooltip, useAnchoredPosition,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { MessageFeedbackRating } from '@deepseek-ai/dsh-message-feedback/types'
 import type { MessageFeedbackActionProps } from './slots.ts'
@@ -286,37 +286,40 @@ export function MessageFeedbackActions({ messageId, ensure, rate, toggle, clearN
         <span className={css.failure} role="status">{noteFailure}</span>
       )}
       {rating !== undefined && noteOpen && createPortal(
-        <div
-          ref={panelRef}
-          className={css.notePanel}
-          role="dialog"
-          aria-label={t('note.dialog')}
-          style={pos ?? MEASURE_STYLE}
-        >
-          <textarea
-            ref={inputRef}
-            className={css.noteInput}
-            aria-label={t('note.aria')}
-            placeholder={t('note.placeholder')}
-            value={draft}
-            rows={3}
-            onChange={(event) => { setDraft(event.target.value) }}
-          />
-          <div className={css.noteActions}>
-            <button
-              type="button"
-              className={css.noteSave}
-              disabled={pending}
-              onClick={() => { onSaveNote(rating) }}
-            >
-              {t('note.save')}
-            </button>
-            <button type="button" className={css.noteCancel} onClick={closeNote}>
-              {t('note.cancel')}
-            </button>
+        <>
+          <MobileSheetBackdrop onClose={closeNote} />
+          <div
+            ref={panelRef}
+            className={css.notePanel}
+            role="dialog"
+            aria-label={t('note.dialog')}
+            style={pos ?? MEASURE_STYLE}
+          >
+            <textarea
+              ref={inputRef}
+              className={css.noteInput}
+              aria-label={t('note.aria')}
+              placeholder={t('note.placeholder')}
+              value={draft}
+              rows={3}
+              onChange={(event) => { setDraft(event.target.value) }}
+            />
+            <div className={css.noteActions}>
+              <button
+                type="button"
+                className={css.noteSave}
+                disabled={pending}
+                onClick={() => { onSaveNote(rating) }}
+              >
+                {t('note.save')}
+              </button>
+              <button type="button" className={css.noteCancel} onClick={closeNote}>
+                {t('note.cancel')}
+              </button>
+            </div>
+            {noteFailure !== null && <span className={css.failure} role="status">{noteFailure}</span>}
           </div>
-          {noteFailure !== null && <span className={css.failure} role="status">{noteFailure}</span>}
-        </div>,
+        </>,
         document.body,
       )}
     </>

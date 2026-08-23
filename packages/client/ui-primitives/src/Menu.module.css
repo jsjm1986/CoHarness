@@ -265,6 +265,39 @@
     overflow-y: auto;
   }
 
+  /* Primary menu lists use JS anchor coordinates on desktop. On a phone, a
+     bottom sheet gives every row a stable touch target and avoids a card being
+     placed behind the keyboard or outside a narrow composer. `!important`
+     overrides portal inline top/left coordinates intentionally. */
+  .list {
+    top: auto !important;
+    right: max(var(--dsw-mobile-sheet-edge), var(--dsw-safe-right)) !important;
+    bottom: var(--dsw-mobile-sheet-bottom) !important;
+    left: max(var(--dsw-mobile-sheet-edge), var(--dsw-safe-left)) !important;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    max-height: var(--dsw-mobile-sheet-max-height);
+    overflow-y: auto;
+    border-radius: var(--dsw-mobile-sheet-radius);
+    z-index: 1091;
+    animation: mobile-menu-sheet-in var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+  }
+
+  /* A small handle makes the sheet affordance legible even when the menu has
+     no title row. It is a flex item, so it remains inside the scroll cap. */
+  .list::before {
+    content: '';
+    align-self: center;
+    flex: none;
+    width: 36px;
+    height: 4px;
+    margin: 2px auto 6px;
+    border-radius: var(--dsw-radius-full);
+    background: var(--dsw-alias-label-caption);
+    opacity: 0.7;
+  }
+
   .item {
     min-height: var(--dsw-touch-target);
     height: auto;
@@ -284,5 +317,15 @@
 
   .submenu::before {
     content: none;
+  }
+}
+
+@keyframes mobile-menu-sheet-in {
+  from { opacity: 0; transform: translateY(10px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .list {
+    animation: none;
   }
 }

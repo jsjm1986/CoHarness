@@ -16,7 +16,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import clsx from 'clsx'
 import {
-  IconAgentPresetOutline16, IconCloseOutline16, IconDataOutline16,
+  handleDialogKeyDown, IconAgentPresetOutline16, IconCloseOutline16, IconDataOutline16,
   IconPersonalizationOutline16, IconSettingsOutline16,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SettingsRootComponentProps, SettingsSectionRow } from './shell-contract.ts'
@@ -28,6 +28,15 @@ function navIcon(id: string) {
   if (id === 'agent-presets') return <IconAgentPresetOutline16 className={css.navIcon} size={16} />
   if (id === 'plugins') return <IconPersonalizationOutline16 className={css.navIcon} size={16} />
   return <IconSettingsOutline16 className={css.navIcon} size={16} />
+}
+
+/** Short labels keep the compact tab rail scannable on 320px phones. */
+function compactNavLabel(id: string, label: string): string {
+  if (id === 'general') return label === '通用设置' ? '通用' : 'General'
+  if (id === 'models') return label === '模型' ? '模型' : 'Models'
+  if (id === 'plugins') return label === '插件' ? '插件' : 'Plugins'
+  if (id === 'agent-presets') return label === 'Agent 预设' ? '预设' : 'Presets'
+  return label
 }
 
 type PanelProps = {
@@ -48,18 +57,34 @@ function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose }: PanelP
   // projection falls back to the first row when the id is gone.
   const active = rows.find(r => r.id === activeId)?.id ?? rows[0]?.id
   const titleId = useId()
+  const panelRef = useRef<HTMLDivElement | null>(null)
+  const closeRef = useRef(onClose)
+  closeRef.current = onClose
+  const navRefs = useRef(new Map<string, HTMLButtonElement>())
 
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const onKeyDown = (event: KeyboardEvent): void => {
+      handleDialogKeyDown(event, panelRef.current, () => { closeRef.current() })
     }
     document.addEventListener('keydown', onKeyDown)
-    return () => { document.removeEventListener('keydown', onKeyDown) }
-  }, [onClose])
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      if (previous !== null && previous.isConnected) previous.focus({ preventScroll: true })
+    }
+  }, [])
 
   // Baseline focus management: entering the dialog lands on the close button.
   const closeButton = useRef<HTMLButtonElement | null>(null)
-  useEffect(() => { closeButton.current?.focus() }, [])
+  useEffect(() => { closeButton.current?.focus({ preventScroll: true }) }, [])
+
+  useEffect(() => {
+    if (active === undefined) return
+    const button = navRefs.current.get(active)
+    const scrollIntoView = button === undefined ? undefined : Reflect.get(button, 'scrollIntoView')
+    if (button === undefined || typeof scrollIntoView !== 'function') return
+    scrollIntoView.call(button, { block: 'nearest', inline: 'center' })
+  }, [active])
 
   // The overlay portals to document.body so a compact drawer `transform`
   // cannot become the containing block of this `position: fixed` layer.
@@ -76,20 +101,28 @@ function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose }: PanelP
   return createPortal((
     <div className={css.overlay} role="presentation">
       <div className={css.mask} aria-hidden="true" onClick={onClose} />
-      <div className={css.panel} role="dialog" aria-modal="true" aria-labelledby={titleId}>
+      <div ref={panelRef} className={css.panel} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
         <nav className={css.nav}>
           <div className={css.navTitle} id={titleId}>{renderSlot('settings.header', {})}</div>
           <div className={css.navList}>
             {rows.map(row => (
               <button
                 key={row.id}
+                ref={(button) => {
+                  if (button === null) navRefs.current.delete(row.id)
+                  else navRefs.current.set(row.id, button)
+                }}
                 type="button"
                 className={clsx(css.navCell, row.id === active && css.active)}
                 aria-current={row.id === active ? 'true' : undefined}
+                aria-label={row.label}
                 onClick={() => { onSelect(row.id) }}
               >
                 {navIcon(row.id)}
-                <span className={css.navLabel}>{row.label}</span>
+                <span className={css.navLabel}>
+                  <span className={css.navLabelFull}>{row.label}</span>
+                  <span className={css.navLabelCompact}>{compactNavLabel(row.id, row.label)}</span>
+                </span>
               </button>
             ))}
           </div>

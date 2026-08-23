@@ -7,13 +7,17 @@ import { apply, inject } from '../src/client/index.ts'
 
 describe('ui-documents apply', () => {
   it('declares only the services it reads', () => {
-    expect(inject).toEqual(['slots', 'locale'])
+    expect(inject).toEqual(['slots', 'locale', 'sessions', 'conversation'])
   })
 
   it('registers the documents entry in the sidebar footer action slot', async () => {
     const ctx = new Context()
     await ctx.plugin(SlotRegistry).await()
     ctx.provide('locale', { register: vi.fn(() => () => {}) })
+    ctx.provide('sessions', {
+      list: { getSnapshot: () => ({ current: undefined }), subscribe: () => () => {} },
+    })
+    ctx.provide('conversation', { attachDocument: vi.fn() })
     ctx.slots.register({
       name: 'root',
       children: {

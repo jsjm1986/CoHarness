@@ -10,11 +10,11 @@ import type {
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { JsonBlock, MessageText, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps } from '../contract/slots.ts'
-import { ReferenceIcon } from '../reference/ReferenceIcon.tsx'
+import { ReferenceIcon } from '../ReferenceIcon.tsx'
 import { CompactionItem } from './CompactionItem.tsx'
 import { ContextInjectionRow } from './ContextInjectionRow.tsx'
 import { MessageIconActions } from './MessageIconActions.tsx'
-import { messageSender } from './message-sender.ts'
+import { messageSender } from '../message-sender.ts'
 import css from './MessageItem.module.css'
 
 type UserImage = Extract<UserMessageNode['content'][number], { type: 'image' }>

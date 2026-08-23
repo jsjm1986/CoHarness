@@ -18,6 +18,9 @@ export const VIEWPORT_EXPANDED_MIN = 1024
 /** expanded/wide boundary: wide-desktop layouts start here. */
 export const VIEWPORT_WIDE_MIN = 1440
 
+/** Phone height below which secondary chrome must use the short-screen density. */
+export const VIEWPORT_SHORT_HEIGHT_MAX = 720
+
 /**
  * Classify a frame width into its viewport class.
  * @param width - frame width in px.
@@ -28,4 +31,15 @@ export function viewportClassOf(width: number): ViewportClass {
   if (width < VIEWPORT_EXPANDED_MIN) return 'medium'
   if (width < VIEWPORT_WIDE_MIN) return 'expanded'
   return 'wide'
+}
+
+/**
+ * Identify a compact viewport whose vertical space is short enough to need
+ * reduced header and composer density.
+ * @param width - frame width in px.
+ * @param height - frame height in px.
+ * @returns true for phone-width frames below the short-screen height.
+ */
+export function isShortCompactViewport(width: number, height: number): boolean {
+  return width < VIEWPORT_MEDIUM_MIN && height < VIEWPORT_SHORT_HEIGHT_MAX
 }

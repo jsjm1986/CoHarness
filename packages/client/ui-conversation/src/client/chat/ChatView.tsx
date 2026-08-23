@@ -309,7 +309,10 @@ export function ChatView({
     // Follow new flow content while pinned; do NOT re-pin on every render
     // merely because atBottomRef is true (scroll threshold → setState → snap).
     if (appendedUser || appendedSteering || (tipMoved && atBottomRef.current)) toBottom(el)
-  })
+  }, [
+    chatScroll.read, chatScroll.save, firstSeq, followSig, lastKey,
+    lastNode?.kind, lastSteeringId, openState,
+  ])
 
   const onScrollRef = useRef(() => {})
   onScrollRef.current = () => {

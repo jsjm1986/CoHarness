@@ -265,6 +265,7 @@ function ciSharedStaticGates(): Gate[] {
       label: 'optional dependency imports',
     }),
     pnpmScript('client-packages', 'verify-client-packages', { label: 'client packages' }),
+    pnpmScript('plugin-surfaces', 'verify-plugin-surfaces', { label: 'plugin surfaces' }),
     pnpmScript('issue-management', 'test:issue-management', { label: 'Issue management policy' }),
   ]
 }
@@ -626,6 +627,7 @@ function hygieneLeafGates(options: { artifactNeeds?: string[] } = {}): Gate[] {
       label: 'optional dependency imports',
     }),
     pnpmScript('client-packages', 'verify-client-packages', { label: 'client packages' }),
+    pnpmScript('plugin-surfaces', 'verify-plugin-surfaces', { label: 'plugin surfaces' }),
   ]
 }
 

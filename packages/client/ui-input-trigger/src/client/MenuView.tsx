@@ -9,7 +9,7 @@
  */
 import { Fragment, useEffect, useRef, useSyncExternalStore } from 'react'
 import clsx from 'clsx'
-import { useAnchoredMaxHeight } from '@deepseek-ai/dsh-client-ui-primitives'
+import { MobileSheetBackdrop, useAnchoredMaxHeight } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import css from './MenuView.module.css'
 import type { MenuViewInjected } from './slots.ts'
@@ -65,58 +65,61 @@ export function MenuView({ menu, onPick, onDismiss, t }: MenuViewProps) {
   }, [state.open, onDismiss])
   if (!state.open) return null
   return (
-    <div
-      ref={listRef}
-      className={css.menu}
-      style={{ maxHeight }}
-      role="listbox"
-      aria-label={t('suggestions.aria')}
-      aria-activedescendant={highlight !== null ? optionId(highlight.source, highlight.index) : undefined}
-    >
-      <div className={css.viewport}>
-        {state.groups.map(group => (group.status === 'ready' && group.items.length === 0)
-          ? null
-          : (
-            <Fragment key={group.source}>
-              {/* Source names key the dictionary open-endedly: the lookup chain
+    <>
+      <MobileSheetBackdrop onClose={onDismiss} />
+      <div
+        ref={listRef}
+        className={css.menu}
+        style={{ maxHeight }}
+        role="listbox"
+        aria-label={t('suggestions.aria')}
+        aria-activedescendant={highlight !== null ? optionId(highlight.source, highlight.index) : undefined}
+      >
+        <div className={css.viewport}>
+          {state.groups.map(group => (group.status === 'ready' && group.items.length === 0)
+            ? null
+            : (
+              <Fragment key={group.source}>
+                {/* Source names key the dictionary open-endedly: the lookup chain
                   returns an unknown key verbatim, so an unregistered source
                   shows its raw name — hence the cast past the typed key union. */}
-              {group.showGroupTitle === false || group.items.some(item => item.section !== undefined)
-                ? null
-                : <div className={css.groupTitle} role="presentation" data-source={group.source}>{t(group.source as MenuKey)}</div>}
-              {group.status === 'pending'
-                ? <div className={css.loading} data-source={group.source}>{t('loading')}</div>
-                : group.items.map((item, index) => {
-                  const active = highlight !== null && highlight.source === group.source && highlight.index === index
-                  return (
-                    <Fragment key={optionId(group.source, index)}>
-                      {item.section !== undefined && item.section !== group.items[index - 1]?.section
-                        ? <div className={css.sectionTitle} role="presentation">{item.section}</div>
-                        : null}
-                      <button
-                        id={optionId(group.source, index)}
-                        type="button"
-                        role="option"
-                        aria-selected={active}
-                        className={clsx(css.item, active && css.active)}
-                        // mousedown, not click: the textarea keeps focus (combobox
-                        // pattern) — preventing default stops the focus steal, and the
-                        // pick runs before any blur-driven teardown.
-                        onMouseDown={(ev) => {
-                          ev.preventDefault()
-                          onPick(group.source, index)
-                        }}
-                      >
-                        {item.icon !== undefined && <span className={css.itemIcon} aria-hidden>{item.icon}</span>}
-                        <span className={css.itemName}>{item.name}</span>
-                        {item.description !== undefined && <span className={css.itemDescription}>{item.description}</span>}
-                      </button>
-                    </Fragment>
-                  )
-                })}
-            </Fragment>
-          ))}
+                {group.showGroupTitle === false || group.items.some(item => item.section !== undefined)
+                  ? null
+                  : <div className={css.groupTitle} role="presentation" data-source={group.source}>{t(group.source as MenuKey)}</div>}
+                {group.status === 'pending'
+                  ? <div className={css.loading} data-source={group.source}>{t('loading')}</div>
+                  : group.items.map((item, index) => {
+                    const active = highlight !== null && highlight.source === group.source && highlight.index === index
+                    return (
+                      <Fragment key={optionId(group.source, index)}>
+                        {item.section !== undefined && item.section !== group.items[index - 1]?.section
+                          ? <div className={css.sectionTitle} role="presentation">{item.section}</div>
+                          : null}
+                        <button
+                          id={optionId(group.source, index)}
+                          type="button"
+                          role="option"
+                          aria-selected={active}
+                          className={clsx(css.item, active && css.active)}
+                          // mousedown, not click: the textarea keeps focus (combobox
+                          // pattern) — preventing default stops the focus steal, and the
+                          // pick runs before any blur-driven teardown.
+                          onMouseDown={(ev) => {
+                            ev.preventDefault()
+                            onPick(group.source, index)
+                          }}
+                        >
+                          {item.icon !== undefined && <span className={css.itemIcon} aria-hidden>{item.icon}</span>}
+                          <span className={css.itemName}>{item.name}</span>
+                          {item.description !== undefined && <span className={css.itemDescription}>{item.description}</span>}
+                        </button>
+                      </Fragment>
+                    )
+                  })}
+              </Fragment>
+            ))}
+        </div>
       </div>
-    </div>
+    </>
   )
 }

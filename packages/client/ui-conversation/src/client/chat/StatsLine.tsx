@@ -2,16 +2,17 @@
 // Mounted on 'conversation.composer.dock' so it sticks with the composer in the
 // active conversation scrollport (see ConversationRoot data-conversation-scroll).
 
-import { Fragment, memo, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Fragment, memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Modal, Tooltip, useMediaQuery } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ConversationSnapshot, UseProjection } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: merges the sessionStats key into SessionProjectionMap for useProjection.
 import type {} from '@deepseek-ai/dsh-session-stats/client'
-import type { ContextPressureProjection, TokenUsageProjection } from '@deepseek-ai/dsh-token-meter/client'
+import type { TokenUsageProjection } from '@deepseek-ai/dsh-token-meter/client'
 import type { ComposerBarProps } from '../contract/slots.ts'
 import { formatTokensPerSecond } from './message-chrome.ts'
-import { assistantStepReading } from './turn-metrics.ts'
+import { assistantStepReading } from '../turn-metrics.ts'
+import { formatTokens } from '../stats.ts'
 import css from './StatsLine.module.css'
 
 interface WindowStats {
@@ -81,13 +82,7 @@ export function deriveStats(nodes: ConversationSnapshot['nodes']): WindowStats {
  * @param n - token count.
  * @returns display string.
  */
-export function formatTokens(n: number): string {
-  const scaled = (v: number): string =>
-    v >= 100 ? String(Math.round(v)) : String(Math.round(v * 10) / 10)
-  if (n < 1_000) return String(n)
-  if (n < 1_000_000) return `${scaled(n / 1_000)}K`
-  return `${scaled(n / 1_000_000)}M`
-}
+export { contextOccupancy, formatTokens } from '../stats.ts'
 
 /**
  * Compact duration: 45.2s under a minute, 2m42s from there on.
@@ -170,12 +165,6 @@ export function billedInputTokens(usage: TokenUsageProjection): number {
   return usage.uncachedInputTokens + usage.cacheReadTokens + usage.cacheWriteTokens
 }
 
-interface ContextOccupancy {
-  percent: number
-  usedTokens: number
-  contextWindow: number
-}
-
 /**
  * Approximate context occupancy, using the TUI's integer rounding and upper
  * clamp. The numerator is `projectedTokens` — the provider sample carried
@@ -188,17 +177,6 @@ interface ContextOccupancy {
  * @param pressure - the session's context-pressure projection value.
  * @returns occupancy with its numerator and denominator, or null until both values are known.
  */
-export function contextOccupancy(
-  pressure: ContextPressureProjection | undefined,
-): ContextOccupancy | null {
-  const usedTokens = pressure?.projectedTokens ?? pressure?.pressureTokens
-  if (usedTokens === undefined || pressure?.contextWindow === undefined) return null
-  return {
-    percent: Math.min(100, Math.round(usedTokens / pressure.contextWindow * 100)),
-    usedTokens,
-    contextWindow: pressure.contextWindow,
-  }
-}
 
 /** Props: the conversation-snapshot selector plus the projection read seat. */
 export interface StatsLineProps {
@@ -254,8 +232,13 @@ export const StatsLine = memo(function StatsLine({ useSession, useProjection, t 
   const line = groups.join(' | ')
   // The row elides with ellipsis when overlong; a delayed hover tooltip carries
   // the full line, enabled only while content is actually clipped.
-  const rootRef = useRef<HTMLDivElement | null>(null)
+  const rootRef = useRef<HTMLElement | null>(null)
+  const attachRoot = useCallback((element: HTMLElement | null): void => {
+    rootRef.current = element
+  }, [])
   const [truncated, setTruncated] = useState(false)
+  const phone = useMediaQuery('(max-width: 767px)')
+  const [detailsOpen, setDetailsOpen] = useState(false)
   useLayoutEffect(() => {
     const el = rootRef.current
     if (el === null) return
@@ -267,16 +250,50 @@ export const StatsLine = memo(function StatsLine({ useSession, useProjection, t 
     return () => { observer.disconnect() }
   }, [line])
   if (groups.length === 0) return null
+  const content = groups.map((group, i) => (
+    <Fragment key={group}>
+      {i > 0 && <><span className={css.sep} aria-hidden>|</span>{' '}</>}
+      <span>{group}</span>
+    </Fragment>
+  ))
   return (
-    <Tooltip label={line} side="top" delayMs={500} disabled={!truncated}>
-      <div ref={rootRef} className={css.root}>
-        {groups.map((group, i) => (
-          <Fragment key={group}>
-            {i > 0 && <><span className={css.sep} aria-hidden>|</span>{' '}</>}
-            <span>{group}</span>
-          </Fragment>
-        ))}
-      </div>
-    </Tooltip>
+    <>
+      <Tooltip label={line} side="top" delayMs={500} disabled={phone || !truncated}>
+        {phone
+          ? (
+            <button
+              type="button"
+              ref={attachRoot}
+              className={`${css.root} ${css.mobileTrigger}`}
+              data-stats-line
+              aria-label={t('stats.details')}
+              title={line}
+              onClick={() => { setDetailsOpen(true) }}
+            >
+              <span className={css.mobileSummary}>{groups[0]}</span>
+              {groups.length > 1 && (
+                <span className={css.mobileMore}>· {t('stats.details')}</span>
+              )}
+            </button>
+          )
+          : (
+            <div ref={attachRoot} className={css.root} data-stats-line aria-label={line} title={line}>
+              {content}
+            </div>
+          )}
+      </Tooltip>
+      {phone && (
+        <Modal
+          open={detailsOpen}
+          onClose={() => { setDetailsOpen(false) }}
+          title={t('stats.details')}
+          closeLabel={t('close')}
+        >
+          <div className={css.detailList}>
+            {groups.map(group => <p key={group}>{group}</p>)}
+          </div>
+        </Modal>
+      )}
+    </>
   )
 })

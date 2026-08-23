@@ -49,6 +49,8 @@
   border-radius: var(--dsw-radius-lg);
   background: var(--dsw-specific-menu);
   box-shadow: var(--dsw-shadow-lv3);
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
   font-size: 12px;
   line-height: 20px;
   color: var(--dsw-alias-label-secondary);
@@ -151,8 +153,50 @@
   height: var(--dsw-touch-target);
 }
 
+:global([data-viewport='compact']) .trigger svg {
+  width: var(--dsw-mobile-icon-secondary);
+  height: var(--dsw-mobile-icon-secondary);
+}
+
 :global([data-viewport='compact']) .panel {
   width: min(264px, calc(100vw - 24px));
+}
+
+@media (max-width: 767px) {
+  .panel {
+    position: fixed;
+    right: max(var(--dsw-mobile-sheet-edge), var(--dsw-safe-right));
+    bottom: var(--dsw-mobile-sheet-bottom);
+    left: max(var(--dsw-mobile-sheet-edge), var(--dsw-safe-left));
+    z-index: 1091;
+    width: auto;
+    max-width: none;
+    max-height: var(--dsw-mobile-sheet-max-height);
+    overflow-y: auto;
+    border-radius: var(--dsw-mobile-sheet-radius);
+    animation: context-meter-sheet-in var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+  }
+
+  .panel::before {
+    content: '';
+    display: block;
+    width: 36px;
+    height: 4px;
+    margin: 2px auto 10px;
+    border-radius: var(--dsw-radius-full);
+    background: var(--dsw-alias-label-caption);
+    opacity: 0.7;
+  }
+}
+
+@keyframes context-meter-sheet-in {
+  from { opacity: 0; transform: translateY(10px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none;
+  }
 }
 
 @media (pointer: coarse) {

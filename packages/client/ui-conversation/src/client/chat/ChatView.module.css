@@ -32,6 +32,13 @@
   min-height: auto;
 }
 
+/* The composer is sticky inside the resident conversation scroll body. On a
+   short phone viewport the chat flow needs an explicit bottom reserve so the
+   final row can be read above that seat rather than ending underneath it. */
+:global([data-viewport='compact']) :global([data-conversation-scroll]) .scroll {
+  padding-bottom: calc(var(--dsh-composer-height, 168px) + var(--dsw-space-4));
+}
+
 /* Message column: shared chat width (ConversationRoot --dsh-chat-content-width),
    centered on the same axis as the input box (which caps at chat + 16px); the
    scroller itself stays full-bleed. */

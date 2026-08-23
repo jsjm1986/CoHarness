@@ -1,16 +1,16 @@
 // Web e2e scenario: with the feedback note editor open, the assistant IconActions
 // row stays one intact line (no wrapping, nothing pushed out), and the note
-// editor floats above the transcript in a popover that escapes the conversation
-// column's overflow clip and stays inside the viewport.
+// editor uses a desktop popover or a phone sheet, both portaled outside the
+// conversation column and kept inside the viewport.
 //
 // The hazard this pins: a slot-contributed note editor (260px textarea plus
 // Save and Cancel) cannot fit the shared IconActions row at ANY viewport, and an
 // inline expansion made the row wider than the column — full-screen desktop
 // included — so the branch action and the clock were pushed out of view by later
 // flex items. The fix is to not mount the editor in the row at all: it is a
-// popover portaled to document.body and fixed-positioned from the note trigger's
-// rect, so the row keeps its single 28px line of icons and the trigger, and the
-// panel cannot be cropped by the column's overflow because it lives outside it.
+// portal. Desktop placement follows the note trigger's rect; compact placement
+// is a bottom sheet. Both keep the row's single 28px line of icons and cannot
+// be cropped by the column's overflow because they live outside it.
 //
 // The sweep records, per viewport, whether the open editor keeps the actions row
 // on one line with zero overflow, whether the panel is outside the column (proof
@@ -64,6 +64,10 @@ export interface PopoverMetrics {
   panelOutsideColumn: boolean
   /** True when the panel lies fully inside the viewport (the clamp holds). */
   panelWithinViewport: boolean
+  /** Presentation mode selected at this viewport. */
+  panelMode: 'anchored' | 'sheet'
+  /** Nearest viewport edge gap for the phone Sheet. */
+  panelEdgeGap: number
   /** Horizontal separation between the panel's left edge and the note trigger's, in px. */
   panelToTriggerGap: number
 }
@@ -136,10 +140,18 @@ function measurePopover(page: Page, width: number, editorOpen: boolean): Promise
     let builder: {
       panelOutsideColumn: boolean
       panelWithinViewport: boolean
+      panelMode: 'anchored' | 'sheet'
+      panelEdgeGap: number
       panelToTriggerGap: number
     }
     if (!open) {
-      builder = { panelOutsideColumn: true, panelWithinViewport: true, panelToTriggerGap: 0 }
+      builder = {
+        panelOutsideColumn: true,
+        panelWithinViewport: true,
+        panelMode: viewportWidth < 768 ? 'sheet' : 'anchored',
+        panelEdgeGap: 0,
+        panelToTriggerGap: 0,
+      }
     } else {
       const panel = document.body.querySelector<HTMLElement>('[role="dialog"]')
       if (panel === null) throw new Error('the note popover is not open')
@@ -147,6 +159,7 @@ function measurePopover(page: Page, width: number, editorOpen: boolean): Promise
       const triggerBox = trigger.getBoundingClientRect()
       const vw = window.innerWidth
       const vh = window.innerHeight
+      const sheet = viewportWidth < 768
       builder = {
         // The panel portals out of the column, so the clip cannot reach it.
         panelOutsideColumn: column === null ? true : !column.contains(panel),
@@ -155,9 +168,11 @@ function measurePopover(page: Page, width: number, editorOpen: boolean): Promise
           && panelBox.right <= vw + 0.5
           && panelBox.top >= -0.5
           && panelBox.bottom <= vh + 0.5,
+        panelMode: sheet ? 'sheet' : 'anchored',
+        panelEdgeGap: sheet ? Math.min(panelBox.left, vw - panelBox.right) : 0,
         // The panel is fixed from the trigger's left, so a zero gap says it is
-        // anchored; a clamp can only widen it.
-        panelToTriggerGap: Math.abs(panelBox.left - triggerBox.left),
+        // anchored; phone Sheets intentionally use their own edge geometry.
+        panelToTriggerGap: sheet ? 0 : Math.abs(panelBox.left - triggerBox.left),
       }
     }
 
@@ -186,12 +201,13 @@ function renderGeometry(stops: PopoverMetrics[]): string {
     '# Assistant actions row with the feedback note popover open',
     '',
     '| viewport | row overflow delta | row lines | items-outside delta '
-      + '| panel outside the column | panel within the viewport | panel-to-trigger gap |',
-    '| --- | --- | --- | --- | --- | --- | --- |',
+      + '| panel outside the column | panel within the viewport | panel mode | panel edge gap | panel-to-trigger gap |',
+    '| --- | --- | --- | --- | --- | --- | --- | --- | --- |',
     ...stops.map(stop => `| ${String(stop.width)}px | ${String(stop.rowOverflowOpen - stop.rowOverflowClosed)}px `
       + `| ${String(stop.rowLines)} | ${String(stop.itemsOutsideColumnOpen - stop.itemsOutsideColumnClosed)} `
       + `| ${String(stop.panelOutsideColumn)} | ${String(stop.panelWithinViewport)} `
-      + `| ${String(stop.panelToTriggerGap)}px |`),
+      + `| ${stop.panelMode} | ${String(Math.round(stop.panelEdgeGap))}px `
+      + `| ${String(Math.round(stop.panelToTriggerGap))}px |`),
   ].join('\n')
 }
 
@@ -281,7 +297,12 @@ describe('web e2e: the feedback note editor floats above the column', () => {
       const stops: PopoverMetrics[] = []
       for (const width of WIDTHS) {
         // Reset to the closed baseline at each stop before opening.
-        if (await noteTrigger.getAttribute('aria-expanded') === 'true') await noteTrigger.click()
+        if (await noteTrigger.getAttribute('aria-expanded') === 'true') {
+          // On compact widths the sheet backdrop intentionally covers the
+          // trigger; Escape is the shared modal close path across all modes.
+          await page.keyboard.press('Escape')
+          await expect.poll(() => noteTrigger.getAttribute('aria-expanded')).toBe('false')
+        }
         const closed = await settleAt(width, false)
         await page.getByRole('button', { name: 'Add a note' }).first().click()
         await page.getByRole('dialog').waitFor({ timeout: 10_000 })
@@ -295,6 +316,8 @@ describe('web e2e: the feedback note editor floats above the column', () => {
           itemsOutsideColumnOpen: open.itemsOutsideColumnOpen,
           panelOutsideColumn: open.panelOutsideColumn,
           panelWithinViewport: open.panelWithinViewport,
+          panelMode: open.panelMode,
+          panelEdgeGap: open.panelEdgeGap,
           panelToTriggerGap: open.panelToTriggerGap,
         })
       }
@@ -318,8 +341,14 @@ describe('web e2e: the feedback note editor floats above the column', () => {
       expect(stop.panelOutsideColumn, `viewport ${String(stop.width)}`).toBe(true)
       // The placement clamps the panel inside the viewport at every width.
       expect(stop.panelWithinViewport, `viewport ${String(stop.width)}`).toBe(true)
-      // The panel stays anchored to its trigger rather than drifting off.
-      expect(stop.panelToTriggerGap, `viewport ${String(stop.width)}`).toBeLessThanOrEqual(4)
+      if (stop.width < 768) {
+        expect(stop.panelMode, `viewport ${String(stop.width)}`).toBe('sheet')
+        expect(stop.panelEdgeGap, `viewport ${String(stop.width)}`).toBeGreaterThanOrEqual(10)
+      } else {
+        // Desktop keeps the anchored popover relationship.
+        expect(stop.panelMode, `viewport ${String(stop.width)}`).toBe('anchored')
+        expect(stop.panelToTriggerGap, `viewport ${String(stop.width)}`).toBeLessThanOrEqual(4)
+      }
     }
     expect(tripwire.pageErrors).toEqual([])
   }, 180_000)

@@ -44,7 +44,8 @@ export type ConnectionState = 'connected' | 'reconnecting'
 export interface ConnectionSinks {
   onMuxEnvelope?: (envelope: RpcRequest<MuxFrame>) => void
   onHostEnvelope?: (envelope: RpcRequest<HostFrame>) => void
-  /** After each connection generation is established (both streams open + describe succeeded), first connect included. */
+  /** After each connection generation is established (both streams open + describe succeeded),
+   * first connect included; buffered frames are released after this callback returns. */
   onConnected?: (description: HostDescription) => void
   /** Coarse state transitions (deduplicated: fires only on change). The initial pre-connect
    *  span reports nothing — the UI treats "no state yet" as connecting, not as an outage. */
@@ -110,6 +111,39 @@ export class ConnectionController {
       const ac = new AbortController()
       this.current = ac
 
+      // Stream carriers can deliver a generation's replay before the unary
+      // readiness handshake settles. Keep those frames out of the business
+      // layer until onConnected has let consumers clear stale generation
+      // state; otherwise a replayed pending interaction can be cleared by
+      // the reconnect resync that follows the handshake.
+      let ready = false
+      // Keep the initial replay behind the connected callback, while allowing
+      // the callback itself to start the runtime's unary baseline pulls. A
+      // callback can synchronously re-enter a fake carrier, so the release
+      // flag also keeps those frames ordered behind the already-buffered replay.
+      let releasing = false
+      let generationLive = true
+      const buffered: Array<
+        | { kind: 'mux'; envelope: RpcRequest<MuxFrame> }
+        | { kind: 'host'; envelope: RpcRequest<HostFrame> }
+      > = []
+      const dispatchMux = (envelope: RpcRequest<MuxFrame>): void => {
+        if (!ready || releasing) {
+          if (generationLive && this.isGenerationActive(ac)) buffered.push({ kind: 'mux', envelope })
+          return
+        }
+        if (!generationLive || !this.isGenerationActive(ac)) return
+        this.callSink(() => { this.sinks.onMuxEnvelope?.(envelope) })
+      }
+      const dispatchHost = (envelope: RpcRequest<HostFrame>): void => {
+        if (!ready || releasing) {
+          if (generationLive && this.isGenerationActive(ac)) buffered.push({ kind: 'host', envelope })
+          return
+        }
+        if (!generationLive || !this.isGenerationActive(ac)) return
+        this.callSink(() => { this.sinks.onHostEnvelope?.(envelope) })
+      }
+
       /* v8 ignore next -- initializer placeholder: the Promise executor
        * below runs synchronously and replaces it before anyone can call it. */
       let muxOpened = (): void => {}
@@ -123,10 +157,12 @@ export class ConnectionController {
       const failed = new Promise<void>((resolve) => {
         const settle = (): void => {
           if (gen === this.generation && !ac.signal.aborted) ac.abort()
+          generationLive = false
+          buffered.length = 0
           resolve()
         }
-        void this.pumpStream(this.api.events.mux({}, ac.signal, muxOpened), this.sinks.onMuxEnvelope, settle)
-        void this.pumpStream(this.api.events.host({}, ac.signal, hostOpened), this.sinks.onHostEnvelope, settle)
+        void this.pumpStream(this.api.events.mux({}, ac.signal, muxOpened), dispatchMux, settle)
+        void this.pumpStream(this.api.events.host({}, ac.signal, hostOpened), dispatchHost, settle)
       })
 
       try {
@@ -151,11 +187,30 @@ export class ConnectionController {
         // A state sink may synchronously stop this controller. Do not publish
         // a description for a generation that no longer exists afterward.
         if (this.isGenerationActive(ac)) {
+          // Open the live generation before invoking onConnected so its
+          // synchronous baseline pulls are not held behind the replay gate.
+          // `releasing` keeps any re-entrant stream delivery ordered until the
+          // callback has returned and the captured replay is flushed.
+          ready = true
+          releasing = true
           this.callSink(() => { this.sinks.onConnected?.(descriptionResult.value) })
+          releasing = false
+          if (this.isGenerationActive(ac)) {
+            for (const item of buffered.splice(0)) {
+              if (!this.isGenerationActive(ac)) {
+                buffered.length = 0
+                break
+              }
+              if (item.kind === 'mux') dispatchMux(item.envelope)
+              else dispatchHost(item.envelope)
+            }
+          }
         }
       } catch {
         // Transport failure: treat as generation failure, fall through to the shared backoff.
         if (!ac.signal.aborted) ac.abort()
+        generationLive = false
+        buffered.length = 0
       }
 
       await failed

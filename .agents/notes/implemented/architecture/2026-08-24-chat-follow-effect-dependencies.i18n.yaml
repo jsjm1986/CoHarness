@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-24-chat-follow-effect-dependencies.md
+2026-08-24-chat-follow-effect-dependencies.md: a8e4dc6ad8a3669deca681e2c496813555aa4ce3
+2026-08-24-chat-follow-effect-dependencies.zh.md: 34b1f32ee98a0f29b598c8f4fb407809cc9fea38

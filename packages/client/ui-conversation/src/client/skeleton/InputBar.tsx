@@ -24,10 +24,10 @@ import type {} from '@deepseek-ai/dsh-goal/client'
 import type { Translate } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ComposerBarProps, ComposerDocument } from '../contract/slots.ts'
 import type { DraftDocumentId, EditRange } from '../input/contract.ts'
-import { deriveDecorations } from '../input/decorations.ts'
-import type { DraftDecorations } from '../input/decorations.ts'
+import { deriveDecorations } from '../contract/decorations.ts'
+import type { DraftDecorations } from '../contract/decorations.ts'
 import { attachmentErrorText, imageSizeText } from '../image-labels.ts'
-import { ReferenceIcon } from '../reference/ReferenceIcon.tsx'
+import { ReferenceIcon } from '../ReferenceIcon.tsx'
 import { ContextMeter } from './ContextMeter.tsx'
 import { PermissionSelect } from './PermissionSelect.tsx'
 import { isSafariBrowser, repairSafariTextareaLayout } from './safari.ts'
@@ -913,10 +913,18 @@ export function InputBar({
               {accessSelect}
               {renderSlot('conversation.input.plan', { locked })}
             </div>
-            {leftItems}
+            {leftItems != null && (
+              <div className={css.extensionItems} data-input-extension="left">
+                {leftItems}
+              </div>
+            )}
           </div>
           <div className={css.trailing}>
-            {rightItems}
+            {rightItems != null && (
+              <div className={css.extensionItems} data-input-extension="right">
+                {rightItems}
+              </div>
+            )}
             {renderSlot('conversation.input.model', { locked: modelSeatLocked })}
             <ContextMeter useProjection={useProjection} t={t} />
             {interruptible && (

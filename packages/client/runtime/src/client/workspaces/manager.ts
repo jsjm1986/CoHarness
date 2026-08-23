@@ -4,7 +4,7 @@ import type {
   HostFrame, IApiClient, RpcError, RpcRequest, RpcResult, SessionId, WorkspaceId, WorkspaceView,
 } from '@deepseek-ai/dsh-api-remotes/client'
 import { transportError } from '@deepseek-ai/dsh-host-apiproxy/api'
-import { Notifier } from '../sessions/notifier.ts'
+import { Notifier } from '../notifier.ts'
 import { Workspace, type WorkspaceCreateInput } from './workspace.ts'
 
 /** Monotone workspace-list arrival lifecycle. */

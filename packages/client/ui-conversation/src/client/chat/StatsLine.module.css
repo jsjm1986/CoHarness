@@ -20,12 +20,70 @@
 }
 
 :global([data-viewport='compact']) .root {
-  white-space: normal;
-  overflow: visible;
-  text-overflow: unset;
+  max-height: 20px;
+  padding-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sep {
   color: var(--dsw-alias-separator-primary);
   margin: 0 10px; /* carries the former flex gap */
+}
+
+.mobileTrigger {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+
+.mobileSummary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobileMore {
+  flex: none;
+  color: var(--dsw-alias-label-secondary);
+}
+
+:global([data-viewport='compact']) .mobileTrigger {
+  display: inline-flex;
+  max-height: 24px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 24px;
+  padding: 0 4px;
+  border-radius: var(--dsw-radius-md);
+  font: var(--dsw-mobile-font-secondary);
+}
+
+:global([data-viewport='compact']) .mobileTrigger:hover,
+:global([data-viewport='compact']) .mobileTrigger:focus-visible {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.mobileTrigger:focus-visible {
+  outline: 2px solid var(--dsw-alias-border-l3);
+  outline-offset: -2px;
+}
+
+.detailList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsw-space-3);
+}
+
+.detailList p {
+  margin: 0;
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  line-height: 22px;
+  overflow-wrap: anywhere;
 }
