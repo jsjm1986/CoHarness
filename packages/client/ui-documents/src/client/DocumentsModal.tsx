@@ -8,6 +8,7 @@ import {
   IconFolderClose16,
   IconFolderOpenOutline16,
   IconInspectOutline12,
+  IconPaperclipOutline16,
   IconPlusOutline16,
   IconRefreshOutline16,
   IconSearchOutline16,
@@ -719,8 +720,12 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
               variant="ghost"
               aria-label={t('action.attachNamed', { name: doc.name })}
               title={t('action.attach')}
+              disabled={busy}
               onClick={() => { attachDocument(doc) }}
             >
+              <span className={css.actionIcon} aria-hidden="true">
+                <IconPaperclipOutline16 size={16} />
+              </span>
               <span className={css.actionLabel}>{t('action.attach')}</span>
             </Button>
             <Button
