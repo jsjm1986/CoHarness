@@ -5,29 +5,31 @@
   - paragraph: No per-file size limit, 20 per message
   - navigation "Document path":
     - button "All Documents" [disabled]
-  - img
-  - textbox "Search document name"
-  - combobox "Type":
-    - option "All types" [selected]
-    - option "Images"
-    - option "PDF"
-    - option "Text"
-    - option "Other"
-  - combobox "Sort":
-    - option "Date newest" [selected]
-    - option "Date oldest"
-    - option "Name A–Z"
-    - option "Name Z–A"
-    - option "Size large–small"
-    - option "Size small–large"
-  - button "New Folder":
+  - group "Document filters":
     - img
-    - text: New Folder
-  - button "Upload Document":
-    - img
-    - text: Upload Document
-  - button "Refresh":
-    - img
+    - textbox "Search document name"
+    - combobox "Type":
+      - option "All types" [selected]
+      - option "Images"
+      - option "PDF"
+      - option "Text"
+      - option "Other"
+    - combobox "Sort":
+      - option "Date newest" [selected]
+      - option "Date oldest"
+      - option "Name A–Z"
+      - option "Name Z–A"
+      - option "Size large–small"
+      - option "Size small–large"
+  - group "Document actions":
+    - button "New Folder":
+      - img
+      - text: New Folder
+    - button "Upload Document":
+      - img
+      - text: Upload Document
+    - button "Refresh":
+      - img
   - text: Visible only to you 21 documents
   - list "Document Manager":
     - checkbox "Select this page"

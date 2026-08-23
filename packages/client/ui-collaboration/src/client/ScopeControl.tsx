@@ -190,7 +190,7 @@ export function ScopeControl({
         anchor={(
           <button
             type="button"
-            className={wide ? css.trigger : `${css.trigger} ${css.rail}`}
+            className={wide ? `${css.trigger} ${css.context}` : `${css.trigger} ${css.rail}`}
             aria-label={t('scope.aria')}
             aria-haspopup="menu"
             aria-expanded={open}
