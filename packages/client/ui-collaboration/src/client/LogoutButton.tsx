@@ -39,7 +39,7 @@ export function LogoutButton({ wide, useCollaboration, t }: LogoutButtonProps) {
           className={wide ? css.trigger : `${css.trigger} ${css.rail}`}
           aria-label={t('logout.label')}
         >
-          <IconRightUpOutline16 size={16} />
+          <IconRightUpOutline16 size={wide ? 14 : 16} />
           {wide && <span className={css.label}>{t('logout.label')}</span>}
         </button>
       </Tooltip>

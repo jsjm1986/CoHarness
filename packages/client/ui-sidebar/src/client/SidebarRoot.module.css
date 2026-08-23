@@ -16,6 +16,12 @@
   background: var(--dsw-specific-sidebar-fill);
   color: var(--dsw-alias-label-primary);
   font-size: 14px;
+  /* Footer controls live in separate packages. These inherited values keep
+     their row geometry aligned without coupling their CSS modules. */
+  --dsh-sidebar-footer-row-height: 36px;
+  --dsh-sidebar-footer-row-radius: var(--dsw-radius-md);
+  --dsh-sidebar-footer-row-gap: 2px;
+  --dsh-sidebar-footer-rail-gap: 6px;
   /* The sidebar is elevated above the conversation surface, so a revealed
      scrollbar uses the l2 pair. .quietBars hides it without changing layout. */
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
@@ -296,36 +302,52 @@
   padding-left: 0;
 }
 
-/* Footer seats: additive actions stack above Settings. Each occupant owns its
-   button geometry and hover chrome. */
+/* Footer seats: workspace/account actions share a compact rhythm, while
+   Settings starts a distinct account group. Each occupant owns its button
+   content and hover chrome. */
 .footArea {
   flex: none;
   display: flex;
   flex-direction: column;
+  padding-top: var(--dsw-space-2);
+  border-top: 1px solid var(--dsw-alias-border-l2);
 }
 
 .settingsArea {
   flex: none;
   min-width: 0;
   width: 100%;
+  margin-top: var(--dsw-space-2);
+  padding-top: var(--dsw-space-2);
+  border-top: 1px solid var(--dsw-alias-border-l2);
 }
 
 .footerActions {
   flex: none;
   display: flex;
   flex-direction: column;
+  gap: var(--dsh-sidebar-footer-row-gap);
   min-width: 0;
   width: 100%;
 }
 
+.settingsArea:empty {
+  display: none;
+}
+
 .collapsed .footArea {
   align-items: center;
+  padding-top: 0;
+  border-top: 0;
 }
 
 .collapsed .settingsArea {
   display: flex;
   justify-content: center;
   width: auto;
+  margin-top: var(--dsh-sidebar-footer-rail-gap);
+  padding-top: var(--dsh-sidebar-footer-rail-gap);
+  border-top-color: var(--dsw-alias-border-l2);
 }
 
 .collapsed .footerActions {
@@ -333,7 +355,12 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: var(--dsh-sidebar-footer-rail-gap);
   width: auto;
+}
+
+.collapsed .settingsArea:empty {
+  display: none;
 }
 
 @media (pointer: coarse) {

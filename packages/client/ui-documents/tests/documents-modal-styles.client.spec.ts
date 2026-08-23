@@ -25,6 +25,14 @@ describe('DocumentsModal.module.css', () => {
     expect(modal).toMatch(/@media \(max-width: 767px\)[\s\S]*\.dialog\s*\{[\s\S]*min-height:\s*0/)
   })
 
+  it('separates filters from document actions and gives rows a stable hover rhythm', () => {
+    expect(modal).toMatch(/\.filterGroup\s*,\s*\.actionGroup\s*\{[\s\S]*display:\s*flex/)
+    expect(modal).toMatch(/\.filterGroup\s*\{[\s\S]*flex:\s*1 1 420px/)
+    expect(modal).toMatch(/\.actionGroup\s*\{[\s\S]*margin-left:\s*auto/)
+    expect(modal).toMatch(/\.row:hover\s*\{[\s\S]*background:\s*var\(--dsw-alias-interactive-bg-hover\)/)
+    expect(modal).toMatch(/@media \(pointer: coarse\)[\s\S]*\.newFolder,[\s\S]*min-height:\s*var\(--dsw-touch-target\)/)
+  })
+
   it('keeps the selected destructive action readable on its primary fill', () => {
     expect(modal).toMatch(/\.selectionDelete\s*\{[\s\S]*color:\s*var\(--dsw-alias-label-primary-foreground\)/)
   })

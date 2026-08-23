@@ -853,94 +853,98 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
           </nav>
 
           <div className={css.toolbar}>
-            <Input
-              className={css.search as string}
-              icon={<IconSearchOutline16 size={16} />}
-              placeholder={t('modal.search')}
-              value={query}
-              onChange={(event) => { setQuery(event.target.value) }}
-            />
-            <select
-              className={css.select}
-              aria-label={t('modal.type')}
-              value={typeFilter}
-              onChange={(event) => { setTypeFilter(event.currentTarget.value as DocumentTypeFilter) }}
-            >
-              {TYPE_OPTIONS.map(option => (
-                <option key={option.value} value={option.value}>{t(option.label)}</option>
-              ))}
-            </select>
-            <select
-              className={css.select}
-              aria-label={t('modal.sort')}
-              value={sortValue}
-              onChange={(event) => { setSortValue(event.currentTarget.value) }}
-            >
-              {SORT_OPTIONS.map(option => (
-                <option key={option.value} value={option.value}>{t(option.label)}</option>
-              ))}
-            </select>
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              hidden
-              onChange={(event) => {
-                const files = event.currentTarget.files
-                /* v8 ignore next -- the file input always exposes a FileList */
-                if (files !== null) void uploadFiles(files)
-              }}
-            />
-            {alternateSource === null && sourceOptions.length > 0 && (
+            <div className={css.filterGroup} role="group" aria-label={t('modal.filters')}>
+              <Input
+                className={css.search as string}
+                icon={<IconSearchOutline16 size={16} />}
+                placeholder={t('modal.search')}
+                value={query}
+                onChange={(event) => { setQuery(event.target.value) }}
+              />
+              <select
+                className={css.select}
+                aria-label={t('modal.type')}
+                value={typeFilter}
+                onChange={(event) => { setTypeFilter(event.currentTarget.value as DocumentTypeFilter) }}
+              >
+                {TYPE_OPTIONS.map(option => (
+                  <option key={option.value} value={option.value}>{t(option.label)}</option>
+                ))}
+              </select>
+              <select
+                className={css.select}
+                aria-label={t('modal.sort')}
+                value={sortValue}
+                onChange={(event) => { setSortValue(event.currentTarget.value) }}
+              >
+                {SORT_OPTIONS.map(option => (
+                  <option key={option.value} value={option.value}>{t(option.label)}</option>
+                ))}
+              </select>
+            </div>
+            <div className={css.actionGroup} role="group" aria-label={t('modal.actions')}>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                hidden
+                onChange={(event) => {
+                  const files = event.currentTarget.files
+                  /* v8 ignore next -- the file input always exposes a FileList */
+                  if (files !== null) void uploadFiles(files)
+                }}
+              />
+              {alternateSource === null && sourceOptions.length > 0 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy}
+                  icon={<IconBrowseOutline16 size={16} />}
+                  onClick={openSourcePicker}
+                >
+                  {t('copy.source')}
+                </Button>
+              )}
+              {alternateSource !== null && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => { void load(ROOT_DIRECTORY_ID) }}
+                >
+                  {t('copy.source.current')}
+                </Button>
+              )}
               <Button
+                className={css.newFolder}
                 type="button"
                 variant="outline"
-                disabled={busy}
-                icon={<IconBrowseOutline16 size={16} />}
-                onClick={openSourcePicker}
+                disabled={busy || writeLocked}
+                icon={<IconFolderClose16 size={16} />}
+                onClick={openCreateDirectory}
               >
-                {t('copy.source')}
+                {t('folder.create')}
               </Button>
-            )}
-            {alternateSource !== null && (
               <Button
+                className={css.upload}
                 type="button"
-                variant="outline"
+                variant="primary"
                 disabled={busy}
-                onClick={() => { void load(ROOT_DIRECTORY_ID) }}
+                icon={<IconPlusOutline16 size={16} />}
+                onClick={() => fileInputRef.current?.click()}
               >
-                {t('copy.source.current')}
+                {uploadLabel}
               </Button>
-            )}
-            <Button
-              className={css.newFolder}
-              type="button"
-              variant="outline"
-              disabled={busy || writeLocked}
-              icon={<IconFolderClose16 size={16} />}
-              onClick={openCreateDirectory}
-            >
-              {t('folder.create')}
-            </Button>
-            <Button
-              className={css.upload}
-              type="button"
-              variant="primary"
-              disabled={busy}
-              icon={<IconPlusOutline16 size={16} />}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              {uploadLabel}
-            </Button>
-            <Button
-              className={css.refresh}
-              type="button"
-              variant="ghost"
-              aria-label={t('modal.refresh')}
-              disabled={busy}
-              icon={<IconRefreshOutline16 size={16} />}
-              onClick={() => { void load(currentDirectoryId) }}
-            />
+              <Button
+                className={css.refresh}
+                type="button"
+                variant="ghost"
+                aria-label={t('modal.refresh')}
+                disabled={busy}
+                icon={<IconRefreshOutline16 size={16} />}
+                onClick={() => { void load(currentDirectoryId) }}
+              />
+            </div>
           </div>
 
           <div className={css.caption}>
