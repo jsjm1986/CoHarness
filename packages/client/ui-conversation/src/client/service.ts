@@ -17,8 +17,7 @@ import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ISessions, SessionFace, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SubmitImageAttachment, SubmitOutcome } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type { ImageAttachmentRef, ImageMediaType } from '@deepseek-ai/dsh-attachment'
-import type { UserDocIdType } from '@deepseek-ai/dsh-userdoc'
-import type { UserDocTransferTargetRef } from '@deepseek-ai/dsh-userdoc'
+import type { UserDocIdType, UserDocRef } from '@deepseek-ai/dsh-userdoc'
 import type { ComposerAttachment, ComposerDocument } from './contract/slots.ts'
 import type { QueueAction, QueueItemId } from './contract/queue.ts'
 import type { ComposerBlocks } from './input/blocks.ts'
@@ -62,8 +61,8 @@ export interface IConversation {
    * @returns completion of the page pull.
    */
   loadOlder(): Promise<void>
-  /** Attach already-copied durable documents to the selected session draft. */
-  attachExistingDocuments?(sessionId: SessionId, documents: readonly UserDocTransferTargetRef[]): boolean
+  /** Attach one already-stored document to the selected session draft. */
+  attachDocument(sessionId: SessionId, ref: UserDocRef): boolean
 }
 
 /** Create one browser-only draft descriptor; only its id enters input state. */
@@ -85,8 +84,8 @@ interface ImageUrlEntry {
 interface DraftDocumentEntry {
   readonly sessionId: SessionId
   readonly file?: File
-  readonly ownsDocument: boolean
   readonly controller: AbortController
+  readonly ownsUploadedFile: boolean
   descriptor: ComposerDocument
 }
 
@@ -276,6 +275,54 @@ export class ConversationController extends Service implements IConversation {
   }
 
   /**
+   * Attach one durable document to a session's composer as a ready draft.
+   * Existing durable files are referenced by id and are never owned by the
+   * browser draft lifecycle, so removing the composer chip cannot delete them.
+   * @param sessionId - target session id.
+   * @param ref - durable document reference from the manager or user-document service.
+   * @returns true when the composer accepted the document.
+   */
+  attachDocument(sessionId: SessionId, ref: UserDocRef): boolean {
+    if (this.disposed) return false
+    const sessions = this.ctx.get('sessions')
+    if (sessions === undefined) return false
+    const actx = sessions.scope(sessionId)
+    if (actx === undefined) return false
+    const shell = this.input.for(actx)
+    const existing = [...this.draftDocuments.values()].find(entry =>
+      entry.sessionId === sessionId && entry.descriptor.docId === ref.docId)
+    if (existing !== undefined) {
+      if (shell.state.getSnapshot().documentIds.includes(existing.descriptor.id)) return true
+      return shell.addDocuments([existing.descriptor.id])
+    }
+
+    const descriptor: ComposerDocument = {
+      kind: 'document',
+      id: crypto.randomUUID() as DraftDocumentId,
+      docId: ref.docId,
+      name: ref.name,
+      bytes: ref.bytes,
+      mediaType: ref.mediaType,
+      status: 'ready',
+      progress: 1,
+    }
+    const entry: DraftDocumentEntry = {
+      sessionId,
+      controller: new AbortController(),
+      ownsUploadedFile: false,
+      descriptor,
+    }
+    this.draftDocuments.set(descriptor.id, entry)
+    if (!shell.addDocuments([descriptor.id])) {
+      this.draftDocuments.delete(descriptor.id)
+      this.publishDocuments(sessionId)
+      return false
+    }
+    this.publishDocuments(sessionId)
+    return true
+  }
+
+  /**
    * Create browser-local document drafts and begin their uploads.
    * @param sessionId - owning session for the browser drafts.
    * @param files - browser files to upload.
@@ -297,8 +344,8 @@ export class ConversationController extends Service implements IConversation {
       const entry: DraftDocumentEntry = {
         sessionId,
         file,
-        ownsDocument: true,
         controller: new AbortController(),
+        ownsUploadedFile: true,
         descriptor,
       }
       this.draftDocuments.set(descriptor.id, entry)
@@ -319,7 +366,7 @@ export class ConversationController extends Service implements IConversation {
     entry.controller.abort()
     this.draftDocuments.delete(id)
     this.publishDocuments(sessionId)
-    if (entry.ownsDocument && entry.descriptor.docId !== undefined) {
+    if (entry.ownsUploadedFile && entry.descriptor.docId !== undefined) {
       void this.userDocs.remove(entry.descriptor.docId).catch(() => {
         // The draft is already gone; a later list/retry can reconcile an orphan.
       })
@@ -333,7 +380,7 @@ export class ConversationController extends Service implements IConversation {
    */
   retryDraftDocument(sessionId: SessionId, id: DraftDocumentId): void {
     const current = this.draftDocuments.get(id)
-    if (current === undefined || current.sessionId !== sessionId || !current.ownsDocument
+    if (current === undefined || current.sessionId !== sessionId || !current.ownsUploadedFile
       || current.file === undefined || current.descriptor.status !== 'failed') return
     const entry: DraftDocumentEntry = {
       ...current,
@@ -351,50 +398,6 @@ export class ConversationController extends Service implements IConversation {
     this.draftDocuments.set(id, entry)
     this.publishDocuments(sessionId)
     void this.uploadDocument(id, entry)
-  }
-
-  /**
-   * Add durable documents copied by the document manager without uploading or
-   * deleting them from the target store when the draft is removed.
-   * @param sessionId - destination session.
-   * @param documents - safe target refs returned by the Gateway broker.
-   * @returns true when at least one document entered the input machine.
-   */
-  attachExistingDocuments(sessionId: SessionId, documents: readonly UserDocTransferTargetRef[]): boolean {
-    const scoped = this.requireSessions().scope(sessionId)
-    if (scoped === undefined) return false
-    const existing = new Set(this.documentsFor(sessionId).flatMap(document => document.docId === undefined ? [] : [String(document.docId)]))
-    const descriptors: ComposerDocument[] = []
-    for (const ref of documents) {
-      if (existing.has(String(ref.docId))) continue
-      const descriptor: ComposerDocument = {
-        kind: 'document',
-        id: crypto.randomUUID() as DraftDocumentId,
-        docId: ref.docId,
-        name: ref.name,
-        bytes: ref.bytes,
-        mediaType: ref.mediaType,
-        status: 'ready',
-        progress: 1,
-      }
-      descriptors.push(descriptor)
-      this.draftDocuments.set(descriptor.id, {
-        sessionId,
-        ownsDocument: false,
-        controller: new AbortController(),
-        descriptor,
-      })
-      existing.add(String(ref.docId))
-    }
-    if (descriptors.length === 0) return false
-    const ids = descriptors.map(document => document.id)
-    const input = this.input.for(scoped)
-    if (!input.addDocuments(ids)) {
-      for (const id of ids) this.draftDocuments.delete(id)
-      return false
-    }
-    this.publishDocuments(sessionId)
-    return true
   }
 
   /**
@@ -554,8 +557,8 @@ export class ConversationController extends Service implements IConversation {
   }
 
   private async uploadDocument(id: DraftDocumentId, entry: DraftDocumentEntry): Promise<void> {
+    if (entry.file === undefined) return
     try {
-      if (entry.file === undefined) throw new Error('document upload file is unavailable')
       const ref = await this.userDocs.upload(entry.file, entry.controller.signal, (loaded, total) => {
         const current = this.draftDocuments.get(id)
         if (current !== entry) return

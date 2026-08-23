@@ -2,14 +2,20 @@ import { useCallback, useEffect, useState } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { IconBrowseOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import { DocumentsModal } from './DocumentsModal.tsx'
-import type { UserDocTransferTargetRef } from './documents-client.ts'
+import type { UserDocRef } from '@deepseek-ai/dsh-userdoc'
 import { NS } from './locales.ts'
 import css from './DocumentsButton.module.css'
+
+/** Business callback supplied by the host composition for existing documents. */
+export interface DocumentsButtonInjected {
+  /** Add a durable document to the current conversation composer. */
+  attachDocument?: ((document: UserDocRef) => boolean) | undefined
+}
 
 export type DocumentsButtonProps =
   PropsRuntime<'sidebar.footer.action'>
   & PropsLocale<typeof NS>
-  & { onAttach?: (documents: readonly UserDocTransferTargetRef[]) => Promise<void> | void }
+  & DocumentsButtonInjected
 
 /**
  * Render the sidebar Documents trigger and its manager modal.
@@ -18,7 +24,7 @@ export type DocumentsButtonProps =
  * @returns the footer trigger and, while open, the document manager dialog.
  */
 export function DocumentsButton({
-  t, wide, onAttach,
+  t, wide, attachDocument,
 }: DocumentsButtonProps) {
   const [open, setOpen] = useState(false)
   const handleOpen = useCallback(() => { setOpen(true) }, [])
@@ -49,7 +55,7 @@ export function DocumentsButton({
           open
           onClose={handleClose}
           t={t}
-          {...(onAttach === undefined ? {} : { onAttach })}
+          {...(attachDocument === undefined ? {} : { onAttachDocument: attachDocument })}
         />
       )}
     </>

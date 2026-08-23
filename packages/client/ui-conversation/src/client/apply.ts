@@ -19,7 +19,6 @@ import type {
 import type { InputNotice } from './input/contract.ts'
 import { createChatStore } from './stores.ts'
 import { ConversationController, UnsupportedImageMediaTypeError } from './service.ts'
-import type { UserDocTransferTargetRef } from '@deepseek-ai/dsh-userdoc'
 import type { IConversation } from './service.ts'
 import { ComposerBlockRegistry } from './input/blocks.ts'
 import type { ComposerBlock } from './input/blocks.ts'
@@ -123,34 +122,6 @@ export function apply(ctx: Context): void {
   const workspaces = ctx.workspaces
   const layout = ctx.layout
   const slots = ctx.slots
-
-  // The document manager is a separate client plugin. This browser event is a
-  // narrow attach command: bytes never cross it, and the conversation service
-  // remains the sole owner of draft ids and input admission.
-  if (typeof window !== 'undefined') {
-    const onDocumentAttach = (event: Event): void => {
-      const detail = (event as CustomEvent<unknown>).detail
-      if (!Array.isArray(detail)) return
-      const documents = detail.filter((value): value is UserDocTransferTargetRef => {
-        if (value === null || typeof value !== 'object') return false
-        const candidate = value as Partial<UserDocTransferTargetRef>
-        return typeof candidate.docId === 'string' && candidate.docId !== ''
-          && typeof candidate.name === 'string' && candidate.name !== ''
-          && typeof candidate.bytes === 'number' && Number.isSafeInteger(candidate.bytes) && candidate.bytes >= 0
-          && typeof candidate.mediaType === 'string' && candidate.mediaType !== ''
-          && typeof candidate.modifiedAt === 'number' && Number.isFinite(candidate.modifiedAt)
-      })
-      if (documents.length === 0) return
-      const sessionId = sessions.list.getSnapshot().current
-      if (sessionId === undefined) return
-      const conversation = concreteConversation(ctx) as IConversation
-      conversation.attachExistingDocuments?.(sessionId, documents)
-    }
-    ctx.effect(() => {
-      window.addEventListener('dsh-documents-attach', onDocumentAttach)
-      return () => { window.removeEventListener('dsh-documents-attach', onDocumentAttach) }
-    }, 'conversation: document manager attach command')
-  }
 
   registerConversationNodes(ctx)
   registerChatNodeRenderers(ctx)

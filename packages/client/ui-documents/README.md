@@ -1,6 +1,6 @@
 # @deepseek-ai/dsh-client-ui-documents
 
-Workspace document manager for the CoHarness Web UI. Organize, preview, upload, move, download, and delete documents shared with the conversation input box.
+Workspace document manager for the CoHarness Web UI. Organize, preview, upload, move, download, delete, and add stored documents to the conversation input box.
 
 English | [中文](README.zh.md)
 
@@ -43,7 +43,7 @@ MIT
 
 #### What the model sees
 
-The browser shows a Documents button in the sidebar footer. Opening it presents the active scope's document folders through `/api/documents`, with breadcrumb navigation, folder management, name and type filters, sort, 20-row pages, preview, move, download, delete, multi-selection, and upload into the current folder.
+The browser shows a Documents button in the sidebar footer. Opening it presents the active scope's document folders through `/api/documents`, with breadcrumb navigation, folder management, name and type filters, sort, 20-row pages, add-to-conversation, preview, move, download, delete, multi-selection, and upload into the current folder. Adding a row places its existing durable document id into the current conversation composer and closes the manager after acceptance.
 
 #### Token effect
 

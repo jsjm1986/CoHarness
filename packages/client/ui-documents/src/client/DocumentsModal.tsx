@@ -19,7 +19,6 @@ import {
   createUserDocClient, readDocumentsScope, UserDocServiceUnavailableError,
   type DocumentsWorkspaceScope, type UserDocDirectoryIdType, type UserDocDirectoryRef,
   type UserDocLimits, type UserDocRef, type UserDocScope, type UserDocTransferListedDocument,
-  type UserDocTransferTargetRef,
 } from './documents-client.ts'
 import { DocumentPreview } from './DocumentPreview.tsx'
 import { formatBytes, getDateGroup } from './format.ts'
@@ -45,8 +44,8 @@ export interface DocumentsModalProps {
   open: boolean
   onClose: () => void
   t: (key: DocumentsKey, params?: Record<string, string>) => string
-  /** Attach copied target snapshots to the currently selected conversation. */
-  onAttach?: (documents: readonly UserDocTransferTargetRef[]) => Promise<void> | void
+  /** Attach one existing durable document to the current conversation. */
+  onAttachDocument?: (document: UserDocRef) => boolean
 }
 
 interface UploadProgress {
@@ -80,7 +79,6 @@ const MAX_PREVIEW_TEXT_BYTES = 256 * 1024
 const ROOT_DIRECTORY_ID = '' as UserDocDirectoryIdType
 
 const DEFAULT_SORT: DocumentSort = { key: 'date', dir: 'desc' }
-const DOCUMENT_ATTACH_EVENT = 'dsh-documents-attach'
 
 const SORT_OPTIONS: readonly { value: string; key: DocumentSortKey; dir: DocumentSortDir; label: DocumentsKey }[] = [
   { value: 'date:desc', key: 'date', dir: 'desc', label: 'modal.sort.dateDesc' },
@@ -125,9 +123,10 @@ function breadcrumbs(directoryId: UserDocDirectoryIdType, rootName: string): Bre
  * @param props.open - whether the dialog is showing.
  * @param props.onClose - Escape, mask click, or the header close control.
  * @param props.t - localized documents dictionary.
+ * @param props.onAttachDocument - optional callback for adding an existing document to the composer.
  * @returns the manager dialog plus nested delete-confirm and preview dialogs.
  */
-export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAttach }) => {
+export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAttachDocument }) => {
   const [documents, setDocuments] = useState<UserDocRef[]>([])
   const [directories, setDirectories] = useState<UserDocDirectoryRef[]>([])
   const [currentDirectoryId, setCurrentDirectoryId] = useState<UserDocDirectoryIdType>(ROOT_DIRECTORY_ID)
@@ -385,6 +384,19 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     }
   }
 
+  const attachDocument = (doc: UserDocRef) => {
+    setError('')
+    try {
+      if (onAttachDocument?.(doc) === true) {
+        onClose()
+        return
+      }
+    } catch (_attachError) {
+      // Session teardown can race the click; keep the manager open and show the same actionable failure.
+    }
+    setError(t('action.attach.error'))
+  }
+
   const handleMove = async () => {
     if (writeLocked) return
     if (moveTargets === null || moveTargets.length === 0 || moveDirectoryId === currentDirectoryId) return
@@ -518,11 +530,12 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
       })
       const copied = response.items.flatMap(item => item.status === 'copied' ? [item.target] : [])
       const failed = response.items.filter(item => item.status === 'failed').length
-      if (copied.length > 0) {
-        if (onAttach !== undefined) await onAttach(copied)
-        else if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent(DOCUMENT_ATTACH_EVENT, { detail: copied }))
+      if (copied.length > 0 && onAttachDocument !== undefined) {
+        let attached = false
+        for (const ref of copied) {
+          attached = onAttachDocument({ ...ref, path: '' }) || attached
         }
+        if (attached) onClose()
       }
       if (failed > 0) setModalError(t('copy.partial', { count: String(failed) }))
       else setCopyTargets(null)
@@ -700,6 +713,16 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
       <span className={css.actions}>
         {alternateSource === null && (
           <>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              aria-label={t('action.attachNamed', { name: doc.name })}
+              title={t('action.attach')}
+              onClick={() => { attachDocument(doc) }}
+            >
+              <span className={css.actionLabel}>{t('action.attach')}</span>
+            </Button>
             <Button
               type="button"
               size="sm"
