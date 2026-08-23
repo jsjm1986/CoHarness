@@ -1,3 +1,5 @@
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
+import { join, resolve as resolvePath } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import type { Plugin } from 'vite'
@@ -8,20 +10,47 @@ const src = (rel: string): string => fileURLToPath(new URL(rel, import.meta.url)
 const STANDALONE_ERROR = 'apps/web is not a standalone application: bare Vite cannot inject window.__DSH_BOOT__. '
   + 'From a repository checkout, run `pnpm dsh web`; an installed package uses `dsh web`. '
   + 'For client-plugin HMR, run `pnpm dsh web` together with `pnpm run dev:web`.'
-const DEFAULT_CLIENT_TITLE = 'DSH Local Build'
+const DEFAULT_CLIENT_TITLE = 'CoHarness'
+const LOCAL_FAVICON_ASSET = 'favicon-coharness.svg'
 
 /** Escape build-time text before placing it in the HTML title element. */
 function escapeHtmlText(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-/** Project the public build title into the initial HTML document. */
+/**
+ * Project the public build title and profile-specific install assets into the
+ * browser bundle. Local builds use CoHarness assets; the official profile
+ * retains its explicitly selected DeepSeek Harness title and mark.
+ */
 function clientDocumentTitle(): Plugin {
   const title = escapeHtmlText(process.env.DSH_CLIENT_TITLE ?? DEFAULT_CLIENT_TITLE)
+  const official = process.env.DSH_CLIENT_BUILD_PROFILE === 'official'
   return {
     name: 'dsh-client-document-title',
     transformIndexHtml(html) {
-      return html.replace('<title>DSH Local Build</title>', `<title>${title}</title>`)
+      return html.replace('<title>CoHarness</title>', `<title>${title}</title>`)
+    },
+    writeBundle(options) {
+      // Vite copies public files after the Rollup asset hook. Select the
+      // profile-specific install assets after those files have reached disk,
+      // then remove the source-only favicon companion from the published
+      // directory.
+      const outputDirectory = resolvePath(options.dir ?? src('./dist'))
+      const manifestPath = join(outputDirectory, 'manifest.webmanifest')
+      if (existsSync(manifestPath)) {
+        const value = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+          name?: string
+          short_name?: string
+        }
+        value.name = process.env.DSH_CLIENT_TITLE ?? DEFAULT_CLIENT_TITLE
+        value.short_name = official ? 'DSH' : 'CoHarness'
+        writeFileSync(manifestPath, `${JSON.stringify(value, null, 2)}\n`)
+      }
+      const localPath = join(outputDirectory, LOCAL_FAVICON_ASSET)
+      if (!existsSync(localPath)) return
+      if (!official) writeFileSync(join(outputDirectory, 'favicon.svg'), readFileSync(localPath))
+      unlinkSync(localPath)
     },
   }
 }
