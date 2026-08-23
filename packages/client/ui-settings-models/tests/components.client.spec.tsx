@@ -36,7 +36,8 @@ function expandRow(position: number): void {
 
 /** The capacity inputs of every open row, in row order. */
 function capacityInputs(label: string): HTMLInputElement[] {
-  return screen.getAllByLabelText<HTMLInputElement>(new RegExp(label))
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return screen.getAllByLabelText<HTMLInputElement>(new RegExp(escaped))
 }
 
 const PiAiConfig = Schema.object({
@@ -601,6 +602,7 @@ describe('ModelsSection', () => {
     expect(parseCapacity('131072')).toBe(131_072)
     expect(parseCapacity(' 256K ')).toBe(256_000)
     expect(parseCapacity('256k')).toBe(256_000)
+    expect(parseCapacity('393.216K')).toBe(393_216)
     expect(parseCapacity('1M')).toBe(1_000_000)
     expect(parseCapacity('1m')).toBe(1_000_000)
     // 1M is 1000K, not 1024K: capacities are quoted in decimal.
@@ -621,6 +623,9 @@ describe('ModelsSection', () => {
     expect(formatCapacity(256_000)).toBe('256K')
     expect(formatCapacity(1_500_000)).toBe('1500K')
     expect(formatCapacity(131_072)).toBe('131072')
+    // A provider value such as 393216 stays exact rather than becoming the
+    // different decimal value represented by `384K`.
+    expect(formatCapacity(393_216)).toBe('393216')
     // Values the validator will reject are shown as-is rather than dressed up.
     expect(formatCapacity(Number.NaN)).toBe('NaN')
     expect(formatCapacity(0)).toBe('0')
@@ -636,6 +641,7 @@ describe('ModelsSection', () => {
     fireEvent.click(screen.getByText(en.customized))
     expandRow(1)
     expandRow(2)
+    expect(screen.getAllByText(en.modelCapacityHelp)).toHaveLength(2)
     const windows = capacityInputs(en.contextWindow)
     // The inherited 1000000 reads back short.
     expect((windows[0] as HTMLInputElement).value).toBe('1M')
