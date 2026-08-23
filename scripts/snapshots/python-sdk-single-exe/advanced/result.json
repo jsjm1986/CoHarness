@@ -194,8 +194,7 @@
           "usage": {
             "inputTokens": 3,
             "outputTokens": 3
-          },
-          "credentialSource": "process"
+          }
         }
       }
     },
@@ -381,8 +380,7 @@
           "usage": {
             "inputTokens": 3,
             "outputTokens": 3
-          },
-          "credentialSource": "process"
+          }
         }
       }
     },
@@ -606,8 +604,7 @@
           "usage": {
             "inputTokens": 3,
             "outputTokens": 3
-          },
-          "credentialSource": "process"
+          }
         }
       }
     },
@@ -824,8 +821,7 @@
           "usage": {
             "inputTokens": 3,
             "outputTokens": 3
-          },
-          "credentialSource": "process"
+          }
         }
       }
     },
@@ -1007,8 +1003,7 @@
           "usage": {
             "inputTokens": 3,
             "outputTokens": 3
-          },
-          "credentialSource": "process"
+          }
         }
       }
     },
@@ -1230,8 +1225,7 @@
           "usage": {
             "inputTokens": 3,
             "outputTokens": 3
-          },
-          "credentialSource": "process"
+          }
         }
       }
     },
@@ -1445,8 +1439,7 @@
           "usage": {
             "inputTokens": 3,
             "outputTokens": 3
-          },
-          "credentialSource": "process"
+          }
         }
       }
     },
@@ -1792,8 +1785,7 @@
               "usage": {
                 "inputTokens": 3,
                 "outputTokens": 3
-              },
-              "credentialSource": "process"
+              }
             }
           }
         }
@@ -2039,8 +2031,7 @@
               "usage": {
                 "inputTokens": 3,
                 "outputTokens": 3
-              },
-              "credentialSource": "process"
+              }
             }
           }
         }
@@ -2330,8 +2321,7 @@
               "usage": {
                 "inputTokens": 3,
                 "outputTokens": 3
-              },
-              "credentialSource": "process"
+              }
             }
           }
         }
@@ -2620,8 +2610,7 @@
               "usage": {
                 "inputTokens": 3,
                 "outputTokens": 3
-              },
-              "credentialSource": "process"
+              }
             }
           }
         }
@@ -3033,8 +3022,7 @@
               "usage": {
                 "inputTokens": 3,
                 "outputTokens": 3
-              },
-              "credentialSource": "process"
+              }
             }
           }
         }
@@ -3312,8 +3300,7 @@
               "usage": {
                 "inputTokens": 3,
                 "outputTokens": 3
-              },
-              "credentialSource": "process"
+              }
             }
           }
         }
@@ -3757,8 +3744,7 @@
               "usage": {
                 "inputTokens": 3,
                 "outputTokens": 3
-              },
-              "credentialSource": "process"
+              }
             }
           }
         }
@@ -4067,8 +4053,7 @@
               "usage": {
                 "inputTokens": 3,
                 "outputTokens": 3
-              },
-              "credentialSource": "process"
+              }
             }
           }
         }
@@ -4348,8 +4333,7 @@
               "usage": {
                 "inputTokens": 3,
                 "outputTokens": 3
-              },
-              "credentialSource": "process"
+              }
             }
           }
         }

@@ -18,7 +18,7 @@ type ImageMediaType = 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif'
 ```
 
 ```ts type-equiv
-/** Durable, serializable metadata for one immutable image object. */
+/** Durable, serializable reference to one immutable normalized image. */
 interface ImageAttachmentRef {
   /** Opaque storage identifier; never a filesystem path or bearer URL. */
   attachmentId: AttachmentId
@@ -32,6 +32,14 @@ interface ImageAttachmentRef {
   height: number
   /** Optional display name stripped of local path information. */
   name?: string
+  /**
+   * Input dimensions after applying EXIF orientation and before normalization
+   * scaling. Present only when normalization reduced the image.
+   */
+  originalDimensions?: {
+    width: number
+    height: number
+  }
 }
 ```
 
@@ -109,19 +117,19 @@ Immutable binary attachment service. Implementations validate bytes before publi
 abstract validateImage(input: SaveImageAttachment): Promise<void>
 
 /**
- * Validate one ordered image batch before committing any member.
- * Validation failures start no writes; storage failures return no partial
- * references, although already published content-addressed objects may stay
- * unreachable until a future retention policy collects them.
- * @param inputs - encoded images in their owning message order.
- * @returns durable references in the exact input order.
+ * Validate and durably commit one ordered image batch.
+ * @param inputs - encoded images in owning-message order.
+ * @returns durable normalized attachment references in the same order after every member succeeds.
  */
 async saveImages(inputs: readonly SaveImageAttachment[]): Promise<readonly ImageAttachmentRef[]>
 
 /**
  * Validate and durably commit one image before its owning session event is appended.
+ * The returned reference describes the persisted normalized image. When
+ * normalization reduces the raster, its `originalDimensions` records the
+ * orientation-applied input dimensions.
  * @param input - encoded bytes, declared media type, and optional display name.
- * @returns a durable content-addressed reference.
+ * @returns the durable content-addressed normalized image reference.
  */
 abstract saveImage(input: SaveImageAttachment): Promise<ImageAttachmentRef>
 
@@ -129,13 +137,22 @@ abstract saveImage(input: SaveImageAttachment): Promise<ImageAttachmentRef>
  * Read one image and verify that bytes still match the recorded reference.
  * @param ref - durable reference from the session log.
  * @param signal - optional cancellation for backend read and verification work.
- * @returns the verified bytes and canonical reference.
+ * @returns the verified bytes and normalized attachment reference.
  * @throws the signal reason when aborted, or a storage error when verification fails.
  */
 abstract readImage(ref: ImageAttachmentRef, signal?: AbortSignal): Promise<StoredImageAttachment>
+
+/**
+ * Generate or read one deterministic model-request version from the stored normalized image.
+ * @param ref - durable provider-independent normalized attachment reference.
+ * @param policy - exact route pixel and encoded-byte budget.
+ * @param signal - optional cancellation.
+ * @returns request bytes and the cache/upload identity covering every transform input.
+ */
+readImageRequest( ref: ImageAttachmentRef, policy: ImageRequestPolicy, signal?: AbortSignal, ): Promise<RequestImageAttachment>
 ```
 
-Source: [`packages/attachment/attachment/src/index.ts:33`](../../packages/attachment/attachment/src/index.ts)
+Source: [`packages/attachment/attachment/src/index.ts:37`](../../packages/attachment/attachment/src/index.ts)
 
 <a id="ctxuserdocs--userdocstore-abstract-seam"></a>
 

@@ -418,6 +418,27 @@ describe('Issue lifecycle workflow', () => {
   })
 })
 
+describe('Documentation workflow', () => {
+  it('publishes only through an explicit release dispatch and verifies the release tag', () => {
+    const workflow = loadWorkflow('.github/workflows/docs-pages.yml')
+    expect(workflow.on).toEqual({ workflow_dispatch: null })
+
+    const build = workflowJob(workflow, 'build')
+    if (!Array.isArray(build.steps)) throw new TypeError('Documentation build must define steps')
+    const steps = build.steps.filter(isRecord)
+    const checkout = steps.find(step => typeof step.uses === 'string' && step.uses.startsWith('actions/checkout@'))
+    const verify = steps.find(step => step.name === 'Verify release version')
+
+    expect(checkout).toMatchObject({
+      with: { 'fetch-depth': 0, 'persist-credentials': false },
+    })
+    expect(verify).toMatchObject({
+      env: { RELEASE_PUBLISH: 'true' },
+      run: 'pnpm run release:verify --family dsh',
+    })
+  })
+})
+
 describe('Git hooks', () => {
   it('leaves frozen Agent Note sidecars to the archive verifier', () => {
     const lefthook = loadWorkflow('lefthook.yml')

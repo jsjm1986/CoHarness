@@ -10,9 +10,9 @@ Web Think 行在结算与流式 block 中都把 reasoning 首行渲染成折叠�
 
 ## 决策
 
-只有 reasoning block 是当前流式尾部、且仍处于折叠态的 Think 行会跟随实时输出。其摘要使用最新的非空行，而不是结算后的首行；已有单行摘要元素成为程序化横向滚动区，每次文本更新后钉到 `scrollWidth - clientWidth`。这里刻意直接赋值 `scrollLeft`，通过真实 delta 推进而不虚构独立的跑马灯速度：token 快则移动快，模型停顿则停止，短文本因滚动范围为零而保持静止。
+只有 reasoning block 是当前流式尾部、且仍处于折叠态的 Think 行会跟随实时输出。其摘要使用最新的非空行，而不是结算后的首个可见行；已有单行摘要元素成为程序化横向滚动区，每次文本更新后钉到 `scrollWidth - clientWidth`。这里刻意直接赋值 `scrollLeft`，通过真实 delta 推进而不虚构独立的跑马灯速度：token 快则移动快，模型停顿则停止，短文本因滚动范围为零而保持静止。
 
-该行为由已有呈现组件拥有。`AssistantMarkdown` 只在 Think 行运行时选择最新行；`ToolRow` 已经拥有折叠／展开状态，因此由它决定摘要是否追随行内末端。不改变 session、wire、持久事件或模型可见约定。展开会移除折叠摘要，并让完整 reasoning 正文进入普通页面流。该行结算后恢复稳定首行，同时把摘要重置到左端。其他工具摘要与已结算 Think 行保留已有省略号行为。
+该行为由已有呈现组件拥有。`AssistantMarkdown` 只在 Think 行运行时选择最新行；`ToolRow` 已经拥有折叠／展开状态，因此由它决定摘要是否追随行内末端。不改变 session、wire、持久事件或模型可见约定。展开会移除折叠摘要，并让完整 reasoning 正文进入普通页面流。该行结算后会跳过前导排版空白，恢复稳定的首个可见行，同时把摘要重置到左端；展开正文保留每个原始字符。其他工具摘要与已结算 Think 行保留已有省略号行为。
 
 ## 曾考虑的替代方案
 
@@ -24,8 +24,8 @@ Web Think 行在结算与流式 block 中都把 reasoning 首行渲染成折叠�
 
 ## 后果
 
-折叠行现在会同时通过内容移动和已有扫光传达 provider 节奏，而结算后的 transcript 保持逐字节稳定。滚动更新只发生在流式累加器本就会触发的 React 渲染中；不会增加计时器、动画循环、订阅、持久状态或传输流量。较长的当前 reasoning 行仍会把完整文本留在 DOM 中，只以编程方式裁掉已经溢出的前缀，因此展开仍能显示完整 block，辅助技术读到的也仍是同一份当前摘要文本。
+折叠行现在会同时通过内容移动和已有扫光传达 provider 节奏，而结算后的 reasoning 正文保持逐字节稳定。滚动更新只发生在流式累加器本就会触发的 React 渲染中；不会增加计时器、动画循环、订阅、持久状态或传输流量。较长的当前 reasoning 行仍会把完整文本留在 DOM 中，只以编程方式裁掉已经溢出的前缀，因此展开仍能显示完整 block，辅助技术读到的也仍是同一份当前摘要文本。以空行或缩进开头的正文会获得非空的折叠摘要，展开后仍保留这些排版。
 
 ## 测试
 
-`packages/client/ui-conversation/tests/reasoning-row.client.spec.tsx` 固定最新行选择、算出的右端滚动位置，以及结算后恢复首行和 `scrollLeft = 0`。`apps/web/tests/lifecycle-chrome.e2e.ts` 中的无密钥组装态 Chromium 场景以可观察节奏回放真实录制的 reasoning chunks，把视口收窄到摘要溢出，并断言实时折叠 Think 行到达真实浏览器的滚动边界。其结算态 replay golden 保持不变，证明历史摘要约定仍然稳定。
+`packages/client/ui-conversation/tests/reasoning-row.client.spec.tsx` 固定最新行选择、算出的右端滚动位置、结算后恢复首个可见行和 `scrollLeft = 0`，以及展开正文保留前导空白。`apps/web/tests/lifecycle-chrome.e2e.ts` 中的无密钥组装态 Chromium 场景以可观察节奏回放真实录制的 reasoning chunks，把视口收窄到摘要溢出，并断言实时折叠 Think 行到达真实浏览器的滚动边界。对于没有前导排版空白的 reasoning，其结算态 replay golden 保持不变。

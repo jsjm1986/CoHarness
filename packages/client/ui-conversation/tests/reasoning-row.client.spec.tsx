@@ -86,6 +86,22 @@ describe('ReasoningRow', () => {
     expect(summary.hasAttribute('data-follow-end')).toBe(false)
   })
 
+  it('uses the first visible completed line when reasoning starts with formatting whitespace', () => {
+    const text = '\n  Inspect the session\nCheck persistence'
+    const view = render(
+      <AssistantMarkdown
+        t={t}
+        blocks={[{ kind: 'reasoning', text }]}
+        streaming={false}
+        renderMessageImages={renderMessageImages}
+      />,
+    )
+
+    expect(view.getByText('Inspect the session')).toBeTruthy()
+    fireEvent.click(view.getByText('Think'))
+    expect(view.container.querySelector('[class*="thinkBody"]')?.textContent).toBe(text)
+  })
+
   it('expands from either Think or the reasoning summary', () => {
     const view = render(
       <AssistantMarkdown

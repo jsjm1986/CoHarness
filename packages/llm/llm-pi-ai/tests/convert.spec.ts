@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import type { AttachmentStore } from '@deepseek-ai/dsh-attachment'
-import { createUserMessage, CallId, CONTEXT_WINDOW_EXCEEDED_CODE, EMPTY_RESPONSE_CODE, createMessage } from '@deepseek-ai/dsh-llm'
+import { BlockAssembler, createUserMessage, CallId, CONTEXT_WINDOW_EXCEEDED_CODE, EMPTY_RESPONSE_CODE, createMessage } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, StreamChunk } from '@deepseek-ai/dsh-llm'
 import type { AssistantMessage, AssistantMessageEvent, Usage } from '@earendil-works/pi-ai'
 import { toPiContext } from '../src/context.ts'
@@ -637,6 +637,413 @@ describe('toStreamChunks', () => {
       { type: 'reasoning-delta', index: 0, text: 'mull' },
       { type: 'block-end', index: 0, block: { type: 'reasoning', text: 'mull' } },
     ])
+  })
+
+  it('keeps native thinking and ordinary text blocks distinct with fallback enabled', async () => {
+    const done = assistant({
+      content: [
+        { type: 'thinking', thinking: 'plan' },
+        { type: 'text', text: 'answer' },
+      ],
+    })
+    const chunks = await collect(toStreamChunks(feed(
+      { type: 'thinking_start', contentIndex: 0, partial: assistant() },
+      { type: 'thinking_delta', contentIndex: 0, delta: 'plan', partial: assistant() },
+      { type: 'thinking_end', contentIndex: 0, content: 'plan', partial: assistant() },
+      { type: 'text_start', contentIndex: 1, partial: assistant() },
+      { type: 'text_delta', contentIndex: 1, delta: 'answer', partial: assistant() },
+      { type: 'text_end', contentIndex: 1, content: 'answer', partial: done },
+      { type: 'done', reason: 'stop', message: done },
+    ), undefined, true))
+    expect(chunks
+      .filter((chunk): chunk is Extract<StreamChunk, { type: 'block-start' }> => chunk.type === 'block-start')
+      .map(chunk => [chunk.index, chunk.blockType]))
+      .toEqual([[0, 'reasoning'], [1, 'text']])
+    expect(chunks.at(-1)).toHaveProperty('replayState')
+
+    const assembler = new BlockAssembler()
+    for (const chunk of chunks) assembler.push(chunk)
+    expect(assembler.blocks()).toEqual([
+      { type: 'reasoning', text: 'plan' },
+      { type: 'text', text: 'answer' },
+    ])
+  })
+
+  it('splits a strict tagged text prefix into reasoning and text blocks', async () => {
+    const done = assistant({
+      content: [{ type: 'text', text: '<thinking>plan</thinking>answer' }],
+    })
+    const chunks = await collect(toStreamChunks(feed(
+      { type: 'text_start', contentIndex: 0, partial: assistant() },
+      { type: 'text_delta', contentIndex: 0, delta: '<thi', partial: assistant() },
+      { type: 'text_delta', contentIndex: 0, delta: 'nking>plan</think', partial: assistant() },
+      { type: 'text_delta', contentIndex: 0, delta: 'ing>ans', partial: assistant() },
+      { type: 'text_delta', contentIndex: 0, delta: 'wer', partial: assistant() },
+      { type: 'text_end', contentIndex: 0, content: '<thinking>plan</thinking>answer', partial: done },
+      { type: 'done', reason: 'stop', message: done },
+    ), undefined, true))
+    expect(chunks.slice(0, 8)).toEqual([
+      { type: 'block-start', index: 0, blockType: 'reasoning' },
+      { type: 'reasoning-delta', index: 0, text: 'plan' },
+      { type: 'block-end', index: 0, block: { type: 'reasoning', text: 'plan' } },
+      { type: 'block-start', index: 1, blockType: 'text' },
+      { type: 'text-delta', index: 1, text: 'ans' },
+      { type: 'text-delta', index: 1, text: 'wer' },
+      { type: 'block-end', index: 1, block: { type: 'text', text: 'answer' } },
+      { type: 'usage', usage: { inputTokens: 0, outputTokens: 0 } },
+    ])
+    expect(chunks.at(-1)).toMatchObject({ type: 'finish', reason: { kind: 'stop' } })
+    expect(chunks.at(-1)).not.toHaveProperty('replayState')
+  })
+
+  it('leaves a tagged prefix as ordinary text when fallback is disabled', async () => {
+    const content = '<thinking>plan</thinking>answer'
+    const done = assistant({ content: [{ type: 'text', text: content }] })
+    const chunks = await collect(toStreamChunks(feed(
+      { type: 'text_start', contentIndex: 0, partial: assistant() },
+      { type: 'text_delta', contentIndex: 0, delta: content, partial: assistant() },
+      { type: 'text_end', contentIndex: 0, content, partial: done },
+      { type: 'done', reason: 'stop', message: done },
+    )))
+
+    const assembler = new BlockAssembler()
+    for (const chunk of chunks) assembler.push(chunk)
+    expect(assembler.blocks()).toEqual([{ type: 'text', text: content }])
+    expect(chunks.at(-1)).toHaveProperty('replayState')
+  })
+
+  it('keeps an unclosed tagged prefix as text and retains replay metadata', async () => {
+    const done = assistant({ content: [{ type: 'text', text: '<thinking>partial' }] })
+    const chunks = await collect(toStreamChunks(feed(
+      { type: 'text_start', contentIndex: 0, partial: assistant() },
+      { type: 'text_delta', contentIndex: 0, delta: '<thinking>partial', partial: assistant() },
+      { type: 'text_end', contentIndex: 0, content: '<thinking>partial', partial: done },
+      { type: 'done', reason: 'stop', message: done },
+    ), undefined, true))
+    expect(chunks.slice(0, 3)).toEqual([
+      { type: 'block-start', index: 0, blockType: 'text' },
+      { type: 'text-delta', index: 0, text: '<thinking>partial' },
+      { type: 'block-end', index: 0, block: { type: 'text', text: '<thinking>partial' } },
+    ])
+    expect(chunks.at(-1)).toHaveProperty('replayState')
+  })
+
+  it('uses divergent cumulative text as the authoritative ordinary block', async () => {
+    const done = assistant({ content: [{ type: 'text', text: 'complete answer' }] })
+    const chunks = await collect(toStreamChunks(feed(
+      { type: 'text_start', contentIndex: 0, partial: assistant() },
+      { type: 'text_delta', contentIndex: 0, delta: 'fragment', partial: assistant() },
+      { type: 'text_end', contentIndex: 0, content: 'complete answer', partial: done },
+      { type: 'done', reason: 'stop', message: done },
+    ), undefined, true))
+    expect(chunks.slice(0, 3)).toEqual([
+      { type: 'block-start', index: 0, blockType: 'text' },
+      { type: 'text-delta', index: 0, text: 'fragment' },
+      { type: 'block-end', index: 0, block: { type: 'text', text: 'complete answer' } },
+    ])
+
+    const assembler = new BlockAssembler()
+    for (const chunk of chunks) assembler.push(chunk)
+    expect(assembler.blocks()).toEqual([{ type: 'text', text: 'complete answer' }])
+  })
+
+  it('keeps logical indexes unique when reasoning-only tagged text is followed by multiple tool calls', async () => {
+    const firstTool = { type: 'toolCall' as const, id: 'call-1', name: 'f', arguments: {} }
+    const secondTool = { type: 'toolCall' as const, id: 'call-2', name: 'g', arguments: {} }
+    const done = assistant({ content: [
+      { type: 'text', text: '<thinking>plan</thinking>' },
+      firstTool,
+      secondTool,
+    ], stopReason: 'toolUse' })
+    const chunks = await collect(toStreamChunks(feed(
+      { type: 'text_start', contentIndex: 0, partial: assistant() },
+      { type: 'text_delta', contentIndex: 0, delta: '<thinking>plan</thinking>', partial: assistant() },
+      { type: 'text_end', contentIndex: 0, content: '<thinking>plan</thinking>', partial: assistant() },
+      { type: 'toolcall_start', contentIndex: 1, partial: done },
+      { type: 'toolcall_delta', contentIndex: 1, delta: '{}', partial: done },
+      { type: 'toolcall_end', contentIndex: 1, toolCall: firstTool, partial: done },
+      { type: 'toolcall_start', contentIndex: 2, partial: done },
+      { type: 'toolcall_delta', contentIndex: 2, delta: '{}', partial: done },
+      { type: 'toolcall_end', contentIndex: 2, toolCall: secondTool, partial: done },
+      { type: 'done', reason: 'toolUse', message: done },
+    ), undefined, true))
+    const indexes = chunks
+      .filter((chunk): chunk is Extract<StreamChunk, { type: 'block-start' }> => chunk.type === 'block-start')
+      .map(chunk => chunk.index)
+    expect(indexes).toEqual([0, 1, 2])
+    expect(new Set(indexes).size).toBe(indexes.length)
+  })
+
+  it('keeps tagged text, native reasoning, and multiple tool indexes distinct', async () => {
+    const tagged = { type: 'text' as const, text: '<thinking>tagged plan</thinking>answer' }
+    const native = { type: 'thinking' as const, thinking: 'native plan' }
+    const firstTool = { type: 'toolCall' as const, id: 'call-1', name: 'f', arguments: {} }
+    const secondTool = { type: 'toolCall' as const, id: 'call-2', name: 'g', arguments: {} }
+    const done = assistant({ content: [tagged, native, firstTool, secondTool], stopReason: 'toolUse' })
+    const chunks = await collect(toStreamChunks(feed(
+      { type: 'text_start', contentIndex: 0, partial: assistant() },
+      { type: 'text_delta', contentIndex: 0, delta: tagged.text, partial: assistant({ content: [tagged] }) },
+      { type: 'thinking_start', contentIndex: 1, partial: assistant({ content: [tagged, native] }) },
+      { type: 'thinking_delta', contentIndex: 1, delta: native.thinking, partial: assistant({ content: [tagged, native] }) },
+      { type: 'toolcall_start', contentIndex: 2, partial: done },
+      { type: 'toolcall_delta', contentIndex: 2, delta: '{}', partial: done },
+      { type: 'toolcall_start', contentIndex: 3, partial: done },
+      { type: 'toolcall_delta', contentIndex: 3, delta: '{}', partial: done },
+      { type: 'text_end', contentIndex: 0, content: tagged.text, partial: done },
+      { type: 'thinking_end', contentIndex: 1, content: native.thinking, partial: done },
+      { type: 'toolcall_end', contentIndex: 2, toolCall: firstTool, partial: done },
+      { type: 'toolcall_end', contentIndex: 3, toolCall: secondTool, partial: done },
+      { type: 'done', reason: 'toolUse', message: done },
+    ), undefined, true))
+
+    expect(chunks
+      .filter((chunk): chunk is Extract<StreamChunk, { type: 'block-start' }> => chunk.type === 'block-start')
+      .map(chunk => [chunk.index, chunk.blockType]))
+      .toEqual([
+        [0, 'reasoning'],
+        [1, 'text'],
+        [2, 'reasoning'],
+        [3, 'tool-call'],
+        [4, 'tool-call'],
+      ])
+    expect(chunks.at(-1)).not.toHaveProperty('replayState')
+
+    const assembler = new BlockAssembler()
+    for (const chunk of chunks) assembler.push(chunk)
+    expect(assembler.blocks()).toEqual([
+      { type: 'reasoning', text: 'tagged plan' },
+      { type: 'text', text: 'answer' },
+      { type: 'reasoning', text: 'native plan' },
+      { type: 'tool-call', id: 'call-1', name: 'f', arguments: '{}' },
+      { type: 'tool-call', id: 'call-2', name: 'g', arguments: '{}' },
+    ])
+  })
+
+  it('keeps a lower native reasoning index stable after a later tagged text expands', async () => {
+    const native = { type: 'thinking' as const, thinking: 'native plan' }
+    const tagged = { type: 'text' as const, text: '<thinking>tagged plan</thinking>answer' }
+    const done = assistant({ content: [native, tagged] })
+    const partial = assistant({ content: [native, tagged] })
+    const chunks = await collect(toStreamChunks(feed(
+      { type: 'thinking_start', contentIndex: 0, partial: assistant({ content: [native] }) },
+      { type: 'thinking_delta', contentIndex: 0, delta: 'native ', partial: assistant({ content: [native] }) },
+      { type: 'text_start', contentIndex: 1, partial },
+      { type: 'text_delta', contentIndex: 1, delta: tagged.text, partial },
+      { type: 'thinking_delta', contentIndex: 0, delta: 'plan', partial },
+      { type: 'thinking_end', contentIndex: 0, content: native.thinking, partial: done },
+      { type: 'text_end', contentIndex: 1, content: tagged.text, partial: done },
+      { type: 'done', reason: 'stop', message: done },
+    ), undefined, true))
+
+    expect(chunks
+      .filter((chunk): chunk is Extract<StreamChunk, { type: 'block-start' }> => chunk.type === 'block-start')
+      .map(chunk => [chunk.index, chunk.blockType]))
+      .toEqual([[0, 'reasoning'], [1, 'reasoning'], [2, 'text']])
+    const assembler = new BlockAssembler()
+    for (const chunk of chunks) assembler.push(chunk)
+    expect(assembler.blocks()).toEqual([
+      { type: 'reasoning', text: 'native plan' },
+      { type: 'reasoning', text: 'tagged plan' },
+      { type: 'text', text: 'answer' },
+    ])
+  })
+
+  it('sorts multiple terminal-only text states and lets start events pass while they are pending', async () => {
+    const done = assistant({ content: [
+      { type: 'text', text: 'first' },
+      { type: 'text', text: 'second' },
+    ] })
+    const chunks = await collect(toStreamChunks(feed(
+      { type: 'start', partial: done },
+      { type: 'done', reason: 'stop', message: done },
+    ), undefined, true))
+
+    const assembler = new BlockAssembler()
+    for (const chunk of chunks) assembler.push(chunk)
+    expect(assembler.blocks()).toEqual([
+      { type: 'text', text: 'first' },
+      { type: 'text', text: 'second' },
+    ])
+  })
+
+  it('preserves a text state omitted from an error terminal message', async () => {
+    const error = assistant({ stopReason: 'error', errorMessage: 'interrupted' })
+    const chunks = await collect(toStreamChunks(feed(
+      { type: 'text_start', contentIndex: 0, partial: assistant() },
+      { type: 'error', reason: 'error', error },
+    ), undefined, true))
+    expect(chunks.slice(0, 2)).toEqual([
+      { type: 'block-start', index: 0, blockType: 'text' },
+      { type: 'block-end', index: 0, block: { type: 'text', text: '' } },
+    ])
+  })
+
+  it('requeues a later tool when draining reveals another pending text block', async () => {
+    const first = { type: 'text' as const, text: '<thinking>unclosed' }
+    const second = { type: 'text' as const, text: 'answer' }
+    const tool = { type: 'toolCall' as const, id: 'call-1', name: 'f', arguments: {} }
+    const done = assistant({ content: [first, second, tool], stopReason: 'toolUse' })
+    const chunks = await collect(toStreamChunks(feed(
+      { type: 'text_start', contentIndex: 0, partial: assistant() },
+      { type: 'text_delta', contentIndex: 0, delta: first.text, partial: assistant() },
+      { type: 'text_start', contentIndex: 1, partial: assistant() },
+      { type: 'toolcall_start', contentIndex: 2, partial: assistant({ content: [tool] }) },
+      { type: 'text_end', contentIndex: 0, content: first.text, partial: assistant() },
+      { type: 'text_delta', contentIndex: 1, delta: second.text, partial: assistant() },
+      { type: 'text_end', contentIndex: 1, content: second.text, partial: assistant() },
+      { type: 'toolcall_delta', contentIndex: 2, delta: '{}', partial: done },
+      { type: 'toolcall_end', contentIndex: 2, toolCall: tool, partial: done },
+      { type: 'done', reason: 'toolUse', message: done },
+    ), undefined, true))
+
+    expect(chunks
+      .filter((chunk): chunk is Extract<StreamChunk, { type: 'block-start' }> => chunk.type === 'block-start')
+      .map(chunk => [chunk.index, chunk.blockType]))
+      .toEqual([[0, 'text'], [1, 'text'], [2, 'tool-call']])
+  })
+
+  it('keeps a tool call after tagged text even when its events arrive before the closing tag', async () => {
+    const tool = { type: 'toolCall' as const, id: 'call-1', name: 'f', arguments: {} }
+    const done = assistant({
+      content: [{ type: 'text', text: '<thinking>plan</thinking>answer' }, tool],
+      stopReason: 'toolUse',
+    })
+    const chunks = await collect(toStreamChunks(feed(
+      { type: 'text_start', contentIndex: 0, partial: assistant() },
+      { type: 'text_delta', contentIndex: 0, delta: '<thinking>plan', partial: assistant() },
+      { type: 'toolcall_start', contentIndex: 1, partial: assistant({ content: [tool] }) },
+      { type: 'toolcall_delta', contentIndex: 1, delta: '{}', partial: assistant({ content: [tool] }) },
+      { type: 'text_delta', contentIndex: 0, delta: '</thinking>answer', partial: assistant() },
+      { type: 'text_end', contentIndex: 0, content: '<thinking>plan</thinking>answer', partial: assistant() },
+      { type: 'toolcall_end', contentIndex: 1, toolCall: tool, partial: done },
+      { type: 'done', reason: 'toolUse', message: done },
+    ), undefined, true))
+    expect(chunks
+      .filter((chunk): chunk is Extract<StreamChunk, { type: 'block-start' }> => chunk.type === 'block-start')
+      .map(chunk => [chunk.index, chunk.blockType]))
+      .toEqual([[0, 'reasoning'], [1, 'text'], [2, 'tool-call']])
+  })
+
+  it('uses cumulative text from text_end when deltas are missing', async () => {
+    const content = '<thinking>plan</thinking>answer'
+    const done = assistant({ content: [{ type: 'text', text: content }] })
+    const chunks = await collect(toStreamChunks(feed(
+      { type: 'text_start', contentIndex: 0, partial: assistant() },
+      { type: 'text_end', contentIndex: 0, content, partial: done },
+      { type: 'done', reason: 'stop', message: done },
+    ), undefined, true))
+    expect(chunks.slice(0, 6)).toEqual([
+      { type: 'block-start', index: 0, blockType: 'reasoning' },
+      { type: 'reasoning-delta', index: 0, text: 'plan' },
+      { type: 'block-end', index: 0, block: { type: 'reasoning', text: 'plan' } },
+      { type: 'block-start', index: 1, blockType: 'text' },
+      { type: 'text-delta', index: 1, text: 'answer' },
+      { type: 'block-end', index: 1, block: { type: 'text', text: 'answer' } },
+    ])
+  })
+
+  it('recovers terminal text when the provider omits text events', async () => {
+    const content = '<thinking>plan</thinking>answer'
+    const done = assistant({ content: [{ type: 'text', text: content }] })
+    const chunks = await collect(toStreamChunks(feed(
+      { type: 'start', partial: assistant() },
+      { type: 'done', reason: 'stop', message: done },
+    ), undefined, true))
+    expect(chunks.slice(0, 6)).toEqual([
+      { type: 'block-start', index: 0, blockType: 'reasoning' },
+      { type: 'reasoning-delta', index: 0, text: 'plan' },
+      { type: 'block-end', index: 0, block: { type: 'reasoning', text: 'plan' } },
+      { type: 'block-start', index: 1, blockType: 'text' },
+      { type: 'text-delta', index: 1, text: 'answer' },
+      { type: 'block-end', index: 1, block: { type: 'text', text: 'answer' } },
+    ])
+  })
+
+  it('preserves an empty ordinary text block and keeps replay entries aligned', async () => {
+    const done = assistant({ content: [{ type: 'text', text: '' }] })
+    const chunks = await collect(toStreamChunks(feed(
+      { type: 'text_start', contentIndex: 0, partial: assistant() },
+      { type: 'text_end', contentIndex: 0, content: '', partial: done },
+      { type: 'done', reason: 'stop', message: done },
+    ), undefined, true))
+
+    expect(chunks.slice(0, 4)).toEqual([
+      { type: 'block-start', index: 0, blockType: 'text' },
+      { type: 'block-end', index: 0, block: { type: 'text', text: '' } },
+      { type: 'usage', usage: { inputTokens: 0, outputTokens: 0 } },
+      {
+        type: 'finish',
+        reason: { kind: 'stop' },
+        replayState: {
+          response: {
+            kind: 'pi-ai',
+            version: 2,
+            api: 'openai-completions',
+            provider: 'deepseek',
+            model: 'deepseek-v4-flash',
+            stopReason: 'stop',
+          },
+          blocks: [{ type: 'text' }],
+        },
+      },
+    ])
+
+    const assembler = new BlockAssembler()
+    for (const chunk of chunks) assembler.push(chunk)
+    expect(assembler.blocks()).toEqual([{ type: 'text', text: '' }])
+    expect(assembler.replayState?.blocks).toEqual([{ type: 'text' }])
+  })
+
+  it('preserves an empty text block when only the terminal message carries it', async () => {
+    const done = assistant({ content: [{ type: 'text', text: '' }] })
+    const chunks = await collect(toStreamChunks(feed(
+      { type: 'start', partial: assistant() },
+      { type: 'done', reason: 'stop', message: done },
+    ), undefined, true))
+    expect(chunks.slice(0, 2)).toEqual([
+      { type: 'block-start', index: 0, blockType: 'text' },
+      { type: 'block-end', index: 0, block: { type: 'text', text: '' } },
+    ])
+  })
+
+  it('holds a later tool call when its partial message reveals an earlier tagged text block', async () => {
+    const tool = { type: 'toolCall' as const, id: 'call-1', name: 'f', arguments: {} }
+    const done = assistant({
+      content: [{ type: 'text', text: '<thinking>plan</thinking>answer' }, tool],
+      stopReason: 'toolUse',
+    })
+    const partial = assistant({ content: [{ type: 'text', text: '<thinking>plan' }, tool] })
+    const chunks = await collect(toStreamChunks(feed(
+      { type: 'toolcall_start', contentIndex: 1, partial },
+      { type: 'toolcall_delta', contentIndex: 1, delta: '{}', partial },
+      { type: 'text_end', contentIndex: 0, content: '<thinking>plan</thinking>answer', partial: done },
+      { type: 'toolcall_end', contentIndex: 1, toolCall: tool, partial: done },
+      { type: 'done', reason: 'toolUse', message: done },
+    ), undefined, true))
+    expect(chunks
+      .filter((chunk): chunk is Extract<StreamChunk, { type: 'block-start' }> => chunk.type === 'block-start')
+      .map(chunk => [chunk.index, chunk.blockType]))
+      .toEqual([[0, 'reasoning'], [1, 'text'], [2, 'tool-call']])
+  })
+
+  it('flushes an unclosed tagged prefix before an in-stream error finish', async () => {
+    const content = '<thinking>partial'
+    const error = assistant({
+      content: [{ type: 'text', text: content }],
+      stopReason: 'error',
+      errorMessage: 'interrupted',
+    })
+    const chunks = await collect(toStreamChunks(feed(
+      { type: 'text_start', contentIndex: 0, partial: assistant() },
+      { type: 'text_delta', contentIndex: 0, delta: content, partial: assistant() },
+      { type: 'error', reason: 'error', error },
+    ), undefined, true))
+    expect(chunks.slice(0, 3)).toEqual([
+      { type: 'block-start', index: 0, blockType: 'text' },
+      { type: 'text-delta', index: 0, text: content },
+      { type: 'block-end', index: 0, block: { type: 'text', text: content } },
+    ])
+    expect(chunks.at(-1)).toMatchObject({ type: 'finish', reason: { kind: 'error' } })
   })
 
   it('maps tool-call events, re-stringifying parsed arguments', async () => {

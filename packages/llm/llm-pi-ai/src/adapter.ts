@@ -344,7 +344,15 @@ export class PiAiAdapter extends LlmAdapter {
         // Harness-owned and therefore win collisions.
         headers: requestHeaders(profile.headers),
       })
-      const iterator = toStreamChunks(events, model.contextWindow)[Symbol.asyncIterator]()
+      // Private OpenAI-compatible gateways can serialize thinking in ordinary
+      // `content` even when their model declaration has no reasoning metadata.
+      // The response parser accepts only a first non-whitespace strict tag and
+      // therefore covers this gateway dialect without inspecting ordinary text
+      // after it starts. A valid response that intentionally begins with one
+      // of those XML tags remains an unavoidable heuristic collision; other
+      // protocols have native reasoning events and do not use this fallback.
+      const parseTextThinking = model.api === 'openai-completions'
+      const iterator = toStreamChunks(events, model.contextWindow, parseTextThinking)[Symbol.asyncIterator]()
       let exhausted = false
       try {
         while (true) {

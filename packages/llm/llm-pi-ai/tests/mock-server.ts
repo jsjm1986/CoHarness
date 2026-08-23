@@ -25,6 +25,15 @@ export const textEvents = [
   '[DONE]',
 ]
 
+/** OpenAI-compatible response that places reasoning in ordinary content. */
+export const taggedThinkingEvents = [
+  '{"choices":[{"delta":{"role":"assistant","content":""},"index":0,"finish_reason":null}]}',
+  '{"choices":[{"delta":{"content":"<thinking>"},"index":0,"finish_reason":null}]}',
+  '{"choices":[{"delta":{"content":"plan</thinking>answer"},"index":0,"finish_reason":null}]}',
+  '{"choices":[{"delta":{},"index":0,"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":3}}',
+  '[DONE]',
+]
+
 /** Local provider stand-in: replays scripted behaviors per request. */
 export async function mockServer(script: {
   status?: number
