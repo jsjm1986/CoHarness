@@ -16,6 +16,12 @@ Render the dormant-route action only when the joined Models snapshot contains an
 
 Admin users see one actionable organization entrypoint instead of a disabled compatibility affordance, and organization rows use an organization ownership tag rather than the personal-surface Custom tag. The shared personal surface remains able to adopt adapter-owned routes, and a future organization facade that legitimately exposes a dormant route will automatically regain the two-action layout. Existing provider editing, credential storage, model discovery, authorization, and runtime projection are unchanged.
 
+## Alternatives considered
+
+**Keep the disabled action for visual parity with personal settings.** The label still implies a supported organization operation and adds no information when the facade has no dormant routes. Hiding it reflects the actual target set.
+
+**Remove the shared adoption path entirely.** Personal settings still need to adopt adapter-owned dormant routes, so deleting that path would break a valid compatibility workflow. The condition stays at the rendered action row.
+
 ## Verification
 
 The shared Models component test asserts that organization scope hides the generic action and keeps the organization declaration action. Styles pin the single-action full-width rule. Gateway Admin `ModelsPage` and model-settings facade tests pass, and the Admin production build succeeds.

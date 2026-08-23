@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-24-organization-model-provider-entrypoint.md
-2026-08-24-organization-model-provider-entrypoint.md: 77323fd21ca952a8067300e0d2dfb1e37ce3be59
-2026-08-24-organization-model-provider-entrypoint.zh.md: 60cf608ff082b2edcdd8ca8b1d9d204ab892b39a
+2026-08-24-organization-model-provider-entrypoint.md: 96cfd6d8abe4746fd47e4ea07439c35b1f03122c
+2026-08-24-organization-model-provider-entrypoint.zh.md: c464a8006b670f3140135cbf85d7ed7a6ca75089
