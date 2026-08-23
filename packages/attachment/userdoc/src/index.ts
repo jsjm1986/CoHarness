@@ -47,7 +47,18 @@ export type {
   UserDocRef,
   UserDocPromptAttachment,
   UserDocPromptRepresentation,
+  UserDocScope,
+  UserDocTransferCapabilities,
+  UserDocTransferCapability,
+  UserDocTransferListResponse,
+  UserDocTransferListedDocument,
   UserDocTarget,
+  UserDocTransferItem,
+  UserDocTransferRequest,
+  UserDocTransferResponse,
+  UserDocTransferScopeSummary,
+  UserDocTransferSelection,
+  UserDocTransferTargetRef,
 } from './types.ts'
 
 declare module '@deepseek-ai/cordis' {

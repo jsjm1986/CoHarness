@@ -14,6 +14,12 @@ The plugin adds a **Documents** button to the sidebar footer (alongside the work
 
 The dialog is 960px wide on viewports at least 768px and a full-width bottom sheet below that. A breadcrumb follows the current folder. The toolbar contains name search, type and sort selects, New Folder, upload, and refresh; uploads and desktop drops land in the current folder. A caption states personal vs project visibility and the filtered document count.
 
+Select one or more rows and choose **Copy to another scope** to create a snapshot in a writable project or in personal documents. The manager shows only safe scope labels; Gateway performs authorization and streaming, resolves target name conflicts without overwriting, and reports each file independently. A successful copy can be attached to the active composer as a durable, non-owning draft.
+
+The composer’s Documents control opens the same manager, so a copy started from the input bar returns to that draft through the manager attach command.
+
+The manager can browse an authorized alternate personal/project source as metadata-only rows. Alternate rows expose selection and copy, while preview, download, move, and delete stay bound to the active runtime store.
+
 Folder rows open the folder and expose Rename and Delete; deletion is confirmed and succeeds only for an empty folder. Document rows show a checkbox, ellipsized name, size, and Add to conversation / Preview / Move / Download / Delete. Add to conversation references the stored document directly, so it does not upload a duplicate. Move supports one document or the current selection and offers the root plus every folder as destinations. Compact layouts wrap document actions below the name so 44px touch targets and long names cannot overlap.
 
 Documents are filtered by name and type (image, PDF, text, other), sorted by date, name, or size, and paged 20 rows; date groups apply only to date sort. Checkboxes select across pages; batch move and delete execute one request per id. The default upload policy has no per-document size limit; the message count and aggregate limits remain deployment policy. Preview supports images, PDFs, and text-based files (text capped at 256 KiB); other types show a download fallback. When Gateway `GET /account/api/context` reports a project, the title uses that project name, the caption states member sharing, and delete confirmation adds the all-members warning; a missing collaboration route keeps personal chrome.
@@ -52,6 +58,6 @@ The manager reads and writes the same `/api/documents` store that conversation a
 - Preview is limited to images, PDFs, and text-based files; other media types show a download fallback.
 - Text previews are capped at 256 KiB; larger text files require download.
 - Deleting a document does not rewrite session history, so previously sent messages that reference the document can no longer retrieve its content.
-- The document manager operates on the current runtime scope; switching between personal and project scope shows only that scope's document workspace.
+- Cross-scope copies are snapshots, not live synchronization; the manager does not offer project-to-project transfers.
 - Listings have no server-side pagination; each current folder is returned in one response and documents are paged in the browser.
 - Folder deletion is empty-only; the UI does not recursively delete a folder tree.

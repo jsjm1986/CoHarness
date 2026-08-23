@@ -10,6 +10,7 @@ import type {
   StoredConversation,
 } from '../src/postgres/conversation-repository.ts'
 import { GatewayPrincipalSigner, PRINCIPAL_HEADER } from '../src/principal.ts'
+import type { DocumentTransferResponse } from '../src/document-transfer.ts'
 import { createRuntimeApiHandler } from '../src/runtime-api.ts'
 
 const ORGANIZATION_ID = '11d4a86c-4624-44fa-b69f-7e3f48cc5a04'
@@ -158,6 +159,7 @@ function fixture() {
   })
   return {
     append,
+    deps,
     handler: createRuntimeApiHandler(deps),
     issuePrincipal,
     modes,
@@ -376,6 +378,55 @@ describe('runtime session creation authorization', () => {
       body: { error: 'forbidden' },
     })
     expect(runtime.append).not.toHaveBeenCalled()
+  })
+})
+
+describe('runtime document transfer authorization', () => {
+  it('requires the current principal and delegates only validated runtime metadata', async () => {
+    const runtime = fixture()
+    const transfer = vi.fn(async (input: { payload: unknown }): Promise<DocumentTransferResponse> => {
+      // The callback only records that the validated payload reached it.
+      void input
+      return {
+        version: 1,
+        transferId: 'transfer-1',
+        source: { kind: 'personal', label: 'Personal documents' },
+        target: { kind: 'project', label: 'Shared' },
+        items: [],
+      }
+    })
+    const dependencies = runtime.deps as RuntimeDependencies
+    dependencies.documentTransfer = transfer
+    const noPrincipal = await request(runtime.handler, '/internal/runtime/documents/transfer', {
+      body: { version: 1 },
+    })
+    expect(noPrincipal).toMatchObject({ handled: true, status: 403 })
+    const accepted = await request(runtime.handler, '/internal/runtime/documents/transfer', {
+      principal: runtime.issuePrincipal(CREATOR_ID),
+      body: {
+        version: 1,
+        source: { kind: 'project', projectId: PROJECT_ID },
+        target: { kind: 'personal' },
+        documents: [{ docId: 'report.txt' }],
+      },
+    })
+    expect(accepted).toMatchObject({ handled: true, status: 200, body: { transferId: 'transfer-1' } })
+    expect(transfer).toHaveBeenCalledWith(expect.objectContaining({
+      payload: expect.objectContaining({ version: 1 }),
+    }))
+
+    const list = vi.fn(async () => ({
+      version: 1 as const,
+      scope: { kind: 'project' as const, label: 'Shared' },
+      documents: [],
+    }))
+    dependencies.documentTransferList = list
+    const listed = await request(runtime.handler, '/internal/runtime/documents/transfer/list', {
+      principal: runtime.issuePrincipal(CREATOR_ID),
+      body: { version: 1, scope: { kind: 'project', projectId: PROJECT_ID } },
+    })
+    expect(listed).toMatchObject({ handled: true, status: 200, body: { scope: { label: 'Shared' } } })
+    expect(list).toHaveBeenCalledOnce()
   })
 })
 
