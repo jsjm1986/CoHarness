@@ -176,6 +176,7 @@ describe('DocumentsModal', () => {
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
     expect(screen.getByRole('dialog', { name: t('modal.title') })).toBe(manager)
     expect(screen.getByText(t('scope.viewing', { name: 'Compiler' }))).toBeTruthy()
+    expect(screen.getByRole('button', { name: t('modal.upload') }).hasAttribute('disabled')).toBe(true)
     expect(screen.queryByRole('button', { name: t('action.previewNamed', { name: 'report.pdf' }) })).toBeNull()
   })
 

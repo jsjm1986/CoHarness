@@ -1210,7 +1210,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
                     className={css.upload}
                     type="button"
                     variant="primary"
-                    disabled={busy}
+                    disabled={busy || writeLocked}
                     icon={<IconPlusOutline16 size={16} />}
                     onClick={() => fileInputRef.current?.click()}
                   >
