@@ -36,6 +36,7 @@
       - listitem:
         - checkbox "f-01.txt"
         - text: f-01.txt 21 B
+        - button "Add f-01.txt to conversation": Add to conversation
         - button "Preview f-01.txt": Preview
         - button "Move f-01.txt": Move
         - link "Download f-01.txt":

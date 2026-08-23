@@ -1,6 +1,6 @@
 # @deepseek-ai/dsh-client-ui-documents
 
-Workspace document manager for the CoHarness Web UI. Organize, preview, upload, move, download, and delete documents shared with the conversation input box.
+Workspace document manager for the CoHarness Web UI. Organize, preview, upload, move, download, delete, and add stored documents to the conversation input box.
 
 English | [中文](README.zh.md)
 
@@ -14,7 +14,7 @@ The plugin adds a **Documents** button to the sidebar footer (alongside the work
 
 The dialog is 960px wide on viewports at least 768px and a full-width bottom sheet below that. A breadcrumb follows the current folder. The toolbar contains name search, type and sort selects, New Folder, upload, and refresh; uploads and desktop drops land in the current folder. A caption states personal vs project visibility and the filtered document count.
 
-Folder rows open the folder and expose Rename and Delete; deletion is confirmed and succeeds only for an empty folder. Document rows show a checkbox, ellipsized name, size, and Preview / Move / Download / Delete. Move supports one document or the current selection and offers the root plus every folder as destinations. Compact layouts wrap document actions below the name so 44px touch targets and long names cannot overlap.
+Folder rows open the folder and expose Rename and Delete; deletion is confirmed and succeeds only for an empty folder. Document rows show a checkbox, ellipsized name, size, and Add to conversation / Preview / Move / Download / Delete. Add to conversation references the stored document directly, so it does not upload a duplicate. Move supports one document or the current selection and offers the root plus every folder as destinations. Compact layouts wrap document actions below the name so 44px touch targets and long names cannot overlap.
 
 Documents are filtered by name and type (image, PDF, text, other), sorted by date, name, or size, and paged 20 rows; date groups apply only to date sort. Checkboxes select across pages; batch move and delete execute one request per id. The default upload policy has no per-document size limit; the message count and aggregate limits remain deployment policy. Preview supports images, PDFs, and text-based files (text capped at 256 KiB); other types show a download fallback. When Gateway `GET /account/api/context` reports a project, the title uses that project name, the caption states member sharing, and delete confirmation adds the all-members warning; a missing collaboration route keeps personal chrome.
 
@@ -37,7 +37,7 @@ MIT
 
 #### What the model sees
 
-The browser shows a Documents button in the sidebar footer. Opening it presents the active scope's document folders through `/api/documents`, with breadcrumb navigation, folder management, name and type filters, sort, 20-row pages, preview, move, download, delete, multi-selection, and upload into the current folder.
+The browser shows a Documents button in the sidebar footer. Opening it presents the active scope's document folders through `/api/documents`, with breadcrumb navigation, folder management, name and type filters, sort, 20-row pages, add-to-conversation, preview, move, download, delete, multi-selection, and upload into the current folder. Adding a row places its existing durable document id into the current conversation composer and closes the manager after acceptance.
 
 #### Token effect
 
