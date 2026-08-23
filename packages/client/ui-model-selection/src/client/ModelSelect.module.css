@@ -112,6 +112,10 @@
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 }
 
+.back {
+  display: none;
+}
+
 .status,
 .empty {
   padding: 10px;
@@ -289,20 +293,122 @@
   max-width: none;
 }
 
+/* Keep a recognizable model label on the narrowest phones. The trailing row
+   may wrap, but collapsing the seat to its chevron makes the current route
+   impossible to identify without opening the picker. */
+@media (max-width: 359px) {
+  .root {
+    min-width: 64px;
+  }
+
+  .triggerLabel {
+    min-width: 32px;
+  }
+
+  :global([data-viewport='compact']) .trigger {
+    justify-content: flex-start;
+    text-align: left;
+  }
+}
+
 :global([data-viewport='compact']) .trigger {
   height: var(--dsw-touch-target);
+  max-width: 100%;
+  font: var(--dsw-mobile-font-secondary);
 }
 
 :global([data-viewport='compact']) .menu {
-  left: 0;
-  right: auto;
-  width: min(calc(100vw - 24px), 360px);
-  max-width: min(100%, calc(100vw - 24px));
-  max-height: min(40dvh, calc(var(--dsw-viewport-height, 100dvh) - 160px));
+  position: fixed;
+  right: max(var(--dsw-mobile-sheet-edge), var(--dsw-safe-right));
+  bottom: var(--dsw-mobile-sheet-bottom);
+  left: max(var(--dsw-mobile-sheet-edge), var(--dsw-safe-left));
+  width: auto;
+  max-width: none;
+  max-height: var(--dsw-mobile-sheet-max-height);
+  border-radius: var(--dsw-mobile-sheet-radius);
+  box-shadow: var(--dsw-shadow-lv3);
+  z-index: 1091;
+  animation: mobile-model-sheet-in var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+}
+
+@media (max-width: 767px) {
+  .menu::before {
+    content: '';
+    display: block;
+    align-self: center;
+    flex: none;
+    width: 36px;
+    height: 4px;
+    margin: 2px auto 6px;
+    border-radius: var(--dsw-radius-full);
+    background: var(--dsw-alias-label-caption);
+    opacity: 0.7;
+  }
+
+  .back {
+    display: flex;
+    align-items: center;
+    gap: var(--dsw-space-1);
+    flex: none;
+    min-height: var(--dsw-touch-target);
+    padding: 0 var(--dsw-space-2);
+    border: none;
+    border-radius: var(--dsw-radius-md);
+    background: transparent;
+    color: var(--dsw-alias-label-secondary);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .back:hover,
+  .back:focus-visible {
+    background: var(--dsw-alias-interactive-bg-hover);
+    color: var(--dsw-alias-label-primary);
+  }
+
+  .back:focus-visible {
+    outline: 2px solid var(--dsw-alias-border-l3);
+    outline-offset: -2px;
+  }
+
+  .backTitle {
+    min-width: 0;
+    margin-left: auto;
+    overflow: hidden;
+    color: var(--dsw-alias-label-tertiary);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+@keyframes mobile-model-sheet-in {
+  from { opacity: 0; transform: translateY(10px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu {
+    animation: none;
+  }
 }
 
 :global([data-viewport='compact']) .option,
 :global([data-viewport='compact']) .cell {
   min-height: var(--dsw-touch-target);
   height: auto;
+}
+
+@media (max-width: 767px) {
+  :global([data-viewport='compact']) .option {
+    min-height: 56px;
+    padding-block: var(--dsw-space-2);
+  }
+
+  :global([data-viewport='compact']) .modelName {
+    font: var(--dsw-mobile-font-body);
+  }
+
+  :global([data-viewport='compact']) .description {
+    font: var(--dsw-mobile-font-caption);
+  }
 }

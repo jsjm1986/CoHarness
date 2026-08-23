@@ -13,6 +13,7 @@ import type { CSSProperties, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import clsx from 'clsx'
 import { IconCheckOutline16 } from './icons/index.tsx'
+import { MobileSheetBackdrop } from './MobileSheetBackdrop.tsx'
 import { usePointerGrace } from './pointer-grace.ts'
 import css from './Menu.module.css'
 
@@ -284,6 +285,12 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
     </div>
   )
 
+  // The phone presenter turns every anchored menu into one shared bottom
+  // sheet.  Keep the dismissal surface beside the list (and in the same
+  // portal when the list is portalled) so a tap outside the sheet never lands
+  // on the composer or the page underneath before the owner closes it.
+  const mobileScrim = open ? <MobileSheetBackdrop onClose={onClose} /> : null
+
   // Pointer-leave dismissal watches the WRAPPER, not the list: React's
   // enter/leave traversal runs over the React tree, so trigger and portaled
   // list are one region here. Aiming back at the trigger, or crossing the 4px
@@ -296,7 +303,9 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
       onPointerLeave={closeOnPointerLeave ? () => { if (open) armClose() } : undefined}
     >
       {anchor}
-      {portal ? (list !== false && createPortal(list, document.body)) : list}
+      {portal
+        ? (list !== false && createPortal(<>{mobileScrim}{list}</>, document.body))
+        : <>{mobileScrim}{list}</>}
     </span>
   )
 }

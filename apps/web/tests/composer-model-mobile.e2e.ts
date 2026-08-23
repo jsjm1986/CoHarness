@@ -42,6 +42,8 @@ interface ComposerMetrics {
   modelLabelOverflow: string
   modelLabelWhiteSpace: string
   modelLabelTextOverflow: string
+  modelLabelWidth: number
+  trailingWrapped: boolean
   toolControlRight: number
 }
 
@@ -75,9 +77,10 @@ function measureComposer(page: Page): Promise<ComposerMetrics> {
         height: box.height,
       }
     }
-    const toolControlRight = [...tools.querySelectorAll<HTMLButtonElement | HTMLSelectElement>('button, select')]
+    const toolControls = [...tools.querySelectorAll<HTMLButtonElement | HTMLSelectElement>('button, select')]
       .map(control => ({ control, box: control.getBoundingClientRect() }))
       .filter(({ box }) => box.width > 0 && box.height > 0)
+    const toolControlRight = toolControls
       .reduce((right, { box }) => Math.max(right, box.right), tools.getBoundingClientRect().left)
     return {
       card: rect(card),
@@ -91,6 +94,8 @@ function measureComposer(page: Page): Promise<ComposerMetrics> {
       modelLabelOverflow: getComputedStyle(modelLabel).overflow,
       modelLabelWhiteSpace: getComputedStyle(modelLabel).whiteSpace,
       modelLabelTextOverflow: getComputedStyle(modelLabel).textOverflow,
+      modelLabelWidth: modelLabel.getBoundingClientRect().width,
+      trailingWrapped: trailing.getBoundingClientRect().top >= tools.getBoundingClientRect().bottom - 1,
       toolControlRight,
     }
   }, MODEL_ID)
@@ -100,11 +105,12 @@ function renderGeometry(rows: readonly { width: number; metrics: ComposerMetrics
   const lines = [
     '# Mobile composer model seat',
     '',
-    '| viewport | tool controls before model | model before Send | row inside card | effort display | label overflow | label white-space | label text overflow |',
-    '| --- | --- | --- | --- | --- | --- | --- | --- |',
+    '| viewport | tool controls before model | model before Send | trailing layout | row inside card | effort display | label overflow | label white-space | label text overflow | label width |',
+    '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
   ]
   for (const { width, metrics } of rows) {
-    lines.push(`| ${String(width)}px | ${String(metrics.toolControlRight <= metrics.model.left + 1)} | ${String(metrics.model.right <= metrics.send.left + 1)} | ${String(metrics.row.left >= metrics.card.left - 1 && metrics.row.right <= metrics.card.right + 1)} | ${metrics.modelEffortDisplay} | ${metrics.modelLabelOverflow} | ${metrics.modelLabelWhiteSpace} | ${metrics.modelLabelTextOverflow} |`)
+    const toolsBeforeModel = metrics.toolControlRight <= metrics.model.left + 1 || metrics.trailingWrapped
+    lines.push(`| ${String(width)}px | ${String(toolsBeforeModel)} | ${String(metrics.model.right <= metrics.send.left + 1)} | ${metrics.trailingWrapped ? 'wrapped' : 'same-line'} | ${String(metrics.row.left >= metrics.card.left - 1 && metrics.row.right <= metrics.card.right + 1)} | ${metrics.modelEffortDisplay} | ${metrics.modelLabelOverflow} | ${metrics.modelLabelWhiteSpace} | ${metrics.modelLabelTextOverflow} | ${String(Math.round(metrics.modelLabelWidth))}px |`)
   }
   return lines.join('\n')
 }
@@ -140,7 +146,10 @@ describe('web e2e: mobile composer model label geometry', () => {
     const trigger = page.getByRole('button', { name: /^选择模型/ })
     await trigger.waitFor({ timeout: 15_000 })
     await trigger.click()
-    await page.getByRole('menuitem', { name: /模型/ }).click()
+    // Compact mode opens the model pane directly; wide mode keeps the
+    // settings-like root row and requires one drill-in.
+    const modelMenuItem = page.getByRole('menuitem', { name: /模型/ })
+    if (await modelMenuItem.count() > 0) await modelMenuItem.click()
     await page.getByRole('menuitemradio', { name: MODEL_NAME }).click()
     await page.locator(`button[title^="${MODEL_NAME}"][aria-haspopup="menu"]`).waitFor({ timeout: 15_000 })
   }, 120_000)
@@ -152,8 +161,8 @@ describe('web e2e: mobile composer model label geometry', () => {
 
   it('keeps the model seat between the tools and send controls at phone widths', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-composer-model-mobile'))
-    for (const width of [390, 375]) {
-      await page.setViewportSize({ width, height: 844 })
+    for (const width of [390, 375, 320]) {
+      await page.setViewportSize({ width, height: width === 320 ? 568 : 844 })
       await page.locator('[data-composer-card]').evaluate(async () => {
         await new Promise<void>(resolve => requestAnimationFrame(() => { resolve() }))
       })
@@ -161,8 +170,12 @@ describe('web e2e: mobile composer model label geometry', () => {
       const tolerance = 1
 
       expect(metrics.modelTitle?.startsWith(MODEL_NAME)).toBe(true)
-      expect(metrics.tools.right).toBeLessThanOrEqual(metrics.trailing.left + tolerance)
-      expect(metrics.toolControlRight).toBeLessThanOrEqual(metrics.model.left + tolerance)
+      expect(
+        metrics.tools.right <= metrics.trailing.left + tolerance || metrics.trailingWrapped,
+      ).toBe(true)
+      expect(
+        metrics.toolControlRight <= metrics.model.left + tolerance || metrics.trailingWrapped,
+      ).toBe(true)
       expect(metrics.model.right).toBeLessThanOrEqual(metrics.send.left + tolerance)
       expect(metrics.row.left).toBeGreaterThanOrEqual(metrics.card.left - tolerance)
       expect(metrics.row.right).toBeLessThanOrEqual(metrics.card.right + tolerance)
@@ -171,6 +184,7 @@ describe('web e2e: mobile composer model label geometry', () => {
       expect(metrics.modelLabelOverflow).toBe('hidden')
       expect(metrics.modelLabelWhiteSpace).toBe('nowrap')
       expect(metrics.modelLabelTextOverflow).toBe('ellipsis')
+      expect(metrics.modelLabelWidth, `viewport ${String(width)}`).toBeGreaterThanOrEqual(32)
     }
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)
@@ -178,8 +192,8 @@ describe('web e2e: mobile composer model label geometry', () => {
   it.skipIf(MODE === 'record')('matches the committed mobile geometry golden', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-composer-model-mobile-golden'))
     const rows: { width: number; metrics: ComposerMetrics }[] = []
-    for (const width of [390, 375]) {
-      await page.setViewportSize({ width, height: 844 })
+    for (const width of [390, 375, 320]) {
+      await page.setViewportSize({ width, height: width === 320 ? 568 : 844 })
       await page.locator('[data-composer-card]').evaluate(async () => {
         await new Promise<void>(resolve => requestAnimationFrame(() => { resolve() }))
       })

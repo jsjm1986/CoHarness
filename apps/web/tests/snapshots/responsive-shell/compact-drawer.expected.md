@@ -13,6 +13,9 @@
 - button "Add workspace":
   - img
 - tree "Sessions": No sessions yet
+- button "Documents":
+  - img
+  - text: Documents
 - button "Settings":
   - img
   - text: Settings

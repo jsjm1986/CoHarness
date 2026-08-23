@@ -12,6 +12,10 @@ We recommend using an agent to explore the codebase and understand its architect
 
 There is no privileged core to patch: you extend dsh by mounting a plugin beside the others, and registrations are effects that unwind when their plugin unloads.
 
+## Runtime surface boundaries
+
+"Everything is a plugin" applies to replaceable runtime product capabilities. The bootstrap loader, browser boot kernel, protocol and utility libraries, statically linked UI primitives, and Python/Native platform carriers remain infrastructure outside the runtime plugin tree. `pnpm run verify-plugin-surfaces` reports this partition from package manifests and composition files without adding runtime metadata or dispatch cost.
+
 ## Profiles and bundles
 
 A running `dsh` is a plugin tree composed at boot from ordered layers.

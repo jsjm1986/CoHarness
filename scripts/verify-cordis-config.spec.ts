@@ -51,8 +51,10 @@ describe('workspace Bundle discovery and product dependency closures', () => {
     try {
       const bundleDir = join(fixture, 'packages/subagent/example')
       const plainDir = join(fixture, 'packages/bundle/plain')
+      const externalDir = join(fixture, 'plugins/external-example')
       mkdirSync(bundleDir, { recursive: true })
       mkdirSync(plainDir, { recursive: true })
+      mkdirSync(externalDir, { recursive: true })
       writeFileSync(join(bundleDir, 'package.json'), JSON.stringify({
         name: '@deepseek-ai/dsh-subagent-example',
         dsh: { bundle: { patch: './cordis.patch.yml' } },
@@ -60,9 +62,14 @@ describe('workspace Bundle discovery and product dependency closures', () => {
       writeFileSync(join(plainDir, 'package.json'), JSON.stringify({
         name: '@deepseek-ai/dsh-plain',
       }))
+      writeFileSync(join(externalDir, 'package.json'), JSON.stringify({
+        name: '@deepseek-ai/dsh-external-example',
+        dsh: { bundle: { patch: './cordis.patch.yml' } },
+      }))
 
       expect(bundleManifestPaths(fixture)).toEqual([
         'packages/subagent/example/package.json',
+        'plugins/external-example/package.json',
       ])
     } finally {
       rmSync(fixture, { recursive: true, force: true })
@@ -84,5 +91,11 @@ describe('workspace Bundle discovery and product dependency closures', () => {
     ])).toEqual([
       `${file}: @deepseek-ai/dsh-missing-plugin must be declared in ${manifestPath} dependencies`,
     ])
+    expect(bundlePluginDependencyErrors('plugins/example/package.json', {
+      name: '@deepseek-ai/dsh-external',
+      peerDependencies: { '@deepseek-ai/dsh-peer-plugin': '*' },
+    }, [
+      { file: 'plugins/example/cordis.patch.yml', name: '@deepseek-ai/dsh-peer-plugin' },
+    ])).toEqual([])
   })
 })

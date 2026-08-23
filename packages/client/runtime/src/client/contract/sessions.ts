@@ -12,7 +12,7 @@ import type {
   RpcResult, SessionId, SubagentAddress,
 } from '@deepseek-ai/dsh-api-remotes/client'
 import type { HostObservable, SessionMaybeProvideInfo } from '@deepseek-ai/dsh-client-ui-slots'
-import type { AgentContext } from '../agents/scope.ts'
+import type { AgentContext } from '../scope.ts'
 import type { SessionSearchResultItem } from '../sessions/manager.ts'
 import type {
   SessionBinding, SessionListState, SessionProvideDescriptor,
@@ -20,7 +20,7 @@ import type {
 import type { SessionFace } from './session.ts'
 import type { ObservableSnapshot } from './store.ts'
 
-export type { AgentContext } from '../agents/scope.ts'
+export type { AgentContext } from '../scope.ts'
 
 /** The sessions-service face injected as `ctx.sessions`. */
 export interface ISessions {

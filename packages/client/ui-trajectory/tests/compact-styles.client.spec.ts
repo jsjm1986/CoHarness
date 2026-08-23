@@ -31,6 +31,7 @@ describe('trajectory compact chrome', () => {
   it('grows the timeline earlier-history and table close controls on compact', () => {
     const timeline = load('../src/client/TrajectoryTimeline.module.css')
     const table = load('../src/client/TrajectoryTable.module.css')
+    const views = load('../src/client/views.module.css')
     expect(timeline).toContain("[data-viewport='compact']")
     expect(timeline).toContain('.earlierHistory')
     expect(timeline).toContain('var(--dsw-touch-target)')
@@ -40,5 +41,7 @@ describe('trajectory compact chrome', () => {
     expect(table).toContain('@media (max-width: 767px)')
     expect(table).toContain('width: 100%')
     expect(table).toContain('white-space: normal')
+    expect(views).toContain('[data-trajectory-details]')
+    expect(views).toContain('z-index: 8')
   })
 })

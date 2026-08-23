@@ -6,6 +6,10 @@ import { Context } from '@deepseek-ai/cordis'
 import CredentialProvider, {
   credentialRef,
   type CredentialInfo,
+  type CredentialKey,
+  type CredentialRecord,
+  type CredentialRecordEntry,
+  type CredentialRecordInfo,
   type CredentialRef,
   type ResolvedCredential,
 } from '@deepseek-ai/dsh-credentials'
@@ -24,6 +28,7 @@ afterEach(() => {
 
 class MemoryCredentials extends CredentialProvider {
   private readonly values = new Map<CredentialRef, string>()
+  private readonly records = new Map<CredentialKey, CredentialRecord>()
 
   constructor(ctx: Context, seed: Record<string, string>) {
     super(ctx)
@@ -47,6 +52,38 @@ class MemoryCredentials extends CredentialProvider {
 
   protected override unsetOwned(ref: CredentialRef): Promise<void> {
     this.values.delete(ref)
+    return Promise.resolve()
+  }
+
+  override readRecord(key: CredentialKey): Promise<CredentialRecord | undefined> {
+    return Promise.resolve(this.records.get(key))
+  }
+
+  override describeRecord(key: CredentialKey): Promise<CredentialRecordInfo> {
+    const record = this.records.get(key)
+    return Promise.resolve(record === undefined
+      ? { configured: false, writable: true }
+      : { configured: true, kind: record.kind, writable: true })
+  }
+
+  override listRecords(): Promise<readonly CredentialRecordEntry[]> {
+    return Promise.resolve([...this.records].map(([key, record]) => ({ key, kind: record.kind })))
+  }
+
+  override async modifyRecord(
+    key: CredentialKey,
+    mutate: (current: CredentialRecord | undefined) => Promise<CredentialRecord | undefined>,
+  ): Promise<CredentialRecord | undefined> {
+    const current = this.records.get(key)
+    const next = await mutate(current)
+    if (next === undefined) return current
+    this.records.set(key, next)
+    this.ctx.emit('credentials/record-updated', key)
+    return next
+  }
+
+  override deleteRecord(key: CredentialKey): Promise<void> {
+    if (this.records.delete(key)) this.ctx.emit('credentials/record-updated', key)
     return Promise.resolve()
   }
 }

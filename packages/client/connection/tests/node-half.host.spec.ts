@@ -115,6 +115,20 @@ describe('connection node half', () => {
     expect(routes).toHaveLength(0)
   })
 
+  it('keeps the default carrier cap compatible with the shipped image aggregate', async () => {
+    const ctx = new Context()
+    const routes: WebRoute[] = []
+    ctx.provide('webServer', fakeHttpServer(routes, []) as WebServer)
+    ctx.provide('attachments', {
+      imageLimits: { maxMessageImageBytes: 200 * 1024 * 1024 },
+    } as AttachmentStore)
+    ctx.provide('apiProxy', {} as ApiProxy)
+    const fiber = ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+    expect(routes).toHaveLength(1)
+    await fiber.dispose()
+  })
+
   it('fails the load on a trustedHosts entry that is not a bare authority', async () => {
     const routes: WebRoute[] = []
     const upgrades: WebUpgradeRoute[] = []

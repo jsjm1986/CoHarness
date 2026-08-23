@@ -19,7 +19,7 @@ import clsx from 'clsx'
 import type { ModelReasoningEffort, ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
 import {
   IconCheckOutline16, IconChevronDownOutline14, IconChevronRightOutline14,
-  IconWarningOutline16, Toast,
+  IconChevronLeftOutline14, MobileSheetBackdrop, IconWarningOutline16, Toast, useMediaQuery,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ModelSelectInjected } from './slots.ts'
@@ -63,6 +63,7 @@ export function ModelSelect(
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
   const id = useId()
+  const phone = useMediaQuery('(max-width: 767px)')
 
   const choices = useMemo(() => state.groups.flatMap(group =>
     group.models.map(model => ({
@@ -127,7 +128,10 @@ export function ModelSelect(
   if (!available) return null
 
   const show = (): void => {
-    setPane('root')
+    // Phones have no room for a two-step settings-like root row. Open the
+    // actual model list first; effort remains a secondary drill-in from the
+    // model trigger when it is available.
+    setPane(phone ? 'model' : 'root')
     setOpen(true)
     reload()
   }
@@ -150,7 +154,7 @@ export function ModelSelect(
     if (event.key === 'Escape' && open) {
       event.preventDefault()
       // Escape backs out of a drilled pane first, then closes.
-      if (pane !== 'root') setPane('root')
+      if (pane !== 'root' && !(phone && pane === 'model')) setPane('root')
       else close(true)
       return
     }
@@ -217,11 +221,12 @@ export function ModelSelect(
   }
 
   return (
-    <div ref={rootRef} className={css.root} onKeyDown={onRootKeyDown} onBlur={onBlur}>
+    <div ref={rootRef} className={css.root} data-model-select="" onKeyDown={onRootKeyDown} onBlur={onBlur}>
       <button
         ref={triggerRef}
         type="button"
         className={css.trigger}
+        data-model-trigger=""
         aria-label={triggerAria}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -242,124 +247,139 @@ export function ModelSelect(
       </button>
 
       {open && (
-        <div
-          id={`${id}-menu`}
-          className={css.menu}
-          role="menu"
-          aria-label={t('menu.aria')}
-          aria-busy={state.status === 'loading' || busy}
-        >
-          {pane === 'root' && (
-            <>
-              <button ref={itemRef()} type="button" role="menuitem" className={css.cell} onClick={() => { setPane('model') }}>
-                <span className={css.cellLabel}>{t('menu.model')}</span>
-                <span className={css.cellValue}>{modelLabel}</span>
-                <IconChevronRightOutline14 className={css.cellChevron} />
+        <>
+          <MobileSheetBackdrop onClose={() => { close(true) }} />
+          <div
+            id={`${id}-menu`}
+            className={css.menu}
+            role="menu"
+            aria-label={t('menu.aria')}
+            aria-busy={state.status === 'loading' || busy}
+          >
+            {phone && pane !== 'root' && (
+              <button
+                type="button"
+                className={css.back}
+                aria-label={t('menu.back')}
+                onClick={() => { setPane('root') }}
+              >
+                <IconChevronLeftOutline14 size={16} />
+                <span>{t('menu.back')}</span>
+                <span className={css.backTitle}>{pane === 'model' ? t('menu.model') : t('menu.effort')}</span>
               </button>
-              {reasoning !== undefined && (
-                <button ref={itemRef()} type="button" role="menuitem" className={css.cell} onClick={() => { setPane('effort') }}>
-                  <span className={css.cellLabel}>{t('menu.effort')}</span>
-                  <span className={css.cellValue}>{effortLabel}</span>
+            )}
+            {pane === 'root' && (
+              <>
+                <button ref={itemRef()} type="button" role="menuitem" className={css.cell} onClick={() => { setPane('model') }}>
+                  <span className={css.cellLabel}>{t('menu.model')}</span>
+                  <span className={css.cellValue}>{modelLabel}</span>
                   <IconChevronRightOutline14 className={css.cellChevron} />
                 </button>
-              )}
-            </>
-          )}
-
-          {pane === 'model' && (
-            <>
-              {state.status === 'loading' && (
-                <div className={css.status}>{t('status.loading')}</div>
-              )}
-              {state.error !== null && lastActionRef.current === 'load' && (
-                <div className={css.error}>
-                  <span>{t('error.action', { message: state.error })}</span>
-                  <button type="button" className={css.retry} onClick={reload}>{t('retry')}</button>
-                </div>
-              )}
-              {state.failures.map(failure => (
-                <div className={css.warning} key={failure.id}>
-                  <span>{t('warning.groupLoad', { name: failure.name, message: failure.message })}</span>
-                  <button type="button" className={css.retry} onClick={reload}>{t('retry')}</button>
-                </div>
-              ))}
-              <div className={clsx(css.groups, 'scrollable')}>
-                {state.groups.map((group) => {
-                  const headingId = `${id}-${group.id}`
-                  return (
-                    <section role="group" aria-labelledby={headingId} className={css.group} key={group.id}>
-                      <div className={css.groupTitle} id={headingId}>{group.name}</div>
-                      {group.models.map((model) => {
-                        const selected = state.current?.provider === group.id && state.current.model === model.id
-                        return (
-                          <button
-                            ref={itemRef()}
-                            type="button"
-                            role="menuitemradio"
-                            aria-checked={selected}
-                            className={clsx(css.option, selected && css.selected)}
-                            key={model.id}
-                            title={model.name}
-                            disabled={busy}
-                            onClick={() => { choose({ provider: group.id, model: model.id }) }}
-                          >
-                            <span className={css.optionCopy}>
-                              <span className={css.modelName}>{model.name}</span>
-                              {model.description !== undefined && (
-                                <span className={css.description}>{model.description}</span>
-                              )}
-                            </span>
-                            <span className={css.check}>
-                              {selected ? <IconCheckOutline16 /> : null}
-                            </span>
-                          </button>
-                        )
-                      })}
-                    </section>
-                  )
-                })}
-              </div>
-              {state.status === 'ready' && choices.length === 0 && (
-                <div className={css.empty}>{t('empty.models')}</div>
-              )}
-            </>
-          )}
-
-          {pane === 'effort' && (
-            <>
-              {state.error !== null && lastActionRef.current === 'load' && (
-                <div className={css.error}>
-                  <span>{t('error.action', { message: state.error })}</span>
-                  <button type="button" className={css.retry} onClick={reload}>{t('action.reload')}</button>
-                </div>
-              )}
-              {effortChoices.length === 0
-                ? <div className={css.empty}>{t('empty.efforts')}</div>
-                : effortChoices.map(level => (
-                  <button
-                    ref={itemRef()}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={effectiveEffort === level.effort}
-                    className={clsx(css.option, effectiveEffort === level.effort && css.selected)}
-                    key={level.key}
-                    disabled={busy}
-                    onClick={() => { chooseEffort(level.effort) }}
-                  >
-                    <span className={css.optionCopy}>
-                      <span className={css.modelName}>{level.label}</span>
-                      {level.description !== undefined && (
-                        <span className={css.description}>{level.description}</span>
-                      )}
-                    </span>
-                    <span className={css.check}>
-                      {effectiveEffort === level.effort ? <IconCheckOutline16 /> : null}
-                    </span>
+                {reasoning !== undefined && (
+                  <button ref={itemRef()} type="button" role="menuitem" className={css.cell} onClick={() => { setPane('effort') }}>
+                    <span className={css.cellLabel}>{t('menu.effort')}</span>
+                    <span className={css.cellValue}>{effortLabel}</span>
+                    <IconChevronRightOutline14 className={css.cellChevron} />
                   </button>
+                )}
+              </>
+            )}
+
+            {pane === 'model' && (
+              <>
+                {state.status === 'loading' && (
+                  <div className={css.status}>{t('status.loading')}</div>
+                )}
+                {state.error !== null && lastActionRef.current === 'load' && (
+                  <div className={css.error}>
+                    <span>{t('error.action', { message: state.error })}</span>
+                    <button type="button" className={css.retry} onClick={reload}>{t('retry')}</button>
+                  </div>
+                )}
+                {state.failures.map(failure => (
+                  <div className={css.warning} key={failure.id}>
+                    <span>{t('warning.groupLoad', { name: failure.name, message: failure.message })}</span>
+                    <button type="button" className={css.retry} onClick={reload}>{t('retry')}</button>
+                  </div>
                 ))}
-            </>
-          )}
-        </div>
+                <div className={clsx(css.groups, 'scrollable')}>
+                  {state.groups.map((group) => {
+                    const headingId = `${id}-${group.id}`
+                    return (
+                      <section role="group" aria-labelledby={headingId} className={css.group} key={group.id}>
+                        <div className={css.groupTitle} id={headingId}>{group.name}</div>
+                        {group.models.map((model) => {
+                          const selected = state.current?.provider === group.id && state.current.model === model.id
+                          return (
+                            <button
+                              ref={itemRef()}
+                              type="button"
+                              role="menuitemradio"
+                              aria-checked={selected}
+                              className={clsx(css.option, selected && css.selected)}
+                              key={model.id}
+                              title={model.name}
+                              disabled={busy}
+                              onClick={() => { choose({ provider: group.id, model: model.id }) }}
+                            >
+                              <span className={css.optionCopy}>
+                                <span className={css.modelName}>{model.name}</span>
+                                {model.description !== undefined && (
+                                  <span className={css.description}>{model.description}</span>
+                                )}
+                              </span>
+                              <span className={css.check}>
+                                {selected ? <IconCheckOutline16 /> : null}
+                              </span>
+                            </button>
+                          )
+                        })}
+                      </section>
+                    )
+                  })}
+                </div>
+                {state.status === 'ready' && choices.length === 0 && (
+                  <div className={css.empty}>{t('empty.models')}</div>
+                )}
+              </>
+            )}
+
+            {pane === 'effort' && (
+              <>
+                {state.error !== null && lastActionRef.current === 'load' && (
+                  <div className={css.error}>
+                    <span>{t('error.action', { message: state.error })}</span>
+                    <button type="button" className={css.retry} onClick={reload}>{t('action.reload')}</button>
+                  </div>
+                )}
+                {effortChoices.length === 0
+                  ? <div className={css.empty}>{t('empty.efforts')}</div>
+                  : effortChoices.map(level => (
+                    <button
+                      ref={itemRef()}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={effectiveEffort === level.effort}
+                      className={clsx(css.option, effectiveEffort === level.effort && css.selected)}
+                      key={level.key}
+                      disabled={busy}
+                      onClick={() => { chooseEffort(level.effort) }}
+                    >
+                      <span className={css.optionCopy}>
+                        <span className={css.modelName}>{level.label}</span>
+                        {level.description !== undefined && (
+                          <span className={css.description}>{level.description}</span>
+                        )}
+                      </span>
+                      <span className={css.check}>
+                        {effectiveEffort === level.effort ? <IconCheckOutline16 /> : null}
+                      </span>
+                    </button>
+                  ))}
+              </>
+            )}
+          </div>
+        </>
       )}
       {toast !== null && (
         <Toast

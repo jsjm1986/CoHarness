@@ -2,6 +2,7 @@
 
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
+  'app.title': 'CoHarness',
   'drawer.open': '打开侧边栏',
   'drawer.close': '关闭侧边栏',
   'details.dismiss': '关闭详情',
@@ -12,6 +13,7 @@ export type LayoutKey = keyof typeof zh
 
 /** English dictionary, checked complete against the zh key set. */
 export const en = {
+  'app.title': 'CoHarness',
   'drawer.open': 'Open sidebar',
   'drawer.close': 'Close sidebar',
   'details.dismiss': 'Close details',

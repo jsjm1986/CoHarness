@@ -104,7 +104,7 @@ The seam is `loader.internal = modules`: cordis reaches plugin code through `Ent
 
 ## Directory regime (plugin packages)
 
-One UI feature = one plugin package (`src/client/` browser half). A multi-domain package splits where its code could later become separate packages — ui-conversation is the example: `contract/` (the only shared API), domain directories that never import a sibling domain, and `apply.ts` as the single cross-domain assembly point; `scripts/verify-client-domain-graph.ts` enforces the levels. Registration goes through `slots.register` in `apply` — never module-level side effects.
+One UI feature = one plugin package (`src/client/` browser half). A multi-domain package splits where its code could later become separate packages — ui-conversation is the example: `contract/` (the only shared API), domain directories that never make runtime/value imports from a sibling domain, and `apply.ts` as the single cross-domain assembly point; erased type-only references may name an implementation-owned projection and add no browser module edge or runtime cost. `scripts/verify-client-domain-graph.ts` enforces the levels and treats only explicit package roots such as `WorkspaceBrowser.tsx` as additional assembly points. Registration goes through `slots.register` in `apply` — never module-level side effects.
 
 ## Styling
 

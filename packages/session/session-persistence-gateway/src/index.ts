@@ -211,6 +211,7 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     })
   }
 
+  /* jscpd:ignore-start -- each persistence provider repeats the narrow Service Definition adapter. */
   append(id: SessionId, events: readonly SessionEvent[]): Promise<void> {
     return this.coordinator.append(id, events)
   }
@@ -230,6 +231,7 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
   readFrom(id: SessionId, fromSeq: number, signal?: AbortSignal): Promise<{ meta: SessionHeader; events: SessionEvent[] }> {
     return this.coordinator.readFrom(id, fromSeq, signal)
   }
+  /* jscpd:ignore-end */
 
   private signal(signal?: AbortSignal): AbortSignal {
     const timeout = AbortSignal.timeout(this.requestTimeoutMs)

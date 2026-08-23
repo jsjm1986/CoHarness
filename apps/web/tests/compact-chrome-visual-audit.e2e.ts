@@ -3,7 +3,9 @@
  * `.playwright-mcp/compact-chrome/` — not a committed golden lane.
  *
  * Seeds the navigation-panes fixture so Chat, tool rows, Trajectory, and the
- * event-details overlay exist without a live model turn. Run after
+ * event-details overlay exist without a live model turn. The settings pass
+ * also captures the same compact surface under the shipped dark palette so a
+ * visual audit does not rely on token/color assertions alone. Run after
  * `pnpm run build:lib:client && pnpm run build:web`.
  */
 import { mkdirSync, writeFileSync } from 'node:fs'
@@ -12,7 +14,7 @@ import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
-import { afterAll, beforeAll, describe, it, vi } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { launchWebScaffold, seedSession, type WebScaffold } from './scaffold.ts'
 import { ZH_BROWSER_LOCALE } from './support.ts'
 
@@ -23,6 +25,7 @@ const SEED_ID = 'navigation-panes-web-e2e'
 const PHONES = [
   { tag: '390x844', width: 390, height: 844 },
   { tag: '375x667', width: 375, height: 667 },
+  { tag: '320x568', width: 320, height: 568 },
 ] as const
 
 async function shot(page: Page, name: string): Promise<void> {
@@ -37,6 +40,8 @@ async function dumpOverflow(page: Page): Promise<unknown> {
       .map((el) => {
         const box = el.getBoundingClientRect()
         if (box.width === 0 || box.height === 0) return null
+        const style = getComputedStyle(el)
+        if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return null
         const onScreen = box.right > 1 && box.left < vw - 1 && box.bottom > 1 && box.top < vh - 1
         if (!onScreen) return null
         const label = (el.getAttribute('aria-label') ?? el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 40)
@@ -49,7 +54,11 @@ async function dumpOverflow(page: Page): Promise<unknown> {
       })
       .filter(row => row !== null)
     return {
-      viewport: { vw, vh, stamp: document.querySelector('[data-viewport]')?.getAttribute('data-viewport') },
+      viewport: {
+        vw,
+        vh,
+        stamp: document.querySelector('[data-viewport]')?.getAttribute('data-viewport'),
+      },
       pointerCoarse: window.matchMedia('(pointer: coarse)').matches,
       dsw: getComputedStyle(document.documentElement).getPropertyValue('--dsw-viewport-height'),
       tiny: small.filter(row => row.h < 40 && row.w < 40).slice(0, 20),
@@ -59,6 +68,15 @@ async function dumpOverflow(page: Page): Promise<unknown> {
         if (dialog === null) return null
         const box = dialog.getBoundingClientRect()
         return { x: box.x, y: box.y, w: box.width, h: box.height }
+      })(),
+      stats: (() => {
+        const stats = document.querySelector<HTMLElement>('[data-stats-line]')
+        if (stats === null) return null
+        const box = stats.getBoundingClientRect()
+        return {
+          top: Math.round(box.top), bottom: Math.round(box.bottom), h: Math.round(box.height),
+          viewportGap: Math.round(vh - box.bottom),
+        }
       })(),
     }
   })
@@ -78,6 +96,13 @@ async function openDrawer(page: Page): Promise<void> {
   const expanded = await toggle.getAttribute('aria-expanded')
   if (expanded !== 'true') await toggle.click()
   await page.getByRole('button', { name: /设置|Settings/, exact: true }).waitFor({ timeout: 10_000 })
+  // The visibility flag flips at the beginning of the shell transition; wait
+  // for the drawer edge itself before capturing or interacting with its rows.
+  const drawer = page.locator('[class*="drawer"]').first()
+  await expect.poll(
+    () => drawer.evaluate(element => Math.round(element.getBoundingClientRect().x)),
+    { timeout: 2_000 },
+  ).toBe(0)
 }
 
 async function closeDrawer(page: Page): Promise<void> {
@@ -85,7 +110,11 @@ async function closeDrawer(page: Page): Promise<void> {
   if (await toggle.count() === 0) return
   if (await toggle.getAttribute('aria-expanded') === 'true') {
     await toggle.click()
-    await page.waitForTimeout(250)
+    const drawer = page.locator('[class*="drawer"]').first()
+    await expect.poll(
+      () => drawer.evaluate(element => Math.round(element.getBoundingClientRect().right)),
+      { timeout: 2_000 },
+    ).toBeLessThanOrEqual(0)
   }
 }
 
@@ -157,6 +186,12 @@ describe('visual audit: compact product chrome', () => {
         const pickWorkspace = page.getByRole('button', { name: /选择工作区|Choose workspace/ })
         if (await pickWorkspace.count() > 0) {
           await pickWorkspace.click()
+          const addWorkspace = page.getByRole('menuitem', { name: /添加工作区|Add workspace/ })
+          // The workspace baseline may still be loading, so the compact picker
+          // can expose its explicit add row before the directory flow opens.
+          if (await addWorkspace.count() > 0) {
+            await addWorkspace.first().click()
+          }
           await page.getByRole('dialog').waitFor({ timeout: 10_000 })
           await page.waitForTimeout(300)
           await shot(page, `${prefix}-01-workspace-dialog`)
@@ -176,6 +211,13 @@ describe('visual audit: compact product chrome', () => {
         await openSeededChat(page)
         await shot(page, `${prefix}-03-chat`)
         findings[`${prefix}.chat`] = await dumpOverflow(page)
+        if (phone.width <= 359) {
+          const shellToggle = page.locator('[class*="topbarToggle"]').first()
+          const shellToggleBox = await shellToggle.boundingBox()
+          if (shellToggleBox === null) throw new Error('compact topbar toggle has no geometry')
+          expect(shellToggleBox.x).toBeGreaterThanOrEqual(0)
+          expect(shellToggleBox.x + shellToggleBox.width).toBeLessThanOrEqual(phone.width + 1)
+        }
         await page.getByRole('heading', { name: 'Navigation Summary' }).waitFor({ timeout: 10_000 })
         await shot(page, `${prefix}-04-chat-markdown`)
 
@@ -219,6 +261,11 @@ describe('visual audit: compact product chrome', () => {
           await page.waitForTimeout(300)
           await shot(page, `${prefix}-09-event-details`)
           findings[`${prefix}.eventDetails`] = await dumpOverflow(page)
+          if (phone.width <= 359) {
+            // Short phones must retain the first summary value; a flex-shrunk
+            // nested overview used to leave only section headings visible.
+            expect(await details.getByText('Completed', { exact: true }).count()).toBe(1)
+          }
           const closeDetails = details.getByRole('button', { name: /Close details|关闭详情/ })
           if (await closeDetails.count() > 0) await closeDetails.click()
           else await page.keyboard.press('Escape')
@@ -241,6 +288,14 @@ describe('visual audit: compact product chrome', () => {
             await shot(page, `${prefix}-12-settings-models`)
             findings[`${prefix}.settingsModels`] = await dumpOverflow(page)
           }
+          // Keep one real dark-palette capture for every compact size. The
+          // attribute is the same presenter contract used by ThemeRuntime;
+          // removing it before the next surface keeps the audit independent.
+          await page.evaluate(() => { document.body.setAttribute('data-ds-dark-theme', '') })
+          await page.waitForTimeout(100)
+          await shot(page, `${prefix}-12-settings-dark`)
+          findings[`${prefix}.settingsDark`] = await dumpOverflow(page)
+          await page.evaluate(() => { document.body.removeAttribute('data-ds-dark-theme') })
           await page.keyboard.press('Escape')
         } catch {
           findings[`${prefix}.settings`] = 'no dialog'
@@ -255,6 +310,16 @@ describe('visual audit: compact product chrome', () => {
             await page.waitForTimeout(300)
             await shot(page, `${prefix}-13-documents`)
             findings[`${prefix}.documents`] = await dumpOverflow(page)
+            if (phone.width <= 359) {
+              const toolbar = page.getByRole('dialog').locator('[class*="toolbar"]').first()
+              const newFolder = toolbar.getByRole('button', { name: /新建文件夹|New folder/ })
+              const upload = toolbar.getByRole('button', { name: /上传文档|Upload documents/ })
+              const refresh = toolbar.getByRole('button', { name: /刷新|Refresh/ })
+              const boxes = await Promise.all([newFolder, upload, refresh].map(control => control.boundingBox()))
+              if (boxes.some(box => box === null)) throw new Error('compact document toolbar geometry missing')
+              expect(new Set(boxes.map(box => Math.round(box!.y))).size).toBe(1)
+              expect(boxes.every(box => box!.x >= 0 && box!.x + box!.width <= phone.width + 1)).toBe(true)
+            }
             await page.keyboard.press('Escape')
           } catch {
             findings[`${prefix}.documents`] = 'no dialog'

@@ -8,7 +8,7 @@ Web 后台任务特性的归属方：向 `conversation.session.header.actions` �
 
 终态行保持可见并弱化，直到注册表在 owner 销毁时把它们丢掉。它们本就在快照里，失败任务的 `detail` 是其失败唯一可读之处，在这里过滤掉它们是输出与中断两期要推翻的工作。因此一个运行中的一次性后台 subagent 会同时出现在这里和 [subagent 目录](../ui-subagent/README.zh.md)里：目录负责进入子会话的 transcript，而这个列表是将来中断能力唯一可能附着的句柄。
 
-Escape 关闭列表并把焦点交还触发器，在其外部按下指针同理。最后一个任务消失时先关闭列表再卸载控件，焦点因此不会从一个被移除的节点上凭空消失。样式只用 token；文案走本包自己的 `job` locale 命名空间。行为由 [Web 后台任务展示 Agent Note](../../../.agents/notes/implemented/feature/2026-08-08-web-background-job-display.zh.md) 规定。
+Escape 关闭列表并把焦点交还触发器，在其外部按下指针同理。768px 以下同一列表会变为遵守安全区的手机 Sheet，复用共享遮罩并把行提升到触控尺寸。最后一个任务消失时先关闭列表再卸载控件，焦点因此不会从一个被移除的节点上凭空消失。样式只用 token；文案走本包自己的 `job` locale 命名空间。行为由 [Web 后台任务展示 Agent Note](../../../.agents/notes/implemented/feature/2026-08-08-web-background-job-display.zh.md) 规定。
 
 ## 模型体验
 

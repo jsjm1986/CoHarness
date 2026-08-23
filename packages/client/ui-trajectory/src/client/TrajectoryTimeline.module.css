@@ -97,6 +97,20 @@
   width: var(--dsw-touch-target);
 }
 
+@media (max-width: 767px) {
+  :global([data-viewport='compact']) .plot {
+    height: 54px;
+  }
+
+  :global([data-viewport='compact']) .labels {
+    font: 400 11px/14px var(--dsw-font-family);
+  }
+}
+
+:global([data-viewport-short]) .plot {
+  height: 48px;
+}
+
 .earlierHistory[aria-disabled='true'] {
   cursor: default;
 }

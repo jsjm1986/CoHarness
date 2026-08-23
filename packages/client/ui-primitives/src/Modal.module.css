@@ -32,6 +32,15 @@
   border-radius: 24px;
   background: var(--dsw-alias-bg-layer-2);
   box-shadow: var(--dsw-shadow-lv3);
+  /* The compact dialog content can scroll while the card stays elevated;
+     rebind the scrollbar pair on the surface so the child scrollport does
+     not inherit the page-level thumb. */
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+}
+
+.dialog:focus {
+  outline: none;
 }
 
 .content {
@@ -91,7 +100,26 @@
     max-height: calc(100% - var(--dsw-space-8) - var(--dsw-safe-top));
     padding-bottom: calc(var(--dsw-space-6) + var(--dsw-safe-bottom));
     border-bottom: none;
-    border-radius: var(--dsw-radius-xl) var(--dsw-radius-xl) 0 0;
+    border-radius: var(--dsw-mobile-sheet-radius) var(--dsw-mobile-sheet-radius) 0 0;
+    min-height: 0;
+    animation: mobile-modal-sheet-in var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+  }
+
+  .dialog::before {
+    content: '';
+    align-self: center;
+    flex: none;
+    width: 36px;
+    height: 4px;
+    margin: 8px auto 0;
+    border-radius: var(--dsw-radius-full);
+    background: var(--dsw-alias-label-caption);
+    opacity: 0.7;
+  }
+
+  .content {
+    min-height: 0;
+    overflow-y: auto;
   }
 
   .title {
@@ -106,6 +134,16 @@
 
   .footer {
     flex-wrap: wrap;
+  }
+}
+
+@keyframes mobile-modal-sheet-in {
+  from { opacity: 0; transform: translateY(12px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dialog {
+    animation: none;
   }
 }
 

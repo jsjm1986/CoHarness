@@ -386,10 +386,22 @@
 :global([data-viewport='compact']) .logoRow {
   height: auto;
   min-height: var(--dsw-touch-target);
+  padding-inline: 0;
+  margin-bottom: var(--dsw-space-2);
+}
+
+:global([data-viewport='compact']) .brandName {
+  font: var(--dsw-mobile-font-section);
+  letter-spacing: 0;
+}
+
+:global([data-viewport='compact']) .buildRevision {
+  display: none;
 }
 
 :global([data-viewport='compact']) .newSession {
   min-height: var(--dsw-touch-target);
+  margin-inline: 0;
 }
 
 :global([data-viewport='compact']) .footArea {

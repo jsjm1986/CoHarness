@@ -3,7 +3,7 @@
 // acceptance — zero renders during streaming.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type {
   AssistantMessageNode, ConversationSnapshot, SessionId, ToolResultNode,
 } from '@deepseek-ai/dsh-client-runtime/client'
@@ -255,6 +255,20 @@ describe('StatsLine', () => {
     fireEvent.mouseEnter(view.container.firstElementChild!)
     act(() => { vi.advanceTimersByTime(500) })
     expect(view.container.querySelector('[role="tooltip"]')).toBeNull()
+  })
+
+  it('opens the full stats sheet from the compact row', () => {
+    vi.stubGlobal('matchMedia', () => ({
+      matches: true,
+      media: '(max-width: 767px)',
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }))
+    const { source } = makeSource({ nodes: [assistant(1, 1)] })
+    render(<StatsLine {...props(source)} t={t} />)
+    fireEvent.click(screen.getByRole('button', { name: '会话统计' }))
+    expect(screen.getByRole('dialog', { name: '会话统计' }).textContent)
+      .toContain('1 轮 · 1 步')
   })
 
   it('renders window latency and throughput beside the wall-time group', () => {

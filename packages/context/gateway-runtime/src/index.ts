@@ -86,6 +86,7 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
+/* jscpd:ignore-start -- identical boundary guards are kept local to each capability package. */
 function record(value: unknown): Record<string, unknown> | undefined {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -95,6 +96,7 @@ function record(value: unknown): Record<string, unknown> | undefined {
 function positiveInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0
 }
+/* jscpd:ignore-end */
 
 function nonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0

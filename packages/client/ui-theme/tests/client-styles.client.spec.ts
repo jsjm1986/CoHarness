@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 /** Dynamic ui-theme entry owns the global styles in dependency order. */
 import { Context } from '@deepseek-ai/cordis'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath, URL as NodeURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import { installThemeStyles } from '../src/client/styles.ts'
 
@@ -29,5 +31,13 @@ describe('ui-theme client styles', () => {
     ])
     await fiber.dispose()
     expect(document.head.querySelectorAll(`style[data-plugin="${PLUGIN_ID}"]`)).toHaveLength(0)
+  })
+
+  it('ships the compact typography and icon roles from metrics.css', () => {
+    const metrics = readFileSync(fileURLToPath(new NodeURL('../src/styles/metrics.css', import.meta.url)), 'utf8')
+    expect(metrics).toContain('--dsw-mobile-font-body: 400 14px/22px')
+    expect(metrics).toContain('--dsw-mobile-font-caption: 400 12px/18px')
+    expect(metrics).toContain('--dsw-mobile-icon-primary: 20px')
+    expect(metrics).toContain('--dsw-mobile-page-inset: var(--dsw-space-4)')
   })
 })

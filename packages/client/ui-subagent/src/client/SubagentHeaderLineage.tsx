@@ -7,7 +7,8 @@ import {
   type SessionSummary, type SubagentAddress, type SubagentCatalogSnapshot,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import {
-  IconChevronDownOutline14, IconChevronRightOutline14, IconRefreshOutline14, StateDot,
+  IconChevronDownOutline14, IconChevronRightOutline14, IconRefreshOutline14,
+  MobileSheetBackdrop, StateDot,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { NS } from './locales.ts'
@@ -774,31 +775,34 @@ function CatalogDropdown({
           : <IconChevronDownOutline14 className={open ? css.triggerOpen : undefined} />}
       </button>
       {open && createPortal((
-        <div
-          ref={menuRef}
-          className={css.menu}
-          style={menuPosition}
-          role="tree"
-          aria-label={t('tree.aria')}
-          onMouseEnter={cancelHoverClose}
-          onMouseLeave={scheduleHoverClose}
-        >
-          <CatalogRows
-            parentSessionId={rootSessionId}
-            currentSessionId={currentSessionId}
-            catalog={presentedCatalog}
-            catalogs={catalogs}
-            summaries={summaries}
-            expanded={expanded}
-            level={1}
-            now={now}
-            openChild={openChild}
-            refresh={refresh}
-            toggleBranch={toggleBranch}
-            closeCatalog={() => { changeOpen(false) }}
-            t={t}
-          />
-        </div>
+        <>
+          <MobileSheetBackdrop onClose={() => { changeOpen(false, true) }} />
+          <div
+            ref={menuRef}
+            className={css.menu}
+            style={menuPosition}
+            role="tree"
+            aria-label={t('tree.aria')}
+            onMouseEnter={cancelHoverClose}
+            onMouseLeave={scheduleHoverClose}
+          >
+            <CatalogRows
+              parentSessionId={rootSessionId}
+              currentSessionId={currentSessionId}
+              catalog={presentedCatalog}
+              catalogs={catalogs}
+              summaries={summaries}
+              expanded={expanded}
+              level={1}
+              now={now}
+              openChild={openChild}
+              refresh={refresh}
+              toggleBranch={toggleBranch}
+              closeCatalog={() => { changeOpen(false) }}
+              t={t}
+            />
+          </div>
+        </>
       ), document.body)}
     </div>
   )

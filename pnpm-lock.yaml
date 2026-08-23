@@ -862,10 +862,6 @@ importers:
         version: link:../../interaction/user-approval
 
   packages/api/gateway:
-    dependencies:
-      '@deepseek-ai/dsh-typert-protocol':
-        specifier: workspace:^
-        version: link:../../typert/protocol
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: workspace:^
@@ -879,6 +875,9 @@ importers:
       '@deepseek-ai/dsh-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
+      '@deepseek-ai/dsh-typert-protocol':
+        specifier: workspace:^
+        version: link:../../typert/protocol
       '@deepseek-ai/dsh-typert-registry':
         specifier: workspace:^
         version: link:../../typert/registry
@@ -887,10 +886,6 @@ importers:
         version: 4.4.3
 
   packages/api/remotes:
-    dependencies:
-      '@deepseek-ai/dsh-typert-protocol':
-        specifier: workspace:^
-        version: link:../../typert/protocol
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: workspace:^
@@ -946,6 +941,9 @@ importers:
       '@deepseek-ai/dsh-settings':
         specifier: workspace:^
         version: link:../../settings/settings
+      '@deepseek-ai/dsh-typert-protocol':
+        specifier: workspace:^
+        version: link:../../typert/protocol
       '@deepseek-ai/dsh-typert-registry':
         specifier: workspace:^
         version: link:../../typert/registry
@@ -8659,9 +8657,6 @@ importers:
 
   packages/typert/registry:
     dependencies:
-      '@deepseek-ai/dsh-typert-protocol':
-        specifier: workspace:^
-        version: link:../protocol
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -8672,6 +8667,9 @@ importers:
       '@deepseek-ai/dsh-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
+      '@deepseek-ai/dsh-typert-protocol':
+        specifier: workspace:^
+        version: link:../protocol
 
   packages/util/atomic-write:
     devDependencies:

@@ -8,7 +8,7 @@ The trigger renders only when the session has at least one job, so an ordinary c
 
 Settled rows stay visible and de-emphasized until the registry drops them at owner disposal. They are in the snapshot, a failed job's `detail` is the only place its failure is legible, and filtering them out here is work the output and cancellation phases would undo. A running one-shot background subagent therefore appears both here and in the [subagent catalog](../ui-subagent/README.md): the catalog navigates into the child's transcript, while this list is the only handle a future cancellation can attach to.
 
-Escape closes the list and returns focus to the trigger, as does a pointer press outside it. The last job disappearing closes the list before the control unmounts, so focus never vanishes from a removed node. Styling uses tokens only; copy goes through the package's own `job` locale namespace. The behavior is specified by the [Web background-job display Agent Note](../../../.agents/notes/implemented/feature/2026-08-08-web-background-job-display.md).
+Escape closes the list and returns focus to the trigger, as does a pointer press outside it. Below 768px the same list becomes a safe-area phone sheet with the shared backdrop and touch-sized rows. The last job disappearing closes the list before the control unmounts, so focus never vanishes from a removed node. Styling uses tokens only; copy goes through the package's own `job` locale namespace. The behavior is specified by the [Web background-job display Agent Note](../../../.agents/notes/implemented/feature/2026-08-08-web-background-job-display.md).
 
 ## Model Experience
 

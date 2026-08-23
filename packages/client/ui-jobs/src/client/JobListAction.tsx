@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type { JobView } from '@deepseek-ai/dsh-client-runtime/client'
-import { IconChevronDownOutline14, StateDot, useDismissOnOutsidePointer, type StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconChevronDownOutline14, MobileSheetBackdrop, StateDot, useDismissOnOutsidePointer, useMediaQuery, type StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { NS } from './locales.ts'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -94,6 +94,7 @@ function ordered(jobs: readonly JobView[]): JobView[] {
 export function JobListAction({ sessionId, useSessions, t }: JobListActionProps) {
   const jobs = useSessions(state => state.jobsBySession[sessionId]) ?? NO_TASKS
   const [open, setOpen] = useState(false)
+  const phone = useMediaQuery('(max-width: 767px)')
   const [now, setNow] = useState(() => Date.now())
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -154,28 +155,31 @@ export function JobListAction({ sessionId, useSessions, t }: JobListActionProps)
       </button>
       {open
         ? (
-          <ul className={css.menu} aria-label={t('list.aria')}>
-            {rows.map((job) => {
-              const live = isLive(job)
-              const elapsed = live ? now - job.startedAt : (job.finishedAt ?? job.startedAt) - job.startedAt
-              const duration = formatDuration(elapsed, t)
-              const status = statusLabel(job.status, t)
-              return (
-                <li key={job.id} className={live ? css.row : `${css.row} ${css.rowSettled}`}>
-                  <StateDot state={dotState(job.status)} className={css.rowDot} />
-                  <span className={css.kind}>{job.kind}</span>
-                  <span className={css.label} title={job.label}>{job.label}</span>
-                  <span className={css.status} title={job.detail ?? status}>{job.detail ?? status}</span>
-                  <span
-                    className={css.duration}
-                    title={t(live ? 'duration.title.live' : 'duration.title.done', { duration })}
-                  >
-                    {duration}
-                  </span>
-                </li>
-              )
-            })}
-          </ul>
+          <>
+            {phone && <MobileSheetBackdrop onClose={() => { setOpen(false) }} />}
+            <ul className={css.menu} aria-label={t('list.aria')}>
+              {rows.map((job) => {
+                const live = isLive(job)
+                const elapsed = live ? now - job.startedAt : (job.finishedAt ?? job.startedAt) - job.startedAt
+                const duration = formatDuration(elapsed, t)
+                const status = statusLabel(job.status, t)
+                return (
+                  <li key={job.id} className={live ? css.row : `${css.row} ${css.rowSettled}`}>
+                    <StateDot state={dotState(job.status)} className={css.rowDot} />
+                    <span className={css.kind}>{job.kind}</span>
+                    <span className={css.label} title={job.label}>{job.label}</span>
+                    <span className={css.status} title={job.detail ?? status}>{job.detail ?? status}</span>
+                    <span
+                      className={css.duration}
+                      title={t(live ? 'duration.title.live' : 'duration.title.done', { duration })}
+                    >
+                      {duration}
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+          </>
         )
         : null}
     </div>

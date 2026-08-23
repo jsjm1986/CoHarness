@@ -119,5 +119,8 @@ describe('WorkspaceBrowser.module.css list', () => {
     expect(rowsCss).toContain("[data-viewport='compact']")
     expect(rowsCss).toContain('min-height: var(--dsw-touch-target)')
     expect(rowsCss).toContain('.rowActions')
+    expect(css).toContain('.groupSection')
+    expect(css).toContain('var(--dsw-radius-xl)')
+    expect(rowsCss).toContain('background: var(--dsw-alias-bg-module-platform)')
   })
 })

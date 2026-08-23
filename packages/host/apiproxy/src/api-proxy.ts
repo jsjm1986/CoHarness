@@ -3702,6 +3702,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       },
 
       async clear(request) {
+        /* jscpd:ignore-start -- goal mutations share the same authorization/error ladder. */
         const authorized = await authorizeSession(request.payload.sessionId, 'write')
         if ('error' in authorized) return err(request, authorized.error)
         const found = await agentFor(request.payload.sessionId)
@@ -3714,6 +3715,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         } catch (error: unknown) {
           return goalError(request, error)
         }
+        /* jscpd:ignore-end */
       },
     },
 
@@ -3800,6 +3802,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       // a composition names the plugins a session runs, so reading one is
       // reconnaissance, and copy/remove/openDocument manage the roster and
       // drive the host desktop.
+      /* jscpd:ignore-start -- preset authoring methods intentionally share one refusal ladder. */
       async read(request) {
         const authorized = authorizePersonalConfiguration()
         if (authorized.error !== undefined) return err(request, authorized.error)
@@ -3872,6 +3875,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           return err(request, presetError(agentPreset, error))
         }
       },
+      /* jscpd:ignore-end */
     },
 
     skills: {
@@ -4600,6 +4604,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         if (message.result.error.code !== 'cancelled') {
           return { accepted: false, reason: 'bad-response' }
         }
+        /* jscpd:ignore-start -- approval and question cancellation share an authorization CAS ladder. */
         const authorized = await authorizeSession(pending.sessionId, 'write')
         if ('error' in authorized) return { accepted: false, reason: 'bad-response' }
         if (pendingQuestions.get(message.rpcId) !== pending) return { accepted: false, reason: 'not-pending' }
@@ -4618,6 +4623,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         pending.reject(new UserQuestionError(
           'the user cancelled ask_user_question', 'ASK_CANCELLED'))
         return { accepted: true }
+        /* jscpd:ignore-end */
       }
       const parsed = questionResponsePayloadSchema.safeParse(message.result.value)
       if (!parsed.success) {
@@ -4636,6 +4642,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       if (!matchesQuestions(payload, pending)) {
         return { accepted: false, reason: 'bad-response' }
       }
+      /* jscpd:ignore-start -- approval and question answer paths share the authorization CAS ladder. */
       const authorized = await authorizeSession(pending.sessionId, 'write')
       if ('error' in authorized) return { accepted: false, reason: 'bad-response' }
       if (pendingQuestions.get(message.rpcId) !== pending) return { accepted: false, reason: 'not-pending' }
@@ -4653,6 +4660,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       claimQuestion(pending, 'answered')
       pending.resolve(payload.answer)
       return { accepted: true }
+      /* jscpd:ignore-end */
     },
   }
 }

@@ -154,4 +154,30 @@ describe('web e2e: compact settings overlay', () => {
   it('commits exactly the compact settings snapshot inventory', async () => {
     await assertFixtureInventory(SNAPSHOT_DIR, ['general.expected.md', 'models.expected.md'])
   })
+
+  it('keeps the selected settings tab reachable on a 320px phone', async () => {
+    page = await browser.newPage({
+      viewport: { width: 320, height: 568 },
+      locale: ZH_BROWSER_LOCALE,
+      hasTouch: true,
+      isMobile: true,
+    })
+    tripwire = watchConsole(page)
+    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+    await page.getByRole('button', { name: '打开侧边栏' }).click()
+    await page.getByRole('button', { name: '设置', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: '设置' })
+    await dialog.waitFor({ timeout: 10_000 })
+    const presets = dialog.getByRole('button', { name: 'Agent 预设' })
+    await presets.click()
+    await expect.poll(() => presets.getAttribute('aria-current'), { timeout: 5_000 }).toBe('true')
+    const dialogBox = await dialog.boundingBox()
+    const tabBox = await presets.boundingBox()
+    if (dialogBox === null || tabBox === null) throw new Error('320px settings tab geometry missing')
+    expect(tabBox.x).toBeGreaterThanOrEqual(dialogBox.x - 1)
+    expect(tabBox.x + tabBox.width).toBeLessThanOrEqual(dialogBox.x + dialogBox.width + 1)
+    expect(await dialog.getByRole('heading', { name: 'Agent 预设' }).count()).toBe(1)
+    expect(tripwire.pageErrors).toEqual([])
+  }, 60_000)
 })

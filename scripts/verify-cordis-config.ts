@@ -20,6 +20,7 @@ import { isCordisGroupEntry, isJsExpr, loadCordisYaml } from './cordis-yaml.ts'
 export interface PackageManifest {
   name?: string
   dependencies?: Record<string, string>
+  peerDependencies?: Record<string, string>
   optionalDependencies?: Record<string, string>
   dsh?: { bundle?: { patch?: string } }
 }
@@ -92,23 +93,24 @@ if (import.meta.main) {
  *
  * The browser roster is discovered by scanning composed packages for a
  * `dsh.client` block, and the node half of a surface plugin is an empty
- * `apply`. A `packages/client` package that exports `./client` without that
- * block therefore composes, activates, and contributes nothing — its bundle is
+ * `apply`. A browser package that exports `./client` without that block
+ * therefore composes, activates, and contributes nothing — its bundle is
  * never served and no error is raised anywhere. The mismatch is invisible in
- * the composition file, so it is checked against the manifests instead. Only
- * this group is checked: a Host package's `./client` export is the typed wire
- * face its browser consumers import, not a plugin the roster serves.
+ * the composition file, so it is checked against the manifests instead. Host
+ * packages that expose `./client` only as a typed wire face remain outside
+ * this check unless they explicitly declare `dsh.client`.
  * @returns one violation per client package whose `./client` export and
  * `dsh.client` declaration disagree.
  */
 function validateClientHalvesDeclared(): string[] {
-  return globSync('packages/client/*/package.json', { cwd: root }).flatMap((manifestPath) => {
+  return globSync('packages/*/*/package.json', { cwd: root }).flatMap((manifestPath) => {
     const manifest = readManifest(manifestPath) as PackageManifest & {
       exports?: Record<string, unknown>
       dsh?: { client?: unknown }
     }
     const shipsClient = manifest.exports !== undefined && Object.hasOwn(manifest.exports, './client')
     const declaresClient = manifest.dsh?.client !== undefined
+    if (!declaresClient && !manifestPath.startsWith('packages/client/')) return []
     if (shipsClient === declaresClient) return []
     return [shipsClient
       ? `${manifestPath}: exports "./client" but declares no dsh.client, so its browser half is never served`
@@ -284,7 +286,7 @@ function validateAppResolution(): string[] {
  * @returns Sorted slash-normalized repository-relative package manifest paths.
  */
 export function bundleManifestPaths(repoRoot: string = root): string[] {
-  return globSync('packages/*/*/package.json', { cwd: repoRoot })
+  return globSync(['packages/*/*/package.json', 'plugins/*/package.json'], { cwd: repoRoot })
     .filter(path => typeof readManifest(path, repoRoot).dsh?.bundle?.patch === 'string')
     .map(path => path.replaceAll('\\', '/'))
     .sort()
@@ -302,10 +304,13 @@ export function bundlePluginDependencyErrors(
   manifest: PackageManifest,
   references: readonly PluginReference[],
 ): string[] {
+  const resolverDependencies = manifestPath.startsWith('plugins/')
+    ? { ...manifest.dependencies, ...manifest.peerDependencies }
+    : manifest.dependencies
   return missingPluginDependencies(
     // A Bundle may mount its own package (for example, its provider or runtime row).
     references.filter(reference => packageNameFromSpecifier(reference.name) !== manifest.name),
-    manifest.dependencies ?? {},
+    resolverDependencies ?? {},
     manifestPath,
   )
 }

@@ -11,7 +11,7 @@
 import type { ClientContext, ISessions, SessionBinding, SessionFace, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { InputTriggerController, SubmitImageAttachment, SubmitOutcome } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
-import { queueReadFaceOf } from '../queue/store.ts'
+import { queueReadFaceOf } from '../contract/queue.ts'
 import type { ComposerKeyboard, DraftAttachmentId, DraftDocumentId, SessionInputResolver, SessionInput } from './contract.ts'
 import type { InputSubmitMode } from '../contract/composer-submission.ts'
 import type { PopupDismissFace } from './facade.ts'

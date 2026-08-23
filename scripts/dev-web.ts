@@ -233,6 +233,7 @@ if (isMain) {
     + ` and ${String(libraryDirs.length)} statically linked library packages`
     + (pollInterval !== undefined ? ` (polling ${String(pollInterval)}ms)` : '')
     + `, plus tsc -b ${CLIENT_TYPE_PROGRAM} and the ${SHELL_PACKAGE} dist build:\n  `
-    + [...pluginDirs, ...libraryDirs].join('\n  '),
+    + [...pluginDirs, ...libraryDirs].join('\n  ')
+    + '\n  launch the host with DSH_CLIENT_HMR=1 for no-refresh client reloads',
   )
 }

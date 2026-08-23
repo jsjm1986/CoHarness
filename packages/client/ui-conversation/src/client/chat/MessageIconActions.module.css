@@ -109,3 +109,8 @@
   min-width: var(--dsw-touch-target);
   height: var(--dsw-touch-target);
 }
+
+:global([data-viewport='compact']) .action svg {
+  width: var(--dsw-mobile-icon-secondary);
+  height: var(--dsw-mobile-icon-secondary);
+}
