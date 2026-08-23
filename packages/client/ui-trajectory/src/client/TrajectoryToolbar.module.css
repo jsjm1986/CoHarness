@@ -7,6 +7,11 @@
   height: var(--dsh-trajectory-toolbar-height);
   border-bottom: 1px solid var(--dsw-alias-border-l2);
   background: var(--dsw-alias-bg-layer-1);
+  /* Compact action/search overflow belongs to this toolbar surface. The
+     search capsule is an elevated layer-2 child, so keep any horizontal bar
+     on the toolbar at the same elevation pair. */
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 }
 
 .inner {
@@ -221,6 +226,17 @@
   flex-wrap: wrap;
   height: auto;
   min-height: var(--dsh-trajectory-toolbar-height);
+  padding-inline: var(--dsw-space-2);
+}
+
+:global([data-viewport='compact']) .actions {
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+:global([data-viewport='compact']) .actions::-webkit-scrollbar {
+  display: none;
 }
 
 :global([data-viewport='compact']) .toggle,
@@ -234,4 +250,29 @@
   flex: 1 1 100%;
   min-height: var(--dsw-touch-target);
   height: auto;
+}
+
+:global([data-viewport-short]) .search {
+  min-height: 40px;
+}
+
+@media (max-width: 767px) {
+  :global([data-viewport='compact']) .inner {
+    padding-inline: var(--dsw-mobile-page-inset);
+    gap: var(--dsw-space-2);
+  }
+
+  :global([data-viewport='compact']) .toggle,
+  :global([data-viewport='compact']) .control,
+  :global([data-viewport='compact']) .action {
+    font: var(--dsw-mobile-font-secondary);
+  }
+
+  :global([data-viewport='compact']) .searchInput {
+    font: var(--dsw-mobile-font-secondary);
+  }
+
+  :global([data-viewport='compact']) .search {
+    border-radius: var(--dsw-radius-md);
+  }
 }

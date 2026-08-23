@@ -26,3 +26,10 @@
   /* ConversationRoot publishes the floating composer's live height. */
   --dsh-trajectory-bottom-clearance: calc(var(--dsh-composer-height, 152px) + 16px);
 }
+
+/* A phone event-details sheet is a focused reading surface. Raise the ledger
+   stacking context above the composer only while that sheet exists; the
+   ordinary Trajectory list keeps the composer reachable above its rows. */
+:global([data-viewport='compact']) .ledger:has([data-trajectory-details]) {
+  z-index: 8;
+}

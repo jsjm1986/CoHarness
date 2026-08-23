@@ -15,6 +15,7 @@ import type { GatewayRequestPrincipal, GatewayRuntime } from '@deepseek-ai/dsh-g
 import type { PermissionPresetAuthorization } from '@deepseek-ai/dsh-permission-presets'
 import { SessionId, type SessionId as SessionIdentity } from '@deepseek-ai/dsh-session'
 
+/* jscpd:ignore-start -- identical boundary guards are kept local to each capability package. */
 function record(value: unknown): Record<string, unknown> | undefined {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -24,6 +25,7 @@ function record(value: unknown): Record<string, unknown> | undefined {
 function positiveInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0
 }
+/* jscpd:ignore-end */
 
 function accessView(value: unknown): CollaborationAccess {
   const access = record(value)

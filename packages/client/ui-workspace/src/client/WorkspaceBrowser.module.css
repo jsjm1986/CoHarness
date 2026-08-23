@@ -370,6 +370,32 @@
   scrollbar-gutter: stable;
 }
 
+/* The compact drawer is a navigation surface, not a squeezed desktop tree.
+   Give each Workspace group a card boundary and leave the Session rows as
+   nested, readable targets while preserving the existing tree semantics and
+   drag/reorder hit testing. */
+:global([data-viewport='compact']) .list {
+  padding: var(--dsw-space-2) var(--dsw-space-2) var(--dsw-space-6);
+}
+
+:global([data-viewport='compact']) .groupSection + .groupSection {
+  margin-top: var(--dsw-space-3);
+}
+
+:global([data-viewport='compact']) .groupSection {
+  padding: var(--dsw-space-1);
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-xl);
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: var(--dsw-shadow-lv1);
+}
+
+:global([data-viewport='compact']) .sessionOverflowButton {
+  height: var(--dsw-touch-target);
+  padding-left: var(--dsw-space-5);
+  border-radius: var(--dsw-radius-lg);
+}
+
 .flatList > * + *,
 .searchTree > [role='treeitem'] + [role='treeitem'],
 .groupSection > * + * {

@@ -734,6 +734,17 @@
     flex-wrap: wrap;
   }
 
+  .list {
+    gap: var(--dsw-space-2);
+  }
+
+  .row {
+    padding: var(--dsw-space-3);
+    border: 1px solid var(--dsw-alias-border-l2);
+    border-radius: var(--dsw-radius-lg);
+    background: var(--dsw-alias-bg-layer-1);
+  }
+
   .row:not(.folderRow) .actions {
     flex: 1 1 100%;
     justify-content: flex-end;
@@ -786,5 +797,69 @@
   .progress > span,
   .row {
     transition: none;
+  }
+}
+
+@media (max-width: 359px) {
+  /* Keep the compact toolbar predictable in a narrow sheet. */
+  .toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) var(--dsw-touch-target);
+    align-items: stretch;
+    gap: var(--dsw-space-2);
+  }
+
+  .toolbar .search {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .toolbar .select,
+  .toolbar .newFolder,
+  .toolbar .upload {
+    width: 100%;
+    min-width: 0;
+    min-height: var(--dsw-touch-target);
+  }
+
+  .toolbar .refresh {
+    grid-column: 3;
+    width: var(--dsw-touch-target);
+    min-width: var(--dsw-touch-target);
+    min-height: var(--dsw-touch-target);
+    padding: 0;
+  }
+
+  .toolbar .newFolder {
+    grid-column: 1;
+    padding-inline: var(--dsw-space-1);
+  }
+
+  .toolbar .upload {
+    grid-column: 2;
+  }
+
+  .toolbar .newFolder svg {
+    display: none;
+  }
+
+  .name {
+    font: var(--dsw-mobile-font-body);
+  }
+
+  .row:not(.folderRow) {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .row:not(.folderRow) .meta {
+    align-self: center;
+  }
+
+  .row:not(.folderRow) .actions {
+    grid-column: 2;
+    width: 100%;
+    padding-left: 0;
   }
 }

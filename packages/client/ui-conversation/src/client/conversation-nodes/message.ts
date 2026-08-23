@@ -5,7 +5,7 @@ import type {
 import {
   contextForm, contextProvenance, isAppendSurfaceEvent, isReplacementSurfaceEvent,
 } from '@deepseek-ai/dsh-client-runtime/client'
-import { isCollaborationAttributionNotice } from '../chat/message-sender.ts'
+import { isCollaborationAttributionNotice } from '../message-sender.ts'
 import type { InboxState } from './inbox.ts'
 import { chatNode } from './common.ts'
 

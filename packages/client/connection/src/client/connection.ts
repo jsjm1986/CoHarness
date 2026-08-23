@@ -117,13 +117,18 @@ export class ConnectionController {
       // state; otherwise a replayed pending interaction can be cleared by
       // the reconnect resync that follows the handshake.
       let ready = false
+      // Keep the initial replay behind the connected callback, while allowing
+      // the callback itself to start the runtime's unary baseline pulls. A
+      // callback can synchronously re-enter a fake carrier, so the release
+      // flag also keeps those frames ordered behind the already-buffered replay.
+      let releasing = false
       let generationLive = true
       const buffered: Array<
         | { kind: 'mux'; envelope: RpcRequest<MuxFrame> }
         | { kind: 'host'; envelope: RpcRequest<HostFrame> }
       > = []
       const dispatchMux = (envelope: RpcRequest<MuxFrame>): void => {
-        if (!ready) {
+        if (!ready || releasing) {
           if (generationLive && this.isGenerationActive(ac)) buffered.push({ kind: 'mux', envelope })
           return
         }
@@ -131,7 +136,7 @@ export class ConnectionController {
         this.callSink(() => { this.sinks.onMuxEnvelope?.(envelope) })
       }
       const dispatchHost = (envelope: RpcRequest<HostFrame>): void => {
-        if (!ready) {
+        if (!ready || releasing) {
           if (generationLive && this.isGenerationActive(ac)) buffered.push({ kind: 'host', envelope })
           return
         }
@@ -182,9 +187,15 @@ export class ConnectionController {
         // A state sink may synchronously stop this controller. Do not publish
         // a description for a generation that no longer exists afterward.
         if (this.isGenerationActive(ac)) {
+          // Open the live generation before invoking onConnected so its
+          // synchronous baseline pulls are not held behind the replay gate.
+          // `releasing` keeps any re-entrant stream delivery ordered until the
+          // callback has returned and the captured replay is flushed.
+          ready = true
+          releasing = true
           this.callSink(() => { this.sinks.onConnected?.(descriptionResult.value) })
+          releasing = false
           if (this.isGenerationActive(ac)) {
-            ready = true
             for (const item of buffered.splice(0)) {
               if (!this.isGenerationActive(ac)) {
                 buffered.length = 0

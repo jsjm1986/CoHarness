@@ -72,6 +72,13 @@ describe('SettingsRoot.module.css compact overlay', () => {
     expect(compact).toMatch(/\.options\s*\{[^}]*overscroll-behavior:\s*contain/)
   })
 
+  it('signals horizontally scrollable tabs at the compact edge', () => {
+    const compact = mediaBody('(max-width: 767px)')
+    expect(compact).toMatch(/\.navList\s*\{[^}]*overscroll-behavior-x:\s*contain/)
+    expect(compact).toMatch(/\.navList::after\s*\{[^}]*pointer-events:\s*none/)
+    expect(compact).toMatch(/background:\s*linear-gradient\(to right, transparent, var\(--dsw-alias-bg-layer-2\)\)/)
+  })
+
   it('gives the close control the touch target on coarse pointers', () => {
     const coarse = mediaBody('(pointer: coarse)')
     expect(coarse).toMatch(/\.trigger\s*\{[^}]*min-height:\s*var\(--dsw-touch-target\)/)

@@ -87,7 +87,7 @@ async function bootWeb(
     // The document HTTP consumer only registers routes through Connection;
     // without that transport it would remain pending during this host-only boot.
     { id: 'userdoc-http', disabled: true },
-    // The always-on reload chain waits for the browser roster and bound port
+    // The development-only reload chain waits for the browser roster and bound port
     // disabled above.
     { id: 'client-hmr', disabled: true },
     // The shipped `-auto` chooser resolves its interaction from a running

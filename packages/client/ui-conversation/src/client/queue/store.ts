@@ -6,6 +6,7 @@
  * projection — no second store, no copy.
  */
 import type { ObservableSnapshot, SessionFace } from '@deepseek-ai/dsh-client-runtime/client'
+import { queueReadFaceOf as sharedQueueReadFaceOf } from '../contract/queue.ts'
 import type { QueuedMessage } from '../input/contract.ts'
 
 /**
@@ -17,8 +18,5 @@ import type { QueuedMessage } from '../input/contract.ts'
  * @returns the queue read face (snapshot reference stable while the queue is unchanged).
  */
 export function queueReadFaceOf(session: SessionFace): ObservableSnapshot<readonly QueuedMessage[]> {
-  return {
-    getSnapshot: () => session.getSnapshot().queue,
-    subscribe: fn => session.subscribe(fn),
-  }
+  return sharedQueueReadFaceOf(session)
 }

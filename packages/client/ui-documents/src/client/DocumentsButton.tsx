@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { IconBrowseOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import { DocumentsModal } from './DocumentsModal.tsx'
-import type { UserDocRef } from '@deepseek-ai/dsh-userdoc'
+import type { UserDocRef } from './documents-client.ts'
 import { NS } from './locales.ts'
 import css from './DocumentsButton.module.css'
 

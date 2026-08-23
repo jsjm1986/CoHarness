@@ -7,19 +7,23 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { useMediaQuery } from '@deepseek-ai/dsh-client-ui-primitives/src/use-media-query.ts'
 
-/** Minimal MediaQueryList stub: one listener slot plus a settable match state. */
+/** Minimal MediaQueryList stub: a listener set plus a settable match state. */
 function mediaListStub(initial: boolean) {
   let matches = initial
-  let listener: (() => void) | null = null
+  const listeners = new Set<() => void>()
+  let addCount = 0
+  let removeCount = 0
   const list = {
     get matches() { return matches },
-    addEventListener: (_type: string, fn: () => void) => { listener = fn },
-    removeEventListener: () => { listener = null },
+    addEventListener: (_type: string, fn: () => void) => { addCount += 1; listeners.add(fn) },
+    removeEventListener: (_type: string, fn: () => void) => { removeCount += 1; listeners.delete(fn) },
   } as unknown as MediaQueryList
   return {
     list,
-    set(next: boolean) { matches = next; listener?.() },
-    get subscribed() { return listener !== null },
+    set(next: boolean) { matches = next; for (const listener of [...listeners]) listener() },
+    get subscribed() { return listeners.size > 0 },
+    get addCount() { return addCount },
+    get removeCount() { return removeCount },
   }
 }
 
@@ -45,6 +49,26 @@ describe('useMediaQuery', () => {
     expect(result.current).toBe(false)
   })
 
+  it('shares one native listener across hook instances and removes it after the last unmount', () => {
+    const stub = mediaListStub(false)
+    vi.stubGlobal('matchMedia', vi.fn(() => stub.list))
+    const first = renderHook(() => useMediaQuery('(max-width: 767px)'))
+    const second = renderHook(() => useMediaQuery('(max-width: 767px)'))
+    expect(stub.addCount).toBe(1)
+    expect(stub.removeCount).toBe(0)
+
+    act(() => { stub.set(true) })
+    expect(first.result.current).toBe(true)
+    expect(second.result.current).toBe(true)
+
+    first.unmount()
+    expect(stub.subscribed).toBe(true)
+    expect(stub.removeCount).toBe(0)
+    second.unmount()
+    expect(stub.subscribed).toBe(false)
+    expect(stub.removeCount).toBe(1)
+  })
+
   it('resubscribes when the query changes and unsubscribes on unmount', () => {
     const lists = new Map<string, ReturnType<typeof mediaListStub>>()
     vi.stubGlobal('matchMedia', vi.fn((query: string) => {
@@ -61,5 +85,24 @@ describe('useMediaQuery', () => {
     expect(lists.get('(max-width: 767px)')!.subscribed).toBe(false)
     unmount()
     expect(lists.get('(pointer: coarse)')!.subscribed).toBe(false)
+  })
+
+  it('moves mounted subscribers when the matchMedia implementation is replaced', () => {
+    const first = mediaListStub(false)
+    const second = mediaListStub(true)
+    vi.stubGlobal('matchMedia', vi.fn(() => first.list))
+    const firstHook = renderHook(() => useMediaQuery('(max-width: 767px)'))
+    const { result } = firstHook
+    expect(result.current).toBe(false)
+    vi.stubGlobal('matchMedia', vi.fn(() => second.list))
+    const rerender = renderHook(() => useMediaQuery('(max-width: 767px)'))
+    expect(rerender.result.current).toBe(true)
+    expect(first.removeCount).toBe(1)
+    expect(second.addCount).toBe(1)
+    rerender.unmount()
+    // The original hook is still mounted and now shares the replacement list.
+    act(() => { second.set(false) })
+    expect(result.current).toBe(false)
+    firstHook.unmount()
   })
 })

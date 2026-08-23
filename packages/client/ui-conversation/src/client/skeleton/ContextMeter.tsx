@@ -8,9 +8,9 @@ import { useEffect, useRef, useState } from 'react'
 import type { UseProjection } from '@deepseek-ai/dsh-client-runtime/client'
 // Type-only: the `contextPressure` / `contextBreakdown` projection key merges.
 import type {} from '@deepseek-ai/dsh-token-meter/client'
-import { Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+import { MobileSheetBackdrop, Tooltip, useMediaQuery } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ComposerBarProps } from '../contract/slots.ts'
-import { contextOccupancy, formatTokens } from '../chat/StatsLine.tsx'
+import { contextOccupancy, formatTokens } from '../stats.ts'
 import css from './ContextMeter.module.css'
 
 /** Ring geometry: 14px viewBox, 2px stroke. */
@@ -41,6 +41,7 @@ export function ContextMeter({ useProjection, t }: ContextMeterProps) {
   const pressure = useProjection('contextPressure')
   const breakdown = useProjection('contextBreakdown')
   const [open, setOpen] = useState(false)
+  const phone = useMediaQuery('(max-width: 767px)')
   const rootRef = useRef<HTMLSpanElement | null>(null)
   const context = contextOccupancy(pressure)
   const available = context !== null
@@ -112,6 +113,7 @@ export function ContextMeter({ useProjection, t }: ContextMeterProps) {
           </svg>
         </button>
       </Tooltip>
+      {open && phone && <MobileSheetBackdrop onClose={() => { setOpen(false) }} />}
       {open && (
         <div className={css.panel} role="dialog" aria-label={t('context.used')}>
           <div className={css.header}>

@@ -31,4 +31,22 @@ describe('primitive compact chrome', () => {
     expect(disclosure).toContain('flex-wrap: wrap')
     expect(disclosure).toContain('var(--dsw-touch-target)')
   })
+
+  it('presents portaled menus as safe-area phone sheets', () => {
+    const menu = load('../src/Menu.module.css')
+    const backdrop = load('../src/MobileSheetBackdrop.module.css')
+    expect(menu).toContain('bottom sheet gives every row')
+    expect(menu).toContain('var(--dsw-mobile-sheet-bottom)')
+    expect(menu).toContain('var(--dsw-mobile-sheet-max-height)')
+    expect(menu).toContain('!important')
+    expect(backdrop).toContain('@media (max-width: 767px)')
+    expect(backdrop).toContain('z-index: 1090')
+  })
+
+  it('keeps modal sheets scrollable, elevated, and animated consistently', () => {
+    const modal = load('../src/Modal.module.css')
+    expect(modal).toContain('mobile-modal-sheet-in')
+    expect(modal).toContain('--dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2)')
+    expect(modal).toContain('var(--dsw-safe-bottom)')
+  })
 })

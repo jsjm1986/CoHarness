@@ -42,6 +42,8 @@ const TOOL_TURN_INTERVAL = 10
 const TOOLS_PER_TOOL_TURN = 10
 const EXPECTED_TOOL_CALLS = LONG_HISTORY_TURNS / TOOL_TURN_INTERVAL * TOOLS_PER_TOOL_TURN
 const EXPECTED_TRAJECTORY_ROWS = 2_100
+// The table's aria-rowcount includes its header row as well as these records.
+const EXPECTED_TRAJECTORY_ARIA_ROWS = EXPECTED_TRAJECTORY_ROWS + 1
 const DEFAULT_HISTORY_TURNS = 24
 const PERF_REPLAY_CONTEXT_WINDOW = 10_000_000
 const STREAM_PACE_MS = 8
@@ -804,6 +806,18 @@ async function conversationTurns(page: Page): Promise<number> {
   return stableCount(page.locator('[data-chat-flow-key^="9:turn-tail"]'), count => count > 0)
 }
 
+/** Read the logical trajectory cardinality while the table may render a virtual subset. */
+async function trajectoryLogicalRows(page: Page): Promise<number> {
+  const table = page.locator('[data-trajectory-scroll] table')
+  await table.waitFor({ timeout: 30_000 })
+  const raw = await table.getAttribute('aria-rowcount')
+  const count = Number(raw)
+  if (!Number.isSafeInteger(count) || count < 1) {
+    throw new Error(`trajectory table has invalid aria-rowcount ${JSON.stringify(raw)}`)
+  }
+  return count
+}
+
 function retainedDelta(
   before: RetainedBrowserState,
   after: RetainedBrowserState,
@@ -910,13 +924,18 @@ async function openPerformancePage(
   await world.page.goto(world.scaffold.baseUrl, { waitUntil: 'load' })
   await world.page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
   const group = world.page.getByRole('treeitem').first()
+  // Workspace grouping renders the stable `Ungrouped` bucket label without a
+  // count. The caller asserts cardinality after expanding the bucket; waiting
+  // on a presentation count here would skip the measured path.
+  await group.waitFor({ timeout: 30_000 })
+  const countLabel = `${String(expectedSessions)} ${expectedSessions === 1 ? 'session' : 'sessions'}`
   await expect.poll(() => group.textContent(), { timeout: 30_000 })
-    .toContain(`${String(expectedSessions)} ${expectedSessions === 1 ? 'session' : 'sessions'}`)
+    .toMatch(new RegExp(`Ungrouped|未分组|${countLabel}`, 'i'))
   return group
 }
 
 async function openLongHistory(page: Page): Promise<number> {
-  await page.getByRole('textbox', { name: 'Search name, keywords...', exact: true })
+  await page.getByRole('textbox', { name: /Search sessions\.\.\.|Search name, keywords\.\.\./ })
     .fill('LONG_PERF_SENTINEL')
   const results = page.getByRole('tree', { name: 'Search results' }).getByRole('treeitem')
   await expect.poll(() => results.count(), { timeout: 60_000 }).toBe(1)
@@ -1202,6 +1221,12 @@ describe('manual web performance: complex workspace and history', () => {
 
       const sidebar = await measure(cdp, async () => {
         await group.click()
+        // The grouped browser keeps only five session rows in the first
+        // expansion. Open its explicit overflow control before measuring the
+        // full high-cardinality DOM path.
+        const more = page.getByRole('button', { name: /Show \d+ more sessions|展开其余 \d+ 个会话/ })
+        await more.waitFor({ timeout: 30_000 })
+        await more.click()
         return stableCount(
           page.getByRole('treeitem'),
           count => count === SIDEBAR_SESSION_COUNT + 2,
@@ -1212,7 +1237,7 @@ describe('manual web performance: complex workspace and history', () => {
       await expect.poll(() => page.getByRole('treeitem').count()).toBe(1)
 
       const contentSearch = await measure(cdp, async () => {
-        await page.getByRole('textbox', { name: 'Search name, keywords...', exact: true })
+        await page.getByRole('textbox', { name: /Search sessions\.\.\.|Search name, keywords\.\.\./ })
           .fill('LONG_PERF_SENTINEL')
         const results = page.getByRole('tree', { name: 'Search results' }).getByRole('treeitem')
         await expect.poll(() => results.count(), { timeout: 60_000 }).toBe(1)
@@ -1226,12 +1251,22 @@ describe('manual web performance: complex workspace and history', () => {
       })
       expect(opened.value).toBe(DEFAULT_HISTORY_TURNS)
 
-      const trajectoryRows = page.getByRole('row')
+      const trajectoryRows = page.locator('[data-trajectory-scroll] tr[data-trajectory-row-key]')
+      let coldTrajectoryMountedRows = 0
       const coldTrajectory = await measure(cdp, async () => {
         await page.getByRole('tab', { name: 'Trajectory', exact: true }).click()
-        return stableCount(trajectoryRows, count => count === EXPECTED_TRAJECTORY_ROWS)
+        const logicalRows = await trajectoryLogicalRows(page)
+        coldTrajectoryMountedRows = await stableCount(
+          trajectoryRows,
+          count => count > 0 && count <= EXPECTED_TRAJECTORY_ROWS,
+        )
+        return logicalRows
       })
-      expect(coldTrajectory.value).toBe(EXPECTED_TRAJECTORY_ROWS)
+      // Tail paging exposes the loaded window first; the full logical count is
+      // asserted after the Chat history has been paged in below.
+      expect(coldTrajectory.value).toBeGreaterThan(0)
+      expect(coldTrajectory.value).toBeLessThan(EXPECTED_TRAJECTORY_ROWS)
+      expect(coldTrajectoryMountedRows).toBeLessThan(coldTrajectory.value)
 
       const collapseTurns = await measure(cdp, async () => {
         await page.getByRole('button', { name: 'Collapse turns', exact: true }).click()
@@ -1259,11 +1294,18 @@ describe('manual web performance: complex workspace and history', () => {
         historyPages.push({ turns, measurement: older.measurement })
       }
 
+      let warmTrajectoryMountedRows = 0
       const warmTrajectory = await measure(cdp, async () => {
         await page.getByRole('tab', { name: 'Trajectory', exact: true }).click()
-        return stableCount(trajectoryRows, count => count === EXPECTED_TRAJECTORY_ROWS)
+        const logicalRows = await trajectoryLogicalRows(page)
+        warmTrajectoryMountedRows = await stableCount(
+          trajectoryRows,
+          count => count > 0 && count <= EXPECTED_TRAJECTORY_ROWS,
+        )
+        return logicalRows
       })
-      expect(warmTrajectory.value).toBe(EXPECTED_TRAJECTORY_ROWS)
+      expect(warmTrajectory.value).toBe(EXPECTED_TRAJECTORY_ARIA_ROWS)
+      expect(warmTrajectoryMountedRows).toBeLessThan(EXPECTED_TRAJECTORY_ARIA_ROWS)
       const warmConversation = await measure(cdp, async () => {
         await page.getByRole('tab', { name: 'Chat', exact: true }).click()
         return conversationTurns(page)
@@ -1289,11 +1331,19 @@ describe('manual web performance: complex workspace and history', () => {
         sidebarExpand: sidebar.measurement,
         contentSearch: contentSearch.measurement,
         openLongHistory: { initialTurns: opened.value, ...opened.measurement },
-        coldTrajectory: { rows: coldTrajectory.value, ...coldTrajectory.measurement },
+        coldTrajectory: {
+          ariaRows: coldTrajectory.value,
+          mountedRows: coldTrajectoryMountedRows,
+          ...coldTrajectory.measurement,
+        },
         collapseTurns: { rows: collapseTurns.value, ...collapseTurns.measurement },
         trajectorySearch: { rows: trajectorySearch.value, ...trajectorySearch.measurement },
         historyPages,
-        warmTrajectory: { rows: warmTrajectory.value, ...warmTrajectory.measurement },
+        warmTrajectory: {
+          ariaRows: warmTrajectory.value,
+          mountedRows: warmTrajectoryMountedRows,
+          ...warmTrajectory.measurement,
+        },
         warmConversation: { turns: warmConversation.value, ...warmConversation.measurement },
       }, null, 2)}`)
       expect(world.tripwire.warnings).toEqual([])

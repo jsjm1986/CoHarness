@@ -7,6 +7,90 @@
  */
 import { useCallback, useSyncExternalStore } from 'react'
 
+type MatchMedia = Window['matchMedia']
+
+interface QueryEntry {
+  readonly owner: Window
+  readonly matchMedia: MatchMedia
+  readonly list: MediaQueryList
+  readonly subscribers: Set<() => void>
+  readonly onChange: () => void
+}
+
+/** One native listener per exact query while at least one hook is mounted. */
+const queryEntries = new Map<string, QueryEntry>()
+
+function currentMatchMedia(): MatchMedia | undefined {
+  // The client bundle can be imported by the node-side test/compiler faces.
+  // The DOM lib marks `window` as present, while those faces do not install it.
+  // oxlint-disable-next-line typescript/no-unnecessary-condition
+  const matchMedia = globalThis.window?.matchMedia
+  return typeof matchMedia === 'function' ? matchMedia : undefined
+}
+
+function removeNativeListener(query: string, entry: QueryEntry): void {
+  entry.list.removeEventListener('change', entry.onChange)
+  if (queryEntries.get(query) === entry) queryEntries.delete(query)
+}
+
+function createEntry(
+  query: string,
+  owner: Window,
+  matchMedia: MatchMedia,
+  subscribers: Set<() => void>,
+): QueryEntry {
+  const list = matchMedia.call(owner, query)
+  const entry: QueryEntry = {
+    owner,
+    matchMedia,
+    list,
+    subscribers,
+    onChange: () => {
+      // Copying makes a subscriber free to unsubscribe during notification
+      // without changing which listeners receive this browser event.
+      for (const subscriber of [...subscribers]) subscriber()
+    },
+  }
+  queryEntries.set(query, entry)
+  if (subscribers.size > 0) list.addEventListener('change', entry.onChange)
+  return entry
+}
+
+function entryForSubscription(query: string, matchMedia: MatchMedia): QueryEntry {
+  const owner = window
+  const existing = queryEntries.get(query)
+  if (existing !== undefined && existing.owner === owner && existing.matchMedia === matchMedia) {
+    return existing
+  }
+  // A replaced test realm or browser shim must not strand mounted hooks on
+  // the old MediaQueryList. Carry the subscriber set to the new list.
+  const subscribers = existing?.subscribers ?? new Set<() => void>()
+  if (existing !== undefined) removeNativeListener(query, existing)
+  return createEntry(query, owner, matchMedia, subscribers)
+}
+
+function subscribeToQuery(query: string, onChange: () => void): () => void {
+  const matchMedia = currentMatchMedia()
+  if (matchMedia === undefined) return () => {}
+  const entry = entryForSubscription(query, matchMedia)
+  entry.subscribers.add(onChange)
+  if (entry.subscribers.size === 1) entry.list.addEventListener('change', entry.onChange)
+  return () => {
+    if (!entry.subscribers.delete(onChange) || entry.subscribers.size !== 0) return
+    removeNativeListener(query, entry)
+  }
+}
+
+function readQuery(query: string): boolean {
+  const matchMedia = currentMatchMedia()
+  if (matchMedia === undefined) return false
+  const entry = queryEntries.get(query)
+  if (entry !== undefined && entry.owner === window && entry.matchMedia === matchMedia) {
+    return entry.list.matches
+  }
+  return matchMedia.call(window, query).matches
+}
+
 /**
  * Subscribe to a media query.
  * @param query - media query string, e.g. `'(pointer: coarse)'`.
@@ -14,18 +98,6 @@ import { useCallback, useSyncExternalStore } from 'react'
  * unavailable (jsdom and node e2e runs booting the client tree).
  */
 export function useMediaQuery(query: string): boolean {
-  const subscribe = useCallback((onChange: () => void) => {
-    // jsdom (the unit lane) implements no matchMedia despite lib.dom's
-    // non-optional typing; the optional call keeps that lane unsubscribed.
-    // oxlint-disable-next-line typescript/no-unnecessary-condition
-    const list = window.matchMedia?.(query)
-    // oxlint-disable-next-line typescript/no-unnecessary-condition
-    if (list === undefined) return () => {}
-    list.addEventListener('change', onChange)
-    return () => { list.removeEventListener('change', onChange) }
-  }, [query])
-  // jsdom (the unit lane) implements no matchMedia despite lib.dom's
-  // non-optional typing; the optional call keeps that lane on false.
-  // oxlint-disable-next-line typescript/no-unnecessary-condition
-  return useSyncExternalStore(subscribe, () => window.matchMedia?.(query).matches ?? false)
+  const subscribe = useCallback((onChange: () => void) => subscribeToQuery(query, onChange), [query])
+  return useSyncExternalStore(subscribe, () => readQuery(query))
 }

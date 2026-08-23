@@ -126,6 +126,10 @@ The keyless [CI workflow](../.github/workflows/ci.yml) groups independent gates 
 
 The root [contributor instructions](../AGENTS.md#commands) summarize common commands, while [`package.json`](../package.json) and [scripts/run-gates.ts](../scripts/run-gates.ts) own the current script and gate inventories. Select the smallest checks that cover the changed surface. Documentation changes use `pnpm run doc-sync`; package-public behavior changes also update the owning README or JSDoc, and built-artifact checks require `pnpm run build` first.
 
+### Plugin surfaces and performance
+
+`pnpm run verify-plugin-surfaces` reports the runtime-plugin, static-client, Bundle, and browser-prefetch partition without adding runtime metadata. Ordinary Web launches keep client-plugin HMR disabled so the host does not poll client bundles; set `DSH_CLIENT_HMR=1` when `pnpm run dev:web` is rebuilding bundles and no-refresh reloads are required. `pnpm run perf:command -- --label <name> -- <command> [args...]` measures a built command with warm-up and P95 output; keep performance measurements outside correctness tests and compare like-for-like Node, platform, and artifact builds.
+
 ### Demos
 
 Run the repository build separately before using these source-checkout demos:

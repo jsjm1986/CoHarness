@@ -13,6 +13,10 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.build.json"
   },
+  "dependencies": {
+    "@deepseek-ai/dsh-client-ui-directory-picker-browse": "*",
+    "@deepseek-ai/dsh-host-directory-picker-browse": "*"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"

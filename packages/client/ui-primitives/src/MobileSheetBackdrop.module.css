@@ -1,0 +1,28 @@
+/* One mask for every compact sheet. Keeping this in the primitive package
+   prevents feature presenters from drifting in opacity, blur, or stacking
+   order as new mobile surfaces are added. */
+.root {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .root {
+    position: fixed;
+    z-index: 1090;
+    inset: 0;
+    display: block;
+    background: var(--dsw-alias-bg-mask-1);
+    backdrop-filter: var(--dsw-mask-blur);
+    animation: mobile-sheet-mask-in var(--ds-transition-duration) var(--ds-ease-in-out);
+  }
+}
+
+@keyframes mobile-sheet-mask-in {
+  from { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root {
+    animation: none;
+  }
+}

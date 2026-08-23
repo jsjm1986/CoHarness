@@ -8,6 +8,7 @@ export type ProjectParticipant = CollaborationParticipant & {
   readonly scope: Extract<CollaborationParticipant['scope'], { kind: 'project' }>
 }
 
+/* jscpd:ignore-start -- identical boundary guards are kept local to each capability package. */
 function record(value: unknown): Record<string, unknown> | undefined {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -17,6 +18,7 @@ function record(value: unknown): Record<string, unknown> | undefined {
 function positiveInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0
 }
+/* jscpd:ignore-end */
 
 /**
  * Parse one authenticated participant snapshot, rejecting malformed attribution instead of dropping it.

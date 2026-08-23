@@ -20,7 +20,7 @@ import type { CSSProperties, ReactNode } from 'react'
 import type { PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import { IconPanelLeftOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { computeColumns, DETAILS_DEFAULT, SIDEBAR_DEFAULT } from './columns.ts'
-import { viewportClassOf } from './viewport.ts'
+import { isShortCompactViewport, viewportClassOf } from './viewport.ts'
 import type { createLayoutStore } from './stores.ts'
 import css from './AppFrame.module.css'
 
@@ -105,9 +105,19 @@ export function AppFrame({
     return current !== undefined && s.byId[current]?.blank === false ? current : undefined
   })
   const currentSession = useSessions(s => s.current)
+  const currentTitle = useSessions((s) => {
+    const current = s.current
+    if (current === undefined) return undefined
+    const summary = s.byId[current]
+    return summary?.blank === false ? summary.displayTitle : undefined
+  })
   const frameRef = useRef<HTMLDivElement | null>(null)
+  const topbarToggleRef = useRef<HTMLButtonElement | null>(null)
+  const drawerWasOpen = useRef(false)
   const [viewport, setViewport] = useState(() => window.innerWidth)
+  const [viewportHeight, setViewportHeight] = useState(() => window.innerHeight)
   const mode = viewportClassOf(viewport)
+  const shortCompact = isShortCompactViewport(viewport, viewportHeight)
   // compact and medium lift details out of the grid into an overlay; the
   // sidebar column survives into medium (rail or squeezed-open) while
   // compact re-seats it as the drawer.
@@ -153,8 +163,11 @@ export function AppFrame({
     const observer = new ResizeObserver(() => {
       raf ??= requestAnimationFrame(() => {
         raf = null
-        const width = el.getBoundingClientRect().width
-        if (width > 0) setViewport(width)
+        const rect = el.getBoundingClientRect()
+        if (rect.width > 0) {
+          setViewport(rect.width)
+          if (rect.height > 0) setViewportHeight(rect.height)
+        }
       })
     })
     observer.observe(el)
@@ -183,6 +196,37 @@ export function AppFrame({
   colsRef.current = cols
   const drawerOpen = mode === 'compact' && panels.narrowExpanded
   const detailsOpen = overlayPanels && detailsSession !== undefined && panels.details > 0
+
+  // The shell owns the two mobile/medium overlay surfaces, so Escape is a
+  // shell action only when a nested menu/dialog does not own the gesture.
+  // Nested surfaces register their own document listeners and keep their
+  // focus inside a menu or dialog; closing the drawer underneath them would
+  // otherwise make an Escape press feel like two back steps.
+  useEffect(() => {
+    if (!drawerOpen && !detailsOpen) return
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      const target = event.target
+      if (target instanceof Element
+        && target.closest('[role="dialog"], [role="menu"], [role="listbox"]') !== null) return
+      event.preventDefault()
+      if (detailsOpen) actions.closeDetails()
+      else actions.collapseNarrow()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => { document.removeEventListener('keydown', onKeyDown) }
+  }, [actions, detailsOpen, drawerOpen])
+
+  // Navigation from the drawer can close it without another pointer gesture
+  // (session selection, scrim tap, or Escape). Return focus to the persistent
+  // topbar control so keyboard and switch-control users never lose their
+  // place in the shell.
+  useEffect(() => {
+    if (drawerWasOpen.current && !drawerOpen) {
+      topbarToggleRef.current?.focus({ preventScroll: true })
+    }
+    drawerWasOpen.current = drawerOpen
+  }, [drawerOpen])
 
   // The drag base is the rendered width captured at drag start (grabbing a
   // concession-clamped panel must not jump back to the stored preference);
@@ -216,6 +260,7 @@ export function AppFrame({
             : `${cols.sidebar}px minmax(0, 1fr) ${cols.details}px`,
         }}
       data-viewport={mode}
+      data-viewport-short={shortCompact || undefined}
       data-sidebar-collapsed={sidebarCollapsed || undefined}
       data-details-collapsed={(overlayPanels ? !detailsOpen : cols.details === 0) || undefined}
       data-dragging={dragging || undefined}
@@ -225,6 +270,7 @@ export function AppFrame({
           {/* The compact mode has no rail, so the shell owns the drawer
               affordance; ui-sidebar's own toggle serves the wider modes. */}
           <button
+            ref={topbarToggleRef}
             type="button"
             className={css.topbarToggle}
             aria-label={drawerOpen ? t('drawer.close') : t('drawer.open')}
@@ -233,6 +279,11 @@ export function AppFrame({
           >
             <IconPanelLeftOutline16 />
           </button>
+          <div className={css.topbarContext} data-mobile-app-header>
+            <span className={css.topbarTitle} title={currentTitle ?? t('app.title')}>
+              {currentTitle ?? t('app.title')}
+            </span>
+          </div>
         </div>
       )}
       {mode === 'compact'

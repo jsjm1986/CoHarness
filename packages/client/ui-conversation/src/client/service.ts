@@ -61,7 +61,14 @@ export interface IConversation {
    * @returns completion of the page pull.
    */
   loadOlder(): Promise<void>
-  /** Attach one already-stored document to the selected session draft. */
+  /**
+   * Attach one already-stored user document to a session's composer without
+   * uploading a second copy.
+   * @param sessionId - target session id.
+   * @param ref - durable document reference returned by the user-document service.
+   * @returns true when the composer accepted the document; false when the
+   * session is unavailable or its input is in a locked submission phase.
+   */
   attachDocument(sessionId: SessionId, ref: UserDocRef): boolean
 }
 
@@ -380,8 +387,13 @@ export class ConversationController extends Service implements IConversation {
    */
   retryDraftDocument(sessionId: SessionId, id: DraftDocumentId): void {
     const current = this.draftDocuments.get(id)
-    if (current === undefined || current.sessionId !== sessionId || !current.ownsUploadedFile
-      || current.file === undefined || current.descriptor.status !== 'failed') return
+    if (
+      current === undefined
+      || current.sessionId !== sessionId
+      || current.descriptor.status !== 'failed'
+      || current.file === undefined
+      || !current.ownsUploadedFile
+    ) return
     const entry: DraftDocumentEntry = {
       ...current,
       controller: new AbortController(),

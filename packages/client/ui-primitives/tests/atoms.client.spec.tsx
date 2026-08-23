@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Button, ConnectionBanner, Input, Menu, Modal, Pill } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, ConnectionBanner, Input, Menu, MobileSheetBackdrop, Modal, Pill } from '@deepseek-ai/dsh-client-ui-primitives'
 import { POINTER_GRACE_MS } from '../src/pointer-grace.ts'
 
 afterEach(cleanup)
@@ -405,6 +405,17 @@ describe('Modal', () => {
     const mask = document.querySelector('[aria-hidden="true"]') as HTMLElement
     fireEvent.click(mask)
     expect(onClose).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('MobileSheetBackdrop', () => {
+  it('closes once from the pointer gesture and keeps the surface aria-hidden', () => {
+    const onClose = vi.fn()
+    render(<MobileSheetBackdrop onClose={onClose} />)
+    const backdrop = document.querySelector('[aria-hidden="true"]') as HTMLElement
+    fireEvent.pointerDown(backdrop)
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(backdrop.getAttribute('aria-hidden')).toBe('true')
   })
 })
 

@@ -306,6 +306,20 @@
   left: 0;
 }
 
+/* A trajectory event-details sheet is a deliberate reading takeover. Raise
+   the whole session-view stacking context above the absolute composer seat;
+   raising only the ledger's inner child is insufficient in WebKit because
+   the flex view wrapper establishes the nearer paint boundary. The normal
+   trajectory list keeps the composer above it and therefore preserves the
+   send/queue controls. */
+@media (max-width: 767px) {
+  .scrollBody:has([data-conversation-composer-overlay]):has([data-trajectory-details])
+    > :global([data-slot='conversation.session']) {
+    position: relative;
+    z-index: 8;
+  }
+}
+
 /* Hero phase: the composer stack (hero chrome + workspace row + card) is
    flex-centered in the column; composer phase docks it at the bottom. Flex,
    NOT absolute+transform: a transform would make this box the containing
@@ -356,13 +370,18 @@
 }
 
 :global([data-viewport='compact']) .header {
-  padding: var(--dsw-space-2) var(--dsw-space-3) 0;
+  padding: 0 var(--dsw-mobile-page-inset);
+}
+
+:global([data-viewport-short]) .header {
+  min-height: 40px;
 }
 
 :global([data-viewport='compact']) .tabs {
-  gap: var(--dsw-space-4);
+  gap: var(--dsw-space-5);
   overflow-x: auto;
   overflow-y: hidden;
+  padding-inline: var(--dsw-space-2);
 }
 
 :global([data-viewport='compact']) .tab {
@@ -370,15 +389,58 @@
   display: inline-flex;
   align-items: flex-end;
   min-height: var(--dsw-touch-target);
+  font: var(--dsw-mobile-font-secondary);
+}
+
+:global([data-viewport-short]) .tab {
+  min-height: 40px;
+  padding-bottom: 8px;
 }
 
 :global([data-viewport='compact']) .titleRow {
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  min-height: 40px;
+  gap: var(--dsw-space-1);
+}
+
+/* The AppFrame owns the phone-level title. Keep non-title breadcrumb segments
+   and subagent lineage switchers available, but remove the ordinary current
+   title so it is not painted twice. */
+:global([data-viewport='compact']) .crumbs {
+  display: none;
+}
+
+:global([data-viewport='compact']) .crumbSeg:has(.crumbCurrent) {
+  display: none;
+}
+
+:global([data-viewport='compact']) .titleCluster {
+  display: none;
+}
+
+:global([data-viewport='compact']) .headerActions,
+:global([data-viewport='compact']) .headerUtilities {
+  min-width: 0;
+  overflow-x: auto;
+  gap: var(--dsw-space-1);
+  scrollbar-width: none;
+}
+
+:global([data-viewport='compact']) .headerActions button,
+:global([data-viewport='compact']) .headerUtilities button {
   min-height: var(--dsw-touch-target);
+  flex: none;
+}
+
+:global([data-viewport='compact']) .headerActions::-webkit-scrollbar,
+:global([data-viewport='compact']) .headerUtilities::-webkit-scrollbar {
+  display: none;
 }
 
 :global([data-viewport='compact']) .headerUtilities {
   margin-left: auto;
+  width: 100%;
+  justify-content: flex-end;
 }
 
 :global([data-viewport='compact']) .crumb {
@@ -392,11 +454,30 @@
   padding-left: 0;
 }
 
+:global([data-viewport-short]) .composerHero {
+  padding-bottom: var(--dsw-space-4);
+}
+
+/* Short active phones need a small floor below the stats trigger: the seat is
+   sticky at the visual viewport edge, so without this reserve the final line
+   sits on the last device pixel and its touch target is visibly cut off. */
+:global([data-viewport-short]) .root[data-phase='active'] .composerSeat {
+  padding-bottom: var(--dsw-space-2);
+}
+
 /* Hero: the composer sits inside the session scroll body; center there so
    the tree seat matches active (sticky footer) without a Root remount. */
 .root[data-phase='hero'] .scrollBody {
   justify-content: center;
   overflow-y: auto;
+}
+
+/* The hero is a single composed group. Centering the group in the available
+   visual viewport keeps tall phones from leaving a large dead lower half while
+   short phones still receive the same safe-area and composer constraints. */
+:global([data-viewport='compact']) .root[data-phase='hero'] .scrollBody {
+  justify-content: center;
+  padding-top: 0;
 }
 
 /* Settling (session replaying, hero/docked unknown): keep the composer seat

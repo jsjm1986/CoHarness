@@ -103,7 +103,7 @@ src/client/
   index.ts     public contract surface
 ```
 
-Domain implementation files never import a sibling domain; shared surfaces route through `contract/`. `scripts/verify-client-domain-graph.ts` enforces the layering (contract=0, domains=1, apply/index=2; imports may only point at levels ≤ own; sibling-domain edges fail). Tool presentation is already a separate `ui-tool` package and reaches chat and details only through the slots ui-conversation declares.
+Domain implementation files never make runtime/value imports from a sibling domain; shared surfaces route through `contract/`. Erased type-only projection imports are allowed because they create no browser module edge or runtime cost. `scripts/verify-client-domain-graph.ts` enforces the layering (contract=0, domains=1, apply/index=2; imports may only point at levels ≤ own; live sibling-domain edges fail). Tool presentation is already a separate `ui-tool` package and reaches chat and details only through the slots ui-conversation declares.
 
 ## How to develop
 

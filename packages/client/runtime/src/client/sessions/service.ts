@@ -30,7 +30,7 @@ import type { SnapshotStore } from '../contract/store.ts'
 import { createSnapshotStore } from '../contract/store.ts'
 import type { SessionFace } from '../contract/session.ts'
 import type { AgentContext, ISessions } from '../contract/sessions.ts'
-import { createScope, scopeOf as scopeTagOf } from '../agents/scope.ts'
+import { createScope, scopeOf as scopeTagOf } from '../scope.ts'
 import type { ConversationRuntime } from './conversation-assembler.ts'
 import { SessionManager } from './manager.ts'
 import type { SessionRemotes } from './remotes.ts'
@@ -151,10 +151,10 @@ export interface SessionBinding {
   readonly ctx: AgentContext
 }
 
-// Scope primitives live in ../agents/scope.ts (the client mirror of host
+// Scope primitives live in ../scope.ts (the client mirror of host
 // dsh-scope, keyed by Agent identity); re-exported here so existing
 // consumers keep their import site.
-export { scopeOf } from '../agents/scope.ts'
+export { scopeOf } from '../scope.ts'
 
 /**
  * Workspace display title of a session cwd: the path's last non-empty

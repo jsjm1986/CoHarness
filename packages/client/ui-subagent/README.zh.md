@@ -12,6 +12,8 @@ one-shot child 始终选用只读编辑器，并将 transcript（文本记录）
 
 `@` source 仍然刻意保持独立且惰性。候选是从 `ctx.sessions.list` 零 RPC 得到的运行中 child；pick 会插入字面文本 `@label `，codec 投影为 `@label`。它不参与命令裁决，也不会把 label 解析成继续执行地址。
 
+手机视口下，portal 的目录会变为遵守安全区的 Sheet，复用共享遮罩并把行提升到触控尺寸；树的键盘导航和关闭后的焦点返回保持不变。
+
 ## 模型体验
 
 ### 用户提示词中的 subagent label 文本

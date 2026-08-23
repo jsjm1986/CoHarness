@@ -875,6 +875,10 @@
   background: var(--dsw-alias-bg-layer-1);
 }
 
+.detailsBackdrop {
+  display: none;
+}
+
 .detailsResizeHandle {
   position: absolute;
   z-index: 6;
@@ -1049,6 +1053,26 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
+}
+
+@media (max-width: 767px) {
+  /* The compact summary is one reading column, not two nested scrollports.
+     Keeping the overview and section previews in normal flow prevents the
+     short 320px sheet from shrinking the actual status/value rows to a few
+     pixels. The outer detail body owns the only scroll position. */
+  .detailBodySummary {
+    display: block;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .detailBodySummary > .overview,
+  .detailBodySummary > .compactedSummary {
+    display: block;
+    min-height: auto;
+    max-height: none;
+    overflow: visible;
+  }
 }
 
 .summaryScrollRegion {
@@ -1792,23 +1816,87 @@
 
 /* Compact-viewport tightening (below the 768 medium boundary, docs/web-styling.md). */
 @media (max-width: 767px) {
+  .detailsBackdrop {
+    position: fixed;
+    z-index: 4;
+    inset: 0;
+    display: block;
+    background: var(--dsw-alias-bg-mask-1);
+    backdrop-filter: var(--dsw-mask-blur);
+    animation: trajectory-details-mask-in var(--ds-transition-duration) var(--ds-ease-in-out);
+  }
+
   .details {
     position: absolute;
     z-index: 5;
-    inset: 0;
+    top: max(8px, var(--dsw-safe-top));
+    right: 0;
+    bottom: 0;
+    left: 0;
     width: 100%;
     max-width: none;
     border-left: none;
-    box-shadow: none;
+    border-top: 1px solid var(--dsw-alias-border-l2);
+    border-radius: var(--dsw-mobile-sheet-radius) var(--dsw-mobile-sheet-radius) 0 0;
+    box-shadow: var(--dsw-shadow-lv3);
+    padding-bottom: var(--dsw-safe-bottom);
+    overscroll-behavior: contain;
+    animation: trajectory-details-sheet-in var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+  }
+
+  .details::before {
+    content: '';
+    position: absolute;
+    z-index: 1;
+    top: 6px;
+    left: 50%;
+    width: 36px;
+    height: 4px;
+    border-radius: var(--dsw-radius-full);
+    background: var(--dsw-alias-label-caption);
+    opacity: 0.7;
+    transform: translateX(-50%);
+    pointer-events: none;
   }
 
   .detailsHeader {
     height: auto;
     min-height: var(--dsw-touch-target);
+    padding: 10px var(--dsw-space-3) 4px;
+  }
+
+  .detailsTitle {
+    font: var(--dsw-mobile-font-secondary);
   }
 
   .detailTab {
     min-height: var(--dsw-touch-target);
+    padding-inline: var(--dsw-space-2);
+    font: var(--dsw-mobile-font-secondary);
+  }
+
+  .overview {
+    font: var(--dsw-mobile-font-body);
+  }
+
+  .overview > div {
+    grid-template-columns: 84px minmax(0, 1fr);
+    min-height: 28px;
+    padding-inline: var(--dsw-space-3);
+  }
+
+  .overview dt {
+    font: var(--dsw-mobile-font-secondary);
+  }
+
+  .overview dd {
+    font: var(--dsw-mobile-font-body);
+  }
+
+  .overviewHeading {
+    height: 32px;
+    padding-left: var(--dsw-space-3);
+    font: var(--dsw-mobile-font-section);
   }
 
   .contentText {
@@ -1818,5 +1906,90 @@
   .table tbody td {
     height: auto;
     min-height: var(--dsw-touch-target);
+  }
+
+  /* The ledger remains the same durable record list, but its phone projection
+     uses a readable event feed instead of desktop cell density. Preserve the
+     event rail as a small icon column and let the content own the width. */
+  .table {
+    font: var(--dsw-mobile-font-secondary);
+  }
+
+  .eventColumn {
+    width: 48px;
+  }
+
+  .table td {
+    min-height: var(--dsw-touch-target);
+    padding: var(--dsw-space-2) var(--dsw-space-2);
+    white-space: normal;
+    vertical-align: top;
+  }
+
+  .table .event {
+    padding-right: var(--dsw-space-1) !important;
+    padding-left: var(--dsw-space-2) !important;
+  }
+
+  .kindSlot,
+  .kindTag,
+  .table .kindSlot .message {
+    width: 24px;
+    justify-content: center;
+    padding-inline: 0;
+  }
+
+  .kindTagIcon {
+    width: var(--dsw-mobile-icon-secondary);
+    height: var(--dsw-mobile-icon-secondary);
+  }
+
+  .kindTagLabel,
+  .turnLabelFull {
+    display: none;
+  }
+
+  .turnLabelCompact {
+    max-width: 32px;
+    opacity: 1;
+    font: var(--dsw-mobile-font-caption);
+  }
+
+  .contentText,
+  .resultPreview {
+    display: block;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    font: var(--dsw-mobile-font-body);
+    line-height: 20px;
+  }
+
+  .resultPreview {
+    overflow: visible;
+  }
+
+  .collapsedTurnContent {
+    min-height: 28px;
+    font: var(--dsw-mobile-font-secondary);
+    white-space: normal;
+  }
+
+  .table tbody tr:not([data-request-only='true']):not([data-virtual-spacer]):not([data-history-load]) td {
+    border-bottom-color: var(--dsw-alias-border-l1);
+  }
+}
+
+@keyframes trajectory-details-sheet-in {
+  from { opacity: 0; transform: translateY(12px); }
+}
+
+@keyframes trajectory-details-mask-in {
+  from { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .details,
+  .detailsBackdrop {
+    animation: none;
   }
 }

@@ -16,7 +16,6 @@ import {
 } from '@deepseek-ai/dsh-acp-snapshot'
 import { resolvePwshPath } from '@deepseek-ai/dsh-pwsh-local'
 import { decodeStorageRecord } from '@deepseek-ai/dsh-session'
-import { OFFLOADED_IMAGE_TEXT } from '@deepseek-ai/dsh-llm'
 
 /**
  * The acp-agent example's snapshot suite: the scenario table for
@@ -90,6 +89,16 @@ const PRODUCT_SUBAGENT_RESULT_DIAGNOSTIC_CONFIG = fileURLToPath(
 const FS_DIFF_BOUND_CONFIG = fileURLToPath(new URL('./fs-diff-bound.cordis.yml', import.meta.url))
 const SNAPSHOTS_DIR = join(dirname(fileURLToPath(import.meta.url)), 'snapshots')
 const PACKED_CHUNKS_SOURCE = 'hook-cc-pretool-deny'
+
+/** Replace provider file ids so native Files API assertions stay deterministic. */
+function normalizeProviderFileIds(value: unknown): unknown {
+  if (typeof value === 'string') return value.replace(/file-api-\d+/gu, '{{fileId}}')
+  if (Array.isArray(value)) return value.map(normalizeProviderFileIds)
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, normalizeProviderFileIds(item)]))
+  }
+  return value
+}
 
 async function prepareEditingCordisSkillWorkspace(cwd: string): Promise<void> {
   const target = join(cwd, '.dsh', 'skills', 'editing-cordis-compositions', 'SKILL.md')
@@ -249,10 +258,10 @@ const SCENARIOS: Scenario[] = [
     toolSchemasSource: 'read-image',
     configPath: IMAGE_TEXT_ROUTE_CONFIG,
   },
-  // Authored keyless replay of the oversized-image refusal: admission rejects
-  // the 2001x1 fixture at the default 2000px per-side limit, the model sees a
-  // recoverable tool error, and the turn still completes — the image never
-  // enters durable history.
+  // Authored keyless replay of the normalization path: the 2001x1 fixture is
+  // inside source-admission limits, so the attachment provider normalizes it
+  // before the model sees the durable image block. The transcript pins the
+  // normalized dimensions and proves that a wide source remains readable.
   {
     name: 'read-image-dimension',
     hasModelTurn: true,
@@ -714,11 +723,31 @@ defineAcpSnapshotSuite({
 
 it('pins native DeepSeek image offload in the request sent by the assembled app', async () => {
   const requests: Record<string, unknown>[] = []
+  let fileUploads = 0
   const server = createServer((request: IncomingMessage, response: ServerResponse) => {
+    const path = new URL(request.url ?? '/', 'http://127.0.0.1').pathname
     let body = ''
     request.setEncoding('utf8')
     request.on('data', (chunk: string) => { body += chunk })
     request.on('end', () => {
+      // The file representation deliberately exercises the native DeepSeek
+      // Files API before the chat request. Its multipart body is not JSON and
+      // must not be counted as a completion request.
+      if (request.method === 'POST' && path.endsWith('/files')) {
+        fileUploads += 1
+        const createdAt = Math.floor(Date.now() / 1_000)
+        response.writeHead(200, { 'content-type': 'application/json' })
+        response.end(JSON.stringify({
+          id: `file-api-${String(fileUploads)}`,
+          object: 'file',
+          bytes: 69,
+          created_at: createdAt,
+          filename: 'image.png',
+          purpose: 'user_data',
+          expires_at: createdAt + 604_800,
+        }))
+        return
+      }
       requests.push(JSON.parse(body) as Record<string, unknown>)
       response.writeHead(200, { 'content-type': 'text/event-stream' })
       const events = requests.length === 1
@@ -775,26 +804,34 @@ it('pins native DeepSeek image offload in the request sent by the assembled app'
     expect(result.stderr).toBe('')
     expect(requests).toHaveLength(2)
     const messages = requests[0]?.messages as { content?: unknown }[] | undefined
-    const offloaded = messages?.find(message => JSON.stringify(message.content).includes('[image omitted'))
-    expect(offloaded?.content).toMatchInlineSnapshot(`
+    const firstContent = messages?.find(message => Array.isArray(message.content))?.content
+    expect(normalizeProviderFileIds(firstContent)).toMatchInlineSnapshot(`
       [
         {
           "text": "Compare the older image ",
           "type": "text",
         },
         {
-          "text": "[image omitted to keep the request within its image limit; older images are omitted first. If this image is still needed, read its file again when a path is available; otherwise ask the user to attach it again.]",
+          "text": "
+      Image sha256:b1ff9c8ea3a780bad09b346c423d2d0e46815926879b18e841d928376a946640; request image 1x1px.",
           "type": "text",
+        },
+        {
+          "file_id": "{{fileId}}",
+          "type": "file",
         },
         {
           "text": " with the newer image ",
           "type": "text",
         },
         {
-          "image_url": {
-            "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC",
-          },
-          "type": "image_url",
+          "text": "
+      Image sha256:b1ff9c8ea3a780bad09b346c423d2d0e46815926879b18e841d928376a946640; request image 1x1px.",
+          "type": "text",
+        },
+        {
+          "file_id": "{{fileId}}",
+          "type": "file",
         },
         {
           "text": ", then use read_image on red.png and reply with DONE.",
@@ -803,7 +840,7 @@ it('pins native DeepSeek image offload in the request sent by the assembled app'
       ]
     `)
 
-    const followup = structuredClone((requests[1]?.messages as unknown[]).slice(1)) as Array<{
+    const followup = normalizeProviderFileIds(structuredClone((requests[1]?.messages as unknown[]).slice(1))) as Array<{
       role?: unknown
       content?: unknown
     }>
@@ -820,7 +857,15 @@ it('pins native DeepSeek image offload in the request sent by the assembled app'
     expect(followup).toEqual([
       {
         role: 'user',
-        content: `Compare the older image ${OFFLOADED_IMAGE_TEXT} with the newer image ${OFFLOADED_IMAGE_TEXT}, then use read_image on red.png and reply with DONE.`,
+        content: [
+          { type: 'text', text: 'Compare the older image ' },
+          { type: 'text', text: '\nImage sha256:b1ff9c8ea3a780bad09b346c423d2d0e46815926879b18e841d928376a946640; request image 1x1px.' },
+          { type: 'file', file_id: '{{fileId}}' },
+          { type: 'text', text: ' with the newer image ' },
+          { type: 'text', text: '\nImage sha256:b1ff9c8ea3a780bad09b346c423d2d0e46815926879b18e841d928376a946640; request image 1x1px.' },
+          { type: 'file', file_id: '{{fileId}}' },
+          { type: 'text', text: ', then use read_image on red.png and reply with DONE.' },
+        ],
       },
       {
         role: 'user',
@@ -840,15 +885,15 @@ it('pins native DeepSeek image offload in the request sent by the assembled app'
       {
         role: 'tool',
         tool_call_id: 'native-read-image',
-        content: '<path>{{cwd}}/red.png</path>\n<type>image</type>\n<content>\nimage/png image, 1x1 px, 69 bytes\n</content>',
+        content: '<path>{{cwd}}/red.png</path>\n<type>image</type>\n<content>\nimage/png image, 1x1 px, 69 bytes\n</content>\nImage sha256:b1ff9c8ea3a780bad09b346c423d2d0e46815926879b18e841d928376a946640; request image 1x1px.',
       },
       {
         role: 'user',
         content: [
           { type: 'text', text: 'Attached image(s) from tool result:' },
           {
-            type: 'image_url',
-            image_url: { url: `data:image/png;base64,${image}` },
+            type: 'file',
+            file_id: '{{fileId}}',
           },
         ],
       },

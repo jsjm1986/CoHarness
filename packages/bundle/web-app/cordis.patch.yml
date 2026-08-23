@@ -155,12 +155,14 @@
         surfaceContext: true
         trustedHosts: !!js ctx.webStartup.trustedHosts
 
-    # The client-plugin reload chain, always mounted: it is idle until a
-    # rebuild watcher (pnpm run dev:web) actually rewrites client bundles. It
-    # is a row rather than a child of web-runtime because its node half is a
-    # client-side package, which a host-side bundle cannot import.
+    # The client-plugin reload chain is development-only. Keeping it disabled
+    # in ordinary Web launches removes its stat poll and SSE route from the
+    # steady-state server. Set DSH_CLIENT_HMR=1 when a dev:web rebuild watcher
+    # is running; the exact disabled expression keeps both faces out of the
+    # Host graph and browser manifest when the switch is off.
     - id: client-hmr
       name: '@deepseek-ai/dsh-client-hmr'
+      disabled: !!js process.env.DSH_CLIENT_HMR !== '1'
 
     # ── browser plugin roster (dsh.client rows; node halves are layer-2 hosts) ──
 

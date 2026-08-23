@@ -407,3 +407,51 @@
   width: var(--dsw-touch-target);
   height: var(--dsw-touch-target);
 }
+
+/* Mobile Workspace cards keep the hierarchy visible: the Workspace row is a
+   card header and Sessions are inset children rather than a flat desktop tree. */
+:global([data-viewport='compact']) .projectRow {
+  min-height: 64px;
+  height: auto;
+  padding: var(--dsw-space-2) var(--dsw-space-2) var(--dsw-space-2) var(--dsw-space-3);
+  border-radius: var(--dsw-radius-lg);
+  align-items: flex-start;
+}
+
+:global([data-viewport='compact']) .projectRow .slot {
+  margin-top: 2px;
+}
+
+:global([data-viewport='compact']) .projectRow .title {
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 500;
+}
+
+:global([data-viewport='compact']) .sessionRow {
+  min-height: 52px;
+  height: auto;
+  margin: var(--dsw-space-1) var(--dsw-space-2) 0 var(--dsw-space-6);
+  padding: var(--dsw-space-2) var(--dsw-space-2);
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: var(--dsw-radius-lg);
+  background: var(--dsw-alias-bg-module-platform);
+}
+
+:global([data-viewport='compact']) .sessionRow .title {
+  font-size: 14px;
+  line-height: 20px;
+}
+
+:global([data-viewport='compact']) .flatSessionRowWithoutStatus,
+:global([data-viewport='compact']) .searchResultRow {
+  margin: var(--dsw-space-1) var(--dsw-space-2) 0;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: var(--dsw-radius-lg);
+  background: var(--dsw-alias-bg-module-platform);
+}
+
+:global([data-viewport='compact']) .searchResultRow {
+  min-height: var(--dsw-touch-target);
+  padding: var(--dsw-space-2) var(--dsw-space-3);
+}

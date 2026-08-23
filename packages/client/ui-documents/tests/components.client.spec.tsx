@@ -207,7 +207,6 @@ describe('DocumentsModal', () => {
 
     expect((await screen.findByRole('alert')).textContent).toContain(t('action.attach.error'))
   })
-
   it('shows that the default document size is unlimited', async () => {
     const client = makeClient()
     client.browse.mockImplementation(async () => ({
