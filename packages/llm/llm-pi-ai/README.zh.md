@@ -151,6 +151,12 @@ entry config 与可编辑的 `llm-pi-ai` settings namespace 属于个人 Provide
 
 持久化内容是权威记录；回放状态只负责恢复原生保真度。当前构建无法使用的已存状态——其他适配器的 kind、其他版本（包括旧日志携带的平铺前信封形式）、格式错误的元数据、消息与回放状态之间的提供方／模型不匹配，或内容／块不匹配——会把这一条 assistant 消息降级为同样的外来提供方无关转换而不是让请求失败，插件通过其 `onReplayDegrade` 钩子记录 `INVALID_REPLAY_STATE` 诊断。
 
+### OpenAI 兼容文本中的标签化思考
+
+对于 `openai-completions`，当网关把思考放入普通 `delta.content` 时，适配器还会识别一种严格的思考前缀。它等待第一个非空白 token 必须正好是 `<thinking>`、`<analysis>` 或 `<think>`，并要求有非空正文及匹配的闭合标签，然后将正文发为 `reasoning` 块，将后缀发为 `text`。识别可以跨流式分片，并在增量缺失时使用累计的 `text_end` 或终端内容。若普通文本块的累计内容与增量不一致，`block-end` 仍以完整内容为准。pi-ai 的原生 reasoning 字段继续走原生路径；普通正文后出现的标签、空标签、未闭合标签以及代码或 XML 示例都保留为文本。
+
+这是兼容性启发式，不是通用 XML 解析器。如果回答有意以这些标签之一开头，它会被归类为思考。发生转换时，适配器会省略 pi-ai replay 元数据，因为一个提供方文本块变成了两个 Harness 块；持久化的 Harness 内容仍然是权威记录，后续历史会使用提供方无关的转换。使用其他分隔符的网关会保留为普通文本，直到出现显式的响应方言设置。
+
 ## 词汇差异
 
 - pi-ai 工具调用参数是已解析对象；harness 存储原始 JSON 字符串。适配器会解析输入，并将输出重新字符串化。
@@ -199,6 +205,7 @@ pi-ai 事件会变为 harness 推理、文本、工具调用、usage 与 finish 
 
 ## 已知限制与暂缓事项
 
+- **只有提供方实际公开的推理才能渲染**：推理等级请求可以改变模型的隐藏计算，却不保证返回推理文本，适配器也不会自行合成。pi-ai 0.82.1 会提升 `reasoning_content`、`reasoning` 和 `reasoning_text`；它会保留与工具调用关联的加密 `reasoning_details`，但只存在于 `reasoning_details` 内的文本会在 Harness 收到事件前被丢弃。这类网关还必须发出已支持的原生字段或严格标签文本前缀，否则需要 pi-ai 上游增加支持。
 - **`maxRequestImageBytes` 只统计 base64 图片载荷**：文本、工具与 JSON 结构不计入上限，因此该值必须低于网关请求体上限并留出余量。offload 在请求转换时决定，是历史与配置的纯函数，不记录为会话事件；由按路由能力元数据（图片数量、单图大小、请求总大小）同时驱动准入与组装的完整设计属于暂缓工作。
 - **仅以 OAuth 认证的提供方不予提供**：pi-ai 的 OAuth 只从*已存储*的 OAuth 凭据解析，而本适配器构造 `Models` 集合时不注入凭据存储、也不运行登录流程，因此这类路由的每个请求都会在发出之前以 `Provider is not configured` 失败。可配置提供方目录因此不列出它们；已安装 catalog 中只有 `openai-codex` 属于此类。settings 文档已经写过的路由仍保留目录条目，配置界面据此可以编辑或删除；`apiKeyEnv` 也仍能用该密钥完成认证——对 Codex 而言那是一个会过期、且这里没有任何环节会去刷新的 token。
 - **提供方自带的凭据发现只读进程环境**：不指定凭据的路由交由 catalog 提供方自行解析，而它探测的是环境变量（`AZURE_OPENAI_API_KEY`、`AWS_PROFILE`、`AWS_ACCESS_KEY_ID` 以及各提供方自己的那一组）。它不读任何本地凭据目录，因此只有 `~/.aws/credentials` 而未导出 `AWS_PROFILE` 会被解析为未配置；由 harness 凭据 seam 保管的值，除非进程环境里也有，否则对它不可见。
