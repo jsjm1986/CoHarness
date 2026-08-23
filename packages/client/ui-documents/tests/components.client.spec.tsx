@@ -97,10 +97,12 @@ function renderModal() {
   return render(<DocumentsModal open onClose={() => {}} t={t} />)
 }
 
-function namedButton(action: 'preview' | 'move' | 'delete', name: string) {
+function namedButton(action: 'attach' | 'preview' | 'move' | 'delete', name: string) {
   const key = action === 'preview'
     ? 'action.previewNamed'
-    : action === 'move' ? 'action.moveNamed' : 'action.deleteNamed'
+    : action === 'attach'
+      ? 'action.attachNamed'
+      : action === 'move' ? 'action.moveNamed' : 'action.deleteNamed'
   return screen.getByRole('button', { name: t(key, { name }) })
 }
 
@@ -134,9 +136,46 @@ describe('DocumentsModal', () => {
     expect(screen.getByText('2026-08-17')).toBeTruthy()
     expect(screen.getByText('2.0 KB')).toBeTruthy()
     expect(screen.getByText(t('modal.limits', { size: '10.0 MB', count: '5' }))).toBeTruthy()
+    expect(namedButton('attach', 'report.pdf')).toBeTruthy()
     expect(namedButton('preview', 'report.pdf')).toBeTruthy()
     expect(namedButton('delete', 'report.pdf')).toBeTruthy()
     expect(screen.getByRole('link', { name: t('action.downloadNamed', { name: 'report.pdf' }) })).toBeTruthy()
+  })
+
+  it('adds an existing document to the conversation and closes the manager', async () => {
+    const client = makeClient()
+    const attachDocument = vi.fn(() => true)
+    const onClose = vi.fn()
+    createUserDocClient.mockReturnValue(client)
+    render(<DocumentsModal open onClose={onClose} t={t} onAttachDocument={attachDocument} />)
+    await screen.findByText('report.pdf')
+
+    fireEvent.click(namedButton('attach', 'report.pdf'))
+
+    expect(attachDocument).toHaveBeenCalledWith(expect.objectContaining({ docId: '2026-08-17/report.pdf' }))
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('shows an error when an existing document cannot be attached', async () => {
+    const client = makeClient()
+    createUserDocClient.mockReturnValue(client)
+    render(<DocumentsModal open onClose={() => {}} t={t} onAttachDocument={() => false} />)
+    await screen.findByText('report.pdf')
+
+    fireEvent.click(namedButton('attach', 'report.pdf'))
+
+    expect((await screen.findByRole('alert')).textContent).toContain(t('action.attach.error'))
+  })
+
+  it('contains an attachment callback failure in the manager', async () => {
+    const client = makeClient()
+    createUserDocClient.mockReturnValue(client)
+    render(<DocumentsModal open onClose={() => {}} t={t} onAttachDocument={() => { throw new Error('gone') }} />)
+    await screen.findByText('report.pdf')
+
+    fireEvent.click(namedButton('attach', 'report.pdf'))
+
+    expect((await screen.findByRole('alert')).textContent).toContain(t('action.attach.error'))
   })
 
   it('shows that the default document size is unlimited', async () => {

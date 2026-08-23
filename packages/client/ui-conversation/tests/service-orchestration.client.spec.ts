@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import { makeTranslate, SlotTestRuntime } from '@deepseek-ai/dsh-client-test-runtime'
 import type { QueuedMessage, SessionFace } from '@deepseek-ai/dsh-client-runtime/client'
+import type { UserDocRef } from '@deepseek-ai/dsh-userdoc'
 import { ComposerBlockRegistry } from '../src/client/input/blocks.ts'
 import { InputHub } from '../src/client/input/hub.ts'
 import { ConversationController, UnsupportedImageMediaTypeError } from '../src/client/service.ts'
@@ -100,6 +101,38 @@ describe('ConversationController', () => {
       created.mockRestore()
       revoked.mockRestore()
     }
+    await b.runtime.dispose()
+  })
+
+  it('attaches an existing document by reference and never deletes it when removed', async () => {
+    const b = await bench()
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    const ref = {
+      docId: '2026-08-17/report.pdf',
+      path: '/documents/2026-08-17/report.pdf',
+      name: 'report.pdf',
+      bytes: 2048,
+      mediaType: 'application/pdf',
+      modifiedAt: Date.UTC(2026, 7, 17),
+    } as UserDocRef
+
+    expect(b.root.attachDocument('s1' as never, ref)).toBe(true)
+    const [draft] = b.root.documentStore('s1' as never).getSnapshot()
+    expect(draft).toMatchObject({
+      docId: ref.docId,
+      name: ref.name,
+      status: 'ready',
+      progress: 1,
+    })
+    if (draft === undefined) throw new Error('attached document draft missing')
+    expect(b.root.attachDocument('s1' as never, ref)).toBe(true)
+    expect(b.root.documentStore('s1' as never).getSnapshot()).toHaveLength(1)
+    expect(b.shell.state.getSnapshot().documentIds).toEqual([draft.id])
+    b.root.removeDraftDocument('s1' as never, draft.id)
+    b.shell.removeDocument(draft.id)
+    expect(b.root.documentStore('s1' as never).getSnapshot()).toEqual([])
+    expect(fetchSpy).not.toHaveBeenCalled()
+    fetchSpy.mockRestore()
     await b.runtime.dispose()
   })
 

@@ -8,6 +8,7 @@ import {
   IconFolderClose16,
   IconFolderOpenOutline16,
   IconInspectOutline12,
+  IconPaperclipOutline16,
   IconPlusOutline16,
   IconRefreshOutline16,
   IconSearchOutline16,
@@ -44,6 +45,8 @@ export interface DocumentsModalProps {
   open: boolean
   onClose: () => void
   t: (key: DocumentsKey, params?: Record<string, string>) => string
+  /** Attach a durable document to the current conversation; returns false when unavailable. */
+  onAttachDocument?: ((document: UserDocRef) => boolean) | undefined
 }
 
 interface UploadProgress {
@@ -109,9 +112,10 @@ function breadcrumbs(directoryId: UserDocDirectoryIdType, rootName: string): Bre
  * @param props.open - whether the dialog is showing.
  * @param props.onClose - Escape, mask click, or the header close control.
  * @param props.t - localized documents dictionary.
+ * @param props.onAttachDocument - optional callback for adding an existing document to the composer.
  * @returns the manager dialog plus nested delete-confirm and preview dialogs.
  */
-export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t }) => {
+export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAttachDocument }) => {
   const [documents, setDocuments] = useState<UserDocRef[]>([])
   const [directories, setDirectories] = useState<UserDocDirectoryRef[]>([])
   const [currentDirectoryId, setCurrentDirectoryId] = useState<UserDocDirectoryIdType>(ROOT_DIRECTORY_ID)
@@ -356,6 +360,19 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t }) =>
     }
   }
 
+  const attachDocument = (doc: UserDocRef) => {
+    setError('')
+    try {
+      if (onAttachDocument?.(doc) === true) {
+        onClose()
+        return
+      }
+    } catch (_attachError) {
+      // Session teardown can race the click; keep the manager open and show the same actionable failure.
+    }
+    setError(t('action.attach.error'))
+  }
+
   const handleMove = async () => {
     if (moveTargets === null || moveTargets.length === 0 || moveDirectoryId === currentDirectoryId) return
     const targets = moveTargets
@@ -544,6 +561,20 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t }) =>
         </span>
       </div>
       <span className={css.actions}>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          aria-label={t('action.attachNamed', { name: doc.name })}
+          title={t('action.attach')}
+          disabled={busy}
+          onClick={() => { attachDocument(doc) }}
+        >
+          <span className={css.actionIcon} aria-hidden="true">
+            <IconPaperclipOutline16 size={16} />
+          </span>
+          <span className={css.actionLabel}>{t('action.attach')}</span>
+        </Button>
         <Button
           type="button"
           size="sm"
