@@ -61,6 +61,53 @@ export type AuditFilter = {
   offset?: number
 }
 
+export type AdminDocument = {
+  catalogId: string
+  scope: { kind: 'personal' | 'project'; id?: number; label: string; mode?: 'ro' | 'rw' }
+  docId: string
+  directoryId: string
+  name: string
+  bytes: number
+  mediaType: string
+  modifiedAt: number
+  owner: { id: number; displayName: string } | null
+  ownerSource: 'upload' | 'transfer' | 'legacy' | 'admin'
+  state: 'active' | 'deleted'
+  legacy: boolean
+  lineageRootId: string | null
+}
+
+export type AdminDocumentMetrics = {
+  total: number
+  active: number
+  deleted: number
+  personal: number
+  project: number
+  bytes: number
+  operations24h: number
+  failures24h: number
+}
+
+export type AdminDocumentDetail = {
+  document: AdminDocument
+  history: Array<{
+    id: number
+    eventKind: string
+    actor: { id: number; displayName: string } | null
+    operationId: string | null
+    detail: unknown
+    createdAt: number
+  }>
+  copies: Array<{
+    operationId: string
+    status: string
+    source: { name: string; docId: string }
+    targetDocId: string | null
+    error: { code: string; message: string } | null
+    createdAt: number
+  }>
+}
+
 export class AdminRequestError extends Error {
   constructor(readonly status: number, message: string) {
     super(message)
@@ -158,6 +205,45 @@ export function listAudit(filter: AuditFilter = {}): Promise<AuditEntry[]> {
   if (filter.offset !== undefined) q.set('offset', String(filter.offset))
   const qs = q.toString()
   return request(`/admin/api/audit${qs === '' ? '' : `?${qs}`}`)
+}
+
+export function listDocumentMetrics(): Promise<AdminDocumentMetrics> {
+  return request('/admin/api/documents/metrics')
+}
+
+export function listAdminDocuments(filter: {
+  scope?: 'personal' | 'project'
+  projectId?: number
+  ownerUserId?: number
+  state?: 'active' | 'deleted' | 'all'
+  query?: string
+  limit?: number
+  offset?: number
+} = {}): Promise<AdminDocument[]> {
+  const query = new URLSearchParams()
+  if (filter.scope !== undefined) query.set('scope', filter.scope)
+  if (filter.projectId !== undefined) query.set('projectId', String(filter.projectId))
+  if (filter.ownerUserId !== undefined) query.set('ownerUserId', String(filter.ownerUserId))
+  if (filter.state !== undefined) query.set('state', filter.state)
+  if (filter.query !== undefined && filter.query !== '') query.set('q', filter.query)
+  if (filter.limit !== undefined) query.set('limit', String(filter.limit))
+  if (filter.offset !== undefined) query.set('offset', String(filter.offset))
+  const suffix = query.toString()
+  return request(`/admin/api/documents${suffix === '' ? '' : `?${suffix}`}`)
+}
+
+export function getAdminDocument(id: string): Promise<AdminDocumentDetail> {
+  return request(`/admin/api/documents/${encodeURIComponent(id)}`)
+}
+
+export function deleteAdminDocument(id: string): Promise<void> {
+  return request(`/admin/api/documents/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+export function transferAdminDocumentOwnership(id: string, ownerUserId: number): Promise<void> {
+  return request(`/admin/api/documents/${encodeURIComponent(id)}/ownership`, {
+    method: 'POST', body: JSON.stringify({ ownerUserId }),
+  })
 }
 
 export type ModelGovernanceRow = {

@@ -5,12 +5,183 @@
 .dialog {
   display: flex;
   flex-direction: column;
-  width: min(960px, 100%);
-  min-height: min(640px, calc(100dvh - 48px));
-  max-height: min(860px, calc(100dvh - 48px));
+  /* Keep the previous card tokens discoverable for downstream themes that
+     parse this module; the workbench dimensions below are the active values. */
+  /* width: min(960px, 100%); min-height: min(640px, calc(100dvh - 48px)); max-height: min(860px, calc(100dvh - 48px)); */
+  width: min(1180px, calc(100vw - 48px));
+  min-height: min(720px, calc(100dvh - 32px));
+  max-height: min(900px, calc(100dvh - 32px));
   /* Modal paints this card at layer 2; these tokens inherit to the scrolling list. */
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+}
+
+.workbench {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.scopeRail {
+  display: flex;
+  flex: 0 0 220px;
+  flex-direction: column;
+  gap: var(--dsw-space-1);
+  min-height: 0;
+  padding: var(--dsw-space-3);
+  overflow-y: auto;
+  border-right: 1px solid var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.scopeRailHeading {
+  padding: 4px 8px 8px;
+  color: var(--dsw-alias-label-caption);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.scopeItem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--dsw-space-2);
+  width: 100%;
+  min-height: 48px;
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.scopeItem:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.scopeItemActive {
+  border-color: var(--dsw-alias-border-l3);
+  background: var(--dsw-alias-interactive-bg-active);
+  color: var(--dsw-alias-label-primary);
+}
+
+.scopeItem:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.scopeItemIcon {
+  display: inline-flex;
+  flex: none;
+  padding-top: 2px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.scopeItem > span:last-child {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.scopeItem strong,
+.scopeItem small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scopeItem strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.scopeItem small {
+  color: var(--dsw-alias-label-caption);
+  font-size: 11px;
+}
+
+.workbenchContent {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  padding: var(--dsw-space-4);
+}
+
+.overview {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  gap: var(--dsw-space-3);
+}
+
+.overviewHeader {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--dsw-space-3);
+  padding-bottom: var(--dsw-space-2);
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+}
+
+.overviewHeader h2 {
+  margin: 0;
+  color: var(--dsw-alias-label-primary);
+  font-size: 17px;
+  line-height: 24px;
+}
+
+.overviewHeader p {
+  margin: 2px 0 0;
+  color: var(--dsw-alias-label-caption);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.overviewList {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  overflow: auto;
+}
+
+.overviewRow {
+  display: flex;
+  align-items: center;
+  gap: var(--dsw-space-2);
+  min-width: 0;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+}
+
+.overviewRow .meta {
+  gap: 1px;
+}
+
+.overviewRow > :last-child {
+  flex: none;
+}
+
+.overviewPanel .breadcrumbs,
+.overviewPanel .toolbar,
+.overviewPanel .caption,
+.overviewPanel .selectionBar,
+.overviewPanel .progress,
+.overviewPanel > .status,
+.overviewPanel > .empty,
+.overviewPanel .list,
+.overviewPanel .drop {
+  display: none;
 }
 
 .shell {
@@ -420,6 +591,36 @@
   gap: var(--dsw-space-2);
 }
 
+.inlineForm {
+  display: flex;
+  align-items: center;
+  gap: var(--dsw-space-2);
+}
+
+.inlineForm > *:first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.failedCopies {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsw-space-2);
+  padding-top: var(--dsw-space-2);
+  border-top: 1px solid var(--dsw-alias-border-l2);
+}
+
+.failedCopyRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--dsw-space-2);
+}
+
+.failedCopyRow .name {
+  min-width: 0;
+}
+
 .moveSelect {
   width: 100%;
   max-width: none;
@@ -450,8 +651,43 @@
   .dialog {
     width: 100%;
     min-height: 0;
-    height: calc(100dvh - var(--dsw-space-8) - var(--dsw-safe-top));
-    max-height: calc(100dvh - var(--dsw-space-8) - var(--dsw-safe-top));
+    height: calc(100dvh - var(--dsw-space-4) - var(--dsw-safe-top));
+    max-height: calc(100dvh - var(--dsw-space-4) - var(--dsw-safe-top));
+  }
+
+  .workbench {
+    flex-direction: column;
+  }
+
+  .scopeRail {
+    flex: none;
+    flex-direction: row;
+    gap: 4px;
+    padding: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-right: 0;
+    border-bottom: 1px solid var(--dsw-alias-border-l2);
+  }
+
+  .scopeRailHeading {
+    display: none;
+  }
+
+  .scopeItem {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 132px;
+    min-height: 40px;
+    padding: 6px 8px;
+  }
+
+  .scopeItem small {
+    display: none;
+  }
+
+  .workbenchContent {
+    padding: var(--dsw-space-3);
   }
 
   .toolbar {

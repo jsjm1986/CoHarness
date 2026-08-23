@@ -10,11 +10,20 @@ import type {
   UserDocTransferRequest,
   UserDocTransferCapabilities,
   UserDocTransferListResponse,
+  UserDocTransferDirectoriesResponse,
   UserDocTransferListedDocument,
   UserDocTransferResponse,
+  UserDocTransferPlanResponse,
   UserDocTransferTargetRef,
+  UserDocCatalogHistory,
+  UserDocCatalogHistoryItem,
+  UserDocCatalogMetrics,
+  UserDocCatalogOverview,
+  UserDocCatalogRow,
 } from '@deepseek-ai/dsh-userdoc'
-import { createUserDocClient, UserDocHttpError, UserDocServiceUnavailableError } from './userdoc-client.ts'
+import {
+  createUserDocClient, UserDocHttpError, UserDocServiceUnavailableError,
+} from './userdoc-client.ts'
 
 export type {
   UserDocDirectoryIdType,
@@ -25,11 +34,18 @@ export type {
   UserDocRef,
   UserDocTransferRequest,
   UserDocTransferResponse,
+  UserDocTransferPlanResponse,
   UserDocTransferCapabilities,
   UserDocTransferListResponse,
+  UserDocTransferDirectoriesResponse,
   UserDocTransferListedDocument,
   UserDocScope,
   UserDocTransferTargetRef,
+  UserDocCatalogRow,
+  UserDocCatalogMetrics,
+  UserDocCatalogOverview,
+  UserDocCatalogHistory,
+  UserDocCatalogHistoryItem,
 }
 
 export { createUserDocClient, UserDocHttpError, UserDocServiceUnavailableError }

@@ -13,7 +13,14 @@ import type {
   UserDocTransferRequest,
   UserDocTransferCapabilities,
   UserDocTransferListResponse,
+  UserDocTransferDirectoriesResponse,
   UserDocTransferResponse,
+  UserDocTransferPlanResponse,
+  UserDocCatalogHistory,
+  UserDocCatalogHistoryItem,
+  UserDocCatalogMetrics,
+  UserDocCatalogOverview,
+  UserDocCatalogRow,
 } from '@deepseek-ai/dsh-userdoc'
 
 /** Stable error surfaced when the deployment does not mount the document route. */
@@ -61,6 +68,14 @@ export interface UserDocDirectoriesResponse {
   readonly directories: readonly UserDocDirectoryRef[]
 }
 
+export type {
+  UserDocCatalogHistory,
+  UserDocCatalogHistoryItem,
+  UserDocCatalogMetrics,
+  UserDocCatalogOverview,
+  UserDocCatalogRow,
+}
+
 /** Progress callback for one streaming browser upload. */
 export type UserDocUploadProgress = (loaded: number, total: number) => void
 
@@ -94,16 +109,35 @@ export interface UserDocClient {
   remove(docId: UserDocIdType, signal?: AbortSignal): Promise<void>
   /** Copy snapshots between the current user's personal scope and one project scope. */
   transfer(request: UserDocTransferRequest, signal?: AbortSignal): Promise<UserDocTransferResponse>
+  plan(request: UserDocTransferRequest, signal?: AbortSignal): Promise<UserDocTransferPlanResponse>
+  commit(request: UserDocTransferRequest, signal?: AbortSignal): Promise<UserDocTransferResponse>
+  retry(request: UserDocTransferRequest, signal?: AbortSignal): Promise<UserDocTransferResponse>
   capabilities(signal?: AbortSignal): Promise<UserDocTransferCapabilities>
   listScope(scope: UserDocScope, signal?: AbortSignal): Promise<UserDocTransferListResponse>
+  listScopeDirectories(scope: UserDocScope, signal?: AbortSignal): Promise<UserDocTransferDirectoriesResponse>
+  createScopeDirectory(
+    scope: UserDocScope,
+    parentDirectoryId: UserDocDirectoryIdType,
+    name: string,
+    signal?: AbortSignal,
+  ): Promise<UserDocDirectoryRef>
+  overview(signal?: AbortSignal): Promise<UserDocCatalogOverview>
+  history(signal?: AbortSignal): Promise<UserDocCatalogHistory>
   contentUrl(docId: UserDocIdType): string
 }
 
 const ROOT = '/api/documents'
 const UPLOAD_HEADER = 'x-dsh-document-upload'
 const TRANSFER_PATH = `${ROOT}/transfer`
+const PLAN_PATH = `${TRANSFER_PATH}/plan`
+const COMMIT_PATH = `${TRANSFER_PATH}/commit`
+const RETRY_PATH = `${TRANSFER_PATH}/retry`
 const CAPABILITIES_PATH = `${TRANSFER_PATH}/capabilities`
 const LIST_SCOPE_PATH = `${TRANSFER_PATH}/list`
+const DIRECTORIES_PATH = `${TRANSFER_PATH}/directories`
+const DIRECTORY_CREATE_PATH = `${TRANSFER_PATH}/directories/create`
+const OVERVIEW_PATH = `${ROOT}/overview`
+const HISTORY_PATH = `${ROOT}/history`
 
 function contentUrl(docId: UserDocIdType): string {
   return `${ROOT}/content?id=${encodeURIComponent(docId)}`
@@ -263,12 +297,33 @@ export function createUserDocClient(): UserDocClient {
         body: JSON.stringify(request),
       },
     ),
+    plan: (request, signal) => requestJson<UserDocTransferPlanResponse>(PLAN_PATH, {
+      ...requestInit('POST', signal), headers: { 'content-type': 'application/json' }, body: JSON.stringify(request),
+    }),
+    commit: (request, signal) => requestJson<UserDocTransferResponse>(COMMIT_PATH, {
+      ...requestInit('POST', signal), headers: { 'content-type': 'application/json' }, body: JSON.stringify(request),
+    }),
+    retry: (request, signal) => requestJson<UserDocTransferResponse>(RETRY_PATH, {
+      ...requestInit('POST', signal), headers: { 'content-type': 'application/json' }, body: JSON.stringify(request),
+    }),
     capabilities: signal => requestJson<UserDocTransferCapabilities>(CAPABILITIES_PATH, requestInit('GET', signal)),
     listScope: (scope, signal) => requestJson<UserDocTransferListResponse>(LIST_SCOPE_PATH, {
       ...requestInit('POST', signal),
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ version: 1, scope }),
     }),
+    listScopeDirectories: (scope, signal) => requestJson<UserDocTransferDirectoriesResponse>(DIRECTORIES_PATH, {
+      ...requestInit('POST', signal),
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ version: 1, scope }),
+    }),
+    createScopeDirectory: (scope, parentDirectoryId, name, signal) => requestJson<UserDocDirectoryRef>(DIRECTORY_CREATE_PATH, {
+      ...requestInit('POST', signal),
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ version: 1, scope, directory: parentDirectoryId, name }),
+    }).then(directory => ({ ...directory, path: '' })),
+    overview: signal => requestJson<UserDocCatalogOverview>(OVERVIEW_PATH, requestInit('GET', signal)),
+    history: signal => requestJson<UserDocCatalogHistory>(HISTORY_PATH, requestInit('GET', signal)),
     contentUrl,
   }
 }
