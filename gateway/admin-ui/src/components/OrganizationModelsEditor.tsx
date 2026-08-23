@@ -19,6 +19,7 @@ const organizationCopy = {
   intro: '配置组织统一持有的 Provider、API 密钥和完整模型目录；保存后再向角色、用户或项目分配具体模型。',
   customAdd: '添加组织 Provider',
   customTitle: '组织 Provider',
+  customTag: '组织',
   customRouteHint: '组织 Provider ID 必须以 org- 开头，后续只能使用小写字母、数字和短横线。',
   customRouteInvalid: '组织 Provider ID 必须匹配 org-名称，例如 org-primary。',
   create: '创建组织 Provider',
@@ -62,6 +63,9 @@ export function OrganizationModelsEditor({ onChanged }: { onChanged: () => void 
   const useSnapshot = useMemo(() => bindSnapshot(controller), [controller])
   const t = useMemo(() => (key: keyof typeof zh) => organizationCopy[key], [])
 
+  // The organization facade exposes only configured org-* profiles. The
+  // shared section therefore keeps only its declaration action when no
+  // dormant adapter route can be adopted.
   return (
     <div className="organizationModelsEditor">
       <ModelsSection

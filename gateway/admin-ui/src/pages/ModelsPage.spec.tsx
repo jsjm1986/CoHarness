@@ -140,6 +140,10 @@ describe('ModelsPage', () => {
     render(<ModelsPage />)
 
     expect(await screen.findByText('组织主连接')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '添加提供方' })).toBeNull()
+    expect(screen.getByRole('button', { name: '添加组织 Provider' })).toBeTruthy()
+    expect(screen.queryByText('自定义')).toBeNull()
+    expect(screen.getByText('组织')).toBeTruthy()
     await user.click(screen.getByRole('button', { name: '编辑 组织主连接 (org-primary)' }))
     await user.click(screen.getByText('自定义设置'))
 

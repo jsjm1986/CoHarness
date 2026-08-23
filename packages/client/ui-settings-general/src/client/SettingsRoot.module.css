@@ -1,28 +1,28 @@
 /* Settings shell (figma 501:29904 mask context / 501:29947 panel): sidebar
    foot trigger row + centered 1080x700 modal panel. The trigger uses the
-   sidebar foot's 42px row / 36px rail circle rhythm; the
+   shared footer's compact row / 36px rail circle rhythm; the
    panel is a two-column layout — 188px nav rail + content column with a
    54px header and the 24px-padded options area. */
 
-/* Trigger row: the 42px foot-row box shared with the Cordis footer action. */
+/* Trigger row: the compact foot-row box shared with the footer actions. */
 .trigger {
   flex: none;
   display: flex;
   align-items: center;
   gap: 8px;
   width: calc(100% + 4px);
-  height: 42px;
-  margin: 4px -2px;
-  padding: 0 10px 0 8px;
+  height: var(--dsh-sidebar-footer-row-height, 36px);
+  margin: 0 -2px;
+  padding: 0 8px;
   box-sizing: border-box;
   border: none;
-  border-radius: var(--dsw-radius-lg);
+  border-radius: var(--dsh-sidebar-footer-row-radius, var(--dsw-radius-md));
   background: transparent;
   cursor: pointer;
   overflow: hidden;
   color: var(--dsw-alias-label-primary);
   font-family: inherit;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 22px;
 }
 
@@ -30,11 +30,16 @@
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
+.trigger:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: 1px;
+}
+
 /* Rail trigger: the same 36x36 circle box as the other rail controls. */
 .trigger.rail {
   width: 36px;
   height: 36px;
-  margin: var(--dsw-space-2) 0 10px;
+  margin: 0;
   justify-content: center;
   gap: 0;
   padding: 0;
@@ -307,6 +312,11 @@
 }
 
 @media (pointer: coarse) {
+  .trigger {
+    height: auto;
+    min-height: var(--dsw-touch-target);
+  }
+
   .close {
     width: var(--dsw-touch-target);
     height: var(--dsw-touch-target);

@@ -428,6 +428,10 @@
   gap: 10px;
 }
 
+.addActionsSingle {
+  display: block;
+}
+
 .addButton {
   /* Overrides the shared button base above: these two are not pills sitting in
      a footer but the last slot of the provider list, so they split the row
@@ -440,6 +444,10 @@
   height: 44px;
   border: 1px dashed var(--dsw-alias-border-l3);
   border-radius: var(--dsw-radius-lg);
+}
+
+.addButtonFull {
+  width: 100%;
 }
 
 .addCard,

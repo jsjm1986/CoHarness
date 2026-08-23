@@ -205,7 +205,7 @@
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: var(--dsw-space-3);
+  gap: var(--dsw-space-4);
   min-height: 0;
 }
 
@@ -270,13 +270,32 @@
 .toolbar {
   display: flex;
   flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--dsw-space-2);
+  min-width: 0;
   flex-wrap: wrap;
+}
+
+.filterGroup,
+.actionGroup {
+  display: flex;
   align-items: center;
   gap: var(--dsw-space-2);
+  min-width: 0;
+}
+
+.filterGroup {
+  flex: 1 1 420px;
+}
+
+.actionGroup {
+  flex: 0 1 auto;
+  margin-left: auto;
 }
 
 .search {
-  flex: 1 1 160px;
+  flex: 1 1 220px;
   min-width: 0;
   width: auto;
 }
@@ -284,7 +303,7 @@
 .select {
   flex: none;
   height: 32px;
-  max-width: 180px;
+  max-width: 156px;
   padding: 0 var(--dsw-space-5) 0 var(--dsw-space-2);
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: var(--dsw-radius-md);
@@ -306,6 +325,8 @@
   color: var(--dsw-alias-label-caption);
   font-size: 12px;
   line-height: 18px;
+  padding-bottom: var(--dsw-space-2);
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
 }
 
 .selectionBar {
@@ -352,7 +373,8 @@
   align-items: center;
   gap: var(--dsw-space-2);
   min-width: 0;
-  padding-bottom: var(--dsw-space-1);
+  padding: 0 var(--dsw-space-1) var(--dsw-space-1);
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
 }
 
 .upload {
@@ -371,7 +393,7 @@
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: var(--dsw-space-4);
+  gap: var(--dsw-space-1);
   min-height: 0;
   padding-bottom: var(--dsw-safe-bottom);
   overflow: auto;
@@ -403,8 +425,14 @@
   align-items: center;
   gap: var(--dsw-space-2);
   min-width: 0;
-  padding: var(--dsw-space-2) 0;
+  padding: var(--dsw-space-2) var(--dsw-space-1);
   border-top: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-sm);
+  transition: background-color 120ms ease;
+}
+
+.row:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
 }
 
 .folderAlign {
@@ -610,6 +638,7 @@
     display: none;
   }
 
+  .newFolder,
   .upload,
   .refresh,
   .download {
@@ -665,8 +694,28 @@
     flex-wrap: wrap;
   }
 
+  .filterGroup,
+  .actionGroup {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .filterGroup {
+    flex-wrap: wrap;
+  }
+
+  .actionGroup {
+    margin-left: 0;
+  }
+
   .search {
     flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .filterGroup .select {
+    flex: 1 1 0;
+    max-width: none;
   }
 
   .upload {
@@ -675,6 +724,10 @@
 
   .newFolder {
     flex: 1 1 auto;
+  }
+
+  .actionGroup .refresh {
+    flex: none;
   }
 
   .row:not(.folderRow) {
@@ -730,7 +783,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .progress > span {
+  .progress > span,
+  .row {
     transition: none;
   }
 }

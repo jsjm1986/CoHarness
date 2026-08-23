@@ -120,6 +120,14 @@ describe('LogoutButton', () => {
     expect(button.textContent).toBe('')
     expect(button.className.split(/\s+/)).toContain(logoutCss.rail)
   })
+
+  it('keeps the expanded account action visually secondary', () => {
+    const view = render(<LogoutButton {...logoutProps(snapshot())} />)
+    const button = screen.getByRole('button', { name: '退出登录' })
+    expect(button.className.split(/\s+/)).toContain(logoutCss.trigger)
+    expect(button.querySelector('svg')?.getAttribute('width')).toBe('14')
+    expect(view.container.querySelector('form')?.className.split(/\s+/)).toContain(logoutCss.form)
+  })
 })
 
 describe('ScopeControl', () => {

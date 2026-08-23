@@ -281,6 +281,8 @@ describe('ModelsSection', () => {
     expect(screen.queryByRole('heading', { name: en.organizationTitle })).toBeNull()
     expect(screen.queryByText('openai')).toBeNull()
     expect(screen.queryByText('DeepSeek')).toBeNull()
+    expect(screen.queryByRole('button', { name: en.add })).toBeNull()
+    expect(screen.getByRole('button', { name: en.customAdd })).toBeTruthy()
   })
 
   it('renders the unkeyed whole-section provider as an open setup card in the first-run posture', async () => {

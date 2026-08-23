@@ -168,6 +168,8 @@ describe('DocumentsModal', () => {
     expect(namedButton('preview', 'report.pdf')).toBeTruthy()
     expect(namedButton('delete', 'report.pdf')).toBeTruthy()
     expect(screen.getByRole('link', { name: t('action.downloadNamed', { name: 'report.pdf' }) })).toBeTruthy()
+    expect(screen.getByRole('group', { name: t('modal.filters') })).toBeTruthy()
+    expect(screen.getByRole('group', { name: t('modal.actions') })).toBeTruthy()
   })
 
   it('adds an existing document to the conversation and closes the manager', async () => {
