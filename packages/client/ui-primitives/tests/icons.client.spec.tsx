@@ -67,6 +67,18 @@ describe('FishLogo', () => {
   })
 })
 
+describe('CoHarnessMark', () => {
+  it('renders the independent collaboration mark at the requested square size', () => {
+    const { container } = render(<primitives.CoHarnessMark size={34} className="brand" />)
+    const svg = container.querySelector('svg')!
+    expect(svg.getAttribute('width')).toBe('34')
+    expect(svg.getAttribute('height')).toBe('34')
+    expect(svg.getAttribute('data-brand')).toBe('coharness')
+    expect(svg.getAttribute('class')).toBe('brand')
+    expect(container.innerHTML).toContain('currentColor')
+  })
+})
+
 describe('BrandWordmark', () => {
   it('can render the name artwork with or without its leading mark', () => {
     const view = render(<primitives.BrandWordmark />)

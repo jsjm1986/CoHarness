@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <style>
+    .coharness-arc { stroke: #111827; }
+    .coharness-node { fill: #0f766e; }
+    @media (prefers-color-scheme: dark) {
+      .coharness-arc { stroke: #f8fafc; }
+      .coharness-node { fill: #5eead4; }
+    }
+  </style>
+  <path class="coharness-arc" d="M45 19.5A20 20 0 1 0 45 44.5" stroke-width="6" stroke-linecap="round" />
+  <path class="coharness-arc" d="M20 32h22" stroke-width="6" stroke-linecap="round" />
+  <circle class="coharness-node" cx="46" cy="32" r="4" />
+</svg>
