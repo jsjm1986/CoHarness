@@ -12,13 +12,13 @@
 
 ## 组织 Provider 与凭据
 
-策略中的 `providers` 数组是供 LLM 适配器消费的不可变、已启用组织 Provider 快照。组织路由 id 使用保留的 `org-*` 命名空间，绝不进入可编辑的用户设置。Gateway 管理页面直接复用完整的 Models 设置插件，因此管理员会通过与个人 Provider 相同的编辑器配置协议、端点、API Key、模型列表与模型发现，再把已存模型分配给角色、用户或项目。每份 profile 经组织 facade 持久化后投影进快照；治理页面不维护第二套删减版 Provider 表单。Gateway facade 与运行时加载器会在持久化或发布前校验同一组受管 pi-ai 字段：`compat` 只包含 `thinkingFormat` 与 `supportsReasoningEffort`，非空 compat 只适用于 `openai-completions`，推理映射与 thinking budget 只能使用受支持档位，重试策略采用有界退避，流空闲定时器也必须落在 Node 定时器范围内。发布器会克隆并递归冻结完整 profile，因此适配器 Consumer 无法改写活动快照中的标头、推理映射、重试配置、输入模态或模型条目。
+策略中的 `providers` 数组是供 LLM 适配器消费的不可变、已启用组织 Provider 快照。组织路由 id 使用保留的 `org-*` 命名空间，绝不进入可编辑的用户设置。Gateway 管理页面直接复用完整的 Models 设置插件，因此管理员会通过与个人 Provider 相同的编辑器配置协议、端点、API Key、模型列表与模型发现，再配置角色、用户和项目默认规则或单路由例外。每份 profile 经组织 facade 持久化后投影进快照；治理页面不维护第二套删减版 Provider 表单。Gateway facade 与运行时加载器会在持久化或发布前校验同一组受管 pi-ai 字段：`compat` 只包含 `thinkingFormat` 与 `supportsReasoningEffort`，非空 compat 只适用于 `openai-completions`，推理映射与 thinking budget 只能使用受支持档位，重试策略采用有界退避，流空闲定时器也必须落在 Node 定时器范围内。发布器会克隆并递归冻结完整 profile，因此适配器 Consumer 无法改写活动快照中的标头、推理映射、重试配置、输入模态或模型条目。
 
 `DSH_` 凭据引用命名空间只属于组织 Provider。可编辑的个人 `llm-pi-ai` settings 会拒绝 `DSH_` 引用和 `org-*` 路由。凭据层独占当前快照中的每个引用，并在每次模型请求时通过 `/internal/runtime/model-credential` 解析。Gateway 在返回值之前执行用户或项目模型授权。值不存在或请求失败时绝不回退到同名个人存储，个人配置界面看到的组织引用也是只读的。
 
 组织路由必须显式列出模型。`modelOverrides` 只适用于 catalog 路由，因此不会出现在组织编辑器中；非空值会同时被 Gateway settings facade 和运行时策略加载器拒绝。
 
-个人运行时组合已授权组织路由与用户声明的个人 BYOK 路由。项目运行时设置 `userDeclaredAllowed: false`；其模型权限只来自项目分配，因此同一项目运行时的所有成员看到相同的组织模型集合。
+个人运行时组合已授权组织路由与用户声明的个人 BYOK 路由。项目运行时设置 `userDeclaredAllowed: false`；其模型权限来自项目默认规则和单路由例外，因此同一项目运行时的所有成员看到相同的组织模型集合。
 
 ## 授权判定顺序
 

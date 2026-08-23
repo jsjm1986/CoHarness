@@ -11,12 +11,14 @@ function tables(db: Database.Database): string[] {
 }
 
 describe('SQLite schema migration', () => {
-  it('creates project tables on a fresh database and records schema_version=6', () => {
+  it('creates project tables on a fresh database and records schema_version=7', () => {
     const file = join(mkdtempSync(join(tmpdir(), 'hgw-')), 'g.sqlite')
     const db = openDb(file)
     expect(tables(db)).toEqual(expect.arrayContaining(['projects', 'project_members', 'model_registration_events', 'schema_meta']))
     expect(tables(db)).not.toEqual(expect.arrayContaining(['groups', 'dir_grants']))
-    expect((db.prepare(`SELECT version FROM schema_meta`).get() as { version: number }).version).toBe(6)
+    expect((db.prepare(`PRAGMA table_info(projects)`).all() as Array<{ name: string }>)
+      .some(column => column.name === 'model_access_default_allowed')).toBe(true)
+    expect((db.prepare(`SELECT version FROM schema_meta`).get() as { version: number }).version).toBe(7)
   })
 
   it('folds dir_grants and group members into projects; rw beats ro; then drops old tables', () => {

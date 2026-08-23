@@ -122,9 +122,9 @@ describePg('PostgreSQL baseline', () => {
     pool = createPostgresPool(DATABASE_URL!, { max: 4 })
     await pool.query('DROP SCHEMA IF EXISTS harness CASCADE')
     const migrated = await runMigrations(pool, MIGRATIONS)
-    expect(migrated).toEqual({ applied: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], current: 12 })
+    expect(migrated).toEqual({ applied: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], current: 13 })
     expect(await runMigrations(pool, MIGRATIONS))
-      .toEqual({ applied: [], current: 12 })
+      .toEqual({ applied: [], current: 13 })
     const pushTables = await pool.query<{ table_name: string }>(`SELECT table_name
       FROM information_schema.tables
       WHERE table_schema='harness' AND table_name IN ('push_devices','push_deliveries')
@@ -145,6 +145,10 @@ describePg('PostgreSQL baseline', () => {
       FROM information_schema.columns
       WHERE table_schema='harness' AND table_name='push_devices' AND column_name='provider'`)
     expect(providerColumn.rows).toEqual([{ is_nullable: 'NO', column_default: "'fcm'::text" }])
+    const projectModelDefaultColumn = await pool.query<{ is_nullable: string; column_default: string | null }>(`SELECT is_nullable,column_default
+      FROM information_schema.columns
+      WHERE table_schema='harness' AND table_name='projects' AND column_name='model_access_default_allowed'`)
+    expect(projectModelDefaultColumn.rows).toEqual([{ is_nullable: 'NO', column_default: 'false' }])
     const homeColumns = await pool.query<{ table_name: string; is_nullable: string }>(`SELECT table_name,is_nullable
       FROM information_schema.columns WHERE table_schema='harness' AND column_name='home_path' ORDER BY table_name`)
     expect(homeColumns.rows).toEqual([{ table_name: 'users', is_nullable: 'NO' }])
@@ -270,6 +274,13 @@ describePg('PostgreSQL baseline', () => {
       { kind: 'user', id: first.userId },
       credentialRef,
     )).toBe('sk-first')
+    await pool.query(`UPDATE harness.projects SET model_access_default_allowed=true
+      WHERE organization_id=$1 AND public_id=$2`, [first.context.organizationId, first.projectId])
+    expect(await firstGovernance.resolveOrganizationCredential(
+      { kind: 'project', id: first.projectId },
+      credentialRef,
+    )).toBe('sk-first')
+    await firstGovernance.setProjectAccess(first.projectId, provider.provider, model.model, false)
     expect(await firstGovernance.resolveOrganizationCredential(
       { kind: 'project', id: first.projectId },
       credentialRef,
@@ -1334,6 +1345,7 @@ describePg('PostgreSQL baseline', () => {
       const shared = join(root, 'shared')
       await mkdir(shared)
       const project = await projects.create({ name: 'Runtime Project', path: shared, createdBy: admin.id })
+      expect(project.modelAccessDefaultAllowed).toBe(true)
       await projects.setMember(project.id, member.id, 'rw')
       expect((await projects.getById(project.id))?.members).toEqual([
         { userId: admin.id, username: 'runtime-admin', mode: 'rw' },
@@ -1375,7 +1387,7 @@ describePg('PostgreSQL baseline', () => {
         name: '  Runtime owned project  ', ownerUserId: member.id,
       })
       expect(ownedProject).toMatchObject({
-        name: 'Runtime owned project', origin: 'user', owner: { id: member.id },
+        name: 'Runtime owned project', origin: 'user', owner: { id: member.id }, modelAccessDefaultAllowed: true,
       })
       expect(ownedProject.path.startsWith(`${await realpath(cfg.userProjectsRoot)}/`)).toBe(true)
       const invitation = await projects.createInvitation({
@@ -1504,12 +1516,19 @@ describePg('PostgreSQL baseline', () => {
 
       expect(await governance.policyForProject(project.id)).toMatchObject({
         defaultAllowed: false,
-        models: [{ provider: 'org-runtime', model: 'chat', allowed: false }],
+        models: [
+          { provider: 'org-runtime', model: 'chat', allowed: true },
+          { provider: 'org-runtime', model: 'retired', allowed: false },
+        ],
       })
-      await governance.setProjectAccess(project.id, 'org-runtime', 'chat', true)
+      expect(await governance.projectOverrides(project.id)).toEqual([])
+      await governance.setProjectAccess(project.id, 'org-runtime', 'chat', false)
       expect(await governance.projectOverrides(project.id)).toEqual([
-        { provider: 'org-runtime', model: 'chat', allowed: true },
+        { provider: 'org-runtime', model: 'chat', allowed: false },
       ])
+      expect((await governance.policyForProject(project.id)).models[0]?.allowed).toBe(false)
+      await governance.setProjectAccess(project.id, 'org-runtime', 'chat', null)
+      expect((await governance.policyForProject(project.id)).models[0]?.allowed).toBe(true)
       await governance.upsertModel({
         provider: 'org-runtime',
         model: 'reasoner',
@@ -1522,11 +1541,13 @@ describePg('PostgreSQL baseline', () => {
         cacheReadMicrosPerMillion: 0,
         cacheWriteMicrosPerMillion: 0,
       })
-      await governance.setAllProjectAccess(project.id, true)
-      expect(await governance.projectOverrides(project.id)).toEqual([
+      expect((await governance.policyForProject(project.id)).models).toEqual([
         { provider: 'org-runtime', model: 'chat', allowed: true },
         { provider: 'org-runtime', model: 'reasoner', allowed: true },
+        { provider: 'org-runtime', model: 'retired', allowed: false },
       ])
+      await governance.setAllProjectAccess(project.id, true)
+      expect(await governance.projectOverrides(project.id)).toEqual([])
       await governance.setAllProjectAccess(project.id, null)
       expect(await governance.projectOverrides(project.id)).toEqual([])
       await governance.setProjectAccess(project.id, 'org-runtime', 'chat', true)
@@ -1535,6 +1556,7 @@ describePg('PostgreSQL baseline', () => {
         models: [
           { provider: 'org-runtime', model: 'chat', allowed: true },
           { provider: 'org-runtime', model: 'reasoner', allowed: false },
+          { provider: 'org-runtime', model: 'retired', allowed: false },
         ],
       })
       const projectPolicyPath = await writeProjectModelGovernanceFile(cfg, governance, {
@@ -1552,7 +1574,7 @@ describePg('PostgreSQL baseline', () => {
       expect(projectPolicy).toMatchObject({
         defaultAllowed: false,
         userDeclaredAllowed: false,
-        models: [{ allowed: true }, { allowed: false }],
+        models: [{ allowed: true }, { allowed: false }, { allowed: false }],
       })
       expect(await governance.subjectForIntakeToken(projectPolicy.intakeToken))
         .toEqual({ kind: 'project', id: project.id })

@@ -138,11 +138,14 @@ export async function importSqliteControlPlane(pool: Pool, options: SqliteImport
           ? null : await idForLegacy(client, 'users', organizationId, row.owner_user_id)
         const origin = row.origin === 'user' ? 'user' : 'admin'
         const project = await client.query<{ id: string }>(`INSERT INTO harness.projects(
-          organization_id,name,created_by,origin,owner_user_id,legacy_id,public_id,created_at,updated_at
-        ) VALUES($1,$2,$3,$4,$5,$6,$6,$7,$8) ON CONFLICT(organization_id,legacy_id) DO UPDATE SET
-          name=excluded.name,created_by=excluded.created_by,origin=excluded.origin,owner_user_id=excluded.owner_user_id,public_id=excluded.public_id,
+          organization_id,name,created_by,origin,owner_user_id,model_access_default_allowed,legacy_id,public_id,created_at,updated_at
+        ) VALUES($1,$2,$3,$4,$5,$6,$7,$7,$8,$9) ON CONFLICT(organization_id,legacy_id) DO UPDATE SET
+          name=excluded.name,created_by=excluded.created_by,origin=excluded.origin,owner_user_id=excluded.owner_user_id,
+          model_access_default_allowed=excluded.model_access_default_allowed,public_id=excluded.public_id,
           updated_at=excluded.updated_at RETURNING id`,
-        [organizationId, row.name, createdBy, origin, ownerUserId, row.id, epoch(row.created_at), epoch(row.updated_at)])
+        [organizationId, row.name, createdBy, origin, ownerUserId,
+          row.model_access_default_allowed === true || row.model_access_default_allowed === 1,
+          row.id, epoch(row.created_at), epoch(row.updated_at)])
         await client.query(`INSERT INTO harness.project_mounts(organization_id,project_id,node_id,local_path,canonical_path)
           VALUES($1,$2,$3,$4,$4) ON CONFLICT(project_id,node_id) DO UPDATE SET local_path=excluded.local_path,
           canonical_path=excluded.canonical_path,status='active'`, [organizationId, project.rows[0]!.id, nodeId, row.path])

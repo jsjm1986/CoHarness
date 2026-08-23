@@ -16,7 +16,7 @@ const ORGANIZATION_PROVIDER_PATTERN = /^org-[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
 const organizationCopy = {
   ...zh,
   title: '组织 Provider 与模型',
-  intro: '配置组织统一持有的 Provider、API 密钥和完整模型目录；保存后再向角色、用户或项目分配具体模型。',
+  intro: '配置组织统一持有的 Provider、API 密钥和完整模型目录；保存后按角色、用户和项目的默认规则生效，也可设置单模型例外。',
   customAdd: '添加组织 Provider',
   customTitle: '组织 Provider',
   customTag: '组织',

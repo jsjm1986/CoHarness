@@ -118,7 +118,11 @@ describe('ProjectDetailPage', () => {
     vi.mocked(api.listModelProviders).mockResolvedValue(modelProviders)
     vi.mocked(api.listModels).mockResolvedValue(models)
     vi.mocked(api.getProjectModelAccess).mockResolvedValue({
-      effective: { version: 1, defaultAllowed: false, models: [] },
+      projectDefaultAllowed: false,
+      effective: { version: 1, defaultAllowed: false, models: [
+        { provider: 'org-primary', model: 'deepseek-chat', allowed: true },
+        { provider: 'org-primary', model: 'deepseek-reasoner', allowed: false },
+      ] },
       overrides: [{ provider: 'org-primary', model: 'deepseek-chat', allowed: true }],
     })
     vi.mocked(api.setProjectModelAccess).mockResolvedValue(undefined)
@@ -247,7 +251,11 @@ describe('ProjectDetailPage', () => {
   it('assigns every project model in one write', async () => {
     const user = userEvent.setup()
     vi.mocked(api.getProjectModelAccess).mockResolvedValue({
-      effective: { version: 1, defaultAllowed: false, models: [] },
+      projectDefaultAllowed: false,
+      effective: { version: 1, defaultAllowed: false, models: [
+        { provider: 'org-primary', model: 'deepseek-chat', allowed: true },
+        { provider: 'org-primary', model: 'deepseek-reasoner', allowed: false },
+      ] },
       overrides: [
         { provider: 'org-primary', model: 'deepseek-chat', allowed: true },
         { provider: 'org-archived', model: 'legacy', allowed: true },
@@ -255,10 +263,14 @@ describe('ProjectDetailPage', () => {
     })
     renderPage()
     const enableAll = await screen.findByRole('button', { name: '全部开启' }) as HTMLButtonElement
-    expect(screen.getByText('1 / 2 个模型已分配 · 所有成员共享')).toBeTruthy()
+    expect(screen.getByText('1 / 2 个模型已授权 · 按项目单独授权 · 所有成员共享')).toBeTruthy()
     expect(enableAll.disabled).toBe(false)
     vi.mocked(api.getProjectModelAccess).mockResolvedValue({
-      effective: { version: 1, defaultAllowed: false, models: [] },
+      projectDefaultAllowed: false,
+      effective: { version: 1, defaultAllowed: false, models: [
+        { provider: 'org-primary', model: 'deepseek-chat', allowed: true },
+        { provider: 'org-primary', model: 'deepseek-reasoner', allowed: true },
+      ] },
       overrides: [
         { provider: 'org-primary', model: 'deepseek-chat', allowed: true },
         { provider: 'org-primary', model: 'deepseek-reasoner', allowed: true },
@@ -273,7 +285,11 @@ describe('ProjectDetailPage', () => {
   it('clears every project model in one write', async () => {
     const user = userEvent.setup()
     vi.mocked(api.getProjectModelAccess).mockResolvedValue({
-      effective: { version: 1, defaultAllowed: false, models: [] },
+      projectDefaultAllowed: true,
+      effective: { version: 1, defaultAllowed: false, models: [
+        { provider: 'org-primary', model: 'deepseek-chat', allowed: true },
+        { provider: 'org-primary', model: 'deepseek-reasoner', allowed: true },
+      ] },
       overrides: [
         { provider: 'org-primary', model: 'deepseek-chat', allowed: true },
         { provider: 'org-primary', model: 'deepseek-reasoner', allowed: true },
@@ -283,11 +299,35 @@ describe('ProjectDetailPage', () => {
     const disableAll = await screen.findByRole('button', { name: '全部关闭' }) as HTMLButtonElement
     expect((screen.getByRole('button', { name: '全部开启' }) as HTMLButtonElement).disabled).toBe(true)
     vi.mocked(api.getProjectModelAccess).mockResolvedValue({
-      effective: { version: 1, defaultAllowed: false, models: [] },
+      projectDefaultAllowed: false,
+      effective: { version: 1, defaultAllowed: false, models: [
+        { provider: 'org-primary', model: 'deepseek-chat', allowed: false },
+        { provider: 'org-primary', model: 'deepseek-reasoner', allowed: false },
+      ] },
       overrides: [],
     })
     await user.click(disableAll)
     await waitFor(() => expect(api.setAllProjectModelAccess).toHaveBeenCalledWith(7, null))
     await waitFor(() => expect(disableAll.disabled).toBe(true))
+  })
+
+  it('shows default catalog authorization and records a denial exception', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.getProjectModelAccess).mockResolvedValue({
+      projectDefaultAllowed: true,
+      effective: { version: 1, defaultAllowed: false, models: [
+        { provider: 'org-primary', model: 'deepseek-chat', allowed: true },
+        { provider: 'org-primary', model: 'deepseek-reasoner', allowed: true },
+      ] },
+      overrides: [],
+    })
+    renderPage()
+    const chatRow = within(await screen.findByRole('table', { name: '项目模型权限' }))
+      .getByRole('row', { name: /DeepSeek Chat/ })
+    expect(screen.getByText('2 / 2 个模型已授权 · 新增组织模型自动授权 · 所有成员共享')).toBeTruthy()
+    await user.click(within(chatRow).getByRole('checkbox'))
+    await waitFor(() => expect(api.setProjectModelAccess).toHaveBeenCalledWith(
+      7, 'org-primary', 'deepseek-chat', false,
+    ))
   })
 })

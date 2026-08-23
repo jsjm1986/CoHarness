@@ -713,24 +713,15 @@ export class PostgresModelGovernanceService {
     await transaction(this.context.pool, async (client) => {
       const project = await internalProjectId(client, this.context.organizationId, projectId)
       if (project === null) throw new Error(`unknown project ${String(projectId)}`)
-      if (allowed === null) {
-        await client.query(
-          'DELETE FROM harness.model_project_access WHERE organization_id=$1 AND project_id=$2',
-          [this.context.organizationId, project],
-        )
-      } else {
-        // Same assignable set as the admin project list: managed, non-archived organization models.
-        await client.query(`INSERT INTO harness.model_project_access(
-          organization_id,project_id,model_id,allowed
-        )
-        SELECT $1,$2,model.id,true
-        FROM harness.model_catalog model
-        JOIN harness.model_providers provider ON provider.id=model.provider_id
-          AND provider.organization_id=model.organization_id
-        WHERE model.organization_id=$1 AND provider.source='managed' AND provider.status <> 'archived'
-        ON CONFLICT(project_id,model_id) DO UPDATE SET
-          allowed=true,updated_at=now()`, [this.context.organizationId, project])
-      }
+      await client.query(`UPDATE harness.projects
+        SET model_access_default_allowed=$3,updated_at=now()
+        WHERE organization_id=$1 AND id=$2`, [this.context.organizationId, project, allowed === true])
+      // The default is authoritative for every unlisted model. Clearing explicit
+      // rows keeps the mode unambiguous and lets newly added catalog entries follow it.
+      await client.query(
+        'DELETE FROM harness.model_project_access WHERE organization_id=$1 AND project_id=$2',
+        [this.context.organizationId, project],
+      )
       await this.bumpConfigurationRevision(client)
     })
   }
@@ -796,10 +787,11 @@ export class PostgresModelGovernanceService {
         allowed: boolean
       }>(`SELECT model.provider_key provider,model.model_key model,
         (provider.status='enabled') provider_enabled,model.enabled model_enabled,
-        COALESCE(access.allowed,false) allowed
+        COALESCE(access.allowed,project.model_access_default_allowed) allowed
         FROM harness.model_catalog model
         JOIN harness.model_providers provider ON provider.id=model.provider_id
           AND provider.organization_id=model.organization_id
+        JOIN harness.projects project ON project.id=$2 AND project.organization_id=model.organization_id
         LEFT JOIN harness.model_project_access access ON access.organization_id=model.organization_id
           AND access.model_id=model.id AND access.project_id=$2
         WHERE model.organization_id=$1 AND provider.source='managed' AND provider.status <> 'archived'
@@ -836,11 +828,12 @@ export class PostgresModelGovernanceService {
             AND provider.source='managed' AND provider.status <> 'archived'
             AND model.enabled AND COALESCE(user_access.allowed,role_access.allowed,membership.role='admin'))`
       : `EXISTS(SELECT 1 FROM harness.model_catalog model
-          JOIN harness.model_project_access access ON access.organization_id=model.organization_id
-            AND access.model_id=model.id AND access.project_id=$3 AND access.allowed
+          JOIN harness.projects project ON project.id=$3 AND project.organization_id=model.organization_id
+          LEFT JOIN harness.model_project_access access ON access.organization_id=model.organization_id
+            AND access.model_id=model.id AND access.project_id=project.id
           WHERE model.organization_id=provider.organization_id AND model.provider_id=provider.id
             AND provider.source='managed' AND provider.status <> 'archived'
-            AND model.enabled)`
+            AND model.enabled AND COALESCE(access.allowed,project.model_access_default_allowed))`
     const result = await this.context.pool.query<{
       provider_id: string
       key_version: number

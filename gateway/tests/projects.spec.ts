@@ -141,6 +141,7 @@ describe('ProjectService', () => {
     const project = projects.createManaged({ name: '用户项目', ownerUserId: alice.id })
     expect(project).toMatchObject({
       origin: 'user',
+      modelAccessDefaultAllowed: true,
       owner: { id: alice.id, username: 'alice' },
       createdBy: { id: alice.id, username: 'alice' },
       memberCount: 1,

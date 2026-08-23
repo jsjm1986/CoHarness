@@ -46,6 +46,8 @@ export interface ProjectRow {
   memberCount: number
   /** Source metadata is optional for legacy in-process callers; PostgreSQL always supplies it. */
   origin?: ProjectOrigin
+  /** Whether project model authorization follows the organization catalog by default. */
+  modelAccessDefaultAllowed?: boolean
   owner?: ProjectActor | null
   createdBy?: ProjectActor | null
 }
@@ -236,8 +238,8 @@ export class ProjectService {
     const now = Date.now()
     const insert = this.db.transaction(() => {
       const info = this.db.prepare(
-        `INSERT INTO projects(name, path, created_by, origin, owner_user_id, created_at, updated_at)
-         VALUES(?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO projects(name, path, created_by, origin, owner_user_id, model_access_default_allowed, created_at, updated_at)
+         VALUES(?, ?, ?, ?, ?, 1, ?, ?)`,
       ).run(input.name, input.canonical, input.createdBy, input.origin, input.ownerUserId, now, now)
       const id = Number(info.lastInsertRowid)
       this.db.prepare(`INSERT INTO project_members(project_id, user_id, mode) VALUES(?, ?, 'rw')`)
@@ -248,6 +250,7 @@ export class ProjectService {
         path: input.canonical,
         memberCount: 1,
         origin: input.origin,
+        modelAccessDefaultAllowed: true,
         owner: input.ownerUserId === null ? null : this.actor(input.ownerUserId),
         createdBy: this.actor(input.createdBy),
       }
@@ -261,21 +264,24 @@ export class ProjectService {
 
   list(): ProjectRow[] {
     return (this.db.prepare(
-      `SELECT p.id, p.name, p.path, p.origin, p.owner_user_id AS ownerUserId,
+      `SELECT p.id, p.name, p.path, p.origin,
+              p.model_access_default_allowed AS modelAccessDefaultAllowed, p.owner_user_id AS ownerUserId,
               p.created_by AS createdById, COUNT(m.user_id) AS memberCount
        FROM projects p LEFT JOIN project_members m ON m.project_id = p.id
        GROUP BY p.id ORDER BY p.id`,
     ).all() as Array<ProjectRow & { ownerUserId: number | null; createdById: number | null }>)
       .map(row => ({
         id: row.id, name: row.name, path: row.path, memberCount: Number(row.memberCount),
-        origin: row.origin, owner: row.ownerUserId === null ? null : this.actor(row.ownerUserId),
+        origin: row.origin, modelAccessDefaultAllowed: Boolean(row.modelAccessDefaultAllowed),
+        owner: row.ownerUserId === null ? null : this.actor(row.ownerUserId),
         createdBy: row.createdById === null ? null : this.actor(row.createdById),
       }))
   }
 
   getById(id: number): ProjectDetail | null {
     const row = this.db.prepare(
-      `SELECT p.id, p.name, p.path, p.origin, p.owner_user_id AS ownerUserId,
+      `SELECT p.id, p.name, p.path, p.origin,
+              p.model_access_default_allowed AS modelAccessDefaultAllowed, p.owner_user_id AS ownerUserId,
               p.created_by AS createdById, COUNT(m.user_id) AS memberCount
        FROM projects p LEFT JOIN project_members m ON m.project_id = p.id
        WHERE p.id = ? GROUP BY p.id`,
@@ -292,6 +298,7 @@ export class ProjectService {
       path: row.path,
       memberCount: Number(row.memberCount),
       origin: row.origin,
+      modelAccessDefaultAllowed: Boolean(row.modelAccessDefaultAllowed),
       owner: row.ownerUserId === null ? null : this.actor(row.ownerUserId),
       createdBy: row.createdById === null ? null : this.actor(row.createdById),
       members,
