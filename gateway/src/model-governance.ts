@@ -139,6 +139,65 @@ export interface UsageEvent {
   usage?: { inputTokens: number; outputTokens: number; cacheReadTokens?: number; cacheWriteTokens?: number }
 }
 
+/** A personal Provider/model configuration change reported by a user runtime. */
+export interface ModelRegistrationEvent {
+  /** Discriminates this record from a model usage event on the intake wire. */
+  kind: 'model-registration'
+  /** Stable id used for at-least-once delivery deduplication. */
+  eventId: string
+  /** Client commit time in epoch milliseconds. */
+  occurredAt: number
+  /** Provider route affected by the configuration change. */
+  provider: string
+  /** Model id affected by a model-level action. */
+  model?: string
+  /** Semantic change made to the personal configuration. */
+  action: 'provider-created' | 'provider-modified' | 'provider-deleted'
+    | 'model-created' | 'model-modified' | 'model-deleted'
+  /** This event stream is intentionally limited to personal settings. */
+  scope: 'personal'
+}
+
+/** One persisted personal Provider/model registration event. */
+export interface ModelRegistrationRow {
+  eventId: string
+  userId: number
+  occurredAt: number
+  receivedAt: number
+  provider: string
+  model: string | null
+  action: ModelRegistrationEvent['action']
+  scope: 'personal'
+}
+
+/** Filters and pagination for the administrator's registration audit view. */
+export interface ModelRegistrationFilter {
+  userId?: number
+  provider?: string
+  model?: string
+  action?: ModelRegistrationEvent['action']
+  fromMs?: number
+  toMs?: number
+  offset?: number
+  limit?: number
+}
+
+/** Current-state and history totals for personal model registrations. */
+export interface ModelRegistrationSummary {
+  providerCount: number
+  modelCount: number
+  eventCount: number
+  createdCount: number
+  modifiedCount: number
+  deletedCount: number
+}
+
+/** Registration history rows together with the corresponding totals. */
+export interface ModelRegistrationReport {
+  summary: ModelRegistrationSummary
+  rows: ModelRegistrationRow[]
+}
+
 export interface UsageSummary {
   month: string
   inputTokens: number
@@ -482,6 +541,98 @@ export class ModelGovernanceService {
         buckets.write, estimated, companyCost)
     if (insert.changes === 0) return { inserted: false, alerts: 0 }
     return { inserted: true, alerts: this.evaluateAlerts(userId, monthOf(event.occurredAt, this.timeZone)) }
+  }
+
+  ingestRegistration(subject: ModelUsageSubject, event: ModelRegistrationEvent): { inserted: boolean } {
+    const userId = this.userId(subject)
+    if (event === null || typeof event !== 'object' || event.kind !== 'model-registration') {
+      throw new Error('model registration event must have kind model-registration')
+    }
+    nonEmpty(event.eventId, 'eventId')
+    if (!Number.isSafeInteger(event.occurredAt) || event.occurredAt < 0) {
+      throw new Error('occurredAt must be a non-negative safe integer')
+    }
+    const provider = nonEmpty(event.provider, 'provider')
+    const actions: ModelRegistrationEvent['action'][] = [
+      'provider-created', 'provider-modified', 'provider-deleted',
+      'model-created', 'model-modified', 'model-deleted',
+    ]
+    if (!actions.includes(event.action)) throw new Error('invalid model registration action')
+    if (event.scope !== 'personal') throw new Error('model registration scope must be personal')
+    const modelAction = event.action.startsWith('model-')
+    const model = modelAction ? nonEmpty(event.model ?? '', 'model') : null
+    if (!modelAction && event.model !== undefined) throw new Error('provider registration events cannot name a model')
+    const result = this.db.prepare(`INSERT OR IGNORE INTO model_registration_events(
+      event_id,user_id,occurred_at,received_at,provider,model,action,scope
+    ) VALUES(?,?,?,?,?,?,?,?)`).run(
+      event.eventId, userId, event.occurredAt, Date.now(), provider, model, event.action, event.scope,
+    )
+    return { inserted: result.changes !== 0 }
+  }
+
+  registrationReport(filter: ModelRegistrationFilter = {}): ModelRegistrationReport {
+    const offset = filter.offset ?? 0
+    const limit = filter.limit ?? 100
+    if (!Number.isSafeInteger(offset) || offset < 0) throw new Error('registration offset must be a non-negative safe integer')
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 500) throw new Error('registration limit must be from 1 through 500')
+    const clauses: string[] = []
+    const values: unknown[] = []
+    if (filter.userId !== undefined && (!Number.isSafeInteger(filter.userId) || filter.userId <= 0)) {
+      throw new Error('userId must be a positive safe integer')
+    }
+    if (filter.userId !== undefined) { clauses.push('user_id=?'); values.push(filter.userId) }
+    if (filter.provider !== undefined) { clauses.push('provider=?'); values.push(nonEmpty(filter.provider, 'provider')) }
+    if (filter.model !== undefined) { clauses.push('model=?'); values.push(nonEmpty(filter.model, 'model')) }
+    if (filter.action !== undefined) {
+      const actions: readonly ModelRegistrationEvent['action'][] = [
+        'provider-created', 'provider-modified', 'provider-deleted',
+        'model-created', 'model-modified', 'model-deleted',
+      ]
+      if (!actions.includes(filter.action)) throw new Error('invalid model registration action')
+      clauses.push('action=?'); values.push(filter.action)
+    }
+    if (filter.fromMs !== undefined && (!Number.isSafeInteger(filter.fromMs) || filter.fromMs < 0)) {
+      throw new Error('fromMs must be a non-negative safe integer')
+    }
+    if (filter.toMs !== undefined && (!Number.isSafeInteger(filter.toMs) || filter.toMs < 0)) {
+      throw new Error('toMs must be a non-negative safe integer')
+    }
+    if (filter.fromMs !== undefined) { clauses.push('occurred_at>=?'); values.push(filter.fromMs) }
+    if (filter.toMs !== undefined) { clauses.push('occurred_at<?'); values.push(filter.toMs) }
+    const where = clauses.length === 0 ? '' : ` WHERE ${clauses.join(' AND ')}`
+    const all = this.db.prepare(`SELECT event_id,user_id,occurred_at,received_at,provider,model,action,scope
+      FROM model_registration_events${where} ORDER BY occurred_at DESC,event_id DESC`).all(...values) as Array<{
+        event_id: string; user_id: number; occurred_at: number; received_at: number; provider: string;
+        model: string | null; action: ModelRegistrationEvent['action']; scope: 'personal'
+      }>
+    const providerState = new Map<string, ModelRegistrationEvent['action']>()
+    const modelState = new Map<string, ModelRegistrationEvent['action']>()
+    for (const row of [...all].sort((a, b) => a.occurred_at - b.occurred_at
+      || a.received_at - b.received_at || a.event_id.localeCompare(b.event_id))) {
+      if (row.model === null) providerState.set(`${row.user_id}\0${row.provider}`, row.action)
+      else modelState.set(`${row.user_id}\0${row.provider}\0${row.model}`, row.action)
+    }
+    for (const [key, action] of modelState) {
+      if (action === 'model-deleted') continue
+      const providerKey = key.slice(0, key.lastIndexOf('\0'))
+      if (!providerState.has(providerKey)) providerState.set(providerKey, 'provider-created')
+    }
+    const actionCount = (prefix: string): number => all.filter(row => row.action.startsWith(prefix)).length
+    const rows = all.slice(offset, offset + limit).map(row => ({
+      eventId: row.event_id, userId: row.user_id, occurredAt: row.occurred_at, receivedAt: row.received_at,
+      provider: row.provider, model: row.model, action: row.action, scope: row.scope,
+    }))
+    return {
+      summary: {
+        providerCount: [...providerState.values()].filter(action => action !== 'provider-deleted').length,
+        modelCount: [...modelState.values()].filter(action => action !== 'model-deleted').length,
+        eventCount: all.length,
+        createdCount: actionCount('provider-created') + actionCount('model-created'),
+        modifiedCount: actionCount('provider-modified') + actionCount('model-modified'),
+        deletedCount: actionCount('provider-deleted') + actionCount('model-deleted'),
+      },
+      rows,
+    }
   }
 
   summary(subject: ModelUsageSubject, month = monthOf(Date.now(), this.timeZone)): UsageSummary {

@@ -1,6 +1,6 @@
 /** User-declared (BYOK) route authorization over the settings user layer. */
 
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -166,6 +166,42 @@ describe('user-declared route authorization', () => {
     await vi.waitFor(async () => {
       const chunks = await drain(bench.ctx.llm.stream({ provider: 'shipped', model: 'm2', messages: [] }))
       expect(chunks.at(-1)).toMatchObject({ type: 'finish', reason: { kind: 'stop' } })
+    })
+    await bench.ctx.fiber.dispose()
+  })
+
+  it('writes a non-secret registration event after a personal settings commit', async () => {
+    const bench = await boot({ userDeclaredAllowed: true })
+    await bench.ctx.settings.mutate(settingsNamespace('llm-pi-ai'), [{
+      op: 'set', path: ['providers', 'new route'], value: {
+        api: 'openai-responses', baseURL: 'https://example.test', apiKeyEnv: 'PRIVATE_KEY',
+        models: [{ id: 'custom-model', name: 'Custom' }],
+      },
+    }])
+    await vi.waitFor(() => {
+      const files = readdirSync(join(bench.home, 'model-governance-outbox')).filter(name => name.endsWith('.json'))
+      const records = files.map(name => JSON.parse(readFileSync(join(bench.home, 'model-governance-outbox', name), 'utf8')) as Record<string, unknown>)
+      expect(records.some(record => record.kind === 'model-registration' && record.action === 'provider-created')).toBe(true)
+      expect(records.some(record => record.kind === 'model-registration' && record.model === 'custom-model')).toBe(true)
+      expect(JSON.stringify(records)).not.toContain('PRIVATE_KEY')
+    })
+    await bench.ctx.fiber.dispose()
+  })
+
+  it('does not duplicate a route added after an empty settings baseline', async () => {
+    const bench = await boot({ userDeclaredAllowed: true, userLayers: { providers: {} } })
+    await bench.ctx.settings.mutate(settingsNamespace('llm-pi-ai'), [{
+      op: 'set', path: ['providers', 'new route'], value: {
+        api: 'openai-responses', baseURL: 'https://example.test', models: [{ id: 'custom-model' }],
+      },
+    }])
+    await vi.waitFor(() => {
+      const records = readdirSync(join(bench.home, 'model-governance-outbox'))
+        .filter(name => name.endsWith('.json'))
+        .map(name => JSON.parse(readFileSync(join(bench.home, 'model-governance-outbox', name), 'utf8')) as Record<string, unknown>)
+        .filter(record => record.kind === 'model-registration')
+      expect(records.filter(record => record.action === 'provider-created')).toHaveLength(1)
+      expect(records.filter(record => record.action === 'model-created')).toHaveLength(1)
     })
     await bench.ctx.fiber.dispose()
   })

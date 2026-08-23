@@ -8,6 +8,8 @@
 
 策略与用量记录不包含 API Key、提示词或回复内容。组织凭据在 Gateway 数据库中保持加密，只在适配器解析其引用时通过已鉴权的回环运行时 API 传递。凭据来源只是用于区分公司与个人成本的非秘密层标识。以 UUID 命名的 outbox 文件通过同目录 rename 提交，仅在 intake 成功响应后删除；intake 去重使重试安全。
 
+个人 settings 成功提交后，还会为 Provider/model 的新增、修改和删除生成 `model-registration` 记录。插件挂载时会为 user settings 层中已经存在的身份生成确定性基线记录，重启重放时按事件 ID 幂等。记录只包含路由身份、动作、作用域和时间戳，绝不包含凭据引用值、profile 内容、标头、提示词或回复。它们与用量记录共用 outbox 和 intake 令牌，但 Gateway 存储和管理员查询会把登记历史与调用用量分开。项目运行时不会产生个人登记记录。
+
 ## 组织 Provider 与凭据
 
 策略中的 `providers` 数组是供 LLM 适配器消费的不可变、已启用组织 Provider 快照。组织路由 id 使用保留的 `org-*` 命名空间，绝不进入可编辑的用户设置。Gateway 管理页面直接复用完整的 Models 设置插件，因此管理员会通过与个人 Provider 相同的编辑器配置协议、端点、API Key、模型列表与模型发现，再把已存模型分配给角色、用户或项目。每份 profile 经组织 facade 持久化后投影进快照；治理页面不维护第二套删减版 Provider 表单。Gateway facade 与运行时加载器会在持久化或发布前校验同一组受管 pi-ai 字段：`compat` 只包含 `thinkingFormat` 与 `supportsReasoningEffort`，非空 compat 只适用于 `openai-completions`，推理映射与 thinking budget 只能使用受支持档位，重试策略采用有界退避，流空闲定时器也必须落在 Node 定时器范围内。发布器会克隆并递归冻结完整 profile，因此适配器 Consumer 无法改写活动快照中的标头、推理映射、重试配置、输入模态或模型条目。

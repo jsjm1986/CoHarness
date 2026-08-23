@@ -303,6 +303,18 @@ describe('hand-declared providers', () => {
     })).toThrow(/more than once/)
   })
 
+  it('accepts arbitrary non-empty personal route and model identifiers', () => {
+    const resolved = resolveProfiles({
+      '123 Custom Gateway': {
+        api: 'openai-responses',
+        baseURL: 'https://custom.example/v1',
+        models: [{ id: 'vendor/model v2' }],
+      },
+    })
+    expect(resolved.has('123 Custom Gateway')).toBe(true)
+    expect(resolved.get('123 Custom Gateway')?.piProvider.getModels()[0]?.id).toBe('vendor/model v2')
+  })
+
   it('rejects a declaration that names no wire protocol or endpoint', () => {
     expect(() => resolveProfiles({
       'acme-gateway': { baseURL: 'https://acme.test', models: [{ id: 'm', contextWindow: 1, maxTokens: 1 }] },

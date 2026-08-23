@@ -15,6 +15,21 @@ export interface UsageRecord {
   usage?: { inputTokens: number; outputTokens: number; cacheReadTokens?: number; cacheWriteTokens?: number }
 }
 
+/** A non-secret personal Provider/model settings change. */
+export interface ModelRegistrationRecord {
+  kind: 'model-registration'
+  eventId: string
+  occurredAt: number
+  provider: string
+  model?: string
+  action: 'provider-created' | 'provider-modified' | 'provider-deleted'
+    | 'model-created' | 'model-modified' | 'model-deleted'
+  scope: 'personal'
+}
+
+/** Every record accepted by the governance intake. */
+export type GovernanceRecord = UsageRecord | ModelRegistrationRecord
+
 /** Crash-safe local outbox; each record is committed by same-directory rename. */
 export class UsageOutbox {
   private pumping: Promise<void> = Promise.resolve()
@@ -39,7 +54,7 @@ export class UsageOutbox {
     this.token = token
   }
 
-  enqueue(record: UsageRecord): void {
+  enqueue(record: GovernanceRecord): void {
     mkdirSync(this.dir, { recursive: true, mode: 0o700 })
     const target = join(this.dir, `${record.eventId}.json`)
     const temp = `${target}.${randomBytes(5).toString('hex')}.tmp`

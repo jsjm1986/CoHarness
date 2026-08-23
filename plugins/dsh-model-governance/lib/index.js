@@ -7,6 +7,7 @@ import { OrganizationCredentialLayer } from "./organization-credentials.js";
 import { loadPolicy } from "./policy.js";
 import { ReloadableModelProviderConfig, stagedProviderSnapshot } from "./provider-config.js";
 import { PolicyReloader } from "./reload.js";
+import { baselineRegistrations, diffRegistrations } from "./registration.js";
 import { UserDeclaredRoutes } from "./user-routes.js";
 export const name = 'dsh-model-governance';
 export const inject = ['llm'];
@@ -56,6 +57,7 @@ export function apply(ctx) {
         sctx.effect(() => () => userDeclared.clear());
     });
     const outbox = new UsageOutbox(join(home, 'model-governance-outbox'), policy.intakeUrl, policy.intakeToken);
+    let personalRuntime = policy.userDeclaredAllowed;
     let reloader;
     ctx.effect(() => async () => {
         await reloader?.close();
@@ -71,6 +73,7 @@ export function apply(ctx) {
             access.replace(next);
             providerConfig.replace({ revision: next.version, providers: next.providers });
             outbox.setEndpoint(next.intakeUrl, next.intakeToken);
+            personalRuntime = next.userDeclaredAllowed;
         },
         onInvalid: error => {
             access.unavailable();
@@ -91,6 +94,53 @@ export function apply(ctx) {
             ctx.logger.warn(error);
         }
     };
+    // Personal model settings are audited only after the settings provider has
+    // committed them. The payload contains route/model identities and action
+    // names only; credentials and arbitrary profile fields stay local.
+    ctx.inject(['settings'], (sctx) => {
+        const baselined = new Set();
+        const recordBaseline = () => {
+            if (!personalRuntime)
+                return;
+            for (const descriptor of sctx.settings.describe()) {
+                const namespace = String(descriptor.ns);
+                if (baselined.has(namespace))
+                    continue;
+                const records = baselineRegistrations(namespace, descriptor.user);
+                let complete = true;
+                for (const record of records) {
+                    try {
+                        outbox.enqueue(record);
+                    }
+                    catch (error) {
+                        complete = false;
+                        ctx.logger.warn('model-governance: failed to persist model registration baseline');
+                        ctx.logger.warn(error);
+                    }
+                }
+                if (complete)
+                    baselined.add(namespace);
+            }
+        };
+        recordBaseline();
+        // Settings registrations and adapter directories can settle after this
+        // injection; rerun the deterministic baseline at those commit points.
+        sctx.on('settings/document-updated', recordBaseline);
+        sctx.on('llm/adapters-updated', recordBaseline);
+        sctx.on('settings/updated', (ns, next, prev) => {
+            if (!personalRuntime)
+                return;
+            for (const record of diffRegistrations(String(ns), prev, next)) {
+                try {
+                    outbox.enqueue(record);
+                }
+                catch (error) {
+                    ctx.logger.warn('model-governance: failed to persist model registration record');
+                    ctx.logger.warn(error);
+                }
+            }
+        });
+    });
     ctx.on('llm/stream', (options, next) => {
         const initiatorId = ctx.get('agents')?.currentInitiator()?.session.id;
         const explicitId = options.sessionId;

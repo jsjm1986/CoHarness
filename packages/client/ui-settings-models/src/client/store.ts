@@ -76,7 +76,16 @@ export function messageOf(error: unknown): string {
  */
 export function deriveKeyRef(provider: string, scope: 'personal' | 'organization' = 'personal'): string {
   const prefix = scope === 'organization' ? 'DSH_' : ''
-  return `${prefix}${provider.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_API_KEY`
+  const normalized = provider.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+  // Keep the familiar names for conventional routes, but add a short stable
+  // suffix for arbitrary ids so `a-b` and `a_b` cannot share one credential.
+  const conventional = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(provider)
+  let hash = 2166136261
+  for (const char of provider) { hash ^= char.codePointAt(0) ?? 0; hash = Math.imul(hash, 16777619) }
+  const suffix = (hash >>> 0).toString(36).toUpperCase()
+  const rawStem = normalized === '' ? `PROVIDER_${suffix}` : conventional ? normalized : `${normalized}_${suffix}`
+  const stem = /^[A-Z_]/.test(rawStem) ? rawStem : `PROVIDER_${rawStem}`
+  return `${prefix}${stem}_API_KEY`
 }
 
 /**
