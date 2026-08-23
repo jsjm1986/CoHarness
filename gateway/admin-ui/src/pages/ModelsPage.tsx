@@ -197,7 +197,7 @@ export function ModelsPage() {
     <div className="page">
       <PageHeader
         title="模型治理"
-        description="管理员统一配置完整组织 Provider 和模型目录；个人运行时可同时使用获授权的组织模型与个人 BYOK，项目只使用显式分配的组织模型。"
+        description="管理员统一配置完整组织 Provider 和模型目录；个人运行时可同时使用获授权的组织模型与个人 BYOK，新项目默认跟随全部可用组织模型，管理员仍可设置项目级或单模型例外。"
         meta={loading ? undefined : `${models.length} 个组织模型`}
         actions={actions}
       />

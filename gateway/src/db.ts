@@ -2,7 +2,7 @@ import { mkdirSync } from 'node:fs'
 import { basename, dirname } from 'node:path'
 import Database from 'better-sqlite3'
 
-export const SCHEMA_VERSION = 6
+export const SCHEMA_VERSION = 7
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS projects (
   created_by INTEGER REFERENCES users(id),
   origin TEXT NOT NULL DEFAULT 'admin' CHECK (origin IN ('admin','user')),
   owner_user_id INTEGER REFERENCES users(id),
+  model_access_default_allowed INTEGER NOT NULL DEFAULT 0 CHECK (model_access_default_allowed IN (0,1)),
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
   CHECK ((origin = 'user' AND owner_user_id IS NOT NULL) OR (origin = 'admin'))
@@ -288,6 +289,10 @@ function migrate(db: Database.Database): void {
     }
     if (!projectColumns.has('owner_user_id')) {
       db.exec('ALTER TABLE projects ADD COLUMN owner_user_id INTEGER REFERENCES users(id)')
+    }
+    if (!projectColumns.has('model_access_default_allowed')) {
+      db.exec(`ALTER TABLE projects ADD COLUMN model_access_default_allowed INTEGER NOT NULL DEFAULT 0
+        CHECK (model_access_default_allowed IN (0,1))`)
     }
     if (!names.has('project_invitations')) {
       db.exec(`CREATE TABLE project_invitations (

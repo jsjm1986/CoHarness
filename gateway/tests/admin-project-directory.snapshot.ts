@@ -87,6 +87,7 @@ it('runs the administrator host-directory import through the real Gateway HTTP s
       `name=${project.name}`,
       `path=${project.path}`,
       `origin=${project.origin ?? '<legacy>'}`,
+      `modelAccessDefaultAllowed=${String(project.modelAccessDefaultAllowed)}`,
       '',
       '## Browse after import',
       `status=${String(browseAfter.status)}`,
@@ -116,6 +117,7 @@ interface ProjectResult {
   name: string
   path: string
   origin?: string
+  modelAccessDefaultAllowed: boolean
 }
 
 async function login(base: string): Promise<string> {

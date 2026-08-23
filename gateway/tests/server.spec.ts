@@ -364,8 +364,12 @@ describe('gateway server', () => {
     expect(created.status).toBe(201)
     const project = await created.json() as {
       id: number; name: string; path: string; origin: string; owner: { id: number }; memberCount: number
+      modelAccessDefaultAllowed: boolean
     }
-    expect(project).toMatchObject({ name: 'Alice workspace', origin: 'user', owner: { id: alice.id }, memberCount: 1 })
+    expect(project).toMatchObject({
+      name: 'Alice workspace', origin: 'user', owner: { id: alice.id }, memberCount: 1,
+      modelAccessDefaultAllowed: true,
+    })
     expect(project.path.startsWith(realpathSync(deps.cfg.userProjectsRoot) + '/')).toBe(true)
 
     const aliceContext = await fetch(`${base}/account/api/context`, { headers: { cookie: aliceCookie } })

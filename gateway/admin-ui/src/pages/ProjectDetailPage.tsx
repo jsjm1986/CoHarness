@@ -75,6 +75,8 @@ export function ProjectDetailPage() {
   const [models, setModels] = useState<ModelGovernanceRow[]>([])
   const [modelProviders, setModelProviders] = useState<ModelProviderRow[]>([])
   const [modelAssignments, setModelAssignments] = useState(new Set<string>())
+  const [projectDefaultAllowed, setProjectDefaultAllowed] = useState(false)
+  const [hasProjectOverrides, setHasProjectOverrides] = useState(false)
   const [modelsLoading, setModelsLoading] = useState(true)
   const [modelsError, setModelsError] = useState('')
   const [modelPending, setModelPending] = useState('')
@@ -135,7 +137,9 @@ export function ProjectDetailPage() {
       ])
       setModels(nextModels)
       setModelProviders(nextProviders)
-      setModelAssignments(new Set(access.overrides.filter(row => row.allowed).map(modelKey)))
+      setProjectDefaultAllowed(access.projectDefaultAllowed)
+      setHasProjectOverrides(access.overrides.length > 0)
+      setModelAssignments(new Set(access.effective.models.filter(row => row.allowed).map(modelKey)))
       setModelsError('')
     } catch (cause) {
       setModelsError(messageFrom(cause))
@@ -195,7 +199,12 @@ export function ProjectDetailPage() {
     const key = modelKey(model)
     setModelPending(key)
     try {
-      await setProjectModelAccess(projectId, model.provider, model.model, assigned ? true : null)
+      await setProjectModelAccess(
+        projectId,
+        model.provider,
+        model.model,
+        assigned ? true : projectDefaultAllowed ? false : null,
+      )
       await reloadModelAccess()
     } catch (cause) {
       setModelsError(messageFrom(cause))
@@ -355,10 +364,13 @@ export function ProjectDetailPage() {
                       <Definition label="所有者">{project.owner?.displayName || project.owner?.username || '组织管理'}</Definition>
                       <Definition label="创建者">{project.createdBy?.displayName || project.createdBy?.username || '未知'}</Definition>
                       <Definition label="成员">{`${project.memberCount} 位`}</Definition>
+                      <Definition label="模型默认规则">
+                        {projectDefaultAllowed ? '自动授权全部可用组织模型' : '仅授权项目明确选择的模型'}
+                      </Definition>
                       <Definition label="模型权限">
                         <div className="projectConfigModels">
                           <span>{`${assignedModelCount} / ${assignableModels.length}`}</span>
-                          {assignedModels.length === 0 ? <span>未分配</span> : assignedModels.map(model => (
+                          {assignedModels.length === 0 ? <span>未授权</span> : assignedModels.map(model => (
                             <span className="projectConfigModel" key={modelKey(model)}>{model.displayName}</span>
                           ))}
                         </div>
@@ -372,8 +384,8 @@ export function ProjectDetailPage() {
           <Section
             className="responsiveSection"
             title="项目模型权限"
-            meta={`${assignedModelCount} / ${assignableModels.length} 个模型已分配 · 所有成员共享`}
-            actions={assignableModels.length === 0 && modelAssignments.size === 0 ? undefined : (
+            meta={`${assignedModelCount} / ${assignableModels.length} 个模型已授权 · ${projectDefaultAllowed ? '新增组织模型自动授权' : '按项目单独授权'} · 所有成员共享`}
+            actions={assignableModels.length === 0 && !hasProjectOverrides ? undefined : (
               <div className="projectModelAccessToolbar">
                 <Button
                   disabled={modelPending !== '' || assignableModels.length === 0 || assignedModelCount === assignableModels.length}
@@ -382,7 +394,7 @@ export function ProjectDetailPage() {
                   全部开启
                 </Button>
                 <Button
-                  disabled={modelPending !== '' || modelAssignments.size === 0}
+                  disabled={modelPending !== '' || (!projectDefaultAllowed && assignedModelCount === 0 && !hasProjectOverrides)}
                   onClick={() => { void changeAllModelAssignments(false) }}
                 >
                   全部关闭
@@ -406,7 +418,7 @@ export function ProjectDetailPage() {
                         <tr key={key}>
                           <td><ProjectModelIdentity model={model} /></td>
                           <td><StatusBadge tone={providerEnabled && model.enabled ? 'success' : 'warning'}>{providerEnabled && model.enabled ? '可用' : '暂不可用'}</StatusBadge></td>
-                          <td><Switch label={assignedToProject ? '已分配' : '未分配'} checked={assignedToProject} disabled={modelPending !== ''} onChange={value => { void changeModelAssignment(model, value) }} /></td>
+                          <td><Switch label={assignedToProject ? '已授权' : '未授权'} checked={assignedToProject} disabled={modelPending !== ''} onChange={value => { void changeModelAssignment(model, value) }} /></td>
                         </tr>
                       )
                     })}</tbody>
@@ -424,7 +436,7 @@ export function ProjectDetailPage() {
                           <StatusBadge tone={providerEnabled && model.enabled ? 'success' : 'warning'}>{providerEnabled && model.enabled ? '可用' : '暂不可用'}</StatusBadge>
                         </div>
                         <div className="mobileItemBody">
-                          <Switch label={assignedToProject ? '已分配给项目' : '未分配给项目'} checked={assignedToProject} disabled={modelPending !== ''} onChange={value => { void changeModelAssignment(model, value) }} />
+                          <Switch label={assignedToProject ? '已授权给项目' : '未授权给项目'} checked={assignedToProject} disabled={modelPending !== ''} onChange={value => { void changeModelAssignment(model, value) }} />
                         </div>
                       </article>
                     )

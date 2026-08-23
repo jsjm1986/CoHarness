@@ -489,9 +489,11 @@ async function dispatch(
     const query = new URL(req.url ?? '/', 'http://x').searchParams
     if (method === 'GET') {
       const projectId = Number(query.get('projectId'))
-      if (await deps.projects.getById(projectId) === null) { sendError(res, 404, 'project not found'); return true }
+      const project = await deps.projects.getById(projectId)
+      if (project === null) { sendError(res, 404, 'project not found'); return true }
       sendJson(res, 200, {
         effective: await deps.governance.policyForProject(projectId),
+        projectDefaultAllowed: project.modelAccessDefaultAllowed === true,
         overrides: await deps.governance.projectOverrides(projectId),
       })
       return true

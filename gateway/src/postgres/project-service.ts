@@ -119,8 +119,8 @@ export class PostgresProjectService {
         if (input.ownerUserId !== null && owner === null) throw new Error(`unknown user ${String(input.ownerUserId)}`)
         await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`gateway-port:${this.context.nodeId}`])
         const project = await client.query<{ id: string; public_id: string }>(`INSERT INTO harness.projects(
-          organization_id,name,created_by,origin,owner_user_id
-        ) VALUES($1,$2,$3,$4,$5) RETURNING id,public_id::text`, [
+          organization_id,name,created_by,origin,owner_user_id,model_access_default_allowed
+        ) VALUES($1,$2,$3,$4,$5,true) RETURNING id,public_id::text`, [
           this.context.organizationId, input.name, createdBy, input.origin, owner,
         ])
         const row = project.rows[0]
@@ -162,6 +162,7 @@ export class PostgresProjectService {
       path: string
       member_count: string
       origin: ProjectOrigin
+      model_access_default_allowed: boolean
       owner_id: string | null
       owner_public_id: string | null
       owner_username: string | null
@@ -170,7 +171,7 @@ export class PostgresProjectService {
       creator_username: string | null
       creator_display_name: string | null
     }>(`SELECT p.public_id::text,p.name::text,pm.local_path path,COUNT(m.user_id)::text member_count,
-      p.origin,
+      p.origin,p.model_access_default_allowed,
       owner.id owner_id,owner.public_id::text owner_public_id,owner.username::text owner_username,owner.display_name owner_display_name,
       creator.public_id::text creator_public_id,creator.username::text creator_username,creator.display_name creator_display_name
       FROM harness.projects p
@@ -187,6 +188,7 @@ export class PostgresProjectService {
       path: row.path,
       memberCount: Number(row.member_count),
       origin: row.origin,
+      modelAccessDefaultAllowed: row.model_access_default_allowed,
       owner: row.owner_id === null ? null : {
         id: publicNumber(row.owner_public_id!, 'user'), username: row.owner_username!, displayName: row.owner_display_name!,
       },
@@ -204,6 +206,7 @@ export class PostgresProjectService {
       path: string
       member_count: string
       origin: ProjectOrigin
+      model_access_default_allowed: boolean
       owner_id: string | null
       owner_public_id: string | null
       owner_username: string | null
@@ -212,7 +215,7 @@ export class PostgresProjectService {
       creator_username: string | null
       creator_display_name: string | null
     }>(`SELECT p.id internal_id,p.public_id::text,p.name::text,pm.local_path path,
-      COUNT(m.user_id)::text member_count,p.origin,
+      COUNT(m.user_id)::text member_count,p.origin,p.model_access_default_allowed,
       owner.id owner_id,owner.public_id::text owner_public_id,owner.username::text owner_username,owner.display_name owner_display_name,
       creator.public_id::text creator_public_id,creator.username::text creator_username,creator.display_name creator_display_name
       FROM harness.projects p
@@ -240,6 +243,7 @@ export class PostgresProjectService {
       path: row.path,
       memberCount: Number(row.member_count),
       origin: row.origin,
+      modelAccessDefaultAllowed: row.model_access_default_allowed,
       owner: row.owner_id === null ? null : {
         id: publicNumber(row.owner_public_id!, 'user'), username: row.owner_username!, displayName: row.owner_display_name!,
       },

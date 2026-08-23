@@ -16,6 +16,7 @@ export type Project = {
   path: string
   memberCount: number
   origin?: 'admin' | 'user'
+  modelAccessDefaultAllowed?: boolean
   owner?: { id: number; username: string; displayName: string } | null
   createdBy?: { id: number; username: string; displayName: string } | null
 }
@@ -359,6 +360,12 @@ export type ModelAccessView = {
   overrides: Array<{ provider: string; model: string; allowed: boolean }>
 }
 
+/** Effective model authorization and the project fallback mode returned by the admin API. */
+export type ProjectModelAccessView = ModelAccessView & {
+  /** Project-level fallback used when a route has no explicit override. */
+  projectDefaultAllowed: boolean
+}
+
 export type UsageSummary = {
   month: string
   inputTokens: number
@@ -448,7 +455,7 @@ export function setModelAccess(userId: number, provider: string, model: string, 
   })
 }
 
-export function getProjectModelAccess(projectId: number): Promise<ModelAccessView> {
+export function getProjectModelAccess(projectId: number): Promise<ProjectModelAccessView> {
   return request(`/admin/api/project-model-access?projectId=${projectId}`)
 }
 

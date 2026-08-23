@@ -13,6 +13,7 @@ status=200
 name=Existing App
 path=$ROOT/imports/existing-app
 origin=admin
+modelAccessDefaultAllowed=true
 
 ## Browse after import
 status=200
