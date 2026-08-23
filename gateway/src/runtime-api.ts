@@ -19,8 +19,14 @@ import type { PostgresCollaborationService } from './postgres/collaboration-serv
 import { internalUserId, type PostgresRuntimeContext } from './postgres/runtime-context.ts'
 import type { GatewayPushService } from './push-notifications.ts'
 import type { GatewayModelGovernanceService } from './services.ts'
+import {
+  DocumentTransferError,
+  type RuntimeDocumentTransferHandler,
+  type RuntimeDocumentTransferCapabilitiesHandler,
+  type RuntimeDocumentTransferListHandler,
+} from './document-transfer.ts'
 
-interface RuntimeCredentialSubject {
+export interface RuntimeCredentialSubject {
   organizationId: string
   target: RuntimeTarget
   generation: number
@@ -58,6 +64,12 @@ interface RuntimeApiDependencies {
   governance: Pick<GatewayModelGovernanceService, 'resolveOrganizationCredential'>
   /** Optional FCM delivery; omitted in keyless/unit-test compositions. */
   push?: Pick<GatewayPushService, 'notifyCompleted'>
+  /** Optional cross-scope document broker; absent in standalone test compositions. */
+  documentTransfer?: RuntimeDocumentTransferHandler
+  /** Optional safe scope-capability projection for document-manager clients. */
+  documentTransferCapabilities?: RuntimeDocumentTransferCapabilitiesHandler
+  /** Optional authorized alternate-scope document listing. */
+  documentTransferList?: RuntimeDocumentTransferListHandler
 }
 
 function send(res: ServerResponse, status: number, value: unknown): void {
@@ -169,6 +181,18 @@ function authorizationToken(req: IncomingMessage): string | undefined {
   if (typeof value !== 'string' || !value.startsWith('Bearer ')) return undefined
   const token = value.slice('Bearer '.length)
   return token === '' ? undefined : token
+}
+
+/** Abort a broker operation when the runtime's loopback request is abandoned. */
+function requestSignal(req: IncomingMessage): AbortSignal {
+  const controller = new AbortController()
+  const eventSource = req as IncomingMessage & { once?: IncomingMessage['once'] }
+  if (typeof eventSource.once === 'function') {
+    eventSource.once('aborted', () => {
+      if (!controller.signal.aborted) controller.abort(new Error('runtime request aborted'))
+    })
+  }
+  return controller.signal
 }
 
 function assertionFor(
@@ -357,6 +381,47 @@ export function createRuntimeApiHandler(
         const value = await deps.governance.resolveOrganizationCredential(subject.target, ref)
         res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
         res.end(JSON.stringify(value === null ? { configured: false } : { configured: true, value }))
+        return true
+      }
+
+      if (pathname === '/internal/runtime/documents/transfer' && req.method === 'POST') {
+        const claims = assertionFor(req, deps.principals, subject, true)!
+        if (deps.documentTransfer === undefined) {
+          send(res, 503, { error: 'document-transfer-unavailable' })
+          return true
+        }
+        const result = await deps.documentTransfer({
+          request: req,
+          subject,
+          principal: claims,
+          payload: JSON.parse(body),
+          signal: requestSignal(req),
+        })
+        send(res, 200, result)
+        return true
+      }
+
+      if (pathname === '/internal/runtime/documents/transfer/capabilities' && req.method === 'GET') {
+        const claims = assertionFor(req, deps.principals, subject, true)!
+        if (deps.documentTransferCapabilities === undefined) {
+          send(res, 503, { error: 'document-transfer-unavailable' })
+          return true
+        }
+        send(res, 200, await deps.documentTransferCapabilities({ subject, principal: claims }))
+        return true
+      }
+
+      if (pathname === '/internal/runtime/documents/transfer/list' && req.method === 'POST') {
+        const claims = assertionFor(req, deps.principals, subject, true)!
+        if (deps.documentTransferList === undefined) {
+          send(res, 503, { error: 'document-transfer-unavailable' })
+          return true
+        }
+        send(res, 200, await deps.documentTransferList({
+          subject,
+          principal: claims,
+          payload: JSON.parse(body),
+        }))
         return true
       }
 
@@ -608,6 +673,10 @@ export function createRuntimeApiHandler(
 
       return false
     } catch (error) {
+      if (error instanceof DocumentTransferError) {
+        send(res, error.status, { error: error.code, message: error.message })
+        return true
+      }
       if (error instanceof CollaborationDeniedError) {
         const status = error.code === 'conversation-not-found' ? 404
           : error.code === 'visibility-locked' ? 409 : 403

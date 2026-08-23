@@ -1,5 +1,11 @@
 /** Browser HTTP client for the optional Host user-document service. */
-import type { UserDocIdType, UserDocLimits, UserDocRef } from '@deepseek-ai/dsh-userdoc'
+import type {
+  UserDocIdType,
+  UserDocLimits,
+  UserDocRef,
+  UserDocTransferRequest,
+  UserDocTransferResponse,
+} from '@deepseek-ai/dsh-userdoc'
 
 /** Stable error surfaced when the deployment does not mount the document route. */
 export class UserDocServiceUnavailableError extends Error {
@@ -44,11 +50,13 @@ export interface UserDocClient {
   list(signal?: AbortSignal): Promise<UserDocListResponse>
   upload(file: File, signal?: AbortSignal, onProgress?: UserDocUploadProgress): Promise<UserDocRef>
   remove(docId: UserDocIdType, signal?: AbortSignal): Promise<void>
+  transfer(request: UserDocTransferRequest, signal?: AbortSignal): Promise<UserDocTransferResponse>
   contentUrl(docId: UserDocIdType): string
 }
 
 const ROOT = '/api/documents'
 const UPLOAD_HEADER = 'x-dsh-document-upload'
+const TRANSFER_PATH = `${ROOT}/transfer`
 
 function contentUrl(docId: UserDocIdType): string {
   return `${ROOT}/content?id=${encodeURIComponent(docId)}`
@@ -166,6 +174,11 @@ export function createUserDocClient(): UserDocClient {
         throw error
       }
     },
+    transfer: (request, signal) => requestJson<UserDocTransferResponse>(TRANSFER_PATH, {
+      ...requestInit('POST', signal),
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request),
+    }),
     contentUrl,
   }
 }

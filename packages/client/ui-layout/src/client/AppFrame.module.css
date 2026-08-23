@@ -103,11 +103,19 @@
      inside the visual viewport; the title remains centered by the flex context. */
   .topbarToggle {
     position: relative;
-    left: 24px;
+    left: 0;
     z-index: 1;
   }
 
   .topbarContext {
+    transform: none;
+  }
+
+  .frame:has([data-phase='active']) .topbarToggle {
+    left: 24px;
+  }
+
+  .frame:has([data-phase='active']) .topbarContext {
     transform: translateX(16px);
   }
 }

@@ -5536,6 +5536,12 @@ importers:
       '@deepseek-ai/dsh-client-connection':
         specifier: workspace:^
         version: link:../../client/connection
+      '@deepseek-ai/dsh-collaboration':
+        specifier: workspace:^
+        version: link:../../context/collaboration
+      '@deepseek-ai/dsh-gateway-runtime':
+        specifier: workspace:^
+        version: link:../../context/gateway-runtime
       '@deepseek-ai/dsh-host-webserver':
         specifier: workspace:^
         version: link:../webserver

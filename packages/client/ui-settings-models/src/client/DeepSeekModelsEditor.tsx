@@ -5,7 +5,7 @@
  * override; reset removes that override instead of copying defaults into it.
  */
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
   IconChevronDownOutline14, IconChevronRightOutline14, IconPlusOutline16, IconTrashOutline16,
@@ -195,6 +195,7 @@ export function DeepSeekModelsEditor(props: DeepSeekModelsEditorProps): ReactNod
   // because the rows they annotated are gone.
   const [editing, setEditing] = useState<ReadonlyMap<string, string>>(() => new Map())
   const [expanded, setExpanded] = useState<ReadonlySet<number>>(() => new Set())
+  const capacityHelpPrefix = useId()
 
   const update = (index: number, key: CatalogField, value: unknown): void => {
     const next = props.models.map((model, at) => {
@@ -272,28 +273,32 @@ export function DeepSeekModelsEditor(props: DeepSeekModelsEditorProps): ReactNod
     index: number,
     field: CapacityField,
     fallback: number | undefined,
-  ): ReactNode => (
-    <label className={styles['modelField']}>
-      <span className={styles['modelFieldLabel']}>{props.t(field === 'contextWindow' ? 'contextWindow' : 'maxTokens')}</span>
-      <input
-        className={styles['input']}
-        type="text"
-        inputMode="numeric"
-        value={capacityText(model, index, field)}
-        placeholder={fallback === undefined
-          ? props.t(field === 'contextWindow' ? 'contextWindowPlaceholder' : 'maxTokensPlaceholder')
-          : formatCapacity(fallback)}
-        aria-label={`${props.t(field === 'contextWindow' ? 'contextWindow' : 'maxTokens')} ${String(index + 1)}`}
-        disabled={props.disabled}
-        onChange={(event) => {
-          const text = event.target.value
-          setEditing(current => new Map(current).set(`${String(index)}:${field}`, text))
-          update(index, field, parseCapacity(text))
-        }}
-        onBlur={() => { settleCapacity(index, field) }}
-      />
-    </label>
-  )
+  ): ReactNode => {
+    const helpId = `${capacityHelpPrefix}-capacity-${String(index)}`
+    return (
+      <label className={styles['modelField']}>
+        <span className={styles['modelFieldLabel']}>{props.t(field === 'contextWindow' ? 'contextWindow' : 'maxTokens')}</span>
+        <input
+          className={styles['input']}
+          type="text"
+          inputMode="numeric"
+          value={capacityText(model, index, field)}
+          placeholder={fallback === undefined
+            ? props.t(field === 'contextWindow' ? 'contextWindowPlaceholder' : 'maxTokensPlaceholder')
+            : formatCapacity(fallback)}
+          aria-label={`${props.t(field === 'contextWindow' ? 'contextWindow' : 'maxTokens')} ${String(index + 1)}`}
+          aria-describedby={helpId}
+          disabled={props.disabled}
+          onChange={(event) => {
+            const text = event.target.value
+            setEditing(current => new Map(current).set(`${String(index)}:${field}`, text))
+            update(index, field, parseCapacity(text))
+          }}
+          onBlur={() => { settleCapacity(index, field) }}
+        />
+      </label>
+    )
+  }
 
   return (
     <section className={styles['modelCatalog']} aria-label={props.t('models')}>
@@ -374,6 +379,12 @@ export function DeepSeekModelsEditor(props: DeepSeekModelsEditorProps): ReactNod
                 {expanded.has(index)
                   ? (
                     <div className={styles['modelAdvanced']}>
+                      <p
+                        id={`${capacityHelpPrefix}-capacity-${String(index)}`}
+                        className={styles['capacityHelp']}
+                      >
+                        {props.t('modelCapacityHelp')}
+                      </p>
                       {capacityField(model, index, 'contextWindow', props.defaultContextWindow)}
                       {capacityField(model, index, 'maxTokens', props.defaultMaxTokens)}
                       <label className={styles['modelCheckboxField']}>

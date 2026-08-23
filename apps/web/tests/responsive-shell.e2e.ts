@@ -95,7 +95,7 @@ describe('web e2e: responsive shell modes', () => {
     // Open/Close sidebar with the drawer state.
     const toggle = page.locator('[class*="topbarToggle"]').first()
     await toggle.waitFor({ timeout: 10_000 })
-    expect(await page.locator('[data-mobile-app-header]').textContent()).toBe('DeepSeek Harness')
+    expect(await page.locator('[data-mobile-app-header]').textContent()).toBe('CoHarness')
     expect(await toggle.getAttribute('aria-label')).toBe('Open sidebar')
     const drawer = page.locator('[class*="drawer"]').first()
     expect(await drawer.getAttribute('data-open')).toBeNull()

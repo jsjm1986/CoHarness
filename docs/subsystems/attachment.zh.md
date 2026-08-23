@@ -294,5 +294,5 @@ abstract openRead(docId: UserDocId): Promise<{ ref: UserDocRef; body: ReadableSt
 abstract remove(docId: UserDocId, signal?: AbortSignal): Promise<void>
 ```
 
-Source: [`packages/attachment/userdoc/src/index.ts:74`](../../packages/attachment/userdoc/src/index.ts)
+Source: [`packages/attachment/userdoc/src/index.ts:85`](../../packages/attachment/userdoc/src/index.ts)
 <!-- END GENERATED cordis-surface -->

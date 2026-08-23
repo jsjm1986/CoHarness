@@ -9,6 +9,11 @@ import type {
   UserDocIdType,
   UserDocLimits,
   UserDocRef,
+  UserDocScope,
+  UserDocTransferRequest,
+  UserDocTransferCapabilities,
+  UserDocTransferListResponse,
+  UserDocTransferResponse,
 } from '@deepseek-ai/dsh-userdoc'
 
 /** Stable error surfaced when the deployment does not mount the document route. */
@@ -87,11 +92,18 @@ export interface UserDocClient {
     signal?: AbortSignal,
   ): Promise<UserDocRef>
   remove(docId: UserDocIdType, signal?: AbortSignal): Promise<void>
+  /** Copy snapshots between the current user's personal scope and one project scope. */
+  transfer(request: UserDocTransferRequest, signal?: AbortSignal): Promise<UserDocTransferResponse>
+  capabilities(signal?: AbortSignal): Promise<UserDocTransferCapabilities>
+  listScope(scope: UserDocScope, signal?: AbortSignal): Promise<UserDocTransferListResponse>
   contentUrl(docId: UserDocIdType): string
 }
 
 const ROOT = '/api/documents'
 const UPLOAD_HEADER = 'x-dsh-document-upload'
+const TRANSFER_PATH = `${ROOT}/transfer`
+const CAPABILITIES_PATH = `${TRANSFER_PATH}/capabilities`
+const LIST_SCOPE_PATH = `${TRANSFER_PATH}/list`
 
 function contentUrl(docId: UserDocIdType): string {
   return `${ROOT}/content?id=${encodeURIComponent(docId)}`
@@ -243,6 +255,20 @@ export function createUserDocClient(): UserDocClient {
         throw error
       }
     },
+    transfer: (request, signal) => requestJson<UserDocTransferResponse>(
+      TRANSFER_PATH,
+      {
+        ...requestInit('POST', signal),
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(request),
+      },
+    ),
+    capabilities: signal => requestJson<UserDocTransferCapabilities>(CAPABILITIES_PATH, requestInit('GET', signal)),
+    listScope: (scope, signal) => requestJson<UserDocTransferListResponse>(LIST_SCOPE_PATH, {
+      ...requestInit('POST', signal),
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ version: 1, scope }),
+    }),
     contentUrl,
   }
 }

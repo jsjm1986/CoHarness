@@ -125,6 +125,9 @@ describe('ConversationController', () => {
       progress: 1,
     })
     if (draft === undefined) throw new Error('attached document draft missing')
+    expect(b.root.attachDocument('s1' as never, ref)).toBe(true)
+    expect(b.root.documentStore('s1' as never).getSnapshot()).toHaveLength(1)
+    expect(b.shell.state.getSnapshot().documentIds).toEqual([draft.id])
     b.root.removeDraftDocument('s1' as never, draft.id)
     b.shell.removeDocument(draft.id)
     expect(b.root.documentStore('s1' as never).getSnapshot()).toEqual([])

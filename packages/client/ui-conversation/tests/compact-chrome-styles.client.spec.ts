@@ -29,6 +29,8 @@ describe('conversation compact chrome', () => {
     expect(input).toContain("[data-viewport='compact']")
     expect(input).toContain('.add')
     expect(input).toContain('.primary')
+    expect(input).toContain('.documentRail')
+    expect(input).toContain('.documentStatus')
     expect(input).toContain('var(--dsw-touch-target)')
     expect(input).toContain('flex-wrap: wrap')
     expect(input).toContain('[data-viewport-short]')

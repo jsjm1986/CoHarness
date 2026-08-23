@@ -102,6 +102,87 @@ export interface StoredUserDoc {
   data: Uint8Array
 }
 
+/** Scope selector used by the Gateway's versioned snapshot-copy operation. */
+export type UserDocScope =
+  | { readonly kind: 'personal' }
+  | { readonly kind: 'project'; readonly projectId: number }
+
+/** One source document selected for a cross-scope copy. */
+export interface UserDocTransferSelection {
+  readonly docId: UserDocId
+}
+
+/** Browser/runtime request for a one-way document snapshot copy. */
+export interface UserDocTransferRequest {
+  readonly version: 1
+  readonly source: UserDocScope
+  readonly target: UserDocScope
+  readonly directory?: UserDocDirectoryId
+  readonly documents: readonly UserDocTransferSelection[]
+}
+
+/** Safe target metadata returned after a document snapshot is copied. */
+export interface UserDocTransferTargetRef {
+  readonly docId: UserDocId
+  readonly name: string
+  readonly bytes: number
+  readonly mediaType: string
+  readonly modifiedAt: number
+}
+
+/** One per-file result; a failed item does not roll back successful items. */
+export type UserDocTransferItem =
+  | {
+    readonly status: 'copied'
+    readonly source: { readonly name: string; readonly bytes: number; readonly mediaType: string }
+    readonly target: UserDocTransferTargetRef
+  }
+  | {
+    readonly status: 'failed'
+    readonly source: { readonly name: string }
+    readonly error: { readonly code: string; readonly message: string }
+  }
+
+/** Safe scope label returned to a browser after a transfer. */
+export interface UserDocTransferScopeSummary {
+  readonly kind: 'personal' | 'project'
+  readonly label: string
+}
+
+/** Versioned cross-scope transfer response. */
+export interface UserDocTransferResponse {
+  readonly version: 1
+  readonly transferId: string
+  readonly source: UserDocTransferScopeSummary
+  readonly target: UserDocTransferScopeSummary
+  readonly items: readonly UserDocTransferItem[]
+}
+
+/** Safe scope capability advertised by a Gateway-backed document runtime. */
+export interface UserDocTransferCapability {
+  readonly scope: UserDocScope
+  readonly label: string
+  readonly canRead: boolean
+  readonly canWrite: boolean
+}
+
+/** Versioned cross-scope capability response. */
+export interface UserDocTransferCapabilities {
+  readonly version: 1
+  readonly current: UserDocTransferScopeSummary
+  readonly targets: readonly UserDocTransferCapability[]
+}
+
+/** Safe document row returned when browsing an authorized alternate scope. */
+export type UserDocTransferListedDocument = UserDocTransferTargetRef
+
+/** Versioned alternate-scope document listing. */
+export interface UserDocTransferListResponse {
+  readonly version: 1
+  readonly scope: UserDocTransferScopeSummary
+  readonly documents: readonly UserDocTransferListedDocument[]
+}
+
 /** Exact model-facing representation frozen when a document prompt is admitted. */
 export type UserDocPromptRepresentation =
   | { readonly kind: 'inline'; readonly text: string }

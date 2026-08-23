@@ -10,7 +10,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { ChangeEvent, KeyboardEvent, MouseEvent, ReactNode } from 'react'
 import clsx from 'clsx'
 import {
-  IconCloseOutline16, IconPaperclipOutline16, IconPlusOutline16, IconRefreshOutline14,
+  IconBrowseOutline16, IconCloseOutline16, IconPaperclipOutline16, IconPlusOutline16, IconRefreshOutline14,
   IconWarningOutline16, Toast, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 // Type-only: the `plan` projection key merge (the TodoDock posture — the
@@ -884,6 +884,20 @@ export function InputBar({
                 onClick={() => { fileInputRef.current?.click() }}
               >
                 <IconPaperclipOutline16 size={14} />
+              </button>
+            </Tooltip>
+            <Tooltip label={t('document.browse')} side="top" delayMs={500}>
+              <button
+                type="button"
+                className={css.add}
+                aria-label={t('document.browse')}
+                disabled={locked || machineBusy}
+                onMouseDown={keepFocus}
+                onClick={() => {
+                  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('dsh-documents-open-picker'))
+                }}
+              >
+                <IconBrowseOutline16 size={14} />
               </button>
             </Tooltip>
             <input

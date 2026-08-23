@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { IconBrowseOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import { DocumentsModal } from './DocumentsModal.tsx'
@@ -30,6 +30,13 @@ export function DocumentsButton({
   const handleOpen = useCallback(() => { setOpen(true) }, [])
   const handleClose = useCallback(() => { setOpen(false) }, [])
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const openPicker = (): void => { setOpen(true) }
+    window.addEventListener('dsh-documents-open-picker', openPicker)
+    return () => { window.removeEventListener('dsh-documents-open-picker', openPicker) }
+  }, [])
+
   return (
     <>
       <Tooltip label={t('button.label')} side="right" delayMs={500} disabled={wide}>
@@ -43,7 +50,14 @@ export function DocumentsButton({
           {wide && <span className={css.label}>{t('button.label')}</span>}
         </button>
       </Tooltip>
-      {open && <DocumentsModal open onClose={handleClose} t={t} onAttachDocument={attachDocument} />}
+      {open && (
+        <DocumentsModal
+          open
+          onClose={handleClose}
+          t={t}
+          {...(attachDocument === undefined ? {} : { onAttachDocument: attachDocument })}
+        />
+      )}
     </>
   )
 }

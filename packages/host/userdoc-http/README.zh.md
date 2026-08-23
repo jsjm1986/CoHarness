@@ -8,6 +8,12 @@
 
 `POST /api/documents?name=<filename>&directory=<directoryId>` 把原始请求体流式写入所选文件夹，并要求 `x-dsh-document-upload: 1`；即使在 Connection 的同源检查之前，该自定义头也能阻止跨源 simple request 提交请求体。默认存储接受传输层和文件系统支持的所有文档大小；显式设置有限的 `maxFileBytes` 时，HTTP 会同时检查 `Content-Length` 和流式接收的字节。`GET` 或 `HEAD /api/documents/content?id=<docId>` 以 `nosniff` 和附件 disposition 流式下载。`DELETE /api/documents?id=<docId>` 幂等删除文档。响应只公开稳定的 `UserDocError.code`，绝不包含文档字节或失败的绝对路径。
 
+`POST /api/documents/transfer` 是带版本号的 Gateway 快照复制操作。请求声明个人或项目源、目标及文档 id；只支持个人到项目和项目到个人。当前运行时必须是其中一个端点，项目读取要求成员身份，写入要求 `rw` 成员。Gateway 把源响应直接流式写入目标运行时上传端点，沿用目标命名策略，返回逐文件安全元数据，并在 transfer 审计事件中保存溯源信息。浏览器不会收到源字节或绝对路径。没有 `gatewayRuntime` 的 standalone composition 返回 `DOCUMENT_TRANSFER_UNAVAILABLE`。
+
+`GET /api/documents/transfer/capabilities` 只返回当前安全作用域名称和可写目标，不会列出或打开任何文档。
+
+`POST /api/documents/transfer/list` 接受一个已授权的源作用域，并为 composer 选择器返回安全文档元数据；不会返回路径或文件字节。
+
 ## 模型体验
 
 无，因为该包只存储和传输文件；另一个会话 Consumer 决定哪些文档内容进入模型请求。

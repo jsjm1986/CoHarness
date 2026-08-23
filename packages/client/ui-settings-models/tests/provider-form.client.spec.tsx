@@ -315,6 +315,11 @@ describe('model list editing', () => {
     fireEvent.click(screen.getByRole('button', { name: en.addModel }))
     fireEvent.change(screen.getByLabelText(`${en.modelId} 1`), { target: { value: 'm' } })
     expandModel(1)
+    expect(screen.getByText(en.modelCapacityHelp)).toBeTruthy()
+    const contextField = screen.getByLabelText<HTMLInputElement>(`${en.modelContextWindow} 1`)
+    const helpId = contextField.getAttribute('aria-describedby')
+    expect(helpId).not.toBeNull()
+    expect(document.getElementById(helpId ?? '')?.textContent).toBe(en.modelCapacityHelp)
     fireEvent.change(screen.getByLabelText(`${en.modelContextWindow} 1`), { target: { value: '1M' } })
     fireEvent.change(screen.getByLabelText(`${en.modelMaxTokens} 1`), { target: { value: '32K' } })
 
