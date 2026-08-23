@@ -24,6 +24,7 @@ export interface SqliteImportReport {
   prices: number
   usageEvents: number
   usageAlerts: number
+  registrationEvents: number
   auditEvents: number
   skippedSessions: number
   skippedLoginAttempts: number
@@ -34,7 +35,7 @@ type SqliteRow = Record<string, unknown>
 type SourceTable = 'users' | 'projects' | 'project_members' | 'auth_sessions' | 'login_attempts' | 'instances'
   | 'project_invitations'
   | 'audit_log' | 'model_catalog' | 'model_role_access' | 'model_user_access' | 'model_prices'
-  | 'model_quotas' | 'model_intake_tokens' | 'model_usage' | 'model_usage_alerts'
+  | 'model_quotas' | 'model_intake_tokens' | 'model_usage' | 'model_usage_alerts' | 'model_registration_events'
 
 function rows(db: Database.Database, table: SourceTable): SqliteRow[] {
   const exists = db.prepare(`SELECT 1 FROM sqlite_master WHERE type='table' AND name=?`).get(table)
@@ -282,6 +283,15 @@ export async function importSqliteControlPlane(pool: Pool, options: SqliteImport
           row.threshold, epoch(row.created_at),
         ])
       }
+      const sourceRegistrations = rows(db, 'model_registration_events')
+      for (const row of sourceRegistrations) {
+        await client.query(`INSERT INTO harness.model_registration_events(
+          event_id,organization_id,user_id,occurred_at,received_at,provider_key,model_key,action,scope
+        ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(organization_id,event_id) DO NOTHING`, [
+          row.event_id, organizationId, await idForLegacy(client, 'users', organizationId, row.user_id),
+          epoch(row.occurred_at), epoch(row.received_at), row.provider, row.model, row.action, row.scope,
+        ])
+      }
 
       if (sourceModels.length > 0) {
         await client.query(`UPDATE harness.organizations SET
@@ -308,6 +318,7 @@ export async function importSqliteControlPlane(pool: Pool, options: SqliteImport
         projectMembers: sourceMembers.length, projectInvitations: sourceInvitations.length,
         instances: sourceInstances.length, models: sourceModels.length,
         prices: priceCount, usageEvents: sourceUsage.length, usageAlerts: sourceAlerts.length,
+        registrationEvents: sourceRegistrations.length,
         auditEvents: sourceAudits.length, skippedSessions: rows(db, 'auth_sessions').length,
         skippedLoginAttempts: rows(db, 'login_attempts').length,
         skippedIntakeTokens: rows(db, 'model_intake_tokens').length,

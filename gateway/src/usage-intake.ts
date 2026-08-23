@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage, type Server } from 'node:http'
-import type { UsageEvent } from './model-governance.ts'
+import type { ModelRegistrationEvent, UsageEvent } from './model-governance.ts'
 import type { GatewayAuditService, GatewayModelGovernanceService } from './services.ts'
 
 async function body(req: IncomingMessage, limit = 256 * 1024): Promise<string> {
@@ -20,17 +20,23 @@ export function createUsageIntakeServer(
     const subject = token === '' ? null : await governance.subjectForIntakeToken(token)
     if (subject === null) { res.writeHead(401).end(); return }
     try {
-      const event = JSON.parse(await body(req)) as UsageEvent
-      const result = await governance.ingest(subject, event)
-      if (result.inserted && event.status === 'denied') {
+      const event = JSON.parse(await body(req)) as UsageEvent | ModelRegistrationEvent
+      if (event !== null && typeof event === 'object' && 'kind' in event && event.kind === 'model-registration') {
+        const result = await governance.ingestRegistration(subject, event as ModelRegistrationEvent)
+        res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(result))
+        return
+      }
+      const usage = event as UsageEvent
+      const result = await governance.ingest(subject, usage)
+      if (result.inserted && usage.status === 'denied') {
         await audit?.write({
           ...(subject.kind === 'user' ? { userId: subject.id } : {}),
           action: 'model.denied',
           detail: JSON.stringify({
             subject,
-            provider: event.provider,
-            model: event.model,
-            purpose: event.purpose,
+            provider: usage.provider,
+            model: usage.model,
+            purpose: usage.purpose,
           }),
         })
       }

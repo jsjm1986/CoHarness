@@ -35,14 +35,14 @@ import styles from './ModelsSection.module.css'
 const NS = 'llm-pi-ai'
 
 /**
- * A route id usable as a settings key AND as the stem of a credential name.
- * The leading letter is the second half of that: `deriveKeyRef` uppercases the
- * id and replaces every non-alphanumeric run with `_`, and a credential
- * reference is a POSIX shell identifier, which cannot start with a digit. A
- * digit-leading id passes every check this card makes and then fails at the
- * credential seam with a raw regular expression the user cannot act on.
+ * A route id accepted by the personal settings dictionary. Credential names
+ * are derived independently, so route ids do not need to follow shell-name
+ * grammar; only empty/control-only ids are unusable at the protocol seam.
  */
-const ROUTE_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
+function invalidRoute(value: string, pattern: RegExp | undefined): boolean {
+  if (pattern !== undefined) return !pattern.test(value)
+  return value.trim().length === 0 || /[\u0000-\u001f\u007f]/.test(value)
+}
 
 /** Props of {@link CustomProviderCard}. */
 export interface CustomProviderCardProps {
@@ -98,8 +98,10 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
   /** Everything but the key stops being editable once the provider exists. */
   const profileDisabled = disabled || committed
 
-  const routeInvalid = route.length > 0 && !(props.routePattern ?? ROUTE_PATTERN).test(route)
-  const routeTaken = taken.includes(route)
+  const routeId = route.trim()
+  const routeReserved = props.credentialScope !== 'organization' && routeId.startsWith('org-')
+  const routeInvalid = route.length > 0 && (invalidRoute(route, props.routePattern) || routeReserved)
+  const routeTaken = taken.includes(routeId)
   // Rows are checked by the same per-row validator the editor cards use, so a
   // bad row is named by its position here too. Capacities have route-level
   // fallbacks; what a route cannot default is at least one model.
@@ -109,7 +111,7 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
   // string, which the create path reads as "no key supplied" — a route may
   // legitimately authenticate through the provider's own ambient discovery.
   const keyValue = keyDraft.trim()
-  const ready = route.length > 0 && !routeInvalid && !routeTaken
+  const ready = routeId.length > 0 && !routeInvalid && !routeTaken
     && baseURL.length > 0 && models.length > 0 && modelFailure === undefined
     && keyFailure === undefined
   // The one blocked gate worth a line under the form. A satisfied card says
@@ -122,7 +124,7 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
     // Same for the route id, and it must be tested rather than assumed: the
     // fallback arm below reads "no models yet", so an unmet route gate would
     // fall through to it and contradict the filled-in list right above.
-    || route.length === 0 || routeInvalid || routeTaken
+    || routeId.length === 0 || routeInvalid || routeTaken
     ? undefined
     : baseURL.length === 0
       ? t('customNeedsBaseUrl')
@@ -132,7 +134,7 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
 
   /** Perform the create, returning a failure message or undefined. */
   const createOnce = async (): Promise<string | undefined> => {
-    const keyRef = deriveKeyRef(route, props.credentialScope ?? 'personal')
+    const keyRef = deriveKeyRef(routeId, props.credentialScope ?? 'personal')
     const storesKey = keyValue.length > 0
     if (!committed) {
       const profile = {
@@ -148,7 +150,7 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
       }
       const response = await api.settings.mutate({
         ns: NS,
-        ops: [{ op: 'set', path: ['providers', route], value: profile }],
+        ops: [{ op: 'set', path: ['providers', routeId], value: profile }],
         // `taken` is a snapshot too, so the id check alone cannot see a route
         // declared after this card opened; the revision makes that race a
         // `settings-conflict` instead of a write over the other profile.
@@ -209,7 +211,7 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
       {/* A rejected id reads as a fault, not as guidance — the same split the
           key field below already makes between its failure and its hint. */}
       {routeInvalid || routeTaken
-        ? <p className={styles['error']}>{t(routeInvalid ? 'customRouteInvalid' : 'customRouteTaken')}</p>
+        ? <p className={styles['error']}>{t(routeReserved ? 'customRouteReserved' : routeInvalid ? 'customRouteInvalid' : 'customRouteTaken')}</p>
         : <p className={styles['advancedHint']}>{t('customRouteHint')}</p>}
       <div className={styles['field']}>
         <span className={styles['fieldLabel']}>{t('customDisplayName')}</span>
@@ -217,7 +219,7 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
           className={styles['input']}
           type="text"
           value={displayName}
-          placeholder={route.length === 0 ? t('customDisplayName') : route}
+          placeholder={routeId.length === 0 ? t('customDisplayName') : routeId}
           aria-label={t('customDisplayName')}
           disabled={profileDisabled}
           onChange={(event) => { setDisplayName(event.target.value) }}

@@ -1,13 +1,16 @@
-import { Pencil, Sparkles } from 'lucide-react'
+import { ClipboardList, Pencil, Sparkles } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
   getModelAccess,
+  listModelRegistrations,
   listModels,
   listUsers,
   saveModel,
   setModelAccess,
   type AdminUser,
   type ModelGovernanceRow,
+  type ModelRegistrationAction,
+  type ModelRegistrationReport,
 } from '../api.ts'
 import { OrganizationModelsEditor } from '../components/OrganizationModelsEditor.tsx'
 import {
@@ -24,7 +27,7 @@ import {
   Switch,
 } from '../components/ui.tsx'
 
-type ModelsView = 'catalog' | 'governance'
+type ModelsView = 'catalog' | 'governance' | 'personal'
 
 const PRICE_LABELS = ['输入', '输出', '缓存读取', '缓存写入'] as const
 
@@ -54,6 +57,14 @@ export function ModelsPage() {
   const [selectedUser, setSelectedUser] = useState('')
   const [overrides, setOverrides] = useState(new Map<string, boolean>())
   const [overridePending, setOverridePending] = useState('')
+  const [registrationReport, setRegistrationReport] = useState<ModelRegistrationReport | null>(null)
+  const [registrationLoading, setRegistrationLoading] = useState(false)
+  const [registrationUser, setRegistrationUser] = useState('')
+  const [registrationProvider, setRegistrationProvider] = useState('')
+  const [registrationModel, setRegistrationModel] = useState('')
+  const [registrationAction, setRegistrationAction] = useState<ModelRegistrationAction | ''>('')
+  const [registrationFrom, setRegistrationFrom] = useState('')
+  const [registrationTo, setRegistrationTo] = useState('')
 
   const reload = useCallback(async (showLoading = false) => {
     if (showLoading) setLoading(true)
@@ -73,6 +84,31 @@ export function ModelsPage() {
   }, [])
 
   useEffect(() => { void reload(true) }, [reload])
+
+  const reloadRegistrations = useCallback(async () => {
+    setRegistrationLoading(true)
+    try {
+      const next = await listModelRegistrations({
+        ...registrationUser === '' ? {} : { userId: Number(registrationUser) },
+        ...registrationProvider.trim() === '' ? {} : { provider: registrationProvider.trim() },
+        ...registrationModel.trim() === '' ? {} : { model: registrationModel.trim() },
+        ...registrationAction === '' ? {} : { action: registrationAction },
+        ...registrationFrom === '' ? {} : { from: Date.parse(`${registrationFrom}T00:00:00`) },
+        ...registrationTo === '' ? {} : { to: Date.parse(`${registrationTo}T23:59:59.999`) + 1 },
+        limit: 200,
+      })
+      setRegistrationReport(next)
+      setError('')
+    } catch (cause) {
+      setError(messageFrom(cause))
+    } finally {
+      setRegistrationLoading(false)
+    }
+  }, [registrationAction, registrationFrom, registrationModel, registrationProvider, registrationTo, registrationUser])
+
+  useEffect(() => {
+    if (view === 'personal') void reloadRegistrations()
+  }, [reloadRegistrations, view])
 
   useEffect(() => {
     let active = true
@@ -152,6 +188,7 @@ export function ModelsPage() {
       <div className="segmented" role="group" aria-label="模型治理视图">
         <button type="button" aria-pressed={view === 'catalog'} onClick={() => setView('catalog')}>Provider 与模型</button>
         <button type="button" aria-pressed={view === 'governance'} onClick={() => setView('governance')}>权限与计价</button>
+        <button type="button" aria-pressed={view === 'personal'} onClick={() => setView('personal')}>个人登记</button>
       </div>
     </div>
   )
@@ -167,7 +204,7 @@ export function ModelsPage() {
       <ErrorBanner message={error} />
       {view === 'catalog'
         ? <OrganizationModelsEditor onChanged={modelSettingsChanged} />
-        : (
+        : view === 'governance' ? (
           <ModelDirectory
             loading={loading}
             models={models}
@@ -180,6 +217,25 @@ export function ModelsPage() {
             onSelectUser={setSelectedUser}
             onEdit={openGovernanceEditor}
             onOverride={changeOverride}
+          />
+        ) : (
+          <PersonalRegistrationAudit
+            users={users}
+            report={registrationReport}
+            loading={registrationLoading}
+            user={registrationUser}
+            provider={registrationProvider}
+            model={registrationModel}
+            action={registrationAction}
+            from={registrationFrom}
+            to={registrationTo}
+            onUser={setRegistrationUser}
+            onProvider={setRegistrationProvider}
+            onModel={setRegistrationModel}
+            onAction={setRegistrationAction}
+            onFrom={setRegistrationFrom}
+            onTo={setRegistrationTo}
+            onRefresh={() => { void reloadRegistrations() }}
           />
         )}
 
@@ -236,6 +292,123 @@ export function ModelsPage() {
       </Dialog>
     </div>
   )
+}
+
+function PersonalRegistrationAudit({
+  users,
+  report,
+  loading,
+  user,
+  provider,
+  model,
+  action,
+  from,
+  to,
+  onUser,
+  onProvider,
+  onModel,
+  onAction,
+  onFrom,
+  onTo,
+  onRefresh,
+}: {
+  users: AdminUser[]
+  report: ModelRegistrationReport | null
+  loading: boolean
+  user: string
+  provider: string
+  model: string
+  action: ModelRegistrationAction | ''
+  from: string
+  to: string
+  onUser: (value: string) => void
+  onProvider: (value: string) => void
+  onModel: (value: string) => void
+  onAction: (value: ModelRegistrationAction | '') => void
+  onFrom: (value: string) => void
+  onTo: (value: string) => void
+  onRefresh: () => void
+}) {
+  const summary = report?.summary
+  return (
+    <Section
+      className="responsiveSection"
+      title="个人 Provider/model 登记"
+      meta={summary === undefined ? undefined : `${summary.providerCount} 个 Provider，${summary.modelCount} 个 model`}
+      actions={<Button type="button" onClick={onRefresh}>刷新</Button>}
+    >
+      <p className="inlineNotice">个人可以自由添加和管理 Provider/model；这里仅用于查看登记变化，不参与审批或限制。</p>
+      <div className="registrationFilters">
+        <select className="select selectCompact" value={user} onChange={event => onUser(event.target.value)} aria-label="筛选用户">
+          <option value="">全部用户</option>
+          {users.map(item => <option key={item.id} value={item.id}>{item.username}</option>)}
+        </select>
+        <input className="input" value={provider} onChange={event => onProvider(event.target.value)} placeholder="Provider" aria-label="筛选 Provider" />
+        <input className="input" value={model} onChange={event => onModel(event.target.value)} placeholder="model" aria-label="筛选 model" />
+        <input className="input" type="date" value={from} onChange={event => onFrom(event.target.value)} aria-label="开始日期" />
+        <input className="input" type="date" value={to} onChange={event => onTo(event.target.value)} aria-label="结束日期" />
+        <select className="select selectCompact" value={action} onChange={event => onAction(event.target.value as ModelRegistrationAction | '')} aria-label="筛选动作">
+          <option value="">全部动作</option>
+          {Object.entries(REGISTRATION_ACTION_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+        </select>
+      </div>
+      {loading ? <LoadingState label="正在加载个人登记记录" /> : report === null || report.rows.length === 0 ? (
+        <EmptyState icon={ClipboardList} title="暂无个人登记记录" detail="个人新增 Provider 或 model 后，记录会出现在这里。" />
+      ) : (
+        <>
+          <div className="roleDefaults registrationSummary">
+            <span>事件 {summary?.eventCount ?? 0}</span>
+            <span className="allowed">新增 {summary?.createdCount ?? 0}</span>
+            <span>修改 {summary?.modifiedCount ?? 0}</span>
+            <span className="denied">删除 {summary?.deletedCount ?? 0}</span>
+          </div>
+          <div className="tableWrap desktopOnly">
+            <table className="dataTable modelTable">
+              <thead><tr><th>时间</th><th>用户</th><th>Provider</th><th>model</th><th>动作</th></tr></thead>
+              <tbody>{report.rows.map(row => <RegistrationRow key={row.eventId} row={row} users={users} />)}</tbody>
+            </table>
+          </div>
+          <div className="mobileList">
+            {report.rows.map(row => (
+              <article className="mobileItem" key={row.eventId}>
+                <div className="mobileItemHeader"><strong>{REGISTRATION_ACTION_LABELS[row.action]}</strong><span>{formatRegistrationTime(row.occurredAt)}</span></div>
+                <div className="mobileItemBody"><span>{userName(row.userId, users)}</span><span className="codeText">{row.provider}{row.model === null ? '' : `/${row.model}`}</span></div>
+              </article>
+            ))}
+          </div>
+        </>
+      )}
+    </Section>
+  )
+}
+
+function RegistrationRow({ row, users }: { row: ModelRegistrationReport['rows'][number]; users: AdminUser[] }) {
+  return (
+    <tr>
+      <td>{formatRegistrationTime(row.occurredAt)}</td>
+      <td>{userName(row.userId, users)}</td>
+      <td className="codeText">{row.provider}</td>
+      <td className="codeText">{row.model ?? '—'}</td>
+      <td><StatusBadge tone={row.action.endsWith('deleted') ? 'danger' : row.action.endsWith('created') ? 'success' : 'neutral'}>{REGISTRATION_ACTION_LABELS[row.action]}</StatusBadge></td>
+    </tr>
+  )
+}
+
+const REGISTRATION_ACTION_LABELS: Record<ModelRegistrationAction, string> = {
+  'provider-created': '新增 Provider',
+  'provider-modified': '修改 Provider',
+  'provider-deleted': '删除 Provider',
+  'model-created': '新增 model',
+  'model-modified': '修改 model',
+  'model-deleted': '删除 model',
+}
+
+function userName(id: number, users: AdminUser[]): string {
+  return users.find(user => user.id === id)?.username ?? `用户 ${String(id)}`
+}
+
+function formatRegistrationTime(value: number): string {
+  return new Intl.DateTimeFormat('zh-CN', { dateStyle: 'short', timeStyle: 'short' }).format(value)
 }
 
 function ModelDirectory({

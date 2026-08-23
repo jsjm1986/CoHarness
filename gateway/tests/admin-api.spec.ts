@@ -381,6 +381,23 @@ describe('admin JSON API', () => {
       }),
     })).status).toBe(204)
   })
+  it('shows personal Provider/model registration history without exposing secrets', async () => {
+    const { base, cookie, deps, member } = await setup()
+    deps.governance?.ingestRegistration({ kind: 'user', id: member.id }, {
+      kind: 'model-registration', eventId: 'admin-registration-1', occurredAt: 100,
+      provider: 'custom gateway', action: 'provider-created', scope: 'personal',
+    })
+    deps.governance?.ingestRegistration({ kind: 'user', id: member.id }, {
+      kind: 'model-registration', eventId: 'admin-registration-2', occurredAt: 101,
+      provider: 'custom gateway', model: 'chat-v2', action: 'model-created', scope: 'personal',
+    })
+    const response = await fetch(`${base}/admin/api/model-registrations?userId=${String(member.id)}`, { headers: { cookie } })
+    expect(response.status).toBe(200)
+    const report = await response.json() as { summary: { providerCount: number; modelCount: number }; rows: Array<Record<string, unknown>> }
+    expect(report.summary).toMatchObject({ providerCount: 1, modelCount: 1 })
+    expect(report.rows).toHaveLength(2)
+    expect(JSON.stringify(report)).not.toContain('secret')
+  })
   it('rejects invalid JSON with 400 and leaves non-api /admin unhandled', async () => {
     const { base, cookie } = await setup()
     const bad = await fetch(`${base}/admin/api/projects`, {

@@ -4,6 +4,8 @@ import { applyModelGovernanceToProject, applyModelGovernanceToUser } from './app
 import type { UserRow } from './auth.ts'
 import { CollaborationDeniedError } from './collaboration.ts'
 import type {
+  ModelRegistrationEvent,
+  ModelRegistrationFilter,
   ModelProviderAuthMode,
   ModelProviderProtocol,
   ModelProviderStatus,
@@ -571,6 +573,39 @@ async function dispatch(
       ...await deps.governance!.summary({ kind: 'user', id: user.id }, month),
     })))
     sendJson(res, 200, summaries)
+    return true
+  }
+
+  if (pathname === '/admin/api/model-registrations') {
+    if (deps.governance === undefined || method !== 'GET') return false
+    const query = new URL(req.url ?? '/', 'http://x').searchParams
+    const integer = (name: string): number | undefined => {
+      const raw = query.get(name)
+      if (raw === null || raw === '') return undefined
+      const value = Number(raw)
+      if (!Number.isSafeInteger(value) || value < 0) throw new Error(`${name} must be a non-negative safe integer`)
+      return value
+    }
+    const userId = integer('userId')
+    if (userId !== undefined && userId === 0) throw new Error('userId must be a positive safe integer')
+    const action = query.get('action') as ModelRegistrationEvent['action'] | null
+    const actions: readonly ModelRegistrationEvent['action'][] = [
+      'provider-created', 'provider-modified', 'provider-deleted',
+      'model-created', 'model-modified', 'model-deleted',
+    ]
+    if (action !== null && !actions.includes(action)) throw new Error('invalid model registration action')
+    const from = integer('from')
+    const to = integer('to')
+    const filter: ModelRegistrationFilter = {
+      ...userId === undefined ? {} : { userId },
+      ...query.get('provider') === null ? {} : { provider: query.get('provider')! },
+      ...query.get('model') === null ? {} : { model: query.get('model')! },
+      ...action === null ? {} : { action },
+      ...from === undefined ? {} : { fromMs: from },
+      ...to === undefined ? {} : { toMs: to },
+      offset: integer('offset'), limit: integer('limit'),
+    }
+    sendJson(res, 200, await deps.governance.registrationReport(filter))
     return true
   }
 

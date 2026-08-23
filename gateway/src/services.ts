@@ -11,6 +11,9 @@ import type { InstanceManager } from './instances.ts'
 import type {
   ModelSettingsPathOp,
   ModelUsageSubject,
+  ModelRegistrationEvent,
+  ModelRegistrationFilter,
+  ModelRegistrationReport,
   ModelProviderInput,
   ModelProviderRow,
   ModelRow,
@@ -170,6 +173,8 @@ export interface GatewayModelGovernanceService {
     costLimit: number | null | 'inherit',
   ): Awaitable<void>
   ingest(subject: ModelUsageSubject, event: UsageEvent): Awaitable<{ inserted: boolean; alerts: number }>
+  ingestRegistration(subject: ModelUsageSubject, event: ModelRegistrationEvent): Awaitable<{ inserted: boolean }>
+  registrationReport(filter?: ModelRegistrationFilter): Awaitable<ModelRegistrationReport>
   summary(subject: ModelUsageSubject, month?: string): Awaitable<UsageSummary>
   /**
    * Stored project quota source and the limits currently in force for that source.

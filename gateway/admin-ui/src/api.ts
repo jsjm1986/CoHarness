@@ -377,6 +377,51 @@ export type UsageSummary = {
 
 export type AdminUsageSummary = UsageSummary & { userId: number; username: string }
 
+export type ModelRegistrationAction =
+  | 'provider-created' | 'provider-modified' | 'provider-deleted'
+  | 'model-created' | 'model-modified' | 'model-deleted'
+
+export type ModelRegistrationRow = {
+  eventId: string
+  userId: number
+  occurredAt: number
+  receivedAt: number
+  provider: string
+  model: string | null
+  action: ModelRegistrationAction
+  scope: 'personal'
+}
+
+export type ModelRegistrationReport = {
+  summary: {
+    providerCount: number
+    modelCount: number
+    eventCount: number
+    createdCount: number
+    modifiedCount: number
+    deletedCount: number
+  }
+  rows: ModelRegistrationRow[]
+}
+
+export function listModelRegistrations(filter: {
+  userId?: number
+  provider?: string
+  model?: string
+  action?: ModelRegistrationAction
+  from?: number
+  to?: number
+  offset?: number
+  limit?: number
+} = {}): Promise<ModelRegistrationReport> {
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(filter)) {
+    if (value !== undefined && value !== '') query.set(key, String(value))
+  }
+  const suffix = query.toString()
+  return request(`/admin/api/model-registrations${suffix === '' ? '' : `?${suffix}`}`)
+}
+
 export function listModels(): Promise<ModelGovernanceRow[]> {
   return request('/admin/api/models')
 }
