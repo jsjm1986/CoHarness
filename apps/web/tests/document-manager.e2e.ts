@@ -127,6 +127,41 @@ describe('web e2e: document manager', () => {
     await compareOrRefreshGolden(PAGED_EXPECTED, snapshot, MODE)
   }, 60_000)
 
+  it('desktop: switches the document scope in place without opening a runtime page', async () => {
+    page = await browser.newPage({ viewport: { width: 1280, height: 800 }, locale: 'en-US' })
+    tripwire = watchConsole(page)
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-document-manager-scope'))
+    await mockDocuments(page)
+    await page.route('**/account/api/context', async (route) => {
+      await route.fulfill({ json: {
+        scope: { kind: 'personal' },
+        projects: [{ projectId: 41, name: 'Compiler', mode: 'rw' }],
+      } })
+    })
+    await page.route('**/api/documents/transfer/list', async (route) => {
+      await route.fulfill({ json: {
+        version: 1,
+        scope: { kind: 'project', label: 'Compiler' },
+        documents: [{ docId: 'shared.txt', name: 'shared.txt', bytes: 7, mediaType: 'text/plain', modifiedAt: 1 }],
+      } })
+    })
+    let popupOpened = false
+    page.on('popup', () => { popupOpened = true })
+    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+    await page.getByRole('button', { name: 'Documents', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: 'Document Manager' })
+    await dialog.waitFor({ timeout: 10_000 })
+    await dialog.getByRole('button', { name: /Compiler/ }).waitFor({ timeout: 10_000 })
+    const beforeUrl = page.url()
+    await dialog.getByRole('button', { name: /Compiler/ }).click()
+    await dialog.getByText('Viewing: Compiler', { exact: true }).waitFor({ timeout: 10_000 })
+    await dialog.getByText('shared.txt', { exact: true }).waitFor({ timeout: 10_000 })
+    expect(page.url()).toBe(beforeUrl)
+    expect(await page.getByRole('dialog').count()).toBe(1)
+    expect(popupOpened).toBe(false)
+  }, 60_000)
+
   it('compact: bottom sheet stacks search above upload and keeps row actions inside the dialog', async () => {
     page = await browser.newPage({
       viewport: { width: 390, height: 844 },

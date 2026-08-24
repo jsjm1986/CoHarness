@@ -147,11 +147,23 @@ export interface RuntimeDocumentTransferListHandler {
     readonly subject: RuntimeCredentialSubject
     readonly principal: GatewayPrincipalClaims
     readonly payload: unknown
-  }): Promise<{
-    readonly version: 1
-    readonly scope: DocumentTransferScopeSummary
-    readonly documents: readonly DocumentTransferTargetRef[]
-  }>
+  }): Promise<DocumentTransferListResponse>
+}
+
+/** Safe metadata returned for one authorized alternate scope. */
+export interface DocumentTransferListResponse {
+  readonly version: 1
+  readonly scope: DocumentTransferScopeSummary
+  readonly documents: readonly DocumentTransferTargetRef[]
+}
+
+/** Public Gateway callback for the browser-facing alternate-scope listing. */
+export interface GatewayDocumentTransferListHandler {
+  (input: {
+    readonly user: UserRow
+    readonly payload: unknown
+    readonly signal: AbortSignal
+  }): Promise<DocumentTransferListResponse>
 }
 
 /** Runtime callback for target-folder metadata in an authorized scope. */
@@ -784,74 +796,90 @@ export function createDocumentTransferCapabilitiesHandler(
 }
 
 /** Create the Gateway list operation for one authorized alternate scope. */
+async function listDocumentsForActor(
+  deps: DocumentTransferDependencies,
+  actor: UserRow,
+  payload: unknown,
+  signal?: AbortSignal,
+): Promise<DocumentTransferListResponse> {
+  const candidate = record(payload)
+  if (candidate?.version !== 1) {
+    throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document scope listing request.')
+  }
+  const requested = scope(candidate.scope)
+  let membership: Awaited<ReturnType<GatewayCollaborationService['projectForUser']>> = null
+  if (requested.kind === 'project') {
+    try {
+      membership = await deps.collaboration.projectForUser(requested.projectId, actor.id)
+    } catch {
+      throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document scope authorization is unavailable.')
+    }
+    if (membership === null) {
+      throw new DocumentTransferError('COLLABORATION_FORBIDDEN', 403, 'You cannot read this project document scope.')
+    }
+  }
+  const identity: ScopeIdentity = requested.kind === 'personal'
+    ? { kind: 'personal', id: actor.id, label: 'Personal documents' }
+    : {
+      kind: 'project',
+      id: requested.projectId,
+      label: membership?.name ?? 'Project documents',
+      projectName: membership?.name,
+      mode: membership?.mode,
+    }
+  const runtime = await runtimeFor(deps, identity, actor)
+  const assertion = deps.principals.issue({
+    user: actor,
+    scope: identity.kind === 'personal'
+      ? { kind: 'personal' }
+      : {
+        kind: 'project',
+        projectId: identity.id,
+        projectName: identity.projectName ?? identity.label,
+        mode: identity.mode ?? 'ro',
+      },
+    runtime: { kind: runtime.target.kind, id: runtime.target.id, generation: runtime.generation },
+  })
+  let response: Response
+  try {
+    response = await fetch(`http://127.0.0.1:${String(runtime.port)}/api/documents`, {
+      method: 'GET',
+      headers: headersFor(runtime, assertion),
+      redirect: 'error',
+      ...(signal === undefined ? {} : { signal }),
+    })
+  } catch {
+    throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document scope listing is unavailable.')
+  }
+  const body = await responseJson(response)
+  if (!response.ok) {
+    const error = responseError(body)
+    throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, error.message)
+  }
+  const value = record(body)
+  if (!Array.isArray(value?.documents)) {
+    throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned an invalid listing.')
+  }
+  const documents = value.documents.map(targetRef)
+  return {
+    version: 1,
+    scope: { kind: identity.kind, label: identity.label },
+    documents,
+  }
+}
+
+/** Create the authenticated Gateway broker used by runtime document consumers. */
 export function createDocumentTransferListHandler(
   deps: DocumentTransferDependencies,
 ): RuntimeDocumentTransferListHandler {
-  return async ({ principal, payload }) => {
-    const candidate = record(payload)
-    if (candidate?.version !== 1) {
-      throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document scope listing request.')
-    }
-    const requested = scope(candidate.scope)
-    const actor = syntheticUser(principal)
-    let membership: Awaited<ReturnType<GatewayCollaborationService['projectForUser']>> = null
-    if (requested.kind === 'project') {
-      try {
-        membership = await deps.collaboration.projectForUser(requested.projectId, actor.id)
-      } catch {
-        throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document scope authorization is unavailable.')
-      }
-      if (membership === null) {
-        throw new DocumentTransferError('COLLABORATION_FORBIDDEN', 403, 'You cannot read this project document scope.')
-      }
-    }
-    const identity: ScopeIdentity = requested.kind === 'personal'
-      ? { kind: 'personal', id: actor.id, label: 'Personal documents' }
-      : {
-        kind: 'project',
-        id: requested.projectId,
-        label: membership?.name ?? 'Project documents',
-        projectName: membership?.name,
-        mode: membership?.mode,
-      }
-    const runtime = await runtimeFor(deps, identity, actor)
-    const assertion = deps.principals.issue({
-      user: actor,
-      scope: identity.kind === 'personal'
-        ? { kind: 'personal' }
-        : {
-          kind: 'project',
-          projectId: identity.id,
-          projectName: identity.projectName ?? identity.label,
-          mode: identity.mode ?? 'ro',
-        },
-      runtime: { kind: runtime.target.kind, id: runtime.target.id, generation: runtime.generation },
-    })
-    let response: Response
-    try {
-      response = await fetch(`http://127.0.0.1:${String(runtime.port)}/api/documents`, {
-        method: 'GET',
-        headers: headersFor(runtime, assertion),
-      })
-    } catch {
-      throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document scope listing is unavailable.')
-    }
-    const body = await responseJson(response)
-    if (!response.ok) {
-      const error = responseError(body)
-      throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, error.message)
-    }
-    const value = record(body)
-    if (!Array.isArray(value?.documents)) {
-      throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned an invalid listing.')
-    }
-    const documents = value.documents.map(targetRef)
-    return {
-      version: 1,
-      scope: { kind: identity.kind, label: identity.label },
-      documents,
-    }
-  }
+  return ({ principal, payload }) => listDocumentsForActor(deps, syntheticUser(principal), payload)
+}
+
+/** Create the same broker for the public Gateway document route. */
+export function createGatewayDocumentTransferListHandler(
+  deps: DocumentTransferDependencies,
+): GatewayDocumentTransferListHandler {
+  return ({ user, payload, signal }) => listDocumentsForActor(deps, user, payload, signal)
 }
 
 /** Create a safe target-folder listing for one authorized alternate scope. */

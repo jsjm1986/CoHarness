@@ -25,6 +25,8 @@ const http = require('http')
 const { WebSocketServer } = require(${JSON.stringify(WS_MODULE)})
 const server = http.createServer((req, res) => {
   if (req.url === '/exit') { res.end('bye'); process.exit(0); return }
+  if (req.url === '/api/redirect') { res.writeHead(302, { location: 'http://127.0.0.1:' + process.argv[1] + '/landing' }); res.end(); return }
+  if (req.url === '/api/external-redirect') { res.writeHead(302, { location: 'https://127.0.0.1.evil/landing' }); res.end(); return }
   res.setHeader('content-type', 'application/json')
   res.end(JSON.stringify({ host: req.headers.host, origin: req.headers.origin ?? null, url: req.url, principal: req.headers[${JSON.stringify('x-dsh-gateway-principal')}] ?? null }))
 })
@@ -97,6 +99,24 @@ describe('proxy handlers', () => {
     const grantsFile = join(root, 'users', 'alice', 'dsh', 'directory-grants.json')
     expect(existsSync(grantsFile)).toBe(true)
     expect(JSON.parse(readFileSync(grantsFile, 'utf8'))).toEqual(await deps.projects.effectiveGrants(1))
+  })
+
+  it('does not expose an upstream loopback redirect to the browser', async () => {
+    const { deps, base, cookie } = await setup()
+    await deps.instances.ensureRunning((await deps.users.getByUsername('alice'))!)
+    const response = await fetch(`${base}/api/redirect`, {
+      headers: { cookie, origin: base },
+      redirect: 'manual',
+    })
+    expect(response.status).toBe(302)
+    expect(response.headers.get('location')).toBe('/landing')
+    expect(response.headers.get('location')).not.toContain('127.0.0.1')
+
+    const external = await fetch(`${base}/api/external-redirect`, {
+      headers: { cookie, origin: base },
+      redirect: 'manual',
+    })
+    expect(external.headers.get('location')).toBe('https://127.0.0.1.evil/landing')
   })
 
   it('shows the waiting page and respawns when a ready child has exited', async () => {

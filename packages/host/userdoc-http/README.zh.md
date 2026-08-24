@@ -14,6 +14,8 @@
 
 `POST /api/documents/transfer/list` 接受一个已授权的源作用域，并为 composer 选择器返回安全文档元数据；不会返回路径或文件字节。
 
+在 Gateway 部署中，浏览器请求会先由 Gateway 文档 broker 接管，再进入运行时代理。Standalone composition 仍直接使用 Host Consumer；两条路径都不会在浏览器响应中暴露运行时回环地址。
+
 `POST /api/documents/transfer/directories` 返回安全的目标文件夹元数据，`POST /api/documents/transfer/directories/create` 在检查目标 `rw` 后创建文件夹。`GET /api/documents/overview` 返回用户可读的全部作用域元数据，`GET /api/documents/history` 返回当前作用域最近的审计操作。
 
 `POST /api/documents/transfer/plan` 执行只读元数据预检并返回五分钟有效的计划令牌；`/commit` 和 `/retry` 在开始流式复制前重新校验源和目标权限，成功与失败文件分别提交。

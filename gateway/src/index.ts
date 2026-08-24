@@ -36,6 +36,7 @@ import {
   createDocumentTransferCommitHandler,
   createDocumentTransferPlanHandler,
   createDocumentTransferListHandler,
+  createGatewayDocumentTransferListHandler,
   createDocumentTransferHandler,
 } from './document-transfer.ts'
 import { createDocumentCatalogHandlers } from './document-catalog.ts'
@@ -140,6 +141,14 @@ if (await deps.users.count() === 0) {
 const proxyHandlers = createProxyHandlers(deps, principalKeys.signer)
 const server = createGatewayServer(deps, {
   ...proxyHandlers,
+  documentTransferList: createGatewayDocumentTransferListHandler({
+    instances: deps.instances,
+    users,
+    projects,
+    collaboration,
+    principals: principalKeys.signer,
+    audit,
+  }),
   admin: createAdminApiHandler(deps),
   runtime: createRuntimeApiHandler({
     context,
