@@ -389,6 +389,12 @@
   flex: none;
 }
 
+/* Keep scope navigation available on compact screens without squeezing the
+   primary upload and refresh actions into unreadable capsules. */
+.sourceAction {
+  flex: none;
+}
+
 .list {
   display: flex;
   flex: 1 1 auto;
@@ -691,43 +697,74 @@
   }
 
   .toolbar {
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--dsw-space-3);
   }
 
   .filterGroup,
   .actionGroup {
-    flex: 1 1 100%;
+    flex: none;
     width: 100%;
   }
 
   .filterGroup {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: stretch;
   }
 
   .actionGroup {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) var(--dsw-touch-target);
+    align-items: stretch;
     margin-left: 0;
   }
 
   .search {
-    flex: 1 1 100%;
+    grid-column: 1 / -1;
+    flex: none;
     width: 100%;
+    min-height: var(--dsw-touch-target);
   }
 
   .filterGroup .select {
-    flex: 1 1 0;
+    min-width: 0;
+    width: 100%;
+    flex: none;
     max-width: none;
   }
 
   .upload {
-    flex: 1 1 auto;
+    grid-column: 2;
+    width: 100%;
+    min-width: 0;
   }
 
   .newFolder {
-    flex: 1 1 auto;
+    grid-column: 1;
+    width: 100%;
+    min-width: 0;
   }
 
   .actionGroup .refresh {
-    flex: none;
+    grid-column: 3;
+    width: var(--dsw-touch-target);
+    min-width: var(--dsw-touch-target);
+    padding: 0;
+  }
+
+  .actionGroup .sourceAction {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .actionGroup > .sourceAction,
+  .actionGroup > .newFolder,
+  .actionGroup > .upload,
+  .actionGroup > .refresh {
+    min-height: var(--dsw-touch-target);
   }
 
   .row:not(.folderRow) {
@@ -801,46 +838,20 @@
 }
 
 @media (max-width: 359px) {
-  /* Keep the compact toolbar predictable in a narrow sheet. */
-  .toolbar {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) var(--dsw-touch-target);
-    align-items: stretch;
-    gap: var(--dsw-space-2);
-  }
-
-  .toolbar .search {
-    grid-column: 1 / -1;
-    width: 100%;
-  }
-
-  .toolbar .select,
+  /* Group-owned grids above also govern the narrowest sheet. Keep labels on a
+     single line so the compact action track retains its icon affordances. */
   .toolbar .newFolder,
   .toolbar .upload {
-    width: 100%;
-    min-width: 0;
-    min-height: var(--dsw-touch-target);
-  }
-
-  .toolbar .refresh {
-    grid-column: 3;
-    width: var(--dsw-touch-target);
-    min-width: var(--dsw-touch-target);
-    min-height: var(--dsw-touch-target);
-    padding: 0;
+    font: var(--dsw-mobile-font-secondary);
+    white-space: nowrap;
   }
 
   .toolbar .newFolder {
-    grid-column: 1;
-    padding-inline: var(--dsw-space-1);
+    padding-inline: var(--dsw-space-2);
   }
 
   .toolbar .upload {
-    grid-column: 2;
-  }
-
-  .toolbar .newFolder svg {
-    display: none;
+    padding-inline: var(--dsw-space-2);
   }
 
   .name {

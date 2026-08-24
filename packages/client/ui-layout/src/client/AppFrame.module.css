@@ -4,6 +4,7 @@
   grid-template-rows: 100%;
   height: 100%;
   overflow: hidden;
+  overflow: clip;
   scrollbar-gutter: auto;
   background: var(--dsw-alias-bg-base);
   /* Collapse/expand animates the tracks on the deepsuite sider curve
@@ -18,6 +19,8 @@
 .frame[data-viewport='compact'] {
   grid-template-rows: auto minmax(0, 1fr);
   grid-template-columns: minmax(0, 1fr);
+  justify-items: stretch;
+  align-items: stretch;
   height: var(--dsw-viewport-height, 100%);
 }
 
@@ -95,29 +98,6 @@
 .topbarToggle:focus-visible {
   outline: 2px solid var(--dsw-alias-border-l3);
   outline-offset: -2px;
-}
-
-@media (max-width: 359px) {
-  /* Chromium's narrow mobile layout can place the grid row behind its
-     reserved left scrollbar gutter after a Session mounts. Keep the control
-     inside the visual viewport; the title remains centered by the flex context. */
-  .topbarToggle {
-    position: relative;
-    left: 0;
-    z-index: 1;
-  }
-
-  .topbarContext {
-    transform: none;
-  }
-
-  .frame:has([data-phase='active']) .topbarToggle {
-    left: 24px;
-  }
-
-  .frame:has([data-phase='active']) .topbarContext {
-    transform: translateX(16px);
-  }
 }
 
 /* Scrim behind the compact drawer and the overlay details panel: hidden

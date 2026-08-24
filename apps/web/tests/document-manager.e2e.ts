@@ -148,7 +148,9 @@ describe('web e2e: document manager', () => {
     const searchBox = await dialog.getByPlaceholder('Search document name').boundingBox()
     const uploadBox = await dialog.getByRole('button', { name: 'Upload Document' }).boundingBox()
     const previewBox = await dialog.getByRole('button', { name: 'Preview brief.txt' }).boundingBox()
-    const nameBox = await dialog.getByText('brief.txt', { exact: true }).boundingBox()
+    const name = dialog.getByText('brief.txt', { exact: true })
+    await name.scrollIntoViewIfNeeded()
+    const nameBox = await name.boundingBox()
     if (dialogBox === null || searchBox === null || uploadBox === null || previewBox === null || nameBox === null) {
       throw new Error('document manager compact geometry missing')
     }
@@ -159,6 +161,52 @@ describe('web e2e: document manager', () => {
 
     const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(COMPACT_EXPECTED, snapshot, MODE)
+  }, 60_000)
+
+  it('compact narrow: keeps grouped filters and primary actions on stable tracks', async () => {
+    page = await browser.newPage({
+      viewport: { width: 320, height: 568 },
+      locale: 'en-US',
+      hasTouch: true,
+      isMobile: true,
+    })
+    tripwire = watchConsole(page)
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-document-manager-narrow'))
+    await mockDocuments(page)
+    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+    await page.getByRole('button', { name: 'Open sidebar' }).click()
+    await page.getByRole('button', { name: 'Documents', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: 'Document Manager' })
+    await dialog.waitFor({ timeout: 10_000 })
+
+    const search = dialog.getByPlaceholder('Search document name')
+    const selects = dialog.locator('select')
+    const newFolder = dialog.getByRole('button', { name: 'New folder' })
+    const upload = dialog.getByRole('button', { name: 'Upload Document' })
+    const refresh = dialog.getByRole('button', { name: 'Refresh' })
+    const [dialogBox, searchBox, typeBox, sortBox, newFolderBox, uploadBox, refreshBox] = await Promise.all([
+      dialog.boundingBox(), search.boundingBox(), selects.nth(0).boundingBox(), selects.nth(1).boundingBox(),
+      newFolder.boundingBox(), upload.boundingBox(), refresh.boundingBox(),
+    ])
+    if ([dialogBox, searchBox, typeBox, sortBox, newFolderBox, uploadBox, refreshBox].some(box => box === null)) {
+      throw new Error('document manager narrow geometry missing')
+    }
+    expect(searchBox!.width).toBeGreaterThan(200)
+    expect(Math.abs(typeBox!.width - sortBox!.width)).toBeLessThanOrEqual(2)
+    expect(searchBox!.y + searchBox!.height).toBeLessThanOrEqual(typeBox!.y + 1)
+    expect(typeBox!.y + typeBox!.height).toBeLessThanOrEqual(newFolderBox!.y + 1)
+    expect(new Set([newFolderBox!.y, uploadBox!.y, refreshBox!.y].map(value => Math.round(value))).size).toBe(1)
+    for (const box of [newFolderBox!, uploadBox!, refreshBox!]) {
+      expect(box.height).toBeGreaterThanOrEqual(44)
+      expect(box.x).toBeGreaterThanOrEqual(0)
+      expect(box.x + box.width).toBeLessThanOrEqual(321)
+    }
+    expect(await newFolder.evaluate(element => getComputedStyle(element).whiteSpace)).toBe('nowrap')
+    expect(await upload.evaluate(element => getComputedStyle(element).whiteSpace)).toBe('nowrap')
+    expect(await newFolder.locator('svg').count()).toBeGreaterThan(0)
+    expect(await upload.locator('svg').count()).toBeGreaterThan(0)
+    expect(dialogBox!.x + dialogBox!.width).toBeLessThanOrEqual(321)
   }, 60_000)
 
   it('commits exactly the document-manager snapshot inventory', async () => {
