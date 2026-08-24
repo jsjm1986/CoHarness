@@ -21,6 +21,28 @@ function credentialClass(source) {
 function terminalStatus(chunk) {
     return chunk.reason.kind === 'error' ? 'failed' : chunk.reason.kind === 'aborted' ? 'cancelled' : 'succeeded';
 }
+function participantIdentity(messages) {
+    for (let index = messages.length - 1; index >= 0; index--) {
+        const source = messages[index]?.source;
+        if (source === null || typeof source !== 'object')
+            continue;
+        const participant = source.participant;
+        if (participant === null || typeof participant !== 'object')
+            continue;
+        const userId = participant.userId;
+        const scope = participant.scope;
+        if (scope === null || typeof scope !== 'object')
+            continue;
+        if (scope.kind !== 'project')
+            continue;
+        const projectId = scope.projectId;
+        if (typeof userId === 'number' && Number.isSafeInteger(userId) && userId > 0
+            && typeof projectId === 'number' && Number.isSafeInteger(projectId) && projectId > 0) {
+            return { userId, projectId };
+        }
+    }
+    return undefined;
+}
 /** Mount policy provider plus final llm/stream enforcement and metering. */
 export function apply(ctx) {
     const home = process.env.DSH_HOME ?? join(homedir(), '.dsh');
@@ -145,9 +167,11 @@ export function apply(ctx) {
         const initiatorId = ctx.get('agents')?.currentInitiator()?.session.id;
         const explicitId = options.sessionId;
         const attributedId = explicitId ?? initiatorId;
+        const actor = policy.userDeclaredAllowed ? undefined : participantIdentity(options.messages);
         const base = {
             eventId: randomUUID(), occurredAt: Date.now(), provider: options.provider, model: options.model,
             purpose: options.purpose ?? 'assistant', ...attributedId === undefined ? {} : { sessionId: String(attributedId) },
+            ...actor === undefined ? {} : { actorUserId: actor.userId, actorProjectId: actor.projectId },
         };
         if (initiatorId !== undefined && explicitId !== undefined && initiatorId !== explicitId) {
             return (async function* () {

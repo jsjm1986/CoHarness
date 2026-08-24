@@ -5,6 +5,7 @@ import {
   deleteProject,
   getProjectModelAccess,
   getProject,
+  listUsageContributors,
   getProjectUsage,
   listModelProviders,
   listModels,
@@ -22,6 +23,7 @@ import {
   type ProjectDetail,
   type ProjectQuota,
   type UsageSummary,
+  type UsageContributorReport,
 } from '../api.ts'
 import {
   Button,
@@ -36,16 +38,11 @@ import {
   StatusBadge,
   Switch,
 } from '../components/ui.tsx'
-import { formatCompact, formatMoney, Metric, QuotaSummary } from '../components/usage.tsx'
+import { formatCompact, formatMoney, Metric, PricingState, QuotaSummary } from '../components/usage.tsx'
 
 type MatrixMode = GrantMode | 'none'
 type ProjectQuotaSource = 'inherit' | 'independent'
 type ProjectLimitMode = 'unlimited' | 'custom'
-
-function currentMonth(): string {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-}
 
 export function ProjectDetailPage() {
   const { id } = useParams()
@@ -60,8 +57,9 @@ export function ProjectDetailPage() {
   const [projectName, setProjectName] = useState('')
   const [removeTarget, setRemoveTarget] = useState<AdminUser | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
-  const [month, setMonth] = useState(currentMonth())
+  const [month, setMonth] = useState('')
   const [usage, setUsage] = useState<UsageSummary | null>(null)
+  const [contributors, setContributors] = useState<UsageContributorReport | null>(null)
   const [usageLoading, setUsageLoading] = useState(true)
   const [usageError, setUsageError] = useState('')
   const [quotaOpen, setQuotaOpen] = useState(false)
@@ -109,9 +107,18 @@ export function ProjectDetailPage() {
       setUsageLoading(false)
       return
     }
-    if (showLoading) setUsageLoading(true)
+    if (showLoading) {
+      setUsageLoading(true)
+      setContributors(null)
+    }
     try {
-      setUsage(await getProjectUsage(projectId, month))
+      const [nextUsage, nextContributors] = await Promise.all([
+        getProjectUsage(projectId, month || undefined),
+        listUsageContributors(projectId, month || undefined),
+      ])
+      setUsage(nextUsage)
+      setContributors(nextContributors)
+      if (month === '') setMonth(current => current === '' ? nextUsage.month : current)
       setUsageError('')
     } catch (cause) {
       setUsageError(messageFrom(cause))
@@ -346,6 +353,7 @@ export function ProjectDetailPage() {
                       <Definition label="缓存写入">{usage.cacheWriteTokens.toLocaleString()}</Definition>
                       <Definition label="估算成本">{formatMoney(usage.estimatedCostMicros)}</Definition>
                       <Definition label="缺失计量">{usage.missingUsageCalls.toLocaleString()} 次</Definition>
+                      <Definition label="价格"><PricingState pricing={usage.pricing} /></Definition>
                     </dl>
                   </div>
                   <div className="projectUsagePanel projectQuotaPanel" aria-label="生效额度">
@@ -378,6 +386,29 @@ export function ProjectDetailPage() {
                     </dl>
                   </div>
                 </div>
+              </>
+            )}
+          </Section>
+          <Section className="responsiveSection" title="成员贡献" meta={contributors === null ? undefined : `${contributors.rows.length} 位已确认成员`}>
+            {contributors === null ? <LoadingState label="正在加载成员贡献" /> : (
+              <>
+                <p className="sectionHint">贡献统计用于活动分析，不会重复计入项目账务或成员额度。历史未拆分调用：{contributors.unattributed.totalTokens.toLocaleString()} Token。</p>
+                {contributors.rows.length === 0 ? <EmptyState title="暂无已确认成员贡献" detail="项目调用仍会计入项目总量；没有 participant 身份的历史调用会保留为未拆分。" /> : (
+                  <div className="tableWrap">
+                    <table className="dataTable usageTable">
+                      <thead><tr><th>成员</th><th>调用</th><th>Token</th><th>涉及项目</th><th>价格</th></tr></thead>
+                      <tbody>{contributors.rows.map(row => (
+                        <tr key={row.userId}>
+                          <td>{row.username}{row.archived ? '（已归档）' : ''}</td>
+                          <td>{row.calls.toLocaleString()}</td>
+                          <td>{row.totalTokens.toLocaleString()}</td>
+                          <td>{row.projectCount.toLocaleString()}</td>
+                          <td><PricingState pricing={row.pricing} /></td>
+                        </tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                )}
               </>
             )}
           </Section>

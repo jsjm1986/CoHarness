@@ -71,6 +71,19 @@ async function setup() {
 }
 
 describe('admin JSON API', () => {
+  it('separates the usage overview from contributor activity reports', async () => {
+    const { base, cookie } = await setup()
+    const overview = await fetch(`${base}/admin/api/usage/overview?month=2026-08`, { headers: { cookie } })
+    expect(overview.status).toBe(200)
+    expect(await overview.json()).toMatchObject({ month: '2026-08', users: expect.any(Array), projects: { totalTokens: 0 } })
+    const contributors = await fetch(`${base}/admin/api/usage/contributors?month=2026-08`, { headers: { cookie } })
+    expect(contributors.status).toBe(200)
+    expect(await contributors.json()).toMatchObject({ month: '2026-08', rows: [], unattributed: { totalTokens: 0 } })
+    const health = await fetch(`${base}/admin/api/usage/health?month=2026-08`, { headers: { cookie } })
+    expect(health.status).toBe(200)
+    expect(await health.json()).toMatchObject({ month: '2026-08', missingUsageCalls: 0, maxIntakeLagMs: 0 })
+  })
+
   it('lets an admin create a project and assign members; non-admin is 403', async () => {
     const { base, cookie, root, member } = await setup()
     const shared = join(root, 'shared'); mkdirSync(shared)

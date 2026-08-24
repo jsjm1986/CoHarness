@@ -9,6 +9,10 @@ export interface UsageRecord {
   model: string
   purpose: string
   sessionId?: string
+  /** Public participant id extracted from the durable request, when known. */
+  actorUserId?: number
+  /** Public project id from the participant claim, used only for scope verification. */
+  actorProjectId?: number
   credentialSource: string
   credentialClass: 'company' | 'personal' | 'unknown'
   status: 'succeeded' | 'failed' | 'cancelled' | 'missing-usage' | 'denied'
@@ -76,14 +80,22 @@ export class UsageOutbox {
     for (const name of readdirSync(this.dir).filter(name => name.endsWith('.json')).sort()) {
       if (this.closed) return
       const path = join(this.dir, name)
+      let body: string
+      try { body = await import('node:fs/promises').then(fs => fs.readFile(path, 'utf8')) } catch { return }
+      const post = (payload: string): Promise<Response> => fetch(this.url, {
+        method: 'POST', headers: { authorization: `Bearer ${this.token}`, 'content-type': 'application/json' },
+        body: payload, signal: AbortSignal.timeout(5_000),
+      })
       let response: Response
       try {
-        response = await fetch(this.url, {
-          method: 'POST', headers: { authorization: `Bearer ${this.token}`, 'content-type': 'application/json' },
-          body: await import('node:fs/promises').then(fs => fs.readFile(path, 'utf8')),
-          signal: AbortSignal.timeout(5_000),
-        })
+        response = await post(body)
       } catch { return }
+      if (!response.ok && response.status === 400) {
+        const fallback = actorlessUsageBody(body)
+        if (fallback !== undefined) {
+          try { response = await post(fallback) } catch { return }
+        }
+      }
       if (!response.ok) return
       rmSync(path, { force: true })
     }
@@ -94,4 +106,17 @@ export class UsageOutbox {
     clearInterval(this.timer)
     await this.pumping
   }
+}
+
+/** Remove unverifiable activity fields while preserving the billable usage event. */
+function actorlessUsageBody(body: string): string | undefined {
+  let value: unknown
+  try { value = JSON.parse(body) } catch { return undefined }
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const record = value as Record<string, unknown>
+  if (record.kind === 'model-registration'
+    || (!Object.hasOwn(record, 'actorUserId') && !Object.hasOwn(record, 'actorProjectId'))) return undefined
+  delete record.actorUserId
+  delete record.actorProjectId
+  return JSON.stringify(record)
 }

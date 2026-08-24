@@ -366,8 +366,15 @@ export type ProjectModelAccessView = ModelAccessView & {
   projectDefaultAllowed: boolean
 }
 
-export type UsageSummary = {
-  month: string
+export type UsagePricingView = {
+  status: 'priced' | 'unpriced' | 'configured-zero' | 'mixed' | 'historical-unknown' | 'none'
+  pricedCalls: number
+  unpricedCalls: number
+  configuredZeroCalls: number
+  unknownCalls: number
+}
+
+export type UsageMeasure = {
   inputTokens: number
   outputTokens: number
   cacheReadTokens: number
@@ -377,12 +384,58 @@ export type UsageSummary = {
   companyCostMicros: number
   calls: number
   missingUsageCalls: number
+  pricing?: UsagePricingView
+}
+
+export type UsageSummary = UsageMeasure & {
+  month: string
   tokenLimit: number | null
   companyCostMicrosLimit: number | null
   alerts: Array<{ metric: 'tokens' | 'company-cost'; threshold: 80 | 100; createdAt: number }>
 }
 
 export type AdminUsageSummary = UsageSummary & { userId: number; username: string }
+
+export type UsageContributorRow = UsageMeasure & {
+  userId: number
+  username: string
+  archived?: boolean
+  projectCount: number
+}
+
+export type UsageContributorReport = {
+  month: string
+  timeZone: string
+  projectId?: number
+  rows: UsageContributorRow[]
+  unattributed: UsageMeasure
+}
+
+export type UsageOverview = {
+  month: string
+  timeZone: string
+  personal: UsageMeasure
+  projects: UsageMeasure
+  unattributedProjects: UsageMeasure
+  users: Array<{
+    userId: number
+    username: string
+    archived?: boolean
+    personal: UsageSummary
+    projectContribution: UsageMeasure
+  }>
+}
+
+export type UsageHealth = {
+  month: string
+  timeZone: string
+  missingUsageCalls: number
+  unattributedProjectCalls: number
+  unattributedProjectTokens: number
+  unpricedCalls: number
+  historicalUnknownCalls: number
+  maxIntakeLagMs: number
+}
 
 export type ModelRegistrationAction =
   | 'provider-created' | 'provider-modified' | 'provider-deleted'
@@ -487,6 +540,22 @@ export function setQuota(body: {
 
 export function listUsage(month?: string): Promise<AdminUsageSummary[]> {
   return request(`/admin/api/usage${month === undefined || month === '' ? '' : `?month=${encodeURIComponent(month)}`}`)
+}
+
+export function listUsageOverview(month?: string): Promise<UsageOverview> {
+  return request(`/admin/api/usage/overview${month === undefined || month === '' ? '' : `?month=${encodeURIComponent(month)}`}`)
+}
+
+export function listUsageContributors(projectId?: number, month?: string): Promise<UsageContributorReport> {
+  const query = new URLSearchParams()
+  if (projectId !== undefined) query.set('projectId', String(projectId))
+  if (month !== undefined && month !== '') query.set('month', month)
+  const suffix = query.toString()
+  return request(`/admin/api/usage/contributors${suffix === '' ? '' : `?${suffix}`}`)
+}
+
+export function getUsageHealth(month?: string): Promise<UsageHealth> {
+  return request(`/admin/api/usage/health${month === undefined || month === '' ? '' : `?month=${encodeURIComponent(month)}`}`)
 }
 
 export function getProjectUsage(projectId: number, month?: string): Promise<UsageSummary> {

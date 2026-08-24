@@ -26,9 +26,9 @@ class Adapter extends LlmAdapter {
 async function drain(source: AsyncIterable<StreamChunk>): Promise<StreamChunk[]> {
   const result: StreamChunk[] = []; for await (const chunk of source) result.push(chunk); return result
 }
-function policy(home: string, allowed: boolean): void {
+function policy(home: string, allowed: boolean, userDeclaredAllowed = false): void {
   writeFileSync(join(home, 'model-governance.json'), JSON.stringify({ version: 1, defaultAllowed: false,
-    userDeclaredAllowed: false,
+    userDeclaredAllowed,
     models: [{ provider: 'p', model: 'm', allowed }], providers: [],
     intakeUrl: 'http://127.0.0.1:1/usage', intakeToken: 'token' }))
 }
@@ -60,7 +60,7 @@ describe('instance model governance', () => {
   })
 
   it('records usage with personal credential attribution without changing the stream', async () => {
-    const home = mkdtempSync(join(tmpdir(), 'dsh-gov-')); process.env.DSH_HOME = home; policy(home, true)
+    const home = mkdtempSync(join(tmpdir(), 'dsh-gov-')); process.env.DSH_HOME = home; policy(home, true, true)
     const ctx = new Context(); await ctx.plugin(LlmRuntime)
     const adapter = new Adapter(); ctx.llm.registerAdapter(['p'], adapter); await ctx.plugin(Governance)
     const chunks = await drain(ctx.llm.stream({ provider: 'p', model: 'm', messages: [] }))
@@ -75,7 +75,7 @@ describe('instance model governance', () => {
   })
 
   it('records organization credentials as company usage', async () => {
-    const home = mkdtempSync(join(tmpdir(), 'dsh-gov-')); process.env.DSH_HOME = home; policy(home, true)
+    const home = mkdtempSync(join(tmpdir(), 'dsh-gov-')); process.env.DSH_HOME = home; policy(home, true, true)
     const ctx = new Context(); await ctx.plugin(LlmRuntime)
     const adapter = new Adapter('organization'); ctx.llm.registerAdapter(['p'], adapter); await ctx.plugin(Governance)
     await drain(ctx.llm.stream({ provider: 'p', model: 'm', messages: [] }))
@@ -85,6 +85,45 @@ describe('instance model governance', () => {
     expect(JSON.parse(readFileSync(join(home, 'model-governance-outbox', file!), 'utf8'))).toMatchObject({
       credentialSource: 'organization', credentialClass: 'company', status: 'succeeded',
     })
+    await ctx.fiber.dispose()
+  })
+
+  it('records the latest durable project participant without persisting message content', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'dsh-gov-')); process.env.DSH_HOME = home; policy(home, true, false)
+    const ctx = new Context(); await ctx.plugin(LlmRuntime)
+    ctx.llm.registerAdapter(['p'], new Adapter('organization')); await ctx.plugin(Governance)
+    await drain(ctx.llm.stream({
+      provider: 'p', model: 'm', messages: [{
+        role: 'user', id: 'message-1', content: [{ type: 'text', text: 'secret text' }],
+        source: { kind: 'user', participant: { userId: 7, username: 'member', displayName: 'Member', role: 'user', scope: { kind: 'project', projectId: 3, projectName: 'Project', mode: 'rw' } } },
+      } as never],
+    }))
+    await new Promise(resolve => setTimeout(resolve, 20))
+    const file = readdirSync(join(home, 'model-governance-outbox')).find(name => name.endsWith('.json'))
+    expect(file).toBeDefined()
+    const record = JSON.parse(readFileSync(join(home, 'model-governance-outbox', file!), 'utf8')) as Record<string, unknown>
+    expect(record.actorUserId).toBe(7)
+    expect(record.actorProjectId).toBe(3)
+    expect(JSON.stringify(record)).not.toContain('secret text')
+    await ctx.fiber.dispose()
+  })
+
+  it('does not attribute a personal participant as a shared-project actor', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'dsh-gov-')); process.env.DSH_HOME = home; policy(home, true, true)
+    const ctx = new Context(); await ctx.plugin(LlmRuntime)
+    ctx.llm.registerAdapter(['p'], new Adapter('organization')); await ctx.plugin(Governance)
+    await drain(ctx.llm.stream({
+      provider: 'p', model: 'm', messages: [{
+        role: 'user', id: 'message-personal', content: [{ type: 'text', text: 'private text' }],
+        source: { kind: 'user', participant: { userId: 8, username: 'member', displayName: 'Member', role: 'user', scope: { kind: 'personal' } } },
+      } as never],
+    }))
+    await new Promise(resolve => setTimeout(resolve, 20))
+    const file = readdirSync(join(home, 'model-governance-outbox')).find(name => name.endsWith('.json'))
+    expect(file).toBeDefined()
+    const record = JSON.parse(readFileSync(join(home, 'model-governance-outbox', file!), 'utf8')) as Record<string, unknown>
+    expect(record.actorUserId).toBeUndefined()
+    expect(JSON.stringify(record)).not.toContain('private text')
     await ctx.fiber.dispose()
   })
 
@@ -143,5 +182,29 @@ describe('instance model governance', () => {
     for (let i = 0; i < 30 && readdirSync(dir).includes('e.json'); i++) await new Promise(resolve => setTimeout(resolve, 10))
     await second.close(); await new Promise<void>(resolve => server.close(() => resolve()))
     expect(readdirSync(dir)).not.toContain('e.json')
+  })
+
+  it('keeps project billing when actor verification requires an unattributed retry', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsh-outbox-'))
+    const bodies: Array<Record<string, unknown>> = []
+    const server = createServer(async (req, res) => {
+      const chunks: Buffer[] = []
+      for await (const chunk of req) chunks.push(Buffer.from(chunk as Uint8Array))
+      const value = JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<string, unknown>
+      bodies.push(value)
+      if (value.actorUserId !== undefined) res.writeHead(400).end('{}')
+      else res.writeHead(200).end('{}')
+    })
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+    const outbox = new UsageOutbox(dir, `http://127.0.0.1:${(server.address() as AddressInfo).port}/usage`, 't')
+    outbox.enqueue({ eventId: 'actor-fallback', occurredAt: 1, provider: 'p', model: 'm', purpose: 'assistant',
+      actorUserId: 7, actorProjectId: 3, credentialSource: 'organization', credentialClass: 'company', status: 'succeeded' })
+    for (let i = 0; i < 30 && readdirSync(dir).includes('actor-fallback.json'); i++) await new Promise(resolve => setTimeout(resolve, 10))
+    await outbox.close(); await new Promise<void>(resolve => server.close(() => resolve()))
+    expect(readdirSync(dir)).not.toContain('actor-fallback.json')
+    expect(bodies).toHaveLength(2)
+    expect(bodies[0]).toMatchObject({ actorUserId: 7, actorProjectId: 3 })
+    expect(bodies[1]).not.toHaveProperty('actorUserId')
+    expect(bodies[1]).not.toHaveProperty('actorProjectId')
   })
 })

@@ -20,7 +20,10 @@ import type {
   OrganizationCredentialView,
   OrganizationModelSettingsView,
   RuntimeModelPolicy,
+  UsageContributorReport,
   UsageEvent,
+  UsageHealth,
+  UsageOverview,
   UsageSummary,
   ProjectQuotaView,
 } from './model-governance.ts'
@@ -176,6 +179,10 @@ export interface GatewayModelGovernanceService {
   ingestRegistration(subject: ModelUsageSubject, event: ModelRegistrationEvent): Awaitable<{ inserted: boolean }>
   registrationReport(filter?: ModelRegistrationFilter): Awaitable<ModelRegistrationReport>
   summary(subject: ModelUsageSubject, month?: string): Awaitable<UsageSummary>
+  /** Optional PostgreSQL activity views; SQLite keeps the legacy summary surface. */
+  usageOverview?(month?: string): Awaitable<UsageOverview>
+  usageContributors?(month?: string, projectId?: number): Awaitable<UsageContributorReport>
+  usageHealth?(month?: string): Awaitable<UsageHealth>
   /**
    * Stored project quota source and the limits currently in force for that source.
    * @param projectId - public project id
