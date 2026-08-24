@@ -1,4 +1,4 @@
-import { ClipboardList, Pencil, Sparkles } from 'lucide-react'
+import { ClipboardList, Filter, Pencil, RefreshCw, RotateCcw, Sparkles } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
   getModelAccess,
@@ -28,6 +28,19 @@ import {
 } from '../components/ui.tsx'
 
 type ModelsView = 'catalog' | 'governance' | 'personal'
+
+type RegistrationFilters = {
+  user: string
+  provider: string
+  model: string
+  action: ModelRegistrationAction | ''
+  from: string
+  to: string
+}
+
+const EMPTY_REGISTRATION_FILTERS: RegistrationFilters = {
+  user: '', provider: '', model: '', action: '', from: '', to: '',
+}
 
 const PRICE_LABELS = ['输入', '输出', '缓存读取', '缓存写入'] as const
 
@@ -59,12 +72,8 @@ export function ModelsPage() {
   const [overridePending, setOverridePending] = useState('')
   const [registrationReport, setRegistrationReport] = useState<ModelRegistrationReport | null>(null)
   const [registrationLoading, setRegistrationLoading] = useState(false)
-  const [registrationUser, setRegistrationUser] = useState('')
-  const [registrationProvider, setRegistrationProvider] = useState('')
-  const [registrationModel, setRegistrationModel] = useState('')
-  const [registrationAction, setRegistrationAction] = useState<ModelRegistrationAction | ''>('')
-  const [registrationFrom, setRegistrationFrom] = useState('')
-  const [registrationTo, setRegistrationTo] = useState('')
+  const [registrationDraft, setRegistrationDraft] = useState<RegistrationFilters>(EMPTY_REGISTRATION_FILTERS)
+  const [registrationFilters, setRegistrationFilters] = useState<RegistrationFilters>(EMPTY_REGISTRATION_FILTERS)
 
   const reload = useCallback(async (showLoading = false) => {
     if (showLoading) setLoading(true)
@@ -89,12 +98,12 @@ export function ModelsPage() {
     setRegistrationLoading(true)
     try {
       const next = await listModelRegistrations({
-        ...registrationUser === '' ? {} : { userId: Number(registrationUser) },
-        ...registrationProvider.trim() === '' ? {} : { provider: registrationProvider.trim() },
-        ...registrationModel.trim() === '' ? {} : { model: registrationModel.trim() },
-        ...registrationAction === '' ? {} : { action: registrationAction },
-        ...registrationFrom === '' ? {} : { from: Date.parse(`${registrationFrom}T00:00:00`) },
-        ...registrationTo === '' ? {} : { to: Date.parse(`${registrationTo}T23:59:59.999`) + 1 },
+        ...registrationFilters.user === '' ? {} : { userId: Number(registrationFilters.user) },
+        ...registrationFilters.provider.trim() === '' ? {} : { provider: registrationFilters.provider.trim() },
+        ...registrationFilters.model.trim() === '' ? {} : { model: registrationFilters.model.trim() },
+        ...registrationFilters.action === '' ? {} : { action: registrationFilters.action },
+        ...registrationFilters.from === '' ? {} : { from: Date.parse(`${registrationFilters.from}T00:00:00`) },
+        ...registrationFilters.to === '' ? {} : { to: Date.parse(`${registrationFilters.to}T23:59:59.999`) + 1 },
         limit: 200,
       })
       setRegistrationReport(next)
@@ -104,7 +113,7 @@ export function ModelsPage() {
     } finally {
       setRegistrationLoading(false)
     }
-  }, [registrationAction, registrationFrom, registrationModel, registrationProvider, registrationTo, registrationUser])
+  }, [registrationFilters])
 
   useEffect(() => {
     if (view === 'personal') void reloadRegistrations()
@@ -132,6 +141,16 @@ export function ModelsPage() {
 
   const selected = useMemo(() => users.find(user => String(user.id) === selectedUser), [selectedUser, users])
   const modelSettingsChanged = useCallback(() => { void reload() }, [reload])
+
+  function applyRegistrationFilters(event: FormEvent<HTMLFormElement>): void {
+    event.preventDefault()
+    setRegistrationFilters(registrationDraft)
+  }
+
+  function resetRegistrationFilters(): void {
+    setRegistrationDraft(EMPTY_REGISTRATION_FILTERS)
+    setRegistrationFilters(EMPTY_REGISTRATION_FILTERS)
+  }
 
   function openGovernanceEditor(model: ModelGovernanceRow) {
     setEditingModel(model)
@@ -185,8 +204,8 @@ export function ModelsPage() {
 
   const actions = (
     <div className="pageToolbar modelPageToolbar">
-      <div className="segmented" role="group" aria-label="模型治理视图">
-        <button type="button" aria-pressed={view === 'catalog'} onClick={() => setView('catalog')}>Provider 与模型</button>
+      <div className="segmented modelViewTabs" role="group" aria-label="模型治理视图">
+        <button type="button" aria-pressed={view === 'catalog'} onClick={() => setView('catalog')}>组织模型</button>
         <button type="button" aria-pressed={view === 'governance'} onClick={() => setView('governance')}>权限与计价</button>
         <button type="button" aria-pressed={view === 'personal'} onClick={() => setView('personal')}>个人登记</button>
       </div>
@@ -197,7 +216,7 @@ export function ModelsPage() {
     <div className="page">
       <PageHeader
         title="模型治理"
-        description="管理员统一配置完整组织 Provider 和模型目录；个人运行时可同时使用获授权的组织模型与个人 BYOK，新项目默认跟随全部可用组织模型，管理员仍可设置项目级或单模型例外。"
+        description="统一管理组织 Provider 与模型目录、访问权限和计价；个人 BYOK 仅在个人运行时可用，新项目默认跟随组织模型目录。"
         meta={loading ? undefined : `${models.length} 个组织模型`}
         actions={actions}
       />
@@ -223,18 +242,10 @@ export function ModelsPage() {
             users={users}
             report={registrationReport}
             loading={registrationLoading}
-            user={registrationUser}
-            provider={registrationProvider}
-            model={registrationModel}
-            action={registrationAction}
-            from={registrationFrom}
-            to={registrationTo}
-            onUser={setRegistrationUser}
-            onProvider={setRegistrationProvider}
-            onModel={setRegistrationModel}
-            onAction={setRegistrationAction}
-            onFrom={setRegistrationFrom}
-            onTo={setRegistrationTo}
+            draft={registrationDraft}
+            onDraft={setRegistrationDraft}
+            onApply={applyRegistrationFilters}
+            onReset={resetRegistrationFilters}
             onRefresh={() => { void reloadRegistrations() }}
           />
         )}
@@ -298,62 +309,64 @@ function PersonalRegistrationAudit({
   users,
   report,
   loading,
-  user,
-  provider,
-  model,
-  action,
-  from,
-  to,
-  onUser,
-  onProvider,
-  onModel,
-  onAction,
-  onFrom,
-  onTo,
+  draft,
+  onDraft,
+  onApply,
+  onReset,
   onRefresh,
 }: {
   users: AdminUser[]
   report: ModelRegistrationReport | null
   loading: boolean
-  user: string
-  provider: string
-  model: string
-  action: ModelRegistrationAction | ''
-  from: string
-  to: string
-  onUser: (value: string) => void
-  onProvider: (value: string) => void
-  onModel: (value: string) => void
-  onAction: (value: ModelRegistrationAction | '') => void
-  onFrom: (value: string) => void
-  onTo: (value: string) => void
+  draft: RegistrationFilters
+  onDraft: (value: RegistrationFilters) => void
+  onApply: (event: FormEvent<HTMLFormElement>) => void
+  onReset: () => void
   onRefresh: () => void
 }) {
   const summary = report?.summary
   return (
     <Section
       className="responsiveSection"
-      title="个人 Provider/model 登记"
-      meta={summary === undefined ? undefined : `${summary.providerCount} 个 Provider，${summary.modelCount} 个 model`}
-      actions={<Button type="button" onClick={onRefresh}>刷新</Button>}
+      title="个人 Provider 与模型登记"
+      meta={summary === undefined ? undefined : `${summary.providerCount} 个 Provider · ${summary.modelCount} 个模型`}
+      actions={<Button type="button" icon={RefreshCw} onClick={onRefresh}>刷新</Button>}
     >
-      <p className="inlineNotice">个人可以自由添加和管理 Provider/model；这里仅用于查看登记变化，不参与审批或限制。</p>
-      <div className="registrationFilters">
-        <select className="select selectCompact" value={user} onChange={event => onUser(event.target.value)} aria-label="筛选用户">
-          <option value="">全部用户</option>
-          {users.map(item => <option key={item.id} value={item.id}>{item.username}</option>)}
-        </select>
-        <input className="input" value={provider} onChange={event => onProvider(event.target.value)} placeholder="Provider" aria-label="筛选 Provider" />
-        <input className="input" value={model} onChange={event => onModel(event.target.value)} placeholder="model" aria-label="筛选 model" />
-        <input className="input" type="date" value={from} onChange={event => onFrom(event.target.value)} aria-label="开始日期" />
-        <input className="input" type="date" value={to} onChange={event => onTo(event.target.value)} aria-label="结束日期" />
-        <select className="select selectCompact" value={action} onChange={event => onAction(event.target.value as ModelRegistrationAction | '')} aria-label="筛选动作">
-          <option value="">全部动作</option>
-          {Object.entries(REGISTRATION_ACTION_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-        </select>
-      </div>
+      <p className="inlineNotice">个人可以自由添加和管理 Provider 与模型；此页仅记录登记变化，不参与审批或权限限制。</p>
+      <form className="registrationFilterPanel" onSubmit={onApply} aria-label="个人登记筛选">
+        <div className="registrationFilters">
+          <Field label="用户">
+            <select className="select" value={draft.user} onChange={event => onDraft({ ...draft, user: event.target.value })} aria-label="筛选用户">
+              <option value="">全部用户</option>
+              {users.map(item => <option key={item.id} value={item.id}>{item.username}</option>)}
+            </select>
+          </Field>
+          <Field label="Provider">
+            <input className="input" value={draft.provider} onChange={event => onDraft({ ...draft, provider: event.target.value })} placeholder="按 Provider 筛选" aria-label="筛选 Provider" />
+          </Field>
+          <Field label="模型">
+            <input className="input" value={draft.model} onChange={event => onDraft({ ...draft, model: event.target.value })} placeholder="按模型筛选" aria-label="筛选模型" />
+          </Field>
+          <Field label="开始日期">
+            <input className="input" type="date" value={draft.from} onChange={event => onDraft({ ...draft, from: event.target.value })} aria-label="开始日期" />
+          </Field>
+          <Field label="结束日期">
+            <input className="input" type="date" value={draft.to} onChange={event => onDraft({ ...draft, to: event.target.value })} aria-label="结束日期" />
+          </Field>
+          <Field label="动作">
+            <select className="select" value={draft.action} onChange={event => onDraft({ ...draft, action: event.target.value as ModelRegistrationAction | '' })} aria-label="筛选动作">
+              <option value="">全部动作</option>
+              {Object.entries(REGISTRATION_ACTION_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+            </select>
+          </Field>
+        </div>
+        <div className="filterActions registrationFilterActions">
+          <Button type="button" icon={RotateCcw} onClick={onReset}>重置</Button>
+          <Button type="submit" variant="primary" icon={Filter}>应用筛选</Button>
+        </div>
+      </form>
       {loading ? <LoadingState label="正在加载个人登记记录" /> : report === null || report.rows.length === 0 ? (
-        <EmptyState icon={ClipboardList} title="暂无个人登记记录" detail="个人新增 Provider 或 model 后，记录会出现在这里。" />
+        <EmptyState icon={ClipboardList} title="暂无个人登记记录" detail="个人新增 Provider 或模型后，记录会显示在这里。" />
       ) : (
         <>
           <div className="roleDefaults registrationSummary">
@@ -364,7 +377,7 @@ function PersonalRegistrationAudit({
           </div>
           <div className="tableWrap desktopOnly">
             <table className="dataTable modelTable">
-              <thead><tr><th>时间</th><th>用户</th><th>Provider</th><th>model</th><th>动作</th></tr></thead>
+              <thead><tr><th>时间</th><th>用户</th><th>Provider</th><th>模型</th><th>动作</th></tr></thead>
               <tbody>{report.rows.map(row => <RegistrationRow key={row.eventId} row={row} users={users} />)}</tbody>
             </table>
           </div>
@@ -398,9 +411,9 @@ const REGISTRATION_ACTION_LABELS: Record<ModelRegistrationAction, string> = {
   'provider-created': '新增 Provider',
   'provider-modified': '修改 Provider',
   'provider-deleted': '删除 Provider',
-  'model-created': '新增 model',
-  'model-modified': '修改 model',
-  'model-deleted': '删除 model',
+  'model-created': '新增模型',
+  'model-modified': '修改模型',
+  'model-deleted': '删除模型',
 }
 
 function userName(id: number, users: AdminUser[]): string {

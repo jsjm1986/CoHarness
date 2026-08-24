@@ -456,6 +456,7 @@ export class Session implements SessionFace {
       await this.enqueueHistoryOperation(async (signal) => {
         if (generation !== this.openGeneration || this.openState !== 'open' || !this.hasMore) return
         const page = await this.fetchHistoryPage({ beforeSeq: this.baseSeq, maxMessages: PAGE_MESSAGES }, signal)
+        // oxlint-disable-next-line typescript/no-unnecessary-condition -- stage leave/resync can supersede the awaited page.
         if (page === undefined || generation !== this.openGeneration || this.openState !== 'open') return // keep the window as-is; open already succeeded
         this.applyOlderPage(page)
       }, true)
@@ -473,7 +474,9 @@ export class Session implements SessionFace {
     if (this.historyDetail === 'full') return
     if (this.fillPromise !== null) return this.fillPromise
     if (this.openState !== 'open') await this.open()
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- another caller can start the fill while open() yields.
     if (this.fillPromise !== null) return this.fillPromise
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- open() can settle the mutable detail state while awaited.
     if (this.historyDetail !== 'conversation' && this.historyDetail !== 'filling') return
     const promise = this.enqueueHistoryOperation(signal => this.fillHistoryDetail(signal), false)
     this.fillPromise = promise
@@ -928,6 +931,7 @@ export class Session implements SessionFace {
     const generation = this.openGeneration
     if (!this.stageActive) return
     if (this.openState !== 'open') await this.open()
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- leaveStage/resync may run while open() yields.
     if (!this.stageActive || generation !== this.openGeneration) return
     if (this.openState !== 'open') {
       this.historyWindowMode = 'tail'
@@ -947,11 +951,13 @@ export class Session implements SessionFace {
     let complete = false
     let failure: unknown
     for (let guard = 0; guard < MAX_HISTORY_EXPANSION_PAGES; guard++) {
+      // oxlint-disable-next-line typescript/no-unnecessary-condition -- stage and generation can change during the awaited page.
       if (!this.stageActive || generation !== this.openGeneration || signal.aborted) return
       let page: HistoryPage | undefined
       try {
         page = await this.fetchHistoryPage({ beforeSeq, maxMessages: PAGE_MESSAGES }, signal)
       } catch (error: unknown) {
+        // oxlint-disable-next-line typescript/no-unnecessary-condition -- cancellation can arrive while the carrier awaits.
         if (signal.aborted) throw error instanceof Error ? error : new Error(String(error))
         failure = error
         break
@@ -979,6 +985,7 @@ export class Session implements SessionFace {
       await new Promise<void>((resolve) => { setTimeout(resolve, 0) })
     }
 
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- leaveStage/resync may run during the final page merge.
     if (!this.stageActive || generation !== this.openGeneration || signal.aborted) return
     if (pages.length > 0) this.applyOlderPages(pages, hasMore)
     else if (!hasMore) {
@@ -1008,6 +1015,7 @@ export class Session implements SessionFace {
       await this.enqueueHistoryOperation(async (signal) => {
         if (generation !== this.openGeneration || this.openState !== 'open') return
         const page = await this.fetchHistoryPage({ maxMessages: PAGE_MESSAGES }, signal)
+        // oxlint-disable-next-line typescript/no-unnecessary-condition -- the operation may be superseded while the page awaits.
         if (page === undefined || generation !== this.openGeneration || this.openState !== 'open') return
         const previousHasMore = this.hasMore
         this.mergeHistoryEntries(page.entries)
@@ -1113,12 +1121,14 @@ export class Session implements SessionFace {
       let beforeSeq: number | undefined
       let previousOldest = Number.POSITIVE_INFINITY
       for (let guard = 0; guard < MAX_HISTORY_EXPANSION_PAGES; guard++) {
+        // oxlint-disable-next-line typescript/no-unnecessary-condition -- later iterations follow an awaited history request.
         if (generation !== this.openGeneration || this.openState !== 'open') return
         if (this.omittedSpans.length === 0) break
         const { result } = await this.history({
           ...beforeSeq === undefined ? {} : { beforeSeq },
           maxMessages: PAGE_MESSAGES,
         }, signal)
+        // oxlint-disable-next-line typescript/no-unnecessary-condition -- callbacks can replace the generation while history() yields.
         if (generation !== this.openGeneration || this.openState !== 'open') return
         if (!result.ok || result.value.events.length === 0) break
         const oldest = result.value.events.reduce(
