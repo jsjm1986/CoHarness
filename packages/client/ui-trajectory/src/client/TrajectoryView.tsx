@@ -144,7 +144,6 @@ export function TrajectoryView({
     snapshot.views.get('trajectory') ?? EMPTY_TRAJECTORY_SNAPSHOT)
   const historyLoading = useSession(snapshot =>
     snapshot.openState === 'loading' || snapshot.historyDetail === 'filling')
-  const running = useSession(snapshot => snapshot.running)
   const olderHistoryLoading = useSession(snapshot => snapshot.loadingOlder)
   const hasOlderHistory = useSession(snapshot =>
     snapshot.hasMore && !snapshot.running && snapshot.historyWindowMode === 'tail')
@@ -488,7 +487,6 @@ export function TrajectoryView({
       <div className={css.ledger}>
         <TrajectoryTable
           compact={compact}
-          running={running}
           requestNumbers={requestNumbers}
           turns={timelineTurns}
           streamingCells={streamingCells}

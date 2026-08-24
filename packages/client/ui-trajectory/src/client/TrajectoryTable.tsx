@@ -38,10 +38,6 @@ import { trajectoryPreviewText } from './trajectory-preview.ts'
 import css from './TrajectoryTable.module.css'
 
 const BOTTOM_FOLLOW_THRESHOLD_PX = 2
-// Coalesce explicit tail writes while the virtualizer measures a streamed
-// append. The trailing write catches the final measured height without
-// competing with every intermediate anchor update.
-const TAIL_SCROLL_BURST_MS = 32
 const OLDER_LOAD_THRESHOLD_PX = 48
 const HISTORY_LOAD_ROW_HEIGHT_PX = 30
 const VIRTUALIZATION_THRESHOLD = 100
@@ -360,8 +356,6 @@ function AssistantTimingPanel({ metrics }: { metrics: AssistantMetricDetail }) {
 export interface TrajectoryTableProps {
   /** Whether the frame resolved the compact phone presenter. */
   compact?: boolean
-  /** Whether the owning session is still producing live trajectory records. */
-  running?: boolean
   /** Session-global request numbers for the request groups visible in this context. */
   requestNumbers?: readonly TrajectoryRequestNumber[]
   /** Grouped records in display order. */
@@ -1709,7 +1703,6 @@ function OverviewSection({
  */
 export function TrajectoryTable({
   compact = false,
-  running = false,
   requestNumbers: sessionRequestNumbers,
   turns,
   streamingCells = [],
@@ -1748,9 +1741,6 @@ export function TrajectoryTable({
   const rootRef = useRef<HTMLDivElement>(null)
   const tablePaneRef = useRef<HTMLDivElement>(null)
   const followsTableTail = useRef(false)
-  const tailScrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const tailScrollBurstActive = useRef(false)
-  const tailScrollQueued = useRef(false)
   const tableScrollInitialized = useRef(false)
   const [tableScrollReady, setTableScrollReady] = useState(false)
   const pendingScrollRecordId = useRef<string | null>(null)
@@ -1794,8 +1784,6 @@ export function TrajectoryTable({
   const rowMetrics = compact
     ? MOBILE_TRAJECTORY_ROW_METRICS
     : DESKTOP_TRAJECTORY_ROW_METRICS
-  const requestActive = sessionRequestNumbers?.some(request => request.status === 'running') ?? false
-  const streamingActive = running || streamingCells.length > 0 || requestActive
   const projectedVirtualRows = useMemo(
     () => compact
       ? groupTrajectoryVirtualRows(records, MOBILE_TRAJECTORY_ROW_METRICS)
@@ -2250,36 +2238,6 @@ export function TrajectoryTable({
     if (virtualizationEnabled) rowVirtualizer.scrollToEnd({ behavior: 'auto' })
     else pane.scrollTop = pane.scrollHeight
   }, [rowVirtualizer, virtualizationEnabled])
-  const scrollPaneToTail = useCallback(() => {
-    const pane = tablePaneRef.current
-    if (pane !== null && followsTableTail.current) pane.scrollTop = pane.scrollHeight
-  }, [])
-  const armTailScrollBurst = useCallback((queueScroll: boolean) => {
-    tailScrollQueued.current ||= queueScroll
-    if (tailScrollTimer.current !== null) clearTimeout(tailScrollTimer.current)
-    tailScrollTimer.current = setTimeout(() => {
-      tailScrollTimer.current = null
-      const shouldScroll = tailScrollQueued.current
-      tailScrollQueued.current = false
-      if (shouldScroll && followsTableTail.current) {
-        // Once the virtualizer has established the end anchor, assigning the
-        // native scroll position is sufficient for later measured deltas and
-        // avoids another virtualizer scrollTo write.
-        if (virtualizationEnabled) scrollPaneToTail()
-        else scrollToTail()
-      }
-      if (!virtualizationEnabled) tailScrollBurstActive.current = false
-    }, TAIL_SCROLL_BURST_MS)
-  }, [scrollPaneToTail, scrollToTail, virtualizationEnabled])
-  const cancelTailScroll = useCallback(() => {
-    if (tailScrollTimer.current !== null) {
-      clearTimeout(tailScrollTimer.current)
-      tailScrollTimer.current = null
-    }
-    tailScrollBurstActive.current = false
-    tailScrollQueued.current = false
-  }, [])
-  useEffect(() => () => { cancelTailScroll() }, [cancelTailScroll])
   useLayoutEffect(() => {
     const pane = tablePaneRef.current
     if (pane === null) return
@@ -2296,8 +2254,6 @@ export function TrajectoryTable({
       if (historyLoading) return
       tableScrollInitialized.current = true
       followsTableTail.current = true
-      tailScrollBurstActive.current = false
-      tailScrollQueued.current = false
       if (virtualizationEnabled) rowVirtualizer.scrollToEnd({ behavior: 'auto' })
       else pane.scrollTop = pane.scrollHeight
       setTableScrollReady(true)
@@ -2306,44 +2262,13 @@ export function TrajectoryTable({
     if (!followsTableTail.current) return
     const atTail = pane.scrollHeight - pane.clientHeight - pane.scrollTop
       <= BOTTOM_FOLLOW_THRESHOLD_PX
-    if (virtualizationEnabled && tailScrollBurstActive.current && !streamingActive) {
-      tailScrollBurstActive.current = false
-      if (!atTail) scrollPaneToTail()
-      return
-    }
     if (atTail) return
-    if (virtualizationEnabled && streamingActive) {
-      // A live turn can update the measured row several times before its
-      // final height settles. Follow the first update and wait for the owning
-      // session to leave the running state before writing the final tail.
-      if (!tailScrollBurstActive.current) {
-        tailScrollBurstActive.current = true
-        scrollToTail()
-        if (tailScrollTimer.current === null) {
-          tailScrollTimer.current = setTimeout(() => {
-            tailScrollTimer.current = null
-            scrollPaneToTail()
-          }, 16)
-        }
-      }
-      return
-    }
-    if (!tailScrollBurstActive.current) {
-      tailScrollBurstActive.current = true
-      scrollToTail()
-      armTailScrollBurst(false)
-    } else {
-      armTailScrollBurst(true)
-    }
+    scrollToTail()
   }, [
-    armTailScrollBurst,
-    cancelTailScroll,
     historyLoading,
     historyStartSeq,
     rowVirtualizer,
-    scrollPaneToTail,
     scrollToTail,
-    streamingActive,
     virtualRowStructure,
     virtualizationEnabled,
   ])
@@ -2363,13 +2288,6 @@ export function TrajectoryTable({
           const atTail = pane.scrollHeight - pane.clientHeight - pane.scrollTop
             <= BOTTOM_FOLLOW_THRESHOLD_PX
           followsTableTail.current = atTail
-          if (!atTail) cancelTailScroll()
-          else if (!streamingActive) {
-            // A user- or initialization-driven return to the tail starts a
-            // fresh follow burst; active streams keep their coalescing state.
-            tailScrollBurstActive.current = false
-            tailScrollQueued.current = false
-          }
           requestOlder(pane, true)
         }}
         onClick={(event) => {
