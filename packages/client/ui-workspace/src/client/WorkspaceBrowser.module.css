@@ -383,11 +383,13 @@
 }
 
 :global([data-viewport='compact']) .groupSection {
-  padding: 2px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: var(--dsw-radius-lg);
-  background: var(--dsw-alias-bg-layer-1);
-  box-shadow: var(--dsw-shadow-lv1);
+  /* The workspace is the hierarchy marker; individual sessions stay flat so
+     the drawer reads as one history list instead of a stack of nested cards. */
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 :global([data-viewport='compact']) .sessionOverflowButton {
