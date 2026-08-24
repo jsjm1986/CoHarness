@@ -161,10 +161,29 @@ describe('ModelsPage', () => {
     render(<ModelsPage />)
     await screen.findByText('组织主连接')
     await user.click(screen.getByRole('button', { name: '个人登记' }))
-    expect(await screen.findByText('个人 Provider/model 登记')).toBeTruthy()
-    expect(screen.getAllByText('新增 model').length).toBeGreaterThan(0)
+    expect(await screen.findByText('个人 Provider 与模型登记')).toBeTruthy()
+    expect(screen.getAllByText('新增模型').length).toBeGreaterThan(0)
     expect(screen.getByText('custom')).toBeTruthy()
     expect(api.listModelRegistrations).toHaveBeenCalled()
+  })
+
+  it('applies personal registration filters only after explicit submission', async () => {
+    const user = userEvent.setup()
+    render(<ModelsPage />)
+    await screen.findByText('组织主连接')
+    await user.click(screen.getByRole('button', { name: '个人登记' }))
+    await screen.findByText('个人 Provider 与模型登记')
+
+    const initialCalls = vi.mocked(api.listModelRegistrations).mock.calls.length
+    const provider = screen.getByLabelText('筛选 Provider')
+    await user.type(provider, 'custom')
+    expect(api.listModelRegistrations).toHaveBeenCalledTimes(initialCalls)
+
+    await user.click(screen.getByRole('button', { name: '应用筛选' }))
+    await waitFor(() => expect(api.listModelRegistrations).toHaveBeenLastCalledWith(expect.objectContaining({ provider: 'custom' })))
+
+    await user.click(screen.getByRole('button', { name: '重置' }))
+    await waitFor(() => expect(api.listModelRegistrations).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 200 })))
   })
 
   it('creates an org-prefixed Provider with a complete model profile and credential', async () => {

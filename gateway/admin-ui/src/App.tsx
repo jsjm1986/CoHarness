@@ -66,7 +66,7 @@ function Brand({ compact = false }: { compact?: boolean }) {
       <span className="brandMark"><PanelsTopLeft aria-hidden="true" /></span>
       <span className="brandCopy">
         <strong>DeepSeek Harness</strong>
-        {compact ? null : <span>Admin</span>}
+        {compact ? null : <span>管理端</span>}
       </span>
     </div>
   )

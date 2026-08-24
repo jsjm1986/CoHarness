@@ -26,6 +26,7 @@ import {
   Section,
   StatusBadge,
 } from '../components/ui.tsx'
+import { Metric } from '../components/usage.tsx'
 
 type Draft = { query: string; scope: '' | 'personal' | 'project'; projectId: string; ownerUserId: string; state: 'active' | 'deleted' | 'all' }
 const EMPTY: Draft = { query: '', scope: '', projectId: '', ownerUserId: '', state: 'active' }
@@ -177,7 +178,6 @@ function DocumentTableRow({ row, onOpen }: { row: AdminDocument; onOpen: () => v
   return <tr><td><button className="tableLink" type="button" onClick={onOpen}><span className="documentIdentity"><FileText aria-hidden="true" /><strong>{row.name}</strong><small>{row.docId}</small></span></button></td><td><StatusBadge tone={row.scope.kind === 'project' ? 'info' : 'neutral'}>{row.scope.label}</StatusBadge></td><td>{row.owner?.displayName ?? <span className="muted">未分配</span>}</td><td>{formatBytes(row.bytes)}</td><td><StatusBadge tone={row.state === 'active' ? 'success' : 'danger'}>{row.state === 'active' ? '活跃' : '已删除'}</StatusBadge></td><td>{row.legacy ? '历史导入' : row.ownerSource}</td><td>{formatTime(row.modifiedAt)}</td><td><IconButton label="查看详情" icon={ShieldCheck} variant="secondary" onClick={onOpen} /></td></tr>
 }
 
-function Metric({ label, value, tone }: { label: string; value: string; tone?: 'warning' }) { return <div className="metricCard"><span>{label}</span><strong className={tone === undefined ? '' : 'metricWarning'}>{value}</strong></div> }
 function Definition({ label, children }: { label: string; children: React.ReactNode }) { return <div className="definitionRow"><dt>{label}</dt><dd>{children}</dd></div> }
 function formatBytes(bytes: number): string { if (bytes < 1024) return `${bytes} B`; if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`; if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`; return `${(bytes / 1024 ** 3).toFixed(1)} GB` }
 function formatTime(timestamp: number): string { return new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(timestamp) }
