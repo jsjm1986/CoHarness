@@ -42,14 +42,25 @@ async function dumpOverflow(page: Page): Promise<unknown> {
         if (box.width === 0 || box.height === 0) return null
         const style = getComputedStyle(el)
         if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return null
+        // Virtualized trajectory rows may retain a focusable marker just
+        // outside the feed's own clipping edge; that is intentional and not
+        // viewport overflow.
+        const feed = el.closest<HTMLElement>('[data-trajectory-feed]')
+        if (feed !== null) {
+          const feedBox = feed.getBoundingClientRect()
+          if (box.top < feedBox.top || box.bottom > feedBox.bottom) return null
+        }
         const onScreen = box.right > 1 && box.left < vw - 1 && box.bottom > 1 && box.top < vh - 1
         if (!onScreen) return null
         const label = (el.getAttribute('aria-label') ?? el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 40)
+        const clipped = feed === null
+          ? box.right > vw + 1 || box.bottom > vh + 1 || box.left < -1 || box.top < -1
+          : box.right > vw + 1 || box.left < -1
         return {
           label,
           w: Math.round(box.width),
           h: Math.round(box.height),
-          clipped: box.right > vw + 1 || box.bottom > vh + 1 || box.left < -1 || box.top < -1,
+          clipped,
         }
       })
       .filter(row => row !== null)
@@ -264,16 +275,20 @@ describe('visual audit: compact product chrome', () => {
         }
 
         await page.getByRole('tab', { name: /轨迹|Trajectory/ }).click()
-        await page.locator('table, [role="table"]').first().waitFor({ timeout: 15_000 })
+        await page.locator('[data-trajectory-feed], table, [role="table"]').first().waitFor({ timeout: 15_000 })
         await page.waitForTimeout(400)
         await shot(page, `${prefix}-08-trajectory`)
         findings[`${prefix}.trajectory`] = await dumpOverflow(page)
 
-        const toolEvent = page.locator('tr[data-kind="tool"]').first()
+        const toolEvent = page.locator('[data-trajectory-feed] [data-kind="tool"], tr[data-kind="tool"]').first()
         if (await toolEvent.count() > 0) {
           await toolEvent.click()
-          const details = page.getByRole('complementary', { name: 'Event details' })
+          const details = page.locator('[data-trajectory-details]').first()
           await details.waitFor({ timeout: 10_000 })
+          if (phone.width < 768) {
+            expect(await details.getAttribute('role')).toBe('dialog')
+            expect(await details.getAttribute('aria-modal')).toBe('true')
+          }
           await page.waitForTimeout(300)
           await shot(page, `${prefix}-09-event-details`)
           findings[`${prefix}.eventDetails`] = await dumpOverflow(page)

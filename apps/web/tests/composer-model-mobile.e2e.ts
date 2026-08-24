@@ -188,8 +188,15 @@ describe('web e2e: mobile composer model label geometry', () => {
       })
       const metrics = await measureComposer(page)
       const tolerance = 1
+      const actionIconSizes = await page.locator('[data-composer-card] [class*="add"] svg, [data-composer-card] [class*="primary"] svg, [data-composer-card] [data-session-summary] > svg')
+        .evaluateAll(icons => icons
+          .map(icon => icon.getBoundingClientRect())
+          .filter(box => box.width > 0 && box.height > 0)
+          .map(box => Math.max(box.width, box.height)))
 
       expect(metrics.modelTitle?.startsWith(MODEL_NAME)).toBe(true)
+      expect(actionIconSizes.length, `viewport ${String(width)} has composer action icons`).toBeGreaterThan(0)
+      expect(Math.max(...actionIconSizes), `viewport ${String(width)} composer icon scale`).toBeLessThanOrEqual(16)
       if (metrics.modelPresentation === 'summary') {
         expect(metrics.model.height).toBeGreaterThanOrEqual(56)
         continue

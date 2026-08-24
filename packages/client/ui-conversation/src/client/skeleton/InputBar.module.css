@@ -724,9 +724,10 @@
   }
 
   :global([data-viewport='compact']) .add svg,
-  :global([data-viewport='compact']) .primary svg {
-    width: var(--dsw-mobile-icon-primary);
-    height: var(--dsw-mobile-icon-primary);
+  :global([data-viewport='compact']) .primary svg,
+  :global([data-viewport='compact']) .sessionSummary > svg {
+    width: var(--dsw-mobile-icon-secondary);
+    height: var(--dsw-mobile-icon-secondary);
   }
 
   .sessionSummary {

@@ -98,8 +98,8 @@
 }
 
 @media (max-width: 767px) {
-  :global([data-viewport='compact']) .plot {
-    height: 54px;
+:global([data-viewport='compact']) .plot {
+    height: var(--dsw-mobile-timeline-height);
   }
 
   :global([data-viewport='compact']) .labels {

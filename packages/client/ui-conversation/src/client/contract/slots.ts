@@ -73,7 +73,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * flow instead: `conversation.view` for a whole tab, the input regions for
      * composer chrome.
      */
-    'conversation.session': { kind: 'single'; scope: 'session' }
+    'conversation.session': { kind: 'single'; scope: 'session'; owner: ConversationSessionOwnerProps }
     /**
      * The strip above the session's scrollport: title, view tabs, and the
      * action row. Taking this seat means rendering all three yourself, and it
@@ -81,7 +81,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * seat is declared by whoever occupies this one, so replacing the header
      * takes every action entry down with it.
      */
-    'conversation.session.header': { kind: 'single'; scope: 'session' }
+    'conversation.session.header': { kind: 'single'; scope: 'session'; owner: ConversationSessionHeaderOwnerProps }
     /**
      * One breadcrumb title and its lineage controls. The render site keeps
      * the ordinary title as fallback; an occupant receives plain title data
@@ -304,6 +304,8 @@ export interface HeroAgentPresetOwnerProps {
 
 /** Owner share of the strict session content seat. */
 export interface ConversationSessionOwnerProps {
+  /** Whether the shell is using the compact phone presenter. */
+  compact?: boolean
   /**
    * Wrap the view ring in the transcript scrollport that also hosts the
    * sticky composer seat (whole `'conversation.composer'` chain output).
@@ -319,7 +321,16 @@ export interface ConversationSessionOwnerProps {
 }
 
 /** Header actions derive their state from the standard session/global kit. */
-export interface ConversationHeaderActionOwnerProps {}
+export interface ConversationHeaderActionOwnerProps {
+  /** Whether the action is being rendered inside the compact phone header. */
+  compact?: boolean
+}
+
+/** Owner share of the strict session header. */
+export interface ConversationSessionHeaderOwnerProps {
+  /** Whether the shell is using the compact phone presenter. */
+  compact?: boolean
+}
 
 /** Plain breadcrumb data handed to the optional lineage renderer. */
 export interface ConversationHeaderLineageOwnerProps {
@@ -349,6 +360,8 @@ export interface InputZone {
  * toolview hole).
  */
 export interface ConvViewOwnerProps {
+  /** Whether the shell is using the compact phone presenter. */
+  compact?: boolean
   /** One-shot inspect request from another view (chat's Inspect button); null when idle. */
   inspect?: { callId: CallId } | null
   /** Acknowledge the inspect request once applied (clears the store field). */

@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-Web Session-log download control over the host-streamed ZIP endpoint owned by `dsh-host-apiproxy`. The Host half registers `/export`; the browser half owns a 111×32 `Session log` action in the Session Header, one download controller, and one modal shared by that button and the slash command. ZIP generation, raw JSONL/zstd reads, descendants, attachments, backpressure, and HTTP error semantics remain owned by the [ApiProxy download implementation](../../host/apiproxy/README.md).
+Web Session-log download control over the host-streamed ZIP endpoint owned by `dsh-host-apiproxy`. The Host half registers `/export`; the browser half owns a 111×32 desktop `Session log` action, an icon-only action in the compact AppFrame topbar, one download controller, and one modal shared by both buttons and the slash command. ZIP generation, raw JSONL/zstd reads, descendants, attachments, backpressure, and HTTP error semantics remain owned by the [ApiProxy download implementation](../../host/apiproxy/README.md).
 
 ## Command contract
 
@@ -24,7 +24,7 @@ The modal reports preparation, download start, or failure. Closing it does not c
   name: '@deepseek-ai/dsh-session-log-export'
 ```
 
-The Web bundle mounts the package beside `dsh-host-apiproxy`, `dsh-commands`, `dsh-client-ui-commands`, and `dsh-client-ui-conversation`. The package contributes its button and modal to the right-aligned `conversation.session.header.utilities` list, independently of the title-adjacent mode, Subagent, and Task entries in `conversation.session.header.actions`; Trajectory carries no export control.
+The Web bundle mounts the package beside `dsh-host-apiproxy`, `dsh-commands`, `dsh-client-ui-commands`, `dsh-client-ui-conversation`, and `dsh-client-ui-layout`. The package contributes its desktop action to `conversation.session.header.utilities` and its compact icon action to `shell.mobile.header.actions`, independently of the title-adjacent mode, Subagent, and Task entries in `conversation.session.header.actions`; both presenters use the same controller and modal, and Trajectory carries no export control.
 
 ## Model Experience
 

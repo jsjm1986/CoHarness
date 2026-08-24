@@ -359,8 +359,10 @@ a {
 
 .pageHeader p {
   margin: 5px 0 0;
+  max-width: 920px;
   color: var(--text-secondary);
   font-size: 13px;
+  line-height: 1.6;
 }
 
 .pageMeta,
@@ -399,6 +401,7 @@ a {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 16px;
   min-height: 52px;
   padding: 10px 16px;
@@ -1182,7 +1185,7 @@ a {
   color: var(--text-tertiary);
   font-size: 11px;
   font-weight: 650;
-  text-transform: uppercase;
+  letter-spacing: 0.025em;
   white-space: nowrap;
 }
 
@@ -1310,18 +1313,41 @@ a {
   font-size: 12px;
 }
 
+.registrationFilterPanel {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-subtle);
+}
+
 .registrationFilters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 16px;
+  display: grid;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(170px, 1fr) minmax(170px, 1fr)
+    repeat(2, minmax(145px, 0.8fr)) minmax(140px, 0.8fr);
+  align-items: end;
+  gap: 12px;
+  padding: 16px;
+}
+
+.registrationFilterActions {
+  justify-content: flex-end;
+  padding: 0 16px 16px;
 }
 
 .roleDefaults.registrationSummary {
-  margin-bottom: 16px;
+  align-items: center;
+  min-height: 48px;
+  margin: 0;
+  padding: 10px 16px;
   flex-direction: row;
   flex-wrap: wrap;
-  gap: 14px;
+  gap: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.registrationSummary span {
+  font-variant-numeric: tabular-nums;
 }
 
 .roleDefaults {
@@ -1508,10 +1534,6 @@ a {
   font-size: 11px;
 }
 
-.metricWarning {
-  color: var(--warning);
-}
-
 .inputWithIcon {
   position: relative;
 }
@@ -1646,6 +1668,14 @@ a {
 .segmented button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.modelViewTabs {
+  flex-wrap: wrap;
+}
+
+.modelViewTabs button {
+  min-width: 88px;
 }
 
 .breadcrumb {
@@ -1970,7 +2000,6 @@ a {
   border-right: none;
   background: var(--surface);
 }
-
 .usageStatusStack {
   display: flex;
   flex-direction: column;
@@ -1986,8 +2015,10 @@ a {
 
 .metric {
   min-width: 0;
-  padding: 16px 18px;
+  min-height: 84px;
+  padding: 16px 18px 14px;
   border-right: 1px solid var(--border);
+  background: var(--surface);
 }
 
 .metric:last-child {
@@ -2007,6 +2038,7 @@ a {
   overflow: hidden;
   font-size: 20px;
   font-weight: 650;
+  font-variant-numeric: tabular-nums;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2180,6 +2212,21 @@ a {
   font-size: 12px;
 }
 
+@media (max-width: 1200px) {
+  .registrationFilters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .filterPanel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .filterPanel .filterActions {
+    justify-content: flex-end;
+  }
+}
+
 @media (max-width: 1080px) {
   :root {
     --sidebar-width: 204px;
@@ -2193,13 +2240,8 @@ a {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .filterPanel {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .filterPanel .filterActions {
-    justify-content: flex-end;
+  .registrationFilters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -2287,6 +2329,19 @@ a {
     min-height: 50px;
   }
 
+  .modelPageToolbar {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .modelViewTabs {
+    width: 100%;
+  }
+
+  .modelViewTabs button {
+    flex: 1 1 0;
+  }
+
   .pageHeader h1 {
     font-size: 22px;
   }
@@ -2360,7 +2415,6 @@ a {
   .usageHealthMetrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
   .projectUsageMetrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2381,10 +2435,8 @@ a {
     display: none;
   }
 
-  .registrationFilters > .input,
-  .registrationFilters > .select {
-    min-width: 0;
-    flex: 1 1 150px;
+  .registrationFilters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .projectUsageDetails {
@@ -2411,6 +2463,16 @@ a {
     align-items: flex-start;
   }
 
+  .pageHeader:has(.modelPageToolbar) {
+    flex-wrap: wrap;
+  }
+
+  .pageHeader:has(.modelPageToolbar) .pageHeading,
+  .pageHeader:has(.modelPageToolbar) .pageActions {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+
   .pageTitleLine {
     align-items: flex-start;
     flex-direction: column;
@@ -2424,6 +2486,10 @@ a {
 
   .pageActions {
     max-width: 58%;
+  }
+
+  .pageHeader:has(.modelPageToolbar) .pageActions {
+    max-width: none;
   }
 
   .projectDetailPage .pageActions {
@@ -2485,6 +2551,7 @@ a {
   .formGrid,
   .formGridThree,
   .filterGrid,
+  .registrationFilters,
   .definitionGrid,
   .quotaEditorGrid {
     grid-template-columns: 1fr;

@@ -36,13 +36,22 @@
      prevents each mobile plugin from inventing a smaller caption for primary
      content. */
   --dsw-mobile-font-title: 600 17px/24px var(--dsw-font-family);
+  --dsw-mobile-font-nav: 600 16px/22px var(--dsw-font-family);
   --dsw-mobile-font-section: 600 15px/22px var(--dsw-font-family);
   --dsw-mobile-font-body: 400 14px/22px var(--dsw-font-family);
   --dsw-mobile-font-secondary: 400 13px/20px var(--dsw-font-family);
   --dsw-mobile-font-caption: 400 12px/18px var(--dsw-font-family);
+  --dsw-mobile-font-feed: 400 13px/18px var(--dsw-font-family);
+  --dsw-mobile-font-feed-meta: 400 11px/16px var(--dsw-font-family);
   --dsw-mobile-font-code: 400 13px/20px var(--ds-font-family-code);
   --dsw-mobile-icon-primary: 20px;
   --dsw-mobile-icon-secondary: 16px;
+  --dsw-mobile-header-height: 44px;
+  --dsw-mobile-tab-height: 40px;
+  --dsw-mobile-toolbar-height: 44px;
+  --dsw-mobile-timeline-height: 44px;
+  --dsw-mobile-feed-row-height: 56px;
+  --dsw-mobile-feed-summary-height: 40px;
   --dsw-mobile-control-height: var(--dsw-touch-target);
   --dsw-mobile-summary-height: 56px;
   --dsw-mobile-option-row-height: 56px;

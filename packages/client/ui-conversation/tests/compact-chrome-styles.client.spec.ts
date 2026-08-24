@@ -17,6 +17,9 @@ describe('conversation compact chrome', () => {
     expect(root).toContain('overflow-x: auto')
     expect(root).toContain('.crumb')
     expect(root).toContain('max-width: 100%')
+    expect(root).toContain('display: contents')
+    expect(root).toContain('var(--dsw-mobile-tab-height)')
+    expect(root).toContain('.headerUtilities')
   })
 
   it('shrinks the hero headline and grows the workspace chip on compact', () => {
@@ -32,6 +35,8 @@ describe('conversation compact chrome', () => {
     expect(input).toContain('.documentRail')
     expect(input).toContain('.documentStatus')
     expect(input).toContain('var(--dsw-touch-target)')
+    expect(input).toContain('.sessionSummary > svg')
+    expect(input).toContain('var(--dsw-mobile-icon-secondary)')
     expect(input).toContain('flex-wrap: wrap')
     expect(input).toContain('[data-viewport-short]')
   })

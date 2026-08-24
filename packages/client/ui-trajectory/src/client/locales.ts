@@ -19,6 +19,8 @@ export type TrajectoryKey =
   | 'toolbar.collapseCalls'
   | 'toolbar.search'
   | 'toolbar.searchPlaceholder'
+  | 'toolbar.closeSearch'
+  | 'toolbar.more'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -31,18 +33,20 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 export const zh: Record<TrajectoryKey, string> = {
   'view.trajectory': '轨迹',
   'toolbar.aria': '轨迹工具栏',
-  'toolbar.duration': 'Duration',
+  'toolbar.duration': '时长',
   'toolbar.useActualDuration': 'Use actual duration',
   'toolbar.useEqualWidth': 'Use equal-width operations',
   'toolbar.actualTime': '实际时间',
-  'toolbar.turns': 'Turns',
+  'toolbar.turns': '轮次',
   'toolbar.expandTurns': 'Expand turns',
   'toolbar.collapseTurns': 'Collapse turns',
-  'toolbar.calls': 'Calls',
+  'toolbar.calls': '调用',
   'toolbar.expandCalls': 'Expand calls',
   'toolbar.collapseCalls': 'Collapse calls',
   'toolbar.search': '搜索轨迹',
   'toolbar.searchPlaceholder': '搜索',
+  'toolbar.closeSearch': '关闭搜索',
+  'toolbar.more': '更多轨迹操作',
 }
 
 /** English dictionary. */
@@ -61,4 +65,6 @@ export const en: Record<TrajectoryKey, string> = {
   'toolbar.collapseCalls': 'Collapse calls',
   'toolbar.search': 'Search trajectory',
   'toolbar.searchPlaceholder': 'Search',
+  'toolbar.closeSearch': 'Close search',
+  'toolbar.more': 'More trajectory actions',
 }

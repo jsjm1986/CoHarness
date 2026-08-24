@@ -169,7 +169,7 @@ describe('AppFrame', () => {
     expect(keys).toContain('conversation')
     expect(keys).toContain('details')
     expect(keys).not.toContain('conversation.empty')
-    expect(slotCalls.find(c => c.key === 'conversation')!.props).toEqual({})
+    expect(slotCalls.find(c => c.key === 'conversation')!.props).toEqual({ compact: false })
     expect(slotCalls.find(c => c.key === 'details')!.props).toEqual({})
   })
 
@@ -366,7 +366,7 @@ describe('AppFrame — medium-viewport auto-collapse', () => {
 describe('AppFrame — compact drawer and overlay details', () => {
   it('renders the topbar toggle, no columns template, and no drag handles', () => {
     frameWidth = 390
-    const { frame } = mountFrame()
+    const { frame, slotCalls } = mountFrame()
     expect(frame.getAttribute('data-viewport')).toBe('compact')
     expect(frame.style.gridTemplateColumns).toBe('') // CSS owns the compact template
     expect(frame.querySelectorAll('[class*="handle"]')).toHaveLength(0)
@@ -374,6 +374,8 @@ describe('AppFrame — compact drawer and overlay details', () => {
     expect(toggle.getAttribute('aria-label')).toBe('drawer.open')
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
     expect(frame.querySelector('[data-mobile-app-header]')?.textContent).toBe('Test')
+    expect(slotCalls.find(c => c.key === 'conversation')?.props).toEqual({ compact: true })
+    expect(slotCalls.some(c => c.key === 'shell.mobile.header.actions')).toBe(true)
   })
 
   it('marks a short compact frame for reduced vertical density', () => {

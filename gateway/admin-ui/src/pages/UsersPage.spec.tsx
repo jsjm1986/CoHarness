@@ -67,6 +67,14 @@ describe('UsersPage', () => {
     })
   })
 
+  it('localizes the ready instance state returned by the gateway', async () => {
+    vi.mocked(api.listUsers).mockResolvedValue([{ ...alice, instanceState: 'ready' }])
+    render(<UsersPage />)
+
+    expect(await screen.findAllByText('运行中')).toHaveLength(2)
+    expect(screen.queryAllByText('ready')).toHaveLength(0)
+  })
+
   it('confirms user deletion and removes the account from the list', async () => {
     vi.mocked(api.deleteUser).mockImplementation(async () => {
       vi.mocked(api.listUsers).mockResolvedValue([])

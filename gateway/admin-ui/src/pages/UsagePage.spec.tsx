@@ -55,7 +55,6 @@ describe('UsagePage', () => {
     expect(within(table).getAllByText(/不计入个人额度/)).toHaveLength(2)
     expect(within(table).getByText('bob')).toBeTruthy()
   })
-
   it('renders metering health as one aligned metric group', async () => {
     render(<UsagePage />)
     const group = await screen.findByLabelText('计量健康指标')

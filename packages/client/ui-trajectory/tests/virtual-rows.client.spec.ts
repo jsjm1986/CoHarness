@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import type { TrajectoryCellProps } from '../src/client/trajectory-record.ts'
 import {
-  groupTrajectoryVirtualRows, trajectoryVirtualRecordKey,
+  groupTrajectoryVirtualRows, MOBILE_TRAJECTORY_ROW_METRICS, trajectoryVirtualRecordKey,
   type VirtualizableTrajectoryRecord,
 } from '../src/client/trajectory-virtual-rows.ts'
 
@@ -58,6 +58,20 @@ describe('trajectory virtual rows', () => {
     const summary = record(1, { sourceSeq: 10 }, 'turn')
 
     expect(groupTrajectoryVirtualRows([summary])[0]?.height).toBe(20)
+  })
+
+  it('accepts phone presenter metrics without changing stable keys', () => {
+    const content = record(9, { recordId: 'phone-content' })
+    const summary = record(10, { recordId: 'phone-summary' }, 'turn')
+    const rows = groupTrajectoryVirtualRows(
+      [content, summary],
+      MOBILE_TRAJECTORY_ROW_METRICS,
+    )
+    expect(rows.map(row => row.height)).toEqual([56, 40])
+    expect(rows.map(row => row.key)).toEqual([
+      trajectoryVirtualRecordKey(content),
+      trajectoryVirtualRecordKey(summary),
+    ])
   })
 
   it('keeps an existing row key stable when older history is prepended', () => {

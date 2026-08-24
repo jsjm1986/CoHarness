@@ -27,6 +27,8 @@
 
 .header {
   position: relative;
+  display: flex;
+  flex-direction: column;
   flex: none;
   padding: var(--dsw-space-3) var(--dsw-space-7) 0 var(--dsw-space-5);
   border-bottom: 1px solid transparent;
@@ -51,6 +53,7 @@
 }
 
 .titleRow {
+  order: 0;
   display: flex;
   align-items: center;
   gap: 0;
@@ -134,6 +137,7 @@
 
 /* figma Tab_Group 34:11441: 35px strip, gap 36, pad-left 8, tabs bottom-aligned. */
 .tabs {
+  order: 1;
   position: relative;
   z-index: 1;
   display: flex;
@@ -379,6 +383,10 @@
 }
 
 :global([data-viewport='compact']) .header {
+  flex-direction: row;
+  align-items: stretch;
+  box-sizing: border-box;
+  min-height: var(--dsw-mobile-tab-height);
   padding: 0 var(--dsw-mobile-page-inset);
 }
 
@@ -387,6 +395,10 @@
 }
 
 :global([data-viewport='compact']) .tabs {
+  order: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--dsw-mobile-tab-height);
   gap: var(--dsw-space-5);
   overflow-x: auto;
   overflow-y: hidden;
@@ -397,7 +409,7 @@
   flex: none;
   display: inline-flex;
   align-items: flex-end;
-  min-height: var(--dsw-touch-target);
+  min-height: var(--dsw-mobile-tab-height);
   font: var(--dsw-mobile-font-secondary);
 }
 
@@ -407,8 +419,8 @@
 }
 
 :global([data-viewport='compact']) .titleRow {
-  flex-wrap: nowrap;
-  min-height: 40px;
+  display: contents;
+  min-height: 0;
   gap: var(--dsw-space-1);
 }
 
@@ -424,11 +436,15 @@
 }
 
 :global([data-viewport='compact']) .titleCluster {
-  display: none;
+  display: contents;
 }
 
-:global([data-viewport='compact']) .headerActions,
-:global([data-viewport='compact']) .headerUtilities {
+:global([data-viewport='compact']) .headerActions {
+  order: 1;
+  display: flex;
+  flex: none;
+  align-items: center;
+  max-width: 42%;
   min-width: 0;
   overflow-x: auto;
   gap: var(--dsw-space-1);
@@ -436,20 +452,18 @@
 }
 
 :global([data-viewport='compact']) .headerActions button,
-:global([data-viewport='compact']) .headerUtilities button {
-  min-height: var(--dsw-touch-target);
+:global([data-viewport='compact']) .headerActions [role='button'] {
+  min-width: var(--dsw-touch-target);
+  min-height: var(--dsw-mobile-tab-height);
   flex: none;
 }
 
-:global([data-viewport='compact']) .headerActions::-webkit-scrollbar,
-:global([data-viewport='compact']) .headerUtilities::-webkit-scrollbar {
+:global([data-viewport='compact']) .headerActions::-webkit-scrollbar {
   display: none;
 }
 
 :global([data-viewport='compact']) .headerUtilities {
-  margin-left: auto;
-  width: 100%;
-  justify-content: flex-end;
+  display: none;
 }
 
 :global([data-viewport='compact']) .crumb {

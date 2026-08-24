@@ -346,6 +346,8 @@ function projectPagesInto(
   context: ProjectionContext,
   pageContent: (markdown: string, page: DocsPage) => string,
   entries: DocsPage[] = context.pages,
+  replaceExisting: ReadonlySet<string> = new Set(),
+  allowIdenticalExisting = false,
 ): void {
   const routes = new Set<string>()
   /** Projected path to the repository file that claimed it, pages and images alike. */
@@ -363,7 +365,11 @@ function projectPagesInto(
     // A file the projection did not claim is another producer's output — in
     // the twin pass, the build VitePress just wrote, including `public/`
     // copies. Overwriting one would silently corrupt the site.
-    if (holder === undefined && existsSync(target)) {
+    const identicalExisting = allowIdenticalExisting && !replaceExisting.has(target) && existsSync(target)
+      && statSync(target).size === statSync(sourceAbs).size
+      && readFileSync(target).equals(readFileSync(sourceAbs))
+    if (holder === undefined && existsSync(target)
+      && !replaceExisting.has(target) && !identicalExisting) {
       throw new Error(
         `project-doc-site: ${repoPath(sourceAbs, context.repoRoot)} would overwrite existing build file`
         + ` ${relative(targetRoot, target).split(sep).join('/')}.`,
@@ -496,11 +502,18 @@ export function emitRawMarkdownPages(outDir: string, context: ProjectionContext 
     const alias = indexAliasRoute(page.route)
     return alias === undefined ? [] : [{ ...page, route: alias }]
   })
+  const entries = [...context.pages, ...aliases]
+  // VitePress emits route-named Markdown stubs in MPA mode before buildEnd.
+  // Those paths belong to this raw twin, while other existing files (notably
+  // public assets) must remain protected by projectPagesInto's collision check.
+  const replaceExisting = new Set(entries.map(page => resolve(outDir, page.route)))
   projectPagesInto(
     outDir,
     context,
     (markdown, page) => rawMarkdownPageContent(markdown, page.source),
-    [...context.pages, ...aliases],
+    entries,
+    replaceExisting,
+    true,
   )
 }
 

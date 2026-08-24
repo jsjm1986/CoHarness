@@ -27,7 +27,7 @@ import css from './AppFrame.module.css'
 /** Full composed props: runtime share + child-slot render share + store share + locale seat. */
 export type AppFrameProps =
   & PropsRuntime<'root'>
-  & PropsRenderSlots<'sidebar' | 'conversation' | 'details' | 'shell.overlay'>
+  & PropsRenderSlots<'sidebar' | 'conversation' | 'details' | 'shell.overlay' | 'shell.mobile.header.actions'>
   & PropsStore<ReturnType<typeof createLayoutStore>>
   & PropsLocale<'layout'>
 
@@ -97,6 +97,7 @@ export function AppFrame({
   useSessions,
   actions,
   renderSlot,
+  SessionProvider,
   t,
 }: AppFrameProps) {
   const panels = useStore(s => s)
@@ -284,6 +285,11 @@ export function AppFrame({
               {currentTitle ?? t('app.title')}
             </span>
           </div>
+          <div className={css.topbarActions} data-mobile-session-actions>
+            <SessionProvider empty={() => null}>
+              {() => renderSlot('shell.mobile.header.actions', {})}
+            </SessionProvider>
+          </div>
         </div>
       )}
       {mode === 'compact'
@@ -315,7 +321,7 @@ export function AppFrame({
           loading gate: a bare status line reads worse than the shell's own
           pending rendering. The conversation is session-maybe; the strict
           details entry naturally renders empty while no session is current. */}
-      <CenterColumn>{renderSlot('conversation', {})}</CenterColumn>
+      <CenterColumn>{renderSlot('conversation', { compact: mode === 'compact' })}</CenterColumn>
       {overlayPanels
         ? (
           <>

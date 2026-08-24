@@ -161,10 +161,46 @@ describe('ModelsPage', () => {
     render(<ModelsPage />)
     await screen.findByText('组织主连接')
     await user.click(screen.getByRole('button', { name: '个人登记' }))
-    expect(await screen.findByText('个人 Provider/model 登记')).toBeTruthy()
-    expect(screen.getAllByText('新增 model').length).toBeGreaterThan(0)
+    expect(await screen.findByText('个人 Provider 与模型登记')).toBeTruthy()
+    expect(screen.getAllByText('新增模型').length).toBeGreaterThan(0)
     expect(screen.getByText('custom')).toBeTruthy()
     expect(api.listModelRegistrations).toHaveBeenCalled()
+  })
+
+  it('applies personal registration filters only after explicit submission', async () => {
+    const user = userEvent.setup()
+    render(<ModelsPage />)
+    await screen.findByText('组织主连接')
+    await user.click(screen.getByRole('button', { name: '个人登记' }))
+    await screen.findByText('个人 Provider 与模型登记')
+
+    const initialCalls = vi.mocked(api.listModelRegistrations).mock.calls.length
+    const provider = screen.getByLabelText('筛选 Provider')
+    expect((screen.getByLabelText('开始日期') as HTMLInputElement).placeholder).toBe('YYYY-MM-DD')
+    expect((screen.getByLabelText('结束日期') as HTMLInputElement).placeholder).toBe('YYYY-MM-DD')
+    await user.type(provider, 'custom')
+    expect(api.listModelRegistrations).toHaveBeenCalledTimes(initialCalls)
+
+    await user.click(screen.getByRole('button', { name: '应用筛选' }))
+    await waitFor(() => expect(api.listModelRegistrations).toHaveBeenLastCalledWith(expect.objectContaining({ provider: 'custom' })))
+
+    await user.click(screen.getByRole('button', { name: '重置' }))
+    await waitFor(() => expect(api.listModelRegistrations).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 200 })))
+  })
+
+  it('rejects an invalid personal registration date before requesting', async () => {
+    const user = userEvent.setup()
+    render(<ModelsPage />)
+    await screen.findByText('组织主连接')
+    await user.click(screen.getByRole('button', { name: '个人登记' }))
+    await screen.findByText('个人 Provider 与模型登记')
+
+    const initialCalls = vi.mocked(api.listModelRegistrations).mock.calls.length
+    await user.type(screen.getByLabelText('开始日期'), '2026-02-31')
+    await user.click(screen.getByRole('button', { name: '应用筛选' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('日期无效，请输入真实日期')
+    expect(api.listModelRegistrations).toHaveBeenCalledTimes(initialCalls)
   })
 
   it('creates an org-prefixed Provider with a complete model profile and credential', async () => {
