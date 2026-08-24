@@ -413,7 +413,7 @@
 :global([data-viewport='compact']) .projectRow {
   min-height: 48px;
   height: auto;
-  padding: var(--dsw-space-1) var(--dsw-space-2) var(--dsw-space-1) var(--dsw-space-3);
+  padding: 0 var(--dsw-space-2) 0 var(--dsw-space-3);
   border-radius: var(--dsw-radius-lg);
   align-items: flex-start;
 }
@@ -431,11 +431,11 @@
 :global([data-viewport='compact']) .sessionRow {
   min-height: 44px;
   height: auto;
-  margin: 2px var(--dsw-space-1) 0 var(--dsw-space-5);
-  padding: var(--dsw-space-1) var(--dsw-space-2);
-  border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: var(--dsw-radius-lg);
-  background: var(--dsw-alias-bg-module-platform);
+  margin: 0;
+  padding: 0 var(--dsw-space-2) 0 var(--dsw-space-5);
+  border: 0;
+  border-radius: var(--dsw-radius-md);
+  background: transparent;
 }
 
 :global([data-viewport='compact']) .sessionRow .title {
@@ -443,15 +443,19 @@
   line-height: 18px;
 }
 
+:global([data-viewport='compact']) .sessionRow.selected {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
 :global([data-viewport='compact']) .flatSessionRowWithoutStatus,
 :global([data-viewport='compact']) .searchResultRow {
-  margin: 2px var(--dsw-space-1) 0;
-  border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: var(--dsw-radius-lg);
-  background: var(--dsw-alias-bg-module-platform);
+  margin: 0;
+  border: 0;
+  border-radius: var(--dsw-radius-md);
+  background: transparent;
 }
 
 :global([data-viewport='compact']) .searchResultRow {
   min-height: 44px;
-  padding: var(--dsw-space-1) var(--dsw-space-2);
+  padding: 0 var(--dsw-space-2);
 }
