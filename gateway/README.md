@@ -34,7 +34,7 @@ The public-facing portal gateway for DeepSeek Harness: PostgreSQL-backed login/s
 | `HGW_DATABASE_STARTUP_RETRY_INITIAL_MS` | 1 s | Initial delay before retrying a transient PostgreSQL startup connection failure |
 | `HGW_DATABASE_STARTUP_RETRY_MAX_MS` | 30 s | Maximum delay between transient PostgreSQL startup retries; authentication and migration errors still fail immediately |
 | `HGW_RELEASE_ROOT` | (unset) | Canonical immutable release directory for managed deployments; Gateway, CLI, policy plugins, and `/healthz` share its directory-derived release id |
-| `HGW_DSH_COMMAND` | source entry `apps/cli/src/bin.ts web --port {port}` | Instance launch command; must be unset with `HGW_RELEASE_ROOT`, which derives the built CLI command from that release |
+| `HGW_DSH_COMMAND` | source entry `apps/cli/src/bin.ts web --no-open --port {port}` | Instance launch command; Gateway-managed runtimes must keep `--no-open` so scope changes never open a host-local browser page. Must be unset with `HGW_RELEASE_ROOT`, which derives the built CLI command from that release |
 | `HGW_DSH_REPO_ROOT` | repo root | Resolves the source-run entry; must resolve to `HGW_RELEASE_ROOT` in managed release mode |
 | `HGW_INSTANCE_PORT_BASE` | 42000 | Instance port allocation base |
 | `HGW_IDLE_TIMEOUT_MS` | 30 min | Instance idle-sleep threshold |

@@ -34,7 +34,7 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 | `HGW_DATABASE_STARTUP_RETRY_INITIAL_MS` | 1 秒 | PostgreSQL 启动连接暂时失败时的初始重试间隔 |
 | `HGW_DATABASE_STARTUP_RETRY_MAX_MS` | 30 秒 | PostgreSQL 启动瞬时故障的最大重试间隔；认证和 migration 错误仍会立即失败 |
 | `HGW_RELEASE_ROOT` | （未设置） | 受控部署的规范化不可变 release 目录；Gateway、CLI、策略插件和 `/healthz` 共用由目录名派生的 release id |
-| `HGW_DSH_COMMAND` | 源码入口 `apps/cli/src/bin.ts web --port {port}` | 实例启动命令；设置 `HGW_RELEASE_ROOT` 时必须留空，由该 release 派生已构建 CLI 命令 |
+| `HGW_DSH_COMMAND` | 源码入口 `apps/cli/src/bin.ts web --no-open --port {port}` | 实例启动命令；Gateway 管理的运行时必须保留 `--no-open`，这样切换作用域不会打开宿主机本地运行时页面；设置 `HGW_RELEASE_ROOT` 时必须留空，由该 release 派生已构建 CLI 命令 |
 | `HGW_DSH_REPO_ROOT` | 仓库根 | 解析源码运行入口；受控 release 模式下必须解析到 `HGW_RELEASE_ROOT` |
 | `HGW_INSTANCE_PORT_BASE` | 42000 | 实例端口分配起点 |
 | `HGW_IDLE_TIMEOUT_MS` | 30 分钟 | 实例闲置休眠阈值 |
