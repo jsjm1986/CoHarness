@@ -2416,6 +2416,16 @@ a {
     align-items: flex-start;
   }
 
+  .pageHeader:has(.modelPageToolbar) {
+    flex-wrap: wrap;
+  }
+
+  .pageHeader:has(.modelPageToolbar) .pageHeading,
+  .pageHeader:has(.modelPageToolbar) .pageActions {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+
   .pageTitleLine {
     align-items: flex-start;
     flex-direction: column;
@@ -2429,6 +2439,10 @@ a {
 
   .pageActions {
     max-width: 58%;
+  }
+
+  .pageHeader:has(.modelPageToolbar) .pageActions {
+    max-width: none;
   }
 
   .projectDetailPage .pageActions {

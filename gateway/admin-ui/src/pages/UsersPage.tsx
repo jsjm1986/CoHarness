@@ -356,12 +356,13 @@ function AccountBadge({ status }: { status: AdminUser['status'] }) {
 function InstanceState({ state }: { state: string }) {
   const labels: Record<string, string> = {
     running: '运行中',
+    ready: '运行中',
     starting: '启动中',
     stopping: '停止中',
     stopped: '已停止',
     failed: '异常',
   }
-  const tone = state === 'running' ? 'success' : state === 'starting' ? 'info' : state === 'failed' ? 'danger' : state === 'stopping' ? 'warning' : 'neutral'
+  const tone = state === 'running' || state === 'ready' ? 'success' : state === 'starting' ? 'info' : state === 'failed' ? 'danger' : state === 'stopping' ? 'warning' : 'neutral'
   return <StatusBadge tone={tone}>{labels[state] ?? state}</StatusBadge>
 }
 
