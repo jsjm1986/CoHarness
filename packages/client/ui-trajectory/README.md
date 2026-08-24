@@ -6,6 +6,8 @@ Trajectory renders a turn-aware event ledger with selectable User, Assistant, To
 
 On compact viewports the ledger keeps its durable selection but projects events as a readable mobile feed with larger body roles and a compact timeline strip. An open event inspector becomes an opaque upper-rounded reading sheet with a shared backdrop, one summary scroll position, safe-area insets, and a small drag affordance, so status/value rows remain visible on short phones without changing the underlying selection state.
 
+While a staged session is running, the shared Session window expands older pages in the background and the older-page row stays out of the ledger; the row returns when a later stage entry intentionally starts from a bounded tail.
+
 ## Model Experience
 
 None, as the trajectory views render session data in the browser; nothing here reaches a model request.

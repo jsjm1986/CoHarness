@@ -10,9 +10,9 @@
  * the event window and deferred teardown key off the STAGED session, which
  * follows `list.current` exactly. Staging is the open signal: the window
  * opens ⟺ the session is on stage (today the stage is `current`; the staged
- * state can widen to a multi-pane list later). A session leaving the list
- * tears its scope down immediately unless it is the staged one, whose scope
- * survives frozen (read-only view) until the stage moves on.
+ * state can widen to a multi-pane list later). A session leaving the stage
+ * releases its browser history window; its scope and durable interaction
+ * mirrors remain resident until the ordinary eligibility prune tears them down.
  */
 import type { Context, Fiber } from '@deepseek-ai/cordis'
 import type {
@@ -205,7 +205,7 @@ interface ScopeRecord {
   fiber: Fiber
   ctx: AgentContext
   binding: SessionBinding
-  /** The concrete Session for runtime-internal entry points (staging open()); the binding carries only the outward face. */
+  /** The concrete Session for runtime-internal stage entry/leave; the binding carries only the outward face. */
   session: Session
   /** Render-layer standard-props bundle (identity-stable per scope; the renderer's per-info caches key off it). */
   provideInfo: SessionProvideInfo
@@ -316,9 +316,9 @@ export class SessionRuntime implements ISessions {
     this.manager.subscribe(() => { this.projectList() })
     // Stage follower: every current write (open() and projection alike)
     // re-evaluates staging, so startup restore (persisted selection validated
-    // by the projection) and reconnect resurfacing open their window with no
+    // by the projection) and reconnect resurfacing enter their window with no
     // dedicated code path. Safe to run synchronously inside the store notify:
-    // the follower writes no list state — session.open()'s synchronous prefix
+    // the follower writes no list state — Session.enterStage()'s synchronous prefix
     // touches only session-side state and its own microtask-batched notifier.
     // The current-provide projection follows the same current writes.
     this.list.subscribe(() => {
@@ -424,10 +424,11 @@ export class SessionRuntime implements ISessions {
    * Clear the current selection so the layout shows the no-session empty
    * state (new-session affordance and the workspace preselection flow).
    * Wipes the persisted selection too — a reload stays on empty until the
-   * user opens or starts a session. The staged scope keeps its frozen view
-   * per the masked-gap contract until the next open() moves the stage.
+   * user opens or starts a session. The explicit clear also releases the
+   * staged browser history window; a transient list mask does not.
    */
   clear(): void {
+    this.leaveWatched()
     this.manager.clearSelection()
   }
 
@@ -656,6 +657,8 @@ export class SessionRuntime implements ISessions {
     // transiently absent) holds the stage: tearing down on the gap would
     // destroy exactly the frozen scope the mask exists to preserve.
     if (current === undefined || snapshot.byId[current] === undefined || current === this.watched) return
+    const previous = this.watched
+    if (previous !== undefined) this.scopes.get(previous)?.session.leaveStage()
     this.watched = current
     this.sweepDeferred()
     const record = this.resolve(current)
@@ -663,9 +666,17 @@ export class SessionRuntime implements ISessions {
      * validates and the projection masks absent selections), so resolve
      * cannot miss; kept so a future current writer cannot crash the notify. */
     if (record !== undefined) {
-      void record.session.open()
+      record.session.enterStage()
       void this.manager.refreshSubagents(current)
     }
+  }
+
+  /** Leave the staged history window for an explicit clear-selection action. */
+  private leaveWatched(): void {
+    const watched = this.watched
+    if (watched === undefined) return
+    this.scopes.get(watched)?.session.leaveStage()
+    this.watched = undefined
   }
 
   /**
@@ -801,6 +812,7 @@ export class SessionRuntime implements ISessions {
    * durable truth, a reopen lazily rebuilds and backfills via open().
    */
   private dropScope(id: SessionId, record: ScopeRecord): void {
+    record.session.leaveStage()
     void record.fiber.dispose()
     // Release the Session's dispatch point with the scope it belongs to (a
     // surviving instance — the live Intent — rebinds when resolve re-mints).

@@ -203,6 +203,7 @@ describe('open', () => {
     const snapshot = session.getSnapshot()
     expect(snapshot.openState).toBe('open')
     expect(snapshot.hasMore).toBe(true)
+    expect(snapshot.historyWindowMode).toBe('tail')
     expect(snapshot.nodes.map(n => n.kind)).toEqual(['user', 'assistant'])
     expect(snapshot.turnTimings.get(3)).toEqual({
       startTime: 1_700_000_000_010,
@@ -253,6 +254,83 @@ describe('open', () => {
     const seqs = session.getSnapshot().nodes.map(n => n.seq)
     // Overlapping seq-15 frame (== page tail turn/end) was dropped; 16 appended once.
     expect(seqs).toEqual([11, 13, 16])
+  })
+
+  it('expands the staged live window without exposing a paging control', async () => {
+    const { api, session } = makeSession()
+    const older = plainTurn(0, 0, '更早的问题', '更早的回答')
+    const tail = plainTurn(6, 1, '当前的问题', '当前的回答')
+    api.onHistory = payload => payload.beforeSeq === undefined
+      ? histResponse(tail, true)
+      : histResponse(older, false)
+
+    session.enterStage()
+    await vi.waitFor(() => { expect(session.getSnapshot().openState).toBe('open') })
+    expect(session.getSnapshot().historyWindowMode).toBe('tail')
+    session.handleRunning(true)
+    await vi.waitFor(() => { expect(session.getSnapshot().historyWindowMode).toBe('live') })
+
+    expect(session.getSnapshot().hasMore).toBe(false)
+    expect(chatSeqs(session.getSnapshot())).toEqual([...Array(12).keys()])
+  })
+
+  it('resets only the browser window when the staged session is left and re-entered', async () => {
+    const { api, session } = makeSession()
+    const tail = plainTurn(6, 1, '尾部问题', '尾部回答')
+    const older = plainTurn(0, 0, '更早问题', '更早回答')
+    api.onHistory = payload => payload.beforeSeq === undefined
+      ? histResponse(tail, true)
+      : histResponse(older, false)
+
+    session.enterStage()
+    await vi.waitFor(() => { expect(session.getSnapshot().openState).toBe('open') })
+    session.handleRunning(true)
+    await vi.waitFor(() => { expect(session.getSnapshot().historyWindowMode).toBe('live') })
+    session.handleRunning(false)
+    session.leaveStage()
+    expect(session.getSnapshot()).toMatchObject({ openState: 'cold', historyWindowMode: 'tail', hasMore: false, nodes: [] })
+
+    session.enterStage()
+    await vi.waitFor(() => { expect(session.getSnapshot().openState).toBe('open') })
+    expect(api.callsOf('session.history')).toHaveLength(3)
+    expect(session.getSnapshot().historyWindowMode).toBe('tail')
+    expect(chatSeqs(session.getSnapshot())).toEqual([6, 7, 8, 9, 10, 11])
+  })
+
+  it('aborts a live-history expansion when the staged session is left', async () => {
+    const { api, session } = makeSession()
+    const gate = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()
+    const tail = plainTurn(6, 1, '尾部问题', '尾部回答')
+    api.onHistory = payload => payload.beforeSeq === undefined
+      ? histResponse(tail, true)
+      : gate.promise
+
+    session.enterStage()
+    await vi.waitFor(() => { expect(session.getSnapshot().openState).toBe('open') })
+    session.handleRunning(true)
+    await vi.waitFor(() => { expect(api.callsOf('session.history')).toHaveLength(2) })
+    const signal = api.lastHistorySignal
+    expect(signal?.aborted).toBe(false)
+    session.leaveStage()
+    expect(signal?.aborted).toBe(true)
+    gate.resolve(ok({ events: entries(plainTurn(0, 0, '旧', '旧答')) as never[], hasMore: false }))
+    await Promise.resolve()
+    expect(session.getSnapshot()).toMatchObject({ openState: 'cold', historyWindowMode: 'tail', nodes: [] })
+  })
+
+  it('promotes an accepted staged prompt before the running status frame arrives', async () => {
+    const { api, session } = makeSession()
+    const tail = plainTurn(6, 1, '尾部问题', '尾部回答')
+    const older = plainTurn(0, 0, '更早问题', '更早回答')
+    api.onHistory = payload => payload.beforeSeq === undefined
+      ? histResponse(tail, true)
+      : histResponse(older, false)
+    session.handleBlank(false)
+    session.enterStage()
+    await vi.waitFor(() => { expect(session.getSnapshot().openState).toBe('open') })
+    await expect(session.prompt([{ type: 'text', text: '继续' }], 'queue')).resolves.toMatchObject({ ok: true })
+    await vi.waitFor(() => { expect(session.getSnapshot().historyWindowMode).toBe('live') })
+    expect(session.getSnapshot().hasMore).toBe(false)
   })
 })
 
@@ -379,6 +457,23 @@ describe('live event path', () => {
     await Promise.resolve()
     const seqs = session.getSnapshot().nodes.map(n => n.seq)
     expect(seqs).toEqual([1, 3, 7, 9]) // both turns' user/assistant, no hole, no duplicate 9
+  })
+
+  it('merges a gap repair into the existing window instead of shrinking to the tail', async () => {
+    const initial = plainTurn(6, 1, '保留的问题', '保留的回答')
+    const repaired = [...initial, ...plainTurn(12, 2, '缺口之后的问题', '缺口之后的回答')]
+    const { api, session } = makeSession()
+    api.onHistory = payload => payload.beforeSeq === undefined && api.callsOf('session.history').length > 0
+      ? histResponse(repaired, true)
+      : histResponse(initial, true)
+    await session.open()
+    session.handleMuxEnvelope('gap' as never, {
+      type: 'session/event', sessionId: SID, event: ev.assistant(18, 2, '缺口之后的回答'),
+    })
+    await vi.waitFor(() => { expect(api.callsOf('session.history')).toHaveLength(2) })
+    await vi.waitFor(() => { expect(chatSeqs(session.getSnapshot())).toContain(7) })
+    expect(chatSeqs(session.getSnapshot())).toEqual([...Array(13).keys()].map(seq => seq + 6))
+    expect(session.getSnapshot().hasMore).toBe(true)
   })
 })
 

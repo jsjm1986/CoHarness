@@ -143,6 +143,7 @@ export class FakeApiClient implements IApiClient {
   private readonly muxConns: StreamConn<MuxFrame>[] = []
   private readonly hostConns: StreamConn<HostFrame>[] = []
   lastSearchSignal: AbortSignal | undefined
+  lastHistorySignal: AbortSignal | undefined
 
   // Parameters carry local structural annotations: the CI lint lane runs
   // without built lib/, so IApiClient's indexed-access types collapse to any
@@ -159,8 +160,10 @@ export class FakeApiClient implements IApiClient {
       beforeSeq?: number
       maxMessages?: number
       detail?: 'conversation' | 'full'
-    }) =>
-      this.record('session.history', payload, this.onHistory(payload)),
+    }, signal?: AbortSignal) => {
+      this.lastHistorySignal = signal
+      return this.record('session.history', payload, this.onHistory(payload))
+    },
     models: (payload: unknown) => this.record('session.models', payload, this.onModels(payload)),
     selectModel: (payload: { provider: string; model: string }) =>
       this.record('session.selectModel', payload, this.onSelectModel(payload)),
@@ -184,7 +187,10 @@ export class FakeApiClient implements IApiClient {
 
   readonly subagents: IApiClient['subagents'] = {
     list: (payload: unknown) => this.record('subagent.list', payload, this.onSubagentList(payload)),
-    history: (payload: unknown) => this.record('subagent.history', payload, this.onSubagentHistory(payload)),
+    history: (payload: unknown, signal?: AbortSignal) => {
+      this.lastHistorySignal = signal
+      return this.record('subagent.history', payload, this.onSubagentHistory(payload))
+    },
     prompt: (payload: unknown) => this.record('subagent.prompt', payload, this.onSubagentPrompt(payload)),
     interrupt: (payload: unknown) => this.record('subagent.interrupt', payload, this.onSubagentInterrupt(payload)),
   }

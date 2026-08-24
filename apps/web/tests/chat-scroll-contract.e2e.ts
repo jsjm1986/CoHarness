@@ -5,6 +5,7 @@
 import { access, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -14,6 +15,8 @@ import type { ReplayEntry, ReplayOverrideDoc } from '@deepseek-ai/dsh-llm-replay
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { createChatScrollFixture, type ChatScrollFixture } from './chat-scroll-fixture.ts'
 import {
+  captureStableAria,
+  compareOrRefreshGolden,
   launchWebScaffold,
   seedSession,
   watchConsole,
@@ -23,6 +26,7 @@ import {
 import { newEnglishPage, saveFailureShot } from './support.ts'
 
 const MODE = webSnapshotMode()
+const LIVE_HISTORY_EXPECTED = fileURLToPath(new URL('./snapshots/chat-scroll-contract/live-history.expected.md', import.meta.url))
 const HISTORY_SESSION_ID = 'chat-scroll-history-e2e'
 const TOOL_SESSION_ID = 'chat-scroll-tool-e2e'
 const RESTORE_SESSION_A_ID = 'chat-scroll-restore-a-e2e'
@@ -319,7 +323,7 @@ async function flingTranscript(page: Page, deltaY: number): Promise<void> {
 }
 
 async function wheelToHistoryStart(page: Page): Promise<void> {
-  for (let attempt = 0; attempt < 12; attempt += 1) {
+  for (let attempt = 0; attempt < 64; attempt += 1) {
     if ((await scrollGeometry(page)).scrollTop <= 1) break
     await wheelTranscript(page, -2_400)
   }
@@ -500,11 +504,18 @@ describe('web e2e: long Chat scroll contract', () => {
         await composer.fill(LIVE_TEXT_PROMPT)
         await world.page.getByRole('button', { name: 'Send message', exact: true }).click()
         await world.page.getByText(LIVE_TEXT_FIRST, { exact: false }).last().waitFor({ timeout: 15_000 })
-        await wheelToHistoryStart(world.page)
         const beforeRows = await loadedFlowRows(world.page)
-        await world.page.getByRole('button', { name: 'Load earlier', exact: true }).click()
         await expect.poll(() => held, { timeout: 10_000 }).toBe(true)
+        // The active stage expands its history in the background; the old-page
+        // control must not replace the transcript while the model is running.
+        expect(await world.page.getByRole('button', { name: 'Load earlier', exact: true }).count()).toBe(0)
+        await compareOrRefreshGolden(
+          LIVE_HISTORY_EXPECTED,
+          await captureStableAria(world.page, '[data-history-expanding]', world.scaffold.workspaceCwd),
+          MODE,
+        )
 
+        await wheelToHistoryStart(world.page)
         await wheelTranscript(world.page, 420)
         const readerAnchor = await visibleFlowAnchor(world.page)
         const chunksAfterAnchor = world.events.filter(event => event.type === 'assistant/chunk').length
@@ -533,7 +544,7 @@ describe('web e2e: long Chat scroll contract', () => {
         await loadEarlierWithAnchor(world.page)
         additionalPages += 1
       }
-      expect(additionalPages).toBeGreaterThan(0)
+      expect(additionalPages).toBe(0)
       // The whole log is loaded: turn 1's unique marker renders in the
       // transcript (scoped: the sidebar search row also carries it) and no
       // page remains.
@@ -675,7 +686,17 @@ describe('web e2e: long Chat scroll contract', () => {
         world.page,
         RESTORE_FIXTURE_A,
       )
-      await expectSameFlowTop(world.page, sessionAnchor)
+      // Leaving the session releases its browser history window. Returning
+      // starts at the tail and exposes the explicit older-page affordance;
+      // the user can opt back into the earlier window without stale rows
+      // being silently retained across the stage transition.
+      expect(await world.page.getByRole('button', { name: 'Load earlier', exact: true }).count()).toBe(1)
+      let reentryPages = 0
+      while (reentryPages < 8 && await world.page.getByRole('button', { name: 'Load earlier', exact: true }).count() > 0) {
+        await loadEarlierWithAnchor(world.page)
+        reentryPages += 1
+      }
+      expect(reentryPages).toBeGreaterThan(0)
 
       const backToBottom = world.page.getByRole('button', { name: 'Back to bottom', exact: true })
       await backToBottom.evaluate((button) => {
