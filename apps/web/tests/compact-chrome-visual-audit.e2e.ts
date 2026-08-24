@@ -42,6 +42,14 @@ async function dumpOverflow(page: Page): Promise<unknown> {
         if (box.width === 0 || box.height === 0) return null
         const style = getComputedStyle(el)
         if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return null
+        // Virtualized trajectory rows may retain a focusable marker just
+        // outside the feed's own clipping edge; that is intentional and not
+        // viewport overflow.
+        const feed = el.closest<HTMLElement>('[data-trajectory-feed]')
+        if (feed !== null) {
+          const feedBox = feed.getBoundingClientRect()
+          if (box.bottom <= feedBox.top || box.top >= feedBox.bottom) return null
+        }
         const onScreen = box.right > 1 && box.left < vw - 1 && box.bottom > 1 && box.top < vh - 1
         if (!onScreen) return null
         const label = (el.getAttribute('aria-label') ?? el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 40)

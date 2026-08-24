@@ -87,7 +87,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     doc: 'The whole center column, across both the no-session hero and a live\nconversation. OCCUPIED by ui-conversation\'s ConversationRoot, which\ndeclares the session body, composer, and input seats inside it —\nregistering here replaces the entire conversation surface (and removes\nevery seat it declares) rather than adding to it.\n\nCurrent-session-optional: the occupant owns both states without\nchanging its React identity, so it keeps its own state across a session\nswitch. It receives no owner props; session facts arrive through the\nframework hooks of the `session-maybe` scope.',
     registerOptions: [],
     ownerProps: [
-      '/** Conversation owner share: business state and actions belong to the registrant. */\nexport interface ConvOwnerProps {}',
+      '/** Conversation owner share: the shell\'s resolved compact mode. */\nexport interface ConvOwnerProps {\n  /** True when the frame is using the phone presenter. */\n  compact?: boolean\n}',
     ],
     ownerPropsReferences: [],
     standardProps: [
@@ -908,7 +908,9 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     summary: 'The entire body of one session: taking this seat means rendering that session\'s conversation yourself.',
     doc: 'The entire body of one session: taking this seat means rendering that\nsession\'s conversation yourself. The occupant also owns the per-session\ndraft mirror and the active view ring, so a replacement inherits both\nduties and an empty one leaves a blank session pane — nothing here\ndegrades gracefully. To ADD rather than replace, take a seat inside the\nflow instead: `conversation.view` for a whole tab, the input regions for\ncomposer chrome.',
     registerOptions: [],
-    ownerProps: [],
+    ownerProps: [
+      '/** Owner share of the strict session content seat. */\nexport interface ConversationSessionOwnerProps {\n  /** Whether the shell is using the compact phone presenter. */\n  compact?: boolean\n  /**\n   * Wrap the view ring in the transcript scrollport that also hosts the\n   * sticky composer seat (whole `\'conversation.composer\'` chain output).\n   * Supplied for every real session (hero/settling/active) so the composer\n   * keeps one tree seat across the blank → active flip; the header stays\n   * outside that wrapper as ordinary column chrome (`flex: none`), while\n   * active CSS sticks the seat to the bottom of the same scrollport so wheel\n   * over the footer scrolls the flow.\n   * @param view - the session view-ring content (null while blank chrome is hidden).\n   * @returns the scrollport containing `view` and the sticky composer seat.\n   */\n  wrapActiveBody?: (view: ReactNode) => ReactNode\n}',
+    ],
     ownerPropsReferences: [],
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
@@ -937,7 +939,9 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     summary: 'The strip above the session\'s scrollport: title, view tabs, and the action row.',
     doc: 'The strip above the session\'s scrollport: title, view tabs, and the\naction row. Taking this seat means rendering all three yourself, and it\nalso collapses `conversation.session.header.actions` — that additive\nseat is declared by whoever occupies this one, so replacing the header\ntakes every action entry down with it.',
     registerOptions: [],
-    ownerProps: [],
+    ownerProps: [
+      '/** Owner share of the strict session header. */\nexport interface ConversationSessionHeaderOwnerProps {\n  /** Whether the shell is using the compact phone presenter. */\n  compact?: boolean\n}',
+    ],
     ownerPropsReferences: [],
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
@@ -986,7 +990,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
       },
     ],
     ownerProps: [
-      '/** Header actions derive their state from the standard session/global kit. */\nexport interface ConversationHeaderActionOwnerProps {}',
+      '/** Header actions derive their state from the standard session/global kit. */\nexport interface ConversationHeaderActionOwnerProps {\n  /** Whether the action is being rendered inside the compact phone header. */\n  compact?: boolean\n}',
     ],
     ownerPropsReferences: [],
     standardProps: [
@@ -1071,7 +1075,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
       },
     ],
     ownerProps: [
-      '/** Header actions derive their state from the standard session/global kit. */\nexport interface ConversationHeaderActionOwnerProps {}',
+      '/** Header actions derive their state from the standard session/global kit. */\nexport interface ConversationHeaderActionOwnerProps {\n  /** Whether the action is being rendered inside the compact phone header. */\n  compact?: boolean\n}',
     ],
     ownerPropsReferences: [],
     standardProps: [
@@ -1121,7 +1125,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
       },
     ],
     ownerProps: [
-      '/**\n * View-slot owner share: the cross-view inspect handoff (otherwise views need\n * nothing from the render site — sessionId and the snapshot hook arrive as\n * framework-standard props; tool rows go through each view\'s own declared\n * toolview hole).\n */\nexport interface ConvViewOwnerProps {\n  /** One-shot inspect request from another view (chat\'s Inspect button); null when idle. */\n  inspect?: { callId: CallId } | null\n  /** Acknowledge the inspect request once applied (clears the store field). */\n  onInspectDone?: () => void\n}',
+      '/**\n * View-slot owner share: the cross-view inspect handoff (otherwise views need\n * nothing from the render site — sessionId and the snapshot hook arrive as\n * framework-standard props; tool rows go through each view\'s own declared\n * toolview hole).\n */\nexport interface ConvViewOwnerProps {\n  /** Whether the shell is using the compact phone presenter. */\n  compact?: boolean\n  /** One-shot inspect request from another view (chat\'s Inspect button); null when idle. */\n  inspect?: { callId: CallId } | null\n  /** Acknowledge the inspect request once applied (clears the store field). */\n  onInspectDone?: () => void\n}',
     ],
     ownerPropsReferences: [],
     standardProps: [
@@ -1547,6 +1551,56 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'settings.trigger\', () => ctx.slots.register(\n      { name: \'settings.trigger\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
     source: 'packages/client/ui-settings/src/client/contract/slots.ts:23',
+  },
+  {
+    key: 'shell.mobile.header.actions',
+    kind: 'list',
+    scope: 'session',
+    summary: 'Session-scoped actions rendered in the compact AppFrame topbar.',
+    doc: 'Session-scoped actions rendered in the compact AppFrame topbar.',
+    registerOptions: [
+      {
+        name: 'id',
+        requirement: 'required',
+        type: 'string',
+        doc: 'Your cell key. Use an id of your own: a fresh id is added beside the shipped entries, while reusing a shipped id puts you in THAT cell and replaces it. Owners that filter by id address you by it.',
+      },
+      {
+        name: 'order',
+        requirement: 'optional',
+        type: 'number',
+        doc: 'Position among the entries, ascending (default 0).',
+      },
+      {
+        name: 'label',
+        requirement: 'optional',
+        type: 'string | (() => string)',
+        doc: 'Display text where the owner projects one (nav rows, tabs). A thunk is re-read on every projection, so localized text follows the active locale without re-registering.',
+      },
+    ],
+    ownerProps: [
+      '/** Mobile topbar action owner share: the slot is rendered only in compact mode. */\nexport interface MobileHeaderActionOwnerProps {}',
+    ],
+    ownerPropsReferences: [],
+    standardProps: [
+      'useSessions: SnapshotSelectorHook<SessionListState>',
+      'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'useSession: SnapshotSelectorHook<ConversationSnapshot>',
+      'sessionId: SessionId',
+      'useProjection: UseProjection',
+      'useInput: SnapshotSelectorHook<InputState>',
+      'inputActions: InputActions',
+    ],
+    keyDomain: '',
+    hookContext: '',
+    slotInject: '',
+    declaredBy: 'an entry in \'root\' (client-ui-layout), so it exists while that entry is mounted',
+    occupants: [
+      'session-log-export SessionLogDownloadMobileHeaderAction id \'session-log-download\'',
+    ],
+    replaceRisk: 'none',
+    example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'shell.mobile.header.actions\', () => ctx.slots.register(\n      { name: \'shell.mobile.header.actions\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
+    source: 'packages/client/ui-layout/src/client/index.ts:93',
   },
   {
     key: 'shell.overlay',

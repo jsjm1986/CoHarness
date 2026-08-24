@@ -10,12 +10,14 @@ export interface TrajectoryVirtualRowMetrics {
   terminalBoundaryHeight: number
 }
 
+/** Fixed dimensions for the desktop trajectory table's virtual rows. */
 export const DESKTOP_TRAJECTORY_ROW_METRICS: TrajectoryVirtualRowMetrics = {
   contentHeight: 30,
   collapsedSummaryHeight: 20,
   terminalBoundaryHeight: 9,
 }
 
+/** Fixed dimensions for the compact trajectory feed's virtual rows. */
 export const MOBILE_TRAJECTORY_ROW_METRICS: TrajectoryVirtualRowMetrics = {
   contentHeight: 56,
   collapsedSummaryHeight: 40,
@@ -61,6 +63,7 @@ export function trajectoryVirtualRecordKey(
  * never owns a zero-height item. A terminal separator retains its CSS-owned
  * lower-marker clearance as a standalone item.
  * @param records - Final search/fold projection in ledger order.
+ * @param metrics - Fixed heights for the presenter that consumes the rows.
  * @returns Measurable virtual rows with original logical positions retained.
  */
 export function groupTrajectoryVirtualRows<T extends VirtualizableTrajectoryRecord>(
