@@ -106,7 +106,7 @@ function historySnapshot(
     openState: 'open',
     openError: null,
     hasMore: false,
-    loadingOlder: false, historyDetail: 'full',
+    loadingOlder: false, historyWindowMode: 'tail', historyDetail: 'full',
     promptError: null,
     blank: nodes.length === 0,
     lastAgentError: null,
@@ -362,6 +362,23 @@ describe('plugin registration', () => {
 })
 
 describe('tab switching in ConversationRoot', () => {
+  it('hides the older-page row while the active session expands its history', async () => {
+    const b = await bench({
+      ...historySnapshot(NODES),
+      hasMore: true,
+      running: true,
+      historyWindowMode: 'expanding',
+    })
+    const view = mount(b.slots)
+    fireEvent.click(screen.getByRole('tab', { name: 'Trajectory' }))
+    expect(view.container.querySelector('[data-history-load]')).toBeNull()
+
+    act(() => {
+      b.sessionStore.set({ ...historySnapshot(NODES), hasMore: true, historyWindowMode: 'tail' })
+    })
+    expect(view.container.querySelector('[data-history-load]')).toBeTruthy()
+  })
+
   it('renders two tabs, defaults to chat, and switches to the trajectory ledger', async () => {
     const b = await bench()
     const view = mount(b.slots)

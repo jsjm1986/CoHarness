@@ -342,6 +342,14 @@ export type OpenState = 'cold' | 'loading' | 'open' | 'error'
 export type HistoryDetailState = 'conversation' | 'filling' | 'full'
 
 /**
+ * Retention mode for the browser's event window. A tail is intentionally
+ * bounded for a re-entered idle session; an expanding window is being filled
+ * in the background for the session currently on stage; a live window has
+ * retained every available older page for that stage.
+ */
+export type HistoryWindowMode = 'tail' | 'expanding' | 'live'
+
+/**
  * Input-area shape of an OPEN session, derived at snapshot assembly (the one
  * place that knows the predicate — consumers switch, never re-derive):
  *
@@ -469,6 +477,12 @@ export interface ConversationSnapshot {
   openError: RpcError | null
   hasMore: boolean
   loadingOlder: boolean
+  /**
+   * Whether the current stage retains a bounded tail, is expanding it in the
+   * background, or has retained the live history. The UI must not expose an
+   * older-page control during `'expanding'` or `'live'`.
+   */
+  historyWindowMode: HistoryWindowMode
   /**
    * Whether historical `assistant/chunk` events for the installed window
    * have been downloaded. Chat stays on `'conversation'`; Trajectory fill

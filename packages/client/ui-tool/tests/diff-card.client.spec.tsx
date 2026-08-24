@@ -360,7 +360,7 @@ describe('DetailsPanel diff Output section', () => {
       chat: over.chat ?? toolChatSnapshot(nodes, runningCalls),
       nodes: [], turnTimings: new Map(), turnEnds: new Map(), partial: null, runningCalls: [],
       pending: [], queue: [], running: false, composerPhase: 'active', removed: false,
-      openState: 'open', openError: null, hasMore: false, loadingOlder: false, historyDetail: 'full',
+      openState: 'open', openError: null, hasMore: false, loadingOlder: false, historyWindowMode: 'tail', historyDetail: 'full',
       promptError: null, blank: false, subagent: null, lastAgentError: null, ...over,
     }
   }

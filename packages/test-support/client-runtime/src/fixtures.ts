@@ -64,7 +64,7 @@ export function conversationSnapshot(sessionId: SessionId): ConversationSnapshot
     openState: 'open',
     openError: null,
     hasMore: false,
-    loadingOlder: false, historyDetail: 'full',
+    loadingOlder: false, historyWindowMode: 'tail', historyDetail: 'full',
     promptError: null,
     blank: false,
     lastAgentError: null,

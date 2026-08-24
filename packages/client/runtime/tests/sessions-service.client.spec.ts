@@ -330,6 +330,10 @@ describe('cell (render-layer session kit)', () => {
     // Stage moves: the new occupant opens.
     b.svc.open(sid('s2'))
     expect(historyCalls().map(c => (c.payload as { sessionId: string }).sessionId)).toEqual(['s1', 's2'])
+    // Returning to the first stage reopens its bounded tail instead of
+    // reusing the old browser window.
+    b.svc.open(sid('s1'))
+    expect(historyCalls().map(c => (c.payload as { sessionId: string }).sessionId)).toEqual(['s1', 's2', 's1'])
   })
 
   it('startup restore: a persisted selection validated by the first projection opens its window unprompted', async () => {

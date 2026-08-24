@@ -145,7 +145,8 @@ export function TrajectoryView({
   const historyLoading = useSession(snapshot =>
     snapshot.openState === 'loading' || snapshot.historyDetail === 'filling')
   const olderHistoryLoading = useSession(snapshot => snapshot.loadingOlder)
-  const hasOlderHistory = useSession(snapshot => snapshot.hasMore)
+  const hasOlderHistory = useSession(snapshot =>
+    snapshot.hasMore && !snapshot.running && snapshot.historyWindowMode === 'tail')
 
   useEffect(() => {
     void ensureHistoryDetail()

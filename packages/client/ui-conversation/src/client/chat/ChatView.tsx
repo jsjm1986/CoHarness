@@ -169,6 +169,7 @@ export function ChatView({
   const openState = useSession(s => s.openState)
   const openError = useSession(s => s.openError)
   const hasMore = useSession(s => s.hasMore)
+  const historyWindowMode = useSession(s => s.historyWindowMode)
   const loadingOlder = useSession(s => s.loadingOlder)
   const selectedCallId = useStore(s => s.selection?.callId)
   const [fileOpenError, setFileOpenError] = useState<{ path: string; message: string } | null>(null)
@@ -255,6 +256,18 @@ export function ChatView({
     /* v8 ignore next -- ref-null guard: React attaches the ref before layout effects run. */
     if (local === null) return
     const el = scrollerOf(local)
+    // Automatic live-history expansion has no click handler to arm the
+    // prepend anchor. Capture the reader's current row before its merged page
+    // lands; a pinned reader intentionally keeps following the tail instead.
+    if (loadingOlder && anchorRef.current === null && !atBottomRef.current) {
+      const row = pagingAnchor(local, el)
+      if (row !== null && row.dataset.chatAnchorKey !== undefined) {
+        anchorRef.current = {
+          key: row.dataset.chatAnchorKey,
+          top: flowTop(row, el),
+        }
+      }
+    }
     // Open completed: jump to the bottom once — unless a scroll position
     // survives from a previous mount (view-tab switch away and back), which
     // is restored instead of snapping the reader back to the floor.
@@ -311,7 +324,7 @@ export function ChatView({
     if (appendedUser || appendedSteering || (tipMoved && atBottomRef.current)) toBottom(el)
   }, [
     chatScroll.read, chatScroll.save, firstSeq, followSig, lastKey,
-    lastNode?.kind, lastSteeringId, openState,
+    lastNode?.kind, lastSteeringId, loadingOlder, openState,
   ])
 
   const onScrollRef = useRef(() => {})
@@ -341,7 +354,7 @@ export function ChatView({
     const position = isAtBottom ? null : scrollPosition(local, el)
     if (isAtBottom) {
       anchorRef.current = null
-    } else if (anchorRef.current !== null && position !== null) {
+    } else if ((anchorRef.current !== null || loadingOlder) && position !== null) {
       anchorRef.current = { key: position.anchorKey, top: position.anchorTop }
     }
     // Continuous save (unmount happens after ref detach, so saving there is
@@ -425,7 +438,12 @@ export function ChatView({
               {t('chat.loadError', { message: openError.message, code: openError.code })}
             </div>
           )}
-          {hasMore && (
+          {openState === 'open' && historyWindowMode === 'expanding' && (
+            <div className={css.hint} data-history-expanding="" role="status" aria-live="polite">
+              {t('chat.expandingHistory')}
+            </div>
+          )}
+          {hasMore && !running && historyWindowMode === 'tail' && (
             <div className={css.older}>
               <button type="button" disabled={loadingOlder} onClick={loadOlderAnchored}>
                 {loadingOlder ? t('loading') : t('chat.loadOlder')}

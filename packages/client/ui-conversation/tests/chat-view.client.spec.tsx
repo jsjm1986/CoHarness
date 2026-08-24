@@ -52,7 +52,7 @@ function snapshotBase(): ConversationSnapshot {
     sessionId: SID, views: EMPTY_CONVERSATION_VIEWS, chat: chatSnapshotFixture(), nodes: [],
     turnTimings: new Map(), turnEnds: new Map(), partial: null, runningCalls: [],
     pending: [], queue: [], running: false, composerPhase: 'active', removed: false, openState: 'open', openError: null,
-    hasMore: false, loadingOlder: false, historyDetail: 'full', promptError: null, blank: false, subagent: null, lastAgentError: null,
+    hasMore: false, loadingOlder: false, historyWindowMode: 'tail', historyDetail: 'full', promptError: null, blank: false, subagent: null, lastAgentError: null,
   }
 }
 
@@ -419,6 +419,25 @@ describe('ChatView', () => {
     nextTop = 560
     act(() => { h.set({ nodes: [assistant(2, 'older'), user(9, 'first visible'), user(10, 'next visible')] }) })
     expect(scroller.scrollTop).toBe(590) // latest 90 + the anchored row's 500px prepend shift
+  })
+
+  it('arms a reader anchor for automatic live-history expansion', () => {
+    const h = makeHarness({ nodes: [user(9, '当前')], hasMore: true })
+    const view = render(<h.ChatView {...h.props} />)
+    const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
+    const current = view.container.querySelector('[data-chat-flow-key="fixture:user:9"]') as HTMLDivElement
+    let currentTop = 100
+    Object.defineProperty(scroller, 'scrollHeight', { value: 800, writable: true })
+    Object.defineProperty(scroller, 'clientHeight', { value: 200, writable: true })
+    vi.spyOn(current, 'getBoundingClientRect').mockImplementation(
+      () => ({ top: currentTop, bottom: currentTop + 40 } as DOMRect),
+    )
+    readerScroll(scroller, 80)
+    act(() => { h.set({ loadingOlder: true, historyWindowMode: 'expanding' }) })
+    currentTop = 700
+    Object.defineProperty(scroller, 'scrollHeight', { value: 1_400, writable: true })
+    act(() => { h.set({ nodes: [user(1, '更早'), user(9, '当前')], loadingOlder: false }) })
+    expect(scroller.scrollTop).toBe(680)
   })
 
   it('renders the fixture main line as independently keyed business nodes', () => {
@@ -1394,6 +1413,17 @@ describe('ChatView', () => {
     expect(h.loadOlder).toHaveBeenCalledTimes(1)
     act(() => { h.set({ loadingOlder: true }) })
     expect(view.getByText('加载中…')).toBeTruthy()
+  })
+
+  it('keeps the older-history control out of an active or expanding conversation', () => {
+    const h = makeHarness({ nodes: [user(5, '当前')], hasMore: true, running: true, historyWindowMode: 'expanding' })
+    const view = render(<h.ChatView {...h.props} />)
+    expect(view.queryByText('加载更早')).toBeNull()
+    expect(view.getByText('正在整理当前对话…')).toBeTruthy()
+    act(() => { h.set({ running: false, historyWindowMode: 'live' }) })
+    expect(view.queryByText('加载更早')).toBeNull()
+    act(() => { h.set({ historyWindowMode: 'tail' }) })
+    expect(view.getByText('加载更早')).toBeTruthy()
   })
 
   it('shows open error and loading states', () => {
