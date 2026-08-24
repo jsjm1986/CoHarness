@@ -166,14 +166,30 @@ export function UsagePage() {
       </Section>
       <Section className="responsiveSection" title="计量健康" meta={health?.timeZone}>
         {health === null ? <LoadingState label="正在加载计量健康" /> : (
-          <dl className="definitionGrid">
-            <Definition label="缺失计量">{health.missingUsageCalls.toLocaleString()} 次</Definition>
-            <Definition label="未归属项目调用">{health.unattributedProjectCalls.toLocaleString()} 次</Definition>
-            <Definition label="未归属项目 Token">{health.unattributedProjectTokens.toLocaleString()}</Definition>
-            <Definition label="未配置价格">{health.unpricedCalls.toLocaleString()} 次</Definition>
-            <Definition label="历史价格未知">{health.historicalUnknownCalls.toLocaleString()} 次</Definition>
-            <Definition label="最大 intake 延迟">{(health.maxIntakeLagMs / 1000).toFixed(1)} 秒</Definition>
-          </dl>
+          <div className="usageHealthMetrics" aria-label="计量健康指标">
+            <Metric
+              label="缺失计量"
+              value={`${health.missingUsageCalls.toLocaleString()} 次`}
+              tone={health.missingUsageCalls > 0 ? 'warning' : undefined}
+            />
+            <Metric
+              label="未归属项目调用"
+              value={`${health.unattributedProjectCalls.toLocaleString()} 次`}
+              tone={health.unattributedProjectCalls > 0 ? 'warning' : undefined}
+            />
+            <Metric
+              label="未归属项目 Token"
+              value={health.unattributedProjectTokens.toLocaleString()}
+              tone={health.unattributedProjectTokens > 0 ? 'warning' : undefined}
+            />
+            <Metric
+              label="未配置价格"
+              value={`${health.unpricedCalls.toLocaleString()} 次`}
+              tone={health.unpricedCalls > 0 ? 'warning' : undefined}
+            />
+            <Metric label="历史价格未知" value={`${health.historicalUnknownCalls.toLocaleString()} 次`} />
+            <Metric label="最大上报延迟" value={`${(health.maxIntakeLagMs / 1000).toFixed(1)} 秒`} />
+          </div>
         )}
       </Section>
 
