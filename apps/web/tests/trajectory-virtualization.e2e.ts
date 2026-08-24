@@ -66,14 +66,22 @@ interface RowAnchor {
 }
 
 async function openSeed(page: Page): Promise<void> {
+  const sidebarToggle = page.getByRole('button', { name: /Open sidebar|打开侧边栏/ })
+  if (await sidebarToggle.count() > 0 && await sidebarToggle.getAttribute('aria-expanded') !== 'true') {
+    await sidebarToggle.click()
+  }
   // Search collapsed into a header action; expand it before filling.
-  const searchButton = page.getByRole('button', { name: 'Search sessions' })
+  const searchButton = page.getByRole('button', { name: /Search sessions|搜索会话/ })
   if (await searchButton.getAttribute('aria-expanded') !== 'true') await searchButton.click()
-  const search = page.getByRole('textbox', { name: 'Search sessions...', exact: true })
+  const search = page.getByRole('textbox', { name: /Search sessions|搜索会话/ }).first()
   await search.fill(FIXTURE.markers.user(1))
   const result = page.getByRole('tree', { name: 'Search results' }).getByRole('treeitem')
   await expect.poll(() => result.count(), { timeout: 60_000 }).toBe(1)
   await result.click()
+  const closeSidebar = page.getByRole('button', { name: /Close sidebar|关闭侧边栏/ })
+  if (await closeSidebar.count() > 0 && await closeSidebar.getAttribute('aria-expanded') === 'true') {
+    await closeSidebar.click()
+  }
   await page.getByRole('tab', { name: 'Trajectory', exact: true }).waitFor({ timeout: 30_000 })
   await page.getByText(FIXTURE.markers.assistant(FIXTURE.turns), { exact: false })
     .last()
@@ -360,15 +368,15 @@ describe('web e2e: Trajectory virtualization over tail-paged history', () => {
       await mobilePage.waitForSelector('[class*="frame"]', { timeout: 30_000 })
       await openSeed(mobilePage)
       await openTrajectory(mobilePage)
-      await expect(mobilePage.locator('[data-trajectory-feed]')).toHaveCount(1)
-      await expect(mobilePage.locator('[data-trajectory-scroll] table')).toHaveCount(0)
+      await expect.poll(() => mobilePage.locator('[data-trajectory-feed]').count(), { timeout: 30_000 }).toBe(1)
+      expect(await mobilePage.locator('[data-trajectory-scroll] table').count()).toBe(0)
       expect(await mountedRows(mobilePage)).toBeLessThanOrEqual(MAX_MOUNTED_ROWS)
       const first = mobilePage.locator('[data-trajectory-feed] [data-record-index]').first().getByRole('button').last()
       await first.click()
-      await expect(mobilePage.locator('[data-trajectory-details]')).toHaveAttribute('role', 'dialog')
-      await expect(mobilePage.locator('[data-trajectory-details]')).toHaveAttribute('aria-modal', 'true')
+      await expect.poll(() => mobilePage.locator('[data-trajectory-details]').getAttribute('role'), { timeout: 10_000 }).toBe('dialog')
+      await expect.poll(() => mobilePage.locator('[data-trajectory-details]').getAttribute('aria-modal'), { timeout: 10_000 }).toBe('true')
       await mobilePage.getByRole('button', { name: 'Close details' }).click()
-      await expect(mobilePage.locator('[data-trajectory-details]')).toHaveCount(0)
+      await expect.poll(() => mobilePage.locator('[data-trajectory-details]').count(), { timeout: 10_000 }).toBe(0)
     } finally {
       await mobilePage.close()
     }
