@@ -120,7 +120,7 @@ function addUsage(
 
 export function TrajectoryView({
   useSession, useDuration, loadOlder, setActualDuration, ensureHistoryDetail,
-  inspect, onInspectDone, t,
+  inspect, onInspectDone, t, compact = false,
 }: ConvViewProps & InjectFace<TrajectoryViewInjected> & PropsLocale<'trajectory'>) {
   const [collapsedTurns, setCollapsedTurns] = useState<ReadonlySet<number>>(EMPTY_TURN_IDS)
   const [collapsedAssistants, setCollapsedAssistants] =
@@ -453,6 +453,7 @@ export function TrajectoryView({
   return (
     <div className={css.root} data-conversation-composer-overlay="">
       <TrajectoryToolbar
+        compact={compact}
         actualDuration={actualDuration}
         onActualDurationChange={(nextActualDuration) => {
           setActualDuration(nextActualDuration)
@@ -485,6 +486,7 @@ export function TrajectoryView({
       />
       <div className={css.ledger}>
         <TrajectoryTable
+          compact={compact}
           requestNumbers={requestNumbers}
           turns={timelineTurns}
           streamingCells={streamingCells}

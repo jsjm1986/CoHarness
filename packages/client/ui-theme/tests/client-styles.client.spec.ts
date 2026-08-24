@@ -36,8 +36,12 @@ describe('ui-theme client styles', () => {
   it('ships the compact typography and icon roles from metrics.css', () => {
     const metrics = readFileSync(fileURLToPath(new NodeURL('../src/styles/metrics.css', import.meta.url)), 'utf8')
     expect(metrics).toContain('--dsw-mobile-font-body: 400 14px/22px')
+    expect(metrics).toContain('--dsw-mobile-font-nav: 600 16px/22px')
+    expect(metrics).toContain('--dsw-mobile-font-feed-meta: 400 11px/16px')
     expect(metrics).toContain('--dsw-mobile-font-caption: 400 12px/18px')
     expect(metrics).toContain('--dsw-mobile-icon-primary: 20px')
     expect(metrics).toContain('--dsw-mobile-page-inset: var(--dsw-space-4)')
+    expect(metrics).toContain('--dsw-mobile-header-height: 44px')
+    expect(metrics).toContain('--dsw-mobile-feed-row-height: 56px')
   })
 })

@@ -65,7 +65,7 @@ function equalBreadcrumbs(left: readonly Breadcrumb[], right: readonly Breadcrum
  */
 export function ConversationSessionHeader({
   sessionId, useSession, useSessions, useStore, actions,
-  renderSlot, views, open, t,
+  renderSlot, views, open, t, compact = false,
 }: ConversationSessionHeaderProps) {
   useSyncExternalStore(views.subscribe, views.version)
   const tabs = views.list()
@@ -83,6 +83,22 @@ export function ConversationSessionHeader({
     >
       {!hideChrome && (
         <>
+          {tabs.length > 1 && (
+            <div className={css.tabs} role="tablist">
+              {tabs.map(viewTab => (
+                <button
+                  key={viewTab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={viewTab.id === active?.id}
+                  className={clsx(css.tab, viewTab.id === active?.id && css.tabActive)}
+                  onClick={() => { actions.setView(viewTab.id) }}
+                >
+                  {viewTab.label}
+                </button>
+              ))}
+            </div>
+          )}
           <div className={css.titleRow}>
             <div className={css.titleCluster}>
               <nav className={css.crumbs} aria-label={t('session.hierarchy')}>
@@ -132,29 +148,13 @@ export function ConversationSessionHeader({
                 {ancestry.length === 0 && <span className={css.crumbCurrent}>{sessionId}</span>}
               </nav>
               <div className={css.headerActions}>
-                {renderSlot('conversation.session.header.actions', {})}
+                {renderSlot('conversation.session.header.actions', { compact })}
               </div>
             </div>
             <div className={css.headerUtilities}>
-              {renderSlot('conversation.session.header.utilities', {})}
+              {renderSlot('conversation.session.header.utilities', { compact })}
             </div>
           </div>
-          {tabs.length > 1 && (
-            <div className={css.tabs} role="tablist">
-              {tabs.map(viewTab => (
-                <button
-                  key={viewTab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={viewTab.id === active?.id}
-                  className={clsx(css.tab, viewTab.id === active?.id && css.tabActive)}
-                  onClick={() => { actions.setView(viewTab.id) }}
-                >
-                  {viewTab.label}
-                </button>
-              ))}
-            </div>
-          )}
         </>
       )}
     </header>
@@ -169,7 +169,7 @@ export function ConversationSessionHeader({
  */
 export function ConversationSession({
   sessionId, useSession, useInput, inputActions, useStore, actions,
-  renderSlot, views, bindDraftMirror, releaseSessionImages,
+  renderSlot, views, bindDraftMirror, releaseSessionImages, compact = false,
 }: ConversationSessionProps) {
   useSyncExternalStore(views.subscribe, views.version)
   const tabs = views.list()
@@ -198,6 +198,7 @@ export function ConversationSession({
   return (
     <div className={css.viewArea}>
       {active !== undefined && renderSlot('conversation.view', {
+        compact,
         inspect,
         onInspectDone: () => { actions.setInspect(null) },
       }, { only: active.id })}

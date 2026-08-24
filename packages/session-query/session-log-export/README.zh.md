@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-Web Session 日志下载控制，使用 `dsh-host-apiproxy` 拥有的 Host 流式 ZIP 端点。Host 半包注册 `/export`；浏览器半包在 Session Header 中提供 111×32 的 `Session log` 操作，以及一个供该按钮与斜杠命令共用的下载控制器和弹窗。ZIP 生成、原始 JSONL/zstd 读取、子 Session、附件、背压和 HTTP 错误语义仍由 [ApiProxy 下载实现](../../host/apiproxy/README.zh.md)负责。
+Web Session 日志下载控制，使用 `dsh-host-apiproxy` 拥有的 Host 流式 ZIP 端点。Host 半包注册 `/export`；浏览器半包在桌面 Session Header 中提供 111×32 的 `Session log` 操作，在 compact AppFrame 顶栏提供纯图标操作，并让两个按钮与斜杠命令共用一个下载控制器和弹窗。ZIP 生成、原始 JSONL/zstd 读取、子 Session、附件、背压和 HTTP 错误语义仍由 [ApiProxy 下载实现](../../host/apiproxy/README.zh.md)负责。
 
 ## 命令约定
 
@@ -24,7 +24,7 @@ Host 下载端点会在 `readRaw` 前 flush 活动的根 Session，因此斜杠�
   name: '@deepseek-ai/dsh-session-log-export'
 ```
 
-Web bundle 将本包与 `dsh-host-apiproxy`、`dsh-commands`、`dsh-client-ui-commands` 和 `dsh-client-ui-conversation` 一起挂载。本包把按钮和弹窗贡献到最右侧的 `conversation.session.header.utilities` 列表，与标题旁 `conversation.session.header.actions` 中的模式、Subagent 和 Task 配置项相互独立；Trajectory 不包含导出入口。
+Web bundle 将本包与 `dsh-host-apiproxy`、`dsh-commands`、`dsh-client-ui-commands`、`dsh-client-ui-conversation` 和 `dsh-client-ui-layout` 一起挂载。本包把桌面按钮贡献到 `conversation.session.header.utilities`，把 compact 图标按钮贡献到 `shell.mobile.header.actions`，与标题旁 `conversation.session.header.actions` 中的模式、Subagent 和 Task 配置项相互独立；两个 presenter 共用 controller 与弹窗，Trajectory 不包含导出入口。
 
 ## 模型体验
 

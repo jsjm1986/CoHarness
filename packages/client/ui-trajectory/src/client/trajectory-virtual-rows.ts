@@ -3,9 +3,24 @@
 import type { TrajectoryCellProps } from './trajectory-record.ts'
 import { trajectoryRecordId } from './trajectory-record.ts'
 
-const CONTENT_ROW_HEIGHT = 30
-const COLLAPSED_SUMMARY_HEIGHT = 20
-const TERMINAL_BOUNDARY_HEIGHT = 9
+/** Fixed row heights used by the desktop and compact presenters. */
+export interface TrajectoryVirtualRowMetrics {
+  contentHeight: number
+  collapsedSummaryHeight: number
+  terminalBoundaryHeight: number
+}
+
+export const DESKTOP_TRAJECTORY_ROW_METRICS: TrajectoryVirtualRowMetrics = {
+  contentHeight: 30,
+  collapsedSummaryHeight: 20,
+  terminalBoundaryHeight: 9,
+}
+
+export const MOBILE_TRAJECTORY_ROW_METRICS: TrajectoryVirtualRowMetrics = {
+  contentHeight: 56,
+  collapsedSummaryHeight: 40,
+  terminalBoundaryHeight: 9,
+}
 
 /** Minimal record shape required by the trajectory virtual-row projection. */
 export interface VirtualizableTrajectoryRecord {
@@ -50,6 +65,7 @@ export function trajectoryVirtualRecordKey(
  */
 export function groupTrajectoryVirtualRows<T extends VirtualizableTrajectoryRecord>(
   records: readonly T[],
+  metrics: TrajectoryVirtualRowMetrics = DESKTOP_TRAJECTORY_ROW_METRICS,
 ): readonly TrajectoryVirtualRow<T>[] {
   const rows: TrajectoryVirtualRow<T>[] = []
   let pending: TrajectoryVirtualRowEntry<T>[] = []
@@ -65,8 +81,8 @@ export function groupTrajectoryVirtualRows<T extends VirtualizableTrajectoryReco
     rows.push({
       entries,
       height: record.collapsedSummaryKind === undefined
-        ? CONTENT_ROW_HEIGHT
-        : COLLAPSED_SUMMARY_HEIGHT,
+        ? metrics.contentHeight
+        : metrics.collapsedSummaryHeight,
       key: trajectoryVirtualRecordKey(record),
     })
   }
@@ -74,7 +90,7 @@ export function groupTrajectoryVirtualRows<T extends VirtualizableTrajectoryReco
   if (pending.length > 0) {
     rows.push({
       entries: pending,
-      height: TERMINAL_BOUNDARY_HEIGHT,
+      height: metrics.terminalBoundaryHeight,
       key: pending.map(candidate => trajectoryVirtualRecordKey(candidate.record)).join('|'),
     })
   }

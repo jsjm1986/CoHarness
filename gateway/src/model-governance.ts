@@ -4,6 +4,7 @@ import type { UserRow } from './auth.ts'
 
 export type CredentialClass = 'company' | 'personal' | 'unknown'
 export type UsageStatus = 'succeeded' | 'failed' | 'cancelled' | 'missing-usage' | 'denied'
+export type UsagePricingStatus = 'priced' | 'unpriced' | 'configured-zero' | 'mixed' | 'historical-unknown' | 'none'
 
 /** Provider ids reserved for organization-managed routes. */
 export const ORGANIZATION_PROVIDER_PATTERN = /^org-[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
@@ -133,6 +134,10 @@ export interface UsageEvent {
   model: string
   purpose: string
   sessionId?: string
+  /** Public user id that initiated a shared-project request, when known. */
+  actorUserId?: number
+  /** Public project id carried by the participant claim for scope verification. */
+  actorProjectId?: number
   credentialSource: string
   credentialClass: CredentialClass
   status: UsageStatus
@@ -211,7 +216,77 @@ export interface UsageSummary {
   missingUsageCalls: number
   tokenLimit: number | null
   companyCostMicrosLimit: number | null
+  /** Price coverage; absent only for legacy SQLite callers. */
+  pricing?: UsagePricingView
   alerts: Array<{ metric: 'tokens' | 'company-cost'; threshold: 80 | 100; createdAt: number }>
+}
+
+/** Price coverage for one usage aggregate. */
+export interface UsagePricingView {
+  status: UsagePricingStatus
+  pricedCalls: number
+  unpricedCalls: number
+  configuredZeroCalls: number
+  unknownCalls: number
+}
+
+/** Usage measure without quota or alert state. */
+export interface UsageMeasure {
+  inputTokens: number
+  outputTokens: number
+  cacheReadTokens: number
+  cacheWriteTokens: number
+  totalTokens: number
+  estimatedCostMicros: number
+  companyCostMicros: number
+  calls: number
+  missingUsageCalls: number
+  pricing?: UsagePricingView
+}
+
+/** One user's confirmed contribution to shared project calls. */
+export interface UsageContributorRow extends UsageMeasure {
+  userId: number
+  username: string
+  archived?: boolean
+  projectCount: number
+}
+
+/** Contributor report for all projects or one selected project. */
+export interface UsageContributorReport {
+  month: string
+  timeZone: string
+  projectId?: number
+  rows: UsageContributorRow[]
+  unattributed: UsageMeasure
+}
+
+/** Admin usage overview separating billable subjects from user activity. */
+export interface UsageOverview {
+  month: string
+  timeZone: string
+  personal: UsageMeasure
+  projects: UsageMeasure
+  unattributedProjects: UsageMeasure
+  users: Array<{
+    userId: number
+    username: string
+    archived?: boolean
+    personal: UsageSummary
+    projectContribution: UsageMeasure
+  }>
+}
+
+/** Operational checks for one natural-month usage window. */
+export interface UsageHealth {
+  month: string
+  timeZone: string
+  missingUsageCalls: number
+  unattributedProjectCalls: number
+  unattributedProjectTokens: number
+  unpricedCalls: number
+  historicalUnknownCalls: number
+  maxIntakeLagMs: number
 }
 
 /** Stored project quota source plus the Token and company-cost limits currently in force. */
@@ -510,6 +585,10 @@ export class ModelGovernanceService {
     if (event === null || typeof event !== 'object') throw new Error('usage event must be an object')
     nonEmpty(event.eventId, 'eventId')
     if (!Number.isSafeInteger(event.occurredAt) || event.occurredAt < 0) throw new Error('occurredAt must be a non-negative safe integer')
+    if (event.actorUserId !== undefined && (!Number.isSafeInteger(event.actorUserId) || event.actorUserId <= 0 || event.actorUserId !== userId)) {
+      throw new Error('actorUserId must match the personal usage subject')
+    }
+    if (event.actorProjectId !== undefined) throw new Error('actorProjectId is not valid for personal usage')
     if (!['company', 'personal', 'unknown'].includes(event.credentialClass)) throw new Error('invalid credentialClass')
     if (!['succeeded', 'failed', 'cancelled', 'missing-usage', 'denied'].includes(event.status)) throw new Error('invalid status')
     if (typeof event.credentialSource !== 'string') throw new Error('credentialSource must be a string')
@@ -654,6 +733,7 @@ export class ModelGovernanceService {
     const alerts = this.db.prepare(`SELECT metric,threshold,created_at FROM model_usage_alerts WHERE user_id=? AND month=?
       ORDER BY CASE metric WHEN 'tokens' THEN 0 ELSE 1 END, threshold`).all(userId, month) as Array<{ metric: 'tokens' | 'company-cost'; threshold: 80 | 100; created_at: number }>
     const total = row.input + row.output + row.read + row.write
+    if (!Number.isSafeInteger(total)) throw new Error('total usage tokens exceed safe integer range')
     const quota = (userValue: number | null | undefined, roleValue: number | null | undefined): number | null =>
       userValue === undefined || userValue === -1 ? roleValue ?? null : userValue
     return {
@@ -663,6 +743,67 @@ export class ModelGovernanceService {
       companyCostMicrosLimit: quota(userQuota?.company_cost_micros_limit, roleQuota?.company_cost_micros_limit),
       alerts: alerts.map(alert => ({ metric: alert.metric, threshold: alert.threshold, createdAt: alert.created_at })),
     }
+  }
+
+  usageContributors(month = monthOf(Date.now(), this.timeZone), projectId?: number): UsageContributorReport {
+    if (projectId !== undefined) throw new Error('SQLite model governance has no project runtime support')
+    return {
+      month,
+      timeZone: this.timeZone,
+      rows: [],
+      unattributed: {
+        inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0,
+        estimatedCostMicros: 0, companyCostMicros: 0, calls: 0, missingUsageCalls: 0,
+        pricing: { status: 'none', pricedCalls: 0, unpricedCalls: 0, configuredZeroCalls: 0, unknownCalls: 0 },
+      },
+    }
+  }
+
+  usageOverview(month = monthOf(Date.now(), this.timeZone)): UsageOverview {
+    const identities = this.db.prepare(`SELECT id,username,status,deleted_at FROM users ORDER BY id`).all() as Array<{
+      id: number; username: string; status: 'active' | 'disabled'; deleted_at: number | null
+    }>
+    const users = identities.map(user => ({
+      userId: user.id,
+      username: user.username,
+      archived: user.status !== 'active' || user.deleted_at !== null,
+      personal: this.summary({ kind: 'user', id: user.id }, month),
+      projectContribution: {
+        inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0,
+        estimatedCostMicros: 0, companyCostMicros: 0, calls: 0, missingUsageCalls: 0,
+        pricing: { status: 'none' as const, pricedCalls: 0, unpricedCalls: 0, configuredZeroCalls: 0, unknownCalls: 0 },
+      },
+    }))
+    const personal = users.reduce((sum, row) => ({
+      inputTokens: sum.inputTokens + row.personal.inputTokens,
+      outputTokens: sum.outputTokens + row.personal.outputTokens,
+      cacheReadTokens: sum.cacheReadTokens + row.personal.cacheReadTokens,
+      cacheWriteTokens: sum.cacheWriteTokens + row.personal.cacheWriteTokens,
+      totalTokens: sum.totalTokens + row.personal.totalTokens,
+      estimatedCostMicros: sum.estimatedCostMicros + row.personal.estimatedCostMicros,
+      companyCostMicros: sum.companyCostMicros + row.personal.companyCostMicros,
+      calls: sum.calls + row.personal.calls,
+      missingUsageCalls: sum.missingUsageCalls + row.personal.missingUsageCalls,
+    }), { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0,
+      estimatedCostMicros: 0, companyCostMicros: 0, calls: 0, missingUsageCalls: 0 })
+    const empty: UsageMeasure = {
+      inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0,
+      estimatedCostMicros: 0, companyCostMicros: 0, calls: 0, missingUsageCalls: 0,
+      pricing: { status: 'none', pricedCalls: 0, unpricedCalls: 0, configuredZeroCalls: 0, unknownCalls: 0 },
+    }
+    return { month, timeZone: this.timeZone, personal, projects: empty, unattributedProjects: empty, users }
+  }
+
+  usageHealth(month = monthOf(Date.now(), this.timeZone)): UsageHealth {
+    const { start, end } = monthBounds(month, this.timeZone)
+    const row = this.db.prepare(`SELECT
+      COALESCE(SUM(CASE WHEN status='missing-usage' THEN 1 ELSE 0 END),0) missing,
+      COALESCE(MAX(CASE WHEN received_at > occurred_at THEN received_at - occurred_at ELSE 0 END),0) lag
+      FROM model_usage WHERE occurred_at>=? AND occurred_at<?`).get(start, end) as { missing: number; lag: number }
+    if (!Number.isSafeInteger(row.missing) || row.missing < 0
+      || !Number.isSafeInteger(row.lag) || row.lag < 0) throw new Error('usage health exceeds safe integer range')
+    return { month, timeZone: this.timeZone, missingUsageCalls: row.missing, unattributedProjectCalls: 0,
+      unattributedProjectTokens: 0, unpricedCalls: 0, historicalUnknownCalls: 0, maxIntakeLagMs: row.lag }
   }
 
   private evaluateAlerts(userId: number, month: string): number {

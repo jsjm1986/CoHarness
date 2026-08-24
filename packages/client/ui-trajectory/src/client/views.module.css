@@ -33,3 +33,7 @@
 :global([data-viewport='compact']) .ledger:has([data-trajectory-details]) {
   z-index: 8;
 }
+
+:global([data-viewport='compact']) .root {
+  --dsh-trajectory-toolbar-height: var(--dsw-mobile-toolbar-height);
+}

@@ -44,4 +44,15 @@ describe('trajectory compact chrome', () => {
     expect(views).toContain('[data-trajectory-details]')
     expect(views).toContain('z-index: 8')
   })
+
+  it('ships a flat compact event feed and one-row toolbar controls', () => {
+    const feed = load('../src/client/TrajectoryMobileFeed.module.css')
+    const toolbar = load('../src/client/TrajectoryToolbar.module.css')
+    expect(feed).toContain('.feed')
+    expect(feed).toContain('var(--dsw-mobile-feed-row-height)')
+    expect(feed).toContain('font: var(--dsw-mobile-font-feed-meta)')
+    expect(toolbar).toContain('var(--dsw-mobile-toolbar-height)')
+    expect(toolbar).toContain('.mobileControls')
+    expect(toolbar).toContain('.mobileSearch')
+  })
 })

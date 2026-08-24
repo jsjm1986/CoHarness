@@ -1829,10 +1829,12 @@
   .details {
     position: absolute;
     z-index: 5;
-    top: max(8px, var(--dsw-safe-top));
+    box-sizing: border-box;
+    top: auto;
     right: 0;
     bottom: 0;
     left: 0;
+    height: min(70dvh, calc(var(--dsw-viewport-height, 100dvh) - 96px));
     width: 100%;
     max-width: none;
     border-left: none;

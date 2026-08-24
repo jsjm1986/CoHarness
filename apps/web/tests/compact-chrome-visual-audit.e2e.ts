@@ -263,16 +263,20 @@ describe('visual audit: compact product chrome', () => {
         }
 
         await page.getByRole('tab', { name: /轨迹|Trajectory/ }).click()
-        await page.locator('table, [role="table"]').first().waitFor({ timeout: 15_000 })
+        await page.locator('[data-trajectory-feed], table, [role="table"]').first().waitFor({ timeout: 15_000 })
         await page.waitForTimeout(400)
         await shot(page, `${prefix}-08-trajectory`)
         findings[`${prefix}.trajectory`] = await dumpOverflow(page)
 
-        const toolEvent = page.locator('tr[data-kind="tool"]').first()
+        const toolEvent = page.locator('[data-trajectory-feed] [data-kind="tool"], tr[data-kind="tool"]').first()
         if (await toolEvent.count() > 0) {
           await toolEvent.click()
-          const details = page.getByRole('complementary', { name: 'Event details' })
+          const details = page.locator('[data-trajectory-details]').first()
           await details.waitFor({ timeout: 10_000 })
+          if (phone.width < 768) {
+            expect(await details.getAttribute('role')).toBe('dialog')
+            expect(await details.getAttribute('aria-modal')).toBe('true')
+          }
           await page.waitForTimeout(300)
           await shot(page, `${prefix}-09-event-details`)
           findings[`${prefix}.eventDetails`] = await dumpOverflow(page)

@@ -89,6 +89,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * `id` is added beside the shipped entries instead of replacing them.
      */
     'shell.overlay': { kind: 'list'; scope: 'root' }
+    /** Session-scoped actions rendered in the compact AppFrame topbar. */
+    'shell.mobile.header.actions': { kind: 'list'; scope: 'session'; owner: MobileHeaderActionOwnerProps }
   }
 }
 
@@ -106,11 +108,17 @@ export interface SidebarOwnerProps {
   width: number
 }
 
-/** Conversation owner share: business state and actions belong to the registrant. */
-export interface ConvOwnerProps {}
+/** Conversation owner share: the shell's resolved compact mode. */
+export interface ConvOwnerProps {
+  /** True when the frame is using the phone presenter. */
+  compact?: boolean
+}
 
 /** Details owner share: empty — sessionId arrives as a framework-standard prop. */
 export interface DetailsOwnerProps {}
+
+/** Mobile topbar action owner share: the slot is rendered only in compact mode. */
+export interface MobileHeaderActionOwnerProps {}
 
 /** Dictionary namespace owned by this plugin (shell chrome copy). */
 const NS = 'layout'
@@ -138,6 +146,7 @@ export function apply(ctx: ClientContext): void {
         'conversation': { kind: 'single', scope: 'session-maybe' },
         'details': { kind: 'single', scope: 'session' },
         'shell.overlay': { kind: 'list', scope: 'root' },
+        'shell.mobile.header.actions': { kind: 'list', scope: 'session' },
       },
       // Exclusive store: the factory itself — the framework instantiates per
       // entry and delivers useStore/actions to AppFrame as standard props.

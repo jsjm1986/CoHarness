@@ -5,6 +5,7 @@ import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { SessionLogDownloadHeaderAction } from '../src/client/HeaderAction.tsx'
+import { SessionLogDownloadMobileHeaderAction } from '../src/client/MobileHeaderAction.tsx'
 import { apply, inject } from '../src/client/index.ts'
 
 const SID = 'session-export-apply' as SessionId
@@ -17,6 +18,7 @@ function declare(slots: SlotRegistry): () => void {
     children: {
       'conversation.session.header.actions': { kind: 'list', scope: 'session' },
       'conversation.session.header.utilities': { kind: 'list', scope: 'session' },
+      'shell.mobile.header.actions': { kind: 'list', scope: 'session' },
     },
   } as never, () => null)
 }
@@ -42,6 +44,9 @@ describe('session-log-download browser plugin', () => {
     const entry = b.slots.entries('conversation.session.header.utilities')[0]
     expect(entry?.component).toBe(SessionLogDownloadHeaderAction)
     expect(entry?.options).toMatchObject({ id: 'session-log-download' })
+    expect(b.slots.entries('shell.mobile.header.actions')).toHaveLength(1)
+    expect(b.slots.entries('shell.mobile.header.actions')[0]?.component)
+      .toBe(SessionLogDownloadMobileHeaderAction)
     const injected = (entry?.inject as unknown as () => import('../src/client/Dialog.tsx').SessionLogDownloadDialogInjected)()
     await injected.request(SID)
     expect(b.ctx.sessionLogDownload.store.getSnapshot().bySession[SID]?.status).toBe('error')
@@ -50,6 +55,7 @@ describe('session-log-download browser plugin', () => {
 
     await b.fiber.dispose()
     expect(b.slots.entries('conversation.session.header.utilities')).toHaveLength(0)
+    expect(b.slots.entries('shell.mobile.header.actions')).toHaveLength(0)
   })
 
   it('downloads only for an export execution acknowledged by this browser client', async () => {
@@ -77,6 +83,7 @@ describe('session-log-download browser plugin', () => {
     const b = await bench()
     b.declaration()
     expect(b.slots.entries('conversation.session.header.utilities')).toHaveLength(0)
+    expect(b.slots.entries('shell.mobile.header.actions')).toHaveLength(0)
     const redeclare = declare(b.slots)
     await Promise.resolve()
     expect(b.slots.entries('conversation.session.header.utilities')[0]?.component).toBe(SessionLogDownloadHeaderAction)

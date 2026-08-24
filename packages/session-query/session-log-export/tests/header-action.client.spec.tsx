@@ -5,6 +5,8 @@ import { useSyncExternalStore } from 'react'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import { SessionLogDownloadController } from '../src/client/controller.ts'
 import { SessionLogDownloadHeaderAction } from '../src/client/HeaderAction.tsx'
+import { SessionLogDownloadMobileHeaderAction } from '../src/client/MobileHeaderAction.tsx'
+import type { SessionLogDownloadMobileHeaderActionProps } from '../src/client/MobileHeaderAction.tsx'
 import type { SessionLogDownloadDialogProps } from '../src/client/Dialog.tsx'
 import { en } from '../src/client/locales.ts'
 
@@ -32,7 +34,7 @@ function bench() {
     t: (key: keyof typeof en): string => en[key],
   } as unknown as SessionLogDownloadDialogProps
   const view = render(<SessionLogDownloadHeaderAction {...props} />)
-  return { controller, request, view }
+  return { controller, request, view, props }
 }
 
 afterEach(cleanup)
@@ -68,5 +70,19 @@ describe('Session export Header action', () => {
     release(new Response('zip'))
     await download
     await waitFor(() => { expect(button.getAttribute('aria-busy')).toBe('false') })
+  })
+
+  it('renders the compact icon action with the shared download dialog', async () => {
+    const b = bench()
+    b.view.rerender(
+      <SessionLogDownloadMobileHeaderAction
+        {...(b.props as unknown as SessionLogDownloadMobileHeaderActionProps)}
+      />,
+    )
+    const button = b.view.getByRole('button', { name: 'Export Session log' })
+    expect(button.querySelector('svg')).not.toBeNull()
+    fireEvent.click(button)
+    await waitFor(() => { expect(b.request).toHaveBeenCalledWith(SID) })
+    expect(await b.view.findByRole('dialog', { name: 'Session download started' })).toBeTruthy()
   })
 })

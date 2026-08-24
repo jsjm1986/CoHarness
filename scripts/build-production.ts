@@ -46,10 +46,12 @@ function verifyArtifacts(): void {
     'gateway/deploy/postgres/migrations/003_project_collaboration.sql',
     'gateway/deploy/postgres/migrations/004_conversation_event_json.sql',
     'gateway/deploy/postgres/migrations/005_user_owned_projects.sql',
+    'gateway/deploy/postgres/migrations/014_usage_attribution_status.sql',
     'plugins/dsh-directory-guard/lib/index.js',
     'plugins/dsh-directory-guard/cordis.patch.yml',
     'plugins/dsh-directory-guard/cordis.admin.patch.yml',
     'plugins/dsh-model-governance/lib/index.js',
+    'plugins/dsh-model-governance/lib/outbox.js',
     'plugins/dsh-model-governance/cordis.patch.yml',
   ]) requireFile(resolve(root, path), failures)
   requireAsset(resolve(root, 'apps/web/dist/assets'), '.js', failures)

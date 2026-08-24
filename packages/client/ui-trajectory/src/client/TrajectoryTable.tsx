@@ -23,12 +23,22 @@ import { formatElapsedSeconds, trajectoryRecordId } from './trajectory-record.ts
 import {
   groupTrajectoryVirtualRows, trajectoryVirtualRecordKey,
 } from './trajectory-virtual-rows.ts'
+import {
+  DESKTOP_TRAJECTORY_ROW_METRICS,
+  MOBILE_TRAJECTORY_ROW_METRICS,
+} from './trajectory-virtual-rows.ts'
 import type { TrajectoryVirtualRow } from './trajectory-virtual-rows.ts'
+import {
+  TrajectoryMobileFeed,
+  type TrajectoryMobileFeedItem,
+  type TrajectoryMobileRequestSelection,
+} from './TrajectoryMobileFeed.tsx'
 import type { TrajectoryTurnModel } from './layout.ts'
 import { trajectoryPreviewText } from './trajectory-preview.ts'
 import css from './TrajectoryTable.module.css'
 
 const BOTTOM_FOLLOW_THRESHOLD_PX = 2
+const TAIL_SCROLL_THROTTLE_MS = 32
 const OLDER_LOAD_THRESHOLD_PX = 48
 const HISTORY_LOAD_ROW_HEIGHT_PX = 30
 const VIRTUALIZATION_THRESHOLD = 100
@@ -116,7 +126,7 @@ const KIND_ICON: Record<TrajectoryCellKind, ReactNode> = {
   subtool: <ToolWrenchIcon />,
 }
 
-interface TableRecord {
+export interface TableRecord {
   turn: number | null
   section: number
   group: string
@@ -166,7 +176,7 @@ type DetailTab =
   | 'usage'
   | 'timing'
   | 'diff'
-type RecordState = 'complete' | 'running' | 'error'
+export type RecordState = 'complete' | 'running' | 'error'
 
 interface DetailTabItem {
   id: DetailTab
@@ -345,6 +355,8 @@ function AssistantTimingPanel({ metrics }: { metrics: AssistantMetricDetail }) {
 
 /** Props for the trajectory ledger. */
 export interface TrajectoryTableProps {
+  /** Whether the frame resolved the compact phone presenter. */
+  compact?: boolean
   /** Session-global request numbers for the request groups visible in this context. */
   requestNumbers?: readonly TrajectoryRequestNumber[]
   /** Grouped records in display order. */
@@ -1691,6 +1703,7 @@ function OverviewSection({
  * @returns The ledger and an optional local record inspector.
  */
 export function TrajectoryTable({
+  compact = false,
   requestNumbers: sessionRequestNumbers,
   turns,
   streamingCells = [],
@@ -1720,12 +1733,17 @@ export function TrajectoryTable({
   const [detailsWidth, setDetailsWidth] = useState<number | null>(null)
   const [toolRequestOffset, setToolRequestOffset] = useState<number | null>(null)
   const detailsResizeDrag = useRef<DetailsResizeDrag | null>(null)
+  const detailsCloseRef = useRef<HTMLButtonElement | null>(null)
+  const inspectorTriggerRef = useRef<HTMLElement | null>(null)
+  const detailsWasOpen = useRef(false)
   const appliedRecordSelection = useRef<TrajectoryTableProps['recordSelection']>(null)
   const appliedRecordFocus = useRef<TrajectoryTableProps['recordFocus']>(null)
   const tabHistory = useRef<Set<DetailTab>>(new Set(['overview']))
   const rootRef = useRef<HTMLDivElement>(null)
   const tablePaneRef = useRef<HTMLDivElement>(null)
   const followsTableTail = useRef(false)
+  const lastTailScrollAt = useRef(0)
+  const tailScrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const tableScrollInitialized = useRef(false)
   const [tableScrollReady, setTableScrollReady] = useState(false)
   const pendingScrollRecordId = useRef<string | null>(null)
@@ -1766,24 +1784,29 @@ export function TrajectoryTable({
       ? turnRecords
       : collapseAssistantRecords(turnRecords, collapsedAssistants)
   }, [allRecords, collapsedAssistants, collapsedTurns, searchMatchIndexes])
+  const rowMetrics = compact
+    ? MOBILE_TRAJECTORY_ROW_METRICS
+    : DESKTOP_TRAJECTORY_ROW_METRICS
   const projectedVirtualRows = useMemo(
-    () => groupTrajectoryVirtualRows(records),
-    [records],
+    () => compact
+      ? groupTrajectoryVirtualRows(records, MOBILE_TRAJECTORY_ROW_METRICS)
+      : groupTrajectoryVirtualRows(records),
+    [compact, records],
   )
   const virtualRowStructure = useStableVirtualRowStructure(projectedVirtualRows)
   const virtualizationEnabled = hasOlderRecords
     || records.length > VIRTUALIZATION_THRESHOLD
   const virtualScrollMargin = hasOlderRecords ? HISTORY_LOAD_ROW_HEIGHT_PX : 0
   const estimateVirtualRowSize = useCallback(
-    (index: number) => virtualRowStructure[index]?.height ?? 30,
-    [virtualRowStructure],
+    (index: number) => virtualRowStructure[index]?.height ?? rowMetrics.contentHeight,
+    [rowMetrics.contentHeight, virtualRowStructure],
   )
   const getVirtualRowKey = useCallback(
     (index: number) => virtualRowStructure[index]?.key ?? index,
     [virtualRowStructure],
   )
   const getTableScrollElement = useCallback(() => tablePaneRef.current, [])
-  const rowVirtualizer = useVirtualizer<HTMLDivElement, HTMLTableRowElement>({
+  const rowVirtualizer = useVirtualizer<HTMLDivElement, HTMLElement>({
     count: virtualizationEnabled ? virtualRowStructure.length : 0,
     enabled: virtualizationEnabled,
     estimateSize: estimateVirtualRowSize,
@@ -1839,6 +1862,30 @@ export function TrajectoryTable({
     () => indexRequestBoundaryRuns(records),
     [records],
   )
+  const mobileItems = useMemo<readonly TrajectoryMobileFeedItem[]>(() => {
+    return renderedRecords.map(({ record, position, terminalRequestBoundary }) => {
+      const isCollapsedSummary = record.collapsedSummary !== undefined
+      const key = requestKey(record.turn, record.group)
+      const request = requestBoundaries.get(key) === record.cell.index
+        && !isCollapsedSummary
+        && (record.turn === null || !collapsedTurns.has(record.turn))
+        ? requestNumbers.get(key)
+        : undefined
+      const requestInfo = request === undefined
+        ? undefined
+        : sessionRequestNumbers?.find(candidate => candidate.number === request)
+      return {
+        record,
+        position,
+        terminalRequestBoundary,
+        ...(request === undefined ? {} : { request }),
+        ...(requestInfo === undefined ? {} : { requestInfo }),
+        requestSelected: request !== undefined
+          && selectedRequest?.turn === record.turn
+          && selectedRequest.group === record.group,
+      }
+    })
+  }, [collapsedTurns, requestBoundaries, requestNumbers, renderedRecords, selectedRequest, sessionRequestNumbers])
   const selectedPrompt = selected?.cell.kind === 'system'
     ? selected.cell.promptDetail
     : undefined
@@ -1847,6 +1894,29 @@ export function TrajectoryTable({
     : undefined
   const promptSelected = selectedPrompt !== undefined
   const selectedState = selected === undefined ? undefined : stateOf(selected)
+  const detailsOpen = selectedRequest !== null
+    || promptSelected
+    || (selected !== undefined && selectedState !== undefined)
+  useEffect(() => {
+    if (!compact || detailsOpen === detailsWasOpen.current) return
+    detailsWasOpen.current = detailsOpen
+    if (detailsOpen) {
+      detailsCloseRef.current?.focus({ preventScroll: true })
+    } else {
+      inspectorTriggerRef.current?.focus({ preventScroll: true })
+      inspectorTriggerRef.current = null
+    }
+  }, [compact, detailsOpen])
+  useEffect(() => {
+    if (!compact || !detailsOpen) return
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      event.preventDefault()
+      clearInspectorSelection()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => { document.removeEventListener('keydown', onKeyDown) }
+  }, [compact, detailsOpen])
   const selectedRequestRecordTemplates = useMemo(() => selectedRequest === null
     ? []
     : allRecords.filter(record =>
@@ -1959,12 +2029,20 @@ export function TrajectoryTable({
     setSelectedRequest(null)
   }
 
+  const rememberInspectorTrigger = useCallback(() => {
+    const active = document.activeElement
+    if (active instanceof HTMLElement && rootRef.current?.contains(active)) {
+      inspectorTriggerRef.current = active
+    }
+  }, [])
+
   const clearAllSelections = () => {
     clearInspectorSelection()
     onClearSelection?.()
   }
 
   const selectRecord = useCallback((index: number) => {
+    rememberInspectorTrigger()
     const record = allRecords.find(candidate => candidate.cell.index === index)
     onRecordSelect?.(index)
     setSelectedRequest(null)
@@ -1974,7 +2052,7 @@ export function TrajectoryTable({
     const available = new Set(tabs.map(tab => tab.id))
     const recent = [...tabHistory.current].reverse().find(tab => available.has(tab))
     setActiveTab(recent ?? tabs[0]?.id ?? 'overview')
-  }, [allRecords, onRecordSelect])
+  }, [allRecords, onRecordSelect, rememberInspectorTrigger])
   useEffect(() => {
     if (
       recordSelection === null
@@ -2000,6 +2078,7 @@ export function TrajectoryTable({
     request: SelectedRequest,
     tab: 'overview' | 'timing' = 'overview',
   ) => {
+    rememberInspectorTrigger()
     setSelectedRecordId(null)
     setSelectedRequest(request)
     activateTab(tab)
@@ -2061,7 +2140,7 @@ export function TrajectoryTable({
     const recordIndex = records[position]?.cell.index
     const row = recordIndex === undefined
       ? null
-      : rootRef.current?.querySelector<HTMLElement>(`tr[data-record-index="${recordIndex}"]`)
+      : rootRef.current?.querySelector<HTMLElement>(`[data-record-index="${recordIndex}"]`)
     /* v8 ignore next -- jsdom lacks scrollIntoView; browsers always have it. */
     if (row !== undefined && row !== null && typeof row.scrollIntoView === 'function') {
       row.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -2082,7 +2161,7 @@ export function TrajectoryTable({
       const ledger = rootRef.current
       if (ledger === null) return
       const focusedRows = [
-        ...ledger.querySelectorAll<HTMLElement>('tr[data-timeline-focus="inside"]'),
+        ...ledger.querySelectorAll<HTMLElement>('[data-timeline-focus="inside"]'),
       ]
       const firstRow = focusedRows.at(0)
       const lastRow = focusedRows.at(-1)
@@ -2156,6 +2235,18 @@ export function TrajectoryTable({
       setOlderLoading(false)
     })
   }, [hasOlderRecords, historyStartSeq, olderHistoryLoading, onLoadOlder])
+  const cancelTailScroll = useCallback(() => {
+    if (tailScrollTimer.current === null) return
+    clearTimeout(tailScrollTimer.current)
+    tailScrollTimer.current = null
+  }, [])
+  const scrollToTail = useCallback(() => {
+    const pane = tablePaneRef.current
+    if (pane === null || !followsTableTail.current) return
+    if (virtualizationEnabled) rowVirtualizer.scrollToEnd({ behavior: 'auto' })
+    else pane.scrollTop = pane.scrollHeight
+  }, [rowVirtualizer, virtualizationEnabled])
+  useEffect(() => () => { cancelTailScroll() }, [cancelTailScroll])
   useLayoutEffect(() => {
     const pane = tablePaneRef.current
     if (pane === null) return
@@ -2172,18 +2263,41 @@ export function TrajectoryTable({
       if (historyLoading) return
       tableScrollInitialized.current = true
       followsTableTail.current = true
+      // The first post-load append must be applied immediately. Throttling
+      // starts only after an append has actually been followed; otherwise a
+      // fast initial render can leave the ledger one frame behind the stream.
+      lastTailScrollAt.current = 0
       if (virtualizationEnabled) rowVirtualizer.scrollToEnd({ behavior: 'auto' })
       else pane.scrollTop = pane.scrollHeight
       setTableScrollReady(true)
       return
     }
     if (!followsTableTail.current) return
-    if (virtualizationEnabled) rowVirtualizer.scrollToEnd({ behavior: 'auto' })
-    else pane.scrollTop = pane.scrollHeight
+    const atTail = pane.scrollHeight - pane.clientHeight - pane.scrollTop
+      <= BOTTOM_FOLLOW_THRESHOLD_PX
+    if (atTail) return
+    const now = Date.now()
+    const elapsed = now - lastTailScrollAt.current
+    if (lastTailScrollAt.current !== 0 && elapsed < TAIL_SCROLL_THROTTLE_MS) {
+      if (tailScrollTimer.current === null) {
+        tailScrollTimer.current = setTimeout(() => {
+          tailScrollTimer.current = null
+          if (!followsTableTail.current) return
+          lastTailScrollAt.current = Date.now()
+          scrollToTail()
+        }, TAIL_SCROLL_THROTTLE_MS - elapsed)
+      }
+      return
+    }
+    lastTailScrollAt.current = now
+    scrollToTail()
   }, [
+    cancelTailScroll,
     historyLoading,
     historyStartSeq,
     rowVirtualizer,
+    scrollToTail,
+    tailScrollTimer,
     virtualRowStructure,
     virtualizationEnabled,
   ])
@@ -2200,16 +2314,17 @@ export function TrajectoryTable({
         data-trajectory-scroll=""
         onScroll={(event) => {
           const pane = event.currentTarget
-          followsTableTail.current =
-            pane.scrollHeight - pane.clientHeight - pane.scrollTop
-              <= BOTTOM_FOLLOW_THRESHOLD_PX
+          const atTail = pane.scrollHeight - pane.clientHeight - pane.scrollTop
+            <= BOTTOM_FOLLOW_THRESHOLD_PX
+          followsTableTail.current = atTail
+          if (!atTail) cancelTailScroll()
           requestOlder(pane, true)
         }}
         onClick={(event) => {
           if (event.target === event.currentTarget) clearAllSelections()
         }}
       >
-        {showInitialLoading && (
+        {!compact && showInitialLoading && (
           <div className={css.historyLoading} role="status" aria-live="polite">
             <span className={css.historyLoadingBar}>
               <span className={css.historyLoadingSpinner} aria-hidden="true" />
@@ -2217,319 +2332,340 @@ export function TrajectoryTable({
             </span>
           </div>
         )}
-        <table
-          className={css.table}
-          data-scroll-ready={tableScrollReady || undefined}
-          aria-rowcount={records.length + historyRowOffset}
-        >
-          <colgroup>
-            <col className={css.eventColumn} />
-            <col className={css.contentColumn} />
-          </colgroup>
-          <tbody>
-            {hasOlderRecords && (
-              <tr
-                className={css.historyLoadRow}
-                data-history-load=""
-                aria-rowindex={1}
-              >
-                <td colSpan={2}>
-                  <button
-                    type="button"
-                    className={css.historyLoadButton}
-                    disabled={olderBusy || onLoadOlder === undefined}
-                    aria-label={olderBusy
-                      ? 'Loading earlier history…'
-                      : 'Load earlier history'}
-                    onClick={() => {
-                      const pane = tablePaneRef.current
-                      if (pane !== null) requestOlder(pane, false)
-                    }}
-                  >
-                    {olderBusy && (
-                      <span className={css.historyLoadingSpinner} aria-hidden="true" />
-                    )}
-                    <span aria-hidden="true">
-                      {olderBusy ? 'Loading earlier history…' : 'Load earlier history'}
-                    </span>
-                    <span className={css.visuallyHidden} role="status" aria-live="polite">
-                      {olderBusy ? 'Loading earlier history…' : ''}
-                    </span>
-                  </button>
-                </td>
-              </tr>
-            )}
-            {virtualTop > 0 && (
-              <tr className={css.virtualSpacer} data-virtual-spacer="top" aria-hidden="true">
-                <td
-                  colSpan={2}
-                  style={{
-                    '--trajectory-virtual-spacer-height': `${virtualTop}px`,
-                  } as VirtualSpacerStyle}
-                />
-              </tr>
-            )}
-            {renderedRecords.map(({ record, position, terminalRequestBoundary }) => (
-              <RecordPresentation
-                key={trajectoryVirtualRecordKey(record)}
-                cell={record.cell}
-              >
-                {({ displayText, listDisplayText, resultText, toolCallOnly, toolCallText }) => {
-                  const isCollapsedSummary = record.collapsedSummary !== undefined
-                  const isRequestOnly = record.cell.requestOnly === true
-                  const isInitialSystem = record.cell.kind === 'system'
+        {compact ? (
+          <TrajectoryMobileFeed
+            items={mobileItems}
+            logicalCount={records.length + historyRowOffset}
+            scrollReady={tableScrollReady}
+            virtualTop={virtualTop}
+            virtualBottom={virtualBottom}
+            historyLoading={showInitialLoading}
+            olderBusy={olderBusy}
+            hasOlderRecords={hasOlderRecords}
+            onLoadOlder={() => {
+              const pane = tablePaneRef.current
+              if (pane !== null) requestOlder(pane, false)
+            }}
+            selectedIndex={selectedIndex}
+            timelineFocusIndexes={timelineFocusIndexes}
+            onRecordSelect={selectRecord}
+            onRequestSelect={(request: TrajectoryMobileRequestSelection) => { selectRequest(request) }}
+            onToggleTurn={onToggleTurn}
+            onToggleAssistant={onToggleAssistant}
+          />
+        ) : (
+          <table
+            className={css.table}
+            data-scroll-ready={tableScrollReady || undefined}
+            aria-rowcount={records.length + historyRowOffset}
+          >
+            <colgroup>
+              <col className={css.eventColumn} />
+              <col className={css.contentColumn} />
+            </colgroup>
+            <tbody>
+              {hasOlderRecords && (
+                <tr
+                  className={css.historyLoadRow}
+                  data-history-load=""
+                  aria-rowindex={1}
+                >
+                  <td colSpan={2}>
+                    <button
+                      type="button"
+                      className={css.historyLoadButton}
+                      disabled={olderBusy || onLoadOlder === undefined}
+                      aria-label={olderBusy
+                        ? 'Loading earlier history…'
+                        : 'Load earlier history'}
+                      onClick={() => {
+                        const pane = tablePaneRef.current
+                        if (pane !== null) requestOlder(pane, false)
+                      }}
+                    >
+                      {olderBusy && (
+                        <span className={css.historyLoadingSpinner} aria-hidden="true" />
+                      )}
+                      <span aria-hidden="true">
+                        {olderBusy ? 'Loading earlier history…' : 'Load earlier history'}
+                      </span>
+                      <span className={css.visuallyHidden} role="status" aria-live="polite">
+                        {olderBusy ? 'Loading earlier history…' : ''}
+                      </span>
+                    </button>
+                  </td>
+                </tr>
+              )}
+              {virtualTop > 0 && (
+                <tr className={css.virtualSpacer} data-virtual-spacer="top" aria-hidden="true">
+                  <td
+                    colSpan={2}
+                    style={{
+                      '--trajectory-virtual-spacer-height': `${virtualTop}px`,
+                    } as VirtualSpacerStyle}
+                  />
+                </tr>
+              )}
+              {renderedRecords.map(({ record, position, terminalRequestBoundary }) => (
+                <RecordPresentation
+                  key={trajectoryVirtualRecordKey(record)}
+                  cell={record.cell}
+                >
+                  {({ displayText, listDisplayText, resultText, toolCallOnly, toolCallText }) => {
+                    const isCollapsedSummary = record.collapsedSummary !== undefined
+                    const isRequestOnly = record.cell.requestOnly === true
+                    const isInitialSystem = record.cell.kind === 'system'
                 && record.cell.index === allRecords[0]?.cell.index
-                  const key = requestKey(record.turn, record.group)
-                  const request = requestBoundaries.get(key) === record.cell.index
+                    const key = requestKey(record.turn, record.group)
+                    const request = requestBoundaries.get(key) === record.cell.index
                 && !isCollapsedSummary
                 && (record.turn === null || !collapsedTurns.has(record.turn))
-                    ? requestNumbers.get(key)
-                    : undefined
-                  const requestInfo = request === undefined
-                    ? undefined
-                    : sessionRequestNumbers?.find(candidate => candidate.number === request)
-                  const requestStatus = requestInfo?.status
+                      ? requestNumbers.get(key)
+                      : undefined
+                    const requestInfo = request === undefined
+                      ? undefined
+                      : sessionRequestNumbers?.find(candidate => candidate.number === request)
+                    const requestStatus = requestInfo?.status
                 ?? (record.cell.isError === true ? 'error' : undefined)
-                  const requestRunIndex = requestBoundaryRuns.get(record.cell.index) ?? 0
-                  const requestBoundaryStyle: RequestBoundaryStyle = {
-                    '--request-boundary-offset': `${requestRunIndex * 8}px`,
-                  }
-                  const requestLabel = request === undefined
-                    ? undefined
-                    : `Request #${request}${requestInfo?.purpose === 'compaction' ? ' · Compaction' : ''}`
-                  const requestSelected = request !== undefined
+                    const requestRunIndex = requestBoundaryRuns.get(record.cell.index) ?? 0
+                    const requestBoundaryStyle: RequestBoundaryStyle = {
+                      '--request-boundary-offset': `${requestRunIndex * 8}px`,
+                    }
+                    const requestLabel = request === undefined
+                      ? undefined
+                      : `Request #${request}${requestInfo?.purpose === 'compaction' ? ' · Compaction' : ''}`
+                    const requestSelected = request !== undefined
                 && selectedRequest?.turn === record.turn
                 && selectedRequest.group === record.group
-                  const sectionActive = record.turn === null
-                    ? activeSection === record.section
-                    : activeTurn === record.turn
-                  return (
-                    <tr
-                      tabIndex={isRequestOnly ? -1 : 0}
-                      aria-rowindex={position + 1 + historyRowOffset}
-                      aria-label={isCollapsedSummary
-                        ? `Collapsed ${record.collapsedSummaryKind} summary, ${record.collapsedSummary}`
-                        : isRequestOnly
-                          ? `Request ${request ?? ''}, compaction`
-                          : `${request === undefined ? '' : `Request ${request}, `}${KIND_LABEL[record.cell.kind]}, ${listDisplayText || 'no content'}`}
-                      aria-selected={!isCollapsedSummary && !isRequestOnly && selectedIndex === record.cell.index}
-                      data-kind={record.cell.kind}
-                      data-trajectory-row-key={trajectoryVirtualRecordKey(record)}
-                      data-virtual-position={virtualizationEnabled ? position : undefined}
-                      data-record-index={!isCollapsedSummary && !isRequestOnly
-                        ? record.cell.index
-                        : undefined}
-                      data-request-only={isRequestOnly || undefined}
-                      data-terminal-request-boundary={terminalRequestBoundary || undefined}
-                      data-group-start={record.groupStart || undefined}
-                      data-turn-start={record.turnStart || undefined}
-                      data-error={record.cell.isError || undefined}
-                      data-running={stateOf(record) === 'running' || undefined}
-                      data-turn-end={record.turnEnd || undefined}
-                      data-collapsed-summary={record.collapsedSummaryKind}
-                      data-selected={!isCollapsedSummary && selectedIndex === record.cell.index || undefined}
-                      data-timeline-focus={isCollapsedSummary || timelineFocusIndexes === null
-                        ? undefined
-                        : timelineFocusIndexes.has(record.cell.index) ? 'inside' : 'outside'}
-                      onClick={isRequestOnly
-                        ? undefined
-                        : isCollapsedSummary
-                          ? () => {
+                    const sectionActive = record.turn === null
+                      ? activeSection === record.section
+                      : activeTurn === record.turn
+                    return (
+                      <tr
+                        tabIndex={isRequestOnly ? -1 : 0}
+                        aria-rowindex={position + 1 + historyRowOffset}
+                        aria-label={isCollapsedSummary
+                          ? `Collapsed ${record.collapsedSummaryKind} summary, ${record.collapsedSummary}`
+                          : isRequestOnly
+                            ? `Request ${request ?? ''}, compaction`
+                            : `${request === undefined ? '' : `Request ${request}, `}${KIND_LABEL[record.cell.kind]}, ${listDisplayText || 'no content'}`}
+                        aria-selected={!isCollapsedSummary && !isRequestOnly && selectedIndex === record.cell.index}
+                        data-kind={record.cell.kind}
+                        data-trajectory-row-key={trajectoryVirtualRecordKey(record)}
+                        data-virtual-position={virtualizationEnabled ? position : undefined}
+                        data-record-index={!isCollapsedSummary && !isRequestOnly
+                          ? record.cell.index
+                          : undefined}
+                        data-request-only={isRequestOnly || undefined}
+                        data-terminal-request-boundary={terminalRequestBoundary || undefined}
+                        data-group-start={record.groupStart || undefined}
+                        data-turn-start={record.turnStart || undefined}
+                        data-error={record.cell.isError || undefined}
+                        data-running={stateOf(record) === 'running' || undefined}
+                        data-turn-end={record.turnEnd || undefined}
+                        data-collapsed-summary={record.collapsedSummaryKind}
+                        data-selected={!isCollapsedSummary && selectedIndex === record.cell.index || undefined}
+                        data-timeline-focus={isCollapsedSummary || timelineFocusIndexes === null
+                          ? undefined
+                          : timelineFocusIndexes.has(record.cell.index) ? 'inside' : 'outside'}
+                        onClick={isRequestOnly
+                          ? undefined
+                          : isCollapsedSummary
+                            ? () => {
+                              if (record.collapsedSummaryKind === 'turn' && record.turn !== null) {
+                                onToggleTurn(record.turn)
+                              } else onToggleAssistant(trajectoryRecordId(record.cell))
+                            }
+                            : () => { selectRecord(record.cell.index) }}
+                        onDoubleClick={(event) => {
+                          if (isCollapsedSummary || isRequestOnly) return
+                          if (record.turn !== null && collapsedTurns.has(record.turn)) {
+                            event.preventDefault()
+                            onToggleTurn(record.turn)
+                            return
+                          }
+                          if (
+                            record.cell.kind === 'message'
+                      && assistantToolCalls(allRecords, record.cell.index).length > 0
+                          ) {
+                            event.preventDefault()
+                            onToggleAssistant(trajectoryRecordId(record.cell))
+                            return
+                          }
+                          if (!record.turnStart) return
+                          if (record.turn === null) return
+                          if (allRecords.filter(candidate =>
+                            candidate.turn === record.turn
+                      && candidate.cell.requestOnly !== true
+                      && candidate.cell.kind !== 'system').length <= 1) return
+                          event.preventDefault()
+                          onToggleTurn(record.turn)
+                        }}
+                        onKeyDown={(event) => {
+                          if (isRequestOnly) return
+                          if (event.key !== 'Enter' && event.key !== ' ') return
+                          event.preventDefault()
+                          if (isCollapsedSummary) {
                             if (record.collapsedSummaryKind === 'turn' && record.turn !== null) {
                               onToggleTurn(record.turn)
                             } else onToggleAssistant(trajectoryRecordId(record.cell))
+                            return
                           }
-                          : () => { selectRecord(record.cell.index) }}
-                      onDoubleClick={(event) => {
-                        if (isCollapsedSummary || isRequestOnly) return
-                        if (record.turn !== null && collapsedTurns.has(record.turn)) {
-                          event.preventDefault()
-                          onToggleTurn(record.turn)
-                          return
-                        }
-                        if (
-                          record.cell.kind === 'message'
-                      && assistantToolCalls(allRecords, record.cell.index).length > 0
-                        ) {
-                          event.preventDefault()
-                          onToggleAssistant(trajectoryRecordId(record.cell))
-                          return
-                        }
-                        if (!record.turnStart) return
-                        if (record.turn === null) return
-                        if (allRecords.filter(candidate =>
-                          candidate.turn === record.turn
-                      && candidate.cell.requestOnly !== true
-                      && candidate.cell.kind !== 'system').length <= 1) return
-                        event.preventDefault()
-                        onToggleTurn(record.turn)
-                      }}
-                      onKeyDown={(event) => {
-                        if (isRequestOnly) return
-                        if (event.key !== 'Enter' && event.key !== ' ') return
-                        event.preventDefault()
-                        if (isCollapsedSummary) {
-                          if (record.collapsedSummaryKind === 'turn' && record.turn !== null) {
-                            onToggleTurn(record.turn)
-                          } else onToggleAssistant(trajectoryRecordId(record.cell))
-                          return
-                        }
-                        selectRecord(record.cell.index)
-                      }}
-                    >
-                      <td className={css.event}>
-                        {request !== undefined && (
-                          <button
-                            type="button"
-                            className={requestSelected
-                              ? `${css.requestBoundaryControl} ${css.requestBoundaryControlActive}`
-                              : css.requestBoundaryControl}
-                            aria-label={requestLabel}
-                            aria-pressed={requestSelected}
-                            data-label={requestLabel}
-                            data-request-run-index={requestRunIndex}
-                            data-request-status={requestStatus}
-                            style={requestBoundaryStyle}
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              selectRequest({
-                                turn: record.turn,
-                                group: record.group,
-                                ...(requestInfo?.seq === undefined ? {} : { seq: requestInfo.seq }),
-                              })
-                            }}
-                            onDoubleClick={(event) => { event.stopPropagation() }}
-                          />
-                        )}
-                        {record.turn !== null
+                          selectRecord(record.cell.index)
+                        }}
+                      >
+                        <td className={css.event}>
+                          {request !== undefined && (
+                            <button
+                              type="button"
+                              className={requestSelected
+                                ? `${css.requestBoundaryControl} ${css.requestBoundaryControlActive}`
+                                : css.requestBoundaryControl}
+                              aria-label={requestLabel}
+                              aria-pressed={requestSelected}
+                              data-label={requestLabel}
+                              data-request-run-index={requestRunIndex}
+                              data-request-status={requestStatus}
+                              style={requestBoundaryStyle}
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                selectRequest({
+                                  turn: record.turn,
+                                  group: record.group,
+                                  ...(requestInfo?.seq === undefined ? {} : { seq: requestInfo.seq }),
+                                })
+                              }}
+                              onDoubleClick={(event) => { event.stopPropagation() }}
+                            />
+                          )}
+                          {record.turn !== null
                     && activeTurn === record.turn
                     && !isInitialSystem && (
-                          <span className={css.turnRail} aria-hidden="true" />
-                        )}
-                        {!isCollapsedSummary && selectedIndex === record.cell.index && (
-                          <span className={css.selectionRail} aria-hidden="true" />
-                        )}
-                        {!isCollapsedSummary
+                            <span className={css.turnRail} aria-hidden="true" />
+                          )}
+                          {!isCollapsedSummary && selectedIndex === record.cell.index && (
+                            <span className={css.selectionRail} aria-hidden="true" />
+                          )}
+                          {!isCollapsedSummary
                     && !isRequestOnly
                     && record.turnStart && (
-                          <span
-                            className={sectionActive
-                              ? `${css.turnLabel} ${css.turnLabelActive}`
-                              : css.turnLabel}
-                            aria-label={sectionLabel(record.turn)}
-                          >
-                            {record.turn === null
-                              ? sectionLabel(record.turn)
-                              : (
-                                <>
-                                  <span className={css.turnLabelFull} aria-hidden="true">
-                                    {sectionLabel(record.turn)}
-                                  </span>
-                                  <span className={css.turnLabelCompact} aria-hidden="true">
-                                    #{record.turn}
-                                  </span>
-                                </>
-                              )}
-                          </span>
-                        )}
-                        <div className={css.eventInner}>
-                          {!isCollapsedSummary && !isRequestOnly && (
                             <span
-                              className={css.kindSlot}
+                              className={sectionActive
+                                ? `${css.turnLabel} ${css.turnLabelActive}`
+                                : css.turnLabel}
+                              aria-label={sectionLabel(record.turn)}
                             >
-                              <span
-                                className={`${css.kindTag} ${
-                                  record.cell.kind === 'system'
-                                    ? css.systemNeutral
-                                    : record.cell.kind === 'context'
-                                      ? css.contextGreen
-                                      : record.cell.kind === 'compacted'
-                                        ? css.compacted
-                                        : record.cell.kind === 'tool'
-                                          ? css.toolAmber
-                                          : record.cell.kind === 'message'
-                                            ? css.assistantVioletBright
-                                            : record.cell.kind === 'subtool'
-                                              ? css.subtoolAmber
-                                              : css[record.cell.kind]
-                                }`}
-                                data-role-kind={record.cell.kind}
-                              >
-                                <Tooltip
-                                  label={KIND_LABEL[record.cell.kind]}
-                                  side="right"
-                                >
-                                  <span className={css.kindTagIcon} aria-hidden="true">
-                                    {KIND_ICON[record.cell.kind]}
-                                  </span>
-                                </Tooltip>
-                                <span className={css.kindTagLabel}>
-                                  {KIND_LABEL[record.cell.kind]}
-                                </span>
-                              </span>
+                              {record.turn === null
+                                ? sectionLabel(record.turn)
+                                : (
+                                  <>
+                                    <span className={css.turnLabelFull} aria-hidden="true">
+                                      {sectionLabel(record.turn)}
+                                    </span>
+                                    <span className={css.turnLabelCompact} aria-hidden="true">
+                                      #{record.turn}
+                                    </span>
+                                  </>
+                                )}
                             </span>
                           )}
-                        </div>
-                      </td>
-                      <td className={css.content}>
-                        {isRequestOnly
-                          ? null
-                          : record.collapsedSummary !== undefined
-                            ? (
-                              <span className={css.collapsedTurnContent} title={record.collapsedSummary}>
-                                <span className={css.collapsedTurnEllipsis}>…</span>
-                                <span className={css.collapsedTurnText}>{record.collapsedSummary}</span>
-                              </span>
-                            )
-                            : (
+                          <div className={css.eventInner}>
+                            {!isCollapsedSummary && !isRequestOnly && (
                               <span
-                                className={resultText === undefined ? css.contentText : css.resultPreview}
-                                title={resultText === undefined
-                                  ? listDisplayText
-                                  : `${listDisplayText} → ${resultText}`}
+                                className={css.kindSlot}
                               >
-                                <span className={resultText === undefined ? undefined : css.resultRequest}>
-                                  <RecordListText
-                                    displayText={displayText}
-                                    toolCallOnly={toolCallOnly}
-                                    toolCallText={toolCallText}
-                                  />
-                                </span>
-                                {resultText !== undefined && (
-                                  <span className={record.cell.isError ? `${css.inlineResult} ${css.error}` : css.inlineResult}>
-                                    <span className={css.arrow}>→</span>
-                                    <span className={resultText === 'No output'
-                                      ? `${css.inlineResultText} ${css.noOutputText}`
-                                      : css.inlineResultText}
-                                    >
-                                      {resultText}
+                                <span
+                                  className={`${css.kindTag} ${
+                                    record.cell.kind === 'system'
+                                      ? css.systemNeutral
+                                      : record.cell.kind === 'context'
+                                        ? css.contextGreen
+                                        : record.cell.kind === 'compacted'
+                                          ? css.compacted
+                                          : record.cell.kind === 'tool'
+                                            ? css.toolAmber
+                                            : record.cell.kind === 'message'
+                                              ? css.assistantVioletBright
+                                              : record.cell.kind === 'subtool'
+                                                ? css.subtoolAmber
+                                                : css[record.cell.kind]
+                                  }`}
+                                  data-role-kind={record.cell.kind}
+                                >
+                                  <Tooltip
+                                    label={KIND_LABEL[record.cell.kind]}
+                                    side="right"
+                                  >
+                                    <span className={css.kindTagIcon} aria-hidden="true">
+                                      {KIND_ICON[record.cell.kind]}
                                     </span>
+                                  </Tooltip>
+                                  <span className={css.kindTagLabel}>
+                                    {KIND_LABEL[record.cell.kind]}
                                   </span>
-                                )}
+                                </span>
                               </span>
                             )}
-                      </td>
-                    </tr>
-                  )
-                }}
-              </RecordPresentation>
-            ))}
-            {virtualBottom > 0 && (
-              <tr className={css.virtualSpacer} data-virtual-spacer="bottom" aria-hidden="true">
-                <td
-                  colSpan={2}
-                  style={{
-                    '--trajectory-virtual-spacer-height': `${virtualBottom}px`,
-                  } as VirtualSpacerStyle}
-                />
-              </tr>
-            )}
-          </tbody>
-        </table>
+                          </div>
+                        </td>
+                        <td className={css.content}>
+                          {isRequestOnly
+                            ? null
+                            : record.collapsedSummary !== undefined
+                              ? (
+                                <span className={css.collapsedTurnContent} title={record.collapsedSummary}>
+                                  <span className={css.collapsedTurnEllipsis}>…</span>
+                                  <span className={css.collapsedTurnText}>{record.collapsedSummary}</span>
+                                </span>
+                              )
+                              : (
+                                <span
+                                  className={resultText === undefined ? css.contentText : css.resultPreview}
+                                  title={resultText === undefined
+                                    ? listDisplayText
+                                    : `${listDisplayText} → ${resultText}`}
+                                >
+                                  <span className={resultText === undefined ? undefined : css.resultRequest}>
+                                    <RecordListText
+                                      displayText={displayText}
+                                      toolCallOnly={toolCallOnly}
+                                      toolCallText={toolCallText}
+                                    />
+                                  </span>
+                                  {resultText !== undefined && (
+                                    <span className={record.cell.isError ? `${css.inlineResult} ${css.error}` : css.inlineResult}>
+                                      <span className={css.arrow}>→</span>
+                                      <span className={resultText === 'No output'
+                                        ? `${css.inlineResultText} ${css.noOutputText}`
+                                        : css.inlineResultText}
+                                      >
+                                        {resultText}
+                                      </span>
+                                    </span>
+                                  )}
+                                </span>
+                              )}
+                        </td>
+                      </tr>
+                    )
+                  }}
+                </RecordPresentation>
+              ))}
+              {virtualBottom > 0 && (
+                <tr className={css.virtualSpacer} data-virtual-spacer="bottom" aria-hidden="true">
+                  <td
+                    colSpan={2}
+                    style={{
+                      '--trajectory-virtual-spacer-height': `${virtualBottom}px`,
+                    } as VirtualSpacerStyle}
+                  />
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
-      {(selectedRequest !== null
-        || promptSelected
-        || (selected !== undefined && selectedState !== undefined)) && (
+      {detailsOpen && (
         <>
           <div
             className={css.detailsBackdrop}
@@ -2542,6 +2678,8 @@ export function TrajectoryTable({
           <aside
             className={css.details}
             data-trajectory-details
+            role={compact ? 'dialog' : 'complementary'}
+            aria-modal={compact ? true : undefined}
             aria-label="Event details"
             style={detailsWidth === null ? undefined : { width: detailsWidth }}
           >
@@ -2672,6 +2810,7 @@ export function TrajectoryTable({
               </div>
               <button
                 type="button"
+                ref={detailsCloseRef}
                 className={css.close}
                 aria-label="Close details"
                 onClick={clearInspectorSelection}

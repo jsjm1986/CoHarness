@@ -6,7 +6,7 @@
 
 该 bundle 会为 Gateway 启动的每个个人和项目实例挂载 `dsh-gateway-runtime`。它的 peer 服务包由宿主安装提供，因此插件与挂载的运行时共享同一份 Cordis 实例。
 
-策略与用量记录不包含 API Key、提示词或回复内容。组织凭据在 Gateway 数据库中保持加密，只在适配器解析其引用时通过已鉴权的回环运行时 API 传递。凭据来源只是用于区分公司与个人成本的非秘密层标识。以 UUID 命名的 outbox 文件通过同目录 rename 提交，仅在 intake 成功响应后删除；intake 去重使重试安全。
+策略与用量记录不包含 API Key、提示词或回复内容。组织凭据在 Gateway 数据库中保持加密，只在适配器解析其引用时通过已鉴权的回环运行时 API 传递。凭据来源只是用于区分公司与个人成本的非秘密层标识。共享项目用量在 durable request 消息中存在已验证 participant 时会携带其用户 ID 与项目 ID；Gateway 会校验项目作用域，这些 ID 只用于活动报告，不改变账务归属。若 actor 校验失败，outbox 会用同一事件去掉活动字段重试，使项目账务仍记录为未归属。以 UUID 命名的 outbox 文件通过同目录 rename 提交，仅在 intake 成功响应后删除；intake 去重使重试安全。
 
 个人 settings 成功提交后，还会为 Provider/model 的新增、修改和删除生成 `model-registration` 记录。插件挂载时会为 user settings 层中已经存在的身份生成确定性基线记录，重启重放时按事件 ID 幂等。记录只包含路由身份、动作、作用域和时间戳，绝不包含凭据引用值、profile 内容、标头、提示词或回复。它们与用量记录共用 outbox 和 intake 令牌，但 Gateway 存储和管理员查询会把登记历史与调用用量分开。项目运行时不会产生个人登记记录。
 

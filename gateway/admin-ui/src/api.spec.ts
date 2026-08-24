@@ -3,6 +3,9 @@ import {
   deleteUser,
   getProjectModelAccess,
   getProjectUsage,
+  getUsageHealth,
+  listUsageContributors,
+  listUsageOverview,
   listAudit,
   listModelRegistrations,
   listModelProviders,
@@ -100,6 +103,20 @@ describe('admin api URLs', () => {
         headers: { 'content-type': 'application/json' },
       },
     ])
+  })
+
+  it('GETs the usage overview and contributor report with the selected month', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonOk({ month: '2026-08', users: [] }))
+      .mockResolvedValueOnce(jsonOk({ month: '2026-08', rows: [] }))
+      .mockResolvedValueOnce(jsonOk({ month: '2026-08' }))
+    vi.stubGlobal('fetch', fetchMock)
+    await listUsageOverview('2026-08')
+    await listUsageContributors(7, '2026-08')
+    await getUsageHealth('2026-08')
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/admin/api/usage/overview?month=2026-08')
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('/admin/api/usage/contributors?projectId=7&month=2026-08')
+    expect(fetchMock.mock.calls[2]?.[0]).toBe('/admin/api/usage/health?month=2026-08')
   })
 
   it('GETs filtered personal model registration history', async () => {

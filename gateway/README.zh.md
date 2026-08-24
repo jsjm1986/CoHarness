@@ -91,7 +91,8 @@ Session ACL 检查会在每次操作中查询当前成员身份。只依赖 scop
 
 钉死版本的 PostgreSQL 17 部署位于 [`deploy/postgres/`](deploy/postgres/README.zh.md)。Gateway 入口会应用其不可变 migration，并在配置的活跃企业与计算节点无法解析时拒绝监听。认证、用户、项目、个人/项目实例、共享项目对话、协作抢占、审计、模型治理、额度与用量都由 PostgreSQL 支撑。内部 UUID 保留企业外键，数字公共 ID 保持现有 HTTP API 稳定。SQLite 只保留为停止写入后的最终导入源和回滚备份；运行中的 Gateway 不会打开它。
 
-每次调用都会先以 UUID 写入运行时本地的崩溃安全 outbox。仅回环的 intake 在 PostgreSQL 中按 UUID 去重，按调用时间选择生效价格版本，并根据非秘密凭据来源标签归属公司成本（`file`/`project-env`/`request` 为个人，启动环境来源为公司，未知来源按公司成本保守计入）。账本不写 API Key、提示词或回复内容。自然月使用 `HGW_USAGE_TIME_ZONE`；Token 与公司成本额度支持角色默认、按用户继承/不限/自定义，以及项目继承或显式额度。额度只在 80% 和 100% 提醒，不阻断调用。用户在 Web shell 看到持久阈值提醒；管理员看到按用户和按项目自然月汇总、缺失计量次数、估算成本和公司成本。
+每次调用都会先以 UUID 写入运行时本地的崩溃安全 outbox。仅回环的 intake 在 PostgreSQL 中按 UUID 去重，按调用时间选择生效价格版本，并根据非秘密凭据来源标签归属公司成本（`file`/`project-env`/`request` 为个人，启动环境来源为公司，未知来源按公司成本保守计入）。账本不写 API Key、提示词或回复内容。自然月使用 `HGW_USAGE_TIME_ZONE`；Token 与公司成本额度支持角色默认、按用户继承/不限/自定义，以及项目继承或显式额度。额度只在 80% 和 100% 提醒，不阻断调用。账务归属始终只属于一个用户或项目；共享项目记录在可确认时额外保存已验证的参与者 ID，用于非计费活动分析；无法还原的历史项目记录保持未归属。用户在 Web shell 看到持久阈值提醒；管理员看到分开的个人、项目和贡献者汇总、缺失计量次数以及明确的价格覆盖状态。
+Admin 用量 API 保留原有主体汇总，并新增 `/admin/api/usage/overview`、`/admin/api/usage/contributors` 与 `/admin/api/usage/health`；贡献者行只是活动投影，绝不会加到项目账务总量中。归档身份仍会保留在 overview 中，使历史个人用量与已确认的项目活动能够继续和主体总量对账。
 个人 settings 变化会使用同一套已鉴权 outbox，并以 `model-registration` 类型记录。Gateway 将 Provider/model 的新增、修改和删除与用量分开保存，并在管理员 Models 页面提供查询；记录只包含路由身份和时间戳。
 
 ## 目录强制的分层

@@ -9,7 +9,8 @@ import css from './HeaderAction.module.css'
  * @returns the persistent Header action and Session-scoped dialog.
  */
 export function SessionLogDownloadHeaderAction(props: SessionLogDownloadDialogProps): ReactNode {
-  const { sessionId, useSessionLogDownload, request } = props
+  const { sessionId, useSessionLogDownload, request, compact = false, t } = props
+  if (compact) return null
   const entry = useSessionLogDownload(state => state.bySession[String(sessionId)])
   const busy = entry?.status === 'downloading'
 
@@ -20,10 +21,12 @@ export function SessionLogDownloadHeaderAction(props: SessionLogDownloadDialogPr
         className={css.sessionLogButton}
         disabled={busy}
         aria-busy={busy}
+        aria-label={t('button.desktop')}
+        title={t('button.desktop')}
         onClick={() => { void request(sessionId) }}
       >
-        <span>Session log</span>
-        <IconDownloadOutline16 size={12} />
+        <span>{t('button.desktop')}</span>
+        <IconDownloadOutline16 size={16} />
       </button>
       <SessionLogDownloadDialog {...props} />
     </>

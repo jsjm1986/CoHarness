@@ -84,12 +84,16 @@ async function openTrajectory(page: Page): Promise<void> {
   await page.getByRole('tab', { name: 'Trajectory', exact: true }).click()
   const pane = page.locator('[data-trajectory-scroll]')
   await pane.waitFor({ timeout: 30_000 })
-  await page.locator('[data-trajectory-scroll] table[data-scroll-ready="true"]')
+  await page.locator('[data-trajectory-scroll] [data-scroll-ready="true"]')
     .waitFor({ timeout: 30_000 })
 }
 
 async function logicalRows(page: Page): Promise<number> {
-  const raw = await page.locator('[data-trajectory-scroll] table').getAttribute('aria-rowcount')
+  const table = page.locator('[data-trajectory-scroll] table')
+  const feed = page.locator('[data-trajectory-scroll] [data-trajectory-feed]')
+  const raw = await (await table.count() > 0 ? table : feed).getAttribute(
+    await table.count() > 0 ? 'aria-rowcount' : 'aria-setsize',
+  )
   if (raw === null || !/^\d+$/.test(raw)) {
     throw new Error(`trajectory table has invalid aria-rowcount ${JSON.stringify(raw)}`)
   }
@@ -97,7 +101,7 @@ async function logicalRows(page: Page): Promise<number> {
 }
 
 async function mountedRows(page: Page): Promise<number> {
-  return page.locator('[data-trajectory-scroll] tr[data-trajectory-row-key]').count()
+  return page.locator('[data-trajectory-scroll] [data-trajectory-row-key]').count()
 }
 
 async function geometry(page: Page): Promise<ScrollGeometry> {
@@ -126,7 +130,7 @@ async function scrollToRatio(page: Page, ratio: number): Promise<void> {
 async function firstVisibleRow(page: Page): Promise<RowAnchor> {
   return page.locator('[data-trajectory-scroll]').evaluate((host) => {
     const hostBox = host.getBoundingClientRect()
-    const rows = [...host.querySelectorAll<HTMLElement>('tr[data-trajectory-row-key]')]
+    const rows = [...host.querySelectorAll<HTMLElement>('[data-trajectory-row-key]')]
     const row = rows.find((candidate) => {
       const box = candidate.getBoundingClientRect()
       return candidate.dataset.requestOnly !== 'true'
@@ -143,7 +147,7 @@ async function firstVisibleRow(page: Page): Promise<RowAnchor> {
 
 async function rowTop(page: Page, key: string): Promise<number | null> {
   return page.locator('[data-trajectory-scroll]').evaluate((host, targetKey) => {
-    const rows = [...host.querySelectorAll<HTMLElement>('tr[data-trajectory-row-key]')]
+    const rows = [...host.querySelectorAll<HTMLElement>('[data-trajectory-row-key]')]
     const row = rows.find(candidate => candidate.dataset.trajectoryRowKey === targetKey)
     return row === undefined
       ? null
@@ -343,4 +347,30 @@ describe('web e2e: Trajectory virtualization over tail-paged history', () => {
       await page.unroute('**/api/session.history')
     }
   }, 180_000)
+
+  it.skipIf(MODE === 'record')('uses the bounded mobile feed presenter at phone width', async () => {
+    const mobilePage = await browser.newPage({
+      viewport: { width: 390, height: 844 },
+      locale: 'en-US',
+      hasTouch: true,
+      isMobile: true,
+    })
+    try {
+      await mobilePage.goto(scaffold.baseUrl, { waitUntil: 'load' })
+      await mobilePage.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+      await openSeed(mobilePage)
+      await openTrajectory(mobilePage)
+      await expect(mobilePage.locator('[data-trajectory-feed]')).toHaveCount(1)
+      await expect(mobilePage.locator('[data-trajectory-scroll] table')).toHaveCount(0)
+      expect(await mountedRows(mobilePage)).toBeLessThanOrEqual(MAX_MOUNTED_ROWS)
+      const first = mobilePage.locator('[data-trajectory-feed] [data-record-index]').first().getByRole('button').last()
+      await first.click()
+      await expect(mobilePage.locator('[data-trajectory-details]')).toHaveAttribute('role', 'dialog')
+      await expect(mobilePage.locator('[data-trajectory-details]')).toHaveAttribute('aria-modal', 'true')
+      await mobilePage.getByRole('button', { name: 'Close details' }).click()
+      await expect(mobilePage.locator('[data-trajectory-details]')).toHaveCount(0)
+    } finally {
+      await mobilePage.close()
+    }
+  }, 120_000)
 })

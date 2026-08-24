@@ -17,6 +17,9 @@ describe('conversation compact chrome', () => {
     expect(root).toContain('overflow-x: auto')
     expect(root).toContain('.crumb')
     expect(root).toContain('max-width: 100%')
+    expect(root).toContain('display: contents')
+    expect(root).toContain('var(--dsw-mobile-tab-height)')
+    expect(root).toContain('.headerUtilities')
   })
 
   it('shrinks the hero headline and grows the workspace chip on compact', () => {

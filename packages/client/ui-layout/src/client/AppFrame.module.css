@@ -25,11 +25,12 @@
 }
 
 .frame[data-viewport='compact'][data-viewport-short] .topbar {
-  min-height: 48px;
+  min-height: var(--dsw-mobile-header-height);
 }
 
 .topbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: var(--dsw-touch-target) minmax(0, 1fr) var(--dsw-touch-target);
   grid-column: 1;
   justify-self: start;
   align-self: stretch;
@@ -38,9 +39,9 @@
   min-width: 0;
   margin: 0;
   align-items: center;
-  gap: var(--dsw-space-2);
-  min-height: 52px;
-  padding: calc(var(--dsw-space-1) + var(--dsw-safe-top)) var(--dsw-space-2) var(--dsw-space-1)
+  gap: var(--dsw-space-1);
+  min-height: var(--dsw-mobile-header-height);
+  padding: var(--dsw-safe-top) var(--dsw-space-2) 0
     calc(var(--dsw-space-2) + var(--dsw-safe-left));
   border-bottom: 1px solid var(--dsw-alias-border-l1);
   background: var(--dsw-alias-bg-base);
@@ -53,6 +54,26 @@
   align-items: center;
   justify-content: center;
   padding: 0 var(--dsw-space-2);
+}
+
+.topbarActions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--dsw-space-1);
+  overflow: hidden;
+}
+
+.topbarActions:empty {
+  display: block;
+}
+
+.topbarActions button,
+.topbarActions [role='button'] {
+  flex: none;
+  min-width: var(--dsw-touch-target);
+  min-height: var(--dsw-touch-target);
 }
 
 .topbarTitle {

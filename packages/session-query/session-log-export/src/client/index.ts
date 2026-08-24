@@ -4,9 +4,11 @@ import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/c
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-commands/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import { SessionLogDownloadController } from './controller.ts'
 import type { SessionLogDownloadDialogInjected } from './Dialog.tsx'
 import { SessionLogDownloadHeaderAction } from './HeaderAction.tsx'
+import { SessionLogDownloadMobileHeaderAction } from './MobileHeaderAction.tsx'
 import { en, NS, zh, type SessionLogDownloadKey } from './locales.ts'
 
 declare module '@deepseek-ai/cordis' {
@@ -47,6 +49,16 @@ export function apply(ctx: ClientContext): void {
       dismiss: (sessionId: SessionId) => { controller.dismiss(sessionId) },
     }),
   }, SessionLogDownloadHeaderAction))
+  ctx.slots.inject('shell.mobile.header.actions', () => ctx.slots.register({
+    name: 'shell.mobile.header.actions',
+    id: 'session-log-download',
+    locale: NS,
+    inject: (): SessionLogDownloadDialogInjected => ({
+      hooks: { sessionLogDownload: controller.store },
+      request: (sessionId: SessionId) => controller.download(sessionId),
+      dismiss: (sessionId: SessionId) => { controller.dismiss(sessionId) },
+    }),
+  }, SessionLogDownloadMobileHeaderAction))
 }
 
 export type { SessionLogDownloadDialogInjected, SessionLogDownloadDialogProps } from './Dialog.tsx'
