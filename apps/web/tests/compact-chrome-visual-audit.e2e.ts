@@ -48,16 +48,19 @@ async function dumpOverflow(page: Page): Promise<unknown> {
         const feed = el.closest<HTMLElement>('[data-trajectory-feed]')
         if (feed !== null) {
           const feedBox = feed.getBoundingClientRect()
-          if (box.bottom <= feedBox.top || box.top >= feedBox.bottom) return null
+          if (box.top < feedBox.top || box.bottom > feedBox.bottom) return null
         }
         const onScreen = box.right > 1 && box.left < vw - 1 && box.bottom > 1 && box.top < vh - 1
         if (!onScreen) return null
         const label = (el.getAttribute('aria-label') ?? el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 40)
+        const clipped = feed === null
+          ? box.right > vw + 1 || box.bottom > vh + 1 || box.left < -1 || box.top < -1
+          : box.right > vw + 1 || box.left < -1
         return {
           label,
           w: Math.round(box.width),
           h: Math.round(box.height),
-          clipped: box.right > vw + 1 || box.bottom > vh + 1 || box.left < -1 || box.top < -1,
+          clipped,
         }
       })
       .filter(row => row !== null)
