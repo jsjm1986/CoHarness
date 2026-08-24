@@ -365,7 +365,7 @@ function projectPagesInto(
     // A file the projection did not claim is another producer's output — in
     // the twin pass, the build VitePress just wrote, including `public/`
     // copies. Overwriting one would silently corrupt the site.
-    const identicalExisting = allowIdenticalExisting && existsSync(target)
+    const identicalExisting = allowIdenticalExisting && !replaceExisting.has(target) && existsSync(target)
       && statSync(target).size === statSync(sourceAbs).size
       && readFileSync(target).equals(readFileSync(sourceAbs))
     if (holder === undefined && existsSync(target)
