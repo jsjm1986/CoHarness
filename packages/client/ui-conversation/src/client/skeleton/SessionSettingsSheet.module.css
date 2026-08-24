@@ -5,7 +5,7 @@
   bottom: var(--dsw-mobile-sheet-bottom);
   left: max(var(--dsw-mobile-sheet-edge), var(--dsw-safe-left));
   display: flex;
-  max-height: var(--dsw-mobile-sheet-max-height);
+  max-height: min(64dvh, calc(var(--dsw-viewport-height, 100dvh) - 112px));
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--dsw-alias-border-l2);
@@ -23,7 +23,7 @@
   align-self: center;
   width: 36px;
   height: 4px;
-  margin: 8px auto 4px;
+  margin: 6px auto 2px;
   border-radius: var(--dsw-radius-full);
   background: var(--dsw-alias-label-caption);
   opacity: 0.7;
@@ -34,14 +34,14 @@
   flex: none;
   align-items: center;
   justify-content: space-between;
-  min-height: var(--dsw-mobile-control-height);
+  min-height: 48px;
   padding: 0 var(--dsw-space-3);
   border-bottom: 1px solid var(--dsw-alias-border-l2);
 }
 
 .title {
   margin: 0;
-  font: var(--dsw-mobile-font-title);
+  font: 600 16px/22px var(--dsw-font-family);
 }
 
 .close {
@@ -72,8 +72,8 @@
 .tabs {
   display: flex;
   flex: none;
-  gap: var(--dsw-space-1);
-  padding: var(--dsw-space-2) var(--dsw-space-2) 0;
+  gap: 2px;
+  padding: 4px 8px;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -85,15 +85,15 @@
 .tab {
   display: flex;
   flex: 1 0 0;
-  min-width: 88px;
-  min-height: var(--dsw-mobile-control-height);
-  flex-direction: column;
-  align-items: flex-start;
+  min-width: 0;
+  min-height: 40px;
+  flex-direction: row;
+  align-items: center;
   justify-content: center;
-  gap: 1px;
-  padding: var(--dsw-space-1) var(--dsw-space-2);
+  gap: 2px;
+  padding: 0 10px;
   border: 0;
-  border-radius: var(--dsw-radius-md) var(--dsw-radius-md) 0 0;
+  border-radius: var(--dsw-radius-md);
   background: transparent;
   color: var(--dsw-alias-label-secondary);
   text-align: left;
@@ -101,7 +101,7 @@
 }
 
 .tab[aria-selected='true'] {
-  background: var(--dsw-specific-sidebar-nav-item-active);
+  background: var(--dsw-alias-interactive-bg-active);
   color: var(--dsw-alias-label-primary);
 }
 
@@ -131,9 +131,10 @@
 
 .body {
   min-height: 0;
-  padding: var(--dsw-space-2) var(--dsw-space-3) var(--dsw-space-3);
+  padding: 0 8px 8px;
   overflow-y: auto;
   overscroll-behavior: contain;
+  --dsw-mobile-option-row-height: 44px;
 }
 
 @keyframes session-settings-sheet-in {

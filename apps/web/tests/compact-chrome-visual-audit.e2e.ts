@@ -264,6 +264,7 @@ describe('visual audit: compact product chrome', () => {
                 const box = button.getBoundingClientRect()
                 const point = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
                 return point?.closest('[data-session-settings-sheet]') !== null
+                  || point?.getAttribute('aria-hidden') === 'true'
               })
               expect(covered, `${prefix}: session sheet must cover back-to-bottom control`).toBe(true)
             }

@@ -9,4 +9,10 @@ describe('ModelSelect.module.css', () => {
   it('keeps the trigger inside the flex width assigned to its root', () => {
     expect(css).toMatch(/\.trigger\s*\{[^}]*\bwidth:\s*100%;/u)
   })
+
+  it('uses the compact option-row contract inside the shared settings sheet', () => {
+    expect(css).toContain('min-height: var(--dsw-mobile-option-row-height)')
+    expect(css).toContain(".sectionContent .option[aria-checked='true']")
+    expect(css).toContain('font-size: 11px')
+  })
 })
