@@ -2207,7 +2207,9 @@ a {
     left: 0;
     z-index: 10;
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    /* Six destinations are first-class on mobile. Keeping one compact row is
+       clearer than letting the last item wrap into the fixed footer height. */
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     min-height: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom, 0px));
     padding: 6px max(8px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px)
       max(8px, env(safe-area-inset-left, 0px));
@@ -2222,16 +2224,19 @@ a {
     justify-content: center;
     min-width: 0;
     min-height: 54px;
+    padding: 3px 2px;
     flex-direction: column;
     gap: 3px;
     border-radius: var(--radius-lg);
     color: var(--text-tertiary);
-    font-size: 10px;
+    font-size: 11px;
+    line-height: 16px;
     font-weight: 600;
     text-decoration: none;
   }
 
   .mobileNav a.active {
+    background: var(--accent-soft);
     color: var(--accent);
   }
 

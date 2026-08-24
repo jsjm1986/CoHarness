@@ -30,6 +30,8 @@ Take spacing and radii from the metric tokens (`--dsw-space-*`, `--dsw-radius-*`
 
 `metrics.css` also defines compact typography roles (`--dsw-mobile-font-*`), visual icon sizes, control heights, summary heights, and option-row heights. Use 14/22 or larger for primary mobile content, reserve 12/18 for metadata, and keep the 44px touch target independent from the icon's visual size. Stateful controls must keep their current value readable; icon-only controls are reserved for actions whose meaning is independently established by nearby text or an accessible label. A hierarchy-heavy surface may use a mobile presenter or card/list projection; do not make a desktop table readable by shrinking its text until it fits.
 
+Navigation drawers and reading surfaces may reduce card padding, heading rhythm, and inter-row gaps on compact viewports, but they must retain the 44px touch target and the same hierarchy of primary, secondary, and metadata text.
+
 Phone bottom sheets share the `--dsw-mobile-sheet-*` metric tokens for edge, safe-area bottom, radius, and default height. Stateful pickers use the shared settings-sheet grammar: one title row, one section/tab strip, one scrollport, one backdrop, and one option-row selection treatment. `ui-primitives` owns the `MobileSheetBackdrop` mask (including blur, layer order, and reduced-motion behavior), and `Modal` owns the shared focus loop; a presenter may narrow its content cap or add a mobile-only back row without changing the common placement or touch geometry.
 
 The primary list of `Menu` uses the same sheet geometry below 768px, including when its desktop placement is anchor-relative; submenu content remains inline under its parent row.

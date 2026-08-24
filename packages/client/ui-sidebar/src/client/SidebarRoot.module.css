@@ -418,7 +418,7 @@
   height: auto;
   min-height: var(--dsw-touch-target);
   padding-inline: 0;
-  margin-bottom: var(--dsw-space-2);
+  margin-bottom: var(--dsw-space-1);
 }
 
 :global([data-viewport='compact']) .brandName {

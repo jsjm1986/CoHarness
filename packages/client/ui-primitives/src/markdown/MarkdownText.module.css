@@ -38,6 +38,43 @@
   margin: var(--dsw-space-4) 0;
 }
 
+/* Phone reading surface: preserve heading hierarchy while removing the
+   desktop document rhythm that makes one short answer consume most of a
+   narrow viewport. Body copy stays at the shared 14/22 mobile role; heading
+   margins follow the same compact spacing scale used by the conversation
+   cards. */
+:global([data-viewport='compact']) .markdown {
+  font: var(--dsw-mobile-font-body);
+}
+
+:global([data-viewport='compact']) .markdown h1,
+:global([data-viewport='compact']) .markdown h2 {
+  font: 600 18px/26px var(--dsw-font-family);
+  margin: var(--dsw-space-5) 0 var(--dsw-space-2);
+}
+
+:global([data-viewport='compact']) .markdown h3 {
+  font: 600 16px/24px var(--dsw-font-family);
+  margin: var(--dsw-space-4) 0 var(--dsw-space-2);
+}
+
+:global([data-viewport='compact']) .markdown :where(h4, h5, h6) {
+  font: 600 14px/22px var(--dsw-font-family);
+  margin: var(--dsw-space-3) 0 var(--dsw-space-1);
+}
+
+:global([data-viewport='compact']) .markdown p {
+  margin: var(--dsw-space-2) 0;
+}
+
+:global([data-viewport='compact']) .markdown :where(ul, ol) {
+  margin: var(--dsw-space-2) 0;
+}
+
+:global([data-viewport='compact']) .markdown li:not(:first-child) {
+  margin-top: var(--dsw-space-1);
+}
+
 .markdown :where(h1, h2, h3, h4, h5, h6) strong {
   font-weight: inherit;
 }

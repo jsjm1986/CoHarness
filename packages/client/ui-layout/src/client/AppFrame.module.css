@@ -126,7 +126,10 @@
   bottom: 0;
   left: 0;
   z-index: 15;
-  width: min(88%, 360px);
+  /* A phone drawer is a navigation aid, not a second full-screen page. Keep
+     enough transcript visible behind the scrim while leaving every row at a
+     comfortable touch width. */
+  width: min(84%, 320px);
   box-sizing: border-box;
   padding-top: var(--dsw-safe-top);
   padding-bottom: var(--dsw-safe-bottom);
