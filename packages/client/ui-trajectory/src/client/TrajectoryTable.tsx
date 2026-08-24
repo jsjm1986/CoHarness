@@ -38,7 +38,6 @@ import { trajectoryPreviewText } from './trajectory-preview.ts'
 import css from './TrajectoryTable.module.css'
 
 const BOTTOM_FOLLOW_THRESHOLD_PX = 2
-const TAIL_SCROLL_THROTTLE_MS = 32
 const OLDER_LOAD_THRESHOLD_PX = 48
 const HISTORY_LOAD_ROW_HEIGHT_PX = 30
 const VIRTUALIZATION_THRESHOLD = 100
@@ -1742,8 +1741,6 @@ export function TrajectoryTable({
   const rootRef = useRef<HTMLDivElement>(null)
   const tablePaneRef = useRef<HTMLDivElement>(null)
   const followsTableTail = useRef(false)
-  const lastTailScrollAt = useRef(0)
-  const tailScrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const tableScrollInitialized = useRef(false)
   const [tableScrollReady, setTableScrollReady] = useState(false)
   const pendingScrollRecordId = useRef<string | null>(null)
@@ -2235,18 +2232,12 @@ export function TrajectoryTable({
       setOlderLoading(false)
     })
   }, [hasOlderRecords, historyStartSeq, olderHistoryLoading, onLoadOlder])
-  const cancelTailScroll = useCallback(() => {
-    if (tailScrollTimer.current === null) return
-    clearTimeout(tailScrollTimer.current)
-    tailScrollTimer.current = null
-  }, [])
   const scrollToTail = useCallback(() => {
     const pane = tablePaneRef.current
     if (pane === null || !followsTableTail.current) return
     if (virtualizationEnabled) rowVirtualizer.scrollToEnd({ behavior: 'auto' })
     else pane.scrollTop = pane.scrollHeight
   }, [rowVirtualizer, virtualizationEnabled])
-  useEffect(() => () => { cancelTailScroll() }, [cancelTailScroll])
   useLayoutEffect(() => {
     const pane = tablePaneRef.current
     if (pane === null) return
@@ -2263,10 +2254,6 @@ export function TrajectoryTable({
       if (historyLoading) return
       tableScrollInitialized.current = true
       followsTableTail.current = true
-      // The first post-load append must be applied immediately. Throttling
-      // starts only after an append has actually been followed; otherwise a
-      // fast initial render can leave the ledger one frame behind the stream.
-      lastTailScrollAt.current = 0
       if (virtualizationEnabled) rowVirtualizer.scrollToEnd({ behavior: 'auto' })
       else pane.scrollTop = pane.scrollHeight
       setTableScrollReady(true)
@@ -2276,28 +2263,12 @@ export function TrajectoryTable({
     const atTail = pane.scrollHeight - pane.clientHeight - pane.scrollTop
       <= BOTTOM_FOLLOW_THRESHOLD_PX
     if (atTail) return
-    const now = Date.now()
-    const elapsed = now - lastTailScrollAt.current
-    if (lastTailScrollAt.current !== 0 && elapsed < TAIL_SCROLL_THROTTLE_MS) {
-      if (tailScrollTimer.current === null) {
-        tailScrollTimer.current = setTimeout(() => {
-          tailScrollTimer.current = null
-          if (!followsTableTail.current) return
-          lastTailScrollAt.current = Date.now()
-          scrollToTail()
-        }, TAIL_SCROLL_THROTTLE_MS - elapsed)
-      }
-      return
-    }
-    lastTailScrollAt.current = now
     scrollToTail()
   }, [
-    cancelTailScroll,
     historyLoading,
     historyStartSeq,
     rowVirtualizer,
     scrollToTail,
-    tailScrollTimer,
     virtualRowStructure,
     virtualizationEnabled,
   ])
@@ -2317,7 +2288,6 @@ export function TrajectoryTable({
           const atTail = pane.scrollHeight - pane.clientHeight - pane.scrollTop
             <= BOTTOM_FOLLOW_THRESHOLD_PX
           followsTableTail.current = atTail
-          if (!atTail) cancelTailScroll()
           requestOlder(pane, true)
         }}
         onClick={(event) => {
