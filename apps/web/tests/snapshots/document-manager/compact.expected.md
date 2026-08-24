@@ -3,6 +3,11 @@
   - button "Close":
     - img
   - paragraph: No per-file size limit, 20 per message
+  - complementary "Document scopes":
+    - button "All authorized scopes":
+      - strong: All authorized scopes
+    - button "Personal documents":
+      - strong: Personal documents
   - navigation "Document path":
     - button "All Documents" [disabled]
   - group "Document filters":
@@ -30,6 +35,7 @@
       - text: Upload Document
     - button "Refresh":
       - img
+    - button "History"
   - text: Visible only to you 2 documents
   - list "Document Manager":
     - checkbox "Select this page"

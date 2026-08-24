@@ -36,6 +36,10 @@ describe('DocumentsModal.module.css', () => {
   it('keeps the selected destructive action readable on its primary fill', () => {
     expect(modal).toMatch(/\.selectionDelete\s*\{[\s\S]*color:\s*var\(--dsw-alias-label-primary-foreground\)/)
   })
+
+  it('gives alternate-scope actions a full compact toolbar track', () => {
+    expect(modal).toMatch(/\.actionGroup \.sourceAction\s*\{[\s\S]*grid-column:\s*1 \/ -1/)
+  })
 })
 
 describe('DocumentPreview.module.css', () => {

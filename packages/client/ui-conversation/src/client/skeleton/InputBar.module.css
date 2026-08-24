@@ -722,6 +722,21 @@
   }
 }
 
+@media (max-width: 767px) {
+  /* A live model seat deserves its own readable line on every phone width;
+     keeping it beside the tool rail produces an overlap before truncation
+     can help. The blank hero has no model seat and remains one row. */
+  :global([data-viewport='compact']) .row:has([data-model-select]) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  :global([data-viewport='compact']) .row:has([data-model-select]) .trailing {
+    width: 100%;
+    flex: 1 1 auto;
+    justify-content: flex-end;
+  }
+}
+
 @media (max-width: 359px) {
   :global([data-viewport='compact']) .row {
     grid-template-columns: minmax(0, 1fr) auto;

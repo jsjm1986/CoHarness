@@ -1177,6 +1177,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
                   />
                   {scopeView === null && alternateSource === null && sourceOptions.length > 0 && (
                     <Button
+                      className={css.sourceAction}
                       type="button"
                       variant="outline"
                       disabled={busy}
@@ -1188,6 +1189,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
                   )}
                   {(scopeView !== null || alternateSource !== null) && (
                     <Button
+                      className={css.sourceAction}
                       type="button"
                       variant="outline"
                       disabled={busy}
