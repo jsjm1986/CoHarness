@@ -8,6 +8,7 @@ import type { ProjectRuntime } from './instances.ts'
 import type { PrincipalScope } from './principal.ts'
 import type { GatewayPushService, PushProvider } from './push-notifications.ts'
 import { loginPage, passwordPage } from './html.ts'
+import { DocumentTransferError, type GatewayDocumentTransferListHandler } from './document-transfer.ts'
 import type {
   Awaitable,
   GatewayAuditService,
@@ -150,6 +151,8 @@ export type UpgradeHandler = (req: IncomingMessage, socket: Duplex, head: Buffer
 export interface GatewayHandlers {
   proxy?: ProxyHandler
   upgrade?: UpgradeHandler
+  /** Gateway-owned alternate-scope document listing; never expose runtime URLs. */
+  documentTransferList?: GatewayDocumentTransferListHandler
   admin?: (req: IncomingMessage, res: ServerResponse, user: UserRow, pathname: string, body: string) => Promise<boolean>
   runtime?: (req: IncomingMessage, res: ServerResponse, pathname: string, body: string) => Promise<boolean>
   /** Override `serveAdmin` root (tests); default `gateway/public/admin`. */
@@ -388,6 +391,51 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
 
     const resolved = await requestContext(req, user)
     if (resolved.resetScope) res.setHeader('set-cookie', scopeCookie('personal', cfg))
+
+    if (pathname === '/api/documents/transfer/list' && req.method === 'POST'
+      && handlers.documentTransferList !== undefined) {
+      let payload: unknown
+      try {
+        payload = JSON.parse(await readBody(req, cfg.runtimeApiBodyLimitBytes)) as unknown
+      } catch (error: unknown) {
+        if (error instanceof BodyTooLargeError) {
+          send(res, 413, JSON.stringify({ error: { code: 'DOCUMENT_TRANSFER_TOO_LARGE', message: 'Document scope listing request is too large.' } }), 'application/json')
+        } else {
+          send(res, 400, JSON.stringify({ error: { code: 'INVALID_DOCUMENT_TRANSFER', message: 'Invalid document scope listing JSON.' } }), 'application/json')
+        }
+        return
+      }
+      const abort = new AbortController()
+      const onRequestAbort = (): void => { if (!abort.signal.aborted) abort.abort(new Error('document request aborted')) }
+      const onResponseClose = (): void => { if (!res.writableEnded) onRequestAbort() }
+      req.once('aborted', onRequestAbort)
+      res.once('close', onResponseClose)
+      res.once('finish', () => {
+        void Promise.resolve(audit.write({
+          userId: user.id,
+          action: 'api',
+          methodPath: `${req.method} ${pathname}`,
+          status: res.statusCode,
+          ip: clientIp(req),
+        })).catch(error => { console.error('[gateway] API audit write failed:', error) })
+      })
+      res.setHeader('cache-control', 'no-store')
+      try {
+        const result = await handlers.documentTransferList({ user, payload, signal: abort.signal })
+        if (!abort.signal.aborted && !res.writableEnded) send(res, 200, JSON.stringify(result), 'application/json')
+      } catch (error: unknown) {
+        if (abort.signal.aborted || res.writableEnded) return
+        if (error instanceof DocumentTransferError) {
+          send(res, error.status, JSON.stringify({ error: { code: error.code, message: error.message } }), 'application/json')
+          return
+        }
+        throw error
+      } finally {
+        req.removeListener('aborted', onRequestAbort)
+        res.removeListener('close', onResponseClose)
+      }
+      return
+    }
 
     if (pathname === '/account/api/context' && req.method === 'GET') {
       const scopes = await deps.collaboration?.projectsForUser(user.id) ?? []

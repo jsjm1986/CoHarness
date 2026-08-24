@@ -129,6 +129,39 @@ describe('gateway server', () => {
     })
   })
 
+  it('serves the alternate document-scope list in the Gateway without proxying it', async () => {
+    const documentTransferList = vi.fn(async ({ user, payload }: { user: { id: number }; payload: unknown }) => {
+      expect(user.id).toBe(1)
+      expect(payload).toEqual({ version: 1, scope: { kind: 'personal' } })
+      return {
+        version: 1 as const,
+        scope: { kind: 'personal' as const, label: 'Personal documents' },
+        documents: [],
+      }
+    })
+    const { deps, base } = await setup({}, { documentTransferList })
+    const cookie = await login(base, 'root-admin', 'pw-12345678')
+    const response = await fetch(`${base}/api/documents/transfer/list`, {
+      method: 'POST',
+      headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ version: 1, scope: { kind: 'personal' } }),
+      redirect: 'manual',
+    })
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('location')).toBeNull()
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(await response.json()).toEqual({
+      version: 1,
+      scope: { kind: 'personal', label: 'Personal documents' },
+      documents: [],
+    })
+    expect(documentTransferList).toHaveBeenCalledOnce()
+    expect(await deps.audit.query({ action: 'api' })).toEqual([
+      expect.objectContaining({ methodPath: 'POST /api/documents/transfer/list', status: 200 }),
+    ])
+  })
+
   it('uses the runtime API body limit and returns JSON 413 before dispatch', async () => {
     const received: string[] = []
     const { base } = await setup({ HGW_RUNTIME_API_BODY_LIMIT_BYTES: '16' }, {

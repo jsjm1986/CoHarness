@@ -14,6 +14,8 @@ Streaming browser HTTP consumer for [`ctx.userDocs`](../../attachment/userdoc/RE
 
 `POST /api/documents/transfer/list` accepts one authorized source scope and returns safe document metadata for the composer picker; it never returns paths or file bytes.
 
+In the Gateway deployment, this browser route is admitted by the Gateway's document broker before the runtime proxy. Standalone compositions still use the Host consumer directly; neither path exposes a runtime loopback authority in a browser response.
+
 `POST /api/documents/transfer/directories` lists safe target-folder metadata and `POST /api/documents/transfer/directories/create` creates a folder after a target `rw` check. `GET /api/documents/overview` returns metadata-only rows for every scope the actor can read, and `GET /api/documents/history` returns recent audited operations for the current scope.
 
 `POST /api/documents/transfer/plan` performs a metadata-only preflight with a five-minute plan token. `/commit` and `/retry` revalidate source and target permissions before streaming; successful and failed files are committed independently.

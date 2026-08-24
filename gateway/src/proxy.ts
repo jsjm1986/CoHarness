@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { isIP } from 'node:net'
 import type { Duplex } from 'node:stream'
 import httpProxy from 'http-proxy'
 import { writeRuntimeGrantsFile } from './apply-grants.ts'
@@ -14,12 +15,37 @@ function wantsHtml(req: IncomingMessage): boolean {
   return (req.headers.accept ?? '').includes('text/html')
 }
 
+function isLoopbackHostname(hostname: string): boolean {
+  const normalized = hostname.toLowerCase().replace(/^\[|\]$/g, '')
+  if (normalized === 'localhost' || normalized === '::1') return true
+  return isIP(normalized) === 4 && normalized.split('.', 1)[0] === '127'
+}
+
+/** Keep an upstream runtime redirect on the public Gateway origin. */
+function publicLocation(value: string): string {
+  let target: URL
+  try {
+    target = new URL(value, 'http://gateway.internal')
+  } catch {
+    return value
+  }
+  if (!isLoopbackHostname(target.hostname)) return value
+  return `${target.pathname}${target.search}${target.hash}` || '/'
+}
+
 export function createProxyHandlers(
   deps: GatewayDeps,
   principalSigner?: GatewayPrincipalSigner,
 ): { proxy: ProxyHandler; upgrade: UpgradeHandler; close(): void } {
   const { cfg, instances, audit, projects } = deps
   const server = httpProxy.createProxyServer({ xfwd: true })
+  server.on('proxyRes', (proxyResponse) => {
+    const location = proxyResponse.headers.location
+    if (typeof location === 'string') {
+      const rewritten = publicLocation(location)
+      if (rewritten !== location) proxyResponse.headers.location = rewritten
+    }
+  })
 
   // Grants handoff is intrinsic to starting an instance: the manager calls this
   // just before every spawn, so the child always reads the current grants.

@@ -7,6 +7,7 @@ import {
   createDocumentTransferListHandler,
   createDocumentTransferPlanHandler,
   createDocumentTransferHandler,
+  createGatewayDocumentTransferListHandler,
   DocumentTransferError,
 } from '../src/document-transfer.ts'
 import type { GatewayPrincipalClaims } from '../src/principal.ts'
@@ -105,7 +106,14 @@ function fixture() {
     collaboration,
     principals,
   })
-  return { handler, capabilities, list, audit, ensureRunning, projectForUser, plan: createDocumentTransferPlanHandler(dependencies), commit: createDocumentTransferCommitHandler(dependencies) }
+  const publicList = createGatewayDocumentTransferListHandler({
+    instances: { ensureRunning },
+    users: { getById: async () => USER },
+    projects: { getById: async (id) => ({ id, name: 'Compiler', path: '/tmp/compiler', memberCount: 1, members: [] }) },
+    collaboration,
+    principals,
+  })
+  return { handler, capabilities, list, publicList, audit, ensureRunning, projectForUser, plan: createDocumentTransferPlanHandler(dependencies), commit: createDocumentTransferCommitHandler(dependencies) }
 }
 
 function responseForTarget(docId: string, name = 'report.txt'): Response {
@@ -329,5 +337,24 @@ describe('Gateway document transfer broker', () => {
     })
     expect(result.documents).toEqual([expect.objectContaining({ docId: 'reports/a.txt', name: 'a.txt' })])
     expect(JSON.stringify(result)).not.toContain('/private/source')
+  })
+
+  it('uses the same authorization broker for a public Gateway request', async () => {
+    const runtime = fixture()
+    const fetch = vi.fn(async () => new Response(JSON.stringify({
+      documents: [{ docId: 'a.txt', name: 'a.txt', bytes: 1, mediaType: 'text/plain', modifiedAt: 1 }],
+    }), { status: 200, headers: { 'content-type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetch)
+    const result = await runtime.publicList({
+      user: USER,
+      payload: { version: 1, scope: { kind: 'project', projectId: 41 } },
+      signal: new AbortController().signal,
+    })
+    expect(result).toEqual({
+      version: 1,
+      scope: { kind: 'project', label: 'Compiler' },
+      documents: [{ docId: 'a.txt', name: 'a.txt', bytes: 1, mediaType: 'text/plain', modifiedAt: 1 }],
+    })
+    expect(fetch).toHaveBeenCalledWith('http://127.0.0.1:41041/api/documents', expect.objectContaining({ redirect: 'error' }))
   })
 })
