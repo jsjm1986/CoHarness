@@ -226,8 +226,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   }
   const dshCommand = releaseRoot === undefined
     ? env.HGW_DSH_COMMAND?.split(' ')
-      ?? ['node', '--import', resolveTsx(), join(dshRepoRoot, 'apps/cli/src/bin.ts'), 'web', '--port', '{port}']
-    : [process.execPath, join(releaseRoot, 'apps/cli/lib/bin.js'), 'web', '--port', '{port}']
+      ?? ['node', '--import', resolveTsx(), join(dshRepoRoot, 'apps/cli/src/bin.ts'), 'web', '--no-open', '--port', '{port}']
+    : [process.execPath, join(releaseRoot, 'apps/cli/lib/bin.js'), 'web', '--no-open', '--port', '{port}']
+  if (env.HGW_DSH_COMMAND !== undefined && !dshCommand.includes('--no-open')) {
+    throw new Error('HGW_DSH_COMMAND must include --no-open because Gateway runtimes are background services')
+  }
   const releaseGuardPatch = releaseRoot === undefined
     ? undefined
     : join(releaseRoot, 'plugins/dsh-directory-guard/cordis.patch.yml')

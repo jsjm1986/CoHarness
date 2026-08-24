@@ -16,6 +16,7 @@ describe('loadConfig', () => {
     expect(cfg.publicOrigins).toEqual(['http://127.0.0.1:8899'])
     expect(cfg.secureCookies).toBe(false)
     expect(cfg.dshCommand).toContain('{port}')
+    expect(cfg.dshCommand).toContain('--no-open')
     expect(cfg.runtimeApiBodyLimitBytes).toBe(DEFAULT_RUNTIME_API_BODY_LIMIT_BYTES)
     expect(cfg.databaseStartupRetryInitialMs).toBe(DEFAULT_DATABASE_STARTUP_RETRY_INITIAL_MS)
     expect(cfg.databaseStartupRetryMaxMs).toBe(DEFAULT_DATABASE_STARTUP_RETRY_MAX_MS)
@@ -46,6 +47,7 @@ describe('loadConfig', () => {
       process.execPath,
       join(releaseRoot, 'apps/cli/lib/bin.js'),
       'web',
+      '--no-open',
       '--port',
       '{port}',
     ])
@@ -64,6 +66,13 @@ describe('loadConfig', () => {
       .toThrow(/HGW_GATEWAY_DIR must resolve inside/)
     expect(() => loadConfig({ HGW_RELEASE_ROOT: releaseRoot, HGW_MODEL_GOVERNANCE_PACKAGE: '/tmp' }))
       .toThrow(/HGW_MODEL_GOVERNANCE_PACKAGE must resolve inside/)
+  })
+
+  it('rejects a custom runtime command that can open a host-local browser', () => {
+    expect(() => loadConfig({ HGW_DSH_COMMAND: 'node runtime.js --port {port}' }))
+      .toThrow(/HGW_DSH_COMMAND must include --no-open/)
+    expect(loadConfig({ HGW_DSH_COMMAND: 'node runtime.js --no-open --port {port}' }).dshCommand)
+      .toEqual(['node', 'runtime.js', '--no-open', '--port', '{port}'])
   })
 
   it('resolves the tsx loader to an absolute file for the real repo (instances spawn outside it)', () => {

@@ -5,7 +5,7 @@ const OPTS: SystemdOptions = {
   usersRoot: '/srv/harness/users',
   projectRuntimesRoot: '/srv/harness/project-runtimes',
   projectPathRoots: ['/data/projects'],
-  execStart: '/usr/local/bin/node /opt/dsh/lib/bin.js web --port {port}',
+  execStart: '/usr/local/bin/node /opt/dsh/lib/bin.js web --no-open --port {port}',
   gatewayDir: '/srv/harness/gateway',
   memoryMax: '1G',
   cpuQuota: '100%',
@@ -82,7 +82,7 @@ describe('renderUserUnit', () => {
   })
 
   it('substitutes the port into ExecStart and applies resource limits', () => {
-    expect(unit).toContain('ExecStart=/usr/local/bin/node /opt/dsh/lib/bin.js web --port 42001')
+    expect(unit).toContain('ExecStart=/usr/local/bin/node /opt/dsh/lib/bin.js web --no-open --port 42001')
     expect(unit).toContain('MemoryMax=1G')
     expect(unit).toContain('CPUQuota=100%')
   })

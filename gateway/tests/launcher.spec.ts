@@ -19,7 +19,7 @@ function systemdOptions(unitDir: string, calls: string[][]): SystemdLauncherOpti
       usersRoot: '/srv/harness/users',
       projectRuntimesRoot: '/srv/harness/project-runtimes',
       projectPathRoots: ['/data'],
-      execStart: '/usr/local/bin/node /opt/dsh/lib/bin.js web --port {port}',
+      execStart: '/usr/local/bin/node /opt/dsh/lib/bin.js web --no-open --port {port}',
       gatewayDir: '/srv/harness/gateway',
       memoryMax: '1G',
       cpuQuota: '100%',
@@ -50,7 +50,7 @@ describe('SystemdLauncher', () => {
     expect(unit).toContain('TemporaryFileSystem=/srv/harness/users:ro')
     expect(unit).toContain('BindPaths=/srv/harness/users/alice/home')
     expect(unit).toContain('BindReadOnlyPaths=/data/docs')
-    expect(unit).toContain('ExecStart=/usr/local/bin/node /opt/dsh/lib/bin.js web --port 42001')
+    expect(unit).toContain('ExecStart=/usr/local/bin/node /opt/dsh/lib/bin.js web --no-open --port 42001')
     expect(calls).toEqual([['daemon-reload'], ['restart', 'harness-alice.service']])
 
     await proc.terminate(1000)
