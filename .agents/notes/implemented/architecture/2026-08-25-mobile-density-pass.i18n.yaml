@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-25-mobile-density-pass.md
-2026-08-25-mobile-density-pass.md: cef5aeac99193e77278a9cb426eb457a3d555519
-2026-08-25-mobile-density-pass.zh.md: 3b75948ea2cc203224e924a05499cffb963f8a45
+2026-08-25-mobile-density-pass.md: 9f1bf50bd06ead150d9ef70087228164e2604baf
+2026-08-25-mobile-density-pass.zh.md: cbd6326d95e920e045c13596fa5224b95a2979db
