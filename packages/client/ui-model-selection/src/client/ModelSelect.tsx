@@ -27,6 +27,7 @@ import css from './ModelSelect.module.css'
 
 /** Which pane the dropdown shows: the two-row root or one drilled-in list. */
 type Pane = 'root' | 'model' | 'effort'
+type Presentation = 'trigger' | 'summary' | 'section'
 
 /** One dynamic effort row; undefined means preserve the provider default. */
 interface EffortChoice {
@@ -43,8 +44,16 @@ interface EffortChoice {
  * @returns the trigger and, while open, the two-level menu.
  */
 export function ModelSelect(
-  { locked, available, directory, load, select, t }:
-  ModelSelectInjected & { locked: boolean } & PropsLocale<'model'>,
+  {
+    locked, available, directory, load, select, t,
+    presentation = 'trigger', settingsSection = 'model', onOpenSettings,
+  }:
+  ModelSelectInjected & {
+    locked: boolean
+    presentation?: Presentation
+    settingsSection?: 'model' | 'reasoning' | 'permission'
+    onOpenSettings?: (section: 'model' | 'reasoning' | 'permission') => void
+  } & PropsLocale<'model'>,
 ) {
   const state = useSyncExternalStore(
     fn => directory.subscribe(fn),
@@ -110,11 +119,11 @@ export function ModelSelect(
 
   // Mount-time load resolves the trigger label; every open refreshes.
   useEffect(() => {
-    if (available) {
+    if (available && presentation !== 'section') {
       lastActionRef.current = 'load'
       load()
     }
-  }, [available, load])
+  }, [available, load, presentation])
 
   useEffect(() => {
     if (!open) return
@@ -128,6 +137,10 @@ export function ModelSelect(
   if (!available) return null
 
   const show = (): void => {
+    if (phone && onOpenSettings !== undefined) {
+      onOpenSettings('model')
+      return
+    }
     // Phones have no room for a two-step settings-like root row. Open the
     // actual model list first; effort remains a secondary drill-in from the
     // model trigger when it is available.
@@ -172,7 +185,7 @@ export function ModelSelect(
 
   const settleSelection = (accepted: boolean): void => {
     if (accepted) {
-      if (rootRef.current !== null) close(true)
+      if (presentation === 'trigger' && rootRef.current !== null) close(true)
       return
     }
     const message = directory.getSnapshot().error
@@ -184,7 +197,7 @@ export function ModelSelect(
 
   const choose = (selection: ModelSelection): void => {
     if (state.current?.provider === selection.provider && state.current.model === selection.model) {
-      close(true)
+      if (presentation === 'trigger') close(true)
       return
     }
     lastActionRef.current = 'select'
@@ -194,7 +207,7 @@ export function ModelSelect(
   const chooseEffort = (effort: string | undefined): void => {
     if (state.current === null) return
     if (effectiveEffort === effort) {
-      close(true)
+      if (presentation === 'trigger') close(true)
       return
     }
     const selection: ModelSelection = {
@@ -218,6 +231,97 @@ export function ModelSelect(
   const itemRef = () => {
     const at = itemIndex++
     return (node: HTMLButtonElement | null) => { itemRefs.current[at] = node }
+  }
+
+  const catalogStatus = (
+    <>
+      {state.status === 'loading' && <div className={css.status}>{t('status.loading')}</div>}
+      {state.error !== null && lastActionRef.current === 'load' && (
+        <div className={css.error}>
+          <span>{t('error.action', { message: state.error })}</span>
+          <button type="button" className={css.retry} onClick={reload}>{t('retry')}</button>
+        </div>
+      )}
+      {state.failures.map(failure => (
+        <div className={css.warning} key={failure.id}>
+          <span>{t('warning.groupLoad', { name: failure.name, message: failure.message })}</span>
+          <button type="button" className={css.retry} onClick={reload}>{t('retry')}</button>
+        </div>
+      ))}
+    </>
+  )
+
+  const modelOptions = (
+    <div className={clsx(css.groups, css.sectionGroups, 'scrollable')}>
+      {state.groups.map((group) => {
+        const headingId = `${id}-${group.id}`
+        return (
+          <section role="group" aria-labelledby={headingId} className={css.group} key={group.id}>
+            <div className={css.groupTitle} id={headingId}>{group.name}</div>
+            {group.models.map((model) => {
+              const selected = state.current?.provider === group.id && state.current.model === model.id
+              return (
+                <button
+                  ref={itemRef()}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={selected}
+                  className={clsx(css.option, selected && css.selected)}
+                  key={model.id}
+                  title={model.name}
+                  disabled={busy}
+                  onClick={() => { choose({ provider: group.id, model: model.id }) }}
+                >
+                  <span className={css.optionCopy}>
+                    <span className={css.modelName}>{model.name}</span>
+                    {model.description !== undefined && <span className={css.description}>{model.description}</span>}
+                  </span>
+                  <span className={css.check}>{selected ? <IconCheckOutline16 /> : null}</span>
+                </button>
+              )
+            })}
+          </section>
+        )
+      })}
+      {state.status === 'ready' && choices.length === 0 && <div className={css.empty}>{t('empty.models')}</div>}
+    </div>
+  )
+
+  const effortOptions = reasoning === undefined || effortChoices.length === 0
+    ? <div className={css.empty}>{t('empty.efforts')}</div>
+    : (
+      <div className={css.sectionGroups}>
+        {effortChoices.map(level => (
+          <button
+            ref={itemRef()}
+            type="button"
+            role="menuitemradio"
+            aria-checked={effectiveEffort === level.effort}
+            className={clsx(css.option, effectiveEffort === level.effort && css.selected)}
+            key={level.key}
+            disabled={busy}
+            onClick={() => { chooseEffort(level.effort) }}
+          >
+            <span className={css.optionCopy}>
+              <span className={css.modelName}>{level.label}</span>
+              {level.description !== undefined && <span className={css.description}>{level.description}</span>}
+            </span>
+            <span className={css.check}>{effectiveEffort === level.effort ? <IconCheckOutline16 /> : null}</span>
+          </button>
+        ))}
+      </div>
+    )
+
+  if (presentation === 'summary') {
+    return <span className={css.summary} data-model-summary="">{triggerLabel}</span>
+  }
+
+  if (presentation === 'section') {
+    return (
+      <div className={css.sectionContent} data-model-settings-section={settingsSection}>
+        {settingsSection === 'reasoning' ? <>{catalogStatus}{effortOptions}</> : <>{catalogStatus}{modelOptions}</>}
+      </div>
+    )
   }
 
   return (
@@ -287,95 +391,15 @@ export function ModelSelect(
 
             {pane === 'model' && (
               <>
-                {state.status === 'loading' && (
-                  <div className={css.status}>{t('status.loading')}</div>
-                )}
-                {state.error !== null && lastActionRef.current === 'load' && (
-                  <div className={css.error}>
-                    <span>{t('error.action', { message: state.error })}</span>
-                    <button type="button" className={css.retry} onClick={reload}>{t('retry')}</button>
-                  </div>
-                )}
-                {state.failures.map(failure => (
-                  <div className={css.warning} key={failure.id}>
-                    <span>{t('warning.groupLoad', { name: failure.name, message: failure.message })}</span>
-                    <button type="button" className={css.retry} onClick={reload}>{t('retry')}</button>
-                  </div>
-                ))}
-                <div className={clsx(css.groups, 'scrollable')}>
-                  {state.groups.map((group) => {
-                    const headingId = `${id}-${group.id}`
-                    return (
-                      <section role="group" aria-labelledby={headingId} className={css.group} key={group.id}>
-                        <div className={css.groupTitle} id={headingId}>{group.name}</div>
-                        {group.models.map((model) => {
-                          const selected = state.current?.provider === group.id && state.current.model === model.id
-                          return (
-                            <button
-                              ref={itemRef()}
-                              type="button"
-                              role="menuitemradio"
-                              aria-checked={selected}
-                              className={clsx(css.option, selected && css.selected)}
-                              key={model.id}
-                              title={model.name}
-                              disabled={busy}
-                              onClick={() => { choose({ provider: group.id, model: model.id }) }}
-                            >
-                              <span className={css.optionCopy}>
-                                <span className={css.modelName}>{model.name}</span>
-                                {model.description !== undefined && (
-                                  <span className={css.description}>{model.description}</span>
-                                )}
-                              </span>
-                              <span className={css.check}>
-                                {selected ? <IconCheckOutline16 /> : null}
-                              </span>
-                            </button>
-                          )
-                        })}
-                      </section>
-                    )
-                  })}
-                </div>
-                {state.status === 'ready' && choices.length === 0 && (
-                  <div className={css.empty}>{t('empty.models')}</div>
-                )}
+                {catalogStatus}
+                {modelOptions}
               </>
             )}
 
             {pane === 'effort' && (
               <>
-                {state.error !== null && lastActionRef.current === 'load' && (
-                  <div className={css.error}>
-                    <span>{t('error.action', { message: state.error })}</span>
-                    <button type="button" className={css.retry} onClick={reload}>{t('action.reload')}</button>
-                  </div>
-                )}
-                {effortChoices.length === 0
-                  ? <div className={css.empty}>{t('empty.efforts')}</div>
-                  : effortChoices.map(level => (
-                    <button
-                      ref={itemRef()}
-                      type="button"
-                      role="menuitemradio"
-                      aria-checked={effectiveEffort === level.effort}
-                      className={clsx(css.option, effectiveEffort === level.effort && css.selected)}
-                      key={level.key}
-                      disabled={busy}
-                      onClick={() => { chooseEffort(level.effort) }}
-                    >
-                      <span className={css.optionCopy}>
-                        <span className={css.modelName}>{level.label}</span>
-                        {level.description !== undefined && (
-                          <span className={css.description}>{level.description}</span>
-                        )}
-                      </span>
-                      <span className={css.check}>
-                        {effectiveEffort === level.effort ? <IconCheckOutline16 /> : null}
-                      </span>
-                    </button>
-                  ))}
+                {catalogStatus}
+                {effortOptions}
               </>
             )}
           </div>

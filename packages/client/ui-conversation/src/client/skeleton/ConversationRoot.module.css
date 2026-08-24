@@ -267,6 +267,15 @@
   );
 }
 
+/* A phone session-settings sheet is a modal reading takeover. The composer
+   normally sits in stacking level 7 so the back-to-bottom affordance can stay
+   above it; once the sheet mounts, that sibling must move underneath the
+   sheet's shared 1090/1091 backdrop/surface pair. Keeping this on the seat
+   avoids feature presenters inventing z-index exceptions for each control. */
+.root[data-phase='active'] .composerSeat:has([data-session-settings-sheet]) {
+  z-index: 1092;
+}
+
 /* Views may opt into a composer overlay while ConversationRoot retains
    ownership of the seat geometry and its active-phase precedence. */
 .scrollBody:has([data-conversation-composer-overlay]) {

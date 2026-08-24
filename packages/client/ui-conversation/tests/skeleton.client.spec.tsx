@@ -299,7 +299,12 @@ describe('ConversationRoot resident composer', () => {
     // asking for the one thing it prevents — every block this contract has is
     // cleared by choosing a model.
     const seat = (key: string) => b.seatOwners.filter(call => call.key === key).at(-1)?.owner
-    expect(seat('conversation.input.model')).toEqual({ locked: false })
+    expect(seat('conversation.input.model')).toMatchObject({
+      locked: false,
+      presentation: 'trigger',
+      settingsSection: 'model',
+    })
+    expect(typeof (seat('conversation.input.model') as { onOpenSettings?: unknown } | undefined)?.onOpenSettings).toBe('function')
     expect(seat('conversation.input.plan')).toEqual({ locked: true })
   })
 
@@ -316,7 +321,12 @@ describe('ConversationRoot resident composer', () => {
     expect(box.getAttribute('aria-haspopup')).toBe('menu')
     expect(box.placeholder).not.toBe('select a model first')
     const modelSeat = b.seatOwners.filter(call => call.key === 'conversation.input.model').at(-1)?.owner
-    expect(modelSeat).toEqual({ locked: true })
+    expect(modelSeat).toMatchObject({
+      locked: true,
+      presentation: 'trigger',
+      settingsSection: 'model',
+    })
+    expect(typeof (modelSeat as { onOpenSettings?: unknown } | undefined)?.onOpenSettings).toBe('function')
   })
 
   it('keeps composer text in the machine, mirrors to the chat store, and submits through the sink', () => {

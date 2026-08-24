@@ -43,6 +43,10 @@
   --dsw-mobile-font-code: 400 13px/20px var(--ds-font-family-code);
   --dsw-mobile-icon-primary: 20px;
   --dsw-mobile-icon-secondary: 16px;
+  --dsw-mobile-control-height: var(--dsw-touch-target);
+  --dsw-mobile-summary-height: 56px;
+  --dsw-mobile-option-row-height: 56px;
+  --dsw-mobile-control-radius: var(--dsw-radius-full);
   --dsw-mobile-card-radius: var(--dsw-radius-xl);
   --dsw-mobile-page-inset: var(--dsw-space-4);
   --dsw-mobile-section-gap: var(--dsw-space-4);

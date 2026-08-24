@@ -50,6 +50,88 @@
   white-space: nowrap;
 }
 
+.summary {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--dsw-space-1);
+  overflow: hidden;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-mobile-font-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summaryIcon {
+  display: inline-flex;
+  flex: none;
+  width: var(--dsw-mobile-icon-secondary);
+  height: var(--dsw-mobile-icon-secondary);
+}
+
+.summaryIcon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sectionOptions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsw-space-1);
+}
+
+.sectionOption {
+  display: flex;
+  min-height: var(--dsw-mobile-option-row-height);
+  align-items: center;
+  gap: var(--dsw-space-2);
+  padding: var(--dsw-space-2) var(--dsw-space-3);
+  border: 0;
+  border-radius: var(--dsw-radius-md);
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-mobile-font-body);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sectionOption:hover:not(:disabled),
+.sectionOption:focus-visible,
+.sectionOptionSelected {
+  background: var(--dsw-specific-sidebar-nav-item-active);
+}
+
+.sectionOption:focus-visible {
+  outline: 2px solid var(--dsw-alias-border-l3);
+  outline-offset: -2px;
+}
+
+.sectionOption:disabled {
+  color: var(--dsw-alias-label-dimmed);
+  cursor: not-allowed;
+}
+
+.sectionIcon {
+  display: inline-flex;
+  flex: none;
+  width: var(--dsw-mobile-icon-primary);
+  height: var(--dsw-mobile-icon-primary);
+}
+
+.sectionLabel {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sectionCheck {
+  flex: none;
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-mobile-font-section);
+}
+
 .chevron {
   /* inline-flex, not inline: an inline seat reserves baseline descent under
      the svg and floats the glyph off-center in the 28px trigger. */
@@ -57,19 +139,6 @@
   flex: 0 0 auto;
   color: var(--dsw-alias-label-caption);
   transition: transform 120ms ease;
-}
-
-/* Narrow composer: the trigger collapses to icon + chevron so the row keeps
-   fitting. Only triggers that actually carry a mode glyph drop their label —
-   a host-configured mode without one keeps its text as the sole identifier.
-   The 480 container step (docs/web-styling.md) is where the row (attach +
-   modes + model + send) starts squeezing labels; the container is the
-   composer row (InputBar .row — anonymous query because CSS modules hash
-   container-names per module). */
-@container (max-width: 480px) {
-  .trigger:has(.triggerIcon) .triggerLabel {
-    display: none;
-  }
 }
 
 :global([data-viewport='compact']) .trigger {
