@@ -43,6 +43,7 @@ const EMPTY_REGISTRATION_FILTERS: RegistrationFilters = {
 }
 
 const PRICE_LABELS = ['输入', '输出', '缓存读取', '缓存写入'] as const
+const REGISTRATION_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
 
 function yuanToMicros(value: string): number {
   const yuan = Number(value)
@@ -52,6 +53,20 @@ function yuanToMicros(value: string): number {
 
 function microsToYuan(value: number): string {
   return (value / 1_000_000).toFixed(4)
+}
+
+function registrationDate(value: string, endOfDay: boolean): number | undefined {
+  if (value === '') return undefined
+  const parts = REGISTRATION_DATE_PATTERN.exec(value)
+  if (parts === null) throw new Error('日期格式必须为 YYYY-MM-DD')
+  const year = Number(parts[1])
+  const month = Number(parts[2])
+  const day = Number(parts[3])
+  const date = new Date(`${value}T${endOfDay ? '23:59:59.999' : '00:00:00'}`)
+  if (!Number.isFinite(date.getTime()) || date.getFullYear() !== year || date.getMonth() + 1 !== month || date.getDate() !== day) {
+    throw new Error('日期无效，请输入真实日期')
+  }
+  return endOfDay ? date.getTime() + 1 : date.getTime()
 }
 
 export function ModelsPage() {
@@ -102,8 +117,8 @@ export function ModelsPage() {
         ...registrationFilters.provider.trim() === '' ? {} : { provider: registrationFilters.provider.trim() },
         ...registrationFilters.model.trim() === '' ? {} : { model: registrationFilters.model.trim() },
         ...registrationFilters.action === '' ? {} : { action: registrationFilters.action },
-        ...registrationFilters.from === '' ? {} : { from: Date.parse(`${registrationFilters.from}T00:00:00`) },
-        ...registrationFilters.to === '' ? {} : { to: Date.parse(`${registrationFilters.to}T23:59:59.999`) + 1 },
+        ...registrationFilters.from === '' ? {} : { from: registrationDate(registrationFilters.from, false) },
+        ...registrationFilters.to === '' ? {} : { to: registrationDate(registrationFilters.to, true) },
         limit: 200,
       })
       setRegistrationReport(next)
@@ -216,7 +231,7 @@ export function ModelsPage() {
     <div className="page">
       <PageHeader
         title="模型治理"
-        description="统一管理组织 Provider 与模型目录、访问权限和计价；个人 BYOK 仅在个人运行时可用，新项目默认跟随组织模型目录。"
+        description="统一管理组织 Provider、模型权限与计价；个人 BYOK 仅在个人运行时可用。"
         meta={loading ? undefined : `${models.length} 个组织模型`}
         actions={actions}
       />
@@ -348,10 +363,10 @@ function PersonalRegistrationAudit({
             <input className="input" value={draft.model} onChange={event => onDraft({ ...draft, model: event.target.value })} placeholder="按模型筛选" aria-label="筛选模型" />
           </Field>
           <Field label="开始日期">
-            <input className="input" type="date" value={draft.from} onChange={event => onDraft({ ...draft, from: event.target.value })} aria-label="开始日期" />
+            <input className="input" type="text" inputMode="numeric" maxLength={10} value={draft.from} onChange={event => onDraft({ ...draft, from: event.target.value })} placeholder="YYYY-MM-DD" aria-label="开始日期" />
           </Field>
           <Field label="结束日期">
-            <input className="input" type="date" value={draft.to} onChange={event => onDraft({ ...draft, to: event.target.value })} aria-label="结束日期" />
+            <input className="input" type="text" inputMode="numeric" maxLength={10} value={draft.to} onChange={event => onDraft({ ...draft, to: event.target.value })} placeholder="YYYY-MM-DD" aria-label="结束日期" />
           </Field>
           <Field label="动作">
             <select className="select" value={draft.action} onChange={event => onDraft({ ...draft, action: event.target.value as ModelRegistrationAction | '' })} aria-label="筛选动作">
