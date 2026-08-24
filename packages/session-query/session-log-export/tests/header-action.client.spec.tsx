@@ -6,7 +6,6 @@ import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import { SessionLogDownloadController } from '../src/client/controller.ts'
 import { SessionLogDownloadHeaderAction } from '../src/client/HeaderAction.tsx'
 import { SessionLogDownloadMobileHeaderAction } from '../src/client/MobileHeaderAction.tsx'
-import type { SessionLogDownloadMobileHeaderActionProps } from '../src/client/MobileHeaderAction.tsx'
 import type { SessionLogDownloadDialogProps } from '../src/client/Dialog.tsx'
 import { en } from '../src/client/locales.ts'
 
@@ -76,7 +75,7 @@ describe('Session export Header action', () => {
     const b = bench()
     b.view.rerender(
       <SessionLogDownloadMobileHeaderAction
-        {...(b.props as unknown as SessionLogDownloadMobileHeaderActionProps)}
+        {...b.props}
       />,
     )
     const button = b.view.getByRole('button', { name: 'Export Session log' })
