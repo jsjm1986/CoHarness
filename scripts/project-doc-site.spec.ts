@@ -652,6 +652,19 @@ describe('emitRawMarkdownPages', () => {
     }).toThrow('would overwrite')
     expect(readFileSync(join(out, 'logo.svg'), 'utf8')).toBe('public copy\n')
   })
+
+  it('replaces an MPA route stub and an identical emitted image', () => {
+    const { root, pages } = fixture()
+    writeFileSync(join(root, 'docs/a.md'), '![logo](../packages/logo.svg)\n')
+    const out = mirrorDir()
+    writeFileSync(join(out, 'a.md'), '# VitePress route stub\n')
+    writeFileSync(join(out, 'logo.svg'), readFileSync(join(root, 'packages/logo.svg')))
+
+    emitRawMarkdownPages(out, { pages, repoRoot: realpathSync(root), repositoryRef: 'abc123' })
+
+    expect(readFileSync(join(out, 'a.md'), 'utf8')).toBe('![logo](./logo.svg)\n')
+    expect(readFileSync(join(out, 'logo.svg'), 'utf8')).toBe('<svg/>\n')
+  })
 })
 
 describe('rawMarkdownFiles', () => {
