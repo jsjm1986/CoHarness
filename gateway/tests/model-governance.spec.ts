@@ -71,6 +71,12 @@ describe('ModelGovernanceService', () => {
     expect(() => governance.setQuota('role', 'owner', 1, null)).toThrow(/admin or user/)
   })
 
+  it('reports missing usage and intake lag in the SQLite fallback', async () => {
+    const { governance, user } = await setup()
+    governance.ingest({ kind: 'user', id: user.id }, event({ eventId: 'missing-health', status: 'missing-usage', occurredAt: Date.now() }))
+    expect(governance.usageHealth()).toMatchObject({ missingUsageCalls: 1, maxIntakeLagMs: expect.any(Number) })
+  })
+
   it('deduplicates personal registration events and derives current counts', async () => {
     const { governance, user } = await setup()
     const registration = (overrides: Partial<ModelRegistrationEvent> = {}): ModelRegistrationEvent => ({

@@ -122,9 +122,9 @@ describePg('PostgreSQL baseline', () => {
     pool = createPostgresPool(DATABASE_URL!, { max: 4 })
     await pool.query('DROP SCHEMA IF EXISTS harness CASCADE')
     const migrated = await runMigrations(pool, MIGRATIONS)
-    expect(migrated).toEqual({ applied: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], current: 13 })
+    expect(migrated).toEqual({ applied: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], current: 14 })
     expect(await runMigrations(pool, MIGRATIONS))
-      .toEqual({ applied: [], current: 13 })
+      .toEqual({ applied: [], current: 14 })
     const pushTables = await pool.query<{ table_name: string }>(`SELECT table_name
       FROM information_schema.tables
       WHERE table_schema='harness' AND table_name IN ('push_devices','push_deliveries')
@@ -188,6 +188,14 @@ describePg('PostgreSQL baseline', () => {
     } finally {
       await pool.query('DELETE FROM harness.schema_migrations WHERE version=$1', [unknownVersion])
     }
+  })
+
+  it('keeps actor attribution confined to project-owned usage rows', async () => {
+    await expect(pool.query(`INSERT INTO harness.model_usage(
+      organization_id,event_id,user_id,actor_user_id,occurred_at,provider_key,model_key,purpose,
+      credential_source,credential_class,status
+    ) VALUES($1,'personal-actor',$2,$2,now(),'provider','model','assistant','user-env','company','succeeded')`,
+    [organizationId, userId])).rejects.toMatchObject({ code: '23514' })
   })
 
   it('isolates encrypted organization credentials and enforces user and project model access', async () => {
@@ -1272,6 +1280,9 @@ describePg('PostgreSQL baseline', () => {
       expect(imported.rows[0]).toMatchObject({ password_hash: 'hash-member', role: 'member', access_mode: 'rw',
         desired_state: 'stopped', model_allowed: false, input_price: '1.250000000', token_mode: 'custom',
         cost_mode: 'inherit', estimated_cost: '0.123456000', alert_count: '1' })
+      const importedUsageState = await pool.query<{ pricing_status: string; actor_user_id: string | null }>(`SELECT
+        pricing_status,actor_user_id FROM harness.model_usage WHERE organization_id=$1 AND event_id='usage-1'`, [first.organizationId])
+      expect(importedUsageState.rows[0]).toEqual({ pricing_status: 'historical-unknown', actor_user_id: null })
       const creatorMembership = await pool.query<{ access_mode: string }>(`SELECT pm.access_mode
         FROM harness.project_members pm
         JOIN harness.users u ON u.id=pm.user_id AND u.organization_id=pm.organization_id
@@ -1491,6 +1502,9 @@ describePg('PostgreSQL baseline', () => {
       }
       expect(await governance.ingest({ kind: 'user', id: member.id }, usage)).toEqual({ inserted: true, alerts: 1 })
       expect(await governance.ingest({ kind: 'user', id: member.id }, usage)).toEqual({ inserted: false, alerts: 0 })
+      const personalUsageRow = await pool.query<{ actor_user_id: string | null }>(`SELECT actor_user_id
+        FROM harness.model_usage WHERE organization_id=$1 AND event_id=$2`, [context.organizationId, usage.eventId])
+      expect(personalUsageRow.rows[0]).toEqual({ actor_user_id: null })
       expect(await governance.summary({ kind: 'user', id: member.id })).toMatchObject({
         totalTokens: 8,
         estimatedCostMicros: 8,
@@ -1587,17 +1601,43 @@ describePg('PostgreSQL baseline', () => {
       const projectIntakeToken = await governance.issueIntakeToken({ kind: 'project', id: project.id })
       expect(await governance.subjectForIntakeToken(projectIntakeToken))
         .toEqual({ kind: 'project', id: project.id })
-      const projectUsage = { ...usage, eventId: randomUUID(), sessionId: 'shared-runtime-session' }
+      const projectUsage = {
+        ...usage, eventId: randomUUID(), sessionId: 'shared-runtime-session', actorUserId: member.id, actorProjectId: project.id,
+      }
       expect(await governance.ingest({ kind: 'project', id: project.id }, projectUsage))
         .toEqual({ inserted: true, alerts: 1 })
       expect(await governance.summary({ kind: 'project', id: project.id })).toMatchObject({
         totalTokens: 8,
         estimatedCostMicros: 8,
         companyCostMicros: 8,
+        pricing: { status: 'priced', pricedCalls: 1 },
         tokenLimit: 10,
         companyCostMicrosLimit: 100,
         alerts: [{ metric: 'tokens', threshold: 80 }],
       })
+      const contributors = await governance.usageContributors()
+      expect(contributors.rows).toEqual([expect.objectContaining({
+        userId: member.id,
+        username: 'runtime-user',
+        projectCount: 1,
+        totalTokens: 8,
+      })])
+      expect(contributors.unattributed.totalTokens).toBe(0)
+      const overview = await governance.usageOverview()
+      expect(overview.projects.totalTokens).toBe(8)
+      expect(overview.users.find(user => user.userId === member.id)?.projectContribution.totalTokens).toBe(8)
+      expect(await governance.usageHealth()).toMatchObject({
+        missingUsageCalls: 0,
+        unattributedProjectCalls: 0,
+        unpricedCalls: 0,
+        historicalUnknownCalls: 0,
+      })
+      await expect(governance.ingest({ kind: 'project', id: project.id }, {
+        ...projectUsage, eventId: randomUUID(), actorUserId: 999999,
+      })).rejects.toThrow(/unknown usage actor/)
+      await expect(governance.ingest({ kind: 'project', id: project.id }, {
+        ...projectUsage, eventId: randomUUID(), actorProjectId: project.id + 1,
+      })).rejects.toThrow(/actorProjectId must match/)
       await governance.setQuota('project', String(project.id), 'inherit', 'inherit')
       expect(await governance.projectQuota(project.id)).toEqual({
         source: 'inherit',
@@ -1618,10 +1658,10 @@ describePg('PostgreSQL baseline', () => {
         tokenLimit: null,
         companyCostMicrosLimit: null,
       })
-      const projectUsageOwner = await pool.query<{ user_id: string | null; project_id: string | null }>(`SELECT
-        user_id,project_id FROM harness.model_usage WHERE organization_id=$1 AND event_id=$2`,
+      const projectUsageOwner = await pool.query<{ user_id: string | null; project_id: string | null; actor_user_id: string | null; pricing_status: string }>(`SELECT
+        user_id,project_id,actor_user_id,pricing_status FROM harness.model_usage WHERE organization_id=$1 AND event_id=$2`,
       [context.organizationId, projectUsage.eventId])
-      expect(projectUsageOwner.rows[0]).toEqual({ user_id: null, project_id: expect.any(String) })
+      expect(projectUsageOwner.rows[0]).toMatchObject({ user_id: null, project_id: expect.any(String), actor_user_id: expect.any(String), pricing_status: 'priced' })
       const projectInternalId = projectUsageOwner.rows[0]!.project_id!
       const projectOwner = await pool.query<{ id: string }>(
         'SELECT id FROM harness.users WHERE organization_id=$1 AND public_id=$2',

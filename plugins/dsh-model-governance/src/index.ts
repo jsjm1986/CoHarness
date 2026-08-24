@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
-import type { GenerateOptions, StreamChunk, TokenUsage } from '@deepseek-ai/dsh-llm'
+import type { GenerateOptions, Message, StreamChunk, TokenUsage } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-settings'
 import type {} from '@deepseek-ai/dsh-agent'
 import { ReloadableModelAccess } from './access.ts'
@@ -25,6 +25,25 @@ function credentialClass(source: string): UsageRecord['credentialClass'] {
 
 function terminalStatus(chunk: Extract<StreamChunk, { type: 'finish' }>): UsageRecord['status'] {
   return chunk.reason.kind === 'error' ? 'failed' : chunk.reason.kind === 'aborted' ? 'cancelled' : 'succeeded'
+}
+
+function participantIdentity(messages: readonly Message[]): { userId: number; projectId: number } | undefined {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const source = messages[index]?.source
+    if (source === null || typeof source !== 'object') continue
+    const participant = (source as { participant?: unknown }).participant
+    if (participant === null || typeof participant !== 'object') continue
+    const userId = (participant as { userId?: unknown }).userId
+    const scope = (participant as { scope?: unknown }).scope
+    if (scope === null || typeof scope !== 'object') continue
+    if ((scope as { kind?: unknown }).kind !== 'project') continue
+    const projectId = (scope as { projectId?: unknown }).projectId
+    if (typeof userId === 'number' && Number.isSafeInteger(userId) && userId > 0
+      && typeof projectId === 'number' && Number.isSafeInteger(projectId) && projectId > 0) {
+      return { userId, projectId }
+    }
+  }
+  return undefined
 }
 
 /** Mount policy provider plus final llm/stream enforcement and metering. */
@@ -141,9 +160,11 @@ export function apply(ctx: Context): void {
     const initiatorId = ctx.get('agents')?.currentInitiator()?.session.id
     const explicitId = options.sessionId
     const attributedId = explicitId ?? initiatorId
+    const actor = policy.userDeclaredAllowed ? undefined : participantIdentity(options.messages)
     const base = {
       eventId: randomUUID(), occurredAt: Date.now(), provider: options.provider, model: options.model,
       purpose: options.purpose ?? 'assistant', ...attributedId === undefined ? {} : { sessionId: String(attributedId) },
+      ...actor === undefined ? {} : { actorUserId: actor.userId, actorProjectId: actor.projectId },
     }
     if (initiatorId !== undefined && explicitId !== undefined && initiatorId !== explicitId) {
       return (async function* (): AsyncIterable<StreamChunk> {

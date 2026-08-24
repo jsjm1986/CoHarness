@@ -1,6 +1,6 @@
-import { AlertTriangle, Gauge, Settings2, WalletCards } from 'lucide-react'
+import { Gauge, Settings2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { listUsage, listUsers, setQuota, type AdminUsageSummary, type AdminUser } from '../api.ts'
+import { getUsageHealth, listUsageOverview, listUsers, setQuota, type AdminUser, type UsageHealth, type UsageOverview } from '../api.ts'
 import {
   Button,
   Dialog,
@@ -11,18 +11,14 @@ import {
   PageHeader,
   Section,
 } from '../components/ui.tsx'
-import { formatCompact, formatMoney, MeteringState, Metric, QuotaSummary } from '../components/usage.tsx'
+import { formatCompact, formatMoney, MeteringState, Metric, PricingState, QuotaSummary } from '../components/usage.tsx'
 
 type QuotaMode = 'inherit' | 'unlimited' | 'custom'
 
-function currentMonth(): string {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-}
-
 export function UsagePage() {
-  const [month, setMonth] = useState(currentMonth())
-  const [rows, setRows] = useState<AdminUsageSummary[]>([])
+  const [month, setMonth] = useState('')
+  const [overview, setOverview] = useState<UsageOverview | null>(null)
+  const [health, setHealth] = useState<UsageHealth | null>(null)
   const [users, setUsers] = useState<AdminUser[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -38,8 +34,12 @@ export function UsagePage() {
   const reload = useCallback(async (showLoading = false) => {
     if (showLoading) setLoading(true)
     try {
-      const [nextRows, nextUsers] = await Promise.all([listUsage(month), listUsers()])
-      setRows(nextRows)
+      const [nextOverview, nextUsers, nextHealth] = await Promise.all([
+        listUsageOverview(month || undefined), listUsers(), getUsageHealth(month || undefined),
+      ])
+      setOverview(nextOverview)
+      setHealth(nextHealth)
+      if (month === '') setMonth(current => current === '' ? nextOverview.month : current)
       setUsers(nextUsers)
       setError('')
     } catch (cause) {
@@ -51,12 +51,15 @@ export function UsagePage() {
 
   useEffect(() => { void reload(true) }, [reload])
 
-  const totals = useMemo(() => rows.reduce((sum, row) => ({
-    calls: sum.calls + row.calls,
-    tokens: sum.tokens + row.totalTokens,
-    cost: sum.cost + row.companyCostMicros,
-    alerts: sum.alerts + row.alerts.length,
-  }), { calls: 0, tokens: 0, cost: 0, alerts: 0 }), [rows])
+  const rows = overview?.users ?? []
+  const totals = useMemo(() => ({
+    personalCalls: overview?.personal.calls ?? 0,
+    personalTokens: overview?.personal.totalTokens ?? 0,
+    projectTokens: overview?.projects.totalTokens ?? 0,
+    unattributedTokens: overview?.unattributedProjects.totalTokens ?? 0,
+    companyCost: overview?.personal.companyCostMicros ?? 0,
+    alerts: rows.reduce((sum, row) => sum + row.personal.alerts.length, 0),
+  }), [overview, rows])
 
   function changeSubjectType(next: 'role' | 'user') {
     setSubjectType(next)
@@ -98,7 +101,7 @@ export function UsagePage() {
     <div className="page">
       <PageHeader
         title="模型用量"
-        description="查看自然月用量、公司成本、计量完整性和建议性额度告警。"
+        description="个人用量用于额度与账务；项目贡献用于活动分析，不与项目总量重复相加。"
         actions={(
           <div className="pageToolbar">
             <label className="monthPicker"><span>月份</span><input className="input" type="month" value={month} onChange={event => setMonth(event.target.value)} /></label>
@@ -107,13 +110,16 @@ export function UsagePage() {
         )}
       />
       <ErrorBanner message={error} />
-      <div className="metricGrid" aria-label="用量汇总">
-        <Metric label="调用次数" value={totals.calls.toLocaleString()} />
-        <Metric label="Token 总量" value={formatCompact(totals.tokens)} />
-        <Metric label="公司成本" value={formatMoney(totals.cost, 2)} />
+      <div className="metricGrid usageOverviewMetrics" aria-label="用量汇总">
+        <Metric label="个人调用" value={totals.personalCalls.toLocaleString()} />
+        <Metric label="个人 Token" value={formatCompact(totals.personalTokens)} />
+        <Metric label="项目 Token" value={formatCompact(totals.projectTokens)} />
+        <Metric label="项目公司成本" value={formatMoney(overview?.projects.companyCostMicros ?? 0, 2)} />
+        <Metric label="未归属项目 Token" value={formatCompact(totals.unattributedTokens)} tone={totals.unattributedTokens > 0 ? 'warning' : undefined} />
+        <Metric label="个人公司成本" value={formatMoney(totals.companyCost, 2)} />
         <Metric label="额度告警" value={totals.alerts.toLocaleString()} tone={totals.alerts > 0 ? 'warning' : undefined} />
       </div>
-      <Section className="responsiveSection" title="用户明细" meta={loading ? undefined : `${rows.length} 位用户`}>
+      <Section className="responsiveSection" title="用户用量" meta={loading ? undefined : `${rows.length} 位用户 · ${overview?.timeZone ?? ''}`}>
         {loading ? <LoadingState label="正在加载用量" /> : rows.length === 0 ? (
           <EmptyState icon={Gauge} title="本月暂无用量" detail="所选月份还没有收到模型调用计量记录。" />
         ) : (
@@ -121,18 +127,18 @@ export function UsagePage() {
             <div className="tableWrap desktopOnly">
               <table className="dataTable usageTable">
                 <thead>
-                  <tr><th>用户</th><th>调用</th><th>Token</th><th>估算成本</th><th>公司成本</th><th>计量</th><th>额度与告警</th></tr>
+                  <tr><th>用户</th><th>个人调用</th><th>个人 Token</th><th>项目贡献</th><th>个人公司成本</th><th>价格</th><th>计量与额度</th></tr>
                 </thead>
                 <tbody>
                   {rows.map(row => (
                     <tr key={row.userId}>
                       <td><UsageIdentity row={row} /></td>
-                      <td>{row.calls.toLocaleString()}</td>
-                      <td><TokenBreakdown row={row} /></td>
-                      <td>{formatMoney(row.estimatedCostMicros)}</td>
-                      <td>{formatMoney(row.companyCostMicros)}</td>
-                      <td><MeteringState missing={row.missingUsageCalls} /></td>
-                      <td><QuotaSummary summary={row} /></td>
+                      <td>{row.personal.calls.toLocaleString()}</td>
+                      <td><TokenBreakdown summary={row.personal} /></td>
+                      <td><ContributionValue value={row.projectContribution.totalTokens} calls={row.projectContribution.calls} /></td>
+                      <td>{formatMoney(row.personal.companyCostMicros)}</td>
+                      <td><PricingState pricing={row.personal.pricing} /></td>
+                      <td><div className="usageStatusStack"><MeteringState missing={row.personal.missingUsageCalls} /><QuotaSummary summary={row.personal} /></div></td>
                     </tr>
                   ))}
                 </tbody>
@@ -141,20 +147,33 @@ export function UsagePage() {
             <div className="mobileList">
               {rows.map(row => (
                 <article className="mobileItem" key={row.userId}>
-                  <div className="mobileItemHeader"><UsageIdentity row={row} /><MeteringState missing={row.missingUsageCalls} /></div>
+                  <div className="mobileItemHeader"><UsageIdentity row={row} /><MeteringState missing={row.personal.missingUsageCalls} /></div>
                   <div className="mobileItemBody">
                     <dl className="definitionGrid">
-                      <Definition label="调用次数">{row.calls.toLocaleString()}</Definition>
-                      <Definition label="Token">{row.totalTokens.toLocaleString()}</Definition>
-                      <Definition label="估算成本">{formatMoney(row.estimatedCostMicros)}</Definition>
-                      <Definition label="公司成本">{formatMoney(row.companyCostMicros)}</Definition>
+                      <Definition label="个人调用">{row.personal.calls.toLocaleString()}</Definition>
+                      <Definition label="个人 Token">{row.personal.totalTokens.toLocaleString()}</Definition>
+                      <Definition label="项目贡献">{row.projectContribution.totalTokens.toLocaleString()}（{row.projectContribution.calls.toLocaleString()} 次）</Definition>
+                      <Definition label="个人公司成本">{formatMoney(row.personal.companyCostMicros)}</Definition>
+                      <Definition label="价格"><PricingState pricing={row.personal.pricing} /></Definition>
                     </dl>
-                    <QuotaSummary summary={row} />
+                    <QuotaSummary summary={row.personal} />
                   </div>
                 </article>
               ))}
             </div>
           </>
+        )}
+      </Section>
+      <Section className="responsiveSection" title="计量健康" meta={health?.timeZone}>
+        {health === null ? <LoadingState label="正在加载计量健康" /> : (
+          <dl className="definitionGrid">
+            <Definition label="缺失计量">{health.missingUsageCalls.toLocaleString()} 次</Definition>
+            <Definition label="未归属项目调用">{health.unattributedProjectCalls.toLocaleString()} 次</Definition>
+            <Definition label="未归属项目 Token">{health.unattributedProjectTokens.toLocaleString()}</Definition>
+            <Definition label="未配置价格">{health.unpricedCalls.toLocaleString()} 次</Definition>
+            <Definition label="历史价格未知">{health.historicalUnknownCalls.toLocaleString()} 次</Definition>
+            <Definition label="最大 intake 延迟">{(health.maxIntakeLagMs / 1000).toFixed(1)} 秒</Definition>
+          </dl>
         )}
       </Section>
 
@@ -219,17 +238,23 @@ export function UsagePage() {
   )
 }
 
-function UsageIdentity({ row }: { row: AdminUsageSummary }) {
+type UsageOverviewUser = UsageOverview['users'][number]
+
+function UsageIdentity({ row }: { row: UsageOverviewUser }) {
   return (
     <div className="userIdentity">
       <span className="avatar" aria-hidden="true">{row.username.slice(0, 1)}</span>
-      <span className="identityText"><strong>{row.username}</strong><span>ID {row.userId} · {row.month}</span></span>
+      <span className="identityText"><strong>{row.username}</strong><span>ID {row.userId} · {row.archived ? '已归档历史' : '个人账务'}</span></span>
     </div>
   )
 }
 
-function TokenBreakdown({ row }: { row: AdminUsageSummary }) {
-  return <div className="stackedValue"><strong>{row.totalTokens.toLocaleString()}</strong><span className="muted">输入 {formatCompact(row.inputTokens)} · 输出 {formatCompact(row.outputTokens)}</span></div>
+function TokenBreakdown({ summary }: { summary: UsageOverviewUser['personal'] }) {
+  return <div className="stackedValue"><strong>{summary.totalTokens.toLocaleString()}</strong><span className="muted">输入 {formatCompact(summary.inputTokens)} · 输出 {formatCompact(summary.outputTokens)}</span></div>
+}
+
+function ContributionValue({ value, calls }: { value: number; calls: number }) {
+  return <div className="stackedValue"><strong>{value.toLocaleString()}</strong><span className="muted">{calls.toLocaleString()} 次 · 不计入个人额度</span></div>
 }
 
 function QuotaEditor({ label, mode, subjectType, value, inputLabel, inputMode, onMode, onValue }: {

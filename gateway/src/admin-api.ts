@@ -578,6 +578,35 @@ async function dispatch(
     return true
   }
 
+  if (pathname === '/admin/api/usage/overview') {
+    if (deps.governance?.usageOverview === undefined || method !== 'GET') return false
+    const month = new URL(req.url ?? '/', 'http://x').searchParams.get('month') ?? undefined
+    sendJson(res, 200, await deps.governance.usageOverview(month))
+    return true
+  }
+
+  if (pathname === '/admin/api/usage/contributors') {
+    if (deps.governance?.usageContributors === undefined || method !== 'GET') return false
+    const query = new URL(req.url ?? '/', 'http://x').searchParams
+    const rawProject = query.get('projectId')
+    let projectId: number | undefined
+    if (rawProject !== null) {
+      projectId = Number(rawProject)
+      if (!Number.isSafeInteger(projectId) || projectId <= 0) throw new Error('projectId must be a positive safe integer')
+      if (await deps.projects.getById(projectId) === null) { sendError(res, 404, 'project not found'); return true }
+    }
+    const month = query.get('month') ?? undefined
+    sendJson(res, 200, await deps.governance.usageContributors(month, projectId))
+    return true
+  }
+
+  if (pathname === '/admin/api/usage/health') {
+    if (deps.governance?.usageHealth === undefined || method !== 'GET') return false
+    const month = new URL(req.url ?? '/', 'http://x').searchParams.get('month') ?? undefined
+    sendJson(res, 200, await deps.governance.usageHealth(month))
+    return true
+  }
+
   if (pathname === '/admin/api/model-registrations') {
     if (deps.governance === undefined || method !== 'GET') return false
     const query = new URL(req.url ?? '/', 'http://x').searchParams

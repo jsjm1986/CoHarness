@@ -13,7 +13,14 @@ import type {
   ModelRow,
   RuntimeModelPolicy,
   RuntimeModelProvider,
+  UsageContributorReport,
+  UsageContributorRow,
   UsageEvent,
+  UsageHealth,
+  UsageMeasure,
+  UsageOverview,
+  UsagePricingStatus,
+  UsagePricingView,
   UsageSummary,
   ProjectQuotaView,
 } from '../model-governance.ts'
@@ -228,6 +235,10 @@ interface UsageTotalsRow {
   company: string
   calls: string
   missing: string
+  priced: string
+  unpriced: string
+  configured_zero: string
+  unknown: string
 }
 
 interface UsageAlertRow {
@@ -243,21 +254,10 @@ function usageSummary(
   companyCostMicrosLimit: number | null,
   alerts: readonly UsageAlertRow[],
 ): UsageSummary {
-  const input = safeCount(row.input, 'input tokens')
-  const output = safeCount(row.output, 'output tokens')
-  const read = safeCount(row.read, 'cache read tokens')
-  const write = safeCount(row.write, 'cache write tokens')
+  const measure = usageMeasure(row)
   return {
     month,
-    inputTokens: input,
-    outputTokens: output,
-    cacheReadTokens: read,
-    cacheWriteTokens: write,
-    totalTokens: input + output + read + write,
-    estimatedCostMicros: decimalToMicros(row.cost),
-    companyCostMicros: decimalToMicros(row.company),
-    calls: safeCount(row.calls, 'usage calls'),
-    missingUsageCalls: safeCount(row.missing, 'missing usage calls'),
+    ...measure,
     tokenLimit,
     companyCostMicrosLimit,
     alerts: alerts.map(alert => ({
@@ -265,6 +265,62 @@ function usageSummary(
       threshold: alert.threshold,
       createdAt: alert.created_at.getTime(),
     })),
+  }
+}
+
+function pricingView(row: UsageTotalsRow, calls: number): UsagePricingView {
+  const pricedCalls = safeCount(row.priced, 'priced usage calls')
+  const unpricedCalls = safeCount(row.unpriced, 'unpriced usage calls')
+  const configuredZeroCalls = safeCount(row.configured_zero, 'configured-zero usage calls')
+  const unknownCalls = safeCount(row.unknown, 'unknown pricing calls')
+  const status: UsagePricingStatus = calls === 0
+    ? 'none'
+    : unknownCalls === calls
+        ? 'historical-unknown'
+      : pricedCalls === calls
+        ? 'priced'
+        : unpricedCalls === calls
+          ? 'unpriced'
+          : configuredZeroCalls === calls
+            ? 'configured-zero'
+            : 'mixed'
+  return { status, pricedCalls, unpricedCalls, configuredZeroCalls, unknownCalls }
+}
+
+function usageMeasure(row: UsageTotalsRow): UsageMeasure {
+  const input = safeCount(row.input, 'input tokens')
+  const output = safeCount(row.output, 'output tokens')
+  const read = safeCount(row.read, 'cache read tokens')
+  const write = safeCount(row.write, 'cache write tokens')
+  const calls = safeCount(row.calls, 'usage calls')
+  const totalTokens = input + output + read + write
+  if (!Number.isSafeInteger(totalTokens)) throw new Error('total usage tokens exceed safe integer range')
+  return {
+    inputTokens: input,
+    outputTokens: output,
+    cacheReadTokens: read,
+    cacheWriteTokens: write,
+    totalTokens,
+    estimatedCostMicros: decimalToMicros(row.cost),
+    companyCostMicros: decimalToMicros(row.company),
+    calls,
+    missingUsageCalls: safeCount(row.missing, 'missing usage calls'),
+    pricing: pricingView(row, calls),
+  }
+}
+
+function zeroUsageMeasure(): UsageMeasure {
+  return {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    totalTokens: 0,
+    estimatedCostMicros: 0,
+    companyCostMicros: 0,
+    calls: 0,
+    missingUsageCalls: 0,
+    pricing: { status: 'none', pricedCalls: 0, unpricedCalls: 0, configuredZeroCalls: 0, unknownCalls: 0 },
   }
 }
 
@@ -994,6 +1050,15 @@ export class PostgresModelGovernanceService {
     if (!Number.isSafeInteger(event.occurredAt) || event.occurredAt < 0) {
       throw new Error('occurredAt must be a non-negative safe integer')
     }
+    if (event.actorUserId !== undefined && (!Number.isSafeInteger(event.actorUserId) || event.actorUserId <= 0)) {
+      throw new Error('actorUserId must be a positive safe integer')
+    }
+    if (event.actorProjectId !== undefined && (!Number.isSafeInteger(event.actorProjectId) || event.actorProjectId <= 0)) {
+      throw new Error('actorProjectId must be a positive safe integer')
+    }
+    if (event.actorProjectId !== undefined && event.actorUserId === undefined) {
+      throw new Error('actorProjectId requires actorUserId')
+    }
     if (!['company', 'personal', 'unknown'].includes(event.credentialClass)) throw new Error('invalid credentialClass')
     if (!['succeeded', 'failed', 'cancelled', 'missing-usage', 'denied'].includes(event.status)) {
       throw new Error('invalid status')
@@ -1019,6 +1084,35 @@ export class PostgresModelGovernanceService {
         : null
       if (subject.kind === 'user' && user === null) throw new Error(`unknown user ${String(subject.id)}`)
       if (subject.kind === 'project' && project === null) throw new Error(`unknown project ${String(subject.id)}`)
+      // Actor attribution is an activity projection for shared projects only;
+      // personal billing rows must not duplicate their billing user here.
+      let actor: string | null = null
+      if (subject.kind === 'project') {
+        if (event.actorProjectId !== undefined && event.actorProjectId !== subject.id) {
+          throw new Error('actorProjectId must match the project usage subject')
+        }
+        if (event.actorUserId !== undefined) {
+          actor = await internalUserId(client, this.context.organizationId, event.actorUserId)
+          if (actor === null) throw new Error(`unknown usage actor ${String(event.actorUserId)}`)
+          const member = await client.query<{ allowed: boolean }>(`SELECT EXISTS(
+            SELECT 1 FROM harness.users u
+            JOIN harness.memberships membership ON membership.organization_id=u.organization_id
+              AND membership.user_id=u.id AND membership.status='active'
+            LEFT JOIN harness.project_members member ON member.organization_id=u.organization_id
+              AND member.project_id=$2 AND member.user_id=u.id
+            WHERE u.organization_id=$1 AND u.id=$3 AND u.status='active'
+              AND (membership.role='admin' OR member.access_mode='rw')
+          ) allowed`, [this.context.organizationId, project, actor])
+          if (member.rows[0]?.allowed !== true) throw new Error(`usage actor ${String(event.actorUserId)} is not an active project writer`)
+        }
+      } else {
+        if (event.actorUserId !== undefined && event.actorUserId !== subject.id) {
+          throw new Error('actorUserId must match the personal usage subject')
+        }
+        if (event.actorProjectId !== undefined) {
+          throw new Error('actorProjectId is not valid for personal usage')
+        }
+      }
       const catalog = await client.query<{
         id: string
         input_price: string | null
@@ -1034,6 +1128,10 @@ export class PostgresModelGovernanceService {
         ) p ON true WHERE m.organization_id=$1 AND m.provider_key=$2 AND m.model_key=$3`,
       [this.context.organizationId, provider, model, event.occurredAt])
       const price = catalog.rows[0]
+      const priceValues = [price?.input_price, price?.output_price, price?.cache_read_price, price?.cache_write_price]
+      const pricingStatus = price === undefined || price.input_price === null
+        ? 'unpriced'
+        : priceValues.every(value => decimalToMicros(value ?? '0') === 0) ? 'configured-zero' : 'priced'
       const estimated = price?.input_price === null || price?.input_price === undefined ? 0 : Math.round((
         buckets.input * decimalToMicros(price.input_price)
         + buckets.output * decimalToMicros(price.output_price ?? '0')
@@ -1042,15 +1140,17 @@ export class PostgresModelGovernanceService {
       ) / 1_000_000)
       const companyCost = credentialClass === 'personal' ? 0 : estimated
       const inserted = await client.query<{ event_id: string }>(`INSERT INTO harness.model_usage(
-        event_id,organization_id,user_id,project_id,occurred_at,received_at,model_id,provider_key,model_key,purpose,
+        event_id,organization_id,user_id,project_id,actor_user_id,pricing_status,occurred_at,received_at,model_id,provider_key,model_key,purpose,
         session_id,credential_source,credential_class,status,input_tokens,output_tokens,cache_read_tokens,
         cache_write_tokens,estimated_cost,company_cost
-      ) VALUES($1,$2,$3,$4,to_timestamp($5/1000.0),now(),$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+      ) VALUES($1,$2,$3,$4,$5,$6,to_timestamp($7/1000.0),now(),$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
       ON CONFLICT(organization_id,event_id) DO NOTHING RETURNING event_id`, [
         event.eventId,
         this.context.organizationId,
         user,
         project,
+        actor,
+        pricingStatus,
         event.occurredAt,
         price?.id ?? null,
         provider,
@@ -1177,22 +1277,184 @@ export class PostgresModelGovernanceService {
     return this.summaryWith(this.context.pool, subject, month)
   }
 
+  /**
+   * Summarize confirmed project actors without changing project billing totals.
+   * @param month - natural month in the configured usage time zone.
+   * @param projectId - optional public project filter.
+   * @returns contributor rows and project calls without a confirmed actor.
+   */
+  async usageContributors(month = monthOf(Date.now(), this.timeZone), projectId?: number): Promise<UsageContributorReport> {
+    const project = projectId === undefined
+      ? undefined
+      : await internalProjectId(this.context.pool, this.context.organizationId, projectId)
+    if (projectId !== undefined && project === null) throw new Error(`unknown project ${String(projectId)}`)
+    const projectInternalId = project ?? undefined
+    const rows = await this.contributorRows(this.context.pool, month, projectInternalId)
+    const unattributed = await this.usageTotalsWhere(
+      this.context.pool,
+      projectInternalId === undefined ? 'project_id IS NOT NULL AND actor_user_id IS NULL' : 'project_id=$2 AND actor_user_id IS NULL',
+      projectInternalId === undefined ? [] : [projectInternalId],
+      month,
+    )
+    return {
+      month,
+      timeZone: this.timeZone,
+      ...(projectId === undefined ? {} : { projectId }),
+      rows,
+      unattributed: usageMeasure(unattributed),
+    }
+  }
+
+  /**
+   * Build the administrator overview for personal, project, and contributor usage.
+   * @param month - natural month in the configured usage time zone.
+   * @returns non-overlapping billing totals plus activity projections.
+   */
+  async usageOverview(month = monthOf(Date.now(), this.timeZone)): Promise<UsageOverview> {
+    const users = await this.context.pool.query<{ public_id: string; username: string; archived: boolean }>(`SELECT
+      u.public_id::text,u.username::text,
+      (u.deleted_at IS NOT NULL OR u.status <> 'active' OR COALESCE(membership.status <> 'active', true)) archived
+      FROM harness.users u LEFT JOIN harness.memberships membership
+        ON membership.organization_id=u.organization_id AND membership.user_id=u.id
+      WHERE u.organization_id=$1
+      ORDER BY u.public_id`, [this.context.organizationId])
+    const [personal, projects, unattributed, contributors] = await Promise.all([
+      this.usageTotalsWhere(this.context.pool, 'user_id IS NOT NULL', [], month),
+      this.usageTotalsWhere(this.context.pool, 'project_id IS NOT NULL', [], month),
+      this.usageTotalsWhere(this.context.pool, 'project_id IS NOT NULL AND actor_user_id IS NULL', [], month),
+      this.contributorRows(this.context.pool, month),
+    ])
+    const contributions = new Map(contributors.map(row => [row.userId, row]))
+    const userRows = await Promise.all(users.rows.map(async user => {
+      const userId = safeCount(user.public_id, 'user id')
+      return {
+        userId,
+        username: user.username,
+        archived: user.archived,
+        personal: await this.userSummaryWith(this.context.pool, userId, month),
+        projectContribution: contributions.get(userId) ?? zeroUsageMeasure(),
+      }
+    }))
+    return {
+      month,
+      timeZone: this.timeZone,
+      personal: usageMeasure(personal),
+      projects: usageMeasure(projects),
+      unattributedProjects: usageMeasure(unattributed),
+      users: userRows,
+    }
+  }
+
+  /**
+   * Check ingestion and attribution coverage for one natural month.
+   * @param month - natural month in the configured usage time zone.
+   * @returns health counters suitable for an administrator diagnostic view.
+   */
+  async usageHealth(month = monthOf(Date.now(), this.timeZone)): Promise<UsageHealth> {
+    const { start, end } = monthBounds(month, this.timeZone)
+    const result = await this.context.pool.query<{
+      missing: string
+      unattributed_calls: string
+      unattributed_tokens: string
+      unpriced: string
+      historical_unknown: string
+      max_lag_ms: string | null
+    }>(`SELECT COUNT(*) FILTER (WHERE status='missing-usage')::text missing,
+      COUNT(*) FILTER (WHERE project_id IS NOT NULL AND actor_user_id IS NULL)::text unattributed_calls,
+      COALESCE(SUM(input_tokens+output_tokens+cache_read_tokens+cache_write_tokens)
+        FILTER (WHERE project_id IS NOT NULL AND actor_user_id IS NULL),0)::text unattributed_tokens,
+      COUNT(*) FILTER (WHERE pricing_status='unpriced')::text unpriced,
+      COUNT(*) FILTER (WHERE pricing_status='historical-unknown')::text historical_unknown,
+      COALESCE(MAX(GREATEST(EXTRACT(epoch FROM (received_at-occurred_at))*1000,0)),0)::text max_lag_ms
+      FROM harness.model_usage WHERE organization_id=$1
+        AND occurred_at>=to_timestamp($2/1000.0) AND occurred_at<to_timestamp($3/1000.0)`,
+    [this.context.organizationId, start, end])
+    const row = result.rows[0]!
+    const maxIntakeLagMs = Math.round(Number(row.max_lag_ms ?? '0'))
+    if (!Number.isSafeInteger(maxIntakeLagMs) || maxIntakeLagMs < 0) throw new Error('intake lag exceeds safe integer range')
+    return {
+      month,
+      timeZone: this.timeZone,
+      missingUsageCalls: safeCount(row.missing, 'missing usage calls'),
+      unattributedProjectCalls: safeCount(row.unattributed_calls, 'unattributed project calls'),
+      unattributedProjectTokens: safeCount(row.unattributed_tokens, 'unattributed project tokens'),
+      unpricedCalls: safeCount(row.unpriced, 'unpriced calls'),
+      historicalUnknownCalls: safeCount(row.historical_unknown, 'historical unknown calls'),
+      maxIntakeLagMs,
+    }
+  }
+
+  private async contributorRows(
+    queryable: Queryable,
+    month: string,
+    projectInternalId?: string,
+  ): Promise<UsageContributorRow[]> {
+    const { start, end } = monthBounds(month, this.timeZone)
+    const values: unknown[] = [this.context.organizationId, start, end]
+    const projectClause = projectInternalId === undefined ? '' : ' AND mu.project_id=$4'
+    if (projectInternalId !== undefined) values.push(projectInternalId)
+    const result = await queryable.query<UsageTotalsRow & {
+      user_id: string
+      username: string
+      archived: boolean
+      projects: string
+    }>(`SELECT u.public_id::text user_id,u.username::text username,
+      (u.deleted_at IS NOT NULL OR u.status <> 'active') archived,
+      COUNT(DISTINCT mu.project_id)::text projects,
+      COALESCE(SUM(mu.input_tokens),0)::text input,COALESCE(SUM(mu.output_tokens),0)::text output,
+      COALESCE(SUM(mu.cache_read_tokens),0)::text read,COALESCE(SUM(mu.cache_write_tokens),0)::text write,
+      COALESCE(SUM(mu.estimated_cost),0)::text cost,COALESCE(SUM(mu.company_cost),0)::text company,
+      COUNT(*)::text calls,COUNT(*) FILTER (WHERE mu.status='missing-usage')::text missing,
+      COUNT(*) FILTER (WHERE mu.pricing_status='priced')::text priced,
+      COUNT(*) FILTER (WHERE mu.pricing_status='unpriced')::text unpriced,
+      COUNT(*) FILTER (WHERE mu.pricing_status='configured-zero')::text configured_zero,
+      COUNT(*) FILTER (WHERE mu.pricing_status='historical-unknown')::text unknown
+      FROM harness.model_usage mu JOIN harness.users u ON u.id=mu.actor_user_id
+        AND u.organization_id=mu.organization_id
+      WHERE mu.organization_id=$1 AND mu.project_id IS NOT NULL AND mu.actor_user_id IS NOT NULL
+        AND mu.occurred_at>=to_timestamp($2/1000.0) AND mu.occurred_at<to_timestamp($3/1000.0)${projectClause}
+      GROUP BY u.public_id,u.username,u.deleted_at,u.status
+      ORDER BY SUM(mu.input_tokens+mu.output_tokens+mu.cache_read_tokens+mu.cache_write_tokens) DESC,u.public_id`, values)
+    return result.rows.map(row => ({
+      userId: safeCount(row.user_id, 'contributor user id'),
+      username: row.username,
+      archived: row.archived,
+      projectCount: safeCount(row.projects, 'contributor project count'),
+      ...usageMeasure(row),
+    }))
+  }
+
   private async usageTotals(
     queryable: Queryable,
     subject: ModelUsageSubject,
     internalId: string,
     month: string,
   ): Promise<UsageTotalsRow> {
-    const { start, end } = monthBounds(month, this.timeZone)
     const subjectColumn = subject.kind === 'user' ? 'user_id' : 'project_id'
+    return this.usageTotalsWhere(queryable, `${subjectColumn}=$2`, [internalId], month)
+  }
+
+  private async usageTotalsWhere(
+    queryable: Queryable,
+    predicate: string,
+    values: readonly unknown[],
+    month: string,
+  ): Promise<UsageTotalsRow> {
+    const { start, end } = monthBounds(month, this.timeZone)
+    const startParameter = values.length + 2
     const usage = await queryable.query<UsageTotalsRow>(`SELECT COALESCE(SUM(input_tokens),0)::text input,
       COALESCE(SUM(output_tokens),0)::text output,COALESCE(SUM(cache_read_tokens),0)::text read,
       COALESCE(SUM(cache_write_tokens),0)::text write,COALESCE(SUM(estimated_cost),0)::text cost,
       COALESCE(SUM(company_cost),0)::text company,COUNT(*)::text calls,
-      COUNT(*) FILTER (WHERE status='missing-usage')::text missing
-      FROM harness.model_usage WHERE organization_id=$1 AND ${subjectColumn}=$2
-        AND occurred_at>=to_timestamp($3/1000.0) AND occurred_at<to_timestamp($4/1000.0)`,
-    [this.context.organizationId, internalId, start, end])
+      COUNT(*) FILTER (WHERE status='missing-usage')::text missing,
+      COUNT(*) FILTER (WHERE pricing_status='priced')::text priced,
+      COUNT(*) FILTER (WHERE pricing_status='unpriced')::text unpriced,
+      COUNT(*) FILTER (WHERE pricing_status='configured-zero')::text configured_zero,
+      COUNT(*) FILTER (WHERE pricing_status='historical-unknown')::text unknown
+      FROM harness.model_usage WHERE organization_id=$1 AND ${predicate}
+        AND occurred_at>=to_timestamp($${String(startParameter)}/1000.0)
+        AND occurred_at<to_timestamp($${String(startParameter + 1)}/1000.0)`,
+    [this.context.organizationId, ...values, start, end])
     return usage.rows[0]!
   }
 
@@ -1207,8 +1469,8 @@ export class PostgresModelGovernanceService {
   }
 
   private async userSummaryWith(queryable: Queryable, userId: number, month: string): Promise<UsageSummary> {
-    const user = await queryable.query<{ id: string; role: 'admin' | 'member' }>(`SELECT u.id,m.role
-      FROM harness.users u JOIN harness.memberships m
+    const user = await queryable.query<{ id: string; role: 'admin' | 'member' | null }>(`SELECT u.id,m.role
+      FROM harness.users u LEFT JOIN harness.memberships m
         ON m.organization_id=u.organization_id AND m.user_id=u.id
       WHERE u.organization_id=$1 AND u.public_id=$2`, [this.context.organizationId, userId])
     const identity = user.rows[0]
@@ -1221,9 +1483,11 @@ export class PostgresModelGovernanceService {
       company_cost_limit: string | null
     }>('SELECT token_mode,token_limit::text,company_cost_mode,company_cost_limit::text FROM harness.user_quotas WHERE user_id=$1',
     [identity.id])
-    const roleQuota = await queryable.query<{ token_limit: string | null; company_cost_limit: string | null }>(`SELECT
-      token_limit::text,company_cost_limit::text FROM harness.role_quotas
-      WHERE organization_id=$1 AND role=$2`, [this.context.organizationId, identity.role])
+    const roleQuota = identity.role === null
+      ? { rows: [] as Array<{ token_limit: string | null; company_cost_limit: string | null }> }
+      : await queryable.query<{ token_limit: string | null; company_cost_limit: string | null }>(`SELECT
+        token_limit::text,company_cost_limit::text FROM harness.role_quotas
+        WHERE organization_id=$1 AND role=$2`, [this.context.organizationId, identity.role])
     const alerts = await queryable.query<UsageAlertRow>(`SELECT metric,threshold,created_at FROM harness.model_usage_alerts
       WHERE user_id=$1 AND period_start=$2::date ORDER BY CASE metric WHEN 'tokens' THEN 0 ELSE 1 END,threshold`,
     [identity.id, `${month}-01`])

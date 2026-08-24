@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-25-dual-usage-attribution.md
+2026-08-25-dual-usage-attribution.md: b33a762f85ba6c4447bfda98c79cd1f80744318f
+2026-08-25-dual-usage-attribution.zh.md: 1e44bd8a05f9b8dca3307d1822e65ada355c6212

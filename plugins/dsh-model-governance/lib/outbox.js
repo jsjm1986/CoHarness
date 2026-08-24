@@ -59,16 +59,34 @@ export class UsageOutbox {
             if (this.closed)
                 return;
             const path = join(this.dir, name);
-            let response;
+            let body;
             try {
-                response = await fetch(this.url, {
-                    method: 'POST', headers: { authorization: `Bearer ${this.token}`, 'content-type': 'application/json' },
-                    body: await import('node:fs/promises').then(fs => fs.readFile(path, 'utf8')),
-                    signal: AbortSignal.timeout(5_000),
-                });
+                body = await import('node:fs/promises').then(fs => fs.readFile(path, 'utf8'));
             }
             catch {
                 return;
+            }
+            const post = (payload) => fetch(this.url, {
+                method: 'POST', headers: { authorization: `Bearer ${this.token}`, 'content-type': 'application/json' },
+                body: payload, signal: AbortSignal.timeout(5_000),
+            });
+            let response;
+            try {
+                response = await post(body);
+            }
+            catch {
+                return;
+            }
+            if (!response.ok && response.status === 400) {
+                const fallback = actorlessUsageBody(body);
+                if (fallback !== undefined) {
+                    try {
+                        response = await post(fallback);
+                    }
+                    catch {
+                        return;
+                    }
+                }
             }
             if (!response.ok)
                 return;
@@ -80,4 +98,23 @@ export class UsageOutbox {
         clearInterval(this.timer);
         await this.pumping;
     }
+}
+/** Remove unverifiable activity fields while preserving the billable usage event. */
+function actorlessUsageBody(body) {
+    let value;
+    try {
+        value = JSON.parse(body);
+    }
+    catch {
+        return undefined;
+    }
+    if (value === null || typeof value !== 'object' || Array.isArray(value))
+        return undefined;
+    const record = value;
+    if (record.kind === 'model-registration'
+        || (!Object.hasOwn(record, 'actorUserId') && !Object.hasOwn(record, 'actorProjectId')))
+        return undefined;
+    delete record.actorUserId;
+    delete record.actorProjectId;
+    return JSON.stringify(record);
 }

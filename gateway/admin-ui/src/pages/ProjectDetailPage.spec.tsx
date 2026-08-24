@@ -10,6 +10,7 @@ vi.mock('../api.ts', () => ({
   getProjectModelAccess: vi.fn(),
   getProject: vi.fn(),
   getProjectUsage: vi.fn(),
+  listUsageContributors: vi.fn(),
   listModelProviders: vi.fn(),
   listModels: vi.fn(),
   listUsers: vi.fn(),
@@ -55,6 +56,34 @@ const usage = {
   tokenLimit: 10_000,
   companyCostMicrosLimit: 5_000_000,
   alerts: [],
+  pricing: { status: 'priced' as const, pricedCalls: 4, unpricedCalls: 0, configuredZeroCalls: 0, unknownCalls: 0 },
+}
+
+const contributors = {
+  month: '2026-08',
+  timeZone: 'Asia/Shanghai',
+  projectId: 7,
+  rows: [{
+    userId: 1,
+    username: 'alice',
+    archived: false,
+    projectCount: 1,
+    inputTokens: 700,
+    outputTokens: 300,
+    cacheReadTokens: 50,
+    cacheWriteTokens: 20,
+    totalTokens: 1_070,
+    estimatedCostMicros: 2_000_000,
+    companyCostMicros: 1_500_000,
+    calls: 4,
+    missingUsageCalls: 0,
+    pricing: { status: 'priced' as const, pricedCalls: 4, unpricedCalls: 0, configuredZeroCalls: 0, unknownCalls: 0 },
+  }],
+  unattributed: {
+    inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0,
+    estimatedCostMicros: 0, companyCostMicros: 0, calls: 0, missingUsageCalls: 0,
+    pricing: { status: 'none' as const, pricedCalls: 0, unpricedCalls: 0, configuredZeroCalls: 0, unknownCalls: 0 },
+  },
 }
 
 const modelProviders: api.ModelProviderRow[] = [{
@@ -115,6 +144,7 @@ describe('ProjectDetailPage', () => {
     vi.mocked(api.getProject).mockResolvedValue(project)
     vi.mocked(api.listUsers).mockResolvedValue([alice])
     vi.mocked(api.getProjectUsage).mockResolvedValue(usage)
+    vi.mocked(api.listUsageContributors).mockResolvedValue(contributors)
     vi.mocked(api.listModelProviders).mockResolvedValue(modelProviders)
     vi.mocked(api.listModels).mockResolvedValue(models)
     vi.mocked(api.getProjectModelAccess).mockResolvedValue({

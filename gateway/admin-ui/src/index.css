@@ -1951,6 +1951,27 @@ a {
   background: var(--surface);
 }
 
+.usageOverviewMetrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.usageOverviewMetrics .metric:nth-child(3n) {
+  border-right: none;
+}
+
+.usageStatusStack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.sectionHint {
+  margin: 0 16px 14px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
 .metric {
   min-width: 0;
   padding: 16px 18px;
@@ -2310,6 +2331,18 @@ a {
   .metricGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     margin-top: 16px;
+  }
+
+  .usageOverviewMetrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .usageOverviewMetrics .metric:nth-child(3n) {
+    border-right: 1px solid var(--border);
+  }
+
+  .usageOverviewMetrics .metric:nth-child(2n) {
+    border-right: none;
   }
 
   .projectUsageMetrics {
