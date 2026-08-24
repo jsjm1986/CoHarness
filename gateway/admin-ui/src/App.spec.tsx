@@ -26,6 +26,7 @@ describe('App', () => {
     expect(screen.getAllByRole('button', { name: '退出登录' })).toHaveLength(2)
     expect(screen.getAllByRole('navigation', { name: '管理导航' })).toHaveLength(2)
     expect(screen.getAllByRole('link', { name: '用户' })).toHaveLength(2)
+    expect(screen.getAllByRole('link')).toHaveLength(12)
     expect(screen.getByRole('heading', { name: '用户页面' })).toBeTruthy()
     await userEvent.click(screen.getAllByRole('link', { name: '项目' })[0]!)
     expect(screen.getByRole('heading', { name: '项目页面' })).toBeTruthy()
