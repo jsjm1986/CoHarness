@@ -375,17 +375,17 @@
    nested, readable targets while preserving the existing tree semantics and
    drag/reorder hit testing. */
 :global([data-viewport='compact']) .list {
-  padding: var(--dsw-space-2) var(--dsw-space-2) var(--dsw-space-6);
+  padding: var(--dsw-space-1) var(--dsw-space-1) var(--dsw-space-4);
 }
 
 :global([data-viewport='compact']) .groupSection + .groupSection {
-  margin-top: var(--dsw-space-3);
+  margin-top: var(--dsw-space-2);
 }
 
 :global([data-viewport='compact']) .groupSection {
-  padding: var(--dsw-space-1);
+  padding: 2px;
   border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: var(--dsw-radius-xl);
+  border-radius: var(--dsw-radius-lg);
   background: var(--dsw-alias-bg-layer-1);
   box-shadow: var(--dsw-shadow-lv1);
 }
