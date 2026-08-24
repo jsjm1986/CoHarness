@@ -16,6 +16,12 @@ Compact navigation uses a narrower drawer, a reduced group/list rhythm, and 44px
 
 The drawer leaves a visible conversation strip behind the scrim and more history fits before scrolling. A short response now reads as a compact document rather than a desktop document scaled into a phone. Desktop layout and data operations are unchanged.
 
+## Alternatives considered
+
+**Keep desktop spacing on compact viewports.** This preserves one set of visual values but leaves too little conversation visible on a phone, so compact spacing has its own documented values.
+
+**Make the compact drawer full width.** This maximizes the drawer canvas but hides the conversation context behind the scrim, so the drawer remains narrower and leaves a visible strip.
+
 ## Verification
 
 Workspace, layout, sidebar, and primitive style suites pass. The assembled compact visual audit passes at 320/375/390px and screenshots were reviewed after the density changes.
