@@ -65,7 +65,7 @@ function Brand({ compact = false }: { compact?: boolean }) {
     <div className={`brand ${compact ? 'brandCompact' : ''}`}>
       <span className="brandMark"><PanelsTopLeft aria-hidden="true" /></span>
       <span className="brandCopy">
-        <strong>DeepSeek Harness</strong>
+        <strong>CoHarness</strong>
         {compact ? null : <span>管理端</span>}
       </span>
     </div>

@@ -32,8 +32,8 @@ nav a{margin-right:16px;color:#0071e3;text-decoration:none}
 }
 
 export function loginPage(error = ''): string {
-  return layout('登录 - Harness', `<div class="card" style="max-width:380px;margin:80px auto">
-<h1>DeepSeek Harness</h1>
+  return layout('登录 - CoHarness', `<div class="card" style="max-width:380px;margin:80px auto">
+<h1>CoHarness</h1>
 ${error === '' ? '' : `<p class="error">${escapeHtml(error)}</p>`}
 <form method="post" action="/login">
 <p><input name="username" placeholder="用户名" autocomplete="username" required style="width:100%"></p>
@@ -43,7 +43,7 @@ ${error === '' ? '' : `<p class="error">${escapeHtml(error)}</p>`}
 }
 
 export function passwordPage(error = ''): string {
-  return layout('修改密码 - Harness', `<div class="card" style="max-width:380px;margin:80px auto">
+  return layout('修改密码 - CoHarness', `<div class="card" style="max-width:380px;margin:80px auto">
 <h1>请设置新密码</h1>
 ${error === '' ? '' : `<p class="error">${escapeHtml(error)}</p>`}
 <form method="post" action="/account/password">
@@ -54,7 +54,7 @@ ${error === '' ? '' : `<p class="error">${escapeHtml(error)}</p>`}
 
 /** Render the retry page shown while a personal or project runtime starts. */
 export function waitingPage(): string {
-  return layout('正在启动 - Harness', `<div class="card" style="max-width:380px;margin:80px auto;text-align:center">
+  return layout('正在启动 - CoHarness', `<div class="card" style="max-width:380px;margin:80px auto;text-align:center">
 <div role="status" aria-live="polite" aria-busy="true">
 <div class="startup-spinner" aria-hidden="true"></div>
 <h1>正在启动您的工作台…</h1>
