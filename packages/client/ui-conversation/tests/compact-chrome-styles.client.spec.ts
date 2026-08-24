@@ -35,6 +35,8 @@ describe('conversation compact chrome', () => {
     expect(input).toContain('.documentRail')
     expect(input).toContain('.documentStatus')
     expect(input).toContain('var(--dsw-touch-target)')
+    expect(input).toContain('.sessionSummary > svg')
+    expect(input).toContain('var(--dsw-mobile-icon-secondary)')
     expect(input).toContain('flex-wrap: wrap')
     expect(input).toContain('[data-viewport-short]')
   })
