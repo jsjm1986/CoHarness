@@ -49,4 +49,12 @@ describe('primitive compact chrome', () => {
     expect(modal).toContain('--dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2)')
     expect(modal).toContain('var(--dsw-safe-bottom)')
   })
+
+  it('tightens markdown reading rhythm on compact viewports', () => {
+    const markdown = load('../src/markdown/MarkdownText.module.css')
+    expect(markdown).toContain("[data-viewport='compact']")
+    expect(markdown).toContain('font: var(--dsw-mobile-font-body)')
+    expect(markdown).toContain('font: 600 18px/26px var(--dsw-font-family)')
+    expect(markdown).toContain('margin: var(--dsw-space-2) 0')
+  })
 })

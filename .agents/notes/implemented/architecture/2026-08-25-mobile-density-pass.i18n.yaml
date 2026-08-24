@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-25-mobile-density-pass.md
+2026-08-25-mobile-density-pass.md: cf41ed11bf242cdc160b46cfe6cb41673bc267e0
+2026-08-25-mobile-density-pass.zh.md: ec7c4976fef05b3117534e42ef8d46f470a2c583
