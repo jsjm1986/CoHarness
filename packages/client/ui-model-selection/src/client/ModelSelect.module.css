@@ -167,14 +167,14 @@
   display: flex;
   min-height: 0;
   flex-direction: column;
-  gap: var(--dsw-space-2);
+  gap: var(--dsw-space-1);
 }
 
 .sectionGroups {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: var(--dsw-space-1);
+  gap: 2px;
 }
 
 .group + .group {
@@ -185,11 +185,11 @@
   position: sticky;
   top: 0;
   z-index: 1;
-  padding: 5px var(--dsw-space-2) 3px;
+  padding: 6px 8px 2px;
   background: var(--dsw-specific-menu);
   color: var(--dsw-alias-label-tertiary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 11px;
+  line-height: 16px;
   font-weight: 500;
 }
 
@@ -416,9 +416,10 @@
 }
 
 @media (max-width: 767px) {
-  :global([data-viewport='compact']) .option {
-    min-height: 56px;
-    padding-block: var(--dsw-space-2);
+:global([data-viewport='compact']) .option {
+    min-height: var(--dsw-mobile-option-row-height);
+    padding-block: 0;
+    border-radius: var(--dsw-radius-md);
   }
 
   :global([data-viewport='compact']) .modelName {
@@ -428,4 +429,16 @@
   :global([data-viewport='compact']) .description {
     font: var(--dsw-mobile-font-caption);
   }
+}
+
+/* Section rows sit inside SessionSettingsSheet, whose selected state is a
+   quiet surface tint rather than a second card. Provider headings use the
+   sheet surface as their sticky backing, so they remain readable while the
+   list scrolls without painting a bar behind every group. */
+.sectionContent .groupTitle {
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.sectionContent .option[aria-checked='true'] {
+  background: var(--dsw-alias-interactive-bg-active);
 }

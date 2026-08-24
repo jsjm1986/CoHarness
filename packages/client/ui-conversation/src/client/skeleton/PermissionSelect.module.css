@@ -77,7 +77,7 @@
 .sectionOptions {
   display: flex;
   flex-direction: column;
-  gap: var(--dsw-space-1);
+  gap: 2px;
 }
 
 .sectionOption {
@@ -85,7 +85,7 @@
   min-height: var(--dsw-mobile-option-row-height);
   align-items: center;
   gap: var(--dsw-space-2);
-  padding: var(--dsw-space-2) var(--dsw-space-3);
+  padding: 0 8px;
   border: 0;
   border-radius: var(--dsw-radius-md);
   background: transparent;
@@ -98,7 +98,7 @@
 .sectionOption:hover:not(:disabled),
 .sectionOption:focus-visible,
 .sectionOptionSelected {
-  background: var(--dsw-specific-sidebar-nav-item-active);
+  background: var(--dsw-alias-interactive-bg-active);
 }
 
 .sectionOption:focus-visible {
