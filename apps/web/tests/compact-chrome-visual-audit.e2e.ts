@@ -95,10 +95,10 @@ async function openDrawer(page: Page): Promise<void> {
   if (await toggle.count() === 0) return
   const expanded = await toggle.getAttribute('aria-expanded')
   if (expanded !== 'true') await toggle.click()
-  await page.getByRole('button', { name: /设置|Settings/, exact: true }).waitFor({ timeout: 10_000 })
+  const drawer = page.locator('[class*="drawer"]').first()
+  await drawer.getByRole('button', { name: /^设置$|^Settings$/ }).waitFor({ timeout: 10_000 })
   // The visibility flag flips at the beginning of the shell transition; wait
   // for the drawer edge itself before capturing or interacting with its rows.
-  const drawer = page.locator('[class*="drawer"]').first()
   await expect.poll(
     () => drawer.evaluate(element => Math.round(element.getBoundingClientRect().x)),
     { timeout: 2_000 },
@@ -181,6 +181,9 @@ describe('visual audit: compact product chrome', () => {
         await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
         await dismissOnboarding(page)
         await shot(page, `${prefix}-00-landing`)
+        if (phone.width <= 359) {
+          expect(await page.locator('[data-session-summary]').count()).toBe(0)
+        }
         findings[`${prefix}.landing`] = await dumpOverflow(page)
 
         const pickWorkspace = page.getByRole('button', { name: /选择工作区|Choose workspace/ })
@@ -242,6 +245,18 @@ describe('visual audit: compact product chrome', () => {
         if (await model.count() > 0) {
           await model.click()
           await page.waitForTimeout(300)
+          const sessionSheet = page.locator('[data-session-settings-sheet]')
+          if (await sessionSheet.count() > 0) {
+            const toBottom = page.getByRole('button', { name: /回到底部|Back to bottom/ })
+            if (await toBottom.count() > 0 && await toBottom.isVisible()) {
+              const covered = await toBottom.evaluate((button) => {
+                const box = button.getBoundingClientRect()
+                const point = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
+                return point?.closest('[data-session-settings-sheet]') !== null
+              })
+              expect(covered, `${prefix}: session sheet must cover back-to-bottom control`).toBe(true)
+            }
+          }
           await shot(page, `${prefix}-07-model-menu`)
           findings[`${prefix}.model`] = await dumpOverflow(page)
           await page.keyboard.press('Escape')

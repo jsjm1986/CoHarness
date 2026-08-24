@@ -613,6 +613,12 @@ export interface ComposerBarInjected {
 export interface InputControlOwnerProps {
   /** Session-removed lock (the bar's chrome disable state). */
   locked: boolean
+  /** Whether the occupant renders its normal trigger or a section in the shared mobile sheet. */
+  presentation?: 'trigger' | 'summary' | 'section'
+  /** Section opened when a mobile trigger is activated. */
+  settingsSection?: 'model' | 'reasoning' | 'permission'
+  /** Shared mobile session-settings opener supplied by InputBar. */
+  onOpenSettings?: (section: 'model' | 'reasoning' | 'permission') => void
 }
 
 /** Full composer-bar props: standard kit & owner share & control-seat render share & injected share (hooks bound) & locale seat. */

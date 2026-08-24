@@ -417,6 +417,14 @@
   gap: 12px;
 }
 
+.sessionSummary {
+  display: none;
+}
+
+.sessionSettingsRow {
+  display: none;
+}
+
 /* Attach circle (figma + control): 28px, selector fill, primary glyph. */
 .add {
   display: grid;
@@ -720,6 +728,61 @@
     width: var(--dsw-mobile-icon-primary);
     height: var(--dsw-mobile-icon-primary);
   }
+
+  .sessionSummary {
+    display: flex;
+    align-items: center;
+    gap: var(--dsw-space-2);
+    width: 100%;
+    min-height: var(--dsw-mobile-summary-height);
+    padding: 0 var(--dsw-space-2);
+    border: 0;
+    border-radius: var(--dsw-mobile-control-radius);
+    background: var(--dsw-alias-bg-module-platform);
+    color: var(--dsw-alias-label-primary);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .sessionSummary:disabled {
+    color: var(--dsw-alias-label-dimmed);
+    cursor: default;
+  }
+
+  .sessionSummary:focus-visible {
+    outline: 2px solid var(--dsw-alias-border-l3);
+    outline-offset: -2px;
+  }
+
+  .sessionSummaryText {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .sessionSummaryModel,
+  .sessionSummaryMeta {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .sessionSummaryModel {
+    font: var(--dsw-mobile-font-secondary);
+    font-weight: 500;
+  }
+
+  .sessionSummaryMeta {
+    color: var(--dsw-alias-label-caption);
+    font: var(--dsw-mobile-font-caption);
+  }
+
+  .sessionSummaryChevron {
+    flex: none;
+    color: var(--dsw-alias-label-caption);
+  }
 }
 
 @media (max-width: 767px) {
@@ -741,6 +804,21 @@
   :global([data-viewport='compact']) .row {
     grid-template-columns: minmax(0, 1fr) auto;
     row-gap: 2px;
+  }
+
+  :global([data-viewport='compact']) .row:has(.sessionSettingsRow) {
+    row-gap: var(--dsw-space-2);
+  }
+
+  :global([data-viewport='compact']) .sessionSettingsRow {
+    display: block;
+    grid-column: 1 / -1;
+    min-width: 0;
+    width: 100%;
+  }
+
+  :global([data-viewport='compact']) .sessionSettingsRow .sessionSummary {
+    min-height: var(--dsw-mobile-summary-height);
   }
 
   :global([data-viewport='compact']) .trailing {

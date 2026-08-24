@@ -10,8 +10,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { ChangeEvent, KeyboardEvent, MouseEvent, ReactNode } from 'react'
 import clsx from 'clsx'
 import {
-  IconBrowseOutline16, IconCloseOutline16, IconPaperclipOutline16, IconPlusOutline16, IconRefreshOutline14,
-  IconWarningOutline16, Toast, Tooltip,
+  IconBrowseOutline16, IconChevronDownOutline14, IconCloseOutline16, IconPaperclipOutline16, IconPlusOutline16, IconRefreshOutline14,
+  IconSettingsOutline16, IconWarningOutline16, Toast, Tooltip, useMediaQuery,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 // Type-only: the `plan` projection key merge (the TodoDock posture — the
 // composer reads a host-computed value; the domain owns the key).
@@ -30,6 +30,7 @@ import { attachmentErrorText, imageSizeText } from '../image-labels.ts'
 import { ReferenceIcon } from '../ReferenceIcon.tsx'
 import { ContextMeter } from './ContextMeter.tsx'
 import { PermissionSelect } from './PermissionSelect.tsx'
+import { SessionSettingsSheet, type SessionSettingsSection, type SessionSettingsSectionId } from './SessionSettingsSheet.tsx'
 import { isSafariBrowser, repairSafariTextareaLayout } from './safari.ts'
 import css from './InputBar.module.css'
 
@@ -155,6 +156,8 @@ export function InputBar({
   placeholder, accessory, overlay, leftItems, rightItems, footer,
 }: InputBarProps) {
   const input = useInput(s => s)
+  const phone = useMediaQuery('(max-width: 767px)')
+  const narrowPhone = useMediaQuery('(max-width: 359px)')
   const notice = useNotices(s => s)
   const lexicon = useLexicon(s => s)
   const commandMenuOpen = useMenuLauncher(source => source === 'command')
@@ -196,6 +199,13 @@ export function InputBar({
     setToast({ seq: toastSeq.current, text })
   }, [])
   const dismissToast = useCallback(() => { setToast(null) }, [])
+  const [sessionSettingsOpen, setSessionSettingsOpen] = useState(false)
+  const [sessionSettingsSection, setSessionSettingsSection] = useState<SessionSettingsSectionId>('model')
+  const openSessionSettings = useCallback((section: SessionSettingsSectionId): void => {
+    setSessionSettingsSection(section)
+    setSessionSettingsOpen(true)
+  }, [])
+  const closeSessionSettings = useCallback((): void => { setSessionSettingsOpen(false) }, [])
   // The deployment's image-intake limits (absent while no attachment service
   // is composed — the pre-check below then defers entirely to the host).
   const imageLimits = useProjection('imageLimits')
@@ -681,7 +691,98 @@ export function InputBar({
   // or while the command face is absent with the session).
   const accessSelect: ReactNode = command === undefined
     ? null
-    : <PermissionSelect key={sessionId} value={permissions} locked={locked} command={command} t={t} />
+    : <PermissionSelect
+      key={sessionId}
+      value={permissions}
+      locked={locked}
+      command={command}
+      t={t}
+      presentation="trigger"
+      onOpenSettings={openSessionSettings}
+    />
+
+  const modelSummary = narrowPhone
+    ? renderSlot('conversation.input.model', {
+      locked: modelSeatLocked,
+      presentation: 'summary',
+      settingsSection: 'model',
+      onOpenSettings: openSessionSettings,
+    })
+    : null
+  const permissionSummary = narrowPhone && command !== undefined
+    ? <PermissionSelect
+      key={`${sessionId}-summary`}
+      value={permissions}
+      locked={locked}
+      command={command}
+      t={t}
+      presentation="summary"
+      onOpenSettings={openSessionSettings}
+    />
+    : null
+  // The phone summary describes an existing session only. The hero keeps the
+  // same resident composer DOM for transition stability, but it has no model
+  // or permission facts yet; rendering a disabled empty pill there wastes the
+  // narrowest phone's only toolbar row and reads like a broken control.
+  const hasSessionSummary = narrowPhone && live && (modelSummary != null || permissionSummary != null)
+  const sessionSummary = hasSessionSummary
+    ? (
+      <button
+        type="button"
+        className={css.sessionSummary}
+        aria-label={t('input.sessionSettings')}
+        data-session-summary=""
+        disabled={locked}
+        onMouseDown={keepFocus}
+        onClick={() => { openSessionSettings('model') }}
+      >
+        <IconSettingsOutline16 size={20} />
+        <span className={css.sessionSummaryText}>
+          <span className={css.sessionSummaryModel}>{modelSummary ?? t('input.sessionSettings')}</span>
+          {permissionSummary !== null && <span className={css.sessionSummaryMeta}>{permissionSummary}</span>}
+        </span>
+        <IconChevronDownOutline14 className={css.sessionSummaryChevron} aria-hidden />
+      </button>
+    )
+    : null
+
+  const sessionSettingsSections: readonly SessionSettingsSection[] = phone && sessionSettingsOpen ? [
+    {
+      id: 'model',
+      label: t('input.sessionModel'),
+      content: renderSlot('conversation.input.model', {
+        locked: modelSeatLocked,
+        presentation: 'section',
+        settingsSection: 'model',
+        onOpenSettings: openSessionSettings,
+      }),
+    },
+    {
+      id: 'reasoning',
+      label: t('input.sessionReasoning'),
+      content: renderSlot('conversation.input.model', {
+        locked: modelSeatLocked,
+        presentation: 'section',
+        settingsSection: 'reasoning',
+        onOpenSettings: openSessionSettings,
+      }),
+    },
+    {
+      id: 'permission',
+      label: t('input.sessionPermission'),
+      content: command === undefined
+        ? null
+        : <PermissionSelect
+          key={`${sessionId}-section`}
+          value={permissions}
+          locked={locked}
+          command={command}
+          t={t}
+          presentation="section"
+          onOpenSettings={openSessionSettings}
+        />,
+    },
+  ] : []
 
   // Mirror-layer decorations: a visible backdrop with transparent textarea
   // text. Claim tokens and references retain the draft's own glyph metrics,
@@ -924,7 +1025,7 @@ export function InputBar({
               </button>
             </Tooltip>
             <div className={css.modes}>
-              {accessSelect}
+              {!narrowPhone && accessSelect}
               {renderSlot('conversation.input.plan', { locked })}
             </div>
             {leftItems != null && (
@@ -939,7 +1040,12 @@ export function InputBar({
                 {rightItems}
               </div>
             )}
-            {renderSlot('conversation.input.model', { locked: modelSeatLocked })}
+            {!narrowPhone && renderSlot('conversation.input.model', {
+              locked: modelSeatLocked,
+              presentation: 'trigger',
+              settingsSection: 'model',
+              onOpenSettings: openSessionSettings,
+            })}
             <ContextMeter useProjection={useProjection} t={t} />
             {interruptible && (
               <Tooltip label={t('input.stop')} side="top" delayMs={500}>
@@ -978,8 +1084,22 @@ export function InputBar({
               </button>
             </Tooltip>
           </div>
+          {narrowPhone && sessionSummary !== null && (
+            <div className={css.sessionSettingsRow}>{sessionSummary}</div>
+          )}
         </div>
       </div>
+      {phone && (
+        <SessionSettingsSheet
+          open={sessionSettingsOpen}
+          activeSection={sessionSettingsSection}
+          sections={sessionSettingsSections}
+          title={t('input.sessionSettings')}
+          closeLabel={t('input.sessionSettingsClose')}
+          onClose={closeSessionSettings}
+          onSectionChange={setSessionSettingsSection}
+        />
+      )}
       {footer}
     </div>
   )

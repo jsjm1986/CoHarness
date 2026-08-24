@@ -38,6 +38,7 @@ interface ComposerMetrics {
   model: Rect
   send: Rect
   modelTitle: string | null
+  modelPresentation: 'trigger' | 'summary'
   modelEffortDisplay: string
   modelLabelOverflow: string
   modelLabelWhiteSpace: string
@@ -54,15 +55,19 @@ function measureComposer(page: Page): Promise<ComposerMetrics> {
     const row = card.querySelector<HTMLElement>(':scope > [class*="row"]')
     const tools = row?.querySelector<HTMLElement>(':scope > [class*="tools"]') ?? null
     const trailing = row?.querySelector<HTMLElement>(':scope > [class*="trailing"]') ?? null
-    const model = card.querySelector<HTMLButtonElement>(`button[title^="${modelId}"][aria-haspopup="menu"]`)
-    const modelLabel = model?.querySelector<HTMLElement>('[class*="triggerLabel"]') ?? null
-    const modelEffort = model?.querySelector<HTMLElement>('[class*="triggerEffort"]') ?? null
-    const send = trailing === null
-      ? undefined
-      : [...trailing.querySelectorAll<HTMLButtonElement>('[class*="primary"]')].at(-1)
+    const modelButton = card.querySelector<HTMLButtonElement>(`button[title^="${modelId}"][aria-haspopup="menu"]`)
+    const modelSummary = card.querySelector<HTMLElement>('[data-session-summary]')
+    const model = modelButton ?? modelSummary
+    const modelLabel = modelButton?.querySelector<HTMLElement>('[class*="triggerLabel"]')
+      ?? card.querySelector<HTMLElement>('[data-model-summary]')
+      ?? null
+    const modelEffort = modelButton?.querySelector<HTMLElement>('[class*="triggerEffort"]') ?? null
+    const send: HTMLButtonElement | null = trailing === null
+      ? card.querySelector<HTMLButtonElement>('button[aria-label="发送消息"], button[aria-label="Send message"]')
+      : [...trailing.querySelectorAll<HTMLButtonElement>('[class*="primary"]')].at(-1) ?? null
     if (
       row === null || tools === null || trailing === null || model === null
-      || modelLabel === null || modelEffort === null || send === undefined
+      || modelLabel === null || send === null
     ) {
       throw new Error('composer toolbar controls not found')
     }
@@ -89,8 +94,9 @@ function measureComposer(page: Page): Promise<ComposerMetrics> {
       trailing: rect(trailing),
       model: rect(model),
       send: rect(send),
-      modelTitle: model.getAttribute('title'),
-      modelEffortDisplay: getComputedStyle(modelEffort).display,
+      modelTitle: modelButton?.getAttribute('title') ?? modelSummary?.textContent ?? null,
+      modelPresentation: modelButton === null ? 'summary' : 'trigger',
+      modelEffortDisplay: modelEffort === null ? 'summary' : getComputedStyle(modelEffort).display,
       modelLabelOverflow: getComputedStyle(modelLabel).overflow,
       modelLabelWhiteSpace: getComputedStyle(modelLabel).whiteSpace,
       modelLabelTextOverflow: getComputedStyle(modelLabel).textOverflow,
@@ -109,8 +115,10 @@ function renderGeometry(rows: readonly { width: number; metrics: ComposerMetrics
     '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
   ]
   for (const { width, metrics } of rows) {
-    const toolsBeforeModel = metrics.toolControlRight <= metrics.model.left + 1 || metrics.trailingWrapped
-    lines.push(`| ${String(width)}px | ${String(toolsBeforeModel)} | ${String(metrics.model.right <= metrics.send.left + 1)} | ${metrics.trailingWrapped ? 'wrapped' : 'same-line'} | ${String(metrics.row.left >= metrics.card.left - 1 && metrics.row.right <= metrics.card.right + 1)} | ${metrics.modelEffortDisplay} | ${metrics.modelLabelOverflow} | ${metrics.modelLabelWhiteSpace} | ${metrics.modelLabelTextOverflow} | ${String(Math.round(metrics.modelLabelWidth))}px |`)
+    const toolsBeforeModel = metrics.modelPresentation === 'summary' || metrics.toolControlRight <= metrics.model.left + 1 || metrics.trailingWrapped
+    const modelBeforeSend = metrics.modelPresentation === 'summary' || metrics.model.right <= metrics.send.left + 1
+    const layout = metrics.modelPresentation === 'summary' ? 'summary' : metrics.trailingWrapped ? 'wrapped' : 'same-line'
+    lines.push(`| ${String(width)}px | ${String(toolsBeforeModel)} | ${String(modelBeforeSend)} | ${layout} | ${String(metrics.row.left >= metrics.card.left - 1 && metrics.row.right <= metrics.card.right + 1)} | ${metrics.modelEffortDisplay} | ${metrics.modelLabelOverflow} | ${metrics.modelLabelWhiteSpace} | ${metrics.modelLabelTextOverflow} | ${String(Math.round(metrics.modelLabelWidth))}px |`)
   }
   return lines.join('\n')
 }
@@ -151,6 +159,18 @@ describe('web e2e: mobile composer model label geometry', () => {
     const modelMenuItem = page.getByRole('menuitem', { name: /模型/ })
     if (await modelMenuItem.count() > 0) await modelMenuItem.click()
     await page.getByRole('menuitemradio', { name: MODEL_NAME }).click()
+    const settings = page.getByRole('dialog', { name: '会话设置' })
+    if (await settings.count() > 0) {
+      await settings.getByRole('tab', { name: '思考等级' }).click()
+      await settings.getByRole('menuitemradio', { name: 'High' }).click()
+      await settings.getByRole('tab', { name: '权限' }).click()
+      const readOnly = settings.getByRole('menuitemradio', { name: 'Read Only' })
+      await readOnly.waitFor({ timeout: 10_000 })
+      await readOnly.click()
+      await page.waitForFunction(() => [...document.querySelectorAll('[data-session-settings-sheet] [role="menuitemradio"]')]
+        .some(item => item.textContent?.includes('Read Only') && item.getAttribute('aria-checked') === 'true'), undefined, { timeout: 10_000 })
+      await settings.getByRole('button', { name: '关闭会话设置' }).click()
+    }
     await page.locator(`button[title^="${MODEL_NAME}"][aria-haspopup="menu"]`).waitFor({ timeout: 15_000 })
   }, 120_000)
 
@@ -170,6 +190,10 @@ describe('web e2e: mobile composer model label geometry', () => {
       const tolerance = 1
 
       expect(metrics.modelTitle?.startsWith(MODEL_NAME)).toBe(true)
+      if (metrics.modelPresentation === 'summary') {
+        expect(metrics.model.height).toBeGreaterThanOrEqual(56)
+        continue
+      }
       expect(
         metrics.tools.right <= metrics.trailing.left + tolerance || metrics.trailingWrapped,
       ).toBe(true)
@@ -180,11 +204,11 @@ describe('web e2e: mobile composer model label geometry', () => {
       expect(metrics.row.left).toBeGreaterThanOrEqual(metrics.card.left - tolerance)
       expect(metrics.row.right).toBeLessThanOrEqual(metrics.card.right + tolerance)
       expect(metrics.send.right).toBeLessThanOrEqual(metrics.card.right + tolerance)
-      expect(metrics.modelEffortDisplay).toBe('none')
+      expect(metrics.modelEffortDisplay).toBe('block')
       expect(metrics.modelLabelOverflow).toBe('hidden')
       expect(metrics.modelLabelWhiteSpace).toBe('nowrap')
       expect(metrics.modelLabelTextOverflow).toBe('ellipsis')
-      expect(metrics.modelLabelWidth, `viewport ${String(width)}`).toBeGreaterThanOrEqual(32)
+      expect(metrics.modelLabelWidth, `viewport ${String(width)}`).toBeGreaterThanOrEqual(width === 320 ? 80 : 32)
     }
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)

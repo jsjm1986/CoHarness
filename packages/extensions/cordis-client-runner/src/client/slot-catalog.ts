@@ -713,7 +713,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     doc: 'The named model-select seat at the right end of the composer tool row,\nleft of the send button — one occupant, so taking it means rendering the\nwhole model affordance yourself. Same `locked`-only owner share and same\nrenders-nothing-while-empty contract as the plan seat. Note the composer\ndeliberately keeps this seat LIVE while it refuses text for a\nmodel-related block: every such block is one the user clears by picking\na model here.',
     registerOptions: [],
     ownerProps: [
-      '/**\n * Owner share of the two named composer control seats (plan / model): the\n * bar passes its disable state; the filling entry owns everything else.\n */\nexport interface InputControlOwnerProps {\n  /** Session-removed lock (the bar\'s chrome disable state). */\n  locked: boolean\n}',
+      '/**\n * Owner share of the two named composer control seats (plan / model): the\n * bar passes its disable state; the filling entry owns everything else.\n */\nexport interface InputControlOwnerProps {\n  /** Session-removed lock (the bar\'s chrome disable state). */\n  locked: boolean\n  /** Whether the occupant renders its normal trigger or a section in the shared mobile sheet. */\n  presentation?: \'trigger\' | \'summary\' | \'section\'\n  /** Section opened when a mobile trigger is activated. */\n  settingsSection?: \'model\' | \'reasoning\' | \'permission\'\n  /** Shared mobile session-settings opener supplied by InputBar. */\n  onOpenSettings?: (section: \'model\' | \'reasoning\' | \'permission\') => void\n}',
     ],
     ownerPropsReferences: [],
     standardProps: [
@@ -793,7 +793,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     doc: 'The named plan-status seat in the composer tool row, immediately right\nof the access-mode control — one occupant, so taking it means rendering\nthe plan affordance yourself. The owner passes only `locked` (see\nInputControlOwnerProps): honour it by refusing interaction, and\ntake everything else from the framework session kit or your own inject.\nUnoccupied, the seat renders nothing at all — the bar paints no\nplaceholder, so an absent plan plugin costs no layout.',
     registerOptions: [],
     ownerProps: [
-      '/**\n * Owner share of the two named composer control seats (plan / model): the\n * bar passes its disable state; the filling entry owns everything else.\n */\nexport interface InputControlOwnerProps {\n  /** Session-removed lock (the bar\'s chrome disable state). */\n  locked: boolean\n}',
+      '/**\n * Owner share of the two named composer control seats (plan / model): the\n * bar passes its disable state; the filling entry owns everything else.\n */\nexport interface InputControlOwnerProps {\n  /** Session-removed lock (the bar\'s chrome disable state). */\n  locked: boolean\n  /** Whether the occupant renders its normal trigger or a section in the shared mobile sheet. */\n  presentation?: \'trigger\' | \'summary\' | \'section\'\n  /** Section opened when a mobile trigger is activated. */\n  settingsSection?: \'model\' | \'reasoning\' | \'permission\'\n  /** Shared mobile session-settings opener supplied by InputBar. */\n  onOpenSettings?: (section: \'model\' | \'reasoning\' | \'permission\') => void\n}',
     ],
     ownerPropsReferences: [],
     standardProps: [

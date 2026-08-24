@@ -65,12 +65,6 @@
    secondary chrome on a phone. Dropping it at the shared narrow step leaves
    the model label and chevron a real flex allocation instead of letting the
    effort's min-content width push into the meter. */
-@container (max-width: 480px) {
-  .triggerEffort {
-    display: none;
-  }
-}
-
 .chevron {
   flex: 0 0 auto;
   color: var(--dsw-alias-label-caption);
@@ -158,6 +152,29 @@
 .groups {
   min-height: 0;
   overflow-y: auto;
+}
+
+.summary {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-mobile-font-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sectionContent {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: var(--dsw-space-2);
+}
+
+.sectionGroups {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--dsw-space-1);
 }
 
 .group + .group {

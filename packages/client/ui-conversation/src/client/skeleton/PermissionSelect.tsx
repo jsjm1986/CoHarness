@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import clsx from 'clsx'
 import type { PermissionSelect as PermissionSelectValue } from '@deepseek-ai/dsh-permission-presets/client'
-import { IconChevronDownOutline14, Menu, RiskConfirmation } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconChevronDownOutline14, Menu, RiskConfirmation, useMediaQuery } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ComposerBarProps } from '../contract/slots.ts'
 import css from './PermissionSelect.module.css'
+
+type Presentation = 'trigger' | 'summary' | 'section'
 
 const FULL_ACCESS = 'danger-full-access'
 
@@ -67,13 +69,16 @@ export interface PermissionSelectProps {
   command: (line: string) => Promise<boolean>
   /** The owning bar's locale seat, passed down as a plain prop. */
   t: ComposerBarProps['t']
+  presentation?: Presentation
+  onOpenSettings?: (section: 'model' | 'reasoning' | 'permission') => void
 }
 
-export function PermissionSelect({ value, locked, command, t }: PermissionSelectProps) {
+export function PermissionSelect({ value, locked, command, t, presentation = 'trigger', onOpenSettings }: PermissionSelectProps) {
   const [pick, setPick] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
   const [confirmation, setConfirmation] = useState<string | null>(null)
   const [acknowledged, setAcknowledged] = useState(false)
+  const phone = useMediaQuery('(max-width: 767px)')
 
   useEffect(() => {
     if (!locked && value !== undefined) return
@@ -88,12 +93,13 @@ export function PermissionSelect({ value, locked, command, t }: PermissionSelect
   const current = value.options.find(option => option.value === currentValue)
   const busy = pick !== null || confirmation !== null
 
-  const items: MenuEntry[] = value.options
+  const options = value.options
     .filter(o => o.value !== 'custom')
     .map((option) => {
       const icon = permissionGlyph(option.value)
       return { id: option.value, label: optionLabel(option), ...icon === undefined ? {} : { icon } }
     })
+  const items: MenuEntry[] = options
 
   const submit = (id: string): void => {
     setPick(id)
@@ -125,6 +131,60 @@ export function PermissionSelect({ value, locked, command, t }: PermissionSelect
     submit(id)
   }
 
+  const currentLabel = current === undefined ? displayName(currentValue) : optionLabel(current)
+  const summary = presentation === 'summary'
+    ? (
+      <span className={css.summary} data-permission-summary="">
+        {permissionGlyph(currentValue) !== undefined && (
+          <span className={css.summaryIcon} aria-hidden>{permissionGlyph(currentValue)}</span>
+        )}
+        <span>{currentLabel}</span>
+      </span>
+    )
+    : null
+  if (summary !== null) return summary
+
+  const confirmationDialog = (
+    <RiskConfirmation
+      open={confirmation !== null}
+      title={t('access.confirm.title')}
+      description={t('access.confirm.description')}
+      acknowledgeLabel={t('access.confirm.acknowledge')}
+      cancelLabel={t('access.confirm.cancel')}
+      confirmLabel={t('access.confirm.enable')}
+      acknowledged={acknowledged}
+      disabled={locked}
+      onAcknowledgedChange={setAcknowledged}
+      onCancel={closeConfirmation}
+      onConfirm={confirmFullAccess}
+    />
+  )
+
+  if (presentation === 'section') {
+    return (
+      <>
+        <div className={css.sectionOptions} role="group" aria-label={t('input.accessMode', { name: currentLabel })}>
+          {options.map(item => (
+            <button
+              key={item.id}
+              type="button"
+              role="menuitemradio"
+              aria-checked={item.id === currentValue}
+              className={clsx(css.sectionOption, item.id === currentValue && css.sectionOptionSelected)}
+              disabled={locked || busy}
+              onClick={() => { choose(item.id) }}
+            >
+              {item.icon !== undefined && <span className={css.sectionIcon}>{item.icon}</span>}
+              <span className={css.sectionLabel}>{item.label}</span>
+              {item.id === currentValue && <span className={css.sectionCheck}>✓</span>}
+            </button>
+          ))}
+        </div>
+        {confirmationDialog}
+      </>
+    )
+  }
+
   return (
     <>
       <Menu
@@ -141,7 +201,13 @@ export function PermissionSelect({ value, locked, command, t }: PermissionSelect
             aria-label={t('input.accessMode', { name: current === undefined ? displayName(currentValue) : optionLabel(current) })}
             title={current?.description}
             disabled={locked || busy}
-            onClick={() => { setOpen(!open) }}
+            onClick={() => {
+              if (phone && onOpenSettings !== undefined) {
+                onOpenSettings('permission')
+              } else {
+                setOpen(!open)
+              }
+            }}
           >
             {permissionGlyph(currentValue) !== undefined && (
               <span className={css.triggerIcon} aria-hidden>{permissionGlyph(currentValue)}</span>
@@ -154,19 +220,7 @@ export function PermissionSelect({ value, locked, command, t }: PermissionSelect
           </button>
         }
       />
-      <RiskConfirmation
-        open={confirmation !== null}
-        title={t('access.confirm.title')}
-        description={t('access.confirm.description')}
-        acknowledgeLabel={t('access.confirm.acknowledge')}
-        cancelLabel={t('access.confirm.cancel')}
-        confirmLabel={t('access.confirm.enable')}
-        acknowledged={acknowledged}
-        disabled={locked}
-        onAcknowledgedChange={setAcknowledged}
-        onCancel={closeConfirmation}
-        onConfirm={confirmFullAccess}
-      />
+      {confirmationDialog}
     </>
   )
 }

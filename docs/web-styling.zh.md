@@ -28,9 +28,9 @@
 
 间距与圆角取自度量 token（`--dsw-space-*`、`--dsw-radius-*`），设备安全区取自 `--dsw-safe-*`（metrics.css）。在粗指针设备上，悬停显现的控件需要 `@media (pointer: coarse)` 常显回退，交互目标保持至少 `--dsw-touch-target`；仅悬停的提示归入 `@media (hover: hover)`。框架内外壳在 `[data-viewport='compact']` 下同样放大这些目标，因为部分手机 WebView 会报 `pointer: fine`。portal 渲染的浮层看不到框架标记——它们在 JS 里用 ui-primitives 的 `useMediaQuery` 按相同阈值分支，并在 `@media (max-width: 767px)` 下放大同样的目标。框架内侧栏脚注把 `sidebar.footer.action` 叠成 Settings 几何的通栏行，叠在 Settings 上方；收起的 rail 把同一组占用者竖排成 36px 圆。
 
-`metrics.css` 还定义了 compact 排版角色（`--dsw-mobile-font-*`）和图标视觉尺寸。手机主要内容使用 14/22 或更大的字号，12/18 只用于元数据；44px 触控目标与图标的视觉尺寸分开控制。信息层级复杂的页面可以使用手机专属 presenter 或卡片／列表投影，不得把桌面表格单纯缩小到刚好塞进屏幕。
+`metrics.css` 还定义了 compact 排版角色（`--dsw-mobile-font-*`）、图标视觉尺寸、控件高度、摘要高度与选项行高度。手机主要内容使用 14/22 或更大的字号，12/18 只用于元数据；44px 触控目标与图标的视觉尺寸分开控制。有状态的控件必须保留当前值文字；只有当含义已经由附近文字或无障碍标签明确建立时，动作控件才可以使用纯图标。信息层级复杂的页面可以使用手机专属 presenter 或卡片／列表投影，不得把桌面表格单纯缩小到刚好塞进屏幕。
 
-手机底部 Sheet 共享 `--dsw-mobile-sheet-*` 度量 token，统一边缘、安全区底部、圆角和默认高度。`ui-primitives` 统一持有 `MobileSheetBackdrop` 遮罩（包括模糊、层级和减弱动效），`Modal` 统一持有焦点循环；呈现器可以收窄内容上限或增加手机专属返回行，但不得改变共同的放置位置和触控几何。
+手机底部 Sheet 共享 `--dsw-mobile-sheet-*` 度量 token，统一边缘、安全区底部、圆角和默认高度。有状态的选择器使用统一设置 Sheet 语言：一个标题行、一条 section/tab strip、一个滚动区、一层遮罩，以及同一种选中选项行。`ui-primitives` 统一持有 `MobileSheetBackdrop` 遮罩（包括模糊、层级和减弱动效），`Modal` 统一持有焦点循环；呈现器可以收窄内容上限或增加手机专属返回行，但不得改变共同的放置位置和触控几何。
 
 `Menu` 的主列表在 768px 以下使用同一套 Sheet 几何，即使桌面放置方式是相对锚点定位；子菜单内容仍在父行下方内联展开。
 
