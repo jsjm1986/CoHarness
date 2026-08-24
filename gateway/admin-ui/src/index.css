@@ -1959,6 +1959,18 @@ a {
   border-right: none;
 }
 
+.usageHealthMetrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--border);
+}
+
+.usageHealthMetrics .metric {
+  border-right: none;
+  background: var(--surface);
+}
+
 .usageStatusStack {
   display: flex;
   flex-direction: column;
@@ -2345,6 +2357,10 @@ a {
     border-right: none;
   }
 
+  .usageHealthMetrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .projectUsageMetrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2475,6 +2491,10 @@ a {
   }
 
   .quotaSourceOptions {
+    grid-template-columns: 1fr;
+  }
+
+  .usageHealthMetrics {
     grid-template-columns: 1fr;
   }
 
