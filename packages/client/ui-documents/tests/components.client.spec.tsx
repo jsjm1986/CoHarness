@@ -125,6 +125,18 @@ function renderModal() {
   return render(<DocumentsModal open onClose={() => {}} t={t} />)
 }
 
+function stubPhoneMedia(): void {
+  const listeners = new Set<() => void>()
+  vi.stubGlobal('matchMedia', vi.fn(() => ({
+    matches: true,
+    addEventListener: (_type: string, listener: () => void) => { listeners.add(listener) },
+    removeEventListener: (_type: string, listener: () => void) => { listeners.delete(listener) },
+    dispatchEvent: () => true,
+    media: '(max-width: 767px)',
+    onchange: null,
+  }) as unknown as MediaQueryList))
+}
+
 function namedButton(action: 'attach' | 'preview' | 'move' | 'delete', name: string) {
   const key = action === 'preview'
     ? 'action.previewNamed'
@@ -178,6 +190,99 @@ describe('DocumentsModal', () => {
     expect(screen.getByText(t('scope.viewing', { name: 'Compiler' }))).toBeTruthy()
     expect(screen.getByRole('button', { name: t('modal.upload') }).hasAttribute('disabled')).toBe(true)
     expect(screen.queryByRole('button', { name: t('action.previewNamed', { name: 'report.pdf' }) })).toBeNull()
+  })
+
+  it('uses a compact scope sheet and keeps scope search local', async () => {
+    stubPhoneMedia()
+    const client = makeClient()
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        scope: { kind: 'personal' },
+        projects: [
+          { projectId: 41, name: 'Compiler', mode: 'rw' },
+          { projectId: 42, name: 'Payments', mode: 'ro' },
+        ],
+      }),
+    })))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText('report.pdf')
+    fireEvent.click(screen.getByTestId('documents-scope-trigger'))
+    const sheet = await screen.findByRole('dialog', { name: t('scope.switch.title') })
+    const search = within(sheet).getByPlaceholderText(t('scope.switch.search'))
+    fireEvent.change(search, { target: { value: 'Compiler' } })
+    expect(within(sheet).getByRole('option', { name: /Compiler/ })).toBeTruthy()
+    expect(within(sheet).queryByRole('option', { name: /Payments/ })).toBeNull()
+    fireEvent.click(within(sheet).getByRole('option', { name: /Compiler/ }))
+    await waitFor(() => { expect(client.listScope).toHaveBeenCalledWith({ kind: 'project', projectId: 41 }) })
+    expect(screen.queryByRole('dialog', { name: t('scope.switch.title') })).toBeNull()
+  })
+
+  it('opens the compact alternate-source sheet from More without a second manager dialog', async () => {
+    stubPhoneMedia()
+    const client = makeClient()
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        scope: { kind: 'personal' },
+        projects: [{ projectId: 41, name: 'Compiler', mode: 'ro' }],
+      }),
+    })))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText('report.pdf')
+    fireEvent.click(screen.getByRole('button', { name: t('action.more') }))
+    const more = await screen.findByRole('dialog', { name: t('action.more') })
+    fireEvent.click(within(more).getByRole('button', { name: t('copy.source') }))
+    const source = await screen.findByRole('dialog', { name: t('copy.source.title') })
+    fireEvent.click(within(source).getByRole('option', { name: /Compiler/ }))
+    await waitFor(() => { expect(client.listScope).toHaveBeenCalledWith({ kind: 'project', projectId: 41 }) })
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+  })
+
+  it('filters compact lists locally without issuing another browse request', async () => {
+    stubPhoneMedia()
+    const client = makeClient()
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText('report.pdf')
+    const browseCalls = client.browse.mock.calls.length
+    fireEvent.click(screen.getByRole('button', { name: t('action.more') }))
+    const more = await screen.findByRole('dialog', { name: t('action.more') })
+    fireEvent.change(within(more).getByLabelText(t('modal.type')), { target: { value: 'pdf' } })
+    fireEvent.change(within(more).getByLabelText(t('modal.sort')), { target: { value: 'name:asc' } })
+    expect(client.browse).toHaveBeenCalledTimes(browseCalls)
+  })
+
+  it('routes compact row actions through one sheet and preserves the existing preview modal', async () => {
+    stubPhoneMedia()
+    const client = makeClient()
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText('report.pdf')
+    fireEvent.click(screen.getByRole('button', { name: t('action.moreNamed', { name: 'report.pdf' }) }))
+    const sheet = await screen.findByRole('dialog', { name: t('action.moreNamed', { name: 'report.pdf' }) })
+    fireEvent.click(within(sheet).getByRole('button', { name: t('action.preview') }))
+    expect(await screen.findByRole('dialog', { name: t('preview.title', { name: 'report.pdf' }) })).toBeTruthy()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: t('preview.title', { name: 'report.pdf' }) })).toBeNull()
+  })
+
+  it('keeps the compact batch bar separate from the scrolling list', async () => {
+    stubPhoneMedia()
+    const client = makeClient()
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText('report.pdf')
+    fireEvent.click(screen.getByRole('checkbox', { name: 'report.pdf' }))
+    const batch = screen.getByTestId('documents-batch-bar')
+    expect(batch.textContent).toContain(t('selection.selected', { count: '1' }))
+    fireEvent.click(within(batch).getByRole('button', { name: t('selection.actions') }))
+    const sheet = await screen.findByRole('dialog', { name: t('selection.actions') })
+    expect(within(sheet).getByRole('button', { name: t('selection.copy') })).toBeTruthy()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: t('selection.actions') })).toBeNull()
   })
 
   it('loads and groups documents by date with limits and actions', async () => {

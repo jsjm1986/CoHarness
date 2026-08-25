@@ -3,65 +3,40 @@
   - button "Close":
     - img
   - paragraph: No per-file size limit, 20 per message
-  - complementary "Document scopes":
-    - button "All authorized scopes":
-      - strong: All authorized scopes
-    - button "Personal documents":
-      - strong: Personal documents
+  - button "Personal documents Visible only to you":
+    - strong: Personal documents
+    - text: Visible only to you
+    - img
   - navigation "Document path":
     - button "All Documents" [disabled]
   - group "Document filters":
     - img
     - textbox "Search document name"
-    - combobox "Type":
-      - option "All types" [selected]
-      - option "Images"
-      - option "PDF"
-      - option "Text"
-      - option "Other"
-    - combobox "Sort":
-      - option "Date newest" [selected]
-      - option "Date oldest"
-      - option "Name A–Z"
-      - option "Name Z–A"
-      - option "Size large–small"
-      - option "Size small–large"
   - group "Document actions":
-    - button "New Folder":
-      - img
-      - text: New Folder
     - button "Upload Document":
       - img
       - text: Upload Document
-    - button "Refresh":
+    - button "More actions":
       - img
-    - button "History"
+      - text: More actions
   - text: Visible only to you 2 documents
   - list "Document Manager":
     - checkbox "Select this page"
     - listitem:
       - button "Open folder reports": reports
-      - button "Rename folder reports"
-      - button "Delete folder reports"
+      - 'button "More actions: folder reports"':
+        - img
     - group "Upload date 2026-08-16":
       - text: 2026-08-16
       - listitem:
         - checkbox "notes.txt"
-        - text: notes.txt 30.0 KB
-        - button "Add notes.txt to conversation"
-        - button "Preview notes.txt"
-        - button "Move notes.txt"
-        - link "Download notes.txt":
-          - /url: /api/documents/content?id=2026-08-16%2Fnotes.txt
-        - button "Delete notes.txt"
+        - text: notes.txt 30.0 KB · 2026-08-16
+        - 'button "More actions: notes.txt"':
+          - img
     - group "Upload date 2026-08-14":
       - text: 2026-08-14
       - listitem:
         - checkbox "brief.txt"
-        - text: brief.txt 21 B
-        - button "Add brief.txt to conversation"
-        - button "Preview brief.txt"
-        - button "Move brief.txt"
-        - link "Download brief.txt":
-          - /url: /api/documents/content?id=2026-08-14%2Fbrief.txt
-        - button "Delete brief.txt"
+        - text: brief.txt 21 B · 2026-08-14
+        - 'button "More actions: brief.txt"':
+          - img

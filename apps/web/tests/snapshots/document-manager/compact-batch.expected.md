@@ -1,0 +1,14 @@
+- heading "Batch actions" [level=2]
+- button "Close":
+  - img
+- paragraph: 1 selected
+- list:
+  - button "Move selected" [disabled]:
+    - img
+    - text: Move selected
+  - button "Copy to another scope":
+    - img
+    - text: Copy to another scope
+  - button "Delete selected" [disabled]:
+    - img
+    - text: Delete selected
