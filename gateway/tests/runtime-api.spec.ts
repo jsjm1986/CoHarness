@@ -113,6 +113,8 @@ function fixture() {
   const push = {
     notifyCompleted: vi.fn(async (_sessionId: string, _eventSeq: number): Promise<void> => {}),
   }
+  const archiveSnapshot = vi.fn(async () => [{ id: 'command-1', rootSessionId: 'session-archive', action: 'restore' as const }])
+  const archiveAck = vi.fn(async () => {})
   const deps = {
     context: {
       organizationSlug: ORGANIZATION_SLUG,
@@ -130,6 +132,7 @@ function fixture() {
       append,
       listScoped: vi.fn(async () => []),
       load,
+      removeTree: vi.fn(async () => []),
     },
     collaboration: {
       access: vi.fn(async () => { throw new CollaborationDeniedError('conversation-not-found') }),
@@ -146,6 +149,7 @@ function fixture() {
     principals,
     governance: { resolveOrganizationCredential },
     push,
+    archives: { syncRuntimeSnapshot: archiveSnapshot, acknowledgeCommand: archiveAck },
   } satisfies RuntimeDependencies
   const issuePrincipal = (userId: number, mode: 'ro' | 'rw' = modes.get(userId) ?? 'rw') => principals.issue({
     user: user(userId, userId === ADMIN_ID ? 'admin' : 'user'),
@@ -166,6 +170,8 @@ function fixture() {
     principals,
     resolveOrganizationCredential,
     push,
+    archiveSnapshot,
+    archiveAck,
   }
 }
 
@@ -517,6 +523,47 @@ describe('runtime organization credentials', () => {
     expect(await request(runtime.handler, '/internal/runtime/model-credential', {
       body: { ref: '../secret' },
     })).toMatchObject({ handled: true, status: 400 })
+  })
+})
+
+describe('runtime archive synchronization', () => {
+  it('accepts a complete snapshot and returns pending lifecycle commands', async () => {
+    const runtime = fixture()
+    const response = await request(runtime.handler, '/internal/runtime/archive/snapshot', {
+      body: {
+        revision: 4,
+        archivedSessionIds: ['session-archive'],
+        sessions: [{ sessionId: 'session-archive', header: { createdAt: CREATED_AT, cwd: '/tmp/shared' } }],
+        search: [{ sessionId: 'session-archive', seq: 0, role: 'user', content: 'hello', occurredAt: CREATED_AT }],
+      },
+    })
+    expect(response).toMatchObject({ handled: true, status: 200, body: { commands: [{ id: 'command-1', rootSessionId: 'session-archive', action: 'restore' }] } })
+    expect(runtime.archiveSnapshot).toHaveBeenCalledWith(expect.objectContaining({
+      runtime: { kind: 'project', id: PROJECT_ID }, revision: 4, archivedSessionIds: ['session-archive'],
+    }))
+
+    const ack = await request(runtime.handler, '/internal/runtime/archive/ack', {
+      body: { commandId: 'command-1', revision: 5 },
+    })
+    expect(ack).toMatchObject({ handled: true, status: 200, body: { acknowledged: true } })
+    expect(runtime.archiveAck).toHaveBeenCalledWith('command-1', 5, undefined)
+  })
+
+  it('rejects malformed retained Workspace metadata at the runtime boundary', async () => {
+    const runtime = fixture()
+    const response = await request(runtime.handler, '/internal/runtime/archive/snapshot', {
+      body: {
+        revision: 1,
+        archivedSessionIds: ['session-archive'],
+        sessions: [{
+          sessionId: 'session-archive',
+          header: {},
+          workspace: { path: 7, title: 'Workspace', position: 0 },
+        }],
+      },
+    })
+    expect(response).toMatchObject({ handled: true, status: 400, body: { error: 'invalid archive session snapshot' } })
+    expect(runtime.archiveSnapshot).not.toHaveBeenCalled()
   })
 })
 

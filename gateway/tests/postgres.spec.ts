@@ -122,9 +122,9 @@ describePg('PostgreSQL baseline', () => {
     pool = createPostgresPool(DATABASE_URL!, { max: 4 })
     await pool.query('DROP SCHEMA IF EXISTS harness CASCADE')
     const migrated = await runMigrations(pool, MIGRATIONS)
-    expect(migrated).toEqual({ applied: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], current: 14 })
+    expect(migrated).toEqual({ applied: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], current: 15 })
     expect(await runMigrations(pool, MIGRATIONS))
-      .toEqual({ applied: [], current: 14 })
+      .toEqual({ applied: [], current: 15 })
     const pushTables = await pool.query<{ table_name: string }>(`SELECT table_name
       FROM information_schema.tables
       WHERE table_schema='harness' AND table_name IN ('push_devices','push_deliveries')
@@ -141,6 +141,18 @@ describePg('PostgreSQL baseline', () => {
       { table_name: 'document_operation_items' },
       { table_name: 'document_operations' },
     ])
+    const archiveTables = await pool.query<{ table_name: string }>(`SELECT table_name
+      FROM information_schema.tables WHERE table_schema='harness' AND table_name LIKE 'conversation_archive_%' ORDER BY table_name`)
+    expect(archiveTables.rows).toEqual([
+      { table_name: 'conversation_archive_commands' },
+      { table_name: 'conversation_archive_records' },
+      { table_name: 'conversation_archive_search' },
+    ])
+    const archiveMessageCount = await pool.query<{ is_nullable: string; column_default: string | null }>(`SELECT is_nullable,column_default
+      FROM information_schema.columns
+      WHERE table_schema='harness' AND table_name='conversation_archive_records' AND column_name='message_count'`)
+    expect(archiveMessageCount.rows[0]?.is_nullable).toBe('NO')
+    expect(archiveMessageCount.rows[0]?.column_default).toMatch(/0/)
     const providerColumn = await pool.query<{ is_nullable: string; column_default: string | null }>(`SELECT is_nullable,column_default
       FROM information_schema.columns
       WHERE table_schema='harness' AND table_name='push_devices' AND column_name='provider'`)

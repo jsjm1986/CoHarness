@@ -223,6 +223,25 @@ describe('WorkspaceManager', () => {
     await refresh
     expect(manager.getSnapshot().archivedSessionIds).toEqual([sid('s1'), sid('s2')])
   })
+
+  it('uses a newer revision to restore an archived row instead of merging the old set', async () => {
+    const api = new FakeApiClient()
+    const manager = new WorkspaceManager(api)
+    manager.handleHostEnvelope({
+      rpcId: 'archive' as never,
+      payload: { type: 'host/archived-sessions-changed', archivedSessionIds: [sid('s1')], archiveRevision: 1 },
+    } as never)
+    manager.handleHostEnvelope({
+      rpcId: 'restore' as never,
+      payload: { type: 'host/archived-sessions-changed', archivedSessionIds: [], archiveRevision: 2 },
+    } as never)
+    expect(manager.getSnapshot().archivedSessionIds).toEqual([])
+    manager.handleHostEnvelope({
+      rpcId: 'stale' as never,
+      payload: { type: 'host/archived-sessions-changed', archivedSessionIds: [sid('s1')], archiveRevision: 1 },
+    } as never)
+    expect(manager.getSnapshot().archivedSessionIds).toEqual([])
+  })
 })
 
 describe('WorkspaceRuntime', () => {

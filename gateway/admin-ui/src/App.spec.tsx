@@ -9,6 +9,7 @@ vi.mock('./pages/ProjectDetailPage.tsx', () => ({ ProjectDetailPage: () => <h1>�
 vi.mock('./pages/ModelsPage.tsx', () => ({ ModelsPage: () => <h1>模型页面</h1> }))
 vi.mock('./pages/UsagePage.tsx', () => ({ UsagePage: () => <h1>用量页面</h1> }))
 vi.mock('./pages/AuditPage.tsx', () => ({ AuditPage: () => <h1>审计页面</h1> }))
+vi.mock('./pages/ArchivesPage.tsx', () => ({ ArchivesPage: () => <h1>归档页面</h1> }))
 
 describe('App', () => {
   beforeEach(() => {
@@ -28,7 +29,8 @@ describe('App', () => {
     expect(screen.queryByText('DeepSeek Harness')).toBeNull()
     expect(screen.getAllByRole('navigation', { name: '管理导航' })).toHaveLength(2)
     expect(screen.getAllByRole('link', { name: '用户' })).toHaveLength(2)
-    expect(screen.getAllByRole('link')).toHaveLength(12)
+    expect(screen.getAllByRole('link')).toHaveLength(14)
+    expect(screen.getAllByRole('link', { name: '归档' })).toHaveLength(2)
     expect(screen.getAllByRole('link', { name: '审计' })).toHaveLength(2)
     expect(screen.getByRole('heading', { name: '用户页面' })).toBeTruthy()
     await userEvent.click(screen.getAllByRole('link', { name: '项目' })[0]!)

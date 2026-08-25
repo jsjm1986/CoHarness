@@ -43,7 +43,7 @@ export interface WorkspaceApi {
    * `host/archived-sessions-changed`). Archived sessions stay in their
    * workspace's `sessionIds` account; grouping surfaces hide them.
    */
-  list(request: RpcRequest<{}>): Promise<RpcResponse<{ items: WorkspaceView[]; archivedSessionIds: SessionId[] }>>
+  list(request: RpcRequest<{}>): Promise<RpcResponse<{ items: WorkspaceView[]; archivedSessionIds: SessionId[]; archiveRevision?: number }>>
 
   /**
    * Creates (or idempotently resolves) a workspace over an EXISTING directory
@@ -105,5 +105,5 @@ export interface WorkspaceApi {
    * updated set (same snapshot the changed frame carries).
    */
   archiveSession(request: RpcRequest<{ sessionId: SessionId }>):
-  Promise<RpcResponse<{ archivedSessionIds: SessionId[] }>>
+  Promise<RpcResponse<{ archivedSessionIds: SessionId[]; archiveRevision?: number }>>
 }

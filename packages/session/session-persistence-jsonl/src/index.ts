@@ -181,6 +181,19 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     return this.coordinator.append(id, events)
   }
 
+  /** Remove one JSONL session artifact after the caller has stopped its live owner. */
+  override async remove(id: SessionId, signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted()
+    if (this.ctx.get('sessions')?.get(id) !== undefined) {
+      throw new Error(`cannot remove live session '${id}'`)
+    }
+    await this.ensureRootEncoding()
+    const path = await this.findLog(id, signal)
+    if (path === undefined) return
+    signal?.throwIfAborted()
+    await rm(dirname(path), { recursive: true, force: false })
+  }
+
   override prepare(id: SessionId, signal?: AbortSignal): Promise<SessionPreparation> {
     return this.coordinator.prepare(id, signal)
   }

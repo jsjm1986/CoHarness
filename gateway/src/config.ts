@@ -35,6 +35,8 @@ export interface GatewayConfig {
   principalAssertionTtlMs: number
   /** Maximum buffered body bytes accepted by one authenticated runtime API call. */
   runtimeApiBodyLimitBytes: number
+  /** Days a trashed archive remains recoverable before purge. */
+  archiveRetentionDays: number
   /** Initial delay before retrying a transient PostgreSQL startup failure. */
   databaseStartupRetryInitialMs: number
   /** Maximum delay between transient PostgreSQL startup retries. */
@@ -272,6 +274,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   if (databaseStartupRetryMaxMs < databaseStartupRetryInitialMs) {
     throw new Error('HGW_DATABASE_STARTUP_RETRY_MAX_MS must be at least HGW_DATABASE_STARTUP_RETRY_INITIAL_MS')
   }
+  const archiveRetentionDays = positiveSafeInteger(
+    env.HGW_ARCHIVE_RETENTION_DAYS,
+    30,
+    'HGW_ARCHIVE_RETENTION_DAYS',
+  )
   const instancePortBase = Number(env.HGW_INSTANCE_PORT_BASE ?? 42000)
   if (!Number.isSafeInteger(instancePortBase) || instancePortBase < 1024 || instancePortBase > 65535) {
     throw new Error('HGW_INSTANCE_PORT_BASE must be an integer between 1024 and 65535')
@@ -299,6 +306,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     principalKeyDir: env.HGW_PRINCIPAL_KEY_DIR ?? join(stateRoot, 'principal-keys'),
     principalAssertionTtlMs: Number(env.HGW_PRINCIPAL_ASSERTION_TTL_MS ?? 30_000),
     runtimeApiBodyLimitBytes,
+    archiveRetentionDays,
     databaseStartupRetryInitialMs,
     databaseStartupRetryMaxMs,
     runtimeCredentialDir: env.HGW_RUNTIME_CREDENTIAL_DIR ?? join(stateRoot, 'runtime-credentials'),

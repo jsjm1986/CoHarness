@@ -143,6 +143,7 @@
     { "path": "./packages/attachment/userdoc-local" },
     { "path": "./packages/context/userdoc-context" },
     { "path": "./packages/context/gateway-runtime" },
+    { "path": "./packages/context/archive-gateway" },
     { "path": "./packages/context/collaboration" },
     { "path": "./packages/context/collaboration-context" },
     { "path": "./packages/context/collaboration-gateway" },

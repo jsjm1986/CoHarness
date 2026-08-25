@@ -143,6 +143,20 @@ export abstract class SessionPersistence extends Service {
   abstract append(id: SessionId, events: readonly SessionEvent[]): Promise<void>
 
   /**
+   * Remove one complete persisted session tree when the deployment exposes a
+   * destructive archive lifecycle. Backends that do not support deletion fail
+   * explicitly so callers keep a pending purge instead of silently losing the
+   * lifecycle acknowledgement.
+   * @param _id - root or session id selected for removal.
+   * @param signal - optional cancellation for backend work.
+   * @returns after the backend has removed the addressed artifact.
+   */
+  remove(_id: SessionId, signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted()
+    return Promise.reject(new Error('this session persistence backend does not support removal'))
+  }
+
+  /**
    * Prepare the exact unpublished Session used by resume. Implementations may
    * reuse object graphs retained by an earlier {@link inspect} after confirming
    * their durable revision is still current; disposal releases an unpublished

@@ -472,4 +472,18 @@ export class ConversationRepository {
       ORDER BY similarity(s.content,$2) DESC,s.occurred_at DESC LIMIT $3`, [organizationId, query, limit])
     return result.rows.map(row => ({ sessionId: row.session_id, seq: Number(row.event_seq), content: row.content }))
   }
+
+  /** Remove one root conversation tree and return owned file paths for cleanup. */
+  async removeTree(organizationId: string, rootSessionId: string): Promise<string[]> {
+    return await transaction(this.pool, async client => {
+      const files = await client.query<{ local_path: string }>(`SELECT f.local_path
+        FROM harness.content_files f
+        JOIN harness.conversation_sessions s ON s.id=f.session_id AND s.organization_id=f.organization_id
+        WHERE f.organization_id=$1 AND s.root_session_id=$2`, [organizationId, rootSessionId])
+      await client.query(`DELETE FROM harness.content_files WHERE organization_id=$1 AND session_id IN
+        (SELECT id FROM harness.conversation_sessions WHERE organization_id=$1 AND root_session_id=$2)`, [organizationId, rootSessionId])
+      await client.query(`DELETE FROM harness.conversation_sessions WHERE organization_id=$1 AND root_session_id=$2`, [organizationId, rootSessionId])
+      return files.rows.map(row => row.local_path)
+    })
+  }
 }

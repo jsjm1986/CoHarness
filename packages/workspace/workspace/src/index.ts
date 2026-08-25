@@ -68,6 +68,29 @@ declare module '@deepseek-ai/cordis' {
   interface Context {
     workspaceRegistry: WorkspaceRegistry
   }
+  interface Events {
+    /**
+     * Complete archive snapshot after a durable archive or restore mutation.
+     * @param snapshot - committed registry archive snapshot.
+     * @mode emit
+     */
+    'workspace/archive-changed': (snapshot: WorkspaceArchiveSnapshot) => void
+  }
+}
+
+/** Versioned registry-global archive snapshot shared with Gateway adapters. */
+export interface WorkspaceArchiveSnapshot {
+  readonly revision: number
+  readonly archivedSessionIds: readonly SessionId[]
+}
+
+/** Archived session metadata and its retained Workspace placement. */
+export interface ArchivedSessionEntry {
+  readonly sessionId: SessionId
+  /** Root of the persisted parent-session lineage, even when only a child is archived. */
+  readonly rootSessionId: SessionId
+  readonly header: SessionHeader
+  readonly workspace?: { readonly id: WorkspaceId; readonly path: string; readonly title: string; readonly position: number }
 }
 
 interface BootstrapGroup {
@@ -234,6 +257,59 @@ export class WorkspaceRegistry extends Service {
     return this.requireState().archivedSessionIds
   }
 
+  /** Current monotonic archive snapshot revision. */
+  get archiveRevision(): number {
+    return this.requireState().archiveRevision
+  }
+
+  /**
+   * Return the complete versioned archive snapshot for synchronization.
+   * @returns the current archive revision and ordered ids.
+   */
+  archiveSnapshot(): WorkspaceArchiveSnapshot {
+    const state = this.requireState()
+    return { revision: state.archiveRevision, archivedSessionIds: state.archivedSessionIds }
+  }
+
+  /**
+   * Resolve archived headers and their original Workspace positions for a sync consumer.
+   * @returns archived entries with root lineage and retained placement.
+   */
+  async archivedEntries(): Promise<readonly ArchivedSessionEntry[]> {
+    const state = this.requireState()
+    const headers = await this.ctx.sessionPersistence.list()
+    const liveHeaders = this.ctx.get('sessions')?.list().map(session => session.header) ?? []
+    const allHeaders = [...headers, ...liveHeaders.filter(live => !headers.some(header => header.id === live.id))]
+    await this.indexHeaders(allHeaders)
+    const byId = new Map(allHeaders.map(header => [header.id, header]))
+    const rootOf = (id: SessionId): SessionId => {
+      const seen = new Set<SessionId>()
+      let current = id
+      while (true) {
+        if (seen.has(current)) throw new Error(`session lineage cycle at '${String(current)}'`)
+        seen.add(current)
+        const parent = byId.get(current)?.parentSession
+        if (parent === undefined) return current
+        current = parent
+      }
+    }
+    const result: ArchivedSessionEntry[] = []
+    for (const sessionId of state.archivedSessionIds) {
+      const header = this.headers.get(sessionId)
+      if (header === undefined) continue
+      let placement: ArchivedSessionEntry['workspace']
+      for (const workspace of this.list()) {
+        const position = workspace.sessionIds.indexOf(sessionId)
+        if (position >= 0) {
+          placement = { id: workspace.id, path: workspace.path, title: workspace.title, position }
+          break
+        }
+      }
+      result.push({ sessionId, rootSessionId: rootOf(sessionId), header, ...(placement === undefined ? {} : { workspace: placement }) })
+    }
+    return result
+  }
+
   /**
    * Archive one session durably. The session must exist (live or in session
    * persistence); its workspace accounting — or lack of one — is irrelevant.
@@ -250,7 +326,29 @@ export class WorkspaceRegistry extends Service {
         throw new WorkspaceUnknownSessionError(sessionId)
       }
       const state = this.requireState()
-      await this.setState({ ...state, archivedSessionIds: [...state.archivedSessionIds, sessionId] })
+      await this.setState({
+        ...state,
+        archivedSessionIds: [...state.archivedSessionIds, sessionId],
+        archiveRevision: state.archiveRevision + 1,
+      })
+      this.emitArchiveSnapshot()
+    })
+  }
+
+  /**
+   * Restore one archived session to its retained Workspace accounting slot.
+   * @param sessionId - session to restore.
+   */
+  restoreSession(sessionId: SessionId): Promise<void> {
+    return this.enqueueOperation(async () => {
+      const state = this.requireState()
+      if (!state.archivedSessionIds.includes(sessionId)) return
+      await this.setState({
+        ...state,
+        archivedSessionIds: state.archivedSessionIds.filter(id => id !== sessionId),
+        archiveRevision: state.archiveRevision + 1,
+      })
+      this.emitArchiveSnapshot()
     })
   }
 
@@ -331,6 +429,7 @@ export class WorkspaceRegistry extends Service {
         initialized: true,
         workspaceIds: [id, ...state.workspaceIds],
         archivedSessionIds: state.archivedSessionIds,
+        archiveRevision: state.archiveRevision,
       })
     } catch (error) {
       this.entities.delete(id)
@@ -363,6 +462,7 @@ export class WorkspaceRegistry extends Service {
       initialized: true,
       workspaceIds: state.workspaceIds.filter(workspaceId => workspaceId !== id),
       archivedSessionIds: state.archivedSessionIds,
+      archiveRevision: state.archiveRevision,
     }
     await this.setState({
       ...nextState,
@@ -420,6 +520,7 @@ export class WorkspaceRegistry extends Service {
       initialized: state.initialized,
       workspaceIds: state.workspaceIds,
       archivedSessionIds: state.archivedSessionIds,
+      archiveRevision: state.archiveRevision,
     })
   }
 
@@ -502,9 +603,15 @@ export class WorkspaceRegistry extends Service {
       .map(([id]) => id)
 
     if (!sameIds(state.workspaceIds, workspaceIds)) {
-      await this.setState({ initialized: false, workspaceIds, archivedSessionIds: state.archivedSessionIds })
+      await this.setState({
+        initialized: false, workspaceIds, archivedSessionIds: state.archivedSessionIds,
+        archiveRevision: state.archiveRevision,
+      })
     }
-    await this.setState({ initialized: true, workspaceIds, archivedSessionIds: state.archivedSessionIds })
+    await this.setState({
+      initialized: true, workspaceIds, archivedSessionIds: state.archivedSessionIds,
+      archiveRevision: state.archiveRevision,
+    })
   }
 
   private validateStoredState(state: WorkspaceDomainState): void {
@@ -643,6 +750,10 @@ export class WorkspaceRegistry extends Service {
   private async setState(state: WorkspaceDomainState): Promise<void> {
     await (this.global as DomainGlobal<WorkspaceDomainState>).set(state)
     this.state = state
+  }
+
+  private emitArchiveSnapshot(): void {
+    this.ctx.emit('workspace/archive-changed', this.archiveSnapshot())
   }
 
   private enqueueOperation<T>(operation: () => Promise<T>): Promise<T> {

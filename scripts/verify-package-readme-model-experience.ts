@@ -144,6 +144,7 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/credentials/credentials-local': { kind: 'indirect', reason: 'The file/environment provider stores credential values; consumers of ctx.credentials own any model-facing behavior.' },
   'packages/context/collaboration': { kind: 'indirect', reason: 'The service defines authorization operations; its consumers own participant attribution and other model-visible behavior.' },
   'packages/context/collaboration-gateway': { kind: 'indirect', reason: 'The provider authorizes operations; dsh-collaboration-context owns model-visible participant attribution.' },
+  'packages/context/archive-gateway': { kind: 'none', reason: 'The provider synchronizes archived session records and serves administrator-only history; it contributes no model input.' },
   'packages/context/gateway-runtime': { kind: 'none', reason: 'The request context authenticates Host operations and contributes no model input.' },
   'packages/util/atomic-write': { kind: 'none', reason: 'Pure filesystem write primitive; registers nothing model-facing.' },
   'packages/session/session-telemetry': { kind: 'none', reason: 'The seam observes the session stream and hands redacted copies outward; it registers nothing model-facing.' },

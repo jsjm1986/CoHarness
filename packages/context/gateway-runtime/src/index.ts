@@ -43,6 +43,8 @@ export interface GatewayPrincipalClaims {
   issuedAt: number
   expiresAt: number
   nonce: string
+  /** Optional capability purpose used by loopback-only runtime integrations. */
+  purpose?: 'archive-read'
 }
 
 /** Private launch credential delivered through an inherited FD or systemd credential file. */
@@ -145,6 +147,9 @@ function principalClaims(value: unknown): GatewayPrincipalClaims {
     || claims.expiresAt <= claims.issuedAt || !nonEmptyString(claims.nonce)) {
     throw new Error('invalid Gateway principal assertion')
   }
+  if (claims.purpose !== undefined && claims.purpose !== 'archive-read') {
+    throw new Error('invalid Gateway principal assertion')
+  }
   if (scope.kind === 'project' && (!positiveInteger(scope.projectId)
     || !nonEmptyString(scope.projectName) || (scope.mode !== 'ro' && scope.mode !== 'rw'))) {
     throw new Error('invalid Gateway principal assertion')
@@ -193,7 +198,8 @@ export function verifyGatewayPrincipal(
     throw new Error('expired or foreign Gateway principal assertion')
   }
   if (claims.scope.kind === 'personal') {
-    if (claims.runtime.kind !== 'user' || claims.user.id !== claims.runtime.id) {
+    if (claims.runtime.kind !== 'user'
+      || (claims.user.id !== claims.runtime.id && claims.purpose !== 'archive-read')) {
       throw new Error('invalid Gateway principal assertion scope')
     }
   } else if (claims.runtime.kind !== 'project' || claims.scope.projectId !== claims.runtime.id) {

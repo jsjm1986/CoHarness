@@ -17,6 +17,7 @@ import {
   withDatabaseStartupRetry,
 } from './postgres/database.ts'
 import { ConversationRepository } from './postgres/conversation-repository.ts'
+import { ConversationArchiveService, type ConversationArchiveRuntimeRead } from './postgres/conversation-archive-service.ts'
 import { PostgresInstanceRepository } from './postgres/instance-repository.ts'
 import { PostgresModelGovernanceService } from './postgres/model-governance-service.ts'
 import {
@@ -26,7 +27,7 @@ import {
 import { PostgresProjectService } from './postgres/project-service.ts'
 import { checkPostgresReadiness, resolvePostgresRuntimeContext } from './postgres/runtime-context.ts'
 import { PostgresUserService } from './postgres/user-service.ts'
-import { loadPrincipalKeys } from './principal.ts'
+import { loadPrincipalKeys, PRINCIPAL_HEADER } from './principal.ts'
 import { createProxyHandlers } from './proxy.ts'
 import { createPostgresPushService } from './push-notifications.ts'
 import { createRuntimeApiHandler } from './runtime-api.ts'
@@ -45,6 +46,41 @@ import { PostgresDocumentCatalogService } from './postgres/document-catalog-serv
 import { runtimeDirectoryGrants } from './runtime-directory-grants.ts'
 import { createGatewayServer, type GatewayDeps } from './server.ts'
 import { createUsageIntakeServer } from './usage-intake.ts'
+
+function archiveReadPayload(value: unknown): ConversationArchiveRuntimeRead {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error('runtime archive reader returned invalid JSON')
+  }
+  const payload = value as { title?: unknown; descendants?: unknown; events?: unknown; hasMore?: unknown }
+  if ((payload.title !== undefined && typeof payload.title !== 'string')
+    || !Array.isArray(payload.descendants) || !Array.isArray(payload.events) || typeof payload.hasMore !== 'boolean') {
+    throw new Error('runtime archive reader returned invalid archive page')
+  }
+  const descendants = payload.descendants.map(item => {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) throw new Error('runtime archive reader returned invalid descendant')
+    const row = item as { sessionId?: unknown; parentSessionId?: unknown; title?: unknown }
+    if (typeof row.sessionId !== 'string' || row.sessionId === ''
+      || (row.parentSessionId !== null && typeof row.parentSessionId !== 'string')
+      || typeof row.title !== 'string') throw new Error('runtime archive reader returned invalid descendant')
+    return { sessionId: row.sessionId, parentSessionId: row.parentSessionId, title: row.title }
+  })
+  const events = payload.events.map(item => {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) throw new Error('runtime archive reader returned invalid event')
+    const row = item as { sessionId?: unknown; seq?: unknown; type?: unknown; time?: unknown; data?: unknown }
+    if (typeof row.sessionId !== 'string' || row.sessionId === '' || typeof row.type !== 'string' || row.type === ''
+      || typeof row.seq !== 'number' || !Number.isSafeInteger(row.seq) || row.seq < 0
+      || typeof row.time !== 'number' || !Number.isSafeInteger(row.time) || row.time < 0) {
+      throw new Error('runtime archive reader returned invalid event')
+    }
+    return { sessionId: row.sessionId, seq: row.seq, type: row.type, time: row.time, data: row.data }
+  })
+  return {
+    ...(typeof payload.title === 'string' ? { title: payload.title } : {}),
+    descendants,
+    events,
+    hasMore: payload.hasMore,
+  }
+}
 
 const cfg = loadConfig()
 if (cfg.releaseId !== undefined) console.log(`[gateway] release ${cfg.releaseId}`)
@@ -116,6 +152,52 @@ const launcher = selectLauncher(cfg, () => ({
     return (await runtimeDirectoryGrants(user, projects)).map(({ path, mode }) => ({ path, mode }))
   },
 }))
+const instances = new InstanceManager(instanceRepository, cfg, launcher, {
+  principalPublicKey: principalKeys.publicKeyPem,
+})
+const archives = new ConversationArchiveService(context, cfg.archiveRetentionDays)
+archives.setRuntimeReader(async (runtime, rootSessionId, fromSeq, limit) => {
+  let subject: Awaited<ReturnType<PostgresUserService['getById']>> | {
+    kind: 'project'; id: number; name: string; path: string
+  }
+  let projectName: string | undefined
+  if (runtime.kind === 'user') {
+    subject = await users.getById(runtime.id)
+  } else {
+    const project = await projects.getById(runtime.id)
+    subject = project === null ? null : { kind: 'project', id: project.id, name: project.name, path: project.path }
+    projectName = project?.name
+  }
+  if (subject === null || subject === undefined) return undefined
+  const running = await instances.ensureRunning(subject)
+  const scope = runtime.kind === 'project'
+    ? { kind: 'project' as const, projectId: runtime.id, projectName: projectName ?? `Project ${String(runtime.id)}`, mode: 'ro' as const }
+    : { kind: 'personal' as const }
+  const assertion = principalKeys.signer.issue({
+    user: {
+      id: 1,
+      username: 'gateway-archive-reader',
+      displayName: 'Gateway archive reader',
+      role: 'admin',
+      status: 'active',
+      homePath: '/',
+      mustChangePassword: false,
+    },
+    scope,
+    runtime: { kind: runtime.kind, id: runtime.id, generation: running.generation },
+    purpose: 'archive-read',
+  })
+  const authority = `127.0.0.1:${String(running.port)}`
+  const response = await fetch(
+    `http://${authority}/api/internal/archive/read?sessionId=${encodeURIComponent(rootSessionId)}&fromSeq=${String(fromSeq)}&limit=${String(limit)}`,
+    { headers: { host: authority, [PRINCIPAL_HEADER]: assertion }, signal: AbortSignal.timeout(cfg.readinessTimeoutMs) },
+  )
+  if (response.status === 404) return undefined
+  let value: unknown
+  try { value = await response.json() } catch { throw new Error(`runtime archive reader returned HTTP ${String(response.status)}`) }
+  if (!response.ok) throw new Error(`runtime archive reader returned HTTP ${String(response.status)}`)
+  return archiveReadPayload(value)
+})
 const deps: GatewayDeps = {
   cfg,
   auth,
@@ -125,10 +207,9 @@ const deps: GatewayDeps = {
   governance,
   collaboration,
   documents: documentCatalog,
+  archives,
   push,
-  instances: new InstanceManager(instanceRepository, cfg, launcher, {
-    principalPublicKey: principalKeys.publicKeyPem,
-  }),
+  instances,
   readiness: () => checkPostgresReadiness(context),
 }
 
@@ -162,6 +243,7 @@ const server = createGatewayServer(deps, {
     instances: instanceRepository,
     conversations,
     collaboration,
+    archives,
     principals: principalKeys.signer,
     governance,
     push,
@@ -247,6 +329,12 @@ const reaper = setInterval(() => {
     console.error('[gateway] idle reaper failed:', error)
   })
 }, 60_000)
+const archiveRetentionSweep = setInterval(() => {
+  void archives.purgeDue().catch(error => {
+    console.error('[gateway] archive retention sweep failed:', error)
+  })
+}, 60 * 60_000)
+archiveRetentionSweep.unref()
 
 const CONNECTION_DRAIN_MS = 3000
 const SHUTDOWN_TIMEOUT_MS = 10_000
@@ -274,6 +362,7 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
   }, SHUTDOWN_TIMEOUT_MS)
   forced.unref()
   clearInterval(reaper)
+  clearInterval(archiveRetentionSweep)
   try {
     proxyHandlers.close()
     await Promise.all([closeListeningServer(server), closeListeningServer(intake)])

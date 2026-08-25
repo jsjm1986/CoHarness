@@ -62,6 +62,33 @@ export type AuditFilter = {
   offset?: number
 }
 
+export type ConversationArchiveState = 'archived' | 'trash' | 'purged'
+
+export type ConversationArchiveRow = {
+  rootSessionId: string
+  title: string
+  creator: { id: number; displayName: string } | null
+  project: { id: number; name: string } | null
+  runtime: { kind: 'user' | 'project'; id: number }
+  workspace: { path: string; title: string; position: number | null } | null
+  state: ConversationArchiveState
+  archivedAt: number
+  restoredAt: number | null
+  trashedAt: number | null
+  purgeAfter: number | null
+  syncState: 'pending' | 'synced' | 'conflict' | 'unavailable'
+  childCount: number
+  messageCount: number
+  updatedAt: number
+}
+
+export type ConversationArchiveDetail = {
+  record: ConversationArchiveRow
+  descendants: Array<{ sessionId: string; parentSessionId: string | null; title: string }>
+  events: Array<{ sessionId: string; seq: number; type: string; time: number; data: unknown }>
+  hasMore: boolean
+}
+
 export type AdminDocument = {
   catalogId: string
   scope: { kind: 'personal' | 'project'; id?: number; label: string; mode?: 'ro' | 'rw' }
@@ -206,6 +233,46 @@ export function listAudit(filter: AuditFilter = {}): Promise<AuditEntry[]> {
   if (filter.offset !== undefined) q.set('offset', String(filter.offset))
   const qs = q.toString()
   return request(`/admin/api/audit${qs === '' ? '' : `?${qs}`}`)
+}
+
+export function listArchives(filter: {
+  state?: ConversationArchiveState | 'all'
+  query?: string
+  userId?: number
+  projectId?: number
+  from?: number
+  to?: number
+  limit?: number
+  offset?: number
+} = {}): Promise<ConversationArchiveRow[]> {
+  const query = new URLSearchParams()
+  if (filter.state !== undefined) query.set('state', filter.state)
+  if (filter.query !== undefined && filter.query !== '') query.set('q', filter.query)
+  for (const key of ['userId', 'projectId', 'from', 'to', 'limit', 'offset'] as const) {
+    const value = filter[key]
+    if (value !== undefined) query.set(key, String(value))
+  }
+  const suffix = query.toString()
+  return request(`/admin/api/archives${suffix === '' ? '' : `?${suffix}`}`)
+}
+
+export function getArchive(rootSessionId: string, fromSeq = 0, limit = 200): Promise<ConversationArchiveDetail> {
+  const query = new URLSearchParams({ fromSeq: String(fromSeq), limit: String(limit) })
+  return request(`/admin/api/archives/${encodeURIComponent(rootSessionId)}?${query.toString()}`)
+}
+
+export function exportArchive(rootSessionId: string): string {
+  return `/admin/api/archives/${encodeURIComponent(rootSessionId)}/export`
+}
+
+export function applyArchiveAction(action: 'restore' | 'trash' | 'purge', ids: string[]): Promise<{
+  action: string
+  results: Array<{ rootSessionId: string; ok: boolean; error?: string }>
+}> {
+  return request('/admin/api/archives/actions', {
+    method: 'POST',
+    body: JSON.stringify({ action, ids, idempotencyKey: crypto.randomUUID() }),
+  })
 }
 
 export function listDocumentMetrics(): Promise<AdminDocumentMetrics> {

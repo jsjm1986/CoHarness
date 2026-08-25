@@ -1508,6 +1508,154 @@ a {
   color: var(--accent);
 }
 
+.pageActionGroup,
+.dialogActionRow,
+.archiveBulkBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.archiveBulkBar {
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.checkLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.checkLabel input {
+  accent-color: var(--accent);
+}
+
+.archiveOwner {
+  display: grid;
+  gap: 2px;
+}
+
+.archiveOwner small,
+.archiveMobileOpen span {
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.archiveMobileOpen {
+  display: grid;
+  width: 100%;
+  gap: 4px;
+  margin-top: 12px;
+  padding: 12px 0 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  text-align: left;
+}
+
+.archiveMobileOpen:hover .codeText {
+  color: var(--accent);
+}
+
+.archiveDetail {
+  display: grid;
+  gap: 18px;
+}
+
+.archiveDescendants {
+  display: grid;
+  gap: 8px;
+}
+
+.archiveDescendants h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.archiveDescendants ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.archiveDescendants li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(120px, auto);
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-subtle);
+}
+
+.archiveDescendants li span {
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+.archiveDescendants li strong,
+.archiveDescendants li code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.archiveDescendants li code {
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+.archiveTimeline {
+  display: grid;
+  gap: 10px;
+  max-height: min(58dvh, 720px);
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.archiveEvent {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-subtle);
+}
+
+.archiveEventMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+.archiveEventMeta small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.archiveEvent pre {
+  max-height: 260px;
+  margin: 8px 0 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
 .documentIdentity {
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr);
@@ -2574,6 +2722,26 @@ a {
   .formActions,
   .dialogFooter {
     width: 100%;
+  }
+
+  .pageActionGroup,
+  .pageActionGroup .button,
+  .dialogActionRow,
+  .dialogActionRow .button {
+    width: 100%;
+  }
+
+  .archiveBulkBar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .archiveDescendants li {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .archiveDescendants li code {
+    grid-column: 2;
   }
 
   .filterPanel {

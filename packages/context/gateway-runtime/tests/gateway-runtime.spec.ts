@@ -79,6 +79,27 @@ describe('Gateway runtime credential', () => {
       runtime: { kind: 'project', id: 41, generation: 8 },
     }), credential, undefined, NOW + 1)).toThrow(/expired or foreign/)
   })
+
+  it('accepts only the signed administrator archive capability for another personal runtime', () => {
+    const { credential, issue } = fixture()
+    const personalCredential: GatewayRuntimeCredential = {
+      ...credential,
+      runtime: { kind: 'user', id: 41, generation: 7 },
+    }
+    const archive = issue({
+      user: { id: 9, username: 'admin', displayName: 'Admin', role: 'admin' },
+      scope: { kind: 'personal' },
+      runtime: { kind: 'user', id: 41, generation: 7 },
+      purpose: 'archive-read',
+    })
+    expect(verifyGatewayPrincipal(archive, personalCredential).purpose).toBe('archive-read')
+    const ordinary = issue({
+      user: { id: 9, username: 'admin', displayName: 'Admin', role: 'admin' },
+      scope: { kind: 'personal' },
+      runtime: { kind: 'user', id: 41, generation: 7 },
+    })
+    expect(() => verifyGatewayPrincipal(ordinary, personalCredential)).toThrow(/scope/)
+  })
 })
 
 describe('Gateway request context', () => {

@@ -421,7 +421,11 @@ describe('project collaboration streams', () => {
       value: { ...visibleWorkspace, title: 'Visible changed' },
     })
 
-    await expect(changed).resolves.toMatchObject({
+    let changedFrame = await changed
+    while (changedFrame.done === false && changedFrame.value.payload.type !== 'host/workspace-changed') {
+      changedFrame = await stream.next()
+    }
+    expect(changedFrame).toMatchObject({
       done: false,
       value: {
         payload: {
@@ -447,7 +451,11 @@ describe('project collaboration streams', () => {
         archivedSessionIds: [privateId, visibleId],
       },
     })
-    await expect(archived).resolves.toMatchObject({
+    let archivedFrame = await archived
+    while (archivedFrame.done === false && archivedFrame.value.payload.type !== 'host/archived-sessions-changed') {
+      archivedFrame = await stream.next()
+    }
+    expect(archivedFrame).toMatchObject({
       done: false,
       value: {
         payload: {

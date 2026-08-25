@@ -20,6 +20,7 @@ import type {
   GatewayProjectService,
   GatewayUserService,
 } from './services.ts'
+import type { ConversationArchiveService } from './postgres/conversation-archive-service.ts'
 import { isAdminPath, serveAdmin } from './static.ts'
 
 export interface GatewayDeps {
@@ -33,6 +34,8 @@ export interface GatewayDeps {
   collaboration?: GatewayCollaborationService
   /** Optional organization-level document metadata catalog. */
   documents?: GatewayDocumentCatalogService
+  /** Optional organization-wide archived conversation index and lifecycle service. */
+  archives?: ConversationArchiveService
   /** Optional persistent device registry and multi-provider push delivery service. */
   push?: GatewayPushService
   readiness?: () => Awaitable<void>
