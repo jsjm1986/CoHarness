@@ -50,6 +50,13 @@ async function dumpOverflow(page: Page): Promise<unknown> {
           const feedBox = feed.getBoundingClientRect()
           if (box.top < feedBox.top || box.bottom > feedBox.bottom) return null
         }
+        const documentScrollport = el.closest<HTMLElement>('[data-documents-list], [data-documents-sheet-scrollport]')
+        if (documentScrollport !== null) {
+          const scrollStyle = getComputedStyle(documentScrollport)
+          const scrollBox = documentScrollport.getBoundingClientRect()
+          if ((scrollStyle.overflowY === 'auto' || scrollStyle.overflowY === 'scroll')
+            && (box.top < scrollBox.top || box.bottom > scrollBox.bottom)) return null
+        }
         const onScreen = box.right > 1 && box.left < vw - 1 && box.bottom > 1 && box.top < vh - 1
         if (!onScreen) return null
         const label = (el.getAttribute('aria-label') ?? el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 40)
@@ -302,6 +309,53 @@ describe('visual audit: compact product chrome', () => {
           else await page.keyboard.press('Escape')
         }
 
+        // Assistant request details use the same kind badge as ledger rows.
+        // Keep this header in the audit because the compact row rail must not
+        // shrink the semantic label inside the reading sheet. The first paint
+        // also has to mask the composer before the sheet's entrance motion
+        // settles; otherwise a slow mobile WebView briefly exposes two layers.
+        const assistantEvent = page.locator('[data-trajectory-feed] [data-kind="message"], tr[data-kind="message"]').last()
+        if (await assistantEvent.count() > 0) {
+          await assistantEvent.click()
+          const assistantDetails = page.locator('[data-trajectory-details]').first()
+          await assistantDetails.waitFor({ timeout: 10_000 })
+          const immediateLayer = await page.evaluate(() => {
+            const card = document.querySelector<HTMLElement>('[data-composer-card]')
+            const sheet = document.querySelector<HTMLElement>('[data-trajectory-details]')
+            if (card === null || sheet === null) return null
+            const box = card.getBoundingClientRect()
+            const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
+            return hit?.closest('[data-trajectory-details]') !== null
+          })
+          if (phone.width < 768) expect(immediateLayer, `${prefix}: details mask must cover composer on first paint`).toBe(true)
+          await page.waitForFunction(() => {
+            const sheet = document.querySelector<HTMLElement>('[data-trajectory-details]')
+            if (sheet === null) return false
+            const transform = getComputedStyle(sheet).transform
+            return transform === 'none' || transform === 'matrix(1, 0, 0, 1, 0, 0)'
+          }, undefined, { timeout: 5_000 })
+          const kind = assistantDetails.locator('[data-trajectory-details-kind]')
+          const kindBox = await kind.boundingBox()
+          if (kindBox === null) throw new Error(`${prefix}: assistant details kind has no geometry`)
+          expect(kindBox.x, `${prefix}: assistant details kind starts inside the viewport`).toBeGreaterThanOrEqual(0)
+          expect(kindBox.x + kindBox.width, `${prefix}: assistant details kind stays inside the viewport`).toBeLessThanOrEqual(phone.width + 1)
+          expect(await kind.textContent()).toBe('ASSISTANT')
+          const layer = await page.evaluate(() => {
+            const card = document.querySelector<HTMLElement>('[data-composer-card]')
+            const sheet = document.querySelector<HTMLElement>('[data-trajectory-details]')
+            if (card === null || sheet === null) return null
+            const box = card.getBoundingClientRect()
+            const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
+            return hit?.closest('[data-trajectory-details]') !== null
+          })
+          if (phone.width < 768) expect(layer, `${prefix}: details sheet must cover composer`).toBe(true)
+          await shot(page, `${prefix}-09-assistant-details`)
+          findings[`${prefix}.assistantDetails`] = await dumpOverflow(page)
+          const closeAssistantDetails = assistantDetails.getByRole('button', { name: /Close details|关闭详情/ })
+          if (await closeAssistantDetails.count() > 0) await closeAssistantDetails.click()
+          else await page.keyboard.press('Escape')
+        }
+
         await openDrawer(page)
         await shot(page, `${prefix}-10-drawer`)
         findings[`${prefix}.drawer`] = await dumpOverflow(page)
@@ -337,20 +391,58 @@ describe('visual audit: compact product chrome', () => {
         if (await documents.count() > 0) {
           await documents.click()
           try {
-            await page.getByRole('dialog').waitFor({ timeout: 8_000 })
-            await page.waitForTimeout(300)
+            const dialog = page.getByRole('dialog', { name: '文档管理' })
+            await dialog.waitFor({ timeout: 8_000 })
             await shot(page, `${prefix}-13-documents`)
             findings[`${prefix}.documents`] = await dumpOverflow(page)
-            if (phone.width <= 359) {
-              const toolbar = page.getByRole('dialog').locator('[class*="toolbar"]').first()
-              const newFolder = toolbar.getByRole('button', { name: /新建文件夹|New folder/ })
-              const upload = toolbar.getByRole('button', { name: /上传文档|Upload documents/ })
-              const refresh = toolbar.getByRole('button', { name: /刷新|Refresh/ })
-              const boxes = await Promise.all([newFolder, upload, refresh].map(control => control.boundingBox()))
-              if (boxes.some(box => box === null)) throw new Error('compact document toolbar geometry missing')
-              expect(new Set(boxes.map(box => Math.round(box!.y))).size).toBe(1)
-              expect(boxes.every(box => box!.x >= 0 && box!.x + box!.width <= phone.width + 1)).toBe(true)
+            const scopeTrigger = dialog.locator('[data-documents-scope-trigger]')
+            const upload = dialog.getByRole('button', { name: /上传文档|Upload Document/ })
+            const more = dialog.locator('[data-documents-toolbar-more]')
+            const boxes = await Promise.all([scopeTrigger, upload, more].map(control => control.boundingBox()))
+            if (boxes.some(box => box === null)) throw new Error('compact document toolbar geometry missing')
+            expect(boxes.every(box => box!.height >= 44 && box!.x >= 0 && box!.x + box!.width <= phone.width + 1)).toBe(true)
+            expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true)
+
+            await scopeTrigger.click()
+            const scopeSheet = page.locator('[data-documents-sheet="scope-view"]')
+            await scopeSheet.waitFor({ timeout: 8_000 })
+            await shot(page, `${prefix}-14-documents-scope`)
+            findings[`${prefix}.documentsScope`] = await dumpOverflow(page)
+            await page.keyboard.press('Escape')
+
+            await more.click()
+            const moreSheet = page.locator('[data-documents-sheet="toolbar-more"]')
+            await moreSheet.waitFor({ timeout: 8_000 })
+            await shot(page, `${prefix}-15-documents-more`)
+            findings[`${prefix}.documentsMore`] = await dumpOverflow(page)
+            await page.keyboard.press('Escape')
+
+            const rowMore = dialog.locator('[data-documents-row-more]').first()
+            if (await rowMore.count() > 0) {
+              await rowMore.scrollIntoViewIfNeeded()
+              await rowMore.click()
+              const actionSheet = page.locator('[data-documents-sheet="document-actions"], [data-documents-sheet="directory-actions"]').first()
+              await actionSheet.waitFor({ timeout: 8_000 })
+              await shot(page, `${prefix}-16-documents-row-actions`)
+              findings[`${prefix}.documentsRowActions`] = await dumpOverflow(page)
+              await page.keyboard.press('Escape')
             }
+
+            await page.evaluate(() => { document.body.setAttribute('data-ds-dark-theme', '') })
+            await page.waitForTimeout(100)
+            const darkPalette = await page.evaluate(() => {
+              const dialog = document.querySelector<HTMLElement>('[role="dialog"][aria-label="文档管理"]')
+              const card = document.querySelector<HTMLElement>('[data-documents-list] [role="listitem"]')
+              return {
+                dialog: dialog === null ? '' : getComputedStyle(dialog).backgroundColor,
+                card: card === null ? '' : getComputedStyle(card).backgroundColor,
+              }
+            })
+            expect(darkPalette.dialog).not.toBe('rgb(255, 255, 255)')
+            expect(darkPalette.card).not.toBe('rgb(255, 255, 255)')
+            await shot(page, `${prefix}-17-documents-dark`)
+            findings[`${prefix}.documentsDark`] = await dumpOverflow(page)
+            await page.evaluate(() => { document.body.removeAttribute('data-ds-dark-theme') })
             await page.keyboard.press('Escape')
           } catch {
             findings[`${prefix}.documents`] = 'no dialog'

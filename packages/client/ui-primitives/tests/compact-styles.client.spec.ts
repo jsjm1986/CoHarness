@@ -39,8 +39,12 @@ describe('primitive compact chrome', () => {
     expect(menu).toContain('var(--dsw-mobile-sheet-bottom)')
     expect(menu).toContain('var(--dsw-mobile-sheet-max-height)')
     expect(menu).toContain('!important')
+    expect(menu).toContain('.list.scrollable')
+    expect(menu).toContain('overflow: hidden')
+    expect(menu).toContain('.list.scrollable .viewport')
     expect(backdrop).toContain('@media (max-width: 767px)')
     expect(backdrop).toContain('z-index: 1090')
+    expect(backdrop).toContain('animation: none')
   })
 
   it('keeps modal sheets scrollable, elevated, and animated consistently', () => {

@@ -1,0 +1,30 @@
+- menu:
+  - searchbox "Search project spaces"
+  - text: Personal
+  - menuitem "Personal":
+    - img
+    - text: Personal
+  - separator
+  - text: Projects
+  - menuitem "Payments migration Can edit":
+    - img
+    - text: Payments migration Can edit
+    - img
+  - menuitem "Audit platform Read only":
+    - img
+    - text: Audit platform Read only
+  - separator
+  - text: New conversation visibility
+  - menuitem "Shared with project Project members can view and participate":
+    - img
+    - text: Shared with project Project members can view and participate
+    - img
+  - menuitem "Only me Only the creator can view it":
+    - img
+    - text: Only me Only the creator can view it
+  - menuitem "New project space":
+    - img
+    - text: New project space
+  - menuitem "Invitations and tasks":
+    - img
+    - text: Invitations and tasks

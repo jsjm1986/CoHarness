@@ -1,0 +1,20 @@
+- 'heading "More actions: brief.txt" [level=2]'
+- button "Close":
+  - img
+- strong: brief.txt
+- text: 21 B · 2026-08-14
+- list:
+  - button "Add to conversation":
+    - img
+    - text: Add to conversation
+  - button "Preview"
+  - button "Move":
+    - img
+    - text: Move
+  - link "Download brief.txt":
+    - /url: /api/documents/content?id=2026-08-14%2Fbrief.txt
+    - img
+    - text: Download
+  - button "Delete":
+    - img
+    - text: Delete

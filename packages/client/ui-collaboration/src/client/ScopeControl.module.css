@@ -79,6 +79,100 @@
   color: var(--dsw-alias-label-caption);
 }
 
+/* Keep a large project roster from pushing the menu across the whole frame;
+   Menu's scrolling viewport leaves the management actions pinned below it. */
+.scopeMenu {
+  --dsh-menu-max-height: min(480px, calc(100vh - 24px));
+}
+
+.menuSearch {
+  display: flex;
+  align-items: center;
+  gap: var(--dsw-space-2);
+  min-height: 34px;
+  box-sizing: border-box;
+  padding: 0 var(--dsw-space-2);
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.menuSearch:focus-within {
+  border-color: var(--dsw-alias-brand-primary);
+  box-shadow: 0 0 0 1px var(--dsw-alias-brand-primary);
+}
+
+.menuSearchIcon {
+  display: inline-flex;
+  flex: none;
+}
+
+.menuSearchInput {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.menuSearchInput::placeholder {
+  color: var(--dsw-alias-label-caption);
+}
+
+.menuSearchInput::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.menuSearchClear {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--dsw-radius-xs);
+  background: transparent;
+  color: var(--dsw-alias-label-caption);
+  cursor: pointer;
+}
+
+.menuSearchClear:hover,
+.menuSearchClear:focus-visible {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+@media (pointer: coarse) {
+  .menuSearch {
+    min-height: var(--dsw-touch-target);
+  }
+
+  .menuSearchClear {
+    width: var(--dsw-touch-target);
+    height: var(--dsw-touch-target);
+  }
+}
+
+/* Portaled menus do not inherit the frame's data-viewport attribute. */
+@media (max-width: 767px) {
+  .menuSearch {
+    min-height: var(--dsw-touch-target);
+  }
+
+  .menuSearchClear {
+    width: var(--dsw-touch-target);
+    height: var(--dsw-touch-target);
+  }
+}
+
 .menuText {
   display: flex;
   flex-direction: column;

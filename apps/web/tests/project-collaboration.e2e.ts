@@ -16,6 +16,8 @@ import { newEnglishPage, saveFailureShot } from './support.ts'
 
 const SEED = fileURLToPath(new URL('./snapshots/seeded-history/seed.jsonl', import.meta.url))
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/project-collaboration', import.meta.url))
+const SCOPE_PICKER_EXPECTED = join(SNAPSHOT_DIR, 'scope-picker.expected.md')
+const SCOPE_PICKER_MOBILE_EXPECTED = join(SNAPSHOT_DIR, 'scope-picker-mobile.expected.md')
 const SHARING_EXPECTED = join(SNAPSHOT_DIR, 'sharing.expected.md')
 const SWITCHING_EXPECTED = join(SNAPSHOT_DIR, 'switching.expected.md')
 const READ_ONLY_EXPECTED = join(SNAPSHOT_DIR, 'read-only.expected.md')
@@ -227,6 +229,9 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     expect(await scope.textContent()).toContain('Can edit')
     await scope.click()
     await page.getByText('New conversation visibility', { exact: true }).waitFor()
+    expect(await page.getByRole('menu').evaluate(element => getComputedStyle(element).maxHeight)).toBe('480px')
+    const scopeSnapshot = await captureStableAria(page, '[role="menu"]', scaffold.workspaceCwd)
+    await compareOrRefreshGolden(SCOPE_PICKER_EXPECTED, scopeSnapshot, MODE)
     await page.getByRole('menuitem', { name: /Only me/ }).click()
 
     const sharing = page.getByRole('button', { name: 'Manage conversation sharing' })
@@ -273,6 +278,38 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     } finally {
       releaseScope()
     }
+  }, 60_000)
+
+  it('presents the scope picker as a bounded phone sheet', async () => {
+    page = await browser.newPage({
+      viewport: { width: 390, height: 844 },
+      locale: 'en-US',
+      hasTouch: true,
+      isMobile: true,
+    })
+    tripwire = watchConsole(page)
+    await mockGateway(page, 'rw')
+    onTestFailed(() => saveFailureShot(page!, 'web-e2e-project-collaboration-scope-mobile'))
+    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+
+    await page.getByRole('button', { name: 'Open sidebar' }).click()
+    const scope = page.getByRole('button', { name: 'Switch personal or project scope' })
+    await scope.waitFor({ timeout: 10_000 })
+    await scope.click()
+    const menu = page.getByRole('menu')
+    await menu.waitFor({ timeout: 10_000 })
+    expect(await menu.evaluate(element => getComputedStyle(element).position)).toBe('fixed')
+    expect(await menu.evaluate(element => getComputedStyle(element).bottom)).not.toBe('auto')
+    expect(await menu.evaluate(element => getComputedStyle(element).overflowY)).toBe('hidden')
+    expect(await menu.locator('[class*="viewport"]').evaluate(element => getComputedStyle(element).overflowY)).toBe('auto')
+    const search = menu.locator('input[type="search"]')
+    expect(await search.count()).toBe(1)
+    expect(await search.evaluate(element => getComputedStyle(element.parentElement!).minHeight)).toBe('44px')
+    const snapshot = await captureStableAria(page, '[role="menu"]', scaffold.workspaceCwd)
+    await compareOrRefreshGolden(SCOPE_PICKER_MOBILE_EXPECTED, snapshot, MODE)
+    await search.fill('pay')
+    expect(await menu.getByRole('button', { name: 'Clear project-space search' }).evaluate(element => getComputedStyle(element).width)).toBe('44px')
   }, 60_000)
 
   it('keeps project, preset, subagent, and utility actions on one desktop header row', async () => {
@@ -389,7 +426,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
 
   it('keeps its snapshot inventory closed', async () => {
     await assertFixtureInventory(SNAPSHOT_DIR, [
-      'header-geometry.expected.md', 'read-only.expected.md', 'sharing.expected.md', 'switching.expected.md',
+      'header-geometry.expected.md', 'read-only.expected.md', 'scope-picker-mobile.expected.md', 'scope-picker.expected.md', 'sharing.expected.md', 'switching.expected.md',
     ])
   })
 })

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
-  IconChevronDownOutline14, IconGlobeOutline14, IconShareOutline16,
-  IconPlusOutline16, IconUserOutline16, IconWarningOutline16, Menu, type MenuEntry,
+  IconChevronDownOutline14, IconCloseFill14, IconGlobeOutline14, IconSearchOutline16,
+  IconShareOutline16, IconPlusOutline16, IconUserOutline16, IconWarningOutline16,
+  Menu, type MenuEntry,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {
@@ -42,6 +43,8 @@ export type ScopeControlProps =
 
 /**
  * Render the personal/project runtime selector and project create visibility.
+ * The project roster is searchable, capped to a viewport-safe menu height,
+ * and presented through the shared phone sheet below the compact breakpoint.
  * @param props - composed slot props.
  * @returns scope trigger and its portaled menu, or null outside Gateway collaboration.
  */
@@ -53,7 +56,12 @@ export function ScopeControl({
   const [open, setOpen] = useState(false)
   const [managerMode, setManagerMode] = useState<ProjectManagerMode>()
   const [invitationCount, setInvitationCount] = useState(0)
+  const [projectQuery, setProjectQuery] = useState('')
   const context = state.context
+  const normalizedProjectQuery = projectQuery.trim().toLowerCase()
+  const visibleProjects = context === undefined || normalizedProjectQuery === ''
+    ? context?.projects ?? []
+    : context.projects.filter(project => project.name.toLowerCase().includes(normalizedProjectQuery))
 
   useEffect(() => {
     if (getInvitationCount === undefined) return
@@ -63,6 +71,9 @@ export function ScopeControl({
       .catch(() => { if (active) setInvitationCount(0) })
     return () => { active = false }
   }, [open, managerMode, getInvitationCount])
+  useEffect(() => {
+    if (!open || context?.projects.length === 0) setProjectQuery('')
+  }, [open, context?.projects.length])
   if (state.status !== 'ready' || context === undefined
     || (context.scope.kind === 'personal' && context.projects.length === 0
       && createProject === undefined && listInvitations === undefined)) return null
@@ -72,6 +83,24 @@ export function ScopeControl({
   const currentScopeId = projectScope === undefined
     ? 'scope:personal'
     : `scope:project:${projectScope.projectId}`
+  const projectEntries: MenuEntry[] = visibleProjects.map(project => ({
+    id: `scope:project:${project.projectId}`,
+    label: (
+      <span className={css.menuText}>
+        <span className={css.menuTitle}>{project.name}</span>
+        <span className={css.menuDescription}>
+          {project.mode === 'ro' ? t('scope.readOnly') : t('scope.readWrite')}
+        </span>
+      </span>
+    ),
+    icon: <IconShareOutline16 size={16} />,
+    disabled: state.scopeBusy,
+  }))
+  if (visibleProjects.length === 0 && normalizedProjectQuery !== '') {
+    projectEntries.push({
+      type: 'label', id: 'project-search-empty', text: t('scope.searchEmpty'),
+    })
+  }
   const entries: MenuEntry[] = [
     { type: 'label', id: 'personal-label', text: t('scope.personal') },
     {
@@ -82,19 +111,7 @@ export function ScopeControl({
     },
     { type: 'separator', id: 'scope-separator' },
     { type: 'label', id: 'project-label', text: t('scope.projects') },
-    ...context.projects.map(project => ({
-      id: `scope:project:${project.projectId}`,
-      label: (
-        <span className={css.menuText}>
-          <span className={css.menuTitle}>{project.name}</span>
-          <span className={css.menuDescription}>
-            {project.mode === 'ro' ? t('scope.readOnly') : t('scope.readWrite')}
-          </span>
-        </span>
-      ),
-      icon: <IconShareOutline16 size={16} />,
-      disabled: state.scopeBusy,
-    })),
+    ...projectEntries,
   ]
 
   const currentProject = projectScope === undefined
@@ -152,6 +169,31 @@ export function ScopeControl({
     ? state.scopeBusy ? t('scope.switching') : t('scope.aria')
     : t('scope.failed')
   const iconSize = wide ? 16 : 18
+  const projectSearch = context.projects.length > 0 ? (
+    <div className={css.menuSearch}>
+      <span className={css.menuSearchIcon} aria-hidden="true">
+        <IconSearchOutline16 size={16} />
+      </span>
+      <input
+        type="search"
+        className={css.menuSearchInput}
+        aria-label={t('scope.searchAria')}
+        placeholder={t('scope.searchPlaceholder')}
+        value={projectQuery}
+        onChange={(event) => { setProjectQuery(event.currentTarget.value) }}
+      />
+      {projectQuery.length > 0 && (
+        <button
+          type="button"
+          className={css.menuSearchClear}
+          aria-label={t('scope.searchClear')}
+          onClick={() => { setProjectQuery('') }}
+        >
+          <span aria-hidden="true"><IconCloseFill14 size={14} /></span>
+        </button>
+      )}
+    </div>
+  ) : undefined
 
   return (
     <>
@@ -159,7 +201,9 @@ export function ScopeControl({
         open={open}
         onClose={() => { setOpen(false) }}
         items={entries}
+        header={projectSearch}
         {...managerEntries.length > 0 ? { footer: managerEntries } : {}}
+        listClassName={css.scopeMenu}
         selectedIds={[
           currentScopeId,
           ...(projectScope?.mode === 'rw' ? [`visibility:${state.stagedVisibility}`] : []),

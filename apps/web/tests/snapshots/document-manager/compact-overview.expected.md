@@ -1,0 +1,11 @@
+- region "All authorized scopes":
+  - heading "All authorized scopes" [level=2]
+  - paragraph: Metadata only
+  - button "Refresh":
+    - img
+    - text: Refresh
+  - list:
+    - listitem:
+      - text: notes.txt Personal documents · 30.0 KB · Alice
+      - button "Copy notes.txt":
+        - img

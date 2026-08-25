@@ -4,7 +4,7 @@
 
 纯 React 原子组件（零 cordis）：StateDot、DisclosureRow、ic_ds_* 图标、Button/Pill/Menu/Modal/Input、手机 Sheet 的 `MobileSheetBackdrop` 关闭遮罩、Toast 短时横幅、OnboardingSurface 首次使用接管层（portal 到 body 的遮罩加不透明展示层，在且仅在自身生命周期内保持 `#root` 为 `inert`）、markdown 家族（MessageText/MarkdownText/JsonBlock）、只读 JsonTree 检查器、用于 portal presenter 的 `useMediaQuery` 视口钩子、`useAnchoredMaxHeight` 钩子（把底部锚定的浮层高度收敛到锚点上方的视口空间，并在 resize、scroll 与调用方提供的依赖变化时重新测量）、`useAnchoredPosition` 钩子（让固定定位的浮动面板跟住锚点：测量、偏移、按视口边距钳制，并在捕获阶段滚动、窗口缩放与面板自身尺寸变化时重新定位）、TerminalBlock、DiffBlock、ReadBlock、SearchBlock，以及 WebBlock。
 
-`Menu` 主列表在桌面使用锚点位置；768px 以下会使用 `--dsw-mobile-sheet-*` 变为遵守安全区的手机 Sheet，并统一提供遮罩和拖拽提示。其行仍是可选择的 menu item，并保留相同的外部按下关闭和 Escape 行为。`Modal` 使用相同的 Sheet 呈现，并在打开期间把键盘焦点保持在对话框内。portal presenter 如果信息层级需要手机专属分支，应使用 `useMediaQuery('(max-width: 767px)')`；外壳内部组件继续使用 `data-viewport` 标记。
+`Menu` 主列表在桌面使用锚点位置；可选的 `header` 固定在可滚动条目视口上方，可选的 `footer` 固定在下方；`listClassName` 允许消费方设置产品自己的列表几何约束，例如高度上限。768px 以下会使用 `--dsw-mobile-sheet-*` 变为遵守安全区的手机 Sheet，并统一提供遮罩和拖拽提示；可滚动菜单会把 header 和 footer 留在条目滚动区外，条目仍是可选择的 menu item，并保留相同的外部按下关闭和 Escape 行为。`Modal` 使用相同的 Sheet 呈现，并在打开期间把键盘焦点保持在对话框内。portal presenter 如果信息层级需要手机专属分支，应使用 `useMediaQuery('(max-width: 767px)')`；外壳内部组件继续使用 `data-viewport` 标记。
 
 ## 悬浮卡片
 

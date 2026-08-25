@@ -518,7 +518,7 @@
     width: 19px;
   }
 
-  .kindTag,
+  .table .kindTag,
   .table .kindSlot .message {
     justify-content: center;
     width: 19px;
@@ -526,13 +526,13 @@
     padding-left: 0;
   }
 
-  .kindTagIcon {
+  .table .kindTagIcon {
     width: 13px;
     opacity: 1;
     transform: scale(1);
   }
 
-  .kindTagLabel {
+  .table .kindTagLabel {
     max-width: 0;
     opacity: 0;
   }
@@ -911,10 +911,24 @@
 
 .detailsTitle {
   display: flex;
+  flex: 1 1 auto;
   align-items: center;
+  overflow: hidden;
   min-width: 0;
   gap: var(--dsw-space-2);
   color: var(--dsw-alias-label-primary);
+}
+
+/* The compact ledger shrinks row badges to icon rails. The detail header is a
+   separate reading surface and must retain its semantic kind label instead of
+   inheriting that 19px row width. */
+.detailsTitle .kindTag {
+  flex: none;
+  width: auto;
+  max-width: 100%;
+  overflow: hidden;
+  padding-inline: 5px;
+  white-space: nowrap;
 }
 
 .requestDetailsDot {
@@ -931,6 +945,7 @@
 }
 
 .detailsLocation {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   color: var(--dsw-alias-label-tertiary);
@@ -1823,7 +1838,9 @@
     display: block;
     background: var(--dsw-alias-bg-mask-1);
     backdrop-filter: var(--dsw-mask-blur);
-    animation: trajectory-details-mask-in var(--ds-transition-duration) var(--ds-ease-in-out);
+    /* The mask is visible on the first paint. Fading it in exposes the fixed
+       composer for a frame on slower mobile WebViews. */
+    animation: none;
   }
 
   .details {
@@ -1844,6 +1861,7 @@
     padding-bottom: var(--dsw-safe-bottom);
     overscroll-behavior: contain;
     animation: trajectory-details-sheet-in var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+    animation-fill-mode: both;
   }
 
   .details::before {
@@ -1934,19 +1952,19 @@
   }
 
   .kindSlot,
-  .kindTag,
+  .table .kindTag,
   .table .kindSlot .message {
     width: 24px;
     justify-content: center;
     padding-inline: 0;
   }
 
-  .kindTagIcon {
+  .table .kindTagIcon {
     width: var(--dsw-mobile-icon-secondary);
     height: var(--dsw-mobile-icon-secondary);
   }
 
-  .kindTagLabel,
+  .table .kindTagLabel,
   .turnLabelFull {
     display: none;
   }
@@ -1982,7 +2000,7 @@
 }
 
 @keyframes trajectory-details-sheet-in {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 1; transform: translateY(12px); }
 }
 
 @keyframes trajectory-details-mask-in {

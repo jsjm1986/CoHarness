@@ -30,4 +30,10 @@ describe('ScopeControl.module.css', () => {
     expect(css).toContain('.trigger:not(.rail)')
     expect(css).toContain('min-height: var(--dsw-touch-target)')
   })
+
+  it('caps the project menu and keeps its search controls tappable on phones', () => {
+    expect(css).toMatch(/\.scopeMenu\s*\{[^}]*--dsh-menu-max-height:\s*min\(480px,\s*calc\(100vh - 24px\)\)/)
+    expect(css).toMatch(/@media \(max-width: 767px\)[\s\S]*\.menuSearch\s*\{[^}]*min-height:\s*var\(--dsw-touch-target\)/)
+    expect(css).toMatch(/\.menuSearchClear\s*\{[^}]*width:\s*24px/)
+  })
 })

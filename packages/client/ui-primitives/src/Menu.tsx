@@ -78,6 +78,7 @@ const MEASURE_STYLE: CSSProperties = { visibility: 'hidden', left: 0, top: 0 }
  * gap and a brief overshoot survivable; coming back cancels the close.
  * @param props.dense - reduce vertical row spacing without changing the standard typography or card width.
  * @param props.compact - use reduced menu typography and spacing.
+ * @param props.header - optional non-scrolling content rendered above the item viewport.
  * @param props.getAnchorRect - portal mode only: supply the anchor rect
  * directly (e.g. from a host-owned trigger button) instead of measuring the
  * Menu's own wrapper span. Required when the wrapper isn't itself laid out at
@@ -86,12 +87,14 @@ const MEASURE_STYLE: CSSProperties = { visibility: 'hidden', left: 0, top: 0 }
  * scroll/resize; return null to skip placement for that frame.
  * @param props.footer - rows pinned below the scrolling items area, separated
  * by a hairline; they stay visible while the items above scroll.
+ * @param props.listClassName - optional class applied to the floating list rather than its trigger wrapper.
  * @returns anchor wrapper with the conditional list.
  */
-export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, onClose, align = 'start', side = 'bottom', portal = false, closeOnPointerLeave = false, dense = false, compact = false, getAnchorRect, footer, className }: {
+export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, onClose, align = 'start', side = 'bottom', portal = false, closeOnPointerLeave = false, dense = false, compact = false, getAnchorRect, header, footer, listClassName, className }: {
   open: boolean
   anchor: ReactNode
   items: readonly MenuEntry[]
+  header?: ReactNode
   footer?: readonly MenuEntry[]
   selectedId?: string | undefined
   selectedIds?: readonly string[] | undefined
@@ -104,6 +107,7 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
   dense?: boolean
   compact?: boolean
   getAnchorRect?: () => DOMRect | null
+  listClassName?: string | undefined
   className?: string | undefined
 }) {
   const rootRef = useRef<HTMLSpanElement>(null)
@@ -266,7 +270,7 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
   const list = open && (
     <div
       ref={listRef}
-      className={clsx(css.list, dense && css.denseList, compact && css.compactList, scrollable && css.scrollable, portal && css.portal, side === 'top' && !portal && css.sideTop, align === 'end' && !portal && css.alignEnd)}
+      className={clsx(css.list, listClassName, dense && css.denseList, compact && css.compactList, scrollable && css.scrollable, portal && css.portal, side === 'top' && !portal && css.sideTop, align === 'end' && !portal && css.alignEnd)}
       style={portal ? fixedPos ?? MEASURE_STYLE : undefined}
       role="menu"
       // React portals bubble synthetic events through the REACT tree: without
@@ -274,6 +278,9 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
       // (open/toggle) after onSelect.
       onClick={(e) => { e.stopPropagation() }}
     >
+      {header !== undefined && header !== null && (
+        <div className={css.header} role="presentation">{header}</div>
+      )}
       <div className={css.viewport} role="presentation">
         {items.map(renderEntry)}
       </div>

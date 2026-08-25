@@ -1,0 +1,103 @@
+/* Compact document controls use one inset sheet family. The manager itself
+   remains the full-height workbench; this card owns its own vertical scroll. */
+
+.dialog.dialog {
+  width: min(480px, calc(100vw - 48px));
+  max-height: min(720px, calc(100dvh - 48px));
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+  animation: none;
+}
+
+.surface {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  max-height: inherit;
+  flex-direction: column;
+  color: var(--dsw-alias-label-primary);
+}
+
+.handle {
+  flex: none;
+  align-self: center;
+  width: 36px;
+  height: 4px;
+  margin: 8px auto 2px;
+  border-radius: var(--dsw-radius-full);
+  background: var(--dsw-alias-label-caption);
+  opacity: 0.7;
+}
+
+.header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--dsw-space-2);
+  min-height: 52px;
+  padding: 0 var(--dsw-space-4);
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+}
+
+.title {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  font: var(--dsw-mobile-font-nav);
+  color: var(--dsw-alias-label-primary);
+}
+
+.close {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--dsw-touch-target);
+  height: var(--dsw-touch-target);
+  padding: 0;
+  border: 0;
+  border-radius: var(--dsw-radius-md);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+
+.close:hover,
+.close:focus-visible {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.close:focus-visible {
+  outline: 2px solid var(--dsw-alias-border-l3);
+  outline-offset: -2px;
+}
+
+.body {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  gap: var(--dsw-space-3);
+  padding: var(--dsw-space-3) var(--dsw-space-4) calc(var(--dsw-space-4) + var(--dsw-safe-bottom));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 767px) {
+  .dialog.dialog {
+    width: calc(100vw - (2 * var(--dsw-mobile-sheet-edge)));
+    max-width: none;
+    max-height: var(--dsw-mobile-sheet-max-height);
+    margin: 0 var(--dsw-mobile-sheet-edge) var(--dsw-mobile-sheet-bottom);
+    border-radius: var(--dsw-mobile-sheet-radius);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dialog.dialog {
+    animation: none;
+  }
+}

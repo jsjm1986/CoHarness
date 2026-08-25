@@ -30,7 +30,7 @@
 /* A phone event-details sheet is a focused reading surface. Raise the ledger
    stacking context above the composer only while that sheet exists; the
    ordinary Trajectory list keeps the composer reachable above its rows. */
-:global([data-viewport='compact']) .ledger:has([data-trajectory-details]) {
+:global([data-viewport='compact']) .ledger:has([data-trajectory-details-open]) {
   z-index: 8;
 }
 

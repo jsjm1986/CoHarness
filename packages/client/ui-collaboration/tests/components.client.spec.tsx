@@ -134,6 +134,10 @@ describe('ScopeControl', () => {
   it('hides before collaboration is ready and for personal users without projects', () => {
     const loading = render(<ScopeControl {...scopeProps(snapshot({ status: 'loading' }))} />)
     expect(loading.container.textContent).toBe('')
+    const noContext = snapshot()
+    delete noContext.context
+    loading.rerender(<ScopeControl {...scopeProps(noContext)} />)
+    expect(loading.container.textContent).toBe('')
     loading.rerender(<ScopeControl {...scopeProps(snapshot({
       context: { ...projectContext, scope: { kind: 'personal' }, projects: [] },
     }))} />)
@@ -164,6 +168,43 @@ describe('ScopeControl', () => {
     fireEvent.click(trigger)
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.queryByText('新对话可见范围')).toBeNull()
+  })
+
+  it('filters a growing project roster without hiding personal scope or pinned actions', () => {
+    const projects = Array.from({ length: 10 }, (_, index) => ({
+      projectId: 100 + index,
+      name: `项目 ${index + 1}`,
+      path: `/srv/project-${index + 1}`,
+      mode: index === 3 ? 'ro' as const : 'rw' as const,
+    }))
+    projects[3] = { ...projects[3]!, name: '审计平台' }
+    const view = render(<ScopeControl {...scopeProps(snapshot({
+      context: { ...projectContext, projects },
+    }), { createProject: vi.fn() })} />)
+    fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
+
+    const menu = screen.getByRole('menu')
+    expect(menu.className.split(/\s+/)).toContain(css.scopeMenu)
+    const search = screen.getByRole<HTMLInputElement>('searchbox', { name: '搜索项目空间' })
+    expect(search.placeholder).toBe('搜索项目空间')
+    expect(screen.getByRole('menuitem', { name: '个人空间' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: /新建项目空间/ })).toBeTruthy()
+
+    fireEvent.change(search, { target: { value: '审计' } })
+    expect(screen.getByRole('menuitem', { name: /审计平台/ })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: '项目 1' })).toBeNull()
+
+    fireEvent.change(search, { target: { value: '不存在' } })
+    expect(screen.getByText('没有匹配的项目空间')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '清除项目空间搜索' }))
+    expect(search.value).toBe('')
+    expect(screen.getByRole('menuitem', { name: '项目 1可编辑' })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
+    expect(screen.queryByRole('menu')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
+    expect(screen.getByRole<HTMLInputElement>('searchbox', { name: '搜索项目空间' }).value).toBe('')
+    view.unmount()
   })
 
   it('renders a compact rail trigger and omits create visibility for read-only projects', () => {

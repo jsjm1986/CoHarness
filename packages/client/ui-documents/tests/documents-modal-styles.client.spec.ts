@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 const modal = readFileSync(fileURLToPath(new URL('../src/client/DocumentsModal.module.css', import.meta.url)), 'utf8')
 const preview = readFileSync(fileURLToPath(new URL('../src/client/DocumentPreview.module.css', import.meta.url)), 'utf8')
+const sheet = readFileSync(fileURLToPath(new URL('../src/client/DocumentsMobileSheet.module.css', import.meta.url)), 'utf8')
 
 function dialogBlock(source: string): string {
   const match = source.match(/\.dialog\s*\{[^}]*\}/)
@@ -23,6 +24,8 @@ describe('DocumentsModal.module.css', () => {
   it('keeps the compact dialog a full-width bottom sheet', () => {
     expect(modal).toMatch(/@media \(max-width: 767px\)[\s\S]*\.dialog\s*\{[\s\S]*width:\s*100%/)
     expect(modal).toMatch(/@media \(max-width: 767px\)[\s\S]*\.dialog\s*\{[\s\S]*min-height:\s*0/)
+    expect(modal).toMatch(/\.dialog\.dialog\s*\{[\s\S]*box-sizing:\s*border-box/)
+    expect(modal).toMatch(/@media \(max-width: 767px\)[\s\S]*\.dialog\.dialog\s*\{[\s\S]*height:\s*100%[\s\S]*max-height:\s*100%/)
   })
 
   it('separates filters from document actions and gives rows a stable hover rhythm', () => {
@@ -37,8 +40,26 @@ describe('DocumentsModal.module.css', () => {
     expect(modal).toMatch(/\.selectionDelete\s*\{[\s\S]*color:\s*var\(--dsw-alias-label-primary-foreground\)/)
   })
 
-  it('gives alternate-scope actions a full compact toolbar track', () => {
-    expect(modal).toMatch(/\.actionGroup \.sourceAction\s*\{[\s\S]*grid-column:\s*1 \/ -1/)
+  it('gives compact upload and More controls one full toolbar track', () => {
+    expect(modal).toMatch(/\.actionGroup\.mobileActionGroup\s*\{[\s\S]*display:\s*flex/)
+    expect(modal).toMatch(/\.mobileActionGroup \.upload\s*\{[\s\S]*flex:\s*1 1 auto/)
+  })
+
+  it('keeps compact navigation and operations in touch-safe sheets', () => {
+    expect(modal).toMatch(/\.scopeTrigger\s*\{[\s\S]*min-height:\s*var\(--dsw-touch-target\)/)
+    expect(modal).toMatch(/\.rowMore\s*\{[\s\S]*min-width:\s*var\(--dsw-touch-target\)[\s\S]*min-height:\s*var\(--dsw-touch-target\)/)
+    expect(modal).toMatch(/\.mobileSelectionBar\s*\{[\s\S]*var\(--dsw-safe-bottom\)/)
+    expect(modal).toMatch(/@media \(max-width: 767px\)[\s\S]*\.scopeRail\s*\{[\s\S]*display:\s*none/)
+  })
+})
+
+describe('DocumentsMobileSheet.module.css', () => {
+  it('uses the shared inset sheet geometry and one body scrollport', () => {
+    expect(sheet).toMatch(/\.dialog\.dialog\s*\{[\s\S]*overflow:\s*hidden/)
+    expect(sheet).toMatch(/\.dialog\.dialog\s*\{[\s\S]*animation:\s*none/)
+    expect(sheet).toMatch(/\.body\s*\{[\s\S]*overflow-y:\s*auto/)
+    expect(sheet).toMatch(/var\(--dsw-mobile-sheet-bottom\)/)
+    expect(sheet).toMatch(/var\(--dsw-safe-bottom\)/)
   })
 })
 
