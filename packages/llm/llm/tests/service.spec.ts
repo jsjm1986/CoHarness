@@ -13,6 +13,7 @@ import LlmRuntime, {
   ReasoningEffortId,
   resolveRetryPolicy,
   StreamChunk,
+  UNSAFE_MODEL_OUTPUT_CODE,
   createMessage,
   createUserMessage,
 } from '@deepseek-ai/dsh-llm'
@@ -183,6 +184,54 @@ describe('LlmRuntime', () => {
     const chunks: StreamChunk[] = []
     for await (const chunk of ctx.llm.stream({ provider: 'test-provider', model: 'test-model', messages: [] })) chunks.push(chunk)
     expect(chunks).toEqual(SCRIPT)
+  })
+
+  it('fails closed for tagged text from an adapter before it reaches consumers', async () => {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    ctx.llm.registerAdapter(['test-provider'], new ScriptedAdapter([
+      { type: 'block-start', index: 0, blockType: 'text' },
+      { type: 'text-delta', index: 0, text: '<thinking>private</thinking>answer' },
+      { type: 'block-end', index: 0, block: { type: 'text', text: '<thinking>private</thinking>answer' } },
+      { type: 'finish', reason: { kind: 'stop' } },
+    ]))
+
+    const chunks = await collect(ctx.llm.stream({ provider: 'test-provider', model: 'test-model', messages: [] }))
+    expect(chunks).toHaveLength(2)
+    expect(chunks[0]).toEqual({ type: 'block-start', index: 0, blockType: 'text' })
+    expect(chunks[1]).toMatchObject({
+      type: 'finish',
+      reason: { kind: 'error', failure: { code: UNSAFE_MODEL_OUTPUT_CODE } },
+    })
+  })
+
+  it('fails closed for a middleware-owned stream without calling the adapter chain', async () => {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    let adapterCalled = false
+    ctx.llm.registerAdapter(['middleware'], new class extends LlmAdapter {
+      override stream(_options: GenerateOptions): AsyncIterable<StreamChunk> {
+        adapterCalled = true
+        throw new Error('middleware test must not reach the adapter')
+      }
+    })
+    ctx.on('llm/stream', (_options, _next) => {
+      return (async function* (): AsyncGenerator<StreamChunk> {
+        yield { type: 'block-start', index: 0, blockType: 'text' }
+        yield { type: 'text-delta', index: 0, text: '<thinking>private</thinking>answer' }
+        yield { type: 'block-end', index: 0, block: { type: 'text', text: '<thinking>private</thinking>answer' } }
+        yield { type: 'finish', reason: { kind: 'stop' } }
+      })()
+    })
+
+    const chunks = await collect(ctx.llm.stream({ provider: 'middleware', model: 'm', messages: [] }))
+    expect(adapterCalled).toBe(false)
+    expect(chunks).toHaveLength(2)
+    expect(chunks[0]).toEqual({ type: 'block-start', index: 0, blockType: 'text' })
+    expect(chunks[1]).toMatchObject({
+      type: 'finish',
+      reason: { kind: 'error', failure: { code: UNSAFE_MODEL_OUTPUT_CODE } },
+    })
   })
 
   it('trusts the immutable message creation boundary for direct calls', async () => {
@@ -384,8 +433,7 @@ describe('LlmRuntime', () => {
           [Symbol.asyncIterator](): AsyncIterator<StreamChunk> {
             return {
               // Third-party adapters can reject with arbitrary values.
-              // oxlint-disable-next-line typescript/prefer-promise-reject-errors
-              next: () => Promise.reject('plain provider failure'),
+              next: () => Promise.reject('plain provider failure'), // oxlint-disable-line typescript/prefer-promise-reject-errors -- arbitrary rejection is the case under test
             }
           },
         }

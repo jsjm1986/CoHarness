@@ -4,7 +4,7 @@
 
 import type { StreamChunk } from '@deepseek-ai/dsh-llm/types'
 import type { AssistantBlock, PartialAssistant } from './conversation.ts'
-import { toAssistantBlock } from './conversation.ts'
+import { sanitizeAssistantText, toAssistantBlock } from './conversation.ts'
 
 /**
  * Whether a stream chunk changes the partial assistant projection shown by the UI.
@@ -23,6 +23,7 @@ export function isVisibleAssistantChunk(type: string): boolean {
 export class PartialAccumulator {
   // Sparse on purpose: block-start may arrive out of order, leaving holes until compaction.
   private blocks: (AssistantBlock | undefined)[] = []
+  private rawText = new Map<number, string>()
   private changed = true
   private snapshot: PartialAssistant
 
@@ -49,12 +50,15 @@ export class PartialAccumulator {
     switch (chunk.type) {
       case 'block-start': {
         this.blocks[chunk.index] = emptyAssistantBlock(chunk.blockType)
+        if (chunk.blockType === 'text') this.rawText.set(chunk.index, '')
         this.changed = true
         return true
       }
       case 'text-delta': {
         const prev = this.blocks[chunk.index]
-        this.blocks[chunk.index] = { kind: 'text', text: (prev?.kind === 'text' ? prev.text : '') + chunk.text }
+        const raw = (this.rawText.get(chunk.index) ?? (prev?.kind === 'text' ? prev.text : '')) + chunk.text
+        this.rawText.set(chunk.index, raw)
+        this.blocks[chunk.index] = { kind: 'text', text: sanitizeAssistantText(raw) }
         this.changed = true
         return true
       }
@@ -78,6 +82,7 @@ export class PartialAccumulator {
       }
       case 'block-end': {
         this.blocks[chunk.index] = toAssistantBlock(chunk.block)
+        if (chunk.block.type === 'text') this.rawText.delete(chunk.index)
         this.changed = true
         return true
       }

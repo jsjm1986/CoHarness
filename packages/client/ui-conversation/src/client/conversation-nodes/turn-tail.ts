@@ -2,7 +2,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {
   ConversationMatch, ConversationNodeContext, ConversationNodeDefinition, TurnLocation,
 } from '@deepseek-ai/dsh-client-runtime/client'
-import { isAppendSurfaceEvent, toAssistantBlocks } from '@deepseek-ai/dsh-client-runtime/client'
+import { isAppendSurfaceEvent, sanitizeAssistantText, toAssistantBlocks } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-llm-retry/types'
 import type {
   AssistantChatData, FinalAssistantChatData, TurnTailChatData,
@@ -44,10 +44,10 @@ function hasTextAssistant(event: Parameters<ConversationNodeDefinition['match']>
 function chunkHasText(event: Parameters<ConversationNodeDefinition['match']>[0]): boolean {
   if (event.type !== 'assistant/chunk') return false
   const chunk = event.data.chunk
-  if (chunk.type === 'text-delta') return chunk.text.trim() !== ''
+  if (chunk.type === 'text-delta') return sanitizeAssistantText(chunk.text).trim() !== ''
   return chunk.type === 'block-end'
     && chunk.block.type === 'text'
-    && chunk.block.text.trim() !== ''
+    && sanitizeAssistantText(chunk.block.text).trim() !== ''
 }
 
 function turnCoordinates(event: Parameters<ConversationNodeDefinition['match']>[0]): {

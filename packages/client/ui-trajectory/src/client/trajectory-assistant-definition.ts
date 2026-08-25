@@ -4,7 +4,7 @@ import type {
   ConversationNodeContext, ConversationNodeDefinition, PartialAssistant, RequestView,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import {
-  displayFailureMessage, emptyAssistantBlock, isTokenDelta, toAssistantBlock,
+  displayFailureMessage, emptyAssistantBlock, isTokenDelta, sanitizeAssistantText, toAssistantBlock,
   toAssistantBlocks,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { trajectoryNode } from './trajectory-definition-common.ts'
@@ -35,6 +35,7 @@ interface AssistantState {
   readonly started: boolean
   readonly sawChunk: boolean
   readonly blocks: readonly (AssistantBlock | undefined)[]
+  readonly rawText: ReadonlyMap<number, string>
   readonly firstVisibleSeq: number | undefined
   readonly firstVisibleTime: number | undefined
   readonly firstTokenTime: number | undefined
@@ -59,6 +60,7 @@ function initialState(
     started,
     sawChunk: false,
     blocks: [],
+    rawText: new Map(),
     firstVisibleSeq: undefined,
     firstVisibleTime: undefined,
     firstTokenTime: undefined,
@@ -111,15 +113,20 @@ function updateChunk(state: AssistantState, match: ConversationMatch): Assistant
     return { ...state, sawChunk: true, usage: addUsage(state.usage, chunk.usage) }
   }
   const blocks = [...state.blocks]
+  const rawText = new Map(state.rawText)
   switch (chunk.type) {
     case 'block-start':
       blocks[chunk.index] = emptyAssistantBlock(chunk.blockType)
+      if (chunk.blockType === 'text') rawText.set(chunk.index, '')
+      else rawText.delete(chunk.index)
       break
     case 'text-delta': {
       const previous = blocks[chunk.index]
+      const text = (rawText.get(chunk.index) ?? (previous?.kind === 'text' ? previous.text : '')) + chunk.text
+      rawText.set(chunk.index, text)
       blocks[chunk.index] = {
         kind: 'text',
-        text: (previous?.kind === 'text' ? previous.text : '') + chunk.text,
+        text: sanitizeAssistantText(text),
       }
       break
     }
@@ -146,6 +153,7 @@ function updateChunk(state: AssistantState, match: ConversationMatch): Assistant
     }
     case 'block-end':
       blocks[chunk.index] = toAssistantBlock(chunk.block)
+      if (chunk.block.type === 'text') rawText.delete(chunk.index)
       break
     default:
       return { ...state, sawChunk: true }
@@ -155,6 +163,7 @@ function updateChunk(state: AssistantState, match: ConversationMatch): Assistant
     ...state,
     sawChunk: true,
     blocks,
+    rawText,
     ...(visible && state.firstVisibleSeq === undefined
       ? { firstVisibleSeq: match.event.seq, firstVisibleTime: match.event.time }
       : {}),
@@ -188,6 +197,7 @@ function fallbackState(context: ConversationNodeContext<AssistantState>): Assist
       state = {
         ...state,
         blocks: toAssistantBlocks(event.data.message.content),
+        rawText: new Map(),
         final: match,
         usage: state.usage ?? event.data.usage,
       }
@@ -309,6 +319,7 @@ const trajectoryAssistantDefinition: ConversationNodeDefinition<AssistantState> 
       return {
         ...context.state,
         blocks: toAssistantBlocks(match.event.data.message.content),
+        rawText: new Map(),
         final: match,
         usage: context.state.usage ?? match.event.data.usage,
       }

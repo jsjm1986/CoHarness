@@ -30,6 +30,7 @@ import { HarnessError, INVALID_CREDENTIAL_CODE } from './error.ts'
 import { normalizeLlmFailure } from './adapter-failure.ts'
 import { normalizeApiKey } from './api-key.ts'
 import { contentHasImage, projectImagesForTextModel } from './content.ts'
+import { guardTextThinkingStream } from './text-thinking-guard.ts'
 
 export * from './attribution.ts'
 export * from './brand.ts'
@@ -993,11 +994,14 @@ export class LlmRuntime extends Service {
     options: GenerateOptions,
     prepared?: PreparedDispatch,
   ): AsyncIterable<StreamChunk> {
-    return this.ctx.waterfall(
-      this,
-      'llm/stream',
-      options,
-      () => this.adapterStream(options, prepared),
+    return guardTextThinkingStream(
+      this.ctx.waterfall(
+        this,
+        'llm/stream',
+        options,
+        () => this.adapterStream(options, prepared),
+      ),
+      { provider: options.provider, model: options.model },
     )
   }
 }

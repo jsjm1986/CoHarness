@@ -33,6 +33,17 @@ describe('PartialAccumulator', () => {
     expect(acc.toPartial().blocks).toEqual([{ kind: 'reasoning', text: '换型重起' }])
   })
 
+  it('does not publish a tagged thinking prefix while it is streaming', () => {
+    const acc = new PartialAccumulator(1, 0)
+    acc.push(chunk({ type: 'block-start', index: 0, blockType: 'text' }))
+    acc.push(chunk({ type: 'text-delta', index: 0, text: '<thi' }))
+    expect(acc.toPartial().blocks).toEqual([{ kind: 'text', text: '' }])
+    acc.push(chunk({ type: 'text-delta', index: 0, text: 'nking>private</thinking>answer' }))
+    expect(acc.toPartial().blocks).toEqual([{ kind: 'text', text: 'answer' }])
+    acc.push(chunk({ type: 'block-end', index: 0, block: { type: 'text', text: '<thinking>private</thinking>answer' } }))
+    expect(acc.toPartial().blocks).toEqual([{ kind: 'text', text: 'answer' }])
+  })
+
   it('accumulates reasoning deltas on the reasoning lane', () => {
     const acc = new PartialAccumulator(1, 0)
     acc.push(chunk({ type: 'block-start', index: 0, blockType: 'reasoning' }))

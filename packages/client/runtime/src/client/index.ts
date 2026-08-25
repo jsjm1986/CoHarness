@@ -84,7 +84,7 @@ export type {
   UnknownSurfaceNode, UserMessageNode,
 } from './sessions/conversation.ts'
 export {
-  EMPTY_CHAT_SNAPSHOT, EMPTY_CONVERSATION_VIEWS, toAssistantBlock, toAssistantBlocks,
+  EMPTY_CHAT_SNAPSHOT, EMPTY_CONVERSATION_VIEWS, sanitizeAssistantText, toAssistantBlock, toAssistantBlocks,
 } from './sessions/conversation.ts'
 export { emptyAssistantBlock } from './sessions/partial.ts'
 export { isTokenDelta } from './sessions/assistant-timing.ts'

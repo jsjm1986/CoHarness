@@ -5,7 +5,7 @@ import ModelProviderConfig from '@deepseek-ai/dsh-model-provider-config'
 import type { ModelProviderConfigSnapshot } from '@deepseek-ai/dsh-model-provider-config'
 import * as LlmPiAi from '@deepseek-ai/dsh-llm-pi-ai'
 import { assemble } from './assemble.ts'
-import { closeMockServers, mockServer, textEvents } from './mock-server.ts'
+import { closeMockServers, mockServer, taggedThinkingEvents, textEvents } from './mock-server.ts'
 
 class StaticModelProviderConfig extends ModelProviderConfig {
   constructor(ctx: Context, private readonly current: ModelProviderConfigSnapshot) {
@@ -92,5 +92,46 @@ describe('organization-managed Provider composition', () => {
     })
     const request = server.requests[0] as Record<string, unknown>
     expect(request.max_tokens ?? request.max_completion_tokens).toBe(4096)
+  })
+
+  it('normalizes tagged content on an organization-managed route before the shared guard', async () => {
+    vi.stubEnv('DSH_ORG_GLM_API_KEY', 'organization-glm-key')
+    const server = await mockServer([{ events: taggedThinkingEvents }])
+    const snapshot: ModelProviderConfigSnapshot = {
+      revision: 8,
+      providers: [{
+        provider: 'org-glm',
+        displayName: 'GLM Organization',
+        driver: 'pi-ai',
+        protocol: 'openai-completions',
+        baseURL: `${server.url}/v1`,
+        credentialRef: 'DSH_ORG_GLM_API_KEY',
+        profile: { compat: { thinkingFormat: 'deepseek' } },
+        models: [{
+          id: 'deepseek-v4-pro-0813',
+          name: 'DeepSeek V4 Pro',
+          maxTokens: 4096,
+        }],
+      }],
+    }
+
+    const ctx = new Context()
+    context = ctx
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin(StaticModelProviderConfig, snapshot)
+    await ctx.plugin(LlmPiAi, {})
+
+    const result = await assemble(ctx, {
+      provider: 'org-glm',
+      model: 'deepseek-v4-pro-0813',
+      messages: [],
+    })
+    expect(result.message.content).toEqual([
+      { type: 'reasoning', text: 'plan' },
+      { type: 'text', text: 'answer' },
+    ])
+    expect(result.finish).toEqual({ kind: 'stop' })
+    expect(server.paths).toEqual(['/v1/chat/completions'])
+    expect(server.headers[0]?.authorization).toBe('Bearer organization-glm-key')
   })
 })

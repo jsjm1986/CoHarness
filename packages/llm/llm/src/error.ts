@@ -38,6 +38,9 @@ export const QUOTA_EXCEEDED_CODE = 'QUOTA'
  */
 export const EMPTY_RESPONSE_CODE = 'EMPTY_RESPONSE'
 
+/** Canonical code for a model response rejected before visible publication because it carried tagged thinking in text. */
+export const UNSAFE_MODEL_OUTPUT_CODE = 'UNSAFE_MODEL_OUTPUT'
+
 /**
  * Canonical provider-neutral code for a credential that was supplied but
  * cannot be used — malformed rather than absent. Distinct from
