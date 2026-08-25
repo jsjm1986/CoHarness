@@ -2,18 +2,37 @@
 
 English | [中文](README.zh.md)
 
-**CoHarness is a self-hosted, multi-user agent workspace built on DeepSeek Harness (DSH).**
+**CoHarness is a fully pluginized harness for teams to build, validate, and strengthen their own patterns for people-and-agent work.**
 
-CoHarness combines the Cordis plugin runtime from [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) with a product layer for authenticated teams: personal and shared project workspaces, durable conversations, document workflows, model governance, usage accounting, and an administrator Gateway. The user-facing brand is CoHarness; runtime package names, plugin ids, file conventions, and compatibility-facing APIs intentionally retain the `dsh` vocabulary so upstream alignment remains practical.
+CoHarness combines the Cordis plugin runtime from [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) with a product layer for authenticated teams. It does not prescribe one fixed kind of agent or one fixed collaboration workflow. A team can assemble the models, tools, roles, context, permissions, delegation paths, and workflows that fit its work, then capture practices proven in real projects as plugins, skills, profiles, bundles, or workflows. The user-facing brand is CoHarness; runtime package names, plugin ids, file conventions, and compatibility-facing APIs intentionally retain the `dsh` vocabulary so upstream alignment remains practical.
 
 CoHarness is an independent derivative project, not a rebranded upstream release. Upstream DSH remains the reference for the underlying plugin and agent-runtime contracts. CoHarness adds and maintains its own Gateway, collaboration, administration, document, deployment, and Android capabilities. Synchronization with upstream is selective and behavior-based; this repository does not promise byte-for-byte or commit-for-commit parity with every upstream release.
 
+## Collaboration philosophy
+
+CoHarness treats collaboration as something a team builds, not a feature a team merely consumes. The team decides how agents should participate in its work, then assembles and refines that approach through plugins, profiles, bundles, skills, and workflows. The project is where those choices meet real work: it provides a shared environment and durable history in which people and agents can test a way of working, learn from it, and carry it forward.
+
+The unit of collaboration is shared work, not a shared chat link. A project can hold one continuing agent environment, participant contributions, delegation relationships, pending decisions, and recoverable progress. People contribute direction, context, judgment, and authorization; agents investigate, execute, explain, and report. Sharing context does not grant unlimited access: membership, conversation visibility, and read/write authority continue to define each participant's role.
+
+A primary agent can delegate part of the work to a specialist agent with a clear relationship, scope, and responsibility. A child agent may be a one-time specialist or a continuing collaborator that accepts later messages, resumes after interruption, and reports selected results back to its parent. Child work does not silently inherit every capability or permission, and its internal transcript does not flood the parent context. The team can therefore shape not only what agents can do, but also how responsibility and information move between them.
+
+Human decisions are part of the work rather than a final review step. An approval authorizes a controlled action, while a question supplies the business judgment or missing context needed to continue. In a shared project, one valid participant claims a pending decision and the result becomes part of the common history, so concurrent responses do not produce competing outcomes.
+
+Practices that work can be reused and strengthened. A successful delegation pattern, review step, context source, or tool policy can become part of the team's next plugin, skill, profile, bundle, or workflow. Contributions, delegation, pending decisions, progress, and outcomes remain available after a browser closes or an individual agent stops. CoHarness is built around these principles:
+
+- Shared work, not shared chat, is the unit of collaboration.
+- Identity and contribution belong in the work context, not only in the interface.
+- Delegation follows explicit relationships and limits rather than copying every permission.
+- Information moves to the people and agents who need it, instead of spreading without purpose.
+- Human judgment is a first-class part of progressing work.
+- Every task should be possible to continue, hand over, recover, and review.
+
 ## Who it is for
 
-- **Personal users** can run a local Web workspace, connect a model provider, choose a project directory, and let an agent inspect or change files with approval prompts and durable conversation history. A local setup does not require PostgreSQL or the Gateway.
-- **Team members and project leads** can use authenticated personal spaces and shared projects, invite members with `ro` or `rw` access, collaborate in shared conversations, and keep project files and runtime state in the project scope.
-- **Organization administrators** can operate the Gateway, manage users and projects, authorize model routes, review usage and audit records, configure quotas, and manage deployment and backup procedures.
-- **Integrators and developers** can compose Cordis plugins, use the TypeScript or Python SDK, connect through JSON-RPC or ACP, and add model, tool, storage, or execution providers.
+- **Personal users** can use the same durable work model on one machine without a Gateway or PostgreSQL.
+- **Team members and project leads** can contribute to shared project work, take over an ongoing task, review agent activity, and respond to decisions within their authority.
+- **Organization administrators** can establish the project, membership, model, usage, audit, and runtime rules that make collaboration accountable.
+- **Integrators and developers** can extend the same collaboration model through plugins, SDKs, JSON-RPC, ACP, and new agent providers.
 
 ## Choose a setup
 
@@ -41,9 +60,11 @@ The [Web user guide](docs/user/guide/index.md) covers the first session, model c
 
 ## Use it as a team
 
-The Gateway is the multi-user control plane. Each account has a personal space, while a shared project uses one project-scoped runtime and persistence. Project members receive `ro` or `rw` access; conversations can be project-visible or creator-private, and project permissions are checked by the host rather than trusted to the browser. Administrators manage users, projects, invitations, model-route authorization, quotas, usage summaries, audit records, and runtime health.
+The Gateway turns the collaboration model into an authenticated project boundary. Each account has a personal space, while a shared project uses one project-scoped runtime and persistence; members do not receive disconnected copies of the same conversation. Project members receive `ro` or `rw` access, and a root conversation can be project-visible or creator-private with visibility inherited by its descendants. Permissions are enforced by the host and Gateway, not trusted to the browser.
 
-Organization-managed model routes can be authorized per role, user, and project. Personal users may use their own BYOK routes; shared project runtimes remain catalog-controlled. Usage records attribute activity without storing API keys, prompts, or responses in the ledger. Linux deployments add systemd and mount-namespace confinement; macOS deployments do not provide that kernel boundary and should be treated accordingly.
+A team can let one person start an investigation, another add context, a specialist agent inspect code or tests, and an authorized participant decide whether a waiting action may proceed. The shared history records those contributions and decisions, while selected child-agent reports keep the main task useful without importing every internal detail. A member can return to the project later and continue work from the same durable state.
+
+Administrators manage users, projects, invitations, model-route authorization, quotas, usage summaries, audit records, and runtime health. Organization-managed model routes can be authorized per role, user, and project. Personal users may use their own BYOK routes; shared project runtimes remain catalog-controlled. Usage records attribute activity without storing API keys, prompts, or responses in the ledger. Linux deployments add systemd and mount-namespace confinement; macOS deployments do not provide that kernel boundary and should be treated accordingly.
 
 Read the [Gateway reference](gateway/README.md) for the control-plane behavior and the [deployment runbook](gateway/deploy/README.md) for PostgreSQL, releases, isolation, TLS, backups, upgrades, and rollback.
 
