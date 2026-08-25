@@ -2,6 +2,7 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
+import { defaultModelFromPolicy } from '../src/apply-model-governance.ts'
 import { loadConfig } from '../src/config.ts'
 import { openDb } from '../src/db.ts'
 import { ModelGovernanceService, type ModelRegistrationEvent, type UsageEvent } from '../src/model-governance.ts'
@@ -26,6 +27,24 @@ function event(overrides: Partial<UsageEvent> = {}): UsageEvent {
 }
 
 describe('ModelGovernanceService', () => {
+  it('chooses an authorized route that the managed runtime actually serves', () => {
+    expect(defaultModelFromPolicy({
+      models: [
+        { provider: 'org-stale', model: 'chat', allowed: true },
+        { provider: 'org-live', model: 'chat', allowed: true },
+      ],
+      providers: [{ provider: 'org-live', models: [{ id: 'chat' }] }],
+    })).toEqual({ provider: 'org-live', model: 'chat' })
+    expect(defaultModelFromPolicy({
+      models: [{ provider: 'org-live', model: 'chat', allowed: false }],
+      providers: [{ provider: 'org-live', models: [{ id: 'chat' }] }],
+    })).toBeUndefined()
+    expect(defaultModelFromPolicy({
+      models: [{ provider: 'org-live', model: 'chat', allowed: true }],
+      providers: [],
+    })).toBeUndefined()
+  })
+
   it('applies role defaults, user exceptions, and global disable in priority order', async () => {
     const { governance, admin, user } = await setup()
     governance.upsertModel({ provider: 'p', model: 'm', displayName: 'M', enabled: true,
