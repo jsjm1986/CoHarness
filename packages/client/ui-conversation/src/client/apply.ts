@@ -219,6 +219,8 @@ export function apply(ctx: Context): void {
       hooks: { composerBlock: sessionId === undefined ? ABSENT_BLOCK : composerBlocks.storeFor(sessionId) },
       selectWorkspace: async (workspaceId, options: WorkspaceSelectionOptions = {}) => {
         const nextId = await workspaces.openWorkspace(workspaceId)
+        // Validate/open first: a race can invalidate a history id between the
+        // snapshot scan and selection, and that failure must retain the draft.
         sessions.open(nextId)
         if (options.discardDraft === true && sessionId !== undefined && nextId !== sessionId) {
           inputHub.discardDraft(sessionId)
