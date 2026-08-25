@@ -115,3 +115,30 @@
 .expand:hover {
   color: var(--dsw-alias-label-secondary);
 }
+
+@media (max-width: 767px) {
+  .block {
+    --dsl-read-line-height: 20px;
+    --dsl-read-gutter: 44px;
+    margin: var(--dsw-space-3) 0;
+  }
+
+  .banner {
+    min-height: var(--dsw-touch-target);
+    padding: 0 10px;
+  }
+
+  .copyButton {
+    min-width: var(--dsw-touch-target);
+    min-height: var(--dsw-touch-target);
+  }
+
+  .body {
+    padding: var(--dsw-space-2) 0;
+    font: var(--dsw-mobile-font-code);
+  }
+
+  .gutter {
+    padding-right: 10px;
+  }
+}

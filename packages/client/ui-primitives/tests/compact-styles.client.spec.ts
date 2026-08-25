@@ -61,4 +61,24 @@ describe('primitive compact chrome', () => {
     expect(markdown).toContain('font: 600 18px/26px var(--dsw-font-family)')
     expect(markdown).toContain('margin: var(--dsw-space-2) 0')
   })
+
+  it('keeps code and tool-result card chrome compact without shrinking tap targets', () => {
+    const cards = [
+      load('../src/markdown/CodeBlock.module.css'),
+      load('../src/ReadBlock.module.css'),
+      load('../src/SearchBlock.module.css'),
+      load('../src/TerminalBlock.module.css'),
+      load('../src/DiffBlock.module.css'),
+    ]
+    for (const css of cards) {
+      expect(css).toContain('@media (max-width: 767px)')
+      expect(css).toContain('min-height: var(--dsw-touch-target)')
+      expect(css).toContain('padding: 0 10px')
+    }
+  })
+
+  it('tightens non-copy result surfaces on compact viewports too', () => {
+    expect(load('../src/WebBlock.module.css')).toContain('max-height: min(240px, 45vh)')
+    expect(load('../src/markdown/JsonBlock.module.css')).toContain('max-height: min(200px, 40vh)')
+  })
 })

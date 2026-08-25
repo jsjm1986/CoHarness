@@ -105,3 +105,30 @@
   font: var(--dsw-font-markdown-code-block);
   color: var(--dsw-alias-label-tertiary);
 }
+
+@media (max-width: 767px) {
+  .block {
+    --dsl-diff-line-height: 20px;
+    margin: var(--dsw-space-3) 0;
+  }
+
+  .copyButton {
+    top: 0;
+    right: 4px;
+    min-width: var(--dsw-touch-target);
+    min-height: var(--dsw-touch-target);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .body {
+    padding: var(--dsw-space-2) 10px;
+    font: var(--dsw-mobile-font-code);
+  }
+
+  .footer {
+    padding: 0 10px var(--dsw-space-2);
+    font: var(--dsw-mobile-font-code);
+  }
+}

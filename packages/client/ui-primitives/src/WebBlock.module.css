@@ -128,3 +128,29 @@
 .fetch .truncated {
   margin-top: 0;
 }
+
+@media (max-width: 767px) {
+  .block {
+    margin: var(--dsw-space-3) 0;
+    padding: var(--dsw-space-2) 10px;
+  }
+
+  .sources {
+    gap: var(--dsw-space-2);
+    max-height: min(240px, 45vh);
+  }
+
+  .sourceLink {
+    font-size: 13px;
+    line-height: 20px;
+  }
+
+  .snippet {
+    font-size: 12px;
+    line-height: 18px;
+  }
+
+  .fetch {
+    gap: var(--dsw-space-1);
+  }
+}

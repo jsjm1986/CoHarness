@@ -57,7 +57,11 @@ export function CodeBlock({ code, lang, className, copyLabel = '复制', copiedL
     )
 
   return (
-    <div ref={rootRef} className={clsx(css.block, 'md-code-block', className)}>
+    <div
+      ref={rootRef}
+      className={clsx(css.block, 'md-code-block', className)}
+      data-empty={trimmed === '' ? '' : undefined}
+    >
       <div className={css.bannerWrap}>
         <div className={css.banner}>
           <div className={css.infostring}>{lang ?? ''}</div>
