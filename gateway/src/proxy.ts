@@ -37,6 +37,8 @@ function publicLocation(value: string): string {
 function isDocumentUploadDataPath(method: string | undefined, pathname: string): boolean {
   return /^\/api\/documents\/uploads\/[^/]+\/chunks\/[0-9]+$/u.test(pathname)
     || (method === 'GET' && /^\/api\/documents\/uploads\/[^/]+$/u.test(pathname))
+    || /^\/api\/documents\/transfer\/uploads\/[^/]+\/chunks\/[0-9]+$/u.test(pathname)
+    || (method === 'GET' && /^\/api\/documents\/transfer\/uploads\/[^/]+$/u.test(pathname))
 }
 
 export function createProxyHandlers(

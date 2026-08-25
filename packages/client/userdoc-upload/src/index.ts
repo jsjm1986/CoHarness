@@ -18,6 +18,10 @@ export type UserDocUploadProgress = (loaded: number, total: number, phase?: User
 export interface ResumableUploadOptions {
   /** Root document route; defaults to the shared Host route. */
   readonly root?: string
+  /** Query string appended to every session, chunk, status, and completion request. */
+  readonly query?: string
+  /** Namespace used to isolate resumable sessions for distinct document targets. */
+  readonly resumeNamespace?: string
   /** JSON request helper that maps the host's wire errors to its public error class. */
   readonly requestJson: <T>(input: RequestInfo | URL, init?: RequestInit) => Promise<T>
   /** Error used when an XHR disconnects before a response arrives. */
@@ -49,8 +53,14 @@ function hash(data: Uint8Array): string {
   return hex(sha256(data))
 }
 
-function resumeKey(directoryId: UserDocDirectoryIdType, fingerprint: string): string {
-  return `${String(directoryId)}\u0000${fingerprint}`
+function resumeKey(directoryId: UserDocDirectoryIdType, fingerprint: string, namespace: string): string {
+  return namespace === ''
+    ? `${String(directoryId)}\u0000${fingerprint}`
+    : `${namespace}\u0000${String(directoryId)}\u0000${fingerprint}`
+}
+
+function endpoint(root: string, suffix: string, query: string): string {
+  return `${root}${suffix}${query}`
 }
 
 function localResumeRecords(): Record<string, ResumeRecord> {
@@ -281,14 +291,16 @@ export async function resumableUpload(
   options: ResumableUploadOptions,
 ): Promise<UserDocRef> {
   const root = options.root ?? '/api/documents'
+  const query = options.query ?? ''
+  const namespace = options.resumeNamespace ?? ''
   const fingerprint = await fileFingerprint(file, signal)
-  const key = resumeKey(directoryId, fingerprint)
+  const key = resumeKey(directoryId, fingerprint, namespace)
   const existing = await resumeRecord(key)
   let session: UserDocUploadSession | undefined
   if (existing !== undefined && existing.bytes === file.size) {
     try {
       session = checkedSession(await options.requestJson<UserDocUploadSession>(
-        `${root}/uploads/${encodeURIComponent(String(existing.uploadId))}`,
+        endpoint(root, `/uploads/${encodeURIComponent(String(existing.uploadId))}`, query),
         signal === undefined ? {} : { signal },
       ), file, options.responseError)
     } catch (error) {
@@ -296,7 +308,7 @@ export async function resumableUpload(
       await deleteResumeRecord(key)
     }
   }
-  session ??= checkedSession(await options.requestJson<UserDocUploadSession>(`${root}/uploads`, {
+  session ??= checkedSession(await options.requestJson<UserDocUploadSession>(endpoint(root, '/uploads', query), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ version: 1, name: file.name, directory: directoryId, bytes: file.size, fingerprint }),
@@ -304,7 +316,7 @@ export async function resumableUpload(
   }), file, options.responseError)
   if (session.state === 'failed') {
     await deleteResumeRecord(key)
-    session = checkedSession(await options.requestJson<UserDocUploadSession>(`${root}/uploads`, {
+    session = checkedSession(await options.requestJson<UserDocUploadSession>(endpoint(root, '/uploads', query), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ version: 1, name: file.name, directory: directoryId, bytes: file.size, fingerprint }),
@@ -330,7 +342,7 @@ export async function resumableUpload(
     if (start >= session.receivedBytes) {
       let sent = 0
       await uploadChunkWithRetry(
-        `${root}/uploads/${encodeURIComponent(String(session.uploadId))}/chunks/${String(index)}`,
+        endpoint(root, `/uploads/${encodeURIComponent(String(session.uploadId))}/chunks/${String(index)}`, query),
         new Blob([data]), start, endExclusive - 1, file.size, digest, signal, options.networkError, options.responseError,
         (loaded) => { sent = loaded; onProgress?.(uploaded + sent, file.size) },
       )
@@ -340,7 +352,7 @@ export async function resumableUpload(
     start = endExclusive
   }
   let current = checkedSession(await options.requestJson<UserDocUploadSession>(
-    `${root}/uploads/${encodeURIComponent(String(session.uploadId))}/complete`,
+    endpoint(root, `/uploads/${encodeURIComponent(String(session.uploadId))}/complete`, query),
     {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -352,7 +364,7 @@ export async function resumableUpload(
   while (current.state === 'verifying') {
     await delay(500, signal)
     current = checkedSession(await options.requestJson<UserDocUploadSession>(
-      `${root}/uploads/${encodeURIComponent(String(session.uploadId))}`,
+      endpoint(root, `/uploads/${encodeURIComponent(String(session.uploadId))}`, query),
       signal === undefined ? {} : { signal },
     ), file, options.responseError)
   }

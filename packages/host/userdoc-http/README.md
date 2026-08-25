@@ -14,6 +14,8 @@ Uploads use the versioned resumable session protocol: `POST /api/documents/uploa
 
 `POST /api/documents/transfer/list` accepts one authorized source scope and returns safe document metadata for the composer picker; it never returns paths or file bytes.
 
+The Gateway deployment also owns `/api/documents/transfer/uploads` and its resumable child routes. Each request names a personal or project target through a validated `scope` query, and the Gateway rechecks write authority before streaming the request to that target runtime. Standalone Host compositions continue to expose only the current-runtime upload route.
+
 In the Gateway deployment, this browser route is admitted by the Gateway's document broker before the runtime proxy. Standalone compositions still use the Host consumer directly; neither path exposes a runtime loopback authority in a browser response.
 
 `POST /api/documents/transfer/directories` lists safe target-folder metadata and `POST /api/documents/transfer/directories/create` creates a folder after a target `rw` check. `GET /api/documents/overview` returns metadata-only rows for every scope the actor can read, and `GET /api/documents/history` returns recent audited operations for the current scope.

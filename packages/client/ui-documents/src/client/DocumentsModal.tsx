@@ -92,6 +92,7 @@ interface SourceOption {
   value: string
   label: string
   scope: UserDocScope
+  mode: 'ro' | 'rw'
 }
 
 /** Metadata-only view selected from the workbench scope rail. */
@@ -99,6 +100,8 @@ interface ScopeView {
   value: string
   label: string
   scope: UserDocScope
+  mode: 'ro' | 'rw'
+  canUpload: boolean
 }
 
 interface OverviewCopyTarget {
@@ -211,7 +214,11 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
   const [alternateSource, setAlternateSource] = useState<SourceOption | null>(null)
   const [sourcePickerOpen, setSourcePickerOpen] = useState(false)
   const [sourcePickerValue, setSourcePickerValue] = useState('')
+  const [sourcePickerQuery, setSourcePickerQuery] = useState('')
   const [sourcePickerLoading, setSourcePickerLoading] = useState(false)
+  const [uploadScopePickerOpen, setUploadScopePickerOpen] = useState(false)
+  const [uploadScopePickerValue, setUploadScopePickerValue] = useState('')
+  const [uploadScopePickerQuery, setUploadScopePickerQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [modalError, setModalError] = useState('')
@@ -266,6 +273,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     setOverviewMode(false)
     setScopeView(null)
     setAlternateSource(null)
+    setUploadScopePickerOpen(false)
     try {
       const [response, nextScope] = await Promise.all([
         userDocs.current.browse(directoryId, signal),
@@ -298,6 +306,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
       setOverviewMode(true)
       setScopeView(null)
       setAlternateSource(null)
+      setUploadScopePickerOpen(false)
       setSelected(new Set())
       return true
     } catch (cause) {
@@ -337,7 +346,17 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
       setDocuments(nextDocuments)
       setDirectories([])
       setCurrentDirectoryId(ROOT_DIRECTORY_ID)
-      setScopeView({ value: target.kind === 'personal' ? 'personal' : `project:${String(target.projectId)}`, label, scope: target })
+      const project = target.kind === 'project'
+        ? scope.projects?.find(candidate => candidate.projectId === target.projectId)
+        : undefined
+      const mode = project?.mode ?? 'rw'
+      setScopeView({
+        value: target.kind === 'personal' ? 'personal' : `project:${String(target.projectId)}`,
+        label,
+        scope: target,
+        mode,
+        canUpload: target.kind === 'personal' || mode === 'rw',
+      })
       setAlternateSource(null)
       setOverviewMode(false)
       setSelected(new Set())
@@ -436,7 +455,8 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
   }, [headerState])
 
   const uploadFiles = async (list: FileList | readonly File[]) => {
-    if (writeLocked) return
+    if (overviewMode || alternateSource !== null
+      || (scopeView !== null ? !scopeView.canUpload : scope.kind === 'project' && scope.mode === 'ro')) return
     const files = fileListOf(list)
     if (files.length === 0) return
     setUploading(true)
@@ -444,18 +464,23 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     setProgress({ current: 0, total: files.length, percent: 0 })
     try {
       for (const [index, file] of files.entries()) {
-        await userDocs.current.upload(file, currentDirectoryId, undefined, (loaded: number, total: number, phase?: UserDocUploadPhase) => {
+        const report = (loaded: number, total: number, phase?: UserDocUploadPhase): void => {
           setProgress({
             current: index + 1,
             total: files.length,
             percent: total === 0 ? 0 : Math.round((loaded / total) * 100),
             ...(phase === undefined ? {} : { phase }),
           })
-        })
+        }
+        if (scopeView !== null) {
+          await userDocs.current.uploadToScope(scopeView.scope, file, ROOT_DIRECTORY_ID, undefined, report)
+        } else {
+          await userDocs.current.upload(file, currentDirectoryId, undefined, report)
+        }
       }
       /* v8 ignore next -- the hidden input stays mounted for the modal lifetime */
       if (fileInputRef.current) fileInputRef.current.value = ''
-      void load(currentDirectoryId)
+      await refreshDisplayed()
     } catch (cause) {
       setError(uploadErrorMessage(cause, t))
     } finally {
@@ -662,11 +687,36 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     : { kind: 'personal' }
 
   const sourceOptions: SourceOption[] = [
-    ...(scope.kind === 'personal' ? [] : [{ value: 'personal', label: t('copy.target.personal'), scope: { kind: 'personal' } as const }]),
+    ...((scope.kind !== 'personal' || scopeView?.scope.kind === 'project') && scopeView?.scope.kind !== 'personal'
+      ? [{ value: 'personal', label: t('copy.target.personal'), scope: { kind: 'personal' } as const, mode: 'rw' as const }]
+      : []),
     ...(scope.projects ?? [])
-      .filter(project => !(scope.kind === 'project' && scope.projectId === project.projectId))
-      .map(project => ({ value: `project:${String(project.projectId)}`, label: project.name, scope: { kind: 'project', projectId: project.projectId } as const })),
+      .filter(project => !(scope.kind === 'project' && scope.projectId === project.projectId)
+        && !(scopeView?.scope.kind === 'project' && scopeView.scope.projectId === project.projectId))
+      .map(project => ({
+        value: `project:${String(project.projectId)}`,
+        label: project.name,
+        scope: { kind: 'project', projectId: project.projectId } as const,
+        mode: project.mode,
+      })),
   ]
+  const filteredSourceOptions = sourceOptions.filter((option) => {
+    const needle = sourcePickerQuery.trim().toLowerCase()
+    return needle === '' || option.label.toLowerCase().includes(needle)
+  })
+  const uploadScopeOptions: SourceOption[] = [
+    { value: 'personal', label: t('copy.target.personal'), scope: { kind: 'personal' }, mode: 'rw' },
+    ...(scope.projects ?? []).filter(project => project.mode === 'rw').map(project => ({
+      value: `project:${String(project.projectId)}`,
+      label: project.name,
+      scope: { kind: 'project', projectId: project.projectId } as const,
+      mode: project.mode,
+    })),
+  ]
+  const filteredUploadScopeOptions = uploadScopeOptions.filter((option) => {
+    const needle = uploadScopePickerQuery.trim().toLowerCase()
+    return needle === '' || option.label.toLowerCase().includes(needle)
+  })
 
   const mobileViewOptions = useMemo(() => [
     {
@@ -706,7 +756,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     ? sourceOptions.map(option => ({
       value: option.value,
       label: option.label,
-      description: t('copy.source.viewing', { name: option.label }),
+      description: `${option.mode === 'rw' ? t('scope.project.mode.editable') : t('scope.project.mode.readOnly')} · ${t('scope.source.readOnly')}`,
       kind: 'source' as const,
     }))
     : mobileViewOptions
@@ -762,14 +812,57 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     }
   }
 
+  const refreshDisplayed = async (): Promise<void> => {
+    if (scopeView !== null) {
+      try {
+        const response = await userDocs.current.listScope(scopeView.scope)
+        setDocuments(response.documents.map(document => ({ ...document, path: '' })))
+        setSelected(new Set())
+        setQuery('')
+        setPage(1)
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : t('copy.error'))
+      }
+      return
+    }
+    if (alternateSource !== null) {
+      await browseSource(alternateSource.value)
+      return
+    }
+    await load(currentDirectoryId)
+  }
+
   const openSourcePicker = () => {
     if (sourceOptions.length === 0) {
       setError(t('copy.source.unavailable'))
       return
     }
     setSourcePickerValue(sourceOptions[0]?.value ?? '')
+    setSourcePickerQuery('')
     setSourcePickerOpen(true)
     setModalError('')
+  }
+
+  const openUploadScopePicker = () => {
+    if (uploadScopeOptions.length === 0) {
+      setError(t('scope.upload.unavailable'))
+      return
+    }
+    if (phone) {
+      setMobileSheet({ kind: 'scope', mode: 'view', query: '' })
+      return
+    }
+    setUploadScopePickerValue(uploadScopeOptions[0]?.value ?? '')
+    setUploadScopePickerQuery('')
+    setUploadScopePickerOpen(true)
+    setModalError('')
+  }
+
+  const chooseUploadScope = async () => {
+    const option = uploadScopeOptions.find(candidate => candidate.value === uploadScopePickerValue)
+    if (option === undefined) return
+    const succeeded = await openScopeView(option.scope, option.label)
+    if (succeeded) setUploadScopePickerOpen(false)
   }
 
   const openMobileScopeSheet = (mode: 'view' | 'source') => {
@@ -971,13 +1064,16 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
   const directoryTrail = breadcrumbs(currentDirectoryId, scopeView?.label ?? alternateSource?.label ?? t('breadcrumb.root'))
   const readOnlyProject = scope.kind === 'project' && scope.mode === 'ro'
   const writeLocked = scopeView !== null || alternateSource !== null || readOnlyProject
+  const uploadLocked = overviewMode || alternateSource !== null || (scopeView !== null ? !scopeView.canUpload : readOnlyProject)
 
   const projectExtra = scope.kind === 'project' ? t('delete.confirm.project.extra') : ''
   const visibility = scope.kind === 'project'
     ? t('modal.visibility.project')
     : t('modal.visibility.personal')
   const visibleScope = scopeView !== null
-    ? t('scope.viewing', { name: scopeView.label })
+    ? scopeView.canUpload
+      ? t('scope.upload.target', { name: scopeView.label })
+      : t('scope.viewing', { name: scopeView.label })
     : alternateSource === null
       ? visibility
       : t('copy.source.viewing', { name: alternateSource.label })
@@ -1031,8 +1127,9 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
       className={css.upload}
       type="button"
       variant="primary"
-      disabled={busy || writeLocked}
+      disabled={busy || uploadLocked}
       aria-label={uploading ? uploadLabel : t('modal.upload')}
+      title={scopeView !== null && !scopeView.canUpload ? t('scope.upload.readOnly', { name: scopeView.label }) : undefined}
       icon={<IconPlusOutline16 size={16} />}
       onClick={() => fileInputRef.current?.click()}
     >
@@ -1277,6 +1374,33 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     else setDeleteTargets(targets)
   }
 
+  const renderScopePickerOption = (
+    option: SourceOption,
+    selectedValue: string,
+    disabled: boolean,
+    detail: string,
+    onSelect: (value: string) => void,
+  ) => (
+    <button
+      key={option.value}
+      type="button"
+      role="option"
+      aria-selected={selectedValue === option.value}
+      className={`${css.scopePickerOption} ${selectedValue === option.value ? css.scopePickerOptionSelected : ''}`}
+      disabled={disabled}
+      onClick={() => { onSelect(option.value) }}
+    >
+      <span className={css.scopeItemIcon} aria-hidden="true">
+        {option.scope.kind === 'project' ? <IconFolderClose16 size={18} /> : <IconBrowseOutline16 size={18} />}
+      </span>
+      <span className={css.scopePickerCopy}>
+        <strong>{option.label}</strong>
+        <small>{detail}</small>
+      </span>
+      {selectedValue === option.value && <span className={css.sheetCheck} aria-hidden="true">✓</span>}
+    </button>
+  )
+
   const mobileSheetContent = mobileSheet?.kind === 'scope' ? (
     <DocumentsMobileSheet
       open
@@ -1314,7 +1438,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
           <p className={css.sheetStatus}>{t('modal.noResults')}</p>
         ) : filteredMobileScopeOptions.map((option) => {
           const selectedOption = mobileSheet.mode === 'view' && option.value === mobileScopeValue
-          const disabled = loading || overviewLoading || sourcePickerLoading
+          const disabled = busy || loading || overviewLoading || sourcePickerLoading || uploadScopePickerOpen
           return (
             <button
               key={option.value}
@@ -1387,7 +1511,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
           variant="ghost"
           disabled={busy}
           icon={<IconRefreshOutline16 size={18} />}
-          onClick={() => { closeMobileSheet(); void load(currentDirectoryId) }}
+          onClick={() => { closeMobileSheet(); void refreshDisplayed() }}
         >
           {t('modal.refresh')}
         </Button>
@@ -1542,17 +1666,17 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
         <div className={css.workbench}>
           <aside className={css.scopeRail} aria-label={t('scope.rail.label')}>
             <div className={css.scopeRailHeading}>{t('scope.rail.title')}</div>
-            <button type="button" className={`${css.scopeItem} ${overviewMode ? css.scopeItemActive : ''}`} onClick={() => { void openOverview() }} disabled={overviewLoading || loading}>
+            <button type="button" className={`${css.scopeItem} ${overviewMode ? css.scopeItemActive : ''}`} onClick={() => { void openOverview() }} disabled={busy || overviewLoading || loading}>
               <span className={css.scopeItemIcon} aria-hidden="true"><IconBrowseOutline16 size={16} /></span>
               <span><strong>{t('scope.all')}</strong><small>{t('scope.all.description')}</small></span>
             </button>
-            <button type="button" className={`${css.scopeItem} ${!overviewMode && alternateSource === null && (scopeView?.scope.kind === 'personal' || (scopeView === null && scope.kind === 'personal')) ? css.scopeItemActive : ''}`} onClick={() => { void openScopeView({ kind: 'personal' }, t('copy.target.personal')) }} disabled={loading || overviewLoading}>
+            <button type="button" className={`${css.scopeItem} ${!overviewMode && alternateSource === null && (scopeView?.scope.kind === 'personal' || (scopeView === null && scope.kind === 'personal')) ? css.scopeItemActive : ''}`} onClick={() => { void openScopeView({ kind: 'personal' }, t('copy.target.personal')) }} disabled={busy || loading || overviewLoading}>
               <span className={css.scopeItemIcon} aria-hidden="true"><IconPaperclipOutline16 size={16} /></span>
               <span><strong>{t('copy.target.personal')}</strong><small>{t('scope.personal.description')}</small></span>
             </button>
             {(scope.projects ?? []).map((project) => {
               const isCurrent = !overviewMode && alternateSource === null && ((scopeView?.scope.kind === 'project' && scopeView.scope.projectId === project.projectId) || (scopeView === null && scope.kind === 'project' && scope.projectId === project.projectId))
-              return <button key={project.projectId} type="button" className={`${css.scopeItem} ${isCurrent ? css.scopeItemActive : ''}`} onClick={() => { void openScopeView({ kind: 'project', projectId: project.projectId }, project.name) }} disabled={loading || overviewLoading}>
+              return <button key={project.projectId} type="button" className={`${css.scopeItem} ${isCurrent ? css.scopeItemActive : ''}`} onClick={() => { void openScopeView({ kind: 'project', projectId: project.projectId }, project.name) }} disabled={busy || loading || overviewLoading}>
                 <span className={css.scopeItemIcon} aria-hidden="true"><IconFolderClose16 size={16} /></span>
                 <span><strong>{project.name}</strong><small>{t('scope.project.meta', { mode: projectModeLabel(project.mode, t), description: t('scope.project.description') })}</small></span>
               </button>
@@ -1591,7 +1715,10 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
                 <section className={css.overview} aria-label={t('scope.all')}>
                   <header className={css.overviewHeader}>
                     <div><h2>{t('scope.all')}</h2><p>{t('scope.all.description')}</p></div>
-                    <Button type="button" variant="ghost" icon={<IconRefreshOutline16 size={16} />} disabled={overviewLoading} onClick={() => { void openOverview() }}>{t('modal.refresh')}</Button>
+                    <div className={css.overviewActions}>
+                      <Button type="button" variant="primary" icon={<IconPlusOutline16 size={16} />} disabled={overviewLoading || busy} onClick={openUploadScopePicker}>{t('scope.upload.choose')}</Button>
+                      <Button type="button" variant="ghost" icon={<IconRefreshOutline16 size={16} />} disabled={overviewLoading || busy} onClick={() => { void openOverview() }}>{t('modal.refresh')}</Button>
+                    </div>
                   </header>
                   {overviewError !== '' && <div className={css.error} role="alert">{overviewError}</div>}
                   {overviewLoading ? <p className={css.status}>{t('scope.all.loading')}</p> : overviewRows.length === 0 ? <p className={css.empty}>{t('scope.all.empty')}</p> : (
@@ -1641,6 +1768,25 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
                 ))}
               </nav>
 
+              {scopeView !== null && (
+                <div className={`${css.scopeNotice} ${scopeView.canUpload ? css.scopeNoticeTarget : css.scopeNoticeReadOnly}`} role="status">
+                  <span className={css.scopeNoticeIcon} aria-hidden="true"><IconFolderClose16 size={16} /></span>
+                  <span className={css.scopeNoticeCopy}>
+                    <strong>{t('scope.upload.target', { name: scopeView.label })}</strong>
+                    <small>{scopeView.canUpload ? t('scope.upload.root') : t('scope.upload.readOnly', { name: scopeView.label })}</small>
+                  </span>
+                </div>
+              )}
+              {alternateSource !== null && (
+                <div className={`${css.scopeNotice} ${css.scopeNoticeReadOnly}`} role="status">
+                  <span className={css.scopeNoticeIcon} aria-hidden="true"><IconBrowseOutline16 size={16} /></span>
+                  <span className={css.scopeNoticeCopy}>
+                    <strong>{t('copy.source.viewing', { name: alternateSource.label })}</strong>
+                    <small>{t('scope.source.readOnly')}</small>
+                  </span>
+                </div>
+              )}
+
               <div className={css.toolbar}>
                 <div className={css.filterGroup} role="group" aria-label={t('modal.filters')}>
                   <Input
@@ -1689,7 +1835,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
                   />
                   {phone ? (
                     <>
-                      {uploadButton}
+                      {alternateSource === null && !overviewMode && uploadButton}
                       <Button
                         className={css.mobileMore}
                         data-documents-toolbar-more=""
@@ -1740,7 +1886,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
                       >
                         {t('folder.create')}
                       </Button>
-                      {uploadButton}
+                      {alternateSource === null && !overviewMode && uploadButton}
                       <Button
                         className={css.refresh}
                         type="button"
@@ -1748,7 +1894,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
                         aria-label={t('modal.refresh')}
                         disabled={busy}
                         icon={<IconRefreshOutline16 size={16} />}
-                        onClick={() => { void load(currentDirectoryId) }}
+                        onClick={() => { void refreshDisplayed() }}
                       />
                       <Button
                         type="button"
@@ -1820,7 +1966,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
               ) : !hasEntries ? (
                 <div className={css.emptyState}>
                   <p className={css.empty}>{t('modal.empty')}</p>
-                  {phone && !writeLocked && (
+                  {phone && !uploadLocked && (
                     <div className={css.emptyActions}>
                       <Button type="button" variant="primary" aria-label={t('modal.upload')} icon={<IconPlusOutline16 size={16} />} onClick={() => { fileInputRef.current?.click() }}>
                         {t('modal.upload.compact')}
@@ -2168,16 +2314,72 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
         >
           <div className={css.form}>
             <p className={css.confirm}>{t('copy.source.message')}</p>
-            <label className={css.formLabel} htmlFor="documents-source-scope">{t('copy.source.label')}</label>
-            <select
-              id="documents-source-scope"
-              className={`${css.select} ${css.moveSelect}`}
-              value={sourcePickerValue}
-              onChange={(event) => { setSourcePickerValue(event.currentTarget.value) }}
-            >
-              {sourceOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
+            <label className={css.formLabel} htmlFor="documents-source-scope-search">{t('copy.source.label')}</label>
+            {sourceOptions.length > 1 && (
+              <Input
+                id="documents-source-scope-search"
+                icon={<IconSearchOutline16 size={16} />}
+                placeholder={t('scope.switch.search')}
+                value={sourcePickerQuery}
+                onChange={(event) => { setSourcePickerQuery(event.target.value) }}
+              />
+            )}
+            <div className={css.scopePickerOptions} role="listbox" aria-label={t('copy.source.label')}>
+              {filteredSourceOptions.length === 0 ? (
+                <p className={css.status}>{t('modal.noResults')}</p>
+              ) : filteredSourceOptions.map(option => renderScopePickerOption(
+                option,
+                sourcePickerValue,
+                sourcePickerLoading,
+                `${option.mode === 'rw' ? t('scope.project.mode.editable') : t('scope.project.mode.readOnly')} · ${t('scope.source.readOnly')}`,
+                setSourcePickerValue,
+              ))}
+            </div>
             {sourcePickerLoading && <p className={css.status}>{t('copy.source.loading')}</p>}
+          </div>
+        </Modal>
+      )}
+
+      {uploadScopePickerOpen && (
+        <Modal
+          open
+          onClose={() => { if (!busy) setUploadScopePickerOpen(false) }}
+          title={t('scope.upload.choose')}
+          closeLabel={t('modal.close')}
+          className={css.confirmDialog as string}
+          footer={(
+            <>
+              <Button type="button" variant="outline" disabled={busy} onClick={() => { setUploadScopePickerOpen(false) }}>
+                {t('modal.cancel')}
+              </Button>
+              <Button type="button" variant="primary" disabled={busy || uploadScopePickerValue === ''} onClick={() => { void chooseUploadScope() }}>
+                {t('scope.upload.confirm')}
+              </Button>
+            </>
+          )}
+        >
+          <div className={css.form}>
+            <p className={css.confirm}>{t('scope.upload.root')}</p>
+            {uploadScopeOptions.length > 1 && (
+              <Input
+                autoFocus
+                icon={<IconSearchOutline16 size={16} />}
+                placeholder={t('scope.switch.search')}
+                value={uploadScopePickerQuery}
+                onChange={(event) => { setUploadScopePickerQuery(event.target.value) }}
+              />
+            )}
+            <div className={css.scopePickerOptions} role="listbox" aria-label={t('scope.upload.choose')}>
+              {filteredUploadScopeOptions.length === 0 ? (
+                <p className={css.status}>{t('scope.upload.unavailable')}</p>
+              ) : filteredUploadScopeOptions.map(option => renderScopePickerOption(
+                option,
+                uploadScopePickerValue,
+                busy,
+                `${t('scope.project.mode.editable')} · ${t('scope.upload.root')}`,
+                setUploadScopePickerValue,
+              ))}
+            </div>
           </div>
         </Modal>
       )}

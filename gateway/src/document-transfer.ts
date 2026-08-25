@@ -3,6 +3,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import type { IncomingMessage } from 'node:http'
 import { basename } from 'node:path'
+import { Readable } from 'node:stream'
 import type { UserRow } from './auth.ts'
 import type { GatewayPrincipalClaims, GatewayPrincipalSigner } from './principal.ts'
 import { PRINCIPAL_HEADER } from './principal.ts'
@@ -20,6 +21,8 @@ import type { PostgresDocumentCatalogService } from './postgres/document-catalog
 const MAX_TRANSFER_FILES = 50
 const MAX_DOCUMENT_ID_BYTES = 4096
 const TRANSFER_PLAN_TTL_MS = 300_000
+/** Public Gateway path for resumable uploads into a non-current scope. */
+export const DOCUMENT_TRANSFER_UPLOADS_PATH = '/api/documents/transfer/uploads'
 
 interface TransferPlanRecord {
   readonly actorId: number
@@ -165,6 +168,22 @@ export interface GatewayDocumentTransferListHandler {
   }): Promise<DocumentTransferListResponse>
 }
 
+/** Public Gateway callback for a target-scope resumable upload request. */
+export interface GatewayDocumentTransferUploadHandler {
+  (input: {
+    /** Authenticated browser account. */
+    readonly user: UserRow
+    /** Original request stream; chunk bodies are forwarded without buffering. */
+    readonly request: IncomingMessage
+    /** Public upload pathname, validated by the Gateway server. */
+    readonly pathname: string
+    /** Target scope parsed from the public query string. */
+    readonly scope: DocumentTransferScope
+    /** Aborts when the browser disconnects. */
+    readonly signal: AbortSignal
+  }): Promise<Response>
+}
+
 /** Runtime callback for target-folder metadata in an authorized scope. */
 export interface RuntimeDocumentTransferDirectoriesHandler {
   (input: {
@@ -261,6 +280,16 @@ function scope(value: unknown): DocumentTransferScope {
     return { kind: 'project', projectId: candidate.projectId }
   }
   throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document transfer scope.')
+}
+
+/** Decode the compact scope key used by the browser-facing upload route. */
+export function parseDocumentScopeKey(value: unknown): DocumentTransferScope {
+  if (value === 'personal') return { kind: 'personal' }
+  if (typeof value === 'string' && /^project:[1-9][0-9]*$/u.test(value)) {
+    const projectId = Number(value.slice('project:'.length))
+    if (Number.isSafeInteger(projectId) && projectId > 0) return { kind: 'project', projectId }
+  }
+  throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document upload scope.')
 }
 
 function requestValue(value: unknown): DocumentTransferRequest {
@@ -564,6 +593,69 @@ function headersFor(handle: RuntimeHandle, assertion: string): Headers {
     origin: `http://${authority}`,
     [PRINCIPAL_HEADER]: assertion,
   })
+}
+
+interface AuthorizedScope {
+  readonly identity: ScopeIdentity
+  readonly runtime: RuntimeHandle
+  readonly assertion: string
+}
+
+/** Resolve one browser-requested scope and issue a principal for its runtime. */
+async function authorizedScope(
+  deps: DocumentTransferDependencies,
+  actor: UserRow,
+  requested: DocumentTransferScope,
+  action: 'read' | 'write',
+): Promise<AuthorizedScope> {
+  if (requested.kind === 'personal') {
+    const identity: ScopeIdentity = { kind: 'personal', id: actor.id, label: 'Personal documents' }
+    const runtime = await runtimeFor(deps, identity, actor)
+    return {
+      identity,
+      runtime,
+      assertion: deps.principals.issue({
+        user: actor,
+        scope: { kind: 'personal' },
+        runtime: { kind: runtime.target.kind, id: runtime.target.id, generation: runtime.generation },
+      }),
+    }
+  }
+
+  let membership: Awaited<ReturnType<GatewayCollaborationService['projectForUser']>>
+  try {
+    membership = await deps.collaboration.projectForUser(requested.projectId, actor.id)
+  } catch {
+    throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Project document authorization is unavailable.')
+  }
+  if (membership === null) {
+    throw new DocumentTransferError('COLLABORATION_FORBIDDEN', 403, 'You cannot access this project document scope.')
+  }
+  if (action === 'write' && membership.mode !== 'rw' && !membership.administrator) {
+    throw new DocumentTransferError('COLLABORATION_FORBIDDEN', 403, 'You cannot modify this project document scope.')
+  }
+  const identity: ScopeIdentity = {
+    kind: 'project',
+    id: requested.projectId,
+    label: membership.name,
+    projectName: membership.name,
+    mode: membership.mode,
+  }
+  const runtime = await runtimeFor(deps, identity, actor)
+  return {
+    identity,
+    runtime,
+    assertion: deps.principals.issue({
+      user: actor,
+      scope: {
+        kind: 'project',
+        projectId: requested.projectId,
+        projectName: membership.name,
+        mode: action === 'write' ? 'rw' : membership.mode,
+      },
+      runtime: { kind: runtime.target.kind, id: runtime.target.id, generation: runtime.generation },
+    }),
+  }
 }
 
 async function audit(
@@ -919,44 +1011,12 @@ async function listDocumentsForActor(
     throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document scope listing request.')
   }
   const requested = scope(candidate.scope)
-  let membership: Awaited<ReturnType<GatewayCollaborationService['projectForUser']>> = null
-  if (requested.kind === 'project') {
-    try {
-      membership = await deps.collaboration.projectForUser(requested.projectId, actor.id)
-    } catch {
-      throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document scope authorization is unavailable.')
-    }
-    if (membership === null) {
-      throw new DocumentTransferError('COLLABORATION_FORBIDDEN', 403, 'You cannot read this project document scope.')
-    }
-  }
-  const identity: ScopeIdentity = requested.kind === 'personal'
-    ? { kind: 'personal', id: actor.id, label: 'Personal documents' }
-    : {
-      kind: 'project',
-      id: requested.projectId,
-      label: membership?.name ?? 'Project documents',
-      projectName: membership?.name,
-      mode: membership?.mode,
-    }
-  const runtime = await runtimeFor(deps, identity, actor)
-  const assertion = deps.principals.issue({
-    user: actor,
-    scope: identity.kind === 'personal'
-      ? { kind: 'personal' }
-      : {
-        kind: 'project',
-        projectId: identity.id,
-        projectName: identity.projectName ?? identity.label,
-        mode: identity.mode ?? 'ro',
-      },
-    runtime: { kind: runtime.target.kind, id: runtime.target.id, generation: runtime.generation },
-  })
+  const authorized = await authorizedScope(deps, actor, requested, 'read')
   let response: Response
   try {
-    response = await fetch(`http://127.0.0.1:${String(runtime.port)}/api/documents`, {
+    response = await fetch(`http://127.0.0.1:${String(authorized.runtime.port)}/api/documents`, {
       method: 'GET',
-      headers: headersFor(runtime, assertion),
+      headers: headersFor(authorized.runtime, authorized.assertion),
       redirect: 'error',
       ...(signal === undefined ? {} : { signal }),
     })
@@ -975,7 +1035,7 @@ async function listDocumentsForActor(
   const documents = value.documents.map(targetRef)
   return {
     version: 1,
-    scope: { kind: identity.kind, label: identity.label },
+    scope: { kind: authorized.identity.kind, label: authorized.identity.label },
     documents,
   }
 }
@@ -994,6 +1054,132 @@ export function createGatewayDocumentTransferListHandler(
   return ({ user, payload, signal }) => listDocumentsForActor(deps, user, payload, signal)
 }
 
+function safeUploadSession(value: unknown): Record<string, unknown> {
+  const candidate = record(value)
+  const validState = candidate?.state === 'uploading' || candidate?.state === 'verifying'
+    || candidate?.state === 'complete' || candidate?.state === 'failed'
+  if (candidate === undefined || typeof candidate.uploadId !== 'string' || !/^[0-9a-f-]{36}$/u.test(candidate.uploadId)
+    || typeof candidate.name !== 'string' || candidate.name === '' || candidate.name.length > 4096
+    || !validRelativeId(candidate.directoryId, true)
+    || typeof candidate.bytes !== 'number' || !Number.isSafeInteger(candidate.bytes) || candidate.bytes < 0
+    || typeof candidate.fingerprint !== 'string' || candidate.fingerprint === '' || candidate.fingerprint.length > 512
+    || typeof candidate.chunkBytes !== 'number' || !Number.isSafeInteger(candidate.chunkBytes) || candidate.chunkBytes <= 0
+    || typeof candidate.receivedBytes !== 'number' || !Number.isSafeInteger(candidate.receivedBytes)
+    || candidate.receivedBytes < 0 || candidate.receivedBytes > candidate.bytes
+    || typeof candidate.expiresAt !== 'number' || !Number.isFinite(candidate.expiresAt)
+    || !validState) {
+    throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The target runtime returned invalid upload metadata.')
+  }
+  const result: Record<string, unknown> = {
+    uploadId: candidate.uploadId,
+    name: candidate.name,
+    directoryId: candidate.directoryId,
+    bytes: candidate.bytes,
+    fingerprint: candidate.fingerprint,
+    chunkBytes: candidate.chunkBytes,
+    receivedBytes: candidate.receivedBytes,
+    expiresAt: candidate.expiresAt,
+    state: candidate.state,
+  }
+  if (candidate.ref !== undefined) {
+    const ref = record(candidate.ref)
+    if (ref === undefined || !validRelativeId(ref.docId, false) || typeof ref.name !== 'string' || ref.name === ''
+      || ref.name.length > 255 || typeof ref.bytes !== 'number' || !Number.isSafeInteger(ref.bytes) || ref.bytes < 0
+      || typeof ref.mediaType !== 'string' || ref.mediaType === '' || ref.mediaType.length > 200
+      || typeof ref.modifiedAt !== 'number' || !Number.isFinite(ref.modifiedAt)) {
+      throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The target runtime returned invalid document metadata.')
+    }
+    result.ref = {
+      docId: ref.docId,
+      name: ref.name,
+      bytes: ref.bytes,
+      mediaType: ref.mediaType,
+      modifiedAt: ref.modifiedAt,
+      path: '',
+    }
+  }
+  if (candidate.error !== undefined) {
+    const error = record(candidate.error)
+    if (error === undefined || typeof error.code !== 'string' || !/^[A-Z][A-Z0-9_]{0,127}$/u.test(error.code)
+      || typeof error.message !== 'string' || error.message.length > 240
+      || /[\u0000-\u001f\u007f]|[/\\]/u.test(error.message)) {
+      throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The target runtime returned invalid upload error metadata.')
+    }
+    result.error = { code: error.code, message: error.message }
+  }
+  if (result.state === 'complete' && result.ref === undefined) {
+    throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The target runtime completed an upload without a document reference.')
+  }
+  return result
+}
+
+function runtimeUploadPath(pathname: string): string {
+  const suffix = pathname.slice(DOCUMENT_TRANSFER_UPLOADS_PATH.length)
+  if (suffix !== '' && !/^\/[0-9a-f-]{36}(?:\/complete|\/chunks\/[0-9]+)?$/u.test(suffix)) {
+    throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document upload path.')
+  }
+  return `/api/documents/uploads${suffix}`
+}
+
+function uploadHeaders(request: IncomingMessage, runtime: RuntimeHandle, assertion: string): Headers {
+  const headers = headersFor(runtime, assertion)
+  for (const name of ['content-type', 'content-length', 'content-range', 'x-dsh-chunk-sha256']) {
+    const value = request.headers[name]
+    if (typeof value === 'string') headers.set(name, value)
+  }
+  return headers
+}
+
+function uploadErrorEnvelope(value: unknown): Record<string, unknown> {
+  const error = responseError(value)
+  return { error: { code: error.code, message: error.message } }
+}
+
+/** Create the Gateway broker for resumable uploads into an authorized target scope. */
+export function createGatewayDocumentTransferUploadHandler(
+  deps: DocumentTransferDependencies,
+): GatewayDocumentTransferUploadHandler {
+  return async ({ user, request, pathname, scope: requested, signal }) => {
+    const targetPath = runtimeUploadPath(pathname)
+    const authorized = await authorizedScope(deps, user, requested, 'write')
+    const method = request.method ?? 'GET'
+    const hasBody = method !== 'GET' && method !== 'HEAD' && method !== 'DELETE'
+    let response: Response
+    try {
+      response = await fetch(`http://127.0.0.1:${String(authorized.runtime.port)}${targetPath}`, {
+        method,
+        headers: uploadHeaders(request, authorized.runtime, authorized.assertion),
+        ...(hasBody ? {
+          body: Readable.toWeb(request) as ReadableStream<Uint8Array>,
+          duplex: 'half' as const,
+        } : {}),
+        redirect: 'error',
+        signal,
+      } as RequestInit & { duplex?: 'half' })
+    } catch (error) {
+      if (signal.aborted) throw signal.reason
+      throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Target document runtime is unavailable.')
+    }
+    if (response.status === 204) return new Response(null, { status: 204 })
+    let body: unknown
+    try {
+      body = await response.json() as unknown
+    } catch {
+      throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The target runtime returned invalid upload JSON.')
+    }
+    if (!response.ok) {
+      return new Response(JSON.stringify(uploadErrorEnvelope(body)), {
+        status: response.status,
+        headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+      })
+    }
+    return new Response(JSON.stringify(safeUploadSession(body)), {
+      status: response.status,
+      headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+    })
+  }
+}
+
 /** Create a safe target-folder listing for one authorized alternate scope. */
 export function createDocumentTransferDirectoriesHandler(
   deps: DocumentTransferDependencies,
@@ -1003,28 +1189,11 @@ export function createDocumentTransferDirectoriesHandler(
     if (candidate?.version !== 1) throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document directory request.')
     const requested = scope(candidate.scope)
     const actor = syntheticUser(principal)
-    let membership: Awaited<ReturnType<GatewayCollaborationService['projectForUser']>> = null
-    if (requested.kind === 'project') {
-      try { membership = await deps.collaboration.projectForUser(requested.projectId, actor.id) } catch {
-        throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document scope authorization is unavailable.')
-      }
-      if (membership === null) throw new DocumentTransferError('COLLABORATION_FORBIDDEN', 403, 'You cannot read this project document scope.')
-    }
-    const identity: ScopeIdentity = requested.kind === 'personal'
-      ? { kind: 'personal', id: actor.id, label: 'Personal documents' }
-      : { kind: 'project', id: requested.projectId, label: membership?.name ?? 'Project documents', projectName: membership?.name, mode: membership?.mode }
-    const runtime = await runtimeFor(deps, identity, actor)
-    const assertion = deps.principals.issue({
-      user: actor,
-      scope: identity.kind === 'personal' ? { kind: 'personal' } : {
-        kind: 'project', projectId: identity.id, projectName: identity.projectName ?? identity.label, mode: identity.mode ?? 'ro',
-      },
-      runtime: { kind: runtime.target.kind, id: runtime.target.id, generation: runtime.generation },
-    })
+    const authorized = await authorizedScope(deps, actor, requested, 'read')
     let response: Response
     try {
-      response = await fetch(`http://127.0.0.1:${String(runtime.port)}/api/documents/directories`, {
-        method: 'GET', headers: headersFor(runtime, assertion),
+      response = await fetch(`http://127.0.0.1:${String(authorized.runtime.port)}/api/documents/directories`, {
+        method: 'GET', headers: headersFor(authorized.runtime, authorized.assertion),
       })
     } catch {
       throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document directory listing is unavailable.')
@@ -1038,7 +1207,7 @@ export function createDocumentTransferDirectoriesHandler(
       return validRelativeId(item?.directoryId, true) && nonEmptyString(item?.name)
         ? [{ directoryId: item.directoryId, name: item.name }] : []
     })
-    return { version: 1, scope: { kind: identity.kind, label: identity.label }, directories }
+    return { version: 1, scope: { kind: authorized.identity.kind, label: authorized.identity.label }, directories }
   }
 }
 
@@ -1054,28 +1223,11 @@ export function createDocumentTransferDirectoryCreateHandler(
     }
     const requested = scope(candidate.scope)
     const actor = syntheticUser(principal)
-    let membership: Awaited<ReturnType<GatewayCollaborationService['projectForUser']>> = null
-    if (requested.kind === 'project') {
-      try { membership = await deps.collaboration.projectForUser(requested.projectId, actor.id) } catch {
-        throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Target project authorization is unavailable.')
-      }
-      if (membership === null || (membership.mode !== 'rw' && !membership.administrator)) {
-        throw new DocumentTransferError('COLLABORATION_FORBIDDEN', 403, 'You cannot create folders in this project scope.')
-      }
-    }
-    const identity: ScopeIdentity = requested.kind === 'personal'
-      ? { kind: 'personal', id: actor.id, label: 'Personal documents' }
-      : { kind: 'project', id: requested.projectId, label: membership?.name ?? 'Project documents', projectName: membership?.name, mode: 'rw' }
-    const runtime = await runtimeFor(deps, identity, actor)
-    const assertion = deps.principals.issue({
-      user: actor,
-      scope: identity.kind === 'personal' ? { kind: 'personal' } : { kind: 'project', projectId: identity.id, projectName: identity.projectName ?? identity.label, mode: 'rw' },
-      runtime: { kind: runtime.target.kind, id: runtime.target.id, generation: runtime.generation },
-    })
+    const authorized = await authorizedScope(deps, actor, requested, 'write')
     let response: Response
     try {
-      response = await fetch(`http://127.0.0.1:${String(runtime.port)}/api/documents/folders?directory=${encodeURIComponent(candidate.directory)}&name=${encodeURIComponent(candidate.name)}`, {
-        method: 'POST', headers: headersFor(runtime, assertion),
+      response = await fetch(`http://127.0.0.1:${String(authorized.runtime.port)}/api/documents/folders?directory=${encodeURIComponent(candidate.directory)}&name=${encodeURIComponent(candidate.name)}`, {
+        method: 'POST', headers: headersFor(authorized.runtime, authorized.assertion),
       })
     } catch {
       throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Target folder creation is unavailable.')
@@ -1089,7 +1241,7 @@ export function createDocumentTransferDirectoryCreateHandler(
     if (!validRelativeId(row?.directoryId, false) || !nonEmptyString(row.name)) {
       throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned invalid folder metadata.')
     }
-    return { version: 1, scope: { kind: identity.kind, label: identity.label }, directory: { directoryId: row.directoryId, name: row.name } }
+    return { version: 1, scope: { kind: authorized.identity.kind, label: authorized.identity.label }, directory: { directoryId: row.directoryId, name: row.name } }
   }
 }
 

@@ -35,6 +35,9 @@ describe('DocumentsModal.module.css', () => {
     expect(modal).toMatch(/\.actionGroup\s*\{[\s\S]*margin-left:\s*auto/)
     expect(modal).toMatch(/\.row:hover\s*\{[\s\S]*background:\s*var\(--dsw-alias-interactive-bg-hover\)/)
     expect(modal).toMatch(/@media \(pointer: coarse\)[\s\S]*\.newFolder,[\s\S]*min-height:\s*var\(--dsw-touch-target\)/)
+    expect(modal).toMatch(/\.overviewActions\s*\{[\s\S]*display:\s*flex/)
+    expect(modal).toMatch(/\.scopeNotice\s*\{[\s\S]*border:\s*1px solid/)
+    expect(modal).toMatch(/\.scopePickerOption\s*\{[\s\S]*min-height:\s*52px/)
   })
 
   it('keeps the selected destructive action readable on its primary fill', () => {

@@ -92,6 +92,14 @@ export interface UserDocClient {
     signal?: AbortSignal,
     onProgress?: UserDocUploadProgress,
   ): Promise<UserDocRef>
+  /** Upload into a selected personal or writable project scope without changing the active runtime. */
+  uploadToScope(
+    scope: UserDocScope,
+    file: File,
+    directoryId: UserDocDirectoryIdType,
+    signal?: AbortSignal,
+    onProgress?: UserDocUploadProgress,
+  ): Promise<UserDocRef>
   createDirectory(parentDirectoryId: UserDocDirectoryIdType, name: string, signal?: AbortSignal): Promise<UserDocDirectoryRef>
   renameDirectory(directoryId: UserDocDirectoryIdType, name: string, signal?: AbortSignal): Promise<UserDocDirectoryRef>
   removeDirectory(directoryId: UserDocDirectoryIdType, signal?: AbortSignal): Promise<void>
@@ -125,11 +133,20 @@ const CAPABILITIES_PATH = `${TRANSFER_PATH}/capabilities`
 const LIST_SCOPE_PATH = `${TRANSFER_PATH}/list`
 const DIRECTORIES_PATH = `${TRANSFER_PATH}/directories`
 const DIRECTORY_CREATE_PATH = `${TRANSFER_PATH}/directories/create`
+const SCOPED_UPLOAD_PATH = TRANSFER_PATH
 const OVERVIEW_PATH = `${ROOT}/overview`
 const HISTORY_PATH = `${ROOT}/history`
 
 function contentUrl(docId: UserDocIdType): string {
   return `${ROOT}/content?id=${encodeURIComponent(docId)}`
+}
+
+function scopeKey(scope: UserDocScope): string {
+  return scope.kind === 'personal' ? 'personal' : `project:${String(scope.projectId)}`
+}
+
+function scopeQuery(scope: UserDocScope): string {
+  return `?scope=${encodeURIComponent(scopeKey(scope))}`
 }
 
 async function parseResponse(response: Response): Promise<unknown> {
@@ -190,6 +207,14 @@ export function createUserDocClient(): UserDocClient {
     listDirectories: signal => requestJson<UserDocDirectoriesResponse>(`${ROOT}/directories`, requestInit('GET', signal)),
     upload: (file, directoryId, signal, onProgress) => resumableUpload(file, directoryId, signal, onProgress, {
       root: ROOT,
+      requestJson,
+      networkError: uploadNetworkError,
+      responseError: errorFrom,
+    }),
+    uploadToScope: (scope, file, directoryId, signal, onProgress) => resumableUpload(file, directoryId, signal, onProgress, {
+      root: SCOPED_UPLOAD_PATH,
+      query: scopeQuery(scope),
+      resumeNamespace: scopeKey(scope),
       requestJson,
       networkError: uploadNetworkError,
       responseError: errorFrom,

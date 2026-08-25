@@ -6,6 +6,8 @@ Shared browser-only uploader used by the conversation composer and document mana
 
 The package has no Cordis service or UI surface. Host-specific clients provide their relative route, JSON request helper, and network-error adapter; the uploader keeps file bytes in the browser and persists only opaque session metadata in IndexedDB (with a localStorage fallback), never document bytes.
 
+Adapters may append a stable query string to every protocol request and provide a resume namespace. The namespace is part of the browser recovery key, so the same file can resume independently in separate personal or project document scopes.
+
 ## Model Experience
 
 None, as this browser transport only moves document bytes and returns a stored reference; prompt assembly and model requests belong to the consuming Host packages.
