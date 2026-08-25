@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, statSync } from 'node:fs'
+import { mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -87,6 +87,23 @@ describe('model governance integration', () => {
     const second = JSON.parse(readFileSync(path, 'utf8')) as typeof first
     expect(second.intakeToken).toBe(first.intakeToken)
     expect(second.models[0]?.allowed).toBe(true)
+  })
+
+  it('projects the authorized default into the runtime patch and removes stale defaults', async () => {
+    const { cfg, user, governance } = await fixture()
+    const patchPath = join(cfg.usersRoot, user.username, 'dsh', 'cordis.patch.yml')
+    writeFileSync(patchPath, '- id: custom\n  config:\n    value: kept\n')
+
+    await writeModelGovernanceFile(cfg, governance, user)
+    let patch = readFileSync(patchPath, 'utf8')
+    expect(patch).toContain('- id: custom')
+    expect(patch).toContain('provider: "p"')
+    expect(patch).toContain('model: "m"')
+
+    governance.setUserAccess(user.id, 'p', 'm', false)
+    await writeModelGovernanceFile(cfg, governance, user)
+    patch = readFileSync(patchPath, 'utf8')
+    expect(patch).toBe('- id: custom\n  config:\n    value: kept\n')
   })
 
   it('projects a changed policy without restarting the user instance', async () => {
