@@ -18,6 +18,7 @@ describe('loadConfig', () => {
     expect(cfg.dshCommand).toContain('{port}')
     expect(cfg.dshCommand).toContain('--no-open')
     expect(cfg.runtimeApiBodyLimitBytes).toBe(DEFAULT_RUNTIME_API_BODY_LIMIT_BYTES)
+    expect(cfg.archiveRetentionDays).toBe(30)
     expect(cfg.databaseStartupRetryInitialMs).toBe(DEFAULT_DATABASE_STARTUP_RETRY_INITIAL_MS)
     expect(cfg.databaseStartupRetryMaxMs).toBe(DEFAULT_DATABASE_STARTUP_RETRY_MAX_MS)
     expect(cfg.projectPathRoots).toEqual([])
@@ -101,6 +102,7 @@ describe('loadConfig', () => {
       HGW_PROJECTS_ROOT: '/srv/harness/projects/admin',
       HGW_IDLE_TIMEOUT_MS: '60000',
       HGW_RUNTIME_API_BODY_LIMIT_BYTES: '8388608',
+      HGW_ARCHIVE_RETENTION_DAYS: '45',
       HGW_DATABASE_STARTUP_RETRY_INITIAL_MS: '250',
       HGW_DATABASE_STARTUP_RETRY_MAX_MS: '5000',
       HGW_FCM_PROJECT_ID: '  firebase-project  ',
@@ -117,6 +119,7 @@ describe('loadConfig', () => {
     expect(cfg.projectsRoot).toBe('/srv/harness/projects/admin')
     expect(cfg.idleTimeoutMs).toBe(60000)
     expect(cfg.runtimeApiBodyLimitBytes).toBe(8 * 1024 * 1024)
+    expect(cfg.archiveRetentionDays).toBe(45)
     expect(cfg.databaseStartupRetryInitialMs).toBe(250)
     expect(cfg.databaseStartupRetryMaxMs).toBe(5000)
     expect(cfg.fcmProjectId).toBe('firebase-project')
@@ -191,6 +194,11 @@ describe('loadConfig', () => {
       .toThrow(/positive safe integer/)
     expect(() => loadConfig({ HGW_RUNTIME_API_BODY_LIMIT_BYTES: 'not-a-number' }))
       .toThrow(/positive safe integer/)
+  })
+
+  it('rejects an invalid archive retention window', () => {
+    expect(() => loadConfig({ HGW_ARCHIVE_RETENTION_DAYS: '0' })).toThrow(/HGW_ARCHIVE_RETENTION_DAYS/)
+    expect(() => loadConfig({ HGW_ARCHIVE_RETENTION_DAYS: 'not-a-number' })).toThrow(/HGW_ARCHIVE_RETENTION_DAYS/)
   })
 
   it('rejects invalid database startup retry windows', () => {

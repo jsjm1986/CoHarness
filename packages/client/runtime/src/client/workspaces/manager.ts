@@ -21,6 +21,8 @@ export interface WorkspaceListSnapshot {
    * lookups build their own transient Set where they need one.
    */
   archivedSessionIds: readonly SessionId[]
+  /** Versioned archive snapshot revision; absent on legacy carriers. */
+  archiveRevision?: number
   state: 'idle' | 'loading' | 'error'
   phase: WorkspaceListPhase
   error: RpcError | null
@@ -36,11 +38,10 @@ export class WorkspaceManager {
   private items: Workspace[] = []
   private itemViewsSource: readonly Workspace[] | null = null
   private itemViewsCache: readonly WorkspaceView[] = []
-  // Archive state is append-only in the current Host API. Every carrier still
-  // sends a complete snapshot, but an older carrier may arrive after a newer
-  // one; retaining the union prevents that stale snapshot from re-showing a
-  // session that was already archived.
+  // Versioned carriers replace the complete archive snapshot; legacy
+  // unversioned carriers remain append-only until the first revision arrives.
   private archivedSessionIds: readonly SessionId[] = []
+  private archiveRevision = 0
   private state: WorkspaceListSnapshot['state'] = 'idle'
   private phase: WorkspaceListPhase = 'pending'
   private error: RpcError | null = null
@@ -93,7 +94,7 @@ export class WorkspaceManager {
           items = items.filter(workspace => !this.removedIds.has(workspace.workspaceId))
           for (const delta of frames) items = applyWorkspaceDelta(items, delta)
           this.installViews(items)
-          this.installArchived(result.value.archivedSessionIds)
+          this.installArchived(result.value.archivedSessionIds, result.value.archiveRevision)
           this.state = 'idle'
           this.phase = 'ready'
         } else {
@@ -219,9 +220,9 @@ export class WorkspaceManager {
    * @param sessionId - session to archive.
    * @returns the wire result.
    */
-  async archiveSession(sessionId: SessionId): Promise<RpcResult<{ archivedSessionIds: SessionId[] }>> {
+  async archiveSession(sessionId: SessionId): Promise<RpcResult<{ archivedSessionIds: SessionId[]; archiveRevision?: number }>> {
     const { result } = await this.api.workspace.archiveSession({ sessionId })
-    if (result.ok) this.installArchived(result.value.archivedSessionIds)
+    if (result.ok) this.installArchived(result.value.archivedSessionIds, result.value.archiveRevision)
     return result
   }
 
@@ -238,7 +239,7 @@ export class WorkspaceManager {
       this.installOrder(envelope.payload.workspaceIds, true)
     }
     else if (envelope.payload.type === 'host/archived-sessions-changed') {
-      this.installArchived(envelope.payload.archivedSessionIds)
+      this.installArchived(envelope.payload.archivedSessionIds, envelope.payload.archiveRevision)
     }
   }
 
@@ -269,6 +270,7 @@ export class WorkspaceManager {
     return {
       items: this.itemViews(),
       archivedSessionIds: this.archivedSessionIds,
+      archiveRevision: this.archiveRevision,
       state: this.state,
       phase: this.phase,
       error: this.error,
@@ -277,16 +279,21 @@ export class WorkspaceManager {
 
   /**
    * Install an archive snapshot without allowing transport reordering to
-   * resurrect a row. The current Host surface only appends archive ids, so a
-   * shorter or divergent late snapshot is stale; a future restore operation
-   * will need an explicit revision/reset protocol instead of removing ids here.
+   * resurrect a row. A newer revision is a complete reset-aware snapshot;
+   * legacy carriers merge only before any versioned snapshot is accepted.
    * @param archivedSessionIds - complete Host archive snapshot.
    */
-  private installArchived(archivedSessionIds: readonly SessionId[]): void {
-    const next = mergeArchivedSessionIds(this.archivedSessionIds, archivedSessionIds)
+  private installArchived(archivedSessionIds: readonly SessionId[], revision?: number): void {
+    if (revision === undefined && this.archiveRevision > 0) return
+    if (revision !== undefined && revision < this.archiveRevision) return
+    const next = revision === undefined || revision === this.archiveRevision
+      ? mergeArchivedSessionIds(this.archivedSessionIds, archivedSessionIds)
+      : [...archivedSessionIds]
     if (next.length === this.archivedSessionIds.length
-      && next.every((id, index) => id === this.archivedSessionIds[index])) return
+      && next.every((id, index) => id === this.archivedSessionIds[index])
+      && (revision === undefined || revision === this.archiveRevision)) return
     this.archivedSessionIds = next
+    if (revision !== undefined) this.archiveRevision = revision
     this.notifier.markDirty()
   }
 
@@ -407,10 +414,8 @@ function applyWorkspaceDelta(items: readonly WorkspaceView[], delta: WorkspaceDe
 }
 
 /**
- * Merge two append-only archive snapshots while preserving the newest known
- * order. A superset snapshot supplies the Host order; a stale subset is
- * ignored; concurrent divergent snapshots retain both ids until a fresh
- * baseline supplies their canonical order.
+ * Merge two legacy unversioned archive snapshots while preserving the newest
+ * known order. Versioned snapshots bypass this helper and replace the set.
  * @param current - archive ids already installed locally.
  * @param incoming - a complete snapshot from a list, unary response, or frame.
  * @returns the merged archive ids.

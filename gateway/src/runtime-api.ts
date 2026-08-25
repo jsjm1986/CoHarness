@@ -19,6 +19,7 @@ import type { PostgresCollaborationService } from './postgres/collaboration-serv
 import { internalUserId, type PostgresRuntimeContext } from './postgres/runtime-context.ts'
 import type { GatewayPushService } from './push-notifications.ts'
 import type { GatewayModelGovernanceService } from './services.ts'
+import type { ConversationArchiveRuntimeSnapshot, ConversationArchiveService } from './postgres/conversation-archive-service.ts'
 import {
   DocumentTransferError,
   type RuntimeDocumentTransferHandler,
@@ -65,11 +66,12 @@ const SURFACE_EVENT_TYPES = new Set([
 interface RuntimeApiDependencies {
   context: Pick<PostgresRuntimeContext, 'pool' | 'organizationSlug'>
   instances: Pick<PostgresInstanceRepository, 'authenticateRuntimeToken'>
-  conversations: Pick<ConversationRepository, 'append' | 'listScoped' | 'load'>
+  conversations: Pick<ConversationRepository, 'append' | 'listScoped' | 'load' | 'removeTree'>
   collaboration: Pick<
     PostgresCollaborationService,
     'access' | 'claimInteraction' | 'projectForUser' | 'readableSessionIds'
   >
+  archives?: Pick<ConversationArchiveService, 'syncRuntimeSnapshot' | 'acknowledgeCommand'>
   principals: GatewayPrincipalSigner
   governance: Pick<GatewayModelGovernanceService, 'resolveOrganizationCredential'>
   /** Optional FCM delivery; omitted in keyless/unit-test compositions. */
@@ -555,6 +557,83 @@ export function createRuntimeApiHandler(
         return true
       }
 
+      if (pathname === '/internal/runtime/archive/snapshot' && req.method === 'POST') {
+        if (deps.archives === undefined) {
+          send(res, 503, { error: 'conversation-archive-unavailable' })
+          return true
+        }
+        const payload = record(JSON.parse(body))
+        const revision = payload?.revision
+        const ids = payload?.archivedSessionIds
+        const sessions = payload?.sessions
+        if (!safeInteger(revision) || revision < 0 || !Array.isArray(ids)
+          || !ids.every(id => typeof id === 'string' && id !== '')
+          || !Array.isArray(sessions) || sessions.length > 5000) {
+          throw new Error('invalid archive snapshot')
+        }
+        const snapshot = {
+          runtime: { kind: subject.target.kind, id: subject.target.id },
+          revision,
+          archivedSessionIds: ids as string[],
+          sessions: sessions.map(value => {
+            const item = record(value)
+            const header = record(item?.header)
+            const workspace = record(item?.workspace)
+            if (typeof item?.sessionId !== 'string' || item.sessionId === '' || header === undefined
+              || (item.rootSessionId !== undefined && (typeof item.rootSessionId !== 'string' || item.rootSessionId === ''))
+              || (item.messageCount !== undefined && (!safeInteger(item.messageCount) || item.messageCount > 1_000_000))
+              || (item.title !== undefined && typeof item.title !== 'string')
+              || (header.createdAt !== undefined && !safeInteger(header.createdAt))
+              || (header.cwd !== undefined && typeof header.cwd !== 'string')
+              || (header.parentSession !== undefined && (typeof header.parentSession !== 'string' || header.parentSession === ''))
+              || (header.agentPreset !== undefined && typeof header.agentPreset !== 'string')
+              || (workspace !== undefined && (typeof workspace.path !== 'string' || workspace.path === ''
+                || typeof workspace.title !== 'string' || workspace.title === ''
+                || !safeInteger(workspace.position))) ) {
+              throw new Error('invalid archive session snapshot')
+            }
+            return {
+              sessionId: item.sessionId,
+              ...(typeof item.rootSessionId === 'string' && item.rootSessionId !== '' ? { rootSessionId: item.rootSessionId } : {}),
+              header: {
+                ...(typeof header.createdAt === 'number' ? { createdAt: header.createdAt } : {}),
+                ...(typeof header.cwd === 'string' ? { cwd: header.cwd } : {}),
+                ...(typeof header.parentSession === 'string' ? { parentSession: header.parentSession } : {}),
+                ...(typeof header.agentPreset === 'string' ? { agentPreset: header.agentPreset } : {}),
+              },
+              ...(typeof item.title === 'string' && item.title !== '' ? { title: item.title } : {}),
+              ...(safeInteger(item.messageCount) ? { messageCount: item.messageCount } : {}),
+              ...(workspace === undefined ? {} : {
+                workspace: {
+                  path: workspace.path as string,
+                  title: workspace.title as string,
+                  position: workspace.position as number,
+                },
+              }),
+            }
+          }),
+          ...(Array.isArray(payload?.search) ? { search: payload.search as ConversationArchiveRuntimeSnapshot['search'] } : {}),
+        } satisfies ConversationArchiveRuntimeSnapshot
+        const commands = await deps.archives.syncRuntimeSnapshot(snapshot)
+        send(res, 200, { commands })
+        return true
+      }
+
+      if (pathname === '/internal/runtime/archive/ack' && req.method === 'POST') {
+        if (deps.archives === undefined) {
+          send(res, 503, { error: 'conversation-archive-unavailable' })
+          return true
+        }
+        const payload = record(JSON.parse(body))
+        if (typeof payload?.commandId !== 'string' || !safeInteger(payload.revision) || payload.revision < 0
+          || (payload.error !== undefined && typeof payload.error !== 'string')) {
+          throw new Error('invalid archive acknowledgement')
+        }
+        await deps.archives.acknowledgeCommand(payload.commandId, payload.revision, payload.error as string | undefined)
+        send(res, 200, { acknowledged: true })
+        return true
+      }
+
       if (pathname === '/internal/runtime/session/append' && req.method === 'POST') {
         const payload = record(JSON.parse(body))
         if (typeof payload?.sessionId !== 'string' || typeof payload.batchId !== 'string') {
@@ -624,6 +703,19 @@ export function createRuntimeApiHandler(
         send(res, 200, {
           revision: value === undefined ? null : revisionFor(subject, value.revision),
         })
+        return true
+      }
+
+      if (pathname === '/internal/runtime/session/remove' && req.method === 'POST') {
+        const payload = record(JSON.parse(body))
+        const sessionId = payload?.sessionId
+        if (typeof sessionId !== 'string' || sessionId === '') throw new Error('invalid session id')
+        if (subject.target.kind !== 'project') {
+          send(res, 409, { error: 'personal-session-removal-is-runtime-local' })
+          return true
+        }
+        await deps.conversations.removeTree(subject.organizationId, sessionId)
+        send(res, 200, { removed: true })
         return true
       }
 

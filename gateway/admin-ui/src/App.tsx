@@ -1,5 +1,6 @@
 import {
   ChartNoAxesCombined,
+  Archive,
   FileText,
   FolderKanban,
   LogOut,
@@ -17,6 +18,7 @@ import { UsersPage } from './pages/UsersPage.tsx'
 import { ModelsPage } from './pages/ModelsPage.tsx'
 import { UsagePage } from './pages/UsagePage.tsx'
 import { DocumentsPage } from './pages/DocumentsPage.tsx'
+import { ArchivesPage } from './pages/ArchivesPage.tsx'
 
 export function App() {
   return (
@@ -42,6 +44,7 @@ export function App() {
             <Route path="/models" element={<ModelsPage />} />
             <Route path="/usage" element={<UsagePage />} />
             <Route path="/documents" element={<DocumentsPage />} />
+            <Route path="/archives" element={<ArchivesPage />} />
             <Route path="/audit" element={<AuditPage />} />
           </Routes>
         </main>
@@ -57,6 +60,7 @@ const NAV_ITEMS: Array<{ to: string; label: string; icon: LucideIcon; end?: bool
   { to: '/models', label: '模型', icon: Sparkles },
   { to: '/usage', label: '用量', icon: ChartNoAxesCombined },
   { to: '/documents', label: '文档', icon: FileText },
+  { to: '/archives', label: '归档', icon: Archive },
   { to: '/audit', label: '审计', icon: ScrollText },
 ]
 

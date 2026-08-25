@@ -15,6 +15,7 @@ import { listProjectDirectories } from './project-directories.ts'
 import type { GrantMode } from './projects.ts'
 import type { GatewayDeps, GatewayHandlers } from './server.ts'
 import { DocumentCatalogError } from './postgres/document-catalog-service.ts'
+import type { ConversationArchiveAdminFilter, ConversationArchiveState } from './postgres/conversation-archive-service.ts'
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, { 'content-type': 'application/json' })
@@ -72,6 +73,9 @@ function mapError(error: unknown): { status: number; error: string } {
   if (error instanceof Error && error.message === 'settings-conflict') {
     return { status: 409, error: error.message }
   }
+  if (error instanceof Error && error.message === 'archive-idempotency-key-reused') {
+    return { status: 409, error: error.message }
+  }
   if (isCodedError(error) && error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
     return { status: 409, error: 'duplicate' }
   }
@@ -120,6 +124,108 @@ async function dispatch(
   if (pathname === '/admin/api/documents/metrics' && method === 'GET') {
     if (deps.documents === undefined) { sendError(res, 503, 'document-catalog-unavailable'); return true }
     sendJson(res, 200, await deps.documents.adminMetrics())
+    return true
+  }
+
+  if (pathname === '/admin/api/archives' && method === 'GET') {
+    if (deps.archives === undefined) { sendError(res, 503, 'conversation-archive-unavailable'); return true }
+    const query = new URL(req.url ?? '/', 'http://admin').searchParams
+    const number = (key: string, minimum = 0): number | undefined => {
+      const raw = query.get(key)
+      if (raw === null || raw === '') return undefined
+      const value = Number(raw)
+      return Number.isSafeInteger(value) && value >= minimum ? value : undefined
+    }
+    const state = query.get('state')
+    if (state !== null && state !== 'all' && state !== 'archived' && state !== 'trash' && state !== 'purged') {
+      sendError(res, 400, 'invalid archive state'); return true
+    }
+    const userId = number('userId', 1)
+    const projectId = number('projectId', 1)
+    const from = number('from', 0)
+    const to = number('to', 0)
+    const limit = number('limit', 1)
+    const offset = number('offset', 0)
+    if ((query.has('userId') && userId === undefined) || (query.has('projectId') && projectId === undefined)
+      || (query.has('from') && from === undefined) || (query.has('to') && to === undefined)
+      || (query.has('limit') && limit === undefined) || (query.has('offset') && offset === undefined)) {
+      sendError(res, 400, 'invalid archive filter'); return true
+    }
+    const filter: ConversationArchiveAdminFilter = {
+      ...(state === null ? {} : { state: state as ConversationArchiveState | 'all' }),
+      ...(query.get('q') === null ? {} : { query: query.get('q') ?? '' }),
+      ...(userId === undefined ? {} : { userId }), ...(projectId === undefined ? {} : { projectId }),
+      ...(from === undefined ? {} : { fromMs: from }), ...(to === undefined ? {} : { toMs: to }),
+      ...(limit === undefined ? {} : { limit }), ...(offset === undefined ? {} : { offset }),
+    }
+    sendJson(res, 200, await deps.archives.adminList(filter))
+    await write('admin.archives.list', { filter: { ...filter, query: filter.query === undefined ? undefined : '[provided]' } })
+    return true
+  }
+
+  const archivePath = /^\/admin\/api\/archives\/([^/]+)$/.exec(pathname)
+  const archiveExportPath = /^\/admin\/api\/archives\/([^/]+)\/export$/.exec(pathname)
+  if (archiveExportPath !== null && method === 'GET') {
+    if (deps.archives === undefined) { sendError(res, 503, 'conversation-archive-unavailable'); return true }
+    const rootSessionId = decodeURIComponent(archiveExportPath[1] ?? '')
+    const detail = deps.archives.exportDetail === undefined
+      ? await deps.archives.detail(rootSessionId, 0, 100_000)
+      : await deps.archives.exportDetail(rootSessionId)
+    if (detail === null) { sendError(res, 404, 'archive not found'); return true }
+    res.writeHead(200, {
+      'content-type': 'application/json; charset=utf-8',
+      'content-disposition': `attachment; filename="${rootSessionId.replace(/[^A-Za-z0-9._-]/g, '_')}.json"`,
+    })
+    res.end(JSON.stringify(detail))
+    await write('admin.archives.export', { rootSessionId })
+    return true
+  }
+  if (archivePath !== null && method === 'GET') {
+    if (deps.archives === undefined) { sendError(res, 503, 'conversation-archive-unavailable'); return true }
+    const rootSessionId = decodeURIComponent(archivePath[1] ?? '')
+    const fromSeq = new URL(req.url ?? '/', 'http://admin').searchParams.get('fromSeq')
+    const limit = new URL(req.url ?? '/', 'http://admin').searchParams.get('limit')
+    const parsedFrom = fromSeq === null ? 0 : Number(fromSeq)
+    const parsedLimit = limit === null ? 200 : Number(limit)
+    if (!Number.isSafeInteger(parsedFrom) || parsedFrom < 0 || !Number.isSafeInteger(parsedLimit) || parsedLimit < 1) {
+      sendError(res, 400, 'invalid archive detail pagination'); return true
+    }
+    const detail = await deps.archives.detail(rootSessionId, parsedFrom, parsedLimit)
+    if (detail === null) { sendError(res, 404, 'archive not found'); return true }
+    sendJson(res, 200, detail)
+    await write('admin.archives.view', { rootSessionId })
+    return true
+  }
+
+  if (pathname === '/admin/api/archives/actions' && method === 'POST') {
+    if (deps.archives === undefined) { sendError(res, 503, 'conversation-archive-unavailable'); return true }
+    const input = parseObject(body)
+    const action = input.action
+    const ids = input.ids
+    const idempotencyKey = input.idempotencyKey
+    if ((action !== 'restore' && action !== 'trash' && action !== 'purge')
+      || !Array.isArray(ids) || ids.length === 0 || ids.length > 50
+      || !ids.every(id => typeof id === 'string' && id !== '')
+      || (idempotencyKey !== undefined && (typeof idempotencyKey !== 'string' || idempotencyKey === ''))) {
+      sendError(res, 400, 'invalid archive action'); return true
+    }
+    const results: Array<{ rootSessionId: string; ok: boolean; error?: string }> = []
+    for (const rootSessionId of ids as string[]) {
+      try {
+        if (action === 'purge') {
+          await deps.archives.purge(rootSessionId, admin.id, idempotencyKey === undefined ? undefined : `${idempotencyKey}:${rootSessionId}`)
+        } else {
+          const value = await deps.archives.setState(rootSessionId, action === 'restore' ? 'archived' : 'trash', admin.id,
+            idempotencyKey === undefined ? undefined : `${idempotencyKey}:${rootSessionId}`)
+          if (value === null) throw new Error('archive not found')
+        }
+        results.push({ rootSessionId, ok: true })
+      } catch (error: unknown) {
+        results.push({ rootSessionId, ok: false, error: error instanceof Error ? error.message : String(error) })
+      }
+    }
+    await write(`admin.archives.${action}`, { count: ids.length, succeeded: results.filter(item => item.ok).length })
+    sendJson(res, 200, { action, results })
     return true
   }
 

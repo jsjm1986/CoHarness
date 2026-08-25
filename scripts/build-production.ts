@@ -53,6 +53,8 @@ function verifyArtifacts(): void {
     'plugins/dsh-model-governance/lib/index.js',
     'plugins/dsh-model-governance/lib/outbox.js',
     'plugins/dsh-model-governance/cordis.patch.yml',
+    'packages/context/archive-gateway/lib/index.js',
+    'packages/context/archive-gateway/lib/invariant.js',
   ]) requireFile(resolve(root, path), failures)
   requireAsset(resolve(root, 'apps/web/dist/assets'), '.js', failures)
   requireAsset(resolve(root, 'apps/web/dist/assets'), '.css', failures)

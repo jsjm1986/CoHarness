@@ -22,6 +22,8 @@ export interface WorkspaceListState {
    * build their own transient Set.
    */
   archivedSessionIds: readonly SessionId[]
+  /** Versioned archive snapshot revision, when supplied by the Host. */
+  archiveRevision?: number
   state: 'idle' | 'loading' | 'error'
   phase: WorkspaceListPhase
   error: RpcError | null
@@ -67,6 +69,7 @@ export class WorkspaceRuntime implements IWorkspaces {
     this.manager = new WorkspaceManager(api)
     this.list = createSnapshotStore<WorkspaceListState>({
       items: [], archivedSessionIds: [], state: 'idle', phase: 'pending', error: null,
+      archiveRevision: 0,
       baselinesReady: false, recentWorkspaceId: undefined,
     })
     this.manager.subscribe(() => { this.project() })
@@ -383,6 +386,7 @@ export class WorkspaceRuntime implements IWorkspaces {
     this.list.set({
       items: workspace.items,
       archivedSessionIds: workspace.archivedSessionIds,
+      ...(workspace.archiveRevision === undefined ? {} : { archiveRevision: workspace.archiveRevision }),
       state: workspace.state,
       phase: workspace.phase,
       error: workspace.error,

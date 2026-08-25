@@ -52,6 +52,8 @@ export const workspaceDomainState = z.object({
   initialized: z.boolean(),
   workspaceIds: z.array(workspaceId),
   archivedSessionIds: z.array(z.string().transform(SessionId)).default([]),
+  /** Monotonic snapshot revision; restore operations require a reset-aware carrier. */
+  archiveRevision: z.number().int().nonnegative().default(0),
   pendingMutation: workspacePendingMutation.optional(),
 })
 
@@ -69,7 +71,7 @@ export const workspaceDomainSpec = defineDomain({
   version: 2,
   global: {
     schema: workspaceDomainState,
-    initial: { initialized: false, workspaceIds: [], archivedSessionIds: [] },
+    initial: { initialized: false, workspaceIds: [], archivedSessionIds: [], archiveRevision: 0 },
   },
   tables: { workspaces: domainTable<WorkspaceId, WorkspaceRecord>(workspaceRecord) },
 })

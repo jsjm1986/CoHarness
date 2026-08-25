@@ -13,6 +13,9 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.build.json"
   },
+  "dependencies": {
+    "@deepseek-ai/dsh-archive-gateway": "*"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
@@ -22,6 +25,7 @@
     "@deepseek-ai/cordis": "4.0.1",
     "@deepseek-ai/dsh-credentials": "0.1.1-rc.1",
     "@deepseek-ai/dsh-gateway-runtime": "0.1.1-rc.1",
+    "@deepseek-ai/dsh-archive-gateway": "0.1.1-rc.1",
     "@deepseek-ai/dsh-llm": "0.1.1-rc.1",
     "@deepseek-ai/dsh-model-access": "0.1.1-rc.1",
     "@deepseek-ai/dsh-model-provider-config": "0.1.1-rc.1",
@@ -29,6 +33,7 @@
     "@deepseek-ai/dsh-settings": "0.1.1-rc.1"
   },
   "devDependencies": {
+    "@deepseek-ai/dsh-archive-gateway": "workspace:^",
     "@types/node": "22.20.0",
     "typescript": "5.9.2",
     "vitest": "4.1.8"

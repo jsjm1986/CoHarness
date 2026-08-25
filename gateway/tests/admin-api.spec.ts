@@ -14,6 +14,7 @@ import { ModelGovernanceService } from '../src/model-governance.ts'
 import { ProjectService } from '../src/projects.ts'
 import { createGatewayServer, type GatewayDeps } from '../src/server.ts'
 import { UserService } from '../src/users.ts'
+import type { ConversationArchiveDetail, ConversationArchiveRow } from '../src/postgres/conversation-archive-service.ts'
 
 let closer: (() => Promise<void>) | undefined
 afterEach(async () => { await closer?.() })
@@ -27,7 +28,7 @@ async function login(base: string, username: string, password: string): Promise<
   return (loginRes.headers.get('set-cookie') ?? '').split(';')[0] ?? ''
 }
 
-async function setup() {
+async function setup(archives?: GatewayDeps['archives']) {
   const root = mkdtempSync(join(tmpdir(), 'hgw-'))
   const db = openDb(join(root, 'g.sqlite'))
   const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), HGW_PROJECTS_ROOT: join(root, 'projects') })
@@ -53,6 +54,7 @@ async function setup() {
     audit: new AuditService(db),
     instances,
     governance: new ModelGovernanceService(db),
+    ...(archives === undefined ? {} : { archives }),
   }
   const admin = await deps.users.create({ username: 'boss', password: 'pw-12345678', role: 'admin' })
   await deps.users.changeOwnPassword(admin.id, 'pw-12345678')
@@ -71,6 +73,37 @@ async function setup() {
 }
 
 describe('admin JSON API', () => {
+  it('lists, reads, and batches archive lifecycle actions for administrators', async () => {
+    const row: ConversationArchiveRow = {
+      rootSessionId: 'session-archive-1', title: '已归档对话', creator: { id: 2, displayName: 'worker' },
+      project: null, runtime: { kind: 'user', id: 2 }, workspace: null, state: 'archived',
+      archivedAt: 1000, restoredAt: null, trashedAt: null, purgeAfter: null, syncState: 'synced',
+      childCount: 0, messageCount: 2, updatedAt: 1000,
+    }
+    const detail: ConversationArchiveDetail = { record: row, descendants: [], events: [], hasMore: false }
+    const calls: string[] = []
+    const archives = {
+      adminList: async () => [row],
+      detail: async () => detail,
+      setState: async (id: string, state: 'archived' | 'trash') => { calls.push(`${state}:${id}`); return { ...row, state } },
+      purge: async (id: string) => { calls.push(`purge:${id}`); return true },
+    } as unknown as GatewayDeps['archives']
+    const { base, cookie } = await setup(archives)
+    const list = await fetch(`${base}/admin/api/archives?state=archived&q=归档`, { headers: { cookie } })
+    expect(list.status).toBe(200)
+    expect(await list.json()).toEqual([row])
+    const read = await fetch(`${base}/admin/api/archives/${row.rootSessionId}`, { headers: { cookie } })
+    expect(read.status).toBe(200)
+    expect(await read.json()).toEqual(detail)
+    const action = await fetch(`${base}/admin/api/archives/actions`, {
+      method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'restore', ids: [row.rootSessionId], idempotencyKey: 'archive-test' }),
+    })
+    expect(action.status).toBe(200)
+    expect(await action.json()).toMatchObject({ results: [{ rootSessionId: row.rootSessionId, ok: true }] })
+    expect(calls).toEqual([`archived:${row.rootSessionId}`])
+  })
+
   it('separates the usage overview from contributor activity reports', async () => {
     const { base, cookie } = await setup()
     const overview = await fetch(`${base}/admin/api/usage/overview?month=2026-08`, { headers: { cookie } })

@@ -216,6 +216,15 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     return this.coordinator.append(id, events)
   }
 
+  /** Ask the authenticated Gateway to remove a root conversation tree. */
+  override async remove(id: SessionId, signal?: AbortSignal): Promise<void> {
+    await this.request('/internal/runtime/session/remove', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sessionId: id }),
+    }, signal)
+  }
+
   override prepare(id: SessionId, signal?: AbortSignal): Promise<SessionPreparation> {
     return this.coordinator.prepare(id, signal)
   }

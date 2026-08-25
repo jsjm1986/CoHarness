@@ -1332,6 +1332,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'id', description: 'the session the batch belongs to.' }, { name: 'events', description: 'the contiguous batch to persist, in seq order.' }],
       },
       {
+        signature: 'remove(_id: SessionId, signal?: AbortSignal): Promise<void>',
+        description: 'Remove one complete persisted session tree when the deployment exposes a destructive archive lifecycle. Backends that do not support deletion fail explicitly so callers keep a pending purge instead of silently losing the lifecycle acknowledgement.',
+        parameters: [{ name: '_id', description: 'root or session id selected for removal.' }, { name: 'signal', description: 'optional cancellation for backend work.' }],
+        returns: 'after the backend has removed the addressed artifact.',
+      },
+      {
         signature: 'async prepare(id: SessionId, signal?: AbortSignal): Promise<SessionPreparation>',
         description: 'Prepare the exact unpublished Session used by resume. Implementations may reuse object graphs retained by an earlier inspect after confirming their durable revision is still current; disposal releases an unpublished reservation. Revision retries require the durable log to remain unchanged for one read/check round trip; continuous external writers may delay completion.',
         parameters: [{ name: 'id', description: 'persisted session to prepare.' }, { name: 'signal', description: 'optional cancellation for preparation work.' }],
@@ -2601,10 +2607,27 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the complete committed workspace order.',
       },
       {
+        signature: 'archiveSnapshot(): WorkspaceArchiveSnapshot',
+        description: 'Return the complete versioned archive snapshot for synchronization.',
+        parameters: [],
+        returns: 'the current archive revision and ordered ids.',
+      },
+      {
+        signature: 'async archivedEntries(): Promise<readonly ArchivedSessionEntry[]>',
+        description: 'Resolve archived headers and their original Workspace positions for a sync consumer.',
+        parameters: [],
+        returns: 'archived entries with root lineage and retained placement.',
+      },
+      {
         signature: 'archiveSession(sessionId: SessionId): Promise<void>',
         description: 'Archive one session durably. The session must exist (live or in session persistence); its workspace accounting — or lack of one — is irrelevant. An already archived id resolves without writing.',
         parameters: [{ name: 'sessionId', description: 'The session to archive.' }],
         returns: 'resolution after durability.',
+      },
+      {
+        signature: 'restoreSession(sessionId: SessionId): Promise<void>',
+        description: 'Restore one archived session to its retained Workspace accounting slot.',
+        parameters: [{ name: 'sessionId', description: 'session to restore.' }],
       },
       {
         signature: 'async resolveByPath(path: string): Promise<Workspace | undefined>',
@@ -3162,6 +3185,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     description: 'A workflow run started — the script\'s meta block validated, the body about to execute. Paired with Events[\'workflow/end\'].',
     parameters: [{ name: 'info', description: 'the run\'s identity snapshot (id + meta).' }],
   },
+  {
+    name: 'workspace/archive-changed',
+    mode: 'emit',
+    signature: '\'workspace/archive-changed\': (snapshot: WorkspaceArchiveSnapshot) => void',
+    summary: 'Complete archive snapshot after a durable archive or restore mutation.',
+    description: 'Complete archive snapshot after a durable archive or restore mutation.',
+    parameters: [{ name: 'snapshot', description: 'committed registry archive snapshot.' }],
+  },
 ]
 
 /** Shapes of every exported type the Service and Event signatures reference (transitively), sorted by name. */
@@ -3225,6 +3256,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ApprovalService',
     declaration: 'export class ApprovalService extends Service {\n    static Config: z<Config>;\n    constructor(ctx: Context, public config: Config);\n    setPolicy(agent: Agent, policy: ApprovalPolicy): void;\n    async request(req: ApprovalRequest): Promise<ApprovalOutcome>;\n    overrideOf(session: Session): ApprovalPolicy | undefined;\n}',
+  },
+  {
+    name: 'ArchivedSessionEntry',
+    declaration: 'export interface ArchivedSessionEntry {\n    readonly sessionId: SessionId;\n    readonly rootSessionId: SessionId;\n    readonly header: SessionHeader;\n    readonly workspace?: {\n        readonly id: WorkspaceId;\n        readonly path: string;\n        readonly title: string;\n        readonly position: number;\n    };\n}',
   },
   {
     name: 'AskUserQuestionAnswer',
@@ -3756,7 +3791,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'GatewayPrincipalClaims',
-    declaration: 'export interface GatewayPrincipalClaims {\n    version: 1;\n    issuer: \'harness-gateway\';\n    audience: \'dsh-runtime\';\n    organization: string;\n    user: {\n        id: number;\n        username: string;\n        displayName: string;\n        role: \'admin\' | \'user\';\n    };\n    scope: GatewayPrincipalScope;\n    runtime: GatewayRuntimeIdentity;\n    issuedAt: number;\n    expiresAt: number;\n    nonce: string;\n}',
+    declaration: 'export interface GatewayPrincipalClaims {\n    version: 1;\n    issuer: \'harness-gateway\';\n    audience: \'dsh-runtime\';\n    organization: string;\n    user: {\n        id: number;\n        username: string;\n        displayName: string;\n        role: \'admin\' | \'user\';\n    };\n    scope: GatewayPrincipalScope;\n    runtime: GatewayRuntimeIdentity;\n    issuedAt: number;\n    expiresAt: number;\n    nonce: string;\n    purpose?: \'archive-read\';\n}',
   },
   {
     name: 'GatewayPrincipalScope',
@@ -5521,6 +5556,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'WorkflowStopReason',
     declaration: 'export type WorkflowStopReason = \'completed\' | \'cancelled\' | \'error\';',
+  },
+  {
+    name: 'WorkspaceArchiveSnapshot',
+    declaration: 'export interface WorkspaceArchiveSnapshot {\n    readonly revision: number;\n    readonly archivedSessionIds: readonly SessionId[];\n}',
   },
 ]
 

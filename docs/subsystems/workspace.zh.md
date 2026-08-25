@@ -204,6 +204,18 @@ delete(id: WorkspaceId): Promise<boolean>
 insertBefore(id: WorkspaceId, beforeId?: WorkspaceId): Promise<readonly WorkspaceId[]>
 
 /**
+ * Return the complete versioned archive snapshot for synchronization.
+ * @returns the current archive revision and ordered ids.
+ */
+archiveSnapshot(): WorkspaceArchiveSnapshot
+
+/**
+ * Resolve archived headers and their original Workspace positions for a sync consumer.
+ * @returns archived entries with root lineage and retained placement.
+ */
+async archivedEntries(): Promise<readonly ArchivedSessionEntry[]>
+
+/**
  * Archive one session durably. The session must exist (live or in session
  * persistence); its workspace accounting — or lack of one — is irrelevant.
  * An already archived id resolves without writing.
@@ -211,6 +223,12 @@ insertBefore(id: WorkspaceId, beforeId?: WorkspaceId): Promise<readonly Workspac
  * @returns resolution after durability.
  */
 archiveSession(sessionId: SessionId): Promise<void>
+
+/**
+ * Restore one archived session to its retained Workspace accounting slot.
+ * @param sessionId - session to restore.
+ */
+restoreSession(sessionId: SessionId): Promise<void>
 
 /**
  * Resolve by canonical directory path without creating or mutating a
@@ -224,5 +242,26 @@ async resolveByPath(path: string): Promise<Workspace | undefined>
 
 Types: [SessionId](core.zh.md)
 
-Source: [`packages/workspace/workspace/src/index.ts:92`](../../packages/workspace/workspace/src/index.ts)
+Source: [`packages/workspace/workspace/src/index.ts:115`](../../packages/workspace/workspace/src/index.ts)
+
+<a id="workspace-events"></a>
+
+### `workspace/*` events
+
+<a id="workspacearchive-changed--emit"></a>
+
+#### `workspace/archive-changed` — emit
+
+Complete archive snapshot after a durable archive or restore mutation.
+
+```ts cordis-catalog
+/**
+ * Complete archive snapshot after a durable archive or restore mutation.
+ * @param snapshot - committed registry archive snapshot.
+ * @mode emit
+ */
+'workspace/archive-changed': (snapshot: WorkspaceArchiveSnapshot) => void
+```
+
+Source: [`packages/workspace/workspace/src/index.ts:77`](../../packages/workspace/workspace/src/index.ts)
 <!-- END GENERATED cordis-surface -->

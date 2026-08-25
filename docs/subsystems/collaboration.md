@@ -44,6 +44,8 @@ interface GatewayPrincipalClaims {
   issuedAt: number
   expiresAt: number
   nonce: string
+  /** Optional capability purpose used by loopback-only runtime integrations. */
+  purpose?: 'archive-read'
 }
 ```
 
@@ -308,7 +310,7 @@ request(path: string, options: GatewayRuntimeRequestInit = {}): Promise<Response
 
 Types: [SessionId](core.md)
 
-Source: [`packages/context/gateway-runtime/src/index.ts:236`](../../packages/context/gateway-runtime/src/index.ts)
+Source: [`packages/context/gateway-runtime/src/index.ts:242`](../../packages/context/gateway-runtime/src/index.ts)
 
 <a id="typert-gateway-events"></a>
 

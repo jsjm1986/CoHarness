@@ -3359,6 +3359,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               ctx.workspaceRegistry.archivedSessionIds,
               captured.authority,
             ),
+            archiveRevision: ctx.workspaceRegistry.archiveRevision,
           })
         } catch (error: unknown) {
           return err(request, collaborationRefusal(error, 'read'))
@@ -3551,6 +3552,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               ctx.workspaceRegistry.archivedSessionIds,
               authorized.authority,
             ),
+            archiveRevision: ctx.workspaceRegistry.archiveRevision,
           })
         } catch (error: unknown) {
           return err(request, collaborationRefusal(error, 'read', sessionId))
@@ -4358,6 +4360,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           const committedWorkspaceIds = new Set<string>()
           let committedWorkspaceOrder: WorkspaceId[] = []
           let archivedSessionIds = ctx.workspaceRegistry.archivedSessionIds
+          let archiveRevision = ctx.workspaceRegistry.archiveRevision
           const initializationPublications: Array<() => void> = []
           let initializing = true
           const fail = createReadStreamFailure(queue, streamErrorFrame)
@@ -4392,11 +4395,12 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             }
           }
 
-          const pushArchived = async (sessionIds: readonly SessionId[]): Promise<void> => {
+          const pushArchived = async (sessionIds: readonly SessionId[], revision: number): Promise<void> => {
             try {
               queue.push(frame({
                 type: 'host/archived-sessions-changed',
                 archivedSessionIds: await readableSessionList(sessionIds, authority),
+                archiveRevision: revision,
               }))
             } catch (error: unknown) {
               fail(error)
@@ -4458,9 +4462,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
                     }
                   }, fail)
                   if (state.archivedSessionIds.length !== archivedSessionIds.length
-                    || state.archivedSessionIds.some((id, index) => id !== archivedSessionIds[index])) {
+                    || state.archivedSessionIds.some((id, index) => id !== archivedSessionIds[index])
+                    || state.archiveRevision !== archiveRevision) {
                     archivedSessionIds = state.archivedSessionIds
-                    void pushArchived(state.archivedSessionIds)
+                    archiveRevision = state.archiveRevision
+                    void pushArchived(state.archivedSessionIds, state.archiveRevision)
                   }
                   return
                 }

@@ -201,6 +201,7 @@ export const EVENT_SCOPE_PAGE: Record<string, string> = {
   'typert-gateway': 'collaboration.md',
   'workflow': 'workflow.md',
   'webserver': 'web-server.md',
+  'workspace': 'workspace.md',
 }
 
 /**
@@ -563,6 +564,8 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   DomainFacility: 'storage.md',
   Workspace: 'workspace.md',
   WorkspaceId: 'workspace.md',
+  WorkspaceArchiveSnapshot: 'workspace.md',
+  ArchivedSessionEntry: 'workspace.md',
   WebBootGraph: 'client-modules.md',
   SessionTelemetryRecord: 'session-telemetry.md',
   WorkflowRunInfo: 'workflow.md',

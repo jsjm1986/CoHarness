@@ -29,6 +29,7 @@ export const workspaceListRequestSchema = z.object({}) satisfies z.ZodType<Wire<
 export const workspaceListValueSchema = z.object({
   items: z.array(workspaceViewSchema),
   archivedSessionIds: z.array(sessionIdSchema),
+  archiveRevision: z.number().int().nonnegative().optional(),
 }) satisfies z.ZodType<Wire<ResponseValue<'workspace.list'>>>
 
 /** workspace.create request payload: the existing directory to adopt. */
@@ -97,4 +98,5 @@ export const workspaceArchiveSessionRequestSchema = z.object({
 /** workspace.archiveSession response value: the full updated archive set. */
 export const workspaceArchiveSessionValueSchema = z.object({
   archivedSessionIds: z.array(sessionIdSchema),
+  archiveRevision: z.number().int().nonnegative().optional(),
 }) satisfies z.ZodType<Wire<ResponseValue<'workspace.archiveSession'>>>

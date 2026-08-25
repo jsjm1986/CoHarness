@@ -21,6 +21,9 @@ import type { UserRow } from './auth.ts'
 
 export const PRINCIPAL_HEADER = 'x-dsh-gateway-principal'
 
+/** Narrow purpose carried by a Gateway assertion that is not a browser request. */
+export type GatewayPrincipalPurpose = 'archive-read'
+
 export type PrincipalScope =
   | { kind: 'personal' }
   | { kind: 'project'; projectId: number; projectName: string; mode: 'ro' | 'rw' }
@@ -45,6 +48,8 @@ export interface GatewayPrincipalClaims {
   issuedAt: number
   expiresAt: number
   nonce: string
+  /** Optional capability purpose; ordinary browser assertions omit it. */
+  purpose?: GatewayPrincipalPurpose
 }
 
 /** Immutable runtime session header bound into a delayed-creation authorization. */
@@ -122,6 +127,7 @@ export class GatewayPrincipalSigner {
     user: UserRow
     scope: PrincipalScope
     runtime: { kind: 'user' | 'project'; id: number; generation: number }
+    purpose?: GatewayPrincipalPurpose
     now?: number
   }): string {
     const issuedAt = input.now ?? Date.now()
@@ -141,6 +147,7 @@ export class GatewayPrincipalSigner {
       issuedAt,
       expiresAt: issuedAt + this.ttlMs,
       nonce: randomUUID(),
+      ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
     }
     return signedPayload(claims, this.privateKey)
   }
@@ -214,6 +221,9 @@ function principalClaims(value: unknown): GatewayPrincipalClaims {
     || typeof claims.issuedAt !== 'number' || !Number.isSafeInteger(claims.issuedAt)
     || typeof claims.expiresAt !== 'number' || !Number.isSafeInteger(claims.expiresAt)
     || claims.expiresAt <= claims.issuedAt || typeof claims.nonce !== 'string' || claims.nonce === '') {
+    throw new Error('invalid principal assertion')
+  }
+  if (claims.purpose !== undefined && claims.purpose !== 'archive-read') {
     throw new Error('invalid principal assertion')
   }
   if (scope.kind === 'project' && (!positiveId(scope.projectId) || typeof scope.projectName !== 'string'

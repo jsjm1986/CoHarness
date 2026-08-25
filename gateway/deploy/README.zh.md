@@ -21,6 +21,8 @@
 5. 创建仅所有者可访问的 `/srv/harness/gateway-data/principal-keys` 和 `/srv/harness/gateway-data/runtime-credentials`，以及 `/srv/harness/project-runtimes` 和项目根目录。为两个受控根配置组继承，例如执行 `install -d -o root -g harness-project -m 2770 /srv/harness/projects/admin /srv/harness/projects/user-projects`；通过显式路径导入的目录仍需显式授予 `harness-project` 读写权限。把 `deploy/harness-gateway.service` 复制到 `/etc/systemd/system/`；调整数据库 URL 文件、`HGW_ORGANIZATION_SLUG`、`HGW_COMPUTE_NODE_NAME`、`HGW_PUBLIC_ORIGINS`、`HGW_PROJECT_PATH_ROOTS`、`HGW_PROJECTS_ROOT`、`HGW_USER_PROJECTS_ROOT`、项目运行时账户/根目录、principal/凭据目录、插件路径和其他宿主机路径，然后执行 `systemctl daemon-reload && systemctl enable --now harness-gateway`。
 6. 数据库中没有用户时，首次启动会把引导管理员密码打进 journal：`journalctl -u harness-gateway | grep 'bootstrap admin'`。
 
+Admin 归档频道由 PostgreSQL migration 015 启用。可通过 `HGW_ARCHIVE_RETENTION_DAYS`（默认 `30`）设置回收站保留窗口。运行时归档快照通过私有 Gateway API 对账；运行时 home 与 Gateway 归档索引必须纳入同一套备份方案。个人正文仍保存在运行时自己的存储中，由管理员阅读器按需读取。
+
 ## 每用户开号
 
 在 `/admin` 创建用户，然后以 root 执行一次 `deploy/provision-user.sh <username>`：它创建 `harness-<username>` 系统账号并 chown `/srv/harness/users/<username>/{home,dsh}`。个人单元在每次启动时按该用户当前授权自动渲染。管理员发起的项目可以在 `HGW_PROJECTS_ROOT` 下得到 `0770` 受管目录，也可以导入从 `HGW_PROJECT_PATH_ROOTS` 下选择的既有目录；导入目录需要显式授予 `harness-project` 读写权限。用户发起的项目仍只提交名称，并在 `HGW_USER_PROJECTS_ROOT` 下创建空目录；前面的 setgid/默认 ACL 配置会让项目单元继承访问权，创建者成为 `rw` 所有者。两种来源都分配一个共享运行时，支持 `ro`/`rw` 邀请，并使用同一套对话与文件夹 scope。项目目录不能与用户数据、运行时或凭据数据、Gateway/发布/插件代码、用户受管项目存储或另一项目重叠。成员身份和个人目录权限写入会在需要时重启正在运行的个人运行时；项目 ACL 按请求检查，不要求重启共享运行时。管理员在个人和项目 scope 都保留 `danger-full-access` 预设，但项目运行时仍受内核项目路径约束。
