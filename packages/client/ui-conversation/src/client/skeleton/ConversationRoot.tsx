@@ -60,7 +60,7 @@ export function ConversationRoot({
     workspace => workspace.workspaceId === discardWorkspaceId,
   )
   const hasUnsentDraft = inputState !== undefined && (
-    inputState.draft.trim() !== ''
+    inputState.draft !== ''
     || inputState.imageIds.length > 0
     || inputState.documentIds.length > 0
   )
@@ -74,6 +74,7 @@ export function ConversationRoot({
 
   const chooseWorkspace = (workspaceId: WorkspaceId): void => {
     setPickerOpen(false)
+    if (pendingWorkspaceId !== undefined) return
     if (sessionWorkspace?.workspaceId === workspaceId) return
     if (sessionId !== undefined && hasUnsentDraft) {
       setDiscardWorkspaceId(workspaceId)

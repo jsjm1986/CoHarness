@@ -423,6 +423,21 @@ describe('ConversationRoot resident composer', () => {
     expect(b.view.getByText('Selected Folder')).toBeTruthy()
   })
 
+  it('treats whitespace as unsent draft content', () => {
+    const b = mount(
+      conversationSnapshot({ composerPhase: 'blank', blank: true }),
+      [
+        { ...workspace('one'), sessionIds: [SID] },
+        { ...workspace('second'), title: 'Selected Folder' },
+      ],
+    )
+    fireEvent.change(b.view.getByRole('textbox'), { target: { value: '   ' } })
+    fireEvent.click(b.view.getByRole('button', { name: '选择工作区' }))
+    const owner = b.pickerOwner() as { onPick(id: WorkspaceId): void }
+    act(() => { owner.onPick(wid('second')) })
+    expect(b.view.getByRole('dialog', { name: '切换工作区并放弃未发送内容？' })).toBeTruthy()
+  })
+
   it('settling phase: a summary that does not prove the session blank hides the composer while it opens', () => {
     const b = mount(conversationSnapshot({ composerPhase: 'blank', blank: true, openState: 'loading' }))
     const root = b.view.container.querySelector('[data-phase]')
