@@ -427,13 +427,14 @@ describe('LlmRuntime', () => {
   })
 
   it('normalizes arbitrary adapter rejections without throwing them downstream', async () => {
+    const rejection: unknown = 'plain provider failure'
     const adapter = new class extends LlmAdapter {
       stream(_options: GenerateOptions): AsyncIterable<StreamChunk> {
         return {
           [Symbol.asyncIterator](): AsyncIterator<StreamChunk> {
             return {
               // Third-party adapters can reject with arbitrary values.
-              next: () => Promise.reject('plain provider failure'), // oxlint-disable-line typescript/prefer-promise-reject-errors -- arbitrary rejection is the case under test
+              next: () => Promise.resolve().then(() => { throw rejection }),
             }
           },
         }

@@ -14,11 +14,12 @@ function dialogBlock(source: string): string {
 }
 
 describe('DocumentsModal.module.css', () => {
-  it('uses a 960px desktop card with a tall min and max height', () => {
+  it('uses the current wide workbench dimensions without stale fallback rules', () => {
     const block = dialogBlock(modal)
-    expect(block).toContain('width: min(960px, 100%)')
-    expect(block).toContain('min-height: min(640px, calc(var(--dsw-viewport-height, 100vh) - 48px))')
-    expect(block).toContain('max-height: min(860px, calc(var(--dsw-viewport-height, 100vh) - 48px))')
+    expect(block).toContain('width: min(1180px, calc(100vw - 48px))')
+    expect(block).toContain('min-height: min(680px, calc(var(--dsw-viewport-height, 100vh) - 40px))')
+    expect(block).toContain('max-height: min(900px, calc(var(--dsw-viewport-height, 100vh) - 32px))')
+    expect(block).not.toContain('960px')
   })
 
   it('keeps the compact dialog a full-width bottom sheet', () => {
@@ -50,6 +51,23 @@ describe('DocumentsModal.module.css', () => {
     expect(modal).toMatch(/\.rowMore\s*\{[\s\S]*min-width:\s*var\(--dsw-touch-target\)[\s\S]*min-height:\s*var\(--dsw-touch-target\)/)
     expect(modal).toMatch(/\.mobileSelectionBar\s*\{[\s\S]*var\(--dsw-safe-bottom\)/)
     expect(modal).toMatch(/@media \(max-width: 767px\)[\s\S]*\.scopeRail\s*\{[\s\S]*display:\s*none/)
+    expect(modal).toMatch(
+      /\.row\s*\{[\s\S]*grid-template-columns:\s*var\(--dsw-touch-target\) 24px minmax\(0, 1fr\) var\(--dsw-touch-target\)/,
+    )
+    expect(modal).toContain('scrollbar-gutter: stable')
+  })
+
+  it('keeps limits and metadata in the shared mobile type roles', () => {
+    expect(modal).toMatch(/\.limits\s*\{[\s\S]*font:\s*var\(--dsw-mobile-font-caption\)/)
+    expect(modal).toMatch(/\.row \.name,[\s\S]*font:\s*var\(--dsw-mobile-font-body\)/)
+    expect(modal).toMatch(/\.row \.size,[\s\S]*font:\s*var\(--dsw-mobile-font-caption\)/)
+  })
+
+  it('compresses desktop action labels in the narrow medium column', () => {
+    expect(modal).toMatch(/@media \(min-width: 768px\) and \(max-width: 1023px\)[\s\S]*\.actions \.actionLabel\s*\{[\s\S]*display:\s*none/)
+    expect(modal).toMatch(
+      /@media \(min-width: 768px\) and \(max-width: 1023px\)[\s\S]*\.actions \.actionIcon\s*\{[\s\S]*display:\s*inline-flex/,
+    )
   })
 })
 
@@ -60,6 +78,8 @@ describe('DocumentsMobileSheet.module.css', () => {
     expect(sheet).toMatch(/\.body\s*\{[\s\S]*overflow-y:\s*auto/)
     expect(sheet).toMatch(/var\(--dsw-mobile-sheet-bottom\)/)
     expect(sheet).toMatch(/var\(--dsw-safe-bottom\)/)
+    expect(sheet).not.toContain('.handle')
+    expect(sheet).toContain('scrollbar-gutter: stable')
   })
 })
 
@@ -69,5 +89,10 @@ describe('DocumentPreview.module.css', () => {
     expect(block).toContain('width: min(960px, 100%)')
     expect(block).toContain('min-height: min(640px, calc(var(--dsw-viewport-height, 100vh) - 48px))')
     expect(block).toContain('max-height: min(860px, calc(var(--dsw-viewport-height, 100vh) - 48px))')
+  })
+
+  it('keeps preview content in one scrollport on compact surfaces', () => {
+    expect(preview).toMatch(/\.body\s*\{[\s\S]*overflow:\s*auto[\s\S]*scrollbar-gutter:\s*stable/)
+    expect(preview).toMatch(/\.text\s*\{[\s\S]*overflow:\s*visible/)
   })
 })

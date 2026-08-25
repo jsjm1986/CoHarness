@@ -5,7 +5,7 @@
 
 .root {
   --dsh-session-list-edge-inset: var(--dsh-sidebar-inline-padding);
-  --dsh-session-list-scrollbar-width: 8px;
+  --dsh-session-list-scrollbar-width: var(--dsh-scrollbar-width);
   --dsh-session-list-scrollbar-offset: 2px;
   flex: 1;
   min-height: 0;
@@ -349,7 +349,7 @@
 }
 
 /* List: the only scrolling region. Block children keep their design heights
-   under content overflow. The 2px edge offset, stable 8px themed scrollbar,
+   under content overflow. The 2px edge offset, stable themed scrollbar,
    and remaining padding equal the shell's right inset, with or without
    overflow, so moving the bar does not move the rows. */
 .list {

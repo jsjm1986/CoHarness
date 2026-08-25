@@ -38,7 +38,7 @@
 // `right` compensation dropped to 0 — and measures the same two tabs through
 // it, which is what keeps the equal rectangles above from being explained by a
 // tab switch that never reached the layout. It is the reported symptom as a
-// number: the card moves 4px, half the 8px band, on each edge.
+// number: the card moves 2px, half the 4px band, on each edge.
 //
 // Zero model calls: a seeded cold session renders from its log, and switching
 // tabs asks the host for nothing. A stray stream would fail loud with NO_ADAPTER.
@@ -329,7 +329,7 @@ describe('web e2e: input card position across view tabs', () => {
     await setMeasuredViewport(page, WIDE_VIEWPORT, false)
     // Vacuity guard. The scenario must be able to fail: on an engine that
     // does not implement `scrollbar-gutter`, Chat reserves nothing and the
-    // overlay seat's fixed compensation stands alone, manufacturing an 8px
+    // overlay seat's fixed compensation stands alone, manufacturing a 4px
     // deviation the equal-rectangle assertions would catch. `stable` reserves
     // even without overflow, so a short transcript is not a vacuous case; the
     // poll still pins the measurement to the overflowing state the product

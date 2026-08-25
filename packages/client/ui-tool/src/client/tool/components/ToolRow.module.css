@@ -223,11 +223,11 @@
   overflow-y: auto;
 }
 
-/* Card-internal scrollbar: a 2px transparent border clips the thumb inward so
-   it floats off the rounded card edge instead of hugging it (the terminal
+/* Card-internal scrollbar: the shared transparent inset clips the thumb inward
+   so it floats off the rounded card edge instead of hugging it (the terminal
    card's own output scroller carries the same treatment in TerminalBlock). */
 .ioSection::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
+  border: var(--dsh-scrollbar-thumb-inset) solid transparent;
   background-clip: padding-box;
   border-radius: var(--dsw-radius-sm);
 }

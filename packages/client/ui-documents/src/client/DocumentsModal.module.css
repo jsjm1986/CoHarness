@@ -5,11 +5,8 @@
 .dialog {
   display: flex;
   flex-direction: column;
-  /* Keep the previous card tokens discoverable for downstream themes that
-     parse this module; the workbench dimensions below are the active values. */
-  /* width: min(960px, 100%); min-height: min(640px, calc(var(--dsw-viewport-height, 100vh) - 48px)); max-height: min(860px, calc(var(--dsw-viewport-height, 100vh) - 48px)); */
   width: min(1180px, calc(100vw - 48px));
-  min-height: min(720px, calc(var(--dsw-viewport-height, 100vh) - 32px));
+  min-height: min(680px, calc(var(--dsw-viewport-height, 100vh) - 40px));
   max-height: min(900px, calc(var(--dsw-viewport-height, 100vh) - 32px));
   /* Modal paints this card at layer 2; these tokens inherit to the scrolling list. */
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
@@ -31,6 +28,7 @@
   min-height: 0;
   padding: var(--dsw-space-3);
   overflow-y: auto;
+  scrollbar-gutter: stable;
   border-right: 1px solid var(--dsw-alias-border-l2);
   background: var(--dsw-alias-bg-layer-2);
 }
@@ -38,7 +36,7 @@
 .scopeRailHeading {
   padding: 4px 8px 8px;
   color: var(--dsw-alias-label-caption);
-  font-size: 11px;
+  font: var(--dsw-mobile-font-caption);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -97,13 +95,13 @@
 }
 
 .scopeItem strong {
-  font-size: 13px;
+  font: var(--dsw-mobile-font-secondary);
   font-weight: 600;
 }
 
 .scopeItem small {
   color: var(--dsw-alias-label-caption);
-  font-size: 11px;
+  font: var(--dsw-mobile-font-caption);
 }
 
 .workbenchContent {
@@ -112,6 +110,7 @@
   min-width: 0;
   min-height: 0;
   flex-direction: column;
+  gap: var(--dsw-space-2);
   padding: var(--dsw-space-4);
 }
 
@@ -153,6 +152,8 @@
   min-height: 0;
   flex-direction: column;
   overflow: auto;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
 }
 
 .overviewRow {
@@ -197,7 +198,21 @@
   flex: 1 1 auto;
   flex-direction: column;
   min-height: 0;
+  width: 100%;
+  margin-top: 0;
+  padding: 0;
   overflow: hidden;
+}
+
+/* Documents own a denser title row than the generic short-form modal while
+   retaining the primitive's focus and close-button behavior. */
+.shell > :first-child {
+  min-height: 48px;
+  padding: 12px var(--dsw-space-4) 8px;
+}
+
+.shell > :first-child h2 {
+  font: var(--dsw-mobile-font-nav);
 }
 
 .panel {
@@ -205,14 +220,13 @@
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: var(--dsw-space-4);
+  gap: var(--dsw-space-3);
   min-height: 0;
 }
 
 .error {
   color: var(--dsw-alias-state-error-primary);
-  font-size: 13px;
-  line-height: 20px;
+  font: var(--dsw-mobile-font-secondary);
 }
 
 .breadcrumbs {
@@ -323,10 +337,20 @@
   justify-content: space-between;
   gap: var(--dsw-space-2);
   color: var(--dsw-alias-label-caption);
-  font-size: 12px;
-  line-height: 18px;
+  font: var(--dsw-mobile-font-caption);
   padding-bottom: var(--dsw-space-2);
   border-bottom: 1px solid var(--dsw-alias-border-l2);
+}
+
+.limits {
+  flex: none;
+  margin: 0 var(--dsw-space-4);
+  padding: var(--dsw-space-2) var(--dsw-space-3);
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-mobile-font-caption);
 }
 
 .selectionBar {
@@ -345,8 +369,7 @@
   gap: var(--dsw-space-2);
   width: 100%;
   color: var(--dsw-alias-label-secondary);
-  font-size: 13px;
-  line-height: 20px;
+  font: var(--dsw-mobile-font-secondary);
 }
 
 .check {
@@ -403,14 +426,15 @@
   min-height: 0;
   padding-bottom: var(--dsw-safe-bottom);
   overflow: auto;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
 }
 
 .status,
 .empty {
   margin: 0;
   color: var(--dsw-alias-label-caption);
-  font-size: 13px;
-  line-height: 20px;
+  font: var(--dsw-mobile-font-secondary);
 }
 
 .group {
@@ -420,9 +444,9 @@
 }
 
 .groupDate {
+  padding: var(--dsw-space-2) var(--dsw-space-1) var(--dsw-space-1);
   color: var(--dsw-alias-label-caption);
-  font-size: 12px;
-  line-height: 18px;
+  font: var(--dsw-mobile-font-caption);
   font-weight: 500;
 }
 
@@ -481,16 +505,14 @@
 .name {
   overflow: hidden;
   color: var(--dsw-alias-label-primary);
-  font-size: 13px;
-  line-height: 20px;
+  font: var(--dsw-mobile-font-secondary);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .size {
   color: var(--dsw-alias-label-caption);
-  font-size: 12px;
-  line-height: 18px;
+  font: var(--dsw-mobile-font-caption);
 }
 
 .actions {
@@ -653,6 +675,30 @@
   }
 }
 
+/* The shared 768px breakpoint still has the desktop scope rail, but its
+   content column cannot fit five text buttons. Keep the desktop semantics and
+   accessible names while using the same compact icon geometry as a toolbar. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .actions {
+    gap: var(--dsw-space-1);
+  }
+
+  .actions > button,
+  .actions > .download {
+    width: 28px;
+    min-width: 28px;
+    padding: 0;
+  }
+
+  .actions .actionIcon {
+    display: inline-flex;
+  }
+
+  .actions .actionLabel {
+    display: none;
+  }
+}
+
 /* -------------------------------------------------------------------------
    Compact document workbench
 
@@ -792,8 +838,8 @@
 .sheetSection {
   display: flex;
   flex-direction: column;
-  gap: var(--dsw-space-2);
-  padding-bottom: var(--dsw-space-3);
+  gap: var(--dsw-space-1);
+  padding-bottom: var(--dsw-space-2);
   border-bottom: 1px solid var(--dsw-alias-border-l2);
 }
 
@@ -918,6 +964,7 @@
 
   .workbenchContent {
     min-height: 0;
+    gap: var(--dsw-space-2);
     padding: var(--dsw-space-3);
   }
 
@@ -1044,11 +1091,18 @@
     flex: 0 0 auto;
     min-width: var(--dsw-touch-target);
     min-height: var(--dsw-touch-target);
+    padding-inline: var(--dsw-space-2);
     white-space: nowrap;
+  }
+
+  .limits {
+    margin-inline: var(--dsw-space-3);
+    padding: var(--dsw-space-1) var(--dsw-space-2);
   }
 
   .caption {
     gap: var(--dsw-space-1);
+    min-height: 24px;
     padding-bottom: var(--dsw-space-2);
   }
 
@@ -1057,7 +1111,7 @@
   }
 
   .list {
-    gap: var(--dsw-space-2);
+    gap: var(--dsw-space-1);
     overscroll-behavior: contain;
   }
 
@@ -1070,15 +1124,11 @@
     display: grid;
     grid-template-columns: var(--dsw-touch-target) 24px minmax(0, 1fr) var(--dsw-touch-target);
     align-items: center;
-    min-height: 64px;
-    padding: var(--dsw-space-2);
+    min-height: 56px;
+    padding: var(--dsw-space-1) 0;
     border: 1px solid var(--dsw-alias-border-l2);
-    border-radius: var(--dsw-radius-lg);
+    border-radius: var(--dsw-radius-md);
     background: var(--dsw-alias-bg-layer-1);
-  }
-
-  .row:not(.folderRow) {
-    flex-wrap: nowrap;
   }
 
   .row:not(.folderRow) .actions {
@@ -1089,6 +1139,16 @@
     min-width: 0;
   }
 
+  .row .name,
+  .overviewRow .name {
+    font: var(--dsw-mobile-font-body);
+  }
+
+  .row .size,
+  .overviewRow .size {
+    font: var(--dsw-mobile-font-caption);
+  }
+
   .row:not(.folderRow) .size {
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1096,14 +1156,22 @@
   }
 
   .folderRow {
-    grid-template-columns: minmax(0, 1fr) var(--dsw-touch-target);
+    grid-template-columns: var(--dsw-touch-target) 24px minmax(0, 1fr) var(--dsw-touch-target);
   }
 
   .folderRow .folderAlign {
-    display: none;
+    display: block;
+    width: var(--dsw-touch-target);
+    height: var(--dsw-touch-target);
+    grid-column: 1;
   }
 
   .folderOpen {
+    display: grid;
+    grid-column: 2 / 4;
+    grid-template-columns: 24px minmax(0, 1fr);
+    align-items: center;
+    gap: var(--dsw-space-2);
     min-width: 0;
     min-height: var(--dsw-touch-target);
   }
@@ -1125,6 +1193,7 @@
     height: var(--dsw-touch-target);
     min-height: var(--dsw-touch-target);
     padding: 0;
+    grid-column: 4;
     border-radius: var(--dsw-radius-md);
   }
 
@@ -1154,11 +1223,13 @@
     position: sticky;
     z-index: 2;
     bottom: 0;
+    margin-inline: calc(-1 * var(--dsw-space-1));
   }
 
   .emptyState {
     align-items: stretch;
-    padding: var(--dsw-space-4) 0;
+    gap: var(--dsw-space-2);
+    padding: var(--dsw-space-3) 0;
   }
 
   .emptyActions {
@@ -1173,10 +1244,10 @@
   .overviewRow {
     display: grid;
     grid-template-columns: 24px minmax(0, 1fr) var(--dsw-touch-target);
-    min-height: 64px;
-    padding: var(--dsw-space-2);
+    min-height: 56px;
+    padding: var(--dsw-space-1);
     border: 1px solid var(--dsw-alias-border-l2);
-    border-radius: var(--dsw-radius-lg);
+    border-radius: var(--dsw-radius-md);
     background: var(--dsw-alias-bg-layer-1);
   }
 

@@ -44,7 +44,7 @@
 }
 
 .ioSection::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
+  border: var(--dsh-scrollbar-thumb-inset) solid transparent;
   background-clip: padding-box;
   border-radius: var(--dsw-radius-sm);
 }

@@ -1,4 +1,4 @@
-- 'heading "More actions: brief.txt" [level=2]'
+- heading "More actions" [level=2]
 - button "Close":
   - img
 - strong: brief.txt

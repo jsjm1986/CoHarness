@@ -1,19 +1,19 @@
-- heading "Switch scope" [level=2]
+- heading "Choose document scope" [level=2]
 - button "Close":
   - img
 - paragraph: "Choose the document scope to view:"
 - img
-- textbox "Search scopes"
+- textbox "Search document scopes"
 - listbox "Document scopes":
-  - option "All authorized scopes Metadata only":
-    - strong: All authorized scopes
+  - option "All accessible documents Metadata only":
+    - strong: All accessible documents
     - text: Metadata only
   - option "Personal documents Private to you" [selected]:
     - strong: Personal documents
     - text: Private to you
-  - option "Compiler RO · Shared project scope":
+  - option "Compiler Read-only · Shared project scope":
     - strong: Compiler
-    - text: RO · Shared project scope
-  - option "Payments RW · Shared project scope":
+    - text: Read-only · Shared project scope
+  - option "Payments Editable · Shared project scope":
     - strong: Payments
-    - text: RW · Shared project scope
+    - text: Editable · Shared project scope

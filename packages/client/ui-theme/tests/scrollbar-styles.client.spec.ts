@@ -344,6 +344,7 @@ describe('scrollbar.css base-surface binding', () => {
 
 describe('scrollbar.css width variable', () => {
   const WIDTH_VARIABLE = `${INDIRECTION_PREFIX}width`
+  const INSET_VARIABLE = `${INDIRECTION_PREFIX}thumb-inset`
 
   it('defines the width variable on body as a static length', () => {
     // The overlay seat compensation reads a fixed number, not a second
@@ -372,6 +373,21 @@ describe('scrollbar.css width variable', () => {
       .findLast(([property]) => property === 'width')?.[1]
     expect(webkitWidth, '::-webkit-scrollbar width').toBeDefined()
     expect(webkitWidth).toBe(variableValue)
+  })
+
+  it('defines a smaller static thumb inset for narrow card scrollbars', () => {
+    const value = scrollbarRules
+      .filter(rule => rule.selectors.includes('body'))
+      .flatMap(rule => rule.declarations)
+      .findLast(([property]) => property === INSET_VARIABLE)?.[1]
+    expect(value, INSET_VARIABLE).toBe('1px')
+    const readers = packageStylesheets()
+      .filter(file => file !== fileURLToPath(new URL('scrollbar.css', STYLES)))
+      .flatMap(file => parseRules(readFileSync(file, 'utf8')))
+      .flatMap(rule => rule.declarations)
+      .flatMap(([, value]) => varReferences(value))
+      .filter(name => name === INSET_VARIABLE)
+    expect(readers.length, INSET_VARIABLE).toBeGreaterThan(0)
   })
 
   it('every reader of the width variable outside ui-theme references a defined variable', () => {
