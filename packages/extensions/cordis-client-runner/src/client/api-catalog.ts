@@ -308,6 +308,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the connected session id.',
       },
       {
+        signature: 'openWorkspace(workspaceId: WorkspaceId): Promise<SessionId>',
+        description: 'Open the most recent historical conversation in a Workspace.',
+        parameters: [{ name: 'workspaceId', description: 'target Workspace.' }],
+        returns: 'the selected historical or fallback blank Session id.',
+      },
+      {
         signature: 'startSession(workspaceId?: WorkspaceId): void',
         description: 'The New Session flow: connect the explicit, current-Session, or recent Workspace and open the resulting session; failures surface on the session list state.',
         parameters: [{ name: 'workspaceId', description: 'explicit target; omitted inherits the current Session\'s Workspace before falling back to the recency projection.' }],

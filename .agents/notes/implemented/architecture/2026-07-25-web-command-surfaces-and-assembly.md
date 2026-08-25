@@ -38,7 +38,7 @@ The pipeline was ready but command knowledge had no landing spot: host-side `ctx
 
 ### Assembly-level acceptance: the slash-flow snapshot
 
-`apps/web/tests/slash-flow.snapshot.ts` pins the user-visible main chain (assembled keyless; package mocks are no substitute for the assembled transcript): the composer disabled with no session → creating a Workspace and entering an already-materialized blank session → picking the `/echo` leadingInput from the `/` menu → the command executes but the blank bit does not flip and the list still shows `New Session` → the first ordinary prompt's successful acceptance converts that same row; the same session-bound textarea holds across blank → active. `workspace-flow.snapshot.ts` separately pins blank-row creation/reuse, first-prompt rejection backfill, and — on a Workspace switch before the first prompt — the draft moving across input machines with the old blank row hidden.
+`apps/web/tests/slash-flow.snapshot.ts` pins the user-visible main chain (assembled keyless; package mocks are no substitute for the assembled transcript): the composer disabled with no session → creating a Workspace and entering an already-materialized blank session → picking the `/echo` leadingInput from the `/` menu → the command executes but the blank bit does not flip and the list still shows `New Session` → the first ordinary prompt's successful acceptance converts that same row; the same session-bound textarea holds across blank → active. The assembled Workspace scenarios separately pin blank-row creation/reuse, first-prompt rejection backfill, history-first entry, explicit New Session Hero entry, and confirmed draft discard with failure retention.
 
 ## Alternatives considered
 

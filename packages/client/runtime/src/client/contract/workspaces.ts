@@ -21,6 +21,12 @@ export interface IWorkspaces {
    */
   connectWorkspace(workspaceId: WorkspaceId): Promise<SessionId>
   /**
+   * Open the most recent historical conversation in a Workspace.
+   * @param workspaceId - target Workspace.
+   * @returns the selected historical or fallback blank Session id.
+   */
+  openWorkspace(workspaceId: WorkspaceId): Promise<SessionId>
+  /**
    * The New Session flow: connect the explicit, current-Session, or recent
    * Workspace and open the resulting session; failures surface on the session
    * list state.

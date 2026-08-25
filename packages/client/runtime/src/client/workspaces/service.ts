@@ -117,11 +117,41 @@ export class WorkspaceRuntime implements IWorkspaces {
   }
 
   /**
+   * Resolve the default conversation for an existing Workspace. The list
+   * snapshot is the complete input: this method performs no additional Host
+   * request and opens only the selected Session. A Workspace with no visible
+   * historical Session falls back to {@link connectWorkspace}, preserving the
+   * New Session blank-reuse semantics.
+   * @param workspaceId - target workspace.
+   * @returns the historical or fallback blank session id.
+   */
+  async openWorkspace(workspaceId: WorkspaceId): Promise<SessionId> {
+    const state = this.list.getSnapshot()
+    const workspace = state.items.find(item => item.workspaceId === workspaceId)
+    if (workspace === undefined) throw new Error(`workspaces.openWorkspace: unknown workspace ${workspaceId}`)
+    const archived = new Set(state.archivedSessionIds)
+    const sessions = this.sessions.list.getSnapshot().byId
+    let selected: { id: SessionId; updatedAt: number; order: number } | undefined
+    for (const [order, id] of workspace.sessionIds.entries()) {
+      const summary = sessions[id]
+      if (summary === undefined || summary.blank || summary.origin === 'subagent' || archived.has(id)) continue
+      if (selected === undefined
+        || summary.updatedAt > selected.updatedAt
+        || (summary.updatedAt === selected.updatedAt && order < selected.order)) {
+        selected = { id, updatedAt: summary.updatedAt, order }
+      }
+    }
+    return selected?.id ?? this.connectWorkspace(workspaceId)
+  }
+
+  /**
    * Follow the first complete Workspace/Session baseline and select a default
-   * session exactly once. A restored current session wins; otherwise the most
-   * recent Workspace is connected (reusing or creating its blank session).
+   * session exactly once. A restored current session wins; otherwise the
+   * newest eligible historical Session across Workspaces opens, falling back
+   * to the recent Workspace's reusable or newly created blank session when no
+   * history exists.
    * Later explicit clears stay cleared instead of retriggering this startup
-   * policy. A failed connect may retry on the next baseline projection.
+   * policy. A failed open may retry on the next baseline projection.
    * @returns disposer for the baseline subscription; late work cannot navigate after disposal.
    */
   startInitialSelection(): () => void {
@@ -129,20 +159,27 @@ export class WorkspaceRuntime implements IWorkspaces {
       throw new Error('workspaces.startInitialSelection: already started')
     }
     this.initialSelectionStarted = true
-    let state: 'waiting' | 'connecting' | 'done' = 'waiting'
+    let state: 'waiting' | 'opening' | 'done' = 'waiting'
     let disposed = false
     const reconcile = (): void => {
       if (disposed || state !== 'waiting') return
       const workspace = this.list.getSnapshot()
       if (!workspace.baselinesReady) return
-      const current = this.sessions.list.getSnapshot().current
-      const target = workspace.recentWorkspaceId
+      const sessions = this.sessions.list.getSnapshot()
+      const current = sessions.current
+      // Startup is history-first across the whole registry. Keep
+      // recentWorkspaceId as the New Session target, where an empty Workspace
+      // is still a valid destination, but do not let a newer blank/subagent
+      // row hide an older visible conversation in another Workspace.
+      const target = recentHistoryWorkspace(
+        workspace.items, sessions.byId, workspace.archivedSessionIds,
+      ) ?? workspace.recentWorkspaceId
       if (current !== undefined || target === undefined) {
         state = 'done'
         return
       }
-      state = 'connecting'
-      void this.connectWorkspace(target).then(
+      state = 'opening'
+      void this.openWorkspace(target).then(
         (sessionId) => {
           if (disposed) return
           if (this.sessions.list.getSnapshot().current === undefined) {
@@ -370,6 +407,31 @@ function recentWorkspace(
     }
     if (latest === Number.NEGATIVE_INFINITY) latest = Date.parse(workspace.createdAt)
     if (selected === undefined || latest > selectedTime) {
+      selected = workspace.workspaceId
+      selectedTime = latest
+    }
+  }
+  return selected
+}
+
+/** Select the Workspace containing the newest eligible historical Session. */
+function recentHistoryWorkspace(
+  workspaces: readonly WorkspaceView[],
+  sessions: SessionsPortList['byId'],
+  archivedSessionIds: readonly SessionId[],
+): WorkspaceId | undefined {
+  const archived = new Set(archivedSessionIds)
+  let selected: WorkspaceId | undefined
+  let selectedTime = Number.NEGATIVE_INFINITY
+  for (const workspace of workspaces) {
+    let latest = Number.NEGATIVE_INFINITY
+    for (const sessionId of workspace.sessionIds) {
+      const session = sessions[sessionId]
+      if (session === undefined || session.blank || session.origin === 'subagent' || archived.has(sessionId)) continue
+      latest = Math.max(latest, session.updatedAt)
+    }
+    if (selected === undefined || latest > selectedTime) {
+      if (latest === Number.NEGATIVE_INFINITY) continue
       selected = workspace.workspaceId
       selectedTime = latest
     }

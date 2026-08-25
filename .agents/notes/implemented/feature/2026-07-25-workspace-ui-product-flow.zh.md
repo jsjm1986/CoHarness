@@ -46,11 +46,11 @@ Session 自己持有首条输入并驱动一条内部流水线：必要时以预
 
 ### 用户动线
 
-应用首次进入时等待 Workspace 与 Session 两份基线 ready。仍有效的真实 Session selection 被恢复；否则进入 New Session，并固定选择一次最近 Workspace。最近 Workspace 取其成员 Session 的最大 `updatedAt`，空 Workspace 回退到 `createdAt`；该派生只决定默认目标，不改变 Host Workspace 顺序，也不会在后续 hydration 时二次改选。
+应用首次进入时等待 Workspace 与 Session 两份基线 ready。仍有效的真实 Session selection 被恢复；否则固定打开所有 Workspace 中最新的可见历史 Session。整个注册表没有符合条件历史时，才选择最近 Workspace 并回退到可复用或新建的空白 Session。最近 Workspace 取其成员 Session 的最大 `updatedAt`，空 Workspace 回退到 `createdAt`；这些派生只决定默认目标，不改变 Host Workspace 顺序，也不会在后续 hydration 时二次改选。
 
 完全没有 Workspace 时，页面创建默认名为 `workspace` 的前端 Workspace 对象和指向它的前端 Session。两者不写 Host，composer 始终可输入；首次发送才依次 materialize Workspace、attach Session、发送消息。
 
-顶部 New Session、Workspace 行内加号和 Workspace picker 最终都调用同一 New Session 动作：显式 Workspace id 直接成为目标，未指定时先使用当前 Session 所属 Workspace，再使用最近 Workspace；没有真实 Workspace 时进入空白 New Session 页面。Workspace picker 的单一 Add workspace 动作（见[单一路径 Note](../simplification/2026-07-31-one-route-to-add-a-workspace.zh.md)；本决策做出时是 Use an existing folder 与按名称创建两个动作）会在用户确认目录时立即创建真实 Workspace，再将前端 Session 的目标改为该 Workspace；即使用户不发送消息，显式创建的空 Workspace 也保留。
+顶部 New Session 与 Workspace 行内加号调用空白 New Session 动作。Hero Workspace picker 会打开所选 Workspace 最新的可见历史 Session；没有历史时才回退到空白动作。显式 Workspace id 直接成为目标，空白动作未指定时先使用当前 Session 所属 Workspace，再使用最近 Workspace；没有真实 Workspace 时进入空白 New Session 页面。Workspace picker 的单一 Add workspace 动作（见[单一路径 Note](../simplification/2026-07-31-one-route-to-add-a-workspace.zh.md)；本决策做出时是 Use an existing folder 与按名称创建两个动作）会在用户确认目录时立即创建真实 Workspace，再将前端 Session 的目标改为该 Workspace；即使用户不发送消息，显式创建的空 Workspace 也保留。Hero 中有未发送文字或浏览器附件时，picker 丢弃前必须要求确认；取消会保持当前 Session 不变。
 
 新建 Workspace 的显示名取自其所在目录。不同 canonical path 可以拥有相同的 basename 派生显示名（见[身份决策](../bug-fix/2026-07-31-same-basename-workspace-adoption.zh.md)）；显式的重命名操作仍保留显示名重名检查。跨 Workspace 移动 Session、从 Ungrouped 手动收编以及分别输入显示名和目录名仍不在此动线范围内。
 
@@ -82,7 +82,7 @@ Host 记账保持手动的 `Workspace.sessionIds` 顺序：新 attach 的 Sessio
 
 React 组件只消费 `useSessions`、`useWorkspaces` 与 session-scoped 钩子，不拥有实体生命周期。Zustand store 只保留布局、当前 view、普通真实 Session 的 composer 文本和其他纯呈现状态；Session/Workspace Intent、materialize phase、错误和保留的提示词位于 React-free 运行时对象层。
 
-Sidebar 与 conversation empty hero 通过 slot 获得标准化动作：`startSession`、`updateSessionPrompt`、`sendSession`、`open` 与 `toggleSidebar`。Workspace picker 复用同一组件与 `createWorkspace` 动作；owner 只提供 popover 开关、锚点和选中回调。呈现层不直接发送 `host/workspace-changed`，Host 事件只由 Host mutation 与流适配器产生。
+Sidebar 与 conversation empty hero 通过 slot 获得标准化动作：`startSession`、`updateSessionPrompt`、`sendSession`、`open` 与 `toggleSidebar`。Workspace picker 复用同一组件与 `createWorkspace` 动作；owner 只提供 popover 开关、锚点和选中回调。运行时区分历史优先的 `openWorkspace` 与空白的 `connectWorkspace`，呈现层不直接发送 `host/workspace-changed`，Host 事件只由 Host mutation 与流适配器产生。
 
 ## Alternatives considered
 

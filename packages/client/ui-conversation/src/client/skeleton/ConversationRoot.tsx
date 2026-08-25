@@ -4,6 +4,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
+import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConversationSlotProps, InputZone } from '../contract/slots.ts'
 import { HeroGlow, HeroShell, WorkspaceChip, workspaceLabel } from './EmptyHero.tsx'
@@ -30,6 +31,7 @@ export function ConversationRoot({
 
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pendingWorkspaceId, setPendingWorkspaceId] = useState<WorkspaceId | undefined>()
+  const [discardWorkspaceId, setDiscardWorkspaceId] = useState<WorkspaceId | undefined>()
   const pickerAnchor = useRef<HTMLButtonElement>(null)
 
   // Publishes the seat's live height as --dsh-composer-height on the scroll
@@ -54,16 +56,50 @@ export function ConversationRoot({
   const pendingWorkspace = workspaces.items.find(
     workspace => workspace.workspaceId === pendingWorkspaceId,
   )
+  const discardWorkspace = workspaces.items.find(
+    workspace => workspace.workspaceId === discardWorkspaceId,
+  )
+  const hasUnsentDraft = inputState !== undefined && (
+    inputState.draft.trim() !== ''
+    || inputState.imageIds.length > 0
+    || inputState.documentIds.length > 0
+  )
+
+  const navigateWorkspace = (workspaceId: WorkspaceId, discardDraft = false): void => {
+    setPendingWorkspaceId(workspaceId)
+    void selectWorkspace(workspaceId, { discardDraft }).catch(() => {
+      setPendingWorkspaceId(current => current === workspaceId ? undefined : current)
+    })
+  }
+
+  const chooseWorkspace = (workspaceId: WorkspaceId): void => {
+    setPickerOpen(false)
+    if (sessionWorkspace?.workspaceId === workspaceId) return
+    if (sessionId !== undefined && hasUnsentDraft) {
+      setDiscardWorkspaceId(workspaceId)
+      return
+    }
+    navigateWorkspace(workspaceId)
+  }
+
+  const confirmWorkspaceDiscard = (): void => {
+    const workspaceId = discardWorkspaceId
+    if (workspaceId === undefined) return
+    setDiscardWorkspaceId(undefined)
+    navigateWorkspace(workspaceId, true)
+  }
 
   // Clear the pending pick once the session lands in it, or when the picked
   // workspace disappears from a ready list (deleted from the sidebar).
   useEffect(() => {
-    if (pendingWorkspaceId === undefined) return
-    if (sessionWorkspace?.workspaceId === pendingWorkspaceId
-      || (workspaces.phase === 'ready' && pendingWorkspace === undefined)) {
+    if (pendingWorkspaceId !== undefined && (sessionWorkspace?.workspaceId === pendingWorkspaceId
+      || (workspaces.phase === 'ready' && pendingWorkspace === undefined))) {
       setPendingWorkspaceId(undefined)
     }
-  }, [pendingWorkspaceId, sessionWorkspace?.workspaceId, workspaces.phase, pendingWorkspace])
+    if (discardWorkspaceId !== undefined && workspaces.phase === 'ready' && discardWorkspace === undefined) {
+      setDiscardWorkspaceId(undefined)
+    }
+  }, [discardWorkspace, discardWorkspaceId, pendingWorkspace, pendingWorkspaceId, sessionWorkspace?.workspaceId, workspaces.phase])
 
   // While a session is still replaying (loading + blank) the hero/docked
   // choice is unknowable — render the composer hidden instead of flashing
@@ -110,13 +146,7 @@ export function ConversationRoot({
         open: pickerOpen,
         anchorRef: pickerAnchor,
         selectedId: pendingWorkspaceId ?? sessionWorkspace?.workspaceId,
-        onPick: (workspaceId) => {
-          setPickerOpen(false)
-          setPendingWorkspaceId(workspaceId)
-          void selectWorkspace(workspaceId).catch(() => {
-            setPendingWorkspaceId(current => current === workspaceId ? undefined : current)
-          })
-        },
+        onPick: chooseWorkspace,
         onClose: () => { setPickerOpen(false) },
       })}
       {renderSlot('conversation.hero.agentPreset', {})}
@@ -190,6 +220,25 @@ export function ConversationRoot({
         {renderSlot('conversation.session', { compact })}
         {composerSeat}
       </div>
+      <Modal
+        open={discardWorkspaceId !== undefined}
+        onClose={() => { setDiscardWorkspaceId(undefined) }}
+        title={t('workspace.discard.title')}
+        description={t('workspace.discard.description', {
+          name: discardWorkspace?.title ?? t('hero.chooseWorkspace'),
+        })}
+        closeLabel={t('workspace.discard.close')}
+        footer={(
+          <>
+            <Button variant="outline" onClick={() => { setDiscardWorkspaceId(undefined) }}>
+              {t('workspace.discard.cancel')}
+            </Button>
+            <Button variant="primary" onClick={confirmWorkspaceDiscard}>
+              {t('workspace.discard.confirm')}
+            </Button>
+          </>
+        )}
+      />
     </div>
   )
 }

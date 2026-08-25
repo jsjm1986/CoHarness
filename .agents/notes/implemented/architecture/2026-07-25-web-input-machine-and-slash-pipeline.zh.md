@@ -73,7 +73,7 @@ occurrence 表与 chip 三投影：
 - composer bar 是一个无条件渲染的 `session-maybe` slot entry：无会话时同一个 InputBar 以惰性态渲染（machine face 缺席、`disabled` owner prop），`connectWorkspace` 返回 blank 会话后同一实例转为 live——textarea DOM 在无会话 → blank 切换及其后每次 phase 翻转中都不重建；`ConversationRoot`、Hero 与布局骨架全程保持。
 - ConversationRoot 的 Hero 判据是 `sessionId === undefined || (composerPhase === 'blank' && (openState === 'open' || summaryBlank === true))`：summary 已证实为空的会话在任何 open state 下都保持 Hero，未经证实的会话则在 loading 期间进入 settling。首次 submit 同步进入 engaging，失败也保留 composer 与错误上下文，不退回 blank Hero；sidebar 的 blank 位只在提示词成功受理后翻 false。
 - 发送统一在 hub defaultSink：乐观清稿后只走 `session.prompt` 且固定 `mode:'queue'`（Web UI 无 steer 入口；host 线缆上的 `mode:'steer'` 不经此 machine）；失败且 live draft 仍为空才回填，用户已经继续输入则不覆盖。不存在 Draft materialize 或 attach 事务。
-- blank Hero 改选 Workspace 时，外壳调用 `connectWorkspace`；目标会话不同时把非空 draft 从当前 shell 搬到目标 shell，再 open 新 id，旧 blank 会话留存但不再 current。
+- blank Hero 改选 Workspace 时，外壳调用 `openWorkspace`，它选择目标最新历史或回退到 `connectWorkspace`。非空 draft 必须先确认，且只有目标解析成功后才丢弃；取消或失败都会保持当前 shell。
 - Notifier 双位约定：`dirty`（快照新鲜度，`ensureFresh` 拉取可清）与 `notifyPending`（通知欠账，只有 flush 清）各自独立——拉取不得吞推送，对象层推订阅者（watchTransaction）依赖这一保证。
 
 ### 纯文本引用：text outcome 与 lexicon 装饰
@@ -103,7 +103,7 @@ skill/@subagent 引用不走占位符 + occurrence 身份链——纯文本引�
 - `conversation.composer.dock`——composer 上沿统计带。
 - `conversation.input.left` / `conversation.input.right`——工具行左右区。
 - `conversation.input.plan` / `conversation.input.model`（single）——工具行两具名控制位；bar 只传 `locked`（owner props），空到 owning 插件注册为止，无占位 fallback。plan seat 未激活时保持为空，因为入口归共享 Command source 所有；有效 plan 目标会渲染 warn 状态的 `Plan ×` 状态按钮，其唯一动作是 `/plan off`。
-- `conversation.hero.workspace`（root scope）——无会话 / blank Hero 共用的 Workspace picker；pick 经 `connectWorkspace` 复用或创建目标 blank 会话，必要时搬运 draft 后切 current。
+- `conversation.hero.workspace`（root scope）——无会话 / blank Hero 共用的 Workspace picker；pick 经 `openWorkspace` 打开目标最新历史或空白回退，并在确认丢弃 draft 后切 current。
 
 ### 测试纪律
 

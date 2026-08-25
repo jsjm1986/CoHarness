@@ -325,6 +325,35 @@ describe('WorkspaceRuntime', () => {
     await expect(workspaces.connectWorkspace(wid('alpha'))).resolves.toBe('s-fresh-2')
   })
 
+  it('openWorkspace selects the newest visible history and ignores blank, archived, and subagent rows', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const sessions = new SessionRuntime(ctx, api, fakeRemote())
+    const workspaces = new WorkspaceRuntime(ctx, api, sessions)
+    api.onWorkspaceList = () => Promise.resolve(ok({
+      items: [workspace('alpha', [
+        sid('s-old'), sid('s-blank'), sid('s-newest'), sid('s-child'), sid('s-archived'),
+      ])] as never[],
+      archivedSessionIds: [sid('s-archived')],
+    }) as never)
+    api.onList = () => Promise.resolve(ok({ items: [
+      { sessionId: sid('s-old'), updatedAt: 4, running: false, blank: false, cwd: '/w/alpha' },
+      { sessionId: sid('s-blank'), updatedAt: 10, running: false, blank: true, cwd: '/w/alpha' },
+      { sessionId: sid('s-newest'), updatedAt: 9, running: false, blank: false, cwd: '/w/alpha' },
+      { sessionId: sid('s-child'), updatedAt: 12, running: false, blank: false, origin: 'subagent', cwd: '/w/alpha' },
+      { sessionId: sid('s-archived'), updatedAt: 11, running: false, blank: false, cwd: '/w/alpha' },
+    ] as never[] }))
+    await Promise.all([workspaces.refresh(), sessions.refresh()])
+    await Promise.resolve()
+
+    const sessionListCalls = api.callsOf('session.list').length
+    await expect(workspaces.openWorkspace(wid('alpha'))).resolves.toBe('s-newest')
+    expect(api.callsOf('session.create')).toEqual([])
+    expect(api.callsOf('session.list')).toHaveLength(sessionListCalls)
+    sessions.open(sid('s-newest'))
+    expect(sessions.list.getSnapshot().current).toBe('s-newest')
+  })
+
   it('prepares create options before reusing blanks and skips plugin-incompatible candidates', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()
@@ -666,19 +695,61 @@ describe('startInitialSelection', () => {
     return { api, sessions, workspaces }
   }
 
-  it('connects the recent Workspace blank session once baselines are ready and opens it', async () => {
+  it('opens the recent Workspace history once baselines are ready', async () => {
     const b = bench()
     const stop = b.workspaces.startInitialSelection()
     // Nothing happens before both baselines land.
     expect(b.api.callsOf('session.create')).toHaveLength(0)
 
     b.api.onWorkspaceList = () => Promise.resolve(ok({
-      items: [workspace('recent', [], '2026-01-02T00:00:00.000Z')] as never[],
+      items: [workspace('recent', [sid('s-history')], '2026-01-02T00:00:00.000Z')] as never[],
     }))
-    b.api.onCreate = () => Promise.resolve(ok({ sessionId: sid('s-new') }))
+    b.api.onList = () => Promise.resolve(ok({
+      items: [{ sessionId: sid('s-history'), updatedAt: 3, running: false, blank: false, cwd: '/w/recent' }] as never[],
+    }))
     await b.workspaces.refresh()
     await b.sessions.refresh()
     // Store notifications and the connect round trip are microtask-batched.
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(b.api.callsOf('session.create')).toEqual([])
+    expect(b.sessions.list.getSnapshot().current).toBe('s-history')
+    stop()
+  })
+
+  it('startup skips newer blank or subagent rows when another Workspace has visible history', async () => {
+    const b = bench()
+    b.api.onWorkspaceList = () => Promise.resolve(ok({
+      items: [
+        workspace('newer-blank', [sid('s-blank')], '2026-02-01T00:00:00.000Z'),
+        workspace('older-history', [sid('s-history')], '2026-01-01T00:00:00.000Z'),
+        workspace('newer-child', [sid('s-child')], '2026-03-01T00:00:00.000Z'),
+      ] as never[],
+    }))
+    b.api.onList = () => Promise.resolve(ok({
+      items: [
+        { sessionId: sid('s-blank'), updatedAt: 100, running: false, blank: true, cwd: '/w/newer-blank' },
+        { sessionId: sid('s-history'), updatedAt: 4, running: false, blank: false, cwd: '/w/older-history' },
+        { sessionId: sid('s-child'), updatedAt: 200, running: false, blank: false, origin: 'subagent', cwd: '/w/newer-child' },
+      ] as never[],
+    }))
+    const stop = b.workspaces.startInitialSelection()
+    await b.workspaces.refresh()
+    await b.sessions.refresh()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(b.sessions.list.getSnapshot().current).toBe('s-history')
+    expect(b.api.callsOf('session.create')).toEqual([])
+    stop()
+  })
+
+  it('falls back to a blank recent Workspace when it has no history', async () => {
+    const b = bench()
+    b.api.onWorkspaceList = () => Promise.resolve(ok({
+      items: [workspace('recent', [], '2026-01-02T00:00:00.000Z')] as never[],
+    }))
+    b.api.onCreate = () => Promise.resolve(ok({ sessionId: sid('s-new') }))
+    const stop = b.workspaces.startInitialSelection()
+    await b.workspaces.refresh()
+    await b.sessions.refresh()
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(b.api.callsOf('session.create')).toEqual([{ workspaceId: 'recent' }])
     expect(b.sessions.list.getSnapshot().current).toBe('s-new')

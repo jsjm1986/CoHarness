@@ -366,9 +366,11 @@ describe('workspaces', () => {
 
     runtime.workspaces.startSession('w1' as WorkspaceId)
     await expect(runtime.workspaces.connectWorkspace('w2' as WorkspaceId)).resolves.toBe('session-of-w2')
+    await expect(runtime.workspaces.openWorkspace('w-history' as WorkspaceId)).resolves.toBe('session-of-w-history')
     expect(runtime.workspaces.calls).toEqual([
       { method: 'startSession', args: ['w1'] },
       { method: 'connectWorkspace', args: ['w2'] },
+      { method: 'openWorkspace', args: ['w-history'] },
     ])
     const stub = vi.fn(() => Promise.resolve('other' as never))
     runtime.workspaces.stub('connectWorkspace', stub)

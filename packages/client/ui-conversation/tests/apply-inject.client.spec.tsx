@@ -2,8 +2,8 @@
 // apply inject factories exercised end to end against the terminal thin
 // API: the strict session API (views triple, draft mirror), the
 // provide-channel input face (machine-sink submit choreography incl.
-// transactional clear + failure retention), the resident API (selectWorkspace
-// draft carrying), the composer-bar stop face, openDetails = select action +
+// transactional clear + failure retention), the resident API (history-first
+// selectWorkspace and confirmed draft discard), the composer-bar stop face, openDetails = select action +
 // layout orchestration, and the closeDetails details API. Complements
 // chat-apply.spec.tsx (registration) and selection-survival.spec.tsx (store
 // axis). History opening is NOT an inject concern — the runtime sessions
@@ -252,62 +252,68 @@ describe('conversation slot inject API', () => {
     await b.runtime.dispose()
   })
 
-  it('routes workspace switching through the runtime owner, carrying the draft', async () => {
+  it('routes workspace switching through the history-first runtime owner and discards only when confirmed', async () => {
     const b = await bench()
     const resident = b.residentApi(ROOT)
-    // Same-session connect (the picked workspace resolves to this session):
-    // no draft movement, plain re-open.
-    b.runtime.workspaces.stub('connectWorkspace', () => Promise.resolve(ROOT))
+    // Same-session history entry resolves to this session: no draft movement,
+    // plain re-open.
+    b.runtime.workspaces.stub('openWorkspace', () => Promise.resolve(ROOT))
     const { state, actions } = b.inputApi(ROOT)
     actions.setDraft('carry me')
     void resident.selectWorkspace('workspace-1' as never)
     await vi.waitFor(() => {
       expect(b.runtime.sessions.calls.filter(c => c.method === 'open')).toHaveLength(1)
     })
-    expect(b.runtime.workspaces.calls).toContainEqual({ method: 'connectWorkspace', args: ['workspace-1'] })
+    expect(b.runtime.workspaces.calls).toContainEqual({ method: 'openWorkspace', args: ['workspace-1'] })
     expect(state.getSnapshot().draft).toBe('carry me')
-    // Cross-session connect: the draft MOVES — the old machine empties, the
-    // new session's machine receives the text, then navigation lands there.
+    // Cross-session history entry: the draft remains in the old session unless
+    // the caller explicitly confirms the discard flow.
     const OTHER = 'other-1' as SessionId
     await b.runtime.sessions.add({ id: OTHER }, { current: false })
-    b.runtime.workspaces.stub('connectWorkspace', () => Promise.resolve(OTHER))
+    b.runtime.workspaces.stub('openWorkspace', () => Promise.resolve(OTHER))
     void resident.selectWorkspace('workspace-2' as never)
     await vi.waitFor(() => {
       expect(b.runtime.sessions.calls).toContainEqual({ method: 'open', args: [OTHER] })
     })
+    expect(state.getSnapshot().draft).toBe('carry me')
+    expect(b.inputApi(OTHER).state.getSnapshot().draft).toBe('')
+    actions.setDraft('discard me')
+    void resident.selectWorkspace('workspace-3' as never, { discardDraft: true })
+    await vi.waitFor(() => {
+      expect(b.runtime.sessions.calls.filter(c => c.method === 'open')).toHaveLength(3)
+    })
     expect(state.getSnapshot().draft).toBe('')
-    expect(b.inputApi(OTHER).state.getSnapshot().draft).toBe('carry me')
     await b.runtime.dispose()
   })
 
-  it('selectWorkspace edge arms: no-session resident, empty-draft move, connect failure retryable', async () => {
+  it('selectWorkspace edge arms: no-session resident, empty-draft move, open failure retryable', async () => {
     const b = await bench()
     // No-session resident (hero before any session): connect resolves and
     // navigation proceeds without any draft choreography.
     const noSession = b.residentApi(undefined)
-    b.runtime.workspaces.stub('connectWorkspace', () => Promise.resolve(ROOT))
+    b.runtime.workspaces.stub('openWorkspace', () => Promise.resolve(ROOT))
     void noSession.selectWorkspace('workspace-0' as never)
     await vi.waitFor(() => {
       expect(b.runtime.sessions.calls).toContainEqual({ method: 'open', args: [ROOT] })
     })
 
-    // Cross-session connect with an EMPTY draft: no move, no clearing.
+    // Cross-session history entry with an EMPTY draft: no move, no clearing.
     const OTHER = 'b9-other' as SessionId
     await b.runtime.sessions.add({ id: OTHER }, { current: false })
     const resident = b.residentApi(ROOT)
     const { state } = b.inputApi(ROOT)
     expect(state.getSnapshot().draft).toBe('')
-    b.runtime.workspaces.stub('connectWorkspace', () => Promise.resolve(OTHER))
+    b.runtime.workspaces.stub('openWorkspace', () => Promise.resolve(OTHER))
     void resident.selectWorkspace('workspace-3' as never)
     await vi.waitFor(() => {
       expect(b.runtime.sessions.calls).toContainEqual({ method: 'open', args: [OTHER] })
     })
     expect(b.inputApi(OTHER).state.getSnapshot().draft).toBe('')
 
-    // Connect failure: the rejection propagates to the caller (the view owns
+    // Open failure: the rejection propagates to the caller (the view owns
     // the rollback) and no further navigation happens.
     const opens = b.runtime.sessions.calls.filter(c => c.method === 'open').length
-    b.runtime.workspaces.stub('connectWorkspace', () => Promise.reject(new Error('offline')))
+    b.runtime.workspaces.stub('openWorkspace', () => Promise.reject(new Error('offline')))
     await expect(resident.selectWorkspace('workspace-4' as never)).rejects.toThrow('offline')
     expect(b.runtime.sessions.calls.filter(c => c.method === 'open')).toHaveLength(opens)
     await b.runtime.dispose()

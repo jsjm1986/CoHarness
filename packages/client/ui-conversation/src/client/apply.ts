@@ -14,7 +14,7 @@ import type { ViewTab } from './contract/views.ts'
 import type {
   ApprovalWait, ChatNodeTurnDataInjected, ChatScrollPosition, ChatViewInjected, ComposerBarInjected,
   ComposerChainProps, ConversationInjected, ConversationSessionHeaderInjected, ConversationSessionInjected,
-  DetailsInjected,
+  DetailsInjected, WorkspaceSelectionOptions,
 } from './contract/slots.ts'
 import type { InputNotice } from './input/contract.ts'
 import { createChatStore } from './stores.ts'
@@ -217,22 +217,10 @@ export function apply(ctx: Context): void {
     },
     inject: (sessionId: SessionId | undefined): ConversationInjected => ({
       hooks: { composerBlock: sessionId === undefined ? ABSENT_BLOCK : composerBlocks.storeFor(sessionId) },
-      selectWorkspace: async (workspaceId) => {
-        const nextId = await workspaces.connectWorkspace(workspaceId)
-        if (sessionId !== undefined && nextId !== sessionId) {
-          const from = inputHub.shell(sessionId)
-          const draft = from.snapshot.draft
-          const imageIds = from.snapshot.imageIds
-          const next = inputHub.shell(nextId)
-          if (imageIds.length === 0 || next.addImages(imageIds)) {
-            if (draft !== '') {
-              next.setDraft(draft)
-              from.setDraft('')
-            }
-            if (imageIds.length > 0) {
-              for (const id of imageIds) from.removeImage(id)
-            }
-          }
+      selectWorkspace: async (workspaceId, options: WorkspaceSelectionOptions = {}) => {
+        const nextId = await workspaces.openWorkspace(workspaceId)
+        if (options.discardDraft === true && sessionId !== undefined && nextId !== sessionId) {
+          inputHub.discardDraft(sessionId)
         }
         sessions.open(nextId)
       },
