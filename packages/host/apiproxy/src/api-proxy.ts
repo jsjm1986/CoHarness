@@ -3759,8 +3759,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         })
       },
 
-      // Recomposing is limited to a blank session because a started
-      // conversation's history was produced under its preset's tools; the
+      // Recomposing is limited to a session with no visible conversation
+      // content because its history is produced under its preset's tools; the
       // agent and the session survive, only the composition is swapped.
       async select(request) {
         const { sessionId, agentPreset } = request.payload
@@ -3779,11 +3779,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         const { agent } = found
         const swap = async (): Promise<RpcResponse<{ agentPreset: string }>> => {
           // Re-read inside the queue: an earlier switch may have run, and a
-          // conversation may have started, since this request arrived.
+          // visible content may have arrived, since this request arrived.
           if (!sessionBlank(agent.session)) {
             return err(request, {
               code: 'agent-preset-locked',
-              message: `session "${sessionId}" has already started; its agent preset is fixed`,
+              message: `session "${sessionId}" already has visible conversation content; its agent preset is fixed`,
               details: { sessionId, agentPreset },
             })
           }
