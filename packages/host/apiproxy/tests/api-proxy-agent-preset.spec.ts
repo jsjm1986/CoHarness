@@ -447,6 +447,20 @@ describe('agentPreset.select', () => {
     expect(response.result.error.code).toBe('agent-preset-locked')
   })
 
+  it('allows a preset switch after an empty turn with no message', async () => {
+    const { api, ctx } = await harness(['standard', 'minimal'])
+    await api.sessions.create(request({ sessionId: SessionId('sel-empty'), agentPreset: 'standard' }))
+    const session = ctx.sessions.get(SessionId('sel-empty'))
+    if (session === undefined) throw new Error('unreachable')
+    session.append('turn/start', { turn: 0 })
+    session.append('turn/end', { turn: 0, reason: { kind: 'completed' } })
+
+    const response = await api.agentPresets.select(
+      request({ sessionId: SessionId('sel-empty'), agentPreset: 'minimal' }))
+
+    expect(response.result).toMatchObject({ ok: true, value: { agentPreset: 'minimal' } })
+  })
+
   it('reports an unknown preset without disturbing the session', async () => {
     const { api } = await harness(['standard'])
     await api.sessions.create(request({ sessionId: SessionId('sel-3') }))
