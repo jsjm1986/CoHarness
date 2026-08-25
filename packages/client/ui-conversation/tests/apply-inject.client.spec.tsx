@@ -319,6 +319,24 @@ describe('conversation slot inject API', () => {
     await b.runtime.dispose()
   })
 
+  it('retains a confirmed draft when opening the resolved target fails', async () => {
+    const b = await bench()
+    const OTHER = 'open-fails-after-resolve' as SessionId
+    await b.runtime.sessions.add({ id: OTHER }, { current: false })
+    const resident = b.residentApi(ROOT)
+    const { state, actions } = b.inputApi(ROOT)
+    actions.setDraft('keep when open fails')
+    b.runtime.workspaces.stub('openWorkspace', () => Promise.resolve(OTHER))
+    const open = vi.spyOn(b.runtime.sessions, 'open').mockImplementation(() => {
+      throw new Error('target disappeared')
+    })
+    await expect(resident.selectWorkspace('workspace-failure' as never, { discardDraft: true }))
+      .rejects.toThrow('target disappeared')
+    expect(state.getSnapshot().draft).toBe('keep when open fails')
+    open.mockRestore()
+    await b.runtime.dispose()
+  })
+
   it('scopedConversation fails loud when the session resolves no scope', async () => {
     const b = await bench()
     // The chat-view inject resolves the scoped conversation service at inject
