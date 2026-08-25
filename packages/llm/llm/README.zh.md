@@ -28,7 +28,7 @@
 - `ctx.llm.prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<PreparedLlmCall>` 在一次精确模型查询中解析配置、脱耦的上下文元数据以及标明哪些字段由适配器默认值填入的标记，再将当前适配器注册和不可变重试策略捕获为一次可取消、一次性调用。
 - `ctx.llm.stream(options: GenerateOptions): AsyncIterable<StreamChunk>` 将一次模型调用流式输出为原始分片（token 级增量）。消费方使用 `BlockAssembler` 将分片组装为块／消息。
 
-`LlmRuntime` 将最终适配器选择、同步分发、迭代器构造和迭代期间的失败，统一转换为流协议唯一的终止形式：`finish { kind: 'error' | 'aborted', failure }`。部分增量输出后发生失败时，内容块可能仍未闭合；消费方会丢弃这些不完整输出。`llm/stream` middleware、嵌套调用、适配器清理和下游消费方的错误仍会抛出，因为它们属于插件或消费方失败，而非模型请求结果。已准备调用会暴露随其确切适配器注册一同捕获的不可变重试策略；完全由 middleware 处理的路由没有服务策略。
+`LlmRuntime` 将最终适配器选择、同步分发、迭代器构造和迭代期间的失败，统一转换为流协议唯一的终止形式：`finish { kind: 'error' | 'aborted', failure }`。部分增量输出后发生失败时，内容块可能仍未闭合；消费方会丢弃这些不完整输出。完整的 `llm/stream` waterfall 还会由提供方无关的 fail-closed 保护层包裹：普通文本块以带标签或未闭合的 `<thinking>`、`<analysis>` 或 `<think>` 前缀开头时，保护层会暂存它并在任何文本交给消费方前以 `UNSAFE_MODEL_OUTPUT` 失败。这样可以同时保护适配器、middleware 接管的路由和直接调用；持久化层与客户端投影仍会独立检查历史或外部事件。`llm/stream` middleware、嵌套调用、适配器清理和下游消费方的错误仍会抛出，因为它们属于插件或消费方失败，而非模型请求结果。已准备调用会暴露随其确切适配器注册一同捕获的不可变重试策略；完全由 middleware 处理的路由没有服务策略。
 
 询问端点属于配置期针对**草稿**的操作，以 settings namespace 而非提供方路由为键——界面正在新增的提供方还不存在，也就没有路由可点名。但请求仍可**点名**它正在编辑的路由，而已经描述该路由的适配器会用自己的知识作答，无需联网；路由名称和 `baseURL` 至少需要提供一项。除此之外，请求携带端点、协议，以及一条 harness 只用于这一次询问、绝不存储的凭据。这里既不读取也不写入 settings 或 credentials；返回内容是界面可以提供给用户采纳的候选元数据，而不是已注册的 catalog。`LlmDiscoveredModel` 除 `id` 外每个字段都是可选的，因为大多数提供方列表只公布 id；采纳其中一条的界面仍要补上其适配器所需的容量。重复与不可用的 id 会被丢弃，无人服务的 namespace 以 `NO_DISCOVERY` 失败，既不点名路由也不给端点的请求以 `INVALID_DISCOVERY` 失败。
 
@@ -57,7 +57,7 @@
 
 消息内容是类型化内容块数组：`text`、`reasoning`、`tool-call`、`tool-result`。联合从可合并扩展的 `ContentBlockMap` 派生，因此插件可以通过 declaration merging 添加块类型。assistant 消息使用模型来源，其中携带生成该消息的提供方和模型，以及可选的适配器私有回放状态。dispatch 前，`LlmRuntime` 只在历史提供方路由与目标提供方路由当前由完全相同的适配器实例拥有时才保留该状态；随后由适配器判定能否在模型／提供方间恢复或转换该状态。核心块集只包含每条已发布路径都支持的块。多模态内容（图像、音频等）没有核心块类型；需要它的功能会通过 map 添加，并一并添加相应的适配器／UI／压缩（compaction）支持。
 
-流式输出是原始分片协议（`block-start`、`text-delta`、`reasoning-delta`、`tool-call-delta`、`block-end`、`usage`、`finish`）。每个适配器结果都以一个终止 `finish` 到达消费方；运行故障使用 `error` 或 `aborted` 作为结束原因，而不会跨流 API 抛出。`BlockAssembler` 是将分片组装为块／消息的唯一共享实现。成功的 `finish` 可以携带 `ReplayEnvelope`——不透明的响应级回放元数据，加上与发射块序列对齐的可选逐块条目。组装对内容与元数据只做一次保留/丢弃决定：`max-tokens` 结束会丢弃可能被截断的工具调用，数据在每个被丢弃的位置同步失去对应条目，因此存储的元数据始终描述存储的内容。
+流式输出是原始分片协议（`block-start`、`text-delta`、`reasoning-delta`、`tool-call-delta`、`block-end`、`usage`、`finish`）。每个适配器结果都以一个终止 `finish` 到达消费方；运行故障使用 `error` 或 `aborted` 作为结束原因，而不会跨流 API 抛出。`BlockAssembler` 是将分片组装为块／消息的唯一共享实现。成功的 `finish` 可以携带 `ReplayEnvelope`——不透明的响应级回放元数据，加上与发射块序列对齐的可选逐块条目。组装对内容与元数据只做一次保留/丢弃决定：`max-tokens` 结束会丢弃可能被截断的工具调用，数据在每个被丢弃的位置同步失去对应条目，因此存储的元数据始终描述存储的内容。运行时保护层位于 waterfall 之后、session 或 UI 消费方之前；Provider 专用规范化可以保留有效回答，而共享边界仍会拒绝任何未规范化的标签前缀。
 
 ### 调用配置（`call-config.ts`）
 
@@ -84,6 +84,7 @@
 - `QUOTA_EXCEEDED_CODE`：帐户配额、余额、点数、预算或用量限制耗尽时使用的非暂时性提供方无关 code。`isQuotaExceededError(detail)` 使这些失败与请求速率限制保持区分。
 - `EMPTY_RESPONSE_CODE`：两个适配器都使用的提供方无关 code，用于表示退化的提供方生成结果：一个未携带任何内容块的终止 `stop`。它会被分类为错误 finish（而非成功空消息），因为尝试未产生持久内容；`dsh-llm-retry` 默认重试它。
 - `INVALID_CREDENTIAL_CODE`：已提供但无法使用的凭据所用的提供方无关 code——格式错误而非缺失，修复方式是改正已存储的值，而不是补充一个凭据，这正是它与 `MISSING_CREDENTIAL` 的区别。它被刻意排除在默认可重试集合之外：格式错误的凭据每次尝试都会以同样方式失败。`assertUsableApiKey(raw, pkg, ref)` 会以该 code 抛出 `LlmError`，是每个适配器判定已存储凭据不可用时共用的诊断。
+- `UNSAFE_MODEL_OUTPUT_CODE`：当响应普通文本以带标签或未闭合的思考前缀开头时使用的、不属于默认可重试集合的 code。流保护层绝不会在已发出的分片中包含暂存前缀，调用方必须把它视为提供方输出协议违规，而不是显示其内容。
 
 ### 真实适配器
 

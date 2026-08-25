@@ -274,6 +274,32 @@ describe('built-in conversation node Definitions', () => {
     })
   })
 
+  it('withholds tagged thinking while the chat Assistant node accumulates deltas', () => {
+    const value = assembler([
+      at(1, 'turn/start', { turn: 1 }),
+      at(2, 'step/start', { turn: 1, step: 1 }),
+      at(3, 'assistant/chunk', {
+        turn: 1,
+        step: 1,
+        chunk: { type: 'block-start', index: 0, blockType: 'text' },
+      }),
+      at(4, 'assistant/chunk', {
+        turn: 1,
+        step: 1,
+        chunk: { type: 'text-delta', index: 0, text: '<thi' },
+      }),
+    ])
+    expect(node(snapshot(value), 'assistant-step')).toBeUndefined()
+
+    value.append(at(5, 'assistant/chunk', {
+      turn: 1,
+      step: 1,
+      chunk: { type: 'text-delta', index: 0, text: 'nking>private</thinking>answer' },
+    }))
+    value.flush()
+    expect(node(snapshot(value), 'assistant-step')?.data).toMatchObject({ blocks: [{ kind: 'text', text: 'answer' }] })
+  })
+
   it('keeps one keyed Tool node from running through settlement and replays nested dispatch after prepend', () => {
     const value = assembler([
       at(1, 'turn/start', { turn: 1 }),

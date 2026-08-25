@@ -1,5 +1,5 @@
 /* Compact document controls use one inset sheet family. The manager itself
-   remains the full-height workbench; this card owns its own vertical scroll. */
+   remains the full-height workbench; this card owns its one vertical scroll. */
 
 .dialog.dialog {
   width: min(480px, calc(100vw - 48px));
@@ -19,24 +19,13 @@
   color: var(--dsw-alias-label-primary);
 }
 
-.handle {
-  flex: none;
-  align-self: center;
-  width: 36px;
-  height: 4px;
-  margin: 8px auto 2px;
-  border-radius: var(--dsw-radius-full);
-  background: var(--dsw-alias-label-caption);
-  opacity: 0.7;
-}
-
 .header {
   display: flex;
   flex: none;
   align-items: center;
   justify-content: space-between;
   gap: var(--dsw-space-2);
-  min-height: 52px;
+  min-height: 48px;
   padding: 0 var(--dsw-space-4);
   border-bottom: 1px solid var(--dsw-alias-border-l2);
 }
@@ -80,9 +69,10 @@
   min-width: 0;
   min-height: 0;
   flex-direction: column;
-  gap: var(--dsw-space-3);
+  gap: var(--dsw-space-2);
   padding: var(--dsw-space-3) var(--dsw-space-4) calc(var(--dsw-space-4) + var(--dsw-safe-bottom));
   overflow-y: auto;
+  scrollbar-gutter: stable;
   overscroll-behavior: contain;
 }
 

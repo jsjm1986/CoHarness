@@ -477,6 +477,12 @@ describePg('PostgreSQL baseline', () => {
     expect((await sessions.search(organizationId, '工具执行'))[0]).toMatchObject({ sessionId, seq: 1 })
     await expect(sessions.append(sessionId, randomUUID(), [{ ...events[0]!, seq: 4 }]))
       .rejects.toThrow(/expected seq 3/)
+    await expect(sessions.append(sessionId, randomUUID(), [{
+      type: 'assistant/message',
+      seq: 3,
+      time: Date.now(),
+      data: { message: { content: [{ type: 'text', text: '<thinking>private</thinking>answer' }] } },
+    }])).rejects.toThrow(/unnormalized tagged thinking/)
   })
 
   it('serializes concurrent retries of one append batch', async () => {

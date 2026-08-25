@@ -48,6 +48,39 @@ export type AssistantBlock =
   | { kind: 'tool-call'; callId: string; name: string; argsRaw: string }
   | { kind: 'other'; block: unknown }
 
+const TAG_NAMES = ['thinking', 'analysis', 'think'] as const
+
+function firstNonWhitespace(value: string): number {
+  const index = value.search(/\S/u)
+  return index < 0 ? value.length : index
+}
+
+function taggedSuffix(value: string): string | undefined {
+  const first = firstNonWhitespace(value)
+  if (first === value.length) return undefined
+  const candidate = value.slice(first)
+  const opening = candidate.match(/^<(thinking|analysis|think)(?:\s[^>]*)?>/iu)
+  if (opening === null || opening[1] === undefined) {
+    const lower = candidate.toLowerCase()
+    return TAG_NAMES.some(tag => `<${tag}`.startsWith(lower) || lower.startsWith(`<${tag}`)) ? '' : undefined
+  }
+  const close = new RegExp(`</${opening[1]}\\s*>`, 'iu')
+  const bodyStart = opening[0].length
+  const body = candidate.slice(bodyStart)
+  const match = close.exec(body)
+  return match === null ? '' : body.slice(match.index + match[0].length)
+}
+
+/**
+ * Remove an unnormalized tagged-thinking prefix from a user-visible text block.
+ * @param text - Stored or streamed assistant text.
+ * @returns The answer suffix, an empty string for an incomplete known prefix, or the original text.
+ */
+export function sanitizeAssistantText(text: string): string {
+  const suffix = taggedSuffix(text)
+  return suffix === undefined ? text : suffix
+}
+
 /**
  * core ContentBlock[] -> AssistantBlock[] (classifier shared by finalized messages and partial block-end).
  * @param content - core content blocks verbatim.
@@ -64,7 +97,7 @@ export function toAssistantBlocks(content: readonly ContentBlock[]): AssistantBl
  */
 export function toAssistantBlock(block: ContentBlock): AssistantBlock {
   switch (block.type) {
-    case 'text': return { kind: 'text', text: block.text }
+    case 'text': return { kind: 'text', text: sanitizeAssistantText(block.text) }
     case 'reasoning': return { kind: 'reasoning', text: block.text }
     case 'image': return { kind: 'image', attachment: block.attachment }
     case 'tool-call': return { kind: 'tool-call', callId: String(block.id), name: block.name, argsRaw: block.arguments }

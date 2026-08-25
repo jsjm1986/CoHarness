@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { transaction } from './database.ts'
+import { assertSafeAssistantEvent } from '../conversation-safety.ts'
 
 export type ConversationVisibility = 'personal' | 'project' | 'private'
 
@@ -306,6 +307,7 @@ export class ConversationRepository {
     for (let index = 0; index < events.length; index++) {
       if (events[index]!.seq !== events[0]!.seq + index) throw new Error('conversation event batch must be contiguous')
     }
+    for (const event of events) assertSafeAssistantEvent(event)
     const batchJson = serialized(events)
     const batchChecksum = digest(batchJson)
     return transaction(this.pool, async (client) => {

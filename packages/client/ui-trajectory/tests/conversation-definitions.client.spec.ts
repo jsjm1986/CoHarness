@@ -88,6 +88,24 @@ function assistantMessage(id: string, text: string) {
 }
 
 describe('Trajectory conversation Definitions', () => {
+  it('withholds tagged thinking from the streaming trajectory partial', () => {
+    const current = snapshot(assembler([
+      at(1, 'turn/start', { turn: 1 }),
+      at(2, 'step/start', { turn: 1, step: 1 }),
+      at(3, 'assistant/chunk', {
+        turn: 1,
+        step: 1,
+        chunk: { type: 'block-start', index: 0, blockType: 'text' },
+      }),
+      at(4, 'assistant/chunk', {
+        turn: 1,
+        step: 1,
+        chunk: { type: 'text-delta', index: 0, text: '<thinking>private</thinking>answer' },
+      }),
+    ]))
+    expect(current.partial?.blocks).toEqual([{ kind: 'text', text: 'answer' }])
+  })
+
   it('assembles streaming usage, preserves retry facts, and materializes interruption', () => {
     const value = assembler([
       at(1, 'turn/start', { turn: 1 }),

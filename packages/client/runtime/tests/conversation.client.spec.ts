@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import type { ContentBlock } from '@deepseek-ai/dsh-api-remotes/client'
-import { toAssistantBlock, toAssistantBlocks } from '../src/client/sessions/conversation.ts'
+import { sanitizeAssistantText, toAssistantBlock, toAssistantBlocks } from '../src/client/sessions/conversation.ts'
 
 describe('toAssistantBlock', () => {
   it('classifies the four block shapes', () => {
@@ -27,5 +27,13 @@ describe('toAssistantBlock', () => {
       { kind: 'image', attachment },
     ])
     expect(toAssistantBlock(blocks[0] as ContentBlock)).toEqual({ kind: 'text', text: '正文' })
+  })
+
+  it('hides tagged thinking prefixes from historical visible text', () => {
+    expect(sanitizeAssistantText('<thinking>private</thinking>answer')).toBe('answer')
+    expect(sanitizeAssistantText('<thinking>private')).toBe('')
+    expect(sanitizeAssistantText('Use <thinking> as an example')).toBe('Use <thinking> as an example')
+    expect(toAssistantBlock({ type: 'text', text: '<analysis>private</analysis>answer' })).toEqual({ kind: 'text', text: 'answer' })
+    expect(toAssistantBlocks([{ type: 'text', text: '<think>private</think>' }])).toEqual([{ kind: 'text', text: '' }])
   })
 })

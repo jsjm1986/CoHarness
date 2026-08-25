@@ -55,7 +55,7 @@
 
 /* Banner scrollbar floats off the card edge like the output's. */
 .header::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
+  border: var(--dsh-scrollbar-thumb-inset) solid transparent;
   background-clip: padding-box;
   border-radius: var(--dsw-radius-sm);
 }
@@ -167,11 +167,10 @@
   overflow-y: auto;
 }
 
-/* Both output scrollbars (vertical cap, horizontal pre overflow) float 2px
-   off the card edge: a transparent border clips the thumb inward so it never
-   hugs the rounded corner. */
+/* Both output scrollbars (vertical cap, horizontal pre overflow) use the
+   shared transparent inset so the thumb never hugs the rounded corner. */
 .output::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
+  border: var(--dsh-scrollbar-thumb-inset) solid transparent;
   background-clip: padding-box;
   border-radius: var(--dsw-radius-sm);
 }

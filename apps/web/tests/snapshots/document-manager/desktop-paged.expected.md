@@ -5,8 +5,8 @@
   - paragraph: No per-file size limit, 20 per message
   - complementary "Document scopes":
     - text: Scopes
-    - button "All authorized scopes Metadata only":
-      - strong: All authorized scopes
+    - button "All accessible documents Metadata only":
+      - strong: All accessible documents
       - text: Metadata only
     - button "Personal documents Private to you":
       - strong: Personal documents

@@ -246,6 +246,8 @@ type ContextFormed =
 
 适配器可以在发出 `StreamChunk` 前规范化提供方特有的思考编码。pi-ai 适配器的 `openai-completions` 路径只识别普通文本中第一个非空白 token 为 `<thinking>`、`<analysis>` 或 `<think>` 且随后出现非空正文和匹配闭合标签的情况；原生 reasoning 字段仍按原生块处理。未闭合、空标签、普通正文中的标签以及代码或 XML 示例都保留为文本；累计的普通内容与流式增量不一致时，仍以完整内容为准。这种兼容性启发式可能把一个提供方文本块拆成 Harness 的 reasoning 与 text 块，因此该响应会省略按块对齐的 replay 元数据；包级规则见 [`llm-pi-ai` README](../../packages/llm/llm-pi-ai/README.zh.md)。
 
+`LlmRuntime` 会用提供方无关的 fail-closed 保护层包裹完整的 `llm/stream` waterfall。它会暂存尚未判定的首段文本；当适配器或 middleware 留下未规范化的标签前缀时，保护层会以 `UNSAFE_MODEL_OUTPUT` 结束，而不会发布带标签或未闭合的思考前缀。保护层在 session 消费方收到分片之前运行，因此提供方专用规范化可以保留有效回答，同时过期或替代路由也无法泄漏原始前缀。
+
 ```ts type-equiv
 /**
  * Adapter-private lossless-JSON state for replaying a successful response,
@@ -1007,7 +1009,7 @@ async prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<Prepared
 stream(options: GenerateOptions): AsyncIterable<StreamChunk>
 ```
 
-Source: [`packages/llm/llm/src/index.ts:311`](../../packages/llm/llm/src/index.ts)
+Source: [`packages/llm/llm/src/index.ts:312`](../../packages/llm/llm/src/index.ts)
 
 <a id="ctxmodelaccess--modelaccessservice"></a>
 
@@ -1089,7 +1091,7 @@ Waterfall around every streaming model call (retry, replay, routing). Bound to t
 'llm/stream'(this: LlmRuntime, options: GenerateOptions, next: () => AsyncIterable<StreamChunk>): AsyncIterable<StreamChunk>
 ```
 
-Source: [`packages/llm/llm/src/index.ts:65`](../../packages/llm/llm/src/index.ts)
+Source: [`packages/llm/llm/src/index.ts:66`](../../packages/llm/llm/src/index.ts)
 
 <a id="model-provider-config-events"></a>
 

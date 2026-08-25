@@ -4,7 +4,8 @@ import type {
   ConversationNodeContext, ConversationNodeDefinition,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import {
-  emptyAssistantBlock, isAppendSurfaceEvent, isTokenDelta, toAssistantBlock, toAssistantBlocks,
+  emptyAssistantBlock, isAppendSurfaceEvent, isTokenDelta, sanitizeAssistantText,
+  toAssistantBlock, toAssistantBlocks,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-llm-retry/types'
 import type { AssistantChatData } from '../contract/chat-nodes.ts'
@@ -28,6 +29,7 @@ interface AssistantState {
   readonly turn: number
   readonly step: number
   readonly blocks: readonly (AssistantBlock | undefined)[]
+  readonly rawText: ReadonlyMap<number, string>
   readonly firstVisibleSeq: number | undefined
   readonly firstVisibleTime: number | undefined
   readonly firstTokenTime: number | undefined
@@ -41,6 +43,7 @@ function initialState(turn: number, step: number): AssistantState {
     turn,
     step,
     blocks: [],
+    rawText: new Map(),
     firstVisibleSeq: undefined,
     firstVisibleTime: undefined,
     firstTokenTime: undefined,
@@ -81,13 +84,18 @@ function updateChunk(state: AssistantState, match: ConversationMatch): Assistant
   if (match.event.type !== 'assistant/chunk') return state
   const chunk = match.event.data.chunk
   const blocks = [...state.blocks]
+  const rawText = new Map(state.rawText)
   switch (chunk.type) {
     case 'block-start':
       blocks[chunk.index] = emptyAssistantBlock(chunk.blockType)
+      if (chunk.blockType === 'text') rawText.set(chunk.index, '')
+      else rawText.delete(chunk.index)
       break
     case 'text-delta': {
       const previous = blocks[chunk.index]
-      blocks[chunk.index] = { kind: 'text', text: (previous?.kind === 'text' ? previous.text : '') + chunk.text }
+      const text = (rawText.get(chunk.index) ?? (previous?.kind === 'text' ? previous.text : '')) + chunk.text
+      rawText.set(chunk.index, text)
+      blocks[chunk.index] = { kind: 'text', text: sanitizeAssistantText(text) }
       break
     }
     case 'reasoning-delta': {
@@ -110,6 +118,7 @@ function updateChunk(state: AssistantState, match: ConversationMatch): Assistant
     }
     case 'block-end':
       blocks[chunk.index] = toAssistantBlock(chunk.block)
+      if (chunk.block.type === 'text') rawText.delete(chunk.index)
       break
     case 'usage':
       return { ...state, usage: chunk.usage }
@@ -121,6 +130,7 @@ function updateChunk(state: AssistantState, match: ConversationMatch): Assistant
   return {
     ...state,
     blocks,
+    rawText,
     hidden: visible ? false : state.hidden,
     ...visible && state.firstVisibleSeq === undefined
       ? { firstVisibleSeq: match.event.seq, firstVisibleTime: match.event.time }
@@ -194,6 +204,7 @@ function fallbackState(context: ConversationNodeContext<AssistantState>): Assist
       state = {
         ...state,
         blocks: toAssistantBlocks(match.event.data.message.content),
+        rawText: new Map(),
         hidden: false,
         final: match,
         usage: match.event.data.usage,
@@ -266,6 +277,7 @@ export const assistantDefinition: ConversationNodeDefinition<AssistantState> = {
       return {
         ...context.state,
         blocks: toAssistantBlocks(match.event.data.message.content),
+        rawText: new Map(),
         hidden: false,
         final: match,
         usage: match.event.data.usage,

@@ -26,6 +26,7 @@ const PHONES = [
   { tag: '390x844', width: 390, height: 844 },
   { tag: '375x667', width: 375, height: 667 },
   { tag: '320x568', width: 320, height: 568 },
+  { tag: '430x932', width: 430, height: 932 },
 ] as const
 
 async function shot(page: Page, name: string): Promise<void> {

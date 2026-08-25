@@ -15,10 +15,10 @@
   - group "Document actions":
     - button "Upload Document":
       - img
-      - text: Upload Document
+      - text: Upload
     - button "More actions":
       - img
-      - text: More actions
+      - text: More
   - text: Visible only to you 2 documents
   - list "Document Manager":
     - checkbox "Select this page"

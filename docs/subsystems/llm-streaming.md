@@ -246,6 +246,8 @@ A streaming response interleaves several typed blocks (text, reasoning, multiple
 
 Adapters may normalize provider-specific reasoning encodings before emitting `StreamChunk`s. The pi-ai adapter's `openai-completions` path recognizes only a first non-whitespace `<thinking>`, `<analysis>`, or `<think>` prefix in ordinary text after a non-empty matching close; native reasoning fields remain native. Unclosed, empty, inline, and code or XML occurrences remain text, and cumulative ordinary content stays authoritative when it differs from streamed deltas. This compatibility heuristic can split one provider text block into Harness reasoning and text blocks, so the adapter omits block-aligned replay metadata for that response; the package-specific rules are in the [`llm-pi-ai` README](../../packages/llm/llm-pi-ai/README.md).
 
+`LlmRuntime` wraps the complete `llm/stream` waterfall with a provider-neutral fail-closed guard. It withholds an undecided leading text prefix and emits `UNSAFE_MODEL_OUTPUT` instead of publishing a tagged or incomplete thinking prefix when an adapter or middleware leaves one unnormalized. The guard runs before session consumers receive chunks, so a provider-specific normalizer can preserve a valid answer while a stale or alternate route cannot leak the raw prefix.
+
 ```ts type-equiv
 /**
  * Adapter-private lossless-JSON state for replaying a successful response,
@@ -1001,7 +1003,7 @@ async prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<Prepared
 stream(options: GenerateOptions): AsyncIterable<StreamChunk>
 ```
 
-Source: [`packages/llm/llm/src/index.ts:311`](../../packages/llm/llm/src/index.ts)
+Source: [`packages/llm/llm/src/index.ts:312`](../../packages/llm/llm/src/index.ts)
 
 <a id="ctxmodelaccess--modelaccessservice"></a>
 
@@ -1083,7 +1085,7 @@ Waterfall around every streaming model call (retry, replay, routing). Bound to t
 'llm/stream'(this: LlmRuntime, options: GenerateOptions, next: () => AsyncIterable<StreamChunk>): AsyncIterable<StreamChunk>
 ```
 
-Source: [`packages/llm/llm/src/index.ts:65`](../../packages/llm/llm/src/index.ts)
+Source: [`packages/llm/llm/src/index.ts:66`](../../packages/llm/llm/src/index.ts)
 
 <a id="model-provider-config-events"></a>
 

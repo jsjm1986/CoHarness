@@ -1,5 +1,5 @@
-- region "All authorized scopes":
-  - heading "All authorized scopes" [level=2]
+- region "All accessible documents":
+  - heading "All accessible documents" [level=2]
   - paragraph: Metadata only
   - button "Refresh":
     - img

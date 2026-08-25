@@ -12,6 +12,8 @@ Status: implemented
 
 pi-ai 适配器为 `openai-completions` 启用文本思考 fallback。`TextThinkingParser` 会暂存第一个非空白前缀，直到确认严格标签 `<thinking>`、`<analysis>` 或 `<think>` 之一具有非空正文和匹配闭合标签。解析器支持标签跨增量分片到达，使用 `text_end` 或终端 assistant message 提供的累计文本恢复缺失内容，并将普通文本、空标签、未闭合标签、正文中的标签以及代码或 XML 示例保持不变。pi-ai 原生 thinking 事件继续走原有路径。
 
+`LlmRuntime` 会用提供方无关的 fail-closed 保护层包裹完整的 `llm/stream` waterfall。它会原样发布普通文本，但当适配器或 middleware 留下带标签或未闭合的已知前缀时，会暂存并以 `UNSAFE_MODEL_OUTPUT` 拒绝，而不会发布任何暂存文本。保护层在 session 消费方收到分片之前运行，因此同一防线覆盖过期适配器注册、托管 Provider 路由和 middleware 接管的流。
+
 流转换器为每个原生文本 index 预留 reasoning 与 text 两个索引，并在较低 index 的文本前缀尚未判定时暂存后续 index 的事件，从而让交错的 reasoning、文本和工具调用分片始终满足 Harness 流不变量。累计的普通文本值与已发出增量不一致时，其 `block-end` 仍以完整内容为准。如果任一文本块发生转换，终端分片会省略 pi-ai replay 元数据，因为一个原生文本块变成了两个 Harness 块；持久化的 Harness 内容仍然权威，后续历史使用提供方无关的转换。前导排版仍保留在 reasoning 块中；[思考摘要决策](../../implemented/feature/2026-08-02-web-thinking-tail-scroll.zh.md)负责其折叠呈现。
 
 ## 考虑过的替代方案
@@ -24,8 +26,10 @@ pi-ai 适配器为 `openai-completions` 启用文本思考 fallback。`TextThink
 
 ## 后果
 
-私有 OpenAI 兼容网关的标签化思考会渲染为独立 reasoning 块，同时不改变其他协议的原生思考行为。有意以这些标签开头的回答可能被归类为思考，未知分隔符仍会保留为普通文本。发生转换的响应会失去该轮的提供方原生 replay 签名和响应 id，但持久化的 Harness 块保持完整，并可作为提供方无关历史安全重放。没有发生转换时，空的原生文本块仍然会发出，以保持 replay 条目对齐。排版空白在展开后仍可见，但不会再产生空的折叠摘要。提供方隐藏的推理，或者只存在于 pi-ai 会丢弃的文本型 `reasoning_details` 中的推理，对本适配器仍然不可用。
+私有 OpenAI 兼容网关的标签化思考在适配器成功规范化时会渲染为独立 reasoning 块，同时不改变其他协议的原生思考行为。到达提供方无关保护层的前缀会在任何暂存文本发布前被拒绝，且该失败不属于默认可重试集合。因此，有意以标签开头的回答可以由适配器归类为思考；绕过适配器或未闭合的已知前缀会 fail-closed，未知分隔符仍然会保留为普通文本。发生转换的响应会失去该轮的提供方原生 replay 签名和响应 id，但持久化的 Harness 块保持完整，并可作为提供方无关历史安全重放。没有发生转换时，空的原生文本块仍然会发出，以保持 replay 条目对齐。客户端投影会从历史和实时文本中移除标签前缀，Gateway 持久化仓库会拒绝仍携带该前缀的 assistant surface 事件。提供方隐藏的推理，或者只存在于 pi-ai 会丢弃的文本型 `reasoning_details` 中的推理，对本适配器仍然不可用。
 
 ## 测试
 
 `packages/llm/llm-pi-ai/tests/text-thinking.spec.ts` 覆盖分片标签、支持的标签名、带空白前缀、空标签和未闭合标签、正文及代码示例、转换后的尾部文本、累计后缀恢复以及分片边界无关性。`packages/llm/llm-pi-ai/tests/convert.spec.ts` 覆盖原生 reasoning 与 fallback 文本并存、交错工具调用、缺失或不一致的增量、仅终端文本、空块、错误结束、索引唯一性、fallback 关闭以及 replay 对齐。适配器集成测试覆盖仅把思考放在普通内容中的 OpenAI 兼容 SSE 响应。聚焦的 V8 覆盖率检查将 `text-thinking.ts` 与 `stream.ts` 的语句、分支、函数和行全部保持在 100%。
+
+`packages/llm/llm/tests/text-thinking-guard.spec.ts` 与 `LlmRuntime` 服务测试覆盖提供方无关的 fail-closed 边界，包括分片前缀、middleware 输出、仅终端块、大小写变体、暂存工具分片、缺少 block-start 和清理。托管 Provider 集成测试让 `org-glm` 路由经过 pi-ai 与共享保护层。`gateway/tests/conversation-safety.spec.ts` 与 PostgreSQL 仓库套件拒绝不安全的 assistant surface 事件。客户端 runtime、chat node 和 trajectory 测试覆盖历史与实时投影抑制。

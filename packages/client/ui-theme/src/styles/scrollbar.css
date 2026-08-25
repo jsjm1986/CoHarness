@@ -17,18 +17,21 @@
 body {
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l1);
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l1);
+  /* Keep card-internal thumb insets smaller than the shared 4px bar so the
+     coloured interior remains visible on WebKit surfaces. */
+  --dsh-scrollbar-thumb-inset: 1px;
   /* The WebKit bar's layout width, mirrored by the ::-webkit-scrollbar rule
      below. A surface that must align itself beside a space-consuming bar
      (ConversationRoot's overlay composer seat) reads this instead of
      hardcoding the number. */
-  --dsh-scrollbar-width: 8px;
+  --dsh-scrollbar-width: 4px;
 }
 
 /* The two paths are mutually exclusive, and the gate is load-bearing rather
    than defensive. A non-`auto` `scrollbar-width` or `scrollbar-color` makes
    Chromium and Safari drop every `::-webkit-scrollbar*` rule for that
    element, including `::-webkit-scrollbar-thumb:hover` — measured in chromium
-   as an 8px `::-webkit-scrollbar` width taking effect on its own and being
+   as a 4px `::-webkit-scrollbar` width taking effect on its own and being
    ignored as soon as `scrollbar-width: thin` is added. Declaring both
    unconditionally therefore leaves the hover tokens with no rendering at all,
    because the engines that implement the hover pseudo-element are exactly the
@@ -64,8 +67,8 @@ body {
    selector matching already does. Not inherited either, hence the unscoped
    selectors. */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 4px;
+  height: 4px;
 }
 
 /* Track stays transparent so the thumb reads against whatever surface scrolls
@@ -75,7 +78,7 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  border-radius: 4px;
+  border-radius: var(--dsw-radius-full);
   background: var(--dsh-scrollbar-thumb);
 }
 

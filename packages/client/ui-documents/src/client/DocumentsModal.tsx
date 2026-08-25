@@ -153,6 +153,34 @@ function parseSort(value: string): DocumentSort {
   return option === undefined ? DEFAULT_SORT : { key: option.key, dir: option.dir }
 }
 
+function projectModeLabel(mode: 'ro' | 'rw', t: (key: DocumentsKey) => string): string {
+  return t(mode === 'rw' ? 'scope.project.mode.editable' : 'scope.project.mode.readOnly')
+}
+
+function documentMetaLabel(
+  document: Pick<UserDocRef, 'bytes' | 'modifiedAt'>,
+  t: (key: DocumentsKey, params?: Record<string, string>) => string,
+  includeDate: boolean,
+): string {
+  const size = formatBytes(document.bytes)
+  if (!includeDate) return size
+  return t('document.meta', {
+    size,
+    date: getDateGroup(document.modifiedAt, t('date.unknown')),
+  })
+}
+
+function overviewMetaLabel(
+  row: UserDocCatalogRow,
+  t: (key: DocumentsKey, params?: Record<string, string>) => string,
+): string {
+  return t('overview.meta', {
+    scope: row.scope.label,
+    size: formatBytes(row.bytes),
+    owner: row.owner?.displayName ?? t('scope.owner.unknown'),
+  })
+}
+
 function breadcrumbs(directoryId: UserDocDirectoryIdType, rootName: string): Breadcrumb[] {
   const result: Breadcrumb[] = [{ directoryId: ROOT_DIRECTORY_ID, name: rootName }]
   const path: string[] = []
@@ -656,7 +684,10 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     ...(scope.projects ?? []).map(project => ({
       value: `project:${String(project.projectId)}`,
       label: project.name,
-      description: `${project.mode.toUpperCase()} · ${t('scope.project.description')}`,
+      description: t('scope.project.meta', {
+        mode: projectModeLabel(project.mode, t),
+        description: t('scope.project.description'),
+      }),
       kind: 'project' as const,
       projectId: project.projectId,
     })),
@@ -1001,17 +1032,23 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
       type="button"
       variant="primary"
       disabled={busy || writeLocked}
+      aria-label={uploading ? uploadLabel : t('modal.upload')}
       icon={<IconPlusOutline16 size={16} />}
       onClick={() => fileInputRef.current?.click()}
     >
-      {uploadLabel}
+      {phone && !uploading ? t('modal.upload.compact') : uploadLabel}
     </Button>
   )
 
   const selectionLabel = t('selection.selected', { count: String(selected.size) })
   const clearSelectionButton = (
-    <Button type="button" variant="ghost" onClick={() => { setSelected(new Set()) }}>
-      {t('selection.clear')}
+    <Button
+      type="button"
+      variant="ghost"
+      aria-label={t('selection.clear')}
+      onClick={() => { setSelected(new Set()) }}
+    >
+      {phone ? t('selection.clear.compact') : t('selection.clear')}
     </Button>
   )
 
@@ -1031,7 +1068,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
   ].filter(directory => directory.directoryId !== currentDirectoryId)
 
   const renderDirectory = (directory: UserDocDirectoryRef) => (
-    <div key={directory.directoryId} className={`${css.row} ${css.folderRow}`} role="listitem">
+    <div key={directory.directoryId} className={`${css.row} ${css.folderRow}`} role="listitem" data-documents-row-kind="folder">
       <span className={css.folderAlign} aria-hidden="true" />
       <button
         type="button"
@@ -1087,7 +1124,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
   )
 
   const renderRow = (doc: UserDocRef) => (
-    <div key={doc.docId} className={css.row} role="listitem">
+    <div key={doc.docId} className={css.row} role="listitem" data-documents-row-kind="document">
       <label className={css.check}>
         <input
           type="checkbox"
@@ -1102,11 +1139,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
       <div className={css.meta}>
         <span className={css.name} title={doc.name}>{doc.name}</span>
         <span className={css.size}>
-          {phone
-            ? `${formatBytes(doc.bytes)} · ${getDateGroup(doc.modifiedAt)}`
-            : sort.key === 'date'
-              ? formatBytes(doc.bytes)
-              : `${formatBytes(doc.bytes)} · ${getDateGroup(doc.modifiedAt)}`}
+          {documentMetaLabel(doc, t, phone || sort.key !== 'date')}
         </span>
       </div>
       {phone ? (
@@ -1397,7 +1430,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
       open
       key={`document-${mobileSheet.document.docId}`}
       kind="document-actions"
-      title={t('action.moreNamed', { name: mobileSheet.document.name })}
+      title={t('action.more')}
       closeLabel={t('modal.close')}
       onClose={closeMobileSheet}
     >
@@ -1427,7 +1460,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
       open
       key={`directory-${mobileSheet.directory.directoryId}`}
       kind="directory-actions"
-      title={t('action.moreFolderNamed', { name: mobileSheet.directory.name })}
+      title={t('action.more')}
       closeLabel={t('modal.close')}
       onClose={closeMobileSheet}
     >
@@ -1501,11 +1534,11 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
         onClose={onClose}
         title={title}
         closeLabel={t('modal.close')}
-        {...(limitsText === '' ? {} : { description: limitsText })}
         className={css.dialog as string}
         contentClassName={css.shell as string}
         {...(pager === undefined ? {} : { footer: pager })}
       >
+        {limitsText !== '' && <p className={css.limits}>{limitsText}</p>}
         <div className={css.workbench}>
           <aside className={css.scopeRail} aria-label={t('scope.rail.label')}>
             <div className={css.scopeRailHeading}>{t('scope.rail.title')}</div>
@@ -1521,7 +1554,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
               const isCurrent = !overviewMode && alternateSource === null && ((scopeView?.scope.kind === 'project' && scopeView.scope.projectId === project.projectId) || (scopeView === null && scope.kind === 'project' && scope.projectId === project.projectId))
               return <button key={project.projectId} type="button" className={`${css.scopeItem} ${isCurrent ? css.scopeItemActive : ''}`} onClick={() => { void openScopeView({ kind: 'project', projectId: project.projectId }, project.name) }} disabled={loading || overviewLoading}>
                 <span className={css.scopeItemIcon} aria-hidden="true"><IconFolderClose16 size={16} /></span>
-                <span><strong>{project.name}</strong><small>{project.mode.toUpperCase()} · {t('scope.project.description')}</small></span>
+                <span><strong>{project.name}</strong><small>{t('scope.project.meta', { mode: projectModeLabel(project.mode, t), description: t('scope.project.description') })}</small></span>
               </button>
             })}
           </aside>
@@ -1562,10 +1595,13 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
                   </header>
                   {overviewError !== '' && <div className={css.error} role="alert">{overviewError}</div>}
                   {overviewLoading ? <p className={css.status}>{t('scope.all.loading')}</p> : overviewRows.length === 0 ? <p className={css.empty}>{t('scope.all.empty')}</p> : (
-                    <div className={css.overviewList} role="list">
+                    <div className={css.overviewList} role="list" data-documents-scrollport="overview">
                       {overviewRows.map(row => <div key={row.catalogId} className={css.overviewRow} role="listitem">
                         <span className={css.fileIcon} aria-hidden="true"><IconBrowseOutline16 size={16} /></span>
-                        <div className={css.meta}><span className={css.name}>{row.name}</span><span className={css.size}>{row.scope.label} · {formatBytes(row.bytes)} · {row.owner?.displayName ?? t('scope.owner.unknown')}</span></div>
+                        <div className={css.meta}>
+                          <span className={css.name} title={row.name}>{row.name}</span>
+                          <span className={css.size}>{overviewMetaLabel(row, t)}</span>
+                        </div>
                         {phone ? (
                           <Button
                             className={css.rowMore}
@@ -1666,7 +1702,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
                         icon={<IconEllipsisOutline16 size={18} />}
                         onClick={() => { setMobileSheet({ kind: 'more' }) }}
                       >
-                        {t('action.more')}
+                        {t('action.more.compact')}
                       </Button>
                     </>
                   ) : (
@@ -1786,11 +1822,11 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
                   <p className={css.empty}>{t('modal.empty')}</p>
                   {phone && !writeLocked && (
                     <div className={css.emptyActions}>
-                      <Button type="button" variant="primary" icon={<IconPlusOutline16 size={16} />} onClick={() => { fileInputRef.current?.click() }}>
-                        {t('modal.upload')}
+                      <Button type="button" variant="primary" aria-label={t('modal.upload')} icon={<IconPlusOutline16 size={16} />} onClick={() => { fileInputRef.current?.click() }}>
+                        {t('modal.upload.compact')}
                       </Button>
-                      <Button type="button" variant="outline" disabled={busy} icon={<IconFolderClose16 size={16} />} onClick={openCreateDirectory}>
-                        {t('folder.create')}
+                      <Button type="button" variant="outline" aria-label={t('folder.create')} disabled={busy} icon={<IconFolderClose16 size={16} />} onClick={openCreateDirectory}>
+                        {t('folder.create.compact')}
                       </Button>
                     </div>
                   )}
@@ -1807,7 +1843,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
                   </Button>
                 </div>
               ) : (
-                <div className={css.list} role="list" aria-label={t('modal.title')} data-documents-list="">
+                <div className={css.list} role="list" aria-label={t('modal.title')} data-documents-list="" data-documents-scrollport="list">
                   {pageDocs.length > 0 && (
                     <div className={css.listHeader}>
                       <label className={css.check}>
@@ -1844,10 +1880,11 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
                   <Button
                     type="button"
                     variant="primary"
+                    aria-label={t('selection.actions')}
                     aria-haspopup="dialog"
                     onClick={() => { setMobileSheet({ kind: 'selection' }) }}
                   >
-                    {t('selection.actions')}
+                    {t('selection.actions.compact')}
                   </Button>
                 </div>
               )}

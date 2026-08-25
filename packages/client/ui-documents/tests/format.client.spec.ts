@@ -24,4 +24,8 @@ describe('getDateGroup', () => {
   it('returns Unknown for an invalid timestamp', () => {
     expect(getDateGroup(Number.NaN)).toBe('Unknown')
   })
+
+  it('accepts a localized fallback for an invalid timestamp', () => {
+    expect(getDateGroup(Number.NaN, '日期未知')).toBe('日期未知')
+  })
 })

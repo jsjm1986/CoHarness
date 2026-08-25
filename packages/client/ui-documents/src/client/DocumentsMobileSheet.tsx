@@ -36,7 +36,6 @@ export function DocumentsMobileSheet({
   return (
     <Modal open={open} onClose={onClose} title={title} headless className={css.dialog as string}>
       <section className={css.surface} data-documents-sheet={kind}>
-        <div className={css.handle} aria-hidden="true" />
         <header className={css.header}>
           <h2 className={css.title}>{title}</h2>
           <button type="button" className={css.close} aria-label={closeLabel} onClick={onClose}>

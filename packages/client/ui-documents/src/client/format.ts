@@ -14,9 +14,10 @@ export function formatBytes(bytes: number): string {
 /**
  * UTC date label for a document modification timestamp.
  * @param modifiedAt - `UserDocRef.modifiedAt` in epoch milliseconds.
- * @returns the `YYYY-MM-DD` date, or `Unknown` for an invalid timestamp.
+ * @param unknownLabel - localized fallback for an invalid timestamp.
+ * @returns the `YYYY-MM-DD` date, or `unknownLabel` for an invalid timestamp.
  */
-export function getDateGroup(modifiedAt: number): string {
-  if (!Number.isFinite(modifiedAt)) return 'Unknown'
+export function getDateGroup(modifiedAt: number, unknownLabel = 'Unknown'): string {
+  if (!Number.isFinite(modifiedAt)) return unknownLabel
   return new Date(modifiedAt).toISOString().slice(0, 10)
 }
