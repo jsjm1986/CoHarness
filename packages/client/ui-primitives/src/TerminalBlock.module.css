@@ -208,3 +208,31 @@
   font: var(--dsl-terminal-font);
   color: var(--dsw-alias-label-tertiary);
 }
+
+@media (max-width: 767px) {
+  .block {
+    --dsl-terminal-line-height: 20px;
+    --dsl-terminal-font: var(--dsw-mobile-font-code);
+    margin: var(--dsw-space-3) 0;
+  }
+
+  .header {
+    min-height: var(--dsw-touch-target);
+    padding: 0 10px 0 var(--dsl-terminal-gutter);
+  }
+
+  .copyButton {
+    min-width: var(--dsw-touch-target);
+    min-height: var(--dsw-touch-target);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .output,
+  .empty {
+    padding-top: var(--dsw-space-2);
+    padding-bottom: var(--dsw-space-2);
+    padding-right: 10px;
+  }
+}

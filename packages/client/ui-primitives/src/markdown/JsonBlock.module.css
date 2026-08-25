@@ -30,3 +30,15 @@
   line-height: 16px;
   color: var(--dsw-alias-label-primary);
 }
+
+@media (max-width: 767px) {
+  .toggle {
+    min-height: var(--dsw-touch-target);
+    padding: 0 8px;
+  }
+
+  .body {
+    max-height: min(200px, 40vh);
+    padding: var(--dsw-space-2);
+  }
+}

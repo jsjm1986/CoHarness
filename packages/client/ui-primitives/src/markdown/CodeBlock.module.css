@@ -66,13 +66,6 @@
   font: inherit;
 }
 
-@media (max-width: 767px) {
-  .copyButton {
-    min-width: var(--dsw-touch-target);
-    min-height: var(--dsw-touch-target);
-  }
-}
-
 .block :where(pre) {
   font: var(--dsl-code-block-content-font);
   padding: var(--dsw-space-4);
@@ -100,4 +93,33 @@
 
 .plain {
   color: var(--dsw-alias-label-primary);
+}
+
+@media (max-width: 767px) {
+  /* Keep the 44px copy target without adding the desktop banner padding on
+     top of it. The banner is one compact toolbar row on a phone. */
+  .block {
+    margin: var(--dsw-space-3) 0;
+  }
+
+  .banner {
+    min-height: var(--dsw-touch-target);
+    padding: 0 10px;
+  }
+
+  .copyButton {
+    min-width: var(--dsw-touch-target);
+    min-height: var(--dsw-touch-target);
+  }
+
+  .block :where(pre) {
+    padding: var(--dsw-space-2) 10px;
+    font: var(--dsw-mobile-font-code);
+  }
+
+  /* Keep an empty fenced block's DOM for markdown parity, but do not reserve
+     a blank code-line gutter underneath its language toolbar. */
+  .block[data-empty] :where(pre) {
+    padding-block: 0;
+  }
 }

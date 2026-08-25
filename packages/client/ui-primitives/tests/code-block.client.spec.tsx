@@ -72,6 +72,12 @@ describe('CodeBlock', () => {
     expect(view.getByText('plain text')).toBeTruthy()
   })
 
+  it('marks an empty fence so compact chrome can collapse its blank body', () => {
+    const view = render(<CodeBlock code="" lang="text" />)
+    expect(view.container.querySelector('[data-empty]')).not.toBeNull()
+    expect(view.container.querySelector('pre code')?.textContent).toBe('')
+  })
+
   it('shows the language banner and copies the pre textContent', async () => {
     vi.useFakeTimers()
     const writeText = vi.fn().mockResolvedValue(undefined)
