@@ -8,6 +8,7 @@ import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import { LanguageRow } from '../src/client/LanguageRow.tsx'
 import type { LanguageRowComponentProps } from '../src/client/LanguageRow.tsx'
 import { createLanguageRowStore } from '../src/client/settings-store.ts'
+import type { SettingsControlState } from '@deepseek-ai/dsh-client-runtime/client'
 
 afterEach(cleanup)
 
@@ -27,17 +28,22 @@ function emptyWorkspaces() {
   return bindSnapshotSelector(store)
 }
 
-function mount(active = 'en') {
+function mount(active = 'en', settings: SettingsControlState = {
+  status: 'ready', writable: true, writableReason: undefined, write: { status: 'idle' },
+}) {
   // Real store instance — the sanctioned zero-machinery path for tests.
   const store = createLanguageRowStore().create()
-  store.actions.sync(active, OPTIONS, 0)
+  store.actions.sync(active, OPTIONS, 0, settings)
   const setLocale = vi.fn()
   const props: LanguageRowComponentProps = {
     useSessions: emptySessions(),
     useWorkspaces: emptyWorkspaces(),
     useStore: bindSnapshotSelector(store),
     actions: store.actions,
-    t: (key: string) => key === 'language.title' ? 'Language' : key,
+    t: (key: string) => ({
+      'language.title': 'Language',
+      'language.projectReadOnly': 'Project settings are read-only',
+    }[key] ?? key),
     setLocale,
   }
   render(<LanguageRow {...props} />)
@@ -78,5 +84,12 @@ describe('LanguageRow', () => {
     expect(screen.getByRole('button', { name: /中文/ })).toBeDefined()
     act(() => { b.store.actions.sync('fr', OPTIONS, 2) })
     expect(screen.getByRole('button', { name: /fr/ })).toBeDefined()
+  })
+
+  it('disables project-scoped controls and explains the read-only reason', () => {
+    mount('en', { status: 'ready', writable: false, writableReason: 'project', write: { status: 'idle' } })
+    const trigger = screen.getByRole('button', { name: /English/ })
+    expect(trigger).toHaveProperty('disabled', true)
+    expect(screen.getByRole('status').textContent).toContain('Project settings are read-only')
   })
 })

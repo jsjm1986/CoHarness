@@ -31,6 +31,17 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
+.notice {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.notice[role='alert'] {
+  color: var(--dsw-alias-state-error-primary);
+}
+
 .selector {
   display: inline-flex;
   align-items: center;
@@ -49,6 +60,12 @@
 
 .selector:hover {
   background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.selector:disabled {
+  color: var(--dsw-alias-label-dimmed);
+  cursor: not-allowed;
+  opacity: 0.72;
 }
 
 .chevron {

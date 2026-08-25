@@ -662,6 +662,7 @@ describe('settings domain', () => {
     const api = createApiProxy(ctx, DEFAULTS)
     const value = expectOk(await api.settings.describe(request({})))
     expect(value.writable).toBe(false)
+    expect(value.writableReason).toBe('provider')
     const error = expectErr(await api.settings.update(request({ ns: 'llm-deepseek', patch: {} })))
     expect(error.code).toBe('settings-rejected')
     expect(error.message).toContain('read-only')
@@ -677,6 +678,7 @@ describe('settings domain', () => {
 
     const value = expectOk(await api.settings.describe(request({})))
     expect(value.writable).toBe(false)
+    expect(value.writableReason).toBe('project')
     expect(value.hasDocument).toBe(false)
     for (const error of [
       expectErr(await api.settings.update(request({ ns: 'llm-deepseek', patch: { apiKey: 'personal' } }))),

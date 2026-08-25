@@ -10,6 +10,7 @@
  * consumers merge more namespaces in and the intersection keeps them
  * string-typed. The rule fires on the narrow-map view, not real redundancy. */
 import type { Context } from '@deepseek-ai/cordis'
+import { settingsControlState } from '@deepseek-ai/dsh-client-runtime/client'
 import {
   type BoundActions, type LocaleDictOf, type LocaleNamespaceMap, type Translate, type TranslateNS,
 } from '@deepseek-ai/dsh-client-ui-slots'
@@ -212,8 +213,16 @@ export class LocaleRuntime {
   setLocale(id: string): void {
     const match = this.snapshot.locales.find(l => l.id === id)
     if (match === undefined) throw new Error(`locale "${id}" is not registered`)
+    const settings = this.host?.getSnapshot()
+    if (settings?.status === 'ready' && !settings.writable) return
     if (this.snapshot.active !== match.id) this.publish(match.id, true)
-    void this.host?.set(LOCALE_PREFERENCE_FIELD, match.id)
+    const host = this.host
+    if (host === undefined) return
+    const write = host.set(LOCALE_PREFERENCE_FIELD, match.id)
+    void write.then(() => {
+      const settled = host.getSnapshot()
+      if (settled.write.status === 'blocked' || settled.write.status === 'error') this.adopt(host)
+    })
   }
 
   /**
@@ -407,9 +416,11 @@ export function apply(ctx: ClientContext): void {
       snapshot.active,
       snapshot.locales.map(l => ({ id: l.id, label: l.label })),
       snapshot.revision,
+      settingsControlState(host.getSnapshot()),
     )
   }
   ctx.on('locale/change', sync)
+  ctx.effect(() => host.subscribe(() => { sync(locale.getLocale()) }), 'locale: settings row state')
   // The served markup declares one language; the resolved locale may differ
   // (browser detection, or a stored preference adopted after activation), so
   // state it once at activation rather than waiting for the first change.

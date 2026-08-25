@@ -4,6 +4,10 @@ English | [中文](README.zh.md)
 
 Locale plugin: LocaleRuntime — the `zh`/`en` preference stored as `locale.preference` in `$DSH_HOME/settings.yaml`; when that explicit Host value is absent, a fresh browser starts provisionally in the language `navigator` asks for (primary-subtag matching, with `en` when it asks for no language this app ships). The Host read runs after plugin activation so an unavailable settings service cannot block the page; its result replaces the provisional browser value live. A browser served through the authenticated Gateway uses the same Host-backed scope; compositions without a Host scope remain process-local. `locale/change` fires on switches, and the plugin points `<html lang>` at the active locale (`zh-CN`/`en`) on activation and on every switch. The service also owns the ns×locale dictionary registry (typed `register(ns, {zh, en})` checked against `LocaleNamespaceMap`, `bind(ns)`→`TranslateNS<ns>`; lookup chain ns → common → en → key), implements the slot system's `LocaleFace`, and installs itself through `ctx.slots.installLocale`, backing the framework-injected `t` standard seat (`Translate`/`TranslateNS` are ui-slots types; import them from there — this package only re-exports for dictionary owners' convenience). The [Host-backed preferences decision](../../../.agents/notes/implemented/bug-fix/2026-08-06-host-backed-web-preferences.md) owns the persistence boundary.
 
+## Settings authority
+
+The Language row follows the bound settings scope's effective locale and disables selection while the first view is loading, the scope is unavailable, the provider is read-only, or a project runtime owns the value. `LocaleRuntime.setLocale` applies the same writable-view guard, so programmatic callers cannot turn a disabled row into a mutation; failed writes are adopted back from the recovered Host value.
+
 ## Model Experience
 
 None, as the locale registry serves browser UI copy; nothing here reaches a model request.

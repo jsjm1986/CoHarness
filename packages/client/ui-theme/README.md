@@ -12,6 +12,10 @@ Scrollbar rebinding contract: `scrollbar.css` binds `--dsh-scrollbar-thumb` and 
 
 The two paths are mutually exclusive by construction. `scrollbar-width`/`scrollbar-color` sit inside `@supports not selector(::-webkit-scrollbar)` because a non-`auto` value of either makes Chromium and Safari discard every `::-webkit-scrollbar*` rule for that element, `::-webkit-scrollbar-thumb:hover` included — declaring both unconditionally leaves `--dsh-scrollbar-thumb-hover` with no rendering anywhere. Firefox therefore takes the standard properties and WebKit-based engines take the pseudo-elements, so the hover token only ever renders through the pseudo-element path. Reasoning and the measured computed values: [the scrollbar Agent Note](../../../.agents/notes/implemented/bug-fix/2026-07-28-themed-scrollbars-and-reserved-gutter.md).
 
+## Settings authority and compatibility
+
+Appearance controls render the effective project value but are disabled when the bound scope reports `loading`, `writable: false`, or a `saving` write. Project and provider restrictions are shown inline; the service also refuses a direct `setTheme` call until a writable Host view exists, so a disabled row cannot be bypassed into a mutation. The theme listener supports both `addEventListener` and legacy `addListener` MediaQueryList implementations. The design stylesheet supplies a `100vh` viewport fallback and the client visual-viewport measurement overrides it when available; all `--ds-*` and `--dsw-*` references are checked against CSS declarations by the token-contract test, with runtime-owned viewport height as the explicit exception.
+
 ## Model Experience
 
 None, as the theme service manages a browser preference; nothing here reaches a model request.

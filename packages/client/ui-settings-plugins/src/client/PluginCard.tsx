@@ -49,7 +49,7 @@ export function PluginCard(props: PluginCardProps) {
   const { state } = props
   if (!state.available) return null
   const title = props.t(props.titleKey)
-  const blocked = !state.dirty || state.invalid || state.saving
+  const blocked = !state.writable || !state.dirty || state.invalid || state.saving
   return (
     <li className={clsx(css.card, open && css.cardOpen)}>
       <button

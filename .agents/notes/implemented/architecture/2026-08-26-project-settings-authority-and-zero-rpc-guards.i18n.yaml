@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-26-project-settings-authority-and-zero-rpc-guards.md
+2026-08-26-project-settings-authority-and-zero-rpc-guards.md: 66225451895e0c768ed5f004a752584f953acaa7
+2026-08-26-project-settings-authority-and-zero-rpc-guards.zh.md: a12704bf910c981676af134b2f180d26b949609e

@@ -5,7 +5,7 @@
   bottom: var(--dsw-mobile-sheet-bottom);
   left: max(var(--dsw-mobile-sheet-edge), var(--dsw-safe-left));
   display: flex;
-  max-height: min(64dvh, calc(var(--dsw-viewport-height, 100dvh) - 112px));
+  max-height: min(64vh, calc(var(--dsw-viewport-height, 100vh) - 112px));
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--dsw-alias-border-l2);

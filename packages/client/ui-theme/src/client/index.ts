@@ -9,6 +9,7 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { BoundActions } from '@deepseek-ai/dsh-client-ui-slots'
+import { settingsControlState } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ClientContext, SettingsScope } from '@deepseek-ai/dsh-client-runtime/client'
 // Type-only: the ctx.settingsScope Context merge. Cross-plugin collaboration
 // goes through the service, never a value import (client bundle purity gate).
@@ -101,6 +102,24 @@ export interface ThemeTokenInspection {
   cssVariable?: string
 }
 
+/** Subscribe to a color-scheme query across current and legacy WebViews. */
+function subscribeMediaQuery(media: MediaQueryList, listener: () => void): () => void {
+  const addEventListener = Reflect.get(media, 'addEventListener')
+  if (typeof addEventListener === 'function') {
+    addEventListener.call(media, 'change', listener)
+    return () => {
+      const removeEventListener = Reflect.get(media, 'removeEventListener')
+      if (typeof removeEventListener === 'function') removeEventListener.call(media, 'change', listener)
+    }
+  }
+  const add = Reflect.get(media, 'addListener')
+  if (typeof add === 'function') add.call(media, listener)
+  return () => {
+    const remove = Reflect.get(media, 'removeListener')
+    if (typeof remove === 'function') remove.call(media, listener)
+  }
+}
+
 declare module '@deepseek-ai/cordis' {
   interface Context {
     theme: ThemeRuntime
@@ -179,8 +198,7 @@ export class ThemeRuntime {
         this.publish()
       }
       ctx.effect(() => {
-        media.addEventListener('change', onChange)
-        return () => { media.removeEventListener('change', onChange) }
+        return subscribeMediaQuery(media, onChange)
       }, 'ui-theme: prefers-color-scheme listener')
     }
     ctx.effect(() => host.subscribe(() => { this.adopt() }), 'ui-theme: settings scope adoption')
@@ -225,8 +243,21 @@ export class ThemeRuntime {
       throw new Error(`theme "${id}" is not registered`)
     }
     if (this.preference === id) return
+    if (isThemePreference(id)) {
+      const settings = this.host.getSnapshot()
+      // A loading/unavailable scope has no authority answer yet. The row is
+      // disabled and the scope drops the attempted write without a wire call;
+      // a later Host view adopts the durable value. A known read-only answer
+      // must not change the live project/provider value even transiently.
+      if (settings.status === 'ready' && !settings.writable) return
+    }
     this.preference = id as ThemePreference
-    if (isThemePreference(id)) void this.host.set(THEME_PREFERENCE_FIELD, id)
+    if (isThemePreference(id)) {
+      void this.host.set(THEME_PREFERENCE_FIELD, id).then(() => {
+        const settled = this.host.getSnapshot()
+        if (settled.write.status === 'blocked' || settled.write.status === 'error') this.adopt()
+      })
+    }
     this.publish()
   }
 
@@ -392,15 +423,16 @@ export function apply(ctx: ClientContext): void {
 
   const store = createAppearanceRowStore()
   let bound: BoundActions<typeof store> | undefined
-  const sync = (snapshot: ThemeSnapshot): void => {
-    bound?.sync(snapshot.preference, snapshot.revision)
+  const sync = (snapshot: ThemeSnapshot = theme.getTheme()): void => {
+    bound?.sync(snapshot.preference, snapshot.revision, settingsControlState(host.getSnapshot()))
   }
   ctx.on('theme/change', sync)
+  ctx.effect(() => host.subscribe(() => { sync() }), 'ui-theme: settings row state')
   const injected = (actions: BoundActions<typeof store>): AppearanceRowInjected => {
     bound = actions
     // Re-sync from the getter so no event is lost between registration and
     // first render (the store's revision guard drops stale duplicates).
-    sync(theme.getTheme())
+    sync()
     return {
       setTheme: (id) => { theme.setTheme(id) },
     }

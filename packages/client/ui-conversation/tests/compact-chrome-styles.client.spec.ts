@@ -72,7 +72,7 @@ describe('conversation compact chrome', () => {
   it('keeps the session settings surface light and compact', () => {
     const sheet = readFileSync(fileURLToPath(new URL('../src/client/skeleton/SessionSettingsSheet.module.css', import.meta.url)), 'utf8')
     const permission = readFileSync(fileURLToPath(new URL('../src/client/skeleton/PermissionSelect.module.css', import.meta.url)), 'utf8')
-    expect(sheet).toContain('max-height: min(64dvh')
+    expect(sheet).toContain('max-height: min(64vh')
     expect(sheet).toContain('min-height: 40px')
     expect(sheet).toContain('--dsw-mobile-option-row-height: 44px')
     expect(sheet).toContain('background: var(--dsw-alias-interactive-bg-active)')

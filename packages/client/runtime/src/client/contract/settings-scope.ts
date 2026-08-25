@@ -7,6 +7,42 @@
  * otherwise close a reference cycle.
  */
 
+/** Why a Host settings document cannot accept browser writes. */
+export type SettingsWritableReason = 'project' | 'provider'
+
+/** State of the most recent settings write attempt. */
+export type SettingsWriteState =
+  | { status: 'idle' }
+  | { status: 'saving' }
+  | { status: 'blocked'; reason: 'loading' | 'unavailable' | SettingsWritableReason }
+  | { status: 'error'; code: string; message: string }
+
+/** Render-facing subset shared by preference rows. */
+export interface SettingsControlState {
+  /** Namespace synchronization status. */
+  status: SettingsScopeSnapshot<unknown>['status']
+  /** Whether the Host accepts writes. */
+  writable: boolean
+  /** Host reason for a read-only document, when known. */
+  writableReason: SettingsWritableReason | undefined
+  /** Latest write state. */
+  write: SettingsWriteState
+}
+
+/**
+ * Project a scope snapshot into the small state a preference control renders.
+ * @param snapshot - the current namespace snapshot.
+ * @returns the render-facing authority and write state.
+ */
+export function settingsControlState<T>(snapshot: SettingsScopeSnapshot<T>): SettingsControlState {
+  return {
+    status: snapshot.status,
+    writable: snapshot.writable,
+    writableReason: snapshot.writableReason,
+    write: snapshot.write,
+  }
+}
+
 /** Client-side sync state of one settings namespace. */
 export interface SettingsScopeSnapshot<T> {
   /**
@@ -32,6 +68,10 @@ export interface SettingsScopeSnapshot<T> {
   revision: number | undefined
   /** Whether the Host document accepts writes; memory mode never does. */
   writable: boolean
+  /** Why the Host declined writes, when {@link writable} is false. */
+  writableReason: SettingsWritableReason | undefined
+  /** State of the most recent write attempt, including blocked and failed writes. */
+  write: SettingsWriteState
   /** `host` syncs with the Host document; `memory` is an explicit process-local mode. */
   mode: 'host' | 'memory'
 }

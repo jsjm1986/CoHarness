@@ -9,6 +9,9 @@ const make = (host?: StubSettingsScope<LocaleSettings>): {
   svc: LocaleRuntime
   events: LocaleSnapshot[]
 } => {
+  if (host?.scope.getSnapshot().status === 'loading') {
+    host.publish({ status: 'ready', writable: true })
+  }
   const ctx = new Context()
   const events: LocaleSnapshot[] = []
   ctx.on('locale/change', (snapshot) => { events.push(snapshot) })

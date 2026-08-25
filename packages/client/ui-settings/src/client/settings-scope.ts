@@ -15,7 +15,8 @@ import type {
 } from '@deepseek-ai/dsh-api-remotes/client'
 import {
   createSnapshotStore, type SettingsScope, type SettingsScopeSnapshot,
-  type SettingsScopeSpec, type SnapshotStore,
+  type SettingsScopeSpec, type SettingsWritableReason, type SettingsWriteState,
+  type SnapshotStore,
 } from '@deepseek-ai/dsh-client-runtime/client'
 // Type-only, and deliberately NOT `@deepseek-ai/dsh-api-remotes/client`: this
 // package is reachable from the Host build graph through its feature-package
@@ -79,6 +80,8 @@ export class SettingsScopeController<T> implements SettingsScope<T> {
       user: undefined,
       revision: undefined,
       writable: false,
+      writableReason: undefined,
+      write: { status: 'idle' },
       mode: persistence,
     })
     if (persistence === 'host') {
@@ -125,6 +128,12 @@ export class SettingsScopeController<T> implements SettingsScope<T> {
   private write(op: SettingsPathOpView): Promise<void> {
     const generation = ++this.writeGeneration
     return this.enqueue(async () => {
+      const before = this.getSnapshot()
+      if (before.status !== 'ready' || !before.writable) {
+        this.setWriteState({ status: 'blocked', reason: this.blockReason(before) })
+        return
+      }
+      this.setWriteState({ status: 'saving' })
       const revision = this.pendingRevision ?? this.getSnapshot().revision
       let response: Awaited<ReturnType<SettingsFace['settings']['mutate']>>
       try {
@@ -133,18 +142,27 @@ export class SettingsScopeController<T> implements SettingsScope<T> {
           ops: [op],
           ...(revision === undefined ? {} : { expectedRevision: revision }),
         })
-      } catch (_settingsWriteFailure) {
+      } catch (settingsWriteFailure) {
         await this.recover(generation)
+        if (generation !== this.writeGeneration || this.disposed) return
+        this.setWriteState({
+          status: 'error', code: 'transport', message: messageOf(settingsWriteFailure),
+        })
         return
       }
       if (!response.result.ok) {
         await this.recover(generation)
+        if (generation !== this.writeGeneration || this.disposed) return
+        this.setWriteState({
+          status: 'error', code: response.result.error.code, message: response.result.error.message,
+        })
         return
       }
       if (this.disposed) return
       if (generation === this.writeGeneration) {
         this.pendingRevision = undefined
         this.mirror.acceptView(response.result.value)
+        this.setWriteState({ status: 'idle' })
       } else {
         this.pendingRevision = response.result.value.revision
       }
@@ -186,12 +204,13 @@ export class SettingsScopeController<T> implements SettingsScope<T> {
     if (this.disposed) return
     const mirrored = this.mirror.getSnapshot()
     if (mirrored.view === undefined) return
-    const { writable } = mirrored.view
+    const { writable, writableReason } = mirrored.view
     const view = mirrored.view.namespaces.find(candidate => candidate.ns === this.spec.namespace)
     if (view === undefined) {
       this.store.update((draft) => {
         draft.status = 'unavailable'
         draft.writable = writable
+        draft.writableReason = writableReason
       })
       return
     }
@@ -201,10 +220,24 @@ export class SettingsScopeController<T> implements SettingsScope<T> {
       draft.base = view.base
       draft.user = view.user
       draft.writable = writable
+      draft.writableReason = writableReason
       if (decoded === undefined) return
       draft.status = 'ready'
       draft.value = decoded
     })
+  }
+
+  /** Publish one write state without touching the accepted settings value. */
+  private setWriteState(write: SettingsWriteState): void {
+    if (this.disposed) return
+    this.store.update((draft) => { draft.write = write })
+  }
+
+  /** Resolve the stable reason shown when a caller reaches a blocked write. */
+  private blockReason(snapshot: SettingsScopeSnapshot<T>): 'loading' | 'unavailable' | SettingsWritableReason {
+    if (snapshot.status === 'loading') return 'loading'
+    if (snapshot.status === 'unavailable') return 'unavailable'
+    return snapshot.writableReason ?? 'provider'
   }
 
   private decode(view: SettingsNamespaceView): T | undefined {
@@ -222,6 +255,10 @@ export class SettingsScopeController<T> implements SettingsScope<T> {
     }
     return failure === undefined ? view.value as T : undefined
   }
+}
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }
 
 declare module '@deepseek-ai/cordis' {

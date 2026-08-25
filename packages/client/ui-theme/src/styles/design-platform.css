@@ -1,3 +1,15 @@
+/* The JS visual-viewport measurement overrides this variable after boot. The
+   CSS fallback keeps compact sheets usable in browsers without `dvh`. */
+:root {
+  --dsw-viewport-height: 100vh;
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --dsw-viewport-height: 100dvh;
+  }
+}
+
 /* Figma font-weight 510 (an SF Pro variable-font weight) always renders as
    font-weight: 500 in this UI — non-variable webfonts snap intermediate
    weights unpredictably across platforms. */

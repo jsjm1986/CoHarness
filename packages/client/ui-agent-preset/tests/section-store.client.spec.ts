@@ -535,6 +535,9 @@ describe('deleting', () => {
       },
       settings: {},
     } as unknown as Pick<IApiClient, 'agentPresets' | 'settings'>)
+    broken.store.set({ ...broken.store.getSnapshot(), authorable: true, rows: [{
+      id: 'mine', trust: 'user', isDefault: false,
+    }] })
     broken.confirmDelete('mine')
 
     await broken.remove()

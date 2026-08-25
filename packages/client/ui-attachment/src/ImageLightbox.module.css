@@ -51,7 +51,7 @@
 
   .image {
     max-width: 100%;
-    max-height: calc(var(--dsw-viewport-height, 100dvh) - 96px);
+    max-height: calc(var(--dsw-viewport-height, 100vh) - 96px);
   }
 
   .close {

@@ -29,6 +29,6 @@
 @media (max-width: 767px) {
   .content {
     padding: var(--dsw-space-6);
-    max-height: calc(var(--dsw-viewport-height, 100dvh) - 48px);
+    max-height: calc(var(--dsw-viewport-height, 100vh) - 48px);
   }
 }

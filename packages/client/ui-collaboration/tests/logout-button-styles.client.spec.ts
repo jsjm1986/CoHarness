@@ -13,14 +13,14 @@ describe('LogoutButton.module.css', () => {
       new RegExp([
         String.raw`\.trigger:hover\s*\{[\s\S]*background:\s*`,
         String.raw`var\(--dsw-alias-interactive-bg-hover-danger\)`,
-        String.raw`[\s\S]*color:\s*var\(--dsw-alias-label-danger\)`,
+        String.raw`[\s\S]*color:\s*var\(--dsw-alias-state-error-primary\)`,
       ].join('')),
     )
     expect(css).toMatch(
       new RegExp([
         String.raw`\.trigger:focus-visible\s*\{[\s\S]*background:\s*`,
         String.raw`var\(--dsw-alias-interactive-bg-hover-danger\)`,
-        String.raw`[\s\S]*color:\s*var\(--dsw-alias-label-danger\)`,
+        String.raw`[\s\S]*color:\s*var\(--dsw-alias-state-error-primary\)`,
       ].join('')),
     )
   })

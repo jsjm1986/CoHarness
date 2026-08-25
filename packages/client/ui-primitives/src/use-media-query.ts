@@ -17,6 +17,24 @@ interface QueryEntry {
   readonly onChange: () => void
 }
 
+function addNativeListener(list: MediaQueryList, listener: () => void): void {
+  const addEventListener = Reflect.get(list, 'addEventListener')
+  if (typeof addEventListener === 'function') addEventListener.call(list, 'change', listener)
+  else {
+    const add = Reflect.get(list, 'addListener')
+    if (typeof add === 'function') add.call(list, listener)
+  }
+}
+
+function removeNativeListenerFromList(list: MediaQueryList, listener: () => void): void {
+  const removeEventListener = Reflect.get(list, 'removeEventListener')
+  if (typeof removeEventListener === 'function') removeEventListener.call(list, 'change', listener)
+  else {
+    const remove = Reflect.get(list, 'removeListener')
+    if (typeof remove === 'function') remove.call(list, listener)
+  }
+}
+
 /** One native listener per exact query while at least one hook is mounted. */
 const queryEntries = new Map<string, QueryEntry>()
 
@@ -29,7 +47,7 @@ function currentMatchMedia(): MatchMedia | undefined {
 }
 
 function removeNativeListener(query: string, entry: QueryEntry): void {
-  entry.list.removeEventListener('change', entry.onChange)
+  removeNativeListenerFromList(entry.list, entry.onChange)
   if (queryEntries.get(query) === entry) queryEntries.delete(query)
 }
 
@@ -52,7 +70,7 @@ function createEntry(
     },
   }
   queryEntries.set(query, entry)
-  if (subscribers.size > 0) list.addEventListener('change', entry.onChange)
+  if (subscribers.size > 0) addNativeListener(list, entry.onChange)
   return entry
 }
 
@@ -74,7 +92,7 @@ function subscribeToQuery(query: string, onChange: () => void): () => void {
   if (matchMedia === undefined) return () => {}
   const entry = entryForSubscription(query, matchMedia)
   entry.subscribers.add(onChange)
-  if (entry.subscribers.size === 1) entry.list.addEventListener('change', entry.onChange)
+  if (entry.subscribers.size === 1) addNativeListener(entry.list, entry.onChange)
   return () => {
     if (!entry.subscribers.delete(onChange) || entry.subscribers.size !== 0) return
     removeNativeListener(query, entry)

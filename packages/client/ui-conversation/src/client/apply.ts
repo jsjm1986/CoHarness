@@ -138,6 +138,7 @@ export function apply(ctx: Context): void {
   const submissionPolicy = new ComposerSubmissionPolicy(
     ctx.settingsScope.bind<ConversationSettings>({ namespace: CONVERSATION_SETTINGS_NAMESPACE }),
   )
+  ctx.effect(() => () => { submissionPolicy.dispose() }, 'ui-conversation: settings policy observer')
 
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({
     name: 'settings.general.item',
@@ -145,7 +146,7 @@ export function apply(ctx: Context): void {
     order: 20,
     locale: NS,
     inject: (): EnterBehaviorRowInjected => ({
-      hooks: { busyEnter: submissionPolicy.busyEnter },
+      hooks: { busyEnter: submissionPolicy.busyEnter, settings: submissionPolicy.settings },
       setBusyEnter: (behavior) => { submissionPolicy.setBusyEnter(behavior) },
     }),
   }, EnterBehaviorRow))

@@ -17,8 +17,8 @@ describe('DocumentsModal.module.css', () => {
   it('uses a 960px desktop card with a tall min and max height', () => {
     const block = dialogBlock(modal)
     expect(block).toContain('width: min(960px, 100%)')
-    expect(block).toContain('min-height: min(640px, calc(100dvh - 48px))')
-    expect(block).toContain('max-height: min(860px, calc(100dvh - 48px))')
+    expect(block).toContain('min-height: min(640px, calc(var(--dsw-viewport-height, 100vh) - 48px))')
+    expect(block).toContain('max-height: min(860px, calc(var(--dsw-viewport-height, 100vh) - 48px))')
   })
 
   it('keeps the compact dialog a full-width bottom sheet', () => {
@@ -67,7 +67,7 @@ describe('DocumentPreview.module.css', () => {
   it('matches the manager desktop width and height', () => {
     const block = dialogBlock(preview)
     expect(block).toContain('width: min(960px, 100%)')
-    expect(block).toContain('min-height: min(640px, calc(100dvh - 48px))')
-    expect(block).toContain('max-height: min(860px, calc(100dvh - 48px))')
+    expect(block).toContain('min-height: min(640px, calc(var(--dsw-viewport-height, 100vh) - 48px))')
+    expect(block).toContain('max-height: min(860px, calc(var(--dsw-viewport-height, 100vh) - 48px))')
   })
 })

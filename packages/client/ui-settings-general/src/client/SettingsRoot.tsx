@@ -17,7 +17,7 @@ import { createPortal } from 'react-dom'
 import clsx from 'clsx'
 import {
   handleDialogKeyDown, IconAgentPresetOutline16, IconCloseOutline16, IconDataOutline16,
-  IconPersonalizationOutline16, IconSettingsOutline16,
+  IconPersonalizationOutline16, IconSettingsOutline16, holdInert,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SettingsRootComponentProps, SettingsSectionRow } from './shell-contract.ts'
 import css from './SettingsRoot.module.css'
@@ -93,9 +93,7 @@ function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose }: PanelP
   useEffect(() => {
     const appRoot = document.getElementById('root')
     if (appRoot === null) return
-    const previous = appRoot.inert
-    appRoot.inert = true
-    return () => { appRoot.inert = previous }
+    return holdInert(appRoot)
   }, [])
 
   return createPortal((

@@ -88,7 +88,7 @@
   flex: none;
   padding: 0 6px;
   border-radius: 5px;
-  background: var(--dsw-alias-fill-l2);
+  background: var(--dsw-alias-bg-layer-2);
   color: var(--dsw-alias-label-secondary);
   font-size: 11px;
   line-height: 18px;
@@ -98,7 +98,7 @@
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  font-family: var(--dsw-font-mono);
+  font-family: var(--ds-font-family-code);
   white-space: nowrap;
   text-overflow: ellipsis;
 }

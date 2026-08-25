@@ -266,7 +266,7 @@
   .list {
     min-width: min(218px, calc(100vw - 24px));
     max-width: calc(100vw - 24px);
-    max-height: min(70dvh, calc(var(--dsw-viewport-height, 100dvh) - 48px));
+    max-height: min(70vh, calc(var(--dsw-viewport-height, 100vh) - 48px));
     overflow-y: auto;
   }
 

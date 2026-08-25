@@ -222,6 +222,7 @@ describe('ui-agent-preset apply', () => {
     // store, and the section's default write does not go through the row.
     await row.load()
     await row.select('standard')
+    await section.load()
     await section.makeDefault('standard')
     expect(row.hooks.agentPreset.getSnapshot().options).toEqual([{ id: 'standard', trust: 'system' }])
     expect(section.hooks.agentPresetSection.getSnapshot().rows)

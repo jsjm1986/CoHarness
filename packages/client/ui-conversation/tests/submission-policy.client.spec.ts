@@ -29,6 +29,7 @@ describe('ComposerSubmissionPolicy', () => {
 
   it('writes an explicit change through the scope after publishing it locally', () => {
     const host = stubSettingsScope<ConversationSettings>()
+    host.publish({ status: 'ready', writable: true })
     const observed: string[] = []
     let liveBehavior = (): string => 'unconstructed'
     const scope: typeof host.scope = {

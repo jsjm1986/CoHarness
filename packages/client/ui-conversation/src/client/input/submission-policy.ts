@@ -4,7 +4,7 @@
  * Host and Agent keep the actual delivery-window authority.
  */
 import {
-  createSnapshotStore, type SettingsScope, type SnapshotStore,
+  createSnapshotStore, settingsControlState, type SettingsControlState, type SettingsScope, type SnapshotStore,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   BusyEnterBehavior, ComposerSubmitGesture, InputSubmitMode,
@@ -22,7 +22,10 @@ export { DEFAULT_BUSY_ENTER_BEHAVIOR } from '../../submission-settings.ts'
 export class ComposerSubmissionPolicy {
   /** Reactive preference source for the Settings row. */
   readonly busyEnter: SnapshotStore<BusyEnterBehavior> = createSnapshotStore(DEFAULT_BUSY_ENTER_BEHAVIOR)
+  /** Host writability and write status source for the Settings row. */
+  readonly settings: SnapshotStore<SettingsControlState>
   private readonly host: SettingsScope<ConversationSettings> | undefined
+  private readonly unsubscribe: (() => void) | undefined
 
   /**
    * @param host - durable preference scope owned by the providing plugin;
@@ -32,8 +35,14 @@ export class ComposerSubmissionPolicy {
    */
   constructor(host?: SettingsScope<ConversationSettings>) {
     this.host = host
+    this.settings = createSnapshotStore(host === undefined
+      ? { status: 'ready', writable: true, writableReason: undefined, write: { status: 'idle' } }
+      : settingsControlState(host.getSnapshot()))
     if (host !== undefined) {
-      host.subscribe(() => { this.adopt(host) })
+      this.unsubscribe = host.subscribe(() => {
+        this.settings.set(settingsControlState(host.getSnapshot()))
+        this.adopt(host)
+      })
       this.adopt(host)
     }
   }
@@ -63,8 +72,15 @@ export class ComposerSubmissionPolicy {
    */
   setBusyEnter(behavior: BusyEnterBehavior): void {
     if (this.busyEnter.getSnapshot() === behavior) return
+    const snapshot = this.host?.getSnapshot()
+    if (snapshot?.status === 'ready' && !snapshot.writable) return
     this.busyEnter.set(behavior)
     void this.host?.set(BUSY_ENTER_FIELD, behavior)
+  }
+
+  /** Release the scope observer owned by this policy. */
+  dispose(): void {
+    this.unsubscribe?.()
   }
 
   /**

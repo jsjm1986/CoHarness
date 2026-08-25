@@ -142,7 +142,7 @@
 .kindcontext { color: var(--dsw-alias-state-success-primary); background: var(--dsw-alias-state-success-tertiary); }
 .kindtool,
 .kindsubtool { color: var(--dsw-alias-state-warn-label); background: var(--dsw-alias-state-warn-tertiary); }
-.kindmessage { color: var(--dsw-alias-brand-primary-new-colorprimary-new-color); background: var(--dsw-alias-fill-tsp-secondary); }
+.kindmessage { color: var(--dsw-alias-brand-primary-new-colorprimary-new-color); background: var(--dsw-alias-bg-module-platform); }
 .kindsystem,
 .kindcompacted { color: var(--dsw-alias-label-secondary); background: var(--dsw-alias-bg-module-platform); }
 
