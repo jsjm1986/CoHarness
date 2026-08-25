@@ -753,7 +753,7 @@ export class Session implements SessionFace {
     this.baseSeq = logicalBaseSeq(this.events, this.omittedSpans) ?? 0
     this.hasMore = hasMore
     this.historyWindowMode = 'tail'
-    if (this.events.some(hasConversationContent)) this.markConversationContent(true)
+    if (this.events.some(hasConversationContent)) this.markConversationContent()
     if (this.events.some(event => event.type === 'turn/start')) this.firstPromptPendingTurn = false
     this.conversation.replaceWindow(entries.map(conversationInput), hasMore)
     if (projections !== undefined) this.projections.seed(projections)
@@ -769,7 +769,7 @@ export class Session implements SessionFace {
     if (tailSeq !== null && event.seq <= tailSeq) return 'none' // replay overlap, drop
     this.events.push(event)
     this.views.push(view)
-    if (hasConversationContent(event)) this.markConversationContent(true)
+    if (hasConversationContent(event)) this.markConversationContent()
     if (event.type === 'turn/start') this.firstPromptPendingTurn = false
     const queueChanged = this.queueMirror.acceptDurable(event)
     const publication = this.conversation.append({ event, view })
@@ -803,12 +803,12 @@ export class Session implements SessionFace {
   }
 
   /** Mark the first durable non-empty message and notify the list owner once. */
-  private markConversationContent(notifyOwner: boolean): void {
+  private markConversationContent(): void {
     if (this.conversationContentObserved) return
     this.conversationContentObserved = true
     if (!this.blankBit) return
     this.blankBit = false
-    if (notifyOwner) this.options.onEngaged?.(this)
+    this.options.onEngaged?.(this)
     this.notifier.markDirty()
   }
 
