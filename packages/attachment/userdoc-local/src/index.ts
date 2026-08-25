@@ -7,6 +7,7 @@ import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { UserDocDirectoryId, UserDocStore } from '@deepseek-ai/dsh-userdoc'
 import type {
+  BeginUserDocUpload,
   ResolveUserDocTarget,
   StoredUserDoc,
   UserDocDirectoryListing,
@@ -15,6 +16,9 @@ import type {
   UserDocLimits,
   UserDocRef,
   UserDocTarget,
+  UserDocUploadChunk,
+  UserDocUploadId,
+  UserDocUploadSession,
 } from '@deepseek-ai/dsh-userdoc'
 import { expandHomePath } from '@deepseek-ai/dsh-home-paths'
 import {
@@ -24,6 +28,7 @@ import {
   listDocFiles,
   moveDocFile,
   openDocFile,
+  publishDocPartial,
   readDocFile,
   removeDocDirectory,
   removeDocFile,
@@ -33,6 +38,22 @@ import {
   statDocFile,
 } from './store.ts'
 import { migrateLegacyDocuments } from './migration.ts'
+import {
+  DEFAULT_UPLOAD_CHUNK_BYTES,
+  DEFAULT_UPLOAD_CLEANUP_INTERVAL_MS,
+  DEFAULT_UPLOAD_MAX_CONCURRENT,
+  DEFAULT_UPLOAD_MIN_FREE_BYTES,
+  DEFAULT_UPLOAD_SESSION_TTL_MS,
+  LocalUploadManager,
+} from './upload.ts'
+
+export {
+  DEFAULT_UPLOAD_CHUNK_BYTES,
+  DEFAULT_UPLOAD_CLEANUP_INTERVAL_MS,
+  DEFAULT_UPLOAD_MAX_CONCURRENT,
+  DEFAULT_UPLOAD_MIN_FREE_BYTES,
+  DEFAULT_UPLOAD_SESSION_TTL_MS,
+} from './upload.ts'
 
 export { DEFAULT_MEDIA_TYPE, mediaTypeFor } from './media-type.ts'
 export {
@@ -54,6 +75,7 @@ export {
   listDocFiles,
   moveDocFile,
   openDocFile,
+  publishDocPartial,
   readDocFile,
   removeDocDirectory,
   removeDocFile,
@@ -96,6 +118,16 @@ export interface Config {
   maxMessageBytes?: number
   /** Maximum bytes of a document inlined into a prompt as text. */
   maxInlineTextBytes?: number
+  /** Maximum bytes accepted by one resumable upload request. */
+  uploadChunkBytes?: number
+  /** Retention period for incomplete resumable uploads. */
+  uploadSessionTtlMs?: number
+  /** Minimum free bytes retained on the document filesystem. */
+  uploadMinFreeBytes?: number
+  /** Maximum concurrent resumable upload sessions. */
+  uploadMaxConcurrent?: number
+  /** Interval between expired-session cleanup sweeps. */
+  uploadCleanupIntervalMs?: number
 }
 
 /** Real-file local document store. */
@@ -107,11 +139,17 @@ export class LocalUserDocStore extends UserDocStore {
     maxFilesPerMessage: z.number().step(1).min(1).default(DEFAULT_MAX_FILES_PER_MESSAGE),
     maxMessageBytes: z.number().step(1).min(1).default(DEFAULT_MAX_MESSAGE_BYTES),
     maxInlineTextBytes: z.number().step(1).min(1).default(DEFAULT_MAX_INLINE_TEXT_BYTES),
+    uploadChunkBytes: z.number().step(1).min(64 * 1024).default(DEFAULT_UPLOAD_CHUNK_BYTES),
+    uploadSessionTtlMs: z.number().step(1).min(60 * 1000).default(DEFAULT_UPLOAD_SESSION_TTL_MS),
+    uploadMinFreeBytes: z.number().step(1).min(0).default(DEFAULT_UPLOAD_MIN_FREE_BYTES),
+    uploadMaxConcurrent: z.number().step(1).min(1).default(DEFAULT_UPLOAD_MAX_CONCURRENT),
+    uploadCleanupIntervalMs: z.number().step(1).min(60 * 1000).default(DEFAULT_UPLOAD_CLEANUP_INTERVAL_MS),
   })
 
   /** Absolute document root. */
   readonly root: string
   readonly limits: UserDocLimits
+  private readonly uploads: LocalUploadManager
   private readonly legacyRoot: string | undefined
   private ready: Promise<void> | undefined
 
@@ -130,13 +168,38 @@ export class LocalUserDocStore extends UserDocStore {
       maxFilesPerMessage: config.maxFilesPerMessage ?? DEFAULT_MAX_FILES_PER_MESSAGE,
       maxMessageBytes: config.maxMessageBytes ?? DEFAULT_MAX_MESSAGE_BYTES,
       maxInlineTextBytes: config.maxInlineTextBytes ?? DEFAULT_MAX_INLINE_TEXT_BYTES,
+      upload: Object.freeze({
+        protocol: 'resumable-v1' as const,
+        chunkBytes: config.uploadChunkBytes ?? DEFAULT_UPLOAD_CHUNK_BYTES,
+        sessionTtlMs: config.uploadSessionTtlMs ?? DEFAULT_UPLOAD_SESSION_TTL_MS,
+        resumable: true as const,
+      }),
     })
+    this.uploads = new LocalUploadManager({
+      root: this.root,
+      limits: this.limits,
+      resolveTarget: input => this.resolveTarget(input),
+      publish: (target, partial, bytes, expectedSha256) => publishDocPartial(this.root, target, partial, bytes, expectedSha256),
+    }, {
+      chunkBytes: config.uploadChunkBytes ?? DEFAULT_UPLOAD_CHUNK_BYTES,
+      sessionTtlMs: config.uploadSessionTtlMs ?? DEFAULT_UPLOAD_SESSION_TTL_MS,
+      minFreeBytes: config.uploadMinFreeBytes ?? DEFAULT_UPLOAD_MIN_FREE_BYTES,
+      maxConcurrent: config.uploadMaxConcurrent ?? DEFAULT_UPLOAD_MAX_CONCURRENT,
+      cleanupIntervalMs: config.uploadCleanupIntervalMs ?? DEFAULT_UPLOAD_CLEANUP_INTERVAL_MS,
+    })
+    ctx.effect(() => {
+      return () => { this.uploads.stopCleanup() }
+    }, 'userdoc-local: upload cleanup')
   }
 
   private ensureReady(): Promise<void> {
-    this.ready ??= this.legacyRoot === undefined
-      ? mkdir(this.root, { recursive: true, mode: 0o700 }).then(() => undefined)
-      : migrateLegacyDocuments(this.legacyRoot, this.root)
+    this.ready ??= (async () => {
+      if (this.legacyRoot === undefined) await mkdir(this.root, { recursive: true, mode: 0o700 })
+      else await migrateLegacyDocuments(this.legacyRoot, this.root)
+      await this.uploads.cleanupExpired()
+      await this.uploads.resumePendingFinalizations()
+      this.uploads.startCleanup()
+    })()
     return this.ready
   }
 
@@ -152,6 +215,38 @@ export class LocalUserDocStore extends UserDocStore {
   ): Promise<UserDocRef> {
     await this.ensureReady()
     return saveDocFile(this.root, target, body, this.limits, signal)
+  }
+
+  async beginUpload(input: BeginUserDocUpload): Promise<UserDocUploadSession> {
+    await this.ensureReady()
+    return this.uploads.begin(input)
+  }
+
+  async inspectUpload(uploadId: UserDocUploadId, signal?: AbortSignal): Promise<UserDocUploadSession> {
+    signal?.throwIfAborted()
+    await this.ensureReady()
+    return this.uploads.inspect(uploadId)
+  }
+
+  async writeUploadChunk(
+    uploadId: UserDocUploadId,
+    chunk: UserDocUploadChunk,
+    signal?: AbortSignal,
+  ): Promise<UserDocUploadSession> {
+    await this.ensureReady()
+    return this.uploads.write(uploadId, chunk, signal)
+  }
+
+  async completeUpload(uploadId: UserDocUploadId, sha256: string, signal?: AbortSignal): Promise<UserDocUploadSession> {
+    signal?.throwIfAborted()
+    await this.ensureReady()
+    return this.uploads.complete(uploadId, sha256)
+  }
+
+  async cancelUpload(uploadId: UserDocUploadId, signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted()
+    await this.ensureReady()
+    return this.uploads.cancel(uploadId)
   }
 
   async list(signal?: AbortSignal): Promise<UserDocRef[]> {

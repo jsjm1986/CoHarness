@@ -2,11 +2,13 @@ import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it } from 'vitest'
 import {
   DOCUMENT_NOT_FOUND_CODE,
+  DOCUMENT_UPLOAD_PROTOCOL_CODE,
   DOCUMENT_WRITE_FAILED_CODE,
   UserDocDirectoryId,
   UserDocError,
   UserDocId,
   UserDocStore,
+  type BeginUserDocUpload,
 } from '../src/index.ts'
 import type {
   ResolveUserDocTarget,
@@ -16,6 +18,9 @@ import type {
   UserDocLimits,
   UserDocRef,
   UserDocTarget,
+  UserDocUploadChunk,
+  UserDocUploadId,
+  UserDocUploadSession,
 } from '../src/index.ts'
 
 const LIMITS: UserDocLimits = {
@@ -23,6 +28,7 @@ const LIMITS: UserDocLimits = {
   maxFilesPerMessage: 2,
   maxMessageBytes: 16,
   maxInlineTextBytes: 4,
+  upload: { protocol: 'resumable-v1', chunkBytes: 65536, sessionTtlMs: 86400000, resumable: true },
 }
 
 function ref(docId: string): UserDocRef {
@@ -133,6 +139,26 @@ class MemoryUserDocStore extends UserDocStore {
 
   async remove(docId: string): Promise<void> {
     this.saved.delete(docId)
+  }
+
+  async beginUpload(_input: BeginUserDocUpload): Promise<UserDocUploadSession> {
+    throw new UserDocError('resumable uploads are unavailable in this test store', DOCUMENT_UPLOAD_PROTOCOL_CODE)
+  }
+
+  async inspectUpload(_uploadId: UserDocUploadId): Promise<UserDocUploadSession> {
+    throw new UserDocError('resumable uploads are unavailable in this test store', DOCUMENT_UPLOAD_PROTOCOL_CODE)
+  }
+
+  async writeUploadChunk(_uploadId: UserDocUploadId, _chunk: UserDocUploadChunk): Promise<UserDocUploadSession> {
+    throw new UserDocError('resumable uploads are unavailable in this test store', DOCUMENT_UPLOAD_PROTOCOL_CODE)
+  }
+
+  async completeUpload(_uploadId: UserDocUploadId, _sha256: string): Promise<UserDocUploadSession> {
+    throw new UserDocError('resumable uploads are unavailable in this test store', DOCUMENT_UPLOAD_PROTOCOL_CODE)
+  }
+
+  async cancelUpload(_uploadId: UserDocUploadId): Promise<void> {
+    throw new UserDocError('resumable uploads are unavailable in this test store', DOCUMENT_UPLOAD_PROTOCOL_CODE)
   }
 
   private directoryRef(directoryId: string): UserDocDirectoryRef {

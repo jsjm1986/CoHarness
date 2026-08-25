@@ -8,6 +8,8 @@ This is deliberately the opposite of [`dsh-attachment`](../attachment/README.md)
 
 `resolveTarget` is an explicit step, not a default hidden inside `save`: it sanitizes the client-supplied name, resolves the selected directory inside the document root, and returns the exact path `save` will create. Callers resolve first, then stream bytes into `save`, so admission and containment are decided before a single byte is written. A finite `maxFileBytes` is enforced against received bytes; `null` leaves the per-document size unlimited. Failed writes leave nothing behind.
 
+The same seam also owns resumable upload sessions. Providers create an opaque session, accept sequential range-checked chunks, verify per-chunk and final SHA-256 digests, and publish a `UserDocRef` only after the complete file is verified. Session state is provider-owned and never exposes a temporary path to the browser.
+
 `listDirectory` returns one folder's immediate children, while `list` retains the recursive document view used by prompt attachment and older consumers. `createDirectory`, `renameDirectory`, and `removeDirectory` manage ordinary folders; root rename/delete and non-empty deletion are rejected. `move` accepts a document id and destination directory id and never replaces an occupied name. Directory and document ids are opaque root-relative values; providers validate them again whenever they cross into the filesystem.
 
 `mediaType` is recorded verbatim and never verified, parsed, or dispatched on. There is no format allowlist. A harness accepts what a person uploads and lets the agent decide what the file is; server-side parsing, text extraction, and thumbnailing are outside this seam by design.
@@ -26,7 +28,7 @@ None; this package neither assembles nor sends a provider request.
 
 ## Known Limitations and Deferred Work
 
-- **No retention, quota accounting, or garbage collection** — uploads accumulate under the user's own directory until removed. A multi-user deployment enforces disk quota at its own layer, because this seam cannot see the other users sharing the volume.
+- **No business quota accounting** — providers may leave the per-file limit unlimited, while a concrete provider remains responsible for disk-availability and temporary-session safety.
 - **`list` walks one document root** — there is no index or cross-root view, so a very large workspace is scanned in full for recursive consumers.
 - **No content verification on read** — unlike the content-addressed attachment path, a document is an ordinary file that anything with filesystem access may have changed since upload, and `bytes` is the length recorded at upload time.
 - **Snapshot copies are not synchronized** — a cross-scope transfer is one-way and independent after the target file commits.

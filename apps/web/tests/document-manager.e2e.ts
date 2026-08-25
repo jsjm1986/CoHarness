@@ -29,6 +29,7 @@ const LIMITS = {
   maxFilesPerMessage: 20,
   maxMessageBytes: 100,
   maxInlineTextBytes: 256,
+  upload: { protocol: 'resumable-v1', chunkBytes: 8 * 1024 * 1024, sessionTtlMs: 86400000, resumable: true },
 }
 
 const LIST_PAYLOAD = {

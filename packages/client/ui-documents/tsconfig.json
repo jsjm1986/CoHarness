@@ -30,6 +30,9 @@
       "path": "../ui-slots"
     },
     {
+      "path": "../userdoc-upload"
+    },
+    {
       "path": "../../runtime-diagnostics/invariants"
     },
     {

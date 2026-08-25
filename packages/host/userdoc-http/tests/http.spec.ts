@@ -1,4 +1,5 @@
 import { createServer, type Server } from 'node:http'
+import { createHash } from 'node:crypto'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -7,13 +8,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import LocalUserDocStore from '@deepseek-ai/dsh-userdoc-local'
 import {
-  DOCUMENT_TOO_LARGE_CODE,
-  INVALID_DOCUMENT_NAME_CODE,
+  DOCUMENT_UPLOAD_PROTOCOL_CODE,
 } from '@deepseek-ai/dsh-userdoc'
 import {
   handleUserDocHttp,
   USERDOC_HTTP_PATH,
-  USERDOC_UPLOAD_HEADER,
+  USERDOC_UPLOADS_PATH,
 } from '../src/index.ts'
 
 let root: string
@@ -24,38 +24,71 @@ let origin: string
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'dsh-userdoc-http-'))
   context = new Context()
-  await context.plugin(LocalUserDocStore, { uploadRoot: root, maxFileBytes: 8 })
+  await context.plugin(LocalUserDocStore, { uploadRoot: root, maxFileBytes: 8, uploadChunkBytes: 64 * 1024, uploadMinFreeBytes: 0 })
   server = createServer((req, res) => { void handleUserDocHttp(context, req, res) })
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   origin = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`
 })
 
 afterEach(async () => {
-  await new Promise<void>(resolve => server.close(() => { resolve() }))
+  if (server !== undefined) await new Promise<void>(resolve => server.close(() => { resolve() }))
   await context.fiber.dispose()
   await rm(root, { recursive: true, force: true })
 })
 
-async function upload(
-  name: string,
-  body: BodyInit,
-  headers: HeadersInit = {},
-  directory = '',
-): Promise<Response> {
-  const requestHeaders = new Headers(headers)
-  requestHeaders.set(USERDOC_UPLOAD_HEADER, '1')
-  return fetch(`${origin}${USERDOC_HTTP_PATH}?name=${encodeURIComponent(name)}&directory=${encodeURIComponent(directory)}`, {
+async function beginUpload(name: string, bytes: number, fingerprint = 'test', directory = ''): Promise<Response> {
+  return fetch(`${origin}${USERDOC_UPLOADS_PATH}`, {
     method: 'POST',
-    headers: requestHeaders,
-    body,
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ version: 1, name, directory, bytes, fingerprint }),
   })
 }
 
+async function uploadChunk(uploadId: string, index: number, data: string, total: number, start: number): Promise<Response> {
+  const bytes = new TextEncoder().encode(data)
+  const digest = createHash('sha256').update(bytes).digest('hex')
+  return fetch(`${origin}${USERDOC_UPLOADS_PATH}/${uploadId}/chunks/${String(index)}`, {
+    method: 'PUT',
+    headers: {
+      'content-range': `bytes ${String(start)}-${String(start + bytes.byteLength - 1)}/${String(total)}`,
+      'x-dsh-chunk-sha256': digest,
+      'content-length': String(bytes.byteLength),
+    },
+    body: bytes,
+  })
+}
+
+async function completeUpload(uploadId: string, body: string): Promise<Response> {
+  const digest = createHash('sha256').update(body).digest('hex')
+  const response = await fetch(`${origin}${USERDOC_UPLOADS_PATH}/${uploadId}/complete`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ version: 1, sha256: digest }),
+  })
+  if (response.status !== 202) return response
+  for (;;) {
+    const status = await fetch(`${origin}${USERDOC_UPLOADS_PATH}/${uploadId}`)
+    const value = await status.json() as { state?: string }
+    if (value.state !== 'verifying') {
+      return new Response(JSON.stringify(value), {
+        status: status.status,
+        headers: { 'content-type': 'application/json' },
+      })
+    }
+    await new Promise(resolve => setTimeout(resolve, 5))
+  }
+}
+
 describe('user-document HTTP consumer', () => {
-  it('streams an upload, lists it, downloads GET and HEAD, then deletes it idempotently', async () => {
-    const created = await upload('年报.txt', 'hello')
-    expect(created.status).toBe(201)
-    const ref = await created.json() as { docId: string; path: string; name: string; bytes: number }
+  it('uploads through resumable chunks, lists, downloads, and deletes idempotently', async () => {
+    const started = await beginUpload('年报.txt', 5)
+    expect(started.status).toBe(200)
+    const session = await started.json() as { uploadId: string }
+    expect((await uploadChunk(session.uploadId, 0, 'hello', 5, 0)).status).toBe(200)
+    const created = await completeUpload(session.uploadId, 'hello')
+    expect(created.status).toBe(200)
+    const completed = await created.json() as { ref: { docId: string; path: string; name: string; bytes: number } }
+    const ref = completed.ref
     expect(ref).toMatchObject({ name: '年报.txt', bytes: 5 })
     expect(await readFile(ref.path, 'utf8')).toBe('hello')
 
@@ -85,12 +118,12 @@ describe('user-document HTTP consumer', () => {
     expect(await (await fetch(`${origin}${USERDOC_HTTP_PATH}`)).json()).toMatchObject({ documents: [] })
   })
 
-  it('requires the non-simple upload header before consuming a body', async () => {
+  it('rejects the removed one-request upload protocol', async () => {
     const response = await fetch(`${origin}${USERDOC_HTTP_PATH}?name=a.txt`, {
       method: 'POST', body: 'body',
     })
-    expect(response.status).toBe(400)
-    expect(await response.json()).toMatchObject({ error: { code: 'UPLOAD_HEADER_REQUIRED' } })
+    expect(response.status).toBe(426)
+    expect(await response.json()).toMatchObject({ error: { code: DOCUMENT_UPLOAD_PROTOCOL_CODE } })
   })
 
   it('creates, browses, renames, and deletes folders and moves a document', async () => {
@@ -100,9 +133,12 @@ describe('user-document HTTP consumer', () => {
     expect(createdFolder.status).toBe(201)
     expect(await createdFolder.json()).toMatchObject({ directoryId: 'reports', name: 'reports' })
 
-    const createdDocument = await upload('summary.txt', 'hello', {}, 'reports')
-    expect(createdDocument.status).toBe(201)
-    const document = await createdDocument.json() as { docId: string }
+    const started = await beginUpload('summary.txt', 5, 'summary', 'reports')
+    const session = await started.json() as { uploadId: string }
+    await uploadChunk(session.uploadId, 0, 'hello', 5, 0)
+    const createdDocument = await completeUpload(session.uploadId, 'hello')
+    expect(createdDocument.status).toBe(200)
+    const document = (await createdDocument.json() as { ref: { docId: string } }).ref
     expect(document.docId).toBe('reports/summary.txt')
 
     const rootListing = await fetch(`${origin}${USERDOC_HTTP_PATH}?directory=`)
@@ -134,35 +170,17 @@ describe('user-document HTTP consumer', () => {
     expect((await fetch(`${origin}${USERDOC_HTTP_PATH}/folders?id=archive`, { method: 'DELETE' })).status).toBe(204)
   })
 
-  it('maps declared and streamed byte-limit failures to the stable public code', async () => {
-    const declared = await upload('large.bin', '123456789')
-    expect(declared.status).toBe(413)
-    expect(await declared.json()).toMatchObject({ error: { code: DOCUMENT_TOO_LARGE_CODE } })
-
-    const stream = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(new TextEncoder().encode('12345'))
-        controller.enqueue(new TextEncoder().encode('67890'))
-        controller.close()
-      },
-    })
-    const streamed = await fetch(`${origin}${USERDOC_HTTP_PATH}?name=stream.bin`, {
-      method: 'POST',
-      headers: { [USERDOC_UPLOAD_HEADER]: '1' },
-      body: stream,
-      // Node fetch requires duplex for a streaming request body.
-      duplex: 'half',
-    } as RequestInit & { duplex: 'half' })
-    expect(streamed.status).toBe(413)
-    expect(await streamed.json()).toMatchObject({ error: { code: DOCUMENT_TOO_LARGE_CODE } })
-    expect(await (await fetch(`${origin}${USERDOC_HTTP_PATH}`)).json()).toMatchObject({ documents: [] })
+  it('rejects an upload chunk larger than the configured request size', async () => {
+    const started = await beginUpload('large.bin', 9, 'large')
+    expect(started.status).toBe(413)
+    expect(await started.json()).toMatchObject({ error: { code: 'DOCUMENT_TOO_LARGE' } })
   })
 
   it('returns stable validation errors without leaking an absolute path', async () => {
-    const missing = await upload('', 'x')
+    const missing = await beginUpload('', 1, 'missing')
     expect(missing.status).toBe(400)
     const body = await missing.text()
-    expect(JSON.parse(body)).toMatchObject({ error: { code: INVALID_DOCUMENT_NAME_CODE } })
+    expect(JSON.parse(body)).toMatchObject({ error: { code: 'INVALID_DOCUMENT_NAME' } })
     expect(body).not.toContain(root)
 
     const badRef = await fetch(`${origin}${USERDOC_HTTP_PATH}/content?id=..%2Foutside`)

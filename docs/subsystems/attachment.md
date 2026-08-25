@@ -193,6 +193,47 @@ abstract resolveTarget(input: ResolveUserDocTarget): Promise<UserDocTarget>
 abstract save( target: UserDocTarget, body: ReadableStream<Uint8Array>, signal?: AbortSignal, ): Promise<UserDocRef>
 
 /**
+ * Create or reuse a resumable upload session.
+ * @param input - untrusted browser metadata validated by the provider.
+ * @returns the public upload session state.
+ */
+abstract beginUpload(input: BeginUserDocUpload): Promise<UserDocUploadSession>
+
+/**
+ * Read one upload session's public state.
+ * @param uploadId - opaque provider-produced identifier.
+ * @param signal - optional cancellation.
+ * @returns current upload state.
+ */
+abstract inspectUpload(uploadId: UserDocUploadId, signal?: AbortSignal): Promise<UserDocUploadSession>
+
+/**
+ * Append one sequential chunk to an upload session.
+ * @param uploadId - opaque provider-produced identifier.
+ * @param chunk - validated range, digest, and raw body.
+ * @param signal - optional cancellation.
+ * @returns updated public upload state.
+ */
+abstract writeUploadChunk( uploadId: UserDocUploadId, chunk: UserDocUploadChunk, signal?: AbortSignal, ): Promise<UserDocUploadSession>
+
+/**
+ * Start or repeat final verification and publication.
+ * @param uploadId - opaque provider-produced identifier.
+ * @param sha256 - final SHA-256 digest supplied by the browser.
+ * @param signal - optional cancellation.
+ * @returns verifying, complete, or failed public state.
+ */
+abstract completeUpload( uploadId: UserDocUploadId, sha256: string, signal?: AbortSignal, ): Promise<UserDocUploadSession>
+
+/**
+ * Cancel and remove one incomplete upload session.
+ * @param uploadId - opaque provider-produced identifier.
+ * @param signal - optional cancellation.
+ * @returns after temporary data is removed.
+ */
+abstract cancelUpload(uploadId: UserDocUploadId, signal?: AbortSignal): Promise<void>
+
+/**
  * List every stored document, newest modification first.
  * @param signal - optional cancellation for the directory scan.
  * @returns references to all stored documents; empty before the first upload.
@@ -294,5 +335,5 @@ abstract openRead(docId: UserDocId): Promise<{ ref: UserDocRef; body: ReadableSt
 abstract remove(docId: UserDocId, signal?: AbortSignal): Promise<void>
 ```
 
-Source: [`packages/attachment/userdoc/src/index.ts:92`](../../packages/attachment/userdoc/src/index.ts)
+Source: [`packages/attachment/userdoc/src/index.ts:110`](../../packages/attachment/userdoc/src/index.ts)
 <!-- END GENERATED cordis-surface -->

@@ -101,6 +101,26 @@ describe('proxy handlers', () => {
     expect(JSON.parse(readFileSync(grantsFile, 'utf8'))).toEqual(await deps.projects.effectiveGrants(1))
   })
 
+  it('does not create one audit row for every resumable upload data request', async () => {
+    const { deps, base, cookie } = await setup()
+    await deps.instances.ensureRunning((await deps.users.getByUsername('alice'))!)
+    const uploadPath = '/api/documents/uploads/00000000-0000-4000-8000-000000000000'
+    const chunk = await fetch(`${base}${uploadPath}/chunks/0`, {
+      method: 'PUT',
+      headers: {
+        cookie,
+        origin: base,
+        'content-range': 'bytes 0-0/1',
+        'content-length': '1',
+      },
+      body: 'x',
+    })
+    expect(chunk.status).toBe(200)
+    const status = await fetch(`${base}${uploadPath}`, { headers: { cookie, origin: base } })
+    expect(status.status).toBe(200)
+    expect(await deps.audit.query({ action: 'api' })).toEqual([])
+  })
+
   it('does not expose an upstream loopback redirect to the browser', async () => {
     const { deps, base, cookie } = await setup()
     await deps.instances.ensureRunning((await deps.users.getByUsername('alice'))!)

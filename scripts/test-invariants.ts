@@ -27,6 +27,10 @@ import type {
   UserDocLimits,
   UserDocRef,
   UserDocTarget,
+  BeginUserDocUpload,
+  UserDocUploadChunk,
+  UserDocUploadId,
+  UserDocUploadSession,
 } from '@deepseek-ai/dsh-userdoc'
 
 declare global {
@@ -153,6 +157,7 @@ class TestUserDocStore extends UserDocStore {
     maxFilesPerMessage: 1,
     maxMessageBytes: 1,
     maxInlineTextBytes: 1,
+    upload: { protocol: 'resumable-v1', chunkBytes: 65536, sessionTtlMs: 86400000, resumable: true },
   }
 
   resolveTarget(_input: ResolveUserDocTarget): Promise<UserDocTarget> {
@@ -165,6 +170,26 @@ class TestUserDocStore extends UserDocStore {
     _signal?: AbortSignal,
   ): Promise<UserDocRef> {
     return Promise.reject(new Error('test invariant user document store does not save documents'))
+  }
+
+  beginUpload(_input: BeginUserDocUpload): Promise<UserDocUploadSession> {
+    return Promise.reject(new Error('test invariant user document store does not begin uploads'))
+  }
+
+  inspectUpload(_uploadId: UserDocUploadId): Promise<UserDocUploadSession> {
+    return Promise.reject(new Error('test invariant user document store does not inspect uploads'))
+  }
+
+  writeUploadChunk(_uploadId: UserDocUploadId, _chunk: UserDocUploadChunk): Promise<UserDocUploadSession> {
+    return Promise.reject(new Error('test invariant user document store does not write upload chunks'))
+  }
+
+  completeUpload(_uploadId: UserDocUploadId, _sha256: string): Promise<UserDocUploadSession> {
+    return Promise.reject(new Error('test invariant user document store does not complete uploads'))
+  }
+
+  cancelUpload(_uploadId: UserDocUploadId): Promise<void> {
+    return Promise.reject(new Error('test invariant user document store does not cancel uploads'))
   }
 
   list(_signal?: AbortSignal): Promise<UserDocRef[]> {

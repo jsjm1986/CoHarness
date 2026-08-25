@@ -47,6 +47,7 @@ function installXhr(configure: (xhr: MockXhr) => void): void {
 describe('createUserDocClient', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
+    globalThis.localStorage?.clear()
   })
 
   it('lists documents and builds a content URL', async () => {
@@ -164,12 +165,27 @@ describe('createUserDocClient', () => {
     ])
   })
 
-  it('uploads through XHR with computable and non-computable progress', async () => {
+  it('uploads one resumable chunk and reports byte progress', async () => {
     const loaded: number[] = []
+    const session = {
+      uploadId: '00000000-0000-4000-8000-000000000000',
+      name: 'a.txt', directoryId: '', bytes: 5, fingerprint: 'fingerprint', chunkBytes: 65536,
+      receivedBytes: 0, expiresAt: Date.now() + 1000, state: 'uploading',
+    }
+    const complete = { ...session, receivedBytes: 5, state: 'complete', ref }
+    const calls: Array<{ url: string; method: string }> = []
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+      calls.push({ url, method: init?.method ?? 'GET' })
+      const body = url.endsWith('/complete') ? complete : session
+      return { ok: true, status: 200, text: async () => JSON.stringify(body) }
+    }))
     installXhr((xhr) => {
       xhr.send = vi.fn(function send(this: MockXhr) {
-        this.upload.onprogress?.({ lengthComputable: true, loaded: 4, total: 8 } as ProgressEvent)
-        this.upload.onprogress?.({ lengthComputable: false, loaded: 3 } as ProgressEvent)
+        this.status = 200
+        this.responseText = '{}'
+        this.upload.onprogress?.({ lengthComputable: true, loaded: 4, total: 5 } as ProgressEvent)
+        this.upload.onprogress?.({ lengthComputable: true, loaded: 5, total: 5 } as ProgressEvent)
         this.onload?.()
       })
     })
@@ -177,26 +193,31 @@ describe('createUserDocClient', () => {
       loaded.push(value)
     })
     expect(result).toEqual(ref)
-    expect(loaded).toEqual([4, 3])
+    expect(loaded).toContain(4)
+    expect(loaded.at(-1)).toBe(5)
+    expect(calls.map(call => call.method)).toEqual(['POST', 'POST'])
   })
 
-  it('rejects an XHR error, abort, HTTP failure, invalid JSON, empty success, and send throw', async () => {
+  it('preserves upload network, abort, and protocol errors', async () => {
     const client = createUserDocClient()
     const file = new File(['x'], 'a.txt')
 
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, text: async () => JSON.stringify({
+      uploadId: '00000000-0000-4000-8000-000000000000', name: 'a.txt', directoryId: '', bytes: 1,
+      fingerprint: 'x', chunkBytes: 65536, receivedBytes: 0, expiresAt: Date.now() + 1000, state: 'uploading',
+    }) })))
     installXhr((xhr) => {
       xhr.status = 0
       xhr.send = vi.fn(function send(this: MockXhr) { this.onerror?.() })
     })
     await expect(client.upload(file, rootDirectoryId)).rejects.toThrow('connection was interrupted')
 
-    installXhr((xhr) => {
-      xhr.send = vi.fn(function send(this: MockXhr) { this.onabort?.() })
-    })
-    await expect(client.upload(file, rootDirectoryId)).rejects.toMatchObject({ name: 'AbortError' })
-
     const reason = new Error('user-abort')
     const controller = new AbortController()
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, text: async () => JSON.stringify({
+      uploadId: '00000000-0000-4000-8000-000000000000', name: 'a.txt', directoryId: '', bytes: 1,
+      fingerprint: 'x', chunkBytes: 65536, receivedBytes: 0, expiresAt: Date.now() + 1000, state: 'uploading',
+    }) })))
     installXhr((xhr) => {
       xhr.send = vi.fn()
       xhr.abort = vi.fn(function abort(this: MockXhr) { this.onabort?.() })
@@ -205,43 +226,10 @@ describe('createUserDocClient', () => {
     controller.abort(reason)
     await expect(pending).rejects.toBe(reason)
 
-    installXhr((xhr) => {
-      xhr.status = 400
-      xhr.responseText = 'nope'
-      xhr.send = vi.fn(function send(this: MockXhr) { this.onload?.() })
-    })
-    await expect(client.upload(file, rootDirectoryId)).rejects.toBeInstanceOf(UserDocHttpError)
-
-    installXhr((xhr) => {
-      xhr.responseText = ''
-      xhr.send = vi.fn(function send(this: MockXhr) { this.onload?.() })
-    })
-    expect(await client.upload(file, rootDirectoryId)).toBeUndefined()
-
-    installXhr((xhr) => {
-      xhr.send = vi.fn(() => { throw 'boom' })
-    })
-    await expect(client.upload(file, rootDirectoryId)).rejects.toThrow('boom')
-
-    installXhr((xhr) => {
-      xhr.send = vi.fn(function send(this: MockXhr) {
-        this.onload?.()
-        this.onerror?.()
-      })
-    })
-    expect(await client.upload(file, rootDirectoryId)).toEqual(ref)
-
-    const aborted = new AbortController()
-    installXhr((xhr) => {
-      xhr.send = vi.fn()
-    })
-    const waiting = client.upload(file, rootDirectoryId, aborted.signal)
-    aborted.abort()
-    await expect(waiting).rejects.toMatchObject({ name: 'AbortError' })
-
-    installXhr((xhr) => {
-      xhr.send = vi.fn(() => { throw new Error('send-failed') })
-    })
-    await expect(client.upload(file, rootDirectoryId)).rejects.toThrow('send-failed')
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: false, status: 426,
+      text: async () => JSON.stringify({ error: { code: 'DOCUMENT_UPLOAD_PROTOCOL', message: 'refresh' } }),
+    })))
+    await expect(client.upload(file, rootDirectoryId)).rejects.toMatchObject({ status: 426, code: 'DOCUMENT_UPLOAD_PROTOCOL' })
   })
 })

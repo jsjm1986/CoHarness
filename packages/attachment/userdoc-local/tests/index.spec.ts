@@ -1,5 +1,6 @@
 import { Context } from '@deepseek-ai/cordis'
-import { DOCUMENT_TOO_LARGE_CODE, INVALID_DOCUMENT_REF_CODE, UserDocId } from '@deepseek-ai/dsh-userdoc'
+import { createHash } from 'node:crypto'
+import { DOCUMENT_TOO_LARGE_CODE, INVALID_DOCUMENT_REF_CODE, UserDocDirectoryId, UserDocId } from '@deepseek-ai/dsh-userdoc'
 import { lstat, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -10,6 +11,8 @@ import LocalUserDocStore, {
   DEFAULT_MAX_INLINE_TEXT_BYTES,
   DEFAULT_MAX_MESSAGE_BYTES,
   DEFAULT_DOCUMENT_DIR_NAME,
+  DEFAULT_UPLOAD_CHUNK_BYTES,
+  DEFAULT_UPLOAD_SESSION_TTL_MS,
 } from '../src/index.ts'
 
 const roots: string[] = []
@@ -41,6 +44,12 @@ describe('local user-document service', () => {
       maxFilesPerMessage: DEFAULT_MAX_FILES_PER_MESSAGE,
       maxMessageBytes: DEFAULT_MAX_MESSAGE_BYTES,
       maxInlineTextBytes: DEFAULT_MAX_INLINE_TEXT_BYTES,
+      upload: {
+        protocol: 'resumable-v1',
+        chunkBytes: DEFAULT_UPLOAD_CHUNK_BYTES,
+        sessionTtlMs: DEFAULT_UPLOAD_SESSION_TTL_MS,
+        resumable: true,
+      },
     })
   })
 
@@ -121,5 +130,34 @@ describe('local user-document service', () => {
 
     expect(service.limits.maxFileBytes).toBeNull()
     expect(ref.bytes).toBe(96)
+  })
+
+  it('resumes, verifies, and publishes a resumable upload without exposing session files', async () => {
+    const service = await store({ maxFileBytes: null, uploadChunkBytes: 65536, uploadMinFreeBytes: 0 })
+    const bytes = new TextEncoder().encode('hello')
+    const digest = createHash('sha256').update(bytes).digest('hex')
+    const session = await service.beginUpload({
+      name: 'resume.txt', directoryId: UserDocDirectoryId(''), bytes: bytes.byteLength, fingerprint: 'resume-test',
+    })
+    expect(session.receivedBytes).toBe(0)
+    const chunk = await service.writeUploadChunk(session.uploadId, {
+      index: 0, start: 0, end: bytes.byteLength - 1, total: bytes.byteLength, sha256: digest,
+      body: new ReadableStream({ start(controller) { controller.enqueue(bytes); controller.close() } }),
+    })
+    expect(chunk.receivedBytes).toBe(bytes.byteLength)
+    const duplicate = await service.writeUploadChunk(session.uploadId, {
+      index: 0, start: 0, end: bytes.byteLength - 1, total: bytes.byteLength, sha256: digest,
+      body: new ReadableStream({ start(controller) { controller.enqueue(bytes); controller.close() } }),
+    })
+    expect(duplicate.receivedBytes).toBe(bytes.byteLength)
+    expect((await service.completeUpload(session.uploadId, digest)).state).toBe('verifying')
+    let completed = await service.inspectUpload(session.uploadId)
+    for (let attempt = 0; completed.state === 'verifying' && attempt < 50; attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 2))
+      completed = await service.inspectUpload(session.uploadId)
+    }
+    expect(completed.state).toBe('complete')
+    expect(completed.ref).toMatchObject({ name: 'resume.txt', bytes: 5 })
+    expect(await service.list()).toHaveLength(1)
   })
 })

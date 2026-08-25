@@ -15,27 +15,26 @@ import {
   DOCUMENT_READ_FAILED_CODE,
   DOCUMENT_TARGET_CONFLICT_CODE,
   DOCUMENT_TOO_LARGE_CODE,
+  DOCUMENT_UPLOAD_PROTOCOL_CODE,
+  DOCUMENT_UPLOAD_RANGE_CODE,
   INVALID_DOCUMENT_DIRECTORY_CODE,
   INVALID_DOCUMENT_NAME_CODE,
   INVALID_DOCUMENT_REF_CODE,
+  UserDocDirectoryId,
   UserDocError,
   UserDocId,
   type UserDocErrorCode,
   type UserDocRef,
   type UserDocStore,
 } from '@deepseek-ai/dsh-userdoc'
-import { handleUserDocHttp, USERDOC_HTTP_PATH, USERDOC_UPLOAD_HEADER } from '../src/index.ts'
+import { handleUserDocHttp, USERDOC_HTTP_PATH, USERDOC_UPLOADS_PATH } from '../src/index.ts'
 
 const LIMITS = {
   maxFileBytes: 8,
   maxFilesPerMessage: 2,
   maxMessageBytes: 16,
   maxInlineTextBytes: 8,
-}
-
-const UNLIMITED_LIMITS = {
-  ...LIMITS,
-  maxFileBytes: null,
+  upload: { protocol: 'resumable-v1' as const, chunkBytes: 65536, sessionTtlMs: 86400000, resumable: true as const },
 }
 
 const REF: UserDocRef = {
@@ -47,7 +46,7 @@ const REF: UserDocRef = {
   modifiedAt: 1,
 }
 
-type StoreOverrides = Partial<Pick<UserDocStore, 'list' | 'resolveTarget' | 'save' | 'openRead' | 'remove'>>
+type StoreOverrides = Partial<Pick<UserDocStore, 'list' | 'resolveTarget' | 'save' | 'openRead' | 'remove' | 'inspectUpload' | 'writeUploadChunk'>>
 
 function stream(text = 'body'): ReadableStream<Uint8Array> {
   return new ReadableStream({
@@ -138,47 +137,37 @@ function response(options: ResponseOptions = {}): { res: ServerResponse; state: 
 }
 
 describe('user-document HTTP handler edges', () => {
-  it.each([
-    ['not-a-number', 'INVALID_CONTENT_LENGTH'],
-    ['-1', 'INVALID_CONTENT_LENGTH'],
-  ])('rejects the Content-Length value %s', async (declared, code) => {
-    const req = request('POST', `${USERDOC_HTTP_PATH}?name=report.txt`, {
-      [USERDOC_UPLOAD_HEADER]: '1',
-      'content-length': declared,
-    })
+  it('rejects the removed one-request upload protocol', async () => {
+    const req = request('POST', `${USERDOC_HTTP_PATH}?name=report.txt`)
     const { res, state } = response()
 
     await handleUserDocHttp(context(store()), req, res)
 
-    expect(state.status).toBe(400)
-    expect(JSON.parse(state.body)).toMatchObject({ error: { code } })
+    expect(state.status).toBe(426)
+    expect(JSON.parse(state.body)).toMatchObject({ error: { code: DOCUMENT_UPLOAD_PROTOCOL_CODE } })
   })
 
-  it('does not reject a large declared body when the store has no per-document limit', async () => {
-    const req = request('POST', `${USERDOC_HTTP_PATH}?name=large.bin`, {
-      [USERDOC_UPLOAD_HEADER]: '1',
-      'content-length': '1000000000000',
+  it('rejects malformed upload metadata and chunk ranges', async () => {
+    const malformed = Readable.from(['{}']) as unknown as IncomingMessage
+    Object.assign(malformed, { method: 'POST', url: USERDOC_UPLOADS_PATH, headers: { 'content-length': '2' } })
+    const first = response()
+    await handleUserDocHttp(context(store()), malformed, first.res)
+    expect(first.state.status).toBe(400)
+
+    const chunk = request('PUT', `${USERDOC_UPLOADS_PATH}/00000000-0000-4000-8000-000000000000/chunks/0`, {
+      'content-range': 'bytes bad',
+      'content-length': '1',
+      'x-dsh-chunk-sha256': '0'.repeat(64),
     })
-    const { res, state } = response()
-    let saved = false
-    const userDocs = Object.assign(store({ save: async () => { saved = true; return REF } }), {
-      limits: UNLIMITED_LIMITS,
-    }) as unknown as UserDocStore
-
-    await handleUserDocHttp(context(userDocs), req, res)
-
-    expect(saved).toBe(true)
-    expect(state.status).toBe(201)
-  })
-
-  it('rejects an upload with no name query parameter', async () => {
-    const req = request('POST', USERDOC_HTTP_PATH, { [USERDOC_UPLOAD_HEADER]: '1' })
-    const { res, state } = response()
-
-    await handleUserDocHttp(context(store()), req, res)
-
-    expect(state.status).toBe(400)
-    expect(JSON.parse(state.body)).toMatchObject({ error: { code: INVALID_DOCUMENT_NAME_CODE } })
+    const second = response()
+    const userDocs = store({ inspectUpload: async () => ({
+      uploadId: '00000000-0000-4000-8000-000000000000' as never,
+      name: 'report.txt', directoryId: UserDocDirectoryId(''), bytes: 1, fingerprint: 'x', chunkBytes: 65536,
+      receivedBytes: 0, expiresAt: Date.now() + 1000, state: 'uploading',
+    }) })
+    await handleUserDocHttp(context(userDocs), chunk, second.res)
+    expect(second.state.status).toBe(416)
+    expect(JSON.parse(second.state.body)).toMatchObject({ error: { code: DOCUMENT_UPLOAD_RANGE_CODE } })
   })
 
   it('uses the document root when IncomingMessage.url is absent', async () => {
@@ -257,21 +246,6 @@ describe('user-document HTTP handler edges', () => {
     await handleUserDocHttp(context(userDocs), req, res)
 
     expect(signal?.aborted).toBe(true)
-    expect(state.status).toBeUndefined()
-  })
-
-  it('does not write an upload failure after the request has aborted', async () => {
-    const req = request('POST', `${USERDOC_HTTP_PATH}?name=report.txt`, { [USERDOC_UPLOAD_HEADER]: '1' })
-    const { res, state } = response()
-    const userDocs = store({
-      resolveTarget: async () => {
-        req.emit('aborted')
-        throw new Error('late store failure')
-      },
-    })
-
-    await handleUserDocHttp(context(userDocs), req, res)
-
     expect(state.status).toBeUndefined()
   })
 

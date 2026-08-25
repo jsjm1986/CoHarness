@@ -6,7 +6,7 @@
 
 `GET /api/documents` 返回部署限额和递归文档视图；加上 `?directory=<directoryId>` 则返回一个文件夹的直接子项。`GET /api/documents/directories` 返回可用移动目标。`POST`、`PATCH` 与 `DELETE /api/documents/folders` 分别创建、重命名和删除空文件夹，`POST /api/documents/move` 在不替换已占用目标的前提下移动一个文档。
 
-`POST /api/documents?name=<filename>&directory=<directoryId>` 把原始请求体流式写入所选文件夹，并要求 `x-dsh-document-upload: 1`；即使在 Connection 的同源检查之前，该自定义头也能阻止跨源 simple request 提交请求体。默认存储接受传输层和文件系统支持的所有文档大小；显式设置有限的 `maxFileBytes` 时，HTTP 会同时检查 `Content-Length` 和流式接收的字节。`GET` 或 `HEAD /api/documents/content?id=<docId>` 以 `nosniff` 和附件 disposition 流式下载。`DELETE /api/documents?id=<docId>` 幂等删除文档。响应只公开稳定的 `UserDocError.code`，绝不包含文档字节或失败的绝对路径。
+上传使用版本化可续传会话协议：`POST /api/documents/uploads` 创建或复用会话，`PUT /api/documents/uploads/<uploadId>/chunks/<index>` 接收带 SHA-256 的原始 `Content-Range` 分片，`POST /api/documents/uploads/<uploadId>/complete` 启动最终校验，`GET` 查询进度，`DELETE` 取消会话。每个分片都小于公网入口限制，因此不再依赖单个请求承载整个文件。已移除的单请求 `POST /api/documents` 返回 `426 UPLOAD_PROTOCOL_REQUIRED`。`GET` 或 `HEAD /api/documents/content?id=<docId>` 以 `nosniff` 和附件 disposition 流式下载。`DELETE /api/documents?id=<docId>` 幂等删除文档。响应只公开稳定的 `UserDocError.code`，绝不包含文档字节或失败的绝对路径。
 
 `POST /api/documents/transfer` 是带版本号的 Gateway 快照复制操作。请求声明任意个人或项目源、目标及文档 id；支持项目到项目和管理员多目标分发。项目读取要求成员身份，写入要求 `rw`（组织管理员隐式拥有 `rw`）。Gateway 把源响应直接流式写入目标运行时上传端点，沿用目标命名策略，返回逐文件安全元数据，并在元数据目录和审计轨迹中保存溯源信息。浏览器不会收到源字节或绝对路径。没有 `gatewayRuntime` 的 standalone composition 返回 `DOCUMENT_TRANSFER_UNAVAILABLE`。
 
@@ -33,3 +33,4 @@
 - **自身不提供认证** —— route 继承 Connection 的可达性与同源策略；把 Web server 暴露到回环之外的部署必须在网关提供认证。
 - **没有服务端分页** —— 递归和直接子项列表都返回完整当前结果；浏览器在本地对返回的文档分页。
 - **下载只使用附件模式** —— 内联预览需要按格式隔离内容的独立 viewer。
+- **临时上传会话有保留期限，已发布文档没有自动过期** —— 未完成会话按本地后端策略清理，已完成文档仍需用户删除。
