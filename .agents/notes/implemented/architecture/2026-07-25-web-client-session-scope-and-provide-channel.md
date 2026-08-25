@@ -59,16 +59,13 @@ Session instances share the scope's lifecycle; liveness eligibility = host-liste
 
 ### The blank bit: the empty session's visible projection, conversion, and reuse
 
-A session "materialized but with no first prompt" is governed by the summary-derived bit `blank` (a derived column, not a header field; SessionHeader stays immutable):
+A session with no visible conversation content is governed by the summary-derived bit `blank` (a derived column, not a header field; SessionHeader stays immutable):
 
-- The host criterion: `session.events.length === 0` (zero log events = no user message yet). A live session reads `summarize()` straight from memory; a cold session is always `false` — the lazy-create contract guarantees a never-appended session never enters `persistence.list()` at all (both the JSONL and SQLite backends are verified truly lazy), so blank never touches disk.
+- The host criterion: no non-empty message is produced by the session surface. Turn boundaries, command records, and usage-only assistant records do not establish conversation content. A live session reads `summarize()` straight from memory; a cold session uses the projection hint or the bounded artifact probe, with unverified large artifacts kept visible ([empty-content and archive-ordering note](../bug-fix/2026-08-25-session-list-empty-content-and-archive-ordering.md)).
 - The wire carries it in two places: the required `SessionSummary.blank` column, and the required `blank` field on the `host/session-added` frame (always true at creation, letting other tabs enter the same blank-session state into their mirrors).
-- The client mirror only lowers, never raises (monotonic), flipped from three sources, all reusing existing wire signals:
-  - The sender's own tab: the **successful response** to the first `prompt()` flips false (acceptance proves the user/message is already in the host log — this flip is confirmation, not optimism; `onEngaged` synchronously updates the list mirror, converting the current `New Session` row in place to an ordinary title, adding no list row). A rejected first prompt keeps the session blank: aligned with host authority, still shown as `New Session`, keeping its connectWorkspace reuse eligibility while it remains a Workspace member.
-  - Other tabs: the `host/session-status (running:true)` frame flips it — a blank session never runs, so the first running necessarily means no longer blank;
-  - Reconnect alignment: `session.list`'s summary.blank is authoritative, so a tab that missed frames aligns naturally on its next pull; a stale blank:true can never mark a converted session back to blank.
+- The client mirror converts on a non-empty `session/event`, not on prompt acceptance or `host/session-status(running:true)`. The manager retains per-session evidence while reconciling list baselines, so an admitted empty turn stays reusable and a stale `blank:true` cannot hide a session whose message event arrived. Reconnect alignment uses `session.list` after that evidence merge.
 - List discipline: the store retains every row; the Workspace browser's grouping, flat view, search, and counts share one visible projection — every non-blank session shows, while blank sessions show only the one with `session.id === sessions.current`, its title forced to `New Session`. After a Workspace switch, the old blank entity stays in the mirror but is hidden from the list while the target Workspace's current blank shows; the user-visible surface therefore holds at most one blank row globally.
-- The residue ledger takes zero GC: after a refresh, blank sessions come back with the bit intact and are reused on the next same-workspace connect while they remain members, so the ordinary single-tab path keeps at most one per workspace; after a host restart, blanks leave no disk trace and simply evaporate; the extra empty shells from multi-tab races only become non-current hidden rows, digested by later reuse, with no coordination.
+- The residue ledger keeps blank rows in the store for reuse while hiding them from grouping surfaces; cold empty logs remain subject to the bounded verification policy, and duplicate blank shells from multi-tab races remain non-current hidden rows until a later same-workspace connect reuses one.
 
 ### connectWorkspace: the sole entry point of New Session
 
@@ -125,7 +122,7 @@ Slot scope is the closed set `root | session-maybe | session`:
 | Components receiving wiring-callback bundles (two-layer inject→props pass-down) | The standard-kit channel lets components fetch their own; the public API converges to hooks + stable props |
 | Swapping the no-session Hero view for the entire session Conversation | Even with the outer layout unchanged, the Hero, picker, and composer subtrees would remount together, making the whole UI region jump |
 | Making InputBar itself `session-maybe` | The input state machine, keyboard command surface, and actions would all have to accept absent values; replacing only the disabled input body keeps optionality at the shell boundary |
-| A dedicated conversion frame | `session-status(running:true)` semantically implies conversion (a blank session never runs); adding a frame buys zero information for one more wire type |
+| A dedicated conversion frame | `session/event` already carries the durable message evidence; a running status alone can precede an empty or rejected turn, so another frame would add a second source of truth |
 
 ## Consequences
 

@@ -63,7 +63,8 @@ export interface AgentPresetsApi {
   /**
    * Recompose one session's agent from a different preset.
    *
-   * Allowed only while the session is blank — no turn has run. Once a
+   * Allowed only while the session is blank — no visible conversation message
+   * has been recorded. Once a
    * conversation starts, its history was produced under that preset's tools,
    * and swapping them would leave logged tool calls the new composition cannot
    * make; the attempt answers `agent-preset-locked`.

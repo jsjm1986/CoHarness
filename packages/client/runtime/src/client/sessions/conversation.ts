@@ -355,7 +355,7 @@ export type HistoryWindowMode = 'tail' | 'expanding' | 'live'
  *
  * - `blank`: the authoritative blank bit is still set and no prompt was
  *   attempted — the UI renders the blank-session guidance hero.
- * - `engaging`: a first prompt was attempted, but no accepted turn or other
+ * - `engaging`: a first prompt was attempted, but no visible message or other
  *   authoritative activity signal has arrived — the UI keeps the composer
  *   visible through admission and error frames.
  * - `active`: the session is non-blank beyond its pending first prompt,
@@ -491,12 +491,9 @@ export interface ConversationSnapshot {
   historyDetail: HistoryDetailState
   promptError: PromptError | null
   /**
-   * Whether this session still has an empty log (no user message yet).
+   * Whether this session still has no visible conversation message.
    * Mirrors the host summary's derived blank bit: seeded from `session.list`
-   * / the `host/session-added` frame, flipped false by the first ACCEPTED
-   * prompt locally (on the RPC success response — acceptance proves the
-   * user message is in the host log; a rejected first prompt keeps the
-   * session blank and reusable) and by any `running: true` status remotely,
+   * / the `host/session-added` frame, converted by the first visible event,
    * and re-aligned by every list re-pull (the summary stays authoritative).
    * Blank sessions are hidden from session lists and reused by New Session.
    */

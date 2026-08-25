@@ -7,7 +7,7 @@ import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import {
-  captureStableAria, compareOrRefreshGolden, launchWebScaffold, seedBlankSession,
+  captureStableAria, compareOrRefreshGolden, launchWebScaffold, seedBlankSession, seedEmptyTurnSession,
   watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
 import { newEnglishPage, saveFailureShot } from './support.ts'
@@ -16,6 +16,7 @@ const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/cold-blank-session', imp
 const SIDEBAR_EXPECTED = join(SNAPSHOT_DIR, 'sidebar.expected.md')
 const MODE = webSnapshotMode()
 const SESSION_ID = 'cold-blank-session-web-e2e'
+const EMPTY_TURN_SESSION_ID = 'cold-empty-turn-session-web-e2e'
 const WORKSPACE_NAME = 'cold-blank-workspace'
 
 describe('web e2e: cold blank Session visibility', () => {
@@ -29,12 +30,19 @@ describe('web e2e: cold blank Session visibility', () => {
     const cwd = join(scaffold.workspaceCwd, WORKSPACE_NAME)
     await mkdir(cwd, { recursive: true })
     await seedBlankSession(scaffold, SESSION_ID, cwd)
+    await seedEmptyTurnSession(scaffold, EMPTY_TURN_SESSION_ID, cwd)
     const header = (await scaffold.ctx.sessionPersistence.list())
       .find(candidate => candidate.id === SESSION_ID)
     if (header === undefined) throw new Error('blank Session fixture did not materialize')
     const location = scaffold.ctx.sessionPersistence.locate(header)
     if (location === undefined) throw new Error('JSONL fixture has no physical artifact')
     expect((await stat(location.path)).size).toBeLessThanOrEqual(1024)
+    const emptyTurnHeader = (await scaffold.ctx.sessionPersistence.list())
+      .find(candidate => candidate.id === EMPTY_TURN_SESSION_ID)
+    if (emptyTurnHeader === undefined) throw new Error('empty-turn Session fixture did not materialize')
+    const emptyTurnLocation = scaffold.ctx.sessionPersistence.locate(emptyTurnHeader)
+    if (emptyTurnLocation === undefined) throw new Error('empty-turn fixture has no physical artifact')
+    expect((await stat(emptyTurnLocation.path)).size).toBeLessThanOrEqual(1024)
 
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
@@ -48,7 +56,7 @@ describe('web e2e: cold blank Session visibility', () => {
     await scaffold?.close()
   })
 
-  it('keeps the verified cold blank Session out of the sidebar', async () => {
+  it('keeps verified blank and empty-turn Sessions out of the sidebar', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-cold-blank-session'))
     const tree = page.getByRole('tree', { name: 'Sessions' })
     await tree.waitFor({ timeout: 30_000 })

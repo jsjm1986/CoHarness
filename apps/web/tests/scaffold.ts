@@ -778,6 +778,26 @@ export async function seedBlankSession(
   return meta.id
 }
 
+/** Seed a cold session whose turn opened and closed without a conversation message. */
+export async function seedEmptyTurnSession(
+  scaffold: WebScaffold,
+  id: string,
+  cwd: string,
+): Promise<SessionId> {
+  const meta: SessionHeader = {
+    version: SESSION_FORMAT_VERSION,
+    id: SessionId(id),
+    createdAt: Date.now() - 60_000,
+    cwd,
+    delegationDepth: 0,
+  }
+  await persistSeedSession(scaffold, meta, [
+    { type: 'turn/start', seq: 0, time: meta.createdAt, data: { turn: 1 } },
+    { type: 'turn/end', seq: 1, time: meta.createdAt + 1, data: { turn: 1, reason: { kind: 'completed' } } },
+  ])
+  return meta.id
+}
+
 /** Materialize one detached Session fixture through the shipped JSONL provider. */
 async function persistSeedSession(
   scaffold: WebScaffold,

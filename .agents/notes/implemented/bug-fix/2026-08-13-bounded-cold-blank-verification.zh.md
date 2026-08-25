@@ -12,9 +12,9 @@ Web 会话树会隐藏空白 Session，并把当前选中的空白项复用为 N
 
 ## Decision
 
-`dsh-host-apiproxy` 注册 `sessionListMetadata` 投影，其中包含 `blank` 与 `lastPromptAt`。已附加摘要直接用同一组函数折叠实时日志。`blank` 只在 `turn/start` 时从 true 单调变为 false；`lastPromptAt` 只在来源 kind 为 `user` 的 `user/message` 上更新。
+`dsh-host-apiproxy` 注册 `sessionListMetadata` 投影，其中包含 `blank` 与 `lastPromptAt`。已附加摘要直接用同一组函数折叠实时日志。`blank` 只在记录非空 surface 消息时转为 false；空轮次与仅用量的 assistant 消息仍保持 blank。该单元使用 state version 2，因此不会复用按旧判定写入的行；`lastPromptAt` 只在来源 kind 为 `user` 的 `user/message` 上更新。后续的[空内容与归档顺序说明](2026-08-25-session-list-empty-content-and-archive-ordering.zh.md)负责共享判定与 Client 对账。
 
-冷摘要信任缓存的 `blank: false`，因为已包含 `turn/start` 的 checkpoint 前缀会始终保持非空。缓存的 `blank: true` 和 cache miss 都无法证明当前日志为空。当 persistence 通过 `locate()` 暴露物理工件，且其观测大小不超过 `coldBlankProbeMaxBytes` 资格阈值（默认每个 Session 1 KiB）时，网关调用 `readFrom(id, 0)`，从已存前缀折叠精确列表元数据。超过阈值的文件、不提供位置的后端、已消失的工件和读取失败都产生 `blank: false`，让 Session 保持可见。
+冷摘要信任缓存的 `blank: false`，因为已包含非空 surface 消息的 checkpoint 前缀会始终保持非空。缓存的 `blank: true` 和 cache miss 都无法证明当前日志为空。当 persistence 通过 `locate()` 暴露物理工件，且其观测大小不超过 `coldBlankProbeMaxBytes` 资格阈值（默认每个 Session 1 KiB）时，网关调用 `readFrom(id, 0)`，从已存前缀折叠精确列表元数据。超过阈值的文件、不提供位置的后端、已消失的工件和读取失败都产生 `blank: false`，让 Session 保持可见。
 
 `updatedAt` 取 `createdAt` 与 `lastPromptAt` 中较晚者。符合资格的工件读取无需额外 I/O 即可提供精确 `lastPromptAt`；其他 cache miss 或陈旧 checkpoint 只会让 Session 排得偏旧，而不会因无关的文件写入被提升。每次异步冷读取后，网关都会再次检查实时 store；若另一请求期间已恢复该 Session，则用已附加摘要替换冷结果。
 
@@ -30,7 +30,7 @@ Web 会话树会隐藏空白 Session，并把当前选中的空白项复用为 N
 
 ## Consequences
 
-既有的小型空白 JSONL 工件无需依赖 projection cache 是否存在即可被隐藏，陈旧 cache 也无法隐藏已存的 `turn/start`。对于 cache 尚不能证明非空，且观测物理大小在配置阈值内的每个 Session，冷列表可能读取其工件。对默认交付的 Zstandard JSONL 后端，该阈值比较压缩后的字节数。
+既有的小型空白 JSONL 工件（包括只含空轮次的日志）无需依赖 projection cache 是否存在即可被隐藏，陈旧 cache 也无法隐藏已存的 surface 消息。对于 cache 尚不能证明非空，且观测物理大小在配置阈值内的每个 Session，冷列表可能读取其工件。对默认交付的 Zstandard JSONL 后端，该阈值比较压缩后的字节数。
 
 超过阈值的空白工件，以及来自不提供位置的后端的空白 Session 会保持可见。对于未被读取的工件，缺失或延迟的最近时间 cache 会回退到 `createdAt`。这些都是保守降级：UI 可能多显示一条空记录，或把 Session 排得偏低，但不会隐藏真实对话，也不会因为单纯打开而把会话提升到前面。
 

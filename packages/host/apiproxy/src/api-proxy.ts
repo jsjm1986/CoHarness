@@ -26,6 +26,7 @@ import type { ContentBlock, MessageSource } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-model-access'
 import type {} from '@deepseek-ai/dsh-model-provider-config'
 import { isAppendSurfaceEvent, isJsonValue, SessionId as brandSessionId } from '@deepseek-ai/dsh-session'
+import { deriveEventMessage } from '@deepseek-ai/dsh-session/surface'
 import type { JsonValue, Session, SessionEvent, SessionEventMap, SessionHeader, SessionId, UserMessage } from '@deepseek-ai/dsh-session'
 import type { SessionPersistence } from '@deepseek-ai/dsh-session-persistence'
 // Type-only: resolves the optional permission-default owner notified after
@@ -703,19 +704,31 @@ function jobViews(snapshots: readonly JobSnapshot[]): JobView[] {
 }
 
 /**
- * Whether the session's conversation has started: no turn has run yet (a
- * turn is one model-loop execution). Standalone plugin events — command
- * lifecycle records, plan/mode, titles, goals — never open a turn, so
- * running `/plan` or `/goal` on a fresh session keeps it blank
- * (list-hidden, reusable).
+ * Whether one event contributes visible conversation content. Turn and step
+ * boundaries can be committed for an empty or rejected input, so they do not
+ * make a session a chat record by themselves.
+ * @param event - persisted session event.
+ * @returns whether the event contains conversation content.
+ */
+function isConversationContentEvent(event: SessionEvent): boolean {
+  const message = deriveEventMessage(event)
+  return message !== null && message.content.length > 0
+}
+
+/**
+ * Whether the session has no visible conversation content. Standalone plugin
+ * events and empty turns keep a fresh session blank, so the list can hide and
+ * reuse it instead of presenting an empty history row.
+ * @param session - live session to inspect.
+ * @returns true while no visible conversation event has been recorded.
  */
 function sessionBlank(session: Session): boolean {
-  return !session.events.some(event => event.type === 'turn/start')
+  return !session.events.some(isConversationContentEvent)
 }
 
 /** Advance the Session-list hint projection by one committed event. */
 function applySessionListMetadata(state: SessionListMetadata, event: SessionEvent): SessionListMetadata {
-  const blank = state.blank && event.type !== 'turn/start'
+  const blank = state.blank && !isConversationContentEvent(event)
   const lastPromptAt = event.type === 'user/message' && event.data.source.kind === 'user'
     ? event.time
     : state.lastPromptAt
@@ -1691,7 +1704,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     })
   })
 
-  // The cache supplies recency and a monotonic non-blank hint. A cached
+  // The cache supplies recency and a monotonic visible-content hint. A cached
   // `blank: true` remains only a prefix fact and is verified on the cold path.
   ctx.inject(['sessionProjections'], (projectionCtx) => {
     projectionCtx.sessionProjections.register<'sessionListMetadata', SessionListMetadata>({
@@ -1700,7 +1713,9 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       init: () => ({ blank: true, lastPromptAt: null }),
       apply: applySessionListMetadata,
       wire: { viewSchema: sessionListMetadataProjectionSchema, view: state => state },
-      stateVersion: 1,
+      // Version 2 invalidates caches produced by the former turn/start-only
+      // blank predicate; those rows must be folded again with visible content.
+      stateVersion: 2,
     })
   })
 
@@ -3744,8 +3759,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         })
       },
 
-      // Recomposing is limited to a blank session because a started
-      // conversation's history was produced under its preset's tools; the
+      // Recomposing is limited to a session with no visible conversation
+      // content because its history is produced under its preset's tools; the
       // agent and the session survive, only the composition is swapped.
       async select(request) {
         const { sessionId, agentPreset } = request.payload
@@ -3764,11 +3779,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         const { agent } = found
         const swap = async (): Promise<RpcResponse<{ agentPreset: string }>> => {
           // Re-read inside the queue: an earlier switch may have run, and a
-          // conversation may have started, since this request arrived.
+          // visible content may have arrived, since this request arrived.
           if (!sessionBlank(agent.session)) {
             return err(request, {
               code: 'agent-preset-locked',
-              message: `session "${sessionId}" has already started; its agent preset is fixed`,
+              message: `session "${sessionId}" already has visible conversation content; its agent preset is fixed`,
               details: { sessionId, agentPreset },
             })
           }

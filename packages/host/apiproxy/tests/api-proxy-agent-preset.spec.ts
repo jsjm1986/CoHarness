@@ -12,6 +12,7 @@ import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry, { type AgentFactory } from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import SessionStore, { SessionId, type Session } from '@deepseek-ai/dsh-session'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import UserQuestionService from '@deepseek-ai/dsh-user-questions'
 import { RpcId, type RpcRequest } from '../src/api/rpc.ts'
 import type { HostFrame } from '../src/api/events.ts'
@@ -430,9 +431,13 @@ describe('agentPreset.select', () => {
   it('refuses once the conversation has started', async () => {
     const { api, ctx } = await harness(['standard', 'minimal'])
     await api.sessions.create(request({ sessionId: SessionId('sel-2'), agentPreset: 'standard' }))
-    // One turn is enough: the history from here on was produced under
-    // `standard`'s tools, and a swap would strand those tool calls.
-    ctx.sessions.get(SessionId('sel-2'))?.append('turn/start', { turn: 0 })
+    // One visible message is enough: the history from here on was produced
+    // under `standard`'s tools, and a swap would strand those tool calls.
+    const session = ctx.sessions.get(SessionId('sel-2'))
+    session?.append('turn/start', { turn: 0 })
+    session?.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'hello' }], source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
 
     const response = await api.agentPresets.select(
       request({ sessionId: SessionId('sel-2'), agentPreset: 'minimal' }))
@@ -440,6 +445,20 @@ describe('agentPreset.select', () => {
     expect(response.result.ok).toBe(false)
     if (response.result.ok) throw new Error('unreachable')
     expect(response.result.error.code).toBe('agent-preset-locked')
+  })
+
+  it('allows a preset switch after an empty turn with no message', async () => {
+    const { api, ctx } = await harness(['standard', 'minimal'])
+    await api.sessions.create(request({ sessionId: SessionId('sel-empty'), agentPreset: 'standard' }))
+    const session = ctx.sessions.get(SessionId('sel-empty'))
+    if (session === undefined) throw new Error('unreachable')
+    session.append('turn/start', { turn: 0 })
+    session.append('turn/end', { turn: 0, reason: { kind: 'completed' } })
+
+    const response = await api.agentPresets.select(
+      request({ sessionId: SessionId('sel-empty'), agentPreset: 'minimal' }))
+
+    expect(response.result).toMatchObject({ ok: true, value: { agentPreset: 'minimal' } })
   })
 
   it('reports an unknown preset without disturbing the session', async () => {

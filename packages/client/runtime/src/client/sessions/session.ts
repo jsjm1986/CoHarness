@@ -4,6 +4,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { AttachmentIdType, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
+import { deriveEventMessage } from '@deepseek-ai/dsh-session/surface'
 import type {
   HistoryEntry, HistoryOmittedSpan, IApiClient, MessageId, MuxFrame, PromptContentPart, QueueAction, RpcError,
   RpcId, RpcResponse, RpcResult, SessionId, SubagentAddress, ToolEventView,
@@ -49,14 +50,7 @@ export interface SessionOptions {
   address?: SubagentAddress
   /** Whether the exact direct parent Agent was live at the latest catalog read. */
   parentAvailable?: boolean
-  /**
-   * First ACCEPTED prompt on a blank session (fires at most once, on the
-   * prompt RPC's success response): the manager mirrors the blank→false flip
-   * into its list row so the session surfaces without waiting for a host
-   * frame. Acceptance is the flip point because it proves the user message
-   * is in the host log; a rejected first prompt keeps the session blank
-   * (hidden, still reusable by connectWorkspace).
-   */
+  /** Notify the manager after a visible conversation event is observed. */
   onEngaged?(session: Session): void
   /**
    * Manager-owned projection value store to adopt (frames route through the
@@ -66,6 +60,17 @@ export interface SessionOptions {
   projections?: ProjectionValueStore
   /** Runtime registries used by this Session-owned Conversation assembler. */
   conversation?: ConversationRuntime
+}
+
+/**
+ * Whether one persisted event contributes a non-empty model-visible message.
+ * Empty turns and usage-only assistant messages must not create a sidebar row.
+ * @param event - session event from history or the live mux stream.
+ * @returns true when the event contains conversation content.
+ */
+export function hasConversationContent(event: SessionEvent): boolean {
+  const message = deriveEventMessage(event)
+  return message !== null && message.content.length > 0
 }
 
 /**
@@ -124,8 +129,10 @@ export class Session implements SessionFace {
   private promptAttempted = false
   /** A first accepted prompt stays in the engaging phase until its turn is observable. */
   private firstPromptPendingTurn = false
-  /** Empty-log mirror (see ConversationSnapshot.blank); unknown bare sessions begin conservatively blank. */
+  /** No-visible-content mirror (see ConversationSnapshot.blank); unknown bare sessions begin conservatively blank. */
   private blankBit = true
+  /** Durable evidence that this Session has emitted visible conversation content. */
+  private conversationContentObserved = false
   private removed = false
   private promptError: PromptError | null = null
   private lastAgentError: string | null = null
@@ -317,19 +324,9 @@ export class Session implements SessionFace {
       this.notifier.markDirty()
       return result
     }
-    // Blank flips on ACCEPTANCE, not attempt: an accepted prompt starts the
-    // conversation's first turn on the host (the host criterion — a logged
-    // turn/start — is fact, not optimism; standalone command and projection
-    // events never flip it), while a rejected first prompt must keep the
-    // session blank — the client-side blank mirror only ever lowers, so
-    // flipping early on a failure would surface the session forever and
-    // strip its connectWorkspace reuse eligibility against the host's
-    // authority.
-    if (this.blankBit) {
-      this.blankBit = false
-      this.options.onEngaged?.(this)
-      this.notifier.markDirty()
-    }
+    // Acceptance only means the Host admitted a turn. The pre-step pipeline
+    // may still reject or empty it, so blankness changes when a visible event
+    // actually arrives rather than at the RPC response.
     this.beginLiveHistory()
     return result
   }
@@ -604,12 +601,6 @@ export class Session implements SessionFace {
    * @param running - the new running state.
    */
   handleRunning(running: boolean): void {
-    // Turn-start conversion: a blank session never runs, so the first
-    // running:true proves another side's first message landed.
-    if (running && this.blankBit) {
-      this.blankBit = false
-      this.notifier.markDirty()
-    }
     if (running) this.firstPromptPendingTurn = false
     if (this.running === running) return
     this.running = running
@@ -645,14 +636,14 @@ export class Session implements SessionFace {
 
   /**
    * Blank-bit relay from the authoritative summary source (list baseline and
-   * the session-added frame). Monotone: once any signal (local first send,
-   * running flip, an earlier summary) cleared it, a stale true never
-   * re-blanks.
-   * @param blank - the summary's derived empty-log bit.
+   * the session-added frame). A stale true cannot re-blank after a visible
+   * conversation event has been observed locally.
+   * @param blank - the summary's derived no-visible-content bit.
    */
   handleBlank(blank: boolean): void {
+    if (!blank) this.conversationContentObserved = true
     if (blank === this.blankBit) return
-    if (blank && (this.promptAttempted || this.running)) return
+    if (blank && this.conversationContentObserved) return
     this.blankBit = blank
     this.notifier.markDirty()
   }
@@ -762,6 +753,7 @@ export class Session implements SessionFace {
     this.baseSeq = logicalBaseSeq(this.events, this.omittedSpans) ?? 0
     this.hasMore = hasMore
     this.historyWindowMode = 'tail'
+    if (this.events.some(hasConversationContent)) this.markConversationContent()
     if (this.events.some(event => event.type === 'turn/start')) this.firstPromptPendingTurn = false
     this.conversation.replaceWindow(entries.map(conversationInput), hasMore)
     if (projections !== undefined) this.projections.seed(projections)
@@ -777,6 +769,7 @@ export class Session implements SessionFace {
     if (tailSeq !== null && event.seq <= tailSeq) return 'none' // replay overlap, drop
     this.events.push(event)
     this.views.push(view)
+    if (hasConversationContent(event)) this.markConversationContent()
     if (event.type === 'turn/start') this.firstPromptPendingTurn = false
     const queueChanged = this.queueMirror.acceptDurable(event)
     const publication = this.conversation.append({ event, view })
@@ -807,6 +800,16 @@ export class Session implements SessionFace {
   private scheduleConversation(publication: ConversationPublication): void {
     if (publication === 'immediate') this.notifier.markDirty()
     else if (publication === 'animation-frame') this.notifier.markFrameDirty()
+  }
+
+  /** Mark the first durable non-empty message and notify the list owner once. */
+  private markConversationContent(): void {
+    if (this.conversationContentObserved) return
+    this.conversationContentObserved = true
+    if (!this.blankBit) return
+    this.blankBit = false
+    this.options.onEngaged?.(this)
+    this.notifier.markDirty()
   }
 
   /** Start one cancellable background expansion for the staged live session. */
