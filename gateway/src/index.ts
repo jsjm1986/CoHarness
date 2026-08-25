@@ -39,6 +39,7 @@ import {
   createDocumentTransferPlanHandler,
   createDocumentTransferListHandler,
   createGatewayDocumentTransferListHandler,
+  createGatewayDocumentTransferUploadHandler,
   createDocumentTransferHandler,
 } from './document-transfer.ts'
 import { createDocumentCatalogHandlers } from './document-catalog.ts'
@@ -230,6 +231,14 @@ const proxyHandlers = createProxyHandlers(deps, principalKeys.signer)
 const server = createGatewayServer(deps, {
   ...proxyHandlers,
   documentTransferList: createGatewayDocumentTransferListHandler({
+    instances: deps.instances,
+    users,
+    projects,
+    collaboration,
+    principals: principalKeys.signer,
+    audit,
+  }),
+  documentTransferUpload: createGatewayDocumentTransferUploadHandler({
     instances: deps.instances,
     users,
     projects,

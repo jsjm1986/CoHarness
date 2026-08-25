@@ -1,13 +1,16 @@
 import { generateKeyPairSync } from 'node:crypto'
+import { Readable } from 'node:stream'
 import { describe, expect, it, vi } from 'vitest'
 import type { UserRow } from '../src/auth.ts'
 import {
+  DOCUMENT_TRANSFER_UPLOADS_PATH,
   createDocumentTransferCapabilitiesHandler,
   createDocumentTransferCommitHandler,
   createDocumentTransferListHandler,
   createDocumentTransferPlanHandler,
   createDocumentTransferHandler,
   createGatewayDocumentTransferListHandler,
+  createGatewayDocumentTransferUploadHandler,
   DocumentTransferError,
 } from '../src/document-transfer.ts'
 import type { GatewayPrincipalClaims } from '../src/principal.ts'
@@ -113,7 +116,14 @@ function fixture() {
     collaboration,
     principals,
   })
-  return { handler, capabilities, list, publicList, audit, ensureRunning, projectForUser, plan: createDocumentTransferPlanHandler(dependencies), commit: createDocumentTransferCommitHandler(dependencies) }
+  const upload = createGatewayDocumentTransferUploadHandler({
+    ...dependencies,
+    users: { getById: async () => USER },
+    projects: { getById: async (id) => id === 41
+      ? { id, name: 'Compiler', path: '/tmp/compiler', memberCount: 1, members: [] }
+      : { id, name: 'Read only', path: '/tmp/readonly', memberCount: 1, members: [] } },
+  })
+  return { handler, capabilities, list, publicList, upload, audit, ensureRunning, projectForUser, plan: createDocumentTransferPlanHandler(dependencies), commit: createDocumentTransferCommitHandler(dependencies) }
 }
 
 function responseForTarget(docId: string, name = 'report.txt', bytes = 5): Response {
@@ -138,6 +148,78 @@ function responseForTargetChunk(): Response {
 }
 
 describe('Gateway document transfer broker', () => {
+  it('forwards a target-scope resumable upload and strips the stored path', async () => {
+    const runtime = fixture()
+    const fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      expect((init?.headers as Headers).get('x-dsh-gateway-principal')).toBeTruthy()
+      return new Response(JSON.stringify({
+        uploadId: '00000000-0000-4000-8000-000000000000', name: 'hello.txt', directoryId: '', bytes: 5,
+        fingerprint: 'browser', chunkBytes: 8, receivedBytes: 0, expiresAt: Date.now() + 60_000, state: 'uploading',
+      }), { status: 200, headers: { 'content-type': 'application/json' } })
+    })
+    vi.stubGlobal('fetch', fetch)
+    const request = Readable.from([Buffer.from(JSON.stringify({ version: 1, name: 'hello.txt', directory: '', bytes: 5, fingerprint: 'browser' }))]) as unknown as NodeJS.ReadableStream & { method: string; headers: Record<string, string> }
+    request.method = 'POST'
+    request.headers = { 'content-type': 'application/json' }
+    const response = await runtime.upload({
+      user: USER,
+      request: request as never,
+      pathname: DOCUMENT_TRANSFER_UPLOADS_PATH,
+      scope: { kind: 'project', projectId: 41 },
+      signal: new AbortController().signal,
+    })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ uploadId: '00000000-0000-4000-8000-000000000000', state: 'uploading' })
+    expect(fetch).toHaveBeenCalledWith('http://127.0.0.1:41041/api/documents/uploads', expect.objectContaining({ method: 'POST' }))
+  })
+
+  it('refuses target-scope uploads for read-only projects before forwarding bytes', async () => {
+    const runtime = fixture()
+    const fetch = vi.fn()
+    vi.stubGlobal('fetch', fetch)
+    const request = Readable.from([]) as unknown as NodeJS.ReadableStream & { method: string; headers: Record<string, string> }
+    request.method = 'POST'
+    request.headers = {}
+    await expect(runtime.upload({
+      user: USER,
+      request: request as never,
+      pathname: DOCUMENT_TRANSFER_UPLOADS_PATH,
+      scope: { kind: 'project', projectId: 42 },
+      signal: new AbortController().signal,
+    })).rejects.toMatchObject({ code: 'COLLABORATION_FORBIDDEN', status: 403 })
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('streams chunk bytes and protocol headers to the selected runtime', async () => {
+    const runtime = fixture()
+    let forwardedBody = ''
+    const fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.body !== undefined) forwardedBody = await new Response(init.body as BodyInit).text()
+      const headers = init?.headers as Headers
+      expect(headers.get('content-range')).toBe('bytes 0-4/5')
+      expect(headers.get('x-dsh-chunk-sha256')).toBe('digest')
+      return new Response(JSON.stringify({
+        uploadId: '00000000-0000-4000-8000-000000000000', name: 'hello.txt', directoryId: '', bytes: 5,
+        fingerprint: 'browser', chunkBytes: 8, receivedBytes: 5, expiresAt: Date.now() + 60_000, state: 'uploading',
+      }), {
+        status: 200, headers: { 'content-type': 'application/json' },
+      })
+    })
+    vi.stubGlobal('fetch', fetch)
+    const request = Readable.from([Buffer.from('hello')]) as unknown as NodeJS.ReadableStream & { method: string; headers: Record<string, string> }
+    request.method = 'PUT'
+    request.headers = { 'content-range': 'bytes 0-4/5', 'content-length': '5', 'x-dsh-chunk-sha256': 'digest' }
+    const response = await runtime.upload({
+      user: USER,
+      request: request as never,
+      pathname: `${DOCUMENT_TRANSFER_UPLOADS_PATH}/00000000-0000-4000-8000-000000000000/chunks/0`,
+      scope: { kind: 'project', projectId: 41 },
+      signal: new AbortController().signal,
+    })
+    expect(response.status).toBe(200)
+    expect(forwardedBody).toBe('hello')
+  })
+
   it('streams a personal snapshot into a rw project and returns no host path', async () => {
     const runtime = fixture()
     const fetch = vi.fn()

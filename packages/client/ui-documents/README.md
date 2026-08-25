@@ -14,6 +14,8 @@ The plugin adds a **Documents** button to the sidebar footer (alongside the work
 
 The dialog is a full-height workbench on desktop and a compact full-screen workbench on phones. Desktop keeps the scope rail and inline actions; compact layouts use a current-scope trigger, a bottom scope sheet, and a More sheet for filters and secondary operations. Each sheet has one title row and one scrollport, while the document list remains the manager's only main scrollport. Upload is the primary compact toolbar action and uses a short visible label with a complete accessible name; uploads and desktop drops land in the current folder. A caption states personal vs project visibility and the filtered document count. Copy uses a metadata plan, target-folder selector, and per-file retry controls.
 
+Selecting another personal or writable project scope keeps the manager and the active conversation in place. That view remains metadata-only for browsing, but its Upload action streams the selected files to the target scope root through the Gateway. Folder management, preview, download, move, delete, and attachment actions remain unavailable until the active runtime scope is restored. Read-only projects stay visible with an explicit permission state, and the all-scope overview offers a target-scope chooser instead of uploading without a destination.
+
 Select one or more rows and choose **Copy to another scope** to create a snapshot in a writable project or in personal documents. The manager shows only safe scope labels; Gateway performs authorization and streaming, resolves target name conflicts without overwriting, and reports each file independently. A successful copy can be attached to the active composer as a durable, non-owning draft.
 
 The composer’s Documents control opens the same manager, so a copy started from the input bar returns to that draft through the manager attach command.
@@ -45,7 +47,7 @@ MIT
 
 #### What the model sees
 
-The browser shows a Documents button in the sidebar footer. Opening it presents the active scope's document folders through `/api/documents`, with breadcrumb navigation, folder management, name and type filters, sort, 20-row pages, add-to-conversation, preview, move, download, delete, multi-selection, and upload into the current folder. Adding a row places its existing durable document id into the current conversation composer and closes the manager after acceptance.
+The browser shows a Documents button in the sidebar footer. Opening it presents the active scope's document folders through `/api/documents`, with breadcrumb navigation, folder management, name and type filters, sort, 20-row pages, add-to-conversation, preview, move, download, delete, multi-selection, and upload into the current folder. Selecting another writable scope adds an upload-only target view whose resumable requests go through the Gateway and land in that scope's root. Adding a row places its existing durable document id into the current conversation composer and closes the manager after acceptance.
 
 #### Token effect
 

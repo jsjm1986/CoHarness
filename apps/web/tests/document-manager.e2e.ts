@@ -1,7 +1,8 @@
 /**
  * Document manager chrome through the shipped Web composition: desktop list
- * dialog, compact bottom sheet, and a paged 21-file list. Keyless: the Host
- * document list is routed to a fixture payload; no model turns.
+ * dialog, compact bottom sheet, target-scope upload, and a paged 21-file list.
+ * Keyless: the Host document list and Gateway target route use fixture payloads;
+ * no model turns are required.
  */
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
@@ -160,11 +161,65 @@ describe('web e2e: document manager', () => {
     await dialog.getByRole('button', { name: /Compiler/ }).waitFor({ timeout: 10_000 })
     const beforeUrl = page.url()
     await dialog.getByRole('button', { name: /Compiler/ }).click()
-    await dialog.getByText('Viewing: Compiler', { exact: true }).waitFor({ timeout: 10_000 })
+    await dialog.getByRole('status').getByText('Upload target: Compiler', { exact: true }).waitFor({ timeout: 10_000 })
     await dialog.getByText('shared.txt', { exact: true }).waitFor({ timeout: 10_000 })
     expect(page.url()).toBe(beforeUrl)
     expect(await page.getByRole('dialog').count()).toBe(1)
     expect(popupOpened).toBe(false)
+  }, 60_000)
+
+  it('desktop: uploads directly to a writable selected scope without reloading the page', async () => {
+    page = await browser.newPage({ viewport: { width: 1280, height: 800 }, locale: 'en-US' })
+    tripwire = watchConsole(page)
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-document-manager-target-upload'))
+    await mockDocuments(page)
+    await page.route('**/account/api/context', async (route) => {
+      await route.fulfill({ json: {
+        scope: { kind: 'personal' },
+        projects: [{ projectId: 41, name: 'Compiler', mode: 'rw' }],
+      } })
+    })
+    await page.route('**/api/documents/transfer/list', async (route) => {
+      await route.fulfill({ json: {
+        version: 1,
+        scope: { kind: 'project', label: 'Compiler' },
+        documents: [{ docId: 'shared.txt', name: 'shared.txt', bytes: 7, mediaType: 'text/plain', modifiedAt: 1 }],
+      } })
+    })
+    const uploadRequests: string[] = []
+    await page.route('**/api/documents/transfer/uploads**', async (route) => {
+      const request = route.request()
+      uploadRequests.push(`${request.method()} ${new URL(request.url()).pathname}?${new URL(request.url()).searchParams.toString()}`)
+      const url = new URL(request.url())
+      if (request.method() === 'POST' && url.pathname.endsWith('/complete')) {
+        await route.fulfill({ json: {
+          uploadId: '00000000-0000-4000-8000-000000000000', name: 'target.txt', directoryId: '', bytes: 6,
+          fingerprint: 'fixture', chunkBytes: 8 * 1024 * 1024, receivedBytes: 6, expiresAt: Date.now() + 60_000,
+          state: 'complete', ref: { docId: 'target.txt', name: 'target.txt', bytes: 6, mediaType: 'text/plain', modifiedAt: 2, path: '' },
+        } })
+        return
+      }
+      if (request.method() === 'PUT') {
+        await route.fulfill({ json: { state: 'uploading', receivedBytes: 6 } })
+        return
+      }
+      await route.fulfill({ json: {
+        uploadId: '00000000-0000-4000-8000-000000000000', name: 'target.txt', directoryId: '', bytes: 6,
+        fingerprint: 'fixture', chunkBytes: 8 * 1024 * 1024, receivedBytes: 0, expiresAt: Date.now() + 60_000, state: 'uploading',
+      } })
+    })
+    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+    await page.getByRole('button', { name: 'Documents', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: 'Document Manager' })
+    await dialog.waitFor({ timeout: 10_000 })
+    await dialog.getByRole('button', { name: /Compiler/ }).click()
+    await dialog.getByRole('status').getByText('Upload target: Compiler', { exact: true }).waitFor({ timeout: 10_000 })
+    const beforeUrl = page.url()
+    await dialog.locator('input[type="file"]').setInputFiles({ name: 'target.txt', mimeType: 'text/plain', buffer: Buffer.from('target') })
+    await expect.poll(() => uploadRequests.some(request => request.startsWith('POST /api/documents/transfer/uploads?'))).toBe(true)
+    await expect.poll(() => uploadRequests.some(request => request.includes('scope=project%3A41'))).toBe(true)
+    expect(page.url()).toBe(beforeUrl)
   }, 60_000)
 
   it('compact: uses a scope trigger, upload primary, and one row action sheet', async () => {

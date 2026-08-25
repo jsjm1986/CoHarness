@@ -22,11 +22,11 @@
 
 .scopeRail {
   display: flex;
-  flex: 0 0 220px;
+  flex: 0 0 236px;
   flex-direction: column;
-  gap: var(--dsw-space-1);
+  gap: 4px;
   min-height: 0;
-  padding: var(--dsw-space-3);
+  padding: var(--dsw-space-4) var(--dsw-space-3);
   overflow-y: auto;
   scrollbar-gutter: stable;
   border-right: 1px solid var(--dsw-alias-border-l2);
@@ -47,8 +47,8 @@
   align-items: flex-start;
   gap: var(--dsw-space-2);
   width: 100%;
-  min-height: 48px;
-  padding: 8px;
+  min-height: 52px;
+  padding: 10px;
   border: 1px solid transparent;
   border-radius: var(--dsw-radius-sm);
   background: transparent;
@@ -110,8 +110,8 @@
   min-width: 0;
   min-height: 0;
   flex-direction: column;
-  gap: var(--dsw-space-2);
-  padding: var(--dsw-space-4);
+  gap: var(--dsw-space-3);
+  padding: var(--dsw-space-5);
 }
 
 .overview {
@@ -130,6 +130,13 @@
   gap: var(--dsw-space-3);
   padding-bottom: var(--dsw-space-2);
   border-bottom: 1px solid var(--dsw-alias-border-l2);
+}
+
+.overviewActions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--dsw-space-2);
 }
 
 .overviewHeader h2 {
@@ -291,6 +298,10 @@
   flex-wrap: wrap;
 }
 
+.toolbar > * {
+  min-height: 36px;
+}
+
 .filterGroup,
 .actionGroup {
   display: flex;
@@ -340,6 +351,56 @@
   font: var(--dsw-mobile-font-caption);
   padding-bottom: var(--dsw-space-2);
   border-bottom: 1px solid var(--dsw-alias-border-l2);
+}
+
+.scopeNotice {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--dsw-space-2);
+  min-width: 0;
+  padding: var(--dsw-space-2) var(--dsw-space-3);
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-layer-1);
+}
+
+.scopeNoticeTarget {
+  border-color: var(--dsw-alias-border-l3);
+}
+
+.scopeNoticeReadOnly {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.scopeNoticeIcon {
+  display: inline-flex;
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.scopeNoticeCopy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.scopeNoticeCopy strong,
+.scopeNoticeCopy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scopeNoticeCopy strong {
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-mobile-font-secondary);
+}
+
+.scopeNoticeCopy small {
+  color: var(--dsw-alias-label-caption);
+  font: var(--dsw-mobile-font-caption);
 }
 
 .limits {
@@ -402,20 +463,24 @@
 
 .upload {
   flex: none;
+  min-height: 36px;
 }
 
 .newFolder {
   flex: none;
+  min-height: 36px;
 }
 
 .refresh {
   flex: none;
+  min-height: 36px;
 }
 
 /* Keep scope navigation available on compact screens without squeezing the
    primary upload and refresh actions into unreadable capsules. */
 .sourceAction {
   flex: none;
+  min-height: 36px;
 }
 
 .list {
@@ -652,6 +717,64 @@
 .moveSelect {
   width: 100%;
   max-width: none;
+}
+
+.scopePickerOptions {
+  display: flex;
+  max-height: 280px;
+  flex-direction: column;
+  gap: var(--dsw-space-1);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.scopePickerOption {
+  display: flex;
+  align-items: center;
+  gap: var(--dsw-space-2);
+  width: 100%;
+  min-height: 52px;
+  padding: var(--dsw-space-2) var(--dsw-space-3);
+  border: 1px solid transparent;
+  border-radius: var(--dsw-radius-md);
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.scopePickerOption:hover:not(:disabled),
+.scopePickerOption:focus-visible {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.scopePickerOptionSelected {
+  border-color: var(--dsw-alias-border-l3);
+  background: var(--dsw-alias-interactive-bg-active);
+}
+
+.scopePickerCopy {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.scopePickerCopy strong,
+.scopePickerCopy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scopePickerCopy strong {
+  font: var(--dsw-mobile-font-secondary);
+}
+
+.scopePickerCopy small {
+  color: var(--dsw-alias-label-caption);
+  font: var(--dsw-mobile-font-caption);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -917,9 +1040,14 @@
 
 .emptyState {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
+  justify-content: center;
   gap: var(--dsw-space-3);
+  min-height: 180px;
+  color: var(--dsw-alias-label-secondary);
+  text-align: center;
 }
 
 .emptyActions {
@@ -1058,6 +1186,15 @@
     gap: var(--dsw-space-2);
   }
 
+  .overviewActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .overviewActions > * {
+    min-height: var(--dsw-touch-target);
+  }
+
   .filterGroup {
     display: flex;
     width: 100%;
@@ -1098,6 +1235,15 @@
   .limits {
     margin-inline: var(--dsw-space-3);
     padding: var(--dsw-space-1) var(--dsw-space-2);
+  }
+
+  .scopeNotice {
+    align-items: flex-start;
+    padding: var(--dsw-space-2);
+  }
+
+  .scopePickerOptions {
+    max-height: none;
   }
 
   .caption {

@@ -78,6 +78,36 @@ describe('resumableUpload', () => {
     expect(progress.at(-1)).toBe(5)
   })
 
+  it('appends a target query and keeps resume records separate by namespace', async () => {
+    const calls: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = urlOf(input)
+      calls.push(`${init?.method ?? 'GET'} ${url}`)
+      const value = url.endsWith('/complete?scope=project%3A41')
+        ? { uploadId, name: 'notes.txt', directoryId: '', bytes: 5, fingerprint: 'x', chunkBytes: 65536, receivedBytes: 5, expiresAt: Date.now() + 1000, state: 'complete', ref }
+        : { uploadId, name: 'notes.txt', directoryId: '', bytes: 5, fingerprint: 'x', chunkBytes: 65536, receivedBytes: 0, expiresAt: Date.now() + 1000, state: 'uploading' }
+      return { ok: true, status: 200, text: async () => JSON.stringify(value) }
+    }))
+    const xhrs = installXhr()
+    const options = {
+      root: '/api/documents/transfer',
+      query: '?scope=project%3A41',
+      resumeNamespace: 'project:41',
+      requestJson: async <T>(input: RequestInfo | URL, init?: RequestInit) => {
+        const response = await fetch(input, init)
+        return JSON.parse(await response.text()) as T
+      },
+      networkError: () => new Error('offline'),
+      responseError: (status: number, body: unknown) => new Error(`${String(status)}:${String(body)}`),
+    }
+    await resumableUpload(new File(['hello'], 'notes.txt'), '' as never, undefined, undefined, options)
+    expect(calls).toEqual([
+      'POST /api/documents/transfer/uploads?scope=project%3A41',
+      'POST /api/documents/transfer/uploads/00000000-0000-4000-8000-000000000000/complete?scope=project%3A41',
+    ])
+    expect(xhrs[0]?.open).toHaveBeenCalledWith('PUT', '/api/documents/transfer/uploads/00000000-0000-4000-8000-000000000000/chunks/0?scope=project%3A41')
+  })
+
   it('resumes from the server-reported contiguous prefix', async () => {
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = urlOf(input)

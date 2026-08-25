@@ -162,6 +162,43 @@ describe('gateway server', () => {
     ])
   })
 
+  it('dispatches target-scope upload requests before the runtime proxy', async () => {
+    const upload = vi.fn(async ({ user, scope, pathname }: { user: { id: number }; scope: unknown; pathname: string }) => {
+      expect(user.id).toBe(1)
+      expect(scope).toEqual({ kind: 'personal' })
+      expect(pathname).toBe('/api/documents/transfer/uploads')
+      return new Response(JSON.stringify({
+        uploadId: '00000000-0000-4000-8000-000000000000', name: 'hello.txt', directoryId: '', bytes: 0,
+        fingerprint: 'x', chunkBytes: 64, receivedBytes: 0, expiresAt: Date.now() + 1_000, state: 'complete',
+        ref: { docId: 'hello.txt', name: 'hello.txt', bytes: 0, mediaType: 'text/plain', modifiedAt: 1, path: '' },
+      }), { status: 200, headers: { 'content-type': 'application/json' } })
+    })
+    const { base } = await setup({}, { documentTransferUpload: upload })
+    const cookie = await login(base, 'root-admin', 'pw-12345678')
+    const response = await fetch(`${base}/api/documents/transfer/uploads?scope=personal`, {
+      method: 'POST',
+      headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ version: 1, name: 'hello.txt', directory: '', bytes: 0, fingerprint: 'x' }),
+    })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ state: 'complete', ref: { path: '' } })
+    expect(upload).toHaveBeenCalledOnce()
+  })
+
+  it('rejects a target upload without a valid compact scope key', async () => {
+    const upload = vi.fn(async () => new Response('{}', { status: 200 }))
+    const { base } = await setup({}, { documentTransferUpload: upload })
+    const cookie = await login(base, 'root-admin', 'pw-12345678')
+    const response = await fetch(`${base}/api/documents/transfer/uploads?scope=project:0`, {
+      method: 'POST',
+      headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ version: 1 }),
+    })
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({ error: { code: 'INVALID_DOCUMENT_TRANSFER', message: 'Invalid document upload scope.' } })
+    expect(upload).not.toHaveBeenCalled()
+  })
+
   it('uses the runtime API body limit and returns JSON 413 before dispatch', async () => {
     const received: string[] = []
     const { base } = await setup({ HGW_RUNTIME_API_BODY_LIMIT_BYTES: '16' }, {

@@ -198,6 +198,29 @@ describe('createUserDocClient', () => {
     expect(calls.map(call => call.method)).toEqual(['POST', 'POST'])
   })
 
+  it('uploads to a selected scope through the Gateway route', async () => {
+    const session = {
+      uploadId: '00000000-0000-4000-8000-000000000000',
+      name: 'a.txt', directoryId: '', bytes: 1, fingerprint: 'fingerprint', chunkBytes: 65536,
+      receivedBytes: 0, expiresAt: Date.now() + 1000, state: 'uploading',
+    }
+    const complete = { ...session, receivedBytes: 1, state: 'complete', ref: { ...ref, bytes: 1 } }
+    const calls: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+      calls.push(`${init?.method ?? 'GET'} ${url}`)
+      return { ok: true, status: 200, text: async () => JSON.stringify(url.includes('/complete?scope=project%3A41') ? complete : session) }
+    }))
+    installXhr((xhr) => {
+      xhr.send = vi.fn(function send(this: MockXhr) { this.status = 200; this.responseText = '{}'; this.onload?.() })
+    })
+    await createUserDocClient().uploadToScope({ kind: 'project', projectId: 41 }, new File(['x'], 'a.txt'), rootDirectoryId)
+    expect(calls).toEqual([
+      'POST /api/documents/transfer/uploads?scope=project%3A41',
+      'POST /api/documents/transfer/uploads/00000000-0000-4000-8000-000000000000/complete?scope=project%3A41',
+    ])
+  })
+
   it('preserves upload network, abort, and protocol errors', async () => {
     const client = createUserDocClient()
     const file = new File(['x'], 'a.txt')

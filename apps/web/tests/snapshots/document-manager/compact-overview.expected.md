@@ -1,6 +1,9 @@
 - region "All accessible documents":
   - heading "All accessible documents" [level=2]
   - paragraph: Metadata only
+  - button "Choose upload scope":
+    - img
+    - text: Choose upload scope
   - button "Refresh":
     - img
     - text: Refresh

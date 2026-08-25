@@ -78,6 +78,13 @@ function makeClient() {
       _signal?: AbortSignal,
       _onProgress?: (loaded: number, total: number) => void,
     ) => doc()),
+    uploadToScope: vi.fn(async (
+      _scope: { kind: 'personal' } | { kind: 'project'; projectId: number },
+      _file: File,
+      _directoryId?: string,
+      _signal?: AbortSignal,
+      _onProgress?: (loaded: number, total: number) => void,
+    ) => doc()),
     createDirectory: vi.fn(async (_parentDirectoryId?: string, name: string = '') => ({
       directoryId: name,
       name,
@@ -193,6 +200,35 @@ describe('DocumentsModal', () => {
     expect(screen.getByText(t('scope.viewing', { name: 'Compiler' }))).toBeTruthy()
     expect(screen.getByRole('button', { name: t('modal.upload') }).hasAttribute('disabled')).toBe(true)
     expect(screen.queryByRole('button', { name: t('action.previewNamed', { name: 'report.pdf' }) })).toBeNull()
+  })
+
+  it('uploads directly to a writable selected scope without using the current runtime upload', async () => {
+    const client = makeClient()
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        scope: { kind: 'personal' },
+        projects: [{ projectId: 41, name: 'Compiler', mode: 'rw' }],
+      }),
+    })))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText('report.pdf')
+    fireEvent.click(screen.getByRole('button', { name: /Compiler/ }))
+    await waitFor(() => { expect(client.listScope).toHaveBeenCalledWith({ kind: 'project', projectId: 41 }) })
+    const input = document.querySelector('input[type="file"]')
+    if (!(input instanceof HTMLInputElement)) throw new Error('document upload input missing')
+    fireEvent.change(input, { target: { files: [new File(['hello'], 'hello.txt', { type: 'text/plain' })] } })
+    await waitFor(() => {
+      expect(client.uploadToScope).toHaveBeenCalledWith(
+        { kind: 'project', projectId: 41 },
+        expect.any(File),
+        '',
+        undefined,
+        expect.any(Function),
+      )
+    })
+    expect(client.upload).not.toHaveBeenCalled()
   })
 
   it('uses a compact scope sheet and keeps scope search local', async () => {
@@ -535,6 +571,8 @@ describe('DocumentsModal', () => {
     await screen.findByText('report.pdf')
     fireEvent.click(screen.getByRole('button', { name: t('copy.source') }))
     const sourceDialog = await screen.findByRole('dialog', { name: t('copy.source.title') })
+    expect(sourceDialog.querySelectorAll('select')).toHaveLength(0)
+    expect(within(sourceDialog).getByRole('option', { name: /Compiler/ })).toBeTruthy()
     fireEvent.click(within(sourceDialog).getByRole('button', { name: t('copy.source.open') }))
     await waitFor(() => { expect(client.listScope).toHaveBeenCalledWith({ kind: 'project', projectId: 41 }) })
     await screen.findByText('report.pdf')
