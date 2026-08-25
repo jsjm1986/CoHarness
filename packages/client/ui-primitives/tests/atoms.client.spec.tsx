@@ -363,6 +363,35 @@ describe('Menu', () => {
     expect(onSelect).toHaveBeenCalledWith('new')
   })
 
+  it('keeps optional header content above the scrolling viewport and applies a list class', () => {
+    const { rerender } = render(
+      <Menu
+        open
+        anchor={<span>trigger</span>}
+        header={<input type="search" aria-label="Filter" />}
+        listClassName="scope-menu"
+        items={items}
+        onSelect={() => {}}
+        onClose={() => {}}
+      />)
+    const menu = screen.getByRole('menu')
+    expect(menu.classList.contains('scope-menu')).toBe(true)
+    expect(screen.getByRole('searchbox', { name: 'Filter' })).toBeDefined()
+    expect(screen.getByRole('searchbox', { name: 'Filter' }).parentElement?.getAttribute('role')).toBe('presentation')
+    expect(screen.getByRole('menuitem', { name: 'Alpha' }).closest('[class*="viewport"]')).not.toBeNull()
+    rerender(
+      <Menu
+        open
+        anchor={<span>trigger</span>}
+        header={null}
+        items={items}
+        onSelect={() => {}}
+        onClose={() => {}}
+      />,
+    )
+    expect(screen.getByRole('menu').querySelector('[class*="header"]')).toBeNull()
+  })
+
   it('caps the list height for internal scrolling unless a submenu row is present', () => {
     const { rerender } = render(
       <Menu open anchor={<span>trigger</span>} items={items} onSelect={() => {}} onClose={() => {}} />)

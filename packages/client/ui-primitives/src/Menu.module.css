@@ -64,7 +64,12 @@
  * this class — the overflow clip would crop the side card, so they rely on
  * staying short. */
 .scrollable {
-  max-height: calc(100vh - 24px);
+  max-height: var(--dsh-menu-max-height, calc(100vh - 24px));
+}
+
+.header {
+  flex: none;
+  min-width: 0;
 }
 
 .viewport {
@@ -282,6 +287,16 @@
     border-radius: var(--dsw-mobile-sheet-radius);
     z-index: 1091;
     animation: mobile-menu-sheet-in var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+  }
+
+  /* Keep a supplied header and pinned footer outside the scrollport. Menus
+     with submenus still scroll as one card because they are not `.scrollable`. */
+  .list.scrollable {
+    overflow: hidden;
+  }
+
+  .list.scrollable .viewport {
+    overflow-y: auto;
   }
 
   /* A small handle makes the sheet affordance legible even when the menu has
