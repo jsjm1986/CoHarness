@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
-import { Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { holdInert, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import css from './OnboardingModal.module.css'
 
 const ignoreImplicitDismiss = (): void => {}
@@ -22,9 +22,7 @@ export function OnboardingModal({
   useEffect(() => {
     const appRoot = document.getElementById('root')
     if (appRoot === null) return
-    const previous = appRoot.inert
-    appRoot.inert = true
-    return () => { appRoot.inert = previous }
+    return holdInert(appRoot)
   }, [])
 
   return (

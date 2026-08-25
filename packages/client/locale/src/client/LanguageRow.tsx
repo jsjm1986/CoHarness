@@ -4,7 +4,7 @@
  * menu. Registered by this package — the locale feature owns its own
  * settings surface.
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import { IconChevronDownOutline14, Menu } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
@@ -30,13 +30,38 @@ export type LanguageRowComponentProps =
 export function LanguageRow({ t, setLocale, useStore }: LanguageRowComponentProps) {
   const active = useStore(s => s.active)
   const options = useStore(s => s.options)
+  const settings = useStore(s => s.settings)
   const [open, setOpen] = useState(false)
   const activeLabel = options.find(o => o.id === active)?.label ?? active
+  const disabled = settings.status !== 'ready' || !settings.writable || settings.write.status === 'saving'
+  const blocked = settings.write.status === 'blocked' ? settings.write.reason : undefined
+  const notice = settings.write.status === 'error'
+    ? t('language.saveFailed')
+    : settings.write.status === 'saving'
+      ? t('language.saving')
+      : blocked === 'loading' || settings.status === 'loading'
+        ? t('language.loading')
+        : blocked === 'unavailable' || settings.status === 'unavailable'
+          ? t('language.unavailable')
+          : blocked === 'project' || settings.writableReason === 'project'
+            ? t('language.projectReadOnly')
+            : blocked === 'provider' || settings.writableReason === 'provider'
+              ? t('language.providerReadOnly')
+              : undefined
+
+  useEffect(() => {
+    if (disabled) setOpen(false)
+  }, [disabled])
 
   return (
     <div className={css.row}>
       <div className={css.rowText}>
         <div className={css.title}>{t('language.title')}</div>
+        {notice === undefined ? null : (
+          <div className={css.notice} role={settings.write.status === 'error' ? 'alert' : 'status'}>
+            {notice}
+          </div>
+        )}
       </div>
       <Menu
         open={open}
@@ -55,6 +80,7 @@ export function LanguageRow({ t, setLocale, useStore }: LanguageRowComponentProp
             className={css.selector}
             aria-haspopup="menu"
             aria-expanded={open}
+            disabled={disabled}
             onClick={() => { setOpen(v => !v) }}
           >
             {activeLabel}

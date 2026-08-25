@@ -245,7 +245,12 @@ export class AgentPresetSettingsController {
    */
   async select(id: string): Promise<void> {
     const before = this.store.getSnapshot()
-    if (before.status === 'saving' || id === before.currentValue) return
+    if (before.status === 'saving' || !before.writable || id === before.currentValue) return
+    const authority = this.describeFace.getSnapshot().view
+    if (authority === undefined || !authority.writable) {
+      this.set({ writable: false })
+      return
+    }
     this.set({ status: 'saving', error: null, currentValue: id })
     const failure = await writeDefaultPreset(this.api, id)
     if (failure !== undefined) {

@@ -45,8 +45,18 @@ function view(value: unknown, revision = 0): SettingsNamespaceView {
   }
 }
 
-function described(value: unknown, revision = 0) {
-  return ok({ writable: true, hasDocument: true, namespaces: [view(value, revision)] })
+function described(
+  value: unknown,
+  revision = 0,
+  options: { writable?: boolean; writableReason?: 'project' | 'provider' } = {},
+) {
+  const writable = options.writable ?? true
+  return ok({
+    writable,
+    ...options.writableReason === undefined ? {} : { writableReason: options.writableReason },
+    hasDocument: true,
+    namespaces: [view(value, revision)],
+  })
 }
 
 function deferred<T>() {
@@ -82,11 +92,34 @@ describe('SettingsScopeController', () => {
     const describeCall = vi.fn().mockResolvedValueOnce(described({ preference: 'dark' }, 3))
     const { mirror, scope } = derivedScope({ describe: describeCall })
     expect(scope.getSnapshot()).toEqual({
-      status: 'loading', value: undefined, revision: undefined, writable: false, mode: 'host',
+      status: 'loading', value: undefined, base: undefined, user: undefined,
+      revision: undefined, writable: false, writableReason: undefined,
+      write: { status: 'idle' }, mode: 'host',
     })
     await mirror.load()
     expect(scope.getSnapshot()).toEqual({
-      status: 'ready', value: { preference: 'dark' }, revision: 3, writable: true, mode: 'host',
+      status: 'ready', value: { preference: 'dark' }, base: undefined, user: undefined,
+      revision: 3, writable: true, writableReason: undefined,
+      write: { status: 'idle' }, mode: 'host',
+    })
+  })
+
+  it.each(['project', 'provider'] as const)('blocks %s-scope writes before they reach the Host', async (reason) => {
+    const describeCall = vi.fn().mockResolvedValueOnce(
+      described({ preference: 'dark' }, 3, { writable: false, writableReason: reason }),
+    )
+    const mutate = vi.fn()
+    const { mirror, scope } = derivedScope({ describe: describeCall, mutate })
+    await mirror.load()
+    expect(scope.getSnapshot()).toMatchObject({
+      status: 'ready', value: { preference: 'dark' }, writable: false, writableReason: reason,
+    })
+
+    await scope.set('preference', 'light')
+
+    expect(mutate).not.toHaveBeenCalled()
+    expect(scope.getSnapshot()).toMatchObject({
+      value: { preference: 'dark' }, write: { status: 'blocked', reason },
     })
   })
 
@@ -188,7 +221,7 @@ describe('SettingsScopeController', () => {
     expect(sibling.getSnapshot()).toMatchObject({ value: { preference: 'dark' }, revision: 5 })
   })
 
-  it('re-reads after a revisionless first write lands during the initial read', async () => {
+  it('blocks a write during the initial read without touching the wire', async () => {
     const initial = deferred<ReturnType<typeof described>>()
     const describeCall = vi.fn()
       .mockReturnValueOnce(initial.promise)
@@ -199,15 +232,19 @@ describe('SettingsScopeController', () => {
     await Promise.resolve()
 
     await scope.set('preference', 'dark')
+    expect(mutate).not.toHaveBeenCalled()
     initial.resolve(described({ preference: 'system' }, 1))
     await loading
 
+    expect(scope.getSnapshot().write).toEqual({ status: 'blocked', reason: 'loading' })
+    await scope.set('preference', 'dark')
     expect(mutate).toHaveBeenCalledWith({
       ns: 'ui-test',
       ops: [{ op: 'set', path: ['preference'], value: 'dark' }],
+      expectedRevision: 1,
     })
-    expect(describeCall).toHaveBeenCalledTimes(2)
-    expect(scope.getSnapshot()).toMatchObject({ value: { preference: 'dark' }, revision: 2 })
+    expect(describeCall).toHaveBeenCalledTimes(1)
+    expect(scope.getSnapshot()).toMatchObject({ value: { preference: 'dark' }, revision: 2, write: { status: 'idle' } })
   })
 
   it('recovers the latest rejected or thrown write from Host state', async () => {
@@ -223,6 +260,7 @@ describe('SettingsScopeController', () => {
     await scope.set('preference', 'dark')
     await scope.set('preference', 'system')
     expect(published.map(section => section?.preference)).toEqual([undefined, 'system', 'light'])
+    expect(scope.getSnapshot().write).toMatchObject({ status: 'error', code: 'transport' })
   })
 
   it('does not recover superseded rejected or thrown writes', async () => {
@@ -283,9 +321,11 @@ describe('SettingsScopeController', () => {
   it('cancels queued and post-dispose writes while draining the in-flight mutation', async () => {
     const first = deferred<RpcResponse<SettingsNamespaceView>>()
     const mutate = vi.fn().mockReturnValue(first.promise)
-    const describeCall = vi.fn()
-    const { scope } = derivedScope({ describe: describeCall, mutate })
+    const describeCall = vi.fn().mockResolvedValueOnce(described({ preference: 'system' }, 0))
+    const { mirror, scope } = derivedScope({ describe: describeCall, mutate })
     const published = trackValues(scope)
+    await mirror.load()
+    expect(scope.getSnapshot().status).toBe('ready')
     const dark = scope.set('preference', 'dark')
     await vi.waitFor(() => { expect(mutate).toHaveBeenCalledOnce() })
     const light = scope.set('preference', 'light')
@@ -297,8 +337,8 @@ describe('SettingsScopeController', () => {
     await Promise.all([dark, light, stop])
     await scope.set('preference', 'system')
     expect(mutate).toHaveBeenCalledOnce()
-    expect(describeCall).not.toHaveBeenCalled()
-    expect(published).toEqual([undefined])
+    expect(describeCall).toHaveBeenCalledOnce()
+    expect(published).toEqual([undefined, { preference: 'system' }])
   })
 
   it('stops deriving from the mirror after dispose', async () => {
@@ -353,7 +393,9 @@ describe('SettingsScopeController', () => {
     const scope = new SettingsScopeController<UiTestSettings>(
       wire, { namespace: 'ui-test' }, mirror, 'memory', settingsSchema)
     expect(scope.getSnapshot()).toEqual({
-      status: 'unavailable', value: undefined, revision: undefined, writable: false, mode: 'memory',
+      status: 'unavailable', value: undefined, base: undefined, user: undefined,
+      revision: undefined, writable: false, writableReason: undefined,
+      write: { status: 'idle' }, mode: 'memory',
     })
     await mirror.load()
     await scope.set('preference', 'dark')

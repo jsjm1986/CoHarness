@@ -8,6 +8,9 @@
 
 import type { RpcRequest, RpcResponse } from './rpc.ts'
 
+/** Why a settings document is read-only for the current browser authority. */
+export type SettingsWritableReason = 'project' | 'provider'
+
 /** One schema-declared secret slot inside a redacted namespace value. */
 export interface SettingsSecretView {
   /** Path from the section root to the removed field. */
@@ -55,11 +58,13 @@ export interface SettingsApi {
    * Describe every registered namespace: redacted layered values plus the
    * serialized schema a client renders its form from. `hasDocument` reports
    * whether a file-backed provider owns a local document without exposing its
-   * Host path. This method is loopback-only; `writable: false` (read-only
-   * provider) tells the client to disable every write control.
+   * Host path. This method is loopback-only; `writable: false` tells the client
+   * to disable every write control, and `writableReason` distinguishes a shared
+   * project runtime from a provider that is read-only in personal scope.
    */
   describe(request: RpcRequest<{}>): Promise<RpcResponse<{
     writable: boolean
+    writableReason?: SettingsWritableReason
     hasDocument: boolean
     namespaces: SettingsNamespaceView[]
   }>>

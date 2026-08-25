@@ -9,6 +9,7 @@
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { holdInert } from './inert.ts'
 import css from './OnboardingSurface.module.css'
 
 /**
@@ -21,8 +22,7 @@ export function OnboardingSurface({ children }: { children: ReactNode }) {
   useEffect(() => {
     const appRoot = document.getElementById('root')
     if (appRoot === null) return
-    appRoot.inert = true
-    return () => { appRoot.inert = false }
+    return holdInert(appRoot)
   }, [])
 
   return createPortal((

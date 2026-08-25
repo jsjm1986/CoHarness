@@ -10,7 +10,7 @@
  * instead of clipping them below a fixed overlay. */
 .dialog.dialog {
   width: min(680px, 100%);
-  height: min(500px, calc(100dvh - 32px));
+  height: min(500px, calc(var(--dsw-viewport-height, 100vh) - 32px));
   padding: 0;
   gap: 0;
   /* The Modal card is an l2 surface and the columns below scroll on it:
@@ -377,7 +377,7 @@
 @media (max-width: 767px) {
   .dialog.dialog {
     width: 100%;
-    height: calc(var(--dsw-viewport-height, 100dvh) - var(--dsw-space-8) - var(--dsw-safe-top));
+    height: calc(var(--dsw-viewport-height, 100vh) - var(--dsw-space-8) - var(--dsw-safe-top));
   }
 
   .millerRow {

@@ -251,8 +251,8 @@
     align-items: stretch;
     justify-content: stretch;
     bottom: auto;
-    height: var(--dsw-viewport-height, 100dvh);
-    max-height: var(--dsw-viewport-height, 100dvh);
+    height: var(--dsw-viewport-height, 100vh);
+    max-height: var(--dsw-viewport-height, 100vh);
   }
 
   .panel {

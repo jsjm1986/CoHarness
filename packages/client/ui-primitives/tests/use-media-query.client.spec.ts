@@ -27,6 +27,25 @@ function mediaListStub(initial: boolean) {
   }
 }
 
+/** Legacy-list variant used by embedded WebViews without addEventListener. */
+function legacyMediaListStub(initial: boolean) {
+  let matches = initial
+  const listeners = new Set<() => void>()
+  let addCount = 0
+  let removeCount = 0
+  const list = {
+    get matches() { return matches },
+    addListener: (fn: () => void) => { addCount += 1; listeners.add(fn) },
+    removeListener: (fn: () => void) => { removeCount += 1; listeners.delete(fn) },
+  } as unknown as MediaQueryList
+  return {
+    list,
+    set(next: boolean) { matches = next; for (const listener of [...listeners]) listener() },
+    get addCount() { return addCount },
+    get removeCount() { return removeCount },
+  }
+}
+
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
@@ -47,6 +66,18 @@ describe('useMediaQuery', () => {
     expect(result.current).toBe(true)
     act(() => { stub.set(false) })
     expect(result.current).toBe(false)
+  })
+
+  it('falls back to addListener/removeListener in legacy WebViews', () => {
+    const stub = legacyMediaListStub(false)
+    vi.stubGlobal('matchMedia', vi.fn(() => stub.list))
+    const { result, unmount } = renderHook(() => useMediaQuery('(max-width: 767px)'))
+    expect(result.current).toBe(false)
+    expect(stub.addCount).toBe(1)
+    act(() => { stub.set(true) })
+    expect(result.current).toBe(true)
+    unmount()
+    expect(stub.removeCount).toBe(1)
   })
 
   it('shares one native listener across hook instances and removes it after the last unmount', () => {

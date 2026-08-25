@@ -3961,8 +3961,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         const visible = projectScope
           ? descriptors.filter(descriptor => projectVisibleNamespaces().has(String(descriptor.ns)))
           : descriptors
+        const writable = settings.writable && !projectScope
         return Promise.resolve(ok(request, {
-          writable: settings.writable && !projectScope,
+          writable,
+          ...writable ? {} : { writableReason: projectScope ? 'project' as const : 'provider' as const },
           hasDocument: settings.documentPath !== undefined && !projectScope,
           namespaces: visible.map(namespaceView),
         }))

@@ -5,13 +5,13 @@ import { createAppearanceRowStore } from '../src/client/settings-store.ts'
 describe('createAppearanceRowStore', () => {
   it('init shape: system preference with revision at -1', () => {
     const store = createAppearanceRowStore().create()
-    expect(store.getSnapshot()).toEqual({ preference: 'system', revision: -1 })
+    expect(store.getSnapshot()).toMatchObject({ preference: 'system', revision: -1, settings: { status: 'loading', writable: false } })
   })
 
   it('sync mirrors the preference and advances the revision', () => {
     const store = createAppearanceRowStore().create()
     store.actions.sync('dark', 0)
-    expect(store.getSnapshot()).toEqual({ preference: 'dark', revision: 0 })
+    expect(store.getSnapshot()).toMatchObject({ preference: 'dark', revision: 0, settings: { status: 'ready', writable: true } })
     store.actions.sync('light', 2)
     expect(store.getSnapshot().preference).toBe('light')
     expect(store.getSnapshot().revision).toBe(2)

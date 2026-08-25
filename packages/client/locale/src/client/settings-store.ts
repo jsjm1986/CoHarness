@@ -4,6 +4,15 @@
  * reads via props.useStore.
  */
 import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SettingsControlState } from '@deepseek-ai/dsh-client-runtime/client'
+
+/** Standalone store default used before the settings transport is attached. */
+const LOCAL_SETTINGS: SettingsControlState = {
+  status: 'ready',
+  writable: true,
+  writableReason: undefined,
+  write: { status: 'idle' },
+}
 
 /** One selectable locale row (id + self-described label). */
 export interface LanguageOptionRow {
@@ -21,11 +30,19 @@ export interface LanguageRowState {
   options: LanguageOptionRow[]
   /** Service revision; -1 until first sync so revision 0 lands as a change. */
   revision: number
+  /** Host writability and write status shown by the row. */
+  settings: SettingsControlState
 }
 
 /** Declared action shape giving the exported factory a stable return type. */
 type LanguageRowActions = {
-  sync: (draft: LanguageRowState, active: string, options: LanguageOptionRow[], revision: number) => void
+  sync: (
+    draft: LanguageRowState,
+    active: string,
+    options: LanguageOptionRow[],
+    revision: number,
+    settings?: SettingsControlState,
+  ) => void
 }
 
 /**
@@ -34,13 +51,26 @@ type LanguageRowActions = {
  */
 export function createLanguageRowStore(): EngineStoreHandle<LanguageRowState, LanguageRowActions> {
   return defineStore({
-    init: (): LanguageRowState => ({ active: '', options: [], revision: -1 }),
+    init: (): LanguageRowState => ({
+      active: '',
+      options: [],
+      revision: -1,
+      settings: { status: 'loading', writable: false, writableReason: undefined, write: { status: 'idle' } },
+    }),
     actions: {
-      sync: (d, active: string, options: LanguageOptionRow[], revision: number) => {
-        if (revision <= d.revision) return
-        d.active = active
-        d.options = options
-        d.revision = revision
+      sync: (
+        d,
+        active: string,
+        options: LanguageOptionRow[],
+        revision: number,
+        settings: SettingsControlState = LOCAL_SETTINGS,
+      ) => {
+        if (revision > d.revision) {
+          d.active = active
+          d.options = options
+          d.revision = revision
+        }
+        d.settings = settings
       },
     },
   })

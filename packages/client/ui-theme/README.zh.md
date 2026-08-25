@@ -12,6 +12,10 @@
 
 两条路径在构造上互斥。`scrollbar-width`／`scrollbar-color` 写在 `@supports not selector(::-webkit-scrollbar)` 之内，因为这两个属性中的任一个只要取非 `auto` 值，Chromium 与 Safari 就会丢弃该元素上的全部 `::-webkit-scrollbar*` 规则，`::-webkit-scrollbar-thumb:hover` 也在其中——若无条件地同时声明，`--dsh-scrollbar-thumb-hover` 在任何引擎上都不会被渲染。因此 Firefox 走标准属性，WebKit 系引擎走伪元素，hover token 只经由伪元素这条路径渲染。相关原理与实测计算值见[滚动条 Agent Note](../../../.agents/notes/implemented/bug-fix/2026-07-28-themed-scrollbars-and-reserved-gutter.zh.md)。
 
+## 设置权限与兼容性
+
+外观控件仍显示项目当前有效值，但绑定 scope 报告 `loading`、`writable: false` 或写入处于 `saving` 时会禁用控件。项目与提供方限制会以内联状态显示；服务自身也会在取得可写的 Host 视图前拒绝直接调用 `setTheme`，因此禁用行无法绕过界面发起 mutation。主题监听器同时支持 `addEventListener` 与旧版 `addListener` MediaQueryList 实现。设计样式表提供 `100vh` 视口回退，客户端可视视口测量就绪后覆盖该值；token-contract 测试会检查所有 `--ds-*` 与 `--dsw-*` 引用均有 CSS 声明，视口高度这一运行时变量是明确例外。
+
 ## 模型体验
 
 无。主题服务管理浏览器偏好；这里没有任何内容进入模型请求。

@@ -38,6 +38,10 @@
 
 `WebBlock` 渲染一次已完成的 web 检索，用一个组件绘制 `web` 渲染意图的两种 kind（由 `kind` 判别）。`search` 在有序引用列表上方显示可选的提供方回答（通过 `MarkdownText`）：每个 source 是一个安全外链，以其标题为标签，或以其主机名为标签，当 URL 无法解析或没有主机名（`file:`/`data:` URL）时回退到原始 URL，因此标签绝不为空；其下渲染 snippet 与发布日期。只有 http(s) URL 会成为锚点（设置 `target`/`rel`）——这是 `MarkdownText` 对不受信任链接所用 allowlist 的 http(s) 子集（该 allowlist 还允许 `mailto:`，此处排除）；任何其他 URL 渲染为纯文本。整份列表渲染在一个定高滚动容器里（`max-height: 320px`、`overflow-y: auto`），因此超出该高度的列表在原地纵向滚动，而不是把卡片撑高；`<li value>` 固定每个 source 的引用编号，从 1 起连续，而不依赖 `<ol>` 的隐式计数。当一次 search 合法地返回无 answer 且无 source 时，卡片显示一个明确的空状态提示，而不是空的 `<ol>`（chat 行不呈现原始 result content）。`fetch` 显示一个紧凑摘要：带链接的最终 URL 及其 HTTP 状态。两者都会标记一次被截断的检索。原理：[Web result 卡片笔记](../../../.agents/notes/implemented/feature/2026-07-30-web-result-card-frontend.zh.md)与[来源滚动笔记](../../../.agents/notes/implemented/feature/2026-08-03-web-search-source-scroll.zh.md)。
 
+## 兼容性
+
+`useMediaQuery` 为每个查询复用一个原生监听器，并在旧版 WebView 中回退到 `addListener`／`removeListener`。`holdInert` 在可用时使用原生 `HTMLElement.inert`，同时在浮层占有页面期间保持 `aria-hidden` 与 tab 停靠点安全。主题样式会先定义 `100vh` 视口回退，待 layout 插件发布可视视口高度后再覆盖。
+
 ## 模型体验
 
 无。该包在浏览器中渲染纯 React 原子组件；这里没有任何内容进入模型请求。

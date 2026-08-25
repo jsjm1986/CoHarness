@@ -7,13 +7,13 @@ const OPTIONS = [{ id: 'zh', label: '中文' }, { id: 'en', label: 'English' }]
 describe('createLanguageRowStore', () => {
   it('init shape: empty mirror with revision at -1', () => {
     const store = createLanguageRowStore().create()
-    expect(store.getSnapshot()).toEqual({ active: '', options: [], revision: -1 })
+    expect(store.getSnapshot()).toMatchObject({ active: '', options: [], revision: -1, settings: { status: 'loading', writable: false } })
   })
 
   it('sync mirrors the snapshot and advances the revision', () => {
     const store = createLanguageRowStore().create()
     store.actions.sync('zh', OPTIONS, 0)
-    expect(store.getSnapshot()).toEqual({ active: 'zh', options: OPTIONS, revision: 0 })
+    expect(store.getSnapshot()).toMatchObject({ active: 'zh', options: OPTIONS, revision: 0, settings: { status: 'ready', writable: true } })
     store.actions.sync('en', OPTIONS, 1)
     expect(store.getSnapshot().active).toBe('en')
     expect(store.getSnapshot().revision).toBe(1)

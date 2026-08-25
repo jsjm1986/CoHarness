@@ -7,10 +7,10 @@
   flex-direction: column;
   /* Keep the previous card tokens discoverable for downstream themes that
      parse this module; the workbench dimensions below are the active values. */
-  /* width: min(960px, 100%); min-height: min(640px, calc(100dvh - 48px)); max-height: min(860px, calc(100dvh - 48px)); */
+  /* width: min(960px, 100%); min-height: min(640px, calc(var(--dsw-viewport-height, 100vh) - 48px)); max-height: min(860px, calc(var(--dsw-viewport-height, 100vh) - 48px)); */
   width: min(1180px, calc(100vw - 48px));
-  min-height: min(720px, calc(100dvh - 32px));
-  max-height: min(900px, calc(100dvh - 32px));
+  min-height: min(720px, calc(var(--dsw-viewport-height, 100vh) - 32px));
+  max-height: min(900px, calc(var(--dsw-viewport-height, 100vh) - 32px));
   /* Modal paints this card at layer 2; these tokens inherit to the scrolling list. */
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
@@ -210,7 +210,7 @@
 }
 
 .error {
-  color: var(--dsw-alias-label-danger);
+  color: var(--dsw-alias-state-error-primary);
   font-size: 13px;
   line-height: 20px;
 }
@@ -505,7 +505,7 @@
 }
 
 .delete {
-  color: var(--dsw-alias-label-danger);
+  color: var(--dsw-alias-state-error-primary);
 }
 
 /* Primary-fill actions need the foreground label token; row deletes use danger
@@ -700,7 +700,7 @@
   padding: var(--dsw-space-2) var(--dsw-space-3);
   border-radius: var(--dsw-radius-md);
   background: var(--dsw-alias-bg-layer-1);
-  color: var(--dsw-alias-label-danger);
+  color: var(--dsw-alias-state-error-primary);
 }
 
 .sheetSearch {
@@ -847,7 +847,7 @@
 }
 
 .sheetDanger {
-  color: var(--dsw-alias-label-danger);
+  color: var(--dsw-alias-state-error-primary);
 }
 
 .sheetEntity {
@@ -1198,7 +1198,7 @@
   .confirmDialog.confirmDialog {
     box-sizing: border-box;
     width: 100%;
-    max-height: calc(100dvh - var(--dsw-space-8) - var(--dsw-safe-top));
+    max-height: calc(var(--dsw-viewport-height, 100vh) - var(--dsw-space-8) - var(--dsw-safe-top));
   }
 
   .formActions,

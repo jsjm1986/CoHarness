@@ -4,7 +4,16 @@
  * reads via props.useStore.
  */
 import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SettingsControlState } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ThemePreference } from '../theme-settings.ts'
+
+/** Standalone store default used before the settings transport is attached. */
+const LOCAL_SETTINGS: SettingsControlState = {
+  status: 'ready',
+  writable: true,
+  writableReason: undefined,
+  write: { status: 'idle' },
+}
 
 /** Store state mirrored from the theme snapshot. */
 export interface AppearanceRowState {
@@ -12,11 +21,18 @@ export interface AppearanceRowState {
   preference: ThemePreference
   /** Service revision; -1 until first sync so revision 0 lands as a change. */
   revision: number
+  /** Host writability and write status shown by the row. */
+  settings: SettingsControlState
 }
 
 /** Declared action shape giving the exported factory a stable return type. */
 type AppearanceRowActions = {
-  sync: (draft: AppearanceRowState, preference: ThemePreference, revision: number) => void
+  sync: (
+    draft: AppearanceRowState,
+    preference: ThemePreference,
+    revision: number,
+    settings?: SettingsControlState,
+  ) => void
 }
 
 /**
@@ -25,12 +41,18 @@ type AppearanceRowActions = {
  */
 export function createAppearanceRowStore(): EngineStoreHandle<AppearanceRowState, AppearanceRowActions> {
   return defineStore({
-    init: (): AppearanceRowState => ({ preference: 'system', revision: -1 }),
+    init: (): AppearanceRowState => ({
+      preference: 'system',
+      revision: -1,
+      settings: { status: 'loading', writable: false, writableReason: undefined, write: { status: 'idle' } },
+    }),
     actions: {
-      sync: (d, preference: ThemePreference, revision: number) => {
-        if (revision <= d.revision) return
-        d.preference = preference
-        d.revision = revision
+      sync: (d, preference: ThemePreference, revision: number, settings: SettingsControlState = LOCAL_SETTINGS) => {
+        if (revision > d.revision) {
+          d.preference = preference
+          d.revision = revision
+        }
+        d.settings = settings
       },
     },
   })

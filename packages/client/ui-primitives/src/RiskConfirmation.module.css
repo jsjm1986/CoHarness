@@ -7,7 +7,7 @@
 @media (max-width: 767px) {
   .confirmation {
     width: 100%;
-    max-height: calc(var(--dsw-viewport-height, 100dvh) - 48px);
+    max-height: calc(var(--dsw-viewport-height, 100vh) - 48px);
   }
 
   .acknowledgement {
@@ -24,12 +24,6 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-}
-
-@supports (height: 100dvh) {
-  .confirmation {
-    max-height: calc(100dvh - 48px);
-  }
 }
 
 .warning {

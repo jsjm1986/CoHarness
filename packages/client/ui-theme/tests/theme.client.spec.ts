@@ -15,6 +15,9 @@ const make = (host = stubSettingsScope<ThemeSettings>()): {
   events: ThemeSnapshot[]
   host: StubSettingsScope<ThemeSettings>
 } => {
+  if (host.scope.getSnapshot().status === 'loading') {
+    host.publish({ status: 'ready', writable: true })
+  }
   const ctx = new Context()
   const events: ThemeSnapshot[] = []
   ctx.on('theme/change', (snapshot) => { events.push(snapshot) })
@@ -243,6 +246,28 @@ describe('ThemeRuntime', () => {
       const media = stubMedia(false)
       const { ctx } = make()
       expect(media.listenerCount()).toBe(1)
+      await ctx.fiber.dispose()
+      expect(media.listenerCount()).toBe(0)
+    })
+
+    it('supports legacy MediaQueryList listeners', async () => {
+      const listeners = new Set<Listener>()
+      const media = {
+        matches: false,
+        addListener: (fn: Listener) => { listeners.add(fn) },
+        removeListener: (fn: Listener) => { listeners.delete(fn) },
+        flip() {
+          this.matches = !this.matches
+          for (const fn of listeners) fn()
+        },
+        listenerCount: () => listeners.size,
+      }
+      vi.stubGlobal('matchMedia', () => media)
+      const { ctx, theme, events } = make()
+      expect(media.listenerCount()).toBe(1)
+      media.flip()
+      expect(theme.getTheme().active.id).toBe('dark')
+      expect(events).toHaveLength(1)
       await ctx.fiber.dispose()
       expect(media.listenerCount()).toBe(0)
     })

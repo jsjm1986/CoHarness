@@ -54,10 +54,9 @@ describe('SettingsRoot.module.css compact overlay', () => {
     expect(block('.options')).toContain('overflow-y: auto')
   })
 
-  it('sizes the portaled overlay from the visual-viewport variable, not 100vh', () => {
+  it('sizes the portaled overlay from the visual-viewport variable with a legacy fallback', () => {
     const compact = mediaBody('(max-width: 767px)')
-    expect(compact).toContain('var(--dsw-viewport-height, 100dvh)')
-    expect(compact).not.toMatch(/100vh/)
+    expect(compact).toContain('var(--dsw-viewport-height, 100vh)')
   })
 
   it('keeps the settings title visible and gives nav cells the touch target', () => {

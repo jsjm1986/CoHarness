@@ -20,6 +20,8 @@ export interface SettingsDescribeView {
   namespaces: readonly SettingsNamespaceView[]
   /** Whether the settings provider accepts writes. */
   writable: boolean
+  /** Why the current browser authority cannot write, when read-only. */
+  writableReason?: 'project' | 'provider'
   /** Whether a native settings document exists for the Host to open. */
   hasDocument: boolean
 }

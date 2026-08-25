@@ -191,6 +191,7 @@ export class AgentPresetSectionController {
    * @returns once the composition loaded or the failure is on the page.
    */
   async view(id: string): Promise<void> {
+    if (!this.store.getSnapshot().authorable) return
     this.set({ error: null })
     try {
       const response = await this.api.agentPresets.read({ agentPreset: id })
@@ -252,6 +253,7 @@ export class AgentPresetSectionController {
   async confirmCopy(): Promise<void> {
     const draft = this.store.getSnapshot().copy
     if (draft === null || draft.saving) return
+    if (!this.store.getSnapshot().authorable) return
     if (draftBlocker(draft, this.store.getSnapshot().rows) !== undefined) return
     this.patchCopy({ saving: true, error: null })
     try {
@@ -283,6 +285,7 @@ export class AgentPresetSectionController {
    * @returns once the host answered and the page reflects it.
    */
   async openLocation(id: string): Promise<void> {
+    if (!this.store.getSnapshot().authorable) return
     try {
       const response = await this.api.agentPresets.openDocument({ agentPreset: id })
       if (!response.result.ok) {
@@ -316,6 +319,7 @@ export class AgentPresetSectionController {
   async remove(): Promise<void> {
     const { pendingDelete, deleting } = this.store.getSnapshot()
     if (pendingDelete === null || deleting) return
+    if (!this.store.getSnapshot().authorable) return
     this.set({ deleting: true, error: null })
     try {
       const response = await this.api.agentPresets.remove({ agentPreset: pendingDelete })
@@ -338,6 +342,7 @@ export class AgentPresetSectionController {
    * @returns once the write settled and the roster was re-read.
    */
   async makeDefault(id: string): Promise<void> {
+    if (!this.store.getSnapshot().authorable) return
     const failure = await writeDefaultPreset(this.api, id)
     if (failure !== undefined) {
       this.set({ error: failure })

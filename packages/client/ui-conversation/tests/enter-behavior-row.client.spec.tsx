@@ -34,6 +34,7 @@ function mount() {
     useSessions: emptySessions(),
     useWorkspaces: emptyWorkspaces(),
     useBusyEnter: bindSnapshotSelector(policy.busyEnter),
+    useSettings: bindSnapshotSelector(policy.settings),
     setBusyEnter,
     t: makeTranslate(en),
   }
@@ -63,5 +64,17 @@ describe('EnterBehaviorRow', () => {
     expect(screen.getByRole('menuitem', { name: 'Steer' })).toBeDefined()
     fireEvent.pointerDown(document.body)
     expect(screen.queryByRole('menuitem', { name: 'Steer' })).toBeNull()
+  })
+
+  it('disables project-scoped controls and explains the read-only reason', () => {
+    const b = mount()
+    act(() => {
+      b.policy.settings.set({
+        status: 'ready', writable: false, writableReason: 'project', write: { status: 'idle' },
+      })
+    })
+    const trigger = screen.getByRole('button', { name: /Queue/ })
+    expect(trigger).toHaveProperty('disabled', true)
+    expect(screen.getByRole('status').textContent).toContain('Project settings')
   })
 })

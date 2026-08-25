@@ -3,7 +3,7 @@
  * preference, clicks drive setTheme. */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { createSnapshotStore, type SessionListState, type WorkspaceListState } from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore, type SessionListState, type SettingsControlState, type WorkspaceListState } from '@deepseek-ai/dsh-client-runtime/client'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import { AppearanceRow } from '../src/client/AppearanceRow.tsx'
 import type { AppearanceRowComponentProps } from '../src/client/AppearanceRow.tsx'
@@ -17,6 +17,12 @@ const COPY: Record<string, string> = {
   'appearance.light': 'Light',
   'appearance.dark': 'Dark',
   'appearance.system': 'System',
+  'appearance.projectReadOnly': 'Project settings are read-only',
+  'appearance.providerReadOnly': 'Provider settings are read-only',
+  'appearance.loading': 'Loading settings',
+  'appearance.saving': 'Saving',
+  'appearance.saveFailed': 'Save failed',
+  'appearance.unavailable': 'Unavailable',
 }
 
 /** Empty global standard-kit hooks (the row reads neither). */
@@ -33,10 +39,15 @@ function emptyWorkspaces() {
   return bindSnapshotSelector(store)
 }
 
-function mount(preference: ThemePreference = 'system') {
+function mount(
+  preference: ThemePreference = 'system',
+  settings: SettingsControlState = {
+    status: 'ready', writable: true, writableReason: undefined, write: { status: 'idle' },
+  },
+) {
   // Real store instance — the sanctioned zero-machinery path for tests.
   const store = createAppearanceRowStore().create()
-  store.actions.sync(preference, 0)
+  store.actions.sync(preference, 0, settings)
   const setTheme = vi.fn()
   const props: AppearanceRowComponentProps = {
     useSessions: emptySessions(),
@@ -71,5 +82,12 @@ describe('AppearanceRow', () => {
     act(() => { b.store.actions.sync('light', 1) })
     expect(pressed(/Light/)).toBe('true')
     expect(pressed(/Dark/)).toBe('false')
+  })
+
+  it('disables project-scoped controls and explains the read-only reason', () => {
+    mount('dark', { status: 'ready', writable: false, writableReason: 'project', write: { status: 'idle' } })
+    const light = screen.getByRole('button', { name: /Light/ })
+    expect(light).toHaveProperty('disabled', true)
+    expect(screen.getByRole('status').textContent).toContain('Project settings are read-only')
   })
 })

@@ -16,6 +16,17 @@
   color: var(--dsw-alias-label-primary);
 }
 
+.notice {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.notice[role='alert'] {
+  color: var(--dsw-alias-state-error-primary);
+}
+
 .cubeRow {
   display: flex;
   align-items: stretch;
@@ -47,6 +58,12 @@
 
 .themeCube:hover:not(.selected) {
   background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.themeCube:disabled {
+  color: var(--dsw-alias-label-dimmed);
+  cursor: not-allowed;
+  opacity: 0.72;
 }
 
 /* Selected cube: #F5F6F7 fill + #ADB2B8 border (static token — the bluish-400

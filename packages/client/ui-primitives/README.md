@@ -38,6 +38,10 @@ Pure React atoms (zero cordis): StateDot, DisclosureRow, ic_ds_* icons, Button/P
 
 `WebBlock` renders a completed web retrieval, one component for both kinds of the `web` render intent (discriminated by `kind`). A `search` shows an optional provider answer (through `MarkdownText`) above an ordered citation list: each source is a safe external link labelled by its title, or its hostname, falling back to the raw URL when the URL does not parse or has no hostname (a `file:`/`data:` URL) so a label is never blank; its snippet and publication date render below it. Only http(s) URLs become anchors (`target`/`rel` set) — the http(s) subset of the allowlist `MarkdownText` applies to untrusted links (it also permits `mailto:`, excluded here); any other URL renders as plain text. The whole list renders in one fixed-height scroll container (`max-height: 320px`, `overflow-y: auto`), so a list taller than that scrolls vertically in place instead of growing the card; `<li value>` pins each source's citation number, contiguous from 1, rather than leaving it to the `<ol>`'s implicit count. When a search legitimately returns no answer and no sources, the card shows an explicit empty-state note rather than a blank `<ol>` (the chat row does not surface the raw result content). A `fetch` shows a compact summary: the linked final URL and its HTTP status. Both mark a capped retrieval. Rationale: [the web result card note](../../../.agents/notes/implemented/feature/2026-07-30-web-result-card-frontend.md) and [the source scroll note](../../../.agents/notes/implemented/feature/2026-08-03-web-search-source-scroll.md).
 
+## Compatibility
+
+`useMediaQuery` shares one native listener per query and falls back to `addListener`/`removeListener` for older WebViews. `holdInert` uses native `HTMLElement.inert` when available and also keeps `aria-hidden` plus tab stops safe while an overlay owns the page. Theme styles define a `100vh` viewport fallback before the layout plugin publishes its visual-viewport height.
+
 ## Model Experience
 
 None, as the package renders pure React atoms in the browser; nothing here reaches a model request.

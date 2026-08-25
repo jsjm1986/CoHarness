@@ -263,7 +263,7 @@ export function AgentPresetSection(props: AgentPresetSectionProps): ReactNode {
                       type="button"
                       className={css.cardMain}
                       aria-pressed={row.isDefault}
-                      disabled={row.isDefault || row.broken !== undefined}
+                      disabled={!state.authorable || row.isDefault || row.broken !== undefined}
                       // Without this the name is the whole card read aloud —
                       // title, badge, description, id.
                       aria-label={`${row.broken !== undefined ? t('brokenBadge') : row.isDefault ? t('inUse') : t('setDefault')}: ${text.name}`}
@@ -302,6 +302,7 @@ export function AgentPresetSection(props: AgentPresetSectionProps): ReactNode {
                               className={css.iconButton}
                               data-tip={t('view')}
                               aria-label={`${t('view')}: ${text.name}`}
+                              disabled={!state.authorable}
                               onClick={() => { void props.view(row.id) }}
                             >
                               <IconBrowseOutline16 />
@@ -314,6 +315,7 @@ export function AgentPresetSection(props: AgentPresetSectionProps): ReactNode {
                             className={css.iconButton}
                             data-tip={state.hasDocument ? t('openLocation') : t('showLocation')}
                             aria-label={`${state.hasDocument ? t('openLocation') : t('showLocation')}: ${text.name}`}
+                            disabled={!state.authorable}
                             onClick={() => { void props.openLocation(row.id) }}
                           >
                             <IconFolderOpenOutline16 />
@@ -336,6 +338,7 @@ export function AgentPresetSection(props: AgentPresetSectionProps): ReactNode {
                           <button
                             type="button"
                             className={`${css.iconButton} ${css.iconDanger}`}
+                            disabled={!state.authorable}
                             data-tip={t('delete')}
                             aria-label={`${t('delete')}: ${text.name}`}
                             onClick={() => { props.confirmDelete(row.id) }}

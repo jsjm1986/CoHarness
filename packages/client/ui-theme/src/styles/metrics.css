@@ -66,5 +66,5 @@
   --dsw-mobile-sheet-edge: 12px;
   --dsw-mobile-sheet-bottom: calc(var(--dsw-safe-bottom) + var(--dsw-mobile-sheet-edge));
   --dsw-mobile-sheet-radius: var(--dsw-radius-xl);
-  --dsw-mobile-sheet-max-height: min(70dvh, calc(var(--dsw-viewport-height, 100dvh) - 96px));
+  --dsw-mobile-sheet-max-height: min(70vh, calc(var(--dsw-viewport-height, 100vh) - 96px));
 }
