@@ -30,8 +30,11 @@ function t(key: DocumentsKey, params?: Record<string, string>): string {
   return text
 }
 
-const limits: UserDocLimits = { maxFileBytes: 10 * 1024 * 1024, maxFilesPerMessage: 5, maxMessageBytes: 100, maxInlineTextBytes: 256 }
-const unlimitedLimits: UserDocLimits = { maxFileBytes: null, maxFilesPerMessage: 5, maxMessageBytes: 100, maxInlineTextBytes: 256 }
+const upload = { protocol: 'resumable-v1' as const, chunkBytes: 8 * 1024 * 1024, sessionTtlMs: 86400000, resumable: true as const }
+const limits: UserDocLimits = {
+  maxFileBytes: 10 * 1024 * 1024, maxFilesPerMessage: 5, maxMessageBytes: 100, maxInlineTextBytes: 256, upload,
+}
+const unlimitedLimits: UserDocLimits = { maxFileBytes: null, maxFilesPerMessage: 5, maxMessageBytes: 100, maxInlineTextBytes: 256, upload }
 
 function doc(ref: Partial<{ docId: string; name: string; bytes: number; mediaType: string; modifiedAt: number }> = {}) {
   const docId = ref.docId ?? '2026-08-17/report.pdf'

@@ -2346,6 +2346,36 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         throws: ['UserDocError when a finite `maxFileBytes` is exceeded or the write fails.'],
       },
       {
+        signature: 'abstract beginUpload(input: BeginUserDocUpload): Promise<UserDocUploadSession>',
+        description: 'Create or reuse a resumable upload session.',
+        parameters: [{ name: 'input', description: 'untrusted browser metadata validated by the provider.' }],
+        returns: 'the public upload session state.',
+      },
+      {
+        signature: 'abstract inspectUpload(uploadId: UserDocUploadId, signal?: AbortSignal): Promise<UserDocUploadSession>',
+        description: 'Read one upload session\'s public state.',
+        parameters: [{ name: 'uploadId', description: 'opaque provider-produced identifier.' }, { name: 'signal', description: 'optional cancellation.' }],
+        returns: 'current upload state.',
+      },
+      {
+        signature: 'abstract writeUploadChunk( uploadId: UserDocUploadId, chunk: UserDocUploadChunk, signal?: AbortSignal, ): Promise<UserDocUploadSession>',
+        description: 'Append one sequential chunk to an upload session.',
+        parameters: [{ name: 'uploadId', description: 'opaque provider-produced identifier.' }, { name: 'chunk', description: 'validated range, digest, and raw body.' }, { name: 'signal', description: 'optional cancellation.' }],
+        returns: 'updated public upload state.',
+      },
+      {
+        signature: 'abstract completeUpload( uploadId: UserDocUploadId, sha256: string, signal?: AbortSignal, ): Promise<UserDocUploadSession>',
+        description: 'Start or repeat final verification and publication.',
+        parameters: [{ name: 'uploadId', description: 'opaque provider-produced identifier.' }, { name: 'sha256', description: 'final SHA-256 digest supplied by the browser.' }, { name: 'signal', description: 'optional cancellation.' }],
+        returns: 'verifying, complete, or failed public state.',
+      },
+      {
+        signature: 'abstract cancelUpload(uploadId: UserDocUploadId, signal?: AbortSignal): Promise<void>',
+        description: 'Cancel and remove one incomplete upload session.',
+        parameters: [{ name: 'uploadId', description: 'opaque provider-produced identifier.' }, { name: 'signal', description: 'optional cancellation.' }],
+        returns: 'after temporary data is removed.',
+      },
+      {
         signature: 'abstract list(signal?: AbortSignal): Promise<UserDocRef[]>',
         description: 'List every stored document, newest modification first.',
         parameters: [{ name: 'signal', description: 'optional cancellation for the directory scan.' }],
@@ -3307,6 +3337,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'BashEnvVariableInfo',
     declaration: 'export interface BashEnvVariableInfo extends BashEnvVariable {\n    contributor: string;\n    key: DshEnvironmentKey;\n}',
+  },
+  {
+    name: 'BeginUserDocUpload',
+    declaration: 'export interface BeginUserDocUpload {\n    readonly name: string;\n    readonly directoryId: UserDocDirectoryId;\n    readonly bytes: number;\n    readonly fingerprint: string;\n}',
   },
   {
     name: 'Branded',
@@ -5334,7 +5368,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'UserDocLimits',
-    declaration: 'export interface UserDocLimits {\n    maxFileBytes: number | null;\n    maxFilesPerMessage: number;\n    maxMessageBytes: number;\n    maxInlineTextBytes: number;\n}',
+    declaration: 'export interface UserDocLimits {\n    maxFileBytes: number | null;\n    maxFilesPerMessage: number;\n    maxMessageBytes: number;\n    maxInlineTextBytes: number;\n    upload: UserDocUploadCapabilities;\n}',
   },
   {
     name: 'UserDocRef',
@@ -5343,6 +5377,26 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'UserDocTarget',
     declaration: 'export interface UserDocTarget {\n    path: string;\n    name: string;\n    docId: UserDocId;\n}',
+  },
+  {
+    name: 'UserDocUploadCapabilities',
+    declaration: 'export interface UserDocUploadCapabilities {\n    readonly protocol: \'resumable-v1\';\n    readonly chunkBytes: number;\n    readonly sessionTtlMs: number;\n    readonly resumable: true;\n}',
+  },
+  {
+    name: 'UserDocUploadChunk',
+    declaration: 'export interface UserDocUploadChunk {\n    readonly index: number;\n    readonly start: number;\n    readonly end: number;\n    readonly total: number;\n    readonly sha256: string;\n    readonly body: ReadableStream<Uint8Array>;\n}',
+  },
+  {
+    name: 'UserDocUploadId',
+    declaration: 'export type UserDocUploadId = Branded<\'UserDocUploadId\'>;',
+  },
+  {
+    name: 'UserDocUploadSession',
+    declaration: 'export interface UserDocUploadSession {\n    readonly uploadId: UserDocUploadId;\n    readonly name: string;\n    readonly directoryId: UserDocDirectoryId;\n    readonly bytes: number;\n    readonly fingerprint: string;\n    readonly chunkBytes: number;\n    readonly receivedBytes: number;\n    readonly expiresAt: number;\n    readonly state: UserDocUploadState;\n    readonly ref?: UserDocRef;\n    readonly error?: {\n        readonly code: string;\n        readonly message: string;\n    };\n}',
+  },
+  {
+    name: 'UserDocUploadState',
+    declaration: 'export type UserDocUploadState = \'uploading\' | \'verifying\' | \'complete\' | \'failed\';',
   },
   {
     name: 'UserMessage',

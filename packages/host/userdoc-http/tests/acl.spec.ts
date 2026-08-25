@@ -5,7 +5,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
 import type { GatewayRuntime } from '@deepseek-ai/dsh-gateway-runtime'
 import { UserDocId, type UserDocRef, type UserDocStore } from '@deepseek-ai/dsh-userdoc'
-import { handleUserDocHttp, USERDOC_HTTP_PATH, USERDOC_UPLOAD_HEADER } from '../src/index.ts'
+import { handleUserDocHttp, USERDOC_HTTP_PATH, USERDOC_UPLOADS_PATH } from '../src/index.ts'
 
 const REF: UserDocRef = {
   docId: UserDocId('report.txt'),
@@ -18,9 +18,23 @@ const REF: UserDocRef = {
 
 function store(): UserDocStore {
   return {
-    limits: { maxFileBytes: 100, maxFilesPerMessage: 5, maxMessageBytes: 100, maxInlineTextBytes: 10 },
+    limits: {
+      maxFileBytes: 100,
+      maxFilesPerMessage: 5,
+      maxMessageBytes: 100,
+      maxInlineTextBytes: 10,
+      upload: { protocol: 'resumable-v1', chunkBytes: 65536, sessionTtlMs: 86400000, resumable: true },
+    },
     resolveTarget: vi.fn(async () => ({ path: REF.path, name: REF.name, docId: REF.docId })),
     save: vi.fn(async () => REF),
+    beginUpload: vi.fn(async () => ({
+      uploadId: '00000000-0000-4000-8000-000000000000', name: 'x.txt', directoryId: '', bytes: 1,
+      fingerprint: 'x', chunkBytes: 65536, receivedBytes: 0, expiresAt: Date.now() + 1000, state: 'uploading',
+    })),
+    inspectUpload: vi.fn(),
+    writeUploadChunk: vi.fn(),
+    completeUpload: vi.fn(),
+    cancelUpload: vi.fn(),
     list: vi.fn(async () => [REF]),
     listDirectory: vi.fn(async () => ({ directoryId: '', directories: [], documents: [REF] })),
     listDirectories: vi.fn(async () => []),
@@ -96,7 +110,7 @@ describe('project document ACL', () => {
     expect(listed.status()).toBe(200)
 
     const upload = response()
-    await handleUserDocHttp(ctx, request('POST', `${USERDOC_HTTP_PATH}?name=x.txt`, { [USERDOC_UPLOAD_HEADER]: '1' }), upload.res)
+    await handleUserDocHttp(ctx, bodyRequest('POST', USERDOC_UPLOADS_PATH, JSON.stringify({ version: 1, name: 'x.txt', directory: '', bytes: 1, fingerprint: 'x' })), upload.res)
     expect(upload.status()).toBe(403)
     expect(upload.body()).toMatchObject({ error: { code: 'COLLABORATION_FORBIDDEN' } })
 
@@ -113,8 +127,8 @@ describe('project document ACL', () => {
 
   it('keeps writes enabled for rw members and fails closed when collaboration is absent', async () => {
     const allowed = response()
-    await handleUserDocHttp(context('rw'), request('POST', `${USERDOC_HTTP_PATH}?name=x.txt`, { [USERDOC_UPLOAD_HEADER]: '1' }), allowed.res)
-    expect(allowed.status()).toBe(201)
+    await handleUserDocHttp(context('rw'), bodyRequest('POST', USERDOC_UPLOADS_PATH, JSON.stringify({ version: 1, name: 'x.txt', directory: '', bytes: 1, fingerprint: 'x' })), allowed.res)
+    expect(allowed.status()).toBe(200)
 
     const unavailable = response()
     await handleUserDocHttp(context('missing'), request('GET', USERDOC_HTTP_PATH), unavailable.res)

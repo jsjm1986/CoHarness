@@ -17,12 +17,25 @@ import {
   DOCUMENT_NOT_FOUND_CODE,
   DOCUMENT_TARGET_CONFLICT_CODE,
   DOCUMENT_TOO_LARGE_CODE,
+  DOCUMENT_UPLOAD_BUSY_CODE,
+  DOCUMENT_UPLOAD_EXPIRED_CODE,
+  DOCUMENT_UPLOAD_HASH_CODE,
+  DOCUMENT_UPLOAD_NOT_FOUND_CODE,
+  DOCUMENT_UPLOAD_PROTOCOL_CODE,
+  DOCUMENT_UPLOAD_RANGE_CODE,
+  DOCUMENT_UPLOAD_SIZE_CODE,
+  DOCUMENT_UPLOAD_STATE_CODE,
+  DOCUMENT_UPLOAD_STORAGE_CODE,
   INVALID_DOCUMENT_DIRECTORY_CODE,
   INVALID_DOCUMENT_NAME_CODE,
   INVALID_DOCUMENT_REF_CODE,
   UserDocDirectoryId,
   UserDocError,
   UserDocId,
+  type BeginUserDocUpload,
+  type UserDocUploadChunk,
+  type UserDocUploadIdType,
+  type UserDocUploadSession,
   type UserDocErrorCode,
   type UserDocRef,
 } from '@deepseek-ai/dsh-userdoc'
@@ -30,8 +43,6 @@ import type {} from '@deepseek-ai/dsh-client-connection'
 
 /** Prefix owned by the document HTTP consumer below Connection's trusted route. */
 export const USERDOC_HTTP_PATH = '/api/documents'
-/** Non-simple request header required before an upload body is accepted. */
-export const USERDOC_UPLOAD_HEADER = 'x-dsh-document-upload'
 /** Versioned cross-scope snapshot-copy endpoint below the document subtree. */
 export const USERDOC_TRANSFER_PATH = `${USERDOC_HTTP_PATH}/transfer`
 /** Metadata-only transfer planning endpoint. */
@@ -50,6 +61,8 @@ export const USERDOC_TRANSFER_DIRECTORY_CREATE_PATH = `${USERDOC_TRANSFER_PATH}/
 export const USERDOC_CATALOG_OVERVIEW_PATH = `${USERDOC_HTTP_PATH}/overview`
 /** Current-scope audited metadata history endpoint. */
 export const USERDOC_CATALOG_HISTORY_PATH = `${USERDOC_HTTP_PATH}/history`
+/** Resumable upload-session creation route. */
+export const USERDOC_UPLOADS_PATH = `${USERDOC_HTTP_PATH}/uploads`
 
 export const name = 'host-userdoc-http'
 export const inject = ['connection', 'userDocs']
@@ -184,6 +197,8 @@ async function authorizeCatalogMutation(ctx: Context, action: 'delete' | 'move' 
 interface ErrorBody { error: { code: string; message: string } }
 
 const TRANSFER_BODY_LIMIT = 256 * 1024
+const UPLOAD_METADATA_BODY_LIMIT = 64 * 1024
+const RANGE_PATTERN = /^bytes ([0-9]+)-([0-9]+)\/([0-9]+)$/u
 
 function json(res: ServerResponse, status: number, value: unknown): void {
   res.writeHead(status, {
@@ -196,7 +211,15 @@ function json(res: ServerResponse, status: number, value: unknown): void {
 function errorStatus(code: UserDocErrorCode): number {
   if (code === DOCUMENT_NOT_FOUND_CODE) return 404
   if (code === DOCUMENT_DIRECTORY_NOT_FOUND_CODE) return 404
+  if (code === DOCUMENT_UPLOAD_NOT_FOUND_CODE) return 404
+  if (code === DOCUMENT_UPLOAD_EXPIRED_CODE) return 410
   if (code === DOCUMENT_TOO_LARGE_CODE) return 413
+  if (code === DOCUMENT_UPLOAD_RANGE_CODE) return 416
+  if (code === DOCUMENT_UPLOAD_HASH_CODE || code === DOCUMENT_UPLOAD_SIZE_CODE) return 422
+  if (code === DOCUMENT_UPLOAD_BUSY_CODE) return 429
+  if (code === DOCUMENT_UPLOAD_STORAGE_CODE) return 507
+  if (code === DOCUMENT_UPLOAD_PROTOCOL_CODE) return 426
+  if (code === DOCUMENT_UPLOAD_STATE_CODE) return 409
   if (code === DOCUMENT_TARGET_CONFLICT_CODE || code === DOCUMENT_NAME_EXHAUSTED_CODE
     || code === DOCUMENT_DIRECTORY_CONFLICT_CODE || code === DOCUMENT_DIRECTORY_NOT_EMPTY_CODE) return 409
   if (code === INVALID_DOCUMENT_NAME_CODE || code === INVALID_DOCUMENT_REF_CODE
@@ -235,6 +258,85 @@ function object(value: unknown): Record<string, unknown> | undefined {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     ? value as Record<string, unknown>
     : undefined
+}
+
+async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
+  const chunks: Buffer[] = []
+  let bytes = 0
+  try {
+    for await (const chunk of req) {
+      const value = typeof chunk === 'string' ? Buffer.from(chunk) : Buffer.from(chunk as Uint8Array)
+      bytes += value.byteLength
+      if (bytes > UPLOAD_METADATA_BODY_LIMIT) {
+        throw new UserDocError('Upload metadata is too large.', DOCUMENT_UPLOAD_SIZE_CODE)
+      }
+      chunks.push(value)
+    }
+  } catch (error) {
+    req.resume()
+    throw error
+  }
+  let decoded: unknown
+  try {
+    decoded = JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown
+  } catch {
+    throw new UserDocError('Upload metadata is not valid JSON.', DOCUMENT_UPLOAD_SIZE_CODE)
+  }
+  const value = object(decoded)
+  if (value === undefined) throw new UserDocError('Upload metadata is invalid.', DOCUMENT_UPLOAD_SIZE_CODE)
+  return value
+}
+
+function uploadIdFrom(value: string): UserDocUploadIdType {
+  let decoded: string
+  try { decoded = decodeURIComponent(value) } catch { throw new UserDocError('Upload identifier is invalid.', DOCUMENT_UPLOAD_NOT_FOUND_CODE) }
+  if (!/^[0-9a-f-]{36}$/u.test(decoded)) throw new UserDocError('Upload identifier is invalid.', DOCUMENT_UPLOAD_NOT_FOUND_CODE)
+  return decoded as UserDocUploadIdType
+}
+
+function parseUploadBegin(value: Record<string, unknown>): BeginUserDocUpload {
+  if (typeof value.name !== 'string' || value.name.length > 4096) {
+    throw new UserDocError('Upload name is invalid.', INVALID_DOCUMENT_NAME_CODE)
+  }
+  if (value.name === '') throw new UserDocError('Upload name is missing.', INVALID_DOCUMENT_NAME_CODE)
+  if (value.version !== 1 || typeof value.directory !== 'string' || value.directory.length > 4096
+    || !Number.isSafeInteger(value.bytes) || (value.bytes as number) < 0
+    || typeof value.fingerprint !== 'string' || value.fingerprint === '' || value.fingerprint.length > 512) {
+    throw new UserDocError('Upload metadata is invalid.', DOCUMENT_UPLOAD_SIZE_CODE)
+  }
+  return {
+    name: value.name,
+    directoryId: UserDocDirectoryId(value.directory),
+    bytes: value.bytes as number,
+    fingerprint: value.fingerprint,
+  }
+}
+
+function parseUploadRange(value: string | undefined): { start: number; end: number; total: number } {
+  const match = value === undefined ? null : RANGE_PATTERN.exec(value)
+  if (match === null) throw new UserDocError('Upload Content-Range is invalid.', DOCUMENT_UPLOAD_RANGE_CODE)
+  const start = Number(match[1])
+  const end = Number(match[2])
+  const total = Number(match[3])
+  if (![start, end, total].every(Number.isSafeInteger) || start < 0 || end < start || total < 0) {
+    throw new UserDocError('Upload Content-Range is invalid.', DOCUMENT_UPLOAD_RANGE_CODE)
+  }
+  return { start, end, total }
+}
+
+function parseUploadIndex(value: string | undefined): number {
+  if (value === undefined || !/^[0-9]+$/u.test(value)) throw new UserDocError('Upload chunk index is invalid.', DOCUMENT_UPLOAD_RANGE_CODE)
+  const index = Number(value)
+  if (!Number.isSafeInteger(index)) throw new UserDocError('Upload chunk index is invalid.', DOCUMENT_UPLOAD_RANGE_CODE)
+  return index
+}
+
+function singleHeader(value: string | string[] | undefined): string | undefined {
+  return typeof value === 'string' ? value : undefined
+}
+
+function uploadStatus(res: ServerResponse, session: UserDocUploadSession): void {
+  json(res, session.state === 'complete' ? 200 : session.state === 'verifying' ? 202 : 200, session)
 }
 
 function transferScope(value: unknown): Record<string, unknown> {
@@ -899,43 +1001,92 @@ function publicRef(ref: UserDocRef): UserDocRef {
   return { ...ref }
 }
 
-async function upload(ctx: Context, req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
+async function beginUpload(ctx: Context, req: IncomingMessage, res: ServerResponse): Promise<void> {
   authorizeDocumentAction(ctx, 'write')
-  if (req.headers[USERDOC_UPLOAD_HEADER] !== '1') {
-    json(res, 400, { error: { code: 'UPLOAD_HEADER_REQUIRED', message: `${USERDOC_UPLOAD_HEADER}: 1 is required.` } } satisfies ErrorBody)
-    return
-  }
-  const declared = req.headers['content-length']
-  if (declared !== undefined) {
-    const bytes = Number(declared)
-    if (!Number.isSafeInteger(bytes) || bytes < 0) {
-      json(res, 400, { error: { code: 'INVALID_CONTENT_LENGTH', message: 'Content-Length must be a non-negative integer.' } } satisfies ErrorBody)
-      return
-    }
-    if (ctx.userDocs.limits.maxFileBytes !== null && bytes > ctx.userDocs.limits.maxFileBytes) {
-      req.resume()
-      json(res, 413, { error: { code: DOCUMENT_TOO_LARGE_CODE, message: 'Document exceeds the configured byte limit.' } } satisfies ErrorBody)
-      return
-    }
-  }
-  const filename = url.searchParams.get('name')
-  if (filename === null) {
+  const input = parseUploadBegin(await readJsonBody(req))
+  uploadStatus(res, await ctx.userDocs.beginUpload(input))
+}
+
+async function inspectUpload(ctx: Context, res: ServerResponse, rawId: string): Promise<void> {
+  authorizeDocumentAction(ctx, 'write')
+  const session = await ctx.userDocs.inspectUpload(uploadIdFrom(rawId))
+  if (session.state === 'complete' && session.ref !== undefined) await syncCatalog(ctx, [session.ref], false, 'upload')
+  uploadStatus(res, session)
+}
+
+async function writeUploadChunk(
+  ctx: Context,
+  req: IncomingMessage,
+  res: ServerResponse,
+  rawId: string,
+  rawIndex: string,
+): Promise<void> {
+  authorizeDocumentAction(ctx, 'write')
+  const uploadId = uploadIdFrom(rawId)
+  const index = parseUploadIndex(rawIndex)
+  const session = await ctx.userDocs.inspectUpload(uploadId)
+  if (session.state !== 'uploading') {
     req.resume()
-    json(res, 400, { error: { code: INVALID_DOCUMENT_NAME_CODE, message: 'Missing name.' } } satisfies ErrorBody)
+    uploadStatus(res, session)
     return
+  }
+  const range = parseUploadRange(singleHeader(req.headers['content-range']))
+  const expectedLength = range.end - range.start + 1
+  const declared = singleHeader(req.headers['content-length'])
+  const contentLength = declared === undefined ? NaN : Number(declared)
+  if (!Number.isSafeInteger(contentLength) || contentLength !== expectedLength
+    || expectedLength > session.chunkBytes) {
+    req.resume()
+    throw new UserDocError('Upload chunk length is invalid.', DOCUMENT_UPLOAD_RANGE_CODE)
+  }
+  const sha256 = singleHeader(req.headers['x-dsh-chunk-sha256'])
+  if (typeof sha256 !== 'string') {
+    req.resume()
+    throw new UserDocError('Upload chunk hash is missing.', DOCUMENT_UPLOAD_HASH_CODE)
   }
   const abort = abortFor(req, res)
   try {
-    // IncomingMessage is consumed directly; no Connection/body-envelope buffer exists on this path.
-    const target = await ctx.userDocs.resolveTarget({ name: filename, directoryId: directoryQuery(url) })
-    const body = Readable.toWeb(req) as ReadableStream<Uint8Array>
-    const ref = await ctx.userDocs.save(target, body, abort.signal)
-    await syncCatalog(ctx, [ref], false, 'upload')
-    json(res, 201, publicRef(ref))
+    const updated = await ctx.userDocs.writeUploadChunk(uploadId, {
+      index,
+      start: range.start,
+      end: range.end,
+      total: range.total,
+      sha256: sha256.toLowerCase(),
+      body: Readable.toWeb(req) as ReadableStream<Uint8Array>,
+    } satisfies UserDocUploadChunk, abort.signal)
+    if (!abort.signal.aborted) uploadStatus(res, updated)
   } catch (error) {
     req.resume()
     if (!res.writableEnded && !abort.signal.aborted) failure(res, error)
   }
+}
+
+async function completeUpload(ctx: Context, req: IncomingMessage, res: ServerResponse, rawId: string): Promise<void> {
+  authorizeDocumentAction(ctx, 'write')
+  const value = await readJsonBody(req)
+  if (value.version !== 1 || typeof value.sha256 !== 'string') {
+    throw new UserDocError('Final upload metadata is invalid.', DOCUMENT_UPLOAD_HASH_CODE)
+  }
+  const session = await ctx.userDocs.completeUpload(uploadIdFrom(rawId), value.sha256.toLowerCase())
+  if (session.state === 'complete' && session.ref !== undefined) await syncCatalog(ctx, [session.ref], false, 'upload')
+  uploadStatus(res, session)
+}
+
+async function cancelUpload(ctx: Context, res: ServerResponse, rawId: string): Promise<void> {
+  authorizeDocumentAction(ctx, 'write')
+  await ctx.userDocs.cancelUpload(uploadIdFrom(rawId))
+  res.writeHead(204, { 'cache-control': 'no-store' })
+  res.end()
+}
+
+function removedOneShotUpload(req: IncomingMessage, res: ServerResponse): void {
+  req.resume()
+  json(res, 426, {
+    error: {
+      code: DOCUMENT_UPLOAD_PROTOCOL_CODE,
+      message: 'Use the resumable document upload protocol.',
+    },
+  } satisfies ErrorBody)
 }
 
 async function createFolder(ctx: Context, res: ServerResponse, url: URL): Promise<void> {
@@ -1012,6 +1163,29 @@ async function download(ctx: Context, req: IncomingMessage, res: ServerResponse,
 export async function handleUserDocHttp(ctx: Context, req: IncomingMessage, res: ServerResponse): Promise<void> {
   const url = query(req)
   try {
+    if (url.pathname === USERDOC_UPLOADS_PATH && req.method === 'POST') {
+      await beginUpload(ctx, req, res)
+      return
+    }
+    const uploadChunk = new RegExp(`^${USERDOC_UPLOADS_PATH}/([^/]+)/chunks/([^/]+)$`, 'u').exec(url.pathname)
+    if (uploadChunk !== null && req.method === 'PUT') {
+      await writeUploadChunk(ctx, req, res, uploadChunk[1] ?? '', uploadChunk[2] ?? '')
+      return
+    }
+    const uploadComplete = new RegExp(`^${USERDOC_UPLOADS_PATH}/([^/]+)/complete$`, 'u').exec(url.pathname)
+    if (uploadComplete !== null && req.method === 'POST') {
+      await completeUpload(ctx, req, res, uploadComplete[1] ?? '')
+      return
+    }
+    const uploadSession = new RegExp(`^${USERDOC_UPLOADS_PATH}/([^/]+)$`, 'u').exec(url.pathname)
+    if (uploadSession !== null && req.method === 'GET') {
+      await inspectUpload(ctx, res, uploadSession[1] ?? '')
+      return
+    }
+    if (uploadSession !== null && req.method === 'DELETE') {
+      await cancelUpload(ctx, res, uploadSession[1] ?? '')
+      return
+    }
     if (url.pathname === USERDOC_HTTP_PATH && req.method === 'GET') {
       authorizeDocumentAction(ctx, 'read')
       const abort = abortFor(req, res)
@@ -1085,7 +1259,8 @@ export async function handleUserDocHttp(ctx: Context, req: IncomingMessage, res:
       return
     }
     if (url.pathname === USERDOC_HTTP_PATH && req.method === 'POST') {
-      await upload(ctx, req, res, url)
+      authorizeDocumentAction(ctx, 'write')
+      removedOneShotUpload(req, res)
       return
     }
     if (url.pathname === `${USERDOC_HTTP_PATH}/content` && (req.method === 'GET' || req.method === 'HEAD')) {

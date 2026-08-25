@@ -1,6 +1,6 @@
 /** Gateway broker for copying document snapshots between authorized personal and project scopes. */
 
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import type { IncomingMessage } from 'node:http'
 import { basename } from 'node:path'
 import type { UserRow } from './auth.ts'
@@ -19,7 +19,6 @@ import type { PostgresDocumentCatalogService } from './postgres/document-catalog
 
 const MAX_TRANSFER_FILES = 50
 const MAX_DOCUMENT_ID_BYTES = 4096
-const DOCUMENT_UPLOAD_HEADER = 'x-dsh-document-upload'
 const TRANSFER_PLAN_TTL_MS = 300_000
 
 interface TransferPlanRecord {
@@ -357,6 +356,143 @@ function targetRef(value: unknown): DocumentTransferTargetRef {
   }
 }
 
+async function uploadSnapshotToRuntime(
+  targetRuntime: RuntimeHandle,
+  targetAssertion: string,
+  source: Response,
+  name: string,
+  directory: string,
+  bytes: number,
+  fingerprint: string,
+  signal: AbortSignal,
+): Promise<DocumentTransferTargetRef> {
+  if (source.body === null || !Number.isSafeInteger(bytes) || bytes < 0) {
+    throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The source runtime did not provide a usable document body.')
+  }
+  const base = `http://127.0.0.1:${String(targetRuntime.port)}/api/documents/uploads`
+  const authHeaders = headersFor(targetRuntime, targetAssertion)
+  authHeaders.set('content-type', 'application/json')
+  const started = await fetch(base, {
+    method: 'POST',
+    headers: authHeaders,
+    body: JSON.stringify({ version: 1, name, directory, bytes, fingerprint }),
+    signal,
+  })
+  const startedBody = await responseJson(started)
+  if (!started.ok) {
+    const error = responseError(startedBody)
+    throw new DocumentTransferError(error.code, started.status, error.message)
+  }
+  const startedValue = record(startedBody)
+  if (typeof startedValue?.uploadId !== 'string' || !/^[0-9a-f-]{36}$/u.test(startedValue.uploadId)
+    || typeof startedValue.chunkBytes !== 'number'
+    || !Number.isSafeInteger(startedValue.chunkBytes) || startedValue.chunkBytes <= 0
+    || typeof startedValue.receivedBytes !== 'number' || !Number.isSafeInteger(startedValue.receivedBytes)
+    || startedValue.receivedBytes < 0 || startedValue.receivedBytes > bytes
+    || (startedValue.state !== 'uploading' && startedValue.state !== 'verifying'
+      && startedValue.state !== 'complete' && startedValue.state !== 'failed')) {
+    throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The target runtime returned invalid upload session metadata.')
+  }
+  const uploadId = startedValue.uploadId
+  if (startedValue.state === 'failed') {
+    throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The target runtime rejected the upload session.')
+  }
+  if (startedValue.state === 'complete') {
+    await source.body.cancel()
+    const completed = targetRef(startedValue.ref)
+    if (completed.bytes !== bytes) {
+      throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The target runtime returned an unexpected document size.')
+    }
+    return completed
+  }
+  const reader = source.body.getReader()
+  const finalHash = createHash('sha256')
+  let pending = Buffer.alloc(0)
+  let done = false
+  let offset = 0
+  let index = 0
+  try {
+    while (offset < bytes) {
+      while (!done && pending.byteLength < startedValue.chunkBytes) {
+        const next = await reader.read()
+        if (next.done) { done = true; break }
+        pending = Buffer.concat([pending, Buffer.from(next.value)])
+      }
+      if (pending.byteLength === 0) break
+      const chunk = pending.subarray(0, Math.min(startedValue.chunkBytes, pending.byteLength))
+      pending = pending.subarray(chunk.byteLength)
+      finalHash.update(chunk)
+      const chunkHash = createHash('sha256').update(chunk).digest('hex')
+      if (offset >= startedValue.receivedBytes) {
+        const headers = headersFor(targetRuntime, targetAssertion)
+        headers.set('content-range', `bytes ${String(offset)}-${String(offset + chunk.byteLength - 1)}/${String(bytes)}`)
+        headers.set('content-length', String(chunk.byteLength))
+        headers.set('x-dsh-chunk-sha256', chunkHash)
+        const response = await fetch(`${base}/${encodeURIComponent(uploadId)}/chunks/${String(index)}`, {
+          method: 'PUT', headers, body: chunk, signal, duplex: 'half',
+        } as RequestInit & { duplex: 'half' })
+        const body = await responseJson(response)
+        if (!response.ok) {
+          const error = responseError(body)
+          throw new DocumentTransferError(error.code, response.status, error.message)
+        }
+        const chunkState = record(body)
+        if (typeof chunkState?.receivedBytes !== 'number' || !Number.isSafeInteger(chunkState.receivedBytes)
+          || chunkState.receivedBytes < offset + chunk.byteLength
+          || (chunkState.state !== undefined && chunkState.state !== 'uploading'
+            && chunkState.state !== 'verifying' && chunkState.state !== 'complete')) {
+          throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The target runtime returned invalid chunk progress.')
+        }
+      }
+      offset += chunk.byteLength
+      index += 1
+    }
+    if (offset !== bytes || pending.byteLength !== 0) {
+      throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The source document byte count changed during transfer.')
+    }
+    const completeHeaders = headersFor(targetRuntime, targetAssertion)
+    completeHeaders.set('content-type', 'application/json')
+    let currentResponse = await fetch(`${base}/${encodeURIComponent(uploadId)}/complete`, {
+      method: 'POST', headers: completeHeaders,
+      body: JSON.stringify({ version: 1, sha256: finalHash.digest('hex') }), signal,
+    })
+    let currentBody = await responseJson(currentResponse)
+    if (!currentResponse.ok) {
+      const error = responseError(currentBody)
+      throw new DocumentTransferError(error.code, currentResponse.status, error.message)
+    }
+    for (;;) {
+      const value = record(currentBody)
+      if (value?.state !== 'verifying') break
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(resolve, 100)
+        const abort = (): void => { clearTimeout(timer); signal.removeEventListener('abort', abort); reject(signal.reason) }
+        signal.addEventListener('abort', abort, { once: true })
+      })
+      currentResponse = await fetch(`${base}/${encodeURIComponent(uploadId)}`, { headers: headersFor(targetRuntime, targetAssertion), signal })
+      currentBody = await responseJson(currentResponse)
+      if (!currentResponse.ok) {
+        const error = responseError(currentBody)
+        throw new DocumentTransferError(error.code, currentResponse.status, error.message)
+      }
+    }
+    const finalValue = record(currentBody)
+    if (finalValue?.state !== 'complete') {
+      const error = responseError({ error: finalValue?.error })
+      throw new DocumentTransferError(error.code, 502, error.message)
+    }
+    return targetRef(finalValue.ref)
+  } catch (error) {
+    await reader.cancel(error).catch(() => {})
+    await fetch(`${base}/${encodeURIComponent(uploadId)}`, {
+      method: 'DELETE', headers: headersFor(targetRuntime, targetAssertion), signal: undefined,
+    }).catch(() => {})
+    throw error
+  } finally {
+    reader.releaseLock()
+  }
+}
+
 function syntheticUser(principal: GatewayPrincipalClaims): UserRow {
   return {
     id: principal.user.id,
@@ -559,43 +695,19 @@ function createSingleDocumentTransferHandler(
         const mediaType = (sourceResponse.headers.get('content-type') ?? 'application/octet-stream').split(';', 1)[0] ?? 'application/octet-stream'
         const lengthHeader = sourceResponse.headers.get('content-length')
         const declaredBytes = lengthHeader === null ? undefined : Number(lengthHeader)
-        const targetUrl = `http://127.0.0.1:${String(targetRuntime.port)}/api/documents?name=${encodeURIComponent(name)}&directory=${encodeURIComponent(input.directory ?? '')}`
-        let targetResponse: Response
-        try {
-          targetResponse = await fetch(targetUrl, {
-            method: 'POST',
-            headers: new Headers({
-              ...Object.fromEntries(headersFor(targetRuntime, targetAssertion).entries()),
-              [DOCUMENT_UPLOAD_HEADER]: '1',
-              'content-type': mediaType,
-            }),
-            body: sourceResponse.body,
-            signal,
-            duplex: 'half',
-          } as RequestInit & { duplex: 'half' })
-        } catch (error) {
-          await sourceResponse.body.cancel().catch(() => {})
-          throw error
+        if (declaredBytes === undefined || !Number.isSafeInteger(declaredBytes) || declaredBytes < 0) {
+          throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The source runtime did not provide a stable document size.')
         }
-        const targetBody = await responseJson(targetResponse)
-        if (!targetResponse.ok) {
-          const error = responseError(targetBody)
-          items.push({ status: 'failed', source: { name }, error })
-          await deps.catalog?.recordCopy({
-            actorUserId: principal.user.id,
-            source: input.source.kind === 'personal' ? { kind: 'personal', userId: principal.user.id } : { kind: 'project', projectId: input.source.projectId },
-            targetScope: input.target.kind === 'personal' ? { kind: 'personal', userId: principal.user.id } : { kind: 'project', projectId: input.target.projectId },
-            sourceDocId: document.docId,
-            sourceName: name,
-            error,
-            operationId: transferId,
-          }).catch(() => {})
-          await audit(deps, principal, transferId, sourceIdentity, targetIdentity, {
-            docId: document.docId, name, status: 'failed', code: error.code,
-          })
-          continue
-        }
-        const ref = targetRef(targetBody)
+        const ref = await uploadSnapshotToRuntime(
+          targetRuntime,
+          targetAssertion,
+          sourceResponse,
+          name,
+          input.directory ?? '',
+          declaredBytes,
+          createHash('sha256').update(`${transferId}\u0000${document.docId}`).digest('hex'),
+          signal,
+        )
         const bytes = declaredBytes !== undefined && Number.isSafeInteger(declaredBytes) && declaredBytes >= 0
           ? declaredBytes
           : ref.bytes

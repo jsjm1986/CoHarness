@@ -3086,10 +3086,20 @@ export interface Config {
   maxMessageBytes?: number
   /** Maximum bytes of a document inlined into a prompt as text. */
   maxInlineTextBytes?: number
+  /** Maximum bytes accepted by one resumable upload request. */
+  uploadChunkBytes?: number
+  /** Retention period for incomplete resumable uploads. */
+  uploadSessionTtlMs?: number
+  /** Minimum free bytes retained on the document filesystem. */
+  uploadMinFreeBytes?: number
+  /** Maximum concurrent resumable upload sessions. */
+  uploadMaxConcurrent?: number
+  /** Interval between expired-session cleanup sweeps. */
+  uploadCleanupIntervalMs?: number
 }
 ```
 
-Source: [`packages/attachment/userdoc-local/src/index.ts:80`](../packages/attachment/userdoc-local/src/index.ts)
+Source: [`packages/attachment/userdoc-local/src/index.ts:102`](../packages/attachment/userdoc-local/src/index.ts)
 
 <a id="deepseek-aidsh-web"></a>
 
@@ -3393,6 +3403,7 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 - `@deepseek-ai/dsh-client-test-runtime` ([`packages/test-support/client-runtime/src/index.ts`](../packages/test-support/client-runtime/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-primitives` ([`packages/client/ui-primitives/src/index.ts`](../packages/client/ui-primitives/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-slots` ([`packages/client/ui-slots/src/index.ts`](../packages/client/ui-slots/src/index.ts))
+- `@deepseek-ai/dsh-client-userdoc-upload` ([`packages/client/userdoc-upload/src/index.ts`](../packages/client/userdoc-upload/src/index.ts))
 - `@deepseek-ai/dsh-client-web` ([`packages/client/web/src/index.ts`](../packages/client/web/src/index.ts))
 - `@deepseek-ai/dsh-cmdline` ([`packages/boot/cmdline/src/index.ts`](../packages/boot/cmdline/src/index.ts))
 - `@deepseek-ai/dsh-code-runtime-python` ([`packages/code-runtime/code-runtime-python/src/index.ts`](../packages/code-runtime/code-runtime-python/src/index.ts))

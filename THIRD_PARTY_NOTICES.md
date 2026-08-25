@@ -42,6 +42,7 @@ External packages that a workspace package resolves at runtime. The tier covers 
 | [`@joplin/turndown-plugin-gfm`](https://github.com/laurent22/joplin-turndown-plugin-gfm) | MIT |
 | [`@jridgewell/gen-mapping`](https://github.com/jridgewell/sourcemaps) | MIT |
 | [`@modelcontextprotocol/sdk`](https://github.com/modelcontextprotocol/typescript-sdk) | MIT |
+| [`@noble/hashes`](https://github.com/paulmillr/noble-hashes) | MIT |
 | [`@openai/codex`](https://github.com/openai/codex) | Apache-2.0 |
 | [`@opentelemetry/api`](https://github.com/open-telemetry/opentelemetry-js) | Apache-2.0 |
 | [`@opentelemetry/api-logs`](https://github.com/open-telemetry/opentelemetry-js) | Apache-2.0 |

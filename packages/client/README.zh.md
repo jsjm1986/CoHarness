@@ -11,6 +11,7 @@ dsh web GUI 的浏览器侧：shell 启动、浏览器与宿主通信、共享 U
 | [`modules/`](modules/README.zh.md) | 加载浏览器侧客户端模块。 |
 | [`connection/`](connection/README.zh.md) | 维护浏览器与宿主之间的 RPC 通信和事件传递。 |
 | [`runtime/`](runtime/README.zh.md) | 为会话、工作区和 UI 组合提供共享客户端服务。 |
+| [`userdoc-upload/`](userdoc-upload/README.zh.md) | 提供文档界面共用的浏览器可续传上传器。 |
 | [`hmr/`](hmr/README.zh.md) | 在开发期间刷新客户端插件。 |
 | [`locale/`](locale/README.zh.md) | 提供本地化偏好与消息词典。 |
 | [`test-runtime/`](../test-support/client-runtime/README.zh.md) | 为客户端功能包提供共享的仓库测试支持。 |

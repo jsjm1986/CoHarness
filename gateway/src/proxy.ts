@@ -33,6 +33,12 @@ function publicLocation(value: string): string {
   return `${target.pathname}${target.search}${target.hash}` || '/'
 }
 
+/** Keep high-volume resumable data-plane requests out of one-row-per-request audit logs. */
+function isDocumentUploadDataPath(method: string | undefined, pathname: string): boolean {
+  return /^\/api\/documents\/uploads\/[^/]+\/chunks\/[0-9]+$/u.test(pathname)
+    || (method === 'GET' && /^\/api\/documents\/uploads\/[^/]+$/u.test(pathname))
+}
+
 export function createProxyHandlers(
   deps: GatewayDeps,
   principalSigner?: GatewayPrincipalSigner,
@@ -125,7 +131,7 @@ export function createProxyHandlers(
       runtime: { kind: ready.target.kind, id: ready.target.id, generation: ready.generation },
     })
     const pathname = new URL(req.url ?? '/', 'http://x').pathname
-    if (pathname.startsWith('/api/')) {
+    if (pathname.startsWith('/api/') && !isDocumentUploadDataPath(req.method, pathname)) {
       res.once('finish', () => {
         void Promise.resolve(audit.write({
           userId: context.user.id,

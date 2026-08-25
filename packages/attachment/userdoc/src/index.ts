@@ -3,16 +3,19 @@
 import { Context, Service } from '@deepseek-ai/cordis'
 import type {
   ResolveUserDocTarget,
+  BeginUserDocUpload,
   StoredUserDoc,
   UserDocDirectoryListing,
   UserDocDirectoryRef,
   UserDocLimits,
   UserDocRef,
   UserDocTarget,
+  UserDocUploadChunk,
+  UserDocUploadSession,
 } from './types.ts'
-import type { UserDocDirectoryId, UserDocId } from './brand.ts'
+import type { UserDocDirectoryId, UserDocId, UserDocUploadId } from './brand.ts'
 
-export { UserDocDirectoryId, UserDocId } from './brand.ts'
+export { UserDocDirectoryId, UserDocId, UserDocUploadId } from './brand.ts'
 export {
   DOCUMENT_DELETE_FAILED_CODE,
   DOCUMENT_DIRECTORY_CONFLICT_CODE,
@@ -26,6 +29,15 @@ export {
   DOCUMENT_READ_FAILED_CODE,
   DOCUMENT_TARGET_CONFLICT_CODE,
   DOCUMENT_STORE_UNAVAILABLE_CODE,
+  DOCUMENT_UPLOAD_BUSY_CODE,
+  DOCUMENT_UPLOAD_EXPIRED_CODE,
+  DOCUMENT_UPLOAD_HASH_CODE,
+  DOCUMENT_UPLOAD_NOT_FOUND_CODE,
+  DOCUMENT_UPLOAD_PROTOCOL_CODE,
+  DOCUMENT_UPLOAD_RANGE_CODE,
+  DOCUMENT_UPLOAD_SIZE_CODE,
+  DOCUMENT_UPLOAD_STATE_CODE,
+  DOCUMENT_UPLOAD_STORAGE_CODE,
   DOCUMENTS_TOO_LARGE_CODE,
   DOCUMENT_TOO_LARGE_CODE,
   DOCUMENT_WRITE_FAILED_CODE,
@@ -38,6 +50,7 @@ export {
 export type { UserDocErrorCode } from './error.ts'
 export type {
   ResolveUserDocTarget,
+  BeginUserDocUpload,
   StoredUserDoc,
   UserDocDirectoryId as UserDocDirectoryIdType,
   UserDocDirectoryListing,
@@ -66,6 +79,11 @@ export type {
   UserDocTransferScopeSummary,
   UserDocTransferSelection,
   UserDocTransferTargetRef,
+  UserDocUploadCapabilities,
+  UserDocUploadChunk,
+  UserDocUploadId as UserDocUploadIdType,
+  UserDocUploadSession,
+  UserDocUploadState,
 } from './types.ts'
 
 declare module '@deepseek-ai/cordis' {
@@ -127,6 +145,55 @@ export abstract class UserDocStore extends Service {
     body: ReadableStream<Uint8Array>,
     signal?: AbortSignal,
   ): Promise<UserDocRef>
+
+  /**
+   * Create or reuse a resumable upload session.
+   * @param input - untrusted browser metadata validated by the provider.
+   * @returns the public upload session state.
+   */
+  abstract beginUpload(input: BeginUserDocUpload): Promise<UserDocUploadSession>
+
+  /**
+   * Read one upload session's public state.
+   * @param uploadId - opaque provider-produced identifier.
+   * @param signal - optional cancellation.
+   * @returns current upload state.
+   */
+  abstract inspectUpload(uploadId: UserDocUploadId, signal?: AbortSignal): Promise<UserDocUploadSession>
+
+  /**
+   * Append one sequential chunk to an upload session.
+   * @param uploadId - opaque provider-produced identifier.
+   * @param chunk - validated range, digest, and raw body.
+   * @param signal - optional cancellation.
+   * @returns updated public upload state.
+   */
+  abstract writeUploadChunk(
+    uploadId: UserDocUploadId,
+    chunk: UserDocUploadChunk,
+    signal?: AbortSignal,
+  ): Promise<UserDocUploadSession>
+
+  /**
+   * Start or repeat final verification and publication.
+   * @param uploadId - opaque provider-produced identifier.
+   * @param sha256 - final SHA-256 digest supplied by the browser.
+   * @param signal - optional cancellation.
+   * @returns verifying, complete, or failed public state.
+   */
+  abstract completeUpload(
+    uploadId: UserDocUploadId,
+    sha256: string,
+    signal?: AbortSignal,
+  ): Promise<UserDocUploadSession>
+
+  /**
+   * Cancel and remove one incomplete upload session.
+   * @param uploadId - opaque provider-produced identifier.
+   * @param signal - optional cancellation.
+   * @returns after temporary data is removed.
+   */
+  abstract cancelUpload(uploadId: UserDocUploadId, signal?: AbortSignal): Promise<void>
 
   /**
    * List every stored document, newest modification first.

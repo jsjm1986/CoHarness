@@ -83,6 +83,33 @@ export const DOCUMENT_MOVE_FAILED_CODE = 'DOCUMENT_MOVE_FAILED'
 /** The legacy upload directory could not be migrated into the document root. */
 export const DOCUMENT_MIGRATION_FAILED_CODE = 'DOCUMENT_MIGRATION_FAILED'
 
+/** A resumable upload session does not exist for the current scope. */
+export const DOCUMENT_UPLOAD_NOT_FOUND_CODE = 'DOCUMENT_UPLOAD_NOT_FOUND'
+
+/** A resumable upload session passed its retention deadline. */
+export const DOCUMENT_UPLOAD_EXPIRED_CODE = 'DOCUMENT_UPLOAD_EXPIRED'
+
+/** A resumable upload chunk range is invalid or out of order. */
+export const DOCUMENT_UPLOAD_RANGE_CODE = 'DOCUMENT_UPLOAD_RANGE'
+
+/** A resumable upload chunk or final digest does not match its bytes. */
+export const DOCUMENT_UPLOAD_HASH_CODE = 'DOCUMENT_UPLOAD_HASH'
+
+/** A resumable upload cannot proceed because its declared size is invalid. */
+export const DOCUMENT_UPLOAD_SIZE_CODE = 'DOCUMENT_UPLOAD_SIZE'
+
+/** A resumable upload cannot proceed while another finalization is active. */
+export const DOCUMENT_UPLOAD_STATE_CODE = 'DOCUMENT_UPLOAD_STATE'
+
+/** The runtime cannot reserve enough storage for a resumable upload. */
+export const DOCUMENT_UPLOAD_STORAGE_CODE = 'DOCUMENT_UPLOAD_STORAGE'
+
+/** The runtime has reached its configured concurrent upload guard. */
+export const DOCUMENT_UPLOAD_BUSY_CODE = 'DOCUMENT_UPLOAD_BUSY'
+
+/** A caller still uses the removed one-request upload protocol. */
+export const DOCUMENT_UPLOAD_PROTOCOL_CODE = 'DOCUMENT_UPLOAD_PROTOCOL'
+
 /** Closed set of stable user-document failure codes. */
 export type UserDocErrorCode =
   | typeof INVALID_DOCUMENT_NAME_CODE
@@ -104,3 +131,12 @@ export type UserDocErrorCode =
   | typeof DOCUMENT_DIRECTORY_WRITE_FAILED_CODE
   | typeof DOCUMENT_MOVE_FAILED_CODE
   | typeof DOCUMENT_MIGRATION_FAILED_CODE
+  | typeof DOCUMENT_UPLOAD_NOT_FOUND_CODE
+  | typeof DOCUMENT_UPLOAD_EXPIRED_CODE
+  | typeof DOCUMENT_UPLOAD_RANGE_CODE
+  | typeof DOCUMENT_UPLOAD_HASH_CODE
+  | typeof DOCUMENT_UPLOAD_SIZE_CODE
+  | typeof DOCUMENT_UPLOAD_STATE_CODE
+  | typeof DOCUMENT_UPLOAD_STORAGE_CODE
+  | typeof DOCUMENT_UPLOAD_BUSY_CODE
+  | typeof DOCUMENT_UPLOAD_PROTOCOL_CODE

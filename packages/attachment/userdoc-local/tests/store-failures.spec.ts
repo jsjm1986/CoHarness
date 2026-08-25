@@ -60,6 +60,7 @@ const LIMITS = {
   maxFilesPerMessage: 4,
   maxMessageBytes: 4096,
   maxInlineTextBytes: 256,
+  upload: { protocol: 'resumable-v1' as const, chunkBytes: 65536, sessionTtlMs: 86400000, resumable: true as const },
 }
 
 function streamOf(text: string): ReadableStream<Uint8Array> {
