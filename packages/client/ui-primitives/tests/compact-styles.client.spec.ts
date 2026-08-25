@@ -41,6 +41,7 @@ describe('primitive compact chrome', () => {
     expect(menu).toContain('!important')
     expect(backdrop).toContain('@media (max-width: 767px)')
     expect(backdrop).toContain('z-index: 1090')
+    expect(backdrop).toContain('animation: none')
   })
 
   it('keeps modal sheets scrollable, elevated, and animated consistently', () => {

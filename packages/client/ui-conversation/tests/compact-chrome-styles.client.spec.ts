@@ -64,7 +64,7 @@ describe('conversation compact chrome', () => {
   })
 
   it('raises a trajectory details takeover above the absolute composer seat', () => {
-    expect(root).toContain('[data-trajectory-details]')
+    expect(root).toContain('[data-trajectory-details-open]')
     expect(root).toContain('z-index: 8')
     expect(root).toContain("[data-slot='conversation.session']")
   })

@@ -2278,7 +2278,12 @@ export function TrajectoryTable({
   const historyRowOffset = hasOlderRecords ? 1 : 0
 
   return (
-    <div ref={rootRef} className={css.split} style={splitStyle}>
+    <div
+      ref={rootRef}
+      className={css.split}
+      style={splitStyle}
+      data-trajectory-details-open={detailsOpen || undefined}
+    >
       <div
         ref={tablePaneRef}
         className={css.tablePane}
@@ -2730,7 +2735,7 @@ export function TrajectoryTable({
               }}
             />
             <div className={css.detailsHeader}>
-              <div className={css.detailsTitle}>
+              <div className={css.detailsTitle} data-trajectory-details-title="">
                 {selectedRequest !== null
                   ? (
                     <>
@@ -2748,7 +2753,7 @@ export function TrajectoryTable({
                   : promptSelected
                     ? (
                       <>
-                        <span className={`${css.kindTag} ${css.systemNeutral}`}>SYSTEM</span>
+                        <span className={`${css.kindTag} ${css.systemNeutral}`} data-trajectory-details-kind="">SYSTEM</span>
                         <span className={css.detailsLocation}>{selected?.cell.text}</span>
                       </>
                     )
@@ -2766,7 +2771,7 @@ export function TrajectoryTable({
                                   : selected.cell.kind === 'subtool'
                                     ? css.subtoolAmber
                                     : css[selected.cell.kind]
-                        }`}
+                        }`} data-trajectory-details-kind=""
                         >
                           {KIND_LABEL[selected.cell.kind]}
                         </span>

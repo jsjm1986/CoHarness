@@ -41,7 +41,9 @@ describe('trajectory compact chrome', () => {
     expect(table).toContain('@media (max-width: 767px)')
     expect(table).toContain('width: 100%')
     expect(table).toContain('white-space: normal')
-    expect(views).toContain('[data-trajectory-details]')
+    expect(table).toContain('.table .kindTag')
+    expect(table).toContain('.detailsTitle .kindTag')
+    expect(views).toContain('[data-trajectory-details-open]')
     expect(views).toContain('z-index: 8')
   })
 

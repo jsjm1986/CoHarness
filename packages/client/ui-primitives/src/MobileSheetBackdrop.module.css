@@ -13,7 +13,9 @@
     display: block;
     background: var(--dsw-alias-bg-mask-1);
     backdrop-filter: var(--dsw-mask-blur);
-    animation: mobile-sheet-mask-in var(--ds-transition-duration) var(--ds-ease-in-out);
+    /* Paint the mask on the first frame. A fade-in briefly reveals the fixed
+       composer beneath every compact sheet on slower mobile WebViews. */
+    animation: none;
   }
 }
 

@@ -326,7 +326,7 @@
    trajectory list keeps the composer above it and therefore preserves the
    send/queue controls. */
 @media (max-width: 767px) {
-  .scrollBody:has([data-conversation-composer-overlay]):has([data-trajectory-details])
+.scrollBody:has([data-conversation-composer-overlay]):has([data-trajectory-details-open])
     > :global([data-slot='conversation.session']) {
     position: relative;
     z-index: 8;

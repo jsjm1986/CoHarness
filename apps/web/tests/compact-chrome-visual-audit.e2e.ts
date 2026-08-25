@@ -302,6 +302,53 @@ describe('visual audit: compact product chrome', () => {
           else await page.keyboard.press('Escape')
         }
 
+        // Assistant request details use the same kind badge as ledger rows.
+        // Keep this header in the audit because the compact row rail must not
+        // shrink the semantic label inside the reading sheet. The first paint
+        // also has to mask the composer before the sheet's entrance motion
+        // settles; otherwise a slow mobile WebView briefly exposes two layers.
+        const assistantEvent = page.locator('[data-trajectory-feed] [data-kind="message"], tr[data-kind="message"]').last()
+        if (await assistantEvent.count() > 0) {
+          await assistantEvent.click()
+          const assistantDetails = page.locator('[data-trajectory-details]').first()
+          await assistantDetails.waitFor({ timeout: 10_000 })
+          const immediateLayer = await page.evaluate(() => {
+            const card = document.querySelector<HTMLElement>('[data-composer-card]')
+            const sheet = document.querySelector<HTMLElement>('[data-trajectory-details]')
+            if (card === null || sheet === null) return null
+            const box = card.getBoundingClientRect()
+            const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
+            return hit?.closest('[data-trajectory-details]') !== null
+          })
+          if (phone.width < 768) expect(immediateLayer, `${prefix}: details mask must cover composer on first paint`).toBe(true)
+          await page.waitForFunction(() => {
+            const sheet = document.querySelector<HTMLElement>('[data-trajectory-details]')
+            if (sheet === null) return false
+            const transform = getComputedStyle(sheet).transform
+            return transform === 'none' || transform === 'matrix(1, 0, 0, 1, 0, 0)'
+          }, undefined, { timeout: 5_000 })
+          const kind = assistantDetails.locator('[data-trajectory-details-kind]')
+          const kindBox = await kind.boundingBox()
+          if (kindBox === null) throw new Error(`${prefix}: assistant details kind has no geometry`)
+          expect(kindBox.x, `${prefix}: assistant details kind starts inside the viewport`).toBeGreaterThanOrEqual(0)
+          expect(kindBox.x + kindBox.width, `${prefix}: assistant details kind stays inside the viewport`).toBeLessThanOrEqual(phone.width + 1)
+          expect(await kind.textContent()).toBe('ASSISTANT')
+          const layer = await page.evaluate(() => {
+            const card = document.querySelector<HTMLElement>('[data-composer-card]')
+            const sheet = document.querySelector<HTMLElement>('[data-trajectory-details]')
+            if (card === null || sheet === null) return null
+            const box = card.getBoundingClientRect()
+            const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
+            return hit?.closest('[data-trajectory-details]') !== null
+          })
+          if (phone.width < 768) expect(layer, `${prefix}: details sheet must cover composer`).toBe(true)
+          await shot(page, `${prefix}-09-assistant-details`)
+          findings[`${prefix}.assistantDetails`] = await dumpOverflow(page)
+          const closeAssistantDetails = assistantDetails.getByRole('button', { name: /Close details|关闭详情/ })
+          if (await closeAssistantDetails.count() > 0) await closeAssistantDetails.click()
+          else await page.keyboard.press('Escape')
+        }
+
         await openDrawer(page)
         await shot(page, `${prefix}-10-drawer`)
         findings[`${prefix}.drawer`] = await dumpOverflow(page)
