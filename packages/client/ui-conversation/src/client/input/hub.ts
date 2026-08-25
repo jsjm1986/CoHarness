@@ -140,6 +140,25 @@ export class InputHub implements SessionInputResolver {
   }
 
   /**
+   * Discard one session's unsent browser-owned input and release its resources.
+   * This apply-layer operation is used only after an explicit navigation
+   * confirmation; it never crosses the public SessionInput face or the durable
+   * session log.
+   * @param id - session whose draft is being discarded.
+   */
+  discardDraft(id: SessionId): void {
+    const shell = this.shells.get(id)
+    if (shell === undefined) return
+    const snapshot = shell.snapshot
+    const conversation = this.conversation()
+    for (const imageId of snapshot.imageIds) conversation.releaseDraftImage(imageId)
+    conversation.releaseDraftDocuments(id, snapshot.documentIds)
+    shell.setDraft('')
+    shell.pruneImages([])
+    shell.pruneDocuments([])
+  }
+
+  /**
    * The InputBar-exclusive keyboard command face: the shell
    * satisfies it structurally; package-internal — handed through the
    * composer-bar entry's inject, never across a plugin boundary.

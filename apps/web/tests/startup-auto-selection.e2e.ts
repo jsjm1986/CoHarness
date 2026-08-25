@@ -1,8 +1,9 @@
 // Web e2e scenario: startup auto-selection keeps the hero on screen.
 //
 // A page load with a workspace already registered runs
-// `WorkspaceRuntime.startInitialSelection`: it connects the most recent
-// workspace and opens its blank session. `openState` flips to `loading` the
+// `WorkspaceRuntime.startInitialSelection`: it opens the most recent
+// workspace's history, falling back to its blank session when no history
+// exists. `openState` flips to `loading` the
 // moment `open()` lands; driving `data-phase=settling` on the conversation
 // root from that flip would hide the composer seat and the header
 // (`visibility:hidden`) for the whole `session.history` round-trip — the
@@ -13,8 +14,8 @@
 // reaches it: the real selection service, the real client session opening over
 // the real /api transport, and a real browser deciding what is painted.
 // The initial Workspace pick also records the resident Hero/composer nodes and
-// proves that opening the first blank Session fills the strict outlets without
-// replacing those nodes.
+// proves that opening the first blank Session fallback fills the strict outlets
+// without replacing those nodes.
 //
 // The round-trip against a loopback host is far too fast to observe, so this
 // scenario HOLDS the `session.history` response open in the browser's network
@@ -22,9 +23,9 @@
 // what makes the assertions non-vacuous: without the phase exemption, the held
 // window is exactly when `settling` would be painted and the composer hidden.
 //
-// Zero model calls: registering a workspace and opening its blank session are
-// host RPCs with no model involvement. A stray stream would fail loud with
-// NO_ADAPTER.
+// Zero model calls: registering a workspace and opening its blank fallback are
+// Host operations with no model involvement. A stray stream would fail loud
+// with NO_ADAPTER.
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'

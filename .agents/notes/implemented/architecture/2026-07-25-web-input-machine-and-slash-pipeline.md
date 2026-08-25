@@ -73,7 +73,7 @@ A trigger/menu/pick pipeline with zero knowledge of "commands":
 - The composer bar is one `session-maybe` slot entry rendered unconditionally: with no session the same InputBar renders inert (machine faces absent, `disabled` owner prop), and once `connectWorkspace` returns a blank session the same instance goes live — the textarea DOM survives the no-session → blank transition and every later phase flip; `ConversationRoot`, the Hero, and the layout skeleton hold throughout.
 - ConversationRoot's Hero criterion is `sessionId === undefined || (composerPhase === 'blank' && (openState === 'open' || summaryBlank === true))`: a summary-proven blank Session remains Hero in every open state, while an unproven Session settles during loading. The first submit enters engaging synchronously, and a failure keeps the composer and the error context rather than falling back to the blank Hero; the sidebar's blank bit flips false only after a prompt is successfully accepted.
 - Sending unifies in the hub defaultSink: after an optimistic draft clear it goes only through `session.prompt` with `mode:'queue'` (the Web UI has no steer entry; host-wire `mode:'steer'` remains outside this machine); backfill happens only when it fails and the live draft is still empty — a user who has kept typing is never overwritten. No Draft materialize or attach transaction exists.
-- When the blank Hero re-picks the Workspace, the shell calls `connectWorkspace`; if the target session differs, the non-empty draft moves from the current shell to the target shell before the new id is opened, and the old blank session survives but is no longer current.
+- When the blank Hero re-picks the Workspace, the shell calls `openWorkspace`, which selects the target's latest history or falls back to `connectWorkspace`. A non-empty draft requires confirmation and is discarded only after the target resolves; cancellation or failure leaves the current shell untouched.
 - The Notifier's two-bit contract: `dirty` (snapshot freshness, clearable by an `ensureFresh` pull) and `notifyPending` (notification debt, cleared only by a flush) are mutually independent — a pull must not swallow a push, and object-layer push subscribers (watchTransaction) depend on this guarantee.
 
 ### Plain-text references: text outcomes and lexicon decoration
@@ -103,7 +103,7 @@ skill/@subagent references skip the placeholder + occurrence identity chain — 
 - `conversation.composer.dock` — the stats band on the composer's top edge.
 - `conversation.input.left` / `conversation.input.right` — the tool-row left and right regions.
 - `conversation.input.plan` / `conversation.input.model` (single) — the tool row's two named control seats; the bar passes only `locked` (owner props), each stays empty until its owning plugin registers, no placeholder fallback. The plan seat stays empty while inactive because the shared Command source owns entry; an effective plan target renders the warn-state `Plan ×` status button, whose only action is `/plan off`.
-- `conversation.hero.workspace` (root scope) — the Workspace picker shared by the no-session and blank Hero; a pick reuses or creates the target blank session through `connectWorkspace`, moving the draft where necessary before switching current.
+- `conversation.hero.workspace` (root scope) — the Workspace picker shared by the no-session and blank Hero; a pick opens the target's latest history through `openWorkspace` or its blank fallback, with confirmed draft discard before switching current.
 
 ### Testing discipline
 

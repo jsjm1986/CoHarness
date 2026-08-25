@@ -30,8 +30,8 @@ export function workspaceLabel(cwd: string): string {
 /**
  * The workspace chip (folder + label + chevron), always interactive: before
  * the first message the workspace stays switchable — picking another one
- * moves the New Session flow to that workspace's blank session. Without a
- * label the chip renders its placeholder state: closed folder + the
+ * opens that workspace's latest conversation, or its blank fallback when no
+ * history exists. Without a label the chip renders its placeholder state: closed folder + the
  * "Choose workspace" call to action.
  * @param props.label - chip label (see {@link workspaceLabel}); omitted → placeholder.
  * @param props.menuOpen - menu expansion echo.

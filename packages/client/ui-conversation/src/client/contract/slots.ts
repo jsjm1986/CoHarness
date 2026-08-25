@@ -176,9 +176,9 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     'conversation.composer': { kind: 'chain'; scope: 'session'; owner: ComposerChainProps }
     /**
      * The hero-phase Workspace picker hole: rendered by ConversationRoot
-     * while the session is blank (picking another workspace switches to that
-     * workspace's blank session, draft carried). Root scope: the picker
-     * reads the global workspace list.
+     * while the session is blank (picking another Workspace opens its latest
+     * history, or a blank fallback; an unsent draft requires confirmation).
+     * Root scope: the picker reads the global Workspace list.
      */
     'conversation.hero.workspace': { kind: 'single'; scope: 'root'; owner: EmptyWorkspaceOwnerProps }
     /**
@@ -488,13 +488,22 @@ export type ConvViewProps = PropsRuntime<'conversation.view'>
 /** The shared chat store handle type declared by the Session header/body, details, and chat-view registrations. */
 export type ChatStore = ReturnType<typeof createChatStore>
 
+/** Options for entering a Workspace from the Hero picker. */
+export interface WorkspaceSelectionOptions {
+  /** Clear the current unsent draft after the target Session resolves. */
+  discardDraft?: boolean
+}
+
 /** Business callbacks injected into the conversation slot. */
 export interface ConversationInjected {
   /**
-   * Connect the selected Workspace and open its reusable/new blank session.
-   * When a blank session is already current, carry its draft to the target.
+   * Open the selected Workspace's latest historical Session, falling back to
+   * its reusable/new blank Session when no history exists. A confirmed draft
+   * discard is applied only after the target Session resolves.
+   * @param workspaceId - target Workspace.
+   * @param options - optional confirmed draft-discard instruction.
    */
-  selectWorkspace: (workspaceId: WorkspaceId) => Promise<void>
+  selectWorkspace: (workspaceId: WorkspaceId, options?: WorkspaceSelectionOptions) => Promise<void>
   /**
    * Framework-bound sources. `composerBlock` is this session's block when a
    * plugin raised one; the reason is the blocker's own localized copy, which

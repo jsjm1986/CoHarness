@@ -514,8 +514,8 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     key: 'conversation.hero.workspace',
     kind: 'single',
     scope: 'root',
-    summary: 'The hero-phase Workspace picker hole: rendered by ConversationRoot while the session is blank (picking another workspace switches to that workspace\'s blank session, draft carried).',
-    doc: 'The hero-phase Workspace picker hole: rendered by ConversationRoot\nwhile the session is blank (picking another workspace switches to that\nworkspace\'s blank session, draft carried). Root scope: the picker\nreads the global workspace list.',
+    summary: 'The hero-phase Workspace picker hole: rendered by ConversationRoot while the session is blank (picking another Workspace opens its latest history, or a blank fallback; an unsent draft requires confirmation).',
+    doc: 'The hero-phase Workspace picker hole: rendered by ConversationRoot\nwhile the session is blank (picking another Workspace opens its latest\nhistory, or a blank fallback; an unsent draft requires confirmation).\nRoot scope: the picker reads the global Workspace list.',
     registerOptions: [],
     ownerProps: [
       '/** Owner share common to the hero / New-Session Workspace pickers. */\nexport interface EmptyWorkspaceOwnerProps {\n  open: boolean\n  anchorRef?: RefObject<HTMLElement>\n  /** Currently active workspace (renders a trailing check in the picker list). */\n  selectedId?: WorkspaceId | undefined\n  onPick: (workspaceId: WorkspaceId) => void\n  onClose: () => void\n}',

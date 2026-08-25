@@ -62,6 +62,19 @@ export class TestWorkspaces implements IWorkspaces {
   }
 
   /**
+   * Open a Workspace's most recent historical Session (recorded). The default
+   * resolves the workspace id back as the session id; stub for navigation tests.
+   * @param workspaceId - target workspace.
+   * @returns the session id selected by the history-first entry flow.
+   */
+  async openWorkspace(workspaceId: WorkspaceId): Promise<SessionId> {
+    this.calls.push({ method: 'openWorkspace', args: [workspaceId] })
+    const stub = this.stubs.get('openWorkspace')
+    if (stub !== undefined) return await (stub(workspaceId) as Promise<SessionId>)
+    return `session-of-${workspaceId}` as SessionId
+  }
+
+  /**
    * New-session flow (recorded; stubbed behavior runs when installed).
    * @param workspaceId - optional explicit workspace target.
    */

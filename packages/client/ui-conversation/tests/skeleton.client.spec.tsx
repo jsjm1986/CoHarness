@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 // ConversationRoot skeleton behavior: the ONE resident composer across the
 // hero (blank session) and active phases — same textarea DOM node, machine-
-// owned draft, and the hero workspace picker (switching = retargetWorkspace).
+// owned draft, and the history-first hero workspace picker.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, within } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import {
@@ -375,7 +375,7 @@ describe('ConversationRoot resident composer', () => {
     expect(seat?.contains(fallback)).toBe(true)
   })
 
-  it('hero phase: same textarea, hero chrome, no header, picker switches the workspace', () => {
+  it('hero phase: same textarea, hero chrome, and draft discard confirmation', async () => {
     const b = mount(
       conversationSnapshot({ composerPhase: 'blank', blank: true }),
       [
@@ -399,14 +399,43 @@ describe('ConversationRoot resident composer', () => {
     expect(host?.contains(box)).toBe(true)
     fireEvent.change(box, { target: { value: 'draft in hero' } })
     expect(b.chat.store.getSnapshot().draft).toBe('draft in hero')
-    // Picker: open through the chip; a pick switches to the other
-    // workspace's blank session (draft carry is apply-layer wiring).
+    // Picker: a picked Workspace with a draft requires explicit confirmation;
+    // cancelling keeps both the current Workspace and the draft.
     fireEvent.click(b.view.getByRole('button', { name: '选择工作区' }))
     const owner = b.pickerOwner() as { open: boolean; onPick(id: WorkspaceId): void }
     expect(owner.open).toBe(true)
     act(() => { owner.onPick(wid('second')) })
-    expect(b.retargetWorkspace).toHaveBeenCalledWith(wid('second'))
+    expect(b.retargetWorkspace).not.toHaveBeenCalled()
+    const discard = b.view.getByRole('dialog', { name: '切换工作区并放弃未发送内容？' })
+    expect(discard).toBeTruthy()
+    fireEvent.click(within(discard).getByRole('button', { name: '留在当前会话' }))
+    expect(b.retargetWorkspace).not.toHaveBeenCalled()
+    expect(b.chat.store.getSnapshot().draft).toBe('draft in hero')
+
+    fireEvent.click(b.view.getByRole('button', { name: '选择工作区' }))
+    const ownerAgain = b.pickerOwner() as { onPick(id: WorkspaceId): void }
+    act(() => { ownerAgain.onPick(wid('second')) })
+    const confirm = b.view.getByRole('dialog', { name: '切换工作区并放弃未发送内容？' })
+    fireEvent.click(within(confirm).getByRole('button', { name: '放弃并切换' }))
+    await vi.waitFor(() => {
+      expect(b.retargetWorkspace).toHaveBeenCalledWith(wid('second'), { discardDraft: true })
+    })
     expect(b.view.getByText('Selected Folder')).toBeTruthy()
+  })
+
+  it('treats whitespace as unsent draft content', () => {
+    const b = mount(
+      conversationSnapshot({ composerPhase: 'blank', blank: true }),
+      [
+        { ...workspace('one'), sessionIds: [SID] },
+        { ...workspace('second'), title: 'Selected Folder' },
+      ],
+    )
+    fireEvent.change(b.view.getByRole('textbox'), { target: { value: '   ' } })
+    fireEvent.click(b.view.getByRole('button', { name: '选择工作区' }))
+    const owner = b.pickerOwner() as { onPick(id: WorkspaceId): void }
+    act(() => { owner.onPick(wid('second')) })
+    expect(b.view.getByRole('dialog', { name: '切换工作区并放弃未发送内容？' })).toBeTruthy()
   })
 
   it('settling phase: a summary that does not prove the session blank hides the composer while it opens', () => {
@@ -497,10 +526,11 @@ describe('ConversationRoot resident composer', () => {
       ],
       selectWorkspace,
     )
+    fireEvent.change(b.view.getByRole('textbox'), { target: { value: '' } })
     fireEvent.click(b.view.getByRole('button', { name: '选择工作区' }))
     const owner = b.pickerOwner() as { onPick(id: WorkspaceId): void }
     await act(async () => { owner.onPick(wid('second')); await Promise.resolve() })
-    expect(selectWorkspace).toHaveBeenCalledWith(wid('second'))
+    expect(selectWorkspace).toHaveBeenCalledWith(wid('second'), { discardDraft: false })
     expect(b.view.queryByText('Selected Folder')).toBeNull()
     expect(b.view.getByText('one')).toBeTruthy()
   })

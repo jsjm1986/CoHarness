@@ -16,6 +16,8 @@ export interface SessionsPortSummary {
   id: SessionId
   /** No-visible-content bit (blank sessions are reused by New Session instead of minting another). */
   blank: boolean
+  /** Durable subagent origin; Workspace entry never selects these as the default conversation. */
+  origin?: 'subagent'
   cwd?: string
   updatedAt: number
 }
