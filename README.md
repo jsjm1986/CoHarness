@@ -8,6 +8,45 @@ CoHarness combines the Cordis plugin runtime from [DeepSeek Harness](https://git
 
 CoHarness is an independent derivative project, not a rebranded upstream release. Upstream DSH remains the reference for the underlying plugin and agent-runtime contracts. CoHarness adds and maintains its own Gateway, collaboration, administration, document, deployment, and Android capabilities. Synchronization with upstream is selective and behavior-based; this repository does not promise byte-for-byte or commit-for-commit parity with every upstream release.
 
+## Who it is for
+
+- **Personal users** can run a local Web workspace, connect a model provider, choose a project directory, and let an agent inspect or change files with approval prompts and durable conversation history. A local setup does not require PostgreSQL or the Gateway.
+- **Team members and project leads** can use authenticated personal spaces and shared projects, invite members with `ro` or `rw` access, collaborate in shared conversations, and keep project files and runtime state in the project scope.
+- **Organization administrators** can operate the Gateway, manage users and projects, authorize model routes, review usage and audit records, configure quotas, and manage deployment and backup procedures.
+- **Integrators and developers** can compose Cordis plugins, use the TypeScript or Python SDK, connect through JSON-RPC or ACP, and add model, tool, storage, or execution providers.
+
+## Choose a setup
+
+| Situation | Recommended setup | What it gives you |
+| --- | --- | --- |
+| Try the product on one computer | Local `dsh web` | A browser workspace using local files and local session storage; no Gateway or PostgreSQL required. |
+| Run repeatable automation | Headless, JSON-RPC, ACP, or an SDK | Non-interactive sessions, streamed events, and integration with scripts or services. |
+| Give a team authenticated access | Gateway plus Web runtimes | Users, personal spaces, shared projects, permissions, model governance, usage, and audit. |
+| Enforce stronger Linux isolation | Gateway with systemd deployment | Per-runtime accounts, mount namespaces, directory grants, and kernel-level project confinement. |
+| Access a hosted workspace on mobile | Web UI or the Android shell | Browser or Capacitor access to an already deployed Gateway; push notifications are optional. |
+
+CoHarness is in pre-release development. Treat production deployment as an evaluated self-hosting responsibility: public APIs, configuration, database schemas, session formats, and deployment procedures may change. Linux systemd provides stronger process and directory confinement than macOS; the macOS launcher is intended for trusted-team development or deployments whose host permissions provide the required protection. See the [Gateway reference](gateway/README.md) and [deployment runbook](gateway/deploy/README.md) before exposing a service to users.
+
+## Start as a personal user
+
+The shortest local path is:
+
+1. Start the [Web UI](#run-from-source) from the directory that contains the files the agent should use.
+2. Open **Settings → Models** and configure a DeepSeek key or another supported provider.
+3. Choose the workspace directory in the Web UI.
+4. Ask the agent to inspect, explain, edit, or organize the workspace. File changes, commands, and other governed operations can require approval under the active permission policy.
+5. Return to the same workspace later to resume durable sessions and review their conversation and tool history.
+
+The [Web user guide](docs/user/guide/index.md) covers the first session, model configuration, workspaces, and follow-up tasks. Use the [CLI reference](apps/cli/reference/README.md) for headless jobs, profiles, and plugin-managed setups.
+
+## Use it as a team
+
+The Gateway is the multi-user control plane. Each account has a personal space, while a shared project uses one project-scoped runtime and persistence. Project members receive `ro` or `rw` access; conversations can be project-visible or creator-private, and project permissions are checked by the host rather than trusted to the browser. Administrators manage users, projects, invitations, model-route authorization, quotas, usage summaries, audit records, and runtime health.
+
+Organization-managed model routes can be authorized per role, user, and project. Personal users may use their own BYOK routes; shared project runtimes remain catalog-controlled. Usage records attribute activity without storing API keys, prompts, or responses in the ledger. Linux deployments add systemd and mount-namespace confinement; macOS deployments do not provide that kernel boundary and should be treated accordingly.
+
+Read the [Gateway reference](gateway/README.md) for the control-plane behavior and the [deployment runbook](gateway/deploy/README.md) for PostgreSQL, releases, isolation, TLS, backups, upgrades, and rollback.
+
 ## What it provides
 
 | Area | Current capability |

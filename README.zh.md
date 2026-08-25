@@ -8,6 +8,45 @@ CoHarness 将 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness
 
 CoHarness 是独立维护的衍生项目，不是把上游版本重新命名后发布。底层插件和智能体运行时的契约仍以上游 DSH 为参考；CoHarness 在此基础上维护自己的 Gateway、协作、管理、文档、部署和 Android 能力。上游同步采用选择性、基于行为的方式，本仓库不承诺与每个上游版本逐文件或逐提交完全一致。
 
+## 适合谁
+
+- **个人用户**可以在本机运行 Web 工作空间，连接模型 Provider，选择项目目录，让智能体在审批提示和持久化对话历史下检查或修改文件。本地部署不需要 PostgreSQL 或 Gateway。
+- **团队成员和项目负责人**可以使用经过认证的个人空间和共享项目，邀请具有 `ro` 或 `rw` 权限的成员，在共享对话中协作，并让项目文件和运行时状态保持在项目 scope 内。
+- **组织管理员**可以运行 Gateway，管理用户和项目，授权模型路由，查看用量和审计记录，配置额度，并管理部署和备份流程。
+- **集成开发者**可以组合 Cordis 插件，使用 TypeScript 或 Python SDK，通过 JSON-RPC 或 ACP 连接，并添加模型、工具、存储或执行 Provider。
+
+## 选择运行方式
+
+| 场景 | 推荐方式 | 提供的能力 |
+| --- | --- | --- |
+| 在一台电脑上试用产品 | 本地 `dsh web` | 使用本地文件和本地 Session 存储的浏览器工作空间；不需要 Gateway 或 PostgreSQL。 |
+| 运行可重复的自动化任务 | Headless、JSON-RPC、ACP 或 SDK | 非交互 Session、事件流和与脚本或服务的集成。 |
+| 为团队提供认证访问 | Gateway 加 Web runtime | 用户、个人空间、共享项目、权限、模型治理、用量和审计。 |
+| 强化 Linux 隔离 | 使用 systemd 部署 Gateway | 每个 runtime 独立账户、mount namespace、目录授权和内核级项目隔离。 |
+| 在移动设备访问托管工作空间 | Web UI 或 Android 壳 | 访问已部署 Gateway 的浏览器或 Capacitor 客户端；推送通知可选。 |
+
+CoHarness 处于发布前开发阶段。生产部署应被视为需要自行评估和负责的自托管工作：公共 API、配置、数据库 schema、Session format 和部署流程可能变化。Linux systemd 提供的进程和目录隔离强于 macOS；macOS 启动器适合可信团队开发，或适合由主机权限提供所需保护的部署。在向用户开放服务前，请阅读 [Gateway 参考](gateway/README.zh.md) 和[部署手册](gateway/deploy/README.zh.md)。
+
+## 以个人用户身份开始
+
+最短的本地使用路径是：
+
+1. 从包含智能体要使用的文件的目录启动[Web UI](#run-from-source)。
+2. 打开**设置 → 模型**，配置 DeepSeek 密钥或其他受支持的 Provider。
+3. 在 Web UI 中选择工作区目录。
+4. 让智能体检查、解释、编辑或整理工作区。文件修改、命令和其他受治理的操作可能需要根据当前权限策略审批。
+5. 之后返回同一工作区即可恢复持久化 Session，并查看对话和工具历史。
+
+[Web 用户指南](docs/user/guide/index.zh.md)介绍首次 Session、模型配置、工作区和后续任务。[CLI 参考](apps/cli/reference/README.zh.md)介绍 headless 任务、profile 和插件管理的部署方式。
+
+## 以团队方式使用
+
+Gateway 是多用户控制面。每个账户拥有个人空间，共享项目则使用一个项目 scope 内的 runtime 和持久化存储。项目成员拥有 `ro` 或 `rw` 权限；对话可以对项目可见，也可以仅创建者可见，项目权限由 Host 检查，不能信任浏览器自行保证。管理员可以管理用户、项目、邀请、模型路由授权、额度、用量汇总、审计记录和运行时健康状态。
+
+组织管理的模型路由可以按角色、用户和项目授权。个人用户可以使用自己的 BYOK 路由；共享项目 runtime 仍由目录控制。用量记录会在不把 API 密钥、提示词或回复写入账本的情况下归属活动。Linux 部署增加 systemd 和 mount namespace 隔离；macOS 不提供这一内核边界，应按相应限制使用。
+
+请阅读 [Gateway 参考](gateway/README.zh.md)了解控制面的行为，阅读[部署手册](gateway/deploy/README.zh.md)了解 PostgreSQL、release、隔离、TLS、备份、升级和回滚。
+
 ## 当前能力
 
 | 领域 | 当前能力 |
