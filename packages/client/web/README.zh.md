@@ -10,6 +10,8 @@ Web 启动内核：`new AppWebEntry(el, seams?).run()` 分两个阶段挂载客�
 
 可选的覆盖参数 `seams` 会为外部 `<script>` 执行无法到达页面上下文的环境转发模块系统的 `loadBundle` 传输覆盖（`BootSeams`）；普通浏览器调用方省略此参数。
 
+在预取或激活动态 entry 之前，启动内核会为缺失的 `AbortSignal.any`、`AbortSignal.timeout` 和 `AbortSignal.abort` 工厂安装兼容实现。这样即使 Android WebView 只提供 `AbortController` 而没有较新的静态工厂，浏览器客户端仍可工作；原生实现存在时则保持不变。
+
 ## 模型体验
 
 无。入口外壳负责启动浏览器插件树；这里没有任何内容进入模型请求。

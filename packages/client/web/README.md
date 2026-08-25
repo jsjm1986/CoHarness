@@ -10,6 +10,8 @@ The boot page uses plain DOM and local CSS, so client-bundle and plugin-activati
 
 The optional override parameter `seams` forwards the module system's `loadBundle` transport override (`BootSeams`) for environments where external `<script>` execution cannot reach the page context; ordinary browser callers omit it.
 
+Before prefetching or activating dynamic entries, the boot kernel installs compatibility implementations for missing `AbortSignal.any`, `AbortSignal.timeout`, and `AbortSignal.abort` factories. This keeps the browser client usable in Android WebViews that provide `AbortController` but not the newer static factories, while preserving native implementations when they exist.
+
 ## Model Experience
 
 None, as the entry shell boots the browser plugin tree; nothing here reaches a model request.

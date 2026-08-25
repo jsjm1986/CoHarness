@@ -202,6 +202,11 @@ describe('WorkspaceManager', () => {
     await archiveFirst
 
     expect(manager.getSnapshot().archivedSessionIds).toEqual([sid('s1'), sid('s2')])
+    manager.handleHostEnvelope({
+      rpcId: 'divergent-frame' as never,
+      payload: { type: 'host/archived-sessions-changed', archivedSessionIds: [sid('s3')] },
+    } as never)
+    expect(manager.getSnapshot().archivedSessionIds).toEqual([sid('s1'), sid('s2'), sid('s3')])
   })
 
   it('merges a stale archive frame before a newer refresh baseline', async () => {
