@@ -1,8 +1,23 @@
 /** User-document vocabulary. @module @deepseek-ai/dsh-userdoc/types */
 
-import type { UserDocDirectoryId, UserDocId } from './brand.ts'
+import type { UserDocDirectoryId, UserDocId, UserDocUploadId } from './brand.ts'
 
-export type { UserDocDirectoryId, UserDocId } from './brand.ts'
+export type { UserDocDirectoryId, UserDocId, UserDocUploadId } from './brand.ts'
+
+/** Wire protocol state for one resumable upload session. */
+export type UserDocUploadState = 'uploading' | 'verifying' | 'complete' | 'failed'
+
+/** Deployment-resolved capabilities of the resumable upload transport. */
+export interface UserDocUploadCapabilities {
+  /** Versioned protocol identifier. */
+  readonly protocol: 'resumable-v1'
+  /** Maximum bytes in one request body. */
+  readonly chunkBytes: number
+  /** Retention period for an incomplete session. */
+  readonly sessionTtlMs: number
+  /** Whether a session can be resumed after the browser reselects a file. */
+  readonly resumable: true
+}
 
 /**
  * Durable, serializable metadata for one uploaded document.
@@ -71,6 +86,62 @@ export interface UserDocLimits {
    * reaches the model as its path only.
    */
   maxInlineTextBytes: number
+  /** Transport capabilities used by the browser upload state machine. */
+  upload: UserDocUploadCapabilities
+}
+
+/** Input used to create or reuse one upload session. */
+export interface BeginUserDocUpload {
+  /** Untrusted display name; the provider sanitizes it before publication. */
+  readonly name: string
+  /** Destination directory; the empty identifier selects the root. */
+  readonly directoryId: UserDocDirectoryId
+  /** Expected byte count from the browser File object. */
+  readonly bytes: number
+  /** Browser-side identity used to find a resumable session. */
+  readonly fingerprint: string
+}
+
+/** One validated raw chunk supplied to the upload store. */
+export interface UserDocUploadChunk {
+  /** Zero-based sequential chunk index. */
+  readonly index: number
+  /** Inclusive byte offset of the first body byte. */
+  readonly start: number
+  /** Inclusive byte offset of the last body byte. */
+  readonly end: number
+  /** Total expected file bytes. */
+  readonly total: number
+  /** Lowercase SHA-256 digest of this chunk. */
+  readonly sha256: string
+  /** Raw request body, consumed exactly once by the provider. */
+  readonly body: ReadableStream<Uint8Array>
+}
+
+/** Public state returned by the upload store without an absolute temp path. */
+export interface UserDocUploadSession {
+  /** Opaque upload identifier. */
+  readonly uploadId: UserDocUploadId
+  /** Sanitized target name reserved by the provider. */
+  readonly name: string
+  /** Destination directory. */
+  readonly directoryId: UserDocDirectoryId
+  /** Expected total bytes. */
+  readonly bytes: number
+  /** Browser file identity. */
+  readonly fingerprint: string
+  /** Configured request chunk size. */
+  readonly chunkBytes: number
+  /** Contiguous bytes durably received from the beginning. */
+  readonly receivedBytes: number
+  /** Session expiry timestamp in epoch milliseconds. */
+  readonly expiresAt: number
+  /** Current lifecycle state. */
+  readonly state: UserDocUploadState
+  /** Published reference once finalization completes. */
+  readonly ref?: UserDocRef
+  /** Stable failure details for a failed finalization. */
+  readonly error?: { readonly code: string; readonly message: string }
 }
 
 /**

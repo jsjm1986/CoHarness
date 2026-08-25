@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-22-unlimited-document-upload.md
-2026-08-22-unlimited-document-upload.md: 240be17802a841917a3faac8af1b72e20a1b2fc9
-2026-08-22-unlimited-document-upload.zh.md: 8ca474ef5050e5e09fbc0f70fd0acd6439fa3d30
+2026-08-22-unlimited-document-upload.md: 55456dc4dfecfccbb324feb7357c05793c26cd81
+2026-08-22-unlimited-document-upload.zh.md: bada780b6bcc1a515c112362dc4be7be6aecf3a6

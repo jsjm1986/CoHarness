@@ -11,6 +11,7 @@ The browser side of the dsh web GUI: shell boot, browser-host communication, sha
 | [`modules/`](modules/README.md) | Loads browser-side client modules. |
 | [`connection/`](connection/README.md) | Maintains browser-host RPC communication and event delivery. |
 | [`runtime/`](runtime/README.md) | Provides shared client services for sessions, workspaces, and UI composition. |
+| [`userdoc-upload/`](userdoc-upload/README.md) | Provides the shared browser resumable uploader used by document surfaces. |
 | [`hmr/`](hmr/README.md) | Refreshes client plugins during development. |
 | [`locale/`](locale/README.md) | Provides localization preferences and message dictionaries. |
 | [`test-runtime/`](../test-support/client-runtime/README.md) | Provides shared repository test support for client feature packages. |

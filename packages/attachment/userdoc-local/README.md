@@ -10,6 +10,10 @@ Reads take the store-scoped `docId` — the root-relative path with forward slas
 
 `mediaType` is derived from the stored file extension, and an unrecognized extension records `application/octet-stream`. It is presentation metadata: nothing here parses content or refuses an unknown format.
 
+## Resumable uploads
+
+The local provider implements the `resumable-v1` upload session used by the Web client. It accepts one request-sized chunk at a time, verifies each chunk with SHA-256, persists a private manifest and partial file below `.upload-sessions/v1/`, and publishes the final file only after a complete SHA-256 verification. A session survives a runtime restart and remains resumable for the configured 24-hour default retention; expired session records and their temporary bytes are removed automatically. The default chunk size is 8 MiB, safely below the public Cloudflare request-body limit, and all upload safety values are configurable through the provider config.
+
 ## Model Experience
 
 Indirectly, through the host prompt-assembly consumer that turns a stored reference into inlined text or a path the agent reads with its ordinary tools.
@@ -20,7 +24,7 @@ None; this package neither assembles nor sends a provider request.
 
 ## Known Limitations and Deferred Work
 
-- **No per-user disk quota** — the default has no per-document byte limit, and `maxMessageBytes` bounds one submitted message, but nothing bounds a root's total size, so a deployment that shares a disk between users needs a quota above this package.
-- **Retention is manual** — stored documents live until a user deletes them; there is no expiry or garbage collection.
+- **No business storage quota** — the default has no per-document or per-user byte quota. The provider still protects the host with a configurable minimum free-space reserve, concurrent-session limit, and cleanup of abandoned upload sessions.
+- **Completed-document retention is manual** — published documents live until a user deletes them. Session records, including completed-state metadata, are temporary and are cleaned after the configured retention.
 - **`list` walks the tree on every call** — there is no index, so a root holding many thousands of files pays a full scan per listing.
 - **Folder deletion is empty-only** — removing a tree requires moving or deleting its contents first; no recursive delete operation is exposed.

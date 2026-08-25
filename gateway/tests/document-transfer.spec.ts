@@ -116,15 +116,25 @@ function fixture() {
   return { handler, capabilities, list, publicList, audit, ensureRunning, projectForUser, plan: createDocumentTransferPlanHandler(dependencies), commit: createDocumentTransferCommitHandler(dependencies) }
 }
 
-function responseForTarget(docId: string, name = 'report.txt'): Response {
+function responseForTarget(docId: string, name = 'report.txt', bytes = 5): Response {
   return new Response(JSON.stringify({
-    docId,
-    path: '/private/should-not-leak',
-    name,
-    bytes: 5,
-    mediaType: 'text/plain',
-    modifiedAt: 10,
-  }), { status: 201, headers: { 'content-type': 'application/json' } })
+    state: 'complete',
+    ref: { docId, path: '/private/should-not-leak', name, bytes, mediaType: 'text/plain', modifiedAt: 10 },
+  }), { status: 200, headers: { 'content-type': 'application/json' } })
+}
+
+function responseForTargetStart(name = 'report.txt', chunkBytes = 8 * 1024 * 1024): Response {
+  return new Response(JSON.stringify({
+    uploadId: '00000000-0000-4000-8000-000000000000', name, directoryId: '', bytes: 5,
+    fingerprint: 'transfer', chunkBytes, receivedBytes: 0,
+    expiresAt: Date.now() + 60_000, state: 'uploading',
+  }), { status: 200, headers: { 'content-type': 'application/json' } })
+}
+
+function responseForTargetChunk(): Response {
+  return new Response(JSON.stringify({ state: 'uploading', receivedBytes: 5 }), {
+    status: 200, headers: { 'content-type': 'application/json' },
+  })
 }
 
 describe('Gateway document transfer broker', () => {
@@ -135,6 +145,8 @@ describe('Gateway document transfer broker', () => {
         status: 200,
         headers: { 'content-type': 'text/plain', 'content-length': '5' },
       }))
+      .mockResolvedValueOnce(responseForTargetStart('report (2).txt'))
+      .mockResolvedValueOnce(responseForTargetChunk())
       .mockResolvedValueOnce(responseForTarget('report (2).txt', 'report (2).txt'))
     vi.stubGlobal('fetch', fetch)
     const result = await runtime.handler({
@@ -156,9 +168,38 @@ describe('Gateway document transfer broker', () => {
       target: { docId: 'report (2).txt', name: 'report (2).txt', bytes: 5 },
     }])
     expect(JSON.stringify(result)).not.toContain('/private/should-not-leak')
-    expect(fetch).toHaveBeenCalledTimes(2)
-    expect(fetch.mock.calls[1]?.[0]).toContain('/api/documents?name=report.txt')
+    expect(fetch).toHaveBeenCalledTimes(4)
+    expect(fetch.mock.calls[1]?.[0]).toContain('/api/documents/uploads')
     expect(runtime.audit).toHaveBeenCalledWith(expect.objectContaining({ action: 'documents.transfer' }))
+  })
+
+  it('keeps source bytes bounded when the target advertises small chunks', async () => {
+    const runtime = fixture()
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(new Response('abcdefghij', {
+        status: 200, headers: { 'content-type': 'text/plain', 'content-length': '10' },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        uploadId: '00000000-0000-4000-8000-000000000000', name: 'parts.txt', directoryId: '', bytes: 10,
+        fingerprint: 'transfer', chunkBytes: 4, receivedBytes: 0, expiresAt: Date.now() + 60_000, state: 'uploading',
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ state: 'uploading', receivedBytes: 4 }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ state: 'uploading', receivedBytes: 8 }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ state: 'uploading', receivedBytes: 10 }), { status: 200 }))
+      .mockResolvedValueOnce(responseForTarget('parts.txt', 'parts.txt', 10))
+    vi.stubGlobal('fetch', fetch)
+    await expect(runtime.handler({
+      request: {} as never, subject: SUBJECT, principal: PRINCIPAL,
+      payload: {
+        version: 1, source: { kind: 'personal' }, target: { kind: 'project', projectId: 41 },
+        documents: [{ docId: 'parts.txt' }],
+      }, signal: new AbortController().signal,
+    })).resolves.toMatchObject({ items: [{ status: 'copied' }] })
+    const chunkCalls = fetch.mock.calls.slice(2, 5)
+    expect(chunkCalls).toHaveLength(3)
+    expect(chunkCalls.map(call => ((call[1] as RequestInit).headers as Headers).get('content-range')))
+      .toEqual(['bytes 0-3/10', 'bytes 4-7/10', 'bytes 8-9/10'])
+    expect(fetch).toHaveBeenCalledTimes(6)
   })
 
   it('allows a ro project source to copy into personal scope', async () => {
@@ -174,6 +215,8 @@ describe('Gateway document transfer broker', () => {
     }
     vi.stubGlobal('fetch', vi.fn()
       .mockResolvedValueOnce(new Response('hello', { status: 200, headers: { 'content-length': '5' } }))
+      .mockResolvedValueOnce(responseForTargetStart())
+      .mockResolvedValueOnce(responseForTargetChunk())
       .mockResolvedValueOnce(responseForTarget('report.txt')))
     await expect(runtime.handler({
       request: {} as never, subject, principal,
@@ -210,7 +253,9 @@ describe('Gateway document transfer broker', () => {
     const runtime = fixture()
     vi.stubGlobal('fetch', vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ error: { code: 'DOCUMENT_NOT_FOUND', message: 'missing' } }), { status: 404 }))
-      .mockResolvedValueOnce(new Response('ok', { status: 200, headers: { 'content-length': '2' } }))
+      .mockResolvedValueOnce(new Response('hello', { status: 200, headers: { 'content-length': '5' } }))
+      .mockResolvedValueOnce(responseForTargetStart('second.txt'))
+      .mockResolvedValueOnce(responseForTargetChunk())
       .mockResolvedValueOnce(responseForTarget('second.txt', 'second.txt')))
     const result = await runtime.handler({
       request: {} as never, subject: SUBJECT, principal: PRINCIPAL,
@@ -253,6 +298,8 @@ describe('Gateway document transfer broker', () => {
     const runtime = fixture()
     const fetch = vi.fn()
       .mockResolvedValueOnce(new Response('hello', { status: 200, headers: { 'content-length': '5' } }))
+      .mockResolvedValueOnce(responseForTargetStart())
+      .mockResolvedValueOnce(responseForTargetChunk())
       .mockResolvedValueOnce(responseForTarget('report.txt'))
     vi.stubGlobal('fetch', fetch)
     await expect(runtime.handler({
@@ -267,7 +314,7 @@ describe('Gateway document transfer broker', () => {
       },
       signal: new AbortController().signal,
     })).resolves.toMatchObject({ source: { kind: 'project' }, target: { kind: 'project' }, items: [{ status: 'copied' }] })
-    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(fetch).toHaveBeenCalledTimes(4)
   })
 
   it('requires and consumes a metadata-only transfer plan before commit', async () => {
@@ -277,6 +324,8 @@ describe('Gateway document transfer broker', () => {
         docId: 'report.txt', name: 'report.txt', bytes: 5, mediaType: 'text/plain', modifiedAt: 1,
       }] }), { status: 200 }))
       .mockResolvedValueOnce(new Response('hello', { status: 200, headers: { 'content-length': '5' } }))
+      .mockResolvedValueOnce(responseForTargetStart())
+      .mockResolvedValueOnce(responseForTargetChunk())
       .mockResolvedValueOnce(responseForTarget('report.txt')))
     const plan = await runtime.plan({
       subject: SUBJECT,

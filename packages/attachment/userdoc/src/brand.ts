@@ -21,6 +21,9 @@ export type UserDocId = Branded<'UserDocId'>
  */
 export type UserDocDirectoryId = Branded<'UserDocDirectoryId'>
 
+/** Opaque identifier for one resumable document upload session. */
+export type UserDocUploadId = Branded<'UserDocUploadId'>
+
 /**
  * Brand a backend-produced document identifier.
  * @param value - relative POSIX-style identifier produced by the store.
@@ -37,4 +40,13 @@ export function UserDocId(value: string): UserDocId {
  */
 export function UserDocDirectoryId(value: string): UserDocDirectoryId {
   return value as UserDocDirectoryId
+}
+
+/**
+ * Brand a backend-produced resumable upload identifier.
+ * @param value - identifier produced by the upload store.
+ * @returns the branded identifier.
+ */
+export function UserDocUploadId(value: string): UserDocUploadId {
+  return value as UserDocUploadId
 }

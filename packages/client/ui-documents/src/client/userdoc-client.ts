@@ -1,7 +1,5 @@
 /* jscpd:ignore-start */
-/** Browser HTTP client for the optional Host user-document service.
- *  This plugin owns a local copy because the client bundle purity gate
- *  forbids a value import of conversation's HTTP client. */
+/** Browser HTTP client for the optional Host user-document service. */
 import type {
   UserDocDirectoryIdType,
   UserDocDirectoryListing,
@@ -22,6 +20,11 @@ import type {
   UserDocCatalogOverview,
   UserDocCatalogRow,
 } from '@deepseek-ai/dsh-userdoc'
+import {
+  resumableUpload,
+  type UserDocUploadPhase,
+  type UserDocUploadProgress,
+} from '@deepseek-ai/dsh-client-userdoc-upload'
 
 /** Stable error surfaced when the deployment does not mount the document route. */
 export class UserDocServiceUnavailableError extends Error {
@@ -74,10 +77,9 @@ export type {
   UserDocCatalogMetrics,
   UserDocCatalogOverview,
   UserDocCatalogRow,
+  UserDocUploadPhase,
+  UserDocUploadProgress,
 }
-
-/** Progress callback for one streaming browser upload. */
-export type UserDocUploadProgress = (loaded: number, total: number) => void
 
 /** Optional document route client; all paths are relative to the current host. */
 export interface UserDocClient {
@@ -90,22 +92,10 @@ export interface UserDocClient {
     signal?: AbortSignal,
     onProgress?: UserDocUploadProgress,
   ): Promise<UserDocRef>
-  createDirectory(
-    parentDirectoryId: UserDocDirectoryIdType,
-    name: string,
-    signal?: AbortSignal,
-  ): Promise<UserDocDirectoryRef>
-  renameDirectory(
-    directoryId: UserDocDirectoryIdType,
-    name: string,
-    signal?: AbortSignal,
-  ): Promise<UserDocDirectoryRef>
+  createDirectory(parentDirectoryId: UserDocDirectoryIdType, name: string, signal?: AbortSignal): Promise<UserDocDirectoryRef>
+  renameDirectory(directoryId: UserDocDirectoryIdType, name: string, signal?: AbortSignal): Promise<UserDocDirectoryRef>
   removeDirectory(directoryId: UserDocDirectoryIdType, signal?: AbortSignal): Promise<void>
-  move(
-    docId: UserDocIdType,
-    directoryId: UserDocDirectoryIdType,
-    signal?: AbortSignal,
-  ): Promise<UserDocRef>
+  move(docId: UserDocIdType, directoryId: UserDocDirectoryIdType, signal?: AbortSignal): Promise<UserDocRef>
   remove(docId: UserDocIdType, signal?: AbortSignal): Promise<void>
   /** Copy snapshots between the current user's personal scope and one project scope. */
   transfer(request: UserDocTransferRequest, signal?: AbortSignal): Promise<UserDocTransferResponse>
@@ -127,7 +117,6 @@ export interface UserDocClient {
 }
 
 const ROOT = '/api/documents'
-const UPLOAD_HEADER = 'x-dsh-document-upload'
 const TRANSFER_PATH = `${ROOT}/transfer`
 const PLAN_PATH = `${TRANSFER_PATH}/plan`
 const COMMIT_PATH = `${TRANSFER_PATH}/commit`
@@ -146,11 +135,7 @@ function contentUrl(docId: UserDocIdType): string {
 async function parseResponse(response: Response): Promise<unknown> {
   const text = await response.text()
   if (text === '') return undefined
-  try {
-    return JSON.parse(text) as unknown
-  } catch {
-    return text
-  }
+  try { return JSON.parse(text) as unknown } catch { return text }
 }
 
 function errorFrom(status: number, body: unknown): Error {
@@ -158,16 +143,15 @@ function errorFrom(status: number, body: unknown): Error {
     const error = (body as { error?: unknown }).error
     if (typeof error === 'object' && error !== null) {
       const record = error as { message?: unknown; code?: unknown }
-      const message = typeof record.message === 'string' ? record.message : 'Document operation failed.'
-      const code = typeof record.code === 'string' ? record.code : undefined
-      return new UserDocHttpError(status, message, code)
+      return new UserDocHttpError(
+        status,
+        typeof record.message === 'string' ? record.message : 'Document operation failed.',
+        typeof record.code === 'string' ? record.code : undefined,
+      )
     }
   }
   if (status === 404) return new UserDocServiceUnavailableError(status)
-  return new UserDocHttpError(
-    status,
-    typeof body === 'string' && body !== '' ? body : 'Document operation failed.',
-  )
+  return new UserDocHttpError(status, typeof body === 'string' && body !== '' ? body : 'Document operation failed.')
 }
 
 async function requestJson<T>(input: RequestInfo | URL, init: RequestInit | undefined): Promise<T> {
@@ -187,61 +171,10 @@ function requestInit(method: string, signal: AbortSignal | undefined): RequestIn
   return signal === undefined ? { method } : { method, signal }
 }
 
-function abortError(signal: AbortSignal | undefined): Error {
-  return signal?.reason instanceof Error
-    ? signal.reason
-    : new DOMException('The operation was aborted.', 'AbortError')
-}
-
 function uploadNetworkError(status: number): Error {
   return status === 0
     ? new Error('Document upload failed because the connection was interrupted before the server responded. Check the network or tunnel and retry.')
     : new Error('Document upload failed.')
-}
-
-function xhrUpload(
-  file: File,
-  directoryId: UserDocDirectoryIdType,
-  signal?: AbortSignal,
-  onProgress?: UserDocUploadProgress,
-): Promise<UserDocRef> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest()
-    let settled = false
-    const finish = (fn: () => void): void => {
-      if (settled) return
-      settled = true
-      signal?.removeEventListener('abort', abort)
-      fn()
-    }
-    const abort = (): void => {
-      xhr.abort()
-      finish(() => { reject(abortError(signal)) })
-    }
-    signal?.addEventListener('abort', abort, { once: true })
-    xhr.open('POST', `${ROOT}?name=${encodeURIComponent(file.name)}&directory=${encodeURIComponent(directoryId)}`)
-    xhr.setRequestHeader(UPLOAD_HEADER, '1')
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) onProgress?.(event.loaded, event.total)
-      else onProgress?.(event.loaded, file.size)
-    }
-    xhr.onerror = () => { finish(() => { reject(uploadNetworkError(xhr.status)) }) }
-    xhr.onabort = () => { finish(() => { reject(abortError(signal)) }) }
-    xhr.onload = () => {
-      let body: unknown
-      try { body = xhr.responseText === '' ? undefined : JSON.parse(xhr.responseText) as unknown } catch { body = undefined }
-      if (xhr.status < 200 || xhr.status >= 300) {
-        finish(() => { reject(errorFrom(xhr.status, body)) })
-        return
-      }
-      finish(() => { resolve(body as UserDocRef) })
-    }
-    try {
-      xhr.send(file)
-    } catch (error) {
-      finish(() => { reject(error instanceof Error ? error : new Error(String(error))) })
-    }
-  })
 }
 
 /**
@@ -252,14 +185,15 @@ export function createUserDocClient(): UserDocClient {
   return {
     list: signal => requestJson<UserDocListResponse>(ROOT, requestInit('GET', signal)),
     browse: (directoryId, signal) => requestJson<UserDocDirectoryResponse>(
-      `${ROOT}?directory=${encodeURIComponent(directoryId)}`,
-      requestInit('GET', signal),
+      `${ROOT}?directory=${encodeURIComponent(directoryId)}`, requestInit('GET', signal),
     ),
-    listDirectories: signal => requestJson<UserDocDirectoriesResponse>(
-      `${ROOT}/directories`,
-      requestInit('GET', signal),
-    ),
-    upload: (file, directoryId, signal, onProgress) => xhrUpload(file, directoryId, signal, onProgress),
+    listDirectories: signal => requestJson<UserDocDirectoriesResponse>(`${ROOT}/directories`, requestInit('GET', signal)),
+    upload: (file, directoryId, signal, onProgress) => resumableUpload(file, directoryId, signal, onProgress, {
+      root: ROOT,
+      requestJson,
+      networkError: uploadNetworkError,
+      responseError: errorFrom,
+    }),
     createDirectory: (parentDirectoryId, name, signal) => requestJson<UserDocDirectoryRef>(
       `${ROOT}/folders?directory=${encodeURIComponent(parentDirectoryId)}&name=${encodeURIComponent(name)}`,
       requestInit('POST', signal),
@@ -269,10 +203,7 @@ export function createUserDocClient(): UserDocClient {
       requestInit('PATCH', signal),
     ),
     removeDirectory: async (directoryId, signal) => {
-      await requestJson<undefined>(
-        `${ROOT}/folders?id=${encodeURIComponent(directoryId)}`,
-        requestInit('DELETE', signal),
-      )
+      await requestJson<undefined>(`${ROOT}/folders?id=${encodeURIComponent(directoryId)}`, requestInit('DELETE', signal))
     },
     move: (docId, directoryId, signal) => requestJson<UserDocRef>(
       `${ROOT}/move?id=${encodeURIComponent(docId)}&directory=${encodeURIComponent(directoryId)}`,
@@ -282,21 +213,14 @@ export function createUserDocClient(): UserDocClient {
       try {
         await requestJson<undefined>(`${ROOT}?id=${encodeURIComponent(docId)}`, requestInit('DELETE', signal))
       } catch (error) {
-        // Delete is idempotent; a missing route means there is no durable object
-        // to clean up, and a 404 from the route has the same convergence result.
         if (error instanceof UserDocServiceUnavailableError) return
         if (error instanceof UserDocHttpError && error.status === 404) return
         throw error
       }
     },
-    transfer: (request, signal) => requestJson<UserDocTransferResponse>(
-      TRANSFER_PATH,
-      {
-        ...requestInit('POST', signal),
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(request),
-      },
-    ),
+    transfer: (request, signal) => requestJson<UserDocTransferResponse>(TRANSFER_PATH, {
+      ...requestInit('POST', signal), headers: { 'content-type': 'application/json' }, body: JSON.stringify(request),
+    }),
     plan: (request, signal) => requestJson<UserDocTransferPlanResponse>(PLAN_PATH, {
       ...requestInit('POST', signal), headers: { 'content-type': 'application/json' }, body: JSON.stringify(request),
     }),
@@ -308,19 +232,13 @@ export function createUserDocClient(): UserDocClient {
     }),
     capabilities: signal => requestJson<UserDocTransferCapabilities>(CAPABILITIES_PATH, requestInit('GET', signal)),
     listScope: (scope, signal) => requestJson<UserDocTransferListResponse>(LIST_SCOPE_PATH, {
-      ...requestInit('POST', signal),
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ version: 1, scope }),
+      ...requestInit('POST', signal), headers: { 'content-type': 'application/json' }, body: JSON.stringify({ version: 1, scope }),
     }),
     listScopeDirectories: (scope, signal) => requestJson<UserDocTransferDirectoriesResponse>(DIRECTORIES_PATH, {
-      ...requestInit('POST', signal),
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ version: 1, scope }),
+      ...requestInit('POST', signal), headers: { 'content-type': 'application/json' }, body: JSON.stringify({ version: 1, scope }),
     }),
     createScopeDirectory: (scope, parentDirectoryId, name, signal) => requestJson<UserDocDirectoryRef>(DIRECTORY_CREATE_PATH, {
-      ...requestInit('POST', signal),
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ version: 1, scope, directory: parentDirectoryId, name }),
+      ...requestInit('POST', signal), headers: { 'content-type': 'application/json' }, body: JSON.stringify({ version: 1, scope, directory: parentDirectoryId, name }),
     }).then(directory => ({ ...directory, path: '' })),
     overview: signal => requestJson<UserDocCatalogOverview>(OVERVIEW_PATH, requestInit('GET', signal)),
     history: signal => requestJson<UserDocCatalogHistory>(HISTORY_PATH, requestInit('GET', signal)),

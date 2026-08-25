@@ -1,6 +1,6 @@
 /** Real-file document storage below one runtime-owned document root. */
 
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { constants, type Stats } from 'node:fs'
 import { lstat, link, mkdir, open, readdir, realpath, rename, rmdir, unlink } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
@@ -16,6 +16,7 @@ import {
   DOCUMENT_READ_FAILED_CODE,
   DOCUMENT_TARGET_CONFLICT_CODE,
   DOCUMENT_TOO_LARGE_CODE,
+  DOCUMENT_UPLOAD_SIZE_CODE,
   DOCUMENT_WRITE_FAILED_CODE,
   INVALID_DOCUMENT_DIRECTORY_CODE,
   INVALID_DOCUMENT_REF_CODE,
@@ -44,6 +45,7 @@ import {
 } from './name.ts'
 
 const PARTIAL_SUFFIX = '.part'
+const INTERNAL_UPLOAD_DIRECTORY = '.upload-sessions'
 /* v8 ignore next -- the fallback runs only on platforms whose fs constants omit O_NOFOLLOW. */
 // oxlint-disable-next-line typescript/no-unnecessary-condition -- O_NOFOLLOW is absent on platforms that do not expose the flag.
 const NOFOLLOW = constants.O_NOFOLLOW ?? 0
@@ -247,6 +249,102 @@ export async function saveDocFile(
 }
 
 /**
+ * Publish a fully verified resumable-upload partial file without copying its
+ * bytes or replacing an existing document.
+ * @param root - absolute document root.
+ * @param target - sanitized target resolved by this store.
+ * @param partialPath - private partial file below the same filesystem root.
+ * @param bytes - expected byte count.
+ * @param expectedSha256 - final digest used to recover a publication committed before a crash.
+ * @returns the durable public document reference.
+ */
+export async function publishDocPartial(
+  root: string,
+  target: UserDocTarget,
+  partialPath: string,
+  bytes: number,
+  expectedSha256?: string,
+): Promise<UserDocRef> {
+  assertInside(root, target.path)
+  assertInside(root, partialPath)
+  await assertRealParent(root, target.path)
+
+  // A process can stop after the hard link is committed but before the
+  // session manifest is replaced. On restart the private partial may already
+  // be gone; recover the published target only when its complete bytes match
+  // the final digest recorded by the session.
+  const existing = async (): Promise<UserDocRef | undefined> => {
+    let published
+    try {
+      published = await openDocument(root, target.path)
+    } catch (error) {
+      if (error instanceof UserDocError && error.code === DOCUMENT_NOT_FOUND_CODE) return undefined
+      throw error
+    }
+    try {
+      if (published.info.size !== bytes) return undefined
+      if (expectedSha256 !== undefined && await digestHandle(published.handle) !== expectedSha256) return undefined
+      return documentRef(root, target.path, published.info)
+    } finally {
+      await published.handle.close()
+    }
+  }
+
+  let partial
+  try {
+    partial = await openDocument(root, partialPath)
+  } catch (error) {
+    if (error instanceof UserDocError && error.code === DOCUMENT_NOT_FOUND_CODE) {
+      const recovered = await existing()
+      if (recovered !== undefined) return recovered
+    }
+    throw error
+  }
+  try {
+    if (partial.info.size !== bytes) {
+      throw new UserDocError('The resumable upload size does not match its manifest.', DOCUMENT_UPLOAD_SIZE_CODE)
+    }
+  } finally {
+    await partial.handle.close()
+  }
+  try {
+    await link(partialPath, target.path)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+      const recovered = await existing()
+      if (recovered !== undefined) {
+        await unlink(partialPath).catch(() => {})
+        return recovered
+      }
+      throw new UserDocError('Document target became occupied before publication.', DOCUMENT_TARGET_CONFLICT_CODE)
+    }
+    throw new UserDocError('Unable to publish the uploaded document.', DOCUMENT_WRITE_FAILED_CODE, { cause: error })
+  }
+  // The hard link is the publication commit. A best-effort cleanup keeps a
+  // transient unlink failure from turning a successfully published document
+  // into a failed session; the session cleanup sweep removes the private
+  // directory later.
+  await unlink(partialPath).catch(() => {})
+  const published = await openDocument(root, target.path)
+  await published.handle.close()
+  return documentRef(root, target.path, published.info)
+}
+
+/** Hash an already-open regular file without buffering the document. */
+async function digestHandle(handle: import('node:fs/promises').FileHandle): Promise<string> {
+  const digest = createHash('sha256')
+  const buffer = Buffer.allocUnsafe(1024 * 1024)
+  let position = 0
+  for (;;) {
+    const result = await handle.read(buffer, 0, buffer.byteLength, position)
+    if (result.bytesRead === 0) break
+    digest.update(buffer.subarray(0, result.bytesRead))
+    position += result.bytesRead
+  }
+  return digest.digest('hex')
+}
+
+/**
  * List every stored document below the document root, newest first.
  * @param root - absolute document root.
  * @param signal - optional cancellation.
@@ -267,6 +365,7 @@ export async function listDocFiles(root: string, signal?: AbortSignal): Promise<
       throw new UserDocError('Unable to list stored documents.', DOCUMENT_READ_FAILED_CODE, { cause: error })
     }
     for (const entry of entries) {
+      if (directory === resolve(root) && entry.name === INTERNAL_UPLOAD_DIRECTORY) continue
       const path = join(directory, entry.name)
       if (entry.isDirectory()) {
         pending.push(path)
@@ -301,6 +400,7 @@ export async function listDocDirectory(
   try {
     for (const entry of await readdir(directory, { withFileTypes: true })) {
       signal?.throwIfAborted()
+      if (directoryId === '' && entry.name === INTERNAL_UPLOAD_DIRECTORY) continue
       const path = join(directory, entry.name)
       if (entry.isDirectory()) {
         directories.push(directoryRef(root, path, await directoryInfo(root, path)))
@@ -342,6 +442,7 @@ export async function listDocDirectories(root: string, signal?: AbortSignal): Pr
     const directory = pending.pop() as string
     for (const entry of await readdir(directory, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue
+      if (directory === resolve(root) && entry.name === INTERNAL_UPLOAD_DIRECTORY) continue
       const path = join(directory, entry.name)
       const ref = directoryRef(root, path, await directoryInfo(root, path))
       directories.push(ref)
@@ -365,7 +466,11 @@ export async function createDocDirectory(
 ): Promise<UserDocDirectoryRef> {
   const parent = pathForDirectoryId(root, parentId)
   await directoryInfo(root, parent)
-  const path = resolve(join(parent, sanitizeDirectoryName(name)))
+  const leaf = sanitizeDirectoryName(name)
+  if (parentId === '' && leaf === INTERNAL_UPLOAD_DIRECTORY) {
+    throw new UserDocError('Document directory name is reserved.', INVALID_DOCUMENT_DIRECTORY_CODE)
+  }
+  const path = resolve(join(parent, leaf))
   assertInside(root, path)
   try {
     await mkdir(path, { mode: 0o700 })
@@ -399,7 +504,11 @@ export async function renameDocDirectory(
   }
   const source = pathForDirectoryId(root, directoryId)
   await directoryInfo(root, source)
-  const target = resolve(join(dirname(source), sanitizeDirectoryName(name)))
+  const leaf = sanitizeDirectoryName(name)
+  if (dirname(source) === resolve(root) && leaf === INTERNAL_UPLOAD_DIRECTORY) {
+    throw new UserDocError('Document directory name is reserved.', INVALID_DOCUMENT_DIRECTORY_CODE)
+  }
+  const target = resolve(join(dirname(source), leaf))
   assertInside(root, target)
   if (source === target) return directoryRef(root, source, await directoryInfo(root, source))
   if (await exists(target)) {

@@ -750,6 +750,7 @@ describe('sessions.prompt storage service selection', () => {
         maxFilesPerMessage: 2,
         maxMessageBytes: 100,
         maxInlineTextBytes: 10,
+        upload: { protocol: 'resumable-v1', chunkBytes: 65536, sessionTtlMs: 86400000, resumable: true },
       },
       stat: () => Promise.resolve(document),
       read: () => Promise.resolve({ ref: document, data: new TextEncoder().encode('hello') }),

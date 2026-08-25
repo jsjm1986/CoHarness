@@ -38,6 +38,7 @@ const LIMITS: UserDocLimits = {
   maxFilesPerMessage: 3,
   maxMessageBytes: 128,
   maxInlineTextBytes: 32,
+  upload: { protocol: 'resumable-v1', chunkBytes: 65536, sessionTtlMs: 86400000, resumable: true },
 }
 
 const UNLIMITED_LIMITS: UserDocLimits = {

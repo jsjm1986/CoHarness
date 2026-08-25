@@ -19,6 +19,7 @@ const LIMITS: UserDocLimits = {
   maxFilesPerMessage: 2,
   maxMessageBytes: 100,
   maxInlineTextBytes: 8,
+  upload: { protocol: 'resumable-v1', chunkBytes: 65536, sessionTtlMs: 86400000, resumable: true },
 }
 
 function ref(id: string, bytes: number, name = `${id}.txt`): UserDocRef {

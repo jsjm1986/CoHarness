@@ -24,6 +24,8 @@ Folder rows open the folder and expose Rename and Delete; deletion is confirmed 
 
 Documents are filtered by name and type (image, PDF, text, other), sorted by date, name, or size, and paged 20 rows; date groups apply only to date sort. Checkboxes select across pages; batch move and delete execute one request per id. The default upload policy has no per-document size limit; the message count and aggregate limits remain deployment policy. Preview supports images, PDFs, and text-based files (text capped at 256 KiB); other types show a download fallback. When Gateway `GET /account/api/context` reports a project, the title uses that project name, the caption states member sharing, and delete confirmation adds the all-members warning; a missing collaboration route keeps personal chrome.
 
+Uploads use one resumable session protocol on desktop and mobile. Small files use one chunk; larger files use 8 MiB chunks with per-chunk and final SHA-256 verification. A network interruption does not discard completed chunks: selecting the same file again resumes the session while it is retained by the runtime. The browser stores only opaque session metadata, never document bytes.
+
 ## Scope isolation
 
 Documents are stored per-runtime scope:
@@ -60,4 +62,5 @@ The manager reads and writes the same `/api/documents` store that conversation a
 - Deleting a document does not rewrite session history, so previously sent messages that reference the document can no longer retrieve its content.
 - Cross-scope copies are snapshots, not live synchronization; project-to-project transfers are supported when both scopes are authorized.
 - Listings have no server-side pagination; each current folder is returned in one response and documents are paged in the browser.
+- A completed document remains until the user deletes it; only abandoned, incomplete upload sessions expire automatically.
 - Folder deletion is empty-only; the UI does not recursively delete a folder tree.

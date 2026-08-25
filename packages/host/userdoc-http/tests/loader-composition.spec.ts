@@ -1,5 +1,6 @@
 /** Real Loader composition for the streaming document route and its disposal. */
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -65,11 +66,34 @@ describe('real Loader composition', () => {
   it('serves through Connection and removes the subtree when its owning plugin unloads', { timeout: 60_000 }, async () => {
     const ctx = await load()
     const origin = `http://127.0.0.1:${String(ctx.webServer.port)}`
-    const created = await fetch(`${origin}/api/documents?name=loader.txt`, {
-      method: 'POST', headers: { 'x-dsh-document-upload': '1' }, body: 'loader',
+    const started = await fetch(`${origin}/api/documents/uploads`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ version: 1, name: 'loader.txt', directory: '', bytes: 6, fingerprint: 'loader' }),
     })
-    expect(created.status).toBe(201)
-    expect(await created.json()).toMatchObject({ name: 'loader.txt', bytes: 6 })
+    const session = await started.json() as { uploadId: string }
+    const data = new TextEncoder().encode('loader')
+    const digest = createHash('sha256').update(data).digest('hex')
+    await fetch(`${origin}/api/documents/uploads/${session.uploadId}/chunks/0`, {
+      method: 'PUT',
+      headers: {
+        'content-range': 'bytes 0-5/6',
+        'content-length': '6',
+        'x-dsh-chunk-sha256': digest,
+      },
+      body: data,
+    })
+    const created = await fetch(`${origin}/api/documents/uploads/${session.uploadId}/complete`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ version: 1, sha256: digest }),
+    })
+    expect(created.status).toBe(202)
+    let completed = await fetch(`${origin}/api/documents/uploads/${session.uploadId}`)
+    for (let attempt = 0; completed.status === 202 && attempt < 50; attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 2))
+      completed = await fetch(`${origin}/api/documents/uploads/${session.uploadId}`)
+    }
+    expect(completed.status).toBe(200)
+    expect(await completed.json()).toMatchObject({ state: 'complete', ref: { name: 'loader.txt', bytes: 6 } })
 
     const entry = [...ctx.loader.entries()].find(item => item.options.name === '@deepseek-ai/dsh-host-userdoc-http')
     expect(entry?.fiber).toBeDefined()

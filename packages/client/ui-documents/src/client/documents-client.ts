@@ -23,6 +23,7 @@ import type {
 } from '@deepseek-ai/dsh-userdoc'
 import {
   createUserDocClient, UserDocHttpError, UserDocServiceUnavailableError,
+  type UserDocUploadPhase,
 } from './userdoc-client.ts'
 
 export type {
@@ -46,6 +47,7 @@ export type {
   UserDocCatalogOverview,
   UserDocCatalogHistory,
   UserDocCatalogHistoryItem,
+  UserDocUploadPhase,
 }
 
 export { createUserDocClient, UserDocHttpError, UserDocServiceUnavailableError }

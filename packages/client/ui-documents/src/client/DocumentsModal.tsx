@@ -21,9 +21,10 @@ import {
   useMediaQuery,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import {
-  createUserDocClient, readDocumentsScope, UserDocServiceUnavailableError,
+  createUserDocClient, readDocumentsScope, UserDocHttpError, UserDocServiceUnavailableError,
   type DocumentsWorkspaceScope, type UserDocDirectoryIdType, type UserDocDirectoryRef, type UserDocIdType,
   type UserDocCatalogHistoryItem, type UserDocCatalogRow, type UserDocLimits, type UserDocRef, type UserDocScope,
+  type UserDocUploadPhase,
   type UserDocTransferListedDocument, type UserDocTransferResponse,
 } from './documents-client.ts'
 import { DocumentPreview } from './DocumentPreview.tsx'
@@ -59,6 +60,17 @@ interface UploadProgress {
   current: number
   total: number
   percent: number
+  phase?: UserDocUploadPhase
+}
+
+function uploadErrorMessage(error: unknown, t: (key: DocumentsKey) => string): string {
+  if (!(error instanceof UserDocHttpError)) return t('modal.upload.error')
+  if (error.code === 'DOCUMENT_UPLOAD_STORAGE') return t('modal.upload.error.storage')
+  if (error.code === 'DOCUMENT_UPLOAD_EXPIRED') return t('modal.upload.error.expired')
+  if (error.code === 'DOCUMENT_UPLOAD_HASH') return t('modal.upload.error.hash')
+  if (error.code === 'DOCUMENT_UPLOAD_PROTOCOL') return t('modal.upload.error.protocol')
+  if (error.status === 507) return t('modal.upload.error.storage')
+  return t('modal.upload.error')
 }
 
 type FolderEditor =
@@ -404,19 +416,20 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     setProgress({ current: 0, total: files.length, percent: 0 })
     try {
       for (const [index, file] of files.entries()) {
-        await userDocs.current.upload(file, currentDirectoryId, undefined, (loaded: number, total: number) => {
+        await userDocs.current.upload(file, currentDirectoryId, undefined, (loaded: number, total: number, phase?: UserDocUploadPhase) => {
           setProgress({
             current: index + 1,
             total: files.length,
             percent: total === 0 ? 0 : Math.round((loaded / total) * 100),
+            ...(phase === undefined ? {} : { phase }),
           })
         })
       }
       /* v8 ignore next -- the hidden input stays mounted for the modal lifetime */
       if (fileInputRef.current) fileInputRef.current.value = ''
       void load(currentDirectoryId)
-    } catch {
-      setError(t('modal.upload.error'))
+    } catch (cause) {
+      setError(uploadErrorMessage(cause, t))
     } finally {
       setUploading(false)
       setProgress(null)
@@ -975,7 +988,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
 
   const busy = uploading
   const uploadLabel = progress !== null && uploading
-    ? t('modal.upload.progressCount', {
+    ? t(progress.phase === 'verifying' ? 'modal.upload.verifyingCount' : 'modal.upload.progressCount', {
       current: String(progress.current),
       total: String(progress.total),
       percent: String(progress.percent),
