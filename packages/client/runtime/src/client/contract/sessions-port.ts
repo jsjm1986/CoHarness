@@ -14,7 +14,7 @@ import type { ObservableSnapshot } from './store.ts'
 /** Session-list row facts sibling domains read: recency, blank-reuse eligibility, and its cwd canon. */
 export interface SessionsPortSummary {
   id: SessionId
-  /** Empty-log bit (blank sessions are reused by New Session instead of minting another). */
+  /** No-visible-content bit (blank sessions are reused by New Session instead of minting another). */
   blank: boolean
   cwd?: string
   updatedAt: number

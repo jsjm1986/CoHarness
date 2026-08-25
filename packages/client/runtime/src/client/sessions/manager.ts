@@ -21,7 +21,7 @@ import type { PendingInteractionStatus } from './pending.ts'
 import type {} from '@deepseek-ai/dsh-session-title/client'
 import { Notifier } from './notifier.ts'
 import { ProjectionValueStore } from './projection-store.ts'
-import { Session } from './session.ts'
+import { hasConversationContent, Session } from './session.ts'
 import type { SessionRemotes } from './remotes.ts'
 
 /**
@@ -128,6 +128,8 @@ export class SessionManager {
    *  is instantiated (list rows read the 'title' key), and an instantiated Session adopts the
    *  same store so history-baseline seeding and frames converge on one row set. */
   private readonly projectionStores = new Map<SessionId, ProjectionValueStore>()
+  /** Session ids with durable evidence of non-empty conversation content. */
+  private readonly engagedSessions = new Set<SessionId>()
   private summaries: SessionSummary[] = []
   private listState: 'idle' | 'loading' | 'error' = 'idle'
   /** Arrival phase; the pending → ready edge fires on the first successful pull (see SessionListPhase). */
@@ -449,9 +451,16 @@ export class SessionManager {
       try {
         const { result } = await this.api.sessions.list({})
         if (result.ok) {
-          const baseline = this.listPhase === 'pending'
+          const rawBaseline = this.listPhase === 'pending'
             ? result.value.items
             : mergeOrderedBaseline(established, result.value.items, summary => summary.sessionId)
+          for (const summary of rawBaseline) {
+            if (!summary.blank) this.engagedSessions.add(summary.sessionId)
+          }
+          const baseline = rawBaseline.map(summary =>
+            this.engagedSessions.has(summary.sessionId) && summary.blank
+              ? { ...summary, blank: false }
+              : summary)
           // Seed first observations from the pull-time baseline BEFORE replaying
           // in-flight mutations, then reconcile the reminders after EVERY
           // replayed mutation: an edge that happens entirely between mutations
@@ -467,6 +476,10 @@ export class SessionManager {
             this.syncCompletedNotifications()
           }
           this.summaries = summaries
+          const present = new Set(summaries.map(summary => summary.sessionId))
+          for (const sessionId of this.engagedSessions) {
+            if (!present.has(sessionId)) this.engagedSessions.delete(sessionId)
+          }
           this.listState = 'idle'
           this.listPhase = 'ready'
           // Covers the empty-mutations pull (a plain baseline carries no edge).
@@ -632,6 +645,8 @@ export class SessionManager {
 
   /** Apply immediately and retain for replay when a list response is in flight. */
   private recordMutation(mutation: SessionListMutation): void {
+    if (mutation.kind === 'engaged') this.engagedSessions.add(mutation.sessionId)
+    else if (mutation.kind === 'remove') this.engagedSessions.delete(mutation.sessionId)
     this.listMutations?.push(mutation)
     this.summaries = applyMutation(this.summaries, mutation)
     // Eager edge reconciliation — a snapshot-build-time pass would miss consecutive status frames.
@@ -692,13 +707,15 @@ export class SessionManager {
     if (frame.type === 'stream/error') return // Controller already treats this as stream failure
     if (
       frame.type === 'session/event'
-      && frame.event.type === 'user/message'
-      && frame.event.data.source.kind === 'user'
+      && hasConversationContent(frame.event)
     ) {
-      // session.list supplies the cold baseline, while a direct prompt or an
-      // admitted steer advances it between pulls. Max keeps replayed or
-      // repaired older user messages from moving the row backwards.
-      this.recordMutation({ kind: 'activity', sessionId: frame.sessionId, updatedAt: frame.event.time })
+      // A mux event is the first cross-client proof that a turn produced
+      // visible content. It also advances recency for human-authored prompts;
+      // max keeps replayed or repaired older events from moving the row back.
+      this.recordMutation({ kind: 'engaged', sessionId: frame.sessionId })
+      if (frame.event.type === 'user/message' && frame.event.data.source.kind === 'user') {
+        this.recordMutation({ kind: 'activity', sessionId: frame.sessionId, updatedAt: frame.event.time })
+      }
     }
     if (frame.type === 'session/projection') {
       // Finished host-computed value: land it in the resident store whether or
@@ -1111,11 +1128,11 @@ function applyMutation(summaries: readonly SessionSummary[], mutation: SessionLi
     case 'remove':
       return summaries.filter(summary => summary.sessionId !== mutation.sessionId)
     case 'status':
-      // running:true doubles as the cross-client blank flip (a blank session
-      // never runs, so the first running frame proves a message landed).
+      // Running is independent of blankness: an empty or rejected turn may
+      // still report a running edge before it closes without a message.
       return summaries.map(summary => summary.sessionId === mutation.sessionId
-        && (summary.running !== mutation.running || (mutation.running && summary.blank))
-        ? { ...summary, running: mutation.running, blank: summary.blank && !mutation.running }
+        && summary.running !== mutation.running
+        ? { ...summary, running: mutation.running }
         : summary)
     case 'activity':
       return summaries.map(summary => summary.sessionId === mutation.sessionId

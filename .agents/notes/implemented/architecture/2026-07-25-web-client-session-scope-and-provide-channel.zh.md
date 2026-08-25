@@ -59,16 +59,13 @@ Session 实例与 scope 同生命周期，存活资格 = host listed（一个判
 
 ### blank 位：空会话的可见投影、转正与复用
 
-「实体化但无首条提示词」的会话经 summary 派生位 `blank` 治理（派生列而非 header 字段，SessionHeader 保持不可变）：
+没有可见对话内容的会话经 summary 派生位 `blank` 治理（派生列而非 header 字段，SessionHeader 保持不可变）：
 
-- host 判据：`session.events.length === 0`（零日志事件 = 尚无用户消息）。live 会话 `summarize()` 内存直读；cold 会话恒 `false`——lazy-create 约定保证 never-appended 会话根本不进 `persistence.list()`（JSONL/SQLite 两后端均已实证真 lazy），blank 从不落盘。
+- host 判据：session surface 没有产生非空消息。轮次边界、命令记录和仅用量的 assistant 记录不构成对话内容。live 会话由 `summarize()` 直接读内存；cold 会话使用 projection 提示或有界工件探测，无法验证的大工件保持可见（见[空内容与归档顺序说明](../bug-fix/2026-08-25-session-list-empty-content-and-archive-ordering.zh.md)）。
 - wire 承载两处：`SessionSummary.blank` 必填列；`host/session-added` 帧必填 `blank` 字段（创建时恒 true，供别的 tab 按同一空会话状态入镜像）。
-- client 镜像只降不升（单调），三来源翻转，全部复用既有 wire 信号：
-  - 发送方本地：首次 `prompt()` 的**成功响应**翻 false（受理即证明用户消息已入 host 日志——此点翻转是确证而非乐观；`onEngaged` 同步更新列表镜像，当前 `New Session` 行原地转为普通标题，不新增列表行）。首条提示词被拒则会话保持 blank：与 host 权威对齐、继续显示为 `New Session`、在仍为该工作区成员时保持 connectWorkspace 复用资格。
-  - 其他端：`host/session-status (running:true)` 帧翻转——blank 会话从不 running，首次 running 必然已非 blank；
-  - 重连对齐：`session.list` 的 summary.blank 是权威，错过帧的端下次拉取自然对齐；陈旧的 blank:true 不能把已转正的会话重新标回 blank。
+- client 镜像在收到非空 `session/event` 时转换，不会因为 prompt 受理或 `host/session-status(running:true)` 就转换。manager 在对账列表基线时保留每个会话的证据，因此已受理但为空的轮次仍可复用，收到消息事件的会话也不会被陈旧的 `blank:true` 隐藏。重连在合并这份证据后使用 `session.list` 对齐。
 - 列表纪律：store 保留全部行；Workspace browser 的分组、平铺、搜索和计数共用同一可见投影——所有非 blank 会话都显示，blank 会话只显示 `session.id === sessions.current` 的一条，并强制标题为 `New Session`。切换 Workspace 后，旧 blank 实体仍在镜像中但从列表隐藏，目标 Workspace 的 current blank 显示；因此用户可见面全局至多一条 blank 行。
-- 残留账零 GC：刷新后 blank 会话带位回来，下次同 workspace 且仍为成员时复用，普通单端路径使每个 workspace 至多保留一个；host 重启后 blank 无盘痕自然蒸发；多 tab 竞态多出的空壳只会成为非 current 隐藏行，后续复用消化，不做协调。
+- 残留账：blank 行保留在 store 中供复用，同时从分组表面隐藏；冷空日志仍遵循有界验证策略，多 tab 竞态多出的空壳会保持为非 current 隐藏行，直到后续同 workspace 连接复用其中一个。
 
 ### connectWorkspace：New Session 的唯一入口
 
@@ -125,7 +122,7 @@ slot scope 是闭集 `root | session-maybe | session`：
 | 组件收 wiring 回调包（inject→props 两层下传） | 标准件通道让组件自取；公共 API 收敛为 hooks + 稳定 props |
 | Hero 无会话视图与会话 Conversation 整支互换 | 即使外层 layout 不变，Hero、picker 与 composer 子树仍会一起重建，界面产生整块抖动 |
 | 让 InputBar 自身变成 `session-maybe` | 输入状态机、键盘命令面与动作都被迫接受缺省值；只替换 disabled 输入体能把可选性留在外壳边界 |
-| 专用「转正」帧 | `session-status(running:true)` 语义蕴含转正（blank 会话从不 running），加帧是 wire 多一型换零信息 |
+| 专用「转正」帧 | `session/event` 已携带持久消息证据；running 状态可能先于空轮次或被拒轮次，新增帧会制造第二个真相来源 |
 
 ## 后果
 

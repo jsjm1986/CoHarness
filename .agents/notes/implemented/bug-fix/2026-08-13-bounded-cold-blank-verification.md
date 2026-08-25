@@ -12,9 +12,9 @@ The same cold list used the JSONL artifact mtime for `updatedAt`. Opening a Sess
 
 ## Decision
 
-`dsh-host-apiproxy` registers `sessionListMetadata`, a projection containing `blank` and `lastPromptAt`. The attached summary folds the same functions directly over the live log. `blank` changes only from true to false on `turn/start`; `lastPromptAt` changes only on a `user/message` whose source kind is `user`.
+`dsh-host-apiproxy` registers `sessionListMetadata`, a projection containing `blank` and `lastPromptAt`. The attached summary folds the same functions directly over the live log. `blank` changes only when a non-empty surface message is recorded; empty turns and usage-only assistant messages remain blank. The unit uses state version 2 so rows written with the earlier predicate are not reused; `lastPromptAt` changes only on a `user/message` whose source kind is `user`. The follow-up [empty-content and archive-ordering note](2026-08-25-session-list-empty-content-and-archive-ordering.md) owns the shared predicate and client reconciliation.
 
-A cold summary trusts cached `blank: false`, because a checkpoint prefix containing `turn/start` remains non-blank. Cached `blank: true` and a cache miss do not prove the current log is blank. When persistence exposes a physical artifact through `locate()` and its observed size is at most the `coldBlankProbeMaxBytes` eligibility threshold (default 1 KiB per Session), the gateway calls `readFrom(id, 0)` and folds exact list metadata from the stored prefix. Files above the threshold, backends without a location, vanished artifacts, and failed reads all produce `blank: false`, keeping the Session visible.
+A cold summary trusts cached `blank: false`, because a checkpoint prefix containing a non-empty surface message remains non-blank. Cached `blank: true` and a cache miss do not prove the current log is blank. When persistence exposes a physical artifact through `locate()` and its observed size is at most the `coldBlankProbeMaxBytes` eligibility threshold (default 1 KiB per Session), the gateway calls `readFrom(id, 0)` and folds exact list metadata from the stored prefix. Files above the threshold, backends without a location, vanished artifacts, and failed reads all produce `blank: false`, keeping the Session visible.
 
 `updatedAt` is the later of `createdAt` and `lastPromptAt`. An eligible artifact read supplies exact `lastPromptAt` at no additional I/O cost; other cache misses or stale checkpoints order the Session too old rather than promoting it from an unrelated file write. After each asynchronous cold read, the gateway checks the live store again and replaces the cold result with an attached summary when another request resumed that Session meanwhile.
 
@@ -30,7 +30,7 @@ A cold summary trusts cached `blank: false`, because a checkpoint prefix contain
 
 ## Consequences
 
-Existing small blank JSONL artifacts are hidden without depending on projection-cache availability, and a stale cache cannot hide a stored `turn/start`. A cold list may read each artifact whose observed physical size is within the configured threshold when its cache does not already prove non-blank. The default threshold compares compressed bytes for the shipped Zstandard JSONL backend.
+Existing small blank JSONL artifacts, including logs containing only an empty turn, are hidden without depending on projection-cache availability, and a stale cache cannot hide a stored surface message. A cold list may read each artifact whose observed physical size is within the configured threshold when its cache does not already prove non-blank. The default threshold compares compressed bytes for the shipped Zstandard JSONL backend.
 
 Blank artifacts above the threshold and blank Sessions on location-less backends remain visible. Missing or delayed recency cache entries for artifacts that are not read fall back to `createdAt`. These are conservative degradations: the UI may show an extra empty row or order a Session too low, but it does not hide a conversation or promote one because it was merely opened.
 

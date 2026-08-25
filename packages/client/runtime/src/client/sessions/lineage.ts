@@ -19,7 +19,7 @@ export interface SessionListEntry {
   title?: string
   updatedAt: number
   running: boolean
-  /** Empty-log bit mirrored from the summary; lists hide blank sessions (filtering stays with the consumer). */
+  /** No-visible-content bit mirrored from the summary; lists hide blank sessions (filtering stays with the consumer). */
   blank: boolean
   parentSessionId?: SessionId
   /** Coarse durable origin for navigation filtering; not a continuation capability. */

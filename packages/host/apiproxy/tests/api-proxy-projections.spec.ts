@@ -211,7 +211,7 @@ describe('session.history projections block', () => {
     expect(after.result.value.projections?.asOfSeq).toBe(session.seq - 1)
     expect('test/last-user' in (after.result.value.projections?.values ?? {})).toBe(false)
     expect(after.result.value.projections?.values.sessionListMetadata).toEqual({
-      blank: true,
+      blank: false,
       lastPromptAt: session.events.at(-1)?.time,
     })
   })
@@ -338,7 +338,7 @@ describe('session/projection push frame', () => {
     await new Promise(resolve => setTimeout(resolve, 0))
     const abort = new AbortController()
     const stream = proxy.events.mux({ rpcId: RpcId('t-proj-mux'), payload: {} }, abort.signal)
-    const collected = collect(stream, 5, abort)
+    const collected = collect(stream, 4, abort)
 
     const now = vi.spyOn(Date, 'now').mockReturnValue(100)
     seedMessages(session, 1)
@@ -361,8 +361,7 @@ describe('session/projection push frame', () => {
       (f): f is Extract<MuxFrame, { type: 'session/projection' }> =>
         f.type === 'session/projection' && f.key === 'sessionListMetadata',
     )).toEqual([
-      { type: 'session/projection', sessionId: session.id, key: 'sessionListMetadata', value: { blank: true, lastPromptAt: 100 }, seq: 0 },
-      { type: 'session/projection', sessionId: session.id, key: 'sessionListMetadata', value: { blank: false, lastPromptAt: 100 }, seq: 1 },
+      { type: 'session/projection', sessionId: session.id, key: 'sessionListMetadata', value: { blank: false, lastPromptAt: 100 }, seq: 0 },
       { type: 'session/projection', sessionId: session.id, key: 'sessionListMetadata', value: { blank: false, lastPromptAt: 300 }, seq: 2 },
     ])
     // Frame seq aligns with the tail block's asOfSeq vocabulary (higher-seq-wins compatible).

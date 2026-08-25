@@ -184,12 +184,12 @@ function histResponse(
 }
 
 describe('open', () => {
-  it('keeps a bare Session blank until an authoritative lifecycle signal arrives', () => {
+  it('keeps a bare Session blank until visible content arrives', () => {
     const { session } = makeSession()
     expect(session.getSnapshot()).toMatchObject({ blank: true, composerPhase: 'blank' })
 
     session.handleRunning(true)
-    expect(session.getSnapshot()).toMatchObject({ blank: false, composerPhase: 'active' })
+    expect(session.getSnapshot()).toMatchObject({ blank: true, composerPhase: 'active' })
   })
 
   it('installs the tail page: cold → loading → open with window and nodes in place', async () => {

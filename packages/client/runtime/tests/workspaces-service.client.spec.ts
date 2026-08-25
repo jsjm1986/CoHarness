@@ -185,6 +185,39 @@ describe('WorkspaceManager', () => {
     await refresh
     expect(manager.getSnapshot().items).toEqual([])
   })
+
+  it('does not let an older concurrent archive echo re-show a session', async () => {
+    const api = new FakeApiClient()
+    const first = deferred<Awaited<ReturnType<FakeApiClient['onWorkspaceArchiveSession']>>>()
+    const second = deferred<Awaited<ReturnType<FakeApiClient['onWorkspaceArchiveSession']>>>()
+    api.onWorkspaceArchiveSession = payload =>
+      (payload as { sessionId: SessionId }).sessionId === sid('s1') ? first.promise : second.promise
+    const manager = new WorkspaceManager(api)
+
+    const archiveFirst = manager.archiveSession(sid('s1'))
+    const archiveSecond = manager.archiveSession(sid('s2'))
+    second.resolve(ok({ archivedSessionIds: [sid('s1'), sid('s2')] }))
+    await archiveSecond
+    first.resolve(ok({ archivedSessionIds: [sid('s1')] }))
+    await archiveFirst
+
+    expect(manager.getSnapshot().archivedSessionIds).toEqual([sid('s1'), sid('s2')])
+  })
+
+  it('merges a stale archive frame before a newer refresh baseline', async () => {
+    const api = new FakeApiClient()
+    const gate = deferred<Awaited<ReturnType<FakeApiClient['onWorkspaceList']>>>()
+    api.onWorkspaceList = () => gate.promise
+    const manager = new WorkspaceManager(api)
+    const refresh = manager.refresh()
+    manager.handleHostEnvelope({
+      rpcId: 'stale-frame' as never,
+      payload: { type: 'host/archived-sessions-changed', archivedSessionIds: [sid('s1')] },
+    } as never)
+    gate.resolve(ok({ items: [], archivedSessionIds: [sid('s1'), sid('s2')] }) as never)
+    await refresh
+    expect(manager.getSnapshot().archivedSessionIds).toEqual([sid('s1'), sid('s2')])
+  })
 })
 
 describe('WorkspaceRuntime', () => {
@@ -572,17 +605,18 @@ describe('WorkspaceRuntime', () => {
     await expect(workspaces.archiveSession(sid('ghost'))).rejects.toThrow(/session-not-found/)
     expect(workspaces.list.getSnapshot().archivedSessionIds).toEqual(['s-idle', 's-open'])
 
-    // The changed frame and the list baseline both re-install the full set.
+    // A late, shorter frame is stale because archive membership is append-only;
+    // it must not make the second archived row visible again.
     workspaces.handleHostEnvelope({
       rpcId: 'frame' as never,
       payload: { type: 'host/archived-sessions-changed', archivedSessionIds: [sid('s-idle')] },
     } as never)
     // Frame installs ride the notifier's microtask batch before projecting.
     await new Promise(resolve => setTimeout(resolve, 0))
-    expect(workspaces.list.getSnapshot().archivedSessionIds).toEqual(['s-idle'])
+    expect(workspaces.list.getSnapshot().archivedSessionIds).toEqual(['s-idle', 's-open'])
     api.onWorkspaceList = () => Promise.resolve(ok({ items: [], archivedSessionIds: [sid('s-open')] }) as never)
     await workspaces.refresh()
-    expect(workspaces.list.getSnapshot().archivedSessionIds).toEqual(['s-open'])
+    expect(workspaces.list.getSnapshot().archivedSessionIds).toEqual(['s-idle', 's-open'])
   })
 
   it('clears a current archived by a remote frame and shields the set from a stale in-flight baseline', async () => {
@@ -611,10 +645,10 @@ describe('WorkspaceRuntime', () => {
     gate.resolve(ok({ items: [], archivedSessionIds: [] }))
     await hydration
     expect(workspaces.list.getSnapshot().archivedSessionIds).toEqual(['s-open'])
-    // The next (fresh) baseline is authoritative again.
+    // A later baseline cannot clear an append-only archive membership either.
     api.onWorkspaceList = () => Promise.resolve(ok({ items: [], archivedSessionIds: [] }) as never)
     await workspaces.refresh()
-    expect(workspaces.list.getSnapshot().archivedSessionIds).toEqual([])
+    expect(workspaces.list.getSnapshot().archivedSessionIds).toEqual(['s-open'])
   })
 })
 

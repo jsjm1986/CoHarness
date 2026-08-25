@@ -55,7 +55,7 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
 
 /** Persisted hints used to summarize a cold Session without reading a large log. */
 export interface SessionListMetadata {
-  /** Whether the checkpoint prefix contains no turn/start event. */
+  /** Whether the checkpoint prefix contains no non-empty conversation message. */
   blank: boolean
   /** Latest source.kind=user message time in the checkpoint prefix. */
   lastPromptAt: number | null
@@ -223,12 +223,11 @@ export interface SessionSummary {
   /** Status of the attached agent; always false for cold (unattached) sessions. */
   running: boolean
   /**
-   * Derived conversation-not-started bit: true while no turn has run.
-   * Standalone plugin events — command lifecycle
-   * records, plan/mode, titles, goals — do not open a turn and therefore do
+   * Derived visible-content bit: true while no non-empty conversation message
+   * has been recorded. Standalone plugin events and empty/rejected turns do
    * not clear it. Clients hide blank Sessions from lists and reuse them for
    * New Session on the same workspace. A cold Session is true only when a
-   * small-artifact read verifies that no `turn/start` exists; unavailable
+   * small-artifact read verifies that no non-empty message exists; unavailable
    * or oversized artifacts conservatively report false.
    */
   blank: boolean

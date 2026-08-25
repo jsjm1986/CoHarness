@@ -1,9 +1,9 @@
 /**
- * The summary blank bit means "conversation not started" (no turn has run),
+ * The summary blank bit means "no visible conversation content",
  * not "log empty": standalone plugin events — command lifecycle records,
  * plan/mode, permission knob events, session titles — never flip it, so running /plan or /goal on a
- * fresh session keeps it list-hidden and reusable, while the first accepted
- * prompt's turn/start clears it. The host/session-added frame shares the
+ * fresh session keeps it list-hidden and reusable, while the first visible
+ * message clears it. The host/session-added frame shares the
  * same predicate function (covered by the workspace spec's frame assertion).
  */
 
@@ -13,6 +13,7 @@ import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import SessionStore from '@deepseek-ai/dsh-session'
 import type { Session } from '@deepseek-ai/dsh-session'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import UserQuestionService from '@deepseek-ai/dsh-user-questions'
 import { CommandId } from '@deepseek-ai/dsh-commands/brand'
 // Side-effect type imports: the knob-event SessionEventMap merges.
@@ -64,7 +65,7 @@ async function listBlank(api: ApiProxy, id: string): Promise<boolean | undefined
   return response.result.value.items.find(item => item.sessionId === id)?.blank
 }
 
-describe('summary blank = conversation not started', () => {
+describe('summary blank = no visible conversation content', () => {
   it('standalone events (command lifecycle, plan/mode, title) keep the session blank', async () => {
     const { ctx, api, attach } = await harness()
     const session = ctx.sessions.create()
@@ -80,6 +81,18 @@ describe('summary blank = conversation not started', () => {
     attach(session)
     appendStandalone(session)
     session.append('turn/start', { turn: 0 })
+    session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'hello' }], source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
     expect(await listBlank(api, session.id)).toBe(false)
+  })
+
+  it('keeps a turn with no conversation messages blank', async () => {
+    const { ctx, api, attach } = await harness()
+    const session = ctx.sessions.create()
+    attach(session)
+    session.append('turn/start', { turn: 0 })
+    session.append('turn/end', { turn: 0, reason: { kind: 'completed' } })
+    expect(await listBlank(api, session.id)).toBe(true)
   })
 })

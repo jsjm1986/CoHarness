@@ -62,7 +62,7 @@ export interface SessionSummary {
   /** Finished while not selected and not yet opened — the sidebar's green "done" reminder. Absent = false. */
   completed?: boolean
   /**
-   * Empty-log bit (host summary derivation mirror). New Session reuses a blank
+   * No-visible-content bit (host summary derivation mirror). New Session reuses a blank
    * one targeting the same workspace. Filtering stays with the consumer: the
    * store carries every row, while the Workspace browser shows only the
    * selected blank entry.

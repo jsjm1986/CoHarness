@@ -114,9 +114,9 @@ export type MuxFrame =
  * Host stream frames. session-added carries the lineage anchor, product
  * origin, project cwd, and blank bit (the list-summary fields a client cannot
  * wait for a refresh to learn); the frame fires at session/created, so blank is
- * constantly true — clients flip it on the session's first
- * `host/session-status(running:true)` (a blank session never runs), and a
- * reconnecting client takes `session.list`'s summary.blank as authoritative.
+ * constantly true. A visible message event, rather than a running status,
+ * converts it; a reconnecting client takes `session.list`'s summary.blank as
+ * authoritative.
  * agent-error is the only outlet for live failures with no turn position;
  * workspace-changed pushes the full new snapshot after every durable
  * workspace mutation (create/attach/order change — the client upserts, while

@@ -62,7 +62,10 @@ describe('sessions.list cold merge', () => {
       if (id === sid('small-blank')) {
         return {
           meta: metas[0]!,
-          events: [{ type: 'session/end-seed', seq: 0, time: 700, data: {} }] as SessionEvent[],
+          events: [
+            { type: 'turn/start', seq: 0, time: 700, data: { turn: 1 } },
+            { type: 'turn/end', seq: 1, time: 701, data: { turn: 1, reason: { kind: 'completed' } } },
+          ] as SessionEvent[],
         }
       }
       if (id === sid('small-conversation')) {

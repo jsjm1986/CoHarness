@@ -36,21 +36,16 @@ export class WorkspaceManager {
   private items: Workspace[] = []
   private itemViewsSource: readonly Workspace[] | null = null
   private itemViewsCache: readonly WorkspaceView[] = []
-  // Full-snapshot state (list response / unary response / changed frame all
-  // carry the complete set), so deltas never merge — installs replace.
+  // Archive state is append-only in the current Host API. Every carrier still
+  // sends a complete snapshot, but an older carrier may arrive after a newer
+  // one; retaining the union prevents that stale snapshot from re-showing a
+  // session that was already archived.
   private archivedSessionIds: readonly SessionId[] = []
   private state: WorkspaceListSnapshot['state'] = 'idle'
   private phase: WorkspaceListPhase = 'pending'
   private error: RpcError | null = null
   private inflight: Promise<void> | null = null
   private refreshFrames: WorkspaceDelta[] | null = null
-  /**
-   * True once a frame or unary echo installed the archive set while a list
-   * request was in flight: that install is newer than the pending baseline,
-   * so the baseline's (older) set must not roll it back — the archive
-   * mirror of replaying refreshFrames over the item baseline.
-   */
-  private archivedSupersedesRefresh = false
   /** Latest local reorder request; only its unary echo may install order. */
   private orderRequestGeneration = 0
   /** Increments on order frames so a later remote commit outranks an older unary echo. */
@@ -98,7 +93,7 @@ export class WorkspaceManager {
           items = items.filter(workspace => !this.removedIds.has(workspace.workspaceId))
           for (const delta of frames) items = applyWorkspaceDelta(items, delta)
           this.installViews(items)
-          if (!this.archivedSupersedesRefresh) this.installArchived(result.value.archivedSessionIds)
+          this.installArchived(result.value.archivedSessionIds)
           this.state = 'idle'
           this.phase = 'ready'
         } else {
@@ -112,7 +107,6 @@ export class WorkspaceManager {
         this.error = folded.ok ? null : folded.error
       } finally {
         this.refreshFrames = null
-        this.archivedSupersedesRefresh = false
         this.inflight = null
         this.notifier.markDirty()
       }
@@ -282,15 +276,17 @@ export class WorkspaceManager {
   }
 
   /**
-   * Replace the archive set when membership actually changed (array identity
-   * backs Object.is short-circuits). Host snapshots are append-ordered, so
-   * positional comparison is exact, not merely heuristic.
+   * Install an archive snapshot without allowing transport reordering to
+   * resurrect a row. The current Host surface only appends archive ids, so a
+   * shorter or divergent late snapshot is stale; a future restore operation
+   * will need an explicit revision/reset protocol instead of removing ids here.
+   * @param archivedSessionIds - complete Host archive snapshot.
    */
   private installArchived(archivedSessionIds: readonly SessionId[]): void {
-    if (this.refreshFrames !== null) this.archivedSupersedesRefresh = true
-    if (archivedSessionIds.length === this.archivedSessionIds.length
-      && archivedSessionIds.every((id, index) => id === this.archivedSessionIds[index])) return
-    this.archivedSessionIds = [...archivedSessionIds]
+    const next = mergeArchivedSessionIds(this.archivedSessionIds, archivedSessionIds)
+    if (next.length === this.archivedSessionIds.length
+      && next.every((id, index) => id === this.archivedSessionIds[index])) return
+    this.archivedSessionIds = next
     this.notifier.markDirty()
   }
 
@@ -408,6 +404,26 @@ function applyWorkspaceDelta(items: readonly WorkspaceView[], delta: WorkspaceDe
   return [...items].sort((left, right) =>
     (rank.get(left.workspaceId) ?? Number.MAX_SAFE_INTEGER)
     - (rank.get(right.workspaceId) ?? Number.MAX_SAFE_INTEGER))
+}
+
+/**
+ * Merge two append-only archive snapshots while preserving the newest known
+ * order. A superset snapshot supplies the Host order; a stale subset is
+ * ignored; concurrent divergent snapshots retain both ids until a fresh
+ * baseline supplies their canonical order.
+ * @param current - archive ids already installed locally.
+ * @param incoming - a complete snapshot from a list, unary response, or frame.
+ * @returns the merged archive ids.
+ */
+function mergeArchivedSessionIds(
+  current: readonly SessionId[],
+  incoming: readonly SessionId[],
+): SessionId[] {
+  const currentSet = new Set(current)
+  const incomingSet = new Set(incoming)
+  if (current.every(id => incomingSet.has(id))) return [...incoming]
+  if (incoming.every(id => currentSet.has(id))) return [...current]
+  return [...current, ...incoming.filter(id => !currentSet.has(id))]
 }
 
 /** Move one known id before an optional anchor; unknown ids leave the order unchanged. */

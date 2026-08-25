@@ -9,6 +9,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SessionId } from '@deepseek-ai/dsh-api-remotes/client'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionCreateError, SessionRuntime, scopeOf } from '../src/client/sessions/service.ts'
 import { FakeApiClient, deferred, err, fakeRemote, ok } from './fake-api.client.ts'
 
@@ -633,7 +634,7 @@ describe('scope lifecycle rides the list mirror (entity parity: no client-side p
 })
 
 describe('blank mirror', () => {
-  it('flips blank=false from the running:true status frame (cross-client conversion)', async () => {
+  it('keeps a session blank on a running frame until a message arrives', async () => {
     const b = bench()
     await feedList(b, [{ id: 's1', blank: true }])
     expect(b.svc.list.getSnapshot().byId[sid('s1')]).toMatchObject({ blank: true })
@@ -642,12 +643,27 @@ describe('blank mirror', () => {
       payload: { type: 'host/session-status', sessionId: sid('s1'), running: true },
     })
     await Promise.resolve()
+    expect(b.svc.list.getSnapshot().byId[sid('s1')]).toMatchObject({ blank: true, running: true })
+    expect(b.svc.binding(sid('s1'))?.session.getSnapshot().blank).toBe(true)
+
+    b.svc.handleMuxEnvelope({
+      rpcId: 'event' as never,
+      payload: {
+        type: 'session/event', sessionId: sid('s1'),
+        event: {
+          type: 'user/message', seq: 0, time: 2,
+          data: createUserMessage({ content: [{ type: 'text', text: 'hello' }], source: { kind: 'user' } }),
+          surfaceOp: 'append',
+        },
+      } as never,
+    })
+    await Promise.resolve()
     expect(b.svc.list.getSnapshot().byId[sid('s1')]).toMatchObject({ blank: false, running: true })
-    // The instantiated Session mirrors the same flip.
-    expect(b.svc.binding(sid('s1'))?.session.getSnapshot().blank).toBe(false)
+    await feedList(b, [{ id: 's1', blank: true, running: false }])
+    expect(b.svc.list.getSnapshot().byId[sid('s1')]).toMatchObject({ blank: false })
   })
 
-  it('flips blank=false on prompt ACCEPTANCE, not on the attempt', async () => {
+  it('waits for a visible event after prompt acceptance', async () => {
     const b = bench()
     await feedList(b, [{ id: 's1', blank: true, cwd: '/w/a' }])
     const session = b.svc.binding(sid('s1'))!.session
@@ -655,12 +671,26 @@ describe('blank mirror', () => {
     const gate = deferred<Awaited<ReturnType<FakeApiClient['onPrompt']>>>()
     b.api.onPrompt = () => gate.promise
     const send = session.prompt([{ type: 'text', text: 'hi' }], 'queue')
-    // In flight: still blank (the flip point is the success response, which
-    // proves the user message reached the host log).
+    // In flight: still blank. An accepted RPC does not prove that the
+    // pre-step pipeline produced a visible message.
     expect(session.getSnapshot().blank).toBe(true)
     gate.resolve(ok({ accepted: true as const }))
     await send
-    expect(session.getSnapshot().blank).toBe(false)
+    expect(session.getSnapshot().blank).toBe(true)
+    await Promise.resolve()
+    expect(b.svc.list.getSnapshot().byId[sid('s1')]).toMatchObject({ blank: true })
+
+    b.svc.handleMuxEnvelope({
+      rpcId: 'event' as never,
+      payload: {
+        type: 'session/event', sessionId: sid('s1'),
+        event: {
+          type: 'user/message', seq: 0, time: 2,
+          data: createUserMessage({ content: [{ type: 'text', text: 'hi' }], source: { kind: 'user' } }),
+          surfaceOp: 'append',
+        },
+      } as never,
+    })
     await Promise.resolve()
     expect(b.svc.list.getSnapshot().byId[sid('s1')]).toMatchObject({ blank: false })
   })
@@ -696,16 +726,16 @@ describe('blank mirror', () => {
     expect(b.svc.list.getSnapshot().byId[sid('s-new')]).toMatchObject({ blank: false })
   })
 
-  it('never re-blanks: a stale blank=true summary cannot hide an engaged session', async () => {
+  it('keeps an accepted empty turn hidden across a stale list refresh', async () => {
     const b = bench()
     await feedList(b, [{ id: 's1', blank: true }])
     const session = b.svc.binding(sid('s1'))!.session
     await session.prompt([{ type: 'text', text: 'hi' }], 'queue')
     await Promise.resolve()
-    expect(b.svc.list.getSnapshot().byId[sid('s1')]).toMatchObject({ blank: false })
-    // The next list pull still claims blank (host hasn't logged the message yet).
+    expect(b.svc.list.getSnapshot().byId[sid('s1')]).toMatchObject({ blank: true })
+    // The next list pull still claims blank because no visible event landed.
     await feedList(b, [{ id: 's1', blank: true }])
-    expect(b.svc.binding(sid('s1'))?.session.getSnapshot().blank).toBe(false)
+    expect(b.svc.binding(sid('s1'))?.session.getSnapshot().blank).toBe(true)
   })
 })
 
