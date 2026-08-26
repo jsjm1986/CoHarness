@@ -52,6 +52,9 @@ const STATIC_MISS_CODES: ReadonlySet<string | undefined> = new Set([
   'ENOTDIR',
 ])
 
+/** Vite asset paths carry a content hash and can be cached across shell reloads. */
+const IMMUTABLE_ASSET_PATH = /^\/assets\/[^/]+-[A-Za-z0-9_-]{8,}\.[^/]+$/u
+
 /**
  * Serve one GET/HEAD static request from the dist root.
  * @param pathname - decoded URL pathname of the request.
@@ -92,7 +95,12 @@ export async function serveStatic(
     res.end()
     return
   }
-  res.writeHead(200, { 'content-type': type })
+  res.writeHead(200, {
+    'content-type': type,
+    ...(IMMUTABLE_ASSET_PATH.test(pathname)
+      ? { 'cache-control': 'public, max-age=31536000, immutable' }
+      : {}),
+  })
   res.end(body)
 }
 

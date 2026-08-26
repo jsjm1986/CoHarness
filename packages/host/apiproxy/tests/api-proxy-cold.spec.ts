@@ -269,6 +269,54 @@ describe('attached updatedAt tracks human prompts', () => {
 })
 
 describe('cold history recovery view', () => {
+  it('reuses a detached conversation tail through the persistence revision', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(UserQuestionService)
+    const sessionId = sid('session-cached-tail')
+    const meta = header(sessionId, 1000)
+    let revision = SessionPersistenceRevision('tail:1')
+    let events: SessionEvent[] = [{
+      type: 'user/message',
+      seq: 0,
+      time: 1100,
+      data: createUserMessage({ content: [{ type: 'text', text: 'first' }], source: { kind: 'user' } }),
+      surfaceOp: 'append',
+    }]
+    const inspect = vi.fn(async () => ({ meta, events }))
+    const listSnapshots = vi.fn(async () => [{ header: meta, revision }])
+    ctx.provide('sessionPersistence', {
+      list: () => Promise.resolve([meta]),
+      inspect,
+      listSnapshots,
+      locate: () => undefined,
+    } as never)
+    const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })
+
+    const first = await api.sessions.history(request({ sessionId, detail: 'conversation' }))
+    if (!first.result.ok) throw new Error('first history failed')
+    first.result.value.events.length = 0
+    const second = await api.sessions.history(request({ sessionId, detail: 'conversation' }))
+    if (!second.result.ok) throw new Error('second history failed')
+    expect(second.result.value.events).toHaveLength(1)
+    expect(inspect).toHaveBeenCalledOnce()
+    expect(listSnapshots).toHaveBeenCalledTimes(3)
+
+    revision = SessionPersistenceRevision('tail:2')
+    events = [...events, {
+      type: 'user/message',
+      seq: 1,
+      time: 1200,
+      data: createUserMessage({ content: [{ type: 'text', text: 'second' }], source: { kind: 'user' } }),
+      surfaceOp: 'append',
+    }]
+    const third = await api.sessions.history(request({ sessionId, detail: 'conversation' }))
+    if (!third.result.ok) throw new Error('third history failed')
+    expect(third.result.value.events).toHaveLength(2)
+    expect(inspect).toHaveBeenCalledTimes(2)
+    expect(listSnapshots).toHaveBeenCalledTimes(5)
+  })
+
   it('shows in-memory interruption repair without activating the session', async () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)

@@ -28,7 +28,7 @@ Settings 分节中的 `reasoningEffort` 在 agent-default-model 插件配置中�
 
 首个回答认领待处理请求之前，系统会对照该请求校验问题响应。多选题的回答项可以同时携带 `selected` 中的请求选项标签与非空 `custom` 文本；单选题的回答项必须二选一。标签重复、标签未知、id 不匹配、批次不完整以及自定义文本为空都会以 `bad-response` 拒绝。
 
-`session.history` 会读取已附加 Session 的内存状态，或通过持久化检查冷日志，而不会恢复或发布 agent，然后按追加来源的消息边界分页：`maxMessages` 统计以追加方式进入 surface 的 `user/message` 和 `assistant/message` 事件，因此仅供模型使用的替换副本不占用配额。每一页仍是一段连续的原始事件区间，从而让压缩（compaction）的仅日志 `compaction/summary` 记录与引用它的替换留在同一页。
+`session.history` 会读取已附加 Session 的内存状态，或通过持久化检查冷日志，而不会恢复或发布 agent，然后按追加来源的消息边界分页：`maxMessages` 统计以追加方式进入 surface 的 `user/message` 和 `assistant/message` 事件，因此仅供模型使用的替换副本不占用配额。每一页仍是一段连续的原始事件区间，从而让压缩（compaction）的仅日志 `compaction/summary` 记录与引用它的替换留在同一页。Web 的 `detail: 'conversation'` 尾页会在每个 Runtime 内按已附加/分离的来源类型、追加日志身份（分离来源还使用持久化版本）、请求页大小和投影注册集版本放入有界缓存；会话事件、工具注册表或投影 key 变化会使其失效，其他历史请求仍走未缓存路径。
 
 `session.history` 与 `subagent.history` 会在该会话记录的组合中计算工具卡片 presenter：已附着会话使用现有 Agent 作用域，冷读则使用 preset 的 standing 作用域而不恢复 Agent。因此已附着的 subagent 会显示 child-local presenter；冷读对于只存在于 child 作用域的 presenter 保留通用卡片。
 

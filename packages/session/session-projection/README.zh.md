@@ -10,6 +10,7 @@
 
 - `ctx.sessionProjections.register(definition): () => void` 注册一个领域的单元。key 重复或 `stateVersion` 非法都会 throw；注册是挂在调用方 fiber 上的 effect，领域插件卸载后其 key（连同缓存的 cell）从后续驱动与快照中消失——客户端将其读作能力缺失。
 - `ctx.sessionProjections.onChanged(listener): () => void` 订阅变更流：每个已提交事件、每个状态引用发生变化的客户端可见单元各回调一次，携带经 schema 校验的 view 与致因 seq。与 `register` 一样绑定 effect。
+- `ctx.sessionProjections.revision`：供读模型缓存使用的单调注册集版本；仅在投影 key 添加或移除时变化，普通值更新不会改变它。
 - `ctx.sessionProjections.stateOf(session, key)` 读取一个已注册单元的当前 host 状态，不计算无关 view。返回值是活的只读引用；调用方不得修改。
 - `ctx.sessionProjections.snapshot(session): ProjectionSnapshot` 对全部已注册客户端可见单元做一次一致的同步切面——`{ asOfSeq, values }`，其中 `asOfSeq` = 所有值共同反映到的最后一个事件的 seq（空日志为 `-1`）。host-only 状态只能通过 `stateOf` 读取。
 

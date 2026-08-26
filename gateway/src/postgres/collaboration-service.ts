@@ -34,7 +34,7 @@ interface LockedAuthority {
 export class PostgresCollaborationService {
   constructor(private readonly context: PostgresRuntimeContext) {}
 
-  private async projectAuthorities(userId: number): Promise<ProjectAuthorityView[]> {
+  private async projectAuthorities(userId: number, projectId?: number): Promise<ProjectAuthorityView[]> {
     const result = await this.context.pool.query<{
       public_id: string
       name: string
@@ -55,8 +55,9 @@ export class PostgresCollaborationService {
         AND member.project_id=p.id AND member.user_id=actor.id
       WHERE actor.organization_id=$1 AND actor.public_id=$2 AND actor.status='active'
         AND p.status='active' AND (membership.role='admin' OR member.user_id IS NOT NULL)
+        AND ($4::bigint IS NULL OR p.public_id=$4)
       ORDER BY p.name,p.public_id`,
-    [this.context.organizationId, userId, this.context.nodeId])
+    [this.context.organizationId, userId, this.context.nodeId, projectId ?? null])
     return result.rows.map(row => ({
       projectId: publicNumber(row.public_id, 'project'),
       name: row.name,
@@ -71,7 +72,7 @@ export class PostgresCollaborationService {
   }
 
   async projectForUser(projectId: number, userId: number): Promise<ProjectAuthorityView | null> {
-    return (await this.projectAuthorities(userId)).find(project => project.projectId === projectId) ?? null
+    return (await this.projectAuthorities(userId, projectId))[0] ?? null
   }
 
   async internalProject(projectId: number): Promise<{

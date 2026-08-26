@@ -370,6 +370,68 @@ describe('gateway server', () => {
     ])
   })
 
+  it('builds account context owner flags from one project catalog read', async () => {
+    const { deps, base } = await setup()
+    const project = await deps.projects.create({ name: 'context-project', createdBy: 1 })
+    deps.collaboration = {
+      projectsForUser: () => [{ projectId: project.id, name: project.name, path: project.path, mode: 'rw' }],
+      projectForUser: () => ({
+        projectId: project.id, name: project.name, path: project.path, mode: 'rw', administrator: true,
+      }),
+      access: () => { throw new Error('not implemented in context test') },
+      listConversations: () => [],
+      readableSessionIds: () => [],
+      setVisibility: () => { throw new Error('not implemented in context test') },
+      claimInteraction: () => false,
+    } satisfies GatewayCollaborationService
+    const list = vi.spyOn(deps.projects, 'list')
+    const detail = vi.spyOn(deps.projects, 'getById')
+    const cookie = await login(base, 'root-admin', 'pw-12345678')
+
+    const response = await fetch(`${base}/account/api/context`, { headers: { cookie } })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({
+      projects: [expect.objectContaining({ name: 'context-project', canManage: true })],
+    })
+    // The collaboration stub supplies the membership set; one catalog read
+    // supplies all owner rows, with no per-project detail read.
+    expect(list).toHaveBeenCalledTimes(1)
+    expect(detail).not.toHaveBeenCalled()
+  })
+
+  it('keeps the detail fallback for legacy catalogs without owner metadata', async () => {
+    const { deps, base } = await setup()
+    const project = await deps.projects.create({ name: 'legacy-context-project', createdBy: 1 })
+    const catalog = vi.spyOn(deps.projects, 'list').mockReturnValue([{
+      id: project.id,
+      name: project.name,
+      path: project.path,
+      memberCount: project.memberCount,
+      origin: project.origin,
+    }])
+    deps.collaboration = {
+      projectsForUser: () => [{ projectId: project.id, name: project.name, path: project.path, mode: 'rw' }],
+      projectForUser: () => ({
+        projectId: project.id, name: project.name, path: project.path, mode: 'rw', administrator: true,
+      }),
+      access: () => { throw new Error('not implemented in legacy context test') },
+      listConversations: () => [],
+      readableSessionIds: () => [],
+      setVisibility: () => { throw new Error('not implemented in legacy context test') },
+      claimInteraction: () => false,
+    } satisfies GatewayCollaborationService
+    const detail = vi.spyOn(deps.projects, 'getById')
+    const cookie = await login(base, 'root-admin', 'pw-12345678')
+
+    const response = await fetch(`${base}/account/api/context`, { headers: { cookie } })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({
+      projects: [expect.objectContaining({ name: 'legacy-context-project', canManage: true })],
+    })
+    expect(catalog).toHaveBeenCalledTimes(1)
+    expect(detail).toHaveBeenCalledWith(project.id)
+  })
+
   it('starts the selected runtime before persisting a personal or project scope', async () => {
     const { deps, base } = await setup()
     installProjectCollaboration(deps)

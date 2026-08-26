@@ -35,6 +35,8 @@ async function loadComposition(): Promise<Context> {
   const distIndex = join(dist, 'index.html')
   await writeFile(distIndex, '<head></head><body>shell</body>')
   await writeFile(join(dist, 'app.js'), 'export {}')
+  await mkdir(join(dist, 'assets'))
+  await writeFile(join(dist, 'assets', 'app-12345678.js'), 'export const hashed = true')
   await writeFile(join(dist, 'blob.bin'), 'BLOB')
   await writeFile(join(dist, 'manifest.webmanifest'), '{}')
   await mkdir(join(dist, 'empty'))
@@ -96,6 +98,9 @@ describe('real Loader composition', () => {
 
     // Real assets with their MIME types; a live rebuild is served on the next read.
     expect(await request(port, '/app.js')).toMatchObject({ status: 200, type: 'text/javascript; charset=utf-8', body: 'export {}' })
+    const hashed = await fetch(`http://127.0.0.1:${String(port)}/assets/app-12345678.js`)
+    expect(hashed.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
+    await hashed.text()
     expect(await request(port, '/manifest.webmanifest')).toMatchObject({
       status: 200,
       type: 'application/manifest+json',

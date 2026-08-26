@@ -158,6 +158,38 @@ describe('session.history projections block', () => {
     expect('projections' in older.result.value).toBe(false)
   })
 
+  it('reuses an unchanged conversation tail and invalidates it when projections change', async () => {
+    const { ctx, session } = await harness(true)
+    const dispose = ctx.sessionProjections.register(lastUserUnit())
+    seedMessages(session, 1)
+    const proxy = api(ctx)
+    const snapshot = vi.spyOn(ctx.sessionProjections, 'snapshot')
+
+    const first = await proxy.sessions.history(request({ sessionId: session.id, detail: 'conversation' }))
+    const callsAfterFirst = snapshot.mock.calls.length
+    const second = await proxy.sessions.history(request({ sessionId: session.id, detail: 'conversation' }))
+    expect(first.result).toEqual(second.result)
+    expect(snapshot).toHaveBeenCalledTimes(callsAfterFirst)
+
+    ctx.emit('tools/change')
+    const afterTools = await proxy.sessions.history(request({ sessionId: session.id, detail: 'conversation' }))
+    expect(afterTools.result).toEqual(first.result)
+    expect(snapshot).toHaveBeenCalledTimes(callsAfterFirst + 1)
+
+    dispose()
+    const third = await proxy.sessions.history(request({ sessionId: session.id, detail: 'conversation' }))
+    expect(third.result.ok).toBe(true)
+    if (!third.result.ok) throw new Error('unreachable')
+    expect('test/last-user' in (third.result.value.projections?.values ?? {})).toBe(false)
+    expect(snapshot).toHaveBeenCalledTimes(callsAfterFirst + 2)
+
+    seedMessages(session, 1)
+    const fourth = await proxy.sessions.history(request({ sessionId: session.id, detail: 'conversation' }))
+    expect(fourth.result.ok).toBe(true)
+    if (!fourth.result.ok) throw new Error('unreachable')
+    expect(fourth.result.value.events.length).toBeGreaterThan(third.result.value.events.length)
+  })
+
   it('serves no block when the composition has no projection registry', async () => {
     const { ctx, session } = await harness(false)
     seedMessages(session, 2)
