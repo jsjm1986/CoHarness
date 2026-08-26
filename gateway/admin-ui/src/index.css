@@ -1569,6 +1569,350 @@ a {
   gap: 18px;
 }
 
+.archiveConversationReader {
+  display: grid;
+  gap: 14px;
+}
+
+.archiveConversation {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.archiveConversationHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.archiveConversationHeader h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.archiveConversationHeader p {
+  margin: 3px 0 0;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.archiveConversationStats {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.archiveConversationStats span + span::before {
+  content: "·";
+  margin-right: 6px;
+  color: var(--border-strong);
+}
+
+.archiveChatTimeline {
+  display: grid;
+  gap: 15px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-subtle);
+}
+
+.archiveChatMessage {
+  display: grid;
+  max-width: min(86%, 720px);
+  gap: 5px;
+  min-width: 0;
+}
+
+.archiveChatMessage-user {
+  justify-self: end;
+  justify-items: end;
+}
+
+.archiveChatMessage-assistant {
+  justify-self: start;
+}
+
+.archiveChatMessageMeta,
+.archiveToolHeader,
+.archiveRawEventMeta {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+.archiveChatMessageMeta time,
+.archiveToolHeader time,
+.archiveSystemCard time,
+.archiveRawEvent summary time {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.archiveChatBubble {
+  min-width: 0;
+  padding: 10px 13px;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.archiveChatMessage-user .archiveChatBubble {
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--border));
+  border-bottom-right-radius: 5px;
+  background: var(--accent-soft);
+}
+
+.archiveChatMessage-assistant .archiveChatBubble {
+  border-bottom-left-radius: 5px;
+}
+
+.archiveMessageText {
+  max-height: min(42dvh, 380px);
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.65;
+}
+
+.archiveMessageNotice {
+  display: block;
+  margin-top: 7px;
+  color: var(--warning);
+  font-size: 11px;
+}
+
+.archiveEventRole {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.archiveEventRole-tool {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.archiveEventRole-system {
+  background: var(--surface-strong);
+  color: var(--text-secondary);
+}
+
+.archiveToolCard,
+.archiveSystemCard {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.archiveToolCard {
+  display: grid;
+  max-width: min(94%, 760px);
+  gap: 10px;
+  justify-self: start;
+  padding: 11px 13px;
+}
+
+.archiveToolHeader strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.archiveInlineDetails,
+.archiveRawDetails {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-subtle);
+}
+
+.archiveInlineDetails summary,
+.archiveRawDetails > summary,
+.archiveRawEvent > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 34px;
+  gap: 10px;
+  padding: 7px 10px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+.archiveInlineDetails summary::marker,
+.archiveRawDetails > summary::marker,
+.archiveRawEvent > summary::marker {
+  color: var(--text-tertiary);
+}
+
+.archiveInlineDetails pre,
+.archiveRawEvent pre {
+  max-height: 260px;
+  margin: 0;
+  padding: 9px 10px 11px 28px;
+  overflow: auto;
+  border-top: 1px solid var(--border);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.archiveToolResult {
+  display: grid;
+  gap: 5px;
+  padding: 9px 10px;
+  border-radius: var(--radius-md);
+  background: var(--surface-subtle);
+}
+
+.archiveToolResult > span,
+.archiveToolResult > small {
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+.archiveToolResult-error {
+  background: var(--danger-soft);
+}
+
+.archiveToolResult-error > span,
+.archiveToolResult-error > small {
+  color: var(--danger);
+}
+
+.archiveToolPending,
+.archiveConversationHint {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.archiveSystemCard {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 11px;
+  color: var(--text-secondary);
+}
+
+.archiveSystemCard > div {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.archiveSystemCard strong {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.archiveSystemCard > div > span {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.archiveSystemCard-warning {
+  border-color: color-mix(in srgb, var(--warning) 28%, var(--border));
+  background: var(--warning-soft);
+}
+
+.archiveSystemCard-warning .archiveEventRole-system {
+  background: color-mix(in srgb, var(--warning) 18%, var(--surface));
+  color: var(--warning);
+}
+
+.archiveSystemCard-success {
+  border-color: color-mix(in srgb, var(--success) 28%, var(--border));
+  background: var(--success-soft);
+}
+
+.archiveSystemCard-success .archiveEventRole-system {
+  background: color-mix(in srgb, var(--success) 18%, var(--surface));
+  color: var(--success);
+}
+
+.archiveRawDetails {
+  overflow: hidden;
+}
+
+.archiveRawDetails > summary {
+  min-height: 42px;
+  padding: 9px 12px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.archiveRawCount {
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.archiveTechnicalDetails {
+  display: grid;
+  gap: 14px;
+  padding: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.archiveRawTimeline {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  max-height: min(46dvh, 520px);
+  overflow: auto;
+}
+
+.archiveRawEvent {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.archiveRawEvent[open] > summary {
+  border-bottom: 1px solid var(--border);
+}
+
+.archiveRawEventMeta {
+  flex-wrap: wrap;
+  padding: 8px 10px 0 28px;
+}
+
+.archiveRawEventMeta span:first-child {
+  color: var(--text-secondary);
+}
+
 .archiveDescendants {
   display: grid;
   gap: 8px;
@@ -1615,45 +1959,6 @@ a {
 .archiveDescendants li code {
   color: var(--text-tertiary);
   font-size: 11px;
-}
-
-.archiveTimeline {
-  display: grid;
-  gap: 10px;
-  max-height: min(58dvh, 720px);
-  overflow: auto;
-  padding-right: 4px;
-}
-
-.archiveEvent {
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface-subtle);
-}
-
-.archiveEventMeta {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  color: var(--text-tertiary);
-  font-size: 11px;
-}
-
-.archiveEventMeta small {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.archiveEvent pre {
-  max-height: 260px;
-  margin: 8px 0 0;
-  overflow: auto;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  color: var(--text);
-  font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 .documentIdentity {
@@ -2734,6 +3039,37 @@ a {
   .archiveBulkBar {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .archiveConversationHeader {
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .archiveConversationStats {
+    white-space: normal;
+  }
+
+  .archiveChatTimeline {
+    padding: 11px;
+  }
+
+  .archiveChatMessage,
+  .archiveToolCard {
+    max-width: 100%;
+  }
+
+  .archiveSystemCard {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .archiveSystemCard time {
+    grid-column: 2;
+    margin-left: 0;
+  }
+
+  .archiveRawDetails > summary {
+    align-items: flex-start;
   }
 
   .archiveDescendants li {
