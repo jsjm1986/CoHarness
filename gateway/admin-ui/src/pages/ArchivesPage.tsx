@@ -4,6 +4,7 @@ import {
   ChevronRight,
   Eye,
   Filter,
+  SearchCheck,
   RotateCcw,
   Trash2,
   Undo2,
@@ -14,6 +15,9 @@ import {
   exportArchive,
   getArchive,
   listArchives,
+  previewEmptyDrafts,
+  trashEmptyDrafts,
+  type EmptyDraftCandidate,
   type ConversationArchiveDetail,
   type ConversationArchiveRow,
   type ConversationArchiveState,
@@ -50,6 +54,10 @@ export function ArchivesPage() {
   const [pendingAction, setPendingAction] = useState<'restore' | 'trash' | 'purge' | null>(null)
   const [confirmAction, setConfirmAction] = useState<'restore' | 'trash' | 'purge' | null>(null)
   const [actionError, setActionError] = useState('')
+  const [emptyCandidates, setEmptyCandidates] = useState<EmptyDraftCandidate[]>([])
+  const [emptySelected, setEmptySelected] = useState<Set<string>>(new Set())
+  const [emptyLoading, setEmptyLoading] = useState(false)
+  const [emptyError, setEmptyError] = useState('')
 
   const fetchRows = useCallback(async (filter: Draft, nextOffset: number, showLoading = true) => {
     const userId = filter.userId === '' ? undefined : Number(filter.userId)
@@ -85,6 +93,34 @@ export function ArchivesPage() {
     event.preventDefault()
     setActive(draft)
     void fetchRows(draft, 0)
+  }
+
+  async function scanEmptyDrafts() {
+    setEmptyLoading(true)
+    setEmptyError('')
+    try {
+      const result = await previewEmptyDrafts({ limit: 200 })
+      setEmptyCandidates(result.candidates)
+      setEmptySelected(new Set())
+    } catch (cause) {
+      setEmptyError(messageFrom(cause))
+    } finally {
+      setEmptyLoading(false)
+    }
+  }
+
+  async function moveEmptyDraftsToTrash() {
+    if (emptySelected.size === 0) return
+    setEmptyLoading(true)
+    setEmptyError('')
+    try {
+      await trashEmptyDrafts([...emptySelected])
+      await scanEmptyDrafts()
+    } catch (cause) {
+      setEmptyError(messageFrom(cause))
+    } finally {
+      setEmptyLoading(false)
+    }
   }
 
   function resetFilters() {
@@ -143,6 +179,24 @@ export function ArchivesPage() {
         )}
       />
       <ErrorBanner message={error} />
+      <Section title="空白会话维护" meta="仅管理员可见">
+        <div className="archiveBulkBar">
+          <span>先扫描一小时无可见内容的会话，再将选中项移入可恢复回收站。</span>
+          <div className="pageActionGroup">
+            <Button icon={SearchCheck} onClick={() => { void scanEmptyDrafts() }} loading={emptyLoading}>扫描</Button>
+            <Button icon={Trash2} variant="danger" disabled={emptySelected.size === 0 || emptyLoading} onClick={() => { void moveEmptyDraftsToTrash() }}>清理选中空草稿</Button>
+          </div>
+        </div>
+        <ErrorBanner message={emptyError} />
+        {emptyCandidates.length === 0 ? <p className="mutedText">尚未发现待维护的空白会话。</p> : (
+          <div className="mobileList">{emptyCandidates.map(candidate => (
+            <label className="mobileItem" key={candidate.rootSessionId}>
+              <span className="checkLabel"><input type="checkbox" checked={emptySelected.has(candidate.rootSessionId)} onChange={event => setEmptySelected(nextSelection(emptySelected, candidate.rootSessionId, event.target.checked))} /><strong>{candidate.rootSessionId}</strong></span>
+              <span className="mutedText">{candidate.creator?.displayName ?? '未知用户'} · {candidate.eventCount} 条事件 · {formatTime(candidate.updatedAt)}</span>
+            </label>
+          ))}</div>
+        )}
+      </Section>
       <Section title="筛选条件">
         <form className="filterPanel" onSubmit={onFilter}>
           <div className="filterGrid">

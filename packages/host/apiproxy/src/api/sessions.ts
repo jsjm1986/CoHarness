@@ -8,7 +8,8 @@ import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { ModelModality } from '@deepseek-ai/dsh-llm'
 import type { AttachmentIdType, ImageAttachmentLimits, ImageAttachmentRef, ImageMediaType } from '@deepseek-ai/dsh-attachment'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm/types'
-import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session/types'
+import type { SessionDraftId, SessionEvent, SessionId } from '@deepseek-ai/dsh-session/types'
+export type { SessionDraftId } from '@deepseek-ai/dsh-session/types'
 // The pure-type outlet: api/ is browser-importable, and the package root's
 // cordis Context merge (via dsh-agent) must not enter client aggregates.
 import type { SessionProjectionMap } from '@deepseek-ai/dsh-session-projection/types'
@@ -57,10 +58,13 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
 export interface SessionListMetadata {
   /** Whether the checkpoint prefix contains no non-empty conversation message. */
   blank: boolean
+  /** Highest event sequence contributing visible conversation content. */
+  visibleContentSeq: number | null
   /** Latest source.kind=user message time in the checkpoint prefix. */
   lastPromptAt: number | null
 }
 
+/** Browser-owned opaque identity for one unmaterialized draft reservation. */
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {
     /**
@@ -231,6 +235,8 @@ export interface SessionSummary {
    * or oversized artifacts conservatively report false.
    */
   blank: boolean
+  /** Durable content watermark used to reconcile stale client list state. */
+  visibleContentSeq?: number
   /** fork/spawn lineage (session.header.parentSession passthrough); absent for root sessions. */
   parentSessionId?: SessionId
   /** Coarse durable origin used by navigation surfaces; never proves resumability. */
@@ -313,8 +319,9 @@ export interface SessionsApi {
     agentPreset?: string
     visibility?: 'project' | 'private'
     reuseWorkspaceBlank?: true
+    draftId?: SessionDraftId
   }>):
-  Promise<RpcResponse<{ sessionId: SessionId; agentPreset?: string }>>
+  Promise<RpcResponse<{ sessionId: SessionId; agentPreset?: string; draft?: true }>>
 
   /**
    * Reads a window of history events; page boundaries align to append-origin message

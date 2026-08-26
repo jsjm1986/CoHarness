@@ -17,6 +17,7 @@ import { randomBytes } from 'node:crypto'
 import {
   DEFAULT_PREPARED_SESSION_CACHE_SIZE, DEFAULT_WRITE_BATCH_MAX_DELAY_MS, MAX_WRITE_BATCH_DELAY_MS,
   SessionPersistence, SessionPersistenceRevision, PersistenceCoordinator, SessionFormatUnsupportedError,
+  sessionContentMetadata,
   type PersistenceBackend, type SessionLocation, type SessionPersistenceSnapshot,
   type SessionInspection, type SessionPersistenceRevision as PersistenceRevision, type SessionRawArtifact,
   type StoredPrefix,
@@ -467,6 +468,15 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     for (const artifact of await this.listArtifacts(signal)) {
       signal?.throwIfAborted()
       try {
+        if (artifact.header.draft === true) {
+          const stored = await this.readPrefix(artifact.path, artifact.header.id, signal)
+          snapshots.push({
+            header: stored.meta,
+            revision: stored.revision,
+            content: sessionContentMetadata(stored.events),
+          })
+          continue
+        }
         const identity = await stat(artifact.path, { bigint: true })
         signal?.throwIfAborted()
         snapshots.push({

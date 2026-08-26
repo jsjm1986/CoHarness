@@ -6,13 +6,52 @@
  */
 
 import { Context, Service } from '@deepseek-ai/cordis'
-import { SessionPreparation } from '@deepseek-ai/dsh-session'
-import type { SessionEvent, SessionId, SessionHeader } from '@deepseek-ai/dsh-session'
+import { hasConversationContent, SessionPreparation } from '@deepseek-ai/dsh-session'
+import type { SessionDraftId, SessionEvent, SessionId, SessionHeader } from '@deepseek-ai/dsh-session'
 import type { SessionPersistenceRevision } from './revision.ts'
 
 // Re-export the metadata vocabulary so Consumers import it from the Service Definition.
 export type { SessionHeader } from '@deepseek-ai/dsh-session'
 export { SessionPersistenceRevision } from './revision.ts'
+
+/** Durable content facts returned by a backend that can answer cold listings authoritatively. */
+export interface SessionContentMetadata {
+  readonly blank: boolean
+  readonly visibleContentSeq: number | null
+  readonly lastPromptAt: number | null
+}
+
+/**
+ * Fold authoritative cold-list content facts from one complete event prefix.
+ * @param events - contiguous session events in sequence order.
+ * @returns blankness, the latest visible-content sequence, and latest human prompt time.
+ */
+export function sessionContentMetadata(events: readonly SessionEvent[]): SessionContentMetadata {
+  let visibleContentSeq: number | null = null
+  let lastPromptAt: number | null = null
+  for (const event of events) {
+    if (hasConversationContent(event)) visibleContentSeq = Math.max(visibleContentSeq ?? -1, event.seq)
+    if (event.type === 'user/message' && event.data.source.kind === 'user') {
+      lastPromptAt = Math.max(lastPromptAt ?? 0, event.time)
+    }
+  }
+  return { blank: visibleContentSeq === null, visibleContentSeq, lastPromptAt }
+}
+
+/** Browser draft reservation request; only ids and UI-independent metadata cross the host boundary. */
+export interface SessionDraftReservationRequest {
+  readonly draftId: SessionDraftId
+  readonly sessionId: SessionId
+  readonly cwd: string
+  readonly visibility?: 'personal' | 'project' | 'private'
+  readonly agentPreset?: string
+}
+
+/** Canonical identity returned by a draft reservation provider. */
+export interface SessionDraftReservation {
+  readonly sessionId: SessionId
+  readonly leaseExpiresAt: number
+}
 
 /** Lightweight immutable source identity returned without loading a full log. */
 export interface SessionPersistenceSnapshot {
@@ -20,6 +59,8 @@ export interface SessionPersistenceSnapshot {
   header: SessionHeader
   /** Opaque source-qualified token that changes whenever this stored log changes. */
   revision: SessionPersistenceRevision
+  /** Optional backend-authoritative content metadata for cold list projections. */
+  content?: SessionContentMetadata
 }
 
 /** Immutable logical session prepared from persistence or a live owner. */
@@ -252,6 +293,33 @@ export abstract class SessionPersistence extends Service {
    * @returns one header and opaque revision per materialized session without loading full logs.
    */
   abstract listSnapshots(signal?: AbortSignal): Promise<SessionPersistenceSnapshot[]>
+
+  /**
+   * Reserve a browser draft before an Agent is created. Local providers return
+   * no value; Gateway providers may return a canonical Session id shared by
+   * retries and other tabs carrying the same draft id.
+   * @param _request - draft identity and scope metadata.
+   * @returns the provider's canonical identity, or undefined when reservations are local-only.
+   */
+  reserveDraft(_request: SessionDraftReservationRequest): Promise<SessionDraftReservation | undefined> {
+    return Promise.resolve(undefined)
+  }
+
+  /**
+   * Renew a provider-owned draft lease. Missing leases are intentionally no-op.
+   * @param _request - draft identity and scope metadata.
+   */
+  heartbeatDraft(_request: SessionDraftReservationRequest): Promise<void> {
+    return Promise.resolve()
+  }
+
+  /**
+   * Release a provider-owned draft lease after materialization or abandonment.
+   * @param _request - draft identity and scope metadata.
+   */
+  releaseDraft(_request: SessionDraftReservationRequest): Promise<void> {
+    return Promise.resolve()
+  }
 }
 
 export default SessionPersistence

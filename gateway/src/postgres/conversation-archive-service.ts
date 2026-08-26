@@ -9,6 +9,8 @@ export type ConversationArchiveState = 'archived' | 'trash' | 'purged'
 /** Server-side filters accepted by the administrator archive list. */
 export interface ConversationArchiveAdminFilter {
   readonly state?: ConversationArchiveState | 'all'
+  /** Maintenance-only selector; ordinary archive views default to conversations. */
+  readonly recordKind?: 'conversation' | 'empty-draft' | 'all'
   readonly query?: string
   readonly userId?: number
   readonly projectId?: number
@@ -17,6 +19,25 @@ export interface ConversationArchiveAdminFilter {
   readonly limit?: number
   readonly offset?: number
 }
+
+/** One old, completely blank root eligible for maintenance review. */
+export interface EmptyDraftCandidate {
+  readonly rootSessionId: string
+  readonly runtime: { readonly kind: 'user' | 'project'; readonly id: number }
+  readonly creator: { readonly id: number; readonly displayName: string } | null
+  readonly project: { readonly id: number; readonly name: string } | null
+  readonly createdAt: number
+  readonly updatedAt: number
+  readonly eventCount: number
+}
+
+/** Bounded maintenance preview; no mutation occurs. */
+export interface EmptyDraftPreview {
+  readonly cutoff: number
+  readonly candidates: readonly EmptyDraftCandidate[]
+}
+
+const DEFAULT_EMPTY_DRAFT_AGE_MS = 60 * 60 * 1000
 
 /** One root conversation row shown by the Admin archive channel. */
 export interface ConversationArchiveRow {
@@ -35,6 +56,8 @@ export interface ConversationArchiveRow {
   readonly childCount: number
   readonly messageCount: number
   readonly updatedAt: number
+  /** Present only for maintenance rows representing empty drafts. */
+  readonly recordKind?: 'empty-draft'
 }
 
 /** One event returned by the built-in administrator conversation reader. */
@@ -82,7 +105,7 @@ export interface ConversationArchiveRuntimeSnapshot {
   readonly sessions: readonly {
     sessionId: string
     rootSessionId?: string
-    header: { createdAt?: number; cwd?: string; parentSession?: string; agentPreset?: string }
+    header: { createdAt?: number; cwd?: string; parentSession?: string; agentPreset?: string; draft?: boolean }
     title?: string
     messageCount?: number
     workspace?: { path: string; title: string; position: number }
@@ -135,6 +158,20 @@ interface ArchiveDbRow {
   child_count: string
   message_count: string
   updated_at_ms: string
+  record_kind: 'conversation' | 'empty-draft'
+}
+
+interface EmptyDraftDbRow {
+  root_session_id: string
+  runtime_kind: 'user' | 'project'
+  runtime_public_id: string
+  creator_public_id: string | null
+  creator_display_name: string | null
+  project_public_id: string | null
+  project_name: string | null
+  created_at_ms: string
+  updated_at_ms: string
+  event_count: string
 }
 
 function safeNumber(value: string | number | null, label: string, nullable = false): number | null {
@@ -175,6 +212,7 @@ function archiveRow(row: ArchiveDbRow): ConversationArchiveRow {
     childCount: safeNumber(row.child_count, 'child count')!,
     messageCount: safeNumber(row.message_count, 'message count')!,
     updatedAt: safeNumber(row.updated_at_ms, 'updated time')!,
+    ...(row.record_kind === 'empty-draft' ? { recordKind: 'empty-draft' as const } : {}),
   }
 }
 
@@ -193,7 +231,8 @@ const ARCHIVE_COLUMNS = `a.root_session_id,
     WHERE child.organization_id=a.organization_id AND child.root_session_id=a.root_session_id
       AND child.id<>a.root_session_id AND child.status<>'deleted')::text child_count,
   a.message_count::text message_count,
-  (extract(epoch FROM COALESCE(r.updated_at,a.updated_at))*1000)::bigint::text updated_at_ms`
+  (extract(epoch FROM COALESCE(r.updated_at,a.updated_at))*1000)::bigint::text updated_at_ms,
+  a.record_kind`
 
 /** PostgreSQL archive index and lifecycle service used by Admin and runtime sync. */
 export class ConversationArchiveService {
@@ -214,12 +253,17 @@ export class ConversationArchiveService {
       values.push(value)
       clauses.push(clause.replace('?', `$${String(values.length)}`))
     }
+    if (filter.recordKind === undefined || filter.recordKind === 'conversation') {
+      clauses.push("a.record_kind='conversation'")
+    } else if (filter.recordKind !== 'all') {
+      add('a.record_kind=?', filter.recordKind)
+    }
     if (filter.state !== undefined && filter.state !== 'all') add('a.state=?', filter.state)
     if (filter.userId !== undefined) add('creator.public_id=?', filter.userId)
     if (filter.projectId !== undefined) add('project.public_id=?', filter.projectId)
     if (filter.fromMs !== undefined) add('a.archived_at >= to_timestamp(?/1000.0)', filter.fromMs)
     if (filter.toMs !== undefined) add('a.archived_at <= to_timestamp(?/1000.0)', filter.toMs)
-    if (filter.state !== 'purged' && filter.state !== 'all') {
+    if (filter.recordKind !== 'empty-draft' && filter.state !== 'purged' && filter.state !== 'all') {
       clauses.push('(a.message_count > 0)')
     }
     if (filter.query !== undefined && filter.query.trim() !== '') {
@@ -250,6 +294,115 @@ export class ConversationArchiveService {
       WHERE ${clauses.join(' AND ')}
       ORDER BY a.archived_at DESC,a.root_session_id LIMIT ${limitArg} OFFSET ${offsetArg}`, values)
     return result.rows.map(archiveRow)
+  }
+
+  /** Inspect old roots that contain no visible content anywhere in their tree. */
+  async previewEmptyDrafts(options: { olderThanMs?: number; limit?: number } = {}): Promise<EmptyDraftPreview> {
+    const age = options.olderThanMs ?? DEFAULT_EMPTY_DRAFT_AGE_MS
+    if (!Number.isSafeInteger(age) || age < 0) throw new Error('invalid empty-draft age')
+    const cutoff = Date.now() - age
+    const limit = boundedLimit(options.limit, 200)
+    const result = await this.context.pool.query<EmptyDraftDbRow>(`SELECT r.id root_session_id,
+      CASE WHEN r.project_id IS NULL THEN 'user' ELSE 'project' END runtime_kind,
+      CASE WHEN r.project_id IS NULL THEN creator.public_id ELSE project.public_id END::text runtime_public_id,
+      creator.public_id::text creator_public_id,creator.display_name creator_display_name,
+      project.public_id::text project_public_id,project.name::text project_name,
+      (extract(epoch FROM r.created_at)*1000)::bigint::text created_at_ms,
+      (extract(epoch FROM r.updated_at)*1000)::bigint::text updated_at_ms,
+      r.event_count::text event_count
+      FROM harness.conversation_sessions r
+      LEFT JOIN harness.users creator ON creator.organization_id=r.organization_id AND creator.id=r.creator_user_id
+      LEFT JOIN harness.projects project ON project.organization_id=r.organization_id AND project.id=r.project_id
+      WHERE r.organization_id=$1 AND r.root_session_id=r.id AND r.status<>'deleted'
+        AND r.has_visible_content=false AND r.updated_at <= to_timestamp($2/1000.0)
+        AND NOT EXISTS (
+          SELECT 1 FROM harness.conversation_sessions child
+          WHERE child.organization_id=r.organization_id AND child.root_session_id=r.root_session_id
+            AND child.has_visible_content=true AND child.status<>'deleted'
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM harness.conversation_draft_reservations d
+          WHERE d.organization_id=r.organization_id AND d.session_id=r.id AND d.lease_expires_at > now()
+        )
+      ORDER BY r.updated_at,r.id LIMIT $3`, [this.context.organizationId, cutoff, limit])
+    return {
+      cutoff,
+      candidates: result.rows.map(row => ({
+        rootSessionId: row.root_session_id,
+        runtime: { kind: row.runtime_kind, id: publicNumber(row.runtime_public_id, 'runtime') },
+        creator: row.creator_public_id === null || row.creator_display_name === null
+          ? null
+          : { id: publicNumber(row.creator_public_id, 'creator'), displayName: row.creator_display_name },
+        project: row.project_public_id === null || row.project_name === null
+          ? null
+          : { id: publicNumber(row.project_public_id, 'project'), name: row.project_name },
+        createdAt: safeNumber(row.created_at_ms, 'created time')!,
+        updatedAt: safeNumber(row.updated_at_ms, 'updated time')!,
+        eventCount: safeNumber(row.event_count, 'event count')!,
+      })),
+    }
+  }
+
+  /** Move reviewed blank roots into the recoverable archive trash. */
+  async trashEmptyDrafts(rootSessionIds: readonly string[], actorUserId: number): Promise<readonly string[]> {
+    if (rootSessionIds.length === 0 || rootSessionIds.length > 200) throw new Error('invalid empty-draft batch')
+    const actor = await this.internalUserId(this.context.pool, actorUserId)
+    if (actor === null) throw new Error('archive actor not found')
+    const trashed = await transaction(this.context.pool, async client => {
+      const result: string[] = []
+      for (const rootSessionId of rootSessionIds) {
+        const row = await client.query<{
+          id: string; project_id: string | null; creator_user_id: string
+        }>(`SELECT r.id,r.project_id,r.creator_user_id
+          FROM harness.conversation_sessions r
+          WHERE r.organization_id=$1 AND r.id=$2 AND r.root_session_id=r.id AND r.status<>'deleted'
+            AND r.has_visible_content=false
+            AND NOT EXISTS (SELECT 1 FROM harness.conversation_sessions child
+              WHERE child.organization_id=r.organization_id AND child.root_session_id=r.id
+                AND child.has_visible_content=true AND child.status<>'deleted')
+          FOR UPDATE`, [this.context.organizationId, rootSessionId])
+        const current = row.rows[0]
+        if (current === undefined) continue
+        const existing = await client.query<{ state: ConversationArchiveState; sync_revision: string }>(`SELECT state,sync_revision::text
+          FROM harness.conversation_archive_records WHERE organization_id=$1 AND root_session_id=$2 FOR UPDATE`,
+        [this.context.organizationId, rootSessionId])
+        if (existing.rows[0]?.state === 'purged' || existing.rows[0]?.state === 'trash') continue
+        const owner = await client.query<{
+          runtime_public_id: string
+        }>(`SELECT CASE WHEN r.project_id IS NULL THEN u.public_id ELSE p.public_id END::text runtime_public_id
+          FROM harness.conversation_sessions r
+          LEFT JOIN harness.users u ON u.organization_id=r.organization_id AND u.id=r.creator_user_id
+          LEFT JOIN harness.projects p ON p.organization_id=r.organization_id AND p.id=r.project_id
+          WHERE r.organization_id=$1 AND r.id=$2`, [this.context.organizationId, rootSessionId])
+        const ownerRow = owner.rows[0]
+        if (ownerRow === undefined) continue
+        const nextRevision = Number(existing.rows[0]?.sync_revision ?? 0) + 1
+        const purgeAfter = Date.now() + this.retentionDays * 86_400_000
+        await client.query(`INSERT INTO harness.conversation_archive_records(
+          organization_id,root_session_id,runtime_kind,runtime_public_id,project_id,creator_user_id,
+          message_count,state,archived_by_user_id,trashed_at,trashed_by_user_id,purge_after,sync_revision,sync_state,record_kind,updated_at
+        ) VALUES($1,$2,$3,$4,$5,$6,0,'trash',$7,now(),$7,to_timestamp($8/1000.0),$9,'synced','empty-draft',now())
+          ON CONFLICT (organization_id,root_session_id) DO UPDATE SET state='trash',trashed_at=now(),
+            purge_after=EXCLUDED.purge_after,trashed_by_user_id=$7,record_kind='empty-draft',sync_revision=$9,
+            sync_state='synced',updated_at=now()`, [
+          this.context.organizationId,
+          rootSessionId,
+          current.project_id === null ? 'user' : 'project',
+          ownerRow.runtime_public_id,
+          current.project_id,
+          current.creator_user_id,
+          actor,
+          purgeAfter,
+          nextRevision,
+        ])
+        await client.query(`INSERT INTO harness.conversation_archive_commands(
+          organization_id,root_session_id,action,requested_by_user_id,desired_revision
+        ) VALUES($1,$2,'trash',$3,$4)`, [this.context.organizationId, rootSessionId, actor, nextRevision])
+        result.push(rootSessionId)
+      }
+      return result
+    })
+    return trashed
   }
 
   /** Load one root archive record and its first event page. */

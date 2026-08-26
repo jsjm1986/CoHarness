@@ -80,6 +80,17 @@ export type ConversationArchiveRow = {
   childCount: number
   messageCount: number
   updatedAt: number
+  recordKind?: 'empty-draft'
+}
+
+export type EmptyDraftCandidate = {
+  rootSessionId: string
+  runtime: { kind: 'user' | 'project'; id: number }
+  creator: { id: number; displayName: string } | null
+  project: { id: number; name: string } | null
+  createdAt: number
+  updatedAt: number
+  eventCount: number
 }
 
 export type ConversationArchiveDetail = {
@@ -244,9 +255,11 @@ export function listArchives(filter: {
   to?: number
   limit?: number
   offset?: number
+  recordKind?: 'conversation' | 'empty-draft' | 'all'
 } = {}): Promise<ConversationArchiveRow[]> {
   const query = new URLSearchParams()
   if (filter.state !== undefined) query.set('state', filter.state)
+  if (filter.recordKind !== undefined) query.set('kind', filter.recordKind)
   if (filter.query !== undefined && filter.query !== '') query.set('q', filter.query)
   for (const key of ['userId', 'projectId', 'from', 'to', 'limit', 'offset'] as const) {
     const value = filter[key]
@@ -254,6 +267,24 @@ export function listArchives(filter: {
   }
   const suffix = query.toString()
   return request(`/admin/api/archives${suffix === '' ? '' : `?${suffix}`}`)
+}
+
+export function previewEmptyDrafts(options: { olderThanMs?: number; limit?: number } = {}): Promise<{
+  cutoff: number
+  candidates: EmptyDraftCandidate[]
+}> {
+  const query = new URLSearchParams()
+  if (options.olderThanMs !== undefined) query.set('ageMs', String(options.olderThanMs))
+  if (options.limit !== undefined) query.set('limit', String(options.limit))
+  const suffix = query.toString()
+  return request(`/admin/api/archives/empty-drafts/preview${suffix === '' ? '' : `?${suffix}`}`)
+}
+
+export function trashEmptyDrafts(ids: string[]): Promise<{ trashed: string[] }> {
+  return request('/admin/api/archives/empty-drafts/trash', {
+    method: 'POST',
+    body: JSON.stringify({ ids }),
+  })
 }
 
 export function getArchive(rootSessionId: string, fromSeq = 0, limit = 200): Promise<ConversationArchiveDetail> {

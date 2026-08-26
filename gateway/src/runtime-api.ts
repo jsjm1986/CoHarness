@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { createHash } from 'node:crypto'
 import { CollaborationDeniedError } from './collaboration.ts'
 import type { RuntimeTarget } from './instances.ts'
 import {
@@ -10,6 +11,7 @@ import {
 } from './principal.ts'
 import type {
   ConversationEvent,
+  ConversationDraftReservation,
   ConversationHeader,
   ConversationRepository,
   StoredConversation,
@@ -67,6 +69,7 @@ interface RuntimeApiDependencies {
   context: Pick<PostgresRuntimeContext, 'pool' | 'organizationSlug'>
   instances: Pick<PostgresInstanceRepository, 'authenticateRuntimeToken'>
   conversations: Pick<ConversationRepository, 'append' | 'listScoped' | 'load' | 'removeTree'>
+    & Partial<Pick<ConversationRepository, 'reserveDraft' | 'heartbeatDraftForOwner' | 'releaseDraftForOwner'>>
   collaboration: Pick<
     PostgresCollaborationService,
     'access' | 'claimInteraction' | 'projectForUser' | 'readableSessionIds'
@@ -140,7 +143,8 @@ function sessionHeader(value: unknown): RuntimeSessionHeader {
     || (header.seedLength !== undefined && !safeInteger(header.seedLength))
     || (header.origin !== undefined && header.origin !== 'subagent')
     || (header.delegationDepth !== undefined && !safeInteger(header.delegationDepth))
-    || !optionalString(header.agentPreset)) {
+    || !optionalString(header.agentPreset)
+    || (header.draft !== undefined && typeof header.draft !== 'boolean')) {
     throw new Error('invalid session header')
   }
   return value as RuntimeSessionHeader
@@ -191,6 +195,7 @@ function runtimeHeader(header: ConversationHeader): RuntimeSessionHeader {
     ...(header.origin === undefined ? {} : { origin: header.origin as 'subagent' }),
     ...(header.delegationDepth === undefined ? {} : { delegationDepth: header.delegationDepth }),
     ...(header.agentPreset === undefined ? {} : { agentPreset: header.agentPreset }),
+    ...(header.draft === undefined ? {} : { draft: header.draft }),
   }
 }
 
@@ -256,6 +261,19 @@ function revisionFor(subject: RuntimeCredentialSubject, revision: string): strin
   return `postgres:${subject.organizationId}:${subject.target.kind}:${String(subject.target.id)}:${revision}`
 }
 
+function draftScopeKey(
+  subject: RuntimeCredentialSubject,
+  claims: GatewayPrincipalClaims,
+  cwd: string,
+  visibility: 'personal' | 'project' | 'private',
+  agentPreset: string | undefined,
+): string {
+  const owner = subject.target.kind === 'user'
+    ? { kind: 'personal', runtime: subject.target.id, user: claims.user.id }
+    : { kind: 'project', runtime: subject.target.id, project: claims.scope.kind === 'project' ? claims.scope.projectId : 0, user: claims.user.id }
+  return createHash('sha256').update(JSON.stringify({ owner, cwd, visibility, agentPreset: agentPreset ?? '' })).digest('hex')
+}
+
 /** Authenticated loopback API used by Gateway-backed runtime plugins. */
 export function createRuntimeApiHandler(
   deps: RuntimeApiDependencies,
@@ -303,6 +321,7 @@ export function createRuntimeApiHandler(
       ...(header.origin === undefined ? {} : { origin: header.origin }),
       ...(header.delegationDepth === undefined ? {} : { delegationDepth: header.delegationDepth }),
       ...(header.agentPreset === undefined ? {} : { agentPreset: header.agentPreset }),
+      ...(header.draft === undefined ? {} : { draft: header.draft }),
     }
   }
 
@@ -352,6 +371,7 @@ export function createRuntimeApiHandler(
       ...(claims.header.delegationDepth === undefined
         ? {} : { delegationDepth: claims.header.delegationDepth }),
       ...(claims.header.agentPreset === undefined ? {} : { agentPreset: claims.header.agentPreset }),
+      ...(claims.header.draft === undefined ? {} : { draft: claims.header.draft }),
     }
   }
 
@@ -557,6 +577,106 @@ export function createRuntimeApiHandler(
         return true
       }
 
+      if (pathname === '/internal/runtime/session/draft/reserve' && req.method === 'POST') {
+        if (deps.conversations.reserveDraft === undefined) {
+          send(res, 503, { error: 'draft-reservation-unavailable' })
+          return true
+        }
+        const payload = record(JSON.parse(body))
+        if (typeof payload?.draftId !== 'string' || payload.draftId.length === 0 || payload.draftId.length > 256
+          || typeof payload.sessionId !== 'string' || payload.sessionId.length === 0 || payload.sessionId.length > 256
+          || typeof payload.cwd !== 'string' || payload.cwd.length === 0 || payload.cwd.length > 4096
+          || (payload.visibility !== 'personal' && payload.visibility !== 'project' && payload.visibility !== 'private')
+          || (payload.agentPreset !== undefined && (typeof payload.agentPreset !== 'string' || payload.agentPreset.length > 256))) {
+          throw new Error('invalid draft reservation request')
+        }
+        const claims = assertionFor(req, deps.principals, subject, true)!
+        const visibility = payload.visibility as 'personal' | 'project' | 'private'
+        let userId: string | undefined
+        let projectId: string | undefined
+        if (subject.target.kind === 'user') {
+          if (visibility !== 'personal' || subject.userInternalId === undefined || claims.scope.kind !== 'personal') {
+            throw new CollaborationDeniedError('forbidden')
+          }
+          userId = subject.userInternalId
+        } else {
+          if (visibility === 'personal' || subject.projectInternalId === undefined || claims.scope.kind !== 'project') {
+            throw new CollaborationDeniedError('forbidden')
+          }
+          const membership = await deps.collaboration.projectForUser(subject.target.id, claims.user.id)
+          if (membership === null || membership.mode !== 'rw') throw new CollaborationDeniedError('forbidden')
+          userId = await internalUserId(deps.context.pool, subject.organizationId, claims.user.id) ?? undefined
+          if (userId === undefined) throw new CollaborationDeniedError('forbidden')
+          projectId = subject.projectInternalId
+        }
+        const reservation: ConversationDraftReservation = await deps.conversations.reserveDraft({
+          organizationId: subject.organizationId,
+          scopeKey: draftScopeKey(subject, claims, payload.cwd, visibility, payload.agentPreset as string | undefined),
+          draftId: payload.draftId,
+          sessionId: payload.sessionId,
+          ...(userId === undefined ? {} : { userId }),
+          ...(projectId === undefined ? {} : { projectId }),
+          cwd: payload.cwd,
+          visibility,
+          ...(payload.agentPreset === undefined ? {} : { agentPreset: payload.agentPreset }),
+        })
+        send(res, 200, {
+          draftId: reservation.draftId,
+          sessionId: reservation.sessionId,
+          leaseExpiresAt: reservation.leaseExpiresAt,
+        })
+        return true
+      }
+
+      if ((pathname === '/internal/runtime/session/draft/heartbeat'
+        || pathname === '/internal/runtime/session/draft/release') && req.method === 'POST') {
+        if (deps.conversations.heartbeatDraftForOwner === undefined
+          || deps.conversations.releaseDraftForOwner === undefined) {
+          send(res, 503, { error: 'draft-reservation-unavailable' })
+          return true
+        }
+        const payload = record(JSON.parse(body))
+        if (typeof payload?.draftId !== 'string' || payload.draftId.length === 0
+          || typeof payload.sessionId !== 'string' || payload.sessionId.length === 0) {
+          throw new Error('invalid draft reservation lifecycle request')
+        }
+        const claims = assertionFor(req, deps.principals, subject, pathname.endsWith('/heartbeat'))
+        let userId: string | undefined
+        let projectId: string | undefined
+        if (subject.target.kind === 'user') {
+          if (subject.userInternalId === undefined
+            || (claims !== undefined && claims.scope.kind !== 'personal')) {
+            throw new CollaborationDeniedError('forbidden')
+          }
+          userId = subject.userInternalId
+        } else {
+          if (subject.projectInternalId === undefined
+            || (claims !== undefined && claims.scope.kind !== 'project')) {
+            throw new CollaborationDeniedError('forbidden')
+          }
+          if (claims !== undefined) {
+            const membership = await deps.collaboration.projectForUser(subject.target.id, claims.user.id)
+            if (membership === null || membership.mode !== 'rw') throw new CollaborationDeniedError('forbidden')
+          }
+          projectId = subject.projectInternalId
+        }
+        const input = {
+          organizationId: subject.organizationId,
+          draftId: payload.draftId,
+          sessionId: payload.sessionId,
+          ...(userId === undefined ? {} : { userId }),
+          ...(projectId === undefined ? {} : { projectId }),
+        }
+        if (pathname.endsWith('/heartbeat')) {
+          const renewed = await deps.conversations.heartbeatDraftForOwner(input)
+          send(res, 200, { renewed })
+        } else {
+          await deps.conversations.releaseDraftForOwner(input)
+          send(res, 200, { released: true })
+        }
+        return true
+      }
+
       if (pathname === '/internal/runtime/archive/snapshot' && req.method === 'POST') {
         if (deps.archives === undefined) {
           send(res, 503, { error: 'conversation-archive-unavailable' })
@@ -587,6 +707,7 @@ export function createRuntimeApiHandler(
               || (header.cwd !== undefined && typeof header.cwd !== 'string')
               || (header.parentSession !== undefined && (typeof header.parentSession !== 'string' || header.parentSession === ''))
               || (header.agentPreset !== undefined && typeof header.agentPreset !== 'string')
+              || (header.draft !== undefined && typeof header.draft !== 'boolean')
               || (workspace !== undefined && (typeof workspace.path !== 'string' || workspace.path === ''
                 || typeof workspace.title !== 'string' || workspace.title === ''
                 || !safeInteger(workspace.position))) ) {
@@ -600,6 +721,7 @@ export function createRuntimeApiHandler(
                 ...(typeof header.cwd === 'string' ? { cwd: header.cwd } : {}),
                 ...(typeof header.parentSession === 'string' ? { parentSession: header.parentSession } : {}),
                 ...(typeof header.agentPreset === 'string' ? { agentPreset: header.agentPreset } : {}),
+                ...(typeof header.draft === 'boolean' ? { draft: header.draft } : {}),
               },
               ...(typeof item.title === 'string' && item.title !== '' ? { title: item.title } : {}),
               ...(safeInteger(item.messageCount) ? { messageCount: item.messageCount } : {}),
@@ -728,6 +850,7 @@ export function createRuntimeApiHandler(
         send(res, 200, { items: items.map(item => ({
           header: runtimeHeader(item.header),
           revision: revisionFor(subject, item.revision),
+          content: item.content,
         })) })
         return true
       }

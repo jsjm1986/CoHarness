@@ -140,6 +140,10 @@ async function dispatch(
     if (state !== null && state !== 'all' && state !== 'archived' && state !== 'trash' && state !== 'purged') {
       sendError(res, 400, 'invalid archive state'); return true
     }
+    const recordKind = query.get('kind')
+    if (recordKind !== null && recordKind !== 'conversation' && recordKind !== 'empty-draft' && recordKind !== 'all') {
+      sendError(res, 400, 'invalid archive record kind'); return true
+    }
     const userId = number('userId', 1)
     const projectId = number('projectId', 1)
     const from = number('from', 0)
@@ -153,6 +157,7 @@ async function dispatch(
     }
     const filter: ConversationArchiveAdminFilter = {
       ...(state === null ? {} : { state: state as ConversationArchiveState | 'all' }),
+      ...(recordKind === null ? {} : { recordKind: recordKind as 'conversation' | 'empty-draft' | 'all' }),
       ...(query.get('q') === null ? {} : { query: query.get('q') ?? '' }),
       ...(userId === undefined ? {} : { userId }), ...(projectId === undefined ? {} : { projectId }),
       ...(from === undefined ? {} : { fromMs: from }), ...(to === undefined ? {} : { toMs: to }),
@@ -160,6 +165,44 @@ async function dispatch(
     }
     sendJson(res, 200, await deps.archives.adminList(filter))
     await write('admin.archives.list', { filter: { ...filter, query: filter.query === undefined ? undefined : '[provided]' } })
+    return true
+  }
+
+  if (pathname === '/admin/api/archives/empty-drafts/preview' && method === 'GET') {
+    if (deps.archives === undefined || deps.archives.previewEmptyDrafts === undefined) {
+      sendError(res, 503, 'conversation-archive-unavailable'); return true
+    }
+    const query = new URL(req.url ?? '/', 'http://admin').searchParams
+    const ageRaw = query.get('ageMs')
+    const limitRaw = query.get('limit')
+    const ageMs = ageRaw === null ? undefined : Number(ageRaw)
+    const limit = limitRaw === null ? undefined : Number(limitRaw)
+    if ((ageRaw !== null && (!Number.isSafeInteger(ageMs) || ageMs < 0))
+      || (limitRaw !== null && (!Number.isSafeInteger(limit) || limit < 1))) {
+      sendError(res, 400, 'invalid empty-draft filter'); return true
+    }
+    const preview = await deps.archives.previewEmptyDrafts({
+      ...(ageMs === undefined ? {} : { olderThanMs: ageMs }),
+      ...(limit === undefined ? {} : { limit }),
+    })
+    sendJson(res, 200, preview)
+    await write('admin.archives.empty-drafts.preview', { count: preview.candidates.length, cutoff: preview.cutoff })
+    return true
+  }
+
+  if (pathname === '/admin/api/archives/empty-drafts/trash' && method === 'POST') {
+    if (deps.archives === undefined || deps.archives.trashEmptyDrafts === undefined) {
+      sendError(res, 503, 'conversation-archive-unavailable'); return true
+    }
+    const input = parseObject(body)
+    const ids = input.ids
+    if (!Array.isArray(ids) || ids.length === 0 || ids.length > 200
+      || !ids.every(id => typeof id === 'string' && id !== '')) {
+      sendError(res, 400, 'invalid empty-draft batch'); return true
+    }
+    const trashed = await deps.archives.trashEmptyDrafts(ids as string[], admin.id)
+    await write('admin.archives.empty-drafts.trash', { requested: ids.length, trashed: trashed.length })
+    sendJson(res, 200, { trashed })
     return true
   }
 

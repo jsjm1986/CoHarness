@@ -75,7 +75,7 @@ type SessionListMutation =
   | { kind: 'status'; sessionId: SessionId; running: boolean }
   | { kind: 'activity'; sessionId: SessionId; updatedAt: number }
   /** Local first-send flip: the sender clears blank without waiting for a host frame. */
-  | { kind: 'engaged'; sessionId: SessionId }
+  | { kind: 'engaged'; sessionId: SessionId; seq: number }
 
 /** Stable identity of a frame retained until an uninstantiated Session can consume it. */
 function bufferedRequestKey(envelope: RpcRequest<MuxFrame>): string | undefined {
@@ -317,8 +317,8 @@ export class SessionManager {
       }),
       // The sender's local first-send flip mirrors into the list row so the
       // session surfaces (lists filter on blank) before any host frame lands.
-      onEngaged: (engaged) => {
-        this.recordMutation({ kind: 'engaged', sessionId: engaged.sessionId })
+      onEngaged: (engaged, visibleContentSeq) => {
+        this.recordMutation({ kind: 'engaged', sessionId: engaged.sessionId, seq: visibleContentSeq })
       },
       projections: this.projectionStore(sessionId),
       ...this.conversation === undefined ? {} : { conversation: this.conversation },
@@ -454,8 +454,13 @@ export class SessionManager {
           const rawBaseline = this.listPhase === 'pending'
             ? result.value.items
             : mergeOrderedBaseline(established, result.value.items, summary => summary.sessionId)
+          // Only a durable content watermark is portable evidence. A bare
+          // blank=false from an older carrier must not become permanent local
+          // state and mask a later authoritative blank baseline.
           for (const summary of rawBaseline) {
-            if (!summary.blank) this.engagedSessions.add(summary.sessionId)
+            if (!summary.blank && summary.visibleContentSeq !== undefined) {
+              this.engagedSessions.add(summary.sessionId)
+            }
           }
           const baseline = rawBaseline.map(summary =>
             this.engagedSessions.has(summary.sessionId) && summary.blank
@@ -555,6 +560,7 @@ export class SessionManager {
     try {
       const shared = {
         ...(opts.sessionId === undefined ? {} : { sessionId: opts.sessionId }),
+        ...(opts.draftId === undefined ? {} : { draftId: opts.draftId }),
         ...(opts.visibility === undefined ? {} : { visibility: opts.visibility }),
         ...(reuseWorkspaceBlank ? { reuseWorkspaceBlank: true as const } : {}),
       }
@@ -712,7 +718,7 @@ export class SessionManager {
       // A mux event is the first cross-client proof that a turn produced
       // visible content. It also advances recency for human-authored prompts;
       // max keeps replayed or repaired older events from moving the row back.
-      this.recordMutation({ kind: 'engaged', sessionId: frame.sessionId })
+      this.recordMutation({ kind: 'engaged', sessionId: frame.sessionId, seq: frame.event.seq })
       if (frame.event.type === 'user/message' && frame.event.data.source.kind === 'user') {
         this.recordMutation({ kind: 'activity', sessionId: frame.sessionId, updatedAt: frame.event.time })
       }
@@ -1066,6 +1072,7 @@ export class SessionManager {
       if (
         prev !== undefined && prev.updatedAt === entry.updatedAt && prev.running === entry.running
         && prev.blank === entry.blank && prev.agentPreset === entry.agentPreset
+        && prev.visibleContentSeq === entry.visibleContentSeq
         && prev.parentSessionId === entry.parentSessionId && prev.cwd === entry.cwd
         && prev.origin === entry.origin && prev.title === entry.title && prev.depth === entry.depth
         && prev.pendingInteraction === entry.pendingInteraction
@@ -1109,6 +1116,9 @@ function applyMutation(summaries: readonly SessionSummary[], mutation: SessionLi
         // Blank only lowers: a stale true (session-added racing the local
         // first send) never re-hides an already-surfaced session.
         blank: existing.blank && mutation.summary.blank,
+        ...(Math.max(existing.visibleContentSeq ?? -1, mutation.summary.visibleContentSeq ?? -1) < 0
+          ? {}
+          : { visibleContentSeq: Math.max(existing.visibleContentSeq ?? -1, mutation.summary.visibleContentSeq ?? -1) }),
         ...(existing.cwd === undefined && mutation.summary.cwd !== undefined ? { cwd: mutation.summary.cwd } : {}),
         ...(existing.parentSessionId === undefined && mutation.summary.parentSessionId !== undefined
           ? { parentSessionId: mutation.summary.parentSessionId } : {}),
@@ -1122,6 +1132,7 @@ function applyMutation(summaries: readonly SessionSummary[], mutation: SessionLi
       }
       if (filled.cwd === existing.cwd && filled.parentSessionId === existing.parentSessionId
         && filled.origin === existing.origin && filled.blank === existing.blank
+        && filled.visibleContentSeq === existing.visibleContentSeq
         && filled.agentPreset === existing.agentPreset) return [...summaries]
       return summaries.map(summary => summary.sessionId === mutation.summary.sessionId ? filled : summary)
     }
@@ -1140,8 +1151,12 @@ function applyMutation(summaries: readonly SessionSummary[], mutation: SessionLi
         ? { ...summary, updatedAt: mutation.updatedAt }
         : summary)
     case 'engaged':
-      return summaries.map(summary => summary.sessionId === mutation.sessionId && summary.blank
-        ? { ...summary, blank: false }
+      return summaries.map(summary => summary.sessionId === mutation.sessionId
+        ? {
+          ...summary,
+          blank: false,
+          visibleContentSeq: Math.max(summary.visibleContentSeq ?? -1, mutation.seq),
+        }
         : summary)
   }
 }

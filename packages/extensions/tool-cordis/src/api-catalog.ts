@@ -1373,6 +1373,22 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'signal', description: 'optional cancellation for backend snapshot-listing work.' }],
         returns: 'one header and opaque revision per materialized session without loading full logs.',
       },
+      {
+        signature: 'reserveDraft(_request: SessionDraftReservationRequest): Promise<SessionDraftReservation | undefined>',
+        description: 'Reserve a browser draft before an Agent is created. Local providers return no value; Gateway providers may return a canonical Session id shared by retries and other tabs carrying the same draft id.',
+        parameters: [{ name: '_request', description: 'draft identity and scope metadata.' }],
+        returns: 'the provider\'s canonical identity, or undefined when reservations are local-only.',
+      },
+      {
+        signature: 'heartbeatDraft(_request: SessionDraftReservationRequest): Promise<void>',
+        description: 'Renew a provider-owned draft lease. Missing leases are intentionally no-op.',
+        parameters: [{ name: '_request', description: 'draft identity and scope metadata.' }],
+      },
+      {
+        signature: 'releaseDraft(_request: SessionDraftReservationRequest): Promise<void>',
+        description: 'Release a provider-owned draft lease after materialization or abandonment.',
+        parameters: [{ name: '_request', description: 'draft identity and scope metadata.' }],
+      },
     ],
   },
   {
@@ -3583,7 +3599,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'CreateSessionOptions',
-    declaration: 'export interface CreateSessionOptions {\n    readonly seed?: readonly SessionEvent[];\n    readonly meta?: {\n        readonly cwd?: string;\n        readonly parentSession?: SessionId;\n        readonly createdAt?: number;\n        readonly seedLength?: number;\n        readonly origin?: \'subagent\';\n        readonly delegationDepth?: number;\n        readonly agentPreset?: string;\n    };\n}',
+    declaration: 'export interface CreateSessionOptions {\n    readonly seed?: readonly SessionEvent[];\n    readonly meta?: {\n        readonly cwd?: string;\n        readonly parentSession?: SessionId;\n        readonly createdAt?: number;\n        readonly seedLength?: number;\n        readonly origin?: \'subagent\';\n        readonly delegationDepth?: number;\n        readonly agentPreset?: string;\n        readonly draft?: boolean;\n    };\n}',
   },
   {
     name: 'CreateTeamTaskRequest',
@@ -4526,6 +4542,22 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type SessionAvailability = \'live\' | \'persisted\';',
   },
   {
+    name: 'SessionContentMetadata',
+    declaration: 'export interface SessionContentMetadata {\n    readonly blank: boolean;\n    readonly visibleContentSeq: number | null;\n    readonly lastPromptAt: number | null;\n}',
+  },
+  {
+    name: 'SessionDraftId',
+    declaration: 'export type SessionDraftId = Branded<\'SessionDraftId\'>;',
+  },
+  {
+    name: 'SessionDraftReservation',
+    declaration: 'export interface SessionDraftReservation {\n    readonly sessionId: SessionId;\n    readonly leaseExpiresAt: number;\n}',
+  },
+  {
+    name: 'SessionDraftReservationRequest',
+    declaration: 'export interface SessionDraftReservationRequest {\n    readonly draftId: SessionDraftId;\n    readonly sessionId: SessionId;\n    readonly cwd: string;\n    readonly visibility?: \'personal\' | \'project\' | \'private\';\n    readonly agentPreset?: string;\n}',
+  },
+  {
     name: 'SessionEvent',
     declaration: 'export type SessionEvent<T extends SessionEventType = SessionEventType> = {\n    [K in SessionEventType]: {\n        type: K;\n        seq: number;\n        time: number;\n        data: SessionEventMap[K];\n        ignorable?: true;\n    } & (K extends SurfaceEventType ? {\n        sourceEventSeqs?: number[];\n        surfaceOp?: SurfaceOp;\n    } : object);\n}[T];',
   },
@@ -4595,7 +4627,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SessionHeader',
-    declaration: 'export interface SessionHeader {\n    readonly version: number;\n    readonly id: SessionId;\n    readonly createdAt: number;\n    readonly cwd?: string;\n    readonly parentSession?: SessionId;\n    readonly seedLength?: number;\n    readonly origin?: \'subagent\';\n    readonly delegationDepth?: number;\n    readonly agentPreset?: string;\n}',
+    declaration: 'export interface SessionHeader {\n    readonly version: number;\n    readonly id: SessionId;\n    readonly createdAt: number;\n    readonly cwd?: string;\n    readonly parentSession?: SessionId;\n    readonly seedLength?: number;\n    readonly origin?: \'subagent\';\n    readonly delegationDepth?: number;\n    readonly agentPreset?: string;\n    readonly draft?: boolean;\n}',
   },
   {
     name: 'SessionId',
@@ -4627,7 +4659,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SessionPersistenceSnapshot',
-    declaration: 'export interface SessionPersistenceSnapshot {\n    header: SessionHeader;\n    revision: SessionPersistenceRevision;\n}',
+    declaration: 'export interface SessionPersistenceSnapshot {\n    header: SessionHeader;\n    revision: SessionPersistenceRevision;\n    content?: SessionContentMetadata;\n}',
   },
   {
     name: 'SessionPreparation',

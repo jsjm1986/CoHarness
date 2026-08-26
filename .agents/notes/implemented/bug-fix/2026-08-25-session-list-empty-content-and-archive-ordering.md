@@ -10,7 +10,7 @@ The sidebar can receive workspace archive snapshots through a list baseline, an 
 
 ## Decision
 
-The Host `SessionSummary.blank` predicate is based on non-empty messages produced by the session surface. Empty turns, command-only records, and usage-only assistant messages remain blank. Attached summaries and the `sessionListMetadata` projection use the same predicate, and the projection state version is `2` so cached values from the previous predicate are not reused. The bounded cold probe keeps its fail-soft visibility rule when an artifact cannot be verified.
+The Host `SessionSummary.blank` predicate is based on non-empty messages produced by the session surface. Empty turns, command-only records, and usage-only assistant messages remain blank. Attached summaries and the `sessionListMetadata` projection use the same predicate, and the projection state version is `3` so cached values from the previous predicate are not reused. Gateway-backed cold listings additionally read authoritative `blank`, `visibleContentSeq`, and `lastPromptAt` metadata; local backends retain the bounded probe fallback.
 
 The Client converts a row when it observes a non-empty session event, not when a prompt is merely accepted or an agent becomes running. It retains per-session engagement evidence while reconciling later list baselines, so a stale `blank: true` row cannot hide a session whose message event already arrived. Running state remains independent from blankness.
 
@@ -28,10 +28,14 @@ The archive registry only appends ids in the current API. The Client merges comp
 
 ## Consequences
 
-Sessions with no non-empty conversation message stay out of grouping, flat, and search surfaces while remaining available for New Session reuse. An attached interrupted or tool-bearing conversation remains visible when its surface carries a non-empty message. Large or location-less cold artifacts that cannot be verified may still be visible; this preserves conversation recovery over aggressive cleanup.
+Sessions with no non-empty conversation message stay out of grouping, flat, and search surfaces while remaining available for New Session reuse. An attached interrupted or tool-bearing conversation remains visible when its surface carries a non-empty message. New browser drafts do not create a durable row until materialization; old blank rows remain recoverable for administrator dry-run and trash maintenance. Large or location-less durable artifacts that cannot be verified may still be visible; this preserves conversation recovery over aggressive cleanup.
 
 Archive membership cannot be removed by the current Client mirror. Adding restore requires a versioned snapshot/reset path and a corresponding update to the merge rule.
 
 ## Verification
 
-Focused runtime and Host tests cover concurrent archive echoes, stale frames before refresh baselines, empty completed turns, cold turn-only artifacts, event-based Client engagement, stale list reconciliation, and preset locking after a real message. The assembled Web cold-session scenario seeds both a no-turn log and a closed empty turn through the shipped compressed JSONL composition and asserts that neither appears in the sidebar.
+Focused runtime and Host tests cover concurrent archive echoes, stale frames before refresh baselines, empty completed turns, cold turn-only artifacts, event-based Client engagement, stale list reconciliation, authoritative content watermarks, deferred draft materialization, and preset locking after a real message. The assembled Web cold-session scenario seeds both a no-turn log and a closed empty turn through the shipped compressed JSONL composition and asserts that neither appears in the sidebar.
+
+## Related
+
+- [Deferred session drafts and authoritative content watermarks](../architecture/2026-08-26-session-draft-lifecycle-and-content-watermarks.md) — owns deferred persistence, cross-tab draft reservations, and the Gateway maintenance lifecycle.

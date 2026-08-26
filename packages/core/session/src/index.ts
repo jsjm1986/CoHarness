@@ -30,7 +30,16 @@ export { interruptedTurnClosers, TOOL_NOT_STARTED, TOOL_OUTCOME_UNKNOWN } from '
 export { decodeStorageRecord, packChunkRuns } from './chunk-rows.ts'
 export type { ChunkRow, StorageRecord } from './chunk-rows.ts'
 export type { SessionSurface, SurfaceFoldReplacement, SurfaceFoldResult } from './surface.ts'
-export { deriveEventMessage, foldSurface, isAppendSurfaceEvent, isReplacementSurfaceEvent, isSurfaceEvent, isSurfaceEligibleType } from './surface.ts'
+export {
+  deriveEventMessage,
+  foldSurface,
+  hasConversationContent,
+  isAppendSurfaceEvent,
+  isReplacementSurfaceEvent,
+  isSurfaceEvent,
+  isSurfaceEligibleType,
+  materializesSession,
+} from './surface.ts'
 export { canonicalHeader, foldRequestHeader, headerEquals } from './request-header.ts'
 export { KNOWN_SESSION_EVENT_TYPES } from './known-event-types.ts'
 
@@ -131,6 +140,9 @@ function validateSessionHeader(id: SessionId, input: unknown): SessionHeader {
   }
   if (record.agentPreset !== undefined && typeof record.agentPreset !== 'string') {
     throw new Error('session header agentPreset must be a string')
+  }
+  if (record.draft !== undefined && typeof record.draft !== 'boolean') {
+    throw new Error('session header draft must be a boolean')
   }
   return deepFreeze(record as unknown as SessionHeader)
 }
@@ -884,6 +896,7 @@ export class SessionStore extends Service {
       ...meta?.origin === undefined ? {} : { origin: meta.origin },
       ...meta?.delegationDepth === undefined ? {} : { delegationDepth: meta.delegationDepth },
       ...meta?.agentPreset === undefined ? {} : { agentPreset: meta.agentPreset },
+      ...meta?.draft === undefined ? {} : { draft: meta.draft },
     }
     return Session.create(sessionId, seed, header)
   }

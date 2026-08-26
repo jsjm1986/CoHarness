@@ -15,7 +15,7 @@ import {
 import { sql } from './sql.ts'
 
 /** Current physical-record schema with packed and compressed event rows. */
-export const SCHEMA_VERSION = 17
+export const SCHEMA_VERSION = 18
 /** Application id reserved for DeepSeek Harness SQLite session databases. */
 export const SESSION_PERSISTENCE_SQLITE_APPLICATION_ID = 0x44534850
 
@@ -32,6 +32,7 @@ export interface SessionRow {
   readonly revision: number
   readonly delegation_depth: number | null
   readonly agent_preset: string | null
+  readonly draft: number
 }
 
 /** One physical event row; packed rows may represent multiple logical events. */
@@ -206,7 +207,7 @@ function initializeDatabase(db: DatabaseSync): void {
   db.exec(sql('schema'))
   db.prepare(sql('insert-persistence-state')).run(randomUUID())
   db.exec(sql('set-application-id'))
-  db.exec(sql('set-user-version-17'))
+  db.exec(sql('set-user-version-18'))
 }
 
 let canonicalSchema: readonly SchemaObjectRow[] | undefined
@@ -291,6 +292,8 @@ export function decodeSessionRow(value: unknown): SessionRow {
   if (origin !== null && origin !== 'subagent') throw new Error('stored session origin must be subagent or null')
   const incarnation = nonemptyStringField(row, 'incarnation')
   if (!UUID.test(incarnation)) throw new Error('stored session incarnation must be a UUID')
+  const draft = integerField(row, 'draft')
+  if (draft !== 0 && draft !== 1) throw new Error('stored session draft must be 0 or 1')
   return {
     id,
     version,
@@ -301,6 +304,7 @@ export function decodeSessionRow(value: unknown): SessionRow {
     origin,
     delegation_depth: nullableNonnegativeSafeIntegerField(row, 'delegation_depth'),
     agent_preset: nullableStringField(row, 'agent_preset'),
+    draft,
     incarnation,
     revision: nonnegativeSafeIntegerField(row, 'revision'),
   }
@@ -355,6 +359,7 @@ export function rowToMeta(row: SessionRow): SessionHeader {
     ...row.origin === null ? {} : { origin: row.origin },
     ...row.delegation_depth === null ? {} : { delegationDepth: row.delegation_depth },
     ...row.agent_preset === null ? {} : { agentPreset: row.agent_preset },
+    ...(row.draft === 1 ? { draft: true } : {}),
   }
 }
 

@@ -10,12 +10,13 @@ import { lstat, mkdir, open } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import type { DatabaseSync, StatementSync } from 'node:sqlite'
 import {
+  SessionId,
   type SessionEvent,
   type SessionHeader,
-  type SessionId,
 } from '@deepseek-ai/dsh-session'
 import {
   SessionPersistenceRevision,
+  sessionContentMetadata,
   type PersistenceBackend,
   type SessionPersistenceRevision as PersistenceRevision,
   type SessionPersistenceSnapshot,
@@ -254,10 +255,24 @@ export class SqliteStore implements PersistenceBackend<number> {
     await this.observe(signal)
     const rows = this.sessionRows()
     signal?.throwIfAborted()
-    return rows.map(row => ({
-      header: rowToMeta(row),
-      revision: sqliteRevision(this.storeIdentity, row),
-    }))
+    const snapshots: SessionPersistenceSnapshot[] = []
+    for (const row of rows) {
+      signal?.throwIfAborted()
+      const header = rowToMeta(row)
+      if (header.draft === true) {
+        const stored = await this.loadStored(SessionId(row.id), signal)
+        /* v8 ignore next -- the row and its events share one serialized SQLite connection. */
+        if (stored === undefined) continue
+        snapshots.push({
+          header,
+          revision: sqliteRevision(this.storeIdentity, row),
+          content: sessionContentMetadata(stored.events),
+        })
+      } else {
+        snapshots.push({ header, revision: sqliteRevision(this.storeIdentity, row) })
+      }
+    }
+    return snapshots
   }
 
   async close(): Promise<void> {
@@ -378,6 +393,7 @@ export class SqliteStore implements PersistenceBackend<number> {
       meta.origin ?? null,
       meta.delegationDepth ?? null,
       meta.agentPreset ?? null,
+      meta.draft === true ? 1 : 0,
       randomUUID(),
     )
   }

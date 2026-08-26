@@ -39,6 +39,8 @@ Images, archives, generated files, and oversized tool output remain on the local
 
 The document catalog migration is numbered `012_document_catalog.sql` because the base branch owns migration 011.
 
+Migration `016_session_content_and_drafts.sql` adds transactional visible-content watermarks, scope-qualified one-hour browser-draft reservations, and the maintenance-only `empty-draft` archive record kind. Existing rows are backfilled from their event JSON; the administrator maintenance preview must be reviewed before any row enters trash.
+
 ## Import a Gateway SQLite snapshot
 
 Always import an online SQLite backup, not a copied live WAL database:

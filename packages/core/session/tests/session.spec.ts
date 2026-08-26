@@ -1050,6 +1050,7 @@ describe('Session', () => {
       { header: { ...base, seedLength: '1' }, error: /seedLength must be a non-negative safe integer/ },
       { header: { ...base, seedLength: 0.5 }, error: /seedLength must be a non-negative safe integer/ },
       { header: { ...base, seedLength: -1 }, error: /seedLength must be a non-negative safe integer/ },
+      { header: { ...base, draft: 'yes' }, error: /header draft must be a boolean/ },
     ]
 
     for (const { header, error } of cases) {
@@ -1282,13 +1283,14 @@ describe('SessionStore', () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)
     const session = ctx.sessions.create(SessionId('delegated-child'), {
-      meta: { parentSession: SessionId('parent'), origin: 'subagent', delegationDepth: 2 },
+      meta: { parentSession: SessionId('parent'), origin: 'subagent', delegationDepth: 2, draft: true },
     })
     expect(session.header).toMatchObject({
       id: 'delegated-child',
       parentSession: 'parent',
       origin: 'subagent',
       delegationDepth: 2,
+      draft: true,
     })
   })
 
@@ -1311,6 +1313,7 @@ describe('SessionStore', () => {
       { meta: { delegationDepth: 0.5 }, error: /delegationDepth must be a non-negative safe integer/ },
       { meta: { delegationDepth: -1 }, error: /delegationDepth must be a non-negative safe integer/ },
       { meta: { agentPreset: 1 }, error: /agentPreset must be a string/ },
+      { meta: { draft: 'yes' }, error: /draft must be a boolean/ },
     ]
 
     for (const [index, { meta, error }] of cases.entries()) {

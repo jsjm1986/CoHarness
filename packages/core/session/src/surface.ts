@@ -113,6 +113,36 @@ export function deriveEventMessage(event: SessionEvent): Message | null {
   }
 }
 
+/**
+ * Whether one event contributes non-empty conversation content.
+ * @param event - session event to inspect.
+ * @returns true when the event carries non-empty derived message content.
+ */
+export function hasConversationContent(event: SessionEvent): boolean {
+  const message = deriveEventMessage(event)
+  return message !== null && message.content.length > 0
+}
+
+/**
+ * Whether an event gives a newly created draft a durable reason to exist.
+ * Policy and runtime-context seed events stay in memory; command and durable
+ * state events remain recoverable even when no chat message exists.
+ * @param event - session event to inspect.
+ * @returns true when the draft must be materialized.
+ */
+export function materializesSession(event: SessionEvent): boolean {
+  if (hasConversationContent(event)) return true
+  switch (event.type as string) {
+    case 'command/run':
+    case 'command/done':
+    case 'goal/change':
+    case 'plan/mode':
+      return true
+    default:
+      return false
+  }
+}
+
 /** One replacement operation observed while folding a session surface. */
 export interface SurfaceFoldReplacement {
   /** Seq of the event that replaced the prior surface range. */

@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import SessionStore, { Session, SessionId, isJsonValue } from '@deepseek-ai/dsh-session'
+import SessionStore, { Session, SessionDraftId, SessionId, isJsonValue } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import {
   DEFAULT_PREPARED_SESSION_CACHE_SIZE, DEFAULT_WRITE_BATCH_MAX_DELAY_MS, MAX_WRITE_BATCH_DELAY_MS,
   SessionPersistence, SessionPersistenceRevision, PersistenceCoordinator,
+  sessionContentMetadata,
   type PersistenceBackend, type SessionPersistenceSnapshot, type StoredPrefix, type StoredSuffix,
 } from '../src/index.ts'
 import { runPersistenceContract, meta, oneTurnLog } from './contract.ts'
@@ -269,6 +271,32 @@ describe('the inherited readRaw default', () => {
       ctx.sessionPersistence.readRaw(SessionId('any-session'), controller.signal),
     ).rejects.toThrow('aborted')
   })
+
+  it('provides no-op draft lease methods for local providers', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(MemoryPersistence)
+    const request = { draftId: SessionDraftId('draft'), sessionId: SessionId('draft'), cwd: '/work' }
+    await expect(ctx.sessionPersistence.reserveDraft(request)).resolves.toBeUndefined()
+    await expect(ctx.sessionPersistence.heartbeatDraft(request)).resolves.toBeUndefined()
+    await expect(ctx.sessionPersistence.releaseDraft(request)).resolves.toBeUndefined()
+  })
+})
+
+describe('session content metadata', () => {
+  it('folds visible sequences and human prompt times independently', () => {
+    expect(sessionContentMetadata([
+      { type: 'turn/start', seq: 0, time: 20, data: { turn: 1 } },
+      {
+        type: 'user/message', seq: 1, time: 10,
+        data: { content: [], source: { kind: 'user' } }, surfaceOp: 'append',
+      } as unknown as SessionEvent,
+      {
+        type: 'user/message', seq: 2, time: 30,
+        data: { content: [{ type: 'text', text: 'visible' }], source: { kind: 'user' } }, surfaceOp: 'append',
+      } as unknown as SessionEvent,
+    ])).toEqual({ blank: false, visibleContentSeq: 2, lastPromptAt: 30 })
+  })
 })
 
 // Each fixture shares one map across mounts. No `corruptTail` is supplied because map writes are
@@ -296,6 +324,34 @@ describe('PersistenceCoordinator seed ownership', () => {
       await ctx.sessions.flush(session)
 
       expect(backend.lastAppendedBatch).toBe(seed)
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('keeps draft-only events in memory and materializes the complete prefix on first content', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const backend = new ControlledBackend()
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      new PersistenceCoordinator(inner, backend)
+    }, { inject: ['sessions'] }))
+    try {
+      const session = ctx.sessions.create(SessionId('deferred-draft'), {
+        meta: { draft: true },
+      })
+      session.append('turn/start', { turn: 1 })
+      await ctx.sessions.flush(session)
+      expect(backend.store.has(session.id)).toBe(false)
+
+      session.append('user/message', createUserMessage({
+        content: [{ type: 'text', text: 'hello' }],
+        source: { kind: 'user' },
+      }), { surfaceOp: 'append' })
+      await ctx.sessions.flush(session)
+      expect(backend.store.get(session.id)?.events.map(event => event.type)).toEqual(['turn/start', 'user/message'])
+      expect(backend.store.get(session.id)?.meta.draft).toBe(false)
     } finally {
       await fiber.dispose()
       await ctx.fiber.dispose()

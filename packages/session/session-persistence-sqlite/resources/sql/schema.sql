@@ -13,6 +13,7 @@ CREATE TABLE sessions (
   origin           TEXT,
   delegation_depth INTEGER,
   agent_preset     TEXT,
+  draft            INTEGER NOT NULL DEFAULT 0 CHECK (draft IN (0, 1)),
   incarnation      TEXT NOT NULL,
   revision         INTEGER NOT NULL
 ) STRICT;

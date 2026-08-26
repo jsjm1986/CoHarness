@@ -3,13 +3,80 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {
   DirectoryListing, IApiClient, RpcError,
-  SessionId, WorkspaceId, WorkspaceView,
+  SessionDraftId, SessionId, WorkspaceId, WorkspaceView,
 } from '@deepseek-ai/dsh-api-remotes/client'
 import type { SnapshotStore } from '../contract/store.ts'
 import { createSnapshotStore } from '../contract/store.ts'
 import type { SessionsPort, SessionsPortList } from '../contract/sessions-port.ts'
 import type { IWorkspaces } from '../contract/workspaces.ts'
 import { WorkspaceManager, type WorkspaceListPhase } from './manager.ts'
+
+let fallbackDraftCounter = 0
+
+/** Generate one opaque browser draft reservation id. */
+function newDraftId(): SessionDraftId {
+  let uuid: string
+  try {
+    uuid = globalThis.crypto.randomUUID()
+  } catch {
+    uuid = `${Date.now().toString(36)}-${String(++fallbackDraftCounter)}-${Math.random().toString(36).slice(2)}`
+  }
+  return `draft-${uuid}` as SessionDraftId
+}
+
+/** Generate the Session identity paired with one browser draft. */
+function newDraftSessionId(): SessionId {
+  let uuid: string
+  try {
+    uuid = globalThis.crypto.randomUUID()
+  } catch {
+    uuid = `${Date.now().toString(36)}-${String(++fallbackDraftCounter)}-${Math.random().toString(36).slice(2)}`
+  }
+  return `session-${uuid}` as SessionId
+}
+
+interface ActiveDraft {
+  draftId: SessionDraftId
+  sessionId: SessionId
+  workspacePath: string
+}
+
+const ACTIVE_DRAFTS_KEY = 'dsh.workspace.drafts.v1'
+
+function loadActiveDrafts(): Map<WorkspaceId, ActiveDraft> {
+  if (typeof localStorage === 'undefined') return new Map()
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(ACTIVE_DRAFTS_KEY) ?? '{}')
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return new Map()
+    const result = new Map<WorkspaceId, ActiveDraft>()
+    for (const [workspaceId, value] of Object.entries(parsed)) {
+      if (typeof value !== 'object' || value === null || Array.isArray(value)) continue
+      const row = value as Record<string, unknown>
+      if (typeof row.draftId !== 'string' || row.draftId.length === 0
+        || typeof row.sessionId !== 'string' || row.sessionId.length === 0
+        || typeof row.workspacePath !== 'string' || row.workspacePath.length === 0) continue
+      result.set(workspaceId as WorkspaceId, {
+        draftId: row.draftId as SessionDraftId,
+        sessionId: row.sessionId as SessionId,
+        workspacePath: row.workspacePath,
+      })
+    }
+    return result
+  } catch {
+    return new Map()
+  }
+}
+
+function saveActiveDrafts(drafts: ReadonlyMap<WorkspaceId, ActiveDraft>): void {
+  if (typeof localStorage === 'undefined') return
+  try {
+    const value: Record<string, ActiveDraft> = {}
+    for (const [workspaceId, draft] of drafts) value[workspaceId] = draft
+    localStorage.setItem(ACTIVE_DRAFTS_KEY, JSON.stringify(value))
+  } catch {
+    // A private-mode or quota failure only disables recovery; the live draft remains usable.
+  }
+}
 
 /** Workspace list plus the two-baseline readiness and default-target projection. */
 export interface WorkspaceListState {
@@ -57,6 +124,8 @@ export class WorkspaceRuntime implements IWorkspaces {
   private readonly manager: WorkspaceManager
   /** In-flight blank-session creates keyed by workspace (connectWorkspace coalescing). */
   private readonly connecting = new Map<WorkspaceId, Promise<SessionId>>()
+  /** Draft reservations survive a reload without storing prompt text or credentials. */
+  private readonly activeDrafts = loadActiveDrafts()
   /** Guards the runtime-owned one-shot initial-selection subscription. */
   private initialSelectionStarted = false
 
@@ -113,7 +182,27 @@ export class WorkspaceRuntime implements IWorkspaces {
         && workspace.sessionIds.includes(summary.id)
         && !archived.includes(summary.id)) reusableSessionIds.push(summary.id)
     }
-    const attempt = this.sessions.createOrReuse({ workspaceId }, reusableSessionIds)
+    const active = this.activeDrafts.get(workspaceId)
+    const draft = active !== undefined && active.workspacePath === workspace.path
+      ? active
+      : { draftId: newDraftId(), sessionId: newDraftSessionId(), workspacePath: workspace.path }
+    this.activeDrafts.set(workspaceId, draft)
+    saveActiveDrafts(this.activeDrafts)
+    const attempt = this.sessions.createOrReuse({
+      workspaceId,
+      draftId: draft.draftId,
+      sessionId: draft.sessionId,
+    }, reusableSessionIds)
+      .then((sessionId) => {
+        if (reusableSessionIds.includes(sessionId)) {
+          this.activeDrafts.delete(workspaceId)
+        } else {
+          const current = this.activeDrafts.get(workspaceId)
+          if (current !== undefined) this.activeDrafts.set(workspaceId, { ...current, sessionId })
+        }
+        saveActiveDrafts(this.activeDrafts)
+        return sessionId
+      })
       .finally(() => { this.connecting.delete(workspaceId) })
     this.connecting.set(workspaceId, attempt)
     return attempt
@@ -374,6 +463,11 @@ export class WorkspaceRuntime implements IWorkspaces {
   private project(): void {
     const workspace = this.manager.getSnapshot()
     const sessions = this.sessions.list.getSnapshot()
+    for (const [workspaceId, draft] of this.activeDrafts) {
+      const summary = sessions.byId[draft.sessionId]
+      if (summary !== undefined && !summary.blank) this.activeDrafts.delete(workspaceId)
+    }
+    saveActiveDrafts(this.activeDrafts)
     const baselinesReady = workspace.phase === 'ready' && sessions.phase === 'ready'
     // An archived current selection clears into the New Session view state —
     // a hidden row must not stay open behind the list. Sweeping here covers
