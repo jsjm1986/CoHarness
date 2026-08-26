@@ -1,5 +1,5 @@
 import { createHash, generateKeyPairSync, randomUUID } from 'node:crypto'
-import { access, mkdir, mkdtemp, readFile, realpath, rm } from 'node:fs/promises'
+import { access, copyFile, mkdir, mkdtemp, readFile, readdir, realpath, rm } from 'node:fs/promises'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -121,10 +121,58 @@ describePg('PostgreSQL baseline', () => {
   beforeAll(async () => {
     pool = createPostgresPool(DATABASE_URL!, { max: 4 })
     await pool.query('DROP SCHEMA IF EXISTS harness CASCADE')
-    const migrated = await runMigrations(pool, MIGRATIONS)
-    expect(migrated).toEqual({ applied: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], current: 15 })
+    const legacyMigrations = await mkdtemp(join(tmpdir(), 'hgw-postgres-migrations-'))
+    try {
+      const migrationNames = (await readdir(MIGRATIONS))
+        .filter(name => Number(name.slice(0, 3)) <= 15)
+      await Promise.all(migrationNames.map(name => copyFile(join(MIGRATIONS, name), join(legacyMigrations, name))))
+      expect(await runMigrations(pool, legacyMigrations)).toEqual({
+        applied: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+        current: 15,
+      })
+      const legacyOrganization = await pool.query<{ id: string }>(
+        `INSERT INTO harness.organizations(slug,display_name) VALUES($1,'Legacy NUL') RETURNING id`,
+        [`legacy-nul-${randomUUID()}`],
+      )
+      const legacyOrganizationId = legacyOrganization.rows[0]!.id
+      const legacyUser = await pool.query<{ id: string }>(`INSERT INTO harness.users(
+        organization_id,username,display_name,home_path
+      ) VALUES($1,'legacy','Legacy','/tmp/legacy') RETURNING id`, [legacyOrganizationId])
+      const legacyUserId = legacyUser.rows[0]!.id
+      await pool.query(`INSERT INTO harness.conversation_sessions(
+        id,organization_id,creator_user_id,session_format_version,created_at,updated_at,
+        visibility,root_session_id,cwd
+      ) VALUES('legacy-nul-session',$1,$2,0,now(),now(),'personal','legacy-nul-session','/tmp/legacy')`, [
+        legacyOrganizationId, legacyUserId,
+      ])
+      const legacyEvent = JSON.stringify({
+        type: 'user/message',
+        data: {
+          content: [{ type: 'text', text: 'legacy\u0000message' }],
+          source: { kind: 'user' },
+        },
+      })
+      await pool.query(`INSERT INTO harness.conversation_events(
+        session_id,seq,event_type,occurred_at,event,payload_bytes
+      ) VALUES('legacy-nul-session',0,'user/message',now(),$1::json,octet_length($1::text))`, [legacyEvent])
+      const migrated = await runMigrations(pool, MIGRATIONS)
+      expect(migrated).toEqual({ applied: [16], current: 16 })
+      const legacyFacts = await pool.query<{
+        has_visible_content: boolean
+        visible_content_seq: string | null
+        last_prompt_at: string | null
+      }>(`SELECT has_visible_content,visible_content_seq,last_prompt_at::text AS last_prompt_at
+        FROM harness.conversation_sessions WHERE id='legacy-nul-session'`)
+      expect(legacyFacts.rows).toEqual([{
+        has_visible_content: true,
+        visible_content_seq: '0',
+        last_prompt_at: expect.any(String),
+      }])
+    } finally {
+      await rm(legacyMigrations, { recursive: true, force: true })
+    }
     expect(await runMigrations(pool, MIGRATIONS))
-      .toEqual({ applied: [], current: 15 })
+      .toEqual({ applied: [], current: 16 })
     const pushTables = await pool.query<{ table_name: string }>(`SELECT table_name
       FROM information_schema.tables
       WHERE table_schema='harness' AND table_name IN ('push_devices','push_deliveries')

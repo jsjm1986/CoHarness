@@ -39,7 +39,7 @@ npm run pg:check
 
 文档目录迁移文件编号为 `012_document_catalog.sql`，因为基线分支已经使用 migration 011。
 
-迁移 `016_session_content_and_drafts.sql` 增加事务内可见内容水位、按 scope 限定的一小时浏览器草稿 reservation，以及仅维护视图使用的 `empty-draft` 归档记录类型。既有行会从事件 JSON 回填；任何行进入回收站前都必须先由管理员审查维护预览。
+迁移 `016_session_content_and_drafts.sql` 增加事务内可见内容水位、按 scope 限定的一小时浏览器草稿 reservation，以及仅维护视图使用的 `empty-draft` 归档记录类型。既有行会从事件 JSON 回填；含转义 NUL 的历史事件 JSON 会在不对该值使用 JSON 运算符的情况下采用保守归类。任何行进入回收站前都必须先由管理员审查维护预览。
 
 ## 导入 Gateway SQLite 快照
 
@@ -87,4 +87,4 @@ HGW_TEST_SQLITE_FILE=/tmp/gateway-before-postgres.sqlite \
   npm run test:postgres
 ```
 
-测试会删除所提供测试数据库中的 `harness` schema，绝不能指向生产库。覆盖内容包括直到版本 15 的不可变 migration、未知 migration ledger 拒绝、企业隔离、任意字符串 Session ID、包含 NUL 字符串的完整 JSON 往返、连续序号约束、并发批次幂等、嵌套工具结果搜索、包含项目邀请的可重复 SQLite 导入、根继承协作 ACL、贡献投影、交互竞态、从空节点配置端口基准分配共享项目运行时、项目文档所有权与谱系、个人 Provider/model 登记历史、项目默认模型授权、项目凭据/额度/用量、归档索引生命周期与保留策略，以及在线认证、用户、项目、节点实例、审计和模型治理服务。
+测试会删除所提供测试数据库中的 `harness` schema，绝不能指向生产库。覆盖内容包括直到版本 16 的不可变 migration（含转义 NUL 回填回归）、未知 migration ledger 拒绝、企业隔离、任意字符串 Session ID、包含 NUL 字符串的完整 JSON 往返、连续序号约束、并发批次幂等、嵌套工具结果搜索、包含项目邀请的可重复 SQLite 导入、根继承协作 ACL、贡献投影、交互竞态、从空节点配置端口基准分配共享项目运行时、项目文档所有权与谱系、个人 Provider/model 登记历史、项目默认模型授权、项目凭据/额度/用量、归档索引生命周期与保留策略，以及在线认证、用户、项目、节点实例、审计和模型治理服务。

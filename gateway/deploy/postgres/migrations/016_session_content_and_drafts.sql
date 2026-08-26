@@ -6,43 +6,47 @@ ALTER TABLE harness.conversation_sessions
   ADD COLUMN visible_content_seq bigint,
   ADD COLUMN last_prompt_at timestamptz;
 
--- Rebuild the facts for rows written before this migration.  The event JSON is
+-- Rebuild the facts for rows written before this migration. The event JSON is
 -- the source of truth; empty assistant usage records and empty message arrays
--- remain blank.  A non-empty content array is the same predicate used by the
--- runtime surface classifier.
+-- remain blank. PostgreSQL `json` accepts escaped NUL characters, but JSON
+-- operators reject them while decoding a value. Such rows are conservatively
+-- treated as visible content (and as a prompt for user messages), so a legacy
+-- message containing NUL cannot disappear from a cold listing.
+WITH event_facts AS (
+  SELECT
+    e.session_id,
+    e.seq,
+    e.occurred_at,
+    CASE
+      WHEN position(chr(92) || 'u0000' IN e.event::text) > 0
+        THEN e.event_type IN ('user/message', 'assistant/message', 'tool/result')
+      WHEN e.event_type = 'user/message'
+        THEN CASE WHEN json_typeof(e.event->'data'->'content') = 'array'
+          THEN json_array_length(e.event->'data'->'content') > 0 ELSE false END
+      WHEN e.event_type IN ('assistant/message', 'tool/result')
+        THEN CASE WHEN json_typeof(e.event->'data'->'message'->'content') = 'array'
+          THEN json_array_length(e.event->'data'->'message'->'content') > 0 ELSE false END
+      ELSE false
+    END AS has_visible_content,
+    CASE
+      WHEN position(chr(92) || 'u0000' IN e.event::text) > 0
+        THEN e.event_type = 'user/message'
+      ELSE e.event_type = 'user/message' AND e.event->'data'->'source'->>'kind' = 'user'
+    END AS is_user_prompt
+  FROM harness.conversation_events AS e
+)
 UPDATE harness.conversation_sessions AS s
 SET has_visible_content = EXISTS (
-      SELECT 1
-      FROM harness.conversation_events AS e
-      WHERE e.session_id = s.id
-        AND (
-          (e.event_type = 'user/message'
-            AND json_array_length(CASE WHEN json_typeof(e.event->'data'->'content') = 'array'
-              THEN e.event->'data'->'content' ELSE '[]'::json END) > 0)
-          OR (e.event_type IN ('assistant/message','tool/result')
-            AND json_array_length(CASE WHEN json_typeof(e.event->'data'->'message'->'content') = 'array'
-              THEN e.event->'data'->'message'->'content' ELSE '[]'::json END) > 0)
-        )
+      SELECT 1 FROM event_facts AS e
+      WHERE e.session_id = s.id AND e.has_visible_content
     ),
     visible_content_seq = (
-      SELECT max(e.seq)
-      FROM harness.conversation_events AS e
-      WHERE e.session_id = s.id
-        AND (
-          (e.event_type = 'user/message'
-            AND json_array_length(CASE WHEN json_typeof(e.event->'data'->'content') = 'array'
-              THEN e.event->'data'->'content' ELSE '[]'::json END) > 0)
-          OR (e.event_type IN ('assistant/message','tool/result')
-            AND json_array_length(CASE WHEN json_typeof(e.event->'data'->'message'->'content') = 'array'
-              THEN e.event->'data'->'message'->'content' ELSE '[]'::json END) > 0)
-        )
+      SELECT max(e.seq) FROM event_facts AS e
+      WHERE e.session_id = s.id AND e.has_visible_content
     ),
     last_prompt_at = (
-      SELECT max(e.occurred_at)
-      FROM harness.conversation_events AS e
-      WHERE e.session_id = s.id
-        AND e.event_type = 'user/message'
-        AND e.event->'data'->'source'->>'kind' = 'user'
+      SELECT max(e.occurred_at) FROM event_facts AS e
+      WHERE e.session_id = s.id AND e.is_user_prompt
     );
 
 ALTER TABLE harness.conversation_sessions
