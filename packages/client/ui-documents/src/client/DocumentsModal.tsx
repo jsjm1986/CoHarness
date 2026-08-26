@@ -73,6 +73,16 @@ function uploadErrorMessage(error: unknown, t: (key: DocumentsKey) => string): s
   return t('modal.upload.error')
 }
 
+function documentErrorMessage(error: unknown, t: (key: DocumentsKey) => string): string {
+  if (error instanceof UserDocHttpError) {
+    if (error.code === 'INSTANCE_STARTING') return t('error.runtimeStarting')
+    if (error.code === 'INSTANCE_UNREACHABLE' || error.code === 'COLLABORATION_UNAVAILABLE') {
+      return t('error.runtimeUnavailable')
+    }
+  }
+  return error instanceof Error ? error.message : String(error)
+}
+
 type FolderEditor =
   | { mode: 'create'; parentDirectoryId: UserDocDirectoryIdType }
   | { mode: 'rename'; directory: UserDocDirectoryRef }
@@ -290,7 +300,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
       if (cause instanceof UserDocServiceUnavailableError) {
         setError(t('error.unavailable'))
       } else {
-        setError(cause instanceof Error ? cause.message : /* v8 ignore next -- Error is always an Error in tests */ String(cause))
+        setError(documentErrorMessage(cause, t))
       }
     } finally {
       if (!signal?.aborted && generation === loadGeneration.current) setLoading(false)
@@ -310,7 +320,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
       setSelected(new Set())
       return true
     } catch (cause) {
-      setOverviewError(cause instanceof Error ? cause.message : String(cause))
+      setOverviewError(documentErrorMessage(cause, t))
       return false
     } finally {
       setOverviewLoading(false)
@@ -325,7 +335,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
       setHistoryItems([...response.items])
       setHistoryOpen(true)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
+      setError(documentErrorMessage(cause, t))
     } finally {
       setHistoryLoading(false)
     }
@@ -364,7 +374,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
       setPage(1)
       return true
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
+      setError(documentErrorMessage(cause, t))
       return false
     } finally {
       setLoading(false)
@@ -805,7 +815,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
       setSourcePickerOpen(false)
       return true
     } catch (error) {
-      setError(error instanceof Error ? error.message : t('copy.error'))
+      setError(documentErrorMessage(error, t))
       return false
     } finally {
       setSourcePickerLoading(false)
@@ -821,7 +831,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
         setQuery('')
         setPage(1)
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : t('copy.error'))
+        setError(documentErrorMessage(cause, t))
       }
       return
     }
@@ -900,7 +910,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
       setFailedCopyItems([])
       setModalError('')
     } catch (cause) {
-      setOverviewError(cause instanceof Error ? cause.message : String(cause))
+      setOverviewError(documentErrorMessage(cause, t))
     }
   }
 

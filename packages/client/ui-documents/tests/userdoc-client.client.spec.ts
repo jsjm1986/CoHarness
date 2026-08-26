@@ -110,6 +110,79 @@ describe('createUserDocClient', () => {
     await expect(client.list()).rejects.toMatchObject({ message: 'not-json' })
   })
 
+  it('recognizes a starting runtime and retries transient document reads', async () => {
+    let calls = 0
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      calls += 1
+      if (calls === 1) {
+        return {
+          ok: false,
+          status: 503,
+          headers: new Headers({ 'retry-after': '0' }),
+          text: async () => JSON.stringify({ error: 'instance-starting' }),
+        }
+      }
+      return { ok: true, text: async () => JSON.stringify({ limits: {}, documents: [ref] }) }
+    }))
+
+    await expect(createUserDocClient().list()).resolves.toMatchObject({ documents: [ref] })
+    expect(calls).toBe(2)
+
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: false,
+      status: 503,
+      headers: new Headers({ 'retry-after': '0' }),
+      text: async () => JSON.stringify({ error: 'instance-starting' }),
+    })))
+    await expect(createUserDocClient().list()).rejects.toMatchObject({
+      name: 'UserDocHttpError',
+      status: 503,
+      code: 'INSTANCE_STARTING',
+      message: 'The document runtime is starting. Retry shortly.',
+      retryAfterMs: 0,
+    })
+  })
+
+  it('waits for a positive retry delay and aborts a delayed read', async () => {
+    let calls = 0
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      calls += 1
+      return calls === 1
+        ? {
+          ok: false,
+          status: 503,
+          headers: new Headers({ 'retry-after': '0.001' }),
+          text: async () => JSON.stringify({ error: 'instance-starting' }),
+        }
+        : { ok: true, text: async () => JSON.stringify({ limits: {}, documents: [ref] }) }
+    }))
+    await expect(createUserDocClient().list()).resolves.toMatchObject({ documents: [ref] })
+    expect(calls).toBe(2)
+
+    const controller = new AbortController()
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: false,
+      status: 503,
+      headers: new Headers({ 'retry-after': '1' }),
+      text: async () => JSON.stringify({ error: 'instance-starting' }),
+    })))
+    const pending = createUserDocClient().list(controller.signal)
+    await Promise.resolve()
+    controller.abort(new Error('cancelled'))
+    await expect(pending).rejects.toThrow('cancelled')
+
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: false,
+      status: 502,
+      headers: new Headers({ 'retry-after': '0' }),
+      text: async () => JSON.stringify({ error: 'instance-unreachable' }),
+    })))
+    await expect(createUserDocClient().list()).rejects.toMatchObject({
+      code: 'INSTANCE_UNREACHABLE',
+      message: 'The document runtime is unavailable. Retry shortly.',
+    })
+  })
+
   it('rethrows fetch failures, including abort and non-Error throws', async () => {
     const abort = new DOMException('The operation was aborted.', 'AbortError')
     vi.stubGlobal('fetch', vi.fn(async () => { throw abort }))

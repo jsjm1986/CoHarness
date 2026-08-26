@@ -535,7 +535,10 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
           send(res, error.status, JSON.stringify({ error: { code: error.code, message: error.message } }), 'application/json')
           return
         }
-        throw error
+        console.error('[gateway] document scope listing failed:', error)
+        send(res, 503, JSON.stringify({
+          error: { code: 'DOCUMENT_TRANSFER_UNAVAILABLE', message: 'Document scope listing is temporarily unavailable.' },
+        }), 'application/json')
       } finally {
         req.removeListener('aborted', onRequestAbort)
         res.removeListener('close', onResponseClose)

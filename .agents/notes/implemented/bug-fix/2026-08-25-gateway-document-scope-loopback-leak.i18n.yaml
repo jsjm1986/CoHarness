@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-25-gateway-document-scope-loopback-leak.md
-2026-08-25-gateway-document-scope-loopback-leak.md: 0fac7daaadeb2bac4adb261e341082adfad208e4
-2026-08-25-gateway-document-scope-loopback-leak.zh.md: f37cba270d5c8ee42141487244862cc77c5aefbb
+2026-08-25-gateway-document-scope-loopback-leak.md: f5692dd55c9a7fce837f202b7977755d9d6c3bf1
+2026-08-25-gateway-document-scope-loopback-leak.zh.md: f0e1f0215b78405ca9236f0eccd05d615bc0519f

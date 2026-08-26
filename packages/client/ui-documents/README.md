@@ -16,6 +16,8 @@ The dialog is a full-height workbench on desktop and a compact full-screen workb
 
 Selecting another personal or writable project scope keeps the manager and the active conversation in place. That view remains metadata-only for browsing, but its Upload action streams the selected files to the target scope root through the Gateway. Folder management, preview, download, move, delete, and attachment actions remain unavailable until the active runtime scope is restored. Read-only projects stay visible with an explicit permission state, and the all-scope overview offers a target-scope chooser instead of uploading without a destination.
 
+Document metadata reads retry a transient runtime-starting response using the server's `Retry-After` delay before surfacing a localized scope-unavailable message. Upload and copy writes are not replayed automatically.
+
 Select one or more rows and choose **Copy to another scope** to create a snapshot in a writable project or in personal documents. The manager shows only safe scope labels; Gateway performs authorization and streaming, resolves target name conflicts without overwriting, and reports each file independently. A successful copy can be attached to the active composer as a durable, non-owning draft.
 
 The composer’s Documents control opens the same manager, so a copy started from the input bar returns to that draft through the manager attach command.
