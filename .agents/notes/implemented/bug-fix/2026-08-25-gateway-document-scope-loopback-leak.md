@@ -27,3 +27,7 @@ Scope switching remains an in-page JSON operation even when the selected runtime
 ## Testing
 
 `gateway/tests/server.spec.ts` verifies the public list route is handled without the proxy and has no `Location` header. `gateway/tests/document-transfer.spec.ts` verifies the public adapter shares project authorization and rejects internal redirects. `gateway/tests/proxy.spec.ts` verifies loopback redirect rewriting and preserves a non-loopback-looking hostname.
+
+## Related
+
+- [Document scope runtime readiness and safe provider projections](2026-08-26-document-scope-runtime-readiness.md) — owns transient runtime retries, structured readiness errors, and canonical Provider URL projection.

@@ -15,7 +15,7 @@ vi.mock('../src/client/documents-client.ts', async (importOriginal) => {
     createUserDocClient,
   }
 })
-import { UserDocServiceUnavailableError } from '../src/client/documents-client.ts'
+import { UserDocHttpError, UserDocServiceUnavailableError } from '../src/client/documents-client.ts'
 import type {
   UserDocDirectoryIdType, UserDocDirectoryRef, UserDocLimits,
 } from '../src/client/documents-client.ts'
@@ -430,6 +430,17 @@ describe('DocumentsModal', () => {
     renderModal()
     const alert = await screen.findByRole('alert')
     expect(alert.textContent).toContain('boom')
+  })
+
+  it('shows a retryable runtime message instead of the generic operation error', async () => {
+    const client = makeClient()
+    client.browse.mockRejectedValue(new UserDocHttpError(
+      503, 'The document runtime is starting. Retry shortly.', 'INSTANCE_STARTING', 0,
+    ))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain(t('error.runtimeStarting'))
   })
 
   it('uploads a selected file, reports progress, and refreshes the list', async () => {

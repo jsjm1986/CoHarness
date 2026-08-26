@@ -162,6 +162,22 @@ describe('gateway server', () => {
     ])
   })
 
+  it('maps an unexpected document scope listing failure to a retryable response', async () => {
+    const documentTransferList = vi.fn(async () => { throw new Error('runtime detail') })
+    const { base } = await setup({}, { documentTransferList })
+    const cookie = await login(base, 'root-admin', 'pw-12345678')
+    const response = await fetch(`${base}/api/documents/transfer/list`, {
+      method: 'POST',
+      headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ version: 1, scope: { kind: 'personal' } }),
+    })
+
+    expect(response.status).toBe(503)
+    expect(await response.json()).toEqual({
+      error: { code: 'DOCUMENT_TRANSFER_UNAVAILABLE', message: 'Document scope listing is temporarily unavailable.' },
+    })
+  })
+
   it('dispatches target-scope upload requests before the runtime proxy', async () => {
     const upload = vi.fn(async ({ user, scope, pathname }: { user: { id: number }; scope: unknown; pathname: string }) => {
       expect(user.id).toBe(1)

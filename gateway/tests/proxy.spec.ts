@@ -147,6 +147,14 @@ describe('proxy handlers', () => {
     await fetch(`http://127.0.0.1:${port}/exit`)
     await new Promise(r => setTimeout(r, 50))
     expect(await deps.instances.isLive(alice.id)).toBe(false)
+    const apiWaiting = await fetch(`${base}/api/echo`, {
+      method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' }, body: '{}',
+    })
+    expect(apiWaiting.status).toBe(503)
+    expect(apiWaiting.headers.get('retry-after')).toBe('2')
+    expect(await apiWaiting.json()).toEqual({
+      error: { code: 'INSTANCE_STARTING', message: 'The runtime is starting. Retry shortly.' },
+    })
     const waiting = await fetch(base + '/', { headers: { cookie, accept: 'text/html' }, redirect: 'manual' })
     expect(waiting.status).toBe(200)
     expect(waiting.headers.get('cache-control')).toBe('no-store')

@@ -27,3 +27,7 @@ Status: implemented
 ## 测试
 
 `gateway/tests/server.spec.ts` 验证公开列表路由不经过代理并且没有 `Location`。`gateway/tests/document-transfer.spec.ts` 验证公开适配器复用项目授权并拒绝内部重定向。`gateway/tests/proxy.spec.ts` 验证回环重定向改写，并保留看起来像回环但实际不是回环的 hostname。
+
+## Related
+
+- [文档作用域 runtime readiness 与安全 Provider projection](2026-08-26-document-scope-runtime-readiness.zh.md) — 负责瞬时 runtime 重试、结构化 readiness 错误和规范 Provider URL projection。

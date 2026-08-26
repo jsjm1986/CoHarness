@@ -45,13 +45,21 @@ export class UserDocHttpError extends Error {
   readonly status: number
   /** Stable host error code, when the response carried one. */
   readonly code: string | undefined
+  /** Server-advised delay before retrying a transient read, in milliseconds. */
+  readonly retryAfterMs: number | undefined
 
-  /** @param status - HTTP status code. @param message - response message. @param code - host error code. */
-  constructor(status: number, message: string, code?: string) {
+  /**
+   * @param status - HTTP status code.
+   * @param message - response message.
+   * @param code - host error code.
+   * @param retryAfterMs - server-advised retry delay.
+   */
+  constructor(status: number, message: string, code?: string, retryAfterMs?: number) {
     super(message)
     this.name = 'UserDocHttpError'
     this.status = status
     this.code = code
+    this.retryAfterMs = retryAfterMs
   }
 }
 
@@ -136,6 +144,8 @@ const DIRECTORY_CREATE_PATH = `${TRANSFER_PATH}/directories/create`
 const SCOPED_UPLOAD_PATH = TRANSFER_PATH
 const OVERVIEW_PATH = `${ROOT}/overview`
 const HISTORY_PATH = `${ROOT}/history`
+const READ_RETRY_LIMIT = 2
+const MAX_RETRY_DELAY_MS = 4000
 
 function contentUrl(docId: UserDocIdType): string {
   return `${ROOT}/content?id=${encodeURIComponent(docId)}`
@@ -155,7 +165,22 @@ async function parseResponse(response: Response): Promise<unknown> {
   try { return JSON.parse(text) as unknown } catch { return text }
 }
 
-function errorFrom(status: number, body: unknown): Error {
+function retryAfterMs(response: Response): number | undefined {
+  const headers = (response as unknown as { headers?: Pick<Headers, 'get'> }).headers
+  const raw = headers === undefined ? null : headers.get('retry-after')
+  if (raw === null || raw === '') return undefined
+  const seconds = Number(raw)
+  if (!Number.isFinite(seconds) || seconds < 0) return undefined
+  return Math.min(MAX_RETRY_DELAY_MS, Math.round(seconds * 1000))
+}
+
+function errorCodeFromString(value: string): string | undefined {
+  if (value === 'instance-starting') return 'INSTANCE_STARTING'
+  if (value === 'instance-unreachable') return 'INSTANCE_UNREACHABLE'
+  return undefined
+}
+
+function errorFrom(status: number, body: unknown, retryDelay?: number): Error {
   if (typeof body === 'object' && body !== null && 'error' in body) {
     const error = (body as { error?: unknown }).error
     if (typeof error === 'object' && error !== null) {
@@ -164,11 +189,30 @@ function errorFrom(status: number, body: unknown): Error {
         status,
         typeof record.message === 'string' ? record.message : 'Document operation failed.',
         typeof record.code === 'string' ? record.code : undefined,
+        retryDelay,
+      )
+    }
+    if (typeof error === 'string' && error !== '') {
+      const code = errorCodeFromString(error)
+      return new UserDocHttpError(
+        status,
+        code === 'INSTANCE_STARTING'
+          ? 'The document runtime is starting. Retry shortly.'
+          : code === 'INSTANCE_UNREACHABLE'
+            ? 'The document runtime is unavailable. Retry shortly.'
+            : 'Document operation failed.',
+        code,
+        retryDelay,
       )
     }
   }
   if (status === 404) return new UserDocServiceUnavailableError(status)
-  return new UserDocHttpError(status, typeof body === 'string' && body !== '' ? body : 'Document operation failed.')
+  return new UserDocHttpError(
+    status,
+    typeof body === 'string' && body !== '' ? body : 'Document operation failed.',
+    undefined,
+    retryDelay,
+  )
 }
 
 async function requestJson<T>(input: RequestInfo | URL, init: RequestInit | undefined): Promise<T> {
@@ -180,8 +224,43 @@ async function requestJson<T>(input: RequestInfo | URL, init: RequestInit | unde
     throw error instanceof Error ? error : new Error(String(error))
   }
   const body = await parseResponse(response)
-  if (!response.ok) throw errorFrom(response.status, body)
+  if (!response.ok) throw errorFrom(response.status, body, retryAfterMs(response))
   return body as T
+}
+
+function transientReadError(error: unknown): error is UserDocHttpError {
+  return error instanceof UserDocHttpError
+    && (error.status === 503 || error.code === 'INSTANCE_STARTING' || error.code === 'INSTANCE_UNREACHABLE')
+}
+
+async function waitForRetry(delayMs: number, signal: AbortSignal | undefined): Promise<void> {
+  signal?.throwIfAborted()
+  if (delayMs <= 0) return
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', abort)
+      resolve()
+    }, delayMs)
+    const abort = (): void => {
+      clearTimeout(timer)
+      signal?.removeEventListener('abort', abort)
+      reject(signal?.reason instanceof Error ? signal.reason : new DOMException('The operation was aborted.', 'AbortError'))
+    }
+    signal?.addEventListener('abort', abort, { once: true })
+  })
+}
+
+async function requestReadJson<T>(input: RequestInfo | URL, init: RequestInit | undefined): Promise<T> {
+  const signal = init?.signal ?? undefined
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await requestJson<T>(input, init)
+    } catch (error) {
+      if (!transientReadError(error) || attempt >= READ_RETRY_LIMIT) throw error
+      const delayMs = error.retryAfterMs ?? Math.min(MAX_RETRY_DELAY_MS, 250 * (2 ** attempt))
+      await waitForRetry(delayMs, signal)
+    }
+  }
 }
 
 function requestInit(method: string, signal: AbortSignal | undefined): RequestInit {
@@ -200,11 +279,11 @@ function uploadNetworkError(status: number): Error {
  */
 export function createUserDocClient(): UserDocClient {
   return {
-    list: signal => requestJson<UserDocListResponse>(ROOT, requestInit('GET', signal)),
-    browse: (directoryId, signal) => requestJson<UserDocDirectoryResponse>(
+    list: signal => requestReadJson<UserDocListResponse>(ROOT, requestInit('GET', signal)),
+    browse: (directoryId, signal) => requestReadJson<UserDocDirectoryResponse>(
       `${ROOT}?directory=${encodeURIComponent(directoryId)}`, requestInit('GET', signal),
     ),
-    listDirectories: signal => requestJson<UserDocDirectoriesResponse>(`${ROOT}/directories`, requestInit('GET', signal)),
+    listDirectories: signal => requestReadJson<UserDocDirectoriesResponse>(`${ROOT}/directories`, requestInit('GET', signal)),
     upload: (file, directoryId, signal, onProgress) => resumableUpload(file, directoryId, signal, onProgress, {
       root: ROOT,
       requestJson,
@@ -256,17 +335,17 @@ export function createUserDocClient(): UserDocClient {
       ...requestInit('POST', signal), headers: { 'content-type': 'application/json' }, body: JSON.stringify(request),
     }),
     capabilities: signal => requestJson<UserDocTransferCapabilities>(CAPABILITIES_PATH, requestInit('GET', signal)),
-    listScope: (scope, signal) => requestJson<UserDocTransferListResponse>(LIST_SCOPE_PATH, {
+    listScope: (scope, signal) => requestReadJson<UserDocTransferListResponse>(LIST_SCOPE_PATH, {
       ...requestInit('POST', signal), headers: { 'content-type': 'application/json' }, body: JSON.stringify({ version: 1, scope }),
     }),
-    listScopeDirectories: (scope, signal) => requestJson<UserDocTransferDirectoriesResponse>(DIRECTORIES_PATH, {
+    listScopeDirectories: (scope, signal) => requestReadJson<UserDocTransferDirectoriesResponse>(DIRECTORIES_PATH, {
       ...requestInit('POST', signal), headers: { 'content-type': 'application/json' }, body: JSON.stringify({ version: 1, scope }),
     }),
     createScopeDirectory: (scope, parentDirectoryId, name, signal) => requestJson<UserDocDirectoryRef>(DIRECTORY_CREATE_PATH, {
       ...requestInit('POST', signal), headers: { 'content-type': 'application/json' }, body: JSON.stringify({ version: 1, scope, directory: parentDirectoryId, name }),
     }).then(directory => ({ ...directory, path: '' })),
-    overview: signal => requestJson<UserDocCatalogOverview>(OVERVIEW_PATH, requestInit('GET', signal)),
-    history: signal => requestJson<UserDocCatalogHistory>(HISTORY_PATH, requestInit('GET', signal)),
+    overview: signal => requestReadJson<UserDocCatalogOverview>(OVERVIEW_PATH, requestInit('GET', signal)),
+    history: signal => requestReadJson<UserDocCatalogHistory>(HISTORY_PATH, requestInit('GET', signal)),
     contentUrl,
   }
 }

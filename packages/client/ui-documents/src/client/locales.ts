@@ -175,6 +175,8 @@ export const zh = {
   'size.mb': 'MB',
   'size.gb': 'GB',
   'error.unavailable': '文档服务不可用',
+  'error.runtimeStarting': '文档作用域正在启动，请稍候重试',
+  'error.runtimeUnavailable': '文档作用域暂时不可用，请稍后重试',
 } as const
 
 /** English dictionary; every key mirrors the Simplified-Chinese source of truth. */
@@ -351,6 +353,8 @@ export const en: Record<keyof typeof zh, string> = {
   'size.mb': 'MB',
   'size.gb': 'GB',
   'error.unavailable': 'Document service unavailable',
+  'error.runtimeStarting': 'The document scope is starting; please retry shortly',
+  'error.runtimeUnavailable': 'The document scope is temporarily unavailable; please retry shortly',
 }
 
 /** Union of every locale key defined for the document manager. */

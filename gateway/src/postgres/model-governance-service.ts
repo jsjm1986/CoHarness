@@ -1760,6 +1760,10 @@ export class PostgresModelGovernanceService {
       ORDER BY provider.provider_key,model.model_key`, [this.context.organizationId])
     const providers = new Map<string, RuntimeModelProvider>()
     for (const row of result.rows) {
+      const profile = cloneJson(row.profile)
+      // Runtime validation requires an embedded profile URL to equal the
+      // canonical Provider URL; older settings may retain a trailing slash.
+      if (profile.baseURL !== undefined) profile.baseURL = row.base_url
       let provider = providers.get(row.provider)
       if (provider === undefined) {
         provider = {
@@ -1769,12 +1773,12 @@ export class PostgresModelGovernanceService {
           protocol: row.protocol,
           baseURL: row.base_url,
           ...row.credential_ref === null ? {} : { credentialRef: row.credential_ref },
-          profile: cloneJson(row.profile),
+          profile,
           models: [],
         }
         providers.set(row.provider, provider)
       }
-      const configured = profileModelsOf(jsonObject(row.profile, `provider ${row.provider} profile`))
+      const configured = profileModelsOf(profile)
         .find(model => model.id === row.model_id)
       const contextWindow = typeof configured?.contextWindow === 'number' ? configured.contextWindow : undefined
       const maxTokens = typeof configured?.maxTokens === 'number' ? configured.maxTokens : undefined

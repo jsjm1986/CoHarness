@@ -95,7 +95,9 @@ export function createProxyHandlers(
           res.end(waitingPage())
         } else {
           res.writeHead(503, { 'content-type': 'application/json', ...retryHeaders })
-          res.end('{"error":"instance-starting"}')
+          res.end(JSON.stringify({
+            error: { code: 'INSTANCE_STARTING', message: 'The runtime is starting. Retry shortly.' },
+          }))
         }
         pending.catch(error => { console.error(`[gateway] instance start failed for ${target.kind} ${String(target.id)}:`, error) })
         return null
@@ -147,7 +149,12 @@ export function createProxyHandlers(
     await new Promise<void>((resolve) => {
       res.once('close', resolve)
       server.web(req, res, targetOptions(ready.port, principal), () => {
-        if (!res.headersSent) { res.writeHead(502, { 'content-type': 'application/json' }); res.end('{"error":"instance-unreachable"}') }
+        if (!res.headersSent) {
+          res.writeHead(502, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({
+            error: { code: 'INSTANCE_UNREACHABLE', message: 'The runtime is unavailable. Retry shortly.' },
+          }))
+        }
         resolve()
       })
     })

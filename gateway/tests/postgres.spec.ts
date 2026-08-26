@@ -1547,6 +1547,12 @@ describePg('PostgreSQL baseline', () => {
         providerView => providerView.provider === 'org-runtime',
       )
       expect(runtimeProvider?.models.map(model => model.id)).toEqual(['chat'])
+      await pool.query(`UPDATE harness.model_providers SET profile = profile || $3::jsonb
+        WHERE organization_id=$1 AND provider_key=$2`, [context.organizationId, 'org-runtime', JSON.stringify({ baseURL: 'https://models.example.test/v1/' })])
+      const normalizedRuntimeProvider = (await governance.policyForProject(project.id)).providers.find(
+        providerView => providerView.provider === 'org-runtime',
+      )
+      expect(normalizedRuntimeProvider?.profile?.baseURL).toBe('https://models.example.test/v1')
       await governance.setUserAccess(member.id, 'org-runtime', 'chat', false)
       expect((await governance.policyFor(member)).models[0]?.allowed).toBe(false)
       expect((await governance.policyFor(member)).defaultAllowed).toBe(false)
