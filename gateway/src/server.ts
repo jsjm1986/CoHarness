@@ -548,9 +548,22 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
 
     if (pathname === '/account/api/context' && req.method === 'GET') {
       const scopes = await deps.collaboration?.projectsForUser(user.id) ?? []
+      // `projectsForUser` already establishes the membership set. Fetch the
+      // project catalog once for the owner flags instead of issuing one
+      // detail query per membership; the response still exposes only the
+      // authorized scope rows.
+      const details = new Map(
+        (scopes.length === 0 ? [] : await deps.projects.list()).map(project => [project.id, project]),
+      )
       const projects = await Promise.all(scopes.map(async (scope) => {
-        const detail = await deps.projects.getById(scope.projectId)
-        const canManage = user.role === 'admin' || detail?.owner?.id === user.id
+        const detail = details.get(scope.projectId)
+        // Older in-process project catalogs may omit owner metadata. Preserve
+        // the previous detail lookup only for those rows; production project
+        // services include `owner` in every catalog row and stay one-query.
+        const owner = detail?.owner !== undefined
+          ? detail.owner
+          : (await deps.projects.getById(scope.projectId))?.owner
+        const canManage = user.role === 'admin' || owner?.id === user.id
         return canManage ? { ...scope, canManage: true } : scope
       }))
       send(res, 200, JSON.stringify({

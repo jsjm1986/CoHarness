@@ -144,6 +144,19 @@ describe('SessionProjectionRegistry drive', () => {
     expect(ctx.sessionProjections.snapshot(session).values['test/marks']).toEqual({ marks: ['kept'] })
   })
 
+  it('increments the registration revision only when a key enters or leaves', async () => {
+    const { ctx } = await harness()
+    expect(ctx.sessionProjections.revision).toBe(0)
+    const first = ctx.sessionProjections.register(marksUnit())
+    expect(ctx.sessionProjections.revision).toBe(1)
+    const second = ctx.sessionProjections.register(marksUnit())
+    expect(ctx.sessionProjections.revision).toBe(1)
+    first()
+    expect(ctx.sessionProjections.revision).toBe(1)
+    second()
+    expect(ctx.sessionProjections.revision).toBe(2)
+  })
+
   it('keeps the unit until the last registrant releases it', async () => {
     const { ctx, session } = await harness()
     const first = ctx.sessionProjections.register(marksUnit())

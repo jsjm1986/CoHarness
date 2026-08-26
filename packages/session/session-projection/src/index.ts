@@ -180,6 +180,8 @@ interface Registration {
 export class SessionProjectionRegistry extends Service {
   private readonly registrations = new Map<string, Registration>()
   private readonly listeners = new Set<ProjectionChangeListener>()
+  /** Bumps when the set of registered projection keys changes. */
+  private registrationRevision = 0
 
   /**
    * Create and install the registry as `ctx.sessionProjections`.
@@ -190,6 +192,16 @@ export class SessionProjectionRegistry extends Service {
     ctx.on('session/event', (session: Session, event: SessionEvent) => {
       this.drive(session, event)
     })
+  }
+
+  /**
+   * Registration-set revision used by read-model caches that retain snapshots.
+   * Value changes remain keyed by the session event sequence; this revision
+   * only changes when a client-visible or host-only key is added or removed.
+   * @returns the current registration-set revision.
+   */
+  get revision(): number {
+    return this.registrationRevision
   }
 
   /**
@@ -245,6 +257,7 @@ export class SessionProjectionRegistry extends Service {
       const existing = this.registrations.get(key)
       if (existing === undefined) {
         this.registrations.set(key, { def: erased, cells: new WeakMap(), refs: 1 })
+        this.registrationRevision += 1
       } else {
         if (existing.def.stateVersion !== erased.stateVersion) {
           throw new Error(`session projection key ${JSON.stringify(key)} is already registered at stateVersion ${String(existing.def.stateVersion)}; refusing to share it with stateVersion ${String(erased.stateVersion)}`)
@@ -256,7 +269,10 @@ export class SessionProjectionRegistry extends Service {
         /* v8 ignore next -- the disposer runs once per successful registration, so the entry it counted is still here */
         if (live === undefined) return
         live.refs -= 1
-        if (live.refs === 0) this.registrations.delete(key)
+        if (live.refs === 0) {
+          this.registrations.delete(key)
+          this.registrationRevision += 1
+        }
       }
     }.bind(this), 'sessionProjections.register()')
     return () => void dispose()

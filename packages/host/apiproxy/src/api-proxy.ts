@@ -28,7 +28,7 @@ import type {} from '@deepseek-ai/dsh-model-provider-config'
 import { isAppendSurfaceEvent, isJsonValue, materializesSession, SessionId as brandSessionId } from '@deepseek-ai/dsh-session'
 import { hasConversationContent as hasSessionConversationContent } from '@deepseek-ai/dsh-session/surface'
 import type { JsonValue, Session, SessionEvent, SessionEventMap, SessionHeader, SessionId, UserMessage } from '@deepseek-ai/dsh-session'
-import type { SessionPersistence } from '@deepseek-ai/dsh-session-persistence'
+import type { SessionPersistence, SessionPersistenceRevision } from '@deepseek-ai/dsh-session-persistence'
 // Type-only: resolves the optional permission-default owner notified after
 // the browser confirms and the Host verifies a Workspace blank reuse target.
 import type {} from '@deepseek-ai/dsh-permission-presets'
@@ -1096,6 +1096,51 @@ type HistorySource =
   | { readonly kind: 'attached'; readonly session: Session }
   | { readonly kind: 'detached'; readonly header: SessionHeader; readonly events: SessionEvent[] }
 
+/** One immutable tail response retained for a repeated Web scope reload. */
+interface HistoryTailCacheEntry {
+  /** Whether the response came from a live Session or a detached log read. */
+  readonly sourceKind: HistorySource['kind']
+  /** Opaque durable revision used to validate a detached source without loading its log. */
+  readonly sourceRevision: SessionPersistenceRevision | undefined
+  /** Event-count/last-seq identity of the source used to build the response. */
+  readonly sourceSignature: string
+  /** Projection registration-set revision used for the response block. */
+  readonly projectionRevision: number | undefined
+  /** Normalized message count requested by the client. */
+  readonly maxMessages: number
+  /** The cache only covers the compact Web conversation detail. */
+  readonly value: HistoryValue
+  /** Approximate retained JSON bytes used by the bounded LRU. */
+  readonly bytes: number
+}
+
+/** The value returned by one successful history implementation before carrier encoding. */
+interface HistoryValue {
+  events: HistoryEntry[]
+  hasMore: boolean
+  projections?: SessionProjectionsBlock
+  omittedSpans?: readonly HistoryOmittedSpan[]
+}
+
+/** Fixed memory-safety bounds keep a cache from growing with project count. */
+const HISTORY_TAIL_CACHE_MAX_ENTRIES = 16
+const HISTORY_TAIL_CACHE_MAX_BYTES = 2 * 1024 * 1024
+
+function historySourceEvents(source: HistorySource): readonly SessionEvent[] {
+  return source.kind === 'attached' ? source.session.events : source.events
+}
+
+/** Stable append-log identity; a new event or replacement invalidates the tail entry. */
+function historySourceSignature(source: HistorySource): string {
+  const events = historySourceEvents(source)
+  const last = events.at(-1)
+  return `${String(events.length)}:${String(last?.seq ?? -1)}:${String(last?.time ?? -1)}`
+}
+
+function projectionRevisionOf(ctx: Context): number | undefined {
+  return ctx.get('sessionProjections')?.revision
+}
+
 function projectionsFor(ctx: Context, session: Session): SessionProjectionsBlock | undefined {
   const registry = ctx.get('sessionProjections')
   if (registry === undefined) return undefined
@@ -1396,7 +1441,102 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   const pendingApprovals = new Map<RpcId, PendingApproval>()
   const muxQueues = new Set<MuxSubscription>()
   const imageAdmissionChains = new WeakMap<Agent, Promise<void>>()
+  /** Conversation-detail tail pages reused while a project runtime stays warm. */
+  const historyTailCache = new Map<SessionId, HistoryTailCacheEntry>()
+  let historyTailCacheBytes = 0
   let canonicalProjectRoot: Promise<string> | undefined
+
+  const clearHistoryTail = (sessionId: SessionId): void => {
+    const entry = historyTailCache.get(sessionId)
+    if (entry === undefined) return
+    historyTailCache.delete(sessionId)
+    historyTailCacheBytes -= entry.bytes
+  }
+
+  /** Read a detached log's cheap durable identity; a cache miss keeps the normal history path. */
+  const detachedHistoryRevision = async (sessionId: SessionId): Promise<SessionPersistenceRevision | undefined> => {
+    const persistence = ctx.get('sessionPersistence')
+    if (persistence === undefined) return undefined
+    try {
+      if (typeof persistence.listSnapshots !== 'function') return undefined
+      return (await persistence.listSnapshots()).find(snapshot => snapshot.header.id === sessionId)?.revision
+    } catch {
+      // The optimization must not turn a persistence identity probe failure into a history failure.
+      return undefined
+    }
+  }
+
+  const readHistoryTailCache = (
+    sessionId: SessionId,
+    sourceKind: HistorySource['kind'],
+    sourceSignature: string | undefined,
+    maxMessages: number,
+    projectionRevision: number | undefined,
+    sourceRevision: SessionPersistenceRevision | undefined,
+  ): HistoryValue | undefined => {
+    const entry = historyTailCache.get(sessionId)
+    if (entry === undefined
+      || entry.sourceKind !== sourceKind
+      || entry.maxMessages !== maxMessages
+      || entry.projectionRevision !== projectionRevision
+      || (sourceKind === 'detached'
+        ? sourceRevision === undefined || entry.sourceRevision !== sourceRevision
+        : entry.sourceRevision !== undefined)
+      || (sourceSignature !== undefined && entry.sourceSignature !== sourceSignature)) return undefined
+    // Touch the entry in insertion order so the oldest untouched page leaves
+    // first when a runtime serves more than the bounded cache capacity.
+    historyTailCache.delete(sessionId)
+    historyTailCache.set(sessionId, entry)
+    try {
+      return structuredClone(entry.value)
+    } catch {
+      clearHistoryTail(sessionId)
+      return undefined
+    }
+  }
+
+  const writeHistoryTailCache = (
+    sessionId: SessionId,
+    sourceKind: HistorySource['kind'],
+    sourceSignature: string,
+    maxMessages: number,
+    projectionRevision: number | undefined,
+    sourceRevision: SessionPersistenceRevision | undefined,
+    value: HistoryValue,
+  ): void => {
+    if (sourceKind === 'detached' && sourceRevision === undefined) return
+    let bytes: number
+    try {
+      bytes = Buffer.byteLength(JSON.stringify(value))
+    } catch {
+      return
+    }
+    if (bytes > HISTORY_TAIL_CACHE_MAX_BYTES) return
+    clearHistoryTail(sessionId)
+    while (historyTailCache.size >= HISTORY_TAIL_CACHE_MAX_ENTRIES
+      || historyTailCacheBytes + bytes > HISTORY_TAIL_CACHE_MAX_BYTES) {
+      const oldest = historyTailCache.keys().next().value
+      if (oldest === undefined) break
+      clearHistoryTail(oldest)
+    }
+    let retained: HistoryValue
+    try {
+      retained = structuredClone(value)
+    } catch {
+      return
+    }
+    const entry: HistoryTailCacheEntry = {
+      sourceKind,
+      sourceRevision,
+      sourceSignature,
+      projectionRevision,
+      maxMessages,
+      value: retained,
+      bytes,
+    }
+    historyTailCache.set(sessionId, entry)
+    historyTailCacheBytes += bytes
+  }
 
   const attachDraftSession = async (
     sessionId: SessionId,
@@ -1433,6 +1573,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   }
 
   ctx.on('session/event', (session, event) => {
+    clearHistoryTail(session.id)
     const draft = draftSessions.get(session.id)
     if (draft === undefined || !materializesSession(event)) return
     draft.materialized = true
@@ -1440,7 +1581,16 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       ctx.logger.warn(`api-proxy: draft "${draft.draftId}" workspace attach failed: ${String(error)}`)
     })
   })
-  ctx.on('session/disposed', (session) => { draftSessions.delete(session.id) })
+  ctx.on('session/disposed', (session) => {
+    draftSessions.delete(session.id)
+    clearHistoryTail(session.id)
+  })
+  // Presenter registrations are part of a history response. A hot composition
+  // change must not leave a cached page carrying views from the old registry.
+  ctx.on('tools/change', () => {
+    historyTailCache.clear()
+    historyTailCacheBytes = 0
+  })
 
   type AuthorizedSession = {
     authority: CollaborationAuthority | undefined
@@ -2869,7 +3019,46 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         const authorized = await authorizeSession(sessionId, 'read')
         if ('error' in authorized) return err(request, authorized.error)
         try {
+          const tailRequest = beforeSeq === undefined && detail === 'conversation'
+          const normalizedMaxMessages = maxMessages ?? DEFAULT_MAX_MESSAGES
+          const projectionRevision = projectionRevisionOf(ctx)
+          let detachedRevisionBefore: SessionPersistenceRevision | undefined
+          // A detached tail can be validated with the persistence revision
+          // without loading its full event log again. Authorization remains
+          // above this optimization, and an attach race is rechecked before a
+          // detached response is reused.
+          if (tailRequest && ctx.sessions.get(sessionId) === undefined) {
+            detachedRevisionBefore = await detachedHistoryRevision(sessionId)
+            const existing = historyTailCache.get(sessionId)
+            if (existing?.sourceKind === 'detached'
+              && existing.maxMessages === normalizedMaxMessages
+              && existing.projectionRevision === projectionRevision
+              && existing.sourceRevision !== undefined) {
+              if (ctx.sessions.get(sessionId) === undefined) {
+                const cached = readHistoryTailCache(
+                  sessionId, 'detached', undefined, normalizedMaxMessages, projectionRevision, detachedRevisionBefore,
+                )
+                if (cached !== undefined && projectionRevisionOf(ctx) === projectionRevision) {
+                  return ok(request, cached)
+                }
+              }
+            }
+          }
           const source = await historySourceFor(sessionId)
+          const sourceSignature = historySourceSignature(source)
+          if (tailRequest && source.kind === 'attached') {
+            const cached = readHistoryTailCache(
+              sessionId, source.kind, sourceSignature, normalizedMaxMessages, projectionRevision, undefined,
+            )
+            if (cached !== undefined
+              && projectionRevisionOf(ctx) === projectionRevision
+              && sourceSignature === historySourceSignature(source)) {
+              return ok(request, cached)
+            }
+          }
+          const detachedRevisionAfterPromise = tailRequest && source.kind === 'detached'
+            ? detachedHistoryRevision(sessionId)
+            : undefined
           // Both awaits happen BEFORE the cut. Ensuring the recorded
           // composition's standing mount is what registers its projection
           // units, so a first cold read would otherwise serve a baseline
@@ -2879,7 +3068,24 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           const scope = await presenterScopeFor(sessionId, sourceSession(source))
           const cut = historyCutOf(source, beforeSeq === undefined)
           const page = historyPage(ctx, cut.events, beforeSeq, maxMessages, scope)
-          return ok(request, historyValue(page, detail, cut.projections))
+          const value = historyValue(page, detail, cut.projections)
+          if (tailRequest
+            && sourceSignature === historySourceSignature(source)
+            && projectionRevision === projectionRevisionOf(ctx)) {
+            const detachedRevisionAfter = source.kind === 'detached'
+              ? await detachedRevisionAfterPromise
+              : undefined
+            writeHistoryTailCache(
+              sessionId, source.kind, sourceSignature, normalizedMaxMessages, projectionRevision,
+              source.kind === 'detached'
+                && detachedRevisionBefore !== undefined
+                && detachedRevisionAfter === detachedRevisionBefore
+                ? detachedRevisionBefore
+                : undefined,
+              value,
+            )
+          }
+          return ok(request, value)
         } catch (error: unknown) {
           if (error instanceof SessionNotFound) {
             return err(request, { code: 'session-not-found', message: error.message, details: { sessionId } })
