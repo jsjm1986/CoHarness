@@ -177,8 +177,8 @@ async function dispatch(
     const limitRaw = query.get('limit')
     const ageMs = ageRaw === null ? undefined : Number(ageRaw)
     const limit = limitRaw === null ? undefined : Number(limitRaw)
-    if ((ageRaw !== null && (!Number.isSafeInteger(ageMs) || ageMs < 0))
-      || (limitRaw !== null && (!Number.isSafeInteger(limit) || limit < 1))) {
+    if ((ageRaw !== null && (ageMs === undefined || !Number.isSafeInteger(ageMs) || ageMs < 0))
+      || (limitRaw !== null && (limit === undefined || !Number.isSafeInteger(limit) || limit < 1))) {
       sendError(res, 400, 'invalid empty-draft filter'); return true
     }
     const preview = await deps.archives.previewEmptyDrafts({

@@ -14,7 +14,7 @@ Status: implemented
 
 Gateway runtime 在创建 Agent 前预留按 scope 限定的 `(draftId, sessionId)`。PostgreSQL 为重试返回 canonical Session id，续期一小时 lease，并在实体化或草稿成功 dispose 后释放。reservation 不包含 prompt 文本、附件字节或凭据。本地 JSONL 与 SQLite 使用同一套延迟 coordinator，并持久化已提升的草稿标记；SQLite 在预发布无迁移策略下拒绝旧 schema。
 
-Gateway 会话行在同一 append 事务中维护 `has_visible_content`、`visible_content_seq` 和 `last_prompt_at`。`listSnapshots()` 将这些事实提供给冷消费者；有 Gateway 索引时，冷列表不再为了判定空白而解析大日志。已有空根会话可以进入仅管理员可见的 dry-run，并通过现有保留窗口进入可恢复的 empty-draft 回收站。
+Gateway 会话行在同一 append 事务中维护 `has_visible_content`、`visible_content_seq` 和 `last_prompt_at`。`listSnapshots()` 将这些事实提供给冷消费者；有 Gateway 索引时，冷列表不再为了判定空白而解析大日志。迁移回填会对含转义 NUL 的历史事件 JSON 采用保守归类，不对该值使用 PostgreSQL JSON 运算符。已有空根会话可以进入仅管理员可见的 dry-run，并通过现有保留窗口进入可恢复的 empty-draft 回收站。
 
 ## Alternatives considered
 
@@ -34,7 +34,7 @@ Gateway 会话行在同一 append 事务中维护 `has_visible_content`、`visib
 
 ## Verification
 
-聚焦测试覆盖共享判定器、仅种子草稿缓冲、首条消息原子实体化、command-only 隐藏、陈旧列表对账、Workspace 草稿复用、SQLite schema 所有权和 Gateway 内容元数据解析。Gateway 与管理员维护路径验证 scope 所有权、lease 过期、dry-run 选择、回收站、恢复和 purge，且不暴露 prompt 数据。
+聚焦测试覆盖共享判定器、仅种子草稿缓冲、首条消息原子实体化、command-only 隐藏、陈旧列表对账、Workspace 草稿复用、SQLite schema 所有权、Gateway 内容元数据解析和历史转义 NUL 事件的迁移回填。Gateway 与管理员维护路径验证 scope 所有权、lease 过期、dry-run 选择、回收站、恢复和 purge，且不暴露 prompt 数据。
 
 ## Related
 

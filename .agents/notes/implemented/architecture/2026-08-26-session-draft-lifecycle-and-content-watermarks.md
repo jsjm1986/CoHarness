@@ -14,7 +14,7 @@ Creating a browser session before the first prompt writes policy, turn, and reje
 
 Gateway runtimes reserve a scope-qualified `(draftId, sessionId)` pair before Agent creation. PostgreSQL returns one canonical Session id for retries, renews a one-hour lease, and releases it after materialization or successful disposal. The reservation contains no prompt text, attachment bytes, or credentials. Local JSONL and SQLite providers use the same deferred coordinator and persist the promoted draft marker; SQLite rejects older schemas under the pre-release no-migration policy.
 
-Gateway session rows maintain `has_visible_content`, `visible_content_seq`, and `last_prompt_at` in the same transaction as event appends. `listSnapshots()` exposes these facts to cold consumers, which do not parse a large log merely to decide whether a row is blank. Existing blank roots are eligible for an administrator-only dry-run and recoverable empty-draft trash flow with the existing retention window.
+Gateway session rows maintain `has_visible_content`, `visible_content_seq`, and `last_prompt_at` in the same transaction as event appends. `listSnapshots()` exposes these facts to cold consumers, which do not parse a large log merely to decide whether a row is blank. Migration backfill classifies legacy event JSON containing escaped NUL conservatively without applying PostgreSQL JSON operators to that value. Existing blank roots are eligible for an administrator-only dry-run and recoverable empty-draft trash flow with the existing retention window.
 
 ## Alternatives considered
 
@@ -34,7 +34,7 @@ The `SessionHeader` and SQLite metadata formats change while the repository is p
 
 ## Verification
 
-Focused tests cover the shared classifier, seed-only draft buffering, first-message atomic materialization, command-only hiding, stale list reconciliation, Workspace draft reuse, SQLite schema ownership, and Gateway content metadata parsing. Gateway and admin maintenance paths validate scope ownership, lease expiry, dry-run selection, trash, restore, and purge without exposing prompt data.
+Focused tests cover the shared classifier, seed-only draft buffering, first-message atomic materialization, command-only hiding, stale list reconciliation, Workspace draft reuse, SQLite schema ownership, Gateway content metadata parsing, and migration backfill for legacy escaped-NUL events. Gateway and admin maintenance paths validate scope ownership, lease expiry, dry-run selection, trash, restore, and purge without exposing prompt data.
 
 ## Related
 
