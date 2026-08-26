@@ -287,6 +287,35 @@ describe('JsonlSessionPersistence: durability and crash semantics', () => {
     expect((await ctx.sessionPersistence.list()).map(h => h.id)).toContain(m.id)
   })
 
+  it('defers a browser draft and reports exact content when a draft artifact is listed', async () => {
+    const session = ctx.sessions.create(SessionId('draft-jsonl'), { meta: { cwd: '/work', draft: true } })
+    session.append('turn/start', { turn: 1 })
+    await ctx.sessions.flush(session)
+    await expect(stat(rawLogPath(root, '/work', session.id))).rejects.toThrow()
+
+    session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'hello' }], source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    await ctx.sessions.flush(session)
+    const snapshot = (await ctx.sessionPersistence.listSnapshots()).find(item => item.header.id === session.id)
+    expect(snapshot?.content).toBeUndefined()
+    expect(snapshot?.header.draft).toBe(false)
+  })
+
+  it('folds content metadata for a draft artifact that was explicitly materialized', async () => {
+    const id = SessionId('draft-jsonl-explicit')
+    await ctx.sessionPersistence.create({ id, version: 0, createdAt: 1, cwd: '/work', draft: true })
+    await ctx.sessionPersistence.append(id, [{ type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } }])
+    await ctx.sessionPersistence.append(id, [{
+      type: 'user/message', seq: 1, time: 2,
+      data: createUserMessage({ content: [{ type: 'text', text: 'hello' }], source: { kind: 'user' } }),
+      surfaceOp: 'append',
+    }])
+    const snapshot = (await ctx.sessionPersistence.listSnapshots()).find(item => item.header.id === id)
+    expect(snapshot?.content).toEqual({ blank: false, visibleContentSeq: 1, lastPromptAt: 2 })
+    expect(snapshot?.header.draft).toBe(true)
+  })
+
   it('readRaw returns the stored artifact text verbatim with its original filename', async () => {
     const m = meta('raw-read', '/work')
     await ctx.sessionPersistence.create(m)

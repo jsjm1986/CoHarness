@@ -527,8 +527,16 @@ export class SessionRuntime implements ISessions {
 
   private async createPrepared(prepared: SessionCreateOptions, reuseSessionId?: SessionId): Promise<SessionId> {
     const sessionId = reuseSessionId ?? prepared.sessionId
+    // A reservation belongs only to a newly minted draft. Reusing an existing
+    // blank session must not attach or consume another tab's reservation key.
+    const request = reuseSessionId === undefined
+      ? prepared
+      : (() => {
+        const { draftId: _draftId, ...rest } = prepared
+        return { ...rest, sessionId: reuseSessionId }
+      })()
     const result = await this.manager.create(
-      sessionId === undefined ? prepared : { ...prepared, sessionId },
+      request,
       reuseSessionId !== undefined,
     )
     if (!result.ok) throw new SessionCreateError(result.error, sessionId)

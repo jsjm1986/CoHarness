@@ -12,7 +12,7 @@ import type { RequestPayload, ResponseValue } from './rpc-map.ts'
 import type { Wire } from './rpc.schema.ts'
 import type {
   HistoryEntry, HistoryOmittedSpan, ModelCatalogFailure, ModelCatalogModel, ModelProviderGroup, ModelReasoning,
-  ModelReasoningEffort, ModelSelection, SessionListMetadata, SessionProjectionsBlock, SessionSearchItem, SessionSummary,
+  ModelReasoningEffort, ModelSelection, SessionDraftId, SessionListMetadata, SessionProjectionsBlock, SessionSearchItem, SessionSummary,
 } from './sessions.ts'
 import type { ToolEventView } from './events.ts'
 import type { AttachmentIdType, ImageAttachmentLimits, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
@@ -38,6 +38,9 @@ export const messageIdSchema = z.string().min(1) as unknown as z.ZodType<Message
  */
 export const workspaceIdSchema = z.string().min(1) as unknown as z.ZodType<WorkspaceId>
 
+/** Draft id: the opaque browser reservation identity. */
+export const sessionDraftIdSchema = z.string().min(1) as unknown as z.ZodType<SessionDraftId>
+
 /** SessionEvent passthrough: strict envelope, wide data (the client fold handles unknown types via its documented default). */
 export const sessionEventSchema = z.object({
   type: z.string(),
@@ -55,6 +58,7 @@ export const sessionSummarySchema = z.object({
   updatedAt: z.number(),
   running: z.boolean(),
   blank: z.boolean(),
+  visibleContentSeq: z.number().int().nonnegative().optional(),
   parentSessionId: sessionIdSchema.optional(),
   origin: z.literal('subagent').optional(),
   cwd: z.string().optional(),
@@ -107,6 +111,7 @@ export const sessionCreateRequestSchema = z.object({
   agentPreset: z.string().optional(),
   visibility: z.union([z.literal('project'), z.literal('private')]).optional(),
   reuseWorkspaceBlank: z.literal(true).optional(),
+  draftId: sessionDraftIdSchema.optional(),
 }).refine(
   payload => payload.workspaceId === undefined || payload.cwd === undefined,
   { message: 'session.create accepts workspaceId or cwd, not both' },
@@ -114,12 +119,16 @@ export const sessionCreateRequestSchema = z.object({
   payload => payload.reuseWorkspaceBlank !== true
     || (payload.workspaceId !== undefined && payload.sessionId !== undefined),
   { message: 'session.create reuseWorkspaceBlank requires workspaceId and sessionId' },
+).refine(
+  payload => payload.draftId === undefined || payload.sessionId !== undefined,
+  { message: 'session.create draftId requires a preallocated sessionId' },
 ) satisfies z.ZodType<Wire<RequestPayload<'session.create'>>>
 
 /** session.create response value. */
 export const sessionCreateValueSchema = z.object({
   sessionId: sessionIdSchema,
   agentPreset: z.string().optional(),
+  draft: z.literal(true).optional(),
 }) satisfies z.ZodType<Wire<ResponseValue<'session.create'>>>
 
 /** session.rename request payload (raw title; host-side normalization decides acceptance). */
@@ -236,6 +245,7 @@ export const sessionProjectionsBlockSchema = z.object({
 /** Host-side validation for the persisted Session-list projection. */
 export const sessionListMetadataProjectionSchema: z.ZodType<SessionListMetadata> = z.object({
   blank: z.boolean(),
+  visibleContentSeq: z.number().int().nonnegative().nullable(),
   lastPromptAt: z.number().nullable(),
 })
 

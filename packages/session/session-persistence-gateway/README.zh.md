@@ -11,6 +11,8 @@
 - append 与 repair 批次 id 是操作类型、会话 id 和载荷的确定性哈希。Gateway/PostgreSQL 去重使重试保持幂等，同时不会抑制不同批次。
 - 每份响应进入 Session store 前都会验证。此提供方通过共享 coordinator 支持完整加载、非变更 inspect、revision 检查、尾部读取、snapshot、批量 append、flush 和恢复。
 - `locate()` 返回 `undefined`，且 `supportsRawArtifacts` 为 false，因为 PostgreSQL 不拥有独立本地文本记录文件。
+- 浏览器创建根会话前会预留按 scope 限定的草稿 id。PostgreSQL 为重试返回同一个 canonical Session id，未使用的 reservation 在一小时后过期，且不保存 prompt 文本或凭据。首个实体化 append 或草稿成功 dispose 后会释放 reservation。
+- `listSnapshots()` 携带 PostgreSQL 维护的 `blank`、`visibleContentSeq` 和 `lastPromptAt` 事实。仅草稿行不会进入普通会话列表；仅命令行仍可恢复并供维护视图处理。
 
 ## 配置
 

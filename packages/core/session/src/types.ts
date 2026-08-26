@@ -21,6 +21,18 @@ export type { JsonValue } from './json.ts'
 /** Identifies one session in the store (and its persistence artifacts). */
 export type SessionId = Branded<'SessionId'>
 
+/** Opaque client identity reserved for one not-yet-materialized session. */
+export type SessionDraftId = Branded<'SessionDraftId'>
+
+/**
+ * Brand one validated browser draft reservation id.
+ * @param id - validated draft reservation id.
+ * @returns the branded draft id.
+ */
+export function SessionDraftId(id: string): SessionDraftId {
+  return id as SessionDraftId
+}
+
 /**
  * Brand a string as a {@link SessionId}.
  * @param id - the raw session id string.
@@ -96,6 +108,8 @@ export interface SessionHeader {
    * would replay history the model can no longer act on.
    */
   readonly agentPreset?: string
+  /** True for a browser draft whose persistence is deferred until materialization. */
+  readonly draft?: boolean
 }
 
 /**
@@ -118,6 +132,7 @@ export interface CreateSessionOptions {
     readonly origin?: 'subagent'
     readonly delegationDepth?: number
     readonly agentPreset?: string
+    readonly draft?: boolean
   }
 }
 

@@ -25,8 +25,8 @@ import { errorChain } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, MessageSource } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-model-access'
 import type {} from '@deepseek-ai/dsh-model-provider-config'
-import { isAppendSurfaceEvent, isJsonValue, SessionId as brandSessionId } from '@deepseek-ai/dsh-session'
-import { deriveEventMessage } from '@deepseek-ai/dsh-session/surface'
+import { isAppendSurfaceEvent, isJsonValue, materializesSession, SessionId as brandSessionId } from '@deepseek-ai/dsh-session'
+import { hasConversationContent as hasSessionConversationContent } from '@deepseek-ai/dsh-session/surface'
 import type { JsonValue, Session, SessionEvent, SessionEventMap, SessionHeader, SessionId, UserMessage } from '@deepseek-ai/dsh-session'
 import type { SessionPersistence } from '@deepseek-ai/dsh-session-persistence'
 // Type-only: resolves the optional permission-default owner notified after
@@ -711,8 +711,7 @@ function jobViews(snapshots: readonly JobSnapshot[]): JobView[] {
  * @returns whether the event contains conversation content.
  */
 function isConversationContentEvent(event: SessionEvent): boolean {
-  const message = deriveEventMessage(event)
-  return message !== null && message.content.length > 0
+  return hasSessionConversationContent(event)
 }
 
 /**
@@ -729,17 +728,20 @@ function sessionBlank(session: Session): boolean {
 /** Advance the Session-list hint projection by one committed event. */
 function applySessionListMetadata(state: SessionListMetadata, event: SessionEvent): SessionListMetadata {
   const blank = state.blank && !isConversationContentEvent(event)
+  const visibleContentSeq = isConversationContentEvent(event) ? event.seq : state.visibleContentSeq
   const lastPromptAt = event.type === 'user/message' && event.data.source.kind === 'user'
     ? event.time
     : state.lastPromptAt
-  return blank === state.blank && lastPromptAt === state.lastPromptAt
+  return blank === state.blank
+    && visibleContentSeq === state.visibleContentSeq
+    && lastPromptAt === state.lastPromptAt
     ? state
-    : { blank, lastPromptAt }
+    : { blank, visibleContentSeq, lastPromptAt }
 }
 
 /** Fold exact list metadata for an attached Session. */
 function sessionListMetadata(events: readonly SessionEvent[]): SessionListMetadata {
-  let state: SessionListMetadata = { blank: true, lastPromptAt: null }
+  let state: SessionListMetadata = { blank: true, visibleContentSeq: null, lastPromptAt: null }
   for (const event of events) state = applySessionListMetadata(state, event)
   return state
 }
@@ -776,6 +778,7 @@ function summarize(session: Session, running: boolean): SessionSummary {
     updatedAt: sessionListUpdatedAt(session.header, metadata),
     running,
     blank: metadata.blank,
+    ...(metadata.visibleContentSeq === null ? {} : { visibleContentSeq: metadata.visibleContentSeq }),
     ...sessionListFields(session.header, session.events),
   }
 }
@@ -830,11 +833,20 @@ async function summarizeCold(
   const probed = metadata?.blank === false
     ? undefined
     : await probeColdSessionMetadata(ctx, persistence, meta, blankProbeMaxBytes, signal)
+  const resolvedMetadata = probed ?? metadata
   return {
     sessionId: meta.id,
-    updatedAt: sessionListUpdatedAt(meta, probed ?? metadata),
+    updatedAt: sessionListUpdatedAt(meta, resolvedMetadata),
     running: false,
-    blank: metadata?.blank === false ? false : probed?.blank ?? false,
+    // A still-draft artifact is an implementation detail until its content is
+    // proven. Unknown or unreadable draft metadata stays hidden; ordinary
+    // durable sessions remain conservatively visible on an optimization miss.
+    blank: meta.draft === true
+      ? resolvedMetadata?.blank ?? true
+      : metadata?.blank === false ? false : resolvedMetadata?.blank ?? false,
+    ...(resolvedMetadata?.visibleContentSeq === null || resolvedMetadata?.visibleContentSeq === undefined
+      ? {}
+      : { visibleContentSeq: resolvedMetadata.visibleContentSeq }),
     // Header-only: reading the log for a blank-window preset switch would
     // defeat the same index read, and attaching the session replaces this row
     // with `summarize()`, which resolves the switch from the events.
@@ -1371,6 +1383,13 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   const presetSwitches = new Map<SessionId, Promise<unknown>>()
   /** Client-chosen identity creation/resume, deduplicated across concurrent retries. */
   const sessionCreations = new Map<SessionId, Promise<Agent>>()
+  /** Draft workspace attachments are published only after durable content lands. */
+  const draftSessions = new Map<SessionId, {
+    workspace: Workspace
+    draftId: string
+    materialized: boolean
+    attachPromise?: Promise<void>
+  }>()
   /** Serializes path ownership and explicit title checks with Workspace mutations. */
   let workspaceCreationChain = Promise.resolve()
   const pendingQuestions = new Map<RpcId, PendingQuestion>()
@@ -1378,6 +1397,50 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   const muxQueues = new Set<MuxSubscription>()
   const imageAdmissionChains = new WeakMap<Agent, Promise<void>>()
   let canonicalProjectRoot: Promise<string> | undefined
+
+  const attachDraftSession = async (
+    sessionId: SessionId,
+    draft: { workspace: Workspace; draftId: string; materialized: boolean; attachPromise?: Promise<void> },
+  ): Promise<void> => {
+    if (draft.attachPromise !== undefined) return draft.attachPromise
+    const operation = (async () => {
+      await draft.workspace.attachSession(sessionId)
+      if (draftSessions.get(sessionId) === draft) draftSessions.delete(sessionId)
+    })()
+    draft.attachPromise = operation
+    try {
+      await operation
+    } catch (error: unknown) {
+      draft.materialized = true
+      throw error
+    } finally {
+      if (draft.attachPromise === operation) delete draft.attachPromise
+    }
+  }
+
+  // HMR does not replay session/created. Recover live draft attachments from
+  // the authoritative cwd/workspace registries before the next event arrives.
+  for (const session of ctx.sessions.list()) {
+    if (session.header.draft !== true || session.header.cwd === undefined) continue
+    const workspace = ctx.workspaceRegistry.list().find(candidate => candidate.path === session.header.cwd)
+    if (workspace !== undefined && !workspace.sessionIds.includes(session.id)) {
+      const draft = { workspace, draftId: String(session.id), materialized: !sessionBlank(session) }
+      draftSessions.set(session.id, draft)
+      if (draft.materialized) void attachDraftSession(session.id, draft).catch((error: unknown) => {
+        ctx.logger.warn(`api-proxy: draft "${draft.draftId}" workspace attach failed: ${String(error)}`)
+      })
+    }
+  }
+
+  ctx.on('session/event', (session, event) => {
+    const draft = draftSessions.get(session.id)
+    if (draft === undefined || !materializesSession(event)) return
+    draft.materialized = true
+    void attachDraftSession(session.id, draft).catch((error: unknown) => {
+      ctx.logger.warn(`api-proxy: draft "${draft.draftId}" workspace attach failed: ${String(error)}`)
+    })
+  })
+  ctx.on('session/disposed', (session) => { draftSessions.delete(session.id) })
 
   type AuthorizedSession = {
     authority: CollaborationAuthority | undefined
@@ -1478,11 +1541,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
 
   /** Run a new root-session operation under the requested project visibility. */
   function withSessionCreation<T>(
-    visibility: CollaborationVisibility,
+    visibility: CollaborationVisibility | 'personal',
     operation: () => Promise<T>,
   ): Promise<T> {
     const collaboration = ctx.get('collaboration')
-    return collaboration === undefined
+    return visibility === 'personal' || collaboration === undefined
       ? operation()
       : collaboration.withSessionCreation({ visibility }, operation)
   }
@@ -1710,12 +1773,12 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     projectionCtx.sessionProjections.register<'sessionListMetadata', SessionListMetadata>({
       key: 'sessionListMetadata',
       stateSchema: sessionListMetadataProjectionSchema,
-      init: () => ({ blank: true, lastPromptAt: null }),
+      init: () => ({ blank: true, visibleContentSeq: null, lastPromptAt: null }),
       apply: applySessionListMetadata,
       wire: { viewSchema: sessionListMetadataProjectionSchema, view: state => state },
       // Version 2 invalidates caches produced by the former turn/start-only
       // blank predicate; those rows must be folded again with visible content.
-      stateVersion: 2,
+      stateVersion: 3,
     })
   })
 
@@ -2042,6 +2105,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     cwd: string,
     checkPersistedIdentity: boolean,
     presetId?: string,
+    draft = false,
   ): Promise<Agent> {
     let creation = sessionCreations.get(sessionId)
     if (creation === undefined) {
@@ -2094,6 +2158,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           agentOptions: agentOptions(),
           meta: {
             cwd,
+            ...(draft ? { draft: true } : {}),
             ...composition.agentPreset === undefined ? {} : { agentPreset: composition.agentPreset },
           },
           setup: composition.setup,
@@ -2157,19 +2222,27 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         ...projections === undefined ? {} : { projections },
       }
     }
-    const items = ctx.sessions.list().map(summarizeAttached)
+    const items = ctx.sessions.list()
+      .filter(session => session.header.draft !== true || !sessionBlank(session))
+      .map(summarizeAttached)
     signal?.throwIfAborted()
     const attached = new Set(items.map(item => item.sessionId))
     const persistence = ctx.get('sessionPersistence')
     if (persistence !== undefined) {
-      const cold = (await persistence.list(signal))
-        .filter(meta => !attached.has(meta.id) && meta.cwd !== undefined)
+      const snapshots: Array<{ header: SessionHeader; content?: SessionListMetadata }> = typeof persistence.listSnapshots === 'function'
+        ? await persistence.listSnapshots(signal)
+        : (await persistence.list(signal)).map(header => ({ header }))
+      const cold = snapshots
+        .filter(snapshot => !attached.has(snapshot.header.id)
+          && snapshot.header.cwd !== undefined
+          && (snapshot.header.draft !== true || snapshot.content?.blank !== true))
       signal?.throwIfAborted()
       for (let offset = 0; offset < cold.length; offset += COLD_SUMMARY_BATCH_SIZE) {
         signal?.throwIfAborted()
         const batch = cold.slice(offset, offset + COLD_SUMMARY_BATCH_SIZE)
         const settled = await Promise.allSettled(
-          batch.map(async (meta) => {
+          batch.map(async (snapshot) => {
+            const meta = snapshot.header
             // Projection hints remain optional. Blank verification may read
             // this Session's artifact only when it passes the configured size check.
             const projections = listProjectionsFor(ctx, meta, undefined)
@@ -2177,12 +2250,13 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               ctx,
               persistence,
               meta,
-              projections?.values.sessionListMetadata,
+              snapshot.content ?? projections?.values.sessionListMetadata,
               coldBlankProbeMaxBytes,
               signal,
             )
             const attachedSession = ctx.sessions.get(meta.id)
             if (attachedSession !== undefined) return summarizeAttached(attachedSession)
+            if (meta.draft === true && summary.blank) return undefined
             return {
               ...summary,
               ...projections === undefined ? {} : { projections },
@@ -2194,7 +2268,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         let failure: unknown
         for (const result of settled) {
           if (result.status === 'fulfilled') {
-            summaries.push(result.value)
+            if (result.value !== undefined) summaries.push(result.value)
           } else if (!rejected) {
             rejected = true
             failure = result.reason
@@ -2617,16 +2691,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       async create(request) {
         const scope = authorizeScopeWrite()
         if ('error' in scope) return err(request, scope.error)
-        const sessionId = request.payload.sessionId ?? `session-${randomUUID()}` as SessionId
-        if (request.payload.sessionId !== undefined && scope.authority?.participant.scope.kind === 'project') {
-          try {
-            await scope.authority.authorize(sessionId, 'write')
-          } catch (error: unknown) {
-            if (!(error instanceof CollaborationError && error.code === 'conversation-not-found')) {
-              return err(request, collaborationRefusal(error, 'write', sessionId))
-            }
-          }
-        }
+        let sessionId = request.payload.sessionId ?? `session-${randomUUID()}` as SessionId
         let workspace: Workspace | undefined
         if (request.payload.workspaceId !== undefined) {
           workspace = ctx.workspaceRegistry.get(brandWorkspaceId(request.payload.workspaceId))
@@ -2645,7 +2710,49 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           return err(request, collaborationRefusal(error, 'write', sessionId))
         }
         const requestedPreset = request.payload.agentPreset
-        const visibility = request.payload.visibility ?? 'project'
+        const visibility = scope.authority?.participant.scope.kind === 'project'
+          ? request.payload.visibility ?? 'project'
+          : 'personal'
+        const draftId = request.payload.draftId
+        const draftRequested = draftId !== undefined
+        let reservedDraft = false
+        if (draftId !== undefined) {
+          try {
+            const persistence = ctx.get('sessionPersistence')
+            const reservation = await withSessionCreation(visibility, async () =>
+              persistence === undefined ? undefined : await persistence.reserveDraft({
+                draftId,
+                sessionId,
+                cwd,
+                visibility,
+                ...(requestedPreset === undefined ? {} : { agentPreset: requestedPreset }),
+              }))
+            if (reservation !== undefined) {
+              sessionId = reservation.sessionId
+              reservedDraft = true
+            }
+          } catch (error: unknown) {
+            if (error instanceof CollaborationError) return err(request, collaborationRefusal(error, 'write', sessionId))
+            return err(request, {
+              code: 'internal',
+              message: `failed to reserve draft "${request.payload.draftId}": ${String(error)}`,
+              details: { sessionId },
+            })
+          }
+        }
+        if ((request.payload.sessionId !== undefined || reservedDraft)
+          && scope.authority?.participant.scope.kind === 'project') {
+          try {
+            await scope.authority.authorize(sessionId, 'write')
+          } catch (error: unknown) {
+            if (!(error instanceof CollaborationError && error.code === 'conversation-not-found')) {
+              return err(request, collaborationRefusal(error, 'write', sessionId))
+            }
+          }
+        }
+        if (workspace !== undefined && draftRequested) {
+          draftSessions.set(sessionId, { workspace, draftId, materialized: false })
+        }
         const refreshDefaultAfterReuse = request.payload.reuseWorkspaceBlank === true
           && workspace !== undefined
           && workspace.sessionIds.includes(sessionId)
@@ -2653,9 +2760,16 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         try {
           await withSessionCreation(
             visibility,
-            () => ensureSession(sessionId, cwd, request.payload.sessionId !== undefined, requestedPreset),
+            () => ensureSession(
+              sessionId,
+              cwd,
+              request.payload.sessionId !== undefined || reservedDraft,
+              requestedPreset,
+              draftRequested,
+            ),
           )
         } catch (error: unknown) {
+          if (draftRequested) draftSessions.delete(sessionId)
           if (error instanceof CollaborationError) {
             return err(request, collaborationRefusal(error, 'write', sessionId))
           }
@@ -2693,14 +2807,38 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           })
         }
         if (workspace !== undefined) {
-          try {
-            await workspace.attachSession(sessionId)
-          } catch (error: unknown) {
-            return err(request, {
-              code: 'workspace-attach-failed',
-              message: `session "${sessionId}" was created but could not attach to workspace "${workspace.id}": ${String(error)}`,
-              details: { sessionId, workspaceId: workspace.id },
-            })
+          if (draftRequested) {
+            const liveSession = ctx.sessions.get(sessionId)
+            const draft = draftSessions.get(sessionId) ?? {
+              workspace,
+              draftId,
+              materialized: liveSession !== undefined && !sessionBlank(liveSession),
+            }
+            draft.workspace = workspace
+            draft.draftId = draftId
+            if (draft.materialized) {
+              try {
+                await attachDraftSession(sessionId, draft)
+              } catch (error: unknown) {
+                return err(request, {
+                  code: 'workspace-attach-failed',
+                  message: `session "${sessionId}" was created but could not attach to workspace "${workspace.id}": ${String(error)}`,
+                  details: { sessionId, workspaceId: workspace.id },
+                })
+              }
+            } else {
+              draftSessions.set(sessionId, draft)
+            }
+          } else {
+            try {
+              await workspace.attachSession(sessionId)
+            } catch (error: unknown) {
+              return err(request, {
+                code: 'workspace-attach-failed',
+                message: `session "${sessionId}" was created but could not attach to workspace "${workspace.id}": ${String(error)}`,
+                details: { sessionId, workspaceId: workspace.id },
+              })
+            }
           }
         }
         if (refreshDefaultAfterReuse) {
@@ -2719,7 +2857,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         // allowed and the row `session.list` serves for the same session.
         const created = ctx.agents.get(sessionId)
         const createdPreset = created === undefined ? undefined : resolveSessionPreset(created.session)
-        return ok(request, { sessionId, ...createdPreset === undefined ? {} : { agentPreset: createdPreset } })
+        return ok(request, {
+          sessionId,
+          ...createdPreset === undefined ? {} : { agentPreset: createdPreset },
+          ...(draftRequested ? { draft: true as const } : {}),
+        })
       },
 
       async history(request) {

@@ -4,10 +4,12 @@ import {
   Session,
   SessionId,
   foldSurface,
+  hasConversationContent,
   isAppendSurfaceEvent,
   isReplacementSurfaceEvent,
   isSurfaceEligibleType,
   isSurfaceEvent,
+  materializesSession,
 } from '@deepseek-ai/dsh-session'
 import { SurfaceManager } from '@deepseek-ai/dsh-session/surface'
 import {
@@ -77,6 +79,30 @@ function toolResultEvent(
     ...sourceEventSeqs === undefined ? {} : { sourceEventSeqs },
   }
 }
+
+describe('session content materialization predicates', () => {
+  it.each([
+    ['empty user message', { type: 'user/message', data: createUserMessage({ content: [], source: { kind: 'user' } }) }, false],
+    ['empty assistant usage record', {
+      type: 'assistant/message',
+      data: { message: createMessage({ role: 'assistant', content: [], source: { kind: 'model', provider: 'p', model: 'm' } }) },
+    }, false],
+    ['non-empty user message', { type: 'user/message', data: createUserMessage({ content: [{ type: 'text', text: 'x' }], source: { kind: 'user' } }) }, true],
+  ] as const)('%s is classified consistently', (_name, event, expected) => {
+    const value = event as unknown as SessionEvent
+    expect(hasConversationContent(value)).toBe(expected)
+    expect(materializesSession(value)).toBe(expected)
+  })
+
+  it.each(['command/run', 'command/done', 'goal/change', 'plan/mode'] as const)('materializes %s state events', (type) => {
+    expect(materializesSession({ type, seq: 0, time: 0, data: {} } as unknown as SessionEvent)).toBe(true)
+  })
+
+  it('keeps policy and turn boundary events non-materializing', () => {
+    expect(materializesSession({ type: 'turn/start', seq: 0, time: 0, data: { turn: 1 } })).toBe(false)
+    expect(materializesSession({ type: 'request/header', seq: 1, time: 0, data: {} } as unknown as SessionEvent)).toBe(false)
+  })
+})
 
 describe('foldSurface source-event references', () => {
   it('accepts absent or valid source-event references and complete replacement coverage', () => {

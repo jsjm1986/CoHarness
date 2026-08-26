@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { spawn } from 'node:child_process'
 import { Context } from '@deepseek-ai/cordis'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { once } from 'node:events'
 import { chmod, mkdir, mkdtemp, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -528,7 +529,7 @@ describe('SessionPersistenceSqlite schema ownership', () => {
 
     const foreignPath = await freshDbPath('dsh-sqlite-foreign-')
     const foreign = new DatabaseSync(foreignPath)
-    foreign.exec(testSql('set-user-version-17'))
+    foreign.exec(testSql('set-user-version-18'))
     foreign.exec(testSql('set-application-id-12345'))
     foreign.close()
     await expect(openDatabase(DatabaseSync, foreignPath, 'wal', DEFAULT_BUSY_TIMEOUT_MS)).rejects.toThrow(/has application id 12345/)
@@ -583,6 +584,7 @@ describe('SessionPersistenceSqlite schema ownership', () => {
       revision: 1,
       delegation_depth: 2,
       agent_preset: 'minimal',
+      draft: 0,
     }
     expect(rowToMeta(decodeSessionRow(base))).toMatchObject({
       cwd: '/project',
@@ -610,6 +612,7 @@ describe('SessionPersistenceSqlite schema ownership', () => {
       revision: 1,
       delegation_depth: null,
       agent_preset: null,
+      draft: 0,
     }
     for (const [value, message] of [
       [null, /object/],
@@ -672,6 +675,27 @@ describe('SessionPersistenceSqlite edge behavior', () => {
     expect(await ctx.sessionPersistence.list()).toEqual([])
     expect(Reflect.get(process, 'emitWarning')).toBe(emitWarning)
     expect(typeof (await stat(path)).size).toBe('number')
+    await ctx.fiber.dispose()
+  })
+
+  it('folds exact content metadata for a draft row after restart', async () => {
+    const path = await freshDbPath('dsh-sqlite-draft-')
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(SessionPersistenceSqlite, { path })
+    const id = SessionId('draft-sqlite')
+    await ctx.sessionPersistence.create({
+      id, version: 0, createdAt: 1, cwd: '/work', draft: true,
+    })
+    await ctx.sessionPersistence.append(id, [{ type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } }])
+    await ctx.sessionPersistence.append(id, [{
+      type: 'user/message', seq: 1, time: 2,
+      data: createUserMessage({
+        content: [{ type: 'text', text: 'hello' }], source: { kind: 'user' },
+      }), surfaceOp: 'append',
+    }])
+    const snapshot = (await ctx.sessionPersistence.listSnapshots()).find(item => item.header.id === id)
+    expect(snapshot?.content).toEqual({ blank: false, visibleContentSeq: 1, lastPromptAt: 2 })
     await ctx.fiber.dispose()
   })
 

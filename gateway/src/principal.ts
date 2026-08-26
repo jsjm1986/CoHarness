@@ -63,6 +63,7 @@ export interface GatewaySessionCreationHeader {
   origin?: 'subagent'
   delegationDepth?: number
   agentPreset?: string
+  draft?: boolean
 }
 
 /** Durable Gateway authorization for atomically materializing one project root. */
@@ -246,7 +247,8 @@ function sessionCreationHeader(value: unknown): GatewaySessionCreationHeader {
     || (header.delegationDepth !== undefined
       && (typeof header.delegationDepth !== 'number'
         || !Number.isSafeInteger(header.delegationDepth) || header.delegationDepth < 0))
-    || (header.agentPreset !== undefined && typeof header.agentPreset !== 'string')) {
+    || (header.agentPreset !== undefined && typeof header.agentPreset !== 'string')
+    || (header.draft !== undefined && typeof header.draft !== 'boolean')) {
     throw new Error('invalid session creation authorization')
   }
   return value as GatewaySessionCreationHeader

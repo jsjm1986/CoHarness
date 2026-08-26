@@ -152,7 +152,7 @@ function conversation(): HistoryValue {
   const toolView: ToolEventView = { for: 'call', view: { card: 'terminal', title: 'ls' } }
   const projections: SessionProjectionsBlock = {
     asOfSeq: 20,
-    values: { sessionListMetadata: { blank: false, lastPromptAt: 1000 } },
+    values: { sessionListMetadata: { blank: false, visibleContentSeq: 6, lastPromptAt: 1000 } },
   }
   const events: HistoryEntry[] = [
     { event: { type: 'turn/start', seq: 0, time: 1000, data: { turn: 1 } } },

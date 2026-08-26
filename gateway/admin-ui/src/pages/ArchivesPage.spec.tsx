@@ -9,6 +9,8 @@ vi.mock('../api.ts', () => ({
   exportArchive: vi.fn((id: string) => `/admin/api/archives/${id}/export`),
   getArchive: vi.fn(),
   listArchives: vi.fn(),
+  previewEmptyDrafts: vi.fn(),
+  trashEmptyDrafts: vi.fn(),
 }))
 
 const row: api.ConversationArchiveRow = {

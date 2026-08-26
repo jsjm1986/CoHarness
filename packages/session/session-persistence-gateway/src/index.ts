@@ -25,6 +25,9 @@ import SessionPersistence, {
   MAX_WRITE_BATCH_DELAY_MS,
   PersistenceCoordinator,
   SessionPersistenceRevision,
+  type SessionDraftReservation,
+  type SessionDraftReservationRequest,
+  type SessionContentMetadata,
   type PersistenceBackend,
   type SessionInspection,
   type SessionLocation,
@@ -50,6 +53,10 @@ interface PendingSessionCreation {
   header: SessionHeader
   authorization: Promise<SessionCreationAuthorization>
   unregister: () => void
+}
+
+interface DraftReservationState {
+  request: SessionDraftReservationRequest
 }
 
 /** Provider tunables for coordinator caching, write coalescing, and loopback requests. */
@@ -107,7 +114,8 @@ function headerFrom(value: unknown): SessionHeader {
     || (header.seedLength !== undefined && !nonNegativeInteger(header.seedLength))
     || (header.origin !== undefined && header.origin !== 'subagent')
     || (header.delegationDepth !== undefined && !nonNegativeInteger(header.delegationDepth))
-    || !optionalString(header.agentPreset)) {
+    || !optionalString(header.agentPreset)
+    || (header.draft !== undefined && typeof header.draft !== 'boolean')) {
     throw new Error('Gateway returned an invalid session header')
   }
   return {
@@ -120,6 +128,24 @@ function headerFrom(value: unknown): SessionHeader {
     ...(header.origin === undefined ? {} : { origin: header.origin }),
     ...(header.delegationDepth === undefined ? {} : { delegationDepth: header.delegationDepth }),
     ...(header.agentPreset === undefined ? {} : { agentPreset: header.agentPreset }),
+    ...(header.draft === undefined ? {} : { draft: header.draft }),
+  }
+}
+
+function contentMetadataFrom(value: unknown): SessionContentMetadata | undefined {
+  if (value === undefined) return undefined
+  const content = record(value)
+  const visibleContentSeq = content?.visibleContentSeq
+  const lastPromptAt = content?.lastPromptAt
+  if (typeof content?.blank !== 'boolean'
+    || (visibleContentSeq !== null && !nonNegativeInteger(visibleContentSeq))
+    || (lastPromptAt !== null && !nonNegativeInteger(lastPromptAt))) {
+    throw new Error('Gateway returned invalid session content metadata')
+  }
+  return {
+    blank: content.blank,
+    visibleContentSeq: visibleContentSeq === null ? null : visibleContentSeq,
+    lastPromptAt: lastPromptAt === null ? null : lastPromptAt,
   }
 }
 
@@ -178,6 +204,7 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
 
   private readonly coordinator: PersistenceCoordinator<never>
   private readonly creations = new Map<SessionId, PendingSessionCreation>()
+  private readonly drafts = new Map<SessionId, DraftReservationState>()
   private readonly requestTimeoutMs: number
 
   constructor(ctx: Context, config: Config = {}) {
@@ -190,7 +217,17 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     })
     ctx.on('session/disposed', (session) => {
       void ctx.sessions.flush(session).then(
-        () => { this.forgetCreation(session.id) },
+        async () => {
+          this.forgetCreation(session.id)
+          const draft = this.drafts.get(session.id)
+          if (draft !== undefined) {
+            try {
+              await this.releaseDraft(draft.request)
+            } catch (error: unknown) {
+              this.ctx.logger.warn(`session-persistence-gateway: draft release for "${session.id}" deferred: ${String(error)}`)
+            }
+          }
+        },
         () => {
           // The coordinator reports the failed retirement; retain creation identity for its retry.
         },
@@ -223,6 +260,60 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ sessionId: id }),
     }, signal)
+  }
+
+  override async reserveDraft(request: SessionDraftReservationRequest): Promise<SessionDraftReservation | undefined> {
+    const visibility = request.visibility
+      ?? (this.ctx.get('collaboration')?.currentCreation()?.visibility
+        ?? (this.ctx.gatewayRuntime.requireCurrent().claims.scope.kind === 'personal' ? 'personal' : 'project'))
+    const value = record(await this.request('/internal/runtime/session/draft/reserve', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        draftId: request.draftId,
+        sessionId: request.sessionId,
+        cwd: request.cwd,
+        visibility,
+        ...(request.agentPreset === undefined ? {} : { agentPreset: request.agentPreset }),
+      }),
+      principal: true,
+    }))
+    if (typeof value?.sessionId !== 'string' || value.sessionId === ''
+      || !nonNegativeInteger(value.leaseExpiresAt)) {
+      throw new Error('Gateway returned an invalid draft reservation')
+    }
+    const canonical = {
+      ...request,
+      sessionId: SessionId(value.sessionId),
+      visibility,
+    }
+    this.drafts.set(canonical.sessionId, { request: canonical })
+    return { sessionId: canonical.sessionId, leaseExpiresAt: value.leaseExpiresAt }
+  }
+
+  override async heartbeatDraft(request: SessionDraftReservationRequest): Promise<void> {
+    const state = this.drafts.get(request.sessionId)
+    if (state === undefined) return
+    await this.request('/internal/runtime/session/draft/heartbeat', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ draftId: state.request.draftId, sessionId: request.sessionId }),
+      principal: true,
+    })
+  }
+
+  override async releaseDraft(request: SessionDraftReservationRequest): Promise<void> {
+    const state = this.drafts.get(request.sessionId)
+    if (state === undefined) return
+    try {
+      await this.request('/internal/runtime/session/draft/release', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ draftId: state.request.draftId, sessionId: request.sessionId }),
+      })
+    } finally {
+      this.drafts.delete(request.sessionId)
+    }
   }
 
   override prepare(id: SessionId, signal?: AbortSignal): Promise<SessionPreparation> {
@@ -383,6 +474,10 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
       }),
     })
     if (creation !== undefined) this.forgetCreation(meta.id, creation)
+    if (!isMaterialized) {
+      const draft = this.drafts.get(meta.id)
+      if (draft !== undefined) await this.releaseDraft(draft.request)
+    }
   }
 
   async commitRepair(meta: SessionHeader, _tornMarker: undefined, closers: readonly SessionEvent[]): Promise<void> {
@@ -410,9 +505,11 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
       if (typeof item?.revision !== 'string' || item.revision === '') {
         throw new Error('Gateway returned an invalid session list revision')
       }
+      const content = contentMetadataFrom(item.content)
       return {
         header: headerFrom(item.header),
         revision: SessionPersistenceRevision(item.revision),
+        ...(content === undefined ? {} : { content }),
       }
     })
   }

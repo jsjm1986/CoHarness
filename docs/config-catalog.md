@@ -1727,7 +1727,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/session/session-persistence-gateway/src/index.ts:56`](../packages/session/session-persistence-gateway/src/index.ts)
+Source: [`packages/session/session-persistence-gateway/src/index.ts:63`](../packages/session/session-persistence-gateway/src/index.ts)
 
 <a id="deepseek-aidsh-session-persistence-jsonl"></a>
 
@@ -1766,7 +1766,7 @@ export interface Config {
 export type JsonlCompression = 'zstd' | 'none'
 ```
 
-Source: [`packages/session/session-persistence-jsonl/src/index.ts:60`](../packages/session/session-persistence-jsonl/src/index.ts)
+Source: [`packages/session/session-persistence-jsonl/src/index.ts:61`](../packages/session/session-persistence-jsonl/src/index.ts)
 
 <a id="deepseek-aidsh-session-persistence-sqlite"></a>
 

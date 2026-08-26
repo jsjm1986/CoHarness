@@ -8,8 +8,10 @@
 import { Context } from '@deepseek-ai/cordis'
 import {
   adoptSessionEvent,
+  hasConversationContent,
   interruptedTurnClosers,
   KNOWN_SESSION_EVENT_TYPES,
+  materializesSession,
   SESSION_FORMAT_VERSION,
   SessionPreparation,
   snapshotJsonValue,
@@ -225,6 +227,8 @@ interface SessionState {
    * distinguish an unused id from a persisted collision.
    */
   materialized: boolean
+  /** Events held in memory while a browser draft has no durable content. */
+  pendingEvents: SessionEvent[]
   /**
    * The live Session this state was bound to via `onCreated`, if any. State
    * created through the public `create()`/`load()` API has no owner; state bound
@@ -654,7 +658,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       throw new Error(`session "${meta.id}" already has a persisted log on disk; load/resume it instead of creating`)
     }
     // Pure lazy: record intent only. No artifact until the first append.
-    this.states.set(meta.id, { meta, cursor: 0, materialized: false })
+    this.states.set(meta.id, { meta, cursor: 0, materialized: false, pendingEvents: [] })
   }
 
   // `async` so synchronous materialization failures below reject (not throw) per
@@ -676,10 +680,12 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     if (batch === undefined) {
       throw new TypeError('session event batch is not losslessly JSON-serializable because it contains non-JSON-serializable data')
     }
-    return this.serialize(id, () => this.appendCore(id, batch))
+    // Direct persistence calls are explicit durability requests. Draft
+    // deferral applies only to automatic live-session write-behind.
+    return this.serialize(id, () => this.appendCore(id, batch, false))
   }
 
-  private async appendCore(id: SessionId, events: readonly SessionEvent[]): Promise<void> {
+  private async appendCore(id: SessionId, events: readonly SessionEvent[], deferDraft = true): Promise<void> {
     // Every append route converges here: the public service, live write-behind
     // drains, and HMR seed/suffix adoption. Legacy-shape rejection stays at
     // this shared boundary so a stale JavaScript plugin cannot persist a
@@ -694,18 +700,37 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     let state = this.states.get(id)
     if (state === undefined) state = await this.adopt(id)
 
-    // Contiguity contract: each event's seq must continue the stored log.
+    // Contiguity includes a buffered draft prefix while no artifact exists.
+    const pendingLength = state.materialized ? 0 : state.pendingEvents.length
     for (const [i, event] of events.entries()) {
-      if (event.seq !== state.cursor + i) {
-        throw new Error(`append seq mismatch for "${id}": expected ${state.cursor + i} at index ${i}, got ${event.seq}`)
+      const expected = state.cursor + pendingLength + i
+      if (event.seq !== expected) {
+        throw new Error(`append seq mismatch for "${id}": expected ${expected} at index ${i}, got ${event.seq}`)
       }
     }
 
-    await this.backend.appendBatch(state.meta, events, state.materialized)
+    if (deferDraft && state.meta.draft === true && !state.materialized && !events.some(materializesSession)) {
+      state.pendingEvents.push(...events.map(event => structuredClone(event)))
+      return
+    }
+
+    // Keep the original batch object when no deferred prefix exists. Besides
+    // avoiding an unnecessary allocation, this preserves the backend adapter's
+    // ownership of constructor seed snapshots; a deferred draft prefix is the
+    // only case that needs a new concatenated batch.
+    const durableEvents = state.materialized || state.pendingEvents.length === 0
+      ? events
+      : [...state.pendingEvents, ...events]
+    const materializedMeta = state.meta.draft === true && durableEvents.some(hasConversationContent)
+      ? { ...state.meta, draft: false }
+      : state.meta
+    await this.backend.appendBatch(materializedMeta, durableEvents, state.materialized)
     // The durable write is the transaction: mark materialized + advance the
     // cursor as soon as it commits (uniform across backends).
     state.materialized = true
-    state.cursor += events.length
+    state.meta = materializedMeta
+    state.cursor += durableEvents.length
+    state.pendingEvents = []
     this.preparations.invalidate(id)
   }
 
@@ -951,10 +976,12 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       meta: source.inspection.meta,
       cursor,
       materialized: true,
+      pendingEvents: [],
     }
     state.meta = source.inspection.meta
     state.cursor = cursor
     state.materialized = true
+    state.pendingEvents = []
     this.states.set(id, state)
     return {
       source,
@@ -1281,16 +1308,19 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       return
     }
 
-    // case 4: a genuinely new session. Register its meta (lazy), then persist its
-    // seed (events present at creation time) once.
+    // case 4: a genuinely new session. Register its meta lazily. Browser draft
+    // seed events stay in memory until a durable event arrives; ordinary
+    // callers retain the historical immediate-seed behavior.
     const meta: SessionHeader = { ...session.header }
     await this.createCore(meta)
     // Bind this state to the live session so a later DIFFERENT session reusing
     // the id is detected as a collision (case 1) rather than silently no-opped.
     const created = this.states.get(id)
     /* v8 ignore next -- create() always sets the state for the id */
-    if (created !== undefined) created.owner = session
-    if (seed.length > 0) await this.appendCore(id, seed)
+    if (created !== undefined) {
+      created.owner = session
+      if (seed.length > 0) await this.appendCore(id, seed)
+    }
   }
 
   /**
@@ -1317,6 +1347,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       meta: { ...meta },
       cursor: storedEvents.length,
       materialized: true,
+      pendingEvents: [],
       owner: session,
     })
     const suffix = seed.slice(storedEvents.length)
@@ -1356,7 +1387,8 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     const state = this.states.get(id)
     /* v8 ignore next -- state is always set by the awaited initialization */
     const cursor = state?.cursor ?? 0
-    const fresh = batch.filter(e => e.seq >= cursor)
+    const pending = state?.materialized === false ? state.pendingEvents.length : 0
+    const fresh = batch.filter(e => e.seq >= cursor + pending)
     await this.appendCore(id, fresh)
   }
 }

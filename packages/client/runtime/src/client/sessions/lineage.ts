@@ -21,6 +21,8 @@ export interface SessionListEntry {
   running: boolean
   /** No-visible-content bit mirrored from the summary; lists hide blank sessions (filtering stays with the consumer). */
   blank: boolean
+  /** Highest visible-content event sequence known to the Host or live stream. */
+  visibleContentSeq?: number
   parentSessionId?: SessionId
   /** Coarse durable origin for navigation filtering; not a continuation capability. */
   origin?: 'subagent'

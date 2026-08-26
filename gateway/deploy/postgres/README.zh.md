@@ -39,6 +39,8 @@ npm run pg:check
 
 文档目录迁移文件编号为 `012_document_catalog.sql`，因为基线分支已经使用 migration 011。
 
+迁移 `016_session_content_and_drafts.sql` 增加事务内可见内容水位、按 scope 限定的一小时浏览器草稿 reservation，以及仅维护视图使用的 `empty-draft` 归档记录类型。既有行会从事件 JSON 回填；任何行进入回收站前都必须先由管理员审查维护预览。
+
 ## 导入 Gateway SQLite 快照
 
 始终导入 SQLite 在线备份，不能直接复制正在使用 WAL 的数据库：

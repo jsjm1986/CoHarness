@@ -11,6 +11,8 @@ Gateway PostgreSQL `SessionPersistence` provider for shared project runtimes. Th
 - Append and repair batch ids are deterministic hashes of operation kind, session id, and payload. Gateway/PostgreSQL deduplication makes a retry idempotent without suppressing a different batch.
 - Every response is validated before it enters the Session store. The provider supports full load, non-mutating inspect, revision checks, tail reads, snapshots, batched append, flush, and recovery through the shared coordinator.
 - `locate()` returns `undefined` and `supportsRawArtifacts` is false because PostgreSQL owns no independent local transcript file.
+- Browser-created roots reserve a scope-qualified draft id before Agent creation. PostgreSQL returns one canonical Session id for retries, expires an unused reservation after one hour, and stores no prompt text or credentials. The reservation is released after the first materializing append or a successful draft disposal.
+- `listSnapshots()` carries PostgreSQL-maintained `blank`, `visibleContentSeq`, and `lastPromptAt` facts. Draft-only rows stay out of ordinary session lists; command-only rows remain recoverable for maintenance.
 
 ## Configuration
 

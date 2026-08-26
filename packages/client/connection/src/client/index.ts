@@ -25,7 +25,7 @@ export type {
   JobView,
   RpcRequest, RpcResponse, RpcResult, RpcError, RpcErrorCode,
   ClientRequest, ServerResponse, ServerRequest, ClientResponse, RpcMessage, RpcReceipt,
-  HostDescription, IApiClient, SessionId, SessionEvent, ContentBlock, StreamChunk,
+  HostDescription, IApiClient, SessionDraftId, SessionId, SessionEvent, ContentBlock, StreamChunk,
   GoalsApi, GoalRef,
   SettingsApi, SettingsNamespaceView, SettingsPathOpView, SettingsSecretView,
   CredentialsApi, CredentialView, ConfigurableProviderView, DiscoveredModelView, LlmApi,

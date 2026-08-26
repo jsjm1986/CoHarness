@@ -4,7 +4,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { AttachmentIdType, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
-import { deriveEventMessage } from '@deepseek-ai/dsh-session/surface'
+import { hasConversationContent as hasSessionConversationContent } from '@deepseek-ai/dsh-session/surface'
 import type {
   HistoryEntry, HistoryOmittedSpan, IApiClient, MessageId, MuxFrame, PromptContentPart, QueueAction, RpcError,
   RpcId, RpcResponse, RpcResult, SessionId, SubagentAddress, ToolEventView,
@@ -51,7 +51,7 @@ export interface SessionOptions {
   /** Whether the exact direct parent Agent was live at the latest catalog read. */
   parentAvailable?: boolean
   /** Notify the manager after a visible conversation event is observed. */
-  onEngaged?(session: Session): void
+  onEngaged?(session: Session, visibleContentSeq: number): void
   /**
    * Manager-owned projection value store to adopt (frames route through the
    * manager and values outlive instantiation); omitted, the Session owns a
@@ -69,8 +69,7 @@ export interface SessionOptions {
  * @returns true when the event contains conversation content.
  */
 export function hasConversationContent(event: SessionEvent): boolean {
-  const message = deriveEventMessage(event)
-  return message !== null && message.content.length > 0
+  return hasSessionConversationContent(event)
 }
 
 /**
@@ -753,7 +752,8 @@ export class Session implements SessionFace {
     this.baseSeq = logicalBaseSeq(this.events, this.omittedSpans) ?? 0
     this.hasMore = hasMore
     this.historyWindowMode = 'tail'
-    if (this.events.some(hasConversationContent)) this.markConversationContent()
+    const visible = this.events.findLast(hasConversationContent)
+    if (visible !== undefined) this.markConversationContent(visible.seq)
     if (this.events.some(event => event.type === 'turn/start')) this.firstPromptPendingTurn = false
     this.conversation.replaceWindow(entries.map(conversationInput), hasMore)
     if (projections !== undefined) this.projections.seed(projections)
@@ -769,7 +769,7 @@ export class Session implements SessionFace {
     if (tailSeq !== null && event.seq <= tailSeq) return 'none' // replay overlap, drop
     this.events.push(event)
     this.views.push(view)
-    if (hasConversationContent(event)) this.markConversationContent()
+    if (hasConversationContent(event)) this.markConversationContent(event.seq)
     if (event.type === 'turn/start') this.firstPromptPendingTurn = false
     const queueChanged = this.queueMirror.acceptDurable(event)
     const publication = this.conversation.append({ event, view })
@@ -802,14 +802,14 @@ export class Session implements SessionFace {
     else if (publication === 'animation-frame') this.notifier.markFrameDirty()
   }
 
-  /** Mark the first durable non-empty message and notify the list owner once. */
-  private markConversationContent(): void {
-    if (this.conversationContentObserved) return
+  /** Mark durable non-empty content and report its latest sequence to the list owner. */
+  private markConversationContent(visibleContentSeq: number): void {
     this.conversationContentObserved = true
-    if (!this.blankBit) return
-    this.blankBit = false
-    this.options.onEngaged?.(this)
-    this.notifier.markDirty()
+    if (this.blankBit) {
+      this.blankBit = false
+      this.notifier.markDirty()
+    }
+    this.options.onEngaged?.(this, visibleContentSeq)
   }
 
   /** Start one cancellable background expansion for the staged live session. */

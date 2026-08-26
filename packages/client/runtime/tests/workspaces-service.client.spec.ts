@@ -9,6 +9,12 @@ import { FakeApiClient, deferred, err, fakeRemote, ok } from './fake-api.client.
 const sid = (id: string): SessionId => id as SessionId
 const wid = (id: string): WorkspaceId => id as WorkspaceId
 
+function callField(call: unknown, key: string): unknown {
+  return typeof call === 'object' && call !== null && !Array.isArray(call)
+    ? (call as Record<string, unknown>)[key]
+    : undefined
+}
+
 function workspace(id: string, sessionIds: SessionId[] = [], createdAt = '2026-01-01T00:00:00.000Z'): WorkspaceView {
   return {
     workspaceId: wid(id), path: `/w/${id}`, title: id, sessionIds,
@@ -317,10 +323,10 @@ describe('WorkspaceRuntime', () => {
     // Miss: beta has only a non-blank session → host create with workspaceId.
     api.onCreate = () => Promise.resolve(ok({ sessionId: sid('s-fresh') }))
     await expect(workspaces.connectWorkspace(wid('beta'))).resolves.toBe('s-fresh')
-    expect(api.callsOf('session.create')).toEqual([
-      { workspaceId: 'alpha', sessionId: 's-blank', reuseWorkspaceBlank: true },
-      { workspaceId: 'beta' },
-    ])
+    const betaCreate = api.callsOf('session.create')[1]
+    expect(betaCreate).toMatchObject({ workspaceId: 'beta' })
+    expect(typeof callField(betaCreate, 'draftId')).toBe('string')
+    expect(typeof callField(betaCreate, 'sessionId')).toBe('string')
     // Same guarantee on the create arm (draft hand-off writes the machine pre-open).
     expect(sessions.binding(sid('s-fresh'))).toBeDefined()
 
@@ -328,11 +334,14 @@ describe('WorkspaceRuntime', () => {
     // never reused, a fresh accounted session is created instead.
     api.onCreate = () => Promise.resolve(ok({ sessionId: sid('s-fresh-3') }))
     await expect(workspaces.connectWorkspace(wid('gamma'))).resolves.toBe('s-fresh-3')
-    expect(api.callsOf('session.create')).toEqual([
-      { workspaceId: 'alpha', sessionId: 's-blank', reuseWorkspaceBlank: true },
-      { workspaceId: 'beta' },
-      { workspaceId: 'gamma' },
-    ])
+    const creates = api.callsOf('session.create')
+    expect(creates[0]).toEqual({ workspaceId: 'alpha', sessionId: 's-blank', reuseWorkspaceBlank: true })
+    expect(creates[1]).toMatchObject({ workspaceId: 'beta' })
+    expect(creates[2]).toMatchObject({ workspaceId: 'gamma' })
+    expect(typeof callField(creates[1], 'draftId')).toBe('string')
+    expect(typeof callField(creates[1], 'sessionId')).toBe('string')
+    expect(typeof callField(creates[2], 'draftId')).toBe('string')
+    expect(typeof callField(creates[2], 'sessionId')).toBe('string')
 
     // Unknown workspace fails loud instead of silently creating in nowhere.
     await expect(workspaces.connectWorkspace(wid('ghost'))).rejects.toThrow(/unknown workspace ghost/)
@@ -418,15 +427,13 @@ describe('WorkspaceRuntime', () => {
 
     api.onCreate = () => Promise.resolve(ok({ sessionId: sid('s-beta-private') }))
     await expect(workspaces.connectWorkspace(wid('beta'))).resolves.toBe('s-beta-private')
-    expect(api.callsOf('session.create')).toEqual([
-      {
-        workspaceId: 'alpha',
-        sessionId: 's-private',
-        visibility: 'private',
-        reuseWorkspaceBlank: true,
-      },
-      { workspaceId: 'beta', visibility: 'private' },
-    ])
+    const privateCreates = api.callsOf('session.create')
+    expect(privateCreates[0]).toEqual({
+      workspaceId: 'alpha', sessionId: 's-private', visibility: 'private', reuseWorkspaceBlank: true,
+    })
+    expect(privateCreates[1]).toMatchObject({ workspaceId: 'beta', visibility: 'private' })
+    expect(typeof callField(privateCreates[1], 'draftId')).toBe('string')
+    expect(typeof callField(privateCreates[1], 'sessionId')).toBe('string')
   })
 
   it('runs create rejection before returning an otherwise reusable blank', async () => {
@@ -770,7 +777,10 @@ describe('startInitialSelection', () => {
     await b.workspaces.refresh()
     await b.sessions.refresh()
     await new Promise(resolve => setTimeout(resolve, 0))
-    expect(b.api.callsOf('session.create')).toEqual([{ workspaceId: 'recent' }])
+    const recentCreate = b.api.callsOf('session.create')[0]
+    expect(recentCreate).toMatchObject({ workspaceId: 'recent' })
+    expect(typeof callField(recentCreate, 'draftId')).toBe('string')
+    expect(typeof callField(recentCreate, 'sessionId')).toBe('string')
     expect(b.sessions.list.getSnapshot().current).toBe('s-new')
     stop()
   })

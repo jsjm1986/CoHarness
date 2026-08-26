@@ -86,6 +86,8 @@ interface SessionHeader {
    * would replay history the model can no longer act on.
    */
   readonly agentPreset?: string
+  /** True for a browser draft whose persistence is deferred until materialization. */
+  readonly draft?: boolean
 }
 ```
 
@@ -118,6 +120,7 @@ interface CreateSessionOptions {
     readonly origin?: 'subagent'
     readonly delegationDepth?: number
     readonly agentPreset?: string
+    readonly draft?: boolean
   }
 }
 ```
@@ -225,6 +228,8 @@ interface SessionPersistenceSnapshot {
   header: SessionHeader
   /** Opaque source-qualified token that changes whenever this stored log changes. */
   revision: SessionPersistenceRevision
+  /** Optional backend-authoritative content metadata for cold list projections. */
+  content?: SessionContentMetadata
 }
 ```
 
@@ -388,9 +393,30 @@ abstract list(signal?: AbortSignal): Promise<SessionHeader[]>
  * @returns one header and opaque revision per materialized session without loading full logs.
  */
 abstract listSnapshots(signal?: AbortSignal): Promise<SessionPersistenceSnapshot[]>
+
+/**
+ * Reserve a browser draft before an Agent is created. Local providers return
+ * no value; Gateway providers may return a canonical Session id shared by
+ * retries and other tabs carrying the same draft id.
+ * @param _request - draft identity and scope metadata.
+ * @returns the provider's canonical identity, or undefined when reservations are local-only.
+ */
+reserveDraft(_request: SessionDraftReservationRequest): Promise<SessionDraftReservation | undefined>
+
+/**
+ * Renew a provider-owned draft lease. Missing leases are intentionally no-op.
+ * @param _request - draft identity and scope metadata.
+ */
+heartbeatDraft(_request: SessionDraftReservationRequest): Promise<void>
+
+/**
+ * Release a provider-owned draft lease after materialization or abandonment.
+ * @param _request - draft identity and scope metadata.
+ */
+releaseDraft(_request: SessionDraftReservationRequest): Promise<void>
 ```
 
 Types: [SessionEvent](session.zh.md) · [SessionId](core.zh.md)
 
-Source: [`packages/session/session-persistence/src/index.ts:84`](../../packages/session/session-persistence/src/index.ts)
+Source: [`packages/session/session-persistence/src/index.ts:125`](../../packages/session/session-persistence/src/index.ts)
 <!-- END GENERATED cordis-surface -->

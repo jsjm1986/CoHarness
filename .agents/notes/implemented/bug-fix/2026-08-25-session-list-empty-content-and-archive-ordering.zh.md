@@ -10,7 +10,7 @@ Status: implemented
 
 ## Decision
 
-Host 的 `SessionSummary.blank` 判定以 session surface 产生的非空消息为准。空轮次、仅命令记录和仅用量的 assistant 消息仍保持 blank。附加会话摘要与 `sessionListMetadata` projection 使用同一判定，projection 的 state version 为 `2`，因此旧判定产生的缓存值不会被复用。有界冷探测在工件无法验证时仍保持向可见性降级的 fail-soft 规则。
+Host 的 `SessionSummary.blank` 判定以 session surface 产生的非空消息为准。空轮次、仅命令记录和仅用量的 assistant 消息仍保持 blank。附加会话摘要与 `sessionListMetadata` projection 使用同一判定，projection 的 state version 为 `3`，因此旧判定产生的缓存值不会被复用。Gateway 冷列表还会读取权威的 `blank`、`visibleContentSeq` 与 `lastPromptAt` 元数据；本地后端保留有界冷探测回退。
 
 Client 只有在观察到非空 session 事件时才把行转为非 blank，不会因为 prompt 刚被受理或 Agent 进入 running 就转换。它在对账后续列表基线时保留每个会话的已参与证据，因此已经收到消息事件的会话不会被陈旧的 `blank: true` 行重新隐藏。running 状态与 blank 状态彼此独立。
 
@@ -28,10 +28,14 @@ Client 只有在观察到非空 session 事件时才把行转为非 blank，不�
 
 ## Consequences
 
-没有非空对话消息的会话会留在列表 store 中，但不会进入分组、平铺和搜索视图，仍可被 New Session 复用。只要 surface 带有非空消息，附加的中断会话或包含工具结果的会话仍会显示。无法验证的过大或无位置冷工件可能继续显示；这保留了恢复真实对话的优先级，而不是激进清理。
+没有非空对话消息的会话会留在列表 store 中，但不会进入分组、平铺和搜索视图，仍可被 New Session 复用。新的浏览器草稿在实体化前不会创建持久行；旧空行仍可由管理员先 dry-run 再移入回收站，保持可恢复。只要 surface 带有非空消息，附加的中断会话或包含工具结果的会话仍会显示。无法验证的过大或无位置持久工件可能继续显示；这保留了恢复真实对话的优先级，而不是激进清理。
 
 当前 Client 镜像不能移除归档成员。增加恢复功能时，需要版本化快照/reset 路径，并同步更新合并规则。
 
 ## Verification
 
-聚焦的 Runtime 与 Host 测试覆盖并发归档应答、刷新基线之前到达的旧帧、空完成轮次、仅轮次边界的冷工件、基于事件的 Client 转换、陈旧列表对账，以及真实消息之后的 preset 锁定。组装后的 Web 冷会话场景通过发行版压缩 JSONL 组合播种一个无轮次日志和一个已关闭的空轮次，并断言两者都不出现在侧栏。
+聚焦的 Runtime 与 Host 测试覆盖并发归档应答、刷新基线之前到达的旧帧、空完成轮次、仅轮次边界的冷工件、基于事件的 Client 转换、陈旧列表对账、权威内容水位、草稿延迟实体化，以及真实消息之后的 preset 锁定。组装后的 Web 冷会话场景通过发行版压缩 JSONL 组合播种一个无轮次日志和一个已关闭的空轮次，并断言两者都不出现在侧栏。
+
+## Related
+
+- [Deferred session drafts and authoritative content watermarks](../architecture/2026-08-26-session-draft-lifecycle-and-content-watermarks.zh.md) — 负责延迟持久化、跨标签页草稿 reservation 和 Gateway 维护生命周期。

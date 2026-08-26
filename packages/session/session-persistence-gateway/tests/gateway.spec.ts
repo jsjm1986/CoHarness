@@ -6,7 +6,7 @@ import type {
   GatewayRuntimeRequestInit,
   GatewaySessionCreationAuthorization,
 } from '@deepseek-ai/dsh-gateway-runtime'
-import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
+import SessionStore, { SessionDraftId, SessionId } from '@deepseek-ai/dsh-session'
 import { describe, expect, it } from 'vitest'
 import {
   appendLog,
@@ -59,6 +59,7 @@ class GatewayTransport {
   private readonly sessions = new Map<string, StoredSession>()
   private readonly batches = new Map<string, string>()
   private readonly authorizations = new Map<string, { header: unknown; visibility: unknown }>()
+  private readonly reservations = new Map<string, string>()
   private readonly pending = new Map<SessionId, Promise<GatewaySessionCreationAuthorization>>()
 
   seed(id: string, events: unknown[]): void {
@@ -142,6 +143,20 @@ class GatewayTransport {
         visibility: body.visibility,
       })
       return json(200, { authorization })
+    }
+
+    if (url.pathname === '/internal/runtime/session/draft/reserve') {
+      const body = bodyRecord(init)
+      const key = String(body.draftId)
+      const sessionId = this.reservations.get(key) ?? String(body.sessionId)
+      this.reservations.set(key, sessionId)
+      return json(200, { draftId: key, sessionId, leaseExpiresAt: Date.now() + 3_600_000 })
+    }
+    if (url.pathname === '/internal/runtime/session/draft/heartbeat') return json(200, { renewed: true })
+    if (url.pathname === '/internal/runtime/session/draft/release') {
+      const body = bodyRecord(init)
+      this.reservations.delete(String(body.draftId))
+      return json(200, { released: true })
     }
 
     if (url.pathname === '/internal/runtime/session/append') {
@@ -271,6 +286,26 @@ describe('GatewaySessionPersistence collaboration creation', () => {
     })
     expect(transport.appends[0]?.body).not.toHaveProperty('header')
     expect(transport.sessionCreation(session.id)).toBeUndefined()
+    await fiber.dispose()
+  })
+
+  it('reserves and releases a canonical browser draft identity', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const transport = new GatewayTransport()
+    transport.principal = PRINCIPAL
+    const fiber = await mountBackend(ctx, transport)
+    const request = {
+      draftId: SessionDraftId('draft-1'),
+      sessionId: SessionId('session-draft-1'),
+      cwd: '/work',
+      visibility: 'private' as const,
+    }
+    await expect(ctx.sessionPersistence.reserveDraft(request)).resolves.toMatchObject({
+      sessionId: SessionId('session-draft-1'),
+    })
+    await expect(ctx.sessionPersistence.heartbeatDraft(request)).resolves.toBeUndefined()
+    await expect(ctx.sessionPersistence.releaseDraft(request)).resolves.toBeUndefined()
     await fiber.dispose()
   })
 })
