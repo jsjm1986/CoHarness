@@ -35,6 +35,7 @@ import {
   Section,
   StatusBadge,
 } from '../components/ui.tsx'
+import { ArchiveConversation } from '../components/ArchiveConversation.tsx'
 
 const PAGE_SIZE = 50
 
@@ -244,7 +245,7 @@ export function ArchivesPage() {
         )}
         {loading || (rows.length === 0 && offset === 0) ? null : <div className="pagination"><span>第 {page} 页</span><IconButton label="上一页" icon={ChevronLeft} variant="secondary" disabled={offset === 0} onClick={() => void fetchRows(active, Math.max(0, offset - PAGE_SIZE))} /><IconButton label="下一页" icon={ChevronRight} variant="secondary" disabled={rows.length < PAGE_SIZE} onClick={() => void fetchRows(active, offset + PAGE_SIZE)} /></div>}
       </Section>
-      <Dialog open={detail !== null || detailLoading} title={detail?.record.title ?? '归档对话'} description={detail === null ? '正在加载对话内容' : `${detail.record.rootSessionId} · ${detail.record.project?.name ?? '个人会话'}`} onClose={() => { if (!detailLoading) setDetail(null) }} wide footer={detail === null ? undefined : <div className="dialogActionRow"><a className="button button-secondary" href={exportArchive(detail.record.rootSessionId)}>导出</a><Button icon={Undo2} onClick={() => setConfirmAction('restore')} loading={pendingAction === 'restore'}>恢复</Button><Button icon={Trash2} variant="danger" onClick={() => setConfirmAction('trash')} loading={pendingAction === 'trash'}>移入回收站</Button><Button variant="danger" onClick={() => setConfirmAction('purge')} loading={pendingAction === 'purge'}>永久清理</Button></div>}>
+      <Dialog open={detail !== null || detailLoading} title={detail?.record.title ?? '归档对话'} description={detail === null ? '正在加载对话内容' : `${detail.record.workspace?.title ?? '未分组'} · ${detail.record.project?.name ?? '个人会话'}`} onClose={() => { if (!detailLoading) setDetail(null) }} wide footer={detail === null ? undefined : <div className="dialogActionRow"><a className="button button-secondary" href={exportArchive(detail.record.rootSessionId)}>导出</a><Button icon={Undo2} onClick={() => setConfirmAction('restore')} loading={pendingAction === 'restore'}>恢复</Button><Button icon={Trash2} variant="danger" onClick={() => setConfirmAction('trash')} loading={pendingAction === 'trash'}>移入回收站</Button><Button variant="danger" onClick={() => setConfirmAction('purge')} loading={pendingAction === 'purge'}>永久清理</Button></div>}>
         {detailLoading ? <LoadingState label="正在读取对话" /> : detail === null ? null : <ArchiveDetail detail={detail} error={actionError} />}
       </Dialog>
       <ConfirmDialog
@@ -269,7 +270,13 @@ function ArchiveMobileRow({ row, checked, onCheck, onOpen }: { row: Conversation
 }
 
 function ArchiveDetail({ detail, error }: { detail: ConversationArchiveDetail; error: string }) {
-  return <div className="archiveDetail"><ErrorBanner message={error} /><dl className="definitionGrid"><div className="definitionRow"><dt>创建者</dt><dd>{detail.record.creator?.displayName ?? '未知用户'}</dd></div><div className="definitionRow"><dt>Workspace</dt><dd>{detail.record.workspace?.title ?? '未分组'}</dd></div><div className="definitionRow"><dt>子会话</dt><dd>{Math.max(0, detail.descendants.length - 1)}</dd></div><div className="definitionRow"><dt>同步状态</dt><dd>{detail.record.syncState}</dd></div></dl><section className="archiveDescendants" aria-label="子会话与分支"><h3>会话树</h3>{detail.descendants.length === 0 ? <p className="mutedText">没有可用的子会话记录。</p> : <ul>{detail.descendants.map(entry => <li key={entry.sessionId}><span>{entry.sessionId === detail.record.rootSessionId ? '根会话' : '子会话'}</span><strong>{entry.title}</strong><code>{entry.sessionId}</code></li>)}</ul>}</section><div className="archiveTimeline" aria-label="对话时间线">{detail.events.length === 0 ? <EmptyState title="正文暂不可用" detail="该会话可能属于离线个人运行时，稍后重试即可。" /> : detail.events.map(event => <article className="archiveEvent" key={`${event.sessionId}:${event.seq}`}><div className="archiveEventMeta"><span>{event.type}</span><small>{event.sessionId}</small><time>{formatTime(event.time)}</time></div><pre>{formatEvent(event.data)}</pre></article>)}</div></div>
+  const syncLabels: Record<ConversationArchiveDetail['record']['syncState'], string> = {
+    pending: '等待同步',
+    synced: '已同步',
+    conflict: '存在冲突',
+    unavailable: '运行时暂不可用',
+  }
+  return <div className="archiveDetail"><ErrorBanner message={error} /><dl className="definitionGrid"><div className="definitionRow"><dt>创建者</dt><dd>{detail.record.creator?.displayName ?? '未知用户'}</dd></div><div className="definitionRow"><dt>Workspace</dt><dd>{detail.record.workspace?.title ?? '未分组'}</dd></div><div className="definitionRow"><dt>项目</dt><dd>{detail.record.project?.name ?? '个人会话'}</dd></div><div className="definitionRow"><dt>归档时间</dt><dd><time dateTime={new Date(detail.record.archivedAt).toISOString()}>{formatTime(detail.record.archivedAt)}</time></dd></div><div className="definitionRow"><dt>记录状态</dt><dd><ArchiveStateBadge state={detail.record.state} /></dd></div><div className="definitionRow"><dt>同步状态</dt><dd>{syncLabels[detail.record.syncState]}</dd></div></dl><ArchiveConversation detail={detail} /></div>
 }
 
 function ArchiveStateBadge({ state }: { state: ConversationArchiveState }) {
@@ -282,11 +289,6 @@ function nextSelection(current: Set<string>, id: string, checked: boolean): Set<
   const next = new Set(current)
   if (checked) next.add(id); else next.delete(id)
   return next
-}
-
-function formatEvent(data: unknown): string {
-  if (typeof data === 'string') return data
-  try { return JSON.stringify(data, null, 2) } catch { return String(data) }
 }
 
 function formatTime(timestamp: number): string {
