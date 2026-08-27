@@ -10,10 +10,25 @@
 import { createRequire } from 'node:module'
 
 // The package's own manifest is the single source of the version so the
-// User-Agent cannot drift from what is published (`./package.json` is an
-// export of this package; the relative path resolves from both `src/` and
-// the bundled `lib/`).
-const { version } = createRequire(import.meta.url)('../package.json') as { version: string }
+// User-Agent cannot drift from what is published. TypeScript-emitted
+// subpaths live under `lib/types`, while bundled entries live directly under
+// `lib`, so both relative locations are tried.
+function packageVersion(): string {
+  const require = createRequire(import.meta.url)
+  const failures: unknown[] = []
+  for (const relativePath of ['../package.json', '../../package.json']) {
+    try {
+      const manifest = require(relativePath) as { version?: unknown }
+      if (typeof manifest.version === 'string' && manifest.version.length > 0) return manifest.version
+      failures.push(new Error(`${relativePath} has no non-empty version`))
+    } catch (error: unknown) {
+      failures.push(error)
+    }
+  }
+  throw new Error('dsh-llm package manifest could not be loaded', { cause: new AggregateError(failures) })
+}
+
+const version = packageVersion()
 
 /**
  * Static public application identity sent to LLM providers.

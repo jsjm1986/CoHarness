@@ -141,6 +141,25 @@ describe('draft-provider model discovery', () => {
     expect(server.paths).toEqual(['/openai/v1/models'])
   })
 
+  it('reads an Anthropic listing with its version and API-key headers', async () => {
+    const server = await listingServer({
+      body: JSON.stringify({ data: [{ id: 'claude-acme', display_name: 'Claude Acme' }] }),
+    })
+    const ctx = await harness()
+
+    const models = await ctx.llm.discoverModels('llm-pi-ai', {
+      baseURL: `${server.url}/anthropic`,
+      api: 'anthropic-messages',
+      apiKey: 'anthropic-key',
+    })
+
+    expect(models).toEqual([{ id: 'claude-acme', name: 'Claude Acme' }])
+    expect(server.paths).toEqual(['/anthropic/v1/models'])
+    expect(server.headers[0]?.['x-api-key']).toBe('anthropic-key')
+    expect(server.headers[0]?.['anthropic-version']).toBe('2023-06-01')
+    expect(server.headers[0]?.authorization).toBeUndefined()
+  })
+
   it('offers no credential when the draft names none', async () => {
     const server = await listingServer({ body: JSON.stringify({ data: [{ id: 'm' }] }) })
     const ctx = await harness()
@@ -283,7 +302,7 @@ describe('draft-provider model discovery', () => {
       .rejects.toMatchObject({ code: 'DISCOVERY_FAILED' })
   })
 
-  it.each(['anthropic-messages', 'azure-openai-responses', 'openai-codex-responses', 'google-generative-ai'])(
+  it.each(['azure-openai-responses', 'openai-codex-responses', 'google-generative-ai'])(
     'says it cannot interrogate %s rather than guessing a shape',
     async (api) => {
       // Azure authenticates with an `api-key` header and an `api-version`

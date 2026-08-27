@@ -28,6 +28,8 @@ The Provider ID is permanent because requests, saved sessions, model defaults, a
 
 Under **Model catalog**, choose **Fetch available models** to query the base URL and credential currently shown in the form. Selecting candidates updates the draft; the provider is not stored until you save. Catalog providers use their installed catalog without a network request.
 
+Discovery follows the selected protocol. `openai-completions` and `openai-responses` send bearer authentication to `GET {baseURL}/models`; `anthropic-messages` sends `x-api-key` and `anthropic-version: 2023-06-01` to `GET {baseURL}/v1/models`. An Anthropic base URL that already ends in `/v1` is not doubled. For an OpenAI-compatible relay, include its `/v1` prefix in `baseURL` when that is where it exposes `/models`; do not enter a website URL that returns HTML instead of the API response.
+
 ### Image input
 
 A model you enter by hand is treated as text-only until it says otherwise, because nothing can ask an endpoint which modalities it accepts. Attaching an image to such a model is refused before it is sent, naming the model.
@@ -125,7 +127,8 @@ If a saved default names a provider that was deleted, the composer displays **Se
 
 - **`MISSING_CREDENTIAL`** — Store the provider key through the Models page or supply the referenced environment variable.
 - **`UNKNOWN_MODEL`** — Select a configured model or add the missing model to the custom provider.
-- **Fetching available models returns 401** — Check the key. Model discovery calls the OpenAI-compatible `GET /models` endpoint; enter models manually for endpoints that do not provide it.
+- **Fetching available models returns 401** — Check the key and protocol. OpenAI-compatible discovery uses bearer-authenticated `GET {baseURL}/models`; Anthropic Messages uses `x-api-key` with `GET {baseURL}/v1/models`.
+- **Fetching available models returns HTML or `Stream ended without finish_reason`** — The route is probably pointed at a website or at the wrong protocol path. For OpenAI-compatible relays, set `baseURL` to the API prefix, usually ending in `/v1`; for Anthropic Messages, set `api: anthropic-messages` and use the relay base so the request reaches `/v1/models` and `/v1/messages`.
 - **The gateway refuses every request although the key and URL are right** — Its request shape differs from OpenAI's. Start with `compat.supportsDeveloperRole: false` and `compat.maxTokensField: max_tokens` on the route.
 - **Only reasoning models fail** — pi-ai sends their system prompt as the `developer` role, which the gateway rejects. Set `compat.supportsDeveloperRole: false`.
 - **A compat switch is refused as having no value** — A key written with nothing after the colon. Give it a value, or remove the key to keep the installed catalog's.

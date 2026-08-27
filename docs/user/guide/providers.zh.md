@@ -28,6 +28,8 @@ Provider ID 是永久的，因为请求、已保存会话、模型默认值和�
 
 在**模型目录**中选择**获取可用模型**，可查询表单当前显示的基础 URL 和凭据。选择候选项只会更新草稿；保存前不会存储提供方。目录提供方使用已安装目录，不发起网络请求。
 
+发现请求遵循所选协议。`openai-completions` 与 `openai-responses` 使用 bearer 认证请求 `GET {baseURL}/models`；`anthropic-messages` 使用 `x-api-key` 和 `anthropic-version: 2023-06-01` 请求 `GET {baseURL}/v1/models`。Anthropic 的 base URL 已以 `/v1` 结尾时不会重复拼接。对于 OpenAI 兼容中转站，如果它在 `/v1` 暴露 `/models`，请把 `/v1` 写入 `baseURL`；不要填写会返回 HTML 网页而不是 API 响应的网站地址。
+
 ### 图片输入
 
 手动输入的模型在自己声明之前一律按纯文本对待，因为没有任何环节能去询问端点接受哪些模态。给这类模型附加图片，会在发送前就被拒绝，并点名该模型。
@@ -125,7 +127,8 @@ llm-pi-ai:
 
 - **`MISSING_CREDENTIAL`**：通过模型页存储提供方密钥，或提供被引用的环境变量。
 - **`UNKNOWN_MODEL`**：选择已配置的模型，或向自定义提供方添加缺失的模型。
-- **获取可用模型返回 401**：检查密钥。模型发现会调用 OpenAI 兼容的 `GET /models` 端点；对于不提供该端点的服务，请手动输入模型。
+- **获取可用模型返回 401**：检查密钥和协议。OpenAI 兼容发现使用 bearer 认证请求 `GET {baseURL}/models`；Anthropic Messages 使用 `x-api-key` 请求 `GET {baseURL}/v1/models`。
+- **获取可用模型返回 HTML，或出现 `Stream ended without finish_reason`**：路由很可能指向了网站地址，或协议路径不匹配。OpenAI 兼容中转站应把 `baseURL` 设为 API 前缀，通常以 `/v1` 结尾；Anthropic Messages 应设 `api: anthropic-messages`，并使用中转站根地址，让请求到达 `/v1/models` 和 `/v1/messages`。
 - **密钥与地址都正确，网关却拒绝每一个请求**：它的请求形状与 OpenAI 不同。先在路由上设 `compat.supportsDeveloperRole: false` 与 `compat.maxTokensField: max_tokens`。
 - **只有推理模型失败**：pi-ai 把它们的系统提示词以 `developer` 角色发出，而网关拒绝该角色。设 `compat.supportsDeveloperRole: false`。
 - **某个 compat 开关因没有值而被拒绝**：冒号后什么都没写。给它一个值，或删掉该键以沿用已安装 catalog 的值。

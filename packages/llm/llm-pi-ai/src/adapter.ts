@@ -30,6 +30,7 @@ import type {
   Models,
   ModelThinkingLevel,
   MutableModels,
+  ProviderResponse,
   SimpleStreamOptions,
   ThinkingLevel,
 } from '@earendil-works/pi-ai'
@@ -334,6 +335,7 @@ export class PiAiAdapter extends LlmAdapter {
       const context = attachments === undefined
         ? toPiContext(options, undefined, onReplayDegrade)
         : await toPiContext(options, attachments, onReplayDegrade, profile.maxRequestImageBytes)
+      let providerResponse: ProviderResponse | undefined
       const events = snapshot.models.streamSimple(model, context, {
         ...profileOptions(profile, reasoning, apiKey),
         ...options.temperature === undefined ? {} : { temperature: options.temperature },
@@ -343,6 +345,7 @@ export class PiAiAdapter extends LlmAdapter {
         // Profile headers are deployment-owned; attribution names are
         // Harness-owned and therefore win collisions.
         headers: requestHeaders(profile.headers),
+        onResponse: (response) => { providerResponse = response },
       })
       // Private OpenAI-compatible gateways can serialize thinking in ordinary
       // `content` even when their model declaration has no reasoning metadata.
@@ -352,7 +355,12 @@ export class PiAiAdapter extends LlmAdapter {
       // of those XML tags remains an unavoidable heuristic collision; other
       // protocols have native reasoning events and do not use this fallback.
       const parseTextThinking = model.api === 'openai-completions'
-      const iterator = toStreamChunks(events, model.contextWindow, parseTextThinking)[Symbol.asyncIterator]()
+      const iterator = toStreamChunks(
+        events,
+        model.contextWindow,
+        parseTextThinking,
+        () => providerResponse,
+      )[Symbol.asyncIterator]()
       let exhausted = false
       try {
         while (true) {

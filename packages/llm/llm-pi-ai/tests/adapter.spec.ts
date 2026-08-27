@@ -352,6 +352,39 @@ describe('PiAiAdapter provider routing', () => {
     expect(server.paths).toEqual(['/chat/completions'])
   })
 
+  it('reports a non-SSE 200 response as malformed instead of retryable transport', async () => {
+    const server = await mockServer([{
+      body: '<!doctype html><title>gateway landing page</title>',
+      headers: { 'content-type': 'text/html; charset=utf-8' },
+    }])
+    const ctx = await harness(server.url)
+
+    const result = await assemble(ctx, { model: 'deepseek-v4-flash', messages: [] })
+
+    expect(result.finish).toMatchObject({
+      kind: 'error',
+      failure: {
+        code: 'MALFORMED_RESPONSE',
+        status: 200,
+        message: expect.stringMatching(/content-type "text\/html; charset=utf-8".*baseURL.*\/v1/),
+      },
+    })
+    expect(server.paths).toEqual(['/chat/completions'])
+  })
+
+  it('keeps a genuine SSE truncation retryable', async () => {
+    const server = await mockServer([{
+      events: ['{"choices":[{"delta":{"role":"assistant","content":""},"index":0,"finish_reason":null}]}'],
+    }])
+    const ctx = await harness(server.url)
+
+    const result = await assemble(ctx, { model: 'deepseek-v4-flash', messages: [] })
+
+    expect(result.finish).toMatchObject({ kind: 'error', failure: { code: 'TRANSPORT' } })
+    if (result.finish.kind !== 'error') throw new Error('expected error finish')
+    expect(result.finish.failure).not.toHaveProperty('status')
+  })
+
   it('uses the resolved catalog context window for usage-based overflow detection', async () => {
     const model = getBuiltinModels('deepseek').find(candidate => candidate.id === 'deepseek-v4-flash')
     if (model === undefined) throw new Error('deepseek-v4-flash missing from pi-ai test catalog')
