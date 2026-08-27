@@ -22,6 +22,7 @@
 - `ctx.llm.listModelDiscoveryNamespaces(): string[]` 列出可以询问端点的 namespace，让界面只在可用之处提供该动作。
 - `ctx.llm.discoverModels(settingsNs: string, request: LlmModelDiscoveryRequest): Promise<LlmDiscoveredModel[]>` 询问某个端点它公布了哪些模型。
 - `discoverModelsAtEndpoint(request: LlmEndpointModelDiscoveryRequest): Promise<readonly LlmDiscoveredModel[]>` 运行从 `@deepseek-ai/dsh-llm/discovery` 导出的共享协议 HTTP 列表请求；pi-ai 与 Gateway 调用方都使用这份实现。
+- `normalizeAnthropicBaseURL(baseURL: URL): URL` 在 Anthropic SDK 消息请求追加版本路径前，规范化可选的末尾 `/v1`；pi-ai 与列表请求共用这个 helper。
 - `ctx.llm.providerRetryPolicy(provider: string): ResolvedRetryPolicy` 返回注册时捕获的提供方自身的重试策略，并解析 normal 默认值。
 - `ctx.llm.listModels(provider: string): Promise<LlmModelInfo[]>` 发现某个已注册提供方当前公布的模型。
 - `ctx.llm.resolveModelInfo(provider: string, model: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo>` 从拥有该精确路由的适配器中，解析并校验确切模型身份，以及可用上下文、输出默认值和推理（reasoning）元数据；异步适配器可选地支持取消。

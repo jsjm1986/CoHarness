@@ -22,6 +22,7 @@ Each provider adapter supplies its resolved route policy. Omitting provider conf
 - `ctx.llm.listModelDiscoveryNamespaces(): string[]` List the namespaces that can interrogate an endpoint, so a surface offers the action only where it works.
 - `ctx.llm.discoverModels(settingsNs: string, request: LlmModelDiscoveryRequest): Promise<LlmDiscoveredModel[]>` Ask one endpoint which models it advertises.
 - `discoverModelsAtEndpoint(request: LlmEndpointModelDiscoveryRequest): Promise<readonly LlmDiscoveredModel[]>` Run the shared protocol HTTP listing request exported by `@deepseek-ai/dsh-llm/discovery`; this is the common implementation for pi-ai and Gateway callers.
+- `normalizeAnthropicBaseURL(baseURL: URL): URL` Normalize an optional trailing `/v1` before an Anthropic SDK message request appends its versioned path; pi-ai and discovery share this helper.
 - `ctx.llm.providerRetryPolicy(provider: string): ResolvedRetryPolicy` Return the provider-owned retry policy captured during registration, with normal defaults resolved.
 - `ctx.llm.listModels(provider: string): Promise<LlmModelInfo[]>` Discover the models one registered provider currently advertises.
 - `ctx.llm.resolveModelInfo(provider: string, model: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo>` Resolve validated exact-model identity plus available context, output-default, and reasoning metadata from the owning adapter, with optional cancellation for asynchronous adapters.

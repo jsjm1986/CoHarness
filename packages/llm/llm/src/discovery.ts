@@ -24,6 +24,20 @@ export type ModelListingProtocol = (typeof MODEL_LISTING_PROTOCOLS)[number]
 /** Maximum response bytes accepted from a caller-supplied model-listing URL. */
 const MAX_RESPONSE_BYTES = 4 * 1024 * 1024
 
+/**
+ * Normalize a parsed Anthropic endpoint before the SDK appends `/v1/messages`.
+ * A copy is returned so callers retain ownership of their URL object.
+ *
+ * @param baseURL - validated endpoint URL, possibly ending in `/v1`.
+ * @returns an endpoint URL without one trailing Anthropic version segment.
+ */
+export function normalizeAnthropicBaseURL(baseURL: URL): URL {
+  const normalized = new URL(baseURL)
+  const path = normalized.pathname.replace(/\/+$/, '')
+  if (path.endsWith('/v1')) normalized.pathname = path.slice(0, -'/v1'.length) || '/'
+  return normalized
+}
+
 /** One endpoint interrogation; unlike the settings-level request, `baseURL` is required. */
 export interface LlmEndpointModelDiscoveryRequest {
   /** Absolute HTTP(S) endpoint prefix to interrogate. */
@@ -76,8 +90,8 @@ function label(...candidates: readonly unknown[]): string | undefined {
 
 /**
  * Build the listing URL while retaining deployment path segments. Anthropic
- * endpoints conventionally use `/v1/models`; when the caller already supplied
- * a `/v1` prefix, do not produce the invalid `/v1/v1/models` variant.
+ * endpoints conventionally use `/v1/models`; a supplied `/v1` prefix is
+ * normalized before the suffix is added.
  */
 function listingUrl(rawBaseURL: string, api: ModelListingProtocol): string {
   const baseURL = rawBaseURL.trim()
@@ -91,10 +105,10 @@ function listingUrl(rawBaseURL: string, api: ModelListingProtocol): string {
     || base.username !== '' || base.password !== '' || base.hash !== '') {
     throw new LlmError('baseURL must be an absolute http or https URL without credentials or a fragment', 'DISCOVERY_FAILED')
   }
-  const path = base.pathname.replace(/\/+$/, '')
-  const anthropicV1 = api === 'anthropic-messages' && !path.endsWith('/v1')
-  base.pathname = `${path}${anthropicV1 ? '/v1' : ''}/models`
-  return base.toString()
+  const endpoint = api === 'anthropic-messages' ? normalizeAnthropicBaseURL(base) : base
+  const path = endpoint.pathname.replace(/\/+$/, '')
+  endpoint.pathname = `${path}${api === 'anthropic-messages' ? '/v1' : ''}/models`
+  return endpoint.toString()
 }
 
 /** Build protocol-specific authentication and version headers. */

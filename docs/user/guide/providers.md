@@ -28,7 +28,7 @@ The Provider ID is permanent because requests, saved sessions, model defaults, a
 
 Under **Model catalog**, choose **Fetch available models** to query the base URL and credential currently shown in the form. Selecting candidates updates the draft; the provider is not stored until you save. Catalog providers use their installed catalog without a network request.
 
-Discovery follows the selected protocol. `openai-completions` and `openai-responses` send bearer authentication to `GET {baseURL}/models`; `anthropic-messages` sends `x-api-key` and `anthropic-version: 2023-06-01` to `GET {baseURL}/v1/models`. An Anthropic base URL that already ends in `/v1` is not doubled. For an OpenAI-compatible relay, include its `/v1` prefix in `baseURL` when that is where it exposes `/models`; do not enter a website URL that returns HTML instead of the API response.
+Discovery follows the selected protocol. `openai-completions` and `openai-responses` send bearer authentication to `GET {baseURL}/models`; `anthropic-messages` sends `x-api-key` and `anthropic-version: 2023-06-01` to `GET {baseURL}/v1/models`. For Anthropic Messages, a trailing `/v1` is normalized for both model discovery and message requests, so the relay root and versioned base are accepted. For an OpenAI-compatible relay, include its `/v1` prefix in `baseURL` when that is where it exposes `/models`; do not enter a website URL that returns HTML instead of the API response.
 
 ### Image input
 
