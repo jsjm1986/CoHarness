@@ -33,6 +33,10 @@ Classification stays on message text because that is the only signal pi-ai deliv
 
 **Automatically append `/v1` to every OpenAI-compatible base URL.** Rejected: valid gateways can serve Chat Completions directly below their configured prefix or use another deployment path. The adapter diagnoses the received response without rewriting a deployment-owned address.
 
+## Testing
+
+`packages/llm/llm-pi-ai/tests/adapter.spec.ts` distinguishes an HTML response from a genuinely truncated SSE stream at the adapter boundary. `examples/headless-agent/malformed-provider.cordis.snapshot.yml` boots the assembled headless app with the real pi-ai adapter against a keyless local HTML endpoint; its transcript pins the status, content type, `MALFORMED_RESPONSE` code, `/v1` hint, absence of a retry event, and single `/chat/completions` request.
+
 ## Consequences
 
 - A mid-stream transport drop and an SSE response truncated before its terminal event carry `TRANSPORT`, so a composed `llm-retry` policy retries them by default instead of failing the turn.

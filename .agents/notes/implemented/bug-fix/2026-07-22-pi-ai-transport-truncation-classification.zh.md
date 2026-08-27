@@ -33,6 +33,10 @@ Status: implemented
 
 **自动为每个 OpenAI 兼容 `baseURL` 追加 `/v1`。** 否决：合法网关可能直接在配置前缀下提供 Chat Completions，或使用其他部署路径。适配器会诊断收到的响应，而不会重写部署方拥有的地址。
 
+## 测试
+
+`packages/llm/llm-pi-ai/tests/adapter.spec.ts` 在适配器层区分 HTML 响应与真正被截断的 SSE 流。`examples/headless-agent/malformed-provider.cordis.snapshot.yml` 使用真实 pi-ai 适配器启动已装配的 headless 应用，并连接无密钥的本地 HTML 端点；其转录固定状态、内容类型、`MALFORMED_RESPONSE` code、`/v1` 提示、不存在重试事件，以及唯一的 `/chat/completions` 请求。
+
 ## 后果
 
 - 流式输出中途的传输层断开，以及在终止事件前被截断的 SSE 响应，会携带 `TRANSPORT`，因此组合出的 `llm-retry` 策略会默认重试它们，而不是让该轮次失败。

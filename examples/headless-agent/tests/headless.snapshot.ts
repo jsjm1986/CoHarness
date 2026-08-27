@@ -33,6 +33,8 @@ const goalScenarioDir = join(snapshotsDir, 'goal-tools')
 const goalConfigPath = fileURLToPath(new URL('../goal.cordis.snapshot.yml', import.meta.url))
 const retryScenarioDir = join(snapshotsDir, 'provider-retry')
 const retryConfigPath = fileURLToPath(new URL('../retry.cordis.snapshot.yml', import.meta.url))
+const malformedProviderScenarioDir = join(snapshotsDir, 'malformed-provider')
+const malformedProviderConfigPath = fileURLToPath(new URL('../malformed-provider.cordis.snapshot.yml', import.meta.url))
 const compactionScenarioDir = join(snapshotsDir, 'compaction-recovery')
 const compactionSessionFixture = join(compactionScenarioDir, 'session.jsonl')
 const compactionStreamExpected = join(compactionScenarioDir, 'stream-json.expected.jsonl')
@@ -84,6 +86,12 @@ interface TaggedThinkingServer {
   readonly url: string
   readonly requests: JsonObject[]
   close(): Promise<void>
+}
+
+interface HtmlGatewayServer {
+  readonly url: string
+  readonly paths: string[]
+  close(): Promise<undefined>
 }
 
 /** Serve one deterministic DeepSeek-compatible response while retaining its request body. */
@@ -161,6 +169,27 @@ async function taggedThinkingServer(): Promise<TaggedThinkingServer> {
     url: `http://127.0.0.1:${address.port}`,
     requests,
     close: () => new Promise(resolve => server.close(() => { resolve() })),
+  }
+}
+
+/** Serve a website response where pi-ai requires an SSE completion stream. */
+async function htmlGatewayServer(): Promise<HtmlGatewayServer> {
+  const paths: string[] = []
+  const server = createServer((request: IncomingMessage, response: ServerResponse) => {
+    request.resume()
+    request.on('end', () => {
+      paths.push(request.url ?? '')
+      response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+      response.end('<!doctype html><title>relay landing page</title>')
+    })
+  })
+  await new Promise<undefined>(resolve => server.listen(0, '127.0.0.1', () => { resolve(undefined) }))
+  const address = server.address()
+  if (address === null || typeof address === 'string') throw new Error('HTML gateway snapshot server has no port')
+  return {
+    url: `http://127.0.0.1:${address.port}`,
+    paths,
+    close: () => new Promise(resolve => server.close(() => { resolve(undefined) })),
   }
 }
 
@@ -379,6 +408,41 @@ describe('headless stream-json snapshots', () => {
     const normalized = normalizeHeadlessStream(result.stdout, runCwd)
     if (refreshing) await writeFile(streamExpected, normalized)
     expect(normalized).toBe(await readFile(streamExpected, 'utf8'))
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
+  it('diagnoses an HTML relay response through the pi-ai assembled app', async () => {
+    const prompt = await scenarioPrompt(malformedProviderScenarioDir, 'malformed-provider')
+    const streamExpected = join(malformedProviderScenarioDir, 'stream-json.expected.jsonl')
+    const server = await htmlGatewayServer()
+    let runCwd = ''
+    try {
+      const result = await runLoaderSmoke({
+        label: 'malformed-provider headless stream-json snapshot',
+        tempDirPrefix: 'headless-snapshot-malformed-provider-',
+        binScript,
+        libBinScript: binScript,
+        configPath: malformedProviderConfigPath,
+        binArgs: [malformedProviderConfigPath, prompt],
+        tsconfigPath,
+        env: {
+          DSH_HTML_GATEWAY_BASE_URL: server.url,
+          HTML_GATEWAY_KEY: 'snapshot-key',
+          NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
+        },
+        prepare: (cwd) => { runCwd = cwd },
+      })
+
+      expect(result.stderr).toBe('')
+      const normalized = normalizeHeadlessStream(result.stdout, runCwd)
+      if (refreshing) await writeFile(streamExpected, normalized)
+      expect(normalized).toBe(await readFile(streamExpected, 'utf8'))
+      expect(normalized).toContain('"code":"MALFORMED_RESPONSE"')
+      expect(normalized).toContain('instead of an SSE stream; check the baseURL and protocol')
+      expect(normalized).not.toContain('"type":"llm/retry"')
+      expect(server.paths).toEqual(['/chat/completions'])
+    } finally {
+      await server.close()
+    }
   }, LOADER_SMOKE_TEST_TIMEOUT_MS)
 
   it('recovers from context overflow through an assembled compaction', async () => {
