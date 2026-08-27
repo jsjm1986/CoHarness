@@ -3,7 +3,7 @@ import { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import type { AttachmentStore } from '@deepseek-ai/dsh-attachment'
 import { BlockAssembler, createUserMessage, CallId, CONTEXT_WINDOW_EXCEEDED_CODE, EMPTY_RESPONSE_CODE, createMessage } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, StreamChunk } from '@deepseek-ai/dsh-llm'
-import type { AssistantMessage, AssistantMessageEvent, Usage } from '@earendil-works/pi-ai'
+import type { AssistantMessage, AssistantMessageEvent, ProviderResponse, Usage } from '@earendil-works/pi-ai'
 import { toPiContext } from '../src/context.ts'
 import { toPiReplayState } from '../src/replay.ts'
 import { mapStopReason, mapUsage, toStreamChunks } from '../src/stream.ts'
@@ -1214,6 +1214,33 @@ describe('mapStopReason / mapUsage', () => {
   ])('maps pi-ai transport wording %j', (errorMessage) => {
     expect(mapStopReason(assistant({ stopReason: 'error', errorMessage })))
       .toMatchObject({ kind: 'error', failure: { code: 'TRANSPORT' } })
+  })
+
+  it('keeps terminal-event wording retryable when response headers do not identify the body', () => {
+    const response: ProviderResponse = { status: 200, headers: { server: 'relay' } }
+    expect(mapStopReason(assistant({
+      stopReason: 'error',
+      errorMessage: 'Stream ended without finish_reason',
+    }), undefined, response)).toMatchObject({ kind: 'error', failure: { code: 'TRANSPORT' } })
+  })
+
+  it.each([
+    ['openai-responses', true],
+    ['anthropic-messages', false],
+  ] as const)('diagnoses a non-SSE %s response with its protocol-specific hint', (api, hasOpenAiHint) => {
+    const response: ProviderResponse = { status: 200, headers: { 'Content-Type': 'application/json' } }
+    const reason = mapStopReason(assistant({
+      api,
+      stopReason: 'error',
+      errorMessage: 'Stream ended without finish_reason',
+    }), undefined, response)
+
+    expect(reason).toMatchObject({
+      kind: 'error',
+      failure: { code: 'MALFORMED_RESPONSE', status: 200 },
+    })
+    if (reason.kind !== 'error') throw new Error('expected error finish')
+    expect(reason.failure.message.includes('commonly end in "/v1"')).toBe(hasOpenAiHint)
   })
 
   it('uses pi-ai provider-specific overflow classification without losing rate-limit exclusions', () => {
