@@ -18,6 +18,8 @@ Selecting another personal or writable project scope keeps the manager and the a
 
 Document metadata reads retry a transient runtime-starting response using the server's `Retry-After` delay before surfacing a localized scope-unavailable message. Upload and copy writes are not replayed automatically.
 
+Scope and folder reads keep the last committed rows visible while a new result is loading. Repeated remote-scope visits reuse a bounded, scope-qualified metadata cache and revalidate it; a failed revalidation keeps the visible rows and exposes the retryable error.
+
 Select one or more rows and choose **Copy to another scope** to create a snapshot in a writable project or in personal documents. The manager shows only safe scope labels; Gateway performs authorization and streaming, resolves target name conflicts without overwriting, and reports each file independently. A copy into the active conversation scope can be attached to the composer as a durable, non-owning draft; a copy into another scope remains there until selected from that scope.
 
 The composer’s Documents control opens the same manager, so a copy started from the input bar returns to that draft through the manager attach command.

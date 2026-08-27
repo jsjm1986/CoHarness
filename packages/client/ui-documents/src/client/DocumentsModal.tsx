@@ -91,6 +91,26 @@ function documentErrorMessage(error: unknown, t: (key: DocumentsKey) => string):
   return error instanceof Error ? error.message : String(error)
 }
 
+/** Whether a rejected listing belongs to a superseded or disposed request. */
+function isAbortError(error: unknown, signal?: AbortSignal): boolean {
+  return signal?.aborted === true
+    || (error instanceof Error && error.name === 'AbortError')
+}
+
+/** Link a component-lifetime signal to one listing controller and return its disposer. */
+function linkAbortSignal(primary: AbortSignal | undefined, controller: AbortController): () => void {
+  if (primary === undefined) return () => {}
+  const abort = (): void => {
+    controller.abort((primary as AbortSignal & { reason?: unknown }).reason)
+  }
+  if (primary.aborted) {
+    abort()
+    return () => {}
+  }
+  primary.addEventListener('abort', abort, { once: true })
+  return () => { primary.removeEventListener('abort', abort) }
+}
+
 type FolderEditor =
   | { mode: 'create'; parentDirectoryId: UserDocDirectoryIdType }
   | { mode: 'rename'; directory: UserDocDirectoryRef }
@@ -180,6 +200,7 @@ const MAX_PREVIEW_TEXT_BYTES = 256 * 1024
 const ROOT_DIRECTORY_ID = '' as UserDocDirectoryIdType
 const MAX_SERVER_PAGE_CACHE_KEYS = 24
 const MAX_SERVER_PAGES_PER_KEY = 8
+const MAX_LEGACY_LISTING_CACHE_ENTRIES = 24
 
 const DEFAULT_SORT: DocumentSort = { key: 'date', dir: 'desc' }
 
@@ -192,6 +213,23 @@ function wireSort(sort: DocumentSort): NonNullable<UserDocListQuery['sort']> {
 /** Stable key for a scope so page caches never cross an authorization context. */
 function scopeCacheKey(value: UserDocScope): string {
   return value.kind === 'personal' ? 'personal' : `project:${String(value.projectId)}`
+}
+
+/** Stable cache key for one scope, directory, and listing request. */
+function documentListingCacheKey(
+  target: UserDocScope,
+  directoryId: UserDocDirectoryIdType,
+  query: string,
+  type: DocumentTypeFilter,
+  sort: NonNullable<UserDocListQuery['sort']>,
+): string {
+  return JSON.stringify({
+    scope: scopeCacheKey(target),
+    directory: String(directoryId),
+    query,
+    type,
+    sort,
+  })
 }
 
 /** Compare scope identities without depending on display labels or modes. */
@@ -327,6 +365,8 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
   const [uploadScopePickerValue, setUploadScopePickerValue] = useState('')
   const [uploadScopePickerQuery, setUploadScopePickerQuery] = useState('')
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [pendingScopeLabel, setPendingScopeLabel] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [modalError, setModalError] = useState('')
@@ -388,6 +428,15 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
   const serverPages = useRef(new Map<string, Map<number, ServerPageRecord>>())
   const serverRequestGeneration = useRef(0)
   const serverLoadedKey = useRef<string | null>(null)
+  const pendingRuntimePages = useRef<{
+    readonly generation: number
+    readonly directoryId: UserDocDirectoryIdType
+    readonly query: string
+    readonly type: DocumentTypeFilter
+    readonly sort: NonNullable<UserDocListQuery['sort']>
+    readonly pages: Map<number, ServerPageRecord>
+  } | null>(null)
+  const listingController = useRef<AbortController | null>(null)
   const overviewRequestGeneration = useRef(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const headerCheckRef = useRef<HTMLInputElement>(null)
@@ -403,6 +452,50 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
   const scopeCache = useRef<DocumentsWorkspaceScope | null>(null)
   const overviewCache = useRef<{ readonly key: string; readonly response: UserDocCatalogOverview } | null>(null)
   const overviewLoadedKey = useRef<string | null>(null)
+
+  const beginListingRequest = (): { controller: AbortController; signal: AbortSignal } => {
+    listingController.current?.abort()
+    const controller = new AbortController()
+    listingController.current = controller
+    return { controller, signal: controller.signal }
+  }
+
+  const finishListingRequest = (controller: AbortController): void => {
+    if (listingController.current === controller) listingController.current = null
+  }
+
+  const rememberLegacyListing = (key: string, value: {
+    readonly documents: readonly UserDocRef[]
+    readonly directories: readonly UserDocDirectoryRef[]
+    readonly directoryId: UserDocDirectoryIdType
+    readonly limits: UserDocLimits | null
+  }): void => {
+    listingCache.current.delete(key)
+    listingCache.current.set(key, value)
+    while (listingCache.current.size > MAX_LEGACY_LISTING_CACHE_ENTRIES) {
+      const oldestKey = listingCache.current.keys().next().value
+      if (oldestKey === undefined) break
+      listingCache.current.delete(oldestKey)
+    }
+  }
+
+  const remoteListingKey = (target: UserDocScope): string => documentListingCacheKey(
+    target, ROOT_DIRECTORY_ID, '', typeFilter, wireSort(parseSort(sortValue)),
+  )
+
+  const cachedRemoteListing = (target: UserDocScope): ServerPageRecord | undefined => {
+    const serverPage = serverPages.current.get(remoteListingKey(target))?.get(1)
+    if (serverPage !== undefined) return serverPage
+    const legacy = listingCache.current.get(remoteListingKey(target))
+    if (legacy === undefined) return undefined
+    return {
+      documents: legacy.documents,
+      directories: legacy.directories,
+      directoryId: legacy.directoryId,
+      limits: legacy.limits,
+      totalDocuments: legacy.documents.length,
+    }
+  }
 
   const rememberServerPage = (key: string, pageNumber: number, record: ServerPageRecord): void => {
     let pages = serverPages.current.get(key)
@@ -422,6 +515,57 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
       if (oldestKey === undefined || oldestKey === key) break
       serverPages.current.delete(oldestKey)
     }
+  }
+
+  const pendingRuntimePageMatches = (
+    pending: {
+      readonly generation: number
+      readonly directoryId: UserDocDirectoryIdType
+      readonly query: string
+      readonly type: DocumentTypeFilter
+      readonly sort: NonNullable<UserDocListQuery['sort']>
+      readonly pages: Map<number, ServerPageRecord>
+    },
+    generation: number,
+    directoryId: UserDocDirectoryIdType,
+  ): boolean => pending.generation === generation
+    && pending.directoryId === directoryId
+    && pending.query === query.trim()
+    && pending.type === typeFilter
+    && pending.sort === wireSort(parseSort(sortValue))
+
+  const rememberPendingRuntimePage = (
+    pending: {
+      readonly pages: Map<number, ServerPageRecord>
+    },
+    pageNumber: number,
+    record: ServerPageRecord,
+  ): void => {
+    pending.pages.set(pageNumber, record)
+    while (pending.pages.size > MAX_SERVER_PAGES_PER_KEY) {
+      const keys = [...pending.pages.keys()]
+      const oldest = keys.find(value => value !== 1) ?? keys[0]
+      if (oldest === undefined) break
+      pending.pages.delete(oldest)
+    }
+  }
+
+  /** Move an initial runtime page chain into the scope-qualified cache. */
+  const settlePendingRuntimePages = (target: UserDocScope, generation: number): string | null => {
+    const pending = pendingRuntimePages.current
+    if (pending === null || pending.generation !== generation) return null
+    const key = documentListingCacheKey(target, pending.directoryId, pending.query, pending.type, pending.sort)
+    for (const [pageNumber, record] of pending.pages) rememberServerPage(key, pageNumber, record)
+    pendingRuntimePages.current = null
+    return key
+  }
+
+  const runtimeListingScopePending = (): boolean => scopeCache.current === null
+    && scopeView === null
+    && alternateSource === null
+
+  const discardPendingRuntimePages = (): void => {
+    pendingRuntimePages.current = null
   }
 
   const runtimeScope = (): UserDocScope => documentScopeOf(scope)
@@ -452,13 +596,13 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
     return result
   }
 
-  const listingKeyFor = (target: UserDocScope, directoryId: UserDocDirectoryIdType): string => JSON.stringify({
-    scope: scopeCacheKey(target),
-    directory: String(directoryId),
-    query: query.trim(),
-    type: typeFilter,
-    sort: wireSort(parseSort(sortValue)),
-  })
+  const listingKeyFor = (target: UserDocScope, directoryId: UserDocDirectoryIdType): string => documentListingCacheKey(
+    target, directoryId, query.trim(), typeFilter, wireSort(parseSort(sortValue)),
+  )
+
+  const emptyListingKey = (target: UserDocScope, directoryId: UserDocDirectoryIdType): string => documentListingCacheKey(
+    target, directoryId, '', typeFilter, wireSort(parseSort(sortValue)),
+  )
 
   const listingKey = (directoryId: UserDocDirectoryIdType): string => listingKeyFor(
     scopeView?.scope ?? alternateSource?.scope ?? cachedRuntimeScope(), directoryId,
@@ -541,15 +685,39 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
   ): Promise<boolean> => {
     const generation = serverRequestGeneration.current + 1
     serverRequestGeneration.current = generation
+    const listingRequest = beginListingRequest()
+    const requestSignal = listingRequest.signal
     const key = listingKey(directoryId)
-    serverLoadedKey.current = key
-    let pagesForKey = serverPages.current.get(key)
-    if (pagesForKey === undefined || force) {
-      pagesForKey = new Map<number, ServerPageRecord>()
+    const runtimeScopePending = runtimeListingScopePending()
+    let pagesForKey: Map<number, ServerPageRecord>
+    if (runtimeScopePending) {
+      // The first runtime listing can finish before account context tells us
+      // which scope owns it. Keep its cursor chain out of the scope cache.
+      let pending = pendingRuntimePages.current
+      if (pending === null || !pendingRuntimePageMatches(pending, loadGeneration.current, directoryId) || force) {
+        pending = {
+          generation: loadGeneration.current,
+          directoryId,
+          query: query.trim(),
+          type: typeFilter,
+          sort: wireSort(parseSort(sortValue)),
+          pages: new Map(),
+        }
+        pendingRuntimePages.current = pending
+      }
+      pagesForKey = pending.pages
+      if (force) pagesForKey.clear()
+    } else {
+      serverLoadedKey.current = key
+      pagesForKey = serverPages.current.get(key) ?? new Map<number, ServerPageRecord>()
+      if (force) pagesForKey.clear()
       serverPages.current.set(key, pagesForKey)
     }
     const cached = force ? undefined : pagesForKey.get(requestedPage)
-    setLoading(true)
+    const keepVisibleListing = listingReadyRef.current
+    setPendingScopeLabel('')
+    setRefreshing(keepVisibleListing)
+    if (!keepVisibleListing) setLoading(true)
     setError('')
     setNotice('')
     try {
@@ -566,7 +734,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
             return false
           }
         }
-        const response = await fetchListingPage(directoryId, queryForPage(cursor)) as {
+        const response = await fetchListingPage(directoryId, queryForPage(cursor), requestSignal) as {
           readonly documents: readonly UserDocRef[]
           readonly directories?: readonly UserDocDirectoryRef[]
           readonly directoryId?: UserDocDirectoryIdType
@@ -589,7 +757,24 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
           totalDocuments: typeof response.totalDocuments === 'number' ? response.totalDocuments : null,
           ...(response.nextCursor === undefined ? {} : { nextCursor: response.nextCursor }),
         }
-        rememberServerPage(key, requestedPage, pageRecord)
+        if (runtimeListingScopePending()) {
+          const activePending = pendingRuntimePages.current
+          if (activePending !== null && pendingRuntimePageMatches(activePending, loadGeneration.current, directoryId)) {
+            rememberPendingRuntimePage(activePending, requestedPage, pageRecord)
+          } else if (requestedPage === 1) {
+            pendingRuntimePages.current = {
+              generation: loadGeneration.current,
+              directoryId,
+              query: query.trim(),
+              type: typeFilter,
+              sort: wireSort(parseSort(sortValue)),
+              pages: new Map(),
+            }
+            rememberPendingRuntimePage(pendingRuntimePages.current, requestedPage, pageRecord)
+          }
+        } else {
+          rememberServerPage(key, requestedPage, pageRecord)
+        }
       }
       if (generation !== serverRequestGeneration.current) return false
       applyServerPage(pageRecord)
@@ -601,33 +786,44 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
     } catch (cause) {
       if (generation !== serverRequestGeneration.current) return false
       if (serverLoadedKey.current === key) serverLoadedKey.current = null
-      setError(documentErrorMessage(cause, t))
+      if (!isAbortError(cause, requestSignal)) setError(documentErrorMessage(cause, t))
       return false
     } finally {
-      if (generation === serverRequestGeneration.current) setLoading(false)
+      if (generation === serverRequestGeneration.current) {
+        setLoading(false)
+        setRefreshing(false)
+        finishListingRequest(listingRequest.controller)
+      }
     }
   }
 
   const load = async (directoryId: UserDocDirectoryIdType = currentDirectoryId, signal?: AbortSignal) => {
     setMobileSheet(null)
+    clearSelection()
     overviewRequestGeneration.current += 1
     overviewLoadedKey.current = null
     const generation = loadGeneration.current + 1
     loadGeneration.current = generation
-    setLoading(true)
+    const listingRequest = beginListingRequest()
+    const unlinkAbortSignal = linkAbortSignal(signal, listingRequest.controller)
+    const requestSignal = listingRequest.signal
+    pendingRuntimePages.current = null
+    const keepVisibleListing = listingReadyRef.current
+    setPendingScopeLabel('')
+    setRefreshing(keepVisibleListing)
+    if (!keepVisibleListing) setLoading(true)
     setError('')
     setNotice('')
     setOverviewMode(false)
     setTrashMode(false)
-    setScopeView(null)
-    setAlternateSource(null)
     setUploadScopePickerOpen(false)
     serverRequestGeneration.current += 1
-    serverPagingRef.current = false
-    listingReadyRef.current = false
-    setServerPaging(false)
-    setServerTotalDocuments(null)
-    setServerNextCursor(undefined)
+    if (!keepVisibleListing) {
+      serverPagingRef.current = false
+      setServerPaging(false)
+      setServerTotalDocuments(null)
+      setServerNextCursor(undefined)
+    }
     // `load` is always the active runtime path. State setters below do not
     // change the closure synchronously when the user leaves an alternate
     // scope, so bypass the selected-scope dispatcher here explicitly.
@@ -643,15 +839,16 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
       listingReadyRef.current = true
       setLoading(false)
     }
-    const cached = cachedScope === null
+    const cached = cachedScope === null || cachedPage !== undefined
       ? undefined
-      : listingCache.current.get(`${scopeCacheKey(documentScopeOf(cachedScope))}:${String(directoryId)}`)
+      : listingCache.current.get(listingKeyFor(documentScopeOf(cachedScope), directoryId))
     if (cached !== undefined) {
       setDocuments([...cached.documents])
       setDirectories([...cached.directories])
       setCurrentDirectoryId(cached.directoryId)
       setLimits(cached.limits)
       setTotalDocuments(cached.documents.length)
+      listingReadyRef.current = true
       setLoading(false)
     }
     if (scopeStatus !== 'ready') setScopeStatus('loading')
@@ -660,10 +857,12 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
       setScopeStatus('ready')
     }
     const scopeRequest = (scopeCache.current === null
-      ? readDocumentsScopeResult(signal)
+      ? readDocumentsScopeResult(requestSignal)
       : Promise.resolve({ scope: scopeCache.current, available: true as const })).then((result) => {
-      if (signal?.aborted || generation !== loadGeneration.current) return
+      if (requestSignal.aborted || generation !== loadGeneration.current) return
       if (result.available) {
+        const settledKey = settlePendingRuntimePages(documentScopeOf(result.scope), generation)
+        if (settledKey !== null) serverLoadedKey.current = settledKey
         setScope(result.scope)
         scopeCache.current = result.scope
         setScopeStatus('ready')
@@ -671,12 +870,12 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
         setScopeStatus('stale')
       }
     }).catch((cause: unknown) => {
-      if (signal?.aborted || generation !== loadGeneration.current) return
+      if (isAbortError(cause, requestSignal) || generation !== loadGeneration.current) return
       setScopeStatus('stale')
       if (cause instanceof UserDocHttpError) setError(documentErrorMessage(cause, t))
     })
     try {
-      const response = await userDocs.current.browse(directoryId, signal, queryForPage()) as {
+      const response = await userDocs.current.browse(directoryId, requestSignal, queryForPage()) as {
         readonly documents: readonly UserDocRef[]
         readonly directories?: readonly UserDocDirectoryRef[]
         readonly directoryId?: UserDocDirectoryIdType
@@ -685,9 +884,10 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
         readonly totalDocuments?: number
         readonly nextCursor?: string
       }
-      if (signal?.aborted || generation !== loadGeneration.current) return
+      if (requestSignal.aborted || generation !== loadGeneration.current) return
       if (isServerPage(response)) {
-        const key = listingKeyFor(runtimeScope(), directoryId)
+        const requestQuery = query.trim()
+        const requestSort = wireSort(parseSort(sortValue))
         const pageRecord: ServerPageRecord = {
           documents: response.documents,
           directories: response.directories ?? [],
@@ -697,8 +897,23 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
           totalDocuments: typeof response.totalDocuments === 'number' ? response.totalDocuments : null,
           ...(response.nextCursor === undefined ? {} : { nextCursor: response.nextCursor }),
         }
-        rememberServerPage(key, 1, pageRecord)
-        serverLoadedKey.current = key
+        const resolvedScope = scopeCache.current === null ? undefined : documentScopeOf(scopeCache.current)
+        if (resolvedScope !== undefined) {
+          const key = documentListingCacheKey(resolvedScope, directoryId, requestQuery, typeFilter, requestSort)
+          rememberServerPage(key, 1, pageRecord)
+          serverLoadedKey.current = key
+          pendingRuntimePages.current = null
+        } else {
+          pendingRuntimePages.current = {
+            generation,
+            directoryId,
+            query: requestQuery,
+            type: typeFilter,
+            sort: requestSort,
+            pages: new Map([[1, pageRecord]]),
+          }
+          serverLoadedKey.current = null
+        }
         applyServerPage(pageRecord)
         setPage(1)
         setServerPaging(true)
@@ -706,6 +921,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
         setServerNextCursor(pageRecord.nextCursor)
         serverPagingRef.current = true
       } else {
+        pendingRuntimePages.current = null
         const legacyResponse = response as unknown as {
           readonly documents: readonly UserDocRef[]
           readonly directories: readonly UserDocDirectoryRef[]
@@ -717,31 +933,51 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
         setCurrentDirectoryId(legacyResponse.directoryId)
         setLimits(legacyResponse.limits ?? null)
         setTotalDocuments(legacyResponse.documents.length)
-        listingCache.current.set(`${scopeCacheKey(cachedRuntimeScope())}:${String(legacyResponse.directoryId)}`, {
-          documents: [...legacyResponse.documents],
-          directories: [...legacyResponse.directories],
-          directoryId: legacyResponse.directoryId,
-          limits: legacyResponse.limits ?? null,
-        })
+        const resolvedScope = scopeCache.current === null ? undefined : documentScopeOf(scopeCache.current)
+        if (resolvedScope !== undefined) {
+          rememberLegacyListing(listingKeyFor(resolvedScope, legacyResponse.directoryId), {
+            documents: [...legacyResponse.documents],
+            directories: [...legacyResponse.directories],
+            directoryId: legacyResponse.directoryId,
+            limits: legacyResponse.limits ?? null,
+          })
+        }
       }
+      setScopeView(null)
+      setAlternateSource(null)
       listingReadyRef.current = true
     } catch (cause) {
-      if (signal?.aborted || generation !== loadGeneration.current) return
+      if (isAbortError(cause, requestSignal) || generation !== loadGeneration.current) return
       if (cause instanceof UserDocServiceUnavailableError) {
         setError(t('error.unavailable'))
       } else {
         setError(documentErrorMessage(cause, t))
       }
     } finally {
-      if (!signal?.aborted && generation === loadGeneration.current) setLoading(false)
+      // A superseded load still owns the component-lifetime listener even
+      // though it no longer owns loading state or the active controller.
+      unlinkAbortSignal()
+      if (generation === loadGeneration.current) {
+        setLoading(false)
+        setRefreshing(false)
+        finishListingRequest(listingRequest.controller)
+      }
     }
     await scopeRequest
   }
 
   const openOverview = async (force = false): Promise<boolean> => {
+    discardPendingRuntimePages()
     const key = overviewFilterKey()
     const generation = overviewRequestGeneration.current + 1
     overviewRequestGeneration.current = generation
+    const listingRequest = beginListingRequest()
+    const requestSignal = listingRequest.signal
+    loadGeneration.current += 1
+    serverRequestGeneration.current += 1
+    setPendingScopeLabel('')
+    setRefreshing(false)
+    clearSelection()
     setOverviewLoading(true)
     setOverviewError('')
     try {
@@ -756,9 +992,9 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
             query: query.trim(),
             type: typeFilter,
             sort: wireSort(parseSort(sortValue)),
-          })
-          : await userDocs.current.overview()
-      if (generation !== overviewRequestGeneration.current) return false
+          }, requestSignal)
+          : await userDocs.current.overview(requestSignal)
+      if (requestSignal.aborted || generation !== overviewRequestGeneration.current) return false
       overviewCache.current = { key, response }
       overviewLoadedKey.current = key
       setOverviewRows([...response.documents])
@@ -782,14 +1018,20 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
       return true
     } catch (cause) {
       if (generation === overviewRequestGeneration.current) overviewLoadedKey.current = null
-      setOverviewError(documentErrorMessage(cause, t))
+      if (!isAbortError(cause, requestSignal)) {
+        const message = documentErrorMessage(cause, t)
+        setOverviewError(message)
+        setError(message)
+      }
       return false
     } finally {
-      setOverviewLoading(false)
+      if (generation === overviewRequestGeneration.current) setOverviewLoading(false)
+      finishListingRequest(listingRequest.controller)
     }
   }
 
   const loadOverviewPage = async (requestedPage: number, cursor?: string): Promise<void> => {
+    discardPendingRuntimePages()
     const pageMethod = (userDocs.current as unknown as Record<string, unknown>).overviewPage
     if (typeof pageMethod !== 'function') {
       setOverviewPage(requestedPage)
@@ -799,6 +1041,9 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
     setOverviewError('')
     const generation = overviewRequestGeneration.current + 1
     overviewRequestGeneration.current = generation
+    const listingRequest = beginListingRequest()
+    const requestSignal = listingRequest.signal
+    serverRequestGeneration.current += 1
     const key = overviewFilterKey()
     try {
       const response = await (pageMethod as (query?: UserDocListQuery, signal?: AbortSignal) => Promise<UserDocCatalogOverview>)({
@@ -807,8 +1052,8 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
         type: typeFilter,
         sort: wireSort(parseSort(sortValue)),
         ...(cursor === undefined ? {} : { cursor }),
-      })
-      if (generation !== overviewRequestGeneration.current) return
+      }, requestSignal)
+      if (requestSignal.aborted || generation !== overviewRequestGeneration.current) return
       setOverviewRows([...response.documents])
       setOverviewNextCursor(response.nextCursor)
       setOverviewTotalDocuments(typeof response.totalDocuments === 'number' ? response.totalDocuments : null)
@@ -817,9 +1062,10 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
       overviewLoadedKey.current = key
       setOverviewServerPaging(true)
     } catch (cause) {
-      setOverviewError(documentErrorMessage(cause, t))
+      if (!isAbortError(cause, requestSignal)) setOverviewError(documentErrorMessage(cause, t))
     } finally {
-      setOverviewLoading(false)
+      if (generation === overviewRequestGeneration.current) setOverviewLoading(false)
+      finishListingRequest(listingRequest.controller)
     }
   }
 
@@ -838,10 +1084,17 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
   }
 
   const openTrash = async (cursor?: string, pageNumber = 1): Promise<boolean> => {
+    discardPendingRuntimePages()
     setTrashLoading(true)
     setError('')
     const generation = loadGeneration.current + 1
     loadGeneration.current = generation
+    const listingRequest = beginListingRequest()
+    const requestSignal = listingRequest.signal
+    serverRequestGeneration.current += 1
+    setPendingScopeLabel('')
+    setRefreshing(false)
+    clearSelection()
     if (cursor === undefined && pageNumber === 1) trashCursors.current = []
     try {
       const clientRecord = userDocs.current as unknown as Record<string, unknown>
@@ -856,7 +1109,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
             limit: PAGE_SIZE,
             ...(cursor === undefined ? {} : { cursor }),
             state: 'trash',
-          })
+          }, requestSignal)
           : await (pageMethod as (
             query?: UserDocListQuery,
             signal?: AbortSignal,
@@ -864,11 +1117,11 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
             limit: PAGE_SIZE,
             ...(cursor === undefined ? {} : { cursor }),
             state: 'trash',
-          })
+          }, requestSignal)
         : remoteScopeView
-          ? await userDocs.current.listTrashInScope(selectedScope)
-          : await userDocs.current.listTrash()
-      if (generation !== loadGeneration.current) return false
+          ? await userDocs.current.listTrashInScope(selectedScope, requestSignal)
+          : await userDocs.current.listTrash(requestSignal)
+      if (requestSignal.aborted || generation !== loadGeneration.current) return false
       setTrashDocuments([...response.documents])
       setTrashNextCursor('nextCursor' in response ? response.nextCursor : undefined)
       setTrashPage(pageNumber)
@@ -882,14 +1135,18 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
       setMobileSheet(null)
       return true
     } catch (cause) {
-      if (generation === loadGeneration.current) setError(documentErrorMessage(cause, t))
+      if (generation === loadGeneration.current && !isAbortError(cause, requestSignal)) {
+        setError(documentErrorMessage(cause, t))
+      }
       return false
     } finally {
       if (generation === loadGeneration.current) setTrashLoading(false)
+      finishListingRequest(listingRequest.controller)
     }
   }
 
   const openScopeView = async (target: UserDocScope, label: string): Promise<boolean> => {
+    discardPendingRuntimePages()
     overviewRequestGeneration.current += 1
     overviewLoadedKey.current = null
     const generation = loadGeneration.current + 1
@@ -900,9 +1157,47 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
       await load(ROOT_DIRECTORY_ID)
       return true
     }
-    setLoading(true)
+    const listingRequest = beginListingRequest()
+    const requestSignal = listingRequest.signal
+    const keepVisibleListing = listingReadyRef.current
+    setPendingScopeLabel(label)
+    setRefreshing(true)
+    clearSelection()
+    if (!keepVisibleListing) setLoading(true)
     setError('')
     serverRequestGeneration.current += 1
+    const project = target.kind === 'project'
+      ? scope.projects?.find(candidate => candidate.projectId === target.projectId)
+      : undefined
+    const mode = project?.mode ?? (target.kind === 'project' && scope.kind === 'project' && scope.projectId === target.projectId
+      ? scope.mode ?? 'rw'
+      : 'rw')
+    const nextScopeView: ScopeView = {
+      value: target.kind === 'personal' ? 'personal' : `project:${String(target.projectId)}`,
+      label,
+      scope: target,
+      mode,
+      canUpload: target.kind === 'personal' || mode === 'rw',
+    }
+    const cached = cachedRemoteListing(target)
+    if (cached !== undefined) {
+      applyServerPage(cached)
+      const cachedHasPaging = serverPages.current.get(remoteListingKey(target))?.get(1) !== undefined
+      setServerPaging(cachedHasPaging)
+      setServerTotalDocuments(cachedHasPaging ? cached.totalDocuments : null)
+      setServerNextCursor(cachedHasPaging ? cached.nextCursor : undefined)
+      serverPagingRef.current = cachedHasPaging
+      setScopeView(nextScopeView)
+      setAlternateSource(null)
+      setOverviewMode(false)
+      setTrashMode(false)
+      clearSelection()
+      setQuery('')
+      setPage(1)
+      setCurrentDirectoryId(ROOT_DIRECTORY_ID)
+      listingReadyRef.current = true
+      setLoading(false)
+    }
     try {
       const initialQuery: UserDocListQuery = {
         limit: PAGE_SIZE,
@@ -910,8 +1205,8 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
         type: typeFilter,
         sort: wireSort(parseSort(sortValue)),
       }
-      const response = await fetchScopeListing(target, ROOT_DIRECTORY_ID, initialQuery)
-      if (generation !== loadGeneration.current) return false
+      const response = await fetchScopeListing(target, ROOT_DIRECTORY_ID, initialQuery, requestSignal)
+      if (requestSignal.aborted || generation !== loadGeneration.current) return false
       const listed = response as {
         readonly documents: readonly (UserDocTransferListedDocument | UserDocRef)[]
         readonly directories?: readonly UserDocDirectoryRef[]
@@ -939,19 +1234,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
         serverPagingRef.current = false
       }
       setCurrentDirectoryId(ROOT_DIRECTORY_ID)
-      const project = target.kind === 'project'
-        ? scope.projects?.find(candidate => candidate.projectId === target.projectId)
-        : undefined
-      const mode = project?.mode ?? (target.kind === 'project' && scope.kind === 'project' && scope.projectId === target.projectId
-        ? scope.mode ?? 'rw'
-        : 'rw')
-      setScopeView({
-        value: target.kind === 'personal' ? 'personal' : `project:${String(target.projectId)}`,
-        label,
-        scope: target,
-        mode,
-        canUpload: target.kind === 'personal' || mode === 'rw',
-      })
+      setScopeView(nextScopeView)
       if (isServerPage(listed)) {
         const pageRecord: ServerPageRecord = {
           documents: nextDocuments,
@@ -962,11 +1245,16 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
           totalDocuments: typeof listed.totalDocuments === 'number' ? listed.totalDocuments : null,
           ...(listed.nextCursor === undefined ? {} : { nextCursor: listed.nextCursor }),
         }
-        const key = JSON.stringify({
-          scope: scopeCacheKey(target), directory: '', query: '', type: typeFilter, sort: wireSort(parseSort(sortValue)),
-        })
+        const key = emptyListingKey(target, ROOT_DIRECTORY_ID)
         rememberServerPage(key, 1, pageRecord)
         serverLoadedKey.current = key
+      } else {
+        rememberLegacyListing(emptyListingKey(target, ROOT_DIRECTORY_ID), {
+          documents: nextDocuments,
+          directories: listedDirectories,
+          directoryId: listed.directoryId ?? ROOT_DIRECTORY_ID,
+          limits: listed.limits ?? null,
+        })
       }
       setAlternateSource(null)
       setOverviewMode(false)
@@ -977,10 +1265,17 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
       listingReadyRef.current = true
       return true
     } catch (cause) {
-      if (generation === loadGeneration.current) setError(documentErrorMessage(cause, t))
+      if (generation === loadGeneration.current && !isAbortError(cause, requestSignal)) {
+        setError(documentErrorMessage(cause, t))
+      }
       return false
     } finally {
-      if (generation === loadGeneration.current) setLoading(false)
+      if (generation === loadGeneration.current) {
+        setLoading(false)
+        setRefreshing(false)
+        setPendingScopeLabel('')
+        finishListingRequest(listingRequest.controller)
+      }
     }
   }
 
@@ -993,12 +1288,22 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
     scopeCache.current = null
     const controller = new AbortController()
     void load(ROOT_DIRECTORY_ID, controller.signal)
-    return () => { controller.abort() }
+    return () => {
+      controller.abort()
+      listingController.current?.abort()
+      listingController.current = null
+    }
   }, [open])
 
   useEffect(() => {
     if (!open || !phone) setMobileSheet(null)
     if (!open) {
+      listingController.current?.abort()
+      listingController.current = null
+      listingReadyRef.current = false
+      setLoading(true)
+      setRefreshing(false)
+      setPendingScopeLabel('')
       setPreviewDoc(null)
       setDeleteTargets(null)
       setFolderEditor(null)
@@ -1051,6 +1356,11 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
 
   useEffect(() => {
     if (!open || overviewMode || trashMode || !listingReadyRef.current || !serverPagingRef.current) return
+    // The initial local page may arrive before account context. Its cursor
+    // chain is held separately until the scope is known; do not start a
+    // duplicate first-page request while that hand-off is pending.
+    const pending = pendingRuntimePages.current
+    if (pending !== null && pendingRuntimePageMatches(pending, loadGeneration.current, currentDirectoryId)) return
     const key = listingKey(currentDirectoryId)
     if (serverLoadedKey.current === key) return
     serverLoadedKey.current = key
@@ -1270,15 +1580,44 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
       void load(directoryId)
       return
     }
-    setLoading(true)
+    const listingRequest = beginListingRequest()
+    const requestSignal = listingRequest.signal
+    const keepVisibleListing = listingReadyRef.current
+    setPendingScopeLabel('')
+    setRefreshing(true)
+    if (!keepVisibleListing) setLoading(true)
     setError('')
     const generation = loadGeneration.current + 1
     loadGeneration.current = generation
     serverRequestGeneration.current += 1
+    const key = emptyListingKey(selectedScope, directoryId)
+    const cached: ServerPageRecord | undefined = serverPages.current.get(key)?.get(1)
+      ?? (() => {
+        const legacy = listingCache.current.get(key)
+        if (legacy === undefined) return undefined
+        return {
+          documents: legacy.documents,
+          directories: legacy.directories,
+          directoryId: legacy.directoryId,
+          limits: legacy.limits,
+          totalDocuments: legacy.documents.length,
+        }
+      })()
+    if (cached !== undefined) {
+      applyServerPage(cached)
+      setCurrentDirectoryId(cached.directoryId)
+      const cachedHasPaging = serverPages.current.get(key)?.get(1) !== undefined
+      setServerPaging(cachedHasPaging)
+      setServerTotalDocuments(cachedHasPaging ? cached.totalDocuments : null)
+      setServerNextCursor(cachedHasPaging ? cached.nextCursor : undefined)
+      serverPagingRef.current = cachedHasPaging
+      listingReadyRef.current = true
+      setLoading(false)
+    }
     void fetchScopeListing(selectedScope, directoryId, {
       limit: PAGE_SIZE, query: '', type: typeFilter, sort: wireSort(parseSort(sortValue)),
-    }).then((rawResponse) => {
-      if (generation !== loadGeneration.current) return
+    }, requestSignal).then((rawResponse) => {
+      if (requestSignal.aborted || generation !== loadGeneration.current) return
       const response = rawResponse as {
         readonly documents: readonly (UserDocTransferListedDocument | UserDocRef)[]
         readonly directories?: readonly UserDocDirectoryRef[]
@@ -1291,14 +1630,8 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
       const nextDirectoryId = response.directoryId ?? directoryId
       const nextDocuments = response.documents.map(document => ({ ...document, path: '' }))
       const nextDirectories = response.directories?.map(normalizeDirectoryRef) ?? []
-      const key = JSON.stringify({
-        scope: scopeCacheKey(selectedScope), directory: String(nextDirectoryId), query: '',
-        type: typeFilter, sort: wireSort(parseSort(sortValue)),
-      })
-      serverLoadedKey.current = JSON.stringify({
-        scope: scopeCacheKey(selectedScope), directory: String(nextDirectoryId), query: '',
-        type: typeFilter, sort: wireSort(parseSort(sortValue)),
-      })
+      const nextKey = emptyListingKey(selectedScope, nextDirectoryId)
+      serverLoadedKey.current = nextKey
       setDocuments(nextDocuments)
       setDirectories(nextDirectories)
       setCurrentDirectoryId(nextDirectoryId)
@@ -1314,13 +1647,19 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
           totalDocuments: typeof response.totalDocuments === 'number' ? response.totalDocuments : null,
           ...(response.nextCursor === undefined ? {} : { nextCursor: response.nextCursor }),
         }
-        rememberServerPage(key, 1, pageRecord)
-        serverLoadedKey.current = key
+        rememberServerPage(nextKey, 1, pageRecord)
+        serverLoadedKey.current = nextKey
         setServerPaging(true)
         setServerTotalDocuments(pageRecord.totalDocuments)
         setServerNextCursor(pageRecord.nextCursor)
         serverPagingRef.current = true
       } else {
+        rememberLegacyListing(emptyListingKey(selectedScope, nextDirectoryId), {
+          documents: nextDocuments,
+          directories: nextDirectories,
+          directoryId: nextDirectoryId,
+          limits: response.limits ?? null,
+        })
         setServerPaging(false)
         setServerTotalDocuments(null)
         setServerNextCursor(undefined)
@@ -1328,8 +1667,16 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
       }
       listingReadyRef.current = true
     }).catch((cause: unknown) => {
-      if (generation === loadGeneration.current) setError(documentErrorMessage(cause, t))
-    }).finally(() => { if (generation === loadGeneration.current) setLoading(false) })
+      if (generation === loadGeneration.current && !isAbortError(cause, requestSignal)) {
+        setError(documentErrorMessage(cause, t))
+      }
+    }).finally(() => {
+      if (generation === loadGeneration.current) {
+        setLoading(false)
+        setRefreshing(false)
+        finishListingRequest(listingRequest.controller)
+      }
+    })
   }
 
   const openCreateDirectory = () => {
@@ -1703,11 +2050,37 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
   const browseSource = async (value = sourcePickerValue): Promise<boolean> => {
     const option = sourceOptions.find(candidate => candidate.value === value)
     if (option === undefined) return false
+    discardPendingRuntimePages()
     setSourcePickerLoading(true)
     setError('')
     const generation = loadGeneration.current + 1
     loadGeneration.current = generation
+    const listingRequest = beginListingRequest()
+    const requestSignal = listingRequest.signal
+    const keepVisibleListing = listingReadyRef.current
+    setPendingScopeLabel(option.label)
+    setRefreshing(true)
+    clearSelection()
+    if (!keepVisibleListing) setLoading(true)
     serverRequestGeneration.current += 1
+    const cached = cachedRemoteListing(option.scope)
+    if (cached !== undefined) {
+      applyServerPage(cached)
+      const cachedHasPaging = serverPages.current.get(remoteListingKey(option.scope))?.get(1) !== undefined
+      setServerPaging(cachedHasPaging)
+      setServerTotalDocuments(cachedHasPaging ? cached.totalDocuments : null)
+      setServerNextCursor(cachedHasPaging ? cached.nextCursor : undefined)
+      serverPagingRef.current = cachedHasPaging
+      setCurrentDirectoryId(ROOT_DIRECTORY_ID)
+      setScopeView(null)
+      setAlternateSource(option)
+      setTrashMode(false)
+      clearSelection()
+      setQuery('')
+      setPage(1)
+      listingReadyRef.current = true
+      setLoading(false)
+    }
     try {
       const initialQuery: UserDocListQuery = {
         limit: PAGE_SIZE,
@@ -1715,8 +2088,8 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
         type: typeFilter,
         sort: wireSort(parseSort(sortValue)),
       }
-      const response = await fetchScopeListing(option.scope, ROOT_DIRECTORY_ID, initialQuery)
-      if (generation !== loadGeneration.current) return false
+      const response = await fetchScopeListing(option.scope, ROOT_DIRECTORY_ID, initialQuery, requestSignal)
+      if (requestSignal.aborted || generation !== loadGeneration.current) return false
       const listed = response as {
         readonly documents: readonly (UserDocTransferListedDocument | UserDocRef)[]
         readonly directories?: readonly UserDocDirectoryRef[]
@@ -1743,15 +2116,19 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
           totalDocuments: typeof listed.totalDocuments === 'number' ? listed.totalDocuments : null,
           ...(listed.nextCursor === undefined ? {} : { nextCursor: listed.nextCursor }),
         }
-        const key = JSON.stringify({
-          scope: scopeCacheKey(option.scope), directory: '', query: '', type: typeFilter, sort: wireSort(parseSort(sortValue)),
-        })
+        const key = emptyListingKey(option.scope, ROOT_DIRECTORY_ID)
         rememberServerPage(key, 1, pageRecord)
         serverLoadedKey.current = key
         setServerPaging(true)
         setServerTotalDocuments(pageRecord.totalDocuments)
         serverPagingRef.current = true
       } else {
+        rememberLegacyListing(emptyListingKey(option.scope, ROOT_DIRECTORY_ID), {
+          documents,
+          directories: listedDirectories,
+          directoryId: listed.directoryId ?? ROOT_DIRECTORY_ID,
+          limits: listed.limits ?? null,
+        })
         setServerPaging(false)
         setServerTotalDocuments(null)
         serverPagingRef.current = false
@@ -1767,14 +2144,22 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
       setSourcePickerOpen(false)
       return true
     } catch (error) {
-      if (generation === loadGeneration.current) setError(documentErrorMessage(error, t))
+      if (generation === loadGeneration.current && !isAbortError(error, requestSignal)) {
+        setError(documentErrorMessage(error, t))
+      }
       return false
     } finally {
-      if (generation === loadGeneration.current) setSourcePickerLoading(false)
+      if (generation === loadGeneration.current) {
+        setSourcePickerLoading(false)
+        setRefreshing(false)
+        setPendingScopeLabel('')
+        finishListingRequest(listingRequest.controller)
+      }
     }
   }
 
   const refreshDisplayed = async (): Promise<void> => {
+    discardPendingRuntimePages()
     listingCache.current.clear()
     // A mutation can change both the count and the cursor chain. Drop every
     // cached page before requesting the refreshed first page.
@@ -1788,12 +2173,15 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
     if (remoteScopeView) {
       const generation = loadGeneration.current + 1
       loadGeneration.current = generation
+      const listingRequest = beginListingRequest()
+      const requestSignal = listingRequest.signal
+      setRefreshing(true)
       serverRequestGeneration.current += 1
       try {
         const target = selectedScope
         const response = await fetchScopeListing(target, currentDirectoryId, {
           limit: PAGE_SIZE, query: '', type: typeFilter, sort: wireSort(parseSort(sortValue)),
-        }) as {
+        }, requestSignal) as {
           readonly documents: readonly (UserDocTransferListedDocument | UserDocRef)[]
           readonly directories?: readonly UserDocDirectoryRef[]
           readonly directoryId?: UserDocDirectoryIdType
@@ -1802,14 +2190,11 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
           readonly totalDocuments?: number
           readonly nextCursor?: string
         }
-        if (generation !== loadGeneration.current) return
+        if (requestSignal.aborted || generation !== loadGeneration.current) return
         const nextDirectoryId = response.directoryId ?? currentDirectoryId
         const nextDocuments = response.documents.map(document => ({ ...document, path: '' }))
         const nextDirectories = response.directories?.map(normalizeDirectoryRef) ?? []
-        const key = JSON.stringify({
-          scope: scopeCacheKey(target), directory: String(nextDirectoryId), query: '',
-          type: typeFilter, sort: wireSort(parseSort(sortValue)),
-        })
+        const key = emptyListingKey(target, nextDirectoryId)
         setDocuments(nextDocuments)
         setDirectories(nextDirectories)
         setCurrentDirectoryId(nextDirectoryId)
@@ -1832,6 +2217,12 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
           setServerNextCursor(pageRecord.nextCursor)
           serverPagingRef.current = true
         } else {
+          rememberLegacyListing(emptyListingKey(target, nextDirectoryId), {
+            documents: nextDocuments,
+            directories: nextDirectories,
+            directoryId: nextDirectoryId,
+            limits: response.limits ?? null,
+          })
           setServerPaging(false)
           setServerTotalDocuments(null)
           setServerNextCursor(undefined)
@@ -1842,7 +2233,14 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
         setQuery('')
         setPage(1)
       } catch (cause) {
-        if (generation === loadGeneration.current) setError(documentErrorMessage(cause, t))
+        if (generation === loadGeneration.current && !isAbortError(cause, requestSignal)) {
+          setError(documentErrorMessage(cause, t))
+        }
+      } finally {
+        if (generation === loadGeneration.current) {
+          setRefreshing(false)
+          finishListingRequest(listingRequest.controller)
+        }
       }
       return
     }
@@ -2554,8 +2952,8 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
           }}
         />
       )}
-      {(loading || overviewLoading || sourcePickerLoading) && (
-        <p className={css.sheetStatus} aria-live="polite">{t('modal.loading')}</p>
+      {(loading || refreshing || overviewLoading || sourcePickerLoading) && (
+        <p className={css.sheetStatus} aria-live="polite">{pendingScopeLabel === '' ? t('modal.loading') : t('scope.switch.loading', { name: pendingScopeLabel })}</p>
       )}
       {error !== '' && <div className={css.sheetError} role="alert">{error}</div>}
       {overviewError !== '' && mobileSheet.mode === 'view' && <div className={css.sheetError} role="alert">{overviewError}</div>}
@@ -2568,7 +2966,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
             : mobileSheet.mode === 'upload'
               ? option.value === uploadScopePickerValue
               : option.value === mobileScopeValue
-          const disabled = busy || loading || overviewLoading || sourcePickerLoading
+          const disabled = busy || overviewLoading || sourcePickerLoading
           return (
             <button
               key={option.value}
@@ -2824,17 +3222,17 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
           <aside className={css.scopeRail} aria-label={t('scope.rail.label')}>
             <div className={css.scopeRailHeading}>{t('scope.rail.title')}</div>
             {scopeStatus === 'stale' && <div className={css.scopeStale} role="status"><span>{t('scope.stale')}</span><button type="button" onClick={() => { scopeCache.current = null; void load(ROOT_DIRECTORY_ID) }}>{t('scope.retry')}</button></div>}
-            <button type="button" className={`${css.scopeItem} ${overviewMode ? css.scopeItemActive : ''}`} onClick={() => { void openOverview() }} disabled={busy || overviewLoading || loading}>
+            <button type="button" className={`${css.scopeItem} ${overviewMode ? css.scopeItemActive : ''}`} onClick={() => { void openOverview() }} disabled={busy || overviewLoading}>
               <span className={css.scopeItemIcon} aria-hidden="true"><IconBrowseOutline16 size={16} /></span>
               <span><strong>{t('scope.all')}</strong><small>{t('scope.all.description')}</small></span>
             </button>
-            <button type="button" className={`${css.scopeItem} ${!overviewMode && alternateSource === null && (scopeView?.scope.kind === 'personal' || (scopeView === null && scope.kind === 'personal')) ? css.scopeItemActive : ''}`} onClick={() => { void openScopeView({ kind: 'personal' }, t('copy.target.personal')) }} disabled={busy || loading || overviewLoading}>
+            <button type="button" className={`${css.scopeItem} ${!overviewMode && alternateSource === null && (scopeView?.scope.kind === 'personal' || (scopeView === null && scope.kind === 'personal')) ? css.scopeItemActive : ''}`} onClick={() => { void openScopeView({ kind: 'personal' }, t('copy.target.personal')) }} disabled={busy || overviewLoading}>
               <span className={css.scopeItemIcon} aria-hidden="true"><IconPaperclipOutline16 size={16} /></span>
               <span><strong>{t('copy.target.personal')}</strong><small>{t('scope.personal.description')}</small></span>
             </button>
             {(scope.projects ?? []).map((project) => {
               const isCurrent = !overviewMode && alternateSource === null && ((scopeView?.scope.kind === 'project' && scopeView.scope.projectId === project.projectId) || (scopeView === null && scope.kind === 'project' && scope.projectId === project.projectId))
-              return <button key={project.projectId} type="button" className={`${css.scopeItem} ${isCurrent ? css.scopeItemActive : ''}`} onClick={() => { void openScopeView({ kind: 'project', projectId: project.projectId }, project.name) }} disabled={busy || loading || overviewLoading}>
+              return <button key={project.projectId} type="button" className={`${css.scopeItem} ${isCurrent ? css.scopeItemActive : ''}`} onClick={() => { void openScopeView({ kind: 'project', projectId: project.projectId }, project.name) }} disabled={busy || overviewLoading}>
                 <span className={css.scopeItemIcon} aria-hidden="true"><IconFolderClose16 size={16} /></span>
                 <span><strong>{project.name}</strong><small>{t('scope.project.meta', { mode: projectModeLabel(project.mode, t), description: t('scope.project.description') })}</small></span>
               </button>
@@ -2851,7 +3249,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
                   data-testid="documents-scope-trigger"
                   aria-haspopup="dialog"
                   aria-expanded={mobileSheet?.kind === 'scope' && mobileSheet.mode === 'view'}
-                  disabled={busy || loading || overviewLoading}
+                  disabled={busy || overviewLoading}
                   onClick={() => { openMobileScopeSheet('view') }}
                 >
                   <span className={css.scopeItemIcon} aria-hidden="true"><IconBrowseOutline16 size={18} /></span>
@@ -3006,7 +3404,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
                       type="button"
                       className={css.crumb}
                       aria-current={index === directoryTrail.length - 1 ? 'page' : undefined}
-                      disabled={loading || index === directoryTrail.length - 1}
+                      disabled={(loading && !listingReadyRef.current) || index === directoryTrail.length - 1}
                       onClick={() => { navigate(crumb.directoryId) }}
                     >
                       {crumb.name}
@@ -3179,6 +3577,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
 
               <div className={css.caption}>
                 <span>{visibleScope}</span>
+                {refreshing && <span className={css.refreshingStatus} role="status" aria-live="polite">{pendingScopeLabel === '' ? t('modal.refreshing') : t('scope.switch.loading', { name: pendingScopeLabel })}</span>}
                 {!loading && <span>{t('modal.count', { count: String(totalDocuments ?? filtered.length) })}</span>}
               </div>
 
@@ -3239,7 +3638,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
                 </div>
               )}
 
-              {loading ? (
+              {loading && !listingReadyRef.current ? (
                 <div className={css.loadingState} role="status" aria-live="polite">
                   <span className={css.visuallyHidden}>{t('modal.loading')}</span>
                   {[0, 1, 2].map(index => <span key={index} className={css.loadingRow} aria-hidden="true" />)}
