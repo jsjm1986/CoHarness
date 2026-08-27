@@ -241,6 +241,134 @@ describe('DocumentsModal', () => {
     expect(screen.getByRole('button', { name: t('action.previewNamed', { name: 'report.pdf' }) })).toBeTruthy()
   })
 
+  it('keeps the current list visible and cancels a superseded scope request', async () => {
+    type ScopeResponse = {
+      directoryId: UserDocDirectoryIdType
+      directories: UserDocDirectoryRef[]
+      documents: ReturnType<typeof doc>[]
+      limits: UserDocLimits
+    }
+    const pending: Array<{ signal: AbortSignal | undefined; resolve: (response: ScopeResponse) => void }> = []
+    const browseScope = vi.fn((_scope: unknown, _directoryId: UserDocDirectoryIdType, signal?: AbortSignal) => (
+      new Promise<ScopeResponse>((resolve) => { pending.push({ signal, resolve }) })
+    ))
+    const client = Object.assign(makeClient(), { browseScope })
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        scope: { kind: 'personal' },
+        projects: [
+          { projectId: 41, name: 'Compiler', mode: 'ro' },
+          { projectId: 42, name: 'Payments', mode: 'rw' },
+        ],
+      }),
+    })))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText('report.pdf')
+
+    fireEvent.click(screen.getByRole('button', { name: /Compiler/ }))
+    await waitFor(() => { expect(browseScope).toHaveBeenCalledTimes(1) })
+    expect(screen.getByText('report.pdf')).toBeTruthy()
+    expect(document.querySelector(`.${modalCss.loadingState}`)).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: /Payments/ }))
+    await waitFor(() => { expect(browseScope).toHaveBeenCalledTimes(2) })
+    expect(pending[0]?.signal?.aborted).toBe(true)
+    expect(screen.getByText('report.pdf')).toBeTruthy()
+
+    pending[1]?.resolve({
+      directoryId: '' as UserDocDirectoryIdType,
+      directories: [],
+      documents: [doc({ docId: 'payments.txt', name: 'payments.txt', mediaType: 'text/plain' })],
+      limits,
+    })
+    await screen.findByText('payments.txt')
+    pending[0]?.resolve({
+      directoryId: '' as UserDocDirectoryIdType,
+      directories: [],
+      documents: [doc({ docId: 'compiler.txt', name: 'compiler.txt', mediaType: 'text/plain' })],
+      limits,
+    })
+    expect(screen.getByText('payments.txt')).toBeTruthy()
+  })
+
+  it('keeps the previous list when a scope request fails', async () => {
+    let rejectScope: (error: Error) => void = () => {}
+    const browseScope = vi.fn(() => new Promise<never>((_, reject) => { rejectScope = reject }))
+    const client = Object.assign(makeClient(), { browseScope })
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        scope: { kind: 'personal' },
+        projects: [{ projectId: 41, name: 'Compiler', mode: 'ro' }],
+      }),
+    })))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText('report.pdf')
+    fireEvent.click(screen.getByRole('button', { name: /Compiler/ }))
+    await waitFor(() => { expect(browseScope).toHaveBeenCalledTimes(1) })
+    rejectScope(new Error('scope unavailable'))
+    expect((await screen.findByRole('alert')).textContent).toContain('scope unavailable')
+    expect(screen.getByText('report.pdf')).toBeTruthy()
+    expect(document.querySelector(`.${modalCss.loadingState}`)).toBeNull()
+  })
+
+  it('shows a previously visited scope from cache while revalidating it', async () => {
+    const responses = new Map<number, ReturnType<typeof doc>[]>([
+      [41, [doc({ docId: 'compiler.txt', name: 'compiler.txt', mediaType: 'text/plain' })]],
+      [42, [doc({ docId: 'payments.txt', name: 'payments.txt', mediaType: 'text/plain' })]],
+    ])
+    type ScopedResponse = {
+      directoryId: UserDocDirectoryIdType
+      directories: UserDocDirectoryRef[]
+      documents: ReturnType<typeof doc>[]
+      limits: UserDocLimits
+    }
+    const pending: Array<{ projectId: number; resolve: (response: ScopedResponse) => void }> = []
+    const browseScope = vi.fn((target: { projectId: number }, _directoryId: UserDocDirectoryIdType, _signal?: AbortSignal) => (
+      new Promise<{
+        directoryId: UserDocDirectoryIdType
+        directories: UserDocDirectoryRef[]
+        documents: ReturnType<typeof doc>[]
+        limits: UserDocLimits
+      }>((resolve) => { pending.push({ projectId: target.projectId, resolve }) })
+    ))
+    const client = Object.assign(makeClient(), { browseScope })
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        scope: { kind: 'personal' },
+        projects: [
+          { projectId: 41, name: 'Compiler', mode: 'ro' },
+          { projectId: 42, name: 'Payments', mode: 'rw' },
+        ],
+      }),
+    })))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByText('report.pdf')
+
+    fireEvent.click(screen.getByRole('button', { name: /Compiler/ }))
+    await waitFor(() => { expect(pending).toHaveLength(1) })
+    pending.shift()?.resolve({ directoryId: '' as UserDocDirectoryIdType, directories: [], documents: responses.get(41)!, limits })
+    await screen.findByText('compiler.txt')
+
+    fireEvent.click(screen.getByRole('button', { name: /Payments/ }))
+    await waitFor(() => { expect(pending).toHaveLength(1) })
+    pending.shift()?.resolve({ directoryId: '' as UserDocDirectoryIdType, directories: [], documents: responses.get(42)!, limits })
+    await screen.findByText('payments.txt')
+
+    fireEvent.click(screen.getByRole('button', { name: /Compiler/ }))
+    await screen.findByText('compiler.txt')
+    expect(document.querySelector(`.${modalCss.loadingState}`)).toBeNull()
+    expect(screen.getByText(t('scope.switch.loading', { name: 'Compiler' }))).toBeTruthy()
+
+    pending.shift()?.resolve({ directoryId: '' as UserDocDirectoryIdType, directories: [], documents: responses.get(41)!, limits })
+    await waitFor(() => { expect(browseScope).toHaveBeenCalledTimes(3) })
+  })
+
   it('uploads directly to a writable selected scope without using the current runtime upload', async () => {
     const client = makeClient()
     vi.stubGlobal('fetch', vi.fn(async () => ({
@@ -1097,9 +1225,49 @@ describe('DocumentsModal', () => {
     expect(await screen.findByText('server-21.txt')).toBeTruthy()
     expect(client.browse).toHaveBeenLastCalledWith(
       '',
-      undefined,
+      expect.any(AbortSignal),
       { limit: 20, query: '', type: 'all', sort: 'date-desc', cursor: 'next-page' },
     )
+  })
+
+  it('keeps the initial cursor chain while runtime scope discovery is pending', async () => {
+    const firstPage = Array.from({ length: 20 }, (_, i) => doc({
+      docId: `pending/${String(i + 1).padStart(2, '0')}.txt`,
+      name: `pending-${String(i + 1).padStart(2, '0')}.txt`,
+      mediaType: 'text/plain',
+    }))
+    const last = doc({ docId: 'pending/21.txt', name: 'pending-21.txt', mediaType: 'text/plain' })
+    let resolveContext: (response: unknown) => void = () => {}
+    const context = new Promise<unknown>((resolve) => { resolveContext = resolve })
+    const client = makeClient()
+    client.browse.mockImplementation(async (_directory, _signal, request) => ({
+      directoryId: '' as UserDocDirectoryIdType,
+      directories: [],
+      documents: request?.cursor === 'next-page' ? [last] : firstPage,
+      limits,
+      totalDocuments: 21,
+      ...(request?.cursor === undefined ? { nextCursor: 'next-page' } : {}),
+    }))
+    vi.stubGlobal('fetch', vi.fn(async (url: RequestInfo) => {
+      const href = typeof url === 'string' ? url : url instanceof URL ? url.toString() : url.url
+      if (href.includes('/account/api/context')) return context
+      return { ok: true, json: async () => ({}) }
+    }))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    expect(await screen.findByText('pending-01.txt')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: t('pager.next') }))
+    expect(await screen.findByText('pending-21.txt')).toBeTruthy()
+    expect(client.browse).toHaveBeenCalledTimes(2)
+    expect(client.browse).toHaveBeenLastCalledWith(
+      '',
+      expect.any(AbortSignal),
+      { limit: 20, query: '', type: 'all', sort: 'date-desc', cursor: 'next-page' },
+    )
+    resolveContext({
+      ok: true,
+      json: async () => ({ scope: { kind: 'personal' }, projects: [] }),
+    })
   })
 
   it('keeps selected document metadata across server pages for batch actions', async () => {
