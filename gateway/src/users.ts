@@ -61,6 +61,27 @@ export class UserService {
     return row === undefined ? null : toUserRow(row as never)
   }
 
+  /** Atomically update administrator-editable fields for one user. */
+  patch(id: number, next: { role?: 'admin' | 'user'; status?: 'active' | 'disabled'; displayName?: string }): void {
+    this.db.transaction(() => {
+      const current = this.db.prepare(`SELECT role, status FROM users WHERE id = ? AND deleted_at IS NULL`)
+        .get(id) as { role: 'admin' | 'user'; status: 'active' | 'disabled' } | undefined
+      if (current === undefined) return
+      this.assertNotLastAdmin(id, { role: next.role, status: next.status })
+      const role = next.role ?? current.role
+      const status = next.status ?? current.status
+      const displayName = next.displayName
+      if (displayName === undefined) {
+        this.db.prepare(`UPDATE users SET role = ?, status = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`)
+          .run(role, status, Date.now(), id)
+      } else {
+        this.db.prepare(`UPDATE users SET role = ?, status = ?, display_name = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`)
+          .run(role, status, displayName, Date.now(), id)
+      }
+      if (status === 'disabled') this.db.prepare(`DELETE FROM auth_sessions WHERE user_id = ?`).run(id)
+    })()
+  }
+
   setStatus(id: number, status: 'active' | 'disabled'): void {
     this.assertNotLastAdmin(id, { status })
     this.db.prepare(`UPDATE users SET status = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`).run(status, Date.now(), id)

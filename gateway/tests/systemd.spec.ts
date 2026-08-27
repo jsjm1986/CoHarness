@@ -82,7 +82,7 @@ describe('renderUserUnit', () => {
   })
 
   it('substitutes the port into ExecStart and applies resource limits', () => {
-    expect(unit).toContain('ExecStart=/usr/local/bin/node /opt/dsh/lib/bin.js web --no-open --port 42001')
+    expect(unit).toContain('ExecStart="/usr/local/bin/node" "/opt/dsh/lib/bin.js" "web" "--no-open" "--port" "42001"')
     expect(unit).toContain('MemoryMax=1G')
     expect(unit).toContain('CPUQuota=100%')
   })
@@ -114,5 +114,13 @@ describe('renderUserUnit', () => {
     expect(project).toContain('BindPaths=/data/projects/compiler')
     expect(project).toContain('BindPaths=/srv/harness/project-runtimes/41/dsh')
     expect(project).not.toContain('BindPaths=/data/projects/other')
+  })
+
+  it('quotes argv fields so spaces and dollar signs cannot change systemd parsing', () => {
+    const unit = renderUserUnit(ALICE, grants, {
+      ...OPTS,
+      execStart: ['/opt/My Harness/bin/node', '--title=hello world', '$HOME', '--port={port}'],
+    })
+    expect(unit).toContain('ExecStart="/opt/My Harness/bin/node" "--title=hello world" "$$HOME" "--port=42001"')
   })
 })

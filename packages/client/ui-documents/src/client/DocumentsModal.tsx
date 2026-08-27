@@ -21,11 +21,14 @@ import {
   useMediaQuery,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import {
-  createUserDocClient, readDocumentsScope, UserDocHttpError, UserDocServiceUnavailableError,
+  createUserDocClient, readDocumentsScopeResult, UserDocHttpError, UserDocServiceUnavailableError,
   type DocumentsWorkspaceScope, type UserDocDirectoryIdType, type UserDocDirectoryRef, type UserDocIdType,
-  type UserDocCatalogHistoryItem, type UserDocCatalogRow, type UserDocLimits, type UserDocRef, type UserDocScope,
+  type UserDocCatalogHistoryItem, type UserDocCatalogOverview, type UserDocCatalogRow, type UserDocLimits,
+  type UserDocRef, type UserDocScope,
+  type UserDocListQuery,
   type UserDocUploadPhase,
   type UserDocTransferListedDocument, type UserDocTransferResponse,
+  type UserDocTrashRef,
 } from './documents-client.ts'
 import { DocumentPreview } from './DocumentPreview.tsx'
 import { DocumentsMobileSheet } from './DocumentsMobileSheet.tsx'
@@ -52,6 +55,8 @@ export interface DocumentsModalProps {
   open: boolean
   onClose: () => void
   t: (key: DocumentsKey, params?: Record<string, string>) => string
+  /** Presentation intent: full management or choosing documents for a draft. */
+  mode?: 'manage' | 'select'
   /** Attach one existing durable document to the current conversation. */
   onAttachDocument?: (document: UserDocRef) => boolean
 }
@@ -79,6 +84,9 @@ function documentErrorMessage(error: unknown, t: (key: DocumentsKey) => string):
     if (error.code === 'INSTANCE_UNREACHABLE' || error.code === 'COLLABORATION_UNAVAILABLE') {
       return t('error.runtimeUnavailable')
     }
+    if (error.code === 'DOCUMENT_LIST_QUERY') return t('error.listQuery')
+    if (error.code === 'DOCUMENT_TRASH_NOT_FOUND') return t('error.trashUnavailable')
+    if (error.code === 'DOCUMENT_RESTORE_CONFLICT') return t('trash.restore.error')
   }
   return error instanceof Error ? error.message : String(error)
 }
@@ -105,6 +113,26 @@ interface SourceOption {
   mode: 'ro' | 'rw'
 }
 
+/** Compatibility view for a client record that may expose alternate-scope browsing. */
+type BrowseScopeFunction = (
+  scope: UserDocScope,
+  directoryId: UserDocDirectoryIdType,
+  signal?: AbortSignal,
+  query?: UserDocListQuery,
+) => Promise<{
+  readonly documents: readonly UserDocRef[]
+  readonly directories: readonly UserDocDirectoryRef[]
+  readonly directoryId: UserDocDirectoryIdType
+  readonly limits?: UserDocLimits
+  readonly parentDirectoryId?: UserDocDirectoryIdType
+  readonly totalDocuments?: number
+  readonly nextCursor?: string
+}>
+
+function browseScopeOf(value: unknown): BrowseScopeFunction | undefined {
+  return typeof value === 'function' ? value as BrowseScopeFunction : undefined
+}
+
 /** Metadata-only view selected from the workbench scope rail. */
 interface ScopeView {
   value: string
@@ -113,6 +141,10 @@ interface ScopeView {
   mode: 'ro' | 'rw'
   canUpload: boolean
 }
+
+type MobileScopeOption =
+  | { value: string; label: string; description: string; kind: 'all' | 'personal' | 'source' }
+  | { value: string; label: string; description: string; kind: 'project'; projectId: number }
 
 interface OverviewCopyTarget {
   readonly row: UserDocCatalogRow
@@ -126,8 +158,18 @@ interface FailedCopyItem {
   readonly target: UserDocScope
 }
 
+interface ServerPageRecord {
+  readonly documents: readonly UserDocRef[]
+  readonly directories: readonly UserDocDirectoryRef[]
+  readonly directoryId: UserDocDirectoryIdType
+  readonly parentDirectoryId?: UserDocDirectoryIdType
+  readonly limits: UserDocLimits | null
+  readonly totalDocuments: number | null
+  readonly nextCursor?: string
+}
+
 type MobileSheetState =
-  | { kind: 'scope'; mode: 'view' | 'source'; query: string }
+  | { kind: 'scope'; mode: 'view' | 'source' | 'upload'; query: string }
   | { kind: 'more' }
   | { kind: 'document'; document: UserDocRef }
   | { kind: 'directory'; directory: UserDocDirectoryRef }
@@ -136,8 +178,39 @@ type MobileSheetState =
 
 const MAX_PREVIEW_TEXT_BYTES = 256 * 1024
 const ROOT_DIRECTORY_ID = '' as UserDocDirectoryIdType
+const MAX_SERVER_PAGE_CACHE_KEYS = 24
+const MAX_SERVER_PAGES_PER_KEY = 8
 
 const DEFAULT_SORT: DocumentSort = { key: 'date', dir: 'desc' }
+
+/** Wire sort value used by the paged document endpoint. */
+function wireSort(sort: DocumentSort): NonNullable<UserDocListQuery['sort']> {
+  const key = sort.key === 'date' ? 'date' : sort.key === 'name' ? 'name' : 'size'
+  return `${key}-${sort.dir}`
+}
+
+/** Stable key for a scope so page caches never cross an authorization context. */
+function scopeCacheKey(value: UserDocScope): string {
+  return value.kind === 'personal' ? 'personal' : `project:${String(value.projectId)}`
+}
+
+/** Compare scope identities without depending on display labels or modes. */
+function sameDocumentScope(left: UserDocScope, right: UserDocScope): boolean {
+  if (left.kind !== right.kind) return false
+  return left.kind === 'personal' || (right.kind === 'project' && left.projectId === right.projectId)
+}
+
+function documentScopeOf(value: DocumentsWorkspaceScope): UserDocScope {
+  return value.kind === 'project' && value.projectId !== undefined
+    ? { kind: 'project', projectId: value.projectId }
+    : { kind: 'personal' }
+}
+
+function catalogRowScope(row: UserDocCatalogRow): UserDocScope {
+  return row.scope.kind === 'project' && row.scope.id !== undefined
+    ? { kind: 'project', projectId: row.scope.id }
+    : { kind: 'personal' }
+}
 
 const SORT_OPTIONS: readonly { value: string; key: DocumentSortKey; dir: DocumentSortDir; label: DocumentsKey }[] = [
   { value: 'date:desc', key: 'date', dir: 'desc', label: 'modal.sort.dateDesc' },
@@ -194,6 +267,14 @@ function overviewMetaLabel(
   })
 }
 
+function trashMetaLabel(
+  document: UserDocTrashRef,
+  t: (key: DocumentsKey, params?: Record<string, string>) => string,
+): string {
+  const days = Math.max(0, Math.ceil((document.purgeAfter - Date.now()) / 86_400_000))
+  return t('trash.meta', { date: getDateGroup(document.trashedAt, t('date.unknown')), days: String(days) })
+}
+
 function breadcrumbs(directoryId: UserDocDirectoryIdType, rootName: string): Breadcrumb[] {
   const result: Breadcrumb[] = [{ directoryId: ROOT_DIRECTORY_ID, name: rootName }]
   const path: string[] = []
@@ -202,6 +283,20 @@ function breadcrumbs(directoryId: UserDocDirectoryIdType, rootName: string): Bre
     result.push({ directoryId: path.join('/') as UserDocDirectoryIdType, name: segment })
   }
   return result
+}
+
+function normalizeDirectoryRef(value: {
+  readonly directoryId: string
+  readonly name: string
+  readonly path?: string
+  readonly modifiedAt?: number
+}): UserDocDirectoryRef {
+  return {
+    directoryId: value.directoryId as UserDocDirectoryIdType,
+    name: value.name,
+    path: value.path ?? '',
+    modifiedAt: value.modifiedAt ?? 0,
+  }
 }
 
 /**
@@ -213,13 +308,15 @@ function breadcrumbs(directoryId: UserDocDirectoryIdType, rootName: string): Bre
  * @param props.onAttachDocument - optional callback for adding an existing document to the composer.
  * @returns the manager dialog plus nested delete-confirm and preview dialogs.
  */
-export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAttachDocument }) => {
+export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode = 'manage', onAttachDocument }) => {
   const phone = useMediaQuery('(max-width: 767px)')
   const [documents, setDocuments] = useState<UserDocRef[]>([])
   const [directories, setDirectories] = useState<UserDocDirectoryRef[]>([])
   const [currentDirectoryId, setCurrentDirectoryId] = useState<UserDocDirectoryIdType>(ROOT_DIRECTORY_ID)
   const [limits, setLimits] = useState<UserDocLimits | null>(null)
+  const [totalDocuments, setTotalDocuments] = useState<number | null>(null)
   const [scope, setScope] = useState<DocumentsWorkspaceScope>({ kind: 'personal' })
+  const [scopeStatus, setScopeStatus] = useState<'loading' | 'ready' | 'stale'>('loading')
   const [scopeView, setScopeView] = useState<ScopeView | null>(null)
   const [alternateSource, setAlternateSource] = useState<SourceOption | null>(null)
   const [sourcePickerOpen, setSourcePickerOpen] = useState(false)
@@ -231,12 +328,14 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
   const [uploadScopePickerQuery, setUploadScopePickerQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
   const [modalError, setModalError] = useState('')
   const [query, setQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<DocumentTypeFilter>('all')
   const [sortValue, setSortValue] = useState('date:desc')
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
+  const [selectedRecords, setSelectedRecords] = useState<Map<string, UserDocRef>>(() => new Map())
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState<UploadProgress | null>(null)
   const [dropActive, setDropActive] = useState(false)
@@ -261,6 +360,11 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
   const [previewDoc, setPreviewDoc] = useState<UserDocRef | null>(null)
   const [overviewMode, setOverviewMode] = useState(false)
   const [overviewRows, setOverviewRows] = useState<UserDocCatalogRow[]>([])
+  const [overviewPage, setOverviewPage] = useState(1)
+  const [overviewServerPaging, setOverviewServerPaging] = useState(false)
+  const [overviewTotalDocuments, setOverviewTotalDocuments] = useState<number | null>(null)
+  const [overviewNextCursor, setOverviewNextCursor] = useState<string | undefined>()
+  const overviewCursors = useRef<string[]>([])
   const [overviewLoading, setOverviewLoading] = useState(false)
   const [overviewCopyRow, setOverviewCopyRow] = useState<OverviewCopyTarget | null>(null)
   const [overviewError, setOverviewError] = useState('')
@@ -268,33 +372,359 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyItems, setHistoryItems] = useState<UserDocCatalogHistoryItem[]>([])
   const [mobileSheet, setMobileSheet] = useState<MobileSheetState | null>(null)
+  const [trashMode, setTrashMode] = useState(false)
+  const [trashDocuments, setTrashDocuments] = useState<UserDocTrashRef[]>([])
+  const [trashLoading, setTrashLoading] = useState(false)
+  const [trashNextCursor, setTrashNextCursor] = useState<string | undefined>()
+  const [trashPage, setTrashPage] = useState(1)
+  const trashCursors = useRef<string[]>([])
+  const [purgeTarget, setPurgeTarget] = useState<UserDocTrashRef | null>(null)
+  /** Whether the current provider answered with the cursor-based listing contract. */
+  const [serverPaging, setServerPaging] = useState(false)
+  const [serverTotalDocuments, setServerTotalDocuments] = useState<number | null>(null)
+  const [serverNextCursor, setServerNextCursor] = useState<string | undefined>()
+  const serverPagingRef = useRef(false)
+  const listingReadyRef = useRef(false)
+  const serverPages = useRef(new Map<string, Map<number, ServerPageRecord>>())
+  const serverRequestGeneration = useRef(0)
+  const serverLoadedKey = useRef<string | null>(null)
+  const overviewRequestGeneration = useRef(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const headerCheckRef = useRef<HTMLInputElement>(null)
   const dragDepth = useRef(0)
   const loadGeneration = useRef(0)
   const userDocs = useRef(createUserDocClient())
+  const listingCache = useRef(new Map<string, {
+    readonly documents: readonly UserDocRef[]
+    readonly directories: readonly UserDocDirectoryRef[]
+    readonly directoryId: UserDocDirectoryIdType
+    readonly limits: UserDocLimits | null
+  }>())
+  const scopeCache = useRef<DocumentsWorkspaceScope | null>(null)
+  const overviewCache = useRef<{ readonly key: string; readonly response: UserDocCatalogOverview } | null>(null)
+  const overviewLoadedKey = useRef<string | null>(null)
+
+  const rememberServerPage = (key: string, pageNumber: number, record: ServerPageRecord): void => {
+    let pages = serverPages.current.get(key)
+    if (pages === undefined) {
+      pages = new Map<number, ServerPageRecord>()
+      serverPages.current.set(key, pages)
+    }
+    pages.set(pageNumber, record)
+    while (pages.size > MAX_SERVER_PAGES_PER_KEY) {
+      const keys = [...pages.keys()]
+      const oldest = keys.find(value => value !== 1) ?? keys[0]
+      if (oldest === undefined) break
+      pages.delete(oldest)
+    }
+    while (serverPages.current.size > MAX_SERVER_PAGE_CACHE_KEYS) {
+      const oldestKey = serverPages.current.keys().next().value
+      if (oldestKey === undefined || oldestKey === key) break
+      serverPages.current.delete(oldestKey)
+    }
+  }
+
+  const runtimeScope = (): UserDocScope => documentScopeOf(scope)
+
+  const cachedRuntimeScope = (): UserDocScope => scopeCache.current === null
+    ? { kind: 'personal' }
+    : documentScopeOf(scopeCache.current)
+
+  const listingScope = (): UserDocScope => scopeView?.scope ?? alternateSource?.scope ?? runtimeScope()
+
+  const overviewFilterKey = (): string => JSON.stringify({
+    query: query.trim(),
+    type: typeFilter,
+    sort: wireSort(parseSort(sortValue)),
+  })
+
+  const clearSelection = (): void => {
+    setSelected(new Set())
+    setSelectedRecords(new Map())
+  }
+
+  const selectedDocumentList = (): UserDocRef[] => {
+    const result: UserDocRef[] = []
+    for (const id of selected) {
+      const document = selectedRecords.get(id) ?? documents.find(candidate => candidate.docId === id)
+      if (document !== undefined) result.push(document)
+    }
+    return result
+  }
+
+  const listingKeyFor = (target: UserDocScope, directoryId: UserDocDirectoryIdType): string => JSON.stringify({
+    scope: scopeCacheKey(target),
+    directory: String(directoryId),
+    query: query.trim(),
+    type: typeFilter,
+    sort: wireSort(parseSort(sortValue)),
+  })
+
+  const listingKey = (directoryId: UserDocDirectoryIdType): string => listingKeyFor(
+    scopeView?.scope ?? alternateSource?.scope ?? cachedRuntimeScope(), directoryId,
+  )
+
+  const queryForPage = (cursor?: string): UserDocListQuery => ({
+    limit: PAGE_SIZE,
+    query: query.trim(),
+    type: typeFilter,
+    sort: wireSort(parseSort(sortValue)),
+    ...(cursor === undefined ? {} : { cursor }),
+  })
+
+  /**
+   * Request one directory from an explicitly selected scope.
+   *
+   * `browseScope` is the full browser contract. Older clients only expose the
+   * metadata transfer listing, whose extra arguments are intentionally ignored;
+   * keeping that fallback here means folder navigation does not become a
+   * dead-end when a runtime is upgraded before the browser bundle.
+   */
+  const fetchScopeListing = async (
+    target: UserDocScope,
+    directoryId: UserDocDirectoryIdType,
+    listingQuery: UserDocListQuery,
+    signal?: AbortSignal,
+  ): Promise<unknown> => {
+    const clientRecord = userDocs.current as unknown as Record<string, unknown>
+    const browseScope = browseScopeOf(clientRecord.browseScope)
+    if (browseScope !== undefined) return browseScope(target, directoryId, signal, listingQuery)
+    const client = userDocs.current
+    const listScope = client.listScope.bind(client)
+    // Older metadata-only clients expose a one-argument function. Preserve its
+    // exact call shape; newer clients advertise the directory/query form.
+    return listScope.length >= 2
+      ? listScope(target, signal, directoryId, listingQuery)
+      : listScope(target)
+  }
+
+  const isServerPage = (value: unknown): value is {
+    readonly documents: readonly UserDocRef[]
+    readonly directories?: readonly UserDocDirectoryRef[]
+    readonly directoryId?: UserDocDirectoryIdType
+    readonly parentDirectoryId?: UserDocDirectoryIdType
+    readonly limits?: UserDocLimits
+    readonly totalDocuments?: number
+    readonly nextCursor?: string
+  } => {
+    if (value === null || typeof value !== 'object') return false
+    const candidate = value as Record<string, unknown>
+    return Array.isArray(candidate.documents)
+      && (Object.hasOwn(candidate, 'totalDocuments') || Object.hasOwn(candidate, 'nextCursor'))
+  }
+
+  const fetchListingPage = async (
+    directoryId: UserDocDirectoryIdType,
+    listingQuery: UserDocListQuery,
+    signal?: AbortSignal,
+  ): Promise<unknown> => {
+    const target = listingScope()
+    const remote = scopeView !== null || alternateSource !== null
+    if (!remote) return userDocs.current.browse(directoryId, signal, listingQuery)
+    return fetchScopeListing(target, directoryId, listingQuery, signal)
+  }
+
+  const applyServerPage = (pageRecord: ServerPageRecord): void => {
+    setDocuments([...pageRecord.documents])
+    setDirectories([...pageRecord.directories])
+    setCurrentDirectoryId(pageRecord.directoryId)
+    setLimits(pageRecord.limits)
+    setTotalDocuments(pageRecord.totalDocuments)
+    setServerTotalDocuments(pageRecord.totalDocuments)
+    setServerNextCursor(pageRecord.nextCursor)
+  }
+
+  const loadServerPage = async (
+    requestedPage: number,
+    directoryId: UserDocDirectoryIdType = currentDirectoryId,
+    force = false,
+  ): Promise<boolean> => {
+    const generation = serverRequestGeneration.current + 1
+    serverRequestGeneration.current = generation
+    const key = listingKey(directoryId)
+    serverLoadedKey.current = key
+    let pagesForKey = serverPages.current.get(key)
+    if (pagesForKey === undefined || force) {
+      pagesForKey = new Map<number, ServerPageRecord>()
+      serverPages.current.set(key, pagesForKey)
+    }
+    const cached = force ? undefined : pagesForKey.get(requestedPage)
+    setLoading(true)
+    setError('')
+    setNotice('')
+    try {
+      let pageRecord = cached
+      if (pageRecord === undefined) {
+        let cursor: string | undefined
+        if (requestedPage > 1) {
+          const previous = pagesForKey.get(requestedPage - 1)
+          cursor = previous?.nextCursor
+          // The visible pager advances one page at a time, so a missing
+          // predecessor means the continuation chain is no longer usable.
+          if (cursor === undefined) {
+            if (serverLoadedKey.current === key) serverLoadedKey.current = null
+            return false
+          }
+        }
+        const response = await fetchListingPage(directoryId, queryForPage(cursor)) as {
+          readonly documents: readonly UserDocRef[]
+          readonly directories?: readonly UserDocDirectoryRef[]
+          readonly directoryId?: UserDocDirectoryIdType
+          readonly parentDirectoryId?: UserDocDirectoryIdType
+          readonly limits?: UserDocLimits
+          readonly totalDocuments?: number
+          readonly nextCursor?: string
+        }
+        if (!isServerPage(response)) {
+          if (serverLoadedKey.current === key) serverLoadedKey.current = null
+          return false
+        }
+        const existingDirectories = pagesForKey.get(1)?.directories ?? []
+        pageRecord = {
+          documents: response.documents,
+          directories: response.directories ?? existingDirectories,
+          directoryId: response.directoryId ?? directoryId,
+          ...(response.parentDirectoryId === undefined ? {} : { parentDirectoryId: response.parentDirectoryId }),
+          limits: response.limits ?? (scopeView === null && alternateSource === null ? limits : null),
+          totalDocuments: typeof response.totalDocuments === 'number' ? response.totalDocuments : null,
+          ...(response.nextCursor === undefined ? {} : { nextCursor: response.nextCursor }),
+        }
+        rememberServerPage(key, requestedPage, pageRecord)
+      }
+      if (generation !== serverRequestGeneration.current) return false
+      applyServerPage(pageRecord)
+      setPage(requestedPage)
+      serverPagingRef.current = true
+      setServerPaging(true)
+      listingReadyRef.current = true
+      return true
+    } catch (cause) {
+      if (generation !== serverRequestGeneration.current) return false
+      if (serverLoadedKey.current === key) serverLoadedKey.current = null
+      setError(documentErrorMessage(cause, t))
+      return false
+    } finally {
+      if (generation === serverRequestGeneration.current) setLoading(false)
+    }
+  }
 
   const load = async (directoryId: UserDocDirectoryIdType = currentDirectoryId, signal?: AbortSignal) => {
     setMobileSheet(null)
+    overviewRequestGeneration.current += 1
+    overviewLoadedKey.current = null
     const generation = loadGeneration.current + 1
     loadGeneration.current = generation
     setLoading(true)
     setError('')
+    setNotice('')
     setOverviewMode(false)
+    setTrashMode(false)
     setScopeView(null)
     setAlternateSource(null)
     setUploadScopePickerOpen(false)
-    try {
-      const [response, nextScope] = await Promise.all([
-        userDocs.current.browse(directoryId, signal),
-        readDocumentsScope(signal),
-      ])
+    serverRequestGeneration.current += 1
+    serverPagingRef.current = false
+    listingReadyRef.current = false
+    setServerPaging(false)
+    setServerTotalDocuments(null)
+    setServerNextCursor(undefined)
+    // `load` is always the active runtime path. State setters below do not
+    // change the closure synchronously when the user leaves an alternate
+    // scope, so bypass the selected-scope dispatcher here explicitly.
+    const cachedScope = scopeCache.current
+    const cachedPage = cachedScope === null
+      ? undefined
+      : serverPages.current.get(listingKeyFor(documentScopeOf(cachedScope), directoryId))?.get(1)
+    if (cachedPage !== undefined) {
+      applyServerPage(cachedPage)
+      setServerPaging(true)
+      setServerTotalDocuments(cachedPage.totalDocuments)
+      serverPagingRef.current = true
+      listingReadyRef.current = true
+      setLoading(false)
+    }
+    const cached = cachedScope === null
+      ? undefined
+      : listingCache.current.get(`${scopeCacheKey(documentScopeOf(cachedScope))}:${String(directoryId)}`)
+    if (cached !== undefined) {
+      setDocuments([...cached.documents])
+      setDirectories([...cached.directories])
+      setCurrentDirectoryId(cached.directoryId)
+      setLimits(cached.limits)
+      setTotalDocuments(cached.documents.length)
+      setLoading(false)
+    }
+    if (scopeStatus !== 'ready') setScopeStatus('loading')
+    if (scopeCache.current !== null) {
+      setScope(scopeCache.current)
+      setScopeStatus('ready')
+    }
+    const scopeRequest = (scopeCache.current === null
+      ? readDocumentsScopeResult(signal)
+      : Promise.resolve({ scope: scopeCache.current, available: true as const })).then((result) => {
       if (signal?.aborted || generation !== loadGeneration.current) return
-      setDocuments([...response.documents])
-      setDirectories([...response.directories])
-      setCurrentDirectoryId(response.directoryId)
-      setLimits(response.limits)
-      setScope(nextScope)
+      if (result.available) {
+        setScope(result.scope)
+        scopeCache.current = result.scope
+        setScopeStatus('ready')
+      } else {
+        setScopeStatus('stale')
+      }
+    }).catch((cause: unknown) => {
+      if (signal?.aborted || generation !== loadGeneration.current) return
+      setScopeStatus('stale')
+      if (cause instanceof UserDocHttpError) setError(documentErrorMessage(cause, t))
+    })
+    try {
+      const response = await userDocs.current.browse(directoryId, signal, queryForPage()) as {
+        readonly documents: readonly UserDocRef[]
+        readonly directories?: readonly UserDocDirectoryRef[]
+        readonly directoryId?: UserDocDirectoryIdType
+        readonly parentDirectoryId?: UserDocDirectoryIdType
+        readonly limits?: UserDocLimits
+        readonly totalDocuments?: number
+        readonly nextCursor?: string
+      }
+      if (signal?.aborted || generation !== loadGeneration.current) return
+      if (isServerPage(response)) {
+        const key = listingKeyFor(runtimeScope(), directoryId)
+        const pageRecord: ServerPageRecord = {
+          documents: response.documents,
+          directories: response.directories ?? [],
+          directoryId: response.directoryId ?? directoryId,
+          ...(response.parentDirectoryId === undefined ? {} : { parentDirectoryId: response.parentDirectoryId }),
+          limits: response.limits ?? null,
+          totalDocuments: typeof response.totalDocuments === 'number' ? response.totalDocuments : null,
+          ...(response.nextCursor === undefined ? {} : { nextCursor: response.nextCursor }),
+        }
+        rememberServerPage(key, 1, pageRecord)
+        serverLoadedKey.current = key
+        applyServerPage(pageRecord)
+        setPage(1)
+        setServerPaging(true)
+        setServerTotalDocuments(pageRecord.totalDocuments)
+        setServerNextCursor(pageRecord.nextCursor)
+        serverPagingRef.current = true
+      } else {
+        const legacyResponse = response as unknown as {
+          readonly documents: readonly UserDocRef[]
+          readonly directories: readonly UserDocDirectoryRef[]
+          readonly directoryId: UserDocDirectoryIdType
+          readonly limits?: UserDocLimits
+        }
+        setDocuments([...legacyResponse.documents])
+        setDirectories([...legacyResponse.directories])
+        setCurrentDirectoryId(legacyResponse.directoryId)
+        setLimits(legacyResponse.limits ?? null)
+        setTotalDocuments(legacyResponse.documents.length)
+        listingCache.current.set(`${scopeCacheKey(cachedRuntimeScope())}:${String(legacyResponse.directoryId)}`, {
+          documents: [...legacyResponse.documents],
+          directories: [...legacyResponse.directories],
+          directoryId: legacyResponse.directoryId,
+          limits: legacyResponse.limits ?? null,
+        })
+      }
+      listingReadyRef.current = true
     } catch (cause) {
       if (signal?.aborted || generation !== loadGeneration.current) return
       if (cause instanceof UserDocServiceUnavailableError) {
@@ -305,23 +735,89 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     } finally {
       if (!signal?.aborted && generation === loadGeneration.current) setLoading(false)
     }
+    await scopeRequest
   }
 
-  const openOverview = async (): Promise<boolean> => {
+  const openOverview = async (force = false): Promise<boolean> => {
+    const key = overviewFilterKey()
+    const generation = overviewRequestGeneration.current + 1
+    overviewRequestGeneration.current = generation
     setOverviewLoading(true)
     setOverviewError('')
     try {
-      const response = await userDocs.current.overview()
+      const clientRecord = userDocs.current as unknown as Record<string, unknown>
+      const pageMethod = clientRecord.overviewPage
+      const cached = !force && overviewCache.current?.key === key ? overviewCache.current.response : undefined
+      const response = cached !== undefined
+        ? cached
+        : typeof pageMethod === 'function'
+          ? await (pageMethod as (query?: UserDocListQuery, signal?: AbortSignal) => Promise<UserDocCatalogOverview>)({
+            limit: PAGE_SIZE,
+            query: query.trim(),
+            type: typeFilter,
+            sort: wireSort(parseSort(sortValue)),
+          })
+          : await userDocs.current.overview()
+      if (generation !== overviewRequestGeneration.current) return false
+      overviewCache.current = { key, response }
+      overviewLoadedKey.current = key
       setOverviewRows([...response.documents])
+      setOverviewPage(1)
+      setOverviewNextCursor(response.nextCursor)
+      setOverviewTotalDocuments(typeof response.totalDocuments === 'number' ? response.totalDocuments : null)
+      setOverviewServerPaging(typeof response.totalDocuments === 'number' || response.nextCursor !== undefined)
+      overviewCursors.current = []
       setOverviewMode(true)
+      setTrashMode(false)
+      setTrashNextCursor(undefined)
+      setTrashPage(1)
+      serverPagingRef.current = false
+      setServerPaging(false)
+      setServerTotalDocuments(null)
+      setServerNextCursor(undefined)
       setScopeView(null)
       setAlternateSource(null)
       setUploadScopePickerOpen(false)
-      setSelected(new Set())
+      clearSelection()
       return true
     } catch (cause) {
+      if (generation === overviewRequestGeneration.current) overviewLoadedKey.current = null
       setOverviewError(documentErrorMessage(cause, t))
       return false
+    } finally {
+      setOverviewLoading(false)
+    }
+  }
+
+  const loadOverviewPage = async (requestedPage: number, cursor?: string): Promise<void> => {
+    const pageMethod = (userDocs.current as unknown as Record<string, unknown>).overviewPage
+    if (typeof pageMethod !== 'function') {
+      setOverviewPage(requestedPage)
+      return
+    }
+    setOverviewLoading(true)
+    setOverviewError('')
+    const generation = overviewRequestGeneration.current + 1
+    overviewRequestGeneration.current = generation
+    const key = overviewFilterKey()
+    try {
+      const response = await (pageMethod as (query?: UserDocListQuery, signal?: AbortSignal) => Promise<UserDocCatalogOverview>)({
+        limit: PAGE_SIZE,
+        query: query.trim(),
+        type: typeFilter,
+        sort: wireSort(parseSort(sortValue)),
+        ...(cursor === undefined ? {} : { cursor }),
+      })
+      if (generation !== overviewRequestGeneration.current) return
+      setOverviewRows([...response.documents])
+      setOverviewNextCursor(response.nextCursor)
+      setOverviewTotalDocuments(typeof response.totalDocuments === 'number' ? response.totalDocuments : null)
+      setOverviewPage(requestedPage)
+      overviewCache.current = null
+      overviewLoadedKey.current = key
+      setOverviewServerPaging(true)
+    } catch (cause) {
+      setOverviewError(documentErrorMessage(cause, t))
     } finally {
       setOverviewLoading(false)
     }
@@ -341,7 +837,63 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     }
   }
 
+  const openTrash = async (cursor?: string, pageNumber = 1): Promise<boolean> => {
+    setTrashLoading(true)
+    setError('')
+    const generation = loadGeneration.current + 1
+    loadGeneration.current = generation
+    if (cursor === undefined && pageNumber === 1) trashCursors.current = []
+    try {
+      const clientRecord = userDocs.current as unknown as Record<string, unknown>
+      const pageMethod = remoteScopeView ? clientRecord.listTrashInScopePage : clientRecord.listTrashPage
+      const response = typeof pageMethod === 'function'
+        ? remoteScopeView
+          ? await (pageMethod as (
+            scope: UserDocScope,
+            query?: UserDocListQuery,
+            signal?: AbortSignal,
+          ) => Promise<{ documents: readonly UserDocTrashRef[]; nextCursor?: string }>).call(userDocs.current, selectedScope, {
+            limit: PAGE_SIZE,
+            ...(cursor === undefined ? {} : { cursor }),
+            state: 'trash',
+          })
+          : await (pageMethod as (
+            query?: UserDocListQuery,
+            signal?: AbortSignal,
+          ) => Promise<{ documents: readonly UserDocTrashRef[]; nextCursor?: string }>).call(userDocs.current, {
+            limit: PAGE_SIZE,
+            ...(cursor === undefined ? {} : { cursor }),
+            state: 'trash',
+          })
+        : remoteScopeView
+          ? await userDocs.current.listTrashInScope(selectedScope)
+          : await userDocs.current.listTrash()
+      if (generation !== loadGeneration.current) return false
+      setTrashDocuments([...response.documents])
+      setTrashNextCursor('nextCursor' in response ? response.nextCursor : undefined)
+      setTrashPage(pageNumber)
+      setTrashMode(true)
+      setOverviewMode(false)
+      serverPagingRef.current = false
+      setServerPaging(false)
+      setServerTotalDocuments(null)
+      setServerNextCursor(undefined)
+      clearSelection()
+      setMobileSheet(null)
+      return true
+    } catch (cause) {
+      if (generation === loadGeneration.current) setError(documentErrorMessage(cause, t))
+      return false
+    } finally {
+      if (generation === loadGeneration.current) setTrashLoading(false)
+    }
+  }
+
   const openScopeView = async (target: UserDocScope, label: string): Promise<boolean> => {
+    overviewRequestGeneration.current += 1
+    overviewLoadedKey.current = null
+    const generation = loadGeneration.current + 1
+    loadGeneration.current = generation
     const current = currentScopeDescriptor()
     if (target.kind === current.kind && (target.kind === 'personal'
       || (current.kind === 'project' && target.projectId === current.projectId))) {
@@ -350,16 +902,49 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     }
     setLoading(true)
     setError('')
+    serverRequestGeneration.current += 1
     try {
-      const response = await userDocs.current.listScope(target)
-      const nextDocuments: UserDocRef[] = response.documents.map((document: UserDocTransferListedDocument) => ({ ...document, path: '' }))
+      const initialQuery: UserDocListQuery = {
+        limit: PAGE_SIZE,
+        query: '',
+        type: typeFilter,
+        sort: wireSort(parseSort(sortValue)),
+      }
+      const response = await fetchScopeListing(target, ROOT_DIRECTORY_ID, initialQuery)
+      if (generation !== loadGeneration.current) return false
+      const listed = response as {
+        readonly documents: readonly (UserDocTransferListedDocument | UserDocRef)[]
+        readonly directories?: readonly UserDocDirectoryRef[]
+        readonly directoryId?: UserDocDirectoryIdType
+        readonly parentDirectoryId?: UserDocDirectoryIdType
+        readonly limits?: UserDocLimits
+        readonly totalDocuments?: number
+        readonly nextCursor?: string
+      }
+      const nextDocuments: UserDocRef[] = listed.documents.map((document: UserDocTransferListedDocument | UserDocRef) => ({ ...document, path: '' }))
       setDocuments(nextDocuments)
-      setDirectories([])
+      const listedDirectories = listed.directories?.map(normalizeDirectoryRef) ?? []
+      setDirectories(listedDirectories)
+      setLimits(listed.limits ?? null)
+      setTotalDocuments(typeof listed.totalDocuments === 'number' ? listed.totalDocuments : nextDocuments.length)
+      if (isServerPage(listed)) {
+        setServerPaging(true)
+        setServerTotalDocuments(typeof listed.totalDocuments === 'number' ? listed.totalDocuments : null)
+        setServerNextCursor(listed.nextCursor)
+        serverPagingRef.current = true
+      } else {
+        setServerPaging(false)
+        setServerTotalDocuments(null)
+        setServerNextCursor(undefined)
+        serverPagingRef.current = false
+      }
       setCurrentDirectoryId(ROOT_DIRECTORY_ID)
       const project = target.kind === 'project'
         ? scope.projects?.find(candidate => candidate.projectId === target.projectId)
         : undefined
-      const mode = project?.mode ?? 'rw'
+      const mode = project?.mode ?? (target.kind === 'project' && scope.kind === 'project' && scope.projectId === target.projectId
+        ? scope.mode ?? 'rw'
+        : 'rw')
       setScopeView({
         value: target.kind === 'personal' ? 'personal' : `project:${String(target.projectId)}`,
         label,
@@ -367,23 +952,45 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
         mode,
         canUpload: target.kind === 'personal' || mode === 'rw',
       })
+      if (isServerPage(listed)) {
+        const pageRecord: ServerPageRecord = {
+          documents: nextDocuments,
+          directories: listedDirectories,
+          directoryId: listed.directoryId ?? ROOT_DIRECTORY_ID,
+          ...(listed.parentDirectoryId === undefined ? {} : { parentDirectoryId: listed.parentDirectoryId }),
+          limits: listed.limits ?? null,
+          totalDocuments: typeof listed.totalDocuments === 'number' ? listed.totalDocuments : null,
+          ...(listed.nextCursor === undefined ? {} : { nextCursor: listed.nextCursor }),
+        }
+        const key = JSON.stringify({
+          scope: scopeCacheKey(target), directory: '', query: '', type: typeFilter, sort: wireSort(parseSort(sortValue)),
+        })
+        rememberServerPage(key, 1, pageRecord)
+        serverLoadedKey.current = key
+      }
       setAlternateSource(null)
       setOverviewMode(false)
-      setSelected(new Set())
+      setTrashMode(false)
+      clearSelection()
       setQuery('')
       setPage(1)
+      listingReadyRef.current = true
       return true
     } catch (cause) {
-      setError(documentErrorMessage(cause, t))
+      if (generation === loadGeneration.current) setError(documentErrorMessage(cause, t))
       return false
     } finally {
-      setLoading(false)
+      if (generation === loadGeneration.current) setLoading(false)
     }
   }
 
   useEffect(() => {
     /* v8 ignore next -- modal is always open in tests */
     if (!open) return
+    // The manager stays mounted between opens. Re-read the account context at
+    // each open so a project switch made elsewhere cannot leave stale scope
+    // labels or permissions in the workbench.
+    scopeCache.current = null
     const controller = new AbortController()
     void load(ROOT_DIRECTORY_ID, controller.signal)
     return () => { controller.abort() }
@@ -391,6 +998,18 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
 
   useEffect(() => {
     if (!open || !phone) setMobileSheet(null)
+    if (!open) {
+      setPreviewDoc(null)
+      setDeleteTargets(null)
+      setFolderEditor(null)
+      setDeleteDirectory(null)
+      setMoveTargets(null)
+      setCopyTargets(null)
+      setPurgeTarget(null)
+      setHistoryOpen(false)
+      setUploadScopePickerOpen(false)
+      setSourcePickerOpen(false)
+    }
   }, [open, phone])
 
   useEffect(() => {
@@ -427,7 +1046,26 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
 
   useEffect(() => {
     setPage(1)
+    setOverviewPage(1)
   }, [query, typeFilter, sortValue, currentDirectoryId])
+
+  useEffect(() => {
+    if (!open || overviewMode || trashMode || !listingReadyRef.current || !serverPagingRef.current) return
+    const key = listingKey(currentDirectoryId)
+    if (serverLoadedKey.current === key) return
+    serverLoadedKey.current = key
+    clearSelection()
+    void loadServerPage(1, currentDirectoryId, true)
+  }, [open, overviewMode, trashMode, currentDirectoryId, query, typeFilter, sortValue])
+
+  useEffect(() => {
+    if (!open || !overviewMode) return
+    const key = overviewFilterKey()
+    if (overviewLoadedKey.current === key) return
+    overviewLoadedKey.current = key
+    overviewCursors.current = []
+    void openOverview(true)
+  }, [open, overviewMode, query, typeFilter, sortValue])
 
   const sort = parseSort(sortValue)
   const filtered = useMemo(
@@ -439,18 +1077,54 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     return directories.filter(directory => needle === '' || directory.name.toLowerCase().includes(needle))
   }, [directories, query])
 
+  const overviewFiltered = useMemo(
+    () => overviewServerPaging ? [...overviewRows] : sortDocuments(filterDocuments(overviewRows, query, typeFilter), parseSort(sortValue)),
+    [overviewRows, overviewServerPaging, query, typeFilter, sortValue],
+  )
+  const overviewPages = overviewServerPaging
+    ? overviewTotalDocuments === null
+      ? Math.max(overviewPage, overviewNextCursor === undefined ? overviewPage : overviewPage + 1)
+      : pageCount(overviewTotalDocuments)
+    : pageCount(overviewFiltered.length)
+  const overviewLength = overviewServerPaging
+    ? overviewTotalDocuments ?? overviewFiltered.length
+    : overviewFiltered.length
+  const overviewCurrentPage = overviewServerPaging && overviewTotalDocuments === null
+    ? Math.max(1, overviewPage)
+    : clampPage(overviewPage, overviewLength)
+  const overviewPageRows = overviewServerPaging ? overviewRows : pageSlice(overviewFiltered, overviewCurrentPage)
+
   useEffect(() => {
+    if (serverPagingRef.current) return
     const visibleIds = filtered.map(doc => doc.docId)
+    const visibleIdSet = new Set(visibleIds.map(String))
     setSelected((prev) => {
       const next = pruneSelection(prev, visibleIds)
       if (next.size === prev.size) return prev
       return next
     })
+    setSelectedRecords((prev) => {
+      let changed = false
+      const next = new Map(prev)
+      for (const id of prev.keys()) {
+        if (!visibleIdSet.has(id)) {
+          next.delete(id)
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
   }, [filtered])
 
-  const pages = pageCount(filtered.length)
-  const currentPage = clampPage(page, filtered.length)
-  const pageDocs = pageSlice(filtered, currentPage)
+  const pages = serverPaging
+    ? serverTotalDocuments === null
+      ? Math.max(page, serverNextCursor === undefined ? page : page + 1)
+      : pageCount(serverTotalDocuments)
+    : pageCount(filtered.length)
+  const currentPage = serverPaging && serverTotalDocuments === null
+    ? Math.max(1, page)
+    : clampPage(page, serverPaging ? serverTotalDocuments ?? documents.length : filtered.length)
+  const pageDocs = serverPaging ? documents : pageSlice(filtered, currentPage)
   const pageIds = pageDocs.map(doc => doc.docId)
   const headerState = pageSelectionState(pageIds, selected)
   const groups = sort.key === 'date' ? groupDocumentsByDate(pageDocs) : null
@@ -483,7 +1157,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
           })
         }
         if (scopeView !== null) {
-          await userDocs.current.uploadToScope(scopeView.scope, file, ROOT_DIRECTORY_ID, undefined, report)
+          await userDocs.current.uploadToScope(scopeView.scope, file, currentDirectoryId, undefined, report)
         } else {
           await userDocs.current.upload(file, currentDirectoryId, undefined, report)
         }
@@ -510,9 +1184,24 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     setProgress({ current: 0, total: targets.length, percent: 0 })
     try {
       for (const [index, doc] of targets.entries()) {
-        await userDocs.current.remove(doc.docId)
+        const clientRecord = userDocs.current as unknown as Record<string, unknown>
+        if (remoteScopeView && typeof clientRecord.trashInScope === 'function') {
+          await userDocs.current.trashInScope(selectedScope, doc.docId)
+        } else if (!remoteScopeView && typeof clientRecord.trash === 'function') {
+          await userDocs.current.trash(doc.docId)
+        } else if (remoteScopeView) {
+          await userDocs.current.removeInScope(selectedScope, doc.docId)
+        } else {
+          await userDocs.current.remove(doc.docId)
+        }
         setSelected((prev) => {
           const next = new Set(prev)
+          next.delete(doc.docId)
+          return next
+        })
+        setSelectedRecords((prev) => {
+          if (!prev.has(doc.docId)) return prev
+          const next = new Map(prev)
           next.delete(doc.docId)
           return next
         })
@@ -523,10 +1212,10 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
         })
       }
       setDeleteTargets(null)
-      setSelected(new Set())
-      void load(currentDirectoryId)
+      clearSelection()
+      await refreshDisplayed()
     } catch {
-      await load(currentDirectoryId)
+      await refreshDisplayed()
       setModalError(t('delete.error'))
     } finally {
       setUploading(false)
@@ -534,11 +1223,113 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     }
   }
 
+  const restoreTrashDocument = async (document: UserDocTrashRef) => {
+    if (writeLocked) return
+    setUploading(true)
+    setError('')
+    try {
+      const restored = remoteScopeView
+        ? await userDocs.current.restoreInScope(selectedScope, document.docId)
+        : await userDocs.current.restore(document.docId)
+      setTrashDocuments(previous => previous.filter(item => item.docId !== document.docId))
+      setError('')
+      void restored
+    } catch (cause) {
+      setError(documentErrorMessage(cause, t))
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const purgeTrashDocument = (document: UserDocTrashRef): void => {
+    if (!writeLocked) setPurgeTarget(document)
+  }
+
+  const confirmPurgeTrash = async () => {
+    if (purgeTarget === null || writeLocked) return
+    const document = purgeTarget
+    setUploading(true)
+    setError('')
+    try {
+      if (remoteScopeView) await userDocs.current.purgeInScope(selectedScope, document.docId)
+      else await userDocs.current.purge(document.docId)
+      setTrashDocuments(previous => previous.filter(item => item.docId !== document.docId))
+      setPurgeTarget(null)
+    } catch (cause) {
+      setError(documentErrorMessage(cause, t))
+    } finally {
+      setUploading(false)
+    }
+  }
+
   const navigate = (directoryId: UserDocDirectoryIdType) => {
-    setSelected(new Set())
+    clearSelection()
     setQuery('')
     setPage(1)
-    void load(directoryId)
+    if (!remoteScopeView) {
+      void load(directoryId)
+      return
+    }
+    setLoading(true)
+    setError('')
+    const generation = loadGeneration.current + 1
+    loadGeneration.current = generation
+    serverRequestGeneration.current += 1
+    void fetchScopeListing(selectedScope, directoryId, {
+      limit: PAGE_SIZE, query: '', type: typeFilter, sort: wireSort(parseSort(sortValue)),
+    }).then((rawResponse) => {
+      if (generation !== loadGeneration.current) return
+      const response = rawResponse as {
+        readonly documents: readonly (UserDocTransferListedDocument | UserDocRef)[]
+        readonly directories?: readonly UserDocDirectoryRef[]
+        readonly directoryId?: UserDocDirectoryIdType
+        readonly parentDirectoryId?: UserDocDirectoryIdType
+        readonly limits?: UserDocLimits
+        readonly totalDocuments?: number
+        readonly nextCursor?: string
+      }
+      const nextDirectoryId = response.directoryId ?? directoryId
+      const nextDocuments = response.documents.map(document => ({ ...document, path: '' }))
+      const nextDirectories = response.directories?.map(normalizeDirectoryRef) ?? []
+      const key = JSON.stringify({
+        scope: scopeCacheKey(selectedScope), directory: String(nextDirectoryId), query: '',
+        type: typeFilter, sort: wireSort(parseSort(sortValue)),
+      })
+      serverLoadedKey.current = JSON.stringify({
+        scope: scopeCacheKey(selectedScope), directory: String(nextDirectoryId), query: '',
+        type: typeFilter, sort: wireSort(parseSort(sortValue)),
+      })
+      setDocuments(nextDocuments)
+      setDirectories(nextDirectories)
+      setCurrentDirectoryId(nextDirectoryId)
+      setLimits(response.limits ?? null)
+      setTotalDocuments(typeof response.totalDocuments === 'number' ? response.totalDocuments : nextDocuments.length)
+      if (isServerPage(response)) {
+        const pageRecord: ServerPageRecord = {
+          documents: nextDocuments,
+          directories: nextDirectories,
+          directoryId: nextDirectoryId,
+          ...(response.parentDirectoryId === undefined ? {} : { parentDirectoryId: response.parentDirectoryId }),
+          limits: response.limits ?? null,
+          totalDocuments: typeof response.totalDocuments === 'number' ? response.totalDocuments : null,
+          ...(response.nextCursor === undefined ? {} : { nextCursor: response.nextCursor }),
+        }
+        rememberServerPage(key, 1, pageRecord)
+        serverLoadedKey.current = key
+        setServerPaging(true)
+        setServerTotalDocuments(pageRecord.totalDocuments)
+        setServerNextCursor(pageRecord.nextCursor)
+        serverPagingRef.current = true
+      } else {
+        setServerPaging(false)
+        setServerTotalDocuments(null)
+        setServerNextCursor(undefined)
+        serverPagingRef.current = false
+      }
+      listingReadyRef.current = true
+    }).catch((cause: unknown) => {
+      if (generation === loadGeneration.current) setError(documentErrorMessage(cause, t))
+    }).finally(() => { if (generation === loadGeneration.current) setLoading(false) })
   }
 
   const openCreateDirectory = () => {
@@ -561,12 +1352,18 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     setModalError('')
     try {
       if (folderEditor.mode === 'create') {
-        await userDocs.current.createDirectory(folderEditor.parentDirectoryId, folderName.trim())
+        if (remoteScopeView) await userDocs.current.createDirectoryInScope(selectedScope, folderEditor.parentDirectoryId, folderName.trim())
+        else await userDocs.current.createDirectory(folderEditor.parentDirectoryId, folderName.trim())
       } else {
-        await userDocs.current.renameDirectory(folderEditor.directory.directoryId, folderName.trim())
+        if (remoteScopeView) {
+          await userDocs.current.renameDirectoryInScope(
+            selectedScope, folderEditor.directory.directoryId, folderName.trim(),
+          )
+        }
+        else await userDocs.current.renameDirectory(folderEditor.directory.directoryId, folderName.trim())
       }
       setFolderEditor(null)
-      await load(currentDirectoryId)
+      await refreshDisplayed()
     } catch {
       setModalError(t(folderEditor.mode === 'create' ? 'folder.create.error' : 'folder.rename.error'))
     } finally {
@@ -580,9 +1377,10 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     setUploading(true)
     setModalError('')
     try {
-      await userDocs.current.removeDirectory(deleteDirectory.directoryId)
+      if (remoteScopeView) await userDocs.current.removeDirectoryInScope(selectedScope, deleteDirectory.directoryId)
+      else await userDocs.current.removeDirectory(deleteDirectory.directoryId)
       setDeleteDirectory(null)
-      await load(currentDirectoryId)
+      await refreshDisplayed()
     } catch {
       setModalError(t('folder.delete.error'))
     } finally {
@@ -600,8 +1398,14 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     setError('')
     setModalError('')
     try {
-      const response = await userDocs.current.listDirectories()
-      const available = [...response.directories]
+      const response = remoteScopeView
+        ? await userDocs.current.listScopeDirectories(selectedScope)
+        : await userDocs.current.listDirectories()
+      const available: UserDocDirectoryRef[] = response.directories.map(directory => ({
+        ...directory,
+        path: 'path' in directory ? directory.path : '',
+        modifiedAt: 'modifiedAt' in directory ? directory.modifiedAt : 0,
+      }))
       setMoveDirectories(available)
       if (currentDirectoryId === ROOT_DIRECTORY_ID) {
         setMoveDirectoryId(available[0]?.directoryId ?? ROOT_DIRECTORY_ID)
@@ -616,6 +1420,10 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
 
   const attachDocument = (doc: UserDocRef) => {
     setError('')
+    if (remoteScopeView) {
+      void copyRemoteDocumentToConversation(doc)
+      return
+    }
     try {
       if (onAttachDocument?.(doc) === true) {
         onClose()
@@ -627,6 +1435,68 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     setError(t('action.attach.error'))
   }
 
+  const copyRemoteDocumentToConversation = async (doc: UserDocRef): Promise<void> => {
+    await copyRemoteDocumentsToConversation([doc])
+  }
+
+  const copyRemoteDocumentsToConversation = async (targets: readonly UserDocRef[]): Promise<void> => {
+    if (onAttachDocument === undefined) {
+      setError(t('action.attach.error'))
+      return
+    }
+    setUploading(true)
+    setCopyLoading(true)
+    setError('')
+    setModalError('')
+    setProgress({ current: 0, total: targets.length, percent: 0 })
+    try {
+      const response = await userDocs.current.transfer({
+        version: 1,
+        source: selectedScope,
+        target: currentScopeDescriptor(),
+        documents: targets.map(document => ({ docId: document.docId })),
+      })
+      const copied = response.items.flatMap(item => item.status === 'copied' ? [item.target] : [])
+      const failed = response.items.filter(item => item.status === 'failed').length
+      if (copied.length === 0) {
+        setError(failed > 0 ? t('copy.partial', { count: String(failed) }) : t('action.attach.error'))
+        return
+      }
+      setProgress({ current: targets.length, total: targets.length, percent: 100 })
+      let attached = false
+      for (const document of copied) attached = onAttachDocument({ ...document, path: '' }) || attached
+      if (!attached) {
+        setError(t('action.attach.error'))
+        return
+      }
+      if (failed > 0) setError(t('copy.partial', { count: String(failed) }))
+      else onClose()
+    } catch (cause) {
+      setError(documentErrorMessage(cause, t))
+    } finally {
+      setCopyLoading(false)
+      setUploading(false)
+      setProgress(null)
+    }
+  }
+
+  const attachSelectedDocuments = async (): Promise<void> => {
+    const targets = selectedDocumentList()
+    setMobileSheet(null)
+    if (targets.length === 0 || onAttachDocument === undefined) {
+      setError(t('action.attach.error'))
+      return
+    }
+    if (remoteScopeView) {
+      await copyRemoteDocumentsToConversation(targets)
+      return
+    }
+    let attached = false
+    for (const document of targets) attached = onAttachDocument(document) || attached
+    if (attached) onClose()
+    else setError(t('action.attach.error'))
+  }
+
   const handleMove = async () => {
     if (writeLocked) return
     if (moveTargets === null || moveTargets.length === 0 || moveDirectoryId === currentDirectoryId) return
@@ -636,9 +1506,16 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     setProgress({ current: 0, total: targets.length, percent: 0 })
     try {
       for (const [index, doc] of targets.entries()) {
-        await userDocs.current.move(doc.docId, moveDirectoryId)
+        if (remoteScopeView) await userDocs.current.moveInScope(selectedScope, doc.docId, moveDirectoryId)
+        else await userDocs.current.move(doc.docId, moveDirectoryId)
         setSelected((prev) => {
           const next = new Set(prev)
+          next.delete(doc.docId)
+          return next
+        })
+        setSelectedRecords((prev) => {
+          if (!prev.has(doc.docId)) return prev
+          const next = new Map(prev)
           next.delete(doc.docId)
           return next
         })
@@ -651,10 +1528,10 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
         })
       }
       setMoveTargets(null)
-      setSelected(new Set())
-      await load(currentDirectoryId)
+      clearSelection()
+      await refreshDisplayed()
     } catch {
-      await load(currentDirectoryId)
+      await refreshDisplayed()
       setModalError(t('move.error'))
     } finally {
       setUploading(false)
@@ -665,14 +1542,16 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
   const openCopy = (targets: UserDocRef[]) => {
     if (targets.length === 0) return
     const source = scopeView?.scope ?? alternateSource?.scope ?? currentScopeDescriptor()
+    const current = currentScopeDescriptor()
     const options: CopyTargetOption[] = (scope.projects ?? [])
-      .filter(project => project.mode === 'rw' && !(source.kind === 'project' && source.projectId === project.projectId))
+      .filter(project => project.mode === 'rw' && !(source.kind === 'project' && source.projectId === project.projectId)
+        && (mode !== 'select' || sameDocumentScope({ kind: 'project', projectId: project.projectId }, current)))
       .map(project => ({
         value: `project:${String(project.projectId)}`,
         label: project.name,
         target: { kind: 'project', projectId: project.projectId } as const,
       }))
-    if (!(source.kind === 'personal')) {
+    if (!(source.kind === 'personal') && (mode !== 'select' || sameDocumentScope({ kind: 'personal' }, current))) {
       options.unshift({ value: 'personal', label: t('copy.target.personal'), target: { kind: 'personal' } })
     }
     if (scope.kind === 'personal' && source.kind === 'personal') {
@@ -692,9 +1571,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     setModalError('')
   }
 
-  const currentScopeDescriptor = (): UserDocScope => scope.kind === 'project' && scope.projectId !== undefined
-    ? { kind: 'project', projectId: scope.projectId }
-    : { kind: 'personal' }
+  const currentScopeDescriptor = runtimeScope
 
   const sourceOptions: SourceOption[] = [
     ...((scope.kind !== 'personal' || scopeView?.scope.kind === 'project') && scopeView?.scope.kind !== 'personal'
@@ -728,18 +1605,18 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     return needle === '' || option.label.toLowerCase().includes(needle)
   })
 
-  const mobileViewOptions = useMemo(() => [
+  const mobileViewOptions = useMemo<MobileScopeOption[]>(() => [
     {
       value: 'all',
       label: t('scope.all'),
       description: t('scope.all.description'),
-      kind: 'all' as const,
+      kind: 'all',
     },
     {
       value: 'personal',
       label: t('copy.target.personal'),
       description: t('scope.personal.description'),
-      kind: 'personal' as const,
+      kind: 'personal',
     },
     ...(scope.projects ?? []).map(project => ({
       value: `project:${String(project.projectId)}`,
@@ -762,14 +1639,38 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
           : `project:${String(scope.projectId)}`
         : 'personal')
 
-  const mobileScopeOptions = mobileSheet?.kind === 'scope' && mobileSheet.mode === 'source'
+  const uploadMobileScopeOptions = useMemo<MobileScopeOption[]>(() => (
+    uploadScopeOptions.reduce<MobileScopeOption[]>((result, option) => {
+      if (option.scope.kind === 'project') {
+        result.push({
+          value: option.value,
+          label: option.label,
+          description: `${t('scope.project.mode.editable')} · ${t('scope.upload.root')}`,
+          kind: 'project',
+          projectId: option.scope.projectId,
+        })
+      } else {
+        result.push({
+          value: option.value,
+          label: option.label,
+          description: `${t('scope.project.mode.editable')} · ${t('scope.upload.root')}`,
+          kind: 'personal',
+        })
+      }
+      return result
+    }, [])
+  ), [scope.projects, t])
+
+  const mobileScopeOptions: MobileScopeOption[] = mobileSheet?.kind === 'scope' && mobileSheet.mode === 'source'
     ? sourceOptions.map(option => ({
       value: option.value,
       label: option.label,
       description: `${option.mode === 'rw' ? t('scope.project.mode.editable') : t('scope.project.mode.readOnly')} · ${t('scope.source.readOnly')}`,
       kind: 'source' as const,
     }))
-    : mobileViewOptions
+    : mobileSheet?.kind === 'scope' && mobileSheet.mode === 'upload'
+      ? uploadMobileScopeOptions
+      : mobileViewOptions
 
   const mobileScopeQuery = mobileSheet?.kind === 'scope' ? mobileSheet.query.trim().toLowerCase() : ''
   const filteredMobileScopeOptions = mobileScopeOptions.filter(option => (
@@ -783,6 +1684,12 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     let succeeded = false
     if (mobileSheet.mode === 'source') {
       succeeded = await browseSource(value)
+    } else if (mobileSheet.mode === 'upload') {
+      const uploadOption = uploadScopeOptions.find(candidate => candidate.value === value)
+      if (uploadOption !== undefined) succeeded = await openScopeView(uploadOption.scope, uploadOption.label)
+      if (succeeded) setUploadScopePickerOpen(false)
+      if (succeeded) setMobileSheet(null)
+      return
     } else if (option.kind === 'all') {
       succeeded = await openOverview()
     } else if (option.kind === 'personal') {
@@ -798,47 +1705,150 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     if (option === undefined) return false
     setSourcePickerLoading(true)
     setError('')
+    const generation = loadGeneration.current + 1
+    loadGeneration.current = generation
+    serverRequestGeneration.current += 1
     try {
-      const response = await userDocs.current.listScope(option.scope)
-      const documents: UserDocRef[] = response.documents.map((document: UserDocTransferListedDocument) => ({
+      const initialQuery: UserDocListQuery = {
+        limit: PAGE_SIZE,
+        query: '',
+        type: typeFilter,
+        sort: wireSort(parseSort(sortValue)),
+      }
+      const response = await fetchScopeListing(option.scope, ROOT_DIRECTORY_ID, initialQuery)
+      if (generation !== loadGeneration.current) return false
+      const listed = response as {
+        readonly documents: readonly (UserDocTransferListedDocument | UserDocRef)[]
+        readonly directories?: readonly UserDocDirectoryRef[]
+        readonly directoryId?: UserDocDirectoryIdType
+        readonly limits?: UserDocLimits
+        readonly totalDocuments?: number
+        readonly nextCursor?: string
+      }
+      const documents: UserDocRef[] = listed.documents.map((document: UserDocTransferListedDocument | UserDocRef) => ({
         ...document,
         path: '',
       }))
       setDocuments(documents)
-      setDirectories([])
+      const listedDirectories = listed.directories?.map(normalizeDirectoryRef) ?? []
+      setDirectories(listedDirectories)
+      setLimits(listed.limits ?? null)
+      setTotalDocuments(typeof listed.totalDocuments === 'number' ? listed.totalDocuments : documents.length)
+      if (isServerPage(listed)) {
+        const pageRecord: ServerPageRecord = {
+          documents,
+          directories: listedDirectories,
+          directoryId: listed.directoryId ?? ROOT_DIRECTORY_ID,
+          limits: listed.limits ?? null,
+          totalDocuments: typeof listed.totalDocuments === 'number' ? listed.totalDocuments : null,
+          ...(listed.nextCursor === undefined ? {} : { nextCursor: listed.nextCursor }),
+        }
+        const key = JSON.stringify({
+          scope: scopeCacheKey(option.scope), directory: '', query: '', type: typeFilter, sort: wireSort(parseSort(sortValue)),
+        })
+        rememberServerPage(key, 1, pageRecord)
+        serverLoadedKey.current = key
+        setServerPaging(true)
+        setServerTotalDocuments(pageRecord.totalDocuments)
+        serverPagingRef.current = true
+      } else {
+        setServerPaging(false)
+        setServerTotalDocuments(null)
+        serverPagingRef.current = false
+      }
       setCurrentDirectoryId(ROOT_DIRECTORY_ID)
       setScopeView(null)
       setAlternateSource(option)
-      setSelected(new Set())
+      setTrashMode(false)
+      clearSelection()
       setQuery('')
       setPage(1)
+      listingReadyRef.current = true
       setSourcePickerOpen(false)
       return true
     } catch (error) {
-      setError(documentErrorMessage(error, t))
+      if (generation === loadGeneration.current) setError(documentErrorMessage(error, t))
       return false
     } finally {
-      setSourcePickerLoading(false)
+      if (generation === loadGeneration.current) setSourcePickerLoading(false)
     }
   }
 
   const refreshDisplayed = async (): Promise<void> => {
-    if (scopeView !== null) {
+    listingCache.current.clear()
+    // A mutation can change both the count and the cursor chain. Drop every
+    // cached page before requesting the refreshed first page.
+    serverPages.current.clear()
+    serverLoadedKey.current = null
+    overviewCache.current = null
+    if (trashMode) {
+      await openTrash()
+      return
+    }
+    if (remoteScopeView) {
+      const generation = loadGeneration.current + 1
+      loadGeneration.current = generation
+      serverRequestGeneration.current += 1
       try {
-        const response = await userDocs.current.listScope(scopeView.scope)
-        setDocuments(response.documents.map(document => ({ ...document, path: '' })))
-        setSelected(new Set())
+        const target = selectedScope
+        const response = await fetchScopeListing(target, currentDirectoryId, {
+          limit: PAGE_SIZE, query: '', type: typeFilter, sort: wireSort(parseSort(sortValue)),
+        }) as {
+          readonly documents: readonly (UserDocTransferListedDocument | UserDocRef)[]
+          readonly directories?: readonly UserDocDirectoryRef[]
+          readonly directoryId?: UserDocDirectoryIdType
+          readonly parentDirectoryId?: UserDocDirectoryIdType
+          readonly limits?: UserDocLimits
+          readonly totalDocuments?: number
+          readonly nextCursor?: string
+        }
+        if (generation !== loadGeneration.current) return
+        const nextDirectoryId = response.directoryId ?? currentDirectoryId
+        const nextDocuments = response.documents.map(document => ({ ...document, path: '' }))
+        const nextDirectories = response.directories?.map(normalizeDirectoryRef) ?? []
+        const key = JSON.stringify({
+          scope: scopeCacheKey(target), directory: String(nextDirectoryId), query: '',
+          type: typeFilter, sort: wireSort(parseSort(sortValue)),
+        })
+        setDocuments(nextDocuments)
+        setDirectories(nextDirectories)
+        setCurrentDirectoryId(nextDirectoryId)
+        setLimits(response.limits ?? null)
+        setTotalDocuments(typeof response.totalDocuments === 'number' ? response.totalDocuments : nextDocuments.length)
+        if (isServerPage(response)) {
+          const pageRecord: ServerPageRecord = {
+            documents: nextDocuments,
+            directories: nextDirectories,
+            directoryId: nextDirectoryId,
+            ...(response.parentDirectoryId === undefined ? {} : { parentDirectoryId: response.parentDirectoryId }),
+            limits: response.limits ?? null,
+            totalDocuments: typeof response.totalDocuments === 'number' ? response.totalDocuments : null,
+            ...(response.nextCursor === undefined ? {} : { nextCursor: response.nextCursor }),
+          }
+          rememberServerPage(key, 1, pageRecord)
+          serverLoadedKey.current = key
+          setServerPaging(true)
+          setServerTotalDocuments(pageRecord.totalDocuments)
+          setServerNextCursor(pageRecord.nextCursor)
+          serverPagingRef.current = true
+        } else {
+          setServerPaging(false)
+          setServerTotalDocuments(null)
+          setServerNextCursor(undefined)
+          serverPagingRef.current = false
+        }
+        listingReadyRef.current = true
+        clearSelection()
         setQuery('')
         setPage(1)
       } catch (cause) {
-        setError(documentErrorMessage(cause, t))
+        if (generation === loadGeneration.current) setError(documentErrorMessage(cause, t))
       }
       return
     }
-    if (alternateSource !== null) {
-      await browseSource(alternateSource.value)
-      return
-    }
+    // An explicit refresh is also the user's way to reconcile membership and
+    // project labels while this long-lived dialog remains mounted.
+    scopeCache.current = null
     await load(currentDirectoryId)
   }
 
@@ -859,7 +1869,9 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
       return
     }
     if (phone) {
-      setMobileSheet({ kind: 'scope', mode: 'view', query: '' })
+      setUploadScopePickerValue(uploadScopeOptions[0]?.value ?? '')
+      setUploadScopePickerOpen(true)
+      setMobileSheet({ kind: 'scope', mode: 'upload', query: '' })
       return
     }
     setUploadScopePickerValue(uploadScopeOptions[0]?.value ?? '')
@@ -880,19 +1892,38 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
       setError(t('copy.source.unavailable'))
       return
     }
+    if (mode === 'source') setSourcePickerValue(sourceOptions[0]?.value ?? '')
     setError('')
     setMobileSheet({ kind: 'scope', mode, query: '' })
   }
 
   const openOverviewCopy = async (row: UserDocCatalogRow) => {
-    const source: UserDocScope = row.scope.kind === 'project' && row.scope.id !== undefined
-      ? { kind: 'project', projectId: row.scope.id }
-      : { kind: 'personal' }
+    const source = catalogRowScope(row)
+    if (mode === 'select' && sameDocumentScope(source, currentScopeDescriptor())) {
+      try {
+        if (onAttachDocument?.({
+          docId: row.docId,
+          path: '',
+          name: row.name,
+          bytes: row.bytes,
+          mediaType: row.mediaType,
+          modifiedAt: row.modifiedAt,
+        }) === true) {
+          onClose()
+          return
+        }
+      } catch {
+        // Session teardown can race the overview click; keep the manager open.
+      }
+      setOverviewError(t('action.attach.error'))
+      return
+    }
     try {
       const capabilities = await userDocs.current.capabilities()
       const options = capabilities.targets
         .filter(target => target.canWrite && !(target.scope.kind === source.kind
-          && (target.scope.kind === 'personal' || target.scope.projectId === (source.kind === 'project' ? source.projectId : -1))))
+          && (target.scope.kind === 'personal' || target.scope.projectId === (source.kind === 'project' ? source.projectId : -1)))
+          && (mode !== 'select' || sameDocumentScope(target.scope, currentScopeDescriptor())))
         .map(target => ({
           value: target.scope.kind === 'personal' ? 'personal' : `project:${String(target.scope.projectId)}`,
           label: target.label,
@@ -914,12 +1945,17 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     }
   }
 
+  const openOverviewView = async (row: UserDocCatalogRow): Promise<void> => {
+    const target = catalogRowScope(row)
+    await openScopeView(target, row.scope.label)
+  }
+
   const handleCopy = async () => {
     if (copyTargets === null || (overviewCopyRow === null && selected.size === 0)) return
     const option = copyTargets.find(candidate => candidate.value === copyTarget)
     if (option === undefined) return
     const targets = overviewCopyRow === null
-      ? documents.filter(doc => selected.has(doc.docId))
+      ? selectedDocumentList()
       : [{
         docId: overviewCopyRow.row.docId,
         path: '',
@@ -932,13 +1968,12 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     setCopyLoading(true)
     setUploading(true)
     setModalError('')
+    setNotice('')
     setProgress({ current: 0, total: targets.length, percent: 0 })
+    let noticeAfterCopy: string | undefined
     try {
       const source: UserDocScope = overviewCopyRow?.source ?? scopeView?.scope ?? alternateSource?.scope ?? currentScopeDescriptor()
-      const target = alternateSource === null
-        ? option.target
-        : currentScopeDescriptor()
-      const resolvedTarget = overviewCopyRow === null ? target : option.target
+      const resolvedTarget = option.target
       const transferRequest = {
         version: 1,
         source,
@@ -970,7 +2005,13 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
         : [])
       const failed = failedItems.length
       setFailedCopyItems(failedItems)
-      if (copied.length > 0 && onAttachDocument !== undefined) {
+      if (copied.length === 0 && failed === 0) {
+        setModalError(t('copy.error'))
+        return
+      }
+      const attachToCurrent = copied.length > 0 && onAttachDocument !== undefined
+        && sameDocumentScope(resolvedTarget, currentScopeDescriptor())
+      if (attachToCurrent) {
         let attached = false
         for (const ref of copied) {
           attached = onAttachDocument({ ...ref, path: '' }) || attached
@@ -978,14 +2019,21 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
         if (attached) onClose()
       }
       if (failed > 0) setModalError(t('copy.partial', { count: String(failed) }))
-      else setCopyTargets(null)
-      setSelected(new Set())
+      else {
+        setCopyTargets(null)
+        if (!attachToCurrent && copied.length > 0) noticeAfterCopy = t('copy.success', { target: option.label })
+      }
+      clearSelection()
       if (overviewCopyRow !== null) {
         setOverviewCopyRow(null)
-        await openOverview()
+        overviewCache.current = null
+        await openOverview(true)
+      } else if (alternateSource !== null) {
+        await refreshDisplayed()
       } else {
         await load(currentDirectoryId)
       }
+      if (noticeAfterCopy !== undefined) setNotice(noticeAfterCopy)
     } catch (error) {
       setModalError(error instanceof Error ? error.message : t('copy.error'))
     } finally {
@@ -1007,7 +2055,9 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
       })
       if (response.items.some(result => result.status === 'copied')) {
         setFailedCopyItems(prev => prev.filter(candidate => candidate.docId !== item.docId))
-        await load(currentDirectoryId)
+        if (overviewMode) await openOverview(true)
+        else if (alternateSource !== null) await refreshDisplayed()
+        else await load(currentDirectoryId)
       } else {
         setModalError(t('copy.retry.failed'))
       }
@@ -1037,21 +2087,38 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
   }
 
   const toggleId = (id: string) => {
+    const document = documents.find(candidate => candidate.docId === id)
+    const wasSelected = selected.has(id)
     setSelected((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
       return next
     })
+    setSelectedRecords((prev) => {
+      const next = new Map(prev)
+      if (wasSelected) next.delete(id)
+      else if (document !== undefined) next.set(id, document)
+      return next
+    })
   }
 
   const togglePage = () => {
+    const shouldSelect = headerState !== 'all'
     setSelected((prev) => {
       const next = new Set(prev)
       if (headerState === 'all') {
         for (const id of pageIds) next.delete(id)
       } else {
         for (const id of pageIds) next.add(id)
+      }
+      return next
+    })
+    setSelectedRecords((prev) => {
+      const next = new Map(prev)
+      for (const document of pageDocs) {
+        if (shouldSelect) next.set(document.docId, document)
+        else next.delete(document.docId)
       }
       return next
     })
@@ -1073,8 +2140,20 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     : t('modal.title')
   const directoryTrail = breadcrumbs(currentDirectoryId, scopeView?.label ?? alternateSource?.label ?? t('breadcrumb.root'))
   const readOnlyProject = scope.kind === 'project' && scope.mode === 'ro'
-  const writeLocked = scopeView !== null || alternateSource !== null || readOnlyProject
-  const uploadLocked = overviewMode || alternateSource !== null || (scopeView !== null ? !scopeView.canUpload : readOnlyProject)
+  const selectedScope = scopeView?.scope ?? alternateSource?.scope
+    ?? (scope.kind === 'project' && scope.projectId !== undefined
+      ? { kind: 'project' as const, projectId: scope.projectId }
+      : { kind: 'personal' as const })
+  const selectedScopeMode = scopeView?.mode ?? alternateSource?.mode
+    ?? (readOnlyProject ? 'ro' : 'rw')
+  const writeLocked = overviewMode || selectedScopeMode === 'ro'
+  const uploadLocked = overviewMode || selectedScopeMode === 'ro'
+  const remoteScopeView = scopeView !== null || alternateSource !== null
+  const selectedScopeUrl = remoteScopeView ? selectedScope : undefined
+  const documentContentUrl = (docId: UserDocIdType, inline = false): string => {
+    if (selectedScopeUrl === undefined) return userDocs.current.contentUrl(docId, inline)
+    return userDocs.current.scopedContentUrl(selectedScopeUrl, docId, inline)
+  }
 
   const projectExtra = scope.kind === 'project' ? t('delete.confirm.project.extra') : ''
   const visibility = scope.kind === 'project'
@@ -1153,7 +2232,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
       type="button"
       variant="ghost"
       aria-label={t('selection.clear')}
-      onClick={() => { setSelected(new Set()) }}
+      onClick={clearSelection}
     >
       {phone ? t('selection.clear.compact') : t('selection.clear')}
     </Button>
@@ -1163,14 +2242,18 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     ? t('delete.confirm.message.many', { count: String(deleteTargets.length), projectExtra })
     : t('delete.confirm.message', { projectExtra })
 
-  const showPager = filtered.length > PAGE_SIZE
+  const showPager = serverPaging
+    ? serverTotalDocuments === null ? serverNextCursor !== undefined || currentPage > 1 : pages > 1
+    : filtered.length > PAGE_SIZE
   const hasEntries = directories.length > 0 || documents.length > 0
+    || (serverPaging && (serverTotalDocuments ?? 0) > 0)
   const hasVisibleEntries = filteredDirectories.length > 0 || filtered.length > 0
+    || (serverPaging && (serverTotalDocuments ?? 0) > 0)
   const moveOptions = [
     { directoryId: ROOT_DIRECTORY_ID, name: t('breadcrumb.root') },
     ...moveDirectories.map(directory => ({
       directoryId: directory.directoryId,
-      name: String(directory.directoryId),
+      name: directory.name,
     })),
   ].filter(directory => directory.directoryId !== currentDirectoryId)
 
@@ -1250,24 +2333,54 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
         </span>
       </div>
       {phone ? (
-        scopeView === null && alternateSource === null ? (
-          <Button
-            className={css.rowMore}
-            data-documents-row-more="document"
-            type="button"
-            variant="ghost"
-            aria-label={t('action.moreNamed', { name: doc.name })}
-            aria-haspopup="dialog"
-            onClick={() => { setMobileSheet({ kind: 'document', document: doc }) }}
-          >
-            <IconEllipsisOutline16 size={20} />
-          </Button>
+        !overviewMode ? (
+          <>
+            <span className={css.mobileCoreActions}>
+              <Button
+                className={css.mobileCoreAction}
+                type="button"
+                size="sm"
+                variant="ghost"
+                aria-label={t('action.attachNamed', { name: doc.name })}
+                title={t('action.attach')}
+                disabled={busy}
+                icon={<IconPaperclipOutline16 size={18} />}
+                onClick={() => { attachDocument(doc) }}
+              >
+                <span className={css.mobileCoreLabel}>{t('action.attach')}</span>
+              </Button>
+              <Button
+                className={css.mobileCoreAction}
+                type="button"
+                size="sm"
+                variant="ghost"
+                aria-label={t('action.previewNamed', { name: doc.name })}
+                title={t('action.preview')}
+                disabled={busy}
+                icon={<IconInspectOutline12 size={18} />}
+                onClick={() => { setPreviewDoc(doc) }}
+              >
+                <span className={css.mobileCoreLabel}>{t('action.preview')}</span>
+              </Button>
+            </span>
+            <Button
+              className={css.rowMore}
+              data-documents-row-more="document"
+              type="button"
+              variant="ghost"
+              aria-label={t('action.moreNamed', { name: doc.name })}
+              aria-haspopup="dialog"
+              onClick={() => { setMobileSheet({ kind: 'document', document: doc }) }}
+            >
+              <IconEllipsisOutline16 size={20} />
+            </Button>
+          </>
         ) : (
           <span className={css.readOnlyBadge}>{t('scope.readOnly')}</span>
         )
       ) : (
         <span className={css.actions}>
-          {scopeView === null && alternateSource === null && (
+          {!overviewMode && (
             <>
               <Button
                 type="button"
@@ -1312,7 +2425,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
               </Button>
               <a
                 className={css.download}
-                href={userDocs.current.contentUrl(doc.docId)}
+                href={documentContentUrl(doc.docId)}
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={t('action.downloadNamed', { name: doc.name })}
@@ -1345,7 +2458,10 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     </div>
   )
 
-  const closeMobileSheet = () => { setMobileSheet(null) }
+  const closeMobileSheet = () => {
+    if (mobileSheet?.kind === 'scope' && mobileSheet.mode === 'upload') setUploadScopePickerOpen(false)
+    setMobileSheet(null)
+  }
 
   const performMobileDocumentAction = (action: 'attach' | 'preview' | 'move' | 'download' | 'delete', doc: UserDocRef) => {
     setMobileSheet(null)
@@ -1377,7 +2493,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
   }
 
   const performMobileBatchAction = (action: 'move' | 'copy' | 'delete') => {
-    const targets = documents.filter(doc => selected.has(doc.docId))
+    const targets = selectedDocumentList()
     setMobileSheet(null)
     if (action === 'move') void openMove(targets)
     else if (action === 'copy') openCopy(targets)
@@ -1416,12 +2532,12 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
       open
       key={`scope-${mobileSheet.mode}`}
       kind={`scope-${mobileSheet.mode}`}
-      title={mobileSheet.mode === 'source' ? t('copy.source.title') : t('scope.switch.title')}
+      title={mobileSheet.mode === 'source' ? t('copy.source.title') : mobileSheet.mode === 'upload' ? t('scope.upload.choose') : t('scope.switch.title')}
       closeLabel={t('modal.close')}
       onClose={closeMobileSheet}
     >
       <p className={css.sheetDescription}>
-        {mobileSheet.mode === 'source' ? t('copy.source.message') : t('scope.switch.message')}
+        {mobileSheet.mode === 'source' ? t('copy.source.message') : mobileSheet.mode === 'upload' ? t('scope.upload.root') : t('scope.switch.message')}
       </p>
       {mobileScopeOptions.length > 1 && (
         <Input
@@ -1447,8 +2563,12 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
         {filteredMobileScopeOptions.length === 0 ? (
           <p className={css.sheetStatus}>{t('modal.noResults')}</p>
         ) : filteredMobileScopeOptions.map((option) => {
-          const selectedOption = mobileSheet.mode === 'view' && option.value === mobileScopeValue
-          const disabled = busy || loading || overviewLoading || sourcePickerLoading || uploadScopePickerOpen
+          const selectedOption = mobileSheet.mode === 'source'
+            ? option.value === sourcePickerValue
+            : mobileSheet.mode === 'upload'
+              ? option.value === uploadScopePickerValue
+              : option.value === mobileScopeValue
+          const disabled = busy || loading || overviewLoading || sourcePickerLoading
           return (
             <button
               key={option.value}
@@ -1481,83 +2601,94 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
       closeLabel={t('modal.close')}
       onClose={closeMobileSheet}
     >
-      <section className={css.sheetSection} aria-label={t('modal.filters')}>
-        <h3 className={css.sheetSectionTitle}>{t('modal.filters')}</h3>
-        <label className={css.sheetLabel} htmlFor="documents-mobile-type">{t('modal.type')}</label>
-        <select
-          id="documents-mobile-type"
-          className={css.sheetSelect}
-          value={typeFilter}
-          disabled={busy}
-          onChange={(event) => { setTypeFilter(event.currentTarget.value as DocumentTypeFilter) }}
-        >
-          {TYPE_OPTIONS.map(option => <option key={option.value} value={option.value}>{t(option.label)}</option>)}
-        </select>
-        <label className={css.sheetLabel} htmlFor="documents-mobile-sort">{t('modal.sort')}</label>
-        <select
-          id="documents-mobile-sort"
-          className={css.sheetSelect}
-          value={sortValue}
-          disabled={busy}
-          onChange={(event) => { setSortValue(event.currentTarget.value) }}
-        >
-          {SORT_OPTIONS.map(option => <option key={option.value} value={option.value}>{t(option.label)}</option>)}
-        </select>
-      </section>
-      <div className={css.sheetActions} role="list">
-        <Button
-          className={css.sheetAction}
-          type="button"
-          variant="ghost"
-          disabled={busy || writeLocked}
-          icon={<IconFolderClose16 size={18} />}
-          onClick={() => { closeMobileSheet(); openCreateDirectory() }}
-        >
-          {t('folder.create')}
-        </Button>
-        <Button
-          className={css.sheetAction}
-          type="button"
-          variant="ghost"
-          disabled={busy}
-          icon={<IconRefreshOutline16 size={18} />}
-          onClick={() => { closeMobileSheet(); void refreshDisplayed() }}
-        >
-          {t('modal.refresh')}
-        </Button>
-        <Button
-          className={css.sheetAction}
-          type="button"
-          variant="ghost"
-          disabled={busy || historyLoading || overviewMode}
-          onClick={() => { closeMobileSheet(); void openHistory() }}
-        >
-          {t('history.button')}
-        </Button>
-        {scopeView === null && alternateSource === null && sourceOptions.length > 0 && (
+      <Button
+        className={css.sheetAction}
+        type="button"
+        variant="ghost"
+        disabled={busy || trashLoading}
+        onClick={() => { closeMobileSheet(); void (trashMode ? load(ROOT_DIRECTORY_ID) : openTrash()) }}
+      >
+        {trashMode ? t('trash.back') : t('trash.button')}
+      </Button>
+      {!trashMode && <>
+        <section className={css.sheetSection} aria-label={t('modal.filters')}>
+          <h3 className={css.sheetSectionTitle}>{t('modal.filters')}</h3>
+          <label className={css.sheetLabel} htmlFor="documents-mobile-type">{t('modal.type')}</label>
+          <select
+            id="documents-mobile-type"
+            className={css.sheetSelect}
+            value={typeFilter}
+            disabled={busy}
+            onChange={(event) => { setTypeFilter(event.currentTarget.value as DocumentTypeFilter) }}
+          >
+            {TYPE_OPTIONS.map(option => <option key={option.value} value={option.value}>{t(option.label)}</option>)}
+          </select>
+          <label className={css.sheetLabel} htmlFor="documents-mobile-sort">{t('modal.sort')}</label>
+          <select
+            id="documents-mobile-sort"
+            className={css.sheetSelect}
+            value={sortValue}
+            disabled={busy}
+            onChange={(event) => { setSortValue(event.currentTarget.value) }}
+          >
+            {SORT_OPTIONS.map(option => <option key={option.value} value={option.value}>{t(option.label)}</option>)}
+          </select>
+        </section>
+        <div className={css.sheetActions} role="list">
+          <Button
+            className={css.sheetAction}
+            type="button"
+            variant="ghost"
+            disabled={busy || writeLocked}
+            icon={<IconFolderClose16 size={18} />}
+            onClick={() => { closeMobileSheet(); openCreateDirectory() }}
+          >
+            {t('folder.create')}
+          </Button>
           <Button
             className={css.sheetAction}
             type="button"
             variant="ghost"
             disabled={busy}
-            icon={<IconBrowseOutline16 size={18} />}
-            onClick={() => { openMobileScopeSheet('source') }}
+            icon={<IconRefreshOutline16 size={18} />}
+            onClick={() => { closeMobileSheet(); void refreshDisplayed() }}
           >
-            {t('copy.source')}
+            {t('modal.refresh')}
           </Button>
-        )}
-        {(scopeView !== null || alternateSource !== null) && (
           <Button
             className={css.sheetAction}
             type="button"
             variant="ghost"
-            disabled={busy}
-            onClick={() => { closeMobileSheet(); void load(ROOT_DIRECTORY_ID) }}
+            disabled={busy || historyLoading || overviewMode}
+            onClick={() => { closeMobileSheet(); void openHistory() }}
           >
-            {t('copy.source.current')}
+            {t('history.button')}
           </Button>
-        )}
-      </div>
+          {scopeView === null && alternateSource === null && sourceOptions.length > 0 && (
+            <Button
+              className={css.sheetAction}
+              type="button"
+              variant="ghost"
+              disabled={busy}
+              icon={<IconBrowseOutline16 size={18} />}
+              onClick={() => { openMobileScopeSheet('source') }}
+            >
+              {t('copy.source')}
+            </Button>
+          )}
+          {(scopeView !== null || alternateSource !== null) && (
+            <Button
+              className={css.sheetAction}
+              type="button"
+              variant="ghost"
+              disabled={busy}
+              onClick={() => { closeMobileSheet(); void load(ROOT_DIRECTORY_ID) }}
+            >
+              {t('copy.source.current')}
+            </Button>
+          )}
+        </div>
+      </>}
     </DocumentsMobileSheet>
   ) : mobileSheet?.kind === 'document' ? (
     <DocumentsMobileSheet
@@ -1578,7 +2709,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
         <Button className={css.sheetAction} type="button" variant="ghost" disabled={busy || writeLocked} icon={<IconFolderOpenOutline16 size={18} />} onClick={() => { performMobileDocumentAction('move', mobileSheet.document) }}>{t('action.move')}</Button>
         <a
           className={css.sheetActionLink}
-          href={userDocs.current.contentUrl(mobileSheet.document.docId)}
+          href={documentContentUrl(mobileSheet.document.docId)}
           target="_blank"
           rel="noopener noreferrer"
           aria-label={t('action.downloadNamed', { name: mobileSheet.document.name })}
@@ -1617,7 +2748,8 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
         <strong>{mobileSheet.row.name}</strong>
         <small>{mobileSheet.row.scope.label} · {formatBytes(mobileSheet.row.bytes)} · {mobileSheet.row.owner?.displayName ?? t('scope.owner.unknown')}</small>
       </div>
-      <Button className={css.sheetAction} type="button" variant="primary" disabled={overviewLoading} icon={<IconCopyOutline16 size={18} />} onClick={() => { closeMobileSheet(); void openOverviewCopy(mobileSheet.row) }}>{t('scope.copy')}</Button>
+      <Button className={css.sheetAction} type="button" variant="outline" disabled={overviewLoading} onClick={() => { closeMobileSheet(); void openOverviewView(mobileSheet.row) }}>{t('scope.view')}</Button>
+      <Button className={css.sheetAction} type="button" variant="primary" disabled={overviewLoading} icon={<IconCopyOutline16 size={18} />} onClick={() => { closeMobileSheet(); void openOverviewCopy(mobileSheet.row) }}>{mode === 'select' && sameDocumentScope(catalogRowScope(mobileSheet.row), currentScopeDescriptor()) ? t('action.attach') : mode === 'select' ? t('scope.copyAndAttach') : t('scope.copy')}</Button>
     </DocumentsMobileSheet>
   ) : mobileSheet?.kind === 'selection' ? (
     <DocumentsMobileSheet
@@ -1630,6 +2762,9 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
     >
       <p className={css.sheetDescription}>{t('selection.selected', { count: String(selected.size) })}</p>
       <div className={css.sheetActions} role="list">
+        {mode === 'select' && (
+          <Button className={css.sheetAction} type="button" variant="primary" disabled={busy || onAttachDocument === undefined} icon={<IconPaperclipOutline16 size={18} />} onClick={() => { void attachSelectedDocuments() }}>{t('selection.attach')}</Button>
+        )}
         <Button className={css.sheetAction} type="button" variant="ghost" disabled={busy || writeLocked} icon={<IconFolderOpenOutline16 size={18} />} onClick={() => { performMobileBatchAction('move') }}>{t('selection.move')}</Button>
         <Button className={css.sheetAction} type="button" variant="ghost" disabled={busy} icon={<IconCopyOutline16 size={18} />} onClick={() => { performMobileBatchAction('copy') }}>{t('selection.copy')}</Button>
         <Button className={`${css.sheetAction} ${css.sheetDanger}`} type="button" variant="ghost" disabled={busy || writeLocked} icon={<IconTrashOutline16 size={18} />} onClick={() => { performMobileBatchAction('delete') }}>{t('selection.delete')}</Button>
@@ -1644,16 +2779,28 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
           type="button"
           variant="outline"
           disabled={currentPage <= 1 || busy}
-          onClick={() => { setPage(currentPage - 1) }}
+          onClick={() => {
+            const next = currentPage - 1
+            if (serverPaging) void loadServerPage(next)
+            else setPage(next)
+          }}
         >
           {t('pager.prev')}
         </Button>
-        <span>{t('pager.status', { page: String(currentPage), pages: String(pages) })}</span>
+        <span>{t('pager.status', {
+          page: String(currentPage), pages: serverPaging && serverTotalDocuments === null ? '…' : String(pages),
+        })}</span>
         <Button
           type="button"
           variant="outline"
-          disabled={currentPage >= pages || busy}
-          onClick={() => { setPage(currentPage + 1) }}
+          disabled={busy || (serverPaging
+            ? serverNextCursor === undefined
+            : currentPage >= pages)}
+          onClick={() => {
+            const next = currentPage + 1
+            if (serverPaging) void loadServerPage(next)
+            else setPage(next)
+          }}
         >
           {t('pager.next')}
         </Button>
@@ -1676,6 +2823,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
         <div className={css.workbench}>
           <aside className={css.scopeRail} aria-label={t('scope.rail.label')}>
             <div className={css.scopeRailHeading}>{t('scope.rail.title')}</div>
+            {scopeStatus === 'stale' && <div className={css.scopeStale} role="status"><span>{t('scope.stale')}</span><button type="button" onClick={() => { scopeCache.current = null; void load(ROOT_DIRECTORY_ID) }}>{t('scope.retry')}</button></div>}
             <button type="button" className={`${css.scopeItem} ${overviewMode ? css.scopeItemActive : ''}`} onClick={() => { void openOverview() }} disabled={busy || overviewLoading || loading}>
               <span className={css.scopeItemIcon} aria-hidden="true"><IconBrowseOutline16 size={16} /></span>
               <span><strong>{t('scope.all')}</strong><small>{t('scope.all.description')}</small></span>
@@ -1693,27 +2841,31 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
             })}
           </aside>
           <div className={css.workbenchContent}>
+            {mode === 'select' && <div className={css.selectionModeNotice} role="status">{t('selection.mode.hint')}</div>}
             {phone && (
-              <button
-                type="button"
-                className={css.scopeTrigger}
-                data-documents-scope-trigger=""
-                data-testid="documents-scope-trigger"
-                aria-haspopup="dialog"
-                aria-expanded={mobileSheet?.kind === 'scope' && mobileSheet.mode === 'view'}
-                disabled={busy || loading || overviewLoading}
-                onClick={() => { openMobileScopeSheet('view') }}
-              >
-                <span className={css.scopeItemIcon} aria-hidden="true"><IconBrowseOutline16 size={18} /></span>
-                <span className={css.scopeTriggerCopy}>
-                  <strong>{mobileScopeLabel}</strong>
-                  <small>{visibleScope}</small>
-                </span>
-                <IconChevronDownOutline14 className={css.scopeTriggerChevron} size={14} />
-              </button>
+              <>
+                <button
+                  type="button"
+                  className={css.scopeTrigger}
+                  data-documents-scope-trigger=""
+                  data-testid="documents-scope-trigger"
+                  aria-haspopup="dialog"
+                  aria-expanded={mobileSheet?.kind === 'scope' && mobileSheet.mode === 'view'}
+                  disabled={busy || loading || overviewLoading}
+                  onClick={() => { openMobileScopeSheet('view') }}
+                >
+                  <span className={css.scopeItemIcon} aria-hidden="true"><IconBrowseOutline16 size={18} /></span>
+                  <span className={css.scopeTriggerCopy}>
+                    <strong>{mobileScopeLabel}</strong>
+                    <small>{visibleScope}</small>
+                  </span>
+                  <IconChevronDownOutline14 className={css.scopeTriggerChevron} size={14} />
+                </button>
+                {scopeStatus === 'stale' && <div className={css.scopeStaleMobile} role="status"><span>{t('scope.stale')}</span><button type="button" onClick={() => { scopeCache.current = null; void load(ROOT_DIRECTORY_ID) }}>{t('scope.retry')}</button></div>}
+              </>
             )}
             <div
-              className={`${css.panel}${dropActive ? ` ${css.dropActive}` : ''}${overviewMode ? ` ${css.overviewPanel}` : ''}`}
+              className={`${css.panel}${dropActive ? ` ${css.dropActive}` : ''}${overviewMode ? ` ${css.overviewPanel}` : ''}${trashMode ? ` ${css.trashPanel}` : ''}`}
               data-documents-panel=""
               onDragEnter={onDragEnter}
               onDragOver={onDragOver}
@@ -1721,25 +2873,45 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
               onDrop={onDrop}
             >
               {error !== '' && <div className={css.error} role="alert">{error}</div>}
+              {notice !== '' && <div className={css.notice} role="status">{notice}</div>}
               {overviewMode && (
                 <section className={css.overview} aria-label={t('scope.all')}>
                   <header className={css.overviewHeader}>
                     <div><h2>{t('scope.all')}</h2><p>{t('scope.all.description')}</p></div>
                     <div className={css.overviewActions}>
                       <Button type="button" variant="primary" icon={<IconPlusOutline16 size={16} />} disabled={overviewLoading || busy} onClick={openUploadScopePicker}>{t('scope.upload.choose')}</Button>
-                      <Button type="button" variant="ghost" icon={<IconRefreshOutline16 size={16} />} disabled={overviewLoading || busy} onClick={() => { void openOverview() }}>{t('modal.refresh')}</Button>
+                      <Button type="button" variant="ghost" icon={<IconRefreshOutline16 size={16} />} disabled={overviewLoading || busy} onClick={() => { void openOverview(true) }}>{t('modal.refresh')}</Button>
                     </div>
                   </header>
+                  <div className={css.overviewToolbar} role="group" aria-label={t('modal.filters')}>
+                    <Input
+                      className={css.search as string}
+                      icon={<IconSearchOutline16 size={16} />}
+                      placeholder={t('modal.search')}
+                      value={query}
+                      onChange={(event) => { setQuery(event.target.value) }}
+                    />
+                    {!phone && <>
+                      <select className={css.select} aria-label={t('modal.type')} value={typeFilter} onChange={(event) => { setTypeFilter(event.currentTarget.value as DocumentTypeFilter) }}>
+                        {TYPE_OPTIONS.map(option => <option key={option.value} value={option.value}>{t(option.label)}</option>)}
+                      </select>
+                      <select className={css.select} aria-label={t('modal.sort')} value={sortValue} onChange={(event) => { setSortValue(event.currentTarget.value) }}>
+                        {SORT_OPTIONS.map(option => <option key={option.value} value={option.value}>{t(option.label)}</option>)}
+                      </select>
+                    </>}
+                  </div>
                   {overviewError !== '' && <div className={css.error} role="alert">{overviewError}</div>}
-                  {overviewLoading ? <p className={css.status}>{t('scope.all.loading')}</p> : overviewRows.length === 0 ? <p className={css.empty}>{t('scope.all.empty')}</p> : (
+                  {overviewLoading ? <p className={css.status}>{t('scope.all.loading')}</p> : overviewFiltered.length === 0 ? <p className={css.empty}>{t('scope.all.empty')}</p> : (
                     <div className={css.overviewList} role="list" data-documents-scrollport="overview">
-                      {overviewRows.map(row => <div key={row.catalogId} className={css.overviewRow} role="listitem">
+                      {overviewPageRows.map(row => <div key={row.catalogId} className={css.overviewRow} role="listitem">
                         <span className={css.fileIcon} aria-hidden="true"><IconBrowseOutline16 size={16} /></span>
                         <div className={css.meta}>
                           <span className={css.name} title={row.name}>{row.name}</span>
                           <span className={css.size}>{overviewMetaLabel(row, t)}</span>
                         </div>
-                        {phone ? (
+                        {mode === 'select' ? (
+                          <Button className={css.overviewAttach} type="button" size="sm" variant="primary" disabled={overviewLoading} onClick={() => { void openOverviewCopy(row) }}>{sameDocumentScope(catalogRowScope(row), currentScopeDescriptor()) ? t('action.attach') : t('scope.copyAndAttach')}</Button>
+                        ) : phone ? (
                           <Button
                             className={css.rowMore}
                             data-documents-row-more="overview"
@@ -1753,11 +2925,76 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
                             <IconEllipsisOutline16 size={20} />
                           </Button>
                         ) : (
-                          <Button type="button" size="sm" variant="outline" disabled={overviewLoading} onClick={() => { void openOverviewCopy(row) }}>{t('scope.copy')}</Button>
+                          <span className={css.overviewRowActions}>
+                            <Button type="button" size="sm" variant="ghost" disabled={overviewLoading} onClick={() => { void openOverviewView(row) }}>{t('scope.view')}</Button>
+                            <Button type="button" size="sm" variant="outline" disabled={overviewLoading} onClick={() => { void openOverviewCopy(row) }}>{t('scope.copy')}</Button>
+                          </span>
                         )}
                       </div>)}
                     </div>
                   )}
+                  {overviewPages > 1 && <div className={css.overviewPager}>
+                    <Button type="button" variant="outline" disabled={overviewCurrentPage <= 1 || overviewLoading} onClick={() => {
+                      const previous = overviewCurrentPage - 1
+                      if (overviewServerPaging) {
+                        void loadOverviewPage(
+                          previous,
+                          previous <= 1 ? undefined : overviewCursors.current[previous - 1],
+                        )
+                      }
+                      else setOverviewPage(previous)
+                    }}>{t('pager.prev')}</Button>
+                    <span>{t('pager.status', {
+                      page: String(overviewCurrentPage),
+                      pages: overviewServerPaging && overviewTotalDocuments === null ? '…' : String(overviewPages),
+                    })}</span>
+                    <Button type="button" variant="outline" disabled={overviewServerPaging ? overviewNextCursor === undefined || overviewLoading : overviewCurrentPage >= overviewPages || overviewLoading} onClick={() => {
+                      const next = overviewCurrentPage + 1
+                      if (overviewServerPaging && overviewNextCursor !== undefined) {
+                        overviewCursors.current[overviewCurrentPage] = overviewNextCursor
+                        void loadOverviewPage(next, overviewNextCursor)
+                      } else setOverviewPage(next)
+                    }}>{t('pager.next')}</Button>
+                  </div>}
+                </section>
+              )}
+              {trashMode && (
+                <section className={css.trash} aria-label={t('trash.title')}>
+                  <header className={css.trashHeader}>
+                    <div><h2>{t('trash.title')}</h2><p>{visibleScope}</p></div>
+                    <Button type="button" variant="ghost" disabled={busy || trashLoading} onClick={() => { void openTrash() }}>
+                      {t('modal.refresh')}
+                    </Button>
+                  </header>
+                  {trashLoading ? <p className={css.status}>{t('modal.loading')}</p> : trashDocuments.length === 0 ? <p className={css.empty}>{t('trash.empty')}</p> : (
+                    <div className={css.trashList} role="list">
+                      {trashDocuments.map(document => (
+                        <div key={document.docId} className={css.trashRow} role="listitem">
+                          <span className={css.fileIcon} aria-hidden="true"><IconBrowseOutline16 size={16} /></span>
+                          <div className={css.meta}>
+                            <span className={css.name} title={document.name}>{document.name}</span>
+                            <span className={css.size}>{formatBytes(document.bytes)} · {trashMetaLabel(document, t)}</span>
+                          </div>
+                          <div className={css.trashActions}>
+                            <Button type="button" size="sm" variant="outline" aria-label={t('trash.restoreNamed', { name: document.name })} disabled={busy || writeLocked} onClick={() => { void restoreTrashDocument(document) }}>{t('trash.restore')}</Button>
+                            <Button type="button" size="sm" variant="ghost" className={css.delete} aria-label={t('trash.purgeNamed', { name: document.name })} disabled={busy || writeLocked} onClick={() => { purgeTrashDocument(document) }}>{t('trash.purge')}</Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {!trashLoading && (trashNextCursor !== undefined || trashPage > 1) && <div className={css.overviewPager}>
+                    <Button type="button" variant="outline" disabled={trashPage <= 1 || busy} onClick={() => {
+                      const previous = trashPage - 1
+                      void openTrash(previous <= 1 ? undefined : trashCursors.current[previous - 1], previous)
+                    }}>{t('pager.prev')}</Button>
+                    <span>{t('pager.status', { page: String(trashPage), pages: trashNextCursor === undefined ? String(trashPage) : '…' })}</span>
+                    <Button type="button" variant="outline" disabled={trashNextCursor === undefined || busy} onClick={() => {
+                      if (trashNextCursor === undefined) return
+                      trashCursors.current[trashPage] = trashNextCursor
+                      void openTrash(trashNextCursor, trashPage + 1)
+                    }}>{t('pager.next')}</Button>
+                  </div>}
                 </section>
               )}
 
@@ -1782,17 +3019,19 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
                 <div className={`${css.scopeNotice} ${scopeView.canUpload ? css.scopeNoticeTarget : css.scopeNoticeReadOnly}`} role="status">
                   <span className={css.scopeNoticeIcon} aria-hidden="true"><IconFolderClose16 size={16} /></span>
                   <span className={css.scopeNoticeCopy}>
-                    <strong>{t('scope.upload.target', { name: scopeView.label })}</strong>
-                    <small>{scopeView.canUpload ? t('scope.upload.root') : t('scope.upload.readOnly', { name: scopeView.label })}</small>
+                    <strong>{scopeView.canUpload
+                      ? t('scope.upload.target', { name: scopeView.label })
+                      : scopeView.label}</strong>
+                    <small>{scopeView.canUpload ? t('scope.manage.editable') : t('scope.upload.readOnly', { name: scopeView.label })}</small>
                   </span>
                 </div>
               )}
               {alternateSource !== null && (
-                <div className={`${css.scopeNotice} ${css.scopeNoticeReadOnly}`} role="status">
+                <div className={`${css.scopeNotice} ${alternateSource.mode === 'rw' ? css.scopeNoticeTarget : css.scopeNoticeReadOnly}`} role="status">
                   <span className={css.scopeNoticeIcon} aria-hidden="true"><IconBrowseOutline16 size={16} /></span>
                   <span className={css.scopeNoticeCopy}>
-                    <strong>{t('copy.source.viewing', { name: alternateSource.label })}</strong>
-                    <small>{t('scope.source.readOnly')}</small>
+                    <strong>{alternateSource.label}</strong>
+                    <small>{alternateSource.mode === 'rw' ? t('scope.manage.editable') : t('scope.source.readOnly')}</small>
                   </span>
                 </div>
               )}
@@ -1845,7 +3084,17 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
                   />
                   {phone ? (
                     <>
-                      {alternateSource === null && !overviewMode && uploadButton}
+                      {trashMode ? (
+                        <Button
+                          className={css.trashToggle}
+                          type="button"
+                          variant="outline"
+                          disabled={busy || trashLoading}
+                          onClick={() => { void load(ROOT_DIRECTORY_ID) }}
+                        >
+                          {t('trash.back')}
+                        </Button>
+                      ) : alternateSource === null && !overviewMode && uploadButton}
                       <Button
                         className={css.mobileMore}
                         data-documents-toolbar-more=""
@@ -1863,7 +3112,16 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
                     </>
                   ) : (
                     <>
-                      {scopeView === null && alternateSource === null && sourceOptions.length > 0 && (
+                      <Button
+                        className={css.trashToggle}
+                        type="button"
+                        variant="outline"
+                        disabled={busy || trashLoading}
+                        onClick={() => { void (trashMode ? load(ROOT_DIRECTORY_ID) : openTrash()) }}
+                      >
+                        {trashMode ? t('trash.back') : t('trash.button')}
+                      </Button>
+                      {!trashMode && scopeView === null && alternateSource === null && sourceOptions.length > 0 && (
                         <Button
                           className={css.sourceAction}
                           type="button"
@@ -1875,7 +3133,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
                           {t('copy.source')}
                         </Button>
                       )}
-                      {(scopeView !== null || alternateSource !== null) && (
+                      {!trashMode && (scopeView !== null || alternateSource !== null) && (
                         <Button
                           className={css.sourceAction}
                           type="button"
@@ -1886,7 +3144,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
                           {t('copy.source.current')}
                         </Button>
                       )}
-                      <Button
+                      {!trashMode && <Button
                         className={css.newFolder}
                         type="button"
                         variant="outline"
@@ -1895,9 +3153,9 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
                         onClick={openCreateDirectory}
                       >
                         {t('folder.create')}
-                      </Button>
-                      {alternateSource === null && !overviewMode && uploadButton}
-                      <Button
+                      </Button>}
+                      {!trashMode && alternateSource === null && !overviewMode && uploadButton}
+                      {!trashMode && <Button
                         className={css.refresh}
                         type="button"
                         variant="ghost"
@@ -1905,15 +3163,15 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
                         disabled={busy}
                         icon={<IconRefreshOutline16 size={16} />}
                         onClick={() => { void refreshDisplayed() }}
-                      />
-                      <Button
+                      />}
+                      {!trashMode && <Button
                         type="button"
                         variant="ghost"
                         disabled={busy || historyLoading || overviewMode}
                         onClick={() => { void openHistory() }}
                       >
                         {t('history.button')}
-                      </Button>
+                      </Button>}
                     </>
                   )}
                 </div>
@@ -1921,18 +3179,28 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
 
               <div className={css.caption}>
                 <span>{visibleScope}</span>
-                {!loading && <span>{t('modal.count', { count: String(filtered.length) })}</span>}
+                {!loading && <span>{t('modal.count', { count: String(totalDocuments ?? filtered.length) })}</span>}
               </div>
 
               {selected.size > 0 && (
                 <div className={`${css.selectionBar} ${css.desktopSelectionBar}`}>
                   <span>{selectionLabel}</span>
                   {clearSelectionButton}
+                  {mode === 'select' && (
+                    <Button
+                      type="button"
+                      variant="primary"
+                      disabled={busy || onAttachDocument === undefined}
+                      onClick={() => { void attachSelectedDocuments() }}
+                    >
+                      {t('selection.attach')}
+                    </Button>
+                  )}
                   <Button
                     type="button"
                     variant="ghost"
                     disabled={busy || writeLocked}
-                    onClick={() => { void openMove(documents.filter(doc => selected.has(doc.docId))) }}
+                    onClick={() => { void openMove(selectedDocumentList()) }}
                   >
                     {t('selection.move')}
                   </Button>
@@ -1940,7 +3208,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
                     type="button"
                     variant="ghost"
                     disabled={busy}
-                    onClick={() => { openCopy(documents.filter(doc => selected.has(doc.docId))) }}
+                    onClick={() => { openCopy(selectedDocumentList()) }}
                   >
                     {t('selection.copy')}
                   </Button>
@@ -1950,7 +3218,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
                     variant="primary"
                     disabled={busy || writeLocked}
                     onClick={() => {
-                      setDeleteTargets(documents.filter(doc => selected.has(doc.docId)))
+                      setDeleteTargets(selectedDocumentList())
                     }}
                   >
                     {t('selection.delete')}
@@ -1972,7 +3240,10 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
               )}
 
               {loading ? (
-                <p className={css.status}>{t('modal.loading')}</p>
+                <div className={css.loadingState} role="status" aria-live="polite">
+                  <span className={css.visuallyHidden}>{t('modal.loading')}</span>
+                  {[0, 1, 2].map(index => <span key={index} className={css.loadingRow} aria-hidden="true" />)}
+                </div>
               ) : !hasEntries ? (
                 <div className={css.emptyState}>
                   <p className={css.empty}>{t('modal.empty')}</p>
@@ -2070,6 +3341,29 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
               ))}
             </ol>
           )}
+        </Modal>
+      )}
+
+      {purgeTarget !== null && (
+        <Modal
+          open
+          onClose={() => { if (!busy) setPurgeTarget(null) }}
+          title={t('trash.purge')}
+          closeLabel={t('modal.close')}
+          className={css.confirmDialog as string}
+          footer={(
+            <>
+              <Button type="button" variant="outline" disabled={busy} onClick={() => { setPurgeTarget(null) }}>
+                {t('modal.cancel')}
+              </Button>
+              <Button type="button" variant="primary" disabled={busy || writeLocked} onClick={() => { void confirmPurgeTrash() }}>
+                {t('trash.purge')}
+              </Button>
+            </>
+          )}
+        >
+          <p className={css.confirm}>{t('trash.purge.confirm')}</p>
+          <p className={css.confirm}>{purgeTarget.name}</p>
         </Modal>
       )}
 
@@ -2350,7 +3644,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
         </Modal>
       )}
 
-      {uploadScopePickerOpen && (
+      {uploadScopePickerOpen && !phone && (
         <Modal
           open
           onClose={() => { if (!busy) setUploadScopePickerOpen(false) }}
@@ -2397,6 +3691,9 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, onAt
       {previewDoc && (
         <DocumentPreview
           doc={previewDoc}
+          {...((scopeView?.scope ?? alternateSource?.scope) === undefined
+            ? {}
+            : { scope: scopeView?.scope ?? alternateSource?.scope })}
           maxTextBytes={MAX_PREVIEW_TEXT_BYTES}
           onClose={() => { setPreviewDoc(null) }}
           t={t}

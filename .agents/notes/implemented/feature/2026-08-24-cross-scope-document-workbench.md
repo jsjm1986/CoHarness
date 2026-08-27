@@ -14,7 +14,7 @@ Migration 012 adds an organization-scoped metadata catalog, operation items, and
 
 The transfer broker accepts authorized personal/project pairs, including project-to-project copies. A short-lived metadata plan is consumed by commit; retries recheck authorization and preserve per-file outcomes. Target folders are listed or created through the target runtime, and administrator fan-out is restricted to organization administrators. The browser receives metadata only for the all-scope overview and can enter a scope or create a snapshot before previewing content.
 
-The Web manager is a full-height overlay with a scope rail, metadata-only overview, target-folder copy flow, and current-scope history. Selecting a personal or project scope keeps that one overlay mounted and changes its content to an explicitly read-only metadata view; it does not create a nested dialog or browser window. Admin has a separate Documents route with metrics, filters, metadata table, lineage/history detail, ownership transfer, and explicit metadata-delete confirmation.
+The Web manager is a full-height overlay with a scope rail, metadata-only overview, target-folder copy flow, and current-scope history. Selecting a personal or project scope keeps that one overlay mounted and changes its content to the selected scope's authorized browser; read-only memberships disable writes while writable scopes expose folder and document lifecycle actions. It does not create a nested dialog or browser window. Admin has a separate Documents route with metrics, filters, metadata table, lineage/history detail, ownership transfer, and explicit metadata-delete confirmation.
 
 ## Alternatives considered
 

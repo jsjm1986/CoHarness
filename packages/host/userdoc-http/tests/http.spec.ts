@@ -1,6 +1,6 @@
 import { createServer, type Server } from 'node:http'
 import { createHash } from 'node:crypto'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { AddressInfo } from 'node:net'
@@ -14,6 +14,8 @@ import {
   handleUserDocHttp,
   USERDOC_HTTP_PATH,
   USERDOC_UPLOADS_PATH,
+  USERDOC_TRASH_PATH,
+  USERDOC_RESTORE_PATH,
 } from '../src/index.ts'
 
 let root: string
@@ -90,7 +92,7 @@ describe('user-document HTTP consumer', () => {
     const completed = await created.json() as { ref: { docId: string; path: string; name: string; bytes: number } }
     const ref = completed.ref
     expect(ref).toMatchObject({ name: '年报.txt', bytes: 5 })
-    expect(await readFile(ref.path, 'utf8')).toBe('hello')
+    expect(ref.path).toBe('')
 
     const listed = await fetch(`${origin}${USERDOC_HTTP_PATH}`)
     expect(listed.status).toBe(200)
@@ -116,6 +118,39 @@ describe('user-document HTTP consumer', () => {
     expect((await fetch(remove, { method: 'DELETE' })).status).toBe(204)
     expect((await fetch(remove, { method: 'DELETE' })).status).toBe(204)
     expect(await (await fetch(`${origin}${USERDOC_HTTP_PATH}`)).json()).toMatchObject({ documents: [] })
+  })
+
+  it('returns an opaque-path-free paged listing and restores trash entries', async () => {
+    const upload = async (name: string): Promise<string> => {
+      const started = await beginUpload(name, 1, name)
+      const session = await started.json() as { uploadId: string }
+      await uploadChunk(session.uploadId, 0, 'x', 1, 0)
+      const completed = await completeUpload(session.uploadId, 'x')
+      return (await completed.json() as { ref: { docId: string } }).ref.docId
+    }
+    const first = await upload('a.txt')
+    await upload('b.txt')
+    const page = await fetch(`${origin}${USERDOC_HTTP_PATH}?directory=&limit=1`)
+    expect(page.status).toBe(200)
+    const pageBody = await page.json() as { documents: Array<{ path?: string }>; nextCursor?: string }
+    expect(pageBody.documents).toHaveLength(1)
+    expect(pageBody.documents[0]?.path).toBe('')
+    expect(pageBody.nextCursor).toBeTypeOf('string')
+    const nextPage = await fetch(`${origin}${USERDOC_HTTP_PATH}?directory=&limit=1&cursor=${encodeURIComponent(pageBody.nextCursor ?? '')}`)
+    expect(nextPage.status).toBe(200)
+    expect((await nextPage.json() as { documents: unknown[] }).documents).toHaveLength(1)
+
+    const trashed = await fetch(`${origin}${USERDOC_TRASH_PATH}?id=${encodeURIComponent(first)}`, { method: 'POST' })
+    expect(trashed.status).toBe(200)
+    const trashAfterDelete = await (await fetch(`${origin}${USERDOC_TRASH_PATH}`)).json() as {
+      documents: unknown[]
+    }
+    expect(trashAfterDelete.documents).toHaveLength(1)
+    expect((await fetch(`${origin}${USERDOC_RESTORE_PATH}?id=${encodeURIComponent(first)}`, { method: 'POST' })).status).toBe(200)
+    const trashAfterRestore = await (await fetch(`${origin}${USERDOC_TRASH_PATH}`)).json() as {
+      documents: unknown[]
+    }
+    expect(trashAfterRestore.documents).toHaveLength(0)
   })
 
   it('rejects the removed one-request upload protocol', async () => {

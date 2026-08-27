@@ -284,6 +284,34 @@ describe('Gateway document transfer broker', () => {
     expect(fetch).toHaveBeenCalledTimes(6)
   })
 
+  it('cancels a source response body when target upload setup fails early', async () => {
+    const runtime = fixture()
+    let cancelled = false
+    const sourceBody = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('hello'))
+      },
+      cancel() {
+        cancelled = true
+      },
+    })
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(new Response(sourceBody, {
+        status: 200,
+        headers: { 'content-type': 'text/plain', 'content-length': '5' },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { code: 'UPLOAD_BUSY', message: 'busy' } }), { status: 503 })))
+    const result = await runtime.handler({
+      request: {} as never, subject: SUBJECT, principal: PRINCIPAL,
+      payload: {
+        version: 1, source: { kind: 'personal' }, target: { kind: 'project', projectId: 41 },
+        documents: [{ docId: 'early-failure.txt' }],
+      }, signal: new AbortController().signal,
+    })
+    expect(result.items).toMatchObject([{ status: 'failed', error: { code: 'UPLOAD_BUSY' } }])
+    expect(cancelled).toBe(true)
+  })
+
   it('allows a ro project source to copy into personal scope', async () => {
     const runtime = fixture()
     const principal: GatewayPrincipalClaims = {
@@ -446,10 +474,30 @@ describe('Gateway document transfer broker', () => {
       version: 1,
       current: { kind: 'personal', label: 'Personal documents' },
       targets: [
+        { scope: { kind: 'personal', }, label: 'Personal documents', canRead: true, canWrite: true },
         { scope: { kind: 'project', projectId: 41 }, label: 'Compiler', canRead: true, canWrite: true },
         { scope: { kind: 'project', projectId: 42 }, label: 'Read only', canRead: true, canWrite: false },
         { scope: { kind: 'project', projectId: 43 }, label: 'Runtime', canRead: true, canWrite: true },
       ],
+    })
+  })
+
+  it('advertises the active project as a target for all-scope copies', async () => {
+    const runtime = fixture()
+    const subject: RuntimeCredentialSubject = {
+      organizationId: 'org', target: { kind: 'project', id: 41 }, generation: 2,
+      projectInternalId: 'project-internal',
+    }
+    const principal: GatewayPrincipalClaims = {
+      ...PRINCIPAL,
+      scope: { kind: 'project', projectId: 41, projectName: 'Compiler', mode: 'rw' },
+      runtime: { kind: 'project', id: 41, generation: 2 },
+    }
+    await expect(runtime.capabilities({ subject, principal })).resolves.toMatchObject({
+      targets: expect.arrayContaining([
+        expect.objectContaining({ scope: { kind: 'project', projectId: 41 }, canRead: true, canWrite: true }),
+        expect.objectContaining({ scope: { kind: 'personal' }, canRead: true, canWrite: true }),
+      ]),
     })
   })
 

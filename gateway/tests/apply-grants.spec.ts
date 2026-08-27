@@ -13,10 +13,22 @@ import { UserService } from '../src/users.ts'
 
 const WS_MODULE = createRequire(join(process.cwd(), 'noop.js')).resolve('ws')
 const ECHO_DSH = `
+const fs = require('fs')
+const crypto = require('crypto')
+const credential = JSON.parse(fs.readFileSync(3, 'utf8'))
+const material = (kind, nonce) => 'dsh-gateway-readiness-v1\\0' + kind + '\\0' + nonce + '\\0' + credential.runtime.kind + '\\0' + String(credential.runtime.id) + '\\0' + String(credential.runtime.generation)
+const proof = (kind, nonce) => crypto.createHmac('sha256', credential.token).update(material(kind, nonce)).digest('base64url')
 const http = require('http')
 const { WebSocketServer } = require(${JSON.stringify(WS_MODULE)})
 const server = http.createServer((req, res) => {
   if (req.url === '/exit') { res.end('bye'); process.exit(0); return }
+  if (req.url === '/api/internal/gateway/readiness') {
+    const nonce = req.headers['x-dsh-gateway-readiness-nonce']
+    if (typeof nonce !== 'string' || req.headers['x-dsh-gateway-readiness-request'] !== proof('request', nonce)) { res.statusCode = 403; res.end(); return }
+    res.setHeader('content-type', 'application/json')
+    res.end(JSON.stringify({ version: 1, runtime: credential.runtime, proof: proof('response', nonce) }))
+    return
+  }
   res.setHeader('content-type', 'application/json')
   res.end(JSON.stringify({ host: req.headers.host, origin: req.headers.origin ?? null, url: req.url }))
 })

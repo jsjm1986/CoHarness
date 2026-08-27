@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-19-document-manager-filter-pages-batch.md
-2026-08-19-document-manager-filter-pages-batch.md: 6fb10e14eafbbfd73621e82fa7f4de2b7f61ffa5
-2026-08-19-document-manager-filter-pages-batch.zh.md: ee046ad66054e457a9b140c84c83fb608dc7e691
+2026-08-19-document-manager-filter-pages-batch.md: 6b1740b75cd119ef097bbaaf697b8d744a219db0
+2026-08-19-document-manager-filter-pages-batch.zh.md: 3fdd33fc6f798499e586e4849e72b9dbaeed4823

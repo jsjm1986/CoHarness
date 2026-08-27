@@ -6,7 +6,7 @@ import type { Scope } from '@deepseek-ai/dsh-scope'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import { CodeRuntime } from '@deepseek-ai/dsh-code-runtime'
 import type { CodeRunRequest, CodeRunResult } from '@deepseek-ai/dsh-code-runtime'
-import ToolRuntime, { CodeRunFailedError, RUN_CODE_NAME, TOOL_ABORTED_BEFORE_DISPATCH, defineContentToolFixture, defineTool } from '@deepseek-ai/dsh-tools'
+import ToolRuntime, { CodeRunFailedError, RUN_CODE_NAME, TOOL_ABORTED_BEFORE_DISPATCH, TOOL_RUNTIME_SCHEDULER, defineContentToolFixture, defineTool } from '@deepseek-ai/dsh-tools'
 import type { Config, JsonSchemaNode, PostToolDecision, ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
@@ -43,6 +43,7 @@ class FakeRuntime extends CodeRuntime {
 interface SetupOptions {
   mode?: Config['mode']
   maxParallelSubCalls?: number
+  maxPendingSubCalls?: number
   runtime?: false | { language?: string }
   toolOrder?: string[]
 }
@@ -50,7 +51,11 @@ interface SetupOptions {
 async function setup(options: SetupOptions = {}) {
   const ctx = new Context()
   await ctx.plugin(SystemPrompt, { ...options.toolOrder ? { toolOrder: options.toolOrder } : {} })
-  await ctx.plugin(ToolRuntime, { mode: options.mode ?? 'code', ...options.maxParallelSubCalls !== undefined ? { maxParallelSubCalls: options.maxParallelSubCalls } : {} })
+  await ctx.plugin(ToolRuntime, {
+    mode: options.mode ?? 'code',
+    ...options.maxParallelSubCalls !== undefined ? { maxParallelSubCalls: options.maxParallelSubCalls } : {},
+    ...options.maxPendingSubCalls !== undefined ? { maxPendingSubCalls: options.maxPendingSubCalls } : {},
+  })
   let runtime: FakeRuntime | undefined
   if (options.runtime !== false) {
     await ctx.plugin(FakeRuntime, options.runtime ?? {})
@@ -792,6 +797,52 @@ describe('the sub-dispatch scheduler (native concurrency contract)', () => {
     expect(starts).toEqual(['call-1:code:1'])
     expect(settles).toEqual(['call-1:code:1'])
     expect(abandoned).toEqual(['run_code run is over (run_code settled); writer tool call abandoned'])
+  })
+
+  it('rejects every binding when a staged scheduler promise fails instead of leaving it pending', async () => {
+    const { ctx, runtime } = await setup({ mode: 'code' })
+    registerEcho(ctx)
+    const scheduler = ctx.tools[TOOL_RUNTIME_SCHEDULER]
+    const original = scheduler.dispatch.bind(scheduler)
+    scheduler.dispatch = () => Promise.reject(new Error('scheduler exploded'))
+    runtime.behavior = async (request) => {
+      // The runtime catches the binding rejection, but the bridge still turns
+      // the infrastructure failure into an outer run failure at drain time.
+      await expect(request.bindings[0]!.functions.echo!({ value: 'x' })).rejects.toThrow('scheduler exploded')
+      return { logs: [], value: 'ignored' }
+    }
+    try {
+      const result = await Promise.race([
+        runCode(ctx, 'program'),
+        new Promise<never>((_, reject) => setTimeout(() => { reject(new Error('scheduler failure hung')) }, 500)),
+      ])
+      expect(result.isError).toBe(true)
+      expect((result.content[0] as { text: string }).text).toContain('scheduler exploded')
+    } finally {
+      scheduler.dispatch = original
+    }
+  })
+
+  it('bounds outstanding concurrent sub-calls and recovers the slot after settlement', async () => {
+    const { ctx, runtime } = await setup({ mode: 'code', maxPendingSubCalls: 2 })
+    const gated = registerGated(ctx, 'safe_read', true)
+    runtime.behavior = async (request) => {
+      const tools = request.bindings[0]!.functions
+      const first = tools.safe_read!({ id: 'a' })
+      const second = tools.safe_read!({ id: 'b' })
+      await expect(tools.safe_read!({ id: 'c' })).rejects.toThrow('maximum 2 outstanding calls')
+      await expect.poll(() => gated.pending()).toBe(2)
+      gated.releaseAll()
+      await Promise.all([first, second])
+      // Both earlier entries committed and no longer count against the cap.
+      const fourth = tools.safe_read!({ id: 'd' })
+      await expect.poll(() => gated.pending()).toBe(1)
+      gated.releaseAll()
+      await fourth
+      return { logs: [], value: 'bounded' }
+    }
+    const result = await runCode(ctx, 'program')
+    expect(result.isError).toBe(false)
   })
 })
 

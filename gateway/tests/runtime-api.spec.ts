@@ -540,13 +540,13 @@ describe('runtime archive synchronization', () => {
     expect(response).toMatchObject({ handled: true, status: 200, body: { commands: [{ id: 'command-1', rootSessionId: 'session-archive', action: 'restore' }] } })
     expect(runtime.archiveSnapshot).toHaveBeenCalledWith(expect.objectContaining({
       runtime: { kind: 'project', id: PROJECT_ID }, revision: 4, archivedSessionIds: ['session-archive'],
-    }))
+    }), { kind: 'project', id: PROJECT_ID })
 
     const ack = await request(runtime.handler, '/internal/runtime/archive/ack', {
       body: { commandId: 'command-1', revision: 5 },
     })
     expect(ack).toMatchObject({ handled: true, status: 200, body: { acknowledged: true } })
-    expect(runtime.archiveAck).toHaveBeenCalledWith('command-1', 5, undefined)
+    expect(runtime.archiveAck).toHaveBeenCalledWith('command-1', 5, undefined, { kind: 'project', id: PROJECT_ID })
   })
 
   it('rejects malformed retained Workspace metadata at the runtime boundary', async () => {

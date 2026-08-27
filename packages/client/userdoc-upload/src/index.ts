@@ -44,6 +44,12 @@ const RESUME_STORE_NAME = 'sessions'
 const RESUME_STORAGE_KEY = 'dsh-userdoc-upload-sessions-v1'
 const FINGERPRINT_BYTES = 64 * 1024
 const RETRY_LIMIT = 4
+/** Do not wait forever for a provider that keeps returning `verifying`. */
+const MAX_VERIFY_WAIT_MS = 5 * 60 * 1000
+/** Bound browser-side retained resume metadata when storage is persistent. */
+const MAX_LOCAL_RESUME_RECORDS = 256
+/** Prevent a malformed runtime response from forcing an unbounded browser allocation. */
+const MAX_UPLOAD_CHUNK_BYTES = 64 * 1024 * 1024
 
 function hex(bytes: Uint8Array): string {
   return Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('')
@@ -70,7 +76,13 @@ function localResumeRecords(): Record<string, ResumeRecord> {
     if (raw === null) return {}
     const value: unknown = JSON.parse(raw)
     if (value === null || typeof value !== 'object' || Array.isArray(value)) return {}
-    return value as Record<string, ResumeRecord>
+    const records: Record<string, ResumeRecord> = Object.create(null) as Record<string, ResumeRecord>
+    for (const [key, entry] of Object.entries(value)) {
+      if (entry !== null && typeof entry === 'object' && !Array.isArray(entry)) {
+        Object.defineProperty(records, key, { configurable: true, enumerable: true, value: entry, writable: true })
+      }
+    }
+    return records
   } catch {
     return {}
   }
@@ -78,14 +90,24 @@ function localResumeRecords(): Record<string, ResumeRecord> {
 
 function saveLocalResumeRecords(records: Record<string, ResumeRecord>): void {
   try {
-    if (typeof globalThis.localStorage !== 'undefined') globalThis.localStorage.setItem(RESUME_STORAGE_KEY, JSON.stringify(records))
+    if (typeof globalThis.localStorage === 'undefined') return
+    const entries = Object.entries(records)
+      .sort((left, right) => left[1].updatedAt - right[1].updatedAt)
+      .slice(-MAX_LOCAL_RESUME_RECORDS)
+    const bounded: Record<string, ResumeRecord> = Object.create(null) as Record<string, ResumeRecord>
+    for (const [key, value] of entries) {
+      Object.defineProperty(bounded, key, { configurable: true, enumerable: true, value, writable: true })
+    }
+    globalThis.localStorage.setItem(RESUME_STORAGE_KEY, JSON.stringify(bounded))
   } catch { /* private storage may be disabled */ }
 }
 
 async function openResumeDb(): Promise<IDBDatabase> {
   return new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(RESUME_DB_NAME, 1)
-    request.onupgradeneeded = () => { request.result.createObjectStore(RESUME_STORE_NAME) }
+    request.onupgradeneeded = () => {
+      if (!request.result.objectStoreNames.contains(RESUME_STORE_NAME)) request.result.createObjectStore(RESUME_STORE_NAME)
+    }
     request.onsuccess = () => { resolve(request.result) }
     request.onerror = () => { reject(request.error ?? new Error('IndexedDB open failed')) }
   })
@@ -97,8 +119,8 @@ async function resumeRecord(key: string): Promise<ResumeRecord | undefined> {
     const database = await openResumeDb()
     return await new Promise<ResumeRecord | undefined>((resolve, reject) => {
       const request = database.transaction(RESUME_STORE_NAME, 'readonly').objectStore(RESUME_STORE_NAME).get(key)
-      request.onsuccess = () => { resolve(request.result as ResumeRecord | undefined) }
-      request.onerror = () => { reject(request.error ?? new Error('IndexedDB read failed')) }
+      request.onsuccess = () => { database.close(); resolve(request.result as ResumeRecord | undefined) }
+      request.onerror = () => { database.close(); reject(request.error ?? new Error('IndexedDB read failed')) }
     })
   } catch {
     return localResumeRecords()[key]
@@ -116,8 +138,8 @@ async function putResumeRecord(key: string, record: ResumeRecord): Promise<void>
     const database = await openResumeDb()
     await new Promise<void>((resolve, reject) => {
       const request = database.transaction(RESUME_STORE_NAME, 'readwrite').objectStore(RESUME_STORE_NAME).put(record, key)
-      request.onsuccess = () => { resolve() }
-      request.onerror = () => { reject(request.error ?? new Error('IndexedDB write failed')) }
+      request.onsuccess = () => { database.close(); resolve() }
+      request.onerror = () => { database.close(); reject(request.error ?? new Error('IndexedDB write failed')) }
     })
   } catch {
     const records = localResumeRecords()
@@ -135,8 +157,8 @@ async function deleteResumeRecord(key: string): Promise<void> {
     const database = await openResumeDb()
     await new Promise<void>((resolve, reject) => {
       const request = database.transaction(RESUME_STORE_NAME, 'readwrite').objectStore(RESUME_STORE_NAME).delete(key)
-      request.onsuccess = () => { resolve() }
-      request.onerror = () => { reject(request.error ?? new Error('IndexedDB delete failed')) }
+      request.onsuccess = () => { database.close(); resolve() }
+      request.onerror = () => { database.close(); reject(request.error ?? new Error('IndexedDB delete failed')) }
     })
   } catch { /* localStorage copy is already removed */ }
 }
@@ -182,6 +204,10 @@ function xhrChunk(
       finish(() => { reject(abortError(signal)) })
     }
     signal?.addEventListener('abort', abort, { once: true })
+    if (signal?.aborted) {
+      abort()
+      return
+    }
     xhr.open('PUT', url)
     xhr.setRequestHeader('Content-Range', `bytes ${String(start)}-${String(end)}/${String(total)}`)
     xhr.setRequestHeader('X-DSH-Chunk-SHA256', digest)
@@ -213,6 +239,7 @@ function checkedSession(
   value: unknown,
   file: File,
   responseError: (status: number, body: unknown) => Error,
+  expectedDirectoryId?: UserDocDirectoryIdType,
 ): UserDocUploadSession {
   const invalid = (): never => {
     throw responseError(502, {
@@ -222,8 +249,11 @@ function checkedSession(
   if (value === null || typeof value !== 'object' || Array.isArray(value)) invalid()
   const candidate = value as Record<string, unknown>
   if (!/^[0-9a-f-]{36}$/u.test(String(candidate.uploadId))
-    || typeof candidate.directoryId !== 'string' || typeof candidate.fingerprint !== 'string' || candidate.fingerprint === ''
+    || typeof candidate.directoryId !== 'string'
+    || (expectedDirectoryId !== undefined && candidate.directoryId !== String(expectedDirectoryId))
+    || typeof candidate.fingerprint !== 'string' || candidate.fingerprint === ''
     || candidate.bytes !== file.size || !Number.isSafeInteger(candidate.chunkBytes) || (candidate.chunkBytes as number) <= 0
+    || (candidate.chunkBytes as number) > MAX_UPLOAD_CHUNK_BYTES
     || !Number.isSafeInteger(candidate.receivedBytes) || (candidate.receivedBytes as number) < 0
     || (candidate.receivedBytes as number) > file.size
     || ((candidate.receivedBytes as number) !== file.size
@@ -241,13 +271,23 @@ function retryable(error: unknown): boolean {
 }
 
 async function delay(ms: number, signal?: AbortSignal): Promise<void> {
+  signal?.throwIfAborted()
   await new Promise<void>((resolve, reject) => {
+    let settled = false
     const timer = setTimeout(() => {
+      settled = true
       signal?.removeEventListener('abort', abort)
       resolve()
     }, ms)
-    const abort = (): void => { clearTimeout(timer); signal?.removeEventListener('abort', abort); reject(abortError(signal)) }
+    const abort = (): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      signal?.removeEventListener('abort', abort)
+      reject(abortError(signal))
+    }
     signal?.addEventListener('abort', abort, { once: true })
+    if (signal?.aborted) abort()
   })
 }
 
@@ -302,7 +342,7 @@ export async function resumableUpload(
       session = checkedSession(await options.requestJson<UserDocUploadSession>(
         endpoint(root, `/uploads/${encodeURIComponent(String(existing.uploadId))}`, query),
         signal === undefined ? {} : { signal },
-      ), file, options.responseError)
+      ), file, options.responseError, directoryId)
     } catch (error) {
       if (statusOf(error) !== 404 && statusOf(error) !== 410) throw error
       await deleteResumeRecord(key)
@@ -313,7 +353,7 @@ export async function resumableUpload(
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ version: 1, name: file.name, directory: directoryId, bytes: file.size, fingerprint }),
     ...(signal === undefined ? {} : { signal }),
-  }), file, options.responseError)
+  }), file, options.responseError, directoryId)
   if (session.state === 'failed') {
     await deleteResumeRecord(key)
     session = checkedSession(await options.requestJson<UserDocUploadSession>(endpoint(root, '/uploads', query), {
@@ -321,7 +361,11 @@ export async function resumableUpload(
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ version: 1, name: file.name, directory: directoryId, bytes: file.size, fingerprint }),
       ...(signal === undefined ? {} : { signal }),
-    }), file, options.responseError)
+    }), file, options.responseError, directoryId)
+    if (session.state === 'failed') {
+      await deleteResumeRecord(key)
+      throw options.responseError(422, session)
+    }
   }
   await putResumeRecord(key, {
     fingerprint, uploadId: session.uploadId, name: file.name, directoryId, bytes: file.size, updatedAt: Date.now(),
@@ -359,14 +403,23 @@ export async function resumableUpload(
       body: JSON.stringify({ version: 1, sha256: hex(finalHash.digest()) }),
       ...(signal === undefined ? {} : { signal }),
     },
-  ), file, options.responseError)
+  ), file, options.responseError, directoryId)
   onProgress?.(file.size, file.size, 'verifying')
+  const verifyDeadline = Math.min(current.expiresAt, Date.now() + MAX_VERIFY_WAIT_MS)
   while (current.state === 'verifying') {
-    await delay(500, signal)
+    const remaining = verifyDeadline - Date.now()
+    if (remaining <= 0) {
+      await deleteResumeRecord(key)
+      throw Object.assign(new Error('Document upload verification timed out.'), {
+        status: 504,
+        code: 'DOCUMENT_UPLOAD_VERIFY_TIMEOUT',
+      })
+    }
+    await delay(Math.min(500, remaining), signal)
     current = checkedSession(await options.requestJson<UserDocUploadSession>(
       endpoint(root, `/uploads/${encodeURIComponent(String(session.uploadId))}`, query),
       signal === undefined ? {} : { signal },
-    ), file, options.responseError)
+    ), file, options.responseError, directoryId)
   }
   if (current.state === 'complete' && current.ref !== undefined) {
     await deleteResumeRecord(key)

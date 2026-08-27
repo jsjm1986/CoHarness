@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { redactSecrets, settingsNamespace } from '../src/index.ts'
+import { redactSchemaDefaults, redactSecrets, settingsNamespace } from '../src/index.ts'
 import { MemorySettings } from './memory.ts'
 
 const Profile = z.object({
@@ -20,6 +20,23 @@ const Adapter: z<object> = z.object({
 })
 
 describe('redactSecrets', () => {
+  it('removes serialized defaults from nodes that can contain secrets', () => {
+    const Schema = z.object({
+      apiKey: z.string().role('secret').default('hidden'),
+      visible: z.string().default('shown'),
+      branch: z.union([z.object({ token: z.string().role('secret').default('also-hidden') }), z.string()]),
+    })
+    const redacted = redactSchemaDefaults(Schema.toJSON()) as {
+      refs: Record<string, { meta?: Record<string, unknown> }>
+    }
+    const defaults = Object.values(redacted.refs)
+      .map(node => node.meta?.default)
+      .filter(value => value !== undefined)
+    expect(defaults).not.toContain('hidden')
+    expect(defaults).not.toContain('also-hidden')
+    expect(defaults).toContain('shown')
+  })
+
   it('strips secrets from object, dict, and array containers and records each position', () => {
     const { value, secrets } = redactSecrets(Adapter as z<never>, {
       apiKey: 'top-secret',

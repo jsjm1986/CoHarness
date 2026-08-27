@@ -453,7 +453,7 @@ describe('web e2e: document manager', () => {
         projects: [{ projectId: 41, name: 'Compiler', mode: 'rw' }],
       } })
     })
-    await page.route('**/api/documents/overview', async (route) => {
+    await page.route('**/api/documents/overview**', async (route) => {
       await route.fulfill({ json: {
         version: 1,
         documents: [{

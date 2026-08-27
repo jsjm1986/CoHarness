@@ -21,6 +21,7 @@ import {
 } from '@deepseek-ai/dsh-session'
 import SessionPersistence, {
   DEFAULT_PREPARED_SESSION_CACHE_SIZE,
+  DEFAULT_MAX_PENDING_EVENTS_PER_SESSION,
   DEFAULT_WRITE_BATCH_MAX_DELAY_MS,
   MAX_WRITE_BATCH_DELAY_MS,
   PersistenceCoordinator,
@@ -65,6 +66,8 @@ export interface Config {
   preparedSessionCacheSize?: number
   /** Maximum delay before one live event batch is flushed. */
   writeBatchMaxDelayMs?: number
+  /** Maximum events retained in one live session's pending write queue. */
+  maxPendingEvents?: number
   /** Deadline for one internal Gateway HTTP request. */
   requestTimeoutMs?: number
 }
@@ -199,6 +202,7 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     preparedSessionCacheSize: z.number().step(1).min(1).default(DEFAULT_PREPARED_SESSION_CACHE_SIZE),
     writeBatchMaxDelayMs: z.number().step(1).min(1).max(MAX_WRITE_BATCH_DELAY_MS)
       .default(DEFAULT_WRITE_BATCH_MAX_DELAY_MS),
+    maxPendingEvents: z.number().step(1).min(1).default(DEFAULT_MAX_PENDING_EVENTS_PER_SESSION),
     requestTimeoutMs: z.number().step(1).min(1).default(DEFAULT_REQUEST_TIMEOUT_MS),
   })
 
@@ -214,6 +218,7 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     this.coordinator = new PersistenceCoordinator(this.ctx, this, {
       preparedSessionCacheSize: config.preparedSessionCacheSize ?? DEFAULT_PREPARED_SESSION_CACHE_SIZE,
       writeBatchMaxDelayMs: config.writeBatchMaxDelayMs ?? DEFAULT_WRITE_BATCH_MAX_DELAY_MS,
+      maxPendingEvents: config.maxPendingEvents ?? DEFAULT_MAX_PENDING_EVENTS_PER_SESSION,
     })
     ctx.on('session/disposed', (session) => {
       void ctx.sessions.flush(session).then(

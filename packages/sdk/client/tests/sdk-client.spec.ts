@@ -243,6 +243,19 @@ describe('DeepSeekHarness', () => {
 })
 
 describe('HarnessClient', () => {
+  it('rejects invalid timer settings before spawning a runtime', () => {
+    for (const key of ['requestTimeoutMs', 'shutdownTimeoutMs', 'disposeEofGraceMs', 'disposeGraceMs'] as const) {
+      expect(() => new HarnessClient(fakeLaunch({ }, { [key]: 0 }))).toThrow(new RegExp(`${key} must be a positive`))
+      expect(() => new HarnessClient(fakeLaunch({ }, { [key]: 2_147_483_648 }))).toThrow(new RegExp(`${key} must be.*2147483647`))
+    }
+  })
+
+  it('rejects an invalid per-call timeout without starting the child', async () => {
+    const client = new HarnessClient(fakeLaunch())
+    await expect(client.request('initialize', {}, 0)).rejects.toThrow(/timeoutMs must be a positive/)
+    expect((client as unknown as { child?: unknown }).child).toBeUndefined()
+  })
+
   it('times out a hung request at the per-call bound', async () => {
     const client = new HarnessClient(fakeLaunch({ FAKE_HANG_PROMPT: '1' }))
     cleanups.push(() => client.close())
@@ -471,6 +484,20 @@ describe('HarnessClient', () => {
     // The foreign-root edge and stranger event were filtered; next is the root-child edge.
     expect((await tree.next()).params.childSessionId).toBe('root')
     tree.close()
+    await client.close()
+  })
+
+  it('releases completed ancestry edges so long-lived clients do not retain finished sessions', async () => {
+    const client = new HarnessClient(fakeLaunch())
+    cleanups.push(() => client.close())
+    await client.initialize({ cwd: process.cwd(), provider: 'p', model: 'm' })
+    const inject = (method: string, params: Record<string, unknown>): void => {
+      (client as unknown as { dispatchNotification(n: HarnessNotification): void }).dispatchNotification({ method, params })
+    }
+    inject('subagent.started', { parentSessionId: 'root', childSessionId: 'child' })
+    expect((client as unknown as { sessionParents: Map<string, string> }).sessionParents.size).toBe(1)
+    inject('subagent.finished', { parentSessionId: 'root', childSessionId: 'child' })
+    expect((client as unknown as { sessionParents: Map<string, string> }).sessionParents.size).toBe(0)
     await client.close()
   })
 })

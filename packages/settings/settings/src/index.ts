@@ -8,11 +8,11 @@
 
 import { Context, Service } from '@deepseek-ai/cordis'
 import type z from '@deepseek-ai/schemastery'
-import { redactSecrets } from './redact.ts'
+import { redactSchemaDefaults, redactSecrets } from './redact.ts'
 import type { RedactedSecret } from './redact.ts'
 import type { SettingsNamespace, SettingsUpdateSource } from './types.ts'
 
-export { redactSecrets } from './redact.ts'
+export { redactSchemaDefaults, redactSecrets } from './redact.ts'
 export type { RedactedSecret, RedactedValue } from './redact.ts'
 export type { SettingsNamespace, SettingsUpdateSource } from './types.ts'
 
@@ -92,9 +92,10 @@ export interface SettingsDescriptor {
 /** Options for {@link SettingsProvider.describe}. */
 export interface SettingsDescribeOptions {
   /**
-   * Strip `role('secret')` fields from `value`/`base`/`user` and enumerate
-   * them in each descriptor's `secrets`. Every wire surface MUST pass this;
-   * the verbatim default exists for same-process configuration UIs only.
+   * Strip `role('secret')` fields from `value`/`base`/`user`, remove defaults
+   * from schema nodes that can contain them, and enumerate the positions in
+   * each descriptor's `secrets`. Every wire surface MUST pass this; the
+   * verbatim default exists for same-process configuration UIs only.
    */
   redactSecrets?: boolean
 }
@@ -147,13 +148,16 @@ export function deepEqualJson(a: unknown, b: unknown): boolean {
   if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false
   if (Array.isArray(a) || Array.isArray(b)) {
     if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false
-    return a.every((entry, index) => deepEqualJson(entry, b[index]))
+    for (let index = 0; index < a.length; index += 1) {
+      if (!Object.hasOwn(a, index) || !Object.hasOwn(b, index) || !deepEqualJson(a[index], b[index])) return false
+    }
+    return true
   }
   const left = a as Record<string, unknown>
   const right = b as Record<string, unknown>
   const keys = Object.keys(left)
   if (keys.length !== Object.keys(right).length) return false
-  return keys.every(key => key in right && deepEqualJson(left[key], right[key]))
+  return keys.every(key => Object.hasOwn(right, key) && deepEqualJson(left[key], right[key]))
 }
 
 /**
@@ -264,7 +268,10 @@ function cloneJsonShaped(
     if (Array.isArray(value)) {
       if (visiting.has(value)) throw reject('a circular reference', path)
       visiting.add(value)
-      const entries = value.map((entry, index) => clone(entry, `${path}[${index}]`))
+      const entries = Array.from({ length: value.length }, (_, index) => {
+        if (!Object.hasOwn(value, index)) throw reject('a sparse array', `${path}[${index}]`)
+        return clone(value[index], `${path}[${index}]`)
+      })
       // Un-mark on exit so one object referenced twice without a cycle passes.
       visiting.delete(value)
       return entries
@@ -272,12 +279,15 @@ function cloneJsonShaped(
     if (isPlainObject(value)) {
       if (visiting.has(value)) throw reject('a circular reference', path)
       visiting.add(value)
-      // TODO(settings-json-properties): Use property-safe construction here and
-      // in mergeLayers so valid JSON keys such as "__proto__" remain own data.
       const out: Record<string, unknown> = {}
       for (const [key, entry] of Object.entries(value)) {
         if (entry === undefined) continue
-        out[key] = clone(entry, `${path}.${key}`)
+        Object.defineProperty(out, key, {
+          configurable: true,
+          enumerable: true,
+          value: clone(entry, `${path}.${key}`),
+          writable: true,
+        })
       }
       visiting.delete(value)
       return out
@@ -297,9 +307,23 @@ function cloneJsonShaped(
 function mergeLayers(under: unknown, over: unknown): unknown {
   if (over === undefined) return under
   if (!isPlainObject(under) || !isPlainObject(over)) return over
-  const merged: Record<string, unknown> = { ...under }
+  const merged: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(under)) {
+    Object.defineProperty(merged, key, {
+      configurable: true,
+      enumerable: true,
+      value,
+      writable: true,
+    })
+  }
   for (const [key, value] of Object.entries(over)) {
-    merged[key] = key in merged ? mergeLayers(merged[key], value) : value
+    const next = Object.hasOwn(merged, key) ? mergeLayers(merged[key], value) : value
+    Object.defineProperty(merged, key, {
+      configurable: true,
+      enumerable: true,
+      value: next,
+      writable: true,
+    })
   }
   return merged
 }
@@ -339,6 +363,8 @@ interface SettingsRegistration {
    */
   revision: number
   watchers: Set<SettingsWatcher>
+  /** Registration admission closes before its owner fiber starts teardown. */
+  active: boolean
 }
 
 /**
@@ -380,7 +406,8 @@ export abstract class SettingsProvider extends Service {
       // so disposal completes only once storage and observers are quiescent.
       // Invocations queued but not yet started skip via the stopped check.
       this.stopped = true
-      await Promise.allSettled([...this.writeQueues.values(), ...this.pendingTails])
+      const tails = [...this.registrations.values()].flatMap(registration => this.deactivate(registration))
+      await Promise.allSettled([...this.writeQueues.values(), ...this.pendingTails, ...tails])
     }
     this.publish(await this.load())
   }
@@ -433,6 +460,7 @@ export abstract class SettingsProvider extends Service {
    * @returns the owner scope for reads, observation, and updates.
    */
   register<T>(ns: SettingsNamespace, schema: z<T>, options?: SettingsRegisterOptions<T>): SettingsScope<T> {
+    if (this.isStopped()) throw new Error(`settings service is disposed: "${ns}" cannot be registered`)
     if (this.registrations.has(ns)) {
       throw new Error(`settings namespace "${ns}" is already registered`)
     }
@@ -447,16 +475,25 @@ export abstract class SettingsProvider extends Service {
       resolved: deepFreeze(this.resolve(schema, options?.base, this.section(ns), options?.validate)),
       revision: 0,
       watchers: new Set(),
+      active: true,
     }
     this.ctx.effect(() => {
       this.registrations.set(ns, registration)
-      // TODO(settings-registration-quiescence): Deactivate every watcher and await
-      // its tail on disposal so callbacks cannot outlive the registrant fiber.
-      return () => this.registrations.delete(ns)
+      return async () => {
+        const tails = this.deactivate(registration)
+        // Keep the registration in the map until its already-started watcher
+        // chains settle. A concurrent write observes the inactive flag and
+        // cannot enqueue another callback while this fence is open.
+        await Promise.allSettled(tails)
+        if (this.registrations.get(ns) === registration) this.registrations.delete(ns)
+      }
     }, `settings.register(${JSON.stringify(String(ns))})`)
     return {
       get: () => registration.resolved as T,
       watch: (callback) => {
+        if (!registration.active || this.isStopped()) {
+          throw new Error(`settings namespace "${ns}" registration is disposed`)
+        }
         const watcher: SettingsWatcher = { callback: callback, tail: Promise.resolve(), active: true }
         registration.watchers.add(watcher)
         return () => {
@@ -489,9 +526,10 @@ export abstract class SettingsProvider extends Service {
       }
       const base = registration.base === undefined ? undefined : structuredClone(registration.base)
       const detachedUser = user === undefined ? undefined : structuredClone(user)
+      const serializedSchema = registration.schema.toJSON()
       const descriptor: SettingsDescriptor = {
         ns: registration.ns,
-        schema: registration.schema.toJSON(),
+        schema: options?.redactSecrets === true ? redactSchemaDefaults(serializedSchema) : serializedSchema,
         value: registration.resolved,
         revision: registration.revision,
         ...base === undefined ? {} : { base },
@@ -614,6 +652,9 @@ export abstract class SettingsProvider extends Service {
         throw new Error(`settings service was disposed before the queued "${ns}" ${verb} ran`)
       }
       if (this.registrations.get(ns) !== registration) {
+        throw new Error(`settings namespace "${ns}" registration was disposed before the queued ${verb} ran`)
+      }
+      if (!registration.active) {
         throw new Error(`settings namespace "${ns}" registration was disposed before the queued ${verb} ran`)
       }
       // Every mode derives from the section as it stands NOW, at the front of
@@ -747,6 +788,7 @@ export abstract class SettingsProvider extends Service {
 
   /** Commit a resolved value when changed: swap, notify watchers, emit the event. */
   private commit(registration: SettingsRegistration, next: unknown, source: SettingsUpdateSource): void {
+    if (!registration.active || this.isStopped()) return
     const prev = registration.resolved
     if (deepEqualJson(next, prev)) return
     registration.resolved = next
@@ -796,6 +838,16 @@ export abstract class SettingsProvider extends Service {
       }
     }
     if (invariantFailure !== undefined) throw invariantFailure as Error
+  }
+
+  /** Close watcher admission and detach every watcher before awaiting tails. */
+  private deactivate(registration: SettingsRegistration): Promise<void>[] {
+    if (!registration.active) return []
+    const tails = [...registration.watchers].map(watcher => watcher.tail)
+    registration.active = false
+    for (const watcher of registration.watchers) watcher.active = false
+    registration.watchers.clear()
+    return tails
   }
 
   /** Contained-watcher diagnostic shared by the sync and async failure paths. */

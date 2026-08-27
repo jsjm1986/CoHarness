@@ -1,6 +1,10 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { applyGrantsToUser } from './apply-grants.ts'
-import { applyModelGovernanceToProject, applyModelGovernanceToUser } from './apply-model-governance.ts'
+import {
+  applyModelGovernanceToProject,
+  applyModelGovernanceToUser,
+  scheduleModelGovernanceRefresh,
+} from './apply-model-governance.ts'
 import type { UserRow } from './auth.ts'
 import { CollaborationDeniedError } from './collaboration.ts'
 import type {
@@ -14,8 +18,10 @@ import type {
 import { listProjectDirectories } from './project-directories.ts'
 import type { GrantMode } from './projects.ts'
 import type { GatewayDeps, GatewayHandlers } from './server.ts'
-import { DocumentCatalogError } from './postgres/document-catalog-service.ts'
+import type { GatewayDocumentAdminHandler } from './document-transfer.ts'
+import { DocumentCatalogError, type DocumentCatalogAdminFilter } from './postgres/document-catalog-service.ts'
 import type { ConversationArchiveAdminFilter, ConversationArchiveState } from './postgres/conversation-archive-service.ts'
+import { readResponseJson, ResponseBodyTooLargeError } from './response-budget.ts'
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, { 'content-type': 'application/json' })
@@ -87,11 +93,14 @@ function mapError(error: unknown): { status: number; error: string } {
  * @param deps - users, projects, audit, instances
  * @returns admin handler that writes 200 JSON, 204, or `{ error }` at 400/404/409
  */
-export function createAdminApiHandler(deps: GatewayDeps): NonNullable<GatewayHandlers['admin']> {
+export function createAdminApiHandler(
+  deps: GatewayDeps,
+  documentAdmin?: GatewayDocumentAdminHandler,
+): NonNullable<GatewayHandlers['admin']> {
   return async (req: IncomingMessage, res: ServerResponse, admin: UserRow, pathname: string, body: string): Promise<boolean> => {
     if (!pathname.startsWith('/admin/api')) return false
     try {
-      const ok = await dispatch(deps, req, res, admin, pathname, body)
+      const ok = await dispatch(deps, req, res, admin, pathname, body, documentAdmin)
       if (!ok) sendError(res, 404, 'not found')
     } catch (error) {
       if (res.writableEnded) throw error
@@ -109,6 +118,7 @@ async function dispatch(
   admin: UserRow,
   pathname: string,
   body: string,
+  documentAdmin?: GatewayDocumentAdminHandler,
 ): Promise<boolean> {
   const method = req.method ?? 'GET'
   const ip = req.socket.remoteAddress ?? ''
@@ -117,8 +127,16 @@ async function dispatch(
 
   const refreshModelPolicies = async (): Promise<void> => {
     if (deps.governance === undefined) return
-    for (const target of await deps.users.list()) await applyModelGovernanceToUser(deps, target.id)
-    for (const project of await deps.projects.list()) await applyModelGovernanceToProject(deps, project.id)
+    try {
+      for (const target of await deps.users.list()) await applyModelGovernanceToUser(deps, target.id)
+      for (const project of await deps.projects.list()) await applyModelGovernanceToProject(deps, project.id)
+    } catch (error: unknown) {
+      // The governance transaction is already durable. Keep the request
+      // successful and hand the file cache to the bounded retry worker; ready
+      // runtimes also re-check the durable revision lazily on their next use.
+      console.error('[gateway] model policy projection deferred:', error)
+      scheduleModelGovernanceRefresh(deps)
+    }
   }
 
   if (pathname === '/admin/api/documents/metrics' && method === 'GET') {
@@ -281,28 +299,110 @@ async function dispatch(
     const ownerUserId = query.get('ownerUserId')
     const limit = query.get('limit')
     const offset = query.get('offset')
+    const cursor = query.get('cursor')
+    const search = query.get('q')
     const positive = (value: string | null): number | undefined => {
       if (value === null || value === '') return undefined
       const number = Number(value)
       return Number.isSafeInteger(number) && number > 0 ? number : undefined
     }
     if (scopeKind !== null && scopeKind !== 'personal' && scopeKind !== 'project') { sendError(res, 400, 'invalid scope'); return true }
-    if (state !== null && state !== 'active' && state !== 'deleted' && state !== 'all') { sendError(res, 400, 'invalid state'); return true }
+    if (state !== null && state !== 'active' && state !== 'trash' && state !== 'purged' && state !== 'deleted' && state !== 'all') { sendError(res, 400, 'invalid state'); return true }
     const project = positive(projectId); const owner = positive(ownerUserId)
     const requestedLimit = positive(limit)
     const requestedOffset = offset === null ? undefined : Number(offset)
+    if (cursor !== null && (cursor === '' || cursor.length > 4096)) { sendError(res, 400, 'invalid document cursor'); return true }
+    if (search !== null && search.length > 255) { sendError(res, 400, 'invalid document search'); return true }
     if ((projectId !== null && project === undefined) || (ownerUserId !== null && owner === undefined)
       || (limit !== null && requestedLimit === undefined)
       || (offset !== null && (requestedOffset === undefined || !Number.isSafeInteger(requestedOffset) || requestedOffset < 0))) {
       sendError(res, 400, 'invalid document filter'); return true
     }
-    sendJson(res, 200, await deps.documents.adminList({
+    const filter: DocumentCatalogAdminFilter = {
       ...(scopeKind === null ? {} : { scopeKind }), ...(project === undefined ? {} : { projectId: project }),
       ...(owner === undefined ? {} : { ownerUserId: owner }), ...(state === null ? {} : { state }),
-      ...(query.get('q') === null ? {} : { query: query.get('q') ?? '' }),
+      ...(search === null ? {} : { query: search }),
       ...(requestedLimit === undefined ? {} : { limit: requestedLimit }),
       ...(requestedOffset === undefined || Number.isNaN(requestedOffset) ? {} : { offset: requestedOffset }),
-    }))
+      ...(cursor === null ? {} : { cursor }),
+    }
+    if (deps.documents.adminListPage !== undefined && (cursor !== null || limit !== null)) {
+      sendJson(res, 200, await deps.documents.adminListPage(filter))
+    } else {
+      sendJson(res, 200, await deps.documents.adminList(filter))
+    }
+    await write('admin.documents.list', {
+      filter: { ...filter, query: filter.query === undefined ? undefined : '[provided]' },
+    })
+    return true
+  }
+
+  if (pathname === '/admin/api/documents/actions' && method === 'POST') {
+    if (deps.documents === undefined) { sendError(res, 503, 'document-catalog-unavailable'); return true }
+    const input = parseObject(body)
+    const action = input.action
+    const ids = input.ids
+    if ((action !== 'trash' && action !== 'restore' && action !== 'purge')
+      || !Array.isArray(ids) || ids.length === 0 || ids.length > 100
+      || !ids.every(id => typeof id === 'string' && /^[0-9a-f-]{36}$/iu.test(id))) {
+      sendError(res, 400, 'invalid document action'); return true
+    }
+    const results: Array<{ catalogId: string; ok: boolean; error?: string }> = []
+    for (const catalogId of ids as string[]) {
+      try {
+        const target = deps.documents.target === undefined ? null : await deps.documents.target(catalogId)
+        if (documentAdmin !== undefined && target === null) throw new Error('document not found')
+        if (target !== null && action === 'trash' && target.state === 'purged') {
+          throw new DocumentCatalogError('DOCUMENT_NOT_FOUND', 404, 'Document metadata was permanently cleaned.')
+        }
+        if (target !== null && action === 'restore' && target.state !== 'trash' && target.state !== 'active') {
+          throw new DocumentCatalogError('DOCUMENT_RESTORE_CONFLICT', 409, 'Only a trashed document can be restored.')
+        }
+        if (target !== null && action === 'purge' && target.state !== 'trash' && target.state !== 'purged') {
+          throw new DocumentCatalogError('DOCUMENT_RESTORE_CONFLICT', 409, 'Only a trashed document can be permanently cleaned.')
+        }
+        const alreadyAtTarget = target !== null && ((action === 'trash' && target.state === 'trash')
+          || (action === 'restore' && target.state === 'active') || (action === 'purge' && target.state === 'purged'))
+        if (documentAdmin !== undefined && target !== null && !alreadyAtTarget) {
+          const response = await documentAdmin({
+            user: admin,
+            scope: target.scope.kind === 'personal' ? { kind: 'personal' } : target.scope,
+            ...(target.scope.kind === 'personal' ? { personalOwnerId: target.scope.userId } : {}),
+            docId: target.docId,
+            action,
+            signal: new AbortController().signal,
+          })
+          if (!response.ok) {
+            let message = `Document runtime returned HTTP ${String(response.status)}`
+            try {
+              const value = await readResponseJson(response, deps.cfg.upstreamResponseLimitBytes) as { error?: { message?: unknown } | string }
+              const error = value.error
+              message = typeof error === 'string' ? error
+                : error !== null && typeof error === 'object' && typeof error.message === 'string' ? error.message : message
+            } catch (error) {
+              if (error instanceof ResponseBodyTooLargeError) message = 'Document runtime returned an oversized error response'
+              // Otherwise retain the status-only diagnostic.
+            }
+            throw new Error(message)
+          }
+        }
+        if (action === 'trash') {
+          if (deps.documents.adminTrash !== undefined) await deps.documents.adminTrash(admin.id, catalogId)
+          else await deps.documents.adminDelete(admin.id, catalogId)
+        } else if (action === 'restore') {
+          if (deps.documents.adminRestore === undefined) throw new Error('document restore unavailable')
+          await deps.documents.adminRestore(admin.id, catalogId)
+        } else {
+          if (deps.documents.adminPurge === undefined) throw new Error('document purge unavailable')
+          await deps.documents.adminPurge(admin.id, catalogId)
+        }
+        results.push({ catalogId, ok: true })
+      } catch (error: unknown) {
+        results.push({ catalogId, ok: false, error: error instanceof Error ? error.message : String(error) })
+      }
+    }
+    await write(`admin.documents.${action}`, { count: ids.length, succeeded: results.filter(item => item.ok).length })
+    sendJson(res, 200, { action, results })
     return true
   }
 
@@ -315,9 +415,25 @@ async function dispatch(
       const detail = await deps.documents.detail(catalogId)
       if (detail === null) { sendError(res, 404, 'document not found'); return true }
       sendJson(res, 200, detail)
+      await write('admin.documents.view', { catalogId })
       return true
     }
     if (method === 'DELETE') {
+      if (documentAdmin !== undefined) {
+        const target = deps.documents.target === undefined ? null : await deps.documents.target(catalogId)
+        if (target === null) { sendError(res, 404, 'document not found'); return true }
+        if (target.state !== 'trash') {
+          const response = await documentAdmin({
+            user: admin,
+            scope: target.scope.kind === 'personal' ? { kind: 'personal' } : target.scope,
+            ...(target.scope.kind === 'personal' ? { personalOwnerId: target.scope.userId } : {}),
+            docId: target.docId,
+            action: 'trash',
+            signal: new AbortController().signal,
+          })
+          if (!response.ok) { sendError(res, response.status, 'document runtime unavailable'); return true }
+        }
+      }
       await deps.documents.adminDelete(admin.id, catalogId)
       await write('admin.documents.delete', { catalogId })
       sendNoContent(res)
@@ -375,7 +491,12 @@ async function dispatch(
       const username = str(input, 'username')
       const password = str(input, 'password')
       if (username === undefined || password === undefined) { sendError(res, 400, 'username and password required'); return true }
-      const role = str(input, 'role') === 'admin' ? 'admin' as const : 'user' as const
+      const rawRole = str(input, 'role')
+      if (Object.hasOwn(input, 'role') && rawRole !== 'admin' && rawRole !== 'user') {
+        sendError(res, 400, 'invalid role')
+        return true
+      }
+      const role = rawRole === 'admin' ? 'admin' as const : 'user' as const
       const displayName = str(input, 'displayName')
       const user = await deps.users.create({ username, password, role, displayName })
       await write('admin.users', { username, role })
@@ -439,20 +560,40 @@ async function dispatch(
     const status = str(input, 'status')
     if (role !== undefined && role !== 'admin' && role !== 'user') { sendError(res, 400, 'invalid role'); return true }
     if (status !== undefined && status !== 'active' && status !== 'disabled') { sendError(res, 400, 'invalid status'); return true }
-    if (role !== undefined) {
-      await deps.users.setRole(userId, role)
-      await applyGrantsToUser(deps, userId, admin.id)
-      if (deps.governance !== undefined) await applyModelGovernanceToUser(deps, userId)
-      await write('admin.users.role', { id: userId, role })
-    }
-    if (status !== undefined) {
-      await deps.users.setStatus(userId, status)
-      if (status === 'disabled') await deps.instances.stop(userId)
-      await write('admin.users.status', { id: userId, status })
-    }
-    if (displayName !== undefined) {
-      await deps.users.setDisplayName(userId, displayName)
-      await write('admin.users.display-name', { id: userId })
+    if (deps.users.patch !== undefined) {
+      await deps.users.patch(userId, {
+        ...(role === undefined ? {} : { role }),
+        ...(status === undefined ? {} : { status }),
+        ...(displayName === undefined ? {} : { displayName }),
+      })
+      if (role !== undefined) {
+        await applyGrantsToUser(deps, userId, admin.id)
+        if (deps.governance !== undefined) await applyModelGovernanceToUser(deps, userId)
+        await write('admin.users.role', { id: userId, role })
+      }
+      if (status !== undefined) {
+        if (status === 'disabled') await deps.instances.stop(userId)
+        await write('admin.users.status', { id: userId, status })
+      }
+      if (displayName !== undefined) await write('admin.users.display-name', { id: userId })
+    } else {
+      // Compatibility with hand-built test/legacy services that have not yet
+      // adopted the atomic patch method. Production UserService providers do.
+      if (role !== undefined) {
+        await deps.users.setRole(userId, role)
+        await applyGrantsToUser(deps, userId, admin.id)
+        if (deps.governance !== undefined) await applyModelGovernanceToUser(deps, userId)
+        await write('admin.users.role', { id: userId, role })
+      }
+      if (status !== undefined) {
+        await deps.users.setStatus(userId, status)
+        if (status === 'disabled') await deps.instances.stop(userId)
+        await write('admin.users.status', { id: userId, status })
+      }
+      if (displayName !== undefined) {
+        await deps.users.setDisplayName(userId, displayName)
+        await write('admin.users.display-name', { id: userId })
+      }
     }
     sendNoContent(res)
     return true
@@ -486,8 +627,7 @@ async function dispatch(
         cacheWriteMicrosPerMillion: integer('cacheWriteMicrosPerMillion'),
       })
       await write('admin.models.upsert', { provider, model })
-      for (const target of await deps.users.list()) await applyModelGovernanceToUser(deps, target.id)
-      for (const project of await deps.projects.list()) await applyModelGovernanceToProject(deps, project.id)
+      await refreshModelPolicies()
       sendNoContent(res); return true
     }
     return false
@@ -599,8 +739,7 @@ async function dispatch(
         ...credential === undefined ? {} : { credential: credential as string | null },
       })
       await write('admin.model-providers.upsert', { provider, status })
-      for (const target of await deps.users.list()) await applyModelGovernanceToUser(deps, target.id)
-      for (const project of await deps.projects.list()) await applyModelGovernanceToProject(deps, project.id)
+      await refreshModelPolicies()
       sendNoContent(res)
       return true
     }

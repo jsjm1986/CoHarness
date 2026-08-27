@@ -22,8 +22,8 @@ export interface SystemdOptions {
   projectRuntimesRoot: string
   /** Host roots containing every project directory exposed through grants. */
   projectPathRoots: readonly string[]
-  /** ExecStart command line; `{port}` is replaced with the instance port. */
-  execStart: string
+  /** ExecStart argv; `{port}` is replaced with the instance port. */
+  execStart: readonly string[] | string
   /** Gateway code/data directory made inaccessible to instances. */
   gatewayDir: string
   /** systemd `MemoryMax` value, e.g. `1G`. */
@@ -58,9 +58,79 @@ const USERNAME_RE = /^[a-z][a-z0-9-]{1,30}$/
 
 /** Reject values that would break a systemd unit line or the `src:dst` bind grammar. */
 function assertSafePath(path: string): void {
-  if (path.includes('\n') || path.includes('\r')) throw new Error(`unsafe path (newline): ${JSON.stringify(path)}`)
+  if (path.includes('\n') || path.includes('\r') || path.includes('\u0000')) throw new Error(`unsafe path (control): ${JSON.stringify(path)}`)
   if (path.includes(':')) throw new Error(`unsafe path (colon breaks bind grammar): ${path}`)
   if (path.trim() === '' || !path.startsWith('/')) throw new Error(`path must be absolute: ${path}`)
+}
+
+function commandWords(value: string): string[] {
+  const words: string[] = []
+  let current = ''
+  let quote: '\'' | '"' | undefined
+  let escaped = false
+  let started = false
+  for (const character of value) {
+    if (escaped) {
+      current += character
+      escaped = false
+      started = true
+      continue
+    }
+    if (character === '\\' && quote !== '\'') {
+      escaped = true
+      started = true
+      continue
+    }
+    if (quote !== undefined) {
+      if (character === quote) quote = undefined
+      else current += character
+      started = true
+      continue
+    }
+    if (character === '\'' || character === '"') {
+      quote = character
+      started = true
+      continue
+    }
+    if (/\s/u.test(character)) {
+      if (started) {
+        words.push(current)
+        current = ''
+        started = false
+      }
+      continue
+    }
+    current += character
+    started = true
+  }
+  if (escaped || quote !== undefined) throw new Error('systemd ExecStart contains an unterminated quote or escape')
+  if (started) words.push(current)
+  return words
+}
+
+function execStartArgs(value: SystemdOptions['execStart']): string[] {
+  const args = typeof value === 'string' ? commandWords(value) : [...value]
+  if (args.length === 0) throw new Error('systemd ExecStart must contain an executable')
+  for (const arg of args) {
+    if (/[\u0000-\u001f\u007f]/u.test(arg) || arg.includes('%')) {
+      throw new Error('systemd ExecStart contains an unsafe control or specifier character')
+    }
+  }
+  return args
+}
+
+/** Quote one argv field using systemd's C-style unit-file escaping. */
+function quoteExecArg(value: string): string {
+  return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('$', () => '$$')}"`
+}
+
+function assertResourceValue(value: string, name: string): void {
+  const valid = name === 'MemoryMax'
+    ? value === 'infinity' || /^[1-9][0-9]*(?:K|M|G|T|P|E)?$/u.test(value)
+    : value === 'infinity' || /^[1-9][0-9]*(?:\.[0-9]+)?%$/u.test(value)
+  if (!valid) {
+    throw new Error(`${name} is not a valid systemd resource value`)
+  }
 }
 
 function containsPath(root: string, path: string): boolean {
@@ -101,6 +171,9 @@ export function renderUserUnit(
     ...opts.projectPathRoots,
     opts.gatewayDir,
   ]) assertSafePath(path)
+  const execArgs = execStartArgs(opts.execStart)
+  assertResourceValue(opts.memoryMax, 'MemoryMax')
+  assertResourceValue(opts.cpuQuota, 'CPUQuota')
   if (gatewayCredentialPath !== undefined) assertSafePath(gatewayCredentialPath)
   const privileged = user.kind !== 'project' && user.privileged === true
   if (user.kind === 'project') {
@@ -135,6 +208,10 @@ export function renderUserUnit(
     : [...new Set([opts.usersRoot, opts.projectRuntimesRoot, ...opts.projectPathRoots])]
       .map(path => `TemporaryFileSystem=${path}:ro`)
 
+  const renderedExecStart = execArgs
+    .map(arg => quoteExecArg(arg.replaceAll('{port}', String(user.port))))
+    .join(' ')
+
   return `[Unit]
 Description=DeepSeek Harness instance for ${runtimeKey}
 After=network-online.target
@@ -149,7 +226,7 @@ Environment=DSH_HOME=${user.dshHome}
 Environment=DSH_DIRECTORY_GRANTS=${user.dshHome}/directory-grants.json
 ${gatewayCredentialPath === undefined ? '' : `Environment=DSH_GATEWAY_CREDENTIAL_FILE=%d/dsh-gateway
 LoadCredential=dsh-gateway:${gatewayCredentialPath}
-`}ExecStart=${opts.execStart.replaceAll('{port}', String(user.port))}
+`}ExecStart=${renderedExecStart}
 Restart=on-failure
 RestartSec=5
 

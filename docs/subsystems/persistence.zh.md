@@ -418,5 +418,5 @@ releaseDraft(_request: SessionDraftReservationRequest): Promise<void>
 
 Types: [SessionEvent](session.zh.md) · [SessionId](core.zh.md)
 
-Source: [`packages/session/session-persistence/src/index.ts:125`](../../packages/session/session-persistence/src/index.ts)
+Source: [`packages/session/session-persistence/src/index.ts:126`](../../packages/session/session-persistence/src/index.ts)
 <!-- END GENERATED cordis-surface -->

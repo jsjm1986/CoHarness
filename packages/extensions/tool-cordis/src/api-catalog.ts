@@ -2411,6 +2411,41 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         throws: ['UserDocError when the identifier is invalid or the directory is absent.'],
       },
       {
+        signature: 'async listDirectoryPage( directoryId: UserDocDirectoryId, query: UserDocListQuery = {}, signal?: AbortSignal, ): Promise<UserDocDirectoryPage>',
+        description: 'Return one filtered page without requiring a consumer to materialize the complete directory result. Providers may override this method with an indexed implementation; the default keeps older providers functional.',
+        parameters: [{ name: 'directoryId', description: 'directory to inspect.' }, { name: 'query', description: 'filtering, ordering and cursor options.' }, { name: 'signal', description: 'optional cancellation.' }],
+        returns: 'a page with an opaque offset cursor.',
+      },
+      {
+        signature: 'abstract listTrash(signal?: AbortSignal): Promise<UserDocTrashRef[]>',
+        description: 'List recoverable documents retained in the provider trash.',
+        parameters: [{ name: 'signal', description: 'optional cancellation for the trash scan.' }],
+        returns: 'recoverable document references.',
+      },
+      {
+        signature: 'async listTrashPage( query: UserDocListQuery = {}, signal?: AbortSignal, ): Promise<UserDocTrashPage>',
+        description: 'Return one filtered page from recoverable trash.',
+        parameters: [{ name: 'query', description: 'filtering, ordering and cursor options.' }, { name: 'signal', description: 'optional cancellation for the trash scan.' }],
+        returns: 'a filtered trash page with an opaque offset cursor.',
+      },
+      {
+        signature: 'abstract trash(docId: UserDocId, signal?: AbortSignal): Promise<UserDocTrashRef>',
+        description: 'Move one document into recoverable trash.',
+        parameters: [{ name: 'docId', description: 'store-scoped document identifier.' }, { name: 'signal', description: 'optional cancellation for the move.' }],
+        returns: 'the retained trash reference.',
+      },
+      {
+        signature: 'abstract restore( docId: UserDocId, directoryId?: UserDocDirectoryId, name?: string, signal?: AbortSignal, ): Promise<UserDocRef>',
+        description: 'Restore one trashed document, optionally choosing a destination directory. A local provider recreates a missing original directory before publication; an occupied or link-shaped destination is rejected.',
+        parameters: [{ name: 'docId', description: 'store-scoped document identifier.' }, { name: 'directoryId', description: 'optional destination directory; omitted keeps the original directory.' }, { name: 'name', description: 'optional replacement leaf name.' }, { name: 'signal', description: 'optional cancellation for the restore.' }],
+        returns: 'the restored durable document reference.',
+      },
+      {
+        signature: 'abstract purge(docId: UserDocId, signal?: AbortSignal): Promise<void>',
+        description: 'Permanently remove one trashed document.',
+        parameters: [{ name: 'docId', description: 'store-scoped document identifier.' }, { name: 'signal', description: 'optional cancellation for the purge.' }],
+      },
+      {
         signature: 'abstract listDirectories(signal?: AbortSignal): Promise<UserDocDirectoryRef[]>',
         description: 'List every directory below the document root.',
         parameters: [{ name: 'signal', description: 'optional cancellation for the recursive scan.' }],
@@ -3807,7 +3842,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'GatewayPrincipalClaims',
-    declaration: 'export interface GatewayPrincipalClaims {\n    version: 1;\n    issuer: \'harness-gateway\';\n    audience: \'dsh-runtime\';\n    organization: string;\n    user: {\n        id: number;\n        username: string;\n        displayName: string;\n        role: \'admin\' | \'user\';\n    };\n    scope: GatewayPrincipalScope;\n    runtime: GatewayRuntimeIdentity;\n    issuedAt: number;\n    expiresAt: number;\n    nonce: string;\n    purpose?: \'archive-read\';\n}',
+    declaration: 'export interface GatewayPrincipalClaims {\n    version: 1;\n    issuer: \'harness-gateway\';\n    audience: \'dsh-runtime\';\n    organization: string;\n    user: {\n        id: number;\n        username: string;\n        displayName: string;\n        role: \'admin\' | \'user\';\n    };\n    scope: GatewayPrincipalScope;\n    runtime: GatewayRuntimeIdentity;\n    issuedAt: number;\n    expiresAt: number;\n    nonce: string;\n    purpose?: \'archive-read\' | \'document-admin\';\n}',
   },
   {
     name: 'GatewayPrincipalScope',
@@ -5426,6 +5461,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface UserDocDirectoryListing {\n    directoryId: UserDocDirectoryId;\n    parentDirectoryId?: UserDocDirectoryId;\n    directories: UserDocDirectoryRef[];\n    documents: UserDocRef[];\n}',
   },
   {
+    name: 'UserDocDirectoryPage',
+    declaration: 'export interface UserDocDirectoryPage extends UserDocDirectoryListing {\n    readonly nextCursor?: string;\n    readonly totalDocuments: number;\n}',
+  },
+  {
     name: 'UserDocDirectoryRef',
     declaration: 'export interface UserDocDirectoryRef {\n    directoryId: UserDocDirectoryId;\n    path: string;\n    name: string;\n    modifiedAt: number;\n}',
   },
@@ -5438,12 +5477,32 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface UserDocLimits {\n    maxFileBytes: number | null;\n    maxFilesPerMessage: number;\n    maxMessageBytes: number;\n    maxInlineTextBytes: number;\n    upload: UserDocUploadCapabilities;\n}',
   },
   {
+    name: 'UserDocListQuery',
+    declaration: 'export interface UserDocListQuery {\n    readonly cursor?: string;\n    readonly limit?: number;\n    readonly query?: string;\n    readonly type?: UserDocListType;\n    readonly sort?: UserDocListSort;\n    readonly state?: \'active\' | \'trash\';\n}',
+  },
+  {
+    name: 'UserDocListSort',
+    declaration: 'export type UserDocListSort = \'date-desc\' | \'date-asc\' | \'name-asc\' | \'name-desc\' | \'size-desc\' | \'size-asc\';',
+  },
+  {
+    name: 'UserDocListType',
+    declaration: 'export type UserDocListType = \'all\' | \'image\' | \'pdf\' | \'text\' | \'other\';',
+  },
+  {
     name: 'UserDocRef',
     declaration: 'export interface UserDocRef {\n    docId: UserDocId;\n    path: string;\n    name: string;\n    bytes: number;\n    mediaType: string;\n    modifiedAt: number;\n}',
   },
   {
     name: 'UserDocTarget',
     declaration: 'export interface UserDocTarget {\n    path: string;\n    name: string;\n    docId: UserDocId;\n}',
+  },
+  {
+    name: 'UserDocTrashPage',
+    declaration: 'export interface UserDocTrashPage {\n    readonly documents: readonly UserDocTrashRef[];\n    readonly totalDocuments: number;\n    readonly nextCursor?: string;\n}',
+  },
+  {
+    name: 'UserDocTrashRef',
+    declaration: 'export interface UserDocTrashRef {\n    readonly docId: UserDocId;\n    readonly directoryId: UserDocDirectoryId;\n    readonly name: string;\n    readonly trashedAt: number;\n    readonly purgeAfter: number;\n    readonly bytes: number;\n    readonly mediaType: string;\n    readonly modifiedAt: number;\n}',
   },
   {
     name: 'UserDocUploadCapabilities',

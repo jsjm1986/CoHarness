@@ -103,14 +103,23 @@ describe('runtime client apply', () => {
       }] as never[],
     }))
     bench.api.onList = () => Promise.resolve(ok({ items: [] }))
+    // A preallocated draft id is a request/response correlation key; the
+    // real Host echoes it, so make the fake obey that wire invariant.
+    bench.api.onCreate = payload => Promise.resolve(ok({
+      sessionId: (payload as { sessionId: string }).sessionId as never,
+    }))
 
     bench.sinks?.onConnected?.({ version: '0', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true })
     await flushMicrotasks()
+    await new Promise(resolve => setTimeout(resolve, 0))
 
     const sessions = bench.ctx.get('sessions') as SessionRuntime
     const workspaces = bench.ctx.get('workspaces') as WorkspaceRuntime
-    expect(bench.api.callsOf('session.create')).toEqual([{ workspaceId: 'w-recent' }])
-    expect(sessions.list.getSnapshot().current).toBe('fk-new')
+    const create = bench.api.callsOf('session.create')[0]
+    expect(create).toMatchObject({ workspaceId: 'w-recent' })
+    expect(typeof (create as { draftId?: unknown })?.draftId).toBe('string')
+    expect(typeof (create as { sessionId?: unknown })?.sessionId).toBe('string')
+    expect(sessions.list.getSnapshot().current).toBe((create as { sessionId?: unknown })?.sessionId)
 
     sessions.clear()
     await workspaces.refresh()

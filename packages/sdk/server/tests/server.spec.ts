@@ -190,9 +190,10 @@ describe('HarnessSdkJsonRpcServer', () => {
     const ctx = {
       on: vi.fn(() => () => undefined),
       agents: { create, get: (id: SessionId) => liveAgents.get(String(id)) },
-      get: () => undefined,
+      get: (name: string) => name === 'llm' ? { listProviders: () => [{ id: 'mock' }] } : undefined,
     } as unknown as Context
     const server = new HarnessSdkJsonRpcServer(ctx, new FakeTransport())
+    await server.initialize({ cwd: '.', provider: 'mock', model: 'model' })
     const prompt = (sessionId: string, text: string) => server.prompt({
       sessionId,
       contentBlocks: [{ type: 'text', text }],
@@ -226,9 +227,10 @@ describe('HarnessSdkJsonRpcServer', () => {
         create: vi.fn(async () => handle),
         get: (id: SessionId) => (live && String(id) === 'zombie' ? agent : undefined),
       },
-      get: () => undefined,
+      get: (name: string) => name === 'llm' ? { listProviders: () => [{ id: 'mock' }] } : undefined,
     } as unknown as Context
     const server = new HarnessSdkJsonRpcServer(ctx, new FakeTransport())
+    await server.initialize({ cwd: '.', provider: 'mock', model: 'model' })
     const prompt = (text: string) => server.prompt({
       sessionId: 'zombie',
       contentBlocks: [{ type: 'text', text }],

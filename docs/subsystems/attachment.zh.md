@@ -250,6 +250,59 @@ abstract list(signal?: AbortSignal): Promise<UserDocRef[]>
 abstract listDirectory( directoryId: UserDocDirectoryId, signal?: AbortSignal, ): Promise<UserDocDirectoryListing>
 
 /**
+ * Return one filtered page without requiring a consumer to materialize the
+ * complete directory result. Providers may override this method with an
+ * indexed implementation; the default keeps older providers functional.
+ * @param directoryId - directory to inspect.
+ * @param query - filtering, ordering and cursor options.
+ * @param signal - optional cancellation.
+ * @returns a page with an opaque offset cursor.
+ */
+async listDirectoryPage( directoryId: UserDocDirectoryId, query: UserDocListQuery = {}, signal?: AbortSignal, ): Promise<UserDocDirectoryPage>
+
+/**
+ * List recoverable documents retained in the provider trash.
+ * @param signal - optional cancellation for the trash scan.
+ * @returns recoverable document references.
+ */
+abstract listTrash(signal?: AbortSignal): Promise<UserDocTrashRef[]>
+
+/**
+ * Return one filtered page from recoverable trash.
+ * @param query - filtering, ordering and cursor options.
+ * @param signal - optional cancellation for the trash scan.
+ * @returns a filtered trash page with an opaque offset cursor.
+ */
+async listTrashPage( query: UserDocListQuery = {}, signal?: AbortSignal, ): Promise<UserDocTrashPage>
+
+/**
+ * Move one document into recoverable trash.
+ * @param docId - store-scoped document identifier.
+ * @param signal - optional cancellation for the move.
+ * @returns the retained trash reference.
+ */
+abstract trash(docId: UserDocId, signal?: AbortSignal): Promise<UserDocTrashRef>
+
+/**
+ * Restore one trashed document, optionally choosing a destination directory.
+ * A local provider recreates a missing original directory before publication;
+ * an occupied or link-shaped destination is rejected.
+ * @param docId - store-scoped document identifier.
+ * @param directoryId - optional destination directory; omitted keeps the original directory.
+ * @param name - optional replacement leaf name.
+ * @param signal - optional cancellation for the restore.
+ * @returns the restored durable document reference.
+ */
+abstract restore( docId: UserDocId, directoryId?: UserDocDirectoryId, name?: string, signal?: AbortSignal, ): Promise<UserDocRef>
+
+/**
+ * Permanently remove one trashed document.
+ * @param docId - store-scoped document identifier.
+ * @param signal - optional cancellation for the purge.
+ */
+abstract purge(docId: UserDocId, signal?: AbortSignal): Promise<void>
+
+/**
  * List every directory below the document root.
  * @param signal - optional cancellation for the recursive scan.
  * @returns directory references ordered by identifier.
@@ -335,5 +388,5 @@ abstract openRead(docId: UserDocId): Promise<{ ref: UserDocRef; body: ReadableSt
 abstract remove(docId: UserDocId, signal?: AbortSignal): Promise<void>
 ```
 
-Source: [`packages/attachment/userdoc/src/index.ts:110`](../../packages/attachment/userdoc/src/index.ts)
+Source: [`packages/attachment/userdoc/src/index.ts:137`](../../packages/attachment/userdoc/src/index.ts)
 <!-- END GENERATED cordis-surface -->

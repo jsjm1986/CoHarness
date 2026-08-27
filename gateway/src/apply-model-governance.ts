@@ -27,6 +27,15 @@ interface ModelPolicyProjection {
   }>
 }
 
+/** Per-process projection cache; the durable policy revision remains authoritative. */
+const projectionVersions = new Map<string, number>()
+const projectionQueues = new Map<string, Promise<void>>()
+const refreshTasks = new Map<string, Promise<void>>()
+
+function projectionKey(subject: ModelUsageSubject, dshHome: string): string {
+  return `${subject.kind}:${String(subject.id)}:${dshHome}`
+}
+
 function sameSubject(left: ModelUsageSubject | null, right: ModelUsageSubject): boolean {
   return left?.kind === right.kind && left.id === right.id
 }
@@ -132,17 +141,49 @@ async function writeProjection(
   return path
 }
 
+/** Apply a policy only when its durable revision (or file) changed. */
+async function ensureProjection(
+  cfg: GatewayConfig,
+  governance: GatewayModelGovernanceService,
+  dshHome: string,
+  subject: ModelUsageSubject,
+  readPolicy: () => Promise<Awaited<ReturnType<GatewayModelGovernanceService['policyFor']>>>,
+): Promise<void> {
+  const key = projectionKey(subject, dshHome)
+  await queueProjection(key, async () => {
+    const policy = await readPolicy()
+    const path = join(dshHome, 'model-governance.json')
+    if (projectionVersions.get(key) === policy.version && existsSync(path)) return
+    await writeProjection(cfg, governance, dshHome, subject, policy)
+    projectionVersions.set(key, policy.version)
+  })
+}
+
+/** Serialize every projection write, including eager startup writes. */
+async function queueProjection<T>(key: string, operation: () => Promise<T>): Promise<T> {
+  const previous = projectionQueues.get(key) ?? Promise.resolve()
+  const run = previous.then(operation, operation)
+  const tail = run.then(() => undefined, () => undefined)
+  projectionQueues.set(key, tail)
+  void tail.then(() => {
+    if (projectionQueues.get(key) === tail) projectionQueues.delete(key)
+  })
+  return run
+}
+
 /** Atomically project one user's effective model policy and stable intake credential. */
 export async function writeModelGovernanceFile(
   cfg: GatewayConfig, governance: GatewayModelGovernanceService, user: UserRow,
 ): Promise<string> {
-  return writeProjection(
-    cfg,
-    governance,
-    join(cfg.usersRoot, user.username, 'dsh'),
-    { kind: 'user', id: user.id },
-    await governance.policyFor(user),
-  )
+  const dshHome = join(cfg.usersRoot, user.username, 'dsh')
+  const subject = { kind: 'user' as const, id: user.id }
+  const key = projectionKey(subject, dshHome)
+  return queueProjection(key, async () => {
+    const policy = await governance.policyFor(user)
+    const path = await writeProjection(cfg, governance, dshHome, subject, policy)
+    projectionVersions.set(key, policy.version)
+    return path
+  })
 }
 
 /** Atomically project the shared member policy and project-owned intake credential. */
@@ -151,13 +192,73 @@ export async function writeProjectModelGovernanceFile(
   governance: GatewayModelGovernanceService,
   project: ProjectRuntime,
 ): Promise<string> {
-  return writeProjection(
-    cfg,
-    governance,
-    join(cfg.projectRuntimesRoot, String(project.id), 'dsh'),
-    { kind: 'project', id: project.id },
-    await governance.policyForProject(project.id),
-  )
+  const dshHome = join(cfg.projectRuntimesRoot, String(project.id), 'dsh')
+  const subject = { kind: 'project' as const, id: project.id }
+  const key = projectionKey(subject, dshHome)
+  return queueProjection(key, async () => {
+    const policy = await governance.policyForProject(project.id)
+    const path = await writeProjection(cfg, governance, dshHome, subject, policy)
+    projectionVersions.set(key, policy.version)
+    return path
+  })
+}
+
+/** Lazily refresh one personal runtime's policy before it handles a request. */
+export async function ensureModelGovernanceForUser(
+  cfg: GatewayConfig,
+  governance: GatewayModelGovernanceService,
+  user: UserRow,
+): Promise<void> {
+  const dshHome = join(cfg.usersRoot, user.username, 'dsh')
+  await ensureProjection(cfg, governance, dshHome, { kind: 'user', id: user.id }, () => Promise.resolve(governance.policyFor(user)))
+}
+
+/** Lazily refresh one project runtime's policy before it handles a request. */
+export async function ensureModelGovernanceForProject(
+  cfg: GatewayConfig,
+  governance: GatewayModelGovernanceService,
+  project: ProjectRuntime,
+): Promise<void> {
+  const dshHome = join(cfg.projectRuntimesRoot, String(project.id), 'dsh')
+  await ensureProjection(cfg, governance, dshHome, { kind: 'project', id: project.id }, () => Promise.resolve(governance.policyForProject(project.id)))
+}
+
+/**
+ * Retry a complete policy projection after a database mutation. The database
+ * revision is durable; this task is only an eventually-consistent file cache,
+ * so a transient filesystem/runtime failure must not turn a committed admin
+ * mutation into a half-failed request.
+ */
+export function scheduleModelGovernanceRefresh(
+  deps: Pick<GatewayDeps, 'cfg' | 'governance' | 'users' | 'projects'>,
+): void {
+  if (deps.governance === undefined) return
+  const key = `${deps.cfg.usersRoot}:${deps.cfg.projectRuntimesRoot}`
+  if (refreshTasks.has(key)) return
+  const task = (async () => {
+    let delay = 250
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      try {
+        for (const target of await deps.users.list()) await applyModelGovernanceToUser(deps, target.id)
+        for (const project of await deps.projects.list()) await applyModelGovernanceToProject(deps, project.id)
+        return
+      } catch (error: unknown) {
+        if (attempt === 5) {
+          console.error('[gateway] model policy projection remains pending:', error)
+          return
+        }
+        await new Promise<void>(resolve => {
+          const timer = setTimeout(resolve, delay)
+          timer.unref?.()
+        })
+        delay = Math.min(10_000, delay * 2)
+      }
+    }
+  })()
+  refreshTasks.set(key, task)
+  void task.finally(() => {
+    if (refreshTasks.get(key) === task) refreshTasks.delete(key)
+  }).catch(() => {})
 }
 
 /** Rewrite policy; a running instance applies it through the plugin's file watcher. */

@@ -98,6 +98,7 @@ function bench(options: {
   ctx.provide('agents', { get: getAgent })
   ctx.provide('subagents', { listChildren, followup, interrupt })
   ctx.provide('sessions', {
+    list: () => [],
     get: (id: SessionId) => options.liveChild === true && id === CHILD
       ? { id: CHILD, header: childHeader, events: childEvents }
       : undefined,

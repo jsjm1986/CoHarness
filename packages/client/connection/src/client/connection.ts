@@ -23,6 +23,28 @@ const CONNECTION_DEFAULTS: Required<ConnectionConfig> = {
   streamOpenTimeoutMs: 3_000,
 }
 
+const MAX_TIMER_DELAY_MS = 2_147_483_647
+
+function resolveConnectionConfig(config: ConnectionConfig): Required<ConnectionConfig> {
+  const resolved = { ...CONNECTION_DEFAULTS, ...config }
+  for (const [name, value] of [
+    ['backoffBaseMs', resolved.backoffBaseMs],
+    ['backoffMaxMs', resolved.backoffMaxMs],
+    ['streamOpenTimeoutMs', resolved.streamOpenTimeoutMs],
+  ] as const) {
+    if (!Number.isFinite(value) || value <= 0 || value > MAX_TIMER_DELAY_MS) {
+      throw new RangeError(`${name} must be a positive finite delay no greater than ${String(MAX_TIMER_DELAY_MS)}`)
+    }
+  }
+  if (!Number.isFinite(resolved.backoffFactor) || resolved.backoffFactor <= 0) {
+    throw new RangeError('backoffFactor must be a positive finite number')
+  }
+  if (resolved.backoffMaxMs < resolved.backoffBaseMs) {
+    throw new RangeError('backoffMaxMs must be at least backoffBaseMs')
+  }
+  return resolved
+}
+
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
     const t = setTimeout(done, ms)
@@ -32,6 +54,27 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
       signal.removeEventListener('abort', done)
       resolve()
     }
+  })
+}
+
+/** Resolve when both streams open, the opening deadline elapses, or the generation aborts. */
+function waitForStreamOpen(
+  streamsOpen: Promise<unknown>,
+  timeoutMs: number,
+  signal: AbortSignal,
+): Promise<void> {
+  return new Promise<void>((resolve) => {
+    let settled = false
+    const finish = (): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      signal.removeEventListener('abort', finish)
+      resolve()
+    }
+    const timer = setTimeout(finish, timeoutMs)
+    signal.addEventListener('abort', finish, { once: true })
+    void streamsOpen.then(finish, finish)
   })
 }
 
@@ -61,8 +104,10 @@ export interface ConnectionSinks {
  */
 export class ConnectionController {
   private generation = 0
+  private runToken = 0
   private attempt = 0
   private current: AbortController | null = null
+  private backoff: AbortController | null = null
   private running = false
   private lastState: ConnectionState | null = null
   private readonly config: Required<ConnectionConfig>
@@ -72,21 +117,25 @@ export class ConnectionController {
     private readonly sinks: ConnectionSinks = {},
     config: ConnectionConfig = {},
   ) {
-    this.config = { ...CONNECTION_DEFAULTS, ...config }
+    this.config = resolveConnectionConfig(config)
   }
 
   /** Idempotent: begin the connect/pump/reconnect loop. */
   start(): void {
     if (this.running) return
     this.running = true
-    void this.loop()
+    const token = ++this.runToken
+    void this.loop(token)
   }
 
   /** Stop the loop and abort the current generation's streams. */
   stop(): void {
     this.running = false
+    this.runToken += 1
     this.current?.abort()
     this.current = null
+    this.backoff?.abort()
+    this.backoff = null
   }
 
   private backoffDelay(attempt: number): number {
@@ -96,17 +145,17 @@ export class ConnectionController {
   }
 
   /** Read through a method: stop() flips the flag across awaits, so narrowing from the loop condition must not stick. */
-  private isRunning(): boolean {
-    return this.running
+  private isRunning(token?: number): boolean {
+    return this.running && (token === undefined || token === this.runToken)
   }
 
   /** Re-read both mutable liveness guards after a potentially reentrant sink. */
-  private isGenerationActive(controller: AbortController): boolean {
-    return this.isRunning() && !controller.signal.aborted
+  private isGenerationActive(controller: AbortController, token: number): boolean {
+    return this.isRunning(token) && !controller.signal.aborted
   }
 
-  private async loop(): Promise<void> {
-    while (this.running) {
+  private async loop(token: number): Promise<void> {
+    while (this.isRunning(token)) {
       const gen = ++this.generation
       const ac = new AbortController()
       this.current = ac
@@ -129,18 +178,18 @@ export class ConnectionController {
       > = []
       const dispatchMux = (envelope: RpcRequest<MuxFrame>): void => {
         if (!ready || releasing) {
-          if (generationLive && this.isGenerationActive(ac)) buffered.push({ kind: 'mux', envelope })
+          if (generationLive && this.isGenerationActive(ac, token)) buffered.push({ kind: 'mux', envelope })
           return
         }
-        if (!generationLive || !this.isGenerationActive(ac)) return
+        if (!generationLive || !this.isGenerationActive(ac, token)) return
         this.callSink(() => { this.sinks.onMuxEnvelope?.(envelope) })
       }
       const dispatchHost = (envelope: RpcRequest<HostFrame>): void => {
         if (!ready || releasing) {
-          if (generationLive && this.isGenerationActive(ac)) buffered.push({ kind: 'host', envelope })
+          if (generationLive && this.isGenerationActive(ac, token)) buffered.push({ kind: 'host', envelope })
           return
         }
-        if (!generationLive || !this.isGenerationActive(ac)) return
+        if (!generationLive || !this.isGenerationActive(ac, token)) return
         this.callSink(() => { this.sinks.onHostEnvelope?.(envelope) })
       }
 
@@ -156,7 +205,7 @@ export class ConnectionController {
 
       const failed = new Promise<void>((resolve) => {
         const settle = (): void => {
-          if (gen === this.generation && !ac.signal.aborted) ac.abort()
+          if (gen === this.generation && token === this.runToken && !ac.signal.aborted) ac.abort()
           generationLive = false
           buffered.length = 0
           resolve()
@@ -171,12 +220,21 @@ export class ConnectionController {
         // only then may onConnected fire, so the resync it triggers cannot outrun the
         // subscribed baseline. The timeout guards against a carrier that never fires onOpen
         // (see ConnectionConfig.streamOpenTimeoutMs).
-        const timeout = new AbortController()
-        const [description] = await Promise.all([
-          this.api.host.describe({}),
-          Promise.race([streamsOpen, sleep(this.config.streamOpenTimeoutMs, timeout.signal)]),
+        const handshake = Promise.all([
+          this.api.host.describe({}, ac.signal),
+          // Aborting the generation must wake the open-timeout branch too;
+          // otherwise a carrier that ignores AbortSignal delays reconnect for
+          // the full configured timeout after its stream has already failed.
+          waitForStreamOpen(streamsOpen, this.config.streamOpenTimeoutMs, ac.signal),
         ])
-        timeout.abort()
+        void handshake.catch(() => {})
+        // A third-party unary carrier may ignore AbortSignal. Race the
+        // handshake against the generation's failure edge so stop/reconnect
+        // cannot leave the controller suspended behind that promise.
+        const [description] = await Promise.race([
+          handshake,
+          failed.then(() => { throw new Error('connection generation ended during readiness') }),
+        ])
         const descriptionResult = description.result
         if (!descriptionResult.ok) {
           throw new Error(`host.describe failed: ${descriptionResult.error.code}: ${descriptionResult.error.message}`)
@@ -186,7 +244,7 @@ export class ConnectionController {
         this.emitState('connected')
         // A state sink may synchronously stop this controller. Do not publish
         // a description for a generation that no longer exists afterward.
-        if (this.isGenerationActive(ac)) {
+        if (this.isGenerationActive(ac, token)) {
           // Open the live generation before invoking onConnected so its
           // synchronous baseline pulls are not held behind the replay gate.
           // `releasing` keeps any re-entrant stream delivery ordered until the
@@ -195,9 +253,9 @@ export class ConnectionController {
           releasing = true
           this.callSink(() => { this.sinks.onConnected?.(descriptionResult.value) })
           releasing = false
-          if (this.isGenerationActive(ac)) {
+          if (this.isGenerationActive(ac, token)) {
             for (const item of buffered.splice(0)) {
-              if (!this.isGenerationActive(ac)) {
+              if (!this.isGenerationActive(ac, token)) {
                 buffered.length = 0
                 break
               }
@@ -214,12 +272,14 @@ export class ConnectionController {
       }
 
       await failed
-      if (!this.isRunning()) return
+      if (!this.isRunning(token)) return
       this.emitState('reconnecting')
       this.attempt += 1
       console.warn(`[web-runtime] connection lost, retry #${this.attempt}`)
       const idle = new AbortController()
+      this.backoff = idle
       await sleep(this.backoffDelay(this.attempt), idle.signal)
+      if (this.backoff === idle) this.backoff = null
     }
   }
 

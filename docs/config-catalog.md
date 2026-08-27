@@ -424,7 +424,7 @@ export interface ConnectionConfig {
 }
 ```
 
-Source: [`packages/client/connection/src/index.ts:76`](../packages/client/connection/src/index.ts)
+Source: [`packages/client/connection/src/index.ts:80`](../packages/client/connection/src/index.ts)
 
 <a id="deepseek-aidsh-client-hmr"></a>
 
@@ -958,6 +958,14 @@ export interface Config {
   imageOffloadCountQuantum?: number
   /** Maximum duration of one request-image Files API resolution (default one minute). */
   filesApiTimeoutMs?: number
+  /** Maximum bytes retained from one non-2xx provider error body (default 64 KiB). */
+  maxErrorResponseBytes?: number
+  /** Maximum characters buffered for one incomplete SSE event (default 4 MiB). */
+  maxSseBufferBytes?: number
+  /** Maximum accumulated visible/reasoning response bytes (default 16 MiB). */
+  maxGeneratedTextBytes?: number
+  /** Maximum accumulated arguments for one streamed tool call (default 4 MiB). */
+  maxToolArgumentBytes?: number
   /** Explicit lifetime assigned to each uploaded image (default seven days). */
   fileExpiresAfterSeconds?: number
   /** Remaining lifetime below which an indexed file is replaced (default one hour). */
@@ -1702,6 +1710,20 @@ export interface JsonRpcConfig {
   output?: Writable
   /** Process-exit override; production uses `process.exit`. */
   exit?: (code: number) => void
+  /** Maximum UTF-8 bytes accepted for one JSON-RPC input line. */
+  maxLineBytes?: number
+  /** Maximum pending outbound requests retained by the transport. */
+  maxPendingRequests?: number
+  /** Maximum concurrently handled inbound requests. */
+  maxConcurrentIncoming?: number
+  /** Maximum bytes queued on the protocol output stream. */
+  maxOutputBytes?: number
+  /** Maximum live sessions retained by the SDK server. */
+  maxSessions?: number
+  /** Maximum prompt content bytes accepted by the SDK server. */
+  maxPromptBytes?: number
+  /** Maximum content blocks accepted in one prompt. */
+  maxPromptBlocks?: number
 }
 ```
 
@@ -1722,12 +1744,14 @@ export interface Config {
   preparedSessionCacheSize?: number
   /** Maximum delay before one live event batch is flushed. */
   writeBatchMaxDelayMs?: number
+  /** Maximum events retained in one live session's pending write queue. */
+  maxPendingEvents?: number
   /** Deadline for one internal Gateway HTTP request. */
   requestTimeoutMs?: number
 }
 ```
 
-Source: [`packages/session/session-persistence-gateway/src/index.ts:63`](../packages/session/session-persistence-gateway/src/index.ts)
+Source: [`packages/session/session-persistence-gateway/src/index.ts:64`](../packages/session/session-persistence-gateway/src/index.ts)
 
 <a id="deepseek-aidsh-session-persistence-jsonl"></a>
 
@@ -1760,6 +1784,8 @@ export interface Config {
   preparedSessionCacheSize?: number
   /** Fixed live-event coalescing window; not a backend completion deadline. */
   writeBatchMaxDelayMs?: number
+  /** Maximum events retained in one live session's pending write queue. */
+  maxPendingEvents?: number
 }
 
 /** Physical encoding selected for JSONL session artifacts. */
@@ -1787,13 +1813,15 @@ export interface Config {
   preparedSessionCacheSize?: number
   /** Fixed live-event coalescing window; not a backend completion deadline. */
   writeBatchMaxDelayMs?: number
+  /** Maximum events retained in one live session's pending write queue. */
+  maxPendingEvents?: number
 }
 
 /** Durable journal modes accepted by the backend. */
 export type JournalMode = 'wal' | 'delete' | 'truncate' | 'persist'
 ```
 
-Source: [`packages/session/session-persistence-sqlite/src/index.ts:36`](../packages/session/session-persistence-sqlite/src/index.ts)
+Source: [`packages/session/session-persistence-sqlite/src/index.ts:37`](../packages/session/session-persistence-sqlite/src/index.ts)
 
 <a id="deepseek-aidsh-session-projection-cache"></a>
 
@@ -3006,6 +3034,13 @@ export interface Config {
    * restores strictly serial dispatch. Must be a positive integer.
    */
   maxParallelSubCalls?: number
+  /**
+   * Maximum number of outstanding `run_code` sub-calls retained by one
+   * program, including queued, running, and model-order committing calls.
+   * Calls beyond this bound fail immediately so a fast producer cannot grow
+   * an unbounded in-memory queue. Must be a positive integer.
+   */
+  maxPendingSubCalls?: number
 }
 
 /** How the registry presents its tools to the model (see {@link Config.mode}). */
@@ -3096,10 +3131,12 @@ export interface Config {
   uploadMaxConcurrent?: number
   /** Interval between expired-session cleanup sweeps. */
   uploadCleanupIntervalMs?: number
+  /** Recoverable document trash retention in days. */
+  trashRetentionDays?: number
 }
 ```
 
-Source: [`packages/attachment/userdoc-local/src/index.ts:102`](../packages/attachment/userdoc-local/src/index.ts)
+Source: [`packages/attachment/userdoc-local/src/index.ts:175`](../packages/attachment/userdoc-local/src/index.ts)
 
 <a id="deepseek-aidsh-web"></a>
 

@@ -44,44 +44,77 @@ function tokenHash(token: string): string {
   return createHash('sha256').update(token).digest('hex')
 }
 
+/** Use one lock bucket for equivalent login spellings across case-insensitive stores. */
+function loginKey(username: string): string {
+  return username.toLowerCase()
+}
+
 export class AuthService {
+  private readonly loginTails = new Map<string, Promise<unknown>>()
+
   constructor(private readonly db: Database.Database, private readonly cfg: GatewayConfig) {}
+
+  private serializeLogin<T>(username: string, operation: () => Promise<T>): Promise<T> {
+    const key = loginKey(username)
+    const previous = this.loginTails.get(key) ?? Promise.resolve()
+    const current = previous.then(operation, operation)
+    const tail = current.then(() => undefined, () => undefined)
+    this.loginTails.set(key, tail)
+    void tail.then(() => {
+      if (this.loginTails.get(key) === tail) this.loginTails.delete(key)
+    })
+    return current
+  }
 
   async login(username: string, password: string, ip: string, userAgent: string):
   Promise<{ token: string; user: UserRow } | 'invalid' | 'locked'> {
-    const now = Date.now()
-    const failures = this.db.prepare(
-      `SELECT COUNT(*) AS n FROM login_attempts WHERE username = ? AND ip = ? AND ts > ?`,
-    ).get(username, ip, now - LOCK_WINDOW_MS) as { n: number }
-    if (failures.n >= LOCK_THRESHOLD) return 'locked'
+    return this.serializeLogin(username, async () => {
+      const row = this.db.prepare(`SELECT * FROM users WHERE username = ?`).get(username) as DbUser | undefined
+      const passwordOk = row !== undefined && row.status === 'active' && row.deleted_at === null
+        && await verifyPassword(row.password_hash, password)
+      return this.db.transaction(() => {
+        const now = Date.now()
+        this.db.prepare(`DELETE FROM login_attempts WHERE ts <= ?`).run(now - LOCK_WINDOW_MS)
+        const failures = this.db.prepare(
+          `SELECT COUNT(*) AS n FROM login_attempts WHERE username = ? AND ts > ?`,
+        ).get(username, now - LOCK_WINDOW_MS) as { n: number }
+        if (failures.n >= LOCK_THRESHOLD) return 'locked' as const
 
-    const row = this.db.prepare(`SELECT * FROM users WHERE username = ?`).get(username) as DbUser | undefined
-    const ok = row !== undefined && row.status === 'active' && row.deleted_at === null
-      && await verifyPassword(row.password_hash, password)
-    if (!ok || row === undefined) {
-      this.db.prepare(`INSERT INTO login_attempts(username, ip, ts) VALUES(?, ?, ?)`).run(username, ip, now)
-      return 'invalid'
-    }
+        // Password hashing is asynchronous, so the row checked before the
+        // await may have been disabled or replaced in the meantime. Re-read
+        // the authoritative row before creating a session.
+        const current = this.db.prepare(`SELECT * FROM users WHERE username = ?`).get(username) as DbUser | undefined
+        const accepted = passwordOk && row !== undefined && current !== undefined
+          && current.id === row.id && current.password_hash === row.password_hash
+          && current.status === 'active' && current.deleted_at === null
+        if (!accepted || current === undefined) {
+          this.db.prepare(`INSERT INTO login_attempts(username, ip, ts) VALUES(?, ?, ?)`).run(username, ip, now)
+          return 'invalid' as const
+        }
 
-    this.db.prepare(`DELETE FROM login_attempts WHERE username = ? AND ip = ?`).run(username, ip)
-    const token = randomBytes(32).toString('base64url')
-    this.db.prepare(
-      `INSERT INTO auth_sessions(user_id, token_hash, created_at, expires_at, absolute_expires_at, last_seen_at, ip, user_agent)
-       VALUES(?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(row.id, tokenHash(token), now, now + this.cfg.sessionTtlMs, now + this.cfg.sessionAbsoluteTtlMs, now, ip, userAgent)
-    return { token, user: toUserRow(row) }
+        this.db.prepare(`DELETE FROM login_attempts WHERE username = ?`).run(username)
+        const token = randomBytes(32).toString('base64url')
+        this.db.prepare(
+          `INSERT INTO auth_sessions(user_id, token_hash, created_at, expires_at, absolute_expires_at, last_seen_at, ip, user_agent)
+           VALUES(?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).run(current.id, tokenHash(token), now, now + this.cfg.sessionTtlMs, now + this.cfg.sessionAbsoluteTtlMs, now, ip, userAgent)
+        return { token, user: toUserRow(current) }
+      })()
+    })
   }
 
   validate(token: string): UserRow | null {
-    const now = Date.now()
-    const session = this.db.prepare(`SELECT * FROM auth_sessions WHERE token_hash = ?`).get(tokenHash(token)) as
-      { id: number; user_id: number; expires_at: number; absolute_expires_at: number } | undefined
-    if (session === undefined || session.expires_at < now || session.absolute_expires_at < now) return null
-    this.db.prepare(`UPDATE auth_sessions SET last_seen_at = ?, expires_at = ? WHERE id = ?`)
-      .run(now, Math.min(now + this.cfg.sessionTtlMs, session.absolute_expires_at), session.id)
-    const user = this.db.prepare(`SELECT * FROM users WHERE id = ?`).get(session.user_id) as DbUser | undefined
-    if (user === undefined || user.status !== 'active' || user.deleted_at !== null) return null
-    return toUserRow(user)
+    return this.db.transaction(() => {
+      const now = Date.now()
+      const session = this.db.prepare(`SELECT * FROM auth_sessions WHERE token_hash = ?`).get(tokenHash(token)) as
+        { id: number; user_id: number; expires_at: number; absolute_expires_at: number } | undefined
+      if (session === undefined || session.expires_at < now || session.absolute_expires_at < now) return null
+      this.db.prepare(`UPDATE auth_sessions SET last_seen_at = ?, expires_at = ? WHERE id = ?`)
+        .run(now, Math.min(now + this.cfg.sessionTtlMs, session.absolute_expires_at), session.id)
+      const user = this.db.prepare(`SELECT * FROM users WHERE id = ?`).get(session.user_id) as DbUser | undefined
+      if (user === undefined || user.status !== 'active' || user.deleted_at !== null) return null
+      return toUserRow(user)
+    })()
   }
 
   revoke(token: string): void {

@@ -15,7 +15,7 @@ import { performance } from 'node:perf_hooks'
 import { scheduler } from 'node:timers/promises'
 import { randomBytes } from 'node:crypto'
 import {
-  DEFAULT_PREPARED_SESSION_CACHE_SIZE, DEFAULT_WRITE_BATCH_MAX_DELAY_MS, MAX_WRITE_BATCH_DELAY_MS,
+  DEFAULT_MAX_PENDING_EVENTS_PER_SESSION, DEFAULT_PREPARED_SESSION_CACHE_SIZE, DEFAULT_WRITE_BATCH_MAX_DELAY_MS, MAX_WRITE_BATCH_DELAY_MS,
   SessionPersistence, SessionPersistenceRevision, PersistenceCoordinator, SessionFormatUnsupportedError,
   sessionContentMetadata,
   type PersistenceBackend, type SessionLocation, type SessionPersistenceSnapshot,
@@ -81,6 +81,8 @@ export interface Config {
   preparedSessionCacheSize?: number
   /** Fixed live-event coalescing window; not a backend completion deadline. */
   writeBatchMaxDelayMs?: number
+  /** Maximum events retained in one live session's pending write queue. */
+  maxPendingEvents?: number
 }
 
 /** Opaque coordinator token for replacing bytes recovered from a torn frame. */
@@ -131,6 +133,7 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     preparedSessionCacheSize: z.number().step(1).min(1).default(DEFAULT_PREPARED_SESSION_CACHE_SIZE),
     writeBatchMaxDelayMs: z.number().step(1).min(1).max(MAX_WRITE_BATCH_DELAY_MS)
       .default(DEFAULT_WRITE_BATCH_MAX_DELAY_MS),
+    maxPendingEvents: z.number().step(1).min(1).default(DEFAULT_MAX_PENDING_EVENTS_PER_SESSION),
   })
 
   /**
@@ -155,12 +158,14 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
       ?? DEFAULT_PREPARED_SESSION_CACHE_SIZE
     const writeBatchMaxDelayMs = config.writeBatchMaxDelayMs
       ?? DEFAULT_WRITE_BATCH_MAX_DELAY_MS
+    const maxPendingEvents = config.maxPendingEvents ?? DEFAULT_MAX_PENDING_EVENTS_PER_SESSION
     this.packChunks = config.packChunks ?? DEFAULT_PACK_CHUNKS
     this.compression = config.compression ?? DEFAULT_COMPRESSION
     this.assertUsableRoot()
     this.coordinator = new PersistenceCoordinator<JsonlTornMarker>(this.ctx, this, {
       preparedSessionCacheSize,
       writeBatchMaxDelayMs,
+      maxPendingEvents,
     })
   }
 

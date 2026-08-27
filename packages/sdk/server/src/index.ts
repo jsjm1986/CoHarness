@@ -31,10 +31,31 @@ export interface JsonRpcConfig {
   output?: Writable
   /** Process-exit override; production uses `process.exit`. */
   exit?: (code: number) => void
+  /** Maximum UTF-8 bytes accepted for one JSON-RPC input line. */
+  maxLineBytes?: number
+  /** Maximum pending outbound requests retained by the transport. */
+  maxPendingRequests?: number
+  /** Maximum concurrently handled inbound requests. */
+  maxConcurrentIncoming?: number
+  /** Maximum bytes queued on the protocol output stream. */
+  maxOutputBytes?: number
+  /** Maximum live sessions retained by the SDK server. */
+  maxSessions?: number
+  /** Maximum prompt content bytes accepted by the SDK server. */
+  maxPromptBytes?: number
+  /** Maximum content blocks accepted in one prompt. */
+  maxPromptBlocks?: number
 }
 
 export const Config: Schema<JsonRpcConfig> = Schema.object({
   maxTokensAsSuccess: Schema.boolean().default(false),
+  maxLineBytes: Schema.natural().min(1).default(1 * 1024 * 1024),
+  maxPendingRequests: Schema.natural().min(1).default(1_000),
+  maxConcurrentIncoming: Schema.natural().min(1).default(100),
+  maxOutputBytes: Schema.natural().min(1).default(8 * 1024 * 1024),
+  maxSessions: Schema.natural().min(1).default(1_000),
+  maxPromptBytes: Schema.natural().min(1).default(4 * 1024 * 1024),
+  maxPromptBlocks: Schema.natural().min(1).default(1_000),
 })
 
 /**
@@ -56,9 +77,17 @@ export function apply(ctx: Context, config: JsonRpcConfig): void {
   /* v8 ignore next -- production exit wiring; tests always inject the runtime hooks */
   const exit = config.exit ?? ((code: number): void => { process.exit(code) })
 
-  const transport = new JsonRpcLineTransport(input, output)
+  const transport = new JsonRpcLineTransport(input, output, {
+    ...(config.maxLineBytes === undefined ? {} : { maxLineBytes: config.maxLineBytes }),
+    ...(config.maxPendingRequests === undefined ? {} : { maxPendingRequests: config.maxPendingRequests }),
+    ...(config.maxConcurrentIncoming === undefined ? {} : { maxConcurrentIncoming: config.maxConcurrentIncoming }),
+    ...(config.maxOutputBytes === undefined ? {} : { maxOutputBytes: config.maxOutputBytes }),
+  })
   const server = new HarnessSdkJsonRpcServer(ctx, transport, {
     maxTokensAsSuccess: resolvedConfig.maxTokensAsSuccess,
+    ...(config.maxSessions === undefined ? {} : { maxSessions: config.maxSessions }),
+    ...(config.maxPromptBytes === undefined ? {} : { maxPromptBytes: config.maxPromptBytes }),
+    ...(config.maxPromptBlocks === undefined ? {} : { maxPromptBlocks: config.maxPromptBlocks }),
   })
 
   // Share one exit task so racing shutdown requests cannot dispose the root or

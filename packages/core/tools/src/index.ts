@@ -671,6 +671,13 @@ export interface Config {
    * restores strictly serial dispatch. Must be a positive integer.
    */
   maxParallelSubCalls?: number
+  /**
+   * Maximum number of outstanding `run_code` sub-calls retained by one
+   * program, including queued, running, and model-order committing calls.
+   * Calls beyond this bound fail immediately so a fast producer cannot grow
+   * an unbounded in-memory queue. Must be a positive integer.
+   */
+  maxPendingSubCalls?: number
 }
 
 /**
@@ -780,6 +787,15 @@ function resolveMaxParallelSubCalls(value: number | undefined): number {
   return maxParallelSubCalls
 }
 
+/** Resolve the per-run outstanding sub-call bound at the owning config boundary. */
+function resolveMaxPendingSubCalls(value: number | undefined): number {
+  const maxPendingSubCalls = value ?? 100
+  if (!Number.isInteger(maxPendingSubCalls) || maxPendingSubCalls < 1) {
+    throw new Error('maxPendingSubCalls must be a positive integer')
+  }
+  return maxPendingSubCalls
+}
+
 /**
  * Tool registry and execution pipeline. Scoped registrations shadow globals;
  * one visibility resolver feeds presentation, lookup, and dispatch.
@@ -790,6 +806,7 @@ export class ToolRuntime extends Service {
   static Config: z<Config> = z.object({
     mode: z.union(['native', 'code', 'both'] as const).default('native'),
     maxParallelSubCalls: z.natural().min(1).default(10),
+    maxPendingSubCalls: z.natural().min(1).default(100),
   })
 
   /** Internal staged view consumed by `dsh-agent-loop`'s parallel scheduler. */
@@ -815,6 +832,7 @@ export class ToolRuntime extends Service {
   /** Presentation for scopes that declare none; {@link presentAs} shadows it per scope. */
   private readonly defaultMode: ToolPresentationMode
   private readonly maxParallelSubCalls: number
+  private readonly maxPendingSubCalls: number
   /**
    * Reserved presentation transport, kept outside the filterable registration
    * layers. Built on first need rather than at construction: which agents run
@@ -829,6 +847,7 @@ export class ToolRuntime extends Service {
     // optional-input type for direct (non-Loader) construction in tests.
     this.defaultMode = config.mode ?? 'native'
     this.maxParallelSubCalls = resolveMaxParallelSubCalls(config.maxParallelSubCalls)
+    this.maxPendingSubCalls = resolveMaxPendingSubCalls(config.maxPendingSubCalls)
     ctx.systemPrompt.tools(context => this.wireSchemas(context.scope))
     if (this.defaultMode !== 'native') {
       ctx.systemPrompt.section(this.collapseSection())
@@ -927,6 +946,7 @@ export class ToolRuntime extends Service {
       // the transport for an agent that chose code.
       peekRuntime: () => this.ctx.get('codeRuntime'),
       maxParallel: this.maxParallelSubCalls,
+      maxPending: this.maxPendingSubCalls,
       shapeDispatchLog: dispatch => this.shapeDispatchLog(dispatch),
     })
     return this.codeTransport

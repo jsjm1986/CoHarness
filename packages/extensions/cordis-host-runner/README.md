@@ -35,9 +35,9 @@ The vm sandbox isolates globals but is not a security boundary: Node globals are
 
 | Field | Default | Meaning |
 |---|---|---|
-| `vmTimeoutMs` | `5000` | Milliseconds the synchronous portion of a host half may run in the vm before evaluation is aborted |
+| `vmTimeoutMs` | `5000` | Milliseconds allowed for host-half evaluation and activation; synchronous vm work and async completion are both bounded |
 
-One field is all there is: a run request waits for a person, so the round trip has no deadline of its own.
+One field is all there is: a run request waits for a person, so the round trip has no deadline of its own. Disposal closes admission before retracting definitions, and a definition removed while activation is pending cannot publish a late fiber back into the registry.
 
 ## Export shape
 

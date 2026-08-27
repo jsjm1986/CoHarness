@@ -23,15 +23,17 @@ export const DONE = '[DONE]'
  * without it (truncated response — the model call cannot be trusted).
  * @param stream - raw SSE bytes; reads may split anywhere, including mid-UTF-8 sequence.
  * @param onComment - optional transport-activity callback; comments never enter the yielded payload stream.
+ * @param maxBufferSize - optional maximum buffered characters for one incomplete SSE event.
  * @returns each event's data payload in arrival order, the `[DONE]` sentinel last.
  */
 export async function* parseSse(
   stream: ReadableStream<BufferSource>,
   onComment?: (comment: string) => void,
+  maxBufferSize?: number,
 ): AsyncGenerator<string> {
   const events = stream
     .pipeThrough(new TextDecoderStream())
-    .pipeThrough(new EventSourceParserStream({ onComment }))
+    .pipeThrough(new EventSourceParserStream({ onComment, maxBufferSize }))
   for await (const { data } of events) {
     yield data
     if (data === DONE) return

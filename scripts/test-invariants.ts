@@ -26,6 +26,7 @@ import type {
   UserDocId,
   UserDocLimits,
   UserDocRef,
+  UserDocTrashRef,
   UserDocTarget,
   BeginUserDocUpload,
   UserDocUploadChunk,
@@ -234,6 +235,22 @@ class TestUserDocStore extends UserDocStore {
 
   remove(_docId: UserDocId, _signal?: AbortSignal): Promise<void> {
     return Promise.reject(new Error('test invariant user document store does not remove documents'))
+  }
+
+  listTrash(_signal?: AbortSignal): Promise<UserDocTrashRef[]> {
+    return Promise.reject(new Error('test invariant user document store does not list trash'))
+  }
+
+  trash(_docId: UserDocId, _signal?: AbortSignal): Promise<UserDocTrashRef> {
+    return Promise.reject(new Error('test invariant user document store does not trash documents'))
+  }
+
+  restore(_docId: UserDocId, _directoryId?: UserDocDirectoryId, _name?: string, _signal?: AbortSignal): Promise<UserDocRef> {
+    return Promise.reject(new Error('test invariant user document store does not restore documents'))
+  }
+
+  purge(_docId: UserDocId, _signal?: AbortSignal): Promise<void> {
+    return Promise.reject(new Error('test invariant user document store does not purge documents'))
   }
 }
 

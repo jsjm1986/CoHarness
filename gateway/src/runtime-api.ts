@@ -37,6 +37,7 @@ import {
   type RuntimeDocumentCatalogOverviewHandler,
   type RuntimeDocumentCatalogHistoryHandler,
   type RuntimeDocumentCatalogSyncHandler,
+  type RuntimeDocumentCatalogPurgeHandler,
 } from './document-catalog.ts'
 
 export interface RuntimeCredentialSubject {
@@ -49,7 +50,12 @@ export interface RuntimeCredentialSubject {
 
 type RuntimeSessionHeader = GatewaySessionCreationHeader
 
-const MAX_READABLE_SESSION_IDS = 5000
+const MAX_READABLE_SESSION_IDS = 50_000
+const READABLE_SESSION_BATCH_SIZE = 5_000
+const MAX_ARCHIVE_SESSION_IDS = 5000
+const MAX_ARCHIVE_SEARCH_ROWS = 20_000
+const MAX_ARCHIVE_SEARCH_TOTAL_BYTES = 16 * 1024 * 1024
+const MAX_ARCHIVE_TEXT_BYTES = 64 * 1024
 const EVENT_ENVELOPE_KEYS = new Set([
   'type',
   'seq',
@@ -93,6 +99,7 @@ interface RuntimeApiDependencies {
   documentTransferRetry?: RuntimeDocumentTransferHandler
   /** Optional organization document metadata catalog handlers. */
   documentCatalogSync?: RuntimeDocumentCatalogSyncHandler
+  documentCatalogPurge?: RuntimeDocumentCatalogPurgeHandler
   documentCatalogAuthorize?: RuntimeDocumentCatalogAuthorizeHandler
   documentCatalogOverview?: RuntimeDocumentCatalogOverviewHandler
   documentCatalogHistory?: RuntimeDocumentCatalogHistoryHandler
@@ -117,6 +124,10 @@ function optionalString(value: unknown): value is string | undefined {
   return value === undefined || typeof value === 'string'
 }
 
+function boundedOptionalString(value: unknown, maximum: number): value is string | undefined {
+  return optionalString(value) && (value === undefined || Buffer.byteLength(value, 'utf8') <= maximum)
+}
+
 function surfaceOp(value: unknown): boolean {
   if (value === 'append') return true
   const operation = record(value)
@@ -137,13 +148,13 @@ function jsonSerializable(value: unknown): boolean {
 
 function sessionHeader(value: unknown): RuntimeSessionHeader {
   const header = record(value)
-  if (header === undefined || typeof header.id !== 'string' || header.id === ''
+  if (header === undefined || typeof header.id !== 'string' || header.id === '' || header.id.length > 512
     || !safeInteger(header.version) || !safeInteger(header.createdAt)
-    || !optionalString(header.cwd) || !optionalString(header.parentSession)
+    || !boundedOptionalString(header.cwd, 4096) || !boundedOptionalString(header.parentSession, 512)
     || (header.seedLength !== undefined && !safeInteger(header.seedLength))
     || (header.origin !== undefined && header.origin !== 'subagent')
     || (header.delegationDepth !== undefined && !safeInteger(header.delegationDepth))
-    || !optionalString(header.agentPreset)
+    || !boundedOptionalString(header.agentPreset, 256)
     || (header.draft !== undefined && typeof header.draft !== 'boolean')) {
     throw new Error('invalid session header')
   }
@@ -211,13 +222,25 @@ function authorizationToken(req: IncomingMessage): string | undefined {
   return token === '' ? undefined : token
 }
 
-/** Abort a broker operation when the runtime's loopback request is abandoned. */
-function requestSignal(req: IncomingMessage): AbortSignal {
+/** Abort a broker operation when either side of the loopback request closes. */
+function requestSignal(req: IncomingMessage, res: ServerResponse): AbortSignal {
   const controller = new AbortController()
-  const eventSource = req as IncomingMessage & { once?: IncomingMessage['once'] }
-  if (typeof eventSource.once === 'function') {
-    eventSource.once('aborted', () => {
-      if (!controller.signal.aborted) controller.abort(new Error('runtime request aborted'))
+  const abort = (): void => {
+    if (!controller.signal.aborted) controller.abort(new Error('runtime request aborted'))
+  }
+  const requestEvents = req as IncomingMessage & { once?: IncomingMessage['once'] }
+  if (typeof requestEvents.once === 'function') {
+    requestEvents.once('aborted', abort)
+    requestEvents.once('close', () => {
+      // A normal request emits `close` after its body has been fully parsed;
+      // only an incomplete request indicates a transport disconnect here.
+      if (req.complete === false) abort()
+    })
+  }
+  const responseEvents = res as ServerResponse & { once?: ServerResponse['once'] }
+  if (typeof responseEvents.once === 'function') {
+    responseEvents.once('close', () => {
+      if (!res.writableEnded) abort()
     })
   }
   return controller.signal
@@ -228,6 +251,7 @@ function assertionFor(
   authority: GatewayPrincipalSigner,
   subject: RuntimeCredentialSubject,
   required: boolean,
+  options: { readonly allowDocumentAdmin?: boolean } = {},
 ): GatewayPrincipalClaims | undefined {
   const assertion = assertionHeader(req)
   if (assertion === undefined) {
@@ -240,7 +264,9 @@ function assertionFor(
     throw new CollaborationDeniedError('forbidden')
   }
   if (subject.target.kind === 'user') {
-    if (claims.scope.kind !== 'personal' || claims.user.id !== subject.target.id) {
+    const documentAdmin = options.allowDocumentAdmin === true && claims.purpose === 'document-admin'
+      && claims.user.role === 'admin'
+    if (claims.scope.kind !== 'personal' || (claims.user.id !== subject.target.id && !documentAdmin)) {
       throw new CollaborationDeniedError('forbidden')
     }
   } else if (claims.scope.kind !== 'project' || claims.scope.projectId !== subject.target.id) {
@@ -438,7 +464,7 @@ export function createRuntimeApiHandler(
           subject,
           principal: claims,
           payload: JSON.parse(body),
-          signal: requestSignal(req),
+          signal: requestSignal(req, res),
         })
         send(res, 200, result)
         return true
@@ -453,7 +479,7 @@ export function createRuntimeApiHandler(
           return true
         }
         send(res, 200, await handler({
-          request: req, subject, principal: claims, payload: JSON.parse(body), signal: requestSignal(req),
+          request: req, subject, principal: claims, payload: JSON.parse(body), signal: requestSignal(req, res),
         }))
         return true
       }
@@ -464,7 +490,9 @@ export function createRuntimeApiHandler(
           send(res, 503, { error: 'document-transfer-unavailable' })
           return true
         }
-        send(res, 200, await deps.documentTransferPlan({ subject, principal: claims, payload: JSON.parse(body) }))
+        send(res, 200, await deps.documentTransferPlan({
+          subject, principal: claims, payload: JSON.parse(body), signal: requestSignal(req, res),
+        }))
         return true
       }
 
@@ -474,7 +502,9 @@ export function createRuntimeApiHandler(
           send(res, 503, { error: 'document-transfer-unavailable' })
           return true
         }
-        send(res, 200, await deps.documentTransferCapabilities({ subject, principal: claims }))
+        send(res, 200, await deps.documentTransferCapabilities({
+          subject, principal: claims, signal: requestSignal(req, res),
+        }))
         return true
       }
 
@@ -488,6 +518,7 @@ export function createRuntimeApiHandler(
           subject,
           principal: claims,
           payload: JSON.parse(body),
+          signal: requestSignal(req, res),
         }))
         return true
       }
@@ -498,7 +529,9 @@ export function createRuntimeApiHandler(
           send(res, 503, { error: 'document-transfer-unavailable' })
           return true
         }
-        send(res, 200, await deps.documentTransferDirectories({ subject, principal: claims, payload: JSON.parse(body) }))
+        send(res, 200, await deps.documentTransferDirectories({
+          subject, principal: claims, payload: JSON.parse(body), signal: requestSignal(req, res),
+        }))
         return true
       }
 
@@ -508,12 +541,14 @@ export function createRuntimeApiHandler(
           send(res, 503, { error: 'document-transfer-unavailable' })
           return true
         }
-        send(res, 201, await deps.documentTransferDirectoryCreate({ subject, principal: claims, payload: JSON.parse(body) }))
+        send(res, 201, await deps.documentTransferDirectoryCreate({
+          subject, principal: claims, payload: JSON.parse(body), signal: requestSignal(req, res),
+        }))
         return true
       }
 
       if (pathname === '/internal/runtime/documents/catalog/sync' && req.method === 'POST') {
-        const claims = assertionFor(req, deps.principals, subject, true)!
+        const claims = assertionFor(req, deps.principals, subject, true, { allowDocumentAdmin: true })!
         if (deps.documentCatalogSync === undefined) {
           send(res, 503, { error: 'document-catalog-unavailable' })
           return true
@@ -523,12 +558,22 @@ export function createRuntimeApiHandler(
       }
 
       if (pathname === '/internal/runtime/documents/catalog/authorize' && req.method === 'POST') {
-        const claims = assertionFor(req, deps.principals, subject, true)!
+        const claims = assertionFor(req, deps.principals, subject, true, { allowDocumentAdmin: true })!
         if (deps.documentCatalogAuthorize === undefined) {
           send(res, 503, { error: 'document-catalog-unavailable' })
           return true
         }
         send(res, 200, await deps.documentCatalogAuthorize({ subject, principal: claims, payload: JSON.parse(body) }))
+        return true
+      }
+
+      if (pathname === '/internal/runtime/documents/catalog/purge' && req.method === 'POST') {
+        const claims = assertionFor(req, deps.principals, subject, true, { allowDocumentAdmin: true })!
+        if (deps.documentCatalogPurge === undefined) {
+          send(res, 503, { error: 'document-catalog-unavailable' })
+          return true
+        }
+        send(res, 200, await deps.documentCatalogPurge({ subject, principal: claims, payload: JSON.parse(body) }))
         return true
       }
 
@@ -538,7 +583,15 @@ export function createRuntimeApiHandler(
           send(res, 503, { error: 'document-catalog-unavailable' })
           return true
         }
-        send(res, 200, await deps.documentCatalogOverview({ subject, principal: claims }))
+        const query = new URL(req.url ?? pathname, 'http://runtime').searchParams
+        const options: Record<string, unknown> = {}
+        for (const key of ['query', 'type', 'sort', 'cursor'] as const) {
+          const value = query.get(key)
+          if (value !== null) options[key] = value
+        }
+        const limit = query.get('limit')
+        if (limit !== null) options.limit = Number(limit)
+        send(res, 200, await deps.documentCatalogOverview({ subject, principal: claims, options }))
         return true
       }
 
@@ -686,11 +739,17 @@ export function createRuntimeApiHandler(
         const revision = payload?.revision
         const ids = payload?.archivedSessionIds
         const sessions = payload?.sessions
+        const searchPayload = payload?.search
         if (!safeInteger(revision) || revision < 0 || !Array.isArray(ids)
-          || !ids.every(id => typeof id === 'string' && id !== '')
-          || !Array.isArray(sessions) || sessions.length > 5000) {
+          || ids.length > MAX_ARCHIVE_SESSION_IDS
+          || new Set(ids).size !== ids.length
+          || !ids.every(id => typeof id === 'string' && id !== '' && id.length <= 512)
+          || !Array.isArray(sessions) || sessions.length > 5000
+          || (searchPayload !== undefined && (!Array.isArray(searchPayload) || searchPayload.length > MAX_ARCHIVE_SEARCH_ROWS))) {
           throw new Error('invalid archive snapshot')
         }
+        const sessionIds = new Set<string>()
+        let searchBytes = 0
         const snapshot = {
           runtime: { kind: subject.target.kind, id: subject.target.id },
           revision,
@@ -699,20 +758,22 @@ export function createRuntimeApiHandler(
             const item = record(value)
             const header = record(item?.header)
             const workspace = record(item?.workspace)
-            if (typeof item?.sessionId !== 'string' || item.sessionId === '' || header === undefined
-              || (item.rootSessionId !== undefined && (typeof item.rootSessionId !== 'string' || item.rootSessionId === ''))
+            if (typeof item?.sessionId !== 'string' || item.sessionId === '' || item.sessionId.length > 512
+              || sessionIds.has(item.sessionId) || header === undefined
+              || (item.rootSessionId !== undefined && (typeof item.rootSessionId !== 'string' || item.rootSessionId === '' || item.rootSessionId.length > 512))
               || (item.messageCount !== undefined && (!safeInteger(item.messageCount) || item.messageCount > 1_000_000))
-              || (item.title !== undefined && typeof item.title !== 'string')
+              || (item.title !== undefined && !boundedOptionalString(item.title, MAX_ARCHIVE_TEXT_BYTES))
               || (header.createdAt !== undefined && !safeInteger(header.createdAt))
-              || (header.cwd !== undefined && typeof header.cwd !== 'string')
-              || (header.parentSession !== undefined && (typeof header.parentSession !== 'string' || header.parentSession === ''))
-              || (header.agentPreset !== undefined && typeof header.agentPreset !== 'string')
+              || !boundedOptionalString(header.cwd, 4096)
+              || (header.parentSession !== undefined && (typeof header.parentSession !== 'string' || header.parentSession === '' || header.parentSession.length > 512))
+              || !boundedOptionalString(header.agentPreset, 256)
               || (header.draft !== undefined && typeof header.draft !== 'boolean')
-              || (workspace !== undefined && (typeof workspace.path !== 'string' || workspace.path === ''
-                || typeof workspace.title !== 'string' || workspace.title === ''
+              || (workspace !== undefined && (typeof workspace.path !== 'string' || workspace.path === '' || Buffer.byteLength(workspace.path, 'utf8') > 4096
+                || typeof workspace.title !== 'string' || workspace.title === '' || Buffer.byteLength(workspace.title, 'utf8') > MAX_ARCHIVE_TEXT_BYTES
                 || !safeInteger(workspace.position))) ) {
               throw new Error('invalid archive session snapshot')
             }
+            sessionIds.add(item.sessionId)
             return {
               sessionId: item.sessionId,
               ...(typeof item.rootSessionId === 'string' && item.rootSessionId !== '' ? { rootSessionId: item.rootSessionId } : {}),
@@ -734,9 +795,32 @@ export function createRuntimeApiHandler(
               }),
             }
           }),
-          ...(Array.isArray(payload?.search) ? { search: payload.search as ConversationArchiveRuntimeSnapshot['search'] } : {}),
+          ...(searchPayload === undefined ? {} : {
+            search: searchPayload.map((candidate) => {
+              const item = record(candidate)
+              if (item === undefined || typeof item.sessionId !== 'string' || !sessionIds.has(item.sessionId)
+                || !safeInteger(item.seq) || typeof item.role !== 'string'
+                || (item.role !== 'user' && item.role !== 'assistant')
+                || typeof item.content !== 'string' || Buffer.byteLength(item.content, 'utf8') > MAX_ARCHIVE_TEXT_BYTES
+                || !safeInteger(item.occurredAt)) {
+                throw new Error('invalid archive search row')
+              }
+              searchBytes += Buffer.byteLength(item.content, 'utf8')
+              if (searchBytes > MAX_ARCHIVE_SEARCH_TOTAL_BYTES) throw new Error('archive search payload is too large')
+              return {
+                sessionId: item.sessionId,
+                seq: item.seq,
+                role: item.role,
+                content: item.content,
+                occurredAt: item.occurredAt,
+              }
+            }),
+          }),
         } satisfies ConversationArchiveRuntimeSnapshot
-        const commands = await deps.archives.syncRuntimeSnapshot(snapshot)
+        const commands = await deps.archives.syncRuntimeSnapshot(snapshot, {
+          kind: subject.target.kind,
+          id: subject.target.id,
+        })
         send(res, 200, { commands })
         return true
       }
@@ -751,7 +835,10 @@ export function createRuntimeApiHandler(
           || (payload.error !== undefined && typeof payload.error !== 'string')) {
           throw new Error('invalid archive acknowledgement')
         }
-        await deps.archives.acknowledgeCommand(payload.commandId, payload.revision, payload.error as string | undefined)
+        await deps.archives.acknowledgeCommand(payload.commandId, payload.revision, payload.error as string | undefined, {
+          kind: subject.target.kind,
+          id: subject.target.id,
+        })
         send(res, 200, { acknowledged: true })
         return true
       }
@@ -835,6 +922,9 @@ export function createRuntimeApiHandler(
         if (subject.target.kind !== 'project') {
           send(res, 409, { error: 'personal-session-removal-is-runtime-local' })
           return true
+        }
+        if (await stored(sessionId, subject) === undefined) {
+          throw new CollaborationDeniedError('conversation-not-found')
         }
         await deps.conversations.removeTree(subject.organizationId, sessionId)
         send(res, 200, { removed: true })
@@ -947,7 +1037,7 @@ export function createRuntimeApiHandler(
         const payload = record(JSON.parse(body))
         if (subject.target.kind !== 'project' || !Array.isArray(payload?.sessionIds)
           || payload.sessionIds.length > MAX_READABLE_SESSION_IDS
-          || !payload.sessionIds.every(id => typeof id === 'string' && id !== '')) {
+          || !payload.sessionIds.every(id => typeof id === 'string' && id !== '' && id.length <= 512)) {
           throw new Error('invalid readable session request')
         }
         const requested = new Set(payload.sessionIds)
@@ -962,11 +1052,16 @@ export function createRuntimeApiHandler(
           })) {
           throw new Error('invalid readable session request')
         }
-        const readable = new Set(await deps.collaboration.readableSessionIds(
-          claims.user.id,
-          subject.target.id,
-          payload.sessionIds,
-        ))
+        // PostgreSQL's array parameter and query planner stay bounded even
+        // when a client has a large local session index. Preserve request
+        // order in the response while querying fixed-size chunks.
+        const readable = new Set<string>()
+        for (let offset = 0; offset < payload.sessionIds.length; offset += READABLE_SESSION_BATCH_SIZE) {
+          const batch = payload.sessionIds.slice(offset, offset + READABLE_SESSION_BATCH_SIZE)
+          for (const id of await deps.collaboration.readableSessionIds(claims.user.id, subject.target.id, batch)) {
+            readable.add(id)
+          }
+        }
         for (const candidate of authorizations) {
           const entry = record(candidate)!
           const sessionId = entry.sessionId as string

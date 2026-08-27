@@ -11,6 +11,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import type { Config } from '../index.ts'
 import type {
   ApprovalRequestId, CordisDynamicPluginId, DynamicCordisInvokeResult, JsonValue,
   DynamicCordisInventoryRow,
@@ -184,7 +185,7 @@ export const inject = ['loader', 'modules', 'slots', 'remote', 'remote.dynamicCo
  * Client plugin body: build the runner and subscribe the dispatch family.
  * @param ctx - client root context.
  */
-export function apply(ctx: Context): void {
+export function apply(ctx: Context, config?: Config): void {
   provideClientTimer(ctx)
   const inspect = new ClientCordisInspectRegistry({
     sync: async (providers) => {
@@ -204,6 +205,7 @@ export function apply(ctx: Context): void {
 
   const runner = new DynamicCordisPackageRunner({
     ctx,
+    evaluationTimeoutMs: config?.evaluationTimeoutMs ?? 5000,
     loader: ctx.loader,
     modules: ctx.get('modules') as ClientModuleSystem,
     slots: ctx.get('slots') as SlotRegistry,
@@ -288,7 +290,7 @@ export function apply(ctx: Context): void {
     isLoaded: id => runner.isLoaded(id),
   }
   ctx.provide('dynamicCordisRunner', face)
-  ctx.effect(() => () => { void runner.dispose() }, 'cordis-client-runner: dynamic package runner')
+  ctx.effect(() => async () => { await runner.dispose() }, 'cordis-client-runner: dynamic package runner')
 
   // Forwarded Host events: `$on` hands the listener the Host's own argument list,
   // so these read the request itself rather than a transport envelope.

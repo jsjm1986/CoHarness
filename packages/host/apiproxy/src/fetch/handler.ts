@@ -75,6 +75,18 @@ import {
   encodeHistoryServerResponse,
 } from './history-wire.ts'
 
+/** Raised before JSON.parse when an in-process request body exceeds its budget. */
+class RequestBodyTooLargeError extends Error {}
+
+/** Default UTF-8 byte budget for one unary RPC request body. */
+const DEFAULT_REQUEST_BODY_MAX_BYTES = 4 * 1024 * 1024
+
+/** Ask a stream generator to run its cleanup after a Response body is cancelled. */
+async function closeFrameStream(frames: AsyncIterable<unknown>, reason?: unknown): Promise<void> {
+  const iterator = frames as unknown as AsyncIterator<unknown>
+  await Promise.resolve(iterator.return?.(reason)).catch(() => {})
+}
+
 /**
  * Unary dispatch table, keyed by (and compiler-locked to) RpcMethodMap: a map row without a
  * route row fails to compile, and each row's schema/invoke pair is checked against that row's
@@ -221,7 +233,10 @@ function fullFrame(narrow: RpcRequest<MuxFrame | HostFrame>): ServerRequest {
  * Wrap a frame stream as an SSE Response; stops when req.signal aborts. An
  * impl throw mid-stream emits one stream/error frame and then closes.
  */
-function sseResponse(frames: AsyncIterable<RpcRequest<MuxFrame | HostFrame>>): Response {
+function sseResponse(
+  frames: AsyncIterable<RpcRequest<MuxFrame | HostFrame>>,
+  cancelFrames: (reason?: unknown) => Promise<void>,
+): Response {
   const encoder = new TextEncoder()
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -250,6 +265,9 @@ function sseResponse(frames: AsyncIterable<RpcRequest<MuxFrame | HostFrame>>): R
         } catch { /* already cancelled by the consumer: a double close is the only reachable error */ }
       }
     },
+    async cancel(reason) {
+      await cancelFrames(reason)
+    },
   })
   return new Response(stream, {
     headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' },
@@ -260,6 +278,45 @@ function sseResponse(frames: AsyncIterable<RpcRequest<MuxFrame | HostFrame>>): R
 export interface FetchHandlerOptions {
   /** Complete history response target in uncompressed UTF-8 JSON bytes. */
   historyPageTargetBytes?: number
+  /** Maximum UTF-8 bytes accepted for one unary JSON request body. */
+  requestBodyMaxBytes?: number
+}
+
+/** Read one Request body with a byte budget before parsing JSON. */
+async function readRequestBody(request: Request, limit: number): Promise<string> {
+  const declared = request.headers.get('content-length')
+  if (declared !== null) {
+    const length = Number(declared)
+    if (!Number.isSafeInteger(length) || length < 0 || length > limit) {
+      await request.body?.cancel().catch(() => {})
+      throw new RequestBodyTooLargeError('request body exceeds configured limit')
+    }
+  }
+  if (request.body === null) return ''
+  const reader = request.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  try {
+    for (;;) {
+      const next = await reader.read()
+      if (next.done) break
+      total += next.value.byteLength
+      if (total > limit) {
+        await reader.cancel().catch(() => {})
+        throw new RequestBodyTooLargeError('request body exceeds configured limit')
+      }
+      chunks.push(next.value)
+    }
+  } finally {
+    reader.releaseLock()
+  }
+  const bytes = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return new TextDecoder().decode(bytes)
 }
 
 /**
@@ -274,6 +331,10 @@ export function toFetchHandler(
 ): { fetch: typeof fetch } {
   const historyPageTargetBytes = options.historyPageTargetBytes
     ?? DEFAULT_HISTORY_PAGE_TARGET_BYTES
+  const requestBodyMaxBytes = options.requestBodyMaxBytes ?? DEFAULT_REQUEST_BODY_MAX_BYTES
+  if (!Number.isSafeInteger(requestBodyMaxBytes) || requestBodyMaxBytes < 1) {
+    throw new RangeError('requestBodyMaxBytes must be a positive safe integer')
+  }
   return {
     // Signature matches global fetch: the isomorphic point hands this function to InProcessApiClient as its transport aspect,
     // Clients call in (url, init) form — normalize to Request before handling.
@@ -285,10 +346,22 @@ export function toFetchHandler(
       // No-envelope read channels (SSE GET streams + host-only download):
       // physical routes that answer directly, without a wire envelope.
       if (path === '/api/events.mux' && req.method === 'GET') {
-        return sseResponse(api.events.mux({ rpcId: RpcId(randomUUID()), payload: {} }, req.signal))
+        const streamAbort = new AbortController()
+        const signal = AbortSignal.any([req.signal, streamAbort.signal])
+        const frames = api.events.mux({ rpcId: RpcId(randomUUID()), payload: {} }, signal)
+        return sseResponse(frames, async (reason) => {
+          streamAbort.abort(reason)
+          await closeFrameStream(frames, reason)
+        })
       }
       if (path === '/api/events.host' && req.method === 'GET') {
-        return sseResponse(api.events.host({ rpcId: RpcId(randomUUID()), payload: {} }, req.signal))
+        const streamAbort = new AbortController()
+        const signal = AbortSignal.any([req.signal, streamAbort.signal])
+        const frames = api.events.host({ rpcId: RpcId(randomUUID()), payload: {} }, signal)
+        return sseResponse(frames, async (reason) => {
+          streamAbort.abort(reason)
+          await closeFrameStream(frames, reason)
+        })
       }
       if (path === '/api/session.export' && (req.method === 'GET' || req.method === 'HEAD')) {
         // Query params are a different boundary from the POST envelope, but
@@ -320,8 +393,11 @@ export function toFetchHandler(
 
       let body: unknown
       try {
-        body = await req.json()
-      } catch {
+        body = JSON.parse(await readRequestBody(req, requestBodyMaxBytes)) as unknown
+      } catch (error) {
+        if (error instanceof RequestBodyTooLargeError) {
+          return new Response('request body exceeds configured limit', { status: 413 })
+        }
         // 400 = carrier layer (body is not even JSON); valid JSON with a bad shape goes 200 + bad-request.
         return new Response('body is not JSON', { status: 400 })
       }

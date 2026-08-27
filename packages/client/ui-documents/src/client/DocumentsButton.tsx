@@ -27,12 +27,22 @@ export function DocumentsButton({
   t, wide, attachDocument,
 }: DocumentsButtonProps) {
   const [open, setOpen] = useState(false)
-  const handleOpen = useCallback(() => { setOpen(true) }, [])
+  const [mode, setMode] = useState<'manage' | 'select'>('manage')
+  const handleOpen = useCallback(() => {
+    setMode('manage')
+    setOpen(true)
+  }, [])
   const handleClose = useCallback(() => { setOpen(false) }, [])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    const openPicker = (): void => { setOpen(true) }
+    const openPicker = (event: Event): void => {
+      const detail = event instanceof CustomEvent && typeof event.detail === 'object' && event.detail !== null
+        ? event.detail as { mode?: unknown }
+        : undefined
+      setMode(detail?.mode === 'select' ? 'select' : 'manage')
+      setOpen(true)
+    }
     window.addEventListener('dsh-documents-open-picker', openPicker)
     return () => { window.removeEventListener('dsh-documents-open-picker', openPicker) }
   }, [])
@@ -50,14 +60,13 @@ export function DocumentsButton({
           {wide && <span className={css.label}>{t('button.label')}</span>}
         </button>
       </Tooltip>
-      {open && (
-        <DocumentsModal
-          open
-          onClose={handleClose}
-          t={t}
-          {...(attachDocument === undefined ? {} : { onAttachDocument: attachDocument })}
-        />
-      )}
+      <DocumentsModal
+        open={open}
+        onClose={handleClose}
+        t={t}
+        mode={mode}
+        {...(attachDocument === undefined ? {} : { onAttachDocument: attachDocument })}
+      />
     </>
   )
 }

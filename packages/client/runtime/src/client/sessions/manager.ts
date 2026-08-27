@@ -261,8 +261,10 @@ export class SessionManager {
    * and scope share one lifecycle). The host session log is the durable
    * truth — a later get() lazily rebuilds and open() backfills history.
    * @param sessionId - the session to drop.
+   * @param expected - optional instance identity; a mismatched replacement is left untouched.
    */
-  drop(sessionId: SessionId): void {
+  drop(sessionId: SessionId, expected?: Session): void {
+    if (expected !== undefined && this.sessions.get(sessionId) !== expected) return
     this.sessions.delete(sessionId)
   }
 

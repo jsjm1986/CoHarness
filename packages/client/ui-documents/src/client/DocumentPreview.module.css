@@ -51,6 +51,22 @@
   line-height: 20px;
 }
 
+.download {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--dsw-touch-target);
+  width: fit-content;
+  padding: 0 var(--dsw-space-3);
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-md);
+  color: var(--dsw-alias-label-primary);
+  text-decoration: none;
+}
+
+.download:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
 .image {
   display: block;
   margin: 0 auto;

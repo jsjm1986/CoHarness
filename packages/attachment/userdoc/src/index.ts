@@ -6,14 +6,31 @@ import type {
   BeginUserDocUpload,
   StoredUserDoc,
   UserDocDirectoryListing,
+  UserDocDirectoryPage,
   UserDocDirectoryRef,
   UserDocLimits,
+  UserDocListQuery,
+  UserDocListType,
   UserDocRef,
   UserDocTarget,
   UserDocUploadChunk,
   UserDocUploadSession,
+  UserDocTrashRef,
+  UserDocTrashPage,
 } from './types.ts'
 import type { UserDocDirectoryId, UserDocId, UserDocUploadId } from './brand.ts'
+import { DOCUMENT_LIST_QUERY_CODE, UserDocError } from './error.ts'
+
+function documentTypeForMediaType(mediaType: string): UserDocListType {
+  return mediaType.startsWith('image/') ? 'image'
+    : mediaType === 'application/pdf' ? 'pdf'
+      : mediaType.startsWith('text/') || mediaType.endsWith('+json') || mediaType.endsWith('+xml')
+        || mediaType === 'application/json' || mediaType === 'application/xml'
+        || mediaType === 'application/x-yaml' || mediaType === 'application/javascript' ? 'text' : 'other'
+}
+
+/** Maximum offset accepted by the compatibility page implementation. */
+const MAX_PAGE_OFFSET = 1_000_000
 
 export { UserDocDirectoryId, UserDocId, UserDocUploadId } from './brand.ts'
 export {
@@ -30,6 +47,10 @@ export {
   DOCUMENT_TARGET_CONFLICT_CODE,
   DOCUMENT_STORE_UNAVAILABLE_CODE,
   DOCUMENT_UPLOAD_BUSY_CODE,
+  DOCUMENT_LIST_QUERY_CODE,
+  DOCUMENT_TRASHED_CODE,
+  DOCUMENT_TRASH_NOT_FOUND_CODE,
+  DOCUMENT_RESTORE_CONFLICT_CODE,
   DOCUMENT_UPLOAD_EXPIRED_CODE,
   DOCUMENT_UPLOAD_HASH_CODE,
   DOCUMENT_UPLOAD_NOT_FOUND_CODE,
@@ -54,9 +75,13 @@ export type {
   StoredUserDoc,
   UserDocDirectoryId as UserDocDirectoryIdType,
   UserDocDirectoryListing,
+  UserDocDirectoryPage,
   UserDocDirectoryRef,
   UserDocId as UserDocIdType,
   UserDocLimits,
+  UserDocListQuery,
+  UserDocListSort,
+  UserDocListType,
   UserDocRef,
   UserDocPromptAttachment,
   UserDocPromptRepresentation,
@@ -79,6 +104,8 @@ export type {
   UserDocTransferScopeSummary,
   UserDocTransferSelection,
   UserDocTransferTargetRef,
+  UserDocTrashRef,
+  UserDocTrashPage,
   UserDocUploadCapabilities,
   UserDocUploadChunk,
   UserDocUploadId as UserDocUploadIdType,
@@ -213,6 +240,147 @@ export abstract class UserDocStore extends Service {
     directoryId: UserDocDirectoryId,
     signal?: AbortSignal,
   ): Promise<UserDocDirectoryListing>
+
+  /**
+   * Return one filtered page without requiring a consumer to materialize the
+   * complete directory result. Providers may override this method with an
+   * indexed implementation; the default keeps older providers functional.
+   * @param directoryId - directory to inspect.
+   * @param query - filtering, ordering and cursor options.
+   * @param signal - optional cancellation.
+   * @returns a page with an opaque offset cursor.
+   */
+  async listDirectoryPage(
+    directoryId: UserDocDirectoryId,
+    query: UserDocListQuery = {},
+    signal?: AbortSignal,
+  ): Promise<UserDocDirectoryPage> {
+    signal?.throwIfAborted()
+    if (query.state !== undefined && query.state !== 'active') {
+      throw new UserDocError('Directory trash pages are not available from this provider.', DOCUMENT_LIST_QUERY_CODE)
+    }
+    if (query.cursor !== undefined && (query.cursor.length === 0 || query.cursor.length > 4096)
+      || query.limit !== undefined && (!Number.isSafeInteger(query.limit) || query.limit < 1 || query.limit > 100)
+      || query.query !== undefined && (query.query.length > 255 || /[\u0000-\u001f\u007f]/u.test(query.query))
+      || query.type !== undefined && !['all', 'image', 'pdf', 'text', 'other'].includes(query.type)
+      || query.sort !== undefined && !['date-desc', 'date-asc', 'name-asc', 'name-desc', 'size-desc', 'size-asc'].includes(query.sort)) {
+      throw new UserDocError('Document list query is invalid.', DOCUMENT_LIST_QUERY_CODE)
+    }
+    const listing = await this.listDirectory(directoryId, signal)
+    const limit = Math.min(Math.max(query.limit ?? 20, 1), 100)
+    const offset = query.cursor === undefined || query.cursor === '' ? 0 : Number(query.cursor)
+    if (!Number.isSafeInteger(offset) || offset < 0 || offset > MAX_PAGE_OFFSET) {
+      throw new UserDocError('Document cursor is invalid.', DOCUMENT_LIST_QUERY_CODE)
+    }
+    const safeOffset = offset
+    const needle = query.query?.trim().toLowerCase() ?? ''
+    const type = query.type ?? 'all'
+    const filtered = listing.documents.filter(document =>
+      (needle === '' || document.name.toLowerCase().includes(needle))
+      && (type === 'all' || documentTypeForMediaType(document.mediaType) === type))
+    const sort = query.sort ?? 'date-desc'
+    const ordered = [...filtered].sort((left, right) => {
+      const result = sort.startsWith('name') ? left.name.localeCompare(right.name)
+        : sort.startsWith('size') ? left.bytes - right.bytes : left.modifiedAt - right.modifiedAt
+      const direction = sort.endsWith('asc') ? 1 : -1
+      if (result !== 0) return direction * result
+      return left.docId.localeCompare(right.docId)
+    })
+    const documents = ordered.slice(safeOffset, safeOffset + limit)
+    const nextOffset = safeOffset + documents.length
+    return {
+      ...listing,
+      documents,
+      totalDocuments: ordered.length,
+      ...(nextOffset < ordered.length ? { nextCursor: String(nextOffset) } : {}),
+    }
+  }
+
+  /**
+   * List recoverable documents retained in the provider trash.
+   * @param signal - optional cancellation for the trash scan.
+   * @returns recoverable document references.
+   */
+  abstract listTrash(signal?: AbortSignal): Promise<UserDocTrashRef[]>
+
+  /**
+   * Return one filtered page from recoverable trash.
+   * @param query - filtering, ordering and cursor options.
+   * @param signal - optional cancellation for the trash scan.
+   * @returns a filtered trash page with an opaque offset cursor.
+   */
+  async listTrashPage(
+    query: UserDocListQuery = {},
+    signal?: AbortSignal,
+  ): Promise<UserDocTrashPage> {
+    signal?.throwIfAborted()
+    if (query.state !== undefined && query.state !== 'trash') {
+      throw new UserDocError('Trash list query is invalid.', DOCUMENT_LIST_QUERY_CODE)
+    }
+    if (query.cursor !== undefined && (query.cursor.length === 0 || query.cursor.length > 4096)
+      || query.limit !== undefined && (!Number.isSafeInteger(query.limit) || query.limit < 1 || query.limit > 100)
+      || query.query !== undefined && (query.query.length > 255 || /[\u0000-\u001f\u007f]/u.test(query.query))
+      || query.type !== undefined && !['all', 'image', 'pdf', 'text', 'other'].includes(query.type)
+      || query.sort !== undefined && !['date-desc', 'date-asc', 'name-asc', 'name-desc', 'size-desc', 'size-asc'].includes(query.sort)) {
+      throw new UserDocError('Document list query is invalid.', DOCUMENT_LIST_QUERY_CODE)
+    }
+    const all = await this.listTrash(signal)
+    const limit = Math.min(Math.max(query.limit ?? 20, 1), 100)
+    const offset = query.cursor === undefined || query.cursor === '' ? 0 : Number(query.cursor)
+    if (!Number.isSafeInteger(offset) || offset < 0 || offset > MAX_PAGE_OFFSET) {
+      throw new UserDocError('Document cursor is invalid.', DOCUMENT_LIST_QUERY_CODE)
+    }
+    const needle = query.query?.trim().toLowerCase() ?? ''
+    const filtered = all.filter(document => (needle === '' || document.name.toLowerCase().includes(needle))
+      && (query.type === undefined || query.type === 'all' || documentTypeForMediaType(document.mediaType) === query.type))
+    const sort = query.sort ?? 'date-desc'
+    const ordered = [...filtered].sort((left, right) => {
+      const result = sort.startsWith('name') ? left.name.localeCompare(right.name)
+        : sort.startsWith('size') ? left.bytes - right.bytes : left.trashedAt - right.trashedAt
+      const direction = sort.endsWith('asc') ? 1 : -1
+      if (result !== 0) return direction * result
+      return left.docId.localeCompare(right.docId)
+    })
+    const documents = ordered.slice(offset, offset + limit)
+    const nextOffset = offset + documents.length
+    return {
+      documents,
+      totalDocuments: ordered.length,
+      ...(nextOffset < ordered.length ? { nextCursor: String(nextOffset) } : {}),
+    }
+  }
+
+  /**
+   * Move one document into recoverable trash.
+   * @param docId - store-scoped document identifier.
+   * @param signal - optional cancellation for the move.
+   * @returns the retained trash reference.
+   */
+  abstract trash(docId: UserDocId, signal?: AbortSignal): Promise<UserDocTrashRef>
+
+  /**
+   * Restore one trashed document, optionally choosing a destination directory.
+   * A local provider recreates a missing original directory before publication;
+   * an occupied or link-shaped destination is rejected.
+   * @param docId - store-scoped document identifier.
+   * @param directoryId - optional destination directory; omitted keeps the original directory.
+   * @param name - optional replacement leaf name.
+   * @param signal - optional cancellation for the restore.
+   * @returns the restored durable document reference.
+   */
+  abstract restore(
+    docId: UserDocId,
+    directoryId?: UserDocDirectoryId,
+    name?: string,
+    signal?: AbortSignal,
+  ): Promise<UserDocRef>
+
+  /**
+   * Permanently remove one trashed document.
+   * @param docId - store-scoped document identifier.
+   * @param signal - optional cancellation for the purge.
+   */
+  abstract purge(docId: UserDocId, signal?: AbortSignal): Promise<void>
 
   /**
    * List every directory below the document root.

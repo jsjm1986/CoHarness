@@ -62,6 +62,7 @@ async function buildApi(
     persistence?: boolean | 'throw' | 'unsupported'
     attachments?: boolean | ((ref: ImageAttachmentRef, signal?: AbortSignal) => Promise<ReturnType<typeof storedImage>>)
     sessions?: {
+      list?: () => readonly unknown[]
       get(id: SessionId): { readonly id: SessionId } | undefined
       flush(session: { readonly id: SessionId }): Promise<boolean>
     }
@@ -111,7 +112,16 @@ async function buildApi(
       readImage,
     } as never)
   }
-  if (services.sessions !== undefined) ctx.provide('sessions', services.sessions as never)
+  const sessionService = services.sessions
+  ctx.provide('sessions', {
+    ...(services.sessions ?? {}),
+    list: sessionService?.list ?? (() => []),
+    get: sessionService ? (id: SessionId) => sessionService.get(id) : () => undefined,
+    flush: sessionService
+      ? (session: { readonly id: SessionId }) => sessionService.flush(session)
+      : async () => true,
+  } as never)
+  ctx.provide('workspaceRegistry', { list: () => [] } as never)
   return createApiProxy(ctx, {
     defaultModelSelection: () => ({ provider: 'p', model: 'm' }),
     cwd: '/tmp',

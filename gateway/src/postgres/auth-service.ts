@@ -22,6 +22,11 @@ interface PostgresAuthUser {
   deleted_at: Date | null
 }
 
+/** Login identity including the internal database key required by sessions. */
+interface PostgresAuthIdentity extends PostgresAuthUser {
+  id: string
+}
+
 function tokenHash(token: string): Buffer {
   return createHash('sha256').update(token).digest()
 }
@@ -29,6 +34,11 @@ function tokenHash(token: string): Buffer {
 function sourceIp(ip: string): string | null {
   const normalized = ip.replace(/^::ffff:/, '')
   return isIP(normalized) === 0 ? null : normalized
+}
+
+/** Use one advisory-lock bucket for case-insensitive PostgreSQL usernames. */
+function loginKey(username: string): string {
+  return username.toLowerCase()
 }
 
 function userRow(row: PostgresAuthUser): UserRow {
@@ -45,61 +55,95 @@ function userRow(row: PostgresAuthUser): UserRow {
 
 /** PostgreSQL-backed authentication and sliding sessions for one organization. */
 export class PostgresAuthService {
+  private readonly loginTails = new Map<string, Promise<unknown>>()
+
   constructor(
     private readonly context: PostgresRuntimeContext,
     private readonly cfg: GatewayConfig,
   ) {}
 
+  private serializeLogin<T>(username: string, operation: () => Promise<T>): Promise<T> {
+    const key = `${this.context.organizationId}\u0000${loginKey(username)}`
+    const previous = this.loginTails.get(key) ?? Promise.resolve()
+    const current = previous.then(operation, operation)
+    const tail = current.then(() => undefined, () => undefined)
+    this.loginTails.set(key, tail)
+    void tail.then(() => {
+      if (this.loginTails.get(key) === tail) this.loginTails.delete(key)
+    })
+    return current
+  }
+
   async login(username: string, password: string, ip: string, userAgent: string):
   Promise<{ token: string; user: UserRow } | 'invalid' | 'locked'> {
-    const now = Date.now()
-    const address = sourceIp(ip)
-    const failures = await this.context.pool.query<{ n: string }>(`SELECT COUNT(*)::text n
-      FROM harness.login_attempts
-      WHERE organization_id=$1 AND username=$2 AND source_ip IS NOT DISTINCT FROM $3::inet
-        AND occurred_at > to_timestamp($4/1000.0) AND succeeded=false`,
-    [this.context.organizationId, username, address, now - LOCK_WINDOW_MS])
-    if (Number(failures.rows[0]?.n ?? 0) >= LOCK_THRESHOLD) return 'locked'
-
-    const result = await this.context.pool.query<PostgresAuthUser>(`SELECT u.public_id::text,u.username::text,
-      u.display_name,u.status,u.deleted_at,u.home_path,m.role,m.status membership_status,
-      c.must_change_password,c.password_hash
-      FROM harness.users u
-      JOIN harness.memberships m ON m.organization_id=u.organization_id AND m.user_id=u.id
-      JOIN harness.password_credentials c ON c.user_id=u.id
-      WHERE u.organization_id=$1 AND u.username=$2`, [this.context.organizationId, username])
-    const row = result.rows[0]
-    const accepted = row !== undefined && row.status === 'active' && row.membership_status === 'active'
-      && row.deleted_at === null
-      && await verifyPassword(row.password_hash, password)
-    if (!accepted || row === undefined) {
-      await this.context.pool.query(`INSERT INTO harness.login_attempts(
-        organization_id,username,source_ip,occurred_at,succeeded
-      ) VALUES($1,$2,$3,to_timestamp($4/1000.0),false)`,
-      [this.context.organizationId, username, address, now])
-      return 'invalid'
-    }
-
-    const token = randomBytes(32).toString('base64url')
-    const sessionCreated = await transaction(this.context.pool, async (client) => {
-      await client.query(`DELETE FROM harness.login_attempts
-        WHERE organization_id=$1 AND username=$2 AND source_ip IS NOT DISTINCT FROM $3::inet AND succeeded=false`,
-      [this.context.organizationId, username, address])
-      const user = await client.query<{ id: string }>(
-        'SELECT id FROM harness.users WHERE organization_id=$1 AND public_id=$2 AND deleted_at IS NULL FOR SHARE',
-        [this.context.organizationId, row.public_id],
-      )
-      const userId = user.rows[0]?.id
-      if (userId === undefined) return false
-      await client.query(`INSERT INTO harness.auth_sessions(
-        organization_id,user_id,token_hash,created_at,expires_at,absolute_expires_at,last_seen_at,source_ip,user_agent
-      ) VALUES($1,$2,$3,to_timestamp($4/1000.0),to_timestamp($5/1000.0),to_timestamp($6/1000.0),
-        to_timestamp($4/1000.0),$7,$8)`, [this.context.organizationId, userId, tokenHash(token), now,
-        now + this.cfg.sessionTtlMs, now + this.cfg.sessionAbsoluteTtlMs, address, userAgent])
-      return true
+    return this.serializeLogin(username, async () => {
+      const now = Date.now()
+      const address = sourceIp(ip)
+      const result = await this.context.pool.query<PostgresAuthUser>(`SELECT u.public_id::text,u.username::text,
+        u.display_name,u.status,u.deleted_at,u.home_path,m.role,m.status membership_status,
+        c.must_change_password,c.password_hash
+        FROM harness.users u
+        JOIN harness.memberships m ON m.organization_id=u.organization_id AND m.user_id=u.id
+        JOIN harness.password_credentials c ON c.user_id=u.id
+        WHERE u.organization_id=$1 AND u.username=$2`, [this.context.organizationId, username])
+      const row = result.rows[0]
+      const accepted = row !== undefined && row.status === 'active' && row.membership_status === 'active'
+        && row.deleted_at === null
+        && await verifyPassword(row.password_hash, password)
+      const token = accepted ? randomBytes(32).toString('base64url') : undefined
+      return await transaction(this.context.pool, async (client) => {
+        // Serialize the check-and-record transition across Gateway processes,
+        // not just within this Node instance.
+        await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`gateway-login:${this.context.organizationId}:${username}`])
+        await client.query(`DELETE FROM harness.login_attempts
+          WHERE organization_id=$1 AND occurred_at <= to_timestamp($2/1000.0)`,
+        [this.context.organizationId, now - LOCK_WINDOW_MS])
+        const failures = await client.query<{ n: string }>(`SELECT COUNT(*)::text n
+          FROM harness.login_attempts
+          WHERE organization_id=$1 AND username=$2 AND occurred_at > to_timestamp($3/1000.0) AND succeeded=false`,
+        [this.context.organizationId, username, now - LOCK_WINDOW_MS])
+        if (Number(failures.rows[0]?.n ?? 0) >= LOCK_THRESHOLD) return 'locked' as const
+        if (!accepted || row === undefined || token === undefined) {
+          await client.query(`INSERT INTO harness.login_attempts(
+            organization_id,username,source_ip,occurred_at,succeeded
+          ) VALUES($1,$2,$3,to_timestamp($4/1000.0),false)`,
+          [this.context.organizationId, username, address, now])
+          return 'invalid' as const
+        }
+        await client.query(`DELETE FROM harness.login_attempts
+          WHERE organization_id=$1 AND username=$2 AND succeeded=false`,
+        [this.context.organizationId, username])
+        // Re-read the complete identity under the transaction lock. Password
+        // verification happened before the lock; a concurrent role, display
+        // name, membership, or credential change must not be reflected by the
+        // token returned from this login attempt.
+        const user = await client.query<PostgresAuthIdentity>(
+          `SELECT u.id::text AS id,u.public_id::text,u.username::text,u.display_name,u.status,u.deleted_at,u.home_path,
+            m.role,m.status membership_status,c.must_change_password,c.password_hash
+           FROM harness.users u
+           JOIN harness.memberships m ON m.organization_id=u.organization_id AND m.user_id=u.id
+           JOIN harness.password_credentials c ON c.user_id=u.id
+           WHERE u.organization_id=$1 AND u.public_id=$2
+           FOR SHARE OF u,m,c`,
+          [this.context.organizationId, row.public_id],
+        )
+        const current = user.rows[0]
+        if (current === undefined || current.status !== 'active' || current.membership_status !== 'active'
+          || current.deleted_at !== null || current.password_hash !== row.password_hash) {
+          await client.query(`INSERT INTO harness.login_attempts(
+            organization_id,username,source_ip,occurred_at,succeeded
+          ) VALUES($1,$2,$3,to_timestamp($4/1000.0),false)`,
+          [this.context.organizationId, username, address, now])
+          return 'invalid' as const
+        }
+        await client.query(`INSERT INTO harness.auth_sessions(
+          organization_id,user_id,token_hash,created_at,expires_at,absolute_expires_at,last_seen_at,source_ip,user_agent
+        ) VALUES($1,$2,$3,to_timestamp($4/1000.0),to_timestamp($5/1000.0),to_timestamp($6/1000.0),
+          to_timestamp($4/1000.0),$7,$8)`, [this.context.organizationId, current.id, tokenHash(token), now,
+          now + this.cfg.sessionTtlMs, now + this.cfg.sessionAbsoluteTtlMs, address, userAgent])
+        return { token, user: userRow(current) }
+      })
     })
-    if (!sessionCreated) return 'invalid'
-    return { token, user: userRow(row) }
   }
 
   async validate(token: string): Promise<UserRow | null> {

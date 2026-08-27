@@ -278,6 +278,8 @@ export interface RunCodeBridgeOptions {
   peekRuntime: () => CodeRuntime | undefined
   /** The run's overlap cap for parallel-classified sub-calls (the registry passes its validated `maxParallelSubCalls`). */
   maxParallel: number
+  /** Maximum number of submitted sub-calls retained by one run while they settle (including queued and committing calls). */
+  maxPending: number
   /** Runs the contained `tools/code-dispatch-log` waterfall over one settled sub-dispatch (the registry's private invoker). */
   shapeDispatchLog: (dispatch: CodeDispatchLog) => Promise<ContentBlock[]>
 }
@@ -294,7 +296,7 @@ export interface RunCodeBridgeOptions {
  * @returns the registry-ready definition.
  */
 export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeOptions): ToolDefinition {
-  const { requireRuntime, peekRuntime, maxParallel, shapeDispatchLog } = options
+  const { requireRuntime, peekRuntime, maxParallel, maxPending, shapeDispatchLog } = options
   const definition = defineTool({
     name: RUN_CODE_NAME,
     // The description and `code` parameter description are placeholders here:
@@ -362,20 +364,25 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
         start(): Promise<void>
         classify(): 'parallel' | 'exclusive'
         abandon(): void
+        fail(error: unknown): void
         /** Ordered stage: post-execute + context deferral + settle event, in submission order. */
         commit(): Promise<void>
         /** The launched around-dispatch/body stage; resolved until start() replaces it. */
         flight: Promise<void>
         /** True once the dispatch stage parked its outcome; the commit cursor waits on it. */
         settled: boolean
+        /** True once the binding has been rejected by cancellation or a scheduler failure. */
+        failed: boolean
         /** The classification this entry started under; an exclusive holds its barrier through commit(). */
         mode?: 'parallel' | 'exclusive'
       }
       const pendingQueue: PendingDispatch[] = []
+      let pendingCursor = 0
       const inFlight = new Set<Promise<void>>()
       /** Tracked settle-event side work (log-content listener + append), drained at run settlement. */
       const logWork = new Set<Promise<void>>()
       const commitQueue: PendingDispatch[] = []
+      let commitCursor = 0
       let exclusiveActive = false
       let driving = false
       let driverRun: Promise<void> = Promise.resolve()
@@ -384,6 +391,49 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
         const release = wake
         wake = undefined
         release?.()
+      }
+      // A run can settle while the driver is sleeping with only queued work.
+      // Wake it so those entries are abandoned instead of leaving bindings
+      // pending forever.
+      runController.signal.addEventListener('abort', wakeup, { once: true })
+
+      let hasDriverFailure = false
+      let driverFailure: unknown
+      const compactQueues = (): void => {
+        // The cursor avoids Array#shift's O(n) copy. Periodic compaction keeps
+        // completed entries from retaining the run's argument snapshots.
+        if (pendingCursor >= 64 && pendingCursor * 2 >= pendingQueue.length) {
+          pendingQueue.splice(0, pendingCursor)
+          pendingCursor = 0
+        }
+        if (commitCursor >= 64 && commitCursor * 2 >= commitQueue.length) {
+          commitQueue.splice(0, commitCursor)
+          commitCursor = 0
+        }
+      }
+      const failRun = (error: unknown): void => {
+        if (!hasDriverFailure) {
+          hasDriverFailure = true
+          driverFailure = error
+        }
+        // Abort first so an already-started body receives the same failure;
+        // then reject every binding which can no longer reach commit().
+        runController.abort(error)
+        for (let index = pendingCursor; index < pendingQueue.length; index += 1) {
+          pendingQueue[index]?.fail(error)
+        }
+        for (let index = commitCursor; index < commitQueue.length; index += 1) {
+          commitQueue[index]?.fail(error)
+        }
+        pendingQueue.length = 0
+        pendingCursor = 0
+        commitQueue.length = 0
+        commitCursor = 0
+        wakeup()
+      }
+      const throwDriverFailure = (): void => {
+        if (!hasDriverFailure) return
+        throw driverFailure
       }
       /**
        * The single ordered lane. Each pass commits the head-of-line settled
@@ -398,22 +448,30 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
         driverRun = (async () => {
           try {
             for (;;) {
+              if (hasDriverFailure) throw driverFailure
               // Create the wakeup promise before inspecting state so a settle or submission arriving
               // between the checks and the await below cannot be lost.
               const signal = new Promise<void>((resolve) => { wake = resolve })
-              const commitHead = commitQueue[0]
+              const commitHead = commitQueue[commitCursor]
               if (commitHead !== undefined && commitHead.settled) {
-                commitQueue.shift()
                 await commitHead.commit()
+                // A concurrent failure may have cleared the queue while the
+                // commit awaited policy or log backpressure. Do not advance a
+                // replacement head in that case.
+                if (commitQueue[commitCursor] === commitHead) {
+                  commitCursor += 1
+                  compactQueues()
+                }
                 // The barrier covers post-execute: later starts wait for the
                 // exclusive call's full pipeline, as under the native loop.
                 if (commitHead.mode === 'exclusive') exclusiveActive = false
                 continue
               }
-              const head = pendingQueue[0]
+              const head = pendingQueue[pendingCursor]
               if (head !== undefined) {
                 if (runController.signal.aborted) {
-                  pendingQueue.shift()
+                  pendingCursor += 1
+                  compactQueues()
                   head.abandon()
                   continue
                 }
@@ -424,11 +482,13 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
                 if (capacity) {
                   if (mode === 'exclusive') exclusiveActive = true
                   head.mode = mode
-                  pendingQueue.shift()
+                  pendingCursor += 1
+                  compactQueues()
                   // Joined before start() so the commit cursor sees submission
                   // order; nothing commits it until `settled` flips.
                   commitQueue.push(head)
                   await head.start()
+                  throwDriverFailure()
                   const flight: Promise<void> = head.flight.finally(() => {
                     inFlight.delete(flight)
                     wakeup()
@@ -437,9 +497,14 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
                   continue
                 }
               }
-              if (pendingQueue.length === 0 && commitQueue.length === 0 && inFlight.size === 0) return
+              if (pendingQueue.length === pendingCursor && commitQueue.length === commitCursor && inFlight.size === 0) return
               await signal
             }
+          } catch (error: unknown) {
+            failRun(error)
+            // Started bodies must still reach quiescence. Their rejection is
+            // observed here so no late promise becomes an unhandled rejection.
+            await Promise.allSettled([...inFlight])
           } finally {
             driving = false
             wake = undefined
@@ -456,6 +521,7 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
         // Every settle event is appended inside the open run_code turn
         // (tasks self-remove on settlement).
         while (logWork.size > 0) await Promise.allSettled([...logWork])
+        if (hasDriverFailure) throw driverFailure
       }
 
       // Read through a call, not a bare property: the abort state genuinely
@@ -468,6 +534,10 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
           throw new Error(`run_code run is over (${String(runController.signal.reason)}); ${name} not dispatched`)
         }
         const normalized = jsonNormalizeArgs(rawArgs)
+        const outstanding = pendingQueue.length - pendingCursor + commitQueue.length - commitCursor
+        if (outstanding >= maxPending) {
+          throw new Error(`run_code sub-call limit exceeded (maximum ${maxPending} outstanding calls)`)
+        }
         const n = ++dispatches
         const subCallId = CallId(`${String(exec.callId)}:code:${n}`)
         const input = {
@@ -486,7 +556,10 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
           let parked:
             | { kind: 'post-result' | 'final-result'; exec: ToolRunContext; result: ToolExecutionResult }
             | undefined
+          let bindingSettled = false
           const settle = (result: ToolExecutionResult): void => {
+            if (bindingSettled) return
+            bindingSettled = true
             // The program gets its value NOW: the log-content listener (for
             // example, a spill backend) must never delay the binding or occupy
             // a dispatch slot. The event append is tracked side work; the run's
@@ -524,16 +597,30 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
             })().finally(() => { logWork.delete(task) })
             logWork.add(task)
           }
+          let dispatchFailed = false
+          const isDispatchFailed = (): boolean => dispatchFailed
           pendingQueue.push({
             flight: Promise.resolve(),
             settled: false,
+            failed: false,
             // Re-read per driver pass against the same agent view the SDK
             // declared; fail-closed exclusive when undeclared/invalid.
             classify: () => registry.executionMode(input).kind,
             abandon: () => {
+              if (bindingSettled) return
+              bindingSettled = true
               reject(new Error(`run_code run is over (${String(runController.signal.reason)}); ${name} tool call abandoned`))
             },
+            fail(error: unknown): void {
+              if (bindingSettled) return
+              dispatchFailed = true
+              bindingSettled = true
+              this.failed = true
+              this.settled = true
+              reject(error instanceof Error ? error : new Error(String(error)))
+            },
             async start(): Promise<void> {
+              if (isDispatchFailed()) return
               exec.agent?.session.append('tool/code-dispatch-start', {
                 rootCallId: exec.rootCallId,
                 parentCallId: exec.callId,
@@ -545,17 +632,27 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
               // pre-execute waits for this resolution, as under the native
               // scheduler. Only the launched body below overlaps.
               const prepared = await scheduler.prepare(input)
+              if (isDispatchFailed()) return
               if (prepared.kind === 'dispatch') {
-                this.flight = scheduler.dispatch(prepared.exec).then((dispatchOutcome) => {
-                  parked = { kind: dispatchOutcome.kind, exec: prepared.exec, result: dispatchOutcome.result }
-                  this.settled = true
-                })
+                this.flight = scheduler.dispatch(prepared.exec).then(
+                  (dispatchOutcome) => {
+                    if (isDispatchFailed()) return
+                    parked = { kind: dispatchOutcome.kind, exec: prepared.exec, result: dispatchOutcome.result }
+                    this.settled = true
+                  },
+                  (error: unknown) => {
+                    this.fail(error)
+                    failRun(error)
+                  },
+                )
                 return
               }
+              if (isDispatchFailed()) return
               parked = { kind: prepared.kind, exec: prepared.exec, result: prepared.result }
               this.settled = true
             },
             async commit(): Promise<void> {
+              if (isDispatchFailed()) return
               /* v8 ignore next -- commit() runs only after `settled` flipped, which set parked. */
               if (parked === undefined) return
               const result = parked.kind === 'post-result'
@@ -586,7 +683,7 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
             },
           })
           wakeup()
-          void drive()
+          void drive().catch((error: unknown) => { failRun(error) })
         })
         // A budget expiry or outer cancel that occurs while this call was in
         // flight already aborted the dispatch; stop the program now rather

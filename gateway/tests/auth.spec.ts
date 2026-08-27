@@ -34,7 +34,7 @@ describe('AuthService', () => {
     }
     expect(await auth.login('alice', 'secret-1', '9.9.9.9', 'ua')).toBe('locked')
     const elsewhere = await auth.login('alice', 'secret-1', '8.8.8.8', 'ua')
-    expect(elsewhere).not.toBe('locked')
+    expect(elsewhere).toBe('locked')
   })
 
   it('rejects disabled users and unknown tokens', async () => {

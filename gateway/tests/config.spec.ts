@@ -5,6 +5,7 @@ import {
   DEFAULT_DATABASE_STARTUP_RETRY_INITIAL_MS,
   DEFAULT_DATABASE_STARTUP_RETRY_MAX_MS,
   DEFAULT_RUNTIME_API_BODY_LIMIT_BYTES,
+  MAX_TIMER_DELAY_MS,
   loadConfig,
 } from '../src/config.ts'
 
@@ -210,6 +211,20 @@ describe('loadConfig', () => {
       HGW_DATABASE_STARTUP_RETRY_INITIAL_MS: '5000',
       HGW_DATABASE_STARTUP_RETRY_MAX_MS: '1000',
     })).toThrow(/HGW_DATABASE_STARTUP_RETRY_MAX_MS must be at least/)
+  })
+
+  it('rejects timer-backed settings above Node’s maximum delay', () => {
+    for (const variable of [
+      'HGW_DATABASE_STARTUP_RETRY_INITIAL_MS',
+      'HGW_DATABASE_STARTUP_RETRY_MAX_MS',
+      'HGW_UPSTREAM_TIMEOUT_MS',
+      'HGW_READINESS_TIMEOUT_MS',
+    ]) {
+      expect(() => loadConfig({ [variable]: String(MAX_TIMER_DELAY_MS + 1) }))
+        .toThrow(new RegExp(`${variable}.*${String(MAX_TIMER_DELAY_MS)}`))
+    }
+    expect(loadConfig({ HGW_UPSTREAM_TIMEOUT_MS: String(MAX_TIMER_DELAY_MS) }).upstreamTimeoutMs)
+      .toBe(MAX_TIMER_DELAY_MS)
   })
 
   it('rejects an invalid instance port base', () => {

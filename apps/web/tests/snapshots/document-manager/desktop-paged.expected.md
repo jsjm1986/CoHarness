@@ -5,6 +5,9 @@
   - paragraph: No per-file size limit, 20 per message
   - complementary "Document scopes":
     - text: Scopes
+    - status:
+      - text: Project scopes could not be refreshed; showing the last result
+      - button "Retry"
     - button "All accessible documents Metadata only":
       - strong: All accessible documents
       - text: Metadata only
@@ -30,6 +33,7 @@
       - option "Size large–small"
       - option "Size small–large"
   - group "Document actions":
+    - button "Trash"
     - button "New Folder":
       - img
       - text: New Folder

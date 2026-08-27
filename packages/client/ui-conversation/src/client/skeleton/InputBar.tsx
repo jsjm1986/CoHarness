@@ -995,7 +995,9 @@ export function InputBar({
                 disabled={locked || machineBusy}
                 onMouseDown={keepFocus}
                 onClick={() => {
-                  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('dsh-documents-open-picker'))
+                  if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('dsh-documents-open-picker', { detail: { mode: 'select' } }))
+                  }
                 }}
               >
                 <IconBrowseOutline16 size={14} />

@@ -18,7 +18,7 @@ Browser half of dynamic dual-half plugin packages. The host-side runner holds ev
 
 Loads converge by `(id, rev)` against live state: loading a revision this page already runs answers from live state without reloading (so a replayed run does not look unanswered), a newer revision replaces it, and the same revision after a retract loads afresh. Operations serialize per definition.
 
-Nothing loads at activation, and nothing is restored after a refresh — a page runs a dynamic package only when someone answers a run request or asks for it here.
+Nothing loads at activation, and nothing is restored after a refresh — a page runs a dynamic package only when someone answers a run request or asks for it here. Evaluation, loader creation, and activation each use the configured `evaluationTimeoutMs` deadline (5 seconds by default); a late loader entry is removed asynchronously before its request can become a leaked live fiber.
 
 ## What a run surface reads and calls
 

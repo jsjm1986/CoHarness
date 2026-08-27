@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-27-document-index-pagination-and-trash-lifecycle.md
+2026-08-27-document-index-pagination-and-trash-lifecycle.md: 277d6c767df9d0030bc496a6ce5e42027460e6a8
+2026-08-27-document-index-pagination-and-trash-lifecycle.zh.md: 27333233841b568e4c31d2eee065f4d6dbe3f7ef

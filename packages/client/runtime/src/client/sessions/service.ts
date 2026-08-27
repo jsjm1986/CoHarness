@@ -276,6 +276,8 @@ export class SessionRuntime implements ISessions {
   private watched: SessionId | undefined
   /** Removed-while-staged sessions whose teardown waits for the stage to move away. */
   private readonly deferredRemovals = new Set<SessionId>()
+  /** Scope-fiber teardowns in progress; root disposal waits for every one. */
+  private readonly pendingScopeDisposals = new Set<Promise<void>>()
 
   /**
    * @param ctx - client root context (scope fibers mount under it).
@@ -353,6 +355,26 @@ export class SessionRuntime implements ISessions {
         }
       }, 'sessions: conversation registry rebuild')
     }
+    // Scope records are created lazily, so their fibers are not children of a
+    // single static plugin row. Own a final root teardown that closes every
+    // remaining scope and waits for any prune already in progress.
+    rootCtx.effect(() => async () => {
+      this.watched = undefined
+      for (const [id, record] of this.scopes) {
+        this.scopes.delete(id)
+        this.deferredRemovals.delete(id)
+        this.scheduleDrop(id, record)
+      }
+      while (this.pendingScopeDisposals.size > 0) {
+        const results = await Promise.allSettled([...this.pendingScopeDisposals])
+        const failures = results
+          .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+          .map(result => result.reason as unknown)
+        if (failures.length > 0) {
+          throw new AggregateError(failures, 'client session scope disposal failed')
+        }
+      }
+    }, 'sessions: scope disposal')
     rootCtx.reflect.provide('sessions', this, undefined)
   }
 
@@ -808,7 +830,7 @@ export class SessionRuntime implements ISessions {
       }
       this.scopes.delete(id)
       this.deferredRemovals.delete(id)
-      this.dropScope(id, record)
+      this.scheduleDrop(id, record)
     }
   }
 
@@ -819,16 +841,37 @@ export class SessionRuntime implements ISessions {
    * stores, and the Session instance itself — the host session log is the
    * durable truth, a reopen lazily rebuilds and backfills via open().
    */
-  private dropScope(id: SessionId, record: ScopeRecord): void {
+  private scheduleDrop(id: SessionId, record: ScopeRecord): void {
+    const disposal = this.dropScope(id, record)
+    this.pendingScopeDisposals.add(disposal)
+    // Prunes are triggered from synchronous projection notifications and have
+    // no caller to await. Observe failures here; root teardown still awaits
+    // the same promise and reports an aggregate failure to its owner.
+    void disposal.catch((error: unknown) => {
+      this.rootCtx.logger.error('client session scope disposal failed for "%s"', id)
+      this.rootCtx.logger.error(error)
+    }).finally(() => {
+      this.pendingScopeDisposals.delete(disposal)
+    })
+  }
+
+  /** Dispose one scope and only then release its session-owned dispatch point. */
+  private async dropScope(id: SessionId, record: ScopeRecord): Promise<void> {
     record.session.leaveStage()
-    void record.fiber.dispose()
-    // Release the Session's dispatch point with the scope it belongs to (a
-    // surviving instance — the live Intent — rebinds when resolve re-mints).
-    record.session.unbindScope()
+    // Remove the manager instance before awaiting the fiber so a session that
+    // is re-added during teardown receives a fresh instance. The identity
+    // guard prevents this old teardown from deleting that replacement.
+    this.manager.drop(id, record.session)
     // Optional lookup: slots and sessions are sibling services with no
     // declared dependency; a slots-less boot (object-layer tests) skips.
     this.rootCtx.get('slots')?.pruneStoreScope(id)
-    this.manager.drop(id)
+    try {
+      await record.fiber.dispose()
+    } finally {
+      // Release the Session's dispatch point with the scope it belongs to (a
+      // surviving instance — the live Intent — rebinds when resolve re-mints).
+      record.session.unbindScope()
+    }
   }
 
   /** Run deferred teardowns whose session is no longer staged (called when the stage moves). */
@@ -850,7 +893,7 @@ export class SessionRuntime implements ISessions {
        * future teardown path cannot double-dispose. */
       if (record !== undefined) {
         this.scopes.delete(id)
-        this.dropScope(id, record)
+        this.scheduleDrop(id, record)
       }
     }
   }

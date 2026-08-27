@@ -28,11 +28,11 @@ Status: implemented
 
 **限额针对实际接收到的字节强制执行。** `save` 统计真实读入量，超过 `maxFileBytes` 即在流中途中断并删除残件。声明的 `content-length` 从不被信任，因此超限上传无法靠"超出声明继续发送"填满磁盘。
 
-存储不做内容寻址：字节相同的两次上传就是两个文件、两个标识符，删除其一不会影响另一个——这正是人们对自己目录中文件的预期。
+存储不做内容寻址：字节相同的两次上传就是两个文件、两个标识符，删除其一不会影响另一个——这正是人们对自己目录中文件的预期。活动文件会一直保留到用户移除；提供方回收站会按配置的恢复窗口保留已移除字节，详见[文档索引分页与可恢复回收站](../architecture/2026-08-27-document-index-pagination-and-trash-lifecycle.zh.md)。
 
 ### 主机传输与提示准入
 
-`packages/host/userdoc-http` 通过 Host Connection 注册流式 `/api/documents` 子树。既有的 Host／Origin 信任围栏会先于子树处理器运行；随后上传请求体不会进入有缓冲的 JSON bridge。`POST` 要求 `x-dsh-document-upload: 1`，把原始请求体流式写入 `UserDocStore`，并在读取前拒绝超出限额的声明长度。`GET` 列举引用、目录和限额；文件夹与移动路由修改工作区；`GET`／`HEAD` 流式返回文档内容并带 `nosniff` 与附件 disposition；文档 `DELETE` 幂等执行。错误响应只公开稳定的文档错误码，不包含路径或字节。
+`packages/host/userdoc-http` 通过 Host Connection 注册流式 `/api/documents` 子树。既有的 Host／Origin 信任围栏会先于子树处理器运行；可续传上传分片不会进入有缓冲的 JSON bridge。`POST /api/documents/uploads` 创建或恢复会话，分片与完成路由校验字节范围和摘要，只有最终校验完成后才返回已发布引用。`GET` 列举引用、目录和限额；文件夹与移动路由修改工作区；`GET`／`HEAD` 流式返回文档内容并带 `nosniff` 与附件 disposition；删除文档会进入提供方回收站生命周期。跨作用域转发、游标分页和恢复语义由[文档索引分页与可恢复回收站](../architecture/2026-08-27-document-index-pagination-and-trash-lifecycle.zh.md)负责。错误响应只公开稳定的文档错误码，不包含路径或字节。
 
 提示 API 接受与文本、图片并列的文档标识符。准入只在出现对应内容项时解析相应存储：纯文本提示不需要任一存储缝，纯文档提示也不依赖图片附件存储。`prepareUserDocAttachments` 在提交任何提示前解析全部标识符，强制每条消息的数量与总字节限额，并为每个文档冻结一种表示：不超过 `maxInlineTextBytes` 且能以严格 UTF-8 解码的内容内联，其余文件只以存储路径表示。主机把两种表示都渲染成文本块，并将主机准入后的快照复制进用户消息 source；客户端提交的路径或内联文本从不被信任。web bundle 同时组合本地存储、提示上下文插件与流式 HTTP Consumer。
 
@@ -68,4 +68,4 @@ Conversation controller 持有仅限浏览器的草稿标识与元数据，主�
 
 ## 运行限制
 
-`/api` JSON 信封仍会缓冲请求体，因此不能承载上传；流式子树是有意独立的。存储服务没有每用户磁盘配额或保留策略，部署方必须在本 seam 之外提供容量与清理策略。浏览器同时提供当前草稿 rail 和工作区文档管理器；持久文件仍是普通工作区文件，agent 也可以用已有的文件系统工具检查它们。
+`/api` JSON 信封仍会缓冲请求体，因此不能承载上传；流式子树是有意独立的。存储服务没有每用户业务配额，因此部署方必须在本 seam 之外提供容量策略；未完成上传会话和提供方回收站分别按配置的保留策略清理。浏览器同时提供当前草稿 rail 和工作区文档管理器；持久文件仍是普通工作区文件，agent 也可以用已有的文件系统工具检查它们。

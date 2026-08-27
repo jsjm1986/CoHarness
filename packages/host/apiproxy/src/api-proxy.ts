@@ -536,13 +536,46 @@ function presetFailure(request: RpcRequest<unknown>, error: unknown): RpcRespons
 
 /** Simple async queue: core callbacks push, the AsyncIterable pulls; abort/return cleans up. */
 class FrameQueue<F> {
-  private buffer: F[] = []
+  // A single session event may legitimately carry a tool result close to the
+  // carrier's 8 MiB SSE frame budget. Keep enough room for that frame plus a
+  // burst of control/event envelopes without allowing an unbounded backlog.
+  static readonly MAX_BYTES = 8 * 1024 * 1024
+  static readonly MAX_ITEMS = 1024
+  private buffer: Array<{ item: F; bytes: number }> = []
+  private bufferedBytes = 0
   private waiter: (() => void) | undefined
   private done = false
 
+  constructor(private readonly overflow: () => F) {}
+
   push(item: F): void {
     if (this.done) return
-    this.buffer.push(item)
+    const bytes = frameBytes(item)
+    if (bytes > FrameQueue.MAX_BYTES
+      || this.buffer.length >= FrameQueue.MAX_ITEMS
+      || this.bufferedBytes + bytes > FrameQueue.MAX_BYTES) {
+      this.buffer = []
+      this.bufferedBytes = 0
+      const failure = this.overflow()
+      const failureBytes = frameBytes(failure)
+      this.buffer.push({ item: failure, bytes: failureBytes })
+      this.bufferedBytes = failureBytes
+      this.done = true
+      this.waiter?.()
+      return
+    }
+    this.buffer.push({ item, bytes })
+    this.bufferedBytes += bytes
+    this.waiter?.()
+  }
+
+  /** Publish one terminal frame even when normal buffering has overflowed. */
+  fail(item: F): void {
+    if (this.done) return
+    const bytes = frameBytes(item)
+    this.buffer = [{ item, bytes }]
+    this.bufferedBytes = bytes
+    this.done = true
     this.waiter?.()
   }
 
@@ -556,7 +589,11 @@ class FrameQueue<F> {
     signal.addEventListener('abort', onAbort, { once: true })
     try {
       while (true) {
-        while (this.buffer.length > 0) yield this.buffer.shift() as F
+        while (this.buffer.length > 0) {
+          const next = this.buffer.shift() as { item: F; bytes: number }
+          this.bufferedBytes -= next.bytes
+          yield next.item
+        }
         if (this.done || signal.aborted) return
         await new Promise<void>((resolve) => { this.waiter = resolve })
         this.waiter = undefined
@@ -565,6 +602,17 @@ class FrameQueue<F> {
       signal.removeEventListener('abort', onAbort)
       cleanup()
     }
+  }
+}
+
+function frameBytes(value: unknown): number {
+  try {
+    const serialized: unknown = JSON.stringify(value)
+    return typeof serialized === 'string'
+      ? Buffer.byteLength(serialized)
+      : FrameQueue.MAX_BYTES + 1
+  } catch {
+    return FrameQueue.MAX_BYTES + 1
   }
 }
 
@@ -606,8 +654,7 @@ function createReadStreamFailure<F>(
   return (error: unknown): void => {
     if (failed) return
     failed = true
-    queue.push(frame(render(collaborationRefusal(error, 'read'))))
-    queue.end()
+    queue.fail(frame(render(collaborationRefusal(error, 'read'))))
   }
 }
 
@@ -2020,6 +2067,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         pending.onAbort = onAbort
         pendingQuestions.set(rpcId, pending)
         request.signal?.addEventListener('abort', onAbort, { once: true })
+        if (request.signal?.aborted === true) {
+          onAbort()
+          return
+        }
         const envelope: RpcRequest<MuxFrame> = {
           rpcId,
           payload: { type: 'question/requested', sessionId, questions: request.questions },
@@ -2115,6 +2166,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         }
         pendingApprovals.set(pending.rpcId, pending)
         req.signal?.addEventListener('abort', onAbort, { once: true })
+        if (req.signal?.aborted === true) {
+          onAbort()
+          return
+        }
         broadcastEnvelope(requestedFrame(pending))
       })
     })
@@ -4508,7 +4563,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           }
           const authority = captured.authority
           const streamSignal = principalSignal(signal, authority)
-          const queue = new FrameQueue<RpcRequest<MuxFrame>>()
+          const queue = new FrameQueue<RpcRequest<MuxFrame>>(() => frame({
+            type: 'stream/error',
+            error: { code: 'internal', message: 'event stream queue limit exceeded', details: {} },
+          }))
           const sessions = ctx.sessions.list()
           const initialSessions = sessions.map(session => ({ session, lastSeq: session.seq - 1 }))
           const initialQuestions = [...pendingQuestions.values()]
@@ -4702,7 +4760,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           }
           const authority = captured.authority
           const streamSignal = principalSignal(signal, authority)
-          const queue = new FrameQueue<RpcRequest<HostFrame>>()
+          const queue = new FrameQueue<RpcRequest<HostFrame>>(() => frame({
+            type: 'stream/error',
+            error: { code: 'internal', message: 'event stream queue limit exceeded', details: {} },
+          }))
           const initialSessionIds = ctx.sessions.list().map(session => session.id)
           const committedWorkspaces = ctx.workspaceRegistry.list()
           const committedWorkspaceIds = new Set<string>()

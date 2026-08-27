@@ -21,10 +21,23 @@ import { UserService } from '../src/users.ts'
 // under vitest) so the absolute ws path stays requireable by the plain-node child.
 const WS_MODULE = createRequire(join(process.cwd(), 'noop.js')).resolve('ws')
 const ECHO_DSH = `
+const fs = require('fs')
+const crypto = require('crypto')
 const http = require('http')
 const { WebSocketServer } = require(${JSON.stringify(WS_MODULE)})
+const credential = JSON.parse(fs.readFileSync(3, 'utf8'))
+const material = (kind, nonce) => 'dsh-gateway-readiness-v1\\0' + kind + '\\0' + nonce + '\\0' + credential.runtime.kind + '\\0' + String(credential.runtime.id) + '\\0' + String(credential.runtime.generation)
+const proof = (kind, nonce) => crypto.createHmac('sha256', credential.token).update(material(kind, nonce)).digest('base64url')
 const server = http.createServer((req, res) => {
   if (req.url === '/exit') { res.end('bye'); process.exit(0); return }
+  if (req.url === '/api/internal/gateway/readiness') {
+    const nonce = req.headers['x-dsh-gateway-readiness-nonce']
+    const request = req.headers['x-dsh-gateway-readiness-request']
+    if (typeof nonce !== 'string' || request !== proof('request', nonce)) { res.writeHead(403); res.end(); return }
+    res.setHeader('content-type', 'application/json')
+    res.end(JSON.stringify({ version: 1, runtime: credential.runtime, proof: proof('response', nonce) }))
+    return
+  }
   if (req.url === '/api/redirect') { res.writeHead(302, { location: 'http://127.0.0.1:' + process.argv[1] + '/landing' }); res.end(); return }
   if (req.url === '/api/external-redirect') { res.writeHead(302, { location: 'https://127.0.0.1.evil/landing' }); res.end(); return }
   res.setHeader('content-type', 'application/json')

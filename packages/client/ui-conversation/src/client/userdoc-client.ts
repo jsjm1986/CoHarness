@@ -81,12 +81,29 @@ function errorFrom(status: number, body: unknown): Error {
       const record = error as { message?: unknown; code?: unknown }
       return new UserDocHttpError(
         status,
-        typeof record.message === 'string' ? record.message : 'Document operation failed.',
+        typeof record.message === 'string' ? record.message.slice(0, 240) : 'Document operation failed.',
         typeof record.code === 'string' ? record.code : undefined,
       )
     }
+    if (typeof error === 'string' && error !== '') {
+      const code = error === 'instance-starting' ? 'INSTANCE_STARTING'
+        : error === 'instance-unreachable' ? 'INSTANCE_UNREACHABLE'
+          : undefined
+      return new UserDocHttpError(
+        status,
+        code === 'INSTANCE_STARTING'
+          ? 'The document runtime is starting. Retry shortly.'
+          : code === 'INSTANCE_UNREACHABLE'
+            ? 'The document runtime is unavailable. Retry shortly.'
+            : 'Document operation failed.',
+        code,
+      )
+    }
   }
-  return new UserDocHttpError(status, 'Document operation failed.')
+  return new UserDocHttpError(
+    status,
+    typeof body === 'string' && body !== '' ? body.slice(0, 240) : 'Document operation failed.',
+  )
 }
 
 async function requestJson<T>(input: RequestInfo | URL, init: RequestInit | undefined): Promise<T> {

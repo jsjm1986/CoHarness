@@ -35,6 +35,10 @@ export { API_PATH, HOST_EVENTS_PATH, MUX_EVENTS_PATH } from './api-path.ts'
 export interface ConnectionRequestBoundary {
   kind: 'http' | 'upgrade'
   headers: IncomingHttpHeaders
+  /** HTTP method when the carrier has one (upgrade requests use the opening method). */
+  method?: string
+  /** URL pathname before any RPC dispatch. */
+  pathname?: string
 }
 
 declare module '@deepseek-ai/cordis' {
@@ -202,7 +206,12 @@ export function apply(ctx: Context, config?: ConnectionConfig): void {
         res.end('forbidden')
         return
       }
-      await ctx.waterfall('connection/request', { kind: 'http', headers: req.headers }, async () => {
+      await ctx.waterfall('connection/request', {
+        kind: 'http',
+        headers: req.headers,
+        ...(req.method === undefined ? {} : { method: req.method }),
+        pathname: new URL(req.url ?? '/', 'http://dsh.internal').pathname,
+      }, async () => {
         if (await connection.dispatchHttp(req, res)) return
         await bridge(req, res, fetchHandler, maxRequestBodyBytes)
       })
@@ -223,7 +232,12 @@ export function apply(ctx: Context, config?: ConnectionConfig): void {
             rejectWebSocketUpgrade(socket)
             return
           }
-          return apiCtx.waterfall('connection/request', { kind: 'upgrade', headers: req.headers }, async () => {
+          return apiCtx.waterfall('connection/request', {
+            kind: 'upgrade',
+            headers: req.headers,
+            ...(req.method === undefined ? {} : { method: req.method }),
+            pathname: new URL(req.url ?? '/', 'http://dsh.internal').pathname,
+          }, async () => {
             await handle(req, socket, head)
           })
         },

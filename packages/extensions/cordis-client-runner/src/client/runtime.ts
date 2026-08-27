@@ -122,6 +122,8 @@ export interface DynamicCordisRunnerEnv {
   modules: ClientModuleSystem
   /** Slot registry, for the entry-crash supervision seam. */
   slots: SlotRegistry
+  /** Hard deadline for browser-half evaluation and activation. */
+  evaluationTimeoutMs?: number
   /** Route one `host.call` to the package's host half through the Remote namespace. */
   invoke(
     pluginId: CordisDynamicPluginId,
@@ -155,6 +157,18 @@ export interface DynamicCordisRunnerEnv {
 /** Module-table id of one package (also its loader entry name and fiber name). */
 function moduleIdOf(id: CordisDynamicPluginId): string {
   return `dyn/${id}`
+}
+
+async function withEvaluationTimeout<T>(operation: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => { reject(new Error(`${label} timed out after ${String(timeoutMs)}ms`)) }, timeoutMs)
+  })
+  try {
+    return await Promise.race([operation, timeout])
+  } finally {
+    if (timer !== undefined) clearTimeout(timer)
+  }
 }
 
 /** One live package's contribution summary in this page. */
@@ -206,7 +220,11 @@ export class DynamicCordisPackageRunner {
   }>()
   /** This page's last render crash per package: what a run surface shows on the row. */
   private readonly failures = new Map<CordisDynamicPluginId, DynamicCordisRenderFailure>()
+  /** Loader entries whose creation promise outlived a timed-out load. */
+  private readonly lateCleanups = new Set<Promise<void>>()
   private readonly unwatch: () => void
+  private disposed = false
+  private disposeTask: Promise<void> | undefined
   private snapshotCache: readonly DynamicCordisLivePackage[] | undefined
   private failureCache: ReadonlyMap<CordisDynamicPluginId, DynamicCordisRenderFailure> | undefined
 
@@ -286,7 +304,15 @@ export class DynamicCordisPackageRunner {
    * @returns the outcome the run orchestration reports to the host.
    */
   load(half: DynamicCordisClientHalf): Promise<DynamicCordisLoadResult> {
+    if (this.disposed) {
+      return Promise.resolve({
+        ok: false,
+        cause: 'activate',
+        message: 'dynamic Client runner is disposed',
+      })
+    }
     return this.enqueue(half.pluginId, async () => {
+      if (this.disposed) return { ok: false, cause: 'activate' as const, message: 'dynamic Client runner is disposed' }
       const current = this.live.get(half.pluginId)
       if (current !== undefined) {
         // Already running this activation here: nothing to load, but the caller
@@ -307,21 +333,38 @@ export class DynamicCordisPackageRunner {
    * @param pluginRunId - exact activation being retracted; a newer run survives.
    */
   retract(pluginId: CordisDynamicPluginId, pluginRunId: CordisDynamicPluginRunId): void {
+    if (this.disposed) return
     void this.enqueue(pluginId, async () => {
       const current = this.live.get(pluginId)
       if (current === undefined || current.pkg.pluginRunId !== pluginRunId) return
       await this.teardown(pluginId, current.entryId, current.styles)
       this.notify()
+    }).catch((error: unknown) => {
+      console.error(`[cordis-client-runner] retract for ${pluginId} failed:`, error)
     })
   }
 
   /** Unload everything (plugin disposal path). */
   async dispose(): Promise<void> {
-    this.unwatch()
-    for (const current of [...this.live.values()]) {
-      await this.teardown(current.pkg.pluginId, current.entryId, current.styles)
-    }
-    this.notify()
+    this.disposeTask ??= (async () => {
+      this.disposed = true
+      this.unwatch()
+      // Close admission first and wait for every queued load/retract. A slow
+      // evaluation must settle before its entry can be torn down, otherwise a
+      // late completion can remount after this disposer returns.
+      await Promise.allSettled([...this.queues.values()])
+      while (this.lateCleanups.size > 0) await Promise.allSettled([...this.lateCleanups])
+      for (const current of [...this.live.values()]) {
+        await this.teardown(current.pkg.pluginId, current.entryId, current.styles)
+      }
+      this.queues.clear()
+      // The owning fiber is being disposed; invoking UI listeners here can
+      // update an already-unmounted component. Invalidate snapshots without a
+      // final callback instead.
+      this.snapshotCache = undefined
+      this.failureCache = undefined
+    })()
+    await this.disposeTask
   }
 
   private notify(): void {
@@ -336,7 +379,11 @@ export class DynamicCordisPackageRunner {
     const next = previous.then(op)
     // The queue tail must survive this operation's failure, or one rejection
     // would wedge every later operation on the same package.
-    this.queues.set(id, next.then(() => {}, () => {}))
+    const tail = next.then(() => {}, () => {})
+    this.queues.set(id, tail)
+    void tail.then(() => {
+      if (this.queues.get(id) === tail) this.queues.delete(id)
+    })
     return next
   }
 
@@ -345,7 +392,7 @@ export class DynamicCordisPackageRunner {
     const ledger: DynamicCordisSlotLedgerRow[] = []
     let plugin: DynamicCordisEvaluatedPlugin | ((ctx: unknown) => unknown)
     try {
-      plugin = await evaluateClientHalf(half.pluginId, half.code, {
+      const pendingEvaluation = evaluateClientHalf(half.pluginId, half.code, {
         invoke: (method, args) => this.env.invoke(half.pluginId, half.pluginRunId, method, args),
         noteError: (message) => {
           // A loaded package's own console.error: a page-local diagnostic with
@@ -353,6 +400,14 @@ export class DynamicCordisPackageRunner {
           console.error(`[cordis-client-runner] ${half.pluginId} logged an error:`, message)
         },
       }, styles)
+      plugin = await withEvaluationTimeout(
+        pendingEvaluation,
+        this.env.evaluationTimeoutMs ?? 5_000,
+        `dynamic Client evaluation for "${half.pluginId}"`,
+      ).catch((error: unknown) => {
+        void pendingEvaluation.catch(() => undefined)
+        throw error
+      })
     } catch (error) {
       styles.dispose()
       return { ok: false, cause: 'evaluate', ...errorDetails(error), error }
@@ -371,18 +426,77 @@ export class DynamicCordisPackageRunner {
     this.env.modules.invalidate(moduleId)
     const sink = (globalThis as ModuleLoaderSink).__ModuleLoader__
     if (sink === undefined) {
-      throw new Error('cordis-client-runner: window.__ModuleLoader__ is missing (booted outside the web shell?)')
+      this.env.modules.invalidate(moduleId)
+      styles.dispose()
+      return {
+        ok: false,
+        cause: 'module-import',
+        message: 'window.__ModuleLoader__ is missing (booted outside the web shell?)',
+      }
     }
-    sink.load({ id: moduleId, factory: () => surface })
+    try {
+      sink.load({ id: moduleId, factory: () => surface })
+    } catch (error: unknown) {
+      this.env.modules.invalidate(moduleId)
+      styles.dispose()
+      return { ok: false, cause: 'module-import', ...errorDetails(error), error }
+    }
 
-    const entryId = await this.env.loader.create({ name: moduleId })
-    const fiber = this.env.loader.resolve(entryId).fiber
+    let pendingEntry: Promise<string>
+    try {
+      pendingEntry = this.env.loader.create({ name: moduleId })
+    } catch (error: unknown) {
+      this.env.modules.invalidate(moduleId)
+      styles.dispose()
+      return { ok: false, cause: 'module-import', ...errorDetails(error), error }
+    }
+    const entryId = await withEvaluationTimeout(
+      pendingEntry,
+      this.env.evaluationTimeoutMs ?? 5_000,
+      `dynamic Client load for "${half.pluginId}"`,
+    ).catch((error: unknown) => {
+      // `Loader.create()` may have started an import before the deadline but
+      // resolve its entry id later. Removing only the timeout waiter leaves a
+      // fully mounted, unreachable fiber (and its slot registrations) behind.
+      // Observe the late id and remove that exact entry; the module/style
+      // cleanup here is safe to repeat and does not invalidate a newer load's
+      // factory.
+      const lateCleanup = pendingEntry.then(async (lateEntryId) => {
+        await this.env.loader.remove(lateEntryId).catch((removeError: unknown) => {
+          console.error(`[cordis-client-runner] late entry cleanup for ${half.pluginId} failed:`, removeError)
+        })
+        styles.dispose()
+      }, () => { styles.dispose() })
+      this.lateCleanups.add(lateCleanup)
+      void lateCleanup.then(() => {
+        this.lateCleanups.delete(lateCleanup)
+      })
+      this.env.modules.invalidate(moduleId)
+      styles.dispose()
+      throw error
+    })
+    let fiber: ReturnType<typeof this.env.loader.resolve>['fiber']
+    try {
+      fiber = this.env.loader.resolve(entryId).fiber
+    } catch (error: unknown) {
+      this.env.modules.invalidate(moduleId)
+      styles.dispose()
+      return { ok: false, cause: 'module-import', ...errorDetails(error), error }
+    }
     if (fiber === undefined) {
       await this.teardown(half.pluginId, entryId, styles)
       return { ok: false, cause: 'module-import', message: 'module import failed (see the browser console)' }
     }
     try {
-      await fiber.await()
+      const pendingActivation = fiber.await()
+      await withEvaluationTimeout(
+        pendingActivation,
+        this.env.evaluationTimeoutMs ?? 5_000,
+        `dynamic Client activation for "${half.pluginId}"`,
+      ).catch((error: unknown) => {
+        void pendingActivation.catch(() => undefined)
+        throw error
+      })
     } catch (error) {
       await this.teardown(half.pluginId, entryId, styles)
       return { ok: false, cause: 'activate', ...errorDetails(error), error }

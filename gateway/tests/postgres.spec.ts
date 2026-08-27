@@ -156,7 +156,7 @@ describePg('PostgreSQL baseline', () => {
         session_id,seq,event_type,occurred_at,event,payload_bytes
       ) VALUES('legacy-nul-session',0,'user/message',now(),$1::json,octet_length($1::text))`, [legacyEvent])
       const migrated = await runMigrations(pool, MIGRATIONS)
-      expect(migrated).toEqual({ applied: [16], current: 16 })
+      expect(migrated).toEqual({ applied: [16, 17, 18], current: 18 })
       const legacyFacts = await pool.query<{
         has_visible_content: boolean
         visible_content_seq: string | null
@@ -172,7 +172,7 @@ describePg('PostgreSQL baseline', () => {
       await rm(legacyMigrations, { recursive: true, force: true })
     }
     expect(await runMigrations(pool, MIGRATIONS))
-      .toEqual({ applied: [], current: 16 })
+      .toEqual({ applied: [], current: 18 })
     const pushTables = await pool.query<{ table_name: string }>(`SELECT table_name
       FROM information_schema.tables
       WHERE table_schema='harness' AND table_name IN ('push_devices','push_deliveries')
@@ -248,6 +248,23 @@ describePg('PostgreSQL baseline', () => {
     } finally {
       await pool.query('DELETE FROM harness.schema_migrations WHERE version=$1', [unknownVersion])
     }
+  })
+
+  it('rejects a document owner from another organization', async () => {
+    const otherOrganization = await pool.query<{ id: string }>(
+      `INSERT INTO harness.organizations(slug,display_name) VALUES($1,'Other') RETURNING id`,
+      [`other-doc-fk-${randomUUID()}`],
+    )
+    const otherUser = await pool.query<{ id: string }>(`INSERT INTO harness.users(
+      organization_id,username,display_name,home_path
+    ) VALUES($1,'other-owner','Other owner','/tmp/other-owner') RETURNING id`, [otherOrganization.rows[0]!.id])
+    await expect(pool.query(`INSERT INTO harness.document_catalog(
+      organization_id,scope_kind,scope_user_id,runtime_doc_id,name,bytes,media_type,modified_at_ms,owner_user_id
+    ) VALUES($1,'personal',$2,'cross-org.txt','cross-org.txt',1,'text/plain',1,$3)`, [
+      organizationId,
+      userId,
+      otherUser.rows[0]!.id,
+    ])).rejects.toMatchObject({ code: '23503' })
   })
 
   it('keeps actor attribution confined to project-owned usage rows', async () => {

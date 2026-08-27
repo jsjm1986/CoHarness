@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { ApprovalRequestId } from '../src/index.ts'
 import type {
   ApprovalRequestId as ApprovalRequestIdType, CordisDynamicPluginId,
@@ -147,6 +147,31 @@ describe('dynamic runner definitions', () => {
 })
 
 describe('dynamic runner dispatch', () => {
+  it('does not resurrect a Host activation stopped while startup is pending', async () => {
+    const { runner } = await setup()
+    const defined = define(runner, {
+      sessionId: AGENT_A.id, name: 'slow', purpose: 'p', host: HOST_CODE,
+    })
+    const gate = Promise.withResolvers<undefined>()
+    const internal = runner as unknown as {
+      startHost: (...args: unknown[]) => Promise<unknown>
+    }
+    const startHost = vi.spyOn(internal, 'startHost').mockImplementation(async () => {
+      await gate.promise
+      return undefined
+    })
+    const starting = runner.runHostHalf(AGENT_A, defined.pluginId, defined.packageId, 'run', null, false)
+    await vi.waitFor(() => {
+      expect((runner as unknown as { starting: Map<unknown, unknown> }).starting.size).toBe(1)
+    })
+    const stopping = runner.stop(AGENT_A, defined.pluginId)
+    gate.resolve(undefined)
+    await expect(stopping).resolves.toMatchObject({ ok: true })
+    await expect(starting).resolves.toMatchObject({ ok: false })
+    expect((await runner.inventory())[0]?.activeRun).toBeUndefined()
+    startHost.mockRestore()
+  })
+
   it('starts a host-only package immediately, with no request and no approval', async () => {
     const { ctx, runner, gateway } = await setup()
     const { pluginId, packageId } = define(runner, {

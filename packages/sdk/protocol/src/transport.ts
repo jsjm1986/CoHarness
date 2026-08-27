@@ -53,6 +53,27 @@ interface PendingRequest {
   reject: (error: Error) => void
 }
 
+/** Resource bounds for one newline-delimited JSON-RPC endpoint. */
+export interface JsonRpcTransportOptions {
+  /** Maximum UTF-8 bytes retained for one input line. */
+  maxLineBytes?: number
+  /** Maximum number of requests awaiting a response. */
+  maxPendingRequests?: number
+  /** Maximum concurrently executing inbound request handlers. */
+  maxConcurrentIncoming?: number
+  /** Maximum bytes accepted by the writable's queued output. */
+  maxOutputBytes?: number
+}
+
+/** Default UTF-8 byte limit for one JSON-RPC input line. */
+export const DEFAULT_MAX_LINE_BYTES = 1 * 1024 * 1024
+/** Default number of requests retained while awaiting responses. */
+export const DEFAULT_MAX_PENDING_REQUESTS = 1_000
+/** Default concurrent inbound handler limit. */
+export const DEFAULT_MAX_CONCURRENT_INCOMING = 100
+/** Default queued output byte limit. */
+export const DEFAULT_MAX_OUTPUT_BYTES = 8 * 1024 * 1024
+
 /**
  * Line-delimited endpoint over caller-owned streams. {@link start} attaches
  * listeners; {@link close} detaches them and rejects pending requests without
@@ -66,15 +87,28 @@ export class JsonRpcLineTransport implements JsonRpcTransportPeer {
   private requestHandler: RequestHandler | undefined
   private notificationHandler: NotificationHandler | undefined
   private readonly pending = new Map<JsonRpcId, PendingRequest>()
+  private readonly maxLineBytes: number
+  private readonly maxPendingRequests: number
+  private readonly maxConcurrentIncoming: number
+  private readonly maxOutputBytes: number
+  private activeIncoming = 0
+  private queuedOutputBytes = 0
+  private closed = false
 
   constructor(
     private readonly input: Readable,
     private readonly output: Writable,
-  ) {}
+    options: JsonRpcTransportOptions = {},
+  ) {
+    this.maxLineBytes = positiveBound(options.maxLineBytes, DEFAULT_MAX_LINE_BYTES, 'maxLineBytes')
+    this.maxPendingRequests = positiveBound(options.maxPendingRequests, DEFAULT_MAX_PENDING_REQUESTS, 'maxPendingRequests')
+    this.maxConcurrentIncoming = positiveBound(options.maxConcurrentIncoming, DEFAULT_MAX_CONCURRENT_INCOMING, 'maxConcurrentIncoming')
+    this.maxOutputBytes = positiveBound(options.maxOutputBytes, DEFAULT_MAX_OUTPUT_BYTES, 'maxOutputBytes')
+  }
 
   /** Attach the input listeners and begin reading frames. Idempotent. */
   start(): void {
-    if (this.started) return
+    if (this.started || this.closed) return
     this.started = true
     this.input.on('data', this.onData)
     this.input.on('error', this.onInputError)
@@ -85,6 +119,8 @@ export class JsonRpcLineTransport implements JsonRpcTransportPeer {
    * Detach listeners and reject pending requests. Safe before {@link start}.
    */
   close(): void {
+    if (this.closed) return
+    this.closed = true
     this.input.off('data', this.onData)
     this.input.off('error', this.onInputError)
     this.input.off('end', this.onInputEnd)
@@ -119,6 +155,10 @@ export class JsonRpcLineTransport implements JsonRpcTransportPeer {
    * @returns the result; rejects per {@link JsonRpcTransportPeer.request}.
    */
   request(method: string, params: object, signal?: AbortSignal): Promise<unknown> {
+    if (this.closed) return Promise.reject(new Error('JSON-RPC transport closed'))
+    if (this.pending.size >= this.maxPendingRequests) {
+      return Promise.reject(new Error('JSON-RPC pending request limit exceeded'))
+    }
     const id = `req_${randomUUID().replaceAll('-', '')}`
     const message = { jsonrpc: '2.0', id, method, params }
     return new Promise((resolve, reject) => {
@@ -164,41 +204,62 @@ export class JsonRpcLineTransport implements JsonRpcTransportPeer {
    * @returns a promise that settles with the output write callback.
    */
   flush(): Promise<void> {
+    if (this.closed) return Promise.reject(new Error('JSON-RPC transport closed'))
     return new Promise<void>((resolve, reject) => {
-      this.output.write('', (error) => {
-        if (error) reject(error)
-        else resolve()
-      })
+      try {
+        this.output.write('', (error) => {
+          if (error) reject(error)
+          else resolve()
+        })
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error(String(error)))
+      }
     })
   }
 
   private readonly onData = (chunk: Buffer | string): void => {
+    if (this.closed) return
     this.buffer += typeof chunk === 'string' ? chunk : this.decoder.write(chunk)
     this.drainLines()
+    if (Buffer.byteLength(this.buffer, 'utf8') > this.maxLineBytes) {
+      this.failTransport(new Error(`JSON-RPC input line exceeds ${String(this.maxLineBytes)} bytes`))
+    }
   }
 
   private drainLines(): void {
     for (;;) {
       const newline = this.buffer.indexOf('\n')
       if (newline < 0) break
-      const line = this.buffer.slice(0, newline).trim()
+      const rawLine = this.buffer.slice(0, newline)
       this.buffer = this.buffer.slice(newline + 1)
+      // Check the complete line before parsing it. Checking only the residual
+      // buffer in onData() misses an oversized frame that arrives together
+      // with its newline, because drainLines removes it first.
+      if (Buffer.byteLength(rawLine, 'utf8') > this.maxLineBytes) {
+        this.failTransport(new Error(`JSON-RPC input line exceeds ${String(this.maxLineBytes)} bytes`))
+        return
+      }
+      const line = rawLine.trim()
       if (!line) continue
-      void this.handleLine(line)
+      void this.handleLine(line).catch((error: unknown) => {
+        this.failTransport(error instanceof Error ? error : new Error(String(error)))
+      })
     }
   }
 
   private readonly onInputError = (error: Error): void => {
-    this.failPending(error)
+    this.failTransport(error)
   }
 
   private readonly onInputEnd = (): void => {
+    if (this.closed) return
     this.buffer += this.decoder.end()
     this.drainLines()
-    this.failPending(new Error('JSON-RPC input closed'))
+    this.failTransport(new Error('JSON-RPC input closed'))
   }
 
   private async handleLine(line: string): Promise<void> {
+    if (this.closed) return
     let message: unknown
     try {
       message = JSON.parse(line)
@@ -219,21 +280,35 @@ export class JsonRpcLineTransport implements JsonRpcTransportPeer {
       return
     }
     if (typeof method === 'string') {
-      this.notificationHandler?.(method, objectParams(frame.params))
+      try {
+        this.notificationHandler?.(method, objectParams(frame.params))
+      } catch {
+        // Notification consumers are observers. A faulty callback must not
+        // close the wire or reject unrelated pending requests.
+      }
     }
   }
 
   private async handleIncomingRequest(id: JsonRpcId, method: string, params: Record<string, unknown>): Promise<void> {
+    if (this.activeIncoming >= this.maxConcurrentIncoming) {
+      this.writeError(id, -32000, 'JSON-RPC server is busy')
+      return
+    }
     const handler = this.requestHandler
     if (!handler) {
       this.writeError(id, -32601, `method not found: ${method}`)
       return
     }
+    this.activeIncoming += 1
     try {
-      const result = await handler(method, params)
-      this.write({ jsonrpc: '2.0', id, result })
-    } catch (error) {
-      this.writeError(id, -32603, error instanceof Error ? error.message : String(error))
+      try {
+        const result = await handler(method, params)
+        this.write({ jsonrpc: '2.0', id, result })
+      } catch (error) {
+        this.writeError(id, -32603, error instanceof Error ? error.message : String(error))
+      }
+    } finally {
+      this.activeIncoming -= 1
     }
   }
 
@@ -258,7 +333,40 @@ export class JsonRpcLineTransport implements JsonRpcTransportPeer {
   }
 
   private write(message: Record<string, unknown>): void {
-    this.output.write(`${JSON.stringify(message)}\n`)
+    if (this.closed) throw new Error('JSON-RPC transport closed')
+    const encoded = `${JSON.stringify(message)}\n`
+    const bytes = Buffer.byteLength(encoded, 'utf8')
+    const writableLength = typeof this.output.writableLength === 'number' ? this.output.writableLength : 0
+    const bufferedOutputBytes = Math.max(this.queuedOutputBytes, writableLength)
+    if (bytes > this.maxOutputBytes || bufferedOutputBytes + bytes > this.maxOutputBytes) {
+      const error = new Error(`JSON-RPC output queue exceeds ${String(this.maxOutputBytes)} bytes`)
+      this.failTransport(error)
+      throw error
+    }
+    this.queuedOutputBytes += bytes
+    try {
+      this.output.write(encoded, (error) => {
+        this.queuedOutputBytes = Math.max(0, this.queuedOutputBytes - bytes)
+        if (error !== undefined && error !== null) this.failTransport(error)
+      })
+    } catch (error) {
+      this.queuedOutputBytes = Math.max(0, this.queuedOutputBytes - bytes)
+      this.failTransport(error instanceof Error ? error : new Error(String(error)))
+      throw error
+    }
+  }
+
+  private failTransport(error: Error): void {
+    if (this.closed) {
+      this.failPending(error)
+      return
+    }
+    this.closed = true
+    this.input.off('data', this.onData)
+    this.input.off('error', this.onInputError)
+    this.input.off('end', this.onInputEnd)
+    this.buffer = ''
+    this.failPending(error)
   }
 
   private failPending(error: Error): void {
@@ -266,6 +374,12 @@ export class JsonRpcLineTransport implements JsonRpcTransportPeer {
     this.pending.clear()
     for (const waiter of pending) waiter.reject(error)
   }
+}
+
+function positiveBound(value: number | undefined, fallback: number, name: string): number {
+  const resolved = value ?? fallback
+  if (!Number.isSafeInteger(resolved) || resolved < 1) throw new RangeError(`${name} must be a positive safe integer`)
+  return resolved
 }
 
 /** Normalize JSON-RPC `params` to a plain object (arrays and scalars collapse to `{}`). */

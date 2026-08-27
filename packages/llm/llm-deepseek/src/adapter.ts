@@ -101,6 +101,14 @@ export interface DeepSeekConnectionOptions {
   imageOffloadCountQuantum: number
   /** Maximum duration of one request-image Files API resolution. */
   filesApiTimeoutMs: number
+  /** Maximum bytes retained from one non-2xx provider error body. */
+  maxErrorResponseBytes: number
+  /** Maximum parser buffer for one incomplete SSE event. */
+  maxSseBufferBytes: number
+  /** Maximum accumulated text/reasoning emitted by one response. */
+  maxGeneratedTextBytes: number
+  /** Maximum accumulated JSON argument bytes for one tool call. */
+  maxToolArgumentBytes: number
   /** Upload expiry, refresh, and quota-recovery policy. */
   filePolicy: DeepSeekFilePolicy
   /** Provider-owned model-request retry policy, already resolved. */
@@ -173,6 +181,44 @@ const REASONING_EFFORTS = [
 const OFF_ONLY_REASONING_EFFORTS = [
   { id: OFF_REASONING_EFFORT, name: 'Off' },
 ] as const
+
+/** Read a provider error body without allowing an unbounded response to retain memory. */
+async function readBoundedText(response: Response, limit: number): Promise<string> {
+  if (!Number.isSafeInteger(limit) || limit < 1) throw new RangeError('DeepSeek response byte limit must be a positive safe integer')
+  const declared = response.headers.get('content-length')
+  if (declared !== null) {
+    const length = Number(declared)
+    if (!Number.isSafeInteger(length) || length < 0 || length > limit) {
+      await response.body?.cancel()
+      throw new LlmError('DeepSeek provider error response is too large', 'MALFORMED_RESPONSE')
+    }
+  }
+  if (response.body === null) return ''
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  try {
+    for (;;) {
+      const next = await reader.read()
+      if (next.done) break
+      total += next.value.byteLength
+      if (total > limit) {
+        await reader.cancel()
+        throw new LlmError('DeepSeek provider error response is too large', 'MALFORMED_RESPONSE')
+      }
+      chunks.push(next.value)
+    }
+  } finally {
+    reader.releaseLock()
+  }
+  const bytes = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return new TextDecoder().decode(bytes)
+}
 
 /** Marks a failed file-id resolution that may be retried as an inline request. */
 class FileResolutionFailure extends Error {
@@ -622,7 +668,7 @@ export class DeepSeekAdapter extends LlmAdapter {
       if (!response.ok) {
         let message = `DeepSeek API error (HTTP ${response.status})`
         let providerError: WireError['error']
-        const rawResponse = await response.text()
+        const rawResponse = await readBoundedText(response, connection.maxErrorResponseBytes)
         try {
           const parsed = JSON.parse(rawResponse) as WireError
           providerError = parsed.error
@@ -659,7 +705,13 @@ export class DeepSeekAdapter extends LlmAdapter {
         throw new LlmError('DeepSeek API returned no response body', 'EMPTY_RESPONSE')
       }
 
-      yield* translate(parseSse(response.body, onActivity))
+      yield* translate(
+        parseSse(response.body, onActivity, connection.maxSseBufferBytes),
+        {
+          maxGeneratedTextBytes: connection.maxGeneratedTextBytes,
+          maxToolArgumentBytes: connection.maxToolArgumentBytes,
+        },
+      )
       return
     }
   }

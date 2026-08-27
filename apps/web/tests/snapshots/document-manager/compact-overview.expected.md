@@ -7,6 +7,9 @@
   - button "Refresh":
     - img
     - text: Refresh
+  - group "Document filters":
+    - img
+    - textbox "Search document name"
   - list:
     - listitem:
       - text: notes.txt Personal documents · 30.0 KB · Alice

@@ -225,6 +225,9 @@ const UNARY_VALUE_SCHEMAS: { [K in keyof RpcMethodMap]: z.ZodType<Wire<ResponseV
 
 /** Default timeout for bounded unary calls (rpc-compare 2026-07-19: a hung host must not leave callers pending forever). */
 const DEFAULT_TIMEOUT_MS = 30_000
+const MAX_TIMER_DELAY_MS = 2_147_483_647
+/** Maximum UTF-8 bytes retained while waiting for one SSE frame terminator. */
+const MAX_SSE_FRAME_BYTES = 8 * 1024 * 1024
 
 /** Whether a unary call uses the transport health deadline or only caller/connection cancellation. */
 type UnaryTimeoutPolicy = 'default' | 'caller-signal-only'
@@ -247,7 +250,11 @@ export abstract class AbstractApiClient implements IApiClient {
   private readonly envelopeListeners = new Set<(batch: readonly RpcMessage[]) => void>()
 
   /** @param timeoutMs - timeout for bounded unary calls; user-paced calls and streams do not use it. */
-  constructor(protected readonly timeoutMs: number = DEFAULT_TIMEOUT_MS) {}
+  constructor(protected readonly timeoutMs: number = DEFAULT_TIMEOUT_MS) {
+    if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > MAX_TIMER_DELAY_MS) {
+      throw new RangeError(`timeoutMs must be a positive safe integer no greater than ${String(MAX_TIMER_DELAY_MS)}`)
+    }
+  }
 
   /** Transport aspect: browser fetch, injected handler.fetch, IPC bridge, ... */
   protected abstract doFetch(input: URL, init?: RequestInit): Promise<Response>
@@ -320,7 +327,10 @@ export abstract class AbstractApiClient implements IApiClient {
       body: JSON.stringify(body),
       ...requestSignal === undefined ? {} : { signal: requestSignal },
     })
-    if (!response.ok) throw new Error(`transport failure for ${path}: HTTP ${response.status}`)
+    if (!response.ok) {
+      await response.body?.cancel().catch(() => {})
+      throw new Error(`transport failure for ${path}: HTTP ${response.status}`)
+    }
     return response
   }
 
@@ -372,20 +382,39 @@ export abstract class AbstractApiClient implements IApiClient {
     onOpen?: () => void,
   ): AsyncGenerator<RpcRequest<F>> {
     const response = await this.doFetch(new URL(path, this.resolveBase()), { signal })
-    if (!response.ok || response.body === null) throw new Error(`transport failure for ${path}: HTTP ${response.status}`)
-    onOpen?.()
+    if (!response.ok || response.body === null) {
+      await response.body?.cancel().catch(() => {})
+      throw new Error(`transport failure for ${path}: HTTP ${response.status}`)
+    }
+    try {
+      onOpen?.()
+    } catch (error) {
+      await response.body.cancel().catch(() => {})
+      throw error
+    }
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
+    const encoder = new TextEncoder()
     let buffer = ''
     try {
       while (true) {
         const { done, value } = await reader.read()
-        if (done) return
-        buffer += decoder.decode(value, { stream: true })
+        if (done) {
+          buffer += decoder.decode()
+          if (buffer !== '') throw new Error(`truncated SSE frame on ${path}`)
+          return
+        }
+        const decoded = decoder.decode(value, { stream: true })
+        buffer += decoded
         let boundary: number
         while ((boundary = buffer.indexOf('\n\n')) !== -1) {
           const chunk = buffer.slice(0, boundary)
           buffer = buffer.slice(boundary + 2)
+          // Bound one complete frame, not the aggregate of a burst that
+          // happened to arrive in one transport chunk.
+          if (encoder.encode(chunk).byteLength > MAX_SSE_FRAME_BYTES) {
+            throw new Error(`SSE frame on ${path} exceeds ${String(MAX_SSE_FRAME_BYTES)} bytes`)
+          }
           const data = chunk.split('\n').filter(line => line.startsWith('data: ')).map(line => line.slice(6)).join('')
           if (data === '') continue
           let full: ServerRequest
@@ -399,6 +428,10 @@ export abstract class AbstractApiClient implements IApiClient {
           }
           this.onEnvelope(full)
           yield { rpcId: full.rpcId, payload: frame }
+        }
+        // Only the unterminated tail is retained for the next read.
+        if (encoder.encode(buffer).byteLength > MAX_SSE_FRAME_BYTES) {
+          throw new Error(`SSE frame on ${path} exceeds ${String(MAX_SSE_FRAME_BYTES)} bytes`)
         }
       }
     } finally {

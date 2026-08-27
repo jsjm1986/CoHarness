@@ -18,6 +18,7 @@
 
 - `preparedSessionCacheSize` — coordinator 保留的冷 preparation 正数数量；默认 `5`。
 - `writeBatchMaxDelayMs` — 正数固定批处理窗口；默认 `200`，上限为共享最大定时器延迟。
+- `maxPendingEvents` — 单个活动会话写入 controller 可保留的最大事件数；默认 `10,000`。
 - `requestTimeoutMs` — 单次 Gateway 内部请求的正数期限；默认 `30000`。
 
 ## 模型体验

@@ -32,14 +32,16 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 | `HGW_RUNTIME_CREDENTIAL_DIR` | `~/.harness-gateway/runtime-credentials` | systemd 用户/项目运行时加载的宿主私有凭据文件 |
 | `HGW_RUNTIME_API_BODY_LIMIT_BYTES` | 64 MiB | 单次认证私有运行时 API 请求允许的最大 body 大小 |
 | `HGW_ARCHIVE_RETENTION_DAYS` | 30 | 归档进入回收站后自动清理前的可恢复天数 |
-| `HGW_DATABASE_STARTUP_RETRY_INITIAL_MS` | 1 秒 | PostgreSQL 启动连接暂时失败时的初始重试间隔 |
-| `HGW_DATABASE_STARTUP_RETRY_MAX_MS` | 30 秒 | PostgreSQL 启动瞬时故障的最大重试间隔；认证和 migration 错误仍会立即失败 |
+| `HGW_DATABASE_STARTUP_RETRY_INITIAL_MS` | 1 秒 | PostgreSQL 启动连接暂时失败时的初始重试间隔，最大 2,147,483,647 毫秒 |
+| `HGW_DATABASE_STARTUP_RETRY_MAX_MS` | 30 秒 | PostgreSQL 启动瞬时故障的最大重试间隔，最大 2,147,483,647 毫秒；认证和 migration 错误仍会立即失败 |
 | `HGW_RELEASE_ROOT` | （未设置） | 受控部署的规范化不可变 release 目录；Gateway、CLI、策略插件和 `/healthz` 共用由目录名派生的 release id |
 | `HGW_DSH_COMMAND` | 源码入口 `apps/cli/src/bin.ts web --no-open --port {port}` | 实例启动命令；Gateway 管理的运行时必须保留 `--no-open`，这样切换作用域不会打开宿主机本地运行时页面；设置 `HGW_RELEASE_ROOT` 时必须留空，由该 release 派生已构建 CLI 命令 |
 | `HGW_DSH_REPO_ROOT` | 仓库根 | 解析源码运行入口；受控 release 模式下必须解析到 `HGW_RELEASE_ROOT` |
 | `HGW_INSTANCE_PORT_BASE` | 42000 | 实例端口分配起点 |
 | `HGW_IDLE_TIMEOUT_MS` | 30 分钟 | 实例闲置休眠阈值 |
-| `HGW_READINESS_TIMEOUT_MS` | 30 秒 | 实例就绪等待上限 |
+| `HGW_READINESS_TIMEOUT_MS` | 30 秒 | 实例就绪等待上限，最大 2,147,483,647 毫秒 |
+| `HGW_UPSTREAM_TIMEOUT_MS` | 30 秒 | 单次 HTTP/WebSocket 代理操作等待运行时上游的最长时间，最大 2,147,483,647 毫秒 |
+| `HGW_UPSTREAM_RESPONSE_LIMIT_BYTES` | 64 MiB | Gateway 保留或转发的运行时响应最大字节数 |
 | `HGW_LAUNCHER` | `local` | 实例启动驱动：`local`（macOS 开发子进程）/ `systemd`（Linux 生产每用户单元） |
 | `HGW_SYSTEMD_UNIT_DIR` | `/etc/systemd/system` | systemd 驱动写每用户单元文件的目录 |
 | `HGW_GUARD_PATCH` | `<仓库>/plugins/dsh-directory-guard/cordis.patch.yml` | 实体安装进每个实例的 directory-guard bundle 补丁；release 模式把它固定在 `HGW_RELEASE_ROOT` 内，`off` 可关闭 |
@@ -76,15 +78,15 @@ Gateway 按认证用户保存 Android Token，只在持久化 completed turn 后
 
 ## 项目协作对话
 
-账户运行在个人 scope 或一个可访问项目 scope 中。个人 scope 保留每用户运行时及其持久化；每个项目使用一个覆盖项目路径的共享运行时。scope 选择端点会先启动并等待目标运行时就绪，再写入新的 scope Cookie；启动失败会保留当前 scope，成功后的页面重载会直接连接已就绪进程。代理重试响应禁止缓存并声明两秒后重试，HTML 等待页把自动刷新元数据放在文档 head 中。Gateway 为所选运行时签发短期请求 principal，并在每次代理的 HTTP/WebSocket 操作中转发。运行时会在 Host 代码观察请求前验证组织、用户、scope、运行时 id 和 generation。私有运行时凭据与协作端点只允许 loopback 访问。完整决策见[项目协作对话](../.agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.zh.md)。
+账户运行在个人 scope 或一个可访问项目 scope 中。个人 scope 保留每用户运行时及其持久化；每个项目使用一个覆盖项目路径的共享运行时。scope 选择端点会先启动并等待目标运行时就绪，再写入新的 scope Cookie；启动失败会保留当前 scope，成功后的页面重载会直接连接已就绪进程。代理重试响应禁止缓存并声明两秒后重试，HTML 等待页把自动刷新元数据放在文档 head 中。Gateway 为所选运行时签发短期请求 principal，并在每次代理的 HTTP/WebSocket 操作中转发。长时间 HTTP/WebSocket 工作会持有串行 runtime lease；idle 回收会重新检查 lease 准入，若停止操作赢得竞态则使用新 generation 重试，而不会转发过期端口。运行时会在 Host 代码观察请求前验证组织、用户、scope、运行时 id 和 generation。私有运行时凭据与协作端点只允许 loopback 访问。完整决策见[项目协作对话](../.agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.zh.md)。
 
 项目成员分为 `ro` 和 `rw`。组织管理员无需项目成员记录，就对每个活动项目及其全部对话（包括私密根对话）拥有隐式 `rw` 权限。管理员专用的 `danger-full-access` 预设在个人或项目 scope 中都会在验证请求身份后提供；普通用户不能通过 `/permission` 或新会话默认设置选择它。在共享项目会话中，权限事件属于整个会话，因此管理员切换预设后，所有参与者看到的应用内预设都会改变，直到下一次获得授权的选择；systemd 项目单元仍把宿主访问限制在项目路径内。对普通成员而言，根对话选择项目公开或仅创建者可见，后代继承根 ACL。Host 操作会授权读取、写入、管理、fork、stream、审批和问题；PostgreSQL 只接受每项共享审批/问题的一份响应。项目运行时通过 Gateway PostgreSQL 提供方保存 Session header 和完整事件；其写入和读取解码器会在数据进入活动 Session 前要求精确的事件 envelope 字段与 surface 元数据。持久参与者元数据使模型与 transcript 能区分贡献者。Web 插件展示 scope、可见性、创建者、参与者和贡献次数，并为 `ro` 成员替换完整 composer；浏览器不是授权边界。
 
 Session ACL 检查会在每次操作中查询当前成员身份。只依赖 scope 的 Host 操作最多在 `HGW_PRINCIPAL_ASSERTION_TTL_MS` 内使用已签名模式（默认 30 秒），长连接 stream 会在 principal 过期时断开。删除项目时，Gateway 会在该运行时的串行操作槽内停止共享运行时，再由 PostgreSQL 级联删除项目所属的运行时与协作记录；项目目录仍保留在磁盘上。
 
-文档 broker 使用同一套运行时身份和成员授权执行跨作用域复制。它在个人与项目运行时 HTTP 端点之间流式传输源文档，绝不经过浏览器，沿用目标冲突命名策略，返回安全的逐文件结果，并把源溯源写入持久审计日志。v1 协议不支持项目到项目复制，也不提供实时同步。
+文档 broker 使用同一套运行时身份和成员授权执行跨作用域复制。它在个人与项目运行时 HTTP 端点之间流式传输源文档，绝不经过浏览器，沿用目标冲突命名策略，返回安全的逐文件结果，并把源溯源写入持久审计日志。v1 协议不支持项目到项目复制，也不提供实时同步。运行时 JSON 响应与流式 body 受 `HGW_UPSTREAM_RESPONSE_LIMIT_BYTES` 限制，请求与代理升级受 `HGW_UPSTREAM_TIMEOUT_MS` 限制。
 
-浏览器使用的 `POST /api/documents/transfer/list` 由 Gateway 自己负责，而不再交给通用运行时代理。Gateway 先完成作用域检查，再向选定的目标运行时读取元数据；运行时启动失败会返回经过认证的 JSON 错误，绝不会把浏览器重定向到回环运行时端口。作为最后一道代理保护，其他上游响应中的回环 `Location` 也会在返回公网响应前转换为同源路径。
+浏览器使用的 `POST /api/documents/transfer/list` 由 Gateway 自己负责，而不再交给通用运行时代理。Gateway 先完成作用域检查，再向选定的目标运行时读取元数据；就绪检查使用一次性 nonce，以及由运行时 bearer token 和身份派生的 HMAC 证明，而不是接受端口上的任意 HTTP 响应；运行时启动失败会返回经过认证的 JSON 错误，绝不会把浏览器重定向到回环运行时端口。作为最后一道代理保护，其他上游响应中的回环 `Location` 也会在返回公网响应前转换为同源路径。
 
 Gateway 还负责 `/api/documents/transfer/uploads` 下的目标作用域可续传上传路由。浏览器在每个会话、分片、状态、完成和取消请求中携带紧凑的个人或项目作用域键。Gateway 每次请求都会重新授权，并把分片流式转发到选定运行时，不会暴露其端口或文件系统路径。
 

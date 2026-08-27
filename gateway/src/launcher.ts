@@ -9,7 +9,7 @@
  * Per-user system accounts and directory ownership are provisioning concerns
  * (deploy/provision-user.sh), not launch-time work.
  */
-import { spawn, type ChildProcess } from 'node:child_process'
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { execFile } from 'node:child_process'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -20,6 +20,15 @@ import { renderUserUnit, unitName, type GrantEntry, type SystemdOptions } from '
 
 const localChildren = new Set<ChildProcess>()
 let localChildCleanupInstalled = false
+const SENSITIVE_ENV = /KEY|PASSWORD|SECRET|TOKEN/i
+const PROCESS_TREE_POLL_MS = 25
+const PROCESS_TREE_HARD_TIMEOUT_MS = 10_000
+
+/** Copy the parent environment without ambient credentials or stale DSH state. */
+function scrubbedParentEnv(): NodeJS.ProcessEnv {
+  return Object.fromEntries(Object.entries(process.env).filter(([name, value]) =>
+    value !== undefined && !SENSITIVE_ENV.test(name) && !name.startsWith('DSH_')))
+}
 
 function installLocalChildCleanup(): void {
   if (localChildCleanupInstalled) return
@@ -28,9 +37,98 @@ function installLocalChildCleanup(): void {
     // `exit` is synchronous; kill every tracked local runtime before launchd
     // can start a replacement Gateway with the same runtime ports.
     for (const child of localChildren) {
-      if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL')
+      if (child.pid !== undefined && process.platform !== 'win32') {
+        try { process.kill(-child.pid, 'SIGKILL') } catch { child.kill('SIGKILL') }
+      } else if (child.pid !== undefined && process.platform === 'win32') {
+        // Node does not keep asynchronous child processes alive during the
+        // synchronous `exit` event. Use the blocking taskkill invocation so a
+        // detached descendant tree receives the final signal before the
+        // Gateway process disappears.
+        spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' })
+      } else {
+        child.kill('SIGKILL')
+      }
     }
   })
+}
+
+function processExited(child: ChildProcess): boolean {
+  return child.exitCode !== null || child.signalCode !== null
+}
+
+/** Wait for the direct child and every process in its detached POSIX group. */
+async function waitForPosixGroupExit(child: ChildProcess, deadline: number): Promise<void> {
+  const exited = new Promise<void>(resolve => {
+    if (processExited(child)) resolve()
+    else child.once('exit', () => resolve())
+  })
+  await exited
+  const pid = child.pid
+  if (pid === undefined) return
+  for (;;) {
+    try {
+      process.kill(-pid, 0)
+    } catch (error) {
+      if ((error as { code?: unknown } | null)?.code === 'ESRCH') return
+      // EPERM means the group still exists but is not probeable by this user.
+      if ((error as { code?: unknown } | null)?.code !== 'EPERM') return
+    }
+    if (Date.now() >= deadline) throw new Error(`process group ${String(pid)} did not exit before the termination deadline`)
+    await new Promise(resolve => setTimeout(resolve, PROCESS_TREE_POLL_MS))
+  }
+}
+
+/** Ask Windows to terminate a process tree and wait for its root exit event. */
+async function terminateWindowsTree(child: ChildProcess, force: boolean): Promise<void> {
+  const pid = child.pid
+  if (pid === undefined) {
+    if (!processExited(child)) child.kill(force ? 'SIGKILL' : 'SIGTERM')
+    return
+  }
+  await new Promise<void>((resolve) => {
+    execFile(
+      'taskkill',
+      ['/PID', String(pid), '/T', ...(force ? ['/F'] : [])],
+      { windowsHide: true },
+      () => resolve(),
+    )
+  })
+}
+
+/** Terminate one local runtime and wait until its whole process tree is gone. */
+async function terminateLocalTree(child: ChildProcess, graceMs: number): Promise<void> {
+  const deadline = Date.now() + Math.max(0, graceMs) + PROCESS_TREE_HARD_TIMEOUT_MS
+  if (process.platform === 'win32') {
+    const exited = new Promise<void>(resolve => {
+      if (processExited(child)) resolve()
+      else child.once('exit', () => resolve())
+    })
+    await terminateWindowsTree(child, false)
+    const forceTimer = setTimeout(() => {
+      void terminateWindowsTree(child, true)
+    }, Math.max(0, graceMs))
+    try {
+      await exited
+    } finally {
+      clearTimeout(forceTimer)
+    }
+    return
+  }
+
+  const pid = child.pid
+  if (pid === undefined) {
+    if (!processExited(child)) child.kill('SIGTERM')
+    return
+  }
+  try { process.kill(-pid, 'SIGTERM') } catch { child.kill('SIGTERM') }
+  const forceTimer = setTimeout(() => {
+    try { process.kill(-pid, 'SIGKILL') } catch { child.kill('SIGKILL') }
+  }, Math.max(0, graceMs))
+  try {
+    await waitForPosixGroupExit(child, deadline)
+  } finally {
+    clearTimeout(forceTimer)
+  }
 }
 
 /** Stable process identity and filesystem facts for one runtime. */
@@ -70,10 +168,12 @@ export interface InstanceProc {
   terminate(graceMs: number): Promise<void>
   /**
    * Whether the underlying process is known to have exited. A systemd unit is
-   * not tracked through this handle (systemd supervises it), so its handle
-   * always answers false; liveness there is the manager's HTTP probe.
+   * not tracked through this handle (systemd supervises it), so callers should
+   * prefer {@link isAlive} when the launcher supplies one.
    */
   hasExited(): boolean
+  /** Optional supervisor-backed liveness probe for processes not owned directly. */
+  isAlive?(): Promise<boolean>
 }
 
 /** One instance launch driver. */
@@ -101,7 +201,7 @@ export class LocalLauncher implements Launcher {
     const child = spawn(argv[0] ?? 'node', argv.slice(1), {
       cwd: runtime.homePath,
       env: {
-        ...process.env,
+        ...scrubbedParentEnv(),
         HOME: runtime.homePath,
         DSH_HOME: runtime.dshHome,
         DSH_GATEWAY_CREDENTIAL_FD: '3',
@@ -113,10 +213,21 @@ export class LocalLauncher implements Launcher {
         TSX_TSCONFIG_PATH: join(this.cfg.dshRepoRoot, 'tsconfig.base.json'),
       },
       stdio: ['ignore', 'ignore', 'inherit', 'pipe'],
+      detached: process.platform !== 'win32',
     })
     installLocalChildCleanup()
     localChildren.add(child)
-    child.once('exit', () => { localChildren.delete(child) })
+    // Keep the handle until the entire detached group is gone. The direct
+    // child can exit while a grandchild still owns the runtime port.
+    child.once('exit', () => {
+      if (process.platform === 'win32' || child.pid === undefined) {
+        localChildren.delete(child)
+        return
+      }
+      void waitForPosixGroupExit(child, Date.now() + PROCESS_TREE_HARD_TIMEOUT_MS)
+        .catch(() => {})
+        .finally(() => { localChildren.delete(child) })
+    })
     const credentialPipe = child.stdio[3] as Writable | null | undefined
     if (credentialPipe === null || credentialPipe === undefined) {
       child.kill('SIGKILL')
@@ -128,18 +239,13 @@ export class LocalLauncher implements Launcher {
         credentialPipe.end(runtime.gatewayCredential, resolve)
       })
     } catch (error) {
-      if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL')
+      await terminateLocalTree(child, 0).catch(() => {})
       throw new Error(`runtime credential delivery failed for ${runtime.runtimeKey}: ${String(error)}`)
     }
     return {
       hasExited: () => child.exitCode !== null || child.signalCode !== null,
       terminate: async (graceMs: number) => {
-        if (child.exitCode !== null || child.signalCode !== null) return
-        const exited = new Promise<void>(resolve => child.once('exit', () => resolve()))
-        child.kill('SIGTERM')
-        const timer = setTimeout(() => child.kill('SIGKILL'), graceMs)
-        await exited
-        clearTimeout(timer)
+        await terminateLocalTree(child, graceMs)
       },
     }
   }
@@ -209,6 +315,14 @@ export class SystemdLauncher implements Launcher {
   attach(user: RuntimeProcessIdentity): InstanceProc {
     return {
       hasExited: () => false,
+      isAlive: async () => {
+        try {
+          await this.run(['is-active', '--quiet', unitName(user.runtimeKey)])
+          return true
+        } catch {
+          return false
+        }
+      },
       terminate: async () => { await this.run(['stop', unitName(user.runtimeKey)]) },
     }
   }

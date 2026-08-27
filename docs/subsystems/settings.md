@@ -144,9 +144,10 @@ type SettingsPathOp =
 /** Options for {@link SettingsProvider.describe}. */
 interface SettingsDescribeOptions {
   /**
-   * Strip `role('secret')` fields from `value`/`base`/`user` and enumerate
-   * them in each descriptor's `secrets`. Every wire surface MUST pass this;
-   * the verbatim default exists for same-process configuration UIs only.
+   * Strip `role('secret')` fields from `value`/`base`/`user`, remove defaults
+   * from schema nodes that can contain them, and enumerate the positions in
+   * each descriptor's `secrets`. Every wire surface MUST pass this; the
+   * verbatim default exists for same-process configuration UIs only.
    */
   redactSecrets?: boolean
 }
@@ -252,7 +253,7 @@ async replace(ns: SettingsNamespace, section: object, expectedRevision?: number)
 async mutate(ns: SettingsNamespace, ops: readonly SettingsPathOp[], expectedRevision?: number): Promise<void>
 ```
 
-Source: [`packages/settings/settings/src/index.ts:350`](../../packages/settings/settings/src/index.ts)
+Source: [`packages/settings/settings/src/index.ts:376`](../../packages/settings/settings/src/index.ts)
 
 <a id="settings-events"></a>
 
