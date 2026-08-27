@@ -28,7 +28,7 @@ Provider ID 是永久的，因为请求、已保存会话、模型默认值和�
 
 在**模型目录**中选择**获取可用模型**，可查询表单当前显示的基础 URL 和凭据。选择候选项只会更新草稿；保存前不会存储提供方。目录提供方使用已安装目录，不发起网络请求。
 
-发现请求遵循所选协议。`openai-completions` 与 `openai-responses` 使用 bearer 认证请求 `GET {baseURL}/models`；`anthropic-messages` 使用 `x-api-key` 和 `anthropic-version: 2023-06-01` 请求 `GET {baseURL}/v1/models`。Anthropic 的 base URL 已以 `/v1` 结尾时不会重复拼接。对于 OpenAI 兼容中转站，如果它在 `/v1` 暴露 `/models`，请把 `/v1` 写入 `baseURL`；不要填写会返回 HTML 网页而不是 API 响应的网站地址。
+发现请求遵循所选协议。`openai-completions` 与 `openai-responses` 使用 bearer 认证请求 `GET {baseURL}/models`；`anthropic-messages` 使用 `x-api-key` 和 `anthropic-version: 2023-06-01` 请求 `GET {baseURL}/v1/models`。Anthropic Messages 会同时为模型发现和消息请求规范化末尾的 `/v1`，因此中转站根地址和带版本的 base 都可使用。对于 OpenAI 兼容中转站，如果它在 `/v1` 暴露 `/models`，请把 `/v1` 写入 `baseURL`；不要填写会返回 HTML 网页而不是 API 响应的网站地址。
 
 ### 图片输入
 

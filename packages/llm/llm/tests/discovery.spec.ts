@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   discoverModelsAtEndpoint,
   MODEL_LISTING_PROTOCOLS,
+  normalizeAnthropicBaseURL,
   supportsModelListing,
   userAgent,
 } from '@deepseek-ai/dsh-llm'
@@ -41,6 +42,14 @@ describe('model listing protocol support', () => {
 })
 
 describe('discoverModelsAtEndpoint', () => {
+  it('normalizes only a trailing Anthropic version segment on a copied URL', () => {
+    const input = new URL('https://gateway.example/tenant/v1/?region=cn')
+    expect(normalizeAnthropicBaseURL(input).toString()).toBe('https://gateway.example/tenant?region=cn')
+    expect(input.toString()).toBe('https://gateway.example/tenant/v1/?region=cn')
+    expect(normalizeAnthropicBaseURL(new URL('https://gateway.example/tenant')).toString())
+      .toBe('https://gateway.example/tenant')
+  })
+
   it('requests an OpenAI listing, keeps deployment paths, and normalizes rows', async () => {
     const requests = stubResponse(jsonResponse({
       data: [

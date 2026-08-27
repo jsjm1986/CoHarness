@@ -21,6 +21,7 @@
 
 import { createProvider } from '@earendil-works/pi-ai'
 import type { Api, ApiKeyAuth, Model, Provider, ProviderStreams } from '@earendil-works/pi-ai'
+import { normalizeAnthropicBaseURL } from '@deepseek-ai/dsh-llm'
 import { anthropicMessagesApi } from '@earendil-works/pi-ai/api/anthropic-messages.lazy'
 import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completions.lazy'
 import { openAIResponsesApi } from '@earendil-works/pi-ai/api/openai-responses.lazy'
@@ -48,6 +49,20 @@ const PROTOCOLS: Readonly<Record<string, () => ProviderStreams>> = {
   'openai-completions': openAICompletionsApi,
   'openai-responses': openAIResponsesApi,
   'anthropic-messages': anthropicMessagesApi,
+}
+
+/** Remove Anthropic's version suffix before its SDK appends `/v1/messages`. */
+function providerBaseURL(baseURL: string | undefined, api: string | undefined): string | undefined {
+  if (baseURL === undefined || api !== 'anthropic-messages') return baseURL
+  return normalizeAnthropicBaseURL(new URL(baseURL)).toString()
+}
+
+/** Normalize each model URL before pi-ai's provider SDK appends its endpoint path. */
+function normalizedModels(models: readonly Model<Api>[]): Model<Api>[] {
+  return models.map((model) => {
+    const baseURL = providerBaseURL(model.baseUrl, model.api)
+    return baseURL === undefined || baseURL === model.baseUrl ? model : { ...model, baseUrl: baseURL }
+  })
 }
 
 /**
@@ -144,13 +159,14 @@ function routeAuth(spec: ProviderSpec, catalog: Provider | undefined): Provider[
 function reuseCatalogProvider(base: Provider, spec: ProviderSpec): Provider {
   // Provider-level `baseUrl` is display metadata: pi-ai routes every request
   // through `Model.baseUrl`, which model resolution has already overridden.
-  const baseUrl = spec.baseURL ?? base.baseUrl
+  const baseUrl = providerBaseURL(spec.baseURL ?? base.baseUrl, spec.api)
+  const models = normalizedModels(spec.models)
   return {
     id: spec.provider,
     name: spec.displayName,
     ...baseUrl === undefined ? {} : { baseUrl },
     auth: routeAuth(spec, base),
-    getModels: () => spec.models,
+    getModels: () => models,
     // Delegated rather than copied: the catalog provider stays the receiver, so
     // an implementation holding state on itself keeps working.
     stream: (model, context, options) => base.stream(model, context, options),
@@ -181,12 +197,14 @@ export function buildProvider(spec: ProviderSpec): Provider {
       + ` supported protocols are ${supportedProtocols().join(', ')}`,
     )
   }
+  const baseURL = providerBaseURL(spec.baseURL, spec.api)
+  const models = normalizedModels(spec.models)
   return createProvider({
     id: spec.provider,
     name: spec.displayName,
-    ...spec.baseURL === undefined ? {} : { baseUrl: spec.baseURL },
+    ...baseURL === undefined ? {} : { baseUrl: baseURL },
     auth: routeAuth(spec, catalog),
-    models: spec.models,
+    models,
     api: factory(),
   })
 }
