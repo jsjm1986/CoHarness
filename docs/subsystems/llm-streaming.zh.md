@@ -748,6 +748,8 @@ interface LlmDiscoveredModel {
 }
 ```
 
+对于 `openai-completions` 与 `openai-responses`，端点发现把 `baseURL` 当作前缀：先请求该前缀，只有列表响应为 404、405 或明确的 `text/html` 时才尝试一次末尾 `/v1` 切换项。可选的进程内缓存可以把成功前缀共享给流式请求；它不会持久化，也不会写回设置。Anthropic 消息请求会规范化末尾的 `/v1`，并始终精确追加 `/v1/messages`。
+
 ### 请求信封：`LlmCallConfig` 与记录的 header
 
 循环从已记录状态构建每个请求。`EpochHeader` 记录调用配置，标记由适配器默认值提供的字段，并通过完整的 `request/header` 快照记录渲染后的提示词以及权威返回工具顺序（由 `toolOrder` 配置；未配置时按字典序）。结合派生历史，请求便可由会话日志重建。见 [session.md](session.zh.md#the-request-header-event-requestheader) 与[可重建性 Agent Note](../../.agents/notes/implemented/architecture/2026-07-05-reconstructable-requests.zh.md)。

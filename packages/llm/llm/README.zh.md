@@ -21,7 +21,12 @@
 - `ctx.llm.registerModelDiscovery(settingsNs: string, discover): () => void` 为本插件拥有的 settings namespace 提供查询提供方端点的能力。每个 namespace 只能有一个（`INVALID_DISCOVERY`/`DUPLICATE_DISCOVERY`），并随调用 fiber dispose。
 - `ctx.llm.listModelDiscoveryNamespaces(): string[]` 列出可以询问端点的 namespace，让界面只在可用之处提供该动作。
 - `ctx.llm.discoverModels(settingsNs: string, request: LlmModelDiscoveryRequest): Promise<LlmDiscoveredModel[]>` 询问某个端点它公布了哪些模型。
-- `discoverModelsAtEndpoint(request: LlmEndpointModelDiscoveryRequest): Promise<readonly LlmDiscoveredModel[]>` 运行从 `@deepseek-ai/dsh-llm/discovery` 导出的共享协议 HTTP 列表请求；pi-ai 与 Gateway 调用方都使用这份实现。
+- `discoverModelsAtEndpoint(request: LlmEndpointModelDiscoveryRequest, cache?: LlmEndpointResolutionCache): Promise<readonly LlmDiscoveredModel[]>` 运行从 `@deepseek-ai/dsh-llm/discovery` 导出的共享协议 HTTP 列表请求；pi-ai 与 Gateway 调用方都使用这份实现，并可传入仅存在于进程内的端点缓存。
+- `discoverModelListingAtEndpoint(request: LlmEndpointModelDiscoveryRequest, cache?: LlmEndpointResolutionCache): Promise<LlmEndpointModelDiscoveryResult>` 返回发现到的模型以及成功响应的端点前缀。
+- `modelEndpointCandidates(rawBaseURL: string, api: string): readonly string[]` 生成原始前缀，以及 OpenAI 协议对应的一个末尾 `/v1` 切换项，不修改调用方的设置。
+- `LlmEndpointResolutionCache` 只在内存中记住成功的候选项；所属 profile 层在快照改变时清空它。
+- `LlmEndpointResponseMetadata` 携带端点路径分类所需的状态和响应标头。
+- `isEndpointPathMismatch(response: LlmEndpointResponseMetadata): boolean` 识别 404/405，或明确声明为非 SSE 的成功响应，供流式回退使用。
 - `normalizeAnthropicBaseURL(baseURL: URL): URL` 在 Anthropic SDK 消息请求追加版本路径前，规范化可选的末尾 `/v1`；pi-ai 与列表请求共用这个 helper。
 - `ctx.llm.providerRetryPolicy(provider: string): ResolvedRetryPolicy` 返回注册时捕获的提供方自身的重试策略，并解析 normal 默认值。
 - `ctx.llm.listModels(provider: string): Promise<LlmModelInfo[]>` 发现某个已注册提供方当前公布的模型。
@@ -34,7 +39,7 @@
 
 询问端点属于配置期针对**草稿**的操作，以 settings namespace 而非提供方路由为键——界面正在新增的提供方还不存在，也就没有路由可点名。但请求仍可**点名**它正在编辑的路由，而已经描述该路由的适配器会用自己的知识作答，无需联网；路由名称和 `baseURL` 至少需要提供一项。除此之外，请求携带端点、协议，以及一条 harness 只用于这一次询问、绝不存储的凭据。这里既不读取也不写入 settings 或 credentials；返回内容是界面可以提供给用户采纳的候选元数据，而不是已注册的 catalog。`LlmDiscoveredModel` 除 `id` 外每个字段都是可选的，因为大多数提供方列表只公布 id；采纳其中一条的界面仍要补上其适配器所需的容量。重复与不可用的 id 会被丢弃，无人服务的 namespace 以 `NO_DISCOVERY` 失败，既不点名路由也不给端点的请求以 `INVALID_DISCOVERY` 失败。
 
-共享的 `@deepseek-ai/dsh-llm/discovery` helper 对 `openai-completions` 与 `openai-responses` 使用 bearer 认证请求 `GET {baseURL}/models`，对 `anthropic-messages` 使用 `x-api-key` 加 `anthropic-version: 2023-06-01` 请求 `GET {baseURL}/v1/models`。它拥有 URL 校验、部署路径拼接、密钥校验、有界响应读取、JSON 归一化、取消和发现错误；调用方只保留自己的 catalog 快捷路径、凭据来源与持久化策略。Anthropic 的 base 已以 `/v1` 结尾时不会重复拼接；OpenAI 兼容网关若在 `/v1` 暴露 `/models`，则通常需要把 `/v1` 写入 `baseURL`。
+共享的 `@deepseek-ai/dsh-llm/discovery` helper 对 `openai-completions` 与 `openai-responses` 使用 bearer 认证请求 `GET {baseURL}/models`，对 `anthropic-messages` 使用 `x-api-key` 加 `anthropic-version: 2023-06-01` 请求 `GET {baseURL}/v1/models`。它拥有 URL 校验、部署路径拼接、密钥校验、有界响应读取、JSON 归一化、取消和发现错误；调用方只保留自己的 catalog 快捷路径、凭据来源与持久化策略。OpenAI 列表发现先请求输入前缀，只有收到 404、405 或明确的 `text/html` 响应时才请求一次末尾 `/v1` 切换项，并把成功前缀只记在传入的进程内缓存中。Anthropic 的 base 已以 `/v1` 结尾时不会重复拼接。
 
 提供方和模型元数据用于发现，不构成路由白名单。`registerAdapter()` 仍拥有提供方路由的排他性，并为每条路由捕获适配器的重试策略；适配器可以接受未出现在 `listModels()` 中的模型 id，消费方不得仅因模型未列出而拒绝请求。返回的 selector 元数据已分离；无效或重复的适配器条目会以 `INVALID_ADAPTER` 或 `INVALID_CATALOG` 失败。
 

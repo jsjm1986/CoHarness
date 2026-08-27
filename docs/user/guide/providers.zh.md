@@ -20,7 +20,7 @@
 
 ## 添加自定义提供方
 
-对于公司网关、自建服务器或已安装目录中不存在的提供方，选择**添加自定义提供方**。提供小写 Provider ID、基础 URL、API 协议、凭据和至少一个模型。
+对于公司网关、自建服务器或已安装目录中不存在的提供方，选择**添加自定义提供方**。提供小写 Provider ID、基础 URL、`openai-completions`、`openai-responses` 或 `anthropic-messages` 之一、凭据和至少一个模型。
 
 ![自定义提供方表单：Provider ID、显示名称、API 地址、API 协议、API 密钥](providers-custom-form.zh.png)
 
@@ -28,7 +28,7 @@ Provider ID 是永久的，因为请求、已保存会话、模型默认值和�
 
 在**模型目录**中选择**获取可用模型**，可查询表单当前显示的基础 URL 和凭据。选择候选项只会更新草稿；保存前不会存储提供方。目录提供方使用已安装目录，不发起网络请求。
 
-发现请求遵循所选协议。`openai-completions` 与 `openai-responses` 使用 bearer 认证请求 `GET {baseURL}/models`；`anthropic-messages` 使用 `x-api-key` 和 `anthropic-version: 2023-06-01` 请求 `GET {baseURL}/v1/models`。Anthropic Messages 会同时为模型发现和消息请求规范化末尾的 `/v1`，因此中转站根地址和带版本的 base 都可使用。对于 OpenAI 兼容中转站，如果它在 `/v1` 暴露 `/models`，请把 `/v1` 写入 `baseURL`；不要填写会返回 HTML 网页而不是 API 响应的网站地址。
+发现请求遵循所选协议。`openai-completions` 与 `openai-responses` 使用 bearer 认证请求 `GET {baseURL}/models`；`anthropic-messages` 使用 `x-api-key` 和 `anthropic-version: 2023-06-01` 请求 `GET {baseURL}/v1/models`。Anthropic Messages 会同时为模型发现和消息请求规范化末尾的 `/v1`，因此中转站根地址和带版本的 base 都可使用。对于 OpenAI 兼容中转站，根前缀和带 `/v1` 的前缀都可以填写：宿主先请求输入前缀，只有响应明确表示路径不匹配时才尝试另一个，并把成功选择只记在进程内。请填写 API 前缀而不是完整操作路径；返回网站 HTML 只会作为尝试另一个前缀的信号。
 
 ### 图片输入
 
@@ -128,7 +128,7 @@ llm-pi-ai:
 - **`MISSING_CREDENTIAL`**：通过模型页存储提供方密钥，或提供被引用的环境变量。
 - **`UNKNOWN_MODEL`**：选择已配置的模型，或向自定义提供方添加缺失的模型。
 - **获取可用模型返回 401**：检查密钥和协议。OpenAI 兼容发现使用 bearer 认证请求 `GET {baseURL}/models`；Anthropic Messages 使用 `x-api-key` 请求 `GET {baseURL}/v1/models`。
-- **获取可用模型返回 HTML，或出现 `Stream ended without finish_reason`**：路由很可能指向了网站地址，或协议路径不匹配。OpenAI 兼容中转站应把 `baseURL` 设为 API 前缀，通常以 `/v1` 结尾；Anthropic Messages 应设 `api: anthropic-messages`，并使用中转站根地址，让请求到达 `/v1/models` 和 `/v1/messages`。
+- **获取可用模型返回 HTML，或出现 `Stream ended without finish_reason`**：对于 OpenAI 兼容路由，宿主已经在响应明确表示路径不匹配时尝试过唯一的根／`/v1` 备用项。两个候选都失败时，请确认 `baseURL` 是 API 前缀而不是网站或完整操作路径；Anthropic Messages 应设 `api: anthropic-messages`，并使用中转站根地址，让请求到达 `/v1/models` 和 `/v1/messages`。
 - **密钥与地址都正确，网关却拒绝每一个请求**：它的请求形状与 OpenAI 不同。先在路由上设 `compat.supportsDeveloperRole: false` 与 `compat.maxTokensField: max_tokens`。
 - **只有推理模型失败**：pi-ai 把它们的系统提示词以 `developer` 角色发出，而网关拒绝该角色。设 `compat.supportsDeveloperRole: false`。
 - **某个 compat 开关因没有值而被拒绝**：冒号后什么都没写。给它一个值，或删掉该键以沿用已安装 catalog 的值。

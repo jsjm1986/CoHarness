@@ -172,13 +172,24 @@ async function taggedThinkingServer(): Promise<TaggedThinkingServer> {
   }
 }
 
-/** Serve a website response where pi-ai requires an SSE completion stream. */
+/** Serve HTML at the root prefix and a valid SSE completion at its /v1 toggle. */
 async function htmlGatewayServer(): Promise<HtmlGatewayServer> {
   const paths: string[] = []
   const server = createServer((request: IncomingMessage, response: ServerResponse) => {
     request.resume()
     request.on('end', () => {
       paths.push(request.url ?? '')
+      if ((request.url ?? '').startsWith('/v1/')) {
+        response.writeHead(200, { 'content-type': 'text/event-stream' })
+        response.end([
+          'data: {"choices":[{"delta":{"role":"assistant","content":""},"index":0,"finish_reason":null}]}',
+          'data: {"choices":[{"delta":{"content":"fallback-ok"},"index":0,"finish_reason":null}]}',
+          'data: {"choices":[{"delta":{},"index":0,"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1}}',
+          'data: [DONE]',
+          '',
+        ].join('\n\n'))
+        return
+      }
       response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
       response.end('<!doctype html><title>relay landing page</title>')
     })
@@ -436,10 +447,10 @@ describe('headless stream-json snapshots', () => {
       const normalized = normalizeHeadlessStream(result.stdout, runCwd)
       if (refreshing) await writeFile(streamExpected, normalized)
       expect(normalized).toBe(await readFile(streamExpected, 'utf8'))
-      expect(normalized).toContain('"code":"MALFORMED_RESPONSE"')
-      expect(normalized).toContain('instead of an SSE stream; check the baseURL and protocol')
+      expect(normalized).toContain('fallback-ok')
+      expect(normalized).not.toContain('MALFORMED_RESPONSE')
       expect(normalized).not.toContain('"type":"llm/retry"')
-      expect(server.paths).toEqual(['/chat/completions'])
+      expect(server.paths).toEqual(['/chat/completions', '/v1/chat/completions'])
     } finally {
       await server.close()
     }

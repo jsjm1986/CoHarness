@@ -17,6 +17,8 @@
  * through its own seam and passes it as the request's `apiKey` option, which
  * pi-ai treats as the highest-priority auth override — so `Models` never holds
  * a credential store and the harness keeps its fail-loud reference semantics.
+ * OpenAI-compatible routes probe one alternate `/v1` prefix only after a clear
+ * endpoint-path response; that process-local choice is shared with discovery.
  *
  * @module dsh-llm-pi-ai/adapter
  */
@@ -24,6 +26,8 @@
 import { createModels, getSupportedThinkingLevels } from '@earendil-works/pi-ai'
 import type {
   Api,
+  AssistantMessage,
+  AssistantMessageEvent,
   AuthContext,
   CredentialStore,
   Model,
@@ -37,8 +41,11 @@ import type {
 import {
   attributionHeaders,
   contentHasImage,
+  isEndpointPathMismatch,
+  LlmEndpointResolutionCache,
   LlmAdapter,
   LlmError,
+  modelEndpointCandidates,
   ReasoningEffortId,
 } from '@deepseek-ai/dsh-llm'
 import type {
@@ -62,9 +69,11 @@ interface PiAiSnapshot {
   profiles: ReadonlyMap<string, ResolvedPiAiProviderProfile>
   /** Providers for exactly those profiles; never mutated once published. */
   models: Models
+  /** Cache generation observed when this snapshot was published. */
+  endpointCacheGeneration: number
 }
 
-/** Constructor options for {@link PiAiAdapter}: the two resolution hooks the plugin owns. */
+/** Constructor options for {@link PiAiAdapter}: resolution hooks and runtime dependencies. */
 export interface PiAiAdapterOptions {
   /** Current validated profiles by provider route; called once per operation. */
   profiles: () => ReadonlyMap<string, ResolvedPiAiProviderProfile>
@@ -88,6 +97,8 @@ export interface PiAiAdapterOptions {
    * conversion because its stored replay state is unusable by this build.
    */
   onReplayDegrade?: (detail: { provider: string; model: string; reason: string }) => void
+  /** Process-local endpoint resolution memory shared with model discovery. */
+  endpointCache?: LlmEndpointResolutionCache
 }
 
 /** The auth injectables used when creating each pi-ai model collection. */
@@ -198,6 +209,88 @@ function requestHeaders(headers: Readonly<Record<string, string>> | undefined): 
   }
 }
 
+/** An HTTP response that identifies the wrong endpoint prefix for this call. */
+class EndpointPathMismatch extends Error {
+  override name = 'EndpointPathMismatch'
+
+  /**
+   * @param response - response metadata captured before the body was consumed.
+   */
+  constructor(readonly response: ProviderResponse) {
+    super(`endpoint path mismatch: HTTP ${String(response.status)}`)
+  }
+}
+
+/** Candidate endpoint facts for one model request. */
+interface ModelEndpointCandidates {
+  /** Raw profile/model prefix used as the process-local cache key. */
+  rawBaseURL: string
+  /** Ordered candidates, with a remembered successful endpoint first. */
+  candidates: readonly string[]
+}
+
+/** Whether this model API uses the adapter's endpoint normalization and cache. */
+function supportsEndpointResolution(api: string): boolean {
+  return api === 'openai-completions' || api === 'openai-responses' || api === 'anthropic-messages'
+}
+
+/**
+ * Resolve URL candidates only for protocols whose base URL normalization or
+ * `/v1` variant is owned here. Other pi-ai protocols keep their catalog URL
+ * untouched.
+ *
+ * @param model - model descriptor captured for this request.
+ * @param profile - route profile captured for this request.
+ * @param cache - process-local endpoint memory.
+ * @returns the raw cache key and ordered endpoint candidates.
+ */
+function modelEndpointCandidatesFor(
+  model: Model<Api>,
+  profile: ResolvedPiAiProviderProfile,
+  cache: LlmEndpointResolutionCache,
+): ModelEndpointCandidates {
+  const rawBaseURL = profile.baseURL ?? model.baseUrl
+  if (!supportsEndpointResolution(model.api)) return { rawBaseURL, candidates: [model.baseUrl] }
+
+  const candidates = [...modelEndpointCandidates(rawBaseURL, model.api)]
+  const cached = cache.get(model.api, rawBaseURL)
+  if (cached === undefined || !candidates.includes(cached)) {
+    if (cached !== undefined) cache.delete(model.api, rawBaseURL)
+    return { rawBaseURL, candidates }
+  }
+  return {
+    rawBaseURL,
+    candidates: [cached, ...candidates.filter(candidate => candidate !== cached)],
+  }
+}
+
+/** Use one candidate URL without mutating the frozen model descriptor. */
+function modelAtEndpoint(model: Model<Api>, baseURL: string): Model<Api> {
+  return model.baseUrl === baseURL ? model : { ...model, baseUrl: baseURL }
+}
+
+/** Extract only an HTTP 404/405 status from a pi-ai terminal error string. */
+function endpointPathStatus(error: AssistantMessage): 404 | 405 | undefined {
+  // Read the first HTTP-like status only. A later number can be part of an
+  // error body or URL and must not turn an authentication/network failure into
+  // an endpoint switch.
+  const match = error.errorMessage?.match(/(?:^|[\s(])(?:HTTP\s*)?(\d{3})(?=$|[\s:),-])/i)
+  if (match?.[1] === '404') return 404
+  if (match?.[1] === '405') return 405
+  return undefined
+}
+
+/** Observe terminal pi-ai errors while preserving the source event stream. */
+async function* observeEndpointEvents(
+  events: AsyncIterable<AssistantMessageEvent>,
+  onError: (error: AssistantMessage) => void,
+): AsyncGenerator<AssistantMessageEvent> {
+  for await (const event of events) {
+    if (event.type === 'error') onError(event.error)
+    yield event
+  }
+}
+
 /**
  * pi-ai-backed multi-provider adapter. Each operation reads the current
  * profiles, so a configuration change reaches the next request without a
@@ -205,9 +298,11 @@ function requestHeaders(headers: Readonly<Record<string, string>> | undefined): 
  */
 export class PiAiAdapter extends LlmAdapter {
   private snapshot: PiAiSnapshot | undefined
+  private readonly endpointCache: LlmEndpointResolutionCache
 
   constructor(private readonly config: PiAiAdapterOptions) {
     super()
+    this.endpointCache = config.endpointCache ?? new LlmEndpointResolutionCache()
   }
 
   /**
@@ -219,9 +314,20 @@ export class PiAiAdapter extends LlmAdapter {
   private current(): PiAiSnapshot {
     const profiles = this.config.profiles()
     if (this.snapshot?.profiles === profiles) return this.snapshot
+    // A discovery call may populate the shared cache before the first model
+    // request. Preserve that result; only a replacement of an already-published
+    // snapshot invalidates entries from the previous profile generation.
+    if (this.snapshot !== undefined
+      && this.endpointCache.generation === this.snapshot.endpointCacheGeneration) {
+      this.endpointCache.clear()
+    }
     const models: MutableModels = createModels(this.config.auth)
     for (const profile of profiles.values()) models.setProvider(profile.piProvider)
-    this.snapshot = { profiles, models }
+    this.snapshot = {
+      profiles,
+      models,
+      endpointCacheGeneration: this.endpointCache.generation,
+    }
     return this.snapshot
   }
 
@@ -309,6 +415,11 @@ export class PiAiAdapter extends LlmAdapter {
       model,
       options.reasoningEffort ?? profile.reasoning,
     )
+    const endpoint = modelEndpointCandidatesFor(model, profile, this.endpointCache)
+    const cacheGeneration = snapshot.endpointCacheGeneration
+    // An older in-flight snapshot must not repopulate a cache that the
+    // profile owner invalidated for a newer snapshot while this request ran.
+    const cacheIsCurrent = (): boolean => this.endpointCache.generation === cacheGeneration
     const resolvedApiKey = await this.config.resolveApiKey(options.provider, profile)
     const apiKey = typeof resolvedApiKey === 'object' ? resolvedApiKey.value : resolvedApiKey
     const credentialSource = typeof resolvedApiKey === 'object' ? resolvedApiKey.source : 'unknown'
@@ -335,18 +446,6 @@ export class PiAiAdapter extends LlmAdapter {
       const context = attachments === undefined
         ? toPiContext(options, undefined, onReplayDegrade)
         : await toPiContext(options, attachments, onReplayDegrade, profile.maxRequestImageBytes)
-      let providerResponse: ProviderResponse | undefined
-      const events = snapshot.models.streamSimple(model, context, {
-        ...profileOptions(profile, reasoning, apiKey),
-        ...options.temperature === undefined ? {} : { temperature: options.temperature },
-        ...options.maxTokens === undefined ? {} : { maxTokens: options.maxTokens },
-        ...options.sessionId === undefined ? {} : { sessionId: String(options.sessionId) },
-        signal: watchdog.signal,
-        // Profile headers are deployment-owned; attribution names are
-        // Harness-owned and therefore win collisions.
-        headers: requestHeaders(profile.headers),
-        onResponse: (response) => { providerResponse = response },
-      })
       // Private OpenAI-compatible gateways can serialize thinking in ordinary
       // `content` even when their model declaration has no reasoning metadata.
       // The response parser accepts only a first non-whitespace strict tag and
@@ -355,33 +454,100 @@ export class PiAiAdapter extends LlmAdapter {
       // of those XML tags remains an unavoidable heuristic collision; other
       // protocols have native reasoning events and do not use this fallback.
       const parseTextThinking = model.api === 'openai-completions'
-      const iterator = toStreamChunks(
-        events,
-        model.contextWindow,
-        parseTextThinking,
-        () => providerResponse,
-      )[Symbol.asyncIterator]()
-      let exhausted = false
-      try {
-        while (true) {
-          const result = await watchdog.next(iterator)
-          const timeout = timeoutOf(watchdog.signal, 'LLM_STREAM_IDLE_TIMEOUT')
-          if (timeout !== undefined) throw timeout
-          if (result.done) {
-            exhausted = true
-            return
+      for (const [candidateIndex, baseURL] of endpoint.candidates.entries()) {
+        const hasAlternate = candidateIndex + 1 < endpoint.candidates.length
+        const attemptController = new AbortController()
+        const attemptSignal = AbortSignal.any([watchdog.signal, attemptController.signal])
+        let pathMismatch: EndpointPathMismatch | undefined
+        let providerResponse: ProviderResponse | undefined
+        let iterator: AsyncIterator<StreamChunk> | undefined
+        let exhausted = false
+
+        try {
+          const requestModel = modelAtEndpoint(model, baseURL)
+          const events = snapshot.models.streamSimple(requestModel, context, {
+            ...profileOptions(profile, reasoning, apiKey),
+            ...options.temperature === undefined ? {} : { temperature: options.temperature },
+            ...options.maxTokens === undefined ? {} : { maxTokens: options.maxTokens },
+            ...options.sessionId === undefined ? {} : { sessionId: String(options.sessionId) },
+            signal: attemptSignal,
+            // Profile headers are deployment-owned; attribution names are
+            // Harness-owned and therefore win collisions.
+            headers: requestHeaders(profile.headers),
+            onResponse: (response) => {
+              providerResponse = response
+              if (hasAlternate && !watchdog.signal.aborted && isEndpointPathMismatch(response)) {
+                pathMismatch = new EndpointPathMismatch(response)
+                attemptController.abort(pathMismatch)
+              }
+            },
+          })
+          const observedEvents = observeEndpointEvents(events, (error) => {
+            // The OpenAI SDK rejects non-2xx responses before pi-ai's
+            // onResponse hook runs. Its terminal message retains the status,
+            // so use only 404/405 as the equivalent path-mismatch signal.
+            if (providerResponse !== undefined || !hasAlternate || watchdog.signal.aborted) return
+            const status = endpointPathStatus(error)
+            if (status === undefined) return
+            pathMismatch = new EndpointPathMismatch({ status, headers: {} })
+            attemptController.abort(pathMismatch)
+          })
+          const activeIterator = toStreamChunks(
+            observedEvents,
+            model.contextWindow,
+            parseTextThinking,
+            () => providerResponse,
+          )[Symbol.asyncIterator]()
+          iterator = activeIterator
+          while (true) {
+            const result = await watchdog.next(activeIterator)
+            const timeout = timeoutOf(watchdog.signal, 'LLM_STREAM_IDLE_TIMEOUT')
+            if (timeout !== undefined) throw timeout
+            if (result.done) {
+              exhausted = true
+              break
+            }
+            // The response callback runs before pi-ai consumes the body. Keep
+            // this guard as well so an extension provider cannot leak chunks
+            // from a candidate that has already been rejected.
+            if (pathMismatch !== undefined) continue
+            yield result.value.type === 'usage'
+              ? { ...result.value, credentialSource }
+              : result.value
           }
-          yield result.value.type === 'usage'
-            ? { ...result.value, credentialSource }
-            : result.value
-        }
-      } finally {
-        if (!exhausted) {
-          consumer.abort('pi-ai stream consumer stopped')
-          try {
-            await iterator.return(undefined)
-          } catch (_abortedSdkTeardown) {
-            // The stable signal already owns SDK termination; return-time abort cannot add an outcome.
+
+          if (pathMismatch !== undefined && hasAlternate) {
+            if (watchdog.signal.aborted) throw pathMismatch
+            if (cacheIsCurrent()) this.endpointCache.delete(model.api, endpoint.rawBaseURL)
+            continue
+          }
+          if (providerResponse !== undefined
+            && supportsEndpointResolution(model.api)
+            && cacheIsCurrent()
+            && !isEndpointPathMismatch(providerResponse)) {
+            this.endpointCache.set(model.api, endpoint.rawBaseURL, baseURL)
+          }
+          return
+        } catch (error: unknown) {
+          /* v8 ignore next 4 -- pi-ai's Models wrapper turns provider failures
+           * into terminal events; this handles an extension stream that rejects
+           * directly after onResponse. */
+          if (pathMismatch !== undefined && hasAlternate && !watchdog.signal.aborted) {
+            if (cacheIsCurrent()) this.endpointCache.delete(model.api, endpoint.rawBaseURL)
+            continue
+          }
+          throw error
+        } finally {
+          if (!exhausted) {
+            attemptController.abort('pi-ai stream consumer stopped')
+            /* v8 ignore next 2 -- pi-ai event streams provide return(); the optional guard contains extension streams that do not. */
+            if (iterator?.return !== undefined) {
+              try {
+                await iterator.return(undefined)
+              } catch (_abortedSdkTeardown) {
+                // The attempt controller already owns SDK termination; return-time abort cannot add an outcome.
+              }
+            }
           }
         }
       }

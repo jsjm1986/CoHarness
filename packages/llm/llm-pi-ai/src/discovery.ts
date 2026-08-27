@@ -22,7 +22,7 @@
  */
 
 import { discoverModelsAtEndpoint, LlmError, supportsModelListing } from '@deepseek-ai/dsh-llm'
-import type { LlmDiscoveredModel, LlmModelDiscoveryRequest } from '@deepseek-ai/dsh-llm'
+import type { LlmDiscoveredModel, LlmEndpointResolutionCache, LlmModelDiscoveryRequest } from '@deepseek-ai/dsh-llm'
 import { catalogModels } from './catalog.ts'
 
 /**
@@ -33,6 +33,9 @@ import { catalogModels } from './catalog.ts'
  *   network. A configuration surface never holds a stored secret — it edits a
  *   redacted descriptor — so without this an already-configured route would be
  *   interrogated unauthenticated and answer 401.
+ * @param cache - optional process-local endpoint resolution cache shared with
+ *   model requests; a successful candidate is retained until the profile
+ *   snapshot changes.
  * @returns the advertised models in endpoint order.
  * @throws LlmError when the protocol has no readable listing, the endpoint
  *   refuses or fails the request, or the reply is not a model listing.
@@ -40,6 +43,7 @@ import { catalogModels } from './catalog.ts'
 export async function discoverModels(
   request: LlmModelDiscoveryRequest,
   storedApiKey?: () => Promise<string | undefined>,
+  cache?: LlmEndpointResolutionCache,
 ): Promise<readonly LlmDiscoveredModel[]> {
   // A catalog route already has its answer, and a better one: the installed
   // entries carry context windows and output caps no listing endpoint reports.
@@ -85,5 +89,5 @@ export async function discoverModels(
     api,
     ...(supplied === undefined ? {} : { apiKey: supplied }),
     ...(request.signal === undefined ? {} : { signal: request.signal }),
-  })
+  }, cache)
 }

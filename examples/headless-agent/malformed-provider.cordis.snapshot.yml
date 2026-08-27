@@ -1,5 +1,5 @@
-# Keyless assembled-app composition for an OpenAI-compatible relay whose base
-# URL returns an HTML website instead of the streaming API response.
+# Keyless assembled-app composition for an OpenAI-compatible relay whose root
+# prefix returns HTML and whose `/v1` prefix serves the streaming API response.
 - id: base
   name: '@deepseek-ai/cordis-plugin-include'
   config:
@@ -23,7 +23,7 @@
           toolJobs: false
           goals: false
           includeRuntimeContext: false
-          persona: 'Keyless malformed-provider response snapshot.'
+          persona: 'Keyless endpoint compatibility response snapshot.'
       - id: persistence
         name: '@deepseek-ai/dsh-session-persistence-jsonl'
         config:
