@@ -172,6 +172,7 @@ function namedButton(action: 'attach' | 'preview' | 'move' | 'delete', name: str
 describe('DocumentsModal', () => {
   afterEach(() => {
     cleanup()
+    vi.restoreAllMocks()
     createUserDocClient.mockReset()
     vi.unstubAllGlobals()
   })
@@ -315,7 +316,8 @@ describe('DocumentsModal', () => {
     expect(document.querySelector(`.${modalCss.loadingState}`)).toBeNull()
   })
 
-  it('shows a previously visited scope from cache while revalidating it', async () => {
+  it('shows stale scope metadata while revalidating and discards expired entries', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000)
     const responses = new Map<number, ReturnType<typeof doc>[]>([
       [41, [doc({ docId: 'compiler.txt', name: 'compiler.txt', mediaType: 'text/plain' })]],
       [42, [doc({ docId: 'payments.txt', name: 'payments.txt', mediaType: 'text/plain' })]],
@@ -360,6 +362,7 @@ describe('DocumentsModal', () => {
     pending.shift()?.resolve({ directoryId: '' as UserDocDirectoryIdType, directories: [], documents: responses.get(42)!, limits })
     await screen.findByText('payments.txt')
 
+    now.mockReturnValue(31_001)
     fireEvent.click(screen.getByRole('button', { name: /Compiler/ }))
     await screen.findByText('compiler.txt')
     expect(document.querySelector(`.${modalCss.loadingState}`)).toBeNull()
@@ -367,6 +370,116 @@ describe('DocumentsModal', () => {
 
     pending.shift()?.resolve({ directoryId: '' as UserDocDirectoryIdType, directories: [], documents: responses.get(41)!, limits })
     await waitFor(() => { expect(browseScope).toHaveBeenCalledTimes(3) })
+
+    now.mockReturnValue(331_002)
+    fireEvent.click(screen.getByRole('button', { name: /Payments/ }))
+    await waitFor(() => { expect(browseScope).toHaveBeenCalledTimes(4) })
+    expect(screen.getByText('compiler.txt')).toBeTruthy()
+    expect(screen.queryByText('payments.txt')).toBeNull()
+    pending.shift()?.resolve({ directoryId: '' as UserDocDirectoryIdType, directories: [], documents: responses.get(42)!, limits })
+    await screen.findByText('payments.txt')
+  })
+
+  it('reuses the fresh current-scope listing when the manager is reopened', async () => {
+    const client = makeClient()
+    client.browse.mockImplementationOnce(async () => ({
+      directoryId: '' as UserDocDirectoryIdType,
+      directories: [],
+      documents: [doc({ docId: 'cached.txt', name: 'cached.txt', mediaType: 'text/plain' })],
+      limits,
+    }))
+    const contextFetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ scope: { kind: 'personal' }, projects: [] }),
+    }))
+    vi.stubGlobal('fetch', contextFetch)
+    createUserDocClient.mockReturnValue(client)
+    const view = render(<DocumentsModal open onClose={() => {}} t={t} />)
+    await screen.findByText('cached.txt')
+    await new Promise<void>((resolve) => { setTimeout(resolve, 0) })
+
+    view.rerender(<DocumentsModal open={false} onClose={() => {}} t={t} />)
+    view.rerender(<DocumentsModal open onClose={() => {}} t={t} />)
+    await waitFor(() => { expect(contextFetch).toHaveBeenCalledTimes(2) })
+    expect(client.browse).toHaveBeenCalledOnce()
+    expect(screen.getByText('cached.txt')).toBeTruthy()
+    expect(document.querySelector(`.${modalCss.loadingState}`)).toBeNull()
+  })
+
+  it('loads the new runtime when account context changes across manager opens', async () => {
+    const client = makeClient()
+    client.browse
+      .mockResolvedValueOnce({
+        directoryId: '' as UserDocDirectoryIdType,
+        directories: [],
+        documents: [doc({ docId: 'personal.txt', name: 'personal.txt', mediaType: 'text/plain' })],
+        limits,
+      })
+      .mockResolvedValueOnce({
+        directoryId: '' as UserDocDirectoryIdType,
+        directories: [],
+        documents: [doc({ docId: 'project.txt', name: 'project.txt', mediaType: 'text/plain' })],
+        limits,
+      })
+    let contextCall = 0
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      contextCall += 1
+      const call = contextCall
+      return {
+        ok: true,
+        json: async () => call === 1
+          ? { scope: { kind: 'personal' }, projects: [{ projectId: 41, name: 'Compiler', mode: 'rw' }] }
+          : {
+            scope: { kind: 'project', projectName: 'Compiler', projectId: 41, mode: 'rw' },
+            projects: [{ projectId: 41, name: 'Compiler', mode: 'rw' }],
+          },
+      }
+    }))
+    createUserDocClient.mockReturnValue(client)
+    const view = render(<DocumentsModal open onClose={() => {}} t={t} />)
+    await screen.findByText('personal.txt')
+
+    view.rerender(<DocumentsModal open={false} onClose={() => {}} t={t} />)
+    view.rerender(<DocumentsModal open onClose={() => {}} t={t} />)
+    await screen.findByText('project.txt')
+    expect(client.browse).toHaveBeenCalledTimes(2)
+    expect(screen.getByRole('dialog', { name: t('modal.title.project', { name: 'Compiler' }) })).toBeTruthy()
+  })
+
+  it('caches a legacy runtime listing that arrives before project scope discovery', async () => {
+    const client = makeClient()
+    client.browse.mockImplementationOnce(async () => ({
+      directoryId: '' as UserDocDirectoryIdType,
+      directories: [],
+      documents: [doc({ docId: 'project-cached.txt', name: 'project-cached.txt', mediaType: 'text/plain' })],
+      limits,
+    }))
+    let resolveContext: (response: { ok: true; json: () => Promise<unknown> }) => void = () => {}
+    const firstContext = new Promise<{ ok: true; json: () => Promise<unknown> }>((resolve) => {
+      resolveContext = resolve
+    })
+    const contextResponse = {
+      ok: true as const,
+      json: async () => ({
+        scope: { kind: 'project', projectName: 'Compiler', projectId: 41, mode: 'rw' },
+        projects: [{ projectId: 41, name: 'Compiler', mode: 'rw' }],
+      }),
+    }
+    const contextFetch = vi.fn()
+      .mockImplementationOnce(async () => firstContext)
+      .mockImplementation(async () => contextResponse)
+    vi.stubGlobal('fetch', contextFetch)
+    createUserDocClient.mockReturnValue(client)
+    const view = render(<DocumentsModal open onClose={() => {}} t={t} />)
+    await screen.findByText('project-cached.txt')
+    resolveContext(contextResponse)
+    await screen.findByRole('dialog', { name: t('modal.title.project', { name: 'Compiler' }) })
+
+    view.rerender(<DocumentsModal open={false} onClose={() => {}} t={t} />)
+    view.rerender(<DocumentsModal open onClose={() => {}} t={t} />)
+    await waitFor(() => { expect(contextFetch).toHaveBeenCalledTimes(2) })
+    expect(client.browse).toHaveBeenCalledOnce()
+    expect(screen.getByText('project-cached.txt')).toBeTruthy()
   })
 
   it('uploads directly to a writable selected scope without using the current runtime upload', async () => {
@@ -690,6 +803,18 @@ describe('DocumentsModal', () => {
     expect(alert.textContent).toContain(t('error.runtimeStarting'))
   })
 
+  it('localizes a document scope timeout as a retryable unavailable state', async () => {
+    const client = makeClient()
+    client.browse.mockRejectedValue(new UserDocHttpError(
+      504, 'Document scope request timed out.', 'DOCUMENT_SCOPE_TIMEOUT', undefined,
+    ))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain(t('error.runtimeUnavailable'))
+    expect(alert.textContent).not.toContain('Document scope request timed out.')
+  })
+
   it('uploads a selected file, reports progress, and refreshes the list', async () => {
     const client = makeClient()
     let release: () => void = () => {}
@@ -865,7 +990,9 @@ describe('DocumentsModal', () => {
     fireEvent.click(within(sourceDialog).getByRole('button', { name: t('copy.source.open') }))
     await screen.findByText('report.pdf')
     fireEvent.click(screen.getByRole('button', { name: t('copy.source.current') }))
-    await waitFor(() => { expect(client.browse).toHaveBeenCalledTimes(2) })
+    await screen.findByText('report.pdf')
+    expect(screen.queryByRole('button', { name: t('copy.source.current') })).toBeNull()
+    expect(client.browse).toHaveBeenCalledOnce()
   })
 
   it('deletes a document after confirmation and refreshes', async () => {

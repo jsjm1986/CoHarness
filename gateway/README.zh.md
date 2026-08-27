@@ -40,7 +40,7 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 | `HGW_INSTANCE_PORT_BASE` | 42000 | 实例端口分配起点 |
 | `HGW_IDLE_TIMEOUT_MS` | 30 分钟 | 实例闲置休眠阈值 |
 | `HGW_READINESS_TIMEOUT_MS` | 30 秒 | 实例就绪等待上限，最大 2,147,483,647 毫秒 |
-| `HGW_UPSTREAM_TIMEOUT_MS` | 30 秒 | 单次 HTTP/WebSocket 代理操作等待运行时上游的最长时间，最大 2,147,483,647 毫秒 |
+| `HGW_UPSTREAM_TIMEOUT_MS` | 30 秒 | 单次 HTTP/WebSocket 代理操作或已转发的指定作用域文档元数据请求等待运行时上游的最长时间，最大 2,147,483,647 毫秒 |
 | `HGW_UPSTREAM_RESPONSE_LIMIT_BYTES` | 64 MiB | Gateway 保留或转发的运行时响应最大字节数 |
 | `HGW_LAUNCHER` | `local` | 实例启动驱动：`local`（macOS 开发子进程）/ `systemd`（Linux 生产每用户单元） |
 | `HGW_SYSTEMD_UNIT_DIR` | `/etc/systemd/system` | systemd 驱动写每用户单元文件的目录 |
@@ -84,7 +84,7 @@ Gateway 按认证用户保存 Android Token，只在持久化 completed turn 后
 
 Session ACL 检查会在每次操作中查询当前成员身份。只依赖 scope 的 Host 操作最多在 `HGW_PRINCIPAL_ASSERTION_TTL_MS` 内使用已签名模式（默认 30 秒），长连接 stream 会在 principal 过期时断开。删除项目时，Gateway 会在该运行时的串行操作槽内停止共享运行时，再由 PostgreSQL 级联删除项目所属的运行时与协作记录；项目目录仍保留在磁盘上。
 
-文档 broker 使用同一套运行时身份和成员授权执行跨作用域复制。它在个人与项目运行时 HTTP 端点之间流式传输源文档，绝不经过浏览器，沿用目标冲突命名策略，返回安全的逐文件结果，并把源溯源写入持久审计日志。v1 协议不支持项目到项目复制，也不提供实时同步。运行时 JSON 响应与流式 body 受 `HGW_UPSTREAM_RESPONSE_LIMIT_BYTES` 限制，请求与代理升级受 `HGW_UPSTREAM_TIMEOUT_MS` 限制。
+文档 broker 使用同一套运行时身份和成员授权执行跨作用域复制。它在个人与项目运行时 HTTP 端点之间流式传输源文档，绝不经过浏览器，沿用目标冲突命名策略，返回安全的逐文件结果，并把源溯源写入持久审计日志。v1 协议不支持项目到项目复制，也不提供实时同步。运行时 JSON 响应与流式 body 受 `HGW_UPSTREAM_RESPONSE_LIMIT_BYTES` 限制，代理操作和指定作用域元数据请求受 `HGW_UPSTREAM_TIMEOUT_MS` 限制。指定作用域元数据请求停滞时会返回 HTTP 504 和 `DOCUMENT_SCOPE_TIMEOUT`，并释放 runtime lease；成功的内容流会持有 lease 直到 EOF 或取消，不受元数据截止时间截断。
 
 浏览器使用的 `POST /api/documents/transfer/list` 由 Gateway 自己负责，而不再交给通用运行时代理。Gateway 先完成作用域检查，再向选定的目标运行时读取元数据；就绪检查使用一次性 nonce，以及由运行时 bearer token 和身份派生的 HMAC 证明，而不是接受端口上的任意 HTTP 响应；运行时启动失败会返回经过认证的 JSON 错误，绝不会把浏览器重定向到回环运行时端口。作为最后一道代理保护，其他上游响应中的回环 `Location` 也会在返回公网响应前转换为同源路径。
 

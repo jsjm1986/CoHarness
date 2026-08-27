@@ -11,6 +11,7 @@ import {
   createDocumentTransferHandler,
   createGatewayDocumentTransferListHandler,
   createGatewayDocumentTransferUploadHandler,
+  createGatewayDocumentScopeHandler,
   DocumentTransferError,
 } from '../src/document-transfer.ts'
 import type { GatewayPrincipalClaims } from '../src/principal.ts'
@@ -123,7 +124,19 @@ function fixture() {
       ? { id, name: 'Compiler', path: '/tmp/compiler', memberCount: 1, members: [] }
       : { id, name: 'Read only', path: '/tmp/readonly', memberCount: 1, members: [] } },
   })
-  return { handler, capabilities, list, publicList, upload, audit, ensureRunning, projectForUser, plan: createDocumentTransferPlanHandler(dependencies), commit: createDocumentTransferCommitHandler(dependencies) }
+  return {
+    handler,
+    capabilities,
+    list,
+    publicList,
+    upload,
+    audit,
+    ensureRunning,
+    projectForUser,
+    dependencies,
+    plan: createDocumentTransferPlanHandler(dependencies),
+    commit: createDocumentTransferCommitHandler(dependencies),
+  }
 }
 
 function responseForTarget(docId: string, name = 'report.txt', bytes = 5): Response {
@@ -148,6 +161,90 @@ function responseForTargetChunk(): Response {
 }
 
 describe('Gateway document transfer broker', () => {
+  it('times out stalled scope metadata and releases its runtime lease', async () => {
+    const runtime = fixture()
+    const operationRef = vi.fn(async () => {})
+    const fetch = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      const signal = init?.signal
+      signal?.addEventListener('abort', () => { reject(signal.reason) }, { once: true })
+    }))
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.stubGlobal('fetch', fetch)
+    const handler = createGatewayDocumentScopeHandler({
+      ...runtime.dependencies,
+      instances: { ensureRunning: runtime.ensureRunning, operationRef },
+      upstreamTimeoutMs: 10,
+    })
+    const request = Readable.from([]) as unknown as NodeJS.ReadableStream & {
+      method: string
+      headers: Record<string, string>
+      url: string
+    }
+    request.method = 'GET'
+    request.headers = {}
+    request.url = '/api/documents/scope?scope=project%3A41&directory=private'
+
+    await expect(handler({
+      user: USER,
+      request: request as never,
+      pathname: '/api/documents/scope',
+      operation: 'list',
+      scope: { kind: 'project', projectId: 41 },
+      signal: new AbortController().signal,
+    })).rejects.toMatchObject({ code: 'DOCUMENT_SCOPE_TIMEOUT', status: 504 })
+    expect(operationRef.mock.calls).toEqual([
+      [{ kind: 'project', id: 41 }, 1, 2],
+      [{ kind: 'project', id: 41 }, -1, 2],
+    ])
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(
+      /^\[gateway] document scope upstream timeout operation=list scope=project:41 elapsedMs=\d+$/,
+    ))
+    expect(warn.mock.calls.flat().join(' ')).not.toContain('private')
+  })
+
+  it('applies the scope deadline while reading runtime metadata', async () => {
+    const runtime = fixture()
+    const operationRef = vi.fn(async () => {})
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.stubGlobal('fetch', vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const signal = init?.signal
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          const abort = (): void => { controller.error(signal?.reason) }
+          signal?.addEventListener('abort', abort, { once: true })
+          if (signal?.aborted === true) abort()
+        },
+      })
+      return new Response(body, { status: 200, headers: { 'content-type': 'application/json' } })
+    }))
+    const handler = createGatewayDocumentScopeHandler({
+      ...runtime.dependencies,
+      instances: { ensureRunning: runtime.ensureRunning, operationRef },
+      upstreamTimeoutMs: 10,
+    })
+    const request = Readable.from([]) as unknown as NodeJS.ReadableStream & {
+      method: string
+      headers: Record<string, string>
+      url: string
+    }
+    request.method = 'GET'
+    request.headers = {}
+    request.url = '/api/documents/scope?scope=project%3A41'
+
+    await expect(handler({
+      user: USER,
+      request: request as never,
+      pathname: '/api/documents/scope',
+      operation: 'list',
+      scope: { kind: 'project', projectId: 41 },
+      signal: new AbortController().signal,
+    })).rejects.toMatchObject({ code: 'DOCUMENT_SCOPE_TIMEOUT', status: 504 })
+    expect(operationRef.mock.calls).toEqual([
+      [{ kind: 'project', id: 41 }, 1, 2],
+      [{ kind: 'project', id: 41 }, -1, 2],
+    ])
+  })
+
   it('forwards a target-scope resumable upload and strips the stored path', async () => {
     const runtime = fixture()
     const fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {

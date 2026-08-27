@@ -6,11 +6,17 @@ English | [中文](2026-08-27-stable-document-scope-switching.zh.md)
 
 ## Problem
 
-A cold or busy project runtime can make scope listing wait through Gateway authorization, runtime readiness, and bounded retries. The manager replaced the visible list with a blocking skeleton and allowed superseded requests to continue, so a slow or failed switch appeared as a blank panel and stale responses competed for UI state.
+A cold or busy project runtime can make scope listing wait through Gateway authorization, runtime readiness, and bounded retries. Re-requesting a recently fetched listing on every scope visit makes this expected latency visible even when the manager already holds usable metadata. A runtime listing can also arrive before account context identifies its owning scope, so assigning or discarding it at response time risks either cross-scope cache pollution or a missed cache entry.
 
 ## Decision
 
-The Documents manager keeps the last committed listing visible while a scope, directory, page, or refresh read is in flight. A lightweight refreshing state identifies the pending target; blocking skeletons are used only before the first listing is available. Every listing operation owns an `AbortController` and increments request generations; starting a newer operation aborts the previous one and late responses cannot publish. Reads of remote scopes reuse a bounded in-memory page or listing cache keyed by scope, directory, filters, and sort, then revalidate while the cached rows remain visible. Failed revalidation keeps cached or previous rows and shows the error. Legacy metadata-only clients use the same bounded listing cache when they cannot accept an abort signal.
+The Documents manager keeps the last committed listing visible while a scope, directory, page, or refresh read is in flight. A lightweight refreshing state identifies the pending target; blocking skeletons are used only before the first listing is available. Every listing operation owns an `AbortController` and increments request generations; starting a newer operation aborts the previous one and late responses cannot publish.
+
+Current and alternate scope reads share a bounded in-memory metadata cache keyed by scope, directory, filters, and sort. An entry is fresh for 30 seconds and serves the switch without another list request. An entry remains usable for five minutes: stale entries render immediately while a background request revalidates them, and failed revalidation keeps those rows while exposing the error. Expired entries are removed. Explicit refreshes and document mutations invalidate listing caches. The cache belongs to the mounted manager, contains no document bytes, and is not persisted to browser storage.
+
+The initial runtime listing remains request-owned until account context confirms its scope. Both cursor pages and legacy non-paged responses settle into the scope-qualified cache after confirmation; an unavailable context leaves the temporary listing usable only by that active request. Reopening the manager refreshes account context without discarding a fresh listing, and an identity change loads the new runtime rather than retaining metadata from the former active scope.
+
+Gateway-selected scope metadata forwarding uses `HGW_UPSTREAM_TIMEOUT_MS`. A stalled upstream returns `DOCUMENT_SCOPE_TIMEOUT` with HTTP 504 and releases its runtime lease. Successful document content streams are exempt from the metadata deadline and keep the lease through EOF or cancellation.
 
 ## Alternatives considered
 
@@ -20,15 +26,15 @@ The Documents manager keeps the last committed listing visible while a scope, di
 
 **Rely only on request generations without cancellation.** Rejected because generation checks prevent stale publication but do not stop runtime startup, Gateway work, or browser connections that the user has already superseded.
 
+**Persist metadata in local storage.** Rejected because document names and scope membership must not survive account changes or browser reloads outside the authenticated page lifetime.
+
 ## Consequences
 
-Scope changes can still take as long as the selected runtime needs to become ready, but the manager remains usable and reports the pending target instead of blanking the list. Repeated visits to a scope can show a bounded cached page immediately while the Gateway result is refreshed. Cache entries are metadata-only, scope-qualified, and evicted when their bounded capacity is reached; mutations clear the listing caches before reconciliation.
-
-When the initial runtime page arrives before account scope discovery, its short-lived cursor chain stays attached to the active request until the scope is confirmed. Paging can therefore continue without assigning an unconfirmed runtime result to a scope cache.
+Scope changes can still wait for a cold runtime on the first visit, but recent visits complete from memory and stale visits retain usable rows during revalidation. Cache capacity, freshness, maximum age, scope-qualified keys, and mutation invalidation bound both memory use and metadata lifetime. A stalled runtime metadata response ends at the configured Gateway deadline instead of holding the browser and runtime lease indefinitely.
 
 ## Verification
 
-Client component tests cover visible rows during a pending switch, cancellation of a superseded request, retention of rows after a failed switch, cached scope reuse, and cursor paging while scope discovery is pending. Existing cursor, mobile, style, and HTTP-client tests continue to pass. The package TypeScript check passes for the changed client aggregate.
+Client component tests cover visible rows during a pending switch, cancellation of a superseded request, retention after failure, fresh reuse without a request, stale-while-revalidate behavior, maximum-age eviction, changed account scope on reopen, legacy and cursor responses that precede scope discovery, and cursor paging while discovery is pending. Gateway coverage stalls both response establishment and JSON body reading through the metadata deadline, then verifies the 504 code plus balanced runtime lease calls. The client and Gateway TypeScript checks pass for the changed aggregates.
 
 ## Related
 
