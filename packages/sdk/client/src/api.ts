@@ -13,6 +13,22 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { HarnessClient, isRecord, SdkProtocolError } from './client.ts'
 import type { ContentBlock, DeepSeekHarnessOptions, HarnessClientOptions, HarnessNotification, RunResult } from './types.ts'
 
+const sessionTailsByHarness = new WeakMap<object, Map<string, Promise<unknown>>>()
+
+function serializeSessionRun<T>(harness: object, sessionId: string, operation: () => Promise<T>): Promise<T> {
+  const tails = sessionTailsByHarness.get(harness) ?? new Map<string, Promise<unknown>>()
+  sessionTailsByHarness.set(harness, tails)
+  const previous = tails.get(sessionId) ?? Promise.resolve()
+  const current = previous.then(operation, operation)
+  const tail = current.then(() => undefined, () => undefined)
+  tails.set(sessionId, tail)
+  void tail.then(() => {
+    if (tails.get(sessionId) === tail) tails.delete(sessionId)
+    if (tails.size === 0) sessionTailsByHarness.delete(harness)
+  })
+  return current
+}
+
 /**
  * Reusable SDK for running DeepSeek Harness agent turns in a runtime
  * subprocess. The subprocess starts lazily on first use and stays owned by
@@ -110,6 +126,16 @@ export class DeepSeekHarness implements AsyncDisposable {
   }
 
   /**
+   * Serialize high-level activity intervals for one logical session id.
+   * @param sessionId - logical session id whose operations share one queue.
+   * @param operation - asynchronous operation to run in that queue.
+   * @returns the operation result after earlier work for the session settles.
+   */
+  serializeSession<T>(sessionId: string, operation: () => Promise<T>): Promise<T> {
+    return serializeSessionRun(this, sessionId, operation)
+  }
+
+  /**
    * `await using` support: {@link close}.
    * @returns settlement of the teardown.
    */
@@ -143,7 +169,11 @@ export class HarnessSession {
    * @returns the owned activity interval; rejects on transport loss, timeout,
    * or a protocol error.
    */
-  async run(input: string | ContentBlock[], options?: Pick<RunOptions, 'onNotification'>): Promise<RunResult> {
+  run(input: string | ContentBlock[], options?: Pick<RunOptions, 'onNotification'>): Promise<RunResult> {
+    return serializeSessionRun(this.harness as object, this.id, () => this.runOnce(input, options))
+  }
+
+  private async runOnce(input: string | ContentBlock[], options?: Pick<RunOptions, 'onNotification'>): Promise<RunResult> {
     await this.harness.start()
     const client = this.harness.client
     const contentBlocks = normalizeInput(input)

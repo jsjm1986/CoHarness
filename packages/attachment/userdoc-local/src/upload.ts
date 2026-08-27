@@ -308,6 +308,8 @@ export class LocalUploadManager {
   private readonly cleanupIntervalMs: number
   private readonly jobs = new Map<string, ActiveJob>()
   private cleanupTimer: ReturnType<typeof setInterval> | undefined
+  private cleanupTask: Promise<void> | undefined
+  private stopped = false
 
   /**
    * @param dependencies - document-root callbacks and resolved policy.
@@ -327,11 +329,20 @@ export class LocalUploadManager {
 
   /** Start periodic expired-session cleanup after the document root is ready. */
   startCleanup(): void {
-    if (this.cleanupTimer !== undefined) return
+    if (this.stopped || this.cleanupTimer !== undefined) return
     this.cleanupTimer = setInterval(() => {
-      void this.cleanupExpired().catch(() => {})
+      this.scheduleCleanupSweep()
     }, this.cleanupIntervalMs)
     this.cleanupTimer.unref()
+  }
+
+  /** Run at most one maintenance sweep at a time and retain its join handle. */
+  private scheduleCleanupSweep(): void {
+    if (this.stopped || this.cleanupTask !== undefined) return
+    const task = Promise.resolve().then(() => this.cleanupExpired()).catch(() => {}).finally(() => {
+      if (this.cleanupTask === task) this.cleanupTask = undefined
+    })
+    this.cleanupTask = task
   }
 
   /** Stop periodic cleanup when the owning runtime is disposed. */
@@ -339,6 +350,18 @@ export class LocalUploadManager {
     if (this.cleanupTimer === undefined) return
     clearInterval(this.cleanupTimer)
     this.cleanupTimer = undefined
+  }
+
+  /** Abort and join finalizers before the owning runtime is disposed. */
+  async stop(): Promise<void> {
+    this.stopped = true
+    this.stopCleanup()
+    const jobs = [...this.jobs.values()]
+    for (const job of jobs) job.controller.abort()
+    await Promise.all([
+      ...jobs.map(job => job.promise.catch(() => {})),
+      ...(this.cleanupTask === undefined ? [] : [this.cleanupTask]),
+    ])
   }
 
   /**

@@ -10,7 +10,7 @@
 
 同一个 seam 也负责可续传上传会话。Provider 创建不透明会话，接收按顺序且经过范围校验的分片，验证每个分片和最终文件的 SHA-256，并且只在完整文件验证后发布 `UserDocRef`。会话状态由 Provider 持有，浏览器永远不会看到临时路径。
 
-`listDirectory` 返回一个文件夹的直接子项，`list` 则保留提示附件和旧消费方使用的递归文档视图。`createDirectory`、`renameDirectory` 与 `removeDirectory` 管理普通文件夹；根目录不能重命名或删除，非空文件夹也不能删除。`move` 接受文档 id 与目标文件夹 id，绝不替换同名项。文件夹和文档 id 都是根相对的不透明值；提供方每次进入文件系统前都会重新验证。
+`listDirectory` 返回一个文件夹的直接子项，`list` 则保留提示附件和旧消费方使用的递归文档视图。`listDirectoryPage` 与 `listTrashPage` 为大型工作区提供有界、可筛选的游标分页。`createDirectory`、`renameDirectory` 与 `removeDirectory` 管理普通文件夹；根目录不能重命名或删除，非空文件夹也不能删除。`move` 接受文档 id 与目标文件夹 id，绝不替换同名项。`listTrash`、`trash`、`restore` 与 `purge` 暴露由提供方持有的可恢复生命周期；保留期限和物理清理由提供方策略决定。文件夹和文档 id 都是根相对的不透明值；提供方每次进入文件系统前都会重新验证。
 
 `mediaType` 按原样记录，从不校验、解析或据此分派。这里没有格式白名单。harness 接受用户上传的任何内容，并让 agent 判断文件是什么；服务端解析、文本抽取和缩略图生成按设计不属于该边界。
 

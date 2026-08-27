@@ -33,6 +33,10 @@ export interface GatewayConfig {
   principalKeyDir: string
   /** Lifetime of one browser-request principal assertion. */
   principalAssertionTtlMs: number
+  /** Maximum time an HTTP/WebSocket proxy waits on one runtime upstream operation. */
+  upstreamTimeoutMs: number
+  /** Maximum bytes retained or streamed from one runtime upstream response. */
+  upstreamResponseLimitBytes: number
   /** Maximum buffered body bytes accepted by one authenticated runtime API call. */
   runtimeApiBodyLimitBytes: number
   /** Days a trashed archive remains recoverable before purge. */
@@ -96,6 +100,10 @@ const SYSTEMD_ACCOUNT_RE = /^[a-z][a-z0-9-]{1,30}$/
 export const DEFAULT_RUNTIME_API_BODY_LIMIT_BYTES = 64 * 1024 * 1024
 export const DEFAULT_DATABASE_STARTUP_RETRY_INITIAL_MS = 1_000
 export const DEFAULT_DATABASE_STARTUP_RETRY_MAX_MS = 30_000
+export const DEFAULT_UPSTREAM_TIMEOUT_MS = 30_000
+export const DEFAULT_UPSTREAM_RESPONSE_LIMIT_BYTES = 64 * 1024 * 1024
+/** Maximum delay accepted by Node's timer-backed APIs (setTimeout/setInterval). */
+export const MAX_TIMER_DELAY_MS = 2_147_483_647
 
 function projectPathRoots(value: string | undefined): string[] {
   if (value === undefined) return []
@@ -151,6 +159,83 @@ function positiveSafeInteger(value: string | undefined, fallback: number, variab
   return resolved
 }
 
+function timerDelay(value: string | undefined, fallback: number, variable: string): number {
+  const resolved = positiveSafeInteger(value, fallback, variable)
+  if (resolved > MAX_TIMER_DELAY_MS) {
+    throw new Error(`${variable} must be no greater than ${MAX_TIMER_DELAY_MS} (Node clamps longer timer delays)`)
+  }
+  return resolved
+}
+
+/** Parse a command line without invoking a shell or losing quoted argv fields. */
+function parseCommandLine(value: string): string[] {
+  const args: string[] = []
+  let current = ''
+  let quote: '\'' | '"' | undefined
+  let escaped = false
+  let started = false
+  for (const character of value) {
+    if (escaped) {
+      current += character
+      escaped = false
+      started = true
+      continue
+    }
+    if (character === '\\' && quote !== '\'') {
+      escaped = true
+      started = true
+      continue
+    }
+    if (quote !== undefined) {
+      if (character === quote) quote = undefined
+      else current += character
+      started = true
+      continue
+    }
+    if (character === '\'' || character === '"') {
+      quote = character
+      started = true
+      continue
+    }
+    if (/\s/u.test(character)) {
+      if (started) {
+        args.push(current)
+        current = ''
+        started = false
+      }
+      continue
+    }
+    current += character
+    started = true
+  }
+  if (escaped || quote !== undefined) throw new Error('HGW_DSH_COMMAND contains an unterminated quote or escape')
+  if (started) args.push(current)
+  if (args.length === 0) throw new Error('HGW_DSH_COMMAND must contain an executable')
+  return args
+}
+
+function systemdMemoryValue(value: string, variable: string): string {
+  if (value !== 'infinity' && !/^[1-9][0-9]*(?:K|M|G|T|P|E)?$/u.test(value)) {
+    throw new Error(`${variable} must be a positive systemd byte value or infinity`)
+  }
+  return value
+}
+
+function systemdCpuValue(value: string, variable: string): string {
+  if (value !== 'infinity' && !/^[1-9][0-9]*(?:\.[0-9]+)?%$/u.test(value)) {
+    throw new Error(`${variable} must be a positive systemd percentage or infinity`)
+  }
+  return value
+}
+
+function portNumber(value: string | undefined, fallback: number, variable: string): number {
+  const resolved = Number(value ?? fallback)
+  if (!Number.isSafeInteger(resolved) || resolved < 1 || resolved > 65_535) {
+    throw new Error(`${variable} must be an integer between 1 and 65535`)
+  }
+  return resolved
+}
+
 function requireReleasePath(actual: string, expected: string, variable: string): void {
   if (canonicalDirectory(actual, variable) !== canonicalDirectory(expected, 'HGW_RELEASE_ROOT')) {
     throw new Error(`${variable} must resolve inside the configured HGW_RELEASE_ROOT release`)
@@ -158,7 +243,7 @@ function requireReleasePath(actual: string, expected: string, variable: string):
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig {
-  const port = Number(env.HGW_PORT ?? 8899)
+  const port = portNumber(env.HGW_PORT, 8899, 'HGW_PORT')
   const publicOrigins = (env.HGW_PUBLIC_ORIGINS ?? `http://127.0.0.1:${port}`)
     .split(',').map(s => s.trim()).filter(Boolean)
   const configuredReleaseRoot = env.HGW_RELEASE_ROOT?.trim()
@@ -227,8 +312,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     throw new Error('HGW_DSH_COMMAND must be unset when HGW_RELEASE_ROOT is configured')
   }
   const dshCommand = releaseRoot === undefined
-    ? env.HGW_DSH_COMMAND?.split(' ')
-      ?? ['node', '--import', resolveTsx(), join(dshRepoRoot, 'apps/cli/src/bin.ts'), 'web', '--no-open', '--port', '{port}']
+    ? (env.HGW_DSH_COMMAND === undefined
+      ? ['node', '--import', resolveTsx(), join(dshRepoRoot, 'apps/cli/src/bin.ts'), 'web', '--no-open', '--port', '{port}']
+      : parseCommandLine(env.HGW_DSH_COMMAND))
     : [process.execPath, join(releaseRoot, 'apps/cli/lib/bin.js'), 'web', '--no-open', '--port', '{port}']
   if (env.HGW_DSH_COMMAND !== undefined && !dshCommand.includes('--no-open')) {
     throw new Error('HGW_DSH_COMMAND must include --no-open because Gateway runtimes are background services')
@@ -261,12 +347,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     DEFAULT_RUNTIME_API_BODY_LIMIT_BYTES,
     'HGW_RUNTIME_API_BODY_LIMIT_BYTES',
   )
-  const databaseStartupRetryInitialMs = positiveSafeInteger(
+  const databaseStartupRetryInitialMs = timerDelay(
     env.HGW_DATABASE_STARTUP_RETRY_INITIAL_MS,
     DEFAULT_DATABASE_STARTUP_RETRY_INITIAL_MS,
     'HGW_DATABASE_STARTUP_RETRY_INITIAL_MS',
   )
-  const databaseStartupRetryMaxMs = positiveSafeInteger(
+  const databaseStartupRetryMaxMs = timerDelay(
     env.HGW_DATABASE_STARTUP_RETRY_MAX_MS,
     DEFAULT_DATABASE_STARTUP_RETRY_MAX_MS,
     'HGW_DATABASE_STARTUP_RETRY_MAX_MS',
@@ -288,13 +374,47 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   if ((jpushAppKey === undefined) !== (jpushMasterSecret === undefined)) {
     throw new Error('HGW_JPUSH_APP_KEY and HGW_JPUSH_MASTER_SECRET must be configured together')
   }
+  const intakePort = portNumber(env.HGW_INTAKE_PORT, port + 1, 'HGW_INTAKE_PORT')
+  if (intakePort === port) throw new Error('HGW_INTAKE_PORT must differ from HGW_PORT')
+  const principalAssertionTtlMs = positiveSafeInteger(
+    env.HGW_PRINCIPAL_ASSERTION_TTL_MS,
+    30_000,
+    'HGW_PRINCIPAL_ASSERTION_TTL_MS',
+  )
+  const upstreamTimeoutMs = timerDelay(
+    env.HGW_UPSTREAM_TIMEOUT_MS,
+    DEFAULT_UPSTREAM_TIMEOUT_MS,
+    'HGW_UPSTREAM_TIMEOUT_MS',
+  )
+  const upstreamResponseLimitBytes = positiveSafeInteger(
+    env.HGW_UPSTREAM_RESPONSE_LIMIT_BYTES,
+    DEFAULT_UPSTREAM_RESPONSE_LIMIT_BYTES,
+    'HGW_UPSTREAM_RESPONSE_LIMIT_BYTES',
+  )
+  const idleTimeoutMs = positiveSafeInteger(env.HGW_IDLE_TIMEOUT_MS, 30 * 60 * 1000, 'HGW_IDLE_TIMEOUT_MS')
+  const readinessTimeoutMs = timerDelay(env.HGW_READINESS_TIMEOUT_MS, 30 * 1000, 'HGW_READINESS_TIMEOUT_MS')
+  const sessionTtlMs = positiveSafeInteger(env.HGW_SESSION_TTL_MS, 7 * 24 * 3600 * 1000, 'HGW_SESSION_TTL_MS')
+  const sessionAbsoluteTtlMs = positiveSafeInteger(
+    env.HGW_SESSION_ABS_TTL_MS,
+    30 * 24 * 3600 * 1000,
+    'HGW_SESSION_ABS_TTL_MS',
+  )
+  if (sessionAbsoluteTtlMs < sessionTtlMs) {
+    throw new Error('HGW_SESSION_ABS_TTL_MS must be at least HGW_SESSION_TTL_MS')
+  }
+  const memoryMax = systemdMemoryValue(env.HGW_MEMORY_MAX ?? '1G', 'HGW_MEMORY_MAX')
+  const cpuQuota = systemdCpuValue(env.HGW_CPU_QUOTA ?? '100%', 'HGW_CPU_QUOTA')
+  const systemdUnitDir = env.HGW_SYSTEMD_UNIT_DIR ?? '/etc/systemd/system'
+  if (launcher === 'systemd' && (!systemdUnitDir.startsWith('/') || /[\u0000-\u001f\u007f:]/u.test(systemdUnitDir))) {
+    throw new Error('HGW_SYSTEMD_UNIT_DIR must be an absolute path without control or colon characters')
+  }
   return {
     releaseRoot,
     releaseId: releaseRoot === undefined ? undefined : basename(releaseRoot),
     port,
     organizationSlug: env.HGW_ORGANIZATION_SLUG ?? 'default',
     computeNodeName: env.HGW_COMPUTE_NODE_NAME ?? 'local',
-    intakePort: Number(env.HGW_INTAKE_PORT ?? port + 1),
+    intakePort,
     usageTimeZone: env.HGW_USAGE_TIME_ZONE ?? 'Asia/Shanghai',
     publicOrigins,
     usersRoot,
@@ -304,7 +424,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     projectsRoot,
     projectRuntimeUser,
     principalKeyDir: env.HGW_PRINCIPAL_KEY_DIR ?? join(stateRoot, 'principal-keys'),
-    principalAssertionTtlMs: Number(env.HGW_PRINCIPAL_ASSERTION_TTL_MS ?? 30_000),
+    principalAssertionTtlMs,
+    upstreamTimeoutMs,
+    upstreamResponseLimitBytes,
     runtimeApiBodyLimitBytes,
     archiveRetentionDays,
     databaseStartupRetryInitialMs,
@@ -315,16 +437,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     dshCommand,
     dshRepoRoot,
     instancePortBase,
-    idleTimeoutMs: Number(env.HGW_IDLE_TIMEOUT_MS ?? 30 * 60 * 1000),
-    readinessTimeoutMs: Number(env.HGW_READINESS_TIMEOUT_MS ?? 30 * 1000),
-    sessionTtlMs: Number(env.HGW_SESSION_TTL_MS ?? 7 * 24 * 3600 * 1000),
-    sessionAbsoluteTtlMs: Number(env.HGW_SESSION_ABS_TTL_MS ?? 30 * 24 * 3600 * 1000),
+    idleTimeoutMs,
+    readinessTimeoutMs,
+    sessionTtlMs,
+    sessionAbsoluteTtlMs,
     secureCookies: publicOrigins.some(o => o.startsWith('https://')),
     launcher,
-    memoryMax: env.HGW_MEMORY_MAX ?? '1G',
-    cpuQuota: env.HGW_CPU_QUOTA ?? '100%',
+    memoryMax,
+    cpuQuota,
     gatewayDir,
-    systemdUnitDir: env.HGW_SYSTEMD_UNIT_DIR ?? '/etc/systemd/system',
+    systemdUnitDir,
     guardPatch,
     modelGovernancePackage: releaseModelGovernancePackage
       ?? env.HGW_MODEL_GOVERNANCE_PACKAGE

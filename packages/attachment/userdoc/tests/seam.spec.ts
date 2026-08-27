@@ -17,6 +17,7 @@ import type {
   UserDocDirectoryRef,
   UserDocLimits,
   UserDocRef,
+  UserDocTrashRef,
   UserDocTarget,
   UserDocUploadChunk,
   UserDocUploadId,
@@ -139,6 +140,20 @@ class MemoryUserDocStore extends UserDocStore {
 
   async remove(docId: string): Promise<void> {
     this.saved.delete(docId)
+  }
+
+  async listTrash(): Promise<UserDocTrashRef[]> { return [] }
+
+  async trash(docId: string): Promise<UserDocTrashRef> {
+    throw new UserDocError(`trash unavailable for ${docId}`, DOCUMENT_UPLOAD_PROTOCOL_CODE)
+  }
+
+  async restore(docId: string): Promise<UserDocRef> {
+    throw new UserDocError(`restore unavailable for ${docId}`, DOCUMENT_UPLOAD_PROTOCOL_CODE)
+  }
+
+  async purge(docId: string): Promise<void> {
+    throw new UserDocError(`purge unavailable for ${docId}`, DOCUMENT_UPLOAD_PROTOCOL_CODE)
   }
 
   async beginUpload(_input: BeginUserDocUpload): Promise<UserDocUploadSession> {

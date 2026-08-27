@@ -27,6 +27,10 @@ The package root exposes the Cordis plugin contract and `DeepSeekAdapter`; wire 
     inlineImageOffloadByteQuantum: 10485760 # fallback removal advances in 10 MiB steps
     imageOffloadCountQuantum: 20      # count overflow advances in 20-image steps
     filesApiTimeoutMs: 60000           # per-image Files resolution deadline; one-minute default
+    maxErrorResponseBytes: 65536       # non-2xx response body budget; 64 KiB default
+    maxSseBufferBytes: 4194304         # incomplete SSE event buffer; 4 MiB default
+    maxGeneratedTextBytes: 16777216    # visible/reasoning response budget; 16 MiB default
+    maxToolArgumentBytes: 4194304      # one streamed tool-argument budget; 4 MiB default
     fileExpiresAfterSeconds: 604800   # uploaded image lifetime; 1 hour to 30 days
     fileRefreshMarginSeconds: 3600    # replace ids with less lifetime remaining
     fileQuotaCleanupBatch: 100        # oldest harness-owned files deleted before one quota retry
@@ -66,7 +70,7 @@ The same exact-model result exposes ordered `off`, `low`, `high`, and `max` effo
 
 `thinking: disabled` is a deployment lock that publishes only `off` with `off` as its default. Omitting `reasoningEffort` or configuring it as `off` is valid; configuring `low`, `high`, or `max` fails plugin loading, and a direct per-request attempt to enable thinking fails before network I/O. A request with `GenerateOptions.purpose: 'session-title'` also forces thinking disabled and omits the already-resolved effort, reserving its bounded output for visible title text without changing conversation or compaction defaults.
 
-`streamIdleTimeoutMs` bounds each outstanding provider read, including the initial `fetch`, without counting time the consumer spends between chunks. DeepSeek SSE comments and successful file resolutions rearm an outstanding read as transport activity but never become `StreamChunk` values or session-log events. One stable abort signal reaches the request and body reader for the whole call; expiry stops the transport and throws `LlmError('TIMEOUT')`, while an earlier caller abort throws `LlmError('ABORTED')`. The adapter normally makes one chat request per `stream()` call and makes a second only for stale-file recovery. A file-resolution failure before the first chat sends one inline request. It registers the configured policy as provider metadata, and `dsh-llm-retry` separately executes it at durable agent-step boundaries.
+`streamIdleTimeoutMs` bounds each outstanding provider read, including the initial `fetch`, without counting time the consumer spends between chunks. DeepSeek SSE comments and successful file resolutions rearm an outstanding read as transport activity but never become `StreamChunk` values or session-log events. One stable abort signal reaches the request and body reader for the whole call; expiry stops the transport and throws `LlmError('TIMEOUT')`, while an earlier caller abort throws `LlmError('ABORTED')`. The adapter normally makes one chat request per `stream()` call and makes a second only for stale-file recovery. A file-resolution failure before the first chat sends one inline request. It registers the configured policy as provider metadata, and `dsh-llm-retry` separately executes it at durable agent-step boundaries. Non-2xx error bodies, incomplete SSE events, accumulated visible/reasoning text, and streamed tool arguments are each bounded by their corresponding response-budget fields; malformed chunks and unbounded choice, delta, metadata, or tool-call counts are rejected before they can grow translation state. Exceeding one limit aborts the request with a protocol error instead of retaining unbounded data.
 
 ## Dynamic configuration (settings + credentials)
 

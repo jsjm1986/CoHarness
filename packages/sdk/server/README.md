@@ -10,7 +10,7 @@ The `jsonrpc` plugin serves newline-delimited JSON-RPC over stdio so out-of-proc
 
 ## Config
 
-`maxTokensAsSuccess` defaults to `false` and affects only the deployment-mapped status on `subagent.finished`; root-session prompts have no prompt-level status. `JsonRpcConfig.input`, `output`, and `exit` are runtime-only transport hooks; production uses process stdio and `process.exit`.
+`maxTokensAsSuccess` defaults to `false` and affects only the deployment-mapped status on `subagent.finished`; root-session prompts have no prompt-level status. `JsonRpcConfig.input`, `output`, and `exit` are runtime-only transport hooks; production uses process stdio and `process.exit`. The JSON-RPC transport defaults to 1 MiB input lines, 1,000 pending requests, 100 concurrent inbound handlers, and 8 MiB queued output. The server additionally limits live sessions to 1,000, prompt content to 4 MiB and 1,000 content blocks; all bounds are configurable positive integers and reject excess work.
 
 ## stdout is the protocol
 

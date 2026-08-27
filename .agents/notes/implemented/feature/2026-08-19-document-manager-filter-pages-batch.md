@@ -28,4 +28,6 @@ Filter chips map `mediaType` to `image` / `pdf` / `text` (including `application
 
 ## Consequences
 
-Desktop users get a wider file manager with type, sort, pages, and batch delete. A folder with many documents still reaches the browser in one response before local paging.
+Desktop users get a wider file manager with type, sort, pages, and batch delete. A folder with many documents still reaches the browser in one response before local paging. Providers that implement the later page contract use bounded cursor pages; this note's local filtering remains the fallback for providers that do not.
+
+The page contract and recoverable deletion lifecycle are owned by [document index pagination and recoverable trash](../architecture/2026-08-27-document-index-pagination-and-trash-lifecycle.md).

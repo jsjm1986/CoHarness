@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
+import threading
 from typing import Callable
 
 from .client import HarnessClient, HarnessConfig
@@ -31,6 +32,11 @@ class DeepSeekHarnessConfig:
     launch_args_override: tuple[str, ...] | None = None
     request_timeout_seconds: float | None = None
     shutdown_timeout_seconds: float | None = 1.0
+    max_line_bytes: int = 1 * 1024 * 1024
+    max_pending_requests: int = 1_000
+    max_notification_queue: int = 10_000
+    max_incoming_requests: int = 100
+    max_output_bytes: int = 8 * 1024 * 1024
     base_url: str | None = None
     api_key: str | None = None
 
@@ -79,9 +85,20 @@ class DeepSeekHarness:
                 env=env,
                 request_timeout_seconds=self.config.request_timeout_seconds,
                 shutdown_timeout_seconds=self.config.shutdown_timeout_seconds,
+                max_line_bytes=self.config.max_line_bytes,
+                max_pending_requests=self.config.max_pending_requests,
+                max_notification_queue=self.config.max_notification_queue,
+                max_incoming_requests=self.config.max_incoming_requests,
+                max_output_bytes=self.config.max_output_bytes,
             )
         )
         self._initialized = False
+        self._lifecycle_lock = threading.Lock()
+        # Each entry keeps a reference count so a queued waiter and a newly
+        # arriving run cannot observe different locks while cleanup removes an
+        # idle session key.
+        self._session_locks: dict[str, tuple[threading.Lock, int]] = {}
+        self._session_locks_guard = threading.Lock()
 
     def __enter__(self) -> "DeepSeekHarness":
         self.start()
@@ -95,20 +112,26 @@ class DeepSeekHarness:
         return self._client
 
     def start(self) -> None:
-        if self._initialized:
-            return
-        self._client.start()
-        self._client.initialize(
-            cwd=self._cwd,
-            provider=self.config.provider,
-            model=self.config.model,
-            max_tokens=self.config.max_tokens,
-        )
-        self._initialized = True
+        with self._lifecycle_lock:
+            if self._initialized:
+                return
+            self._client.start()
+            try:
+                self._client.initialize(
+                    cwd=self._cwd,
+                    provider=self.config.provider,
+                    model=self.config.model,
+                    max_tokens=self.config.max_tokens,
+                )
+            except BaseException:
+                self._initialized = False
+                raise
+            self._initialized = True
 
     def close(self) -> None:
-        self._client.close()
-        self._initialized = False
+        with self._lifecycle_lock:
+            self._client.close()
+            self._initialized = False
 
     def start_session(self, session_id: str | None = None) -> "Session":
         self.start()
@@ -123,6 +146,26 @@ class DeepSeekHarness:
     ) -> RunResult:
         return self.start_session(session_id).run(input, on_notification=on_notification)
 
+    def _serialize_session(self, session_id: str, operation: Callable[[], RunResult]) -> RunResult:
+        with self._session_locks_guard:
+            state = self._session_locks.get(session_id)
+            if state is None:
+                state = (threading.Lock(), 0)
+            lock, users = state
+            self._session_locks[session_id] = (lock, users + 1)
+        try:
+            with lock:
+                return operation()
+        finally:
+            with self._session_locks_guard:
+                current = self._session_locks.get(session_id)
+                if current is not None and current[0] is lock:
+                    remaining = current[1] - 1
+                    if remaining <= 0:
+                        self._session_locks.pop(session_id, None)
+                    else:
+                        self._session_locks[session_id] = (lock, remaining)
+
 
 class Session:
     def __init__(self, harness: DeepSeekHarness, session_id: str) -> None:
@@ -130,6 +173,17 @@ class Session:
         self.id = session_id
 
     def run(
+        self,
+        input: str | list[JsonObject],
+        *,
+        on_notification: Callable[[Notification], None] | None = None,
+    ) -> RunResult:
+        return self.harness._serialize_session(
+            self.id,
+            lambda: self._run_once(input, on_notification=on_notification),
+        )
+
+    def _run_once(
         self,
         input: str | list[JsonObject],
         *,

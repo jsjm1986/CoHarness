@@ -134,6 +134,14 @@ export interface Config {
   imageOffloadCountQuantum?: number
   /** Maximum duration of one request-image Files API resolution (default one minute). */
   filesApiTimeoutMs?: number
+  /** Maximum bytes retained from one non-2xx provider error body (default 64 KiB). */
+  maxErrorResponseBytes?: number
+  /** Maximum characters buffered for one incomplete SSE event (default 4 MiB). */
+  maxSseBufferBytes?: number
+  /** Maximum accumulated visible/reasoning response bytes (default 16 MiB). */
+  maxGeneratedTextBytes?: number
+  /** Maximum accumulated arguments for one streamed tool call (default 4 MiB). */
+  maxToolArgumentBytes?: number
   /** Explicit lifetime assigned to each uploaded image (default seven days). */
   fileExpiresAfterSeconds?: number
   /** Remaining lifetime below which an indexed file is replaced (default one hour). */
@@ -172,6 +180,10 @@ export const Config: z<Config> = z.object({
   inlineImageOffloadByteQuantum: z.number().step(1).min(1).default(DEFAULT_INLINE_IMAGE_OFFLOAD_BYTE_QUANTUM),
   imageOffloadCountQuantum: z.number().step(1).min(1).default(DEFAULT_IMAGE_OFFLOAD_COUNT_QUANTUM),
   filesApiTimeoutMs: z.number().min(Number.MIN_VALUE).max(MAX_TIMER_DELAY_MS).default(DEFAULT_FILES_API_TIMEOUT_MS),
+  maxErrorResponseBytes: z.number().step(1).min(1).default(64 * 1024),
+  maxSseBufferBytes: z.number().step(1).min(1).default(4 * 1024 * 1024),
+  maxGeneratedTextBytes: z.number().step(1).min(1).default(16 * 1024 * 1024),
+  maxToolArgumentBytes: z.number().step(1).min(1).default(4 * 1024 * 1024),
   fileExpiresAfterSeconds: z.number().step(1).min(3_600).max(2_592_000).default(DEFAULT_FILE_EXPIRY_SECONDS),
   fileRefreshMarginSeconds: z.number().step(1).min(0).default(DEFAULT_FILE_REFRESH_MARGIN_SECONDS),
   fileQuotaCleanupBatch: z.number().step(1).min(1).max(1_000).default(DEFAULT_FILE_QUOTA_CLEANUP_BATCH),
@@ -354,6 +366,20 @@ export function resolveAdapterOptions(config: Config, environment?: LaunchEnviro
     || fileQuotaCleanupBatch > 1_000) {
     throw new Error('llm-deepseek: fileQuotaCleanupBatch must be an integer from 1 through 1000')
   }
+  const maxErrorResponseBytes = config.maxErrorResponseBytes ?? 64 * 1024
+  const maxSseBufferBytes = config.maxSseBufferBytes ?? 4 * 1024 * 1024
+  const maxGeneratedTextBytes = config.maxGeneratedTextBytes ?? 16 * 1024 * 1024
+  const maxToolArgumentBytes = config.maxToolArgumentBytes ?? 4 * 1024 * 1024
+  for (const [name, value] of [
+    ['maxErrorResponseBytes', maxErrorResponseBytes],
+    ['maxSseBufferBytes', maxSseBufferBytes],
+    ['maxGeneratedTextBytes', maxGeneratedTextBytes],
+    ['maxToolArgumentBytes', maxToolArgumentBytes],
+  ] as const) {
+    if (!Number.isSafeInteger(value) || value < 1) {
+      throw new Error(`llm-deepseek: ${name} must be a positive safe integer`)
+    }
+  }
   return {
     apiKeyEnv: credentialRef(config.apiKeyEnv ?? DEFAULT_API_KEY_ENV),
     baseURL: config.baseURL
@@ -374,6 +400,10 @@ export function resolveAdapterOptions(config: Config, environment?: LaunchEnviro
     inlineImageOffloadByteQuantum,
     imageOffloadCountQuantum,
     filesApiTimeoutMs,
+    maxErrorResponseBytes,
+    maxSseBufferBytes,
+    maxGeneratedTextBytes,
+    maxToolArgumentBytes,
     filePolicy: {
       expiresAfterSeconds: fileExpiresAfterSeconds,
       refreshMarginSeconds: fileRefreshMarginSeconds,

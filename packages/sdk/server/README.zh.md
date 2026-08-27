@@ -10,7 +10,7 @@
 
 ## 配置
 
-`maxTokensAsSuccess` 默认为 `false`，且只影响 `subagent.finished` 上由部署映射的状态；根会话提示词没有提示词级状态。`JsonRpcConfig.input`、`output` 和 `exit` 是仅供运行时使用的传输钩子；生产环境使用进程 stdio 和 `process.exit`。
+`maxTokensAsSuccess` 默认为 `false`，且只影响 `subagent.finished` 上由部署映射的状态；根会话提示词没有提示词级状态。`JsonRpcConfig.input`、`output` 和 `exit` 是仅供运行时使用的传输钩子；生产环境使用进程 stdio 和 `process.exit`。JSON-RPC 传输默认限制输入行 1 MiB、待处理请求 1,000 个、并发入站处理器 100 个、排队输出 8 MiB。服务器另行限制存活 session 1,000 个、提示词内容 4 MiB 和 1,000 个内容块；所有上限都可配置为正整数，超限工作会被拒绝。
 
 ## stdout 即协议
 

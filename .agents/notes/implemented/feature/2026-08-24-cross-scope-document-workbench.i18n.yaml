@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-24-cross-scope-document-workbench.md
-2026-08-24-cross-scope-document-workbench.md: aca7d4934329625d06409b91a8f8c217be2bfa82
-2026-08-24-cross-scope-document-workbench.zh.md: 23e715fe6baa31a6c4cfc086ea39a810f50b67aa
+2026-08-24-cross-scope-document-workbench.md: a1a8c55afc236f54355c5ea64f065deee95fedf5
+2026-08-24-cross-scope-document-workbench.zh.md: 2324acd03d8ea8d5649f5dedcf86dc0b01449a59

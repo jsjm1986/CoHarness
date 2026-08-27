@@ -27,6 +27,10 @@ harness LLM（大语言模型）seam 的 DeepSeek chat-completions 适配器：�
     inlineImageOffloadByteQuantum: 10485760 # fallback removal advances in 10 MiB steps
     imageOffloadCountQuantum: 20      # count overflow advances in 20-image steps
     filesApiTimeoutMs: 60000           # per-image Files resolution deadline; one-minute default
+    maxErrorResponseBytes: 65536       # non-2xx response body budget; 64 KiB default
+    maxSseBufferBytes: 4194304         # incomplete SSE event buffer; 4 MiB default
+    maxGeneratedTextBytes: 16777216    # visible/reasoning response budget; 16 MiB default
+    maxToolArgumentBytes: 4194304      # one streamed tool-argument budget; 4 MiB default
     fileExpiresAfterSeconds: 604800   # uploaded image lifetime; 1 hour to 30 days
     fileRefreshMarginSeconds: 3600    # replace ids with less lifetime remaining
     fileQuotaCleanupBatch: 100        # oldest harness-owned files deleted before one quota retry
@@ -66,7 +70,7 @@ harness LLM（大语言模型）seam 的 DeepSeek chat-completions 适配器：�
 
 `thinking: disabled` 是部署锁定：它只公布 `off`，并以 `off` 为默认值。省略 `reasoningEffort` 或将其配置为 `off` 均有效；配置 `low`、`high` 或 `max` 会使插件加载失败，直接按请求启用思考也会在网络 I/O 前失败。携带 `GenerateOptions.purpose: 'session-title'` 的请求也会强制禁用思考并省略已解析的推理强度，将有界输出保留给可见标题文本，不改变会话或压缩（compaction）默认值。
 
-`streamIdleTimeoutMs` 会限制每次未完成提供方读取，包括初始 `fetch`，但不计入消费方在分片间花费的时间。DeepSeek SSE 注释和成功的文件解析会作为传输活动使尚未完成的读取重新计时，但绝不会成为 `StreamChunk` 值或会话日志事件。同一个稳定的 abort 信号会在整个调用期间传递给请求与 body reader；过期会停止传输并抛出 `LlmError('TIMEOUT')`，较早的调用方 abort 则抛出 `LlmError('ABORTED')`。适配器通常每次 `stream()` 调用发起一次 chat 请求，只有失效文件恢复会发起第二次。首次 chat 前的文件解析失败会发送一次内联请求。适配器把已配置重试策略注册为提供方元数据，再由 `dsh-llm-retry` 在持久化的 agent（智能体）步骤边界单独执行该策略。
+`streamIdleTimeoutMs` 会限制每次未完成提供方读取，包括初始 `fetch`，但不计入消费方在分片间花费的时间。DeepSeek SSE 注释和成功的文件解析会作为传输活动使尚未完成的读取重新计时，但绝不会成为 `StreamChunk` 值或会话日志事件。同一个稳定的 abort 信号会在整个调用期间传递给请求与 body reader；过期会停止传输并抛出 `LlmError('TIMEOUT')`，较早的调用方 abort 则抛出 `LlmError('ABORTED')`。适配器通常每次 `stream()` 调用发起一次 chat 请求，只有失效文件恢复会发起第二次。首次 chat 前的文件解析失败会发送一次内联请求。适配器把已配置重试策略注册为提供方元数据，再由 `dsh-llm-retry` 在持久化的 agent（智能体）步骤边界单独执行该策略。非 2xx 错误体、未完成 SSE 事件、累计可见／推理文本和流式工具参数分别受对应 response budget 字段限制；畸形分片以及无界的 choice、delta、元数据或工具调用数量会在扩大转换状态前被拒绝。超过任一上限都会以协议错误中止请求，不会保留无界数据。
 
 ## 动态配置（settings + credentials）
 

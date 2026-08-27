@@ -4,7 +4,8 @@ import { join } from 'node:path'
 import { createAdminApiHandler } from './admin-api.ts'
 import { applyModelGovernanceToProject, applyModelGovernanceToUser } from './apply-model-governance.ts'
 import { loadConfig } from './config.ts'
-import { InstanceManager } from './instances.ts'
+import { InstanceManager, RuntimeLeaseUnavailableError } from './instances.ts'
+import type { RuntimeTarget } from './instances.ts'
 import { selectLauncher } from './launcher.ts'
 import { PostgresAuditService } from './postgres/audit-service.ts'
 import { PostgresAuthService } from './postgres/auth-service.ts'
@@ -28,6 +29,7 @@ import { PostgresProjectService } from './postgres/project-service.ts'
 import { checkPostgresReadiness, resolvePostgresRuntimeContext } from './postgres/runtime-context.ts'
 import { PostgresUserService } from './postgres/user-service.ts'
 import { loadPrincipalKeys, PRINCIPAL_HEADER } from './principal.ts'
+import { readResponseJson, ResponseBodyTooLargeError } from './response-budget.ts'
 import { createProxyHandlers } from './proxy.ts'
 import { createPostgresPushService } from './push-notifications.ts'
 import { createRuntimeApiHandler } from './runtime-api.ts'
@@ -40,6 +42,8 @@ import {
   createDocumentTransferListHandler,
   createGatewayDocumentTransferListHandler,
   createGatewayDocumentTransferUploadHandler,
+  createGatewayDocumentScopeHandler,
+  createGatewayDocumentAdminHandler,
   createDocumentTransferHandler,
 } from './document-transfer.ts'
 import { createDocumentCatalogHandlers } from './document-catalog.ts'
@@ -126,7 +130,7 @@ const governance = new PostgresModelGovernanceService(
   cfg.usageTimeZone,
 )
 const collaboration = new PostgresCollaborationService(context)
-const documentCatalog = new PostgresDocumentCatalogService(context)
+const documentCatalog = new PostgresDocumentCatalogService(context, cfg.archiveRetentionDays)
 const documentCatalogHandlers = createDocumentCatalogHandlers(documentCatalog, audit)
 const push = createPostgresPushService(context, cfg)
 const principalKeys = loadPrincipalKeys(cfg.principalKeyDir, cfg.organizationSlug, cfg.principalAssertionTtlMs)
@@ -139,7 +143,7 @@ const launcher = selectLauncher(cfg, () => ({
     usersRoot: cfg.usersRoot,
     projectRuntimesRoot: cfg.projectRuntimesRoot,
     projectPathRoots: cfg.projectPathRoots,
-    execStart: cfg.dshCommand.join(' '),
+    execStart: cfg.dshCommand,
     gatewayDir: cfg.gatewayDir,
     memoryMax: cfg.memoryMax,
     cpuQuota: cfg.cpuQuota,
@@ -189,15 +193,35 @@ archives.setRuntimeReader(async (runtime, rootSessionId, fromSeq, limit) => {
     purpose: 'archive-read',
   })
   const authority = `127.0.0.1:${String(running.port)}`
-  const response = await fetch(
-    `http://${authority}/api/internal/archive/read?sessionId=${encodeURIComponent(rootSessionId)}&fromSeq=${String(fromSeq)}&limit=${String(limit)}`,
-    { headers: { host: authority, [PRINCIPAL_HEADER]: assertion }, signal: AbortSignal.timeout(cfg.readinessTimeoutMs) },
-  )
-  if (response.status === 404) return undefined
-  let value: unknown
-  try { value = await response.json() } catch { throw new Error(`runtime archive reader returned HTTP ${String(response.status)}`) }
-  if (!response.ok) throw new Error(`runtime archive reader returned HTTP ${String(response.status)}`)
-  return archiveReadPayload(value)
+  const target: RuntimeTarget = runtime.kind === 'user'
+    ? { kind: 'user', id: runtime.id }
+    : { kind: 'project', id: runtime.id }
+  let operationLease = false
+  try {
+    await instances.operationRef?.(target, 1)
+    operationLease = instances.operationRef !== undefined
+  } catch (error) {
+    if (error instanceof RuntimeLeaseUnavailableError) {
+      throw new Error('runtime archive reader lost its operation lease; retry the archive request', { cause: error })
+    }
+    throw error
+  }
+  try {
+    const response = await fetch(
+      `http://${authority}/api/internal/archive/read?sessionId=${encodeURIComponent(rootSessionId)}&fromSeq=${String(fromSeq)}&limit=${String(limit)}`,
+      { headers: { host: authority, [PRINCIPAL_HEADER]: assertion }, signal: AbortSignal.timeout(cfg.readinessTimeoutMs) },
+    )
+    if (response.status === 404) return undefined
+    let value: unknown
+    try { value = await readResponseJson(response, cfg.upstreamResponseLimitBytes) } catch (error) {
+      if (error instanceof ResponseBodyTooLargeError) throw new Error('runtime archive reader response is too large')
+      throw new Error(`runtime archive reader returned HTTP ${String(response.status)}`)
+    }
+    if (!response.ok) throw new Error(`runtime archive reader returned HTTP ${String(response.status)}`)
+    return archiveReadPayload(value)
+  } finally {
+    if (operationLease) await Promise.resolve(instances.operationRef?.(target, -1)).catch(() => {})
+  }
 })
 const deps: GatewayDeps = {
   cfg,
@@ -228,6 +252,15 @@ for (const target of await deps.users.list()) await applyModelGovernanceToUser(d
 for (const project of await deps.projects.list()) await applyModelGovernanceToProject(deps, project.id)
 
 const proxyHandlers = createProxyHandlers(deps, principalKeys.signer)
+const documentAdmin = createGatewayDocumentAdminHandler({
+  instances: deps.instances,
+  users,
+  projects,
+  collaboration,
+  principals: principalKeys.signer,
+  audit,
+  maxResponseBytes: cfg.upstreamResponseLimitBytes,
+})
 const server = createGatewayServer(deps, {
   ...proxyHandlers,
   documentTransferList: createGatewayDocumentTransferListHandler({
@@ -237,6 +270,7 @@ const server = createGatewayServer(deps, {
     collaboration,
     principals: principalKeys.signer,
     audit,
+    maxResponseBytes: cfg.upstreamResponseLimitBytes,
   }),
   documentTransferUpload: createGatewayDocumentTransferUploadHandler({
     instances: deps.instances,
@@ -245,8 +279,18 @@ const server = createGatewayServer(deps, {
     collaboration,
     principals: principalKeys.signer,
     audit,
+    maxResponseBytes: cfg.upstreamResponseLimitBytes,
   }),
-  admin: createAdminApiHandler(deps),
+  documentScope: createGatewayDocumentScopeHandler({
+    instances: deps.instances,
+    users,
+    projects,
+    collaboration,
+    principals: principalKeys.signer,
+    audit,
+    maxResponseBytes: cfg.upstreamResponseLimitBytes,
+  }),
+  admin: createAdminApiHandler(deps, documentAdmin),
   runtime: createRuntimeApiHandler({
     context,
     instances: instanceRepository,
@@ -263,6 +307,7 @@ const server = createGatewayServer(deps, {
       collaboration,
       principals: principalKeys.signer,
       audit,
+      maxResponseBytes: cfg.upstreamResponseLimitBytes,
       catalog: documentCatalog,
     }),
     documentTransferCommit: createDocumentTransferCommitHandler({
@@ -272,6 +317,7 @@ const server = createGatewayServer(deps, {
       collaboration,
       principals: principalKeys.signer,
       audit,
+      maxResponseBytes: cfg.upstreamResponseLimitBytes,
       catalog: documentCatalog,
     }),
     documentTransferRetry: createDocumentTransferHandler({
@@ -281,6 +327,7 @@ const server = createGatewayServer(deps, {
       collaboration,
       principals: principalKeys.signer,
       audit,
+      maxResponseBytes: cfg.upstreamResponseLimitBytes,
       catalog: documentCatalog,
     }),
     documentTransferPlan: createDocumentTransferPlanHandler({
@@ -290,6 +337,7 @@ const server = createGatewayServer(deps, {
       collaboration,
       principals: principalKeys.signer,
       audit,
+      maxResponseBytes: cfg.upstreamResponseLimitBytes,
       catalog: documentCatalog,
     }),
     documentTransferCapabilities: createDocumentTransferCapabilitiesHandler({ collaboration }),
@@ -300,6 +348,7 @@ const server = createGatewayServer(deps, {
       collaboration,
       principals: principalKeys.signer,
       audit,
+      maxResponseBytes: cfg.upstreamResponseLimitBytes,
     }),
     documentTransferDirectories: createDocumentTransferDirectoriesHandler({
       instances: deps.instances,
@@ -308,6 +357,7 @@ const server = createGatewayServer(deps, {
       collaboration,
       principals: principalKeys.signer,
       audit,
+      maxResponseBytes: cfg.upstreamResponseLimitBytes,
     }),
     documentTransferDirectoryCreate: createDocumentTransferDirectoryCreateHandler({
       instances: deps.instances,
@@ -316,9 +366,11 @@ const server = createGatewayServer(deps, {
       collaboration,
       principals: principalKeys.signer,
       audit,
+      maxResponseBytes: cfg.upstreamResponseLimitBytes,
     }),
     documentCatalogSync: documentCatalogHandlers.sync,
     documentCatalogAuthorize: documentCatalogHandlers.authorize,
+    documentCatalogPurge: documentCatalogHandlers.purge,
     documentCatalogOverview: documentCatalogHandlers.overview,
     documentCatalogHistory: documentCatalogHandlers.history,
   }),
@@ -344,6 +396,12 @@ const archiveRetentionSweep = setInterval(() => {
   })
 }, 60 * 60_000)
 archiveRetentionSweep.unref()
+const documentRetentionSweep = setInterval(() => {
+  void Promise.resolve(documentCatalog.purgeDue?.()).catch(error => {
+    console.error('[gateway] document retention sweep failed:', error)
+  })
+}, 60 * 60_000)
+documentRetentionSweep.unref()
 
 const CONNECTION_DRAIN_MS = 3000
 const SHUTDOWN_TIMEOUT_MS = 10_000
@@ -372,6 +430,7 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
   forced.unref()
   clearInterval(reaper)
   clearInterval(archiveRetentionSweep)
+  clearInterval(documentRetentionSweep)
   try {
     proxyHandlers.close()
     await Promise.all([closeListeningServer(server), closeListeningServer(intake)])

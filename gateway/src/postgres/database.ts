@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import { Pool, type PoolClient, type PoolConfig, type QueryResultRow } from 'pg'
 
 const MIGRATION_LOCK_KEY = 0x48475750
+const MAX_TIMER_DELAY_MS = 2_147_483_647
 const TRANSIENT_DATABASE_CODES = new Set([
   'ECONNABORTED',
   'ECONNREFUSED',
@@ -115,6 +116,13 @@ export async function withDatabaseStartupRetry<T>(
   operation: () => Promise<T>,
   options: DatabaseStartupRetryOptions,
 ): Promise<T> {
+  if (!Number.isSafeInteger(options.initialDelayMs) || options.initialDelayMs < 1
+    || options.initialDelayMs > MAX_TIMER_DELAY_MS
+    || !Number.isSafeInteger(options.maxDelayMs) || options.maxDelayMs < 1
+    || options.maxDelayMs > MAX_TIMER_DELAY_MS
+    || options.maxDelayMs < options.initialDelayMs) {
+    throw new RangeError(`database startup retry delays must be positive safe integers within 1..${MAX_TIMER_DELAY_MS}, with maxDelayMs >= initialDelayMs`)
+  }
   let delayMs = options.initialDelayMs
   while (true) {
     try {

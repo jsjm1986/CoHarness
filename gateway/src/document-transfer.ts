@@ -14,13 +14,20 @@ import type {
   GatewayProjectService,
   GatewayUserService,
 } from './services.ts'
-import type { ProjectRuntime, RuntimeTarget } from './instances.ts'
+import { RuntimeLeaseUnavailableError, type ProjectRuntime, type RuntimeTarget } from './instances.ts'
 import type { RuntimeCredentialSubject } from './runtime-api.ts'
 import type { PostgresDocumentCatalogService } from './postgres/document-catalog-service.ts'
+import { readResponseJson, ResponseBodyTooLargeError } from './response-budget.ts'
 
 const MAX_TRANSFER_FILES = 50
 const MAX_DOCUMENT_ID_BYTES = 4096
 const TRANSFER_PLAN_TTL_MS = 300_000
+/** Upper bound for a target's asynchronous checksum/publication phase. */
+const TRANSFER_VERIFY_MAX_WAIT_MS = TRANSFER_PLAN_TTL_MS
+const MAX_TRANSFER_PLANS = 10_000
+const DEFAULT_TRANSFER_RESPONSE_LIMIT_BYTES = 64 * 1024 * 1024
+/** Bound one buffered transfer chunk even when a runtime advertises a bad value. */
+const MAX_TRANSFER_CHUNK_BYTES = 64 * 1024 * 1024
 /** Public Gateway path for resumable uploads into a non-current scope. */
 export const DOCUMENT_TRANSFER_UPLOADS_PATH = '/api/documents/transfer/uploads'
 
@@ -29,11 +36,35 @@ interface TransferPlanRecord {
   readonly source: DocumentTransferScope
   readonly target: DocumentTransferScope
   readonly targets?: readonly DocumentTransferScope[]
+  readonly directory?: string
   readonly documents: readonly DocumentTransferSelection[]
   readonly expiresAt: number
 }
 
 const transferPlans = new Map<string, TransferPlanRecord>()
+let transferPlanCleanupTimer: ReturnType<typeof setTimeout> | undefined
+
+function pruneTransferPlans(now = Date.now()): void {
+  for (const [id, record] of transferPlans) {
+    if (record.expiresAt <= now) transferPlans.delete(id)
+  }
+}
+
+function scheduleTransferPlanCleanup(): void {
+  if (transferPlanCleanupTimer !== undefined) return
+  const nextExpiry = [...transferPlans.values()].reduce<number | undefined>(
+    (earliest, record) => earliest === undefined ? record.expiresAt : Math.min(earliest, record.expiresAt),
+    undefined,
+  )
+  if (nextExpiry === undefined) return
+  const delay = Math.max(0, nextExpiry - Date.now())
+  transferPlanCleanupTimer = setTimeout(() => {
+    transferPlanCleanupTimer = undefined
+    pruneTransferPlans()
+    scheduleTransferPlanCleanup()
+  }, delay)
+  transferPlanCleanupTimer.unref?.()
+}
 
 /** Versioned scope selector accepted by the document transfer endpoint. */
 export type DocumentTransferScope =
@@ -140,6 +171,8 @@ export interface RuntimeDocumentTransferCapabilitiesHandler {
   (input: {
     readonly subject: RuntimeCredentialSubject
     readonly principal: GatewayPrincipalClaims
+    /** Aborts when the loopback caller disconnects. */
+    readonly signal?: AbortSignal
   }): Promise<DocumentTransferCapabilities>
 }
 
@@ -149,6 +182,8 @@ export interface RuntimeDocumentTransferListHandler {
     readonly subject: RuntimeCredentialSubject
     readonly principal: GatewayPrincipalClaims
     readonly payload: unknown
+    /** Aborts when the loopback caller disconnects. */
+    readonly signal?: AbortSignal
   }): Promise<DocumentTransferListResponse>
 }
 
@@ -157,6 +192,24 @@ export interface DocumentTransferListResponse {
   readonly version: 1
   readonly scope: DocumentTransferScopeSummary
   readonly documents: readonly DocumentTransferTargetRef[]
+  /** Limits advertised by the selected runtime, when available. */
+  readonly limits?: {
+    readonly maxFileBytes: number | null
+    readonly maxFilesPerMessage: number
+    readonly maxMessageBytes: number
+    readonly maxInlineTextBytes: number
+    readonly upload: {
+      readonly protocol: 'resumable-v1'
+      readonly chunkBytes: number
+      readonly sessionTtlMs: number
+      readonly resumable: true
+    }
+  }
+  readonly directoryId?: string
+  readonly parentDirectoryId?: string
+  readonly directories?: readonly { readonly directoryId: string; readonly name: string }[]
+  readonly totalDocuments?: number
+  readonly nextCursor?: string
 }
 
 /** Public Gateway callback for the browser-facing alternate-scope listing. */
@@ -184,12 +237,41 @@ export interface GatewayDocumentTransferUploadHandler {
   }): Promise<Response>
 }
 
+/** Operations exposed by the authenticated full-scope document broker. */
+export type GatewayDocumentScopeOperation = 'list' | 'directories' | 'content' | 'trash' | 'restore' | 'purge' | 'folders' | 'move' | 'delete'
+
+/** Public Gateway callback for browsing or mutating one authorized scope. */
+export interface GatewayDocumentScopeHandler {
+  (input: {
+    readonly user: UserRow
+    readonly request: IncomingMessage
+    readonly pathname: string
+    readonly operation: GatewayDocumentScopeOperation
+    readonly scope: DocumentTransferScope
+    readonly signal: AbortSignal
+  }): Promise<Response>
+}
+
+/** Administrator lifecycle operation forwarded to the catalog row's runtime. */
+export interface GatewayDocumentAdminHandler {
+  (input: {
+    readonly user: UserRow
+    readonly scope: DocumentTransferScope
+    readonly personalOwnerId?: number
+    readonly docId: string
+    readonly action: 'trash' | 'restore' | 'purge'
+    readonly signal: AbortSignal
+  }): Promise<Response>
+}
+
 /** Runtime callback for target-folder metadata in an authorized scope. */
 export interface RuntimeDocumentTransferDirectoriesHandler {
   (input: {
     readonly subject: RuntimeCredentialSubject
     readonly principal: GatewayPrincipalClaims
     readonly payload: unknown
+    /** Aborts when the loopback caller disconnects. */
+    readonly signal?: AbortSignal
   }): Promise<{
     readonly version: 1
     readonly scope: DocumentTransferScopeSummary
@@ -203,6 +285,8 @@ export interface RuntimeDocumentTransferDirectoryCreateHandler {
     readonly subject: RuntimeCredentialSubject
     readonly principal: GatewayPrincipalClaims
     readonly payload: unknown
+    /** Aborts when the loopback caller disconnects. */
+    readonly signal?: AbortSignal
   }): Promise<{ readonly version: 1; readonly scope: DocumentTransferScopeSummary; readonly directory: { readonly directoryId: string; readonly name: string } }>
 }
 
@@ -212,11 +296,14 @@ export interface RuntimeDocumentTransferPlanHandler {
     readonly subject: RuntimeCredentialSubject
     readonly principal: GatewayPrincipalClaims
     readonly payload: unknown
+    /** Aborts when the loopback caller disconnects. */
+    readonly signal?: AbortSignal
   }): Promise<{
     readonly version: 1
     readonly planId: string
     readonly source: DocumentTransferScopeSummary
     readonly target: DocumentTransferScopeSummary
+    readonly directory?: string
     readonly documents: readonly DocumentTransferTargetRef[]
     readonly expiresAt: number
     readonly targets?: readonly { readonly target: DocumentTransferScopeSummary; readonly documents: readonly DocumentTransferTargetRef[] }[]
@@ -225,7 +312,7 @@ export interface RuntimeDocumentTransferPlanHandler {
 
 /** Dependencies needed to authorize and stream one cross-scope transfer. */
 export interface DocumentTransferDependencies {
-  readonly instances: Pick<GatewayInstanceService, 'ensureRunning'>
+  readonly instances: Pick<GatewayInstanceService, 'ensureRunning'> & Partial<Pick<GatewayInstanceService, 'operationRef'>>
   readonly users: Pick<GatewayUserService, 'getById'>
   readonly projects: Pick<GatewayProjectService, 'getById'>
   readonly collaboration: Pick<GatewayCollaborationService, 'projectForUser'>
@@ -234,6 +321,8 @@ export interface DocumentTransferDependencies {
   readonly audit?: Pick<GatewayAuditService, 'write'>
   /** Optional metadata catalog; transfer remains functional during catalog maintenance. */
   readonly catalog?: Pick<PostgresDocumentCatalogService, 'recordCopy'>
+  /** Maximum bytes retained from one runtime JSON response. */
+  readonly maxResponseBytes?: number
 }
 
 interface ScopeIdentity {
@@ -249,6 +338,84 @@ interface RuntimeHandle {
   readonly port: number
   readonly generation: number
   readonly scope: ScopeIdentity
+}
+
+/** Hold an instance operation lease across all work that uses a runtime. */
+async function withRuntimeLeases<T>(
+  deps: Pick<DocumentTransferDependencies, 'instances'>,
+  runtimes: readonly RuntimeHandle[],
+  operation: () => Promise<T>,
+): Promise<T> {
+  const releases: Array<() => Promise<void>> = []
+  try {
+    for (const runtime of runtimes) {
+      releases.push(await acquireRuntimeLease(deps, runtime))
+    }
+    return await operation()
+  } finally {
+    for (const release of releases.reverse()) await release().catch(() => {})
+  }
+}
+
+/** Acquire one idempotent runtime lease for a request that may stream. */
+async function acquireRuntimeLease(
+  deps: Pick<DocumentTransferDependencies, 'instances'>,
+  runtime: RuntimeHandle,
+): Promise<() => Promise<void>> {
+  try {
+    await deps.instances.operationRef?.(runtime.target, 1, runtime.generation)
+  } catch (error) {
+    if (error instanceof RuntimeLeaseUnavailableError) {
+      throw new DocumentTransferError(
+        'COLLABORATION_UNAVAILABLE',
+        503,
+        'The document runtime is restarting; retry the operation.',
+      )
+    }
+    throw error
+  }
+  let released = false
+  return async () => {
+    if (released) return
+    released = true
+    await deps.instances.operationRef?.(runtime.target, -1, runtime.generation)
+  }
+}
+
+/** Keep a runtime lease until a returned streaming response reaches EOF/cancel. */
+function leaseResponse(response: Response, release: () => Promise<void>): Response {
+  if (response.body === null) {
+    void release().catch(() => {})
+    return response
+  }
+  let released = false
+  const finish = async (): Promise<void> => {
+    if (released) return
+    released = true
+    await release().catch(() => {})
+  }
+  const reader = response.body.getReader()
+  const body = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      try {
+        const next = await reader.read()
+        if (next.done) {
+          await finish()
+          controller.close()
+        } else {
+          controller.enqueue(next.value)
+        }
+      } catch (error) {
+        await finish()
+        controller.error(error)
+      }
+    },
+    async cancel(reason) {
+      await reader.cancel(reason).catch(() => {})
+      await finish()
+    },
+  })
+  return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers })
 }
 
 function record(value: unknown): Record<string, unknown> | undefined {
@@ -307,7 +474,16 @@ function requestValue(value: unknown): DocumentTransferRequest {
     throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document transfer targets.')
   }
   const targets = rawTargets === undefined ? undefined : rawTargets.map(scope)
+  if (targets !== undefined) {
+    const keys = targets.map(item => item.kind === 'personal' ? 'personal' : `project:${String(item.projectId)}`)
+    if (new Set(keys).size !== keys.length) {
+      throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Duplicate document transfer target.')
+    }
+  }
   const target = scope(candidate.target ?? targets?.[0])
+  if (targets !== undefined && candidate.target !== undefined && !sameScope(target, targets[0]!)) {
+    throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'The primary transfer target must match the first target.')
+  }
   if (sameScope(source, target)) {
     throw new DocumentTransferError('DOCUMENT_TRANSFER_SAME_SCOPE', 409, 'The source and target scopes must differ.')
   }
@@ -360,19 +536,106 @@ function responseError(value: unknown): { code: string; message: string } {
   return { code, message }
 }
 
-async function responseJson(response: Response): Promise<unknown> {
+function responseLimit(deps: Pick<DocumentTransferDependencies, 'maxResponseBytes'>): number {
+  return deps.maxResponseBytes ?? DEFAULT_TRANSFER_RESPONSE_LIMIT_BYTES
+}
+
+async function responseJson(response: Response, limit = DEFAULT_TRANSFER_RESPONSE_LIMIT_BYTES): Promise<unknown> {
+  return readResponseJson(response, limit)
+}
+
+interface StartedSnapshotUpload {
+  readonly uploadId: string
+  readonly chunkBytes: number
+  readonly receivedBytes: number
+  readonly state: 'uploading' | 'verifying' | 'complete' | 'failed'
+  readonly ref?: unknown
+}
+
+/** Wait for a short polling interval without losing request cancellation. */
+function waitForTransferPoll(delayMs: number, signal: AbortSignal): Promise<void> {
+  if (delayMs <= 0) return Promise.resolve()
+  return new Promise<void>((resolve, reject) => {
+    let settled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const finish = (error?: unknown): void => {
+      if (settled) return
+      settled = true
+      if (timer !== undefined) clearTimeout(timer)
+      signal.removeEventListener('abort', onAbort)
+      if (error === undefined) resolve()
+      else reject(error)
+    }
+    const onAbort = (): void => finish(signal.reason)
+    timer = setTimeout(() => finish(), delayMs)
+    signal.addEventListener('abort', onAbort, { once: true })
+    if (signal.aborted) onAbort()
+  })
+}
+
+/** Start a target upload and release the source body when setup fails. */
+async function startSnapshotUpload(
+  targetRuntime: RuntimeHandle,
+  targetAssertion: string,
+  source: Response,
+  name: string,
+  directory: string,
+  bytes: number,
+  fingerprint: string,
+  signal: AbortSignal,
+  responseLimit: number,
+): Promise<StartedSnapshotUpload> {
   try {
-    return await response.json() as unknown
-  } catch {
-    return undefined
+    const base = `http://127.0.0.1:${String(targetRuntime.port)}/api/documents/uploads`
+    const authHeaders = headersFor(targetRuntime, targetAssertion)
+    authHeaders.set('content-type', 'application/json')
+    const started = await fetch(base, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({ version: 1, name, directory, bytes, fingerprint }),
+      signal,
+    })
+    const startedBody = await responseJson(started, responseLimit)
+    if (!started.ok) {
+      const error = responseError(startedBody)
+      throw new DocumentTransferError(error.code, started.status, error.message)
+    }
+    const startedValue = record(startedBody)
+    if (typeof startedValue?.uploadId !== 'string' || !/^[0-9a-f-]{36}$/u.test(startedValue.uploadId)
+      || typeof startedValue.chunkBytes !== 'number'
+      || !Number.isSafeInteger(startedValue.chunkBytes) || startedValue.chunkBytes <= 0
+      || startedValue.chunkBytes > MAX_TRANSFER_CHUNK_BYTES
+      || typeof startedValue.receivedBytes !== 'number' || !Number.isSafeInteger(startedValue.receivedBytes)
+      || startedValue.receivedBytes < 0 || startedValue.receivedBytes > bytes
+      || (startedValue.state !== 'uploading' && startedValue.state !== 'verifying'
+        && startedValue.state !== 'complete' && startedValue.state !== 'failed')) {
+      throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The target runtime returned invalid upload session metadata.')
+    }
+    if (startedValue.state === 'failed') {
+      throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The target runtime rejected the upload session.')
+    }
+    return {
+      uploadId: startedValue.uploadId,
+      chunkBytes: startedValue.chunkBytes,
+      receivedBytes: startedValue.receivedBytes,
+      state: startedValue.state,
+      ...(startedValue.ref === undefined ? {} : { ref: startedValue.ref }),
+    }
+  } catch (error) {
+    // The target can reject setup before it reads the source response. Cancel
+    // that body explicitly so its keep-alive socket is reusable and no stream
+    // remains attached to the transfer operation.
+    await source.body?.cancel().catch(() => {})
+    throw error
   }
 }
 
 function targetRef(value: unknown): DocumentTransferTargetRef {
   const candidate = record(value)
   if (!validRelativeId(candidate?.docId, false) || !nonEmptyString(candidate.name)
+    || candidate.name.length > 255 || /[\\/\u0000-\u001f\u007f]/u.test(candidate.name)
     || typeof candidate.bytes !== 'number' || !Number.isSafeInteger(candidate.bytes) || candidate.bytes < 0
-    || !nonEmptyString(candidate.mediaType)
+    || !nonEmptyString(candidate.mediaType) || candidate.mediaType.length > 255 || /[\u0000-\u001f\u007f]/u.test(candidate.mediaType)
     || typeof candidate.modifiedAt !== 'number' || !Number.isFinite(candidate.modifiedAt)) {
     throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The target runtime returned invalid document metadata.')
   }
@@ -385,6 +648,33 @@ function targetRef(value: unknown): DocumentTransferTargetRef {
   }
 }
 
+function documentLimits(value: unknown): DocumentTransferListResponse['limits'] {
+  if (value === undefined) return undefined
+  const row = record(value)
+  const upload = record(row?.upload)
+  if (row === undefined || upload === undefined
+    || (row.maxFileBytes !== null && (!Number.isSafeInteger(row.maxFileBytes) || (row.maxFileBytes as number) < 1))
+    || !Number.isSafeInteger(row.maxFilesPerMessage) || (row.maxFilesPerMessage as number) < 1
+    || !Number.isSafeInteger(row.maxMessageBytes) || (row.maxMessageBytes as number) < 1
+    || !Number.isSafeInteger(row.maxInlineTextBytes) || (row.maxInlineTextBytes as number) < 1
+    || upload.protocol !== 'resumable-v1' || !Number.isSafeInteger(upload.chunkBytes) || (upload.chunkBytes as number) < 1
+    || !Number.isSafeInteger(upload.sessionTtlMs) || (upload.sessionTtlMs as number) < 1 || upload.resumable !== true) {
+    throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned invalid document limits.')
+  }
+  return {
+    maxFileBytes: row.maxFileBytes as number | null,
+    maxFilesPerMessage: row.maxFilesPerMessage as number,
+    maxMessageBytes: row.maxMessageBytes as number,
+    maxInlineTextBytes: row.maxInlineTextBytes as number,
+    upload: {
+      protocol: 'resumable-v1',
+      chunkBytes: upload.chunkBytes as number,
+      sessionTtlMs: upload.sessionTtlMs as number,
+      resumable: true,
+    },
+  }
+}
+
 async function uploadSnapshotToRuntime(
   targetRuntime: RuntimeHandle,
   targetAssertion: string,
@@ -394,38 +684,16 @@ async function uploadSnapshotToRuntime(
   bytes: number,
   fingerprint: string,
   signal: AbortSignal,
+  responseLimit: number,
 ): Promise<DocumentTransferTargetRef> {
   if (source.body === null || !Number.isSafeInteger(bytes) || bytes < 0) {
     throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The source runtime did not provide a usable document body.')
   }
   const base = `http://127.0.0.1:${String(targetRuntime.port)}/api/documents/uploads`
-  const authHeaders = headersFor(targetRuntime, targetAssertion)
-  authHeaders.set('content-type', 'application/json')
-  const started = await fetch(base, {
-    method: 'POST',
-    headers: authHeaders,
-    body: JSON.stringify({ version: 1, name, directory, bytes, fingerprint }),
-    signal,
-  })
-  const startedBody = await responseJson(started)
-  if (!started.ok) {
-    const error = responseError(startedBody)
-    throw new DocumentTransferError(error.code, started.status, error.message)
-  }
-  const startedValue = record(startedBody)
-  if (typeof startedValue?.uploadId !== 'string' || !/^[0-9a-f-]{36}$/u.test(startedValue.uploadId)
-    || typeof startedValue.chunkBytes !== 'number'
-    || !Number.isSafeInteger(startedValue.chunkBytes) || startedValue.chunkBytes <= 0
-    || typeof startedValue.receivedBytes !== 'number' || !Number.isSafeInteger(startedValue.receivedBytes)
-    || startedValue.receivedBytes < 0 || startedValue.receivedBytes > bytes
-    || (startedValue.state !== 'uploading' && startedValue.state !== 'verifying'
-      && startedValue.state !== 'complete' && startedValue.state !== 'failed')) {
-    throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The target runtime returned invalid upload session metadata.')
-  }
+  const startedValue = await startSnapshotUpload(
+    targetRuntime, targetAssertion, source, name, directory, bytes, fingerprint, signal, responseLimit,
+  )
   const uploadId = startedValue.uploadId
-  if (startedValue.state === 'failed') {
-    throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The target runtime rejected the upload session.')
-  }
   if (startedValue.state === 'complete') {
     await source.body.cancel()
     const completed = targetRef(startedValue.ref)
@@ -436,20 +704,55 @@ async function uploadSnapshotToRuntime(
   }
   const reader = source.body.getReader()
   const finalHash = createHash('sha256')
-  let pending = Buffer.alloc(0)
+  const pendingChunks: Buffer[] = []
+  let pendingBytes = 0
   let done = false
   let offset = 0
   let index = 0
+  if (startedValue.receivedBytes !== bytes
+    && startedValue.receivedBytes % startedValue.chunkBytes !== 0) {
+    await reader.cancel().catch(() => {})
+    throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The target runtime returned an invalid upload offset.')
+  }
+  const takePending = (maximum: number): Buffer => {
+    const length = Math.min(maximum, pendingBytes)
+    const first = pendingChunks[0]
+    if (first !== undefined && first.byteLength === length) {
+      pendingChunks.shift()
+      pendingBytes -= length
+      return first
+    }
+    const output = Buffer.allocUnsafe(length)
+    let written = 0
+    while (written < length) {
+      const chunk = pendingChunks[0]
+      if (chunk === undefined) break
+      const count = Math.min(chunk.byteLength, length - written)
+      chunk.copy(output, written, 0, count)
+      written += count
+      pendingBytes -= count
+      if (count === chunk.byteLength) pendingChunks.shift()
+      else pendingChunks[0] = chunk.subarray(count)
+    }
+    return output
+  }
   try {
     while (offset < bytes) {
-      while (!done && pending.byteLength < startedValue.chunkBytes) {
+      while (!done && pendingBytes < startedValue.chunkBytes) {
         const next = await reader.read()
         if (next.done) { done = true; break }
-        pending = Buffer.concat([pending, Buffer.from(next.value)])
+        const chunk = Buffer.from(next.value)
+        if (chunk.byteLength > 0) {
+          const remaining = bytes - offset - pendingBytes
+          if (chunk.byteLength > remaining) {
+            throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The source document byte count changed during transfer.')
+          }
+          pendingChunks.push(chunk)
+          pendingBytes += chunk.byteLength
+        }
       }
-      if (pending.byteLength === 0) break
-      const chunk = pending.subarray(0, Math.min(startedValue.chunkBytes, pending.byteLength))
-      pending = pending.subarray(chunk.byteLength)
+      if (pendingBytes === 0) break
+      const chunk = takePending(startedValue.chunkBytes)
       finalHash.update(chunk)
       const chunkHash = createHash('sha256').update(chunk).digest('hex')
       if (offset >= startedValue.receivedBytes) {
@@ -460,14 +763,14 @@ async function uploadSnapshotToRuntime(
         const response = await fetch(`${base}/${encodeURIComponent(uploadId)}/chunks/${String(index)}`, {
           method: 'PUT', headers, body: chunk, signal, duplex: 'half',
         } as RequestInit & { duplex: 'half' })
-        const body = await responseJson(response)
+        const body = await responseJson(response, responseLimit)
         if (!response.ok) {
           const error = responseError(body)
           throw new DocumentTransferError(error.code, response.status, error.message)
         }
         const chunkState = record(body)
         if (typeof chunkState?.receivedBytes !== 'number' || !Number.isSafeInteger(chunkState.receivedBytes)
-          || chunkState.receivedBytes < offset + chunk.byteLength
+          || chunkState.receivedBytes < offset + chunk.byteLength || chunkState.receivedBytes > bytes
           || (chunkState.state !== undefined && chunkState.state !== 'uploading'
             && chunkState.state !== 'verifying' && chunkState.state !== 'complete')) {
           throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The target runtime returned invalid chunk progress.')
@@ -476,7 +779,7 @@ async function uploadSnapshotToRuntime(
       offset += chunk.byteLength
       index += 1
     }
-    if (offset !== bytes || pending.byteLength !== 0) {
+    if (offset !== bytes || pendingBytes !== 0) {
       throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The source document byte count changed during transfer.')
     }
     const completeHeaders = headersFor(targetRuntime, targetAssertion)
@@ -485,21 +788,26 @@ async function uploadSnapshotToRuntime(
       method: 'POST', headers: completeHeaders,
       body: JSON.stringify({ version: 1, sha256: finalHash.digest('hex') }), signal,
     })
-    let currentBody = await responseJson(currentResponse)
+    let currentBody = await responseJson(currentResponse, responseLimit)
     if (!currentResponse.ok) {
       const error = responseError(currentBody)
       throw new DocumentTransferError(error.code, currentResponse.status, error.message)
     }
+    const verifyDeadline = Date.now() + TRANSFER_VERIFY_MAX_WAIT_MS
     for (;;) {
       const value = record(currentBody)
       if (value?.state !== 'verifying') break
-      await new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(resolve, 100)
-        const abort = (): void => { clearTimeout(timer); signal.removeEventListener('abort', abort); reject(signal.reason) }
-        signal.addEventListener('abort', abort, { once: true })
-      })
+      const remaining = verifyDeadline - Date.now()
+      if (remaining <= 0) {
+        throw new DocumentTransferError(
+          'DOCUMENT_TRANSFER_VERIFY_TIMEOUT',
+          504,
+          'The target runtime did not finish verifying the document in time.',
+        )
+      }
+      await waitForTransferPoll(Math.min(100, remaining), signal)
       currentResponse = await fetch(`${base}/${encodeURIComponent(uploadId)}`, { headers: headersFor(targetRuntime, targetAssertion), signal })
-      currentBody = await responseJson(currentResponse)
+      currentBody = await responseJson(currentResponse, responseLimit)
       if (!currentResponse.ok) {
         const error = responseError(currentBody)
         throw new DocumentTransferError(error.code, currentResponse.status, error.message)
@@ -510,7 +818,11 @@ async function uploadSnapshotToRuntime(
       const error = responseError({ error: finalValue?.error })
       throw new DocumentTransferError(error.code, 502, error.message)
     }
-    return targetRef(finalValue.ref)
+    const completed = targetRef(finalValue.ref)
+    if (completed.bytes !== bytes) {
+      throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The target runtime returned an unexpected document size.')
+    }
+    return completed
   } catch (error) {
     await reader.cancel(error).catch(() => {})
     await fetch(`${base}/${encodeURIComponent(uploadId)}`, {
@@ -768,9 +1080,10 @@ function createSingleDocumentTransferHandler(
         },
       runtime: { kind: targetRuntime.target.kind, id: targetRuntime.target.id, generation: targetRuntime.generation },
     })
-    const transferId = randomUUID()
-    const items: DocumentTransferItem[] = []
-    for (const document of input.documents) {
+    return withRuntimeLeases(deps, [sourceRuntime, targetRuntime], async () => {
+      const transferId = randomUUID()
+      const items: DocumentTransferItem[] = []
+      for (const document of input.documents) {
       signal.throwIfAborted()
       const name = sourceName(document.docId)
       try {
@@ -781,8 +1094,9 @@ function createSingleDocumentTransferHandler(
           signal,
         })
         if (!sourceResponse.ok || sourceResponse.body === null) {
-          const error = responseError(await responseJson(sourceResponse))
-          throw new DocumentTransferError(error.code, sourceResponse.status === 404 ? 404 : 502, error.message)
+          const error = responseError(await responseJson(sourceResponse, responseLimit(deps)))
+          const status = sourceResponse.status >= 400 && sourceResponse.status < 500 ? sourceResponse.status : 502
+          throw new DocumentTransferError(error.code, status, error.message)
         }
         const mediaType = (sourceResponse.headers.get('content-type') ?? 'application/octet-stream').split(';', 1)[0] ?? 'application/octet-stream'
         const lengthHeader = sourceResponse.headers.get('content-length')
@@ -799,6 +1113,7 @@ function createSingleDocumentTransferHandler(
           declaredBytes,
           createHash('sha256').update(`${transferId}\u0000${document.docId}`).digest('hex'),
           signal,
+          responseLimit(deps),
         )
         const bytes = declaredBytes !== undefined && Number.isSafeInteger(declaredBytes) && declaredBytes >= 0
           ? declaredBytes
@@ -810,7 +1125,14 @@ function createSingleDocumentTransferHandler(
           targetScope: input.target.kind === 'personal' ? { kind: 'personal', userId: principal.user.id } : { kind: 'project', projectId: input.target.projectId },
           sourceDocId: document.docId,
           sourceName: name,
-          target: { docId: ref.docId, name: ref.name, bytes: ref.bytes, mediaType: ref.mediaType, modifiedAt: ref.modifiedAt },
+          target: {
+            docId: ref.docId,
+            directoryId: String(ref.docId).split('/').slice(0, -1).join('/'),
+            name: ref.name,
+            bytes: ref.bytes,
+            mediaType: ref.mediaType,
+            modifiedAt: ref.modifiedAt,
+          },
           operationId: transferId,
         }).catch(() => {})
         await audit(deps, principal, transferId, sourceIdentity, targetIdentity, {
@@ -856,14 +1178,15 @@ function createSingleDocumentTransferHandler(
           docId: document.docId, name, status: 'failed', code: item.error.code,
         })
       }
-    }
-    return {
-      version: 1,
-      transferId,
-      source: { kind: sourceIdentity.kind, label: sourceIdentity.label },
-      target: { kind: targetIdentity.kind, label: targetIdentity.label },
-      items,
-    }
+      }
+      return {
+        version: 1,
+        transferId,
+        source: { kind: sourceIdentity.kind, label: sourceIdentity.label },
+        target: { kind: targetIdentity.kind, label: targetIdentity.label },
+        items,
+      }
+    })
   }
 }
 
@@ -943,15 +1266,18 @@ export function createDocumentTransferCommitHandler(
     const plan = transferPlans.get(request.planId)
     if (plan === undefined || plan.expiresAt <= Date.now() || plan.actorId !== input.principal.user.id) {
       transferPlans.delete(request.planId)
+      scheduleTransferPlanCleanup()
       throw new DocumentTransferError('DOCUMENT_TRANSFER_PLAN_EXPIRED', 409, 'The transfer plan has expired or belongs to another actor.')
     }
     if (JSON.stringify(plan.source) !== JSON.stringify(request.source)
       || JSON.stringify(plan.target) !== JSON.stringify(request.target)
       || JSON.stringify(plan.targets) !== JSON.stringify(request.targets)
+      || plan.directory !== request.directory
       || JSON.stringify(plan.documents) !== JSON.stringify(request.documents)) {
       throw new DocumentTransferError('DOCUMENT_TRANSFER_PLAN_MISMATCH', 409, 'The transfer request does not match its plan.')
     }
     transferPlans.delete(request.planId)
+    scheduleTransferPlanCleanup()
     return transfer({ ...input, payload: { ...record(input.payload), planId: undefined } })
   }
 }
@@ -986,11 +1312,24 @@ export function createDocumentTransferCapabilitiesHandler(
       scope: { kind: 'project' as const, projectId: project.projectId },
       label: project.name,
       canRead: true,
-      canWrite: project.mode === 'rw',
+      canWrite: project.mode === 'rw' || principal.user.role === 'admin',
     }))
+    // Include the active scope as a candidate. The client removes same-scope
+    // choices after it knows the source document, while keeping this entry is
+    // necessary for project-to-current-project and project-to-personal copies
+    // launched from the all-scope overview.
+    const currentTarget: DocumentTransferCapability = subject.target.kind === 'user'
+      ? { scope: { kind: 'personal' }, label: 'Personal documents', canRead: true, canWrite: true }
+      : {
+        scope: { kind: 'project', projectId: subject.target.id },
+        label: current.label,
+        canRead: true,
+        canWrite: principal.user.role === 'admin'
+          || (principal.scope.kind === 'project' && principal.scope.mode === 'rw'),
+      }
     const targets: DocumentTransferCapability[] = subject.target.kind === 'user'
-      ? projectTargets
-      : [{ scope: { kind: 'personal' as const }, label: 'Personal documents', canRead: true, canWrite: true }, ...projectTargets]
+      ? [currentTarget, ...projectTargets]
+      : [currentTarget, { scope: { kind: 'personal' as const }, label: 'Personal documents', canRead: true, canWrite: true }, ...projectTargets]
     return {
       version: 1,
       current,
@@ -1006,45 +1345,110 @@ async function listDocumentsForActor(
   payload: unknown,
   signal?: AbortSignal,
 ): Promise<DocumentTransferListResponse> {
+  signal?.throwIfAborted()
   const candidate = record(payload)
   if (candidate?.version !== 1) {
     throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document scope listing request.')
   }
   const requested = scope(candidate.scope)
+  if (candidate.directory !== undefined && !validRelativeId(candidate.directory, true)) {
+    throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document scope directory.')
+  }
+  if (candidate.cursor !== undefined && (typeof candidate.cursor !== 'string' || candidate.cursor.length === 0 || candidate.cursor.length > 4096)) {
+    throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document scope cursor.')
+  }
+  if (candidate.limit !== undefined && (!Number.isSafeInteger(candidate.limit) || (candidate.limit as number) < 1 || (candidate.limit as number) > 100)) {
+    throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document scope page size.')
+  }
+  if (candidate.query !== undefined && (typeof candidate.query !== 'string' || candidate.query.length > 255)) {
+    throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document scope search.')
+  }
+  if (candidate.type !== undefined && !['all', 'image', 'pdf', 'text', 'other'].includes(candidate.type as string)) {
+    throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document scope type.')
+  }
+  if (candidate.sort !== undefined && !['date-desc', 'date-asc', 'name-asc', 'name-desc', 'size-desc', 'size-asc'].includes(candidate.sort as string)) {
+    throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document scope sort.')
+  }
+  if (candidate.state !== undefined && candidate.state !== 'active' && candidate.state !== 'trash') {
+    throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document scope state.')
+  }
   const authorized = await authorizedScope(deps, actor, requested, 'read')
-  let response: Response
-  try {
-    response = await fetch(`http://127.0.0.1:${String(authorized.runtime.port)}/api/documents`, {
-      method: 'GET',
-      headers: headersFor(authorized.runtime, authorized.assertion),
-      redirect: 'error',
-      ...(signal === undefined ? {} : { signal }),
-    })
-  } catch {
-    throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document scope listing is unavailable.')
-  }
-  const body = await responseJson(response)
-  if (!response.ok) {
-    const error = responseError(body)
-    throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, error.message)
-  }
-  const value = record(body)
-  if (!Array.isArray(value?.documents)) {
-    throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned an invalid listing.')
-  }
-  const documents = value.documents.map(targetRef)
-  return {
-    version: 1,
-    scope: { kind: authorized.identity.kind, label: authorized.identity.label },
-    documents,
-  }
+  return withRuntimeLeases(deps, [authorized.runtime], async () => {
+    const runtimeUrl = new URL(`http://127.0.0.1:${String(authorized.runtime.port)}/api/documents`)
+    if (typeof candidate.directory === 'string') runtimeUrl.searchParams.set('directory', candidate.directory)
+    if (typeof candidate.cursor === 'string') runtimeUrl.searchParams.set('cursor', candidate.cursor)
+    if (typeof candidate.limit === 'number') runtimeUrl.searchParams.set('limit', String(candidate.limit))
+    if (typeof candidate.query === 'string' && candidate.query !== '') runtimeUrl.searchParams.set('q', candidate.query)
+    if (typeof candidate.type === 'string' && candidate.type !== 'all') runtimeUrl.searchParams.set('type', candidate.type)
+    if (typeof candidate.sort === 'string') runtimeUrl.searchParams.set('sort', candidate.sort)
+    if (typeof candidate.state === 'string' && candidate.state !== 'active') runtimeUrl.searchParams.set('state', candidate.state)
+    let response: Response
+    try {
+      response = await fetch(runtimeUrl.toString(), {
+        method: 'GET',
+        headers: headersFor(authorized.runtime, authorized.assertion),
+        redirect: 'error',
+        ...(signal === undefined ? {} : { signal }),
+      })
+    } catch (error) {
+      if (signal?.aborted) throw signal.reason
+      throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document scope listing is unavailable.')
+    }
+    const body = await responseJson(response, responseLimit(deps))
+    if (!response.ok) {
+      const error = responseError(body)
+      const status = response.status >= 400 && response.status < 500 ? response.status : 503
+      throw new DocumentTransferError(error.code, status, error.message)
+    }
+    const value = record(body)
+    if (!Array.isArray(value?.documents)) {
+      throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned an invalid listing.')
+    }
+    const documents = value.documents.map(targetRef)
+    const directories = value.directories === undefined ? undefined : Array.isArray(value.directories)
+      ? value.directories.map((entry) => {
+        const item = record(entry)
+        if (!validRelativeId(item?.directoryId, true) || !nonEmptyString(item.name) || item.name.length > 255
+          || /[\\/\u0000-\u001f\u007f]/u.test(item.name)) {
+          throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned invalid directory metadata.')
+        }
+        return { directoryId: item.directoryId, name: item.name }
+      })
+      : (() => { throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned invalid directories.') })()
+    const directoryId = value.directoryId === undefined ? undefined : value.directoryId
+    const parentDirectoryId = value.parentDirectoryId === undefined ? undefined : value.parentDirectoryId
+    if ((directoryId !== undefined && !validRelativeId(directoryId, true))
+      || (parentDirectoryId !== undefined && !validRelativeId(parentDirectoryId, true))) {
+      throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned invalid directory metadata.')
+    }
+    const limits = value.limits === undefined ? undefined : documentLimits(value.limits)
+    const totalDocuments = value.totalDocuments === undefined ? undefined
+      : Number.isSafeInteger(value.totalDocuments) && (value.totalDocuments as number) >= documents.length
+        ? value.totalDocuments as number
+        : (() => { throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned invalid paging metadata.') })()
+    const nextCursor = value.nextCursor === undefined ? undefined
+      : typeof value.nextCursor === 'string' && value.nextCursor !== '' && value.nextCursor.length <= 4096
+        ? value.nextCursor
+        : (() => { throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned an invalid cursor.') })()
+    return {
+      version: 1,
+      scope: { kind: authorized.identity.kind, label: authorized.identity.label },
+      documents,
+      ...(limits === undefined ? {} : { limits }),
+      ...(directoryId === undefined ? {} : { directoryId }),
+      ...(parentDirectoryId === undefined ? {} : { parentDirectoryId }),
+      ...(directories === undefined ? {} : { directories }),
+      ...(totalDocuments === undefined ? {} : { totalDocuments }),
+      ...(nextCursor === undefined ? {} : { nextCursor }),
+    }
+  })
 }
 
 /** Create the authenticated Gateway broker used by runtime document consumers. */
 export function createDocumentTransferListHandler(
   deps: DocumentTransferDependencies,
 ): RuntimeDocumentTransferListHandler {
-  return ({ principal, payload }) => listDocumentsForActor(deps, syntheticUser(principal), payload)
+  return ({ principal, payload, signal }) => listDocumentsForActor(deps, syntheticUser(principal), payload, signal)
 }
 
 /** Create the same broker for the public Gateway document route. */
@@ -1060,10 +1464,12 @@ function safeUploadSession(value: unknown): Record<string, unknown> {
     || candidate?.state === 'complete' || candidate?.state === 'failed'
   if (candidate === undefined || typeof candidate.uploadId !== 'string' || !/^[0-9a-f-]{36}$/u.test(candidate.uploadId)
     || typeof candidate.name !== 'string' || candidate.name === '' || candidate.name.length > 4096
+    || /[\\/\u0000-\u001f\u007f]/u.test(candidate.name)
     || !validRelativeId(candidate.directoryId, true)
     || typeof candidate.bytes !== 'number' || !Number.isSafeInteger(candidate.bytes) || candidate.bytes < 0
     || typeof candidate.fingerprint !== 'string' || candidate.fingerprint === '' || candidate.fingerprint.length > 512
     || typeof candidate.chunkBytes !== 'number' || !Number.isSafeInteger(candidate.chunkBytes) || candidate.chunkBytes <= 0
+    || candidate.chunkBytes > MAX_TRANSFER_CHUNK_BYTES
     || typeof candidate.receivedBytes !== 'number' || !Number.isSafeInteger(candidate.receivedBytes)
     || candidate.receivedBytes < 0 || candidate.receivedBytes > candidate.bytes
     || typeof candidate.expiresAt !== 'number' || !Number.isFinite(candidate.expiresAt)
@@ -1084,7 +1490,8 @@ function safeUploadSession(value: unknown): Record<string, unknown> {
   if (candidate.ref !== undefined) {
     const ref = record(candidate.ref)
     if (ref === undefined || !validRelativeId(ref.docId, false) || typeof ref.name !== 'string' || ref.name === ''
-      || ref.name.length > 255 || typeof ref.bytes !== 'number' || !Number.isSafeInteger(ref.bytes) || ref.bytes < 0
+      || ref.name.length > 255 || /[\\/\u0000-\u001f\u007f]/u.test(ref.name)
+      || typeof ref.bytes !== 'number' || !Number.isSafeInteger(ref.bytes) || ref.bytes < 0
       || typeof ref.mediaType !== 'string' || ref.mediaType === '' || ref.mediaType.length > 200
       || typeof ref.modifiedAt !== 'number' || !Number.isFinite(ref.modifiedAt)) {
       throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The target runtime returned invalid document metadata.')
@@ -1130,6 +1537,11 @@ function uploadHeaders(request: IncomingMessage, runtime: RuntimeHandle, asserti
   return headers
 }
 
+/** Drain bytes the upstream stopped reading so the browser connection cannot strand them. */
+function drainForwardedRequest(request: IncomingMessage, hasBody: boolean): void {
+  if (hasBody && request.complete !== true && !request.destroyed) request.resume()
+}
+
 function uploadErrorEnvelope(value: unknown): Record<string, unknown> {
   const error = responseError(value)
   return { error: { code: error.code, message: error.message } }
@@ -1142,41 +1554,246 @@ export function createGatewayDocumentTransferUploadHandler(
   return async ({ user, request, pathname, scope: requested, signal }) => {
     const targetPath = runtimeUploadPath(pathname)
     const authorized = await authorizedScope(deps, user, requested, 'write')
+    return withRuntimeLeases(deps, [authorized.runtime], async () => {
+      const method = request.method ?? 'GET'
+      const hasBody = method !== 'GET' && method !== 'HEAD' && method !== 'DELETE'
+      try {
+        let response: Response
+        try {
+          response = await fetch(`http://127.0.0.1:${String(authorized.runtime.port)}${targetPath}`, {
+            method,
+            headers: uploadHeaders(request, authorized.runtime, authorized.assertion),
+            ...(hasBody ? {
+              body: Readable.toWeb(request) as ReadableStream<Uint8Array>,
+              duplex: 'half' as const,
+            } : {}),
+            redirect: 'error',
+            signal,
+          } as RequestInit & { duplex?: 'half' })
+        } catch (error) {
+          if (signal.aborted) throw signal.reason
+          throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Target document runtime is unavailable.')
+        }
+        if (response.status === 204) return new Response(null, { status: 204 })
+        let body: unknown
+        try {
+          body = await responseJson(response, responseLimit(deps))
+        } catch (error) {
+          if (error instanceof ResponseBodyTooLargeError) {
+            throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The target runtime response is too large.')
+          }
+          throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The target runtime returned invalid upload JSON.')
+        }
+        if (!response.ok) {
+          return new Response(JSON.stringify(uploadErrorEnvelope(body)), {
+            status: response.status,
+            headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+          })
+        }
+        return new Response(JSON.stringify(safeUploadSession(body)), {
+          status: response.status,
+          headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+        })
+      } finally {
+        drainForwardedRequest(request, hasBody)
+      }
+    })
+  }
+}
+
+/** Public prefix for full-scope document operations. */
+export const DOCUMENT_SCOPE_PATH = '/api/documents/scope'
+
+function scopeRuntimePath(operation: GatewayDocumentScopeOperation): string {
+  switch (operation) {
+    case 'list': return '/api/documents'
+    case 'directories': return '/api/documents/directories'
+    case 'content': return '/api/documents/content'
+    case 'trash': return '/api/documents/trash'
+    case 'restore': return '/api/documents/restore'
+    case 'purge': return '/api/documents/purge'
+    case 'folders': return '/api/documents/folders'
+    case 'move': return '/api/documents/move'
+    case 'delete': return '/api/documents/trash'
+    default:
+      return assertNeverScopeOperation(operation)
+  }
+}
+
+function assertNeverScopeOperation(value: never): never {
+  throw new Error(`unexpected document scope operation: ${String(value)}`)
+}
+
+function publicDocumentBody(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(item => publicDocumentBody(item))
+  if (value === null || typeof value !== 'object') return value
+  const row = value as Record<string, unknown>
+  const result: Record<string, unknown> = {}
+  for (const [key, item] of Object.entries(row)) {
+    if (key === 'path' || key === 'trashPath') {
+      result[key] = ''
+      continue
+    }
+    result[key] = publicDocumentBody(item)
+  }
+  return result
+}
+
+function responseWithSafeJson(response: Response, body: unknown): Response {
+  return new Response(JSON.stringify(publicDocumentBody(body)), {
+    status: response.status,
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+    },
+  })
+}
+
+function inlinePreviewMedia(mediaType: string): boolean {
+  return mediaType.startsWith('image/') || mediaType === 'application/pdf'
+    || mediaType.startsWith('text/') || mediaType === 'application/json'
+    || mediaType === 'application/xml' || mediaType === 'application/x-yaml'
+    || mediaType === 'application/javascript' || mediaType.endsWith('+json') || mediaType.endsWith('+xml')
+}
+
+/**
+ * Create a Gateway broker for complete operations in a selected document scope.
+ * Every request is authorized independently; the runtime never receives a
+ * browser-visible URL or an unverified path.
+ */
+export function createGatewayDocumentScopeHandler(
+  deps: DocumentTransferDependencies,
+): GatewayDocumentScopeHandler {
+  return async ({ user, request, operation, scope: requested, signal }) => {
+    const read = operation === 'list' || operation === 'directories' || operation === 'content'
+      || (operation === 'trash' && (request.method ?? 'GET') === 'GET')
+    const authorized = await authorizedScope(deps, user, requested, read ? 'read' : 'write')
+    const releaseLease = await acquireRuntimeLease(deps, authorized.runtime)
+    let handedOff = false
+    const incoming = new URL(request.url ?? '/', 'http://gateway')
+    incoming.searchParams.delete('scope')
+    const target = new URL(scopeRuntimePath(operation), `http://127.0.0.1:${String(authorized.runtime.port)}`)
+    for (const [key, value] of incoming.searchParams) target.searchParams.append(key, value)
+    const headers = headersFor(authorized.runtime, authorized.assertion)
     const method = request.method ?? 'GET'
-    const hasBody = method !== 'GET' && method !== 'HEAD' && method !== 'DELETE'
+    const forwardMethod = operation === 'delete' && method === 'DELETE' ? 'POST' : method
+    const hasBody = forwardMethod !== 'GET' && forwardMethod !== 'HEAD' && forwardMethod !== 'DELETE'
     let response: Response
     try {
-      response = await fetch(`http://127.0.0.1:${String(authorized.runtime.port)}${targetPath}`, {
-        method,
-        headers: uploadHeaders(request, authorized.runtime, authorized.assertion),
-        ...(hasBody ? {
-          body: Readable.toWeb(request) as ReadableStream<Uint8Array>,
-          duplex: 'half' as const,
-        } : {}),
-        redirect: 'error',
-        signal,
-      } as RequestInit & { duplex?: 'half' })
-    } catch (error) {
-      if (signal.aborted) throw signal.reason
-      throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Target document runtime is unavailable.')
+      try {
+        response = await fetch(target, {
+          method: forwardMethod,
+          headers,
+          ...(hasBody ? { body: Readable.toWeb(request) as ReadableStream<Uint8Array>, duplex: 'half' as const } : {}),
+          redirect: 'error',
+          signal,
+        } as RequestInit & { duplex?: 'half' })
+      } catch (error) {
+        if (signal.aborted) throw signal.reason
+        throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document scope is temporarily unavailable.')
+      }
+      if (operation === 'content' && response.ok) {
+      const mediaType = (response.headers.get('content-type') ?? '').split(';', 1)[0] ?? ''
+      const inline = incoming.searchParams.get('inline') === '1' && inlinePreviewMedia(mediaType)
+      const contentDisposition = response.headers.get('content-disposition')
+      const outputHeaders = new Headers(response.headers)
+      outputHeaders.set('cache-control', 'private, no-store')
+      outputHeaders.set('x-content-type-options', 'nosniff')
+      outputHeaders.set('content-security-policy', "default-src 'none'; img-src 'self' data:; frame-ancestors 'none'; sandbox")
+      if (inline) outputHeaders.set('content-disposition', 'inline')
+      else if (contentDisposition === null) outputHeaders.set('content-disposition', 'attachment')
+        handedOff = true
+        return leaseResponse(new Response(response.body, { status: response.status, headers: outputHeaders }), releaseLease)
+      }
+      if (response.status === 204) return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
+      let body: unknown
+      try { body = await responseJson(response, responseLimit(deps)) } catch (error) {
+        if (error instanceof ResponseBodyTooLargeError) {
+          throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The target runtime response is too large.')
+        }
+        // A malformed runtime body may contain a private path or other
+        // implementation detail. Never pass it through the browser broker.
+        throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The target runtime returned invalid document metadata.')
+      }
+      return responseWithSafeJson(response, body)
+    } finally {
+      drainForwardedRequest(request, hasBody)
+      if (!handedOff) await releaseLease().catch(() => {})
     }
-    if (response.status === 204) return new Response(null, { status: 204 })
-    let body: unknown
+  }
+}
+
+async function authorizedAdministratorScope(
+  deps: DocumentTransferDependencies,
+  actor: UserRow,
+  requested: DocumentTransferScope,
+  personalOwnerId: number | undefined,
+): Promise<AuthorizedScope> {
+  if (actor.role !== 'admin') {
+    throw new DocumentTransferError('DOCUMENT_ADMIN_FORBIDDEN', 403, 'Only organization administrators can manage document lifecycle.')
+  }
+  if (requested.kind !== 'personal' || personalOwnerId === undefined || personalOwnerId === actor.id) {
+    return authorizedScope(deps, actor, requested, 'write')
+  }
+  const owner = await deps.users.getById(personalOwnerId)
+  if (owner === null) throw new DocumentTransferError('COLLABORATION_FORBIDDEN', 403, 'Personal document scope is unavailable.')
+  const identity: ScopeIdentity = { kind: 'personal', id: owner.id, label: 'Personal documents' }
+  const runtime = await runtimeFor(deps, identity, owner)
+  return {
+    identity,
+    runtime,
+    assertion: deps.principals.issue({
+      user: actor,
+      scope: { kind: 'personal' },
+      runtime: { kind: runtime.target.kind, id: runtime.target.id, generation: runtime.generation },
+      purpose: 'document-admin',
+    }),
+  }
+}
+
+/** Create a Gateway broker for administrator document recovery actions. */
+export function createGatewayDocumentAdminHandler(
+  deps: DocumentTransferDependencies,
+): GatewayDocumentAdminHandler {
+  return async ({ user, scope: requested, personalOwnerId, docId, action, signal }) => {
+    const authorized = await authorizedAdministratorScope(deps, user, requested, personalOwnerId)
+    const release = await acquireRuntimeLease(deps, authorized.runtime)
+    let handedOff = false
     try {
-      body = await response.json() as unknown
-    } catch {
-      throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The target runtime returned invalid upload JSON.')
+      const path = action === 'trash' ? '/api/documents/trash'
+        : action === 'restore' ? '/api/documents/restore' : '/api/documents/purge'
+      const target = new URL(path, `http://127.0.0.1:${String(authorized.runtime.port)}`)
+      target.searchParams.set('id', docId)
+      const method = action === 'purge' ? 'DELETE' : 'POST'
+      let response: Response
+      try {
+        response = await fetch(target, {
+          method,
+          headers: headersFor(authorized.runtime, authorized.assertion),
+          redirect: 'error',
+          signal,
+        })
+      } catch (error) {
+        if (signal.aborted) throw signal.reason
+        throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document runtime is unavailable.')
+      }
+      if (response.status === 204) {
+        await release().catch(() => {})
+        handedOff = true
+        return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
+      }
+      let body: unknown
+      try { body = await responseJson(response, responseLimit(deps)) } catch (error) {
+        if (error instanceof ResponseBodyTooLargeError) throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The runtime response is too large.')
+        throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The runtime returned invalid document metadata.')
+      }
+      const result = responseWithSafeJson(response, body)
+      await release().catch(() => {})
+      handedOff = true
+      return result
+    } finally {
+      if (!handedOff) await release().catch(() => {})
     }
-    if (!response.ok) {
-      return new Response(JSON.stringify(uploadErrorEnvelope(body)), {
-        status: response.status,
-        headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
-      })
-    }
-    return new Response(JSON.stringify(safeUploadSession(body)), {
-      status: response.status,
-      headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
-    })
   }
 }
 
@@ -1184,30 +1801,39 @@ export function createGatewayDocumentTransferUploadHandler(
 export function createDocumentTransferDirectoriesHandler(
   deps: DocumentTransferDependencies,
 ): RuntimeDocumentTransferDirectoriesHandler {
-  return async ({ principal, payload }) => {
+  return async ({ principal, payload, signal }) => {
     const candidate = record(payload)
     if (candidate?.version !== 1) throw new DocumentTransferError('INVALID_DOCUMENT_TRANSFER', 400, 'Invalid document directory request.')
     const requested = scope(candidate.scope)
     const actor = syntheticUser(principal)
     const authorized = await authorizedScope(deps, actor, requested, 'read')
-    let response: Response
-    try {
-      response = await fetch(`http://127.0.0.1:${String(authorized.runtime.port)}/api/documents/directories`, {
-        method: 'GET', headers: headersFor(authorized.runtime, authorized.assertion),
+    return withRuntimeLeases(deps, [authorized.runtime], async () => {
+      let response: Response
+      try {
+        response = await fetch(`http://127.0.0.1:${String(authorized.runtime.port)}/api/documents/directories`, {
+          method: 'GET', headers: headersFor(authorized.runtime, authorized.assertion),
+          ...(signal === undefined ? {} : { signal }),
+        })
+      } catch (error) {
+        if (signal?.aborted) throw signal.reason
+        throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document directory listing is unavailable.')
+      }
+      const body = await responseJson(response, responseLimit(deps))
+      if (!response.ok) throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document directory listing is unavailable.')
+      const value = record(body)
+      if (!Array.isArray(value?.directories) || value.directories.length > 2000) {
+        throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned an invalid directory listing.')
+      }
+      const directories = value.directories.map(entry => {
+        const item = record(entry)
+        if (!validRelativeId(item?.directoryId, true) || !nonEmptyString(item?.name) || item.name.length > 255
+          || /[\\/\u0000-\u001f\u007f]/u.test(item.name)) {
+          throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned invalid directory metadata.')
+        }
+        return { directoryId: item.directoryId, name: item.name }
       })
-    } catch {
-      throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document directory listing is unavailable.')
-    }
-    const body = await responseJson(response)
-    if (!response.ok) throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document directory listing is unavailable.')
-    const value = record(body)
-    if (!Array.isArray(value?.directories)) throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned an invalid directory listing.')
-    const directories = value.directories.flatMap(entry => {
-      const item = record(entry)
-      return validRelativeId(item?.directoryId, true) && nonEmptyString(item?.name)
-        ? [{ directoryId: item.directoryId, name: item.name }] : []
+      return { version: 1, scope: { kind: authorized.identity.kind, label: authorized.identity.label }, directories }
     })
-    return { version: 1, scope: { kind: authorized.identity.kind, label: authorized.identity.label }, directories }
   }
 }
 
@@ -1215,7 +1841,7 @@ export function createDocumentTransferDirectoriesHandler(
 export function createDocumentTransferDirectoryCreateHandler(
   deps: DocumentTransferDependencies,
 ): RuntimeDocumentTransferDirectoryCreateHandler {
-  return async ({ principal, payload }) => {
+  return async ({ principal, payload, signal }) => {
     const candidate = record(payload)
     if (candidate?.version !== 1 || typeof candidate.name !== 'string' || candidate.name === ''
       || candidate.name.length > 255 || !validRelativeId(candidate.directory, true)) {
@@ -1224,24 +1850,30 @@ export function createDocumentTransferDirectoryCreateHandler(
     const requested = scope(candidate.scope)
     const actor = syntheticUser(principal)
     const authorized = await authorizedScope(deps, actor, requested, 'write')
-    let response: Response
-    try {
-      response = await fetch(`http://127.0.0.1:${String(authorized.runtime.port)}/api/documents/folders?directory=${encodeURIComponent(candidate.directory)}&name=${encodeURIComponent(candidate.name)}`, {
-        method: 'POST', headers: headersFor(authorized.runtime, authorized.assertion),
-      })
-    } catch {
-      throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Target folder creation is unavailable.')
-    }
-    const body = await responseJson(response)
-    if (!response.ok) {
-      const error = responseError(body)
-      throw new DocumentTransferError(error.code, response.status, error.message)
-    }
-    const row = record(body)
-    if (!validRelativeId(row?.directoryId, false) || !nonEmptyString(row.name)) {
-      throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned invalid folder metadata.')
-    }
-    return { version: 1, scope: { kind: authorized.identity.kind, label: authorized.identity.label }, directory: { directoryId: row.directoryId, name: row.name } }
+    const directory = candidate.directory as string
+    const name = candidate.name as string
+    return withRuntimeLeases(deps, [authorized.runtime], async () => {
+      let response: Response
+      try {
+        response = await fetch(`http://127.0.0.1:${String(authorized.runtime.port)}/api/documents/folders?directory=${encodeURIComponent(directory)}&name=${encodeURIComponent(name)}`, {
+          method: 'POST', headers: headersFor(authorized.runtime, authorized.assertion),
+          ...(signal === undefined ? {} : { signal }),
+        })
+      } catch (error) {
+        if (signal?.aborted) throw signal.reason
+        throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Target folder creation is unavailable.')
+      }
+      const body = await responseJson(response, responseLimit(deps))
+      if (!response.ok) {
+        const error = responseError(body)
+        throw new DocumentTransferError(error.code, response.status, error.message)
+      }
+      const row = record(body)
+      if (!validRelativeId(row?.directoryId, false) || !nonEmptyString(row.name)) {
+        throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned invalid folder metadata.')
+      }
+      return { version: 1, scope: { kind: authorized.identity.kind, label: authorized.identity.label }, directory: { directoryId: row.directoryId, name: row.name } }
+    })
   }
 }
 
@@ -1250,7 +1882,7 @@ export function createDocumentTransferPlanHandler(
   deps: DocumentTransferDependencies,
 ): RuntimeDocumentTransferPlanHandler {
   const list = createDocumentTransferListHandler(deps)
-  return async ({ subject, principal, payload }) => {
+  return async ({ subject, principal, payload, signal }) => {
     const input = requestValue(payload)
     if (input.targets !== undefined && input.targets.length > 1 && principal.user.role !== 'admin') {
       throw new DocumentTransferError('DOCUMENT_TRANSFER_MULTI_TARGET_FORBIDDEN', 403, 'Only organization administrators can create multi-target plans.')
@@ -1271,12 +1903,45 @@ export function createDocumentTransferPlanHandler(
       }
       targetSummaries.push({ kind: 'project', label: membership.name })
     }
-    const listed = await list({ subject, principal, payload: { version: 1, scope: input.source } })
     const wanted = new Set(input.documents.map(document => document.docId))
-    const documents = listed.documents.filter(document => wanted.has(document.docId))
+    const found = new Map<string, DocumentTransferTargetRef>()
+    let sourceSummary: DocumentTransferScopeSummary | undefined
+    let cursor: string | undefined
+    const seenCursors = new Set<string>()
+    let pages = 0
+    do {
+      if (cursor !== undefined) {
+        if (seenCursors.has(cursor) || pages >= 500) {
+          throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The source runtime returned a repeating document cursor.')
+        }
+        seenCursors.add(cursor)
+      }
+      pages += 1
+      const listed = await list({
+        subject,
+        principal,
+        signal,
+        payload: {
+          version: 1,
+          scope: input.source,
+          limit: 100,
+          ...(cursor === undefined ? {} : { cursor }),
+        },
+      })
+      sourceSummary = listed.scope
+      for (const document of listed.documents) {
+        if (wanted.has(document.docId)) found.set(document.docId, document)
+      }
+      cursor = listed.nextCursor
+    } while (cursor !== undefined && found.size < wanted.size)
+    if (found.size !== wanted.size) {
+      throw new DocumentTransferError('DOCUMENT_NOT_FOUND', 404, 'One or more source documents are unavailable.')
+    }
+    const documents = input.documents.map(document => found.get(document.docId)!)
     const now = Date.now()
-    for (const [id, record] of transferPlans) {
-      if (record.expiresAt <= now) transferPlans.delete(id)
+    pruneTransferPlans(now)
+    if (transferPlans.size >= MAX_TRANSFER_PLANS) {
+      throw new DocumentTransferError('DOCUMENT_TRANSFER_PLAN_LIMIT', 503, 'Too many transfer plans are pending; retry shortly.')
     }
     const planId = randomUUID()
     const expiresAt = now + TRANSFER_PLAN_TTL_MS
@@ -1285,15 +1950,17 @@ export function createDocumentTransferPlanHandler(
       source: input.source,
       target: input.target,
       ...(input.targets === undefined ? {} : { targets: input.targets }),
-      ...(input.targets === undefined ? {} : { targets: input.targets }),
+      ...(input.directory === undefined ? {} : { directory: input.directory }),
       documents: input.documents,
       expiresAt,
     })
+    scheduleTransferPlanCleanup()
     return {
       version: 1,
       planId,
-      source: listed.scope,
+      source: sourceSummary!,
       target: targetSummaries[0]!,
+      ...(input.directory === undefined ? {} : { directory: input.directory }),
       documents,
       expiresAt,
       ...(targetSummaries.length <= 1 ? {} : { targets: targetSummaries.map(target => ({ target, documents })) }),

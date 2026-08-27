@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { BlockAssembler, EMPTY_RESPONSE_CODE, LlmError } from '@deepseek-ai/dsh-llm'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
 import { DONE } from '../src/sse.ts'
-import { mapFinishReason, mapUsage, translate } from '../src/translate.ts'
+import {
+  MAX_FINISH_REASON_BYTES,
+  MAX_TOOL_CALL_BLOCKS,
+  MAX_TOOL_CALL_DELTAS_PER_CHUNK,
+  mapFinishReason,
+  mapUsage,
+  translate,
+} from '../src/translate.ts'
 
 async function* feed(...payloads: (string | object)[]): AsyncGenerator<string> {
   for (const payload of payloads) {
@@ -259,6 +266,46 @@ describe('translate: errors', () => {
   it('throws STREAM_CLOSED when the payload source ends without DONE', async () => {
     await expect(collect(translate(feed(firstChunk)))).rejects.toThrow(/without \[DONE\]/)
   })
+
+  it.each([
+    [null, 'chunk must be an object'],
+    [{ choices: {} }, 'choices must be a bounded array'],
+    [{ choices: [null] }, 'choice must be an object'],
+    [{ choices: [{ delta: 1 }] }, 'delta must be an object'],
+    [{ choices: [{ delta: { content: 1 } }] }, 'delta.content must be a string or null'],
+    [{ choices: [{ delta: { tool_calls: {} } }] }, 'delta.tool_calls must be a bounded array'],
+    [{ choices: [{ delta: { tool_calls: [null] } }] }, 'tool call must be an object'],
+    [{ choices: [{ delta: { tool_calls: [{ index: -1 }] } }] }, 'tool-call index is invalid'],
+    [{ choices: [{ delta: { tool_calls: [{ index: 0, type: 'text' }] } }] }, 'tool-call type is invalid'],
+    [{ choices: [{ delta: { tool_calls: [{ index: 0, id: '\u0000' }] } }] }, 'tool-call id is invalid'],
+    [{ choices: [{ delta: { tool_calls: [{ index: 0, function: 1 }] } }] }, 'tool-call function must be an object'],
+    [{ choices: [{ delta: { tool_calls: [{ index: 0, function: { name: '\u0000' } }] } }] }, 'tool-call name is invalid'],
+    [{ choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: 1 } }] } }] }, 'tool-call arguments is invalid'],
+    [{ choices: [{ finish_reason: 1 }] }, 'finish_reason is invalid'],
+    [{ usage: [] }, 'usage must be an object or null'],
+    [{ usage: { prompt_tokens: 1, completion_tokens: 1, prompt_tokens_details: [] } }, 'usage.prompt_tokens_details must be an object'],
+  ])('rejects malformed wire shape (%s)', async (payload, message) => {
+    await expect(collect(translate(feed(payload as object, DONE)))).rejects.toThrow(message)
+  })
+
+  it('rejects oversized choice and tool-call arrays before iterating them', async () => {
+    await expect(collect(translate(feed({ choices: Array.from({ length: 17 }, () => ({ delta: {} })) }, DONE))))
+      .rejects.toThrow(/choices must be a bounded array/)
+    const oversizedCalls = Array.from(
+      { length: MAX_TOOL_CALL_DELTAS_PER_CHUNK + 1 },
+      () => ({ index: 0 }),
+    )
+    await expect(collect(translate(feed({ choices: [{ delta: { tool_calls: oversizedCalls } }] }, DONE))))
+      .rejects.toThrow(/tool_calls must be a bounded array/)
+  })
+
+  it('bounds distinct tool-call blocks and finish-reason metadata', async () => {
+    const calls = Array.from({ length: MAX_TOOL_CALL_BLOCKS + 1 }, (_, index) => ({ index }))
+    await expect(collect(translate(feed({ choices: [{ delta: { tool_calls: calls } }] }, DONE))))
+      .rejects.toThrow(/block count exceeds/)
+    await expect(collect(translate(feed({ choices: [{ finish_reason: 'x'.repeat(MAX_FINISH_REASON_BYTES + 1) }] }, DONE))))
+      .rejects.toThrow(/finish_reason is invalid/)
+  })
 })
 
 describe('mapFinishReason', () => {
@@ -308,6 +355,16 @@ describe('mapUsage', () => {
   it('omits optional fields when the wire omits them', () => {
     expect(mapUsage({ prompt_tokens: 10, completion_tokens: 2 }))
       .toEqual({ inputTokens: 10, outputTokens: 2 })
+  })
+
+  it.each([
+    [{ prompt_tokens: -1, completion_tokens: 1 }, 'prompt_tokens'],
+    [{ prompt_tokens: 1, completion_tokens: Number.POSITIVE_INFINITY }, 'completion_tokens'],
+    [{ prompt_tokens: 1, completion_tokens: 1, prompt_tokens_details: { cached_tokens: 2 } }, 'cached tokens exceed'],
+    [{ prompt_tokens: 1, completion_tokens: 1, prompt_cache_miss_tokens: -1 }, 'prompt_cache_miss_tokens'],
+    [{ prompt_tokens: 1, completion_tokens: 1, completion_tokens_details: { reasoning_tokens: 2 } }, 'reasoning tokens exceed'],
+  ])('rejects invalid usage (%s)', (usage, message) => {
+    expect(() => mapUsage(usage as never)).toThrow(message)
   })
 })
 

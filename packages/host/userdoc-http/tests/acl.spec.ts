@@ -5,7 +5,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
 import type { GatewayRuntime } from '@deepseek-ai/dsh-gateway-runtime'
 import { UserDocId, type UserDocRef, type UserDocStore } from '@deepseek-ai/dsh-userdoc'
-import { handleUserDocHttp, USERDOC_HTTP_PATH, USERDOC_UPLOADS_PATH } from '../src/index.ts'
+import { handleUserDocHttp, USERDOC_CATALOG_OVERVIEW_PATH, USERDOC_HTTP_PATH, USERDOC_UPLOADS_PATH } from '../src/index.ts'
 
 const REF: UserDocRef = {
   docId: UserDocId('report.txt'),
@@ -49,7 +49,7 @@ function store(): UserDocStore {
   } as unknown as UserDocStore
 }
 
-function context(mode: 'ro' | 'rw' | 'missing', transfer?: (path: string, init?: RequestInit) => Promise<Response>): Context {
+function context(mode: 'ro' | 'rw' | 'missing', transfer?: (path: string, init?: RequestInit) => Promise<Response>, documentAdmin = false): Context {
   const userDocs = store()
   const authority: CollaborationAuthority = {
     participant: {
@@ -72,6 +72,7 @@ function context(mode: 'ro' | 'rw' | 'missing', transfer?: (path: string, init?:
       if (name === 'gatewayRuntime') return {
         identity: { kind: 'project', id: 41, generation: 1 },
         ...(transfer === undefined ? {} : { request: transfer }),
+        ...(documentAdmin ? { current: () => ({ claims: { user: { role: 'admin' }, purpose: 'document-admin' } }) } : {}),
       } as GatewayRuntime
       if (name === 'collaboration') return collaboration
       return undefined
@@ -134,6 +135,17 @@ describe('project document ACL', () => {
     await handleUserDocHttp(context('missing'), request('GET', USERDOC_HTTP_PATH), unavailable.res)
     expect(unavailable.status()).toBe(503)
     expect(unavailable.body()).toMatchObject({ error: { code: 'COLLABORATION_UNAVAILABLE' } })
+  })
+
+  it('limits a document-admin principal to lifecycle routes', async () => {
+    const denied = response()
+    await handleUserDocHttp(
+      context('rw', undefined, true),
+      request('GET', `${USERDOC_HTTP_PATH}/content?id=report.txt`),
+      denied.res,
+    )
+    expect(denied.status()).toBe(403)
+    expect(denied.body()).toMatchObject({ error: { code: 'COLLABORATION_FORBIDDEN' } })
   })
 
   it('forwards only the versioned transfer metadata to the Gateway runtime', async () => {
@@ -202,5 +214,29 @@ describe('project document ACL', () => {
     expect(result.status()).toBe(200)
     expect(result.body()).toMatchObject({ documents: [{ docId: 'reports/a.txt' }] })
     expect(JSON.stringify(result.body())).not.toContain('/private/secret')
+  })
+
+  it('rejects an oversized runtime JSON response before JSON.parse', async () => {
+    const cancel = vi.fn(async () => {})
+    const runtimeResponse = new Response(new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(new Uint8Array([123])) },
+      cancel,
+    }), {
+      status: 200,
+      headers: {
+        'content-type': 'application/json',
+        'content-length': String(8 * 1024 * 1024 + 1),
+      },
+    })
+    const requestSpy = vi.fn(async () => runtimeResponse)
+    const result = response()
+    await handleUserDocHttp(
+      context('rw', requestSpy),
+      request('GET', USERDOC_CATALOG_OVERVIEW_PATH),
+      result.res,
+    )
+    expect(result.status()).toBe(503)
+    expect(result.body()).toMatchObject({ error: { code: 'DOCUMENT_CATALOG_UNAVAILABLE' } })
+    expect(cancel).toHaveBeenCalledOnce()
   })
 })

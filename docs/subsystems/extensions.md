@@ -256,7 +256,7 @@ inspectPackage( agent: Agent, pluginId: CordisDynamicPluginId, packageId: Cordis
 
 Types: [Agent](core.md)
 
-Source: [`packages/extensions/cordis-host-runner/src/index.ts:127`](../../packages/extensions/cordis-host-runner/src/index.ts)
+Source: [`packages/extensions/cordis-host-runner/src/index.ts:143`](../../packages/extensions/cordis-host-runner/src/index.ts)
 
 <a id="deepseek-ai-events"></a>
 

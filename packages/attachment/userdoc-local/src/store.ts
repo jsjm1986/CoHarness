@@ -3,7 +3,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { constants, type Stats } from 'node:fs'
 import { lstat, link, mkdir, open, readdir, realpath, rename, rmdir, unlink } from 'node:fs/promises'
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { Readable } from 'node:stream'
 import {
   DOCUMENT_DELETE_FAILED_CODE,
@@ -46,6 +46,8 @@ import {
 
 const PARTIAL_SUFFIX = '.part'
 const INTERNAL_UPLOAD_DIRECTORY = '.upload-sessions'
+const INTERNAL_TRASH_DIRECTORY = '.dsh-trash'
+const LIST_METADATA_CONCURRENCY = 8
 /* v8 ignore next -- the fallback runs only on platforms whose fs constants omit O_NOFOLLOW. */
 // oxlint-disable-next-line typescript/no-unnecessary-condition -- O_NOFOLLOW is absent on platforms that do not expose the flag.
 const NOFOLLOW = constants.O_NOFOLLOW ?? 0
@@ -56,11 +58,26 @@ async function assertRealParent(root: string, path: string): Promise<void> {
     realpath(dirname(path)),
   ])
   assertInside(canonicalRoot, canonicalParent)
+  // A canonical parent can still be reached through a symlink below the
+  // document root. Walk the lexical components and refuse link-shaped ones so
+  // a replacement between the realpath check and unlink/rename cannot redirect
+  // the operation to another subtree.
+  const nested = relative(resolve(root), resolve(dirname(path)))
+  if (nested !== '' && !nested.startsWith(`..${sep}`) && nested !== '..') {
+    let current = resolve(root)
+    for (const part of nested.split(sep).filter(Boolean)) {
+      current = join(current, part)
+      const entry = await lstat(current)
+      if (entry.isSymbolicLink() || !entry.isDirectory()) {
+        throw new UserDocError('Document directory not found.', DOCUMENT_DIRECTORY_NOT_FOUND_CODE)
+      }
+    }
+  }
 }
 
 async function openDocument(root: string, path: string) {
   try {
-    await assertRealParent(root, path)
+    if (resolve(path) !== resolve(root)) await assertRealParent(root, path)
     const entry = await lstat(path)
     if (entry.isSymbolicLink()) throw new UserDocError('Document not found.', DOCUMENT_NOT_FOUND_CODE)
     const handle = await open(path, constants.O_RDONLY | NOFOLLOW)
@@ -82,6 +99,7 @@ async function openDocument(root: string, path: string) {
 
 async function directoryInfo(root: string, path: string): Promise<Stats> {
   try {
+    if (resolve(path) !== resolve(root)) await assertRealParent(root, path)
     const [canonicalRoot, canonicalDirectory] = await Promise.all([realpath(root), realpath(path)])
     assertInside(canonicalRoot, canonicalDirectory)
     const entry = await lstat(path)
@@ -128,6 +146,26 @@ async function exists(path: string): Promise<boolean> {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false
     throw error
   }
+}
+
+async function mapConcurrent<T, R>(
+  values: readonly T[],
+  concurrency: number,
+  operation: (value: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(values.length)
+  let next = 0
+  const worker = async (): Promise<void> => {
+    for (;;) {
+      const index = next
+      next += 1
+      const value = values[index]
+      if (value === undefined) return
+      results[index] = await operation(value)
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, values.length) }, () => worker()))
+  return results
 }
 
 /**
@@ -195,15 +233,20 @@ export async function saveDocFile(
     handle = await open(partial, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | NOFOLLOW, 0o600)
     const reader = body.getReader()
     try {
-      while (true) {
-        signal?.throwIfAborted()
-        const { done, value } = await reader.read()
-        if (done) break
-        bytes += value.byteLength
-        if (limits.maxFileBytes !== null && bytes > limits.maxFileBytes) {
-          throw new UserDocError('Document exceeds the configured byte limit.', DOCUMENT_TOO_LARGE_CODE)
+      try {
+        while (true) {
+          signal?.throwIfAborted()
+          const { done, value } = await reader.read()
+          if (done) break
+          bytes += value.byteLength
+          if (limits.maxFileBytes !== null && bytes > limits.maxFileBytes) {
+            throw new UserDocError('Document exceeds the configured byte limit.', DOCUMENT_TOO_LARGE_CODE)
+          }
+          await handle.write(value)
         }
-        await handle.write(value)
+      } catch (error) {
+        await reader.cancel(error).catch(() => {})
+        throw error
       }
     } finally {
       reader.releaseLock()
@@ -364,17 +407,18 @@ export async function listDocFiles(root: string, signal?: AbortSignal): Promise<
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue
       throw new UserDocError('Unable to list stored documents.', DOCUMENT_READ_FAILED_CODE, { cause: error })
     }
-    for (const entry of entries) {
-      if (directory === resolve(root) && entry.name === INTERNAL_UPLOAD_DIRECTORY) continue
+    const files = entries.filter(entry => entry.isFile() && !entry.name.endsWith(PARTIAL_SUFFIX))
+    const listed = await mapConcurrent(files, LIST_METADATA_CONCURRENCY, async (entry) => {
       const path = join(directory, entry.name)
-      if (entry.isDirectory()) {
-        pending.push(path)
-        continue
-      }
-      if (!entry.isFile() || entry.name.endsWith(PARTIAL_SUFFIX)) continue
       const { handle, info } = await openDocument(root, path)
       await handle.close()
-      refs.push(documentRef(root, path, info))
+      return documentRef(root, path, info)
+    })
+    refs.push(...listed)
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue
+      if (directory === resolve(root) && (entry.name === INTERNAL_UPLOAD_DIRECTORY || entry.name === INTERNAL_TRASH_DIRECTORY)) continue
+      pending.push(join(directory, entry.name))
     }
   }
   return refs.sort((left, right) => right.modifiedAt - left.modifiedAt)
@@ -398,19 +442,24 @@ export async function listDocDirectory(
   const directories: UserDocDirectoryRef[] = []
   const documents: UserDocRef[] = []
   try {
-    for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const entries = (await readdir(directory, { withFileTypes: true })).filter((entry) => {
       signal?.throwIfAborted()
-      if (directoryId === '' && entry.name === INTERNAL_UPLOAD_DIRECTORY) continue
+      return !(directoryId === '' && (entry.name === INTERNAL_UPLOAD_DIRECTORY || entry.name === INTERNAL_TRASH_DIRECTORY))
+    })
+    const directoryEntries = entries.filter(entry => entry.isDirectory())
+    const fileEntries = entries.filter(entry => entry.isFile() && !entry.name.endsWith(PARTIAL_SUFFIX))
+    const listedDirectories = await mapConcurrent(directoryEntries, LIST_METADATA_CONCURRENCY, async (entry) => {
       const path = join(directory, entry.name)
-      if (entry.isDirectory()) {
-        directories.push(directoryRef(root, path, await directoryInfo(root, path)))
-        continue
-      }
-      if (!entry.isFile() || entry.name.endsWith(PARTIAL_SUFFIX)) continue
+      return directoryRef(root, path, await directoryInfo(root, path))
+    })
+    const listedDocuments = await mapConcurrent(fileEntries, LIST_METADATA_CONCURRENCY, async (entry) => {
+      const path = join(directory, entry.name)
       const { handle, info } = await openDocument(root, path)
       await handle.close()
-      documents.push(documentRef(root, path, info))
-    }
+      return documentRef(root, path, info)
+    })
+    directories.push(...listedDirectories)
+    documents.push(...listedDocuments)
   } catch (error) {
     if (error instanceof UserDocError) throw error
     throw new UserDocError('Unable to list the document directory.', DOCUMENT_READ_FAILED_CODE, { cause: error })
@@ -442,7 +491,7 @@ export async function listDocDirectories(root: string, signal?: AbortSignal): Pr
     const directory = pending.pop() as string
     for (const entry of await readdir(directory, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue
-      if (directory === resolve(root) && entry.name === INTERNAL_UPLOAD_DIRECTORY) continue
+      if (directory === resolve(root) && (entry.name === INTERNAL_UPLOAD_DIRECTORY || entry.name === INTERNAL_TRASH_DIRECTORY)) continue
       const path = join(directory, entry.name)
       const ref = directoryRef(root, path, await directoryInfo(root, path))
       directories.push(ref)
@@ -467,7 +516,7 @@ export async function createDocDirectory(
   const parent = pathForDirectoryId(root, parentId)
   await directoryInfo(root, parent)
   const leaf = sanitizeDirectoryName(name)
-  if (parentId === '' && leaf === INTERNAL_UPLOAD_DIRECTORY) {
+  if (parentId === '' && (leaf === INTERNAL_UPLOAD_DIRECTORY || leaf === INTERNAL_TRASH_DIRECTORY)) {
     throw new UserDocError('Document directory name is reserved.', INVALID_DOCUMENT_DIRECTORY_CODE)
   }
   const path = resolve(join(parent, leaf))
@@ -505,7 +554,7 @@ export async function renameDocDirectory(
   const source = pathForDirectoryId(root, directoryId)
   await directoryInfo(root, source)
   const leaf = sanitizeDirectoryName(name)
-  if (dirname(source) === resolve(root) && leaf === INTERNAL_UPLOAD_DIRECTORY) {
+  if (dirname(source) === resolve(root) && (leaf === INTERNAL_UPLOAD_DIRECTORY || leaf === INTERNAL_TRASH_DIRECTORY)) {
     throw new UserDocError('Document directory name is reserved.', INVALID_DOCUMENT_DIRECTORY_CODE)
   }
   const target = resolve(join(dirname(source), leaf))
@@ -661,6 +710,18 @@ export async function openDocFile(
 export async function removeDocFile(root: string, docId: UserDocId, signal?: AbortSignal): Promise<void> {
   signal?.throwIfAborted()
   const path = pathForDocId(root, docId)
+  let entry
+  try {
+    entry = await lstat(path)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
+    throw new UserDocError('Unable to delete the stored document.', DOCUMENT_DELETE_FAILED_CODE, { cause: error })
+  }
+  if (!entry.isFile() || entry.isSymbolicLink()) {
+    throw new UserDocError('Document not found.', DOCUMENT_NOT_FOUND_CODE)
+  }
+  signal?.throwIfAborted()
+  await assertRealParent(root, path)
   try {
     await unlink(path)
   } catch (error) {

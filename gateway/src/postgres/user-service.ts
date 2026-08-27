@@ -136,6 +136,59 @@ export class PostgresUserService {
     return result.rows[0] === undefined ? null : toUser(result.rows[0])
   }
 
+  /** Atomically update administrator-editable fields for one user. */
+  async patch(
+    id: number,
+    next: { role?: 'admin' | 'user'; status?: 'active' | 'disabled'; displayName?: string },
+  ): Promise<void> {
+    await transaction(this.context.pool, async (client) => {
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`gateway-admin:${this.context.organizationId}`])
+      const target = await client.query<{
+        id: string
+        role: 'admin' | 'member'
+        user_status: 'active' | 'disabled'
+        membership_status: 'active' | 'disabled'
+      }>(`SELECT u.id,m.role,u.status user_status,m.status membership_status
+        FROM harness.users u
+        JOIN harness.memberships m ON m.organization_id=u.organization_id AND m.user_id=u.id
+        WHERE u.organization_id=$1 AND u.public_id=$2 AND u.deleted_at IS NULL FOR UPDATE OF u,m`,
+      [this.context.organizationId, id])
+      const row = target.rows[0]
+      if (row === undefined) return
+      const losesAdmin = row.role === 'admin' && row.user_status === 'active' && row.membership_status === 'active'
+        && (next.role === 'user' || next.status === 'disabled')
+      if (losesAdmin) {
+        const others = await client.query<{ n: string }>(`SELECT COUNT(*)::text n
+          FROM harness.users u JOIN harness.memberships m
+            ON m.organization_id=u.organization_id AND m.user_id=u.id
+          WHERE u.organization_id=$1 AND u.id<>$2 AND u.deleted_at IS NULL AND u.status='active'
+            AND m.status='active' AND m.role='admin'`, [this.context.organizationId, row.id])
+        if (Number(others.rows[0]?.n ?? 0) === 0) throw new Error('cannot-remove-last-admin')
+      }
+      const role = next.role === undefined ? row.role : next.role === 'admin' ? 'admin' : 'member'
+      const status = next.status ?? row.user_status
+      if (next.displayName === undefined) {
+        await client.query(`UPDATE harness.users SET status=$3,updated_at=now()
+          WHERE organization_id=$1 AND id=$2`, [this.context.organizationId, row.id, status])
+      } else {
+        await client.query(`UPDATE harness.users SET status=$3,display_name=$4,updated_at=now()
+          WHERE organization_id=$1 AND id=$2`, [this.context.organizationId, row.id, status, next.displayName])
+      }
+      if (next.role !== undefined) {
+        await client.query(`UPDATE harness.memberships SET role=$3
+          WHERE organization_id=$1 AND user_id=$2`, [this.context.organizationId, row.id, role])
+      }
+      if (next.status !== undefined) {
+        await client.query(`UPDATE harness.memberships SET status=$3
+          WHERE organization_id=$1 AND user_id=$2`, [this.context.organizationId, row.id, status])
+        if (status === 'disabled') {
+          await client.query(`UPDATE harness.auth_sessions SET revoked_at=now(),revoked_reason='user-disabled'
+            WHERE organization_id=$1 AND user_id=$2 AND revoked_at IS NULL`, [this.context.organizationId, row.id])
+        }
+      }
+    })
+  }
+
   private async mutateAdmin(
     id: number,
     next: { role?: 'admin' | 'user'; status?: 'active' | 'disabled' },

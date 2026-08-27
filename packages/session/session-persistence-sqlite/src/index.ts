@@ -13,6 +13,7 @@ import type {
   SessionPreparation,
 } from '@deepseek-ai/dsh-session'
 import {
+  DEFAULT_MAX_PENDING_EVENTS_PER_SESSION,
   DEFAULT_PREPARED_SESSION_CACHE_SIZE,
   DEFAULT_WRITE_BATCH_MAX_DELAY_MS,
   MAX_WRITE_BATCH_DELAY_MS,
@@ -44,6 +45,8 @@ export interface Config {
   preparedSessionCacheSize?: number
   /** Fixed live-event coalescing window; not a backend completion deadline. */
   writeBatchMaxDelayMs?: number
+  /** Maximum events retained in one live session's pending write queue. */
+  maxPendingEvents?: number
 }
 
 /**
@@ -62,6 +65,7 @@ export class SqliteSessionPersistence extends SessionPersistence {
     preparedSessionCacheSize: z.number().step(1).min(1).default(DEFAULT_PREPARED_SESSION_CACHE_SIZE),
     writeBatchMaxDelayMs: z.number().step(1).min(1).max(MAX_WRITE_BATCH_DELAY_MS)
       .default(DEFAULT_WRITE_BATCH_MAX_DELAY_MS),
+    maxPendingEvents: z.number().step(1).min(1).default(DEFAULT_MAX_PENDING_EVENTS_PER_SESSION),
   })
 
   private readonly store: SqliteStore
@@ -73,6 +77,7 @@ export class SqliteSessionPersistence extends SessionPersistence {
       ?? DEFAULT_PREPARED_SESSION_CACHE_SIZE
     const writeBatchMaxDelayMs = config.writeBatchMaxDelayMs
       ?? DEFAULT_WRITE_BATCH_MAX_DELAY_MS
+    const maxPendingEvents = config.maxPendingEvents ?? DEFAULT_MAX_PENDING_EVENTS_PER_SESSION
     this.store = new SqliteStore({
       path: config.path,
       journalMode: config.journalMode ?? 'wal',
@@ -81,6 +86,7 @@ export class SqliteSessionPersistence extends SessionPersistence {
     this.coordinator = new PersistenceCoordinator(this.ctx, this.store, {
       preparedSessionCacheSize,
       writeBatchMaxDelayMs,
+      maxPendingEvents,
     })
   }
 

@@ -45,7 +45,7 @@ interface GatewayPrincipalClaims {
   expiresAt: number
   nonce: string
   /** Optional capability purpose used by loopback-only runtime integrations. */
-  purpose?: 'archive-read'
+  purpose?: 'archive-read' | 'document-admin'
 }
 ```
 
@@ -62,6 +62,10 @@ Connection 载体在浏览器信任检查后、任何 RPC 或 stream handler 运
 interface ConnectionRequestBoundary {
   kind: 'http' | 'upgrade'
   headers: IncomingHttpHeaders
+  /** HTTP method when the carrier has one (upgrade requests use the opening method). */
+  method?: string
+  /** URL pathname before any RPC dispatch. */
+  pathname?: string
 }
 ```
 
@@ -310,7 +314,7 @@ request(path: string, options: GatewayRuntimeRequestInit = {}): Promise<Response
 
 Types: [SessionId](core.zh.md)
 
-Source: [`packages/context/gateway-runtime/src/index.ts:242`](../../packages/context/gateway-runtime/src/index.ts)
+Source: [`packages/context/gateway-runtime/src/index.ts:284`](../../packages/context/gateway-runtime/src/index.ts)
 
 <a id="typert-gateway-events"></a>
 

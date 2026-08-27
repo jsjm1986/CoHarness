@@ -229,9 +229,29 @@ describe('load', () => {
     const bench = await boot()
     const sink = (globalThis as { __ModuleLoader__?: unknown }).__ModuleLoader__
     delete (globalThis as { __ModuleLoader__?: unknown }).__ModuleLoader__
-    await expect(bench.runner.load(half())).rejects.toThrow(/__ModuleLoader__ is missing/)
+    await expect(bench.runner.load(half())).resolves.toMatchObject({
+      ok: false,
+      cause: 'module-import',
+      message: /__ModuleLoader__ is missing/,
+    })
     ;(globalThis as { __ModuleLoader__?: unknown }).__ModuleLoader__ = sink
     await expect(bench.runner.load(half())).resolves.toEqual({ ok: true, pluginRunId: RUN })
+  })
+
+  it('removes a loader entry whose create promise resolves after the load deadline', async () => {
+    const bench = await boot()
+    const internal = bench.runner as unknown as {
+      env: { evaluationTimeoutMs: number; loader: { create: (options: { name: string }) => Promise<string> } }
+    }
+    internal.env.evaluationTimeoutMs = 10
+    let resolveCreate!: (id: string) => void
+    const delayed = new Promise<string>((resolve) => { resolveCreate = resolve })
+    const create = vi.spyOn(internal.env.loader, 'create').mockReturnValue(delayed)
+    const pending = bench.runner.load(half())
+    await expect(pending).rejects.toThrow(/timed out after 10ms/)
+    resolveCreate('late-entry')
+    await vi.waitFor(() => { expect(bench.removed).toContain('late-entry') })
+    create.mockRestore()
   })
 })
 

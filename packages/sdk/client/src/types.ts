@@ -34,14 +34,24 @@ export interface HarnessClientOptions {
    * for the shared scrub-then-merge base).
    */
   env?: NodeJS.ProcessEnv
-  /** Per-request timeout (ms); `undefined` waits indefinitely (a turn can legitimately run long). */
+  /** Per-request timeout (ms); `undefined` waits indefinitely (a turn can legitimately run long). When set, it is 1..2,147,483,647. */
   requestTimeoutMs?: number
-  /** Bound (ms) on the protocol `shutdown` exchange inside `close()` (default 1000). */
+  /** Bound (ms) on the protocol `shutdown` exchange inside `close()` (default 1000; at most 2,147,483,647). */
   shutdownTimeoutMs?: number
-  /** Grace (ms) for the runtime's stdin-EOF quiesce during `close()` (default 6000). */
+  /** Grace (ms) for the runtime's stdin-EOF quiesce during `close()` (default 6000; at most 2,147,483,647). */
   disposeEofGraceMs?: number
-  /** Termination confirmation window (ms) after SIGTERM/SIGKILL during `close()` (default 3000). */
+  /** Termination confirmation window (ms) after SIGTERM/SIGKILL during `close()` (default 3000; at most 2,147,483,647). */
   disposeGraceMs?: number
+  /** Maximum UTF-8 bytes accepted for one JSON-RPC input line. */
+  maxLineBytes?: number
+  /** Maximum pending JSON-RPC requests retained by the transport. */
+  maxPendingRequests?: number
+  /** Maximum concurrently handled inbound JSON-RPC requests. */
+  maxConcurrentIncoming?: number
+  /** Maximum bytes queued on the JSON-RPC output stream. */
+  maxOutputBytes?: number
+  /** Maximum notifications retained by one subscription when no consumer is waiting. */
+  maxNotificationQueue?: number
 }
 
 /** Options for the high-level {@link DeepSeekHarness} wrapper. */

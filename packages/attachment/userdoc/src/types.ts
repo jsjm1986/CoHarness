@@ -72,6 +72,61 @@ export interface UserDocDirectoryListing {
   documents: UserDocRef[]
 }
 
+/** Server-side listing sort order shared by browser and Gateway callers. */
+export type UserDocListSort = 'date-desc' | 'date-asc' | 'name-asc' | 'name-desc' | 'size-desc' | 'size-asc'
+
+/** Server-side document type filter. */
+export type UserDocListType = 'all' | 'image' | 'pdf' | 'text' | 'other'
+
+/** Query accepted by a paged document-directory listing. */
+export interface UserDocListQuery {
+  /** Opaque continuation token from the previous page. */
+  readonly cursor?: string
+  /** Maximum number of document rows to return. */
+  readonly limit?: number
+  /** Case-insensitive name filter. */
+  readonly query?: string
+  /** Presentation type filter. */
+  readonly type?: UserDocListType
+  /** Stable server-side ordering. */
+  readonly sort?: UserDocListSort
+  /** Active documents or recoverable trash. */
+  readonly state?: 'active' | 'trash'
+}
+
+/** One page of document metadata; the cursor is opaque to clients. */
+export interface UserDocDirectoryPage extends UserDocDirectoryListing {
+  /** Present when another page is available. */
+  readonly nextCursor?: string
+  /** Number of documents matching the query before slicing. */
+  readonly totalDocuments: number
+}
+
+/** Recoverable document metadata retained by a provider's trash store. */
+export interface UserDocTrashRef {
+  /** Original stable document identifier. */
+  readonly docId: UserDocId
+  /** Original directory identifier. */
+  readonly directoryId: UserDocDirectoryId
+  /** Original display name. */
+  readonly name: string
+  /** Time at which the document entered trash. */
+  readonly trashedAt: number
+  /** Time at which automatic purge is allowed. */
+  readonly purgeAfter: number
+  /** Metadata retained for preview/download labels. */
+  readonly bytes: number
+  readonly mediaType: string
+  readonly modifiedAt: number
+}
+
+/** One filtered page from a provider's recoverable trash. */
+export interface UserDocTrashPage {
+  readonly documents: readonly UserDocTrashRef[]
+  readonly totalDocuments: number
+  readonly nextCursor?: string
+}
+
 /** Deployment-resolved limits used by upload admission and request buffering. */
 export interface UserDocLimits {
   /** Maximum bytes accepted for one document; `null` means no per-document limit. */
@@ -199,6 +254,7 @@ export interface UserDocTransferPlanResponse {
   readonly planId: string
   readonly source: UserDocTransferScopeSummary
   readonly target: UserDocTransferScopeSummary
+  readonly directory?: UserDocDirectoryId
   readonly documents: readonly UserDocTransferTargetRef[]
   readonly expiresAt: number
   readonly targets?: readonly { readonly target: UserDocTransferScopeSummary; readonly documents: readonly UserDocTransferTargetRef[] }[]
@@ -270,6 +326,14 @@ export interface UserDocTransferListResponse {
   readonly version: 1
   readonly scope: UserDocTransferScopeSummary
   readonly documents: readonly UserDocTransferListedDocument[]
+  /** Upload and prompt limits when the alternate runtime can disclose them. */
+  readonly limits?: UserDocLimits
+  /** Optional folder metadata when the broker serves a full scope browser. */
+  readonly directoryId?: UserDocDirectoryId
+  readonly parentDirectoryId?: UserDocDirectoryId
+  readonly directories?: readonly { readonly directoryId: UserDocDirectoryId; readonly name: string }[]
+  readonly totalDocuments?: number
+  readonly nextCursor?: string
 }
 
 /** Safe directory metadata returned for an authorized target scope. */
@@ -296,7 +360,11 @@ export interface UserDocCatalogRow {
   readonly modifiedAt: number
   readonly owner: { readonly id: number; readonly displayName: string } | null
   readonly ownerSource: 'upload' | 'transfer' | 'legacy' | 'admin'
-  readonly state: 'active' | 'deleted'
+  readonly state: 'active' | 'trash' | 'purged' | 'deleted'
+  readonly trashedAt?: number | null
+  readonly restoredAt?: number | null
+  readonly purgeAfter?: number | null
+  readonly purgedAt?: number | null
   readonly legacy: boolean
   readonly lineageRootId: string | null
 }
@@ -305,6 +373,8 @@ export interface UserDocCatalogRow {
 export interface UserDocCatalogMetrics {
   readonly total: number
   readonly active: number
+  readonly trash?: number
+  readonly purged?: number
   readonly deleted: number
   readonly personal: number
   readonly project: number
@@ -318,6 +388,8 @@ export interface UserDocCatalogOverview {
   readonly version: 1
   readonly documents: readonly UserDocCatalogRow[]
   readonly metrics: UserDocCatalogMetrics
+  readonly totalDocuments?: number
+  readonly nextCursor?: string
 }
 
 /** One audited metadata operation in the current scope. */

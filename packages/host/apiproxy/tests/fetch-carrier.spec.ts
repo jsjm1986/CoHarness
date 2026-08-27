@@ -736,6 +736,16 @@ describe('handler carrier-layer statuses', () => {
     const response = await handler.fetch('http://x/api/session.list', { method: 'POST', headers: { 'content-type': 'application/json' }, body })
     expect(response.status).toBe(200)
   })
+
+  it('rejects an oversized unary request body before JSON parsing', async () => {
+    const handler = toFetchHandler(fakeApi(), { requestBodyMaxBytes: 8 })
+    const response = await handler.fetch(new Request('http://x/api/session.list', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ payload: '123456789' }),
+    }))
+    expect(response.status).toBe(413)
+  })
 })
 
 describe('SSE streams through the carrier', () => {
@@ -762,6 +772,27 @@ describe('SSE streams through the carrier', () => {
       if (received.length === 2) break // generator return → reader.cancel path
     }
     expect(received).toHaveLength(2)
+  })
+
+  it('closes the underlying frame generator when the SSE response body is cancelled', async () => {
+    let returned = false
+    const api = fakeApi()
+    api.events.mux = (_request, signal) => (async function * (): AsyncGenerator<RpcRequest<MuxFrame>> {
+      try {
+        yield { rpcId: RpcId('cancel-me'), payload: { type: 'session/subscribed', sessionId: 's' as never, lastSeq: -1 } }
+        await new Promise<undefined>((resolve) => {
+          signal.addEventListener('abort', () => { resolve(undefined) }, { once: true })
+        })
+      } finally {
+        returned = true
+      }
+    })()
+    const response = await toFetchHandler(api).fetch(new Request('http://x/api/events.mux'))
+    const reader = response.body?.getReader()
+    if (reader === undefined) throw new Error('SSE response did not expose a body')
+    await reader.read()
+    await reader.cancel()
+    await vi.waitFor(() => { expect(returned).toBe(true) })
   })
 
   it('swallows a reader.cancel rejection on early exit', async () => {
@@ -794,6 +825,54 @@ describe('SSE streams through the carrier', () => {
     const frames = await collect(client(api).events.mux({}, new AbortController().signal))
     expect(frames).toHaveLength(2)
     expect(frames[1]?.payload).toMatchObject({ type: 'stream/error', error: { code: 'internal' } })
+  })
+
+  it('rejects an unterminated SSE frame at EOF', async () => {
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('data: {"jsonrpc":"2.0"}'))
+        controller.close()
+      },
+    })
+    const c = new InProcessApiClient({
+      fetch: async () => new Response(body, { headers: { 'content-type': 'text/event-stream' } }),
+    })
+    await expect(collect(c.events.mux({}, new AbortController().signal))).rejects.toThrow(/truncated SSE frame/)
+  })
+
+  it('rejects an SSE frame that exceeds the retained buffer budget', async () => {
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('x'.repeat(8 * 1024 * 1024 + 1)))
+        controller.close()
+      },
+    })
+    const c = new InProcessApiClient({
+      fetch: async () => new Response(body, { headers: { 'content-type': 'text/event-stream' } }),
+    })
+    await expect(collect(c.events.mux({}, new AbortController().signal))).rejects.toThrow(/exceeds 8388608 bytes/)
+  })
+
+  it('bounds each SSE frame independently when a large burst arrives in one read', async () => {
+    const message = 'x'.repeat(4 * 1024 * 1024)
+    const makeFrame = (rpcId: string): string => `data: ${JSON.stringify({
+      type: 'server-request',
+      rpcId,
+      method: 'stream/error',
+      payload: { type: 'stream/error', error: { code: 'internal', message, details: {} } },
+    })}\n\n`
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(makeFrame('burst-1') + makeFrame('burst-2')))
+        controller.close()
+      },
+    })
+    const c = new InProcessApiClient({
+      fetch: async () => new Response(body, { headers: { 'content-type': 'text/event-stream' } }),
+    })
+    const frames = await collect(c.events.mux({}, new AbortController().signal))
+    expect(frames).toHaveLength(2)
+    expect(frames.map(frame => frame.rpcId)).toEqual(['burst-1', 'burst-2'])
   })
 })
 

@@ -355,8 +355,19 @@ function monthOf(time: number, timeZone: string): string {
 }
 
 export class ModelGovernanceService {
+  private configurationRevisionValue = 0
+
   constructor(private readonly db: Database.Database, private readonly timeZone = 'Asia/Shanghai') {
     new Intl.DateTimeFormat('en-US', { timeZone }).format()
+  }
+
+  /** Return the process-local policy revision used by lazy runtime projections. */
+  configurationRevision(): number {
+    return this.configurationRevisionValue
+  }
+
+  private bumpConfigurationRevision(): void {
+    this.configurationRevisionValue += 1
   }
 
   listProviders(): ModelProviderRow[] {
@@ -460,6 +471,7 @@ export class ModelGovernanceService {
         VALUES(?,?,?,?,?,?,?)`).run(provider, model, effectiveAt, ...prices)
     })
     apply()
+    this.bumpConfigurationRevision()
   }
 
   setUserAccess(userId: number, provider: string, model: string, allowed: boolean | null): void {
@@ -470,10 +482,12 @@ export class ModelGovernanceService {
     }
     if (allowed === null) {
       this.db.prepare(`DELETE FROM model_user_access WHERE user_id=? AND provider=? AND model=?`).run(userId, provider, model)
+      this.bumpConfigurationRevision()
       return
     }
     this.db.prepare(`INSERT INTO model_user_access(user_id,provider,model,allowed) VALUES(?,?,?,?)
       ON CONFLICT(user_id,provider,model) DO UPDATE SET allowed=excluded.allowed`).run(userId, provider, model, allowed ? 1 : 0)
+    this.bumpConfigurationRevision()
   }
 
   userOverrides(userId: number): Array<{ provider: string; model: string; allowed: boolean }> {
@@ -522,7 +536,7 @@ export class ModelGovernanceService {
         provider: string; model: string; enabled: number; allowed: number
       }>
     return {
-      version: Date.now(),
+      version: this.configurationRevisionValue,
       // The catalog is the sole authorization source for every role; unlisted
       // routes fall through to the plugin's user-declared allowance instead.
       defaultAllowed: false,
@@ -572,12 +586,14 @@ export class ModelGovernanceService {
       value === 'inherit' ? -1 : value === null ? null : nonnegative(value, name)
     if (subjectType === 'user' && tokenLimit === 'inherit' && costLimit === 'inherit') {
       this.db.prepare(`DELETE FROM model_quotas WHERE subject_type='user' AND subject_id=?`).run(subjectId)
+      this.bumpConfigurationRevision()
       return
     }
     this.db.prepare(`INSERT INTO model_quotas(subject_type,subject_id,token_limit,company_cost_micros_limit)
       VALUES(?,?,?,?) ON CONFLICT(subject_type,subject_id) DO UPDATE SET token_limit=excluded.token_limit,
       company_cost_micros_limit=excluded.company_cost_micros_limit`)
       .run(subjectType, subjectId, stored(tokenLimit, 'tokenLimit'), stored(costLimit, 'companyCostMicrosLimit'))
+    this.bumpConfigurationRevision()
   }
 
   ingest(subject: ModelUsageSubject, event: UsageEvent): { inserted: boolean; alerts: number } {

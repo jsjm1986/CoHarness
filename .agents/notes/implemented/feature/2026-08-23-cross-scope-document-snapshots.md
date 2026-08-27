@@ -18,7 +18,7 @@ The response and audit record carry a transfer id, source and target scope label
 
 The document HTTP consumer applies the same project membership mode check to listing, reads, uploads, folder operations, moves, and deletes. Missing project collaboration authority fails closed as an unavailable authorization service. The Web manager can copy selected documents to a writable project or to the personal store, and successful target refs can be attached to the active composer as non-owning durable drafts. Removing such a draft never deletes the copied file.
 
-The broker also exposes a metadata-only alternate-scope listing and a capability projection. Alternate rows cannot be downloaded, previewed, moved, or deleted through the active runtime; they can only be selected for a permitted snapshot copy.
+The broker exposes a metadata-only alternate-scope listing and a capability projection. The later selected-scope browser adds separately authorized preview, download, folder, move, trash, restore, and purge routes; an attachment from a non-current scope still copies a snapshot into the active conversation scope before it enters the composer.
 
 ## Verification
 

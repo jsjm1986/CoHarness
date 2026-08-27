@@ -1,5 +1,6 @@
 import type { Pool, PoolClient } from 'pg'
-import { lstat, unlink } from 'node:fs/promises'
+import { lstat, realpath, unlink } from 'node:fs/promises'
+import { dirname, parse } from 'node:path'
 import { transaction } from './database.ts'
 import { publicNumber, type PostgresRuntimeContext } from './runtime-context.ts'
 
@@ -135,6 +136,50 @@ interface ArchiveSearchInput {
   readonly role: 'user' | 'assistant'
   readonly content: string
   readonly occurredAt: number
+}
+
+/** Public runtime identity supplied by an authenticated runtime caller. */
+export interface ConversationArchiveRuntimeIdentity {
+  readonly kind: 'user' | 'project'
+  readonly id: number
+}
+
+/**
+ * Remove one database-recorded content file without traversing a replaced
+ * parent symlink. Content paths are legacy records, so the database service
+ * cannot assume a single configured root; rejecting a non-canonical parent is
+ * safer than attempting a recursive cleanup through an untrusted path.
+ */
+async function unlinkContentFile(path: string): Promise<void> {
+  // Walk every ancestor, not only the immediate parent. A replaced grandparent
+  // can otherwise redirect an apparently ordinary child path outside the
+  // originally recorded tree. Refuse cleanup when any component is link-shaped
+  // or cannot be inspected; the durable archive purge remains authoritative and
+  // a later reconciler can retry the skipped file safely.
+  let parent = dirname(path)
+  const root = parse(parent).root
+  while (parent !== root) {
+    let parentEntry
+    try { parentEntry = await lstat(parent) } catch { return }
+    if (parentEntry.isSymbolicLink()) {
+      // macOS exposes /var (and sometimes /tmp) as a root-level alias into
+      // /private. Those OS-owned aliases are not an archive-controlled
+      // component; permit only the exact /private/<alias> mapping and keep
+      // rejecting links below it.
+      const canonical = await realpath(parent).catch(() => undefined)
+      const rootAlias = parent.startsWith('/') && !parent.slice(1).includes('/')
+        && canonical === `/private${parent}`
+      if (!rootAlias) return
+    } else if (!parentEntry.isDirectory()) {
+      return
+    }
+    parent = dirname(parent)
+  }
+  let parentEntry
+  try { parentEntry = await lstat(root) } catch { return }
+  if (!parentEntry.isDirectory() || parentEntry.isSymbolicLink()) return
+  const file = await lstat(path)
+  if (file.isFile() || file.isSymbolicLink()) await unlink(path)
 }
 
 interface ArchiveDbRow {
@@ -540,7 +585,14 @@ export class ConversationArchiveService {
   }
 
   /** Persist one complete runtime snapshot and return commands awaiting acknowledgement. */
-  async syncRuntimeSnapshot(snapshot: ConversationArchiveRuntimeSnapshot): Promise<readonly { id: string; rootSessionId: string; action: 'restore' | 'trash' | 'purge' }[]> {
+  async syncRuntimeSnapshot(
+    snapshot: ConversationArchiveRuntimeSnapshot,
+    caller?: ConversationArchiveRuntimeIdentity,
+  ): Promise<readonly { id: string; rootSessionId: string; action: 'restore' | 'trash' | 'purge' }[]> {
+    if (caller !== undefined
+      && (caller.kind !== snapshot.runtime.kind || caller.id !== snapshot.runtime.id)) {
+      throw new Error('archive snapshot runtime identity does not match the authenticated runtime')
+    }
     const bySession = new Map(snapshot.sessions.map(item => [item.sessionId, item]))
     const parents = new Map(snapshot.sessions.map(item => [
       item.sessionId, item.header.parentSession === undefined ? undefined : item.header.parentSession,
@@ -563,6 +615,13 @@ export class ConversationArchiveService {
       const list = searchBySession.get(item.sessionId)
       if (list === undefined) searchBySession.set(item.sessionId, [item])
       else list.push(item)
+    }
+    if (caller !== undefined) {
+      await this.assertRuntimeSessionOwnership(caller, [
+        ...snapshot.archivedSessionIds,
+        ...snapshot.sessions.map(item => item.sessionId),
+        ...(snapshot.search ?? []).map(item => item.sessionId),
+      ])
     }
     const grouped = new Map<string, string[]>()
     for (const sessionId of snapshot.archivedSessionIds) {
@@ -603,11 +662,21 @@ export class ConversationArchiveService {
   }
 
   /** Mark a runtime command applied or failed and update the archive sync state. */
-  async acknowledgeCommand(commandId: string, runtimeRevision: number, error?: string): Promise<void> {
+  async acknowledgeCommand(
+    commandId: string,
+    runtimeRevision: number,
+    error?: string,
+    caller?: ConversationArchiveRuntimeIdentity,
+  ): Promise<void> {
     await transaction(this.context.pool, async client => {
       const status = error === undefined ? 'applied' : 'failed'
-      const row = await client.query<{ root_session_id: string; desired_revision: string; status: string }>(`SELECT root_session_id,desired_revision::text,status
-        FROM harness.conversation_archive_commands WHERE organization_id=$1 AND id=$2 FOR UPDATE`, [this.context.organizationId, commandId])
+      const row = await client.query<{ root_session_id: string; desired_revision: string; status: string }>(`SELECT c.root_session_id,c.desired_revision::text,c.status
+        FROM harness.conversation_archive_commands c
+        LEFT JOIN harness.conversation_archive_records a
+          ON a.organization_id=c.organization_id AND a.root_session_id=c.root_session_id
+        WHERE c.organization_id=$1 AND c.id=$2
+          AND ($3::text IS NULL OR (a.runtime_kind=$3 AND a.runtime_public_id=$4))
+        FOR UPDATE`, [this.context.organizationId, commandId, caller?.kind ?? null, caller?.id ?? null])
       const command = row.rows[0]
       if (command === undefined) return
       if (command.status !== 'pending') return
@@ -716,8 +785,7 @@ export class ConversationArchiveService {
     if (!result.found) return false
     for (const path of result.paths) {
       try {
-        const file = await lstat(path)
-        if (file.isFile() || file.isSymbolicLink()) await unlink(path)
+        await unlinkContentFile(path)
       } catch (_error: unknown) {
         // The durable database purge is authoritative; an unavailable local file
         // is retained for the deployment's separate storage-reconciliation pass.
@@ -735,6 +803,35 @@ export class ConversationArchiveService {
     let purged = 0
     for (const row of due.rows) if (await this.purge(row.root_session_id)) purged++
     return purged
+  }
+
+  /** Verify runtime-supplied session identities before projecting archive state. */
+  private async assertRuntimeSessionOwnership(
+    runtime: ConversationArchiveRuntimeIdentity,
+    sessionIds: readonly string[],
+  ): Promise<void> {
+    const unique = [...new Set(sessionIds)]
+    if (unique.length === 0) return
+    if (unique.length > 10_000 || unique.some(id => id.length === 0 || id.length > 512)) {
+      throw new Error('archive snapshot contains invalid or too many session ids')
+    }
+    const owner = runtime.kind === 'project'
+      ? await this.internalProjectId(this.context.pool, runtime.id)
+      : await this.internalUserId(this.context.pool, runtime.id)
+    if (owner === null) throw new Error('archive runtime owner is unavailable')
+    const result = await this.context.pool.query<{ id: string }>(`SELECT s.id
+      FROM harness.conversation_sessions s
+      WHERE s.organization_id=$1 AND s.id=ANY($2::text[])
+        AND (($3::text='project' AND s.project_id=$4::uuid)
+          OR ($3::text='user' AND s.project_id IS NULL AND s.creator_user_id=$4::uuid))`, [
+      this.context.organizationId,
+      unique,
+      runtime.kind,
+      owner,
+    ])
+    if (result.rows.length !== unique.length) {
+      throw new Error('archive snapshot contains a session outside the authenticated runtime')
+    }
   }
 
   private async detailForClient(client: PoolClient, rootSessionId: string): Promise<ConversationArchiveRow> {

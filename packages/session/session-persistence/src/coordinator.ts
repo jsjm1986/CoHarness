@@ -23,13 +23,16 @@ import type { SessionInspection, SessionLocation } from './index.ts'
 import type { SessionPersistenceRevision } from './revision.ts'
 import { observeQueuedAbort, SessionPreparations } from './preparations.ts'
 import type { SessionPreparationReservation } from './preparations.ts'
-import { SessionWriteBehind } from './write-behind.ts'
+import { DEFAULT_MAX_PENDING_EVENTS, SessionWriteBehind } from './write-behind.ts'
 
 /** Default number of detached session preparations retained by a coordinator. */
 export const DEFAULT_PREPARED_SESSION_CACHE_SIZE = 5
 
 /** Default maximum intentional wait before a live session batch starts writing. */
 export const DEFAULT_WRITE_BATCH_MAX_DELAY_MS = 200
+
+/** Default cap on events waiting in one live session's write-behind queue. */
+export const DEFAULT_MAX_PENDING_EVENTS_PER_SESSION = DEFAULT_MAX_PENDING_EVENTS
 
 /** Largest write batching delay accepted by Node's timer implementation. */
 export const MAX_WRITE_BATCH_DELAY_MS = MAX_TIMER_DELAY_MS
@@ -88,6 +91,8 @@ export interface PersistenceCoordinatorOptions {
   readonly preparedSessionCacheSize: number
   /** Maximum intentional batching wait after an idle live queue receives work. */
   readonly writeBatchMaxDelayMs: number
+  /** Maximum events retained in one live session's pending write queue. */
+  readonly maxPendingEvents?: number
 }
 
 /**
@@ -605,6 +610,8 @@ export class PersistenceCoordinator<TornMarker = unknown> {
   private chains = new Map<SessionId, Promise<unknown>>()
   /** Resolved fixed write-batching window shared by per-session controllers. */
   private readonly writeBatchMaxDelayMs: number
+  /** Resolved per-session pending write bound. */
+  private readonly maxPendingEvents: number
 
   constructor(
     private ctx: Context,
@@ -612,6 +619,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     options: PersistenceCoordinatorOptions = {
       preparedSessionCacheSize: DEFAULT_PREPARED_SESSION_CACHE_SIZE,
       writeBatchMaxDelayMs: DEFAULT_WRITE_BATCH_MAX_DELAY_MS,
+      maxPendingEvents: DEFAULT_MAX_PENDING_EVENTS_PER_SESSION,
     },
   ) {
     if (!Number.isSafeInteger(options.preparedSessionCacheSize)
@@ -624,6 +632,11 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       throw new TypeError(`writeBatchMaxDelayMs must be an integer between 1 and ${MAX_WRITE_BATCH_DELAY_MS}`)
     }
     this.writeBatchMaxDelayMs = options.writeBatchMaxDelayMs
+    const maxPendingEvents = options.maxPendingEvents ?? DEFAULT_MAX_PENDING_EVENTS_PER_SESSION
+    if (!Number.isSafeInteger(maxPendingEvents) || maxPendingEvents < 1) {
+      throw new TypeError('maxPendingEvents must be a positive safe integer')
+    }
+    this.maxPendingEvents = maxPendingEvents
     this.preparations = new SessionPreparations(options.preparedSessionCacheSize)
     this.installWritePath()
   }
@@ -1372,6 +1385,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
   private createWriteBehind(session: Session, ready: () => Promise<void>): SessionWriteBehind {
     return new SessionWriteBehind({
       maxDelayMs: this.writeBatchMaxDelayMs,
+      maxPendingEvents: this.maxPendingEvents,
       write: async (batch) => {
         await ready()
         await this.serialize(session.header.id, () => this.appendLiveBatch(session.header.id, batch))

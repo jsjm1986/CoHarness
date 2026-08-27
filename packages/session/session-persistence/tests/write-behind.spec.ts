@@ -257,6 +257,7 @@ describe('SessionWriteBehind', () => {
     let attempt = 0
     const controller = new SessionWriteBehind({
       maxDelayMs: 200,
+      maxPendingEvents: batchSize + 1,
       write: async (events) => {
         sizes.push(events.length)
         if (++attempt === 1) throw failure
@@ -271,5 +272,46 @@ describe('SessionWriteBehind', () => {
     await controller.flush()
     expect(sizes).toEqual([batchSize, batchSize])
     expect(controller.hasWork).toBe(false)
+  })
+
+  it('fails loudly when the pending write queue reaches its configured bound', () => {
+    const report = vi.fn()
+    const controller = new SessionWriteBehind({
+      maxDelayMs: 200,
+      maxPendingEvents: 2,
+      write: async () => {},
+      reportBackgroundFailure: report,
+    })
+    controller.enqueue(event(0))
+    controller.enqueue(event(1))
+    expect(() => { controller.enqueue(event(2)) }).toThrow(/pending-event limit exceeded/)
+    expect(report).toHaveBeenCalledOnce()
+  })
+
+  it('counts an active batch against the retained-event bound', async () => {
+    vi.useFakeTimers()
+    const gate = Promise.withResolvers<undefined>()
+    const batches: number[][] = []
+    let attempt = 0
+    const controller = new SessionWriteBehind({
+      maxDelayMs: 200,
+      maxPendingEvents: 2,
+      write: async (events) => {
+        batches.push(events.map(item => item.seq))
+        if (++attempt === 1) {
+          await gate.promise
+          throw new Error('transient')
+        }
+      },
+      reportBackgroundFailure: vi.fn(),
+    })
+    controller.enqueue(event(0))
+    await vi.advanceTimersByTimeAsync(200)
+    controller.enqueue(event(1))
+    expect(() => { controller.enqueue(event(2)) }).toThrow(/pending-event limit exceeded/)
+    gate.resolve(undefined)
+    await vi.advanceTimersByTimeAsync(0)
+    await controller.flush()
+    expect(batches).toEqual([[0], [0, 1]])
   })
 })

@@ -14,6 +14,8 @@ import type { UserDocDirectoryId as UserDocDirectoryIdType, UserDocTarget } from
 
 /** Maximum bytes of a sanitized leaf name, the common filesystem limit. */
 const MAX_NAME_BYTES = 255
+const INTERNAL_UPLOAD_DIRECTORY = '.upload-sessions'
+const INTERNAL_TRASH_DIRECTORY = '.dsh-trash'
 
 /** Names a POSIX filesystem accepts as entries but which never denote a file. */
 const RESERVED_NAMES = new Set(['', '.', '..'])
@@ -151,8 +153,13 @@ export function directoryIdFor(root: string, path: string): UserDocDirectoryIdTy
 function validRelativeSegments(value: string, allowRoot: boolean): string[] | undefined {
   if (value === '') return allowRoot ? [] : undefined
   const segments = value.split('/')
+  // The provider's root-level maintenance directories are not user
+  // documents. Keep them unreachable through an opaque id even when a caller
+  // guesses the hidden name; nested user directories with the same leaf remain
+  // ordinary entries.
+  if (segments[0] === INTERNAL_UPLOAD_DIRECTORY || segments[0] === INTERNAL_TRASH_DIRECTORY) return undefined
   if (segments.every(segment => segment !== '' && segment !== '.' && segment !== '..'
-    && !segment.includes('\\') && basename(segment) === segment)) return segments
+    && !segment.includes('\\') && !/[\u0000-\u001f\u007f]/u.test(segment) && basename(segment) === segment)) return segments
   return undefined
 }
 
@@ -224,6 +231,10 @@ export async function resolveTargetIn(
 ): Promise<UserDocTarget> {
   assertInside(root, directory)
   const clean = sanitizeName(name)
+  if (resolve(directory) === resolve(root)
+    && (clean === INTERNAL_UPLOAD_DIRECTORY || clean === INTERNAL_TRASH_DIRECTORY)) {
+    throw new UserDocError('Document name is reserved by the document store.', INVALID_DOCUMENT_NAME_CODE)
+  }
   // Bounded rather than unbounded: a caller repeatedly uploading one name is
   // either a client retry loop or an attempt to make this walk the expensive
   // part of a request, and both are better answered with a failure.

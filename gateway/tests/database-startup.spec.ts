@@ -58,4 +58,15 @@ describe('database startup retry', () => {
     await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
     expect(attempts).toBe(1)
   })
+
+  it('rejects retry delays that Node would clamp or that invert the backoff range', async () => {
+    for (const options of [
+      { initialDelayMs: 0, maxDelayMs: 1 },
+      { initialDelayMs: 2_147_483_648, maxDelayMs: 2_147_483_648 },
+      { initialDelayMs: 2, maxDelayMs: 1 },
+    ]) {
+      await expect(withDatabaseStartupRetry(async () => 'ready', options))
+        .rejects.toThrow(/retry delays must be positive safe integers/)
+    }
+  })
 })

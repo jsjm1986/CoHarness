@@ -111,7 +111,11 @@ export type AdminDocument = {
   modifiedAt: number
   owner: { id: number; displayName: string } | null
   ownerSource: 'upload' | 'transfer' | 'legacy' | 'admin'
-  state: 'active' | 'deleted'
+  state: 'active' | 'trash' | 'purged' | 'deleted'
+  trashedAt?: number | null
+  restoredAt?: number | null
+  purgeAfter?: number | null
+  purgedAt?: number | null
   legacy: boolean
   lineageRootId: string | null
 }
@@ -119,6 +123,8 @@ export type AdminDocument = {
 export type AdminDocumentMetrics = {
   total: number
   active: number
+  trash?: number
+  purged?: number
   deleted: number
   personal: number
   project: number
@@ -147,6 +153,11 @@ export type AdminDocumentDetail = {
   }>
 }
 
+export type AdminDocumentPage = {
+  documents: AdminDocument[]
+  nextCursor?: string
+}
+
 export class AdminRequestError extends Error {
   constructor(readonly status: number, message: string) {
     super(message)
@@ -160,7 +171,17 @@ async function request<T>(url: string, init: RequestInit = {}): Promise<T> {
     credentials: 'same-origin',
     headers: { 'content-type': 'application/json', ...init.headers },
   })
-  if (!res.ok) throw new AdminRequestError(res.status, (await res.json() as { error: string }).error)
+  if (!res.ok) {
+    let message = `Request failed (${String(res.status)})`
+    try {
+      const body = await res.json() as { error?: unknown; message?: unknown }
+      if (typeof body.error === 'string' && body.error !== '') message = body.error
+      else if (typeof body.message === 'string' && body.message !== '') message = body.message
+    } catch {
+      // Keep the status-only diagnostic when a proxy returns a non-JSON body.
+    }
+    throw new AdminRequestError(res.status, message)
+  }
   if (res.status === 204) return undefined as T
   return await res.json() as T
 }
@@ -310,11 +331,11 @@ export function listDocumentMetrics(): Promise<AdminDocumentMetrics> {
   return request('/admin/api/documents/metrics')
 }
 
-export function listAdminDocuments(filter: {
+export async function listAdminDocuments(filter: {
   scope?: 'personal' | 'project'
   projectId?: number
   ownerUserId?: number
-  state?: 'active' | 'deleted' | 'all'
+  state?: 'active' | 'trash' | 'purged' | 'deleted' | 'all'
   query?: string
   limit?: number
   offset?: number
@@ -328,7 +349,31 @@ export function listAdminDocuments(filter: {
   if (filter.limit !== undefined) query.set('limit', String(filter.limit))
   if (filter.offset !== undefined) query.set('offset', String(filter.offset))
   const suffix = query.toString()
-  return request(`/admin/api/documents${suffix === '' ? '' : `?${suffix}`}`)
+  const value = await request<AdminDocument[] | AdminDocumentPage>(`/admin/api/documents${suffix === '' ? '' : `?${suffix}`}`)
+  return Array.isArray(value) ? value : value.documents
+}
+
+/** Cursor-based administrator document listing; accepts legacy array responses. */
+export async function listAdminDocumentsPage(filter: {
+  scope?: 'personal' | 'project'
+  projectId?: number
+  ownerUserId?: number
+  state?: 'active' | 'trash' | 'purged' | 'deleted' | 'all'
+  query?: string
+  limit?: number
+  cursor?: string
+} = {}): Promise<AdminDocumentPage> {
+  const query = new URLSearchParams()
+  if (filter.scope !== undefined) query.set('scope', filter.scope)
+  if (filter.projectId !== undefined) query.set('projectId', String(filter.projectId))
+  if (filter.ownerUserId !== undefined) query.set('ownerUserId', String(filter.ownerUserId))
+  if (filter.state !== undefined) query.set('state', filter.state)
+  if (filter.query !== undefined && filter.query !== '') query.set('q', filter.query)
+  if (filter.limit !== undefined) query.set('limit', String(filter.limit))
+  if (filter.cursor !== undefined) query.set('cursor', filter.cursor)
+  const suffix = query.toString()
+  const value = await request<AdminDocumentPage | AdminDocument[]>(`/admin/api/documents${suffix === '' ? '' : `?${suffix}`}`)
+  return Array.isArray(value) ? { documents: value } : value
 }
 
 export function getAdminDocument(id: string): Promise<AdminDocumentDetail> {
@@ -337,6 +382,17 @@ export function getAdminDocument(id: string): Promise<AdminDocumentDetail> {
 
 export function deleteAdminDocument(id: string): Promise<void> {
   return request(`/admin/api/documents/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+/** Apply one lifecycle action to one or more catalog rows. */
+export function applyAdminDocumentAction(action: 'trash' | 'restore' | 'purge', ids: string[]): Promise<{
+  action: string
+  results: Array<{ catalogId: string; ok: boolean; error?: string }>
+}> {
+  return request('/admin/api/documents/actions', {
+    method: 'POST',
+    body: JSON.stringify({ action, ids }),
+  })
 }
 
 export function transferAdminDocumentOwnership(id: string, ownerUserId: number): Promise<void> {

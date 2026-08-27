@@ -6,12 +6,14 @@ import {
   lstatSync,
   mkdirSync,
   readFileSync,
+  realpathSync,
   renameSync,
   rmSync,
+  statSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs'
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import type Database from 'better-sqlite3'
 import type { UserRow } from './auth.ts'
 import type { GatewayConfig } from './config.ts'
@@ -21,6 +23,16 @@ import {
   type Launcher,
   type RuntimePolicyIdentity,
 } from './launcher.ts'
+import {
+  RUNTIME_READINESS_NONCE_HEADER,
+  RUNTIME_READINESS_PATH,
+  RUNTIME_READINESS_REQUEST_HEADER,
+  runtimeReadinessRequestProof,
+  runtimeReadinessResponseProof,
+  sameRuntimeReadinessProof,
+} from './runtime-readiness.ts'
+import { assertProjectImportPathAllowed } from './project-directories.ts'
+import { readResponseJson } from './response-budget.ts'
 
 const POLL_INTERVAL_MS = 300
 const STOP_GRACE_MS = 5000
@@ -57,6 +69,33 @@ interface InstanceOwner {
   name?: string
 }
 
+/** Re-check a persisted project path immediately before it becomes a runtime cwd. */
+function validateProjectRuntimePath(cfg: GatewayConfig, path: string): string {
+  let canonical: string
+  try {
+    canonical = realpathSync(path)
+    if (!statSync(canonical).isDirectory()) throw new Error('project-runtime-path-not-directory')
+  } catch (error) {
+    if (error instanceof Error && error.message === 'project-runtime-path-not-directory') throw error
+    throw new Error('project-runtime-path-unavailable', { cause: error })
+  }
+  // Project rows are stored canonically. A replaced final component must not
+  // silently redirect the next runtime to another tree. The host's `/var`
+  // alias may itself resolve to `/private/var`, so raw path spellings cannot
+  // be compared here; the canonical path is checked against policy below.
+  try {
+    if (lstatSync(path).isSymbolicLink()) throw new Error('project-runtime-path-changed')
+  } catch (error) {
+    if (error instanceof Error && error.message === 'project-runtime-path-changed') throw error
+    throw new Error('project-runtime-path-unavailable', { cause: error })
+  }
+  // Local development projects may intentionally live inside the checkout
+  // (the local launcher has no mount namespace). Systemd launches must repeat
+  // the full reserved/root policy immediately before constructing BindPaths.
+  if (cfg.launcher === 'systemd') assertProjectImportPathAllowed(cfg, canonical)
+  return canonical
+}
+
 /** Durable instance owner. Numeric inputs remain the personal-runtime shorthand. */
 export type RuntimeTarget = { kind: 'user'; id: number } | { kind: 'project'; id: number }
 export type RuntimeTargetInput = RuntimeTarget | number
@@ -81,6 +120,20 @@ export interface RuntimeSecurityConfig {
   principalPublicKey: string
 }
 
+/**
+ * A new operation or WebSocket lease raced with a serialized runtime stop.
+ * Callers must reacquire the runtime and retry with a fresh generation rather
+ * than sending work to the stopped process.
+ */
+export class RuntimeLeaseUnavailableError extends Error {
+  readonly code = 'RUNTIME_LEASE_UNAVAILABLE'
+
+  constructor(target: RuntimeTarget) {
+    super(`runtime ${target.kind}:${String(target.id)} is not ready for a new lease`)
+    this.name = 'RuntimeLeaseUnavailableError'
+  }
+}
+
 function targetOf(input: RuntimeTargetInput): RuntimeTarget {
   return typeof input === 'number' ? { kind: 'user', id: input } : input
 }
@@ -88,6 +141,20 @@ function targetOf(input: RuntimeTargetInput): RuntimeTarget {
 function targetKey(input: RuntimeTargetInput): string {
   const target = targetOf(input)
   return `${target.kind}:${String(target.id)}`
+}
+
+/** Keep leases from different runtime generations independent after a forced stop. */
+function leaseKey(target: RuntimeTarget, generation: number | undefined): string {
+  return generation === undefined ? targetKey(target) : `${targetKey(target)}@${String(generation)}`
+}
+
+function leaseCount(refs: ReadonlyMap<string, number>, target: RuntimeTarget): number {
+  const prefix = `${targetKey(target)}@`
+  let total = refs.get(targetKey(target)) ?? 0
+  for (const [key, count] of refs) {
+    if (key.startsWith(prefix)) total += count
+  }
+  return total
 }
 
 /** Durable instance rows required by {@link InstanceManager}. */
@@ -186,6 +253,8 @@ export class InstanceManager {
   private readonly initialized: Promise<void>
   private readonly procs = new Map<string, InstanceProc>()
   private readonly wsRefs = new Map<string, number>()
+  /** Active HTTP/data-plane operations that must keep a runtime warm. */
+  private readonly operationRefs = new Map<string, number>()
   /** Per-runtime operation chain: serializes start vs stop so a reap cannot orphan a fresh spawn. */
   private readonly ops = new Map<string, Promise<unknown>>()
 
@@ -196,6 +265,8 @@ export class InstanceManager {
    * responsibility.
    */
   beforeStart?: (runtime: RuntimeLaunchContext) => void | Promise<void>
+  /** Refresh versioned policy projections before a ready runtime serves work. */
+  beforeUse?: (subject: UserRow | ProjectRuntime) => void | Promise<void>
 
   constructor(
     source: Database.Database | InstanceRepository,
@@ -234,18 +305,56 @@ export class InstanceManager {
    */
   async isLive(target: RuntimeTargetInput): Promise<boolean> {
     const proc = this.procs.get(targetKey(target))
-    return await this.stateOf(target) === 'ready' && proc !== undefined && !proc.hasExited()
+    if (await this.stateOf(target) !== 'ready' || proc === undefined) return false
+    if (proc.isAlive !== undefined) return await proc.isAlive()
+    return !proc.hasExited()
   }
 
   async touch(target: RuntimeTargetInput): Promise<void> {
     await this.initialized
-    await this.repository.touch(targetOf(target), Date.now())
+    const resolved = targetOf(target)
+    await this.serialize(resolved, async () => {
+      await this.repository.touch(resolved, Date.now())
+    })
   }
 
-  async wsRef(target: RuntimeTargetInput, delta: 1 | -1): Promise<void> {
-    const key = targetKey(target)
-    this.wsRefs.set(key, Math.max(0, (this.wsRefs.get(key) ?? 0) + delta))
-    if (delta === -1) await this.touch(target)
+  async wsRef(target: RuntimeTargetInput, delta: 1 | -1, generation?: number): Promise<void> {
+    await this.initialized
+    const resolved = targetOf(target)
+    await this.serialize(resolved, async () => {
+      if (delta === 1 && await this.repository.stateOf(resolved) !== 'ready') {
+        throw new RuntimeLeaseUnavailableError(resolved)
+      }
+      if (delta === 1 && generation !== undefined && await this.repository.generationOf(resolved) !== generation) {
+        throw new RuntimeLeaseUnavailableError(resolved)
+      }
+      const key = leaseKey(resolved, generation)
+      const next = Math.max(0, (this.wsRefs.get(key) ?? 0) + delta)
+      if (next === 0) this.wsRefs.delete(key)
+      else this.wsRefs.set(key, next)
+      // A close edge is activity too, but it must be ordered after the ref
+      // change so the reaper cannot observe a stale count or timestamp.
+      await this.repository.touch(resolved, Date.now())
+    })
+  }
+
+  /** Hold a runtime lease across a long request so idle reaping cannot stop it. */
+  async operationRef(target: RuntimeTargetInput, delta: 1 | -1, generation?: number): Promise<void> {
+    await this.initialized
+    const resolved = targetOf(target)
+    await this.serialize(resolved, async () => {
+      if (delta === 1 && await this.repository.stateOf(resolved) !== 'ready') {
+        throw new RuntimeLeaseUnavailableError(resolved)
+      }
+      if (delta === 1 && generation !== undefined && await this.repository.generationOf(resolved) !== generation) {
+        throw new RuntimeLeaseUnavailableError(resolved)
+      }
+      const key = leaseKey(resolved, generation)
+      const next = Math.max(0, (this.operationRefs.get(key) ?? 0) + delta)
+      if (next === 0) this.operationRefs.delete(key)
+      else this.operationRefs.set(key, next)
+      await this.repository.touch(resolved, Date.now())
+    })
   }
 
   /** Run `fn` after any in-flight start/stop for this runtime has settled. */
@@ -253,7 +362,11 @@ export class InstanceManager {
     const key = targetKey(target)
     const prev = this.ops.get(key) ?? Promise.resolve()
     const run = prev.then(fn, fn)
-    this.ops.set(key, run.then(() => undefined, () => undefined))
+    const tail = run.then(() => undefined, () => undefined)
+    this.ops.set(key, tail)
+    void tail.then(() => {
+      if (this.ops.get(key) === tail) this.ops.delete(key)
+    })
     return run
   }
 
@@ -275,17 +388,26 @@ export class InstanceManager {
       }
     }
     const target: RuntimeTarget = { kind: 'project', id: subject.id }
+    // Re-read the owner row at the launch boundary. The request that supplied
+    // `subject` may have crossed a project rename/mount update; launching a
+    // stale path would bypass the current project ownership record.
+    const owner = await this.repository.owner(target)
+    if (owner === null || owner.kind !== 'project' || owner.id !== subject.id
+      || resolve(owner.homePath) !== resolve(subject.path)) {
+      throw new Error(`project runtime ${String(subject.id)} ownership changed before launch`)
+    }
+    const projectPath = validateProjectRuntimePath(this.cfg, subject.path)
     return {
       kind: 'project',
       ownerId: subject.id,
       target,
-      project: subject,
+      project: { ...subject, path: projectPath },
       username: `project-${String(subject.id)}`,
       runtimeKey: `project-${String(subject.id)}`,
       systemUser: this.cfg.projectRuntimeUser,
       privileged: false,
       port: await this.portOf(target),
-      homePath: subject.path,
+      homePath: projectPath,
       dshHome: join(this.cfg.projectRuntimesRoot, String(subject.id), 'dsh'),
     }
   }
@@ -297,7 +419,9 @@ export class InstanceManager {
     return this.serialize(target, async () => {
       const port = await this.portOf(target)
       const proc = this.procs.get(targetKey(target))
-      if (await this.stateOf(target) === 'ready' && proc !== undefined && !proc.hasExited()) {
+      if (await this.stateOf(target) === 'ready' && proc !== undefined
+        && (proc.isAlive !== undefined ? await proc.isAlive() : !proc.hasExited())) {
+        await this.beforeUse?.(subject)
         return { port, generation: await this.repository.generationOf(target) }
       }
       return this.start(await this.launchContext(subject), port)
@@ -435,35 +559,78 @@ export class InstanceManager {
       createHash('sha256').update(runtimeToken).digest(),
     )
     const runtime: RuntimeLaunchContext = { ...descriptor, generation }
-    await this.beforeStart?.(runtime)
-    const gatewayCredential = JSON.stringify({
-      version: 1,
-      gatewayUrl: `http://127.0.0.1:${String(this.cfg.port)}`,
-      organization: this.cfg.organizationSlug,
-      runtime: { kind: runtime.kind, id: runtime.ownerId, generation },
-      token: runtimeToken,
-      principalPublicKey: this.security.principalPublicKey,
-    })
-    const proc = await this.launcher.start({ ...runtime, gatewayCredential })
     const key = targetKey(runtime.target)
-    this.procs.set(key, proc)
+    let proc: InstanceProc | undefined
+    try {
+      await this.beforeStart?.(runtime)
+      const gatewayCredential = JSON.stringify({
+        version: 1,
+        gatewayUrl: `http://127.0.0.1:${String(this.cfg.port)}`,
+        organization: this.cfg.organizationSlug,
+        runtime: { kind: runtime.kind, id: runtime.ownerId, generation },
+        token: runtimeToken,
+        principalPublicKey: this.security.principalPublicKey,
+      })
+      proc = await this.launcher.start({ ...runtime, gatewayCredential })
+      this.procs.set(key, proc)
 
-    const deadline = Date.now() + this.cfg.readinessTimeoutMs
-    while (Date.now() < deadline) {
-      if (proc.hasExited()) break
-      try {
-        const response = await fetch(`http://127.0.0.1:${port}/`, { signal: AbortSignal.timeout(1000) })
-        if (response.ok) {
-          await this.repository.markReady(runtime.target, generation)
-          return { port, generation }
-        }
-      } catch { /* not up yet */ }
-      await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS))
+      const deadline = Date.now() + this.cfg.readinessTimeoutMs
+      const readinessNonce = randomBytes(32).toString('base64url')
+      const readinessIdentity = {
+        kind: runtime.kind,
+        id: runtime.ownerId,
+        generation,
+      } as const
+      const readinessRequest = runtimeReadinessRequestProof(runtimeToken, readinessNonce, readinessIdentity)
+      const readinessExpected = runtimeReadinessResponseProof(runtimeToken, readinessNonce, readinessIdentity)
+      while (Date.now() < deadline) {
+        // A supervisor-backed unit can legitimately remain `activating` while
+        // its HTTP endpoint is coming up; the authenticated probe below is the
+        // readiness decision. Direct children still expose an exit edge here.
+        if (proc.hasExited()) break
+        try {
+          const authority = `127.0.0.1:${String(port)}`
+          const response = await fetch(`http://${authority}${RUNTIME_READINESS_PATH}`, {
+            method: 'GET',
+            headers: {
+              host: authority,
+              [RUNTIME_READINESS_NONCE_HEADER]: readinessNonce,
+              [RUNTIME_READINESS_REQUEST_HEADER]: readinessRequest,
+            },
+            signal: AbortSignal.timeout(1000),
+          })
+          if (response.ok) {
+            const value: unknown = await readResponseJson(response, this.cfg.upstreamResponseLimitBytes)
+            const body = typeof value === 'object' && value !== null && !Array.isArray(value)
+              ? value as Record<string, unknown>
+              : undefined
+            const identity = typeof body?.runtime === 'object' && body.runtime !== null && !Array.isArray(body.runtime)
+              ? body.runtime as Record<string, unknown>
+              : undefined
+            if (body?.version !== 1
+              || identity?.kind !== readinessIdentity.kind
+              || identity?.id !== readinessIdentity.id
+              || identity?.generation !== readinessIdentity.generation
+              || !sameRuntimeReadinessProof(readinessExpected, body.proof)) {
+              throw new Error('runtime readiness identity proof did not match the launched instance')
+            }
+            await this.repository.markReady(runtime.target, generation)
+            return { port, generation }
+          }
+        } catch { /* not up yet */ }
+        await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS))
+      }
+      throw new Error(`instance for ${runtime.runtimeKey ?? runtime.username} failed to become ready on port ${port}`)
+    } catch (error) {
+      // A failed post-beginStart path must never strand the durable row in
+      // `starting`; terminate the child first, then publish the stopped state.
+      if (proc !== undefined) await proc.terminate(STOP_GRACE_MS).catch(() => {})
+      if (this.procs.get(key) === proc) this.procs.delete(key)
+      await this.repository.markStopped(runtime.target).catch((cleanupError: unknown) => {
+        console.error(`[gateway] failed to roll back instance ${key}:`, cleanupError)
+      })
+      throw error
     }
-    // Already inside the serialized op — terminate directly (calling the public
-    // serialized stop here would deadlock on this same user's chain).
-    await this.terminate(runtime.target)
-    throw new Error(`instance for ${runtime.runtimeKey ?? runtime.username} failed to become ready on port ${port}`)
   }
 
   async reapIdle(): Promise<number> {
@@ -471,10 +638,23 @@ export class InstanceManager {
     const cutoff = Date.now() - this.cfg.idleTimeoutMs
     const targets = await this.repository.idleTargets(cutoff)
     let stopped = 0
+    const seen = new Set<string>()
     for (const target of targets) {
-      if ((this.wsRefs.get(targetKey(target)) ?? 0) > 0) continue
-      await this.stop(target)
-      stopped += 1
+      const key = targetKey(target)
+      if (seen.has(key)) continue
+      seen.add(key)
+      const didStop = await this.serialize(target, async () => {
+        // Re-check the durable idle predicate after waiting for queued touch
+        // and lease operations. The initial query is only a candidate scan.
+        const stillIdle = (await this.repository.idleTargets(cutoff))
+          .some(candidate => targetKey(candidate) === key)
+        if (!stillIdle
+          || leaseCount(this.wsRefs, target) > 0
+          || leaseCount(this.operationRefs, target) > 0) return false
+        await this.terminate(target)
+        return true
+      })
+      if (didStop) stopped += 1
     }
     return stopped
   }
@@ -526,6 +706,11 @@ export class InstanceManager {
     }
     if (proc !== undefined) await proc.terminate(STOP_GRACE_MS)
     this.procs.delete(key)
+    const prefix = `${key}@`
+    this.wsRefs.delete(key)
+    this.operationRefs.delete(key)
+    for (const refKey of this.wsRefs.keys()) if (refKey.startsWith(prefix)) this.wsRefs.delete(refKey)
+    for (const refKey of this.operationRefs.keys()) if (refKey.startsWith(prefix)) this.operationRefs.delete(refKey)
     await this.repository.markStopped(target)
   }
 

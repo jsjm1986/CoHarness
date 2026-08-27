@@ -4,7 +4,7 @@ import { DOCUMENT_TOO_LARGE_CODE, INVALID_DOCUMENT_REF_CODE, UserDocDirectoryId,
 import { lstat, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import LocalUserDocStore, {
   DEFAULT_MAX_FILE_BYTES,
   DEFAULT_MAX_FILES_PER_MESSAGE,
@@ -91,6 +91,50 @@ describe('local user-document service', () => {
 
     await service.remove(ref.docId)
     await expect(service.list()).resolves.toEqual([])
+  })
+
+  it('returns bounded directory and trash pages with continuation cursors', async () => {
+    const service = await store({ trashRetentionDays: 30 })
+    const first = await service.resolveTarget({ name: 'a.txt' })
+    await service.save(first, stream('a'))
+    const second = await service.resolveTarget({ name: 'b.txt' })
+    await service.save(second, stream('b'))
+    const third = await service.resolveTarget({ name: 'c.txt' })
+    await service.save(third, stream('c'))
+    const page = await service.listDirectoryPage(UserDocDirectoryId(''), { limit: 2, sort: 'name-asc' })
+    expect(page.documents).toHaveLength(2)
+    expect(page.totalDocuments).toBe(3)
+    expect(page.nextCursor).toBe('2')
+    const next = await service.listDirectoryPage(UserDocDirectoryId(''), {
+      limit: 2,
+      sort: 'name-asc',
+      ...(page.nextCursor === undefined ? {} : { cursor: page.nextCursor }),
+    })
+    expect(next.documents).toHaveLength(1)
+    await service.trash(first.docId)
+    const trash = await service.listTrashPage({ limit: 1 })
+    expect(trash.documents).toHaveLength(1)
+    expect(trash.totalDocuments).toBe(1)
+  })
+
+  it('keeps a coalesced listing alive when only the first waiter aborts', async () => {
+    const service = await store()
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const listDirectory = vi.spyOn(service, 'listDirectory').mockImplementation(async (_directoryId, signal) => {
+      await gate
+      signal?.throwIfAborted()
+      return { directoryId: UserDocDirectoryId(''), directories: [], documents: [] }
+    })
+    const firstAbort = new AbortController()
+    const first = service.listDirectoryPage(UserDocDirectoryId(''), { limit: 20 }, firstAbort.signal)
+    const second = service.listDirectoryPage(UserDocDirectoryId(''), { limit: 20 })
+    await vi.waitFor(() => { expect(listDirectory).toHaveBeenCalledOnce() })
+    firstAbort.abort(new Error('first browser closed'))
+    await expect(first).rejects.toThrow('first browser closed')
+    release()
+    await expect(second).resolves.toMatchObject({ totalDocuments: 0, documents: [] })
+    listDirectory.mockRestore()
   })
 
   it('streams a download without buffering and closes over the whole file', async () => {

@@ -9,11 +9,16 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 export interface SessionWriteBehindOptions {
   /** Maximum intentional batching wait after an idle queue receives work. */
   readonly maxDelayMs: number
+  /** Maximum events retained across the pending queue and active write. */
+  readonly maxPendingEvents?: number
   /** Persist one stable ordered prefix; resolves only after backend durability. */
   readonly write: (events: readonly SessionEvent[]) => Promise<void>
   /** Observe a detached background write failure without rejecting the producer. */
   readonly reportBackgroundFailure: (error: unknown) => void
 }
+
+/** Default pending-event bound for one live session controller. */
+export const DEFAULT_MAX_PENDING_EVENTS = 100_000
 
 /**
  * Owns one live session's pending events, fixed batching deadline, active write,
@@ -23,6 +28,7 @@ export class SessionWriteBehind {
   private pending: SessionEvent[] = []
   private timer: ReturnType<typeof setTimeout> | undefined
   private active: Promise<void> | undefined
+  private activeBatchSize = 0
   private barrier: Promise<void> | undefined
   private deadlineExpired = false
   private automaticPaused = false
@@ -30,7 +36,15 @@ export class SessionWriteBehind {
   /**
    * @param options - fixed scheduling policy and durable batch sink.
    */
-  constructor(private readonly options: SessionWriteBehindOptions) {}
+  private readonly maxPendingEvents: number
+
+  constructor(private readonly options: SessionWriteBehindOptions) {
+    const maxPendingEvents = options.maxPendingEvents ?? DEFAULT_MAX_PENDING_EVENTS
+    if (!Number.isSafeInteger(maxPendingEvents) || maxPendingEvents < 1) {
+      throw new TypeError('maxPendingEvents must be a positive safe integer')
+    }
+    this.maxPendingEvents = maxPendingEvents
+  }
 
   /** Whether this controller owns queued events or an active durable write. */
   get hasWork(): boolean {
@@ -43,6 +57,11 @@ export class SessionWriteBehind {
    * @param event - frozen live event to retain independently of its producer.
    */
   enqueue(event: SessionEvent): void {
+    if (this.pending.length + this.activeBatchSize >= this.maxPendingEvents) {
+      const error = new Error(`session write-behind pending-event limit exceeded (${String(this.maxPendingEvents)})`)
+      this.options.reportBackgroundFailure(error)
+      throw error
+    }
     const wasEmpty = this.pending.length === 0
     this.pending.push(structuredClone(event))
     if (this.barrier !== undefined) return
@@ -138,6 +157,7 @@ export class SessionWriteBehind {
   /** Start one stable pending prefix, retaining it in order if durability fails. */
   private startWrite(background: boolean): Promise<void> {
     const batch = this.pending.splice(0)
+    this.activeBatchSize = batch.length
     this.cancelTimer()
     this.deadlineExpired = false
     const operation = Promise.resolve().then(() => this.options.write(batch))
@@ -151,6 +171,7 @@ export class SessionWriteBehind {
         throw error
       })
       .finally(() => {
+        this.activeBatchSize = 0
         this.active = undefined
       })
     this.active = active

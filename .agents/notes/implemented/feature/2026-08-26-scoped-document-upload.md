@@ -14,7 +14,7 @@ The Gateway owns a separate resumable upload subtree at `/api/documents/transfer
 
 The shared browser uploader accepts a request query and a resume namespace. The namespace participates in the IndexedDB/localStorage key so one browser file can resume independently in multiple document scopes. Existing current-runtime uploads keep the original route and behavior.
 
-The document manager treats a selected non-current scope as an upload target with metadata-only browsing. Writable targets enable upload into their root directory; folder management, preview, download, move, delete, and attach remain bound to the active runtime. Read-only projects stay visible with a disabled upload state. Source browsing remains a separate read-only mode, and the all-scope overview requires an explicit writable target.
+The document manager treats a selected non-current scope as an upload target without changing the active conversation. The full authorized-scope browser and its trash lifecycle are described by [document index pagination and recoverable trash](../architecture/2026-08-27-document-index-pagination-and-trash-lifecycle.md); this note continues to own the separate resumable upload route and its per-request write authorization. Read-only projects stay visible with a disabled upload state, and the all-scope overview requires an explicit writable target.
 
 This extends the cross-scope snapshot and resumable-upload decisions recorded in [cross-scope document snapshots](2026-08-23-cross-scope-document-snapshots.md) and [resumable user-document upload](../architecture/2026-08-25-resumable-user-document-upload.md); their copy and current-runtime storage guarantees remain unchanged.
 
@@ -26,7 +26,7 @@ This extends the cross-scope snapshot and resumable-upload decisions recorded in
 
 **Expose the selected runtime's upload port or path to the browser.** Rejected because runtime authorities and filesystem paths are private Gateway facts; the Gateway broker already provides authenticated loopback forwarding.
 
-**Make metadata-only alternate views fully writable.** Rejected because preview, download, move, delete, and attachment operations require a store identity that the active conversation does not share; only explicit target upload is added.
+**Switch the active conversation scope for an upload.** Rejected because `/account/api/scope` reloads the page and changes the runtime used by the open conversation; the dedicated upload route keeps the document operation local to the selected target.
 
 ## Consequences
 

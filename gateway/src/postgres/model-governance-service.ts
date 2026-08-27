@@ -334,6 +334,15 @@ export class PostgresModelGovernanceService {
     new Intl.DateTimeFormat('en-US', { timeZone }).format()
   }
 
+  /** Read the organization policy revision without materializing every route. */
+  async configurationRevision(): Promise<number> {
+    const result = await this.context.pool.query<{ revision: string }>(`SELECT model_configuration_revision::text revision
+      FROM harness.organizations WHERE id=$1`, [this.context.organizationId])
+    const revision = result.rows[0]?.revision
+    if (revision === undefined) throw new Error('organization model configuration revision is unavailable')
+    return safeCount(revision, 'organization model configuration revision')
+  }
+
   async listProviders(): Promise<ModelProviderRow[]> {
     const result = await this.context.pool.query<{
       provider: string

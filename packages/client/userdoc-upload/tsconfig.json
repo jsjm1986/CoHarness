@@ -2,5 +2,8 @@
   "extends": "../../../tsconfig.base.client.json",
   "compilerOptions": { "rootDir": "src", "outDir": "lib/types" },
   "include": ["src"],
-  "references": [{ "path": "../../attachment/userdoc" }]
+  "references": [
+    { "path": "../../attachment/userdoc" },
+    { "path": "../../runtime-diagnostics/invariants" }
+  ]
 }

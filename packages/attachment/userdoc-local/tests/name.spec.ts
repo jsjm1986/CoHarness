@@ -166,6 +166,13 @@ describe('pathForDocId', () => {
     expect(() => pathForDocId(ROOT, '2026-08-14//a.pdf'))
       .toThrow(expect.objectContaining({ code: INVALID_DOCUMENT_REF_CODE }))
   })
+
+  it('keeps provider maintenance directories outside the document id space', () => {
+    expect(() => pathForDocId(ROOT, '.dsh-trash/hidden.bin'))
+      .toThrow(expect.objectContaining({ code: INVALID_DOCUMENT_REF_CODE }))
+    expect(() => pathForDocId(ROOT, '.upload-sessions/v1/session/manifest.json'))
+      .toThrow(expect.objectContaining({ code: INVALID_DOCUMENT_REF_CODE }))
+  })
 })
 
 describe('resolveTargetIn', () => {

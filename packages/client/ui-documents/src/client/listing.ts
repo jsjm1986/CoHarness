@@ -43,7 +43,12 @@ export interface DatedDocGroup<T extends ListingDoc = ListingDoc> {
 /** Header-checkbox tri-state for the current page. */
 export type PageSelectionState = 'none' | 'some' | 'all'
 
-const TEXT_MEDIA = new Set(['application/json', 'application/xml'])
+const TEXT_MEDIA = new Set([
+  'application/json',
+  'application/xml',
+  'application/x-yaml',
+  'application/javascript',
+])
 
 /* v8 ignore next -- closed DocumentSortKey union */
 function assertNever(value: never): never {
@@ -53,12 +58,13 @@ function assertNever(value: never): never {
 /**
  * Map a media type onto a type-filter chip.
  * @param mediaType - `UserDocRef.mediaType` from the list payload.
- * @returns image, pdf, text (including JSON and XML), or other.
+ * @returns image, pdf, text (including JSON, XML, YAML, and JavaScript), or other.
  */
 export function documentTypeBucket(mediaType: string): DocumentTypeBucket {
   if (mediaType.startsWith('image/')) return 'image'
   if (mediaType === 'application/pdf') return 'pdf'
-  if (mediaType.startsWith('text/') || TEXT_MEDIA.has(mediaType)) return 'text'
+  if (mediaType.startsWith('text/') || TEXT_MEDIA.has(mediaType)
+    || mediaType.endsWith('+json') || mediaType.endsWith('+xml')) return 'text'
   return 'other'
 }
 

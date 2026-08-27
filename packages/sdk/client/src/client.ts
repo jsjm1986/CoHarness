@@ -29,6 +29,15 @@ const STDERR_TAIL_LIMIT = 400
 
 /** Grace for the runtime's stdio streams to settle after its exit edge. */
 const STREAM_SETTLE_MS = 100
+const MAX_TIMER_DELAY_MS = 2_147_483_647
+const DEFAULT_SESSION_RELATIONSHIP_LIMIT = 10_000
+
+function validateTimerDelay(value: number | undefined, name: string): void {
+  if (value === undefined) return
+  if (!Number.isSafeInteger(value) || value < 1 || value > MAX_TIMER_DELAY_MS) {
+    throw new RangeError(`${name} must be a positive safe integer no greater than ${MAX_TIMER_DELAY_MS}`)
+  }
+}
 
 /**
  * The runtime subprocess is gone or unusable: it exited, its stdio closed, or
@@ -66,6 +75,7 @@ export class SdkProtocolError extends Error {
 
 interface SubscriptionState {
   readonly queue: HarnessNotification[]
+  readonly maxQueue: number
   readonly waiters: { resolve: (item: HarnessNotification) => void; reject: (error: Error) => void }[]
   readonly filter: NotificationFilter | undefined
   failure: Error | undefined
@@ -148,6 +158,10 @@ class NotificationSubscriptionImpl implements NotificationSubscription {
    * @param notification - the wire notification to deliver.
    */
   push(notification: HarnessNotification): void {
+    // A terminal runtime/close event stops delivery immediately. The state is
+    // retained by the caller so already queued notifications can still drain,
+    // but late frames must not repopulate that queue.
+    if (this.state.failure !== undefined) return
     let matches: boolean
     try {
       matches = this.state.filter === undefined || this.state.filter(notification)
@@ -159,7 +173,14 @@ class NotificationSubscriptionImpl implements NotificationSubscription {
     if (!matches) return
     const waiter = this.state.waiters.shift()
     if (waiter !== undefined) waiter.resolve(notification)
-    else this.state.queue.push(notification)
+    else {
+      if (this.state.queue.length >= this.state.maxQueue) {
+        this.unsubscribe()
+        this.fail(new TransportClosedError('notification subscription queue limit exceeded'))
+        return
+      }
+      this.state.queue.push(notification)
+    }
   }
 
   /**
@@ -194,7 +215,16 @@ export class HarnessClient {
   private closeTask: Promise<void> | undefined
 
   /** @param options - launch spec, complete child environment, and timeouts. */
-  constructor(readonly options: HarnessClientOptions) {}
+  constructor(readonly options: HarnessClientOptions) {
+    validateTimerDelay(options.requestTimeoutMs, 'requestTimeoutMs')
+    validateTimerDelay(options.shutdownTimeoutMs, 'shutdownTimeoutMs')
+    validateTimerDelay(options.disposeEofGraceMs, 'disposeEofGraceMs')
+    validateTimerDelay(options.disposeGraceMs, 'disposeGraceMs')
+    const queueLimit = options.maxNotificationQueue
+    if (queueLimit !== undefined && (!Number.isSafeInteger(queueLimit) || queueLimit < 1)) {
+      throw new RangeError('maxNotificationQueue must be a positive safe integer')
+    }
+  }
 
   /**
    * Spawn the runtime subprocess and start reading frames. Idempotent while
@@ -246,6 +276,7 @@ export class HarnessClient {
       this.exitCode = code
       settled.exited = true
       maybeSettle()
+      this.sessionParents.clear()
       this.failSubscriptions(this.closedError('DeepSeek Harness runtime exited'))
     })
     child.once('close', () => {
@@ -254,7 +285,12 @@ export class HarnessClient {
       // will never be answered.
       this.transport?.close()
     })
-    const transport = new JsonRpcLineTransport(child.stdout, child.stdin)
+    const transport = new JsonRpcLineTransport(child.stdout, child.stdin, {
+      ...(this.options.maxLineBytes === undefined ? {} : { maxLineBytes: this.options.maxLineBytes }),
+      ...(this.options.maxPendingRequests === undefined ? {} : { maxPendingRequests: this.options.maxPendingRequests }),
+      ...(this.options.maxConcurrentIncoming === undefined ? {} : { maxConcurrentIncoming: this.options.maxConcurrentIncoming }),
+      ...(this.options.maxOutputBytes === undefined ? {} : { maxOutputBytes: this.options.maxOutputBytes }),
+    })
     transport.onNotification((method, params) => { this.dispatchNotification({ method, params }) })
     transport.start()
     this.transport = transport
@@ -297,8 +333,10 @@ export class HarnessClient {
    * @returns the raw result; rejects with {@link JsonRpcResponseError} on a
    * protocol error response, {@link RequestTimeoutError} on timeout, and
    * {@link TransportClosedError} when the runtime is gone.
-   */
+  */
   async request(method: string, params?: object, timeoutMs?: number): Promise<unknown> {
+    const timeout = timeoutMs ?? this.options.requestTimeoutMs
+    validateTimerDelay(timeout, 'timeoutMs')
     this.start()
     // A dead runtime cannot answer; fail with process context instead of
     // writing into a destroyed pipe and hanging until the timeout.
@@ -309,7 +347,6 @@ export class HarnessClient {
     const transport = this.transport
     /* v8 ignore next -- start() either sets the transport or throws */
     if (transport === undefined) throw new TransportClosedError('DeepSeek Harness runtime is not running')
-    const timeout = timeoutMs ?? this.options.requestTimeoutMs
     try {
       if (timeout === undefined) return await transport.request(method, params ?? {})
       // The abort signal makes the timeout an abandonment: the transport drops
@@ -341,7 +378,11 @@ export class HarnessClient {
    */
   subscribe(filter?: NotificationFilter): NotificationSubscription {
     const id = String(this.subscriptionSerial++)
-    const state: SubscriptionState = { queue: [], waiters: [], filter, failure: undefined }
+    const maxQueue = this.options.maxNotificationQueue ?? 10_000
+    if (!Number.isSafeInteger(maxQueue) || maxQueue < 1) {
+      throw new RangeError('maxNotificationQueue must be a positive safe integer')
+    }
+    const state: SubscriptionState = { queue: [], maxQueue, waiters: [], filter, failure: undefined }
     const subscription = new NotificationSubscriptionImpl(state, () => { this.subscriptions.delete(id) })
     if (this.closeTask !== undefined || this.exitCode !== undefined || this.spawnError !== undefined) {
       subscription.fail(this.closedError('DeepSeek Harness runtime closed'))
@@ -384,7 +425,15 @@ export class HarnessClient {
 
   private async performClose(): Promise<void> {
     const child = this.child
-    if (child === undefined) return
+    if (child === undefined) {
+      // A subscription may be created before lazy start. Closing such a client
+      // still has to wake every waiter; otherwise `next()` has no producer left
+      // but waits forever.
+      this.transport?.close()
+      this.sessionParents.clear()
+      this.failSubscriptions(this.closedError('DeepSeek Harness runtime closed'))
+      return
+    }
     try {
       await this.request('shutdown', undefined, this.options.shutdownTimeoutMs ?? 1_000)
     } catch (error) {
@@ -397,12 +446,14 @@ export class HarnessClient {
       disposeGraceMs: this.options.disposeGraceMs ?? 3_000,
     })
     this.transport?.close()
+    this.sessionParents.clear()
     this.failSubscriptions(this.closedError('DeepSeek Harness runtime closed'))
   }
 
   private dispatchNotification(notification: HarnessNotification): void {
     this.recordSessionRelationship(notification)
     for (const subscription of this.subscriptions.values()) subscription.push(notification)
+    this.forgetSessionRelationship(notification)
   }
 
   private recordSessionRelationship(notification: HarnessNotification): void {
@@ -410,8 +461,19 @@ export class HarnessClient {
     const parentId = notification.params.parentSessionId
     const childId = notification.params.childSessionId
     if (typeof parentId === 'string' && parentId !== '' && typeof childId === 'string' && childId !== '' && parentId !== childId) {
+      const limit = this.options.maxNotificationQueue ?? DEFAULT_SESSION_RELATIONSHIP_LIMIT
+      if (!this.sessionParents.has(childId) && this.sessionParents.size >= limit) {
+        const oldest = this.sessionParents.keys().next().value
+        if (typeof oldest === 'string') this.sessionParents.delete(oldest)
+      }
       this.sessionParents.set(childId, parentId)
     }
+  }
+
+  private forgetSessionRelationship(notification: HarnessNotification): void {
+    if (notification.method !== 'subagent.finished') return
+    const childId = notification.params.childSessionId
+    if (typeof childId === 'string' && childId !== '') this.sessionParents.delete(childId)
   }
 
   private isDescendantOf(sessionId: string, rootSessionId: string): boolean {
@@ -430,7 +492,12 @@ export class HarnessClient {
   }
 
   private failSubscriptions(error: Error): void {
-    for (const subscription of this.subscriptions.values()) subscription.fail(error)
+    const subscriptions = [...this.subscriptions.values()]
+    // Detach the producer map at the same time as failing the handles. Each
+    // handle owns its queue, so callers can drain prior notifications while no
+    // dead-runtime references or late deliveries remain in this client.
+    this.subscriptions.clear()
+    for (const subscription of subscriptions) subscription.fail(error)
   }
 
   private appendStderr(lines: string[]): void {
@@ -442,10 +509,18 @@ export class HarnessClient {
   }
 
   private settleStreams(): Promise<void> {
-    return Promise.race([
-      this.streamsSettled,
-      new Promise<void>((resolve) => { setTimeout(resolve, STREAM_SETTLE_MS) }),
-    ])
+    return new Promise<void>((resolve) => {
+      let settled = false
+      const timer = setTimeout(() => { finish() }, STREAM_SETTLE_MS)
+      timer.unref()
+      const finish = (): void => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        resolve()
+      }
+      void this.streamsSettled.then(finish, finish)
+    })
   }
 
   private closedError(reason: string): TransportClosedError {

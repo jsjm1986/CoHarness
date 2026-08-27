@@ -1,5 +1,6 @@
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import { createServer } from 'node:http'
+import { once } from 'node:events'
 import type { Duplex } from 'node:stream'
 import type { UserRow } from './auth.ts'
 import { CollaborationDeniedError } from './collaboration.ts'
@@ -10,8 +11,11 @@ import type { GatewayPushService, PushProvider } from './push-notifications.ts'
 import { loginPage, passwordPage } from './html.ts'
 import {
   DOCUMENT_TRANSFER_UPLOADS_PATH,
+  DOCUMENT_SCOPE_PATH,
   DocumentTransferError,
   parseDocumentScopeKey,
+  type GatewayDocumentScopeHandler,
+  type GatewayDocumentAdminHandler,
   type GatewayDocumentTransferListHandler,
   type GatewayDocumentTransferUploadHandler,
 } from './document-transfer.ts'
@@ -28,6 +32,7 @@ import type {
 } from './services.ts'
 import type { ConversationArchiveService } from './postgres/conversation-archive-service.ts'
 import { isAdminPath, serveAdmin } from './static.ts'
+import { ResponseBodyTooLargeError } from './response-budget.ts'
 
 export interface GatewayDeps {
   cfg: GatewayConfig
@@ -81,12 +86,29 @@ function wantsHtml(req: IncomingMessage): boolean {
 class BodyTooLargeError extends Error {}
 
 async function readBody(req: IncomingMessage, limit = 1024 * 1024): Promise<string> {
+  const declared = req.headers['content-length']
+  if (typeof declared === 'string') {
+    const length = Number(declared)
+    if (!Number.isSafeInteger(length) || length < 0 || length > limit) {
+      req.resume()
+      throw new BodyTooLargeError('body too large')
+    }
+  }
   const chunks: Buffer[] = []
   let size = 0
-  for await (const chunk of req) {
-    size += (chunk as Buffer).length
-    if (size > limit) throw new BodyTooLargeError('body too large')
-    chunks.push(chunk as Buffer)
+  try {
+    for await (const chunk of req) {
+      const bytes = typeof chunk === 'string' ? Buffer.byteLength(chunk) : (chunk as Buffer).byteLength
+      size += bytes
+      if (size > limit) {
+        req.resume()
+        throw new BodyTooLargeError('body too large')
+      }
+      chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk as Buffer)
+    }
+  } catch (error) {
+    req.resume()
+    throw error
   }
   return Buffer.concat(chunks).toString()
 }
@@ -114,18 +136,74 @@ function requestAbort(req: IncomingMessage, res: ServerResponse): {
   }
 }
 
-async function sendGatewayResponse(res: ServerResponse, response: Response): Promise<void> {
-  const body = await response.text()
-  res.writeHead(response.status, {
+async function sendGatewayResponse(res: ServerResponse, response: Response, limit: number): Promise<void> {
+  const declared = response.headers.get('content-length')
+  if (declared !== null) {
+    const length = Number(declared)
+    if (!Number.isSafeInteger(length) || length < 0 || length > limit) {
+      await response.body?.cancel()
+      send(res, 502, JSON.stringify({ error: { code: 'UPSTREAM_RESPONSE_TOO_LARGE', message: 'The runtime response is too large.' } }), 'application/json')
+      return
+    }
+  }
+  const headers: Record<string, string> = {
     'content-type': response.headers.get('content-type') ?? 'application/json; charset=utf-8',
     'cache-control': response.headers.get('cache-control') ?? 'no-store',
-  })
-  res.end(body)
+  }
+  for (const name of ['content-length', 'content-disposition', 'x-content-type-options', 'content-security-policy']) {
+    const value = response.headers.get(name)
+    if (value !== null) headers[name] = value
+  }
+  res.writeHead(response.status, headers)
+  if (response.body === null) {
+    res.end()
+    return
+  }
+  const reader = response.body.getReader()
+  const cancelOnClose = (): void => { void reader.cancel().catch(() => {}) }
+  res.once('close', cancelOnClose)
+  try {
+    let total = 0
+    for (;;) {
+      const next = await reader.read()
+      if (next.done) break
+      total += next.value.byteLength
+      if (total > limit) {
+        await reader.cancel().catch(() => {})
+        if (!res.destroyed) res.destroy(new ResponseBodyTooLargeError(limit))
+        return
+      }
+      if (!res.write(next.value)) await Promise.race([once(res, 'drain'), once(res, 'close')])
+      if (res.destroyed) break
+    }
+    if (!res.writableEnded) res.end()
+  } catch (error) {
+    if (!res.destroyed) res.destroy(error as Error)
+  } finally {
+    res.removeListener('close', cancelOnClose)
+    await reader.cancel().catch(() => {})
+    reader.releaseLock()
+  }
 }
 
 function isScopedUploadDataPath(method: string | undefined, pathname: string): boolean {
   return (method === 'PUT' && /\/chunks\/[0-9]+$/u.test(pathname))
     || (method === 'GET' && /^\/api\/documents\/transfer\/uploads\/[0-9a-f-]{36}$/u.test(pathname))
+}
+
+function scopedDocumentOperation(pathname: string, method: string | undefined): import('./document-transfer.ts').GatewayDocumentScopeOperation | undefined {
+  if (pathname === DOCUMENT_SCOPE_PATH) {
+    if (method === 'GET') return 'list'
+    if (method === 'DELETE') return 'delete'
+  }
+  if (pathname === `${DOCUMENT_SCOPE_PATH}/directories` && method === 'GET') return 'directories'
+  if (pathname === `${DOCUMENT_SCOPE_PATH}/content` && (method === 'GET' || method === 'HEAD')) return 'content'
+  if (pathname === `${DOCUMENT_SCOPE_PATH}/trash` && (method === 'GET' || method === 'POST')) return 'trash'
+  if (pathname === `${DOCUMENT_SCOPE_PATH}/restore` && method === 'POST') return 'restore'
+  if (pathname === `${DOCUMENT_SCOPE_PATH}/purge` && method === 'DELETE') return 'purge'
+  if (pathname === `${DOCUMENT_SCOPE_PATH}/folders` && (method === 'POST' || method === 'PATCH' || method === 'DELETE')) return 'folders'
+  if (pathname === `${DOCUMENT_SCOPE_PATH}/move` && method === 'POST') return 'move'
+  return undefined
 }
 
 function sendAdminGate(res: ServerResponse, pathname: string, error: string): void {
@@ -196,6 +274,10 @@ export interface GatewayHandlers {
   documentTransferList?: GatewayDocumentTransferListHandler
   /** Gateway-owned target-scope resumable upload proxy. */
   documentTransferUpload?: GatewayDocumentTransferUploadHandler
+  /** Gateway-owned full document operations for an explicitly selected scope. */
+  documentScope?: GatewayDocumentScopeHandler
+  /** Gateway-owned administrator lifecycle operations for catalog rows. */
+  documentAdmin?: GatewayDocumentAdminHandler
   admin?: (req: IncomingMessage, res: ServerResponse, user: UserRow, pathname: string, body: string) => Promise<boolean>
   runtime?: (req: IncomingMessage, res: ServerResponse, pathname: string, body: string) => Promise<boolean>
   /** Override `serveAdmin` root (tests); default `gateway/public/admin`. */
@@ -484,7 +566,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
           scope,
           signal: abort.signal,
         })
-        if (!abort.signal.aborted && !res.writableEnded) await sendGatewayResponse(res, response)
+        if (!abort.signal.aborted && !res.writableEnded) await sendGatewayResponse(res, response, cfg.upstreamResponseLimitBytes)
       } catch (error: unknown) {
         if (abort.signal.aborted || res.writableEnded) return
         if (error instanceof DocumentTransferError) {
@@ -492,6 +574,55 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
           return
         }
         send(res, 503, JSON.stringify({ error: { code: 'DOCUMENT_TRANSFER_UNAVAILABLE', message: 'Target document runtime is unavailable.' } }), 'application/json')
+      } finally {
+        abort.dispose()
+      }
+      return
+    }
+
+    const scopedOperation = handlers.documentScope === undefined
+      ? undefined
+      : scopedDocumentOperation(pathname, req.method)
+    if (scopedOperation !== undefined && handlers.documentScope !== undefined) {
+      const requestUrl = new URL(req.url ?? '/', 'http://gateway')
+      let scope: ReturnType<typeof parseDocumentScopeKey>
+      try {
+        scope = parseDocumentScopeKey(requestUrl.searchParams.get('scope'))
+      } catch (error: unknown) {
+        if (error instanceof DocumentTransferError) {
+          send(res, error.status, JSON.stringify({ error: { code: error.code, message: error.message } }), 'application/json')
+        } else {
+          send(res, 400, JSON.stringify({ error: { code: 'INVALID_DOCUMENT_TRANSFER', message: 'Invalid document scope.' } }), 'application/json')
+        }
+        return
+      }
+      const abort = requestAbort(req, res)
+      res.once('finish', () => {
+        void Promise.resolve(audit.write({
+          userId: user.id,
+          action: 'api',
+          methodPath: `${req.method} ${pathname}`,
+          status: res.statusCode,
+          ip: clientIp(req),
+        })).catch(error => { console.error('[gateway] API audit write failed:', error) })
+      })
+      try {
+        const response = await handlers.documentScope({
+          user,
+          request: req,
+          pathname,
+          operation: scopedOperation,
+          scope,
+          signal: abort.signal,
+        })
+        if (!abort.signal.aborted && !res.writableEnded) await sendGatewayResponse(res, response, cfg.upstreamResponseLimitBytes)
+      } catch (error: unknown) {
+        if (abort.signal.aborted || res.writableEnded) return
+        if (error instanceof DocumentTransferError) {
+          send(res, error.status, JSON.stringify({ error: { code: error.code, message: error.message } }), 'application/json')
+        } else {
+          send(res, 503, JSON.stringify({ error: { code: 'DOCUMENT_TRANSFER_UNAVAILABLE', message: 'Document scope is temporarily unavailable.' } }), 'application/json')
+        }
       } finally {
         abort.dispose()
       }

@@ -4,15 +4,25 @@
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { createPublicKey, verify as verifySignature, type KeyObject } from 'node:crypto'
+import { createHmac, createPublicKey, timingSafeEqual, verify as verifySignature, type KeyObject } from 'node:crypto'
 import { readFileSync } from 'node:fs'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import { Context, Service } from '@deepseek-ai/cordis'
 import type { Branded } from '@deepseek-ai/dsh-brand'
-import type { ConnectionRequestBoundary } from '@deepseek-ai/dsh-client-connection'
+import type { ConnectionHttpHandler, ConnectionRequestBoundary } from '@deepseek-ai/dsh-client-connection'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 
 /** HTTP header carrying one Gateway-signed browser principal. */
 export const GATEWAY_PRINCIPAL_HEADER = 'x-dsh-gateway-principal'
+
+/** Private runtime HTTP path used by the Gateway's authenticated readiness probe. */
+export const GATEWAY_READINESS_PATH = '/api/internal/gateway/readiness'
+/** One-time nonce header for the Gateway readiness challenge. */
+export const GATEWAY_READINESS_NONCE_HEADER = 'x-dsh-gateway-readiness-nonce'
+/** HMAC challenge proof header. */
+export const GATEWAY_READINESS_REQUEST_HEADER = 'x-dsh-gateway-readiness-request'
+/** HMAC response proof header. */
+export const GATEWAY_READINESS_RESPONSE_HEADER = 'x-dsh-gateway-readiness-response'
 
 /** Runtime identity bound into both the launch credential and every principal. */
 export interface GatewayRuntimeIdentity {
@@ -44,7 +54,7 @@ export interface GatewayPrincipalClaims {
   expiresAt: number
   nonce: string
   /** Optional capability purpose used by loopback-only runtime integrations. */
-  purpose?: 'archive-read'
+  purpose?: 'archive-read' | 'document-admin'
 }
 
 /** Private launch credential delivered through an inherited FD or systemd credential file. */
@@ -104,6 +114,35 @@ function nonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0
 }
 
+function readinessMaterial(
+  kind: 'request' | 'response',
+  nonce: string,
+  identity: GatewayRuntimeIdentity,
+): string {
+  return `dsh-gateway-readiness-v1\u0000${kind}\u0000${nonce}\u0000${identity.kind}\u0000${String(identity.id)}\u0000${String(identity.generation)}`
+}
+
+function readinessProof(
+  kind: 'request' | 'response',
+  token: string,
+  nonce: string,
+  identity: GatewayRuntimeIdentity,
+): string {
+  return createHmac('sha256', token).update(readinessMaterial(kind, nonce, identity)).digest('base64url')
+}
+
+function proofEquals(expected: string, actual: unknown): boolean {
+  if (typeof actual !== 'string') return false
+  const left = Buffer.from(expected, 'base64url')
+  const right = Buffer.from(actual, 'base64url')
+  return left.length === right.length && timingSafeEqual(left, right)
+}
+
+function headerString(headers: Record<string, string | string[] | undefined>, name: string): string | undefined {
+  const value = headers[name]
+  return typeof value === 'string' ? value : undefined
+}
+
 /**
  * Parse and validate one private runtime credential.
  * @param value - decoded credential JSON from the private launch channel.
@@ -147,7 +186,10 @@ function principalClaims(value: unknown): GatewayPrincipalClaims {
     || claims.expiresAt <= claims.issuedAt || !nonEmptyString(claims.nonce)) {
     throw new Error('invalid Gateway principal assertion')
   }
-  if (claims.purpose !== undefined && claims.purpose !== 'archive-read') {
+  if (claims.purpose !== undefined && claims.purpose !== 'archive-read' && claims.purpose !== 'document-admin') {
+    throw new Error('invalid Gateway principal assertion')
+  }
+  if (claims.purpose !== undefined && user.role !== 'admin') {
     throw new Error('invalid Gateway principal assertion')
   }
   if (scope.kind === 'project' && (!positiveInteger(scope.projectId)
@@ -199,7 +241,7 @@ export function verifyGatewayPrincipal(
   }
   if (claims.scope.kind === 'personal') {
     if (claims.runtime.kind !== 'user'
-      || (claims.user.id !== claims.runtime.id && claims.purpose !== 'archive-read')) {
+      || (claims.user.id !== claims.runtime.id && claims.purpose !== 'archive-read' && claims.purpose !== 'document-admin')) {
       throw new Error('invalid Gateway principal assertion scope')
     }
   } else if (claims.runtime.kind !== 'project' || claims.scope.projectId !== claims.runtime.id) {
@@ -251,6 +293,7 @@ export class GatewayRuntime extends Service {
   private readonly gatewayUrl: URL
   private readonly publicKey: KeyObject
   private readonly requests = new AsyncLocalStorage<GatewayRequestPrincipal>()
+  private readonly readinessRequests = new AsyncLocalStorage<string>()
   private readonly sessionCreations = new Map<SessionId, Promise<GatewaySessionCreationAuthorization>>()
 
   constructor(ctx: Context) {
@@ -261,7 +304,18 @@ export class GatewayRuntime extends Service {
     this.gatewayUrl = new URL(this.credential.gatewayUrl)
     this.publicKey = createPublicKey(this.credential.principalPublicKey)
     ctx.on('connection/request', (request: ConnectionRequestBoundary, next) => {
+      const requestMeta = request as ConnectionRequestBoundary & { method?: string; pathname?: string }
       const header = request.headers[GATEWAY_PRINCIPAL_HEADER]
+      const readinessNonce = headerString(request.headers, GATEWAY_READINESS_NONCE_HEADER)
+      const readinessRequest = headerString(request.headers, GATEWAY_READINESS_REQUEST_HEADER)
+      if (request.kind === 'http' && requestMeta.method === 'GET' && requestMeta.pathname === GATEWAY_READINESS_PATH
+        && readinessNonce !== undefined && readinessRequest !== undefined
+        && proofEquals(
+          readinessProof('request', this.credential.token, readinessNonce, this.identity),
+          readinessRequest,
+        )) {
+        return this.readinessRequests.run(readinessNonce, next)
+      }
       if (typeof header !== 'string') throw new Error('Gateway principal assertion is required')
       const principal = {
         assertion: header,
@@ -269,6 +323,38 @@ export class GatewayRuntime extends Service {
       }
       return this.requests.run(principal, next)
     })
+    const connection = ctx.get('connection')
+    if (connection === undefined) throw new Error('gateway runtime requires the connection service')
+    const http = (connection as unknown as {
+      http?: { handlePrefix?: (path: string, handler: ConnectionHttpHandler, options: { authority: 'loopback' }) => () => Promise<void> }
+    }).http
+    const handlePrefix = http?.handlePrefix
+    if (typeof handlePrefix === 'function') {
+      ctx.effect(
+        () => handlePrefix(
+          GATEWAY_READINESS_PATH,
+          (request: IncomingMessage, response: ServerResponse) => { this.handleReadiness(request, response) },
+          { authority: 'loopback' },
+        ),
+        'gateway-runtime: readiness endpoint',
+      )
+    }
+  }
+
+  /** Serve one authenticated readiness challenge after the connection middleware accepted it. */
+  private handleReadiness(_request: IncomingMessage, response: ServerResponse): void {
+    const nonce = this.readinessRequests.getStore()
+    if (nonce === undefined) {
+      response.writeHead(403, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+      response.end(JSON.stringify({ error: 'readiness-proof-required' }))
+      return
+    }
+    response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+    response.end(JSON.stringify({
+      version: 1,
+      runtime: this.identity,
+      proof: readinessProof('response', this.credential.token, nonce, this.identity),
+    }))
   }
 
   /**

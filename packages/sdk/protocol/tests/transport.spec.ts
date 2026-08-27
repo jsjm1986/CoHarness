@@ -189,6 +189,20 @@ describe('JsonRpcLineTransport', () => {
     transport.close()
   })
 
+  it('rejects an oversized complete line before dispatching it', async () => {
+    const input = new PassThrough()
+    const output = new PassThrough()
+    const transport = new JsonRpcLineTransport(input, output, { maxLineBytes: 32 })
+    const seen: string[] = []
+    transport.onNotification((method) => { seen.push(method) })
+    transport.start()
+    input.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'x', params: { value: '0123456789' } })}\n`)
+    await new Promise(resolve => setImmediate(resolve))
+    expect(seen).toEqual([])
+    await expect(transport.request('after-limit', {})).rejects.toThrow('JSON-RPC transport closed')
+    transport.close()
+  })
+
   it('flush waits for all earlier output writes', async () => {
     const events: string[] = []
     const output = new Writable({

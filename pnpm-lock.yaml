@@ -3417,6 +3417,12 @@ importers:
         specifier: 1.8.0
         version: 1.8.0
     devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
       '@deepseek-ai/dsh-userdoc':
         specifier: workspace:^
         version: link:../../attachment/userdoc
@@ -4554,6 +4560,10 @@ importers:
         version: link:../../core/tools
 
   packages/extensions/cordis-client-runner:
+    dependencies:
+      '@deepseek-ai/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: workspace:^

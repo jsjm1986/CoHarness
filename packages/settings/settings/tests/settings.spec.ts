@@ -206,6 +206,33 @@ describe('registration', () => {
     const again = ctx.settings.register(settingsNamespace('ui-theme'), ThemeSchema)
     expect(again.get()).toEqual({ theme: 'light', fontSize: 14 })
   })
+
+  it('waits for an already-started watcher when its registrant fiber disposes', async () => {
+    const { ctx, provider } = await boot()
+    let release: (() => void) | undefined
+    let finished = false
+    const fiber = ctx.plugin({
+      inject: ['settings'],
+      apply: (child: Context) => {
+        const scope = child.settings.register(settingsNamespace('ui-theme'), ThemeSchema)
+        scope.watch(async () => {
+          await new Promise<void>((resolve) => { release = resolve })
+          finished = true
+        })
+      },
+    })
+    await fiber
+    provider.pushExternal({ 'ui-theme': { theme: 'light' } })
+    await vi.waitFor(() => { expect(release).toBeDefined() })
+    let disposed = false
+    const disposal = fiber.dispose().then(() => { disposed = true })
+    await new Promise(resolve => setTimeout(resolve, 10))
+    expect(disposed).toBe(false)
+    release!()
+    await disposal
+    expect(finished).toBe(true)
+    expect(ctx.settings.get(settingsNamespace('ui-theme'))).toBeUndefined()
+  })
 })
 
 describe('update', () => {
@@ -316,6 +343,12 @@ describe('deepEqualJson', () => {
     [{ a: null }, { a: {} }, false],
   ])('compares %j vs %j as %s', (a, b, equal) => {
     expect(deepEqualJson(a, b)).toBe(equal)
+  })
+
+  it('does not treat a sparse array as equal to a dense array', () => {
+    const sparse: unknown[] = []
+    sparse.length = 1
+    expect(deepEqualJson(sparse, [undefined])).toBe(false)
   })
 })
 
@@ -621,6 +654,7 @@ describe('third review regressions', () => {
   })
 
   it.each([
+    ['a sparse array', { value: Object.assign([], { 1: 'value', length: 2 }) }, /sparse array/],
     ['a Map', { value: new Map() }, /Map at \$\.value/],
     ['a bigint', { value: [10n] }, /bigint at \$\.value\[0\]/],
     ['a symbol', { value: Symbol('x') }, /symbol at \$\.value/],

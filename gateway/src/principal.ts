@@ -22,7 +22,7 @@ import type { UserRow } from './auth.ts'
 export const PRINCIPAL_HEADER = 'x-dsh-gateway-principal'
 
 /** Narrow purpose carried by a Gateway assertion that is not a browser request. */
-export type GatewayPrincipalPurpose = 'archive-read'
+export type GatewayPrincipalPurpose = 'archive-read' | 'document-admin'
 
 export type PrincipalScope =
   | { kind: 'personal' }
@@ -224,7 +224,10 @@ function principalClaims(value: unknown): GatewayPrincipalClaims {
     || claims.expiresAt <= claims.issuedAt || typeof claims.nonce !== 'string' || claims.nonce === '') {
     throw new Error('invalid principal assertion')
   }
-  if (claims.purpose !== undefined && claims.purpose !== 'archive-read') {
+  if (claims.purpose !== undefined && claims.purpose !== 'archive-read' && claims.purpose !== 'document-admin') {
+    throw new Error('invalid principal assertion')
+  }
+  if (claims.purpose !== undefined && user.role !== 'admin') {
     throw new Error('invalid principal assertion')
   }
   if (scope.kind === 'project' && (!positiveId(scope.projectId) || typeof scope.projectName !== 'string'

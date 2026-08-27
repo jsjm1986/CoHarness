@@ -62,6 +62,12 @@ export interface GatewayUserService {
   }): Promise<UserRow>
   list(): Awaitable<Array<UserRow & { port: number; instanceState: string }>>
   getById(id: number): Awaitable<UserRow | null>
+  /** Atomically apply the administrator-editable user fields when supported. */
+  patch?(id: number, next: {
+    role?: 'admin' | 'user'
+    status?: 'active' | 'disabled'
+    displayName?: string
+  }): Awaitable<void>
   getByUsername(username: string): Awaitable<UserRow | null>
   setStatus(id: number, status: 'active' | 'disabled'): Awaitable<void>
   setRole(id: number, role: 'admin' | 'user'): Awaitable<void>
@@ -137,10 +143,12 @@ export interface GatewayAuditService {
 export type GatewayDocumentCatalogService = Pick<
   PostgresDocumentCatalogService,
   'adminList' | 'adminMetrics' | 'detail' | 'transferOwnership' | 'adminDelete'
->
+> & Partial<Pick<PostgresDocumentCatalogService, 'adminListPage' | 'target' | 'adminTrash' | 'adminRestore' | 'adminPurge' | 'purgeDue'>>
 
 /** Model authorization, pricing, quota, and usage operations consumed by the Gateway. */
 export interface GatewayModelGovernanceService {
+  /** Monotonic organization policy revision used by lazy runtime projections. */
+  configurationRevision?(): Awaitable<number>
   listProviders(): Awaitable<ModelProviderRow[]>
   upsertProvider(input: ModelProviderInput): Awaitable<void>
   listModels(): Awaitable<ModelRow[]>
@@ -194,6 +202,9 @@ export interface GatewayModelGovernanceService {
 /** Instance lifecycle operations used by HTTP, proxy, and policy handlers. */
 export type GatewayInstanceService = Pick<
   InstanceManager,
-  'beforeStart' | 'portOf' | 'stateOf' | 'generationOf' | 'isLive' | 'touch' | 'wsRef' | 'ensureRunning' | 'reapIdle'
+  'beforeStart' | 'beforeUse' | 'portOf' | 'stateOf' | 'generationOf' | 'isLive' | 'touch' | 'wsRef' | 'ensureRunning' | 'reapIdle'
   | 'stop' | 'stopAll' | 'withStopped'
->
+> & {
+  /** Optional long-request lease supported by the production manager. */
+  operationRef?: InstanceManager['operationRef']
+}

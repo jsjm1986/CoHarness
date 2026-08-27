@@ -37,8 +37,10 @@ async function store(root: string, config: Record<string, unknown> = {}): Promis
 async function complete(storeValue: LocalUserDocStore, uploadId: string, sha256: string) {
   const started = await storeValue.completeUpload(uploadId as never, sha256)
   let current = started
-  for (let attempt = 0; current.state === 'verifying' && attempt < 100; attempt += 1) {
-    await new Promise(resolve => setTimeout(resolve, 2))
+  // Finalization hashes the file through a bounded stream; a 100 MB fixture
+  // can legitimately take longer than a few scheduler ticks on a busy host.
+  for (let attempt = 0; current.state === 'verifying' && attempt < 400; attempt += 1) {
+    await new Promise(resolve => setTimeout(resolve, 25))
     current = await storeValue.inspectUpload(uploadId as never)
   }
   return current

@@ -18,6 +18,7 @@ Gateway PostgreSQL `SessionPersistence` provider for shared project runtimes. Th
 
 - `preparedSessionCacheSize` — positive number of cold preparations retained by the coordinator; default `5`.
 - `writeBatchMaxDelayMs` — positive fixed batching window; default `200`, bounded by the shared maximum timer delay.
+- `maxPendingEvents` — maximum events retained by one live session's write controller; default `10,000`.
 - `requestTimeoutMs` — positive deadline for one internal Gateway request; default `30000`.
 
 ## Model Experience

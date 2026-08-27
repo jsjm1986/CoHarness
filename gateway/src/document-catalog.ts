@@ -7,6 +7,7 @@ import {
   DocumentCatalogError,
   type DocumentCatalogInput,
   type DocumentCatalogScope,
+  type DocumentCatalogOverviewOptions,
   type PostgresDocumentCatalogService,
 } from './postgres/document-catalog-service.ts'
 
@@ -14,6 +15,15 @@ export { DocumentCatalogError } from './postgres/document-catalog-service.ts'
 
 /** Runtime callback consumed by the authenticated loopback API. */
 export interface RuntimeDocumentCatalogSyncHandler {
+  (input: {
+    readonly subject: RuntimeCredentialSubject
+    readonly principal: GatewayPrincipalClaims
+    readonly payload: unknown
+  }): Promise<{ readonly version: 1; readonly accepted: number }>
+}
+
+/** Runtime callback marking permanently purged document metadata. */
+export interface RuntimeDocumentCatalogPurgeHandler {
   (input: {
     readonly subject: RuntimeCredentialSubject
     readonly principal: GatewayPrincipalClaims
@@ -35,6 +45,7 @@ export interface RuntimeDocumentCatalogOverviewHandler {
   (input: {
     readonly subject: RuntimeCredentialSubject
     readonly principal: GatewayPrincipalClaims
+    readonly options?: unknown
   }): Promise<unknown>
 }
 
@@ -68,7 +79,33 @@ function safeText(value: unknown, max: number): value is string {
 
 function safeRelativeId(value: unknown, allowEmpty: boolean): value is string {
   return typeof value === 'string' && value.length <= 4096
-    && (value === '' ? allowEmpty : value.split('/').every(segment => segment !== '' && segment !== '.' && segment !== '..' && !segment.includes('\\')))
+    && (value === '' ? allowEmpty : value.split('/').every(segment => segment !== '' && segment !== '.' && segment !== '..'
+      && !segment.includes('\\') && !/[\u0000-\u001f\u007f]/u.test(segment)))
+}
+
+function overviewOptions(value: unknown): DocumentCatalogOverviewOptions {
+  if (value === undefined) return {}
+  const row = record(value)
+  if (row === undefined) throw new DocumentCatalogError('INVALID_DOCUMENT_METADATA', 400, 'Invalid document overview query.')
+  const query = row.query
+  const type = row.type
+  const sort = row.sort
+  const limit = row.limit
+  const cursor = row.cursor
+  if (query !== undefined && (typeof query !== 'string' || query.length > 255 || /[\u0000-\u001f\u007f]/u.test(query))
+    || cursor !== undefined && (typeof cursor !== 'string' || cursor.length > 4096)
+    || limit !== undefined && (!Number.isSafeInteger(limit) || (limit as number) < 1 || (limit as number) > 200)
+    || type !== undefined && !['all', 'image', 'pdf', 'text', 'other'].includes(type as string)
+    || sort !== undefined && !['date-desc', 'date-asc', 'name-asc', 'name-desc', 'size-desc', 'size-asc'].includes(sort as string)) {
+    throw new DocumentCatalogError('INVALID_DOCUMENT_METADATA', 400, 'Invalid document overview query.')
+  }
+  return {
+    ...(query === undefined || query === '' ? {} : { query }),
+    ...(type === undefined ? {} : { type: type as DocumentCatalogOverviewOptions['type'] }),
+    ...(sort === undefined ? {} : { sort: sort as DocumentCatalogOverviewOptions['sort'] }),
+    ...(limit === undefined ? {} : { limit: limit as number }),
+    ...(cursor === undefined ? {} : { cursor }),
+  }
 }
 
 function metadata(value: unknown): DocumentCatalogInput {
@@ -96,13 +133,15 @@ function serviceError(error: unknown): never {
 
 /** Create handlers backed by one PostgreSQL catalog service. */
 export function createDocumentCatalogHandlers(
-  catalog: Pick<PostgresDocumentCatalogService, 'sync' | 'markDeleted' | 'authorize' | 'overview' | 'history'>,
+  catalog: Pick<PostgresDocumentCatalogService, 'sync' | 'markDeleted' | 'authorize' | 'overview' | 'history'>
+    & Partial<Pick<PostgresDocumentCatalogService, 'markPurged'>>,
   audit?: Pick<GatewayAuditService, 'write'>,
 ): {
   sync: RuntimeDocumentCatalogSyncHandler
   authorize: RuntimeDocumentCatalogAuthorizeHandler
   overview: RuntimeDocumentCatalogOverviewHandler
   history: RuntimeDocumentCatalogHistoryHandler
+  purge: RuntimeDocumentCatalogPurgeHandler
 } {
   const sync: RuntimeDocumentCatalogSyncHandler = async ({ subject, principal, payload }) => {
     try {
@@ -123,7 +162,7 @@ export function createDocumentCatalogHandlers(
       })
       if (value.removed !== undefined) {
         if (!Array.isArray(value.removed) || value.removed.length > 2000
-          || !value.removed.every(item => safeText(item, 4096))) {
+          || !value.removed.every(item => safeRelativeId(item, false))) {
           throw new DocumentCatalogError('INVALID_DOCUMENT_METADATA', 400, 'Invalid document catalog deletion request.')
         }
         for (const docId of value.removed) {
@@ -150,9 +189,10 @@ export function createDocumentCatalogHandlers(
   const authorize: RuntimeDocumentCatalogAuthorizeHandler = async ({ subject, principal, payload }) => {
     try {
       const value = record(payload)
-      if (value?.version !== 1 || (value.action !== 'delete' && value.action !== 'move' && value.action !== 'ownership')
+      if (value?.version !== 1 || (value.action !== 'delete' && value.action !== 'move' && value.action !== 'ownership'
+        && value.action !== 'restore' && value.action !== 'purge')
         || !Array.isArray(value.docIds) || value.docIds.length === 0 || value.docIds.length > 50
-        || !value.docIds.every(item => safeText(item, 4096))) {
+        || !value.docIds.every(item => safeRelativeId(item, false))) {
         throw new DocumentCatalogError('INVALID_DOCUMENT_METADATA', 400, 'Invalid document authorization request.')
       }
       await catalog.authorize({
@@ -170,9 +210,9 @@ export function createDocumentCatalogHandlers(
     }
   }
 
-  const overview: RuntimeDocumentCatalogOverviewHandler = async ({ principal }) => {
+  const overview: RuntimeDocumentCatalogOverviewHandler = async ({ principal, options }) => {
     try {
-      return await catalog.overview(principal.user.id)
+      return await catalog.overview(principal.user.id, overviewOptions(options))
     } catch (error) {
       return serviceError(error)
     }
@@ -188,7 +228,24 @@ export function createDocumentCatalogHandlers(
       return serviceError(error)
     }
   }
-  return { sync, authorize, overview, history }
+  const purge: RuntimeDocumentCatalogPurgeHandler = async ({ subject, principal, payload }) => {
+    try {
+      const value = record(payload)
+      if (value?.version !== 1 || !Array.isArray(value.docIds) || value.docIds.length === 0
+        || value.docIds.length > 50 || !value.docIds.every(item => safeRelativeId(item, false))) {
+        throw new DocumentCatalogError('INVALID_DOCUMENT_METADATA', 400, 'Invalid document purge request.')
+      }
+      const scope = currentScope(subject)
+      for (const docId of value.docIds) {
+        if (catalog.markPurged === undefined) throw new DocumentCatalogError('DOCUMENT_CATALOG_UNAVAILABLE', 503, 'Document purge metadata is unavailable.')
+        await catalog.markPurged(principal.user.id, scope, docId)
+      }
+      return { version: 1, accepted: value.docIds.length }
+    } catch (error) {
+      return serviceError(error)
+    }
+  }
+  return { sync, authorize, overview, history, purge }
 }
 
 /** Parse a public project scope selector for future plan/commit callers. */

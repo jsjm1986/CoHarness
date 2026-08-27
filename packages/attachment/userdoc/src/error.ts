@@ -107,6 +107,18 @@ export const DOCUMENT_UPLOAD_STORAGE_CODE = 'DOCUMENT_UPLOAD_STORAGE'
 /** The runtime has reached its configured concurrent upload guard. */
 export const DOCUMENT_UPLOAD_BUSY_CODE = 'DOCUMENT_UPLOAD_BUSY'
 
+/** A document-list cursor or filter could not be decoded. */
+export const DOCUMENT_LIST_QUERY_CODE = 'DOCUMENT_LIST_QUERY'
+
+/** A document is currently retained in the provider's recoverable trash. */
+export const DOCUMENT_TRASHED_CODE = 'DOCUMENT_TRASHED'
+
+/** A trash restore or purge request could not resolve its document. */
+export const DOCUMENT_TRASH_NOT_FOUND_CODE = 'DOCUMENT_TRASH_NOT_FOUND'
+
+/** A restored document would replace an existing entry. */
+export const DOCUMENT_RESTORE_CONFLICT_CODE = 'DOCUMENT_RESTORE_CONFLICT'
+
 /** A caller still uses the removed one-request upload protocol. */
 export const DOCUMENT_UPLOAD_PROTOCOL_CODE = 'DOCUMENT_UPLOAD_PROTOCOL'
 
@@ -139,4 +151,8 @@ export type UserDocErrorCode =
   | typeof DOCUMENT_UPLOAD_STATE_CODE
   | typeof DOCUMENT_UPLOAD_STORAGE_CODE
   | typeof DOCUMENT_UPLOAD_BUSY_CODE
+  | typeof DOCUMENT_LIST_QUERY_CODE
+  | typeof DOCUMENT_TRASHED_CODE
+  | typeof DOCUMENT_TRASH_NOT_FOUND_CODE
+  | typeof DOCUMENT_RESTORE_CONFLICT_CODE
   | typeof DOCUMENT_UPLOAD_PROTOCOL_CODE

@@ -5,11 +5,11 @@ import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import { loadConfig } from '../src/config.ts'
 import { openDb } from '../src/db.ts'
-import { InstanceManager } from '../src/instances.ts'
+import { InstanceManager, RuntimeLeaseUnavailableError } from '../src/instances.ts'
 import type { InstanceRepository, RuntimeTarget } from '../src/instances.ts'
 import { UserService } from '../src/users.ts'
 
-const FAKE_DSH = `require('http').createServer((q, s) => { if (q.url === '/exit') { s.end('bye'); process.exit(0); return } s.end('ok') }).listen(Number(process.argv[1]), '127.0.0.1')`
+const FAKE_DSH = `const fs=require('fs'),crypto=require('crypto'),http=require('http');const c=JSON.parse(fs.readFileSync(3,'utf8'));const material=(kind,nonce)=>'dsh-gateway-readiness-v1\\0'+kind+'\\0'+nonce+'\\0'+c.runtime.kind+'\\0'+String(c.runtime.id)+'\\0'+String(c.runtime.generation);const proof=(kind,nonce)=>crypto.createHmac('sha256',c.token).update(material(kind,nonce)).digest('base64url');http.createServer((q,s)=>{if(q.url==='/exit'){s.end('bye');process.exit(0);return}if(q.url==='/api/internal/gateway/readiness'){const nonce=q.headers['x-dsh-gateway-readiness-nonce'];const request=q.headers['x-dsh-gateway-readiness-request'];if(typeof nonce!=='string'||request!==proof('request',nonce)){s.statusCode=403;s.end();return}s.setHeader('content-type','application/json');s.end(JSON.stringify({version:1,runtime:c.runtime,proof:proof('response',nonce)}));return}s.end('ok')}).listen(Number(process.argv[1]),'127.0.0.1')`
 
 let manager: InstanceManager | undefined
 afterEach(async () => { await manager?.stopAll() })
@@ -335,5 +335,48 @@ describe('InstanceManager', () => {
     await expect(destructive).resolves.toBe('deleted')
     await expect(restart).resolves.toMatchObject({ port: 43210 })
     expect(await manager.stateOf(target)).toBe('ready')
+  })
+
+  it('serializes idle reaping with lease admission and rejects a lease after stop wins', async () => {
+    const { db, alice, manager } = await setup({ HGW_IDLE_TIMEOUT_MS: '50', HGW_INSTANCE_PORT_BASE: '43230' })
+    await manager.ensureRunning(alice)
+    db.prepare(`UPDATE instances SET last_activity_at = ? WHERE user_id = ?`).run(Date.now() - 60_000, alice.id)
+
+    const lease = manager.operationRef(alice.id, 1)
+    const reap = manager.reapIdle()
+    const [leaseResult, reapResult] = await Promise.allSettled([lease, reap])
+    if (leaseResult.status === 'fulfilled') {
+      expect(reapResult).toEqual({ status: 'fulfilled', value: 0 })
+      await manager.operationRef(alice.id, -1)
+      expect(await manager.stateOf(alice.id)).toBe('ready')
+    } else {
+      expect(leaseResult.reason).toBeInstanceOf(RuntimeLeaseUnavailableError)
+      expect(reapResult).toEqual({ status: 'fulfilled', value: 1 })
+      expect(await manager.stateOf(alice.id)).toBe('stopped')
+    }
+  })
+
+  it('keeps release from an old generation from dropping a new operation lease', async () => {
+    const { root, cfg, manager: initialManager } = await setup({ HGW_INSTANCE_PORT_BASE: '43240' })
+    const projectPath = join(root, 'generation-project')
+    mkdirSync(projectPath, { recursive: true })
+    const project = { kind: 'project' as const, id: 41, name: 'Generation', path: projectPath }
+    const target = { kind: 'project' as const, id: project.id }
+    const projectManager = new InstanceManager(new ProjectRepository(projectPath, 43240), cfg)
+    manager = projectManager
+    const first = await projectManager.ensureRunning(project)
+    await projectManager.operationRef(target, 1, first.generation)
+    await projectManager.stop(target)
+    const second = await projectManager.ensureRunning(project)
+    expect(second.generation).toBeGreaterThan(first.generation)
+    await projectManager.operationRef(target, 1, second.generation)
+    await projectManager.operationRef(target, -1, first.generation)
+    const refs = (projectManager as unknown as { operationRefs: Map<string, number> }).operationRefs
+    expect([...refs.values()]).toEqual([1])
+    await projectManager.operationRef(target, -1, second.generation)
+    expect(refs.size).toBe(0)
+    // Keep the original setup manager from retaining an unused process map in
+    // case the fixture changes its default cleanup order later.
+    await initialManager.stopAll()
   })
 })

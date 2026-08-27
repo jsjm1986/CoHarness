@@ -294,6 +294,27 @@ describe('createUserDocClient', () => {
     ])
   })
 
+  it('keeps the legacy alternate-scope fallback on local paging when it has no cursor', async () => {
+    const calls: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+      calls.push(`${init?.method ?? 'GET'} ${url}`)
+      if (url.startsWith('/api/documents/scope?')) return { ok: false, status: 404, text: async () => '{}' }
+      return {
+        ok: true,
+        text: async () => JSON.stringify({
+          version: 1,
+          scope: { kind: 'project', label: 'Compiler' },
+          documents: [ref, { ...ref, docId: '2026-08-17/b.txt', name: 'b.txt' }],
+        }),
+      }
+    }))
+    const result = await createUserDocClient().browseScope({ kind: 'project', projectId: 41 }, rootDirectoryId)
+    expect(result.totalDocuments).toBeUndefined()
+    expect(result.nextCursor).toBeUndefined()
+    expect(calls[1]).toContain('/api/documents/transfer/list')
+  })
+
   it('preserves upload network, abort, and protocol errors', async () => {
     const client = createUserDocClient()
     const file = new File(['x'], 'a.txt')
