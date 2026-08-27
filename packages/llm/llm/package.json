@@ -34,6 +34,10 @@
       "types": "./lib/types/message.d.ts",
       "default": "./lib/types/message.js"
     },
+    "./discovery": {
+      "types": "./lib/types/discovery.d.ts",
+      "default": "./lib/types/discovery.js"
+    },
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },

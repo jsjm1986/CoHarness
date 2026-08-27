@@ -7,13 +7,13 @@
  * @module @deepseek-ai/dsh-llm/attribution
  */
 
-import { createRequire } from 'node:module'
+import { createRequire, findPackageJSON } from 'node:module'
 
 // The package's own manifest is the single source of the version so the
-// User-Agent cannot drift from what is published (`./package.json` is an
-// export of this package; the relative path resolves from both `src/` and
-// the bundled `lib/`).
-const { version } = createRequire(import.meta.url)('../package.json') as { version: string }
+// User-Agent cannot drift from what is published. Nearest-package lookup is
+// stable from both bundled `lib/` and TypeScript-emitted `lib/types/` entries.
+const packageJsonPath = findPackageJSON('.', import.meta.url)
+const { version } = createRequire(import.meta.url)(packageJsonPath as string) as { version: string }
 
 /**
  * Static public application identity sent to LLM providers.

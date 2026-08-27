@@ -9,9 +9,9 @@
  */
 
 import { CallId, CONTEXT_WINDOW_EXCEEDED_CODE, EMPTY_RESPONSE_CODE, isContextWindowExceededError, isQuotaExceededError, LlmError, QUOTA_EXCEEDED_CODE } from '@deepseek-ai/dsh-llm'
-import type { FinishReason, StreamChunk, TokenUsage } from '@deepseek-ai/dsh-llm'
+import type { FinishReason, LlmFailure, StreamChunk, TokenUsage } from '@deepseek-ai/dsh-llm'
 import { isContextOverflow } from '@earendil-works/pi-ai'
-import type { AssistantMessage, AssistantMessageEvent, Usage as PiUsage } from '@earendil-works/pi-ai'
+import type { AssistantMessage, AssistantMessageEvent, ProviderResponse, Usage as PiUsage } from '@earendil-works/pi-ai'
 import { toPiReplayState } from './replay.ts'
 import { TextThinkingParser } from './text-thinking.ts'
 
@@ -129,6 +129,8 @@ export function mapUsage(usage: PiUsage): TokenUsage {
 // wrapper a bare `terminated`, so we are left pattern-matching terse words here.
 // If pi-ai ever forwards the original Error (or a fetch/dispatcher hook that lets
 // us capture the cause ourselves), classify on `code`/`cause` instead of text.
+const STREAM_TRUNCATION_PATTERN = /stream ended (?:before|without)\b/i
+
 function classifyPiAiError(message: string): string {
   if (/\b(?:401|403)\b/.test(message)) return 'AUTH'
   if (isQuotaExceededError(message)) return QUOTA_EXCEEDED_CODE
@@ -145,7 +147,7 @@ function classifyPiAiError(message: string): string {
   // event`, `… ended without a terminal event`, `Stream ended without
   // finish_reason`). The connection dropped mid-response, so this is a transport
   // truncation, not a model-level error.
-  if (/stream ended (?:before|without)\b/i.test(message)) return 'TRANSPORT'
+  if (STREAM_TRUNCATION_PATTERN.test(message)) return 'TRANSPORT'
   if (/\b(?:network|connection|socket|fetch)\b|\bECONN[A-Z]+\b/i.test(message)
     || /\b(?:other side closed|HTTP2 request did not get a response|WebSocket closed unexpectedly)\b/i.test(message)
     // undici renders a mid-stream socket drop as a bare `terminated` (its
@@ -157,16 +159,51 @@ function classifyPiAiError(message: string): string {
   return 'PI_AI_ERROR'
 }
 
+/** Read one response header without relying on pi-ai's header-name casing. */
+function responseHeader(response: ProviderResponse, name: string): string | undefined {
+  const wanted = name.toLowerCase()
+  for (const [candidate, value] of Object.entries(response.headers)) {
+    if (candidate.toLowerCase() === wanted) return value
+  }
+  return undefined
+}
+
+/** Diagnose a terminal-event parser error whose HTTP response was not an SSE stream. */
+function malformedStreamFailure(
+  message: AssistantMessage,
+  response: ProviderResponse | undefined,
+): LlmFailure | undefined {
+  if (response === undefined || message.errorMessage === undefined
+    || !STREAM_TRUNCATION_PATTERN.test(message.errorMessage)) return undefined
+  const contentType = responseHeader(response, 'content-type')
+  if (contentType === undefined
+    || contentType.split(';', 1)[0]?.trim().toLowerCase() === 'text/event-stream') return undefined
+  const openAiHint = message.api === 'openai-completions' || message.api === 'openai-responses'
+    ? '; OpenAI-compatible base URLs commonly end in "/v1"'
+    : ''
+  return {
+    message: `pi-ai provider "${message.provider}" received HTTP ${response.status} content-type "${contentType}"`
+      + ` for protocol "${message.api}" instead of an SSE stream; check the baseURL and protocol${openAiHint}`,
+    code: 'MALFORMED_RESPONSE',
+    status: response.status,
+  }
+}
+
 /**
  * Map a terminal pi-ai event to the harness finish reason.
  * @param message - the assistant message carried by the `done` or `error` event.
  * @param contextWindow - resolved catalog capacity for usage-based overflow detection.
+ * @param response - HTTP response metadata captured before the body was consumed.
  * @returns the mapped harness reason. Recognized error text, `stop` usage above
  *   `contextWindow`, and zero-output `length` usage that fills the window map
  *   to `CONTEXT_WINDOW_EXCEEDED`; a `stop` with no content blocks maps to an
  *   `EMPTY_RESPONSE` error.
  */
-export function mapStopReason(message: AssistantMessage, contextWindow?: number): FinishReason {
+export function mapStopReason(
+  message: AssistantMessage,
+  contextWindow?: number,
+  response?: ProviderResponse,
+): FinishReason {
   const piAiOverflow = isContextOverflow(message, contextWindow)
   const harnessOverflow = message.stopReason === 'error'
     && message.errorMessage !== undefined
@@ -202,6 +239,8 @@ export function mapStopReason(message: AssistantMessage, contextWindow?: number)
       failure: { message: message.errorMessage ?? 'pi-ai stream aborted', code: 'ABORTED' },
     }
     case 'error': {
+      const malformed = malformedStreamFailure(message, response)
+      if (malformed !== undefined) return { kind: 'error', failure: malformed }
       const text = message.errorMessage ?? 'pi-ai stream error'
       return { kind: 'error', failure: { message: text, code: classifyPiAiError(text) } }
     }
@@ -216,6 +255,7 @@ export function mapStopReason(message: AssistantMessage, contextWindow?: number)
  * @param contextWindow - resolved catalog capacity for usage-based overflow detection.
  * @param parseTextThinking - recognize a strict tagged reasoning prefix in
  *   ordinary text blocks from an OpenAI-compatible gateway.
+ * @param response - read the HTTP response metadata captured for this stream.
  * @returns the harness chunks, ending with `usage` then `finish`; throws
  *   `LlmError` (`STREAM_CLOSED`) if the source ends without a terminal event.
  */
@@ -223,6 +263,7 @@ export async function* toStreamChunks(
   events: AsyncIterable<AssistantMessageEvent>,
   contextWindow?: number,
   parseTextThinking = false,
+  response?: () => ProviderResponse | undefined,
 ): AsyncGenerator<StreamChunk> {
   // pi-ai contentIndex ↔ our block index map is 1:1 until a text block is
   // actually split. A transformed block consumes one extra logical slot, and
@@ -441,7 +482,7 @@ export async function* toStreamChunks(
       yield { type: 'usage', usage: mapUsage(event.message.usage) }
       yield {
         type: 'finish',
-        reason: mapStopReason(event.message, contextWindow),
+        reason: mapStopReason(event.message, contextWindow, response?.()),
         ...transformedTextThinking ? {} : { replayState: toPiReplayState(event.message) },
       }
       return
@@ -456,7 +497,7 @@ export async function* toStreamChunks(
         } while (queuedEvents.length > 0 || pendingNativeIndex() !== undefined)
       }
       yield { type: 'usage', usage: mapUsage(event.error.usage) }
-      yield { type: 'finish', reason: mapStopReason(event.error, contextWindow) }
+      yield { type: 'finish', reason: mapStopReason(event.error, contextWindow, response?.()) }
       return
     }
 

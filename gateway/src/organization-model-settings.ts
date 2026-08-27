@@ -1,3 +1,4 @@
+import { discoverModelsAtEndpoint } from '@deepseek-ai/dsh-llm/discovery'
 import { ORGANIZATION_PROVIDER_PATTERN, type ModelProviderProtocol } from './model-governance.ts'
 import { ORGANIZATION_MODEL_SETTINGS_SCHEMA } from './organization-model-settings-schema.ts'
 
@@ -33,7 +34,6 @@ const DEFAULT_INITIAL_RETRY_DELAY_MS = 500
 const DEFAULT_MAX_RETRY_DELAY_MS = 10_000
 /** Largest delay Node can schedule without clamping it to one millisecond. */
 const MAX_TIMER_DELAY_MS = 2_147_483_647
-const MAX_RESPONSE_BYTES = 4 * 1024 * 1024
 
 /** Clone JSON-compatible data without retaining a caller-owned reference. */
 export function cloneOrganizationJson<T>(value: T): T {
@@ -300,105 +300,18 @@ export function organizationModelSettingsSchema(): unknown {
   return schema
 }
 
-interface ListingEntry {
-  id?: unknown
-  name?: unknown
-  display_name?: unknown
-  context_window?: unknown
-  context_length?: unknown
-  max_tokens?: unknown
-  max_output_tokens?: unknown
-}
-
-function listingString(...values: readonly unknown[]): string | undefined {
-  return values.find(value => typeof value === 'string' && value.length > 0) as string | undefined
-}
-
-function listingCapacity(...values: readonly unknown[]): number | undefined {
-  return values.find(value => typeof value === 'number' && Number.isSafeInteger(value) && value > 0) as number | undefined
-}
-
-async function boundedBody(response: Response, url: string): Promise<string> {
-  const declared = Number(response.headers.get('content-length') ?? Number.NaN)
-  if (Number.isFinite(declared) && declared > MAX_RESPONSE_BYTES) {
-    await response.body?.cancel()
-    throw new Error(`${url} answered with more than ${String(MAX_RESPONSE_BYTES)} bytes`)
-  }
-  if (response.body === null) return ''
-  const reader = response.body.getReader()
-  const chunks: Uint8Array[] = []
-  let total = 0
-  try {
-    for (;;) {
-      const next = await reader.read()
-      if (next.done) break
-      total += next.value.byteLength
-      if (total > MAX_RESPONSE_BYTES) throw new Error(`${url} answered with more than ${String(MAX_RESPONSE_BYTES)} bytes`)
-      chunks.push(next.value)
-    }
-  } finally {
-    await reader.cancel().catch(() => undefined)
-  }
-  const data = new Uint8Array(total)
-  let offset = 0
-  for (const chunk of chunks) {
-    data.set(chunk, offset)
-    offset += chunk.byteLength
-  }
-  return new TextDecoder().decode(data)
-}
-
-/** Discover models through the OpenAI-compatible listing endpoint. */
+/** Discover models through the shared protocol HTTP interrogation layer. */
 export async function discoverOrganizationModels(request: {
   baseURL?: string
   api?: string
   apiKey?: string
 }): Promise<Array<{ id: string; name?: string; contextWindow?: number; maxTokens?: number }>> {
-  if (request.baseURL === undefined || request.baseURL.trim() === '') throw new Error('set a baseURL before discovering models')
-  const api = request.api ?? 'openai-completions'
-  if (api !== 'openai-completions' && api !== 'openai-responses') {
-    throw new Error(`protocol ${api} has no model listing this build can read; enter models by hand`)
+  if (request.baseURL === undefined || request.baseURL.trim() === '') {
+    throw new Error('set a baseURL before discovering models')
   }
-  const base = request.baseURL.replace(/\/+$/, '')
-  const url = `${base}/models`
-  let parsed: URL
-  try {
-    parsed = new URL(url)
-  } catch {
-    throw new Error('baseURL must be an absolute http or https URL')
-  }
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error('baseURL must use http or https')
-  const key = request.apiKey?.trim()
-  if (request.apiKey !== undefined && key === '') throw new Error('API key is blank')
-  let response: Response
-  try {
-    response = await fetch(url, {
-      headers: {
-        accept: 'application/json',
-        ...(key === undefined ? {} : { authorization: `Bearer ${key}` }),
-      },
-    })
-  } catch (error) {
-    throw new Error(`could not reach ${url}: ${error instanceof Error ? error.message : String(error)}`)
-  }
-  if (!response.ok) throw new Error(`${url} answered ${String(response.status)}${response.status === 401 || response.status === 403 ? '; check the API key' : ''}`)
-  let body: unknown
-  try {
-    body = JSON.parse(await boundedBody(response, url))
-  } catch (error) {
-    throw new Error(error instanceof Error && error.message.includes('more than') ? error.message : `${url} did not answer with JSON`)
-  }
-  const data = (body as { data?: unknown } | null)?.data
-  if (!Array.isArray(data)) throw new Error('the endpoint model listing has no data array; enter models by hand')
-  const models: Array<{ id: string; name?: string; contextWindow?: number; maxTokens?: number }> = []
-  for (const raw of data) {
-    const entry = raw as ListingEntry | null
-    const id = listingString(entry?.id)
-    if (id === undefined) continue
-    const name = listingString(entry?.name, entry?.display_name)
-    const contextWindow = listingCapacity(entry?.context_window, entry?.context_length)
-    const maxTokens = listingCapacity(entry?.max_output_tokens, entry?.max_tokens)
-    models.push({ id, ...name === undefined ? {} : { name }, ...contextWindow === undefined ? {} : { contextWindow }, ...maxTokens === undefined ? {} : { maxTokens } })
-  }
-  return models
+  return [...await discoverModelsAtEndpoint({
+    baseURL: request.baseURL,
+    ...(request.api === undefined ? {} : { api: request.api }),
+    ...(request.apiKey === undefined ? {} : { apiKey: request.apiKey }),
+  })]
 }

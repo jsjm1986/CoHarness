@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest'
-import { organizationModelSettingsSchema, validateOrganizationProfiles } from '../src/organization-model-settings.ts'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  discoverOrganizationModels,
+  organizationModelSettingsSchema,
+  validateOrganizationProfiles,
+} from '../src/organization-model-settings.ts'
 
 const profile = {
   displayName: 'Primary',
@@ -94,5 +98,74 @@ describe('organization model settings validation', () => {
     ['duplicate retry codes', { ...openAiProfile, retryPolicy: { mode: 'normal', retryableCodes: ['TIMEOUT', 'TIMEOUT'] } }, /must not contain duplicates/],
   ] satisfies Array<[string, Record<string, unknown>, RegExp]>)('rejects %s', (_name, invalid, message) => {
     expect(() => validateOrganizationProfiles({ providers: { 'org-primary': invalid } })).toThrow(message)
+  })
+})
+
+describe('organization model discovery', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('uses the shared OpenAI listing request and preserves deployment paths', async () => {
+    const requests: Array<{ url: string; headers: Headers }> = []
+    vi.stubGlobal('fetch', async (input: string | URL, init?: RequestInit) => {
+      requests.push({ url: String(input), headers: new Headers(init?.headers) })
+      return new Response(JSON.stringify({ data: [{ id: 'gpt-acme', context_length: 32_768 }] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    })
+
+    await expect(discoverOrganizationModels({
+      baseURL: 'https://gateway.example.test/openai/v1/',
+      api: 'openai-completions',
+      apiKey: 'openai-key',
+    })).resolves.toEqual([{ id: 'gpt-acme', contextWindow: 32_768 }])
+
+    expect(requests).toHaveLength(1)
+    expect(requests[0]?.url).toBe('https://gateway.example.test/openai/v1/models')
+    expect(requests[0]?.headers.get('authorization')).toBe('Bearer openai-key')
+    expect(requests[0]?.headers.get('x-api-key')).toBeNull()
+  })
+
+  it('uses the shared Anthropic listing path and authentication headers', async () => {
+    const requests: Array<{ url: string; headers: Headers }> = []
+    vi.stubGlobal('fetch', async (input: string | URL, init?: RequestInit) => {
+      requests.push({ url: String(input), headers: new Headers(init?.headers) })
+      return new Response(JSON.stringify({ data: [{ id: 'claude-acme', display_name: 'Claude Acme' }] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    })
+
+    await expect(discoverOrganizationModels({
+      baseURL: 'https://gateway.example.test',
+      api: 'anthropic-messages',
+      apiKey: 'anthropic-key',
+    })).resolves.toEqual([{ id: 'claude-acme', name: 'Claude Acme' }])
+
+    expect(requests).toHaveLength(1)
+    expect(requests[0]?.url).toBe('https://gateway.example.test/v1/models')
+    expect(requests[0]?.headers.get('x-api-key')).toBe('anthropic-key')
+    expect(requests[0]?.headers.get('anthropic-version')).toBe('2023-06-01')
+    expect(requests[0]?.headers.get('authorization')).toBeNull()
+  })
+
+  it('does not duplicate an Anthropic v1 base path', async () => {
+    const urls: string[] = []
+    vi.stubGlobal('fetch', async (input: string | URL) => {
+      urls.push(String(input))
+      return new Response(JSON.stringify({ data: [{ id: 'claude-acme' }] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    })
+
+    await discoverOrganizationModels({
+      baseURL: 'https://gateway.example.test/v1',
+      api: 'anthropic-messages',
+    })
+
+    expect(urls).toEqual(['https://gateway.example.test/v1/models'])
   })
 })

@@ -11,7 +11,6 @@ import type {
   GenerateOptions,
   LlmConfigurableProvider,
   LlmDiscoveredModel,
-  LlmFailure,
   LlmModelContext,
   LlmModelDiscoveryRequest,
   LlmModelInfo,
@@ -23,10 +22,9 @@ import type {
 import { freezeMessage, type Message } from './message.ts'
 import { resolveRetryPolicy } from './retry-policy.ts'
 import type { ResolvedRetryPolicy } from './retry-policy.ts'
-import type { ProviderRequestId } from './brand.ts'
 import { callConfigEquals, deepFreeze } from './call-config.ts'
 import type { LlmCallConfig, LlmCallConfigAdapterDefaults } from './call-config.ts'
-import { HarnessError, INVALID_CREDENTIAL_CODE } from './error.ts'
+import { INVALID_CREDENTIAL_CODE, LlmError } from './error.ts'
 import { normalizeLlmFailure } from './adapter-failure.ts'
 import { normalizeApiKey } from './api-key.ts'
 import { contentHasImage, projectImagesForTextModel } from './content.ts'
@@ -34,6 +32,7 @@ import { guardTextThinkingStream } from './text-thinking-guard.ts'
 
 export * from './attribution.ts'
 export * from './brand.ts'
+export * from './discovery.ts'
 export * from './never.ts'
 export * from './error.ts'
 export * from './api-key.ts'
@@ -65,56 +64,6 @@ declare module '@deepseek-ai/cordis' {
      */
     'llm/stream'(this: LlmRuntime, options: GenerateOptions, next: () => AsyncIterable<StreamChunk>): AsyncIterable<StreamChunk>
 
-  }
-}
-
-/** Structured provider facts and cause accepted by {@link LlmError}. */
-export interface LlmErrorOptions extends ErrorOptions {
-  /** Valid HTTP status observed at the provider boundary. */
-  status?: number
-  /** Positive finite provider-requested delay in milliseconds. */
-  providerRetryAfterMs?: number
-  /** Non-empty opaque provider request id. */
-  requestId?: ProviderRequestId
-}
-
-/**
- * Typed error for LLM-related failures. Extends {@link HarnessError}, so the
- * `code` string (e.g. `AUTH`, `RATE_LIMIT`, `NO_ADAPTER`) is shared taxonomy.
- */
-export class LlmError extends HarnessError {
-  /** Serializable facts retained beside this live Error. */
-  readonly failure: LlmFailure
-
-  /**
-   * @param message - non-empty human-readable failure summary.
-   * @param code - non-empty stable provider-neutral machine code.
-   * @param options - optional cause and validated serializable provider facts.
-   */
-  constructor(message: string, code: string, options?: LlmErrorOptions) {
-    if (typeof message !== 'string' || message.length === 0) throw new Error('LlmError message must be a non-empty string')
-    if (typeof code !== 'string' || code.length === 0) throw new Error('LlmError code must be a non-empty string')
-    if (options?.status !== undefined
-      && (!Number.isInteger(options.status) || options.status < 100 || options.status > 599)) {
-      throw new Error('LlmError status must be an integer from 100 through 599')
-    }
-    if (options?.providerRetryAfterMs !== undefined
-      && (!Number.isFinite(options.providerRetryAfterMs) || options.providerRetryAfterMs <= 0)) {
-      throw new Error('LlmError providerRetryAfterMs must be a positive finite number')
-    }
-    if (options?.requestId !== undefined
-      && (typeof options.requestId !== 'string' || options.requestId.length === 0)) {
-      throw new Error('LlmError requestId must be a non-empty string')
-    }
-    super(message, code, options)
-    this.name = 'LlmError'
-    this.failure = Object.freeze({
-      message,
-      code,
-      ...options?.status === undefined ? {} : { status: options.status },
-      ...options?.providerRetryAfterMs === undefined ? {} : { providerRetryAfterMs: options.providerRetryAfterMs },
-      ...options?.requestId === undefined ? {} : { requestId: options.requestId },
-    })
   }
 }
 

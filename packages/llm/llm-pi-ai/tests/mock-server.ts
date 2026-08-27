@@ -64,7 +64,12 @@ export async function mockServer(script: {
         response.end(behavior.body ?? '{}')
         return
       }
-      response.writeHead(200, { 'content-type': 'text/event-stream' })
+      if (behavior.body !== undefined) {
+        response.writeHead(200, { 'content-type': 'application/json', ...behavior.headers })
+        response.end(behavior.body)
+        return
+      }
+      response.writeHead(200, { 'content-type': 'text/event-stream', ...behavior.headers })
       let index = 0
       const writeNext = (): void => {
         const event = behavior.events?.[index++]
