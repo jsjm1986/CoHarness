@@ -18,7 +18,7 @@ Selecting another personal or writable project scope keeps the manager and the a
 
 Document metadata reads retry a transient runtime-starting response using the server's `Retry-After` delay before surfacing a localized scope-unavailable message. Upload and copy writes are not replayed automatically.
 
-Scope and folder reads keep the last committed rows visible while a new result is loading. Repeated remote-scope visits reuse a bounded, scope-qualified metadata cache and revalidate it; a failed revalidation keeps the visible rows and exposes the retryable error.
+Scope and folder reads keep the last committed rows visible while a new result is loading. The mounted manager keeps a bounded, scope-qualified metadata cache: entries fetched within 30 seconds render immediately without another list request, entries up to five minutes old render immediately while the manager revalidates them, and older entries are removed. Explicit refreshes and document mutations invalidate cached listings; failed revalidation keeps the visible rows and exposes the retryable error. The cache is page-memory only and never stores document bytes or survives a browser reload.
 
 Select one or more rows and choose **Copy to another scope** to create a snapshot in a writable project or in personal documents. The manager shows only safe scope labels; Gateway performs authorization and streaming, resolves target name conflicts without overwriting, and reports each file independently. A copy into the active conversation scope can be attached to the composer as a durable, non-owning draft; a copy into another scope remains there until selected from that scope.
 
@@ -59,7 +59,7 @@ The manager is a client-only surface; it adds no conversation context and no tok
 
 #### KV Cache effect
 
-The manager reads and writes the same `/api/documents` store that conversation attachments use, so no separate cache exists and previously uploaded documents remain available across sessions without re-upload.
+The manager reads and writes the same durable `/api/documents` store that conversation attachments use, so previously uploaded documents remain available across sessions without re-upload. Its short-lived browser metadata cache affects only list rendering and has no model KV-cache effect.
 
 ## Known Limitations and Deferred Work
 

@@ -26,6 +26,8 @@ const TRANSFER_PLAN_TTL_MS = 300_000
 const TRANSFER_VERIFY_MAX_WAIT_MS = TRANSFER_PLAN_TTL_MS
 const MAX_TRANSFER_PLANS = 10_000
 const DEFAULT_TRANSFER_RESPONSE_LIMIT_BYTES = 64 * 1024 * 1024
+/** Default deadline for metadata operations forwarded to a document runtime. */
+const DEFAULT_DOCUMENT_SCOPE_TIMEOUT_MS = 30_000
 /** Bound one buffered transfer chunk even when a runtime advertises a bad value. */
 const MAX_TRANSFER_CHUNK_BYTES = 64 * 1024 * 1024
 /** Public Gateway path for resumable uploads into a non-current scope. */
@@ -323,6 +325,8 @@ export interface DocumentTransferDependencies {
   readonly catalog?: Pick<PostgresDocumentCatalogService, 'recordCopy'>
   /** Maximum bytes retained from one runtime JSON response. */
   readonly maxResponseBytes?: number
+  /** Deadline for one forwarded document metadata operation. */
+  readonly upstreamTimeoutMs?: number
 }
 
 interface ScopeIdentity {
@@ -540,6 +544,27 @@ function responseLimit(deps: Pick<DocumentTransferDependencies, 'maxResponseByte
   return deps.maxResponseBytes ?? DEFAULT_TRANSFER_RESPONSE_LIMIT_BYTES
 }
 
+function documentScopeTimeoutMs(
+  deps: Pick<DocumentTransferDependencies, 'upstreamTimeoutMs'>,
+): number {
+  return deps.upstreamTimeoutMs ?? DEFAULT_DOCUMENT_SCOPE_TIMEOUT_MS
+}
+
+function documentScopeLogKey(scope: DocumentTransferScope): string {
+  return scope.kind === 'personal' ? 'personal' : `project:${String(scope.projectId)}`
+}
+
+function documentScopeTimeoutError(
+  operation: GatewayDocumentScopeOperation,
+  scope: DocumentTransferScope,
+  startedAt: number,
+): DocumentTransferError {
+  console.warn(
+    `[gateway] document scope upstream timeout operation=${operation} scope=${documentScopeLogKey(scope)} elapsedMs=${String(Date.now() - startedAt)}`,
+  )
+  return new DocumentTransferError('DOCUMENT_SCOPE_TIMEOUT', 504, 'Document scope request timed out.')
+}
+
 async function responseJson(response: Response, limit = DEFAULT_TRANSFER_RESPONSE_LIMIT_BYTES): Promise<unknown> {
   return readResponseJson(response, limit)
 }
@@ -705,6 +730,7 @@ async function uploadSnapshotToRuntime(
   const reader = source.body.getReader()
   const finalHash = createHash('sha256')
   const pendingChunks: Buffer[] = []
+  let pendingHead = 0
   let pendingBytes = 0
   let done = false
   let offset = 0
@@ -716,23 +742,31 @@ async function uploadSnapshotToRuntime(
   }
   const takePending = (maximum: number): Buffer => {
     const length = Math.min(maximum, pendingBytes)
-    const first = pendingChunks[0]
+    const first = pendingChunks[pendingHead]
     if (first !== undefined && first.byteLength === length) {
-      pendingChunks.shift()
+      pendingHead += 1
       pendingBytes -= length
+      if (pendingHead === pendingChunks.length) {
+        pendingChunks.length = 0
+        pendingHead = 0
+      }
       return first
     }
     const output = Buffer.allocUnsafe(length)
     let written = 0
     while (written < length) {
-      const chunk = pendingChunks[0]
+      const chunk = pendingChunks[pendingHead]
       if (chunk === undefined) break
       const count = Math.min(chunk.byteLength, length - written)
       chunk.copy(output, written, 0, count)
       written += count
       pendingBytes -= count
-      if (count === chunk.byteLength) pendingChunks.shift()
-      else pendingChunks[0] = chunk.subarray(count)
+      if (count === chunk.byteLength) pendingHead += 1
+      else pendingChunks[pendingHead] = chunk.subarray(count)
+    }
+    if (pendingHead === pendingChunks.length) {
+      pendingChunks.length = 0
+      pendingHead = 0
     }
     return output
   }
@@ -1678,6 +1712,13 @@ export function createGatewayDocumentScopeHandler(
     const method = request.method ?? 'GET'
     const forwardMethod = operation === 'delete' && method === 'DELETE' ? 'POST' : method
     const hasBody = forwardMethod !== 'GET' && forwardMethod !== 'HEAD' && forwardMethod !== 'DELETE'
+    const startedAt = Date.now()
+    // Content responses are handed off as streams and may legitimately outlive
+    // the metadata deadline; all JSON document operations get the bounded
+    // Gateway timeout so a stalled runtime cannot leave the browser loading
+    // forever.
+    const timeoutSignal = operation === 'content' ? undefined : AbortSignal.timeout(documentScopeTimeoutMs(deps))
+    const upstreamSignal = timeoutSignal === undefined ? signal : AbortSignal.any([signal, timeoutSignal])
     let response: Response
     try {
       try {
@@ -1686,28 +1727,33 @@ export function createGatewayDocumentScopeHandler(
           headers,
           ...(hasBody ? { body: Readable.toWeb(request) as ReadableStream<Uint8Array>, duplex: 'half' as const } : {}),
           redirect: 'error',
-          signal,
+          signal: upstreamSignal,
         } as RequestInit & { duplex?: 'half' })
-      } catch (error) {
+      } catch {
         if (signal.aborted) throw signal.reason
+        if (timeoutSignal?.aborted === true) throw documentScopeTimeoutError(operation, requested, startedAt)
         throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document scope is temporarily unavailable.')
       }
       if (operation === 'content' && response.ok) {
-      const mediaType = (response.headers.get('content-type') ?? '').split(';', 1)[0] ?? ''
-      const inline = incoming.searchParams.get('inline') === '1' && inlinePreviewMedia(mediaType)
-      const contentDisposition = response.headers.get('content-disposition')
-      const outputHeaders = new Headers(response.headers)
-      outputHeaders.set('cache-control', 'private, no-store')
-      outputHeaders.set('x-content-type-options', 'nosniff')
-      outputHeaders.set('content-security-policy', "default-src 'none'; img-src 'self' data:; frame-ancestors 'none'; sandbox")
-      if (inline) outputHeaders.set('content-disposition', 'inline')
-      else if (contentDisposition === null) outputHeaders.set('content-disposition', 'attachment')
+        const mediaType = (response.headers.get('content-type') ?? '').split(';', 1)[0] ?? ''
+        const inline = incoming.searchParams.get('inline') === '1' && inlinePreviewMedia(mediaType)
+        const contentDisposition = response.headers.get('content-disposition')
+        const outputHeaders = new Headers(response.headers)
+        outputHeaders.set('cache-control', 'private, no-store')
+        outputHeaders.set('x-content-type-options', 'nosniff')
+        outputHeaders.set('content-security-policy', "default-src 'none'; img-src 'self' data:; frame-ancestors 'none'; sandbox")
+        if (inline) outputHeaders.set('content-disposition', 'inline')
+        else if (contentDisposition === null) outputHeaders.set('content-disposition', 'attachment')
         handedOff = true
         return leaseResponse(new Response(response.body, { status: response.status, headers: outputHeaders }), releaseLease)
       }
       if (response.status === 204) return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
       let body: unknown
-      try { body = await responseJson(response, responseLimit(deps)) } catch (error) {
+      try {
+        body = await responseJson(response, responseLimit(deps))
+      } catch (error) {
+        if (signal.aborted) throw signal.reason
+        if (timeoutSignal?.aborted === true) throw documentScopeTimeoutError(operation, requested, startedAt)
         if (error instanceof ResponseBodyTooLargeError) {
           throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The target runtime response is too large.')
         }

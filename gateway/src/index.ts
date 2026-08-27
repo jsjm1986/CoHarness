@@ -289,6 +289,7 @@ const server = createGatewayServer(deps, {
     principals: principalKeys.signer,
     audit,
     maxResponseBytes: cfg.upstreamResponseLimitBytes,
+    upstreamTimeoutMs: cfg.upstreamTimeoutMs,
   }),
   admin: createAdminApiHandler(deps, documentAdmin),
   runtime: createRuntimeApiHandler({
