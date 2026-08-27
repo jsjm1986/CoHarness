@@ -41,6 +41,8 @@ export async function mockServer(script: {
   body?: string
   delayMs?: number
   headers?: Record<string, string>
+  /** Emit an SSE event field from each JSON body's `type` member. */
+  sseEvents?: boolean
 }[]): Promise<MockServer> {
   const paths: string[] = []
   const requests: unknown[] = []
@@ -74,6 +76,10 @@ export async function mockServer(script: {
       const writeNext = (): void => {
         const event = behavior.events?.[index++]
         if (event === undefined) { response.end(); return }
+        const eventName = behavior.sseEvents === true
+          ? (JSON.parse(event) as { type?: unknown }).type
+          : undefined
+        if (typeof eventName === 'string') response.write(`event: ${eventName}\n`)
         response.write(`data: ${event}\n\n`)
         if (behavior.delayMs === undefined) writeNext()
         else setTimeout(writeNext, behavior.delayMs)

@@ -6,6 +6,7 @@ import LlmRuntime, { userAgent } from '@deepseek-ai/dsh-llm'
 import * as LlmPiAi from '@deepseek-ai/dsh-llm-pi-ai'
 import { getBuiltinModels } from '@earendil-works/pi-ai/providers/all'
 import { discoverModels } from '../src/discovery.ts'
+import { assemble } from './assemble.ts'
 
 const servers: Server[] = []
 /** Credential variables a test set, cleared so the next one starts unset. */
@@ -110,6 +111,55 @@ describe('catalog-route model discovery', () => {
 })
 
 describe('draft-provider model discovery', () => {
+  it('shares the discovered endpoint with the first model request', async () => {
+    const requests: Array<{ method: string; path: string }> = []
+    const sse = [
+      '{"choices":[{"delta":{"role":"assistant","content":""},"index":0,"finish_reason":null}]}',
+      '{"choices":[{"delta":{"content":"hello"},"index":0,"finish_reason":null}]}',
+      '{"choices":[{"delta":{},"index":0,"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1}}',
+      '[DONE]',
+    ].map(event => `data: ${event}\n\n`).join('')
+    vi.stubEnv('SHARED_ENDPOINT_KEY', 'shared-key')
+    touchedEnv.push('SHARED_ENDPOINT_KEY')
+    vi.stubGlobal('fetch', async (input: string | URL, init?: RequestInit) => {
+      const url = new URL(String(input))
+      requests.push({ method: init?.method ?? 'GET', path: url.pathname })
+      if (init?.method === 'GET' && url.pathname === '/models') {
+        return new Response('<html>landing</html>', { status: 200, headers: { 'content-type': 'text/html' } })
+      }
+      if (init?.method === 'GET' && url.pathname === '/v1/models') {
+        return new Response(JSON.stringify({ data: [{ id: 'shared-model' }] }), {
+          status: 200, headers: { 'content-type': 'application/json' },
+        })
+      }
+      return new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } })
+    })
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin(LlmPiAi, {
+      providers: {
+        'shared-gateway': {
+          apiKeyEnv: 'SHARED_ENDPOINT_KEY',
+          api: 'openai-completions',
+          baseURL: 'https://shared.example',
+          models: [{ id: 'shared-model' }],
+        },
+      },
+    })
+
+    await expect(ctx.llm.discoverModels('llm-pi-ai', {
+      provider: 'shared-gateway', baseURL: 'https://shared.example',
+    })).resolves.toEqual([{ id: 'shared-model' }])
+    const result = await assemble(ctx, { provider: 'shared-gateway', model: 'shared-model', messages: [] })
+
+    expect(result.message.content).toEqual([{ type: 'text', text: 'hello' }])
+    expect(requests).toEqual([
+      { method: 'GET', path: '/models' },
+      { method: 'GET', path: '/v1/models' },
+      { method: 'POST', path: '/v1/chat/completions' },
+    ])
+  })
+
   it('reads an OpenAI-compatible listing and keeps the capacities it discloses', async () => {
     const server = await listingServer({
       body: JSON.stringify({

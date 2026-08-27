@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { Api, Context, Model, SimpleStreamOptions } from '@earendil-works/pi-ai'
 
 const streamSimple = vi.hoisted(() => vi.fn())
 
@@ -71,5 +72,28 @@ describe('pi-ai SDK retry boundary', () => {
       contextWindow: 8192,
       maxTokens: 1024,
     })
+  })
+
+  it('does not switch endpoints when caller cancellation races a path mismatch', async () => {
+    const controller = new AbortController()
+    streamSimple.mockImplementationOnce((
+      model: Model<Api>,
+      _context: Context,
+      options: SimpleStreamOptions | undefined,
+    ) => {
+      void options?.onResponse?.({ status: 404, headers: {} }, model)
+      controller.abort('caller stopped')
+      return undefined
+    })
+
+    await expect((async () => {
+      for await (const _chunk of gatewayAdapter().stream({
+        provider: 'local-gateway',
+        model: 'local-model',
+        messages: [],
+        signal: controller.signal,
+      })) { /* drain */ }
+    })()).rejects.toMatchObject({ code: 'ABORTED' })
+    expect(streamSimple).toHaveBeenCalledOnce()
   })
 })

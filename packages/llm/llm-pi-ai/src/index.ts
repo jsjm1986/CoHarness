@@ -58,7 +58,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { authContextFrom, credentialStoreFrom } from './auth.ts'
 import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
-import { assertUsableApiKey, LlmError } from '@deepseek-ai/dsh-llm'
+import { assertUsableApiKey, LlmEndpointResolutionCache, LlmError } from '@deepseek-ai/dsh-llm'
 import type { AdapterRegistrationHandle, DirectoryRegistrationHandle, LlmConfigurableProvider } from '@deepseek-ai/dsh-llm'
 import type {
   ManagedModelCompat,
@@ -238,6 +238,7 @@ export function apply(ctx: Context, config: Config): void {
   let lastRaw: Config | undefined
   let lastManaged: ModelProviderConfigSnapshot | undefined
   let memoized: ReadonlyMap<string, ResolvedPiAiProviderProfile> | undefined
+  const endpointCache = new LlmEndpointResolutionCache()
   /**
    * The resolved profiles for the current configuration, memoized by the raw
    * snapshot's identity — which is also what makes the adapter's own snapshot
@@ -254,6 +255,7 @@ export function apply(ctx: Context, config: Config): void {
     const managed = ctx.get('modelProviderConfig')?.snapshot()
     if (raw === lastRaw && managed === lastManaged && memoized !== undefined) return memoized
     const next = resolveProfiles({ ...raw.providers, ...managedProfiles(managed) })
+    endpointCache.clear()
     lastRaw = raw
     lastManaged = managed
     memoized = next
@@ -295,6 +297,7 @@ export function apply(ctx: Context, config: Config): void {
     resolveApiKey,
     auth,
     resolveAttachments: () => ctx.get('attachments'),
+    endpointCache,
     onReplayDegrade: ({ provider, model, reason }) => {
       ctx.logger.warn(
         `llm-pi-ai: unusable replay state on assistant history for route "${provider}/${model}";`
@@ -345,7 +348,11 @@ export function apply(ctx: Context, config: Config): void {
   // except the credential: a configuration surface edits a redacted descriptor
   // and never holds a stored secret, so an already-configured route supplies
   // its own here rather than being interrogated unauthenticated.
-  ctx.llm.registerModelDiscovery(NS, request => discoverModels(request, () => storedApiKey(request.provider)))
+  ctx.llm.registerModelDiscovery(NS, request => discoverModels(
+    request,
+    () => storedApiKey(request.provider),
+    endpointCache,
+  ))
   // Route effects bind to this apply fiber via the stable `ctx` reference,
   // even when a swap runs inside the scoped settings callback below. A bare
   // mount (zero routes) is the dormant posture: nothing registers until a

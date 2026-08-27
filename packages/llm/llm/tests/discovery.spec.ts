@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  discoverModelListingAtEndpoint,
   discoverModelsAtEndpoint,
+  isEndpointContentTypeMismatch,
+  isEndpointPathMismatch,
+  LlmEndpointResolutionCache,
   MODEL_LISTING_PROTOCOLS,
+  modelEndpointCandidates,
   normalizeAnthropicBaseURL,
   supportsModelListing,
   userAgent,
@@ -38,6 +43,45 @@ describe('model listing protocol support', () => {
     ])
     for (const protocol of MODEL_LISTING_PROTOCOLS) expect(supportsModelListing(protocol)).toBe(true)
     expect(supportsModelListing('google-generative-ai')).toBe(false)
+  })
+})
+
+describe('endpoint candidate resolution', () => {
+  it('toggles one trailing v1 for OpenAI protocols and normalizes Anthropic once', () => {
+    expect(modelEndpointCandidates('https://gateway.example/openai', 'openai-completions'))
+      .toEqual(['https://gateway.example/openai', 'https://gateway.example/openai/v1'])
+    expect(modelEndpointCandidates('https://gateway.example/openai/v1/?tenant=acme', 'openai-responses'))
+      .toEqual(['https://gateway.example/openai/v1/?tenant=acme', 'https://gateway.example/openai?tenant=acme'])
+    expect(modelEndpointCandidates('https://gateway.example/anthropic/v1', 'anthropic-messages'))
+      .toEqual(['https://gateway.example/anthropic'])
+    expect(modelEndpointCandidates('https://gateway.example/custom', 'google-generative-ai'))
+      .toEqual(['https://gateway.example/custom'])
+  })
+
+  it('keeps cache operations scoped to protocol and raw base URL', () => {
+    const cache = new LlmEndpointResolutionCache()
+    expect(cache.generation).toBe(0)
+    expect(cache.get('openai-completions', 'https://gateway.example')).toBeUndefined()
+    cache.set('openai-completions', 'https://gateway.example', 'https://gateway.example/v1')
+    expect(cache.get('openai-completions', 'https://gateway.example')).toBe('https://gateway.example/v1')
+    expect(cache.get('openai-responses', 'https://gateway.example')).toBeUndefined()
+    cache.delete('openai-completions', 'https://gateway.example')
+    expect(cache.get('openai-completions', 'https://gateway.example')).toBeUndefined()
+    cache.set('openai-completions', 'https://gateway.example', 'https://gateway.example/v1')
+    cache.clear()
+    expect(cache.get('openai-completions', 'https://gateway.example')).toBeUndefined()
+    expect(cache.generation).toBe(1)
+  })
+
+  it('classifies only explicit status or content-type path mismatches', () => {
+    expect(isEndpointPathMismatch({ status: 404, headers: {} })).toBe(true)
+    expect(isEndpointPathMismatch({ status: 405, headers: {} })).toBe(true)
+    expect(isEndpointPathMismatch({ status: 401, headers: { 'content-type': 'text/html' } })).toBe(false)
+    expect(isEndpointPathMismatch({ status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } })).toBe(true)
+    expect(isEndpointPathMismatch({ status: 200, headers: { 'content-type': 'text/event-stream' } })).toBe(false)
+    expect(isEndpointContentTypeMismatch({ status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } }, 'application/json')).toBe(false)
+    expect(isEndpointContentTypeMismatch({ status: 200, headers: { 'content-type': 'application/problem+json' } }, 'application/json')).toBe(false)
+    expect(isEndpointContentTypeMismatch({ status: 200, headers: {} }, 'text/event-stream')).toBe(false)
   })
 })
 
@@ -102,6 +146,164 @@ describe('discoverModelsAtEndpoint', () => {
     expect(headers.get('x-api-key')).toBe('anthropic-key')
     expect(headers.get('anthropic-version')).toBe('2023-06-01')
     expect(headers.get('authorization')).toBeNull()
+  })
+
+  it('falls back from an HTML root listing to /v1 and remembers the result', async () => {
+    const requests: string[] = []
+    vi.stubGlobal('fetch', async (input: string | URL) => {
+      const url = String(input)
+      requests.push(url)
+      if (url === 'https://gateway.example/models') {
+        return new Response('<html>landing page</html>', {
+          status: 200,
+          headers: { 'content-type': 'text/html; charset=utf-8' },
+        })
+      }
+      return jsonResponse({ data: [{ id: 'relay-model' }] })
+    })
+    const cache = new LlmEndpointResolutionCache()
+    const request = { baseURL: 'https://gateway.example', api: 'openai-completions' }
+
+    await expect(discoverModelListingAtEndpoint(request, cache)).resolves.toEqual({
+      models: [{ id: 'relay-model' }],
+      baseURL: 'https://gateway.example/v1',
+    })
+    await expect(discoverModelListingAtEndpoint(request, cache)).resolves.toEqual({
+      models: [{ id: 'relay-model' }],
+      baseURL: 'https://gateway.example/v1',
+    })
+    expect(requests).toEqual([
+      'https://gateway.example/models',
+      'https://gateway.example/v1/models',
+      'https://gateway.example/v1/models',
+    ])
+  })
+
+  it('falls back from a 404 listing path and from a supplied /v1 path', async () => {
+    const requests: string[] = []
+    vi.stubGlobal('fetch', async (input: string | URL) => {
+      const url = String(input)
+      requests.push(url)
+      if (url.includes('/v1/')) return jsonResponse({ error: 'missing' }, 404)
+      return jsonResponse({ data: [{ id: 'relay-model' }] })
+    })
+    await expect(discoverModelsAtEndpoint({
+      baseURL: 'https://gateway.example/v1',
+      api: 'openai-completions',
+    })).resolves.toEqual([{ id: 'relay-model' }])
+    expect(requests).toEqual([
+      'https://gateway.example/v1/models',
+      'https://gateway.example/models',
+    ])
+  })
+
+  it('does not fall back after a network failure or an ordinary malformed body', async () => {
+    const networkRequests: string[] = []
+    const networkFailure = new Error('connection refused')
+    vi.stubGlobal('fetch', async (input: string | URL) => {
+      networkRequests.push(String(input))
+      throw networkFailure
+    })
+    await expect(discoverModelListingAtEndpoint({
+      baseURL: 'https://gateway.example',
+      api: 'openai-completions',
+    })).rejects.toMatchObject({ code: 'DISCOVERY_FAILED', cause: networkFailure })
+    expect(networkRequests).toEqual(['https://gateway.example/models'])
+
+    vi.unstubAllGlobals()
+    const malformedRequests: string[] = []
+    vi.stubGlobal('fetch', async (input: string | URL) => {
+      malformedRequests.push(String(input))
+      return new Response('not json', {
+        status: 200,
+        headers: { 'content-type': 'text/plain; charset=utf-8' },
+      })
+    })
+    await expect(discoverModelListingAtEndpoint({
+      baseURL: 'https://gateway.example',
+      api: 'openai-completions',
+    })).rejects.toThrow(/did not answer with JSON/)
+    expect(malformedRequests).toEqual(['https://gateway.example/models'])
+
+    vi.unstubAllGlobals()
+    const serverFailureRequests: string[] = []
+    vi.stubGlobal('fetch', async (input: string | URL) => {
+      serverFailureRequests.push(String(input))
+      return new Response('<html>temporarily unavailable</html>', {
+        status: 500,
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+      })
+    })
+    await expect(discoverModelListingAtEndpoint({
+      baseURL: 'https://gateway.example',
+      api: 'openai-completions',
+    })).rejects.toMatchObject({ failure: { status: 500 } })
+    expect(serverFailureRequests).toEqual(['https://gateway.example/models'])
+  })
+
+  it('reports both path candidates when neither can list models', async () => {
+    const requests: string[] = []
+    vi.stubGlobal('fetch', async (input: string | URL) => {
+      requests.push(String(input))
+      return jsonResponse({ error: 'missing' }, 404)
+    })
+    await expect(discoverModelListingAtEndpoint({
+      baseURL: 'https://gateway.example',
+      api: 'openai-responses',
+    })).rejects.toMatchObject({
+      code: 'DISCOVERY_FAILED',
+      message: expect.stringContaining('https://gateway.example/models'),
+    })
+    expect(requests).toEqual([
+      'https://gateway.example/models',
+      'https://gateway.example/v1/models',
+    ])
+  })
+
+  it('drops a cached candidate that is no longer part of the regenerated options', async () => {
+    const requests: string[] = []
+    vi.stubGlobal('fetch', async (input: string | URL) => {
+      requests.push(String(input))
+      return jsonResponse({ data: [{ id: 'relay-model' }] })
+    })
+    const cache = new LlmEndpointResolutionCache()
+    cache.set('openai-completions', 'https://gateway.example', 'https://other.example/v1')
+    await discoverModelsAtEndpoint({
+      baseURL: 'https://gateway.example',
+      api: 'openai-completions',
+    }, cache)
+    expect(requests).toEqual(['https://gateway.example/models'])
+    expect(cache.get('openai-completions', 'https://gateway.example')).toBe('https://gateway.example/')
+  })
+
+  it('does not publish a stale discovery result after cache invalidation', async () => {
+    const cache = new LlmEndpointResolutionCache()
+    const fetch = vi.fn(async () => {
+      cache.clear()
+      return jsonResponse({ data: [{ id: 'relay-model' }] })
+    })
+    vi.stubGlobal('fetch', fetch)
+
+    await expect(discoverModelListingAtEndpoint({
+      baseURL: 'https://gateway.example',
+      api: 'openai-completions',
+    }, cache)).resolves.toMatchObject({ baseURL: 'https://gateway.example/' })
+    expect(cache.get('openai-completions', 'https://gateway.example')).toBeUndefined()
+  })
+
+  it('does not hide authentication failures behind an alternate path', async () => {
+    const requests: string[] = []
+    vi.stubGlobal('fetch', async (input: string | URL) => {
+      requests.push(String(input))
+      return jsonResponse({ error: 'wrong key' }, 401)
+    })
+
+    await expect(discoverModelListingAtEndpoint({
+      baseURL: 'https://gateway.example',
+      api: 'openai-completions',
+      apiKey: 'wrong',
+    })).rejects.toMatchObject({ failure: { status: 401 } })
+    expect(requests).toEqual(['https://gateway.example/models'])
   })
 
   it('does not duplicate an existing Anthropic v1 path and permits unauthenticated probes', async () => {

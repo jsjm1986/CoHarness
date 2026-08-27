@@ -742,6 +742,8 @@ interface LlmDiscoveredModel {
 }
 ```
 
+For `openai-completions` and `openai-responses`, endpoint discovery treats `baseURL` as a prefix and tries that prefix before one trailing `/v1` toggle when the listing answers 404, 405, or explicit `text/html`. An optional process-local cache can share the successful prefix with streaming requests; it is not persisted or written back to settings. Anthropic message requests normalize a trailing `/v1` and always append exactly `/v1/messages`.
+
 ### The request envelope: `LlmCallConfig` and the logged header
 
 The loop builds each request from logged state. `EpochHeader` records call config, marks the fields supplied by adapter defaults, and records the rendered prompt and authoritative returned tool order (configured by `toolOrder`, or lexicographic when unset) through full `request/header` snapshots. Together with derived history, this makes the request reconstructable from the session log. See [session.md](session.md#the-request-header-event-requestheader) and the [reconstructability Agent Note](../../.agents/notes/implemented/architecture/2026-07-05-reconstructable-requests.md).

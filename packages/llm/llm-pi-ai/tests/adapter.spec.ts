@@ -7,7 +7,14 @@ import type {
   SaveImageAttachment,
   StoredImageAttachment,
 } from '@deepseek-ai/dsh-attachment'
-import LlmRuntime, { createUserMessage, CONTEXT_WINDOW_EXCEEDED_CODE, LlmError, ReasoningEffortId, userAgent } from '@deepseek-ai/dsh-llm'
+import LlmRuntime, {
+  createUserMessage,
+  CONTEXT_WINDOW_EXCEEDED_CODE,
+  LlmEndpointResolutionCache,
+  LlmError,
+  ReasoningEffortId,
+  userAgent,
+} from '@deepseek-ai/dsh-llm'
 import * as LlmPiAi from '@deepseek-ai/dsh-llm-pi-ai'
 import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
@@ -30,6 +37,26 @@ const IMAGE_REF: ImageAttachmentRef = {
   height: 1,
 }
 
+/** Minimal complete Anthropic Messages stream for endpoint-path assertions. */
+const anthropicTextEvents = [
+  JSON.stringify({
+    type: 'message_start',
+    message: {
+      id: 'msg-test', type: 'message', role: 'assistant', model: 'claude-test',
+      content: [], stop_reason: null, stop_sequence: null,
+      usage: { input_tokens: 3, output_tokens: 0 },
+    },
+  }),
+  JSON.stringify({ type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } }),
+  JSON.stringify({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'hello' } }),
+  JSON.stringify({ type: 'content_block_stop', index: 0 }),
+  JSON.stringify({
+    type: 'message_delta', delta: { stop_reason: 'end_turn', stop_sequence: null },
+    usage: { output_tokens: 1 },
+  }),
+  JSON.stringify({ type: 'message_stop' }),
+]
+
 async function harness(baseURL: string, overrides: Record<string, unknown> = {}): Promise<Context> {
   vi.stubEnv('PI_TEST_KEY', 'test-key')
   const ctx = new Context()
@@ -44,11 +71,13 @@ async function harness(baseURL: string, overrides: Record<string, unknown> = {})
 function adapterOf(
   providers: Record<string, LlmPiAi.PiAiProviderProfile>,
   apiKey: string | undefined = 'test-key',
+  endpointCache?: LlmEndpointResolutionCache,
 ): PiAiAdapter {
   return new PiAiAdapter({
     profiles: () => resolveProfiles(providers),
     resolveApiKey: () => Promise.resolve(apiKey),
     auth: memoryAuth(),
+    ...(endpointCache === undefined ? {} : { endpointCache }),
   })
 }
 
@@ -352,24 +381,291 @@ describe('PiAiAdapter provider routing', () => {
     expect(server.paths).toEqual(['/chat/completions'])
   })
 
-  it('reports a non-SSE 200 response as malformed instead of retryable transport', async () => {
+  it('does not switch on a 5xx response even when it is HTML', async () => {
     const server = await mockServer([{
-      body: '<!doctype html><title>gateway landing page</title>',
+      status: 503,
+      body: '<html>upstream unavailable</html>',
       headers: { 'content-type': 'text/html; charset=utf-8' },
     }])
     const ctx = await harness(server.url)
 
     const result = await assemble(ctx, { model: 'deepseek-v4-flash', messages: [] })
 
-    expect(result.finish).toMatchObject({
-      kind: 'error',
-      failure: {
-        code: 'MALFORMED_RESPONSE',
-        status: 200,
-        message: expect.stringMatching(/content-type "text\/html; charset=utf-8".*baseURL.*\/v1/),
+    expect(result.finish).toMatchObject({ kind: 'error', failure: { code: 'SERVER' } })
+    expect(server.paths).toEqual(['/chat/completions'])
+  })
+
+  it('falls back from a root HTML response to the /v1 stream endpoint', async () => {
+    const server = await mockServer([
+      {
+        body: '<!doctype html><title>gateway landing page</title>',
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+      },
+      { events: textEvents },
+    ])
+    const ctx = await harness(server.url)
+
+    const result = await assemble(ctx, { model: 'deepseek-v4-flash', messages: [] })
+
+    expect(result.message.content).toEqual([{ type: 'text', text: 'hello' }])
+    expect(server.paths).toEqual(['/chat/completions', '/v1/chat/completions'])
+  })
+
+  it('falls back from a /v1 endpoint to the root endpoint', async () => {
+    const server = await mockServer([
+      { status: 404, body: JSON.stringify({ error: { message: 'wrong path' } }) },
+      { events: textEvents },
+    ])
+    const ctx = await harness(`${server.url}/v1`)
+
+    const result = await assemble(ctx, { model: 'deepseek-v4-flash', messages: [] })
+
+    expect(result.message.content).toEqual([{ type: 'text', text: 'hello' }])
+    expect(server.paths).toEqual(['/v1/chat/completions', '/chat/completions'])
+  })
+
+  it('falls back on an explicit 405 path response', async () => {
+    const server = await mockServer([
+      { status: 405, body: JSON.stringify({ error: { message: 'method not served here' } }) },
+      { events: textEvents },
+    ])
+    const ctx = await harness(server.url)
+
+    await expect(assemble(ctx, { model: 'deepseek-v4-flash', messages: [] })).resolves.toMatchObject({
+      message: { content: [{ type: 'text', text: 'hello' }] },
+    })
+    expect(server.paths).toEqual(['/chat/completions', '/v1/chat/completions'])
+  })
+
+  it('remembers a successful alternate endpoint for the next request', async () => {
+    const server = await mockServer([
+      { status: 404, body: JSON.stringify({ error: { message: 'wrong path' } }) },
+      { events: textEvents },
+      { events: textEvents },
+    ])
+    const ctx = await harness(server.url)
+
+    await expect(assemble(ctx, { model: 'deepseek-v4-flash', messages: [] })).resolves.toMatchObject({
+      message: { content: [{ type: 'text', text: 'hello' }] },
+    })
+    await expect(assemble(ctx, { model: 'deepseek-v4-flash', messages: [] })).resolves.toMatchObject({
+      message: { content: [{ type: 'text', text: 'hello' }] },
+    })
+    expect(server.paths).toEqual(['/chat/completions', '/v1/chat/completions', '/v1/chat/completions'])
+  })
+
+  it('clears endpoint memory when the captured profile snapshot changes', async () => {
+    const server = await mockServer([
+      { status: 404, body: JSON.stringify({ error: { message: 'wrong path' } }) },
+      { events: textEvents },
+      { events: textEvents },
+    ])
+    let profiles = resolveProfiles({
+      gateway: {
+        api: 'openai-completions',
+        baseURL: server.url,
+        models: [{ id: 'gateway-model' }],
       },
     })
-    expect(server.paths).toEqual(['/chat/completions'])
+    // Build a stable profile callback so the adapter can observe the explicit
+    // generation change rather than a new map on every read.
+    const endpointCache = new LlmEndpointResolutionCache()
+    endpointCache.set('openai-completions', server.url, `${server.url}/stale`)
+    const cachedAdapter = new PiAiAdapter({
+      profiles: () => profiles,
+      resolveApiKey: () => Promise.resolve('test-key'),
+      auth: memoryAuth(),
+      endpointCache,
+    })
+    const drain = async (): Promise<void> => {
+      for await (const _chunk of cachedAdapter.stream({
+        provider: 'gateway', model: 'gateway-model', messages: [],
+      })) { /* drain */ }
+    }
+
+    await drain()
+    profiles = resolveProfiles({
+      gateway: {
+        api: 'openai-completions',
+        baseURL: server.url,
+        headers: { 'x-profile-generation': 'two' },
+        models: [{ id: 'gateway-model' }],
+      },
+    })
+    await drain()
+
+    expect(server.paths).toEqual(['/chat/completions', '/v1/chat/completions', '/chat/completions'])
+  })
+
+  it('keeps a new discovery result after an owning profile invalidation', async () => {
+    const server = await mockServer([
+      { status: 404, body: JSON.stringify({ error: { message: 'wrong path' } }) },
+      { events: textEvents },
+      { events: textEvents },
+    ])
+    let profiles = resolveProfiles({
+      gateway: {
+        api: 'openai-completions',
+        baseURL: server.url,
+        models: [{ id: 'gateway-model' }],
+      },
+    })
+    const endpointCache = new LlmEndpointResolutionCache()
+    const adapter = new PiAiAdapter({
+      profiles: () => profiles,
+      resolveApiKey: () => Promise.resolve('test-key'),
+      auth: memoryAuth(),
+      endpointCache,
+    })
+    const drain = async (): Promise<void> => {
+      for await (const _chunk of adapter.stream({
+        provider: 'gateway', model: 'gateway-model', messages: [],
+      })) { /* drain */ }
+    }
+
+    await drain()
+    profiles = resolveProfiles({
+      gateway: {
+        api: 'openai-completions',
+        baseURL: server.url,
+        headers: { 'x-profile-generation': 'two' },
+        models: [{ id: 'gateway-model' }],
+      },
+    })
+    // The profile owner clears the old generation, then discovery resolves the
+    // new profile before its first request and stores the alternate candidate.
+    endpointCache.clear()
+    endpointCache.set('openai-completions', server.url, `${server.url}/v1`)
+    await drain()
+
+    expect(server.paths).toEqual(['/chat/completions', '/v1/chat/completions', '/v1/chat/completions'])
+  })
+
+  it('does not let an older in-flight stream repopulate a newer endpoint cache', async () => {
+    const server = await mockServer([
+      { status: 404, body: JSON.stringify({ error: { message: 'wrong path' } }) },
+      { events: textEvents, delayMs: 80 },
+    ])
+    let profiles = resolveProfiles({
+      gateway: {
+        api: 'openai-completions',
+        baseURL: server.url,
+        models: [{ id: 'gateway-model' }],
+      },
+    })
+    const endpointCache = new LlmEndpointResolutionCache()
+    const adapter = new PiAiAdapter({
+      profiles: () => profiles,
+      resolveApiKey: () => Promise.resolve('test-key'),
+      auth: memoryAuth(),
+      endpointCache,
+    })
+    const pending = (async (): Promise<void> => {
+      for await (const _chunk of adapter.stream({
+        provider: 'gateway', model: 'gateway-model', messages: [],
+      })) { /* drain */ }
+    })()
+    while (server.paths.length < 2) await new Promise<void>(resolve => setImmediate(resolve))
+
+    profiles = resolveProfiles({
+      gateway: {
+        api: 'openai-completions',
+        baseURL: server.url,
+        headers: { 'x-profile-generation': 'two' },
+        models: [{ id: 'gateway-model' }],
+      },
+    })
+    endpointCache.clear()
+    // Model discovery for the new profile selected the root candidate.
+    endpointCache.set('openai-completions', server.url, `${server.url}/`)
+    await pending
+
+    expect(endpointCache.get('openai-completions', server.url)).toBe(`${server.url}/`)
+  })
+
+  it('does not delete a newer cache generation when an older attempt mismatches', async () => {
+    const requests: string[] = []
+    const sse = textEvents.map(event => `data: ${event}\n\n`).join('')
+    const endpointCache = new LlmEndpointResolutionCache()
+    const profiles = resolveProfiles({
+      gateway: {
+        api: 'openai-completions',
+        baseURL: 'https://cache-generation.example',
+        models: [{ id: 'gateway-model' }],
+      },
+    })
+    const adapter = new PiAiAdapter({
+      profiles: () => profiles,
+      resolveApiKey: () => Promise.resolve('test-key'),
+      auth: memoryAuth(),
+      endpointCache,
+    })
+    vi.stubGlobal('fetch', async (input: string | URL) => {
+      requests.push(String(input))
+      if (requests.length === 1) {
+        // Simulate the profile owner publishing a newer discovery result while
+        // this request is waiting for its response headers.
+        endpointCache.clear()
+        return new Response('<html>wrong prefix</html>', {
+          status: 200,
+          headers: { 'content-type': 'text/html; charset=utf-8' },
+        })
+      }
+      return new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } })
+    })
+    try {
+      const chunks = []
+      for await (const chunk of adapter.stream({
+        provider: 'gateway', model: 'gateway-model', messages: [],
+      })) chunks.push(chunk)
+      expect(chunks.at(-1)).toMatchObject({ type: 'finish', reason: { kind: 'stop' } })
+      expect(requests).toEqual([
+        'https://cache-generation.example/chat/completions',
+        'https://cache-generation.example/v1/chat/completions',
+      ])
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('reports a malformed response when both endpoint candidates are rejected', async () => {
+    const server = await mockServer([
+      {
+        body: '<!doctype html><title>root</title>',
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+      },
+      {
+        body: '<!doctype html><title>v1</title>',
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+      },
+    ])
+    const ctx = await harness(server.url)
+
+    const result = await assemble(ctx, { model: 'deepseek-v4-flash', messages: [] })
+
+    expect(result.finish).toMatchObject({
+      kind: 'error',
+      failure: { code: 'MALFORMED_RESPONSE', status: 200 },
+    })
+    if (result.finish.kind !== 'error') throw new Error('expected malformed-response finish')
+    expect(result.finish.failure.message)
+      .toMatch(/content-type "text\/html; charset=utf-8".*baseURL.*\/v1/)
+    expect(server.paths).toEqual(['/chat/completions', '/v1/chat/completions'])
+  })
+
+  it.each(['root', 'v1'] as const)('sends Anthropic Messages to exactly /v1/messages from a %s base', async (form) => {
+    const server = await mockServer([{ events: anthropicTextEvents, sseEvents: true }])
+    const ctx = await harness(form === 'root' ? server.url : `${server.url}/v1`, {
+      api: 'anthropic-messages',
+      models: [{ id: 'claude-test', name: 'Claude test', maxTokens: 1024, contextWindow: 8192 }],
+    })
+
+    const result = await assemble(ctx, { model: 'claude-test', messages: [] })
+
+    expect(result.message.content).toEqual([{ type: 'text', text: 'hello' }])
+    expect(server.paths).toEqual(['/v1/messages'])
+    expect(server.headers[0]?.['x-api-key']).toBe('test-key')
+    expect(server.headers[0]?.authorization).toBeUndefined()
   })
 
   it('keeps a genuine SSE truncation retryable', async () => {
@@ -383,6 +679,7 @@ describe('PiAiAdapter provider routing', () => {
     expect(result.finish).toMatchObject({ kind: 'error', failure: { code: 'TRANSPORT' } })
     if (result.finish.kind !== 'error') throw new Error('expected error finish')
     expect(result.finish.failure).not.toHaveProperty('status')
+    expect(server.paths).toEqual(['/chat/completions'])
   })
 
   it('uses the resolved catalog context window for usage-based overflow detection', async () => {
@@ -888,6 +1185,25 @@ describe('provider profile lifecycle', () => {
       for await (const _chunk of adapter.stream({ provider: 'anthropic', model: 'claude-sonnet-4', messages: [] })) { /* drain */ }
     })()).rejects.toMatchObject({ code: 'NO_ADAPTER' })
     expect(new LlmError('x', 'X')).toBeInstanceOf(Error)
+  })
+
+  it('keeps a catalog protocol outside the URL toggle set on its declared endpoint', async () => {
+    const profiles = resolveProfiles({ mistral: {} })
+    const model = profiles.get('mistral')?.piProvider.getModels()[0]
+    if (model === undefined) throw new Error('mistral catalog has no model for endpoint dispatch')
+    const adapter = new PiAiAdapter({
+      profiles: () => profiles,
+      resolveApiKey: () => Promise.resolve('test-key'),
+      auth: memoryAuth(),
+    })
+    const controller = new AbortController()
+    controller.abort('test cancellation')
+    const chunks = []
+    for await (const chunk of adapter.stream({
+      provider: 'mistral', model: model.id, messages: [], signal: controller.signal,
+    })) chunks.push(chunk)
+
+    expect(chunks.at(-1)).toMatchObject({ type: 'finish', reason: { kind: 'aborted' } })
   })
 
   it('rejects unsupported or unresolved image input before provider I/O', async () => {

@@ -20,7 +20,7 @@ Providers with native authentication need their native credentials instead. Bedr
 
 ## Add a custom provider
 
-Choose **Add a custom provider** for a company gateway, self-hosted server, or provider absent from the installed catalog. Supply a lowercase Provider ID, base URL, API protocol, credential, and at least one model.
+Choose **Add a custom provider** for a company gateway, self-hosted server, or provider absent from the installed catalog. Supply a lowercase Provider ID, base URL, one of `openai-completions`, `openai-responses`, or `anthropic-messages`, a credential, and at least one model.
 
 ![The custom provider form: Provider ID, display name, base URL, API protocol, and API key](providers-custom-form.png)
 
@@ -28,7 +28,7 @@ The Provider ID is permanent because requests, saved sessions, model defaults, a
 
 Under **Model catalog**, choose **Fetch available models** to query the base URL and credential currently shown in the form. Selecting candidates updates the draft; the provider is not stored until you save. Catalog providers use their installed catalog without a network request.
 
-Discovery follows the selected protocol. `openai-completions` and `openai-responses` send bearer authentication to `GET {baseURL}/models`; `anthropic-messages` sends `x-api-key` and `anthropic-version: 2023-06-01` to `GET {baseURL}/v1/models`. For Anthropic Messages, a trailing `/v1` is normalized for both model discovery and message requests, so the relay root and versioned base are accepted. For an OpenAI-compatible relay, include its `/v1` prefix in `baseURL` when that is where it exposes `/models`; do not enter a website URL that returns HTML instead of the API response.
+Discovery follows the selected protocol. `openai-completions` and `openai-responses` send bearer authentication to `GET {baseURL}/models`; `anthropic-messages` sends `x-api-key` and `anthropic-version: 2023-06-01` to `GET {baseURL}/v1/models`. For Anthropic Messages, a trailing `/v1` is normalized for both model discovery and message requests, so the relay root and versioned base are accepted. For an OpenAI-compatible relay, either the root prefix or its `/v1` prefix is accepted: the host tries the entered prefix first and its one alternate only after a clear path response, then keeps the successful choice in process memory. Enter the API prefix, not a full operation path; a website response is used only as the signal to try the alternate.
 
 ### Image input
 
@@ -128,7 +128,7 @@ If a saved default names a provider that was deleted, the composer displays **Se
 - **`MISSING_CREDENTIAL`** — Store the provider key through the Models page or supply the referenced environment variable.
 - **`UNKNOWN_MODEL`** — Select a configured model or add the missing model to the custom provider.
 - **Fetching available models returns 401** — Check the key and protocol. OpenAI-compatible discovery uses bearer-authenticated `GET {baseURL}/models`; Anthropic Messages uses `x-api-key` with `GET {baseURL}/v1/models`.
-- **Fetching available models returns HTML or `Stream ended without finish_reason`** — The route is probably pointed at a website or at the wrong protocol path. For OpenAI-compatible relays, set `baseURL` to the API prefix, usually ending in `/v1`; for Anthropic Messages, set `api: anthropic-messages` and use the relay base so the request reaches `/v1/models` and `/v1/messages`.
+- **Fetching available models returns HTML or `Stream ended without finish_reason`** — The host already tries the one root/`/v1` alternate for OpenAI-compatible routes when the response clearly identifies a path mismatch. If both candidates fail, check that `baseURL` is the API prefix rather than a website or full operation path; for Anthropic Messages, set `api: anthropic-messages` and use the relay base so the request reaches `/v1/models` and `/v1/messages`.
 - **The gateway refuses every request although the key and URL are right** — Its request shape differs from OpenAI's. Start with `compat.supportsDeveloperRole: false` and `compat.maxTokensField: max_tokens` on the route.
 - **Only reasoning models fail** — pi-ai sends their system prompt as the `developer` role, which the gateway rejects. Set `compat.supportsDeveloperRole: false`.
 - **A compat switch is refused as having no value** — A key written with nothing after the colon. Give it a value, or remove the key to keep the installed catalog's.
