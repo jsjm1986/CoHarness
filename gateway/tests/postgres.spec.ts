@@ -156,7 +156,7 @@ describePg('PostgreSQL baseline', () => {
         session_id,seq,event_type,occurred_at,event,payload_bytes
       ) VALUES('legacy-nul-session',0,'user/message',now(),$1::json,octet_length($1::text))`, [legacyEvent])
       const migrated = await runMigrations(pool, MIGRATIONS)
-      expect(migrated).toEqual({ applied: [16, 17, 18], current: 18 })
+      expect(migrated).toEqual({ applied: [16, 17, 18, 19], current: 19 })
       const legacyFacts = await pool.query<{
         has_visible_content: boolean
         visible_content_seq: string | null
@@ -172,7 +172,7 @@ describePg('PostgreSQL baseline', () => {
       await rm(legacyMigrations, { recursive: true, force: true })
     }
     expect(await runMigrations(pool, MIGRATIONS))
-      .toEqual({ applied: [], current: 18 })
+      .toEqual({ applied: [], current: 19 })
     const pushTables = await pool.query<{ table_name: string }>(`SELECT table_name
       FROM information_schema.tables
       WHERE table_schema='harness' AND table_name IN ('push_devices','push_deliveries')
@@ -193,6 +193,7 @@ describePg('PostgreSQL baseline', () => {
       FROM information_schema.tables WHERE table_schema='harness' AND table_name LIKE 'conversation_archive_%' ORDER BY table_name`)
     expect(archiveTables.rows).toEqual([
       { table_name: 'conversation_archive_commands' },
+      { table_name: 'conversation_archive_file_cleanup' },
       { table_name: 'conversation_archive_records' },
       { table_name: 'conversation_archive_search' },
     ])
@@ -201,6 +202,13 @@ describePg('PostgreSQL baseline', () => {
       WHERE table_schema='harness' AND table_name='conversation_archive_records' AND column_name='message_count'`)
     expect(archiveMessageCount.rows[0]?.is_nullable).toBe('NO')
     expect(archiveMessageCount.rows[0]?.column_default).toMatch(/0/)
+    const cleanupIndexes = await pool.query<{ indexname: string }>(`SELECT indexname
+      FROM pg_indexes WHERE schemaname='harness' AND indexname IN ('conversation_archive_file_cleanup_due','content_files_organization_path')
+      ORDER BY indexname`)
+    expect(cleanupIndexes.rows).toEqual([
+      { indexname: 'content_files_organization_path' },
+      { indexname: 'conversation_archive_file_cleanup_due' },
+    ])
     const providerColumn = await pool.query<{ is_nullable: string; column_default: string | null }>(`SELECT is_nullable,column_default
       FROM information_schema.columns
       WHERE table_schema='harness' AND table_name='push_devices' AND column_name='provider'`)
@@ -609,7 +617,7 @@ describePg('PostgreSQL baseline', () => {
     expect(assigned.rows[0]).toEqual({ port: 47000, count: '1' })
   })
 
-  it('keeps PostgreSQL user and project allocations at or above the configured base', async () => {
+  it('reuses PostgreSQL node-local port holes without crossing the configured base', async () => {
     const root = await mkdtemp(join(tmpdir(), 'hgw-postgres-port-base-'))
     const suffix = randomUUID().slice(0, 8)
     try {
@@ -644,17 +652,36 @@ describePg('PostgreSQL baseline', () => {
       const shared = join(root, 'shared')
       await mkdir(shared)
       const projects = new PostgresProjectService(context, cfg)
-      const project = await projects.create({
+      const firstProject = await projects.create({
         name: 'Port Base Project', path: shared, createdBy: Number(creator.rows[0]!.public_id),
       })
       const projectPort = await pool.query<{ port: number }>(`SELECT port FROM harness.instances i
         JOIN harness.projects p ON p.id=i.project_id WHERE p.organization_id=$1 AND p.public_id=$2`,
-      [isolatedOrganizationId, project.id])
+      [isolatedOrganizationId, firstProject.id])
       expect(projectPort.rows[0]?.port).toBe(47000)
 
-      await pool.query(`DELETE FROM harness.instances WHERE project_id=(
-        SELECT id FROM harness.projects WHERE organization_id=$1 AND public_id=$2
-      )`, [isolatedOrganizationId, project.id])
+      const secondPath = join(root, 'shared-2')
+      await mkdir(secondPath)
+      const secondProject = await projects.create({
+        name: 'Port Base Project 2', path: secondPath, createdBy: Number(creator.rows[0]!.public_id),
+      })
+      const secondPort = await pool.query<{ port: number }>(`SELECT port FROM harness.instances i
+        JOIN harness.projects p ON p.id=i.project_id WHERE p.organization_id=$1 AND p.public_id=$2`,
+      [isolatedOrganizationId, secondProject.id])
+      expect(secondPort.rows[0]?.port).toBe(47001)
+
+      await projects.remove(firstProject.id)
+      const replacementPath = join(root, 'shared-3')
+      await mkdir(replacementPath)
+      const replacementProject = await projects.create({
+        name: 'Port Base Project 3', path: replacementPath, createdBy: Number(creator.rows[0]!.public_id),
+      })
+      const replacementPort = await pool.query<{ port: number }>(`SELECT port FROM harness.instances i
+        JOIN harness.projects p ON p.id=i.project_id WHERE p.organization_id=$1 AND p.public_id=$2`,
+      [isolatedOrganizationId, replacementProject.id])
+      expect(replacementPort.rows[0]?.port).toBe(47000)
+
+      await projects.remove(replacementProject.id)
       const users = new PostgresUserService(context, cfg)
       const user = await users.create({ username: `port-base-user-${suffix}`, password: 'pw-12345678' })
       const userPort = await pool.query<{ port: number }>(`SELECT port FROM harness.instances i

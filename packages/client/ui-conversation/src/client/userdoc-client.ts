@@ -12,6 +12,7 @@ import {
   type UserDocUploadPhase,
   type UserDocUploadProgress,
 } from '@deepseek-ai/dsh-client-userdoc-upload'
+import { readApiResponseText } from '@deepseek-ai/dsh-client-runtime/client'
 
 /** Stable error surfaced when the deployment does not mount the document route. */
 export class UserDocServiceUnavailableError extends Error {
@@ -68,7 +69,7 @@ function contentUrl(docId: UserDocIdType): string {
 }
 
 async function parseResponse(response: Response): Promise<unknown> {
-  const text = await response.text()
+  const text = await readApiResponseText(response)
   if (text === '') return undefined
   try { return JSON.parse(text) as unknown } catch { return { error: { message: text } } }
 }

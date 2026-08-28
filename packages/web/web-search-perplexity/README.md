@@ -14,6 +14,7 @@ This is an **implementation** package: it registers a provider into `ctx.web`, i
 | `baseURL` | `https://api.perplexity.ai` | Endpoint base; `/chat/completions` is appended. An unparseable value makes the provider unavailable. |
 | `model` | `sonar` | Search model name. |
 | `maxTokens` | `1024` | Upper bound on generated answer tokens (`max_tokens`). Must be a positive integer. |
+| `maxResponseBytes` | `16 MiB` | Positive safe-integer cap (up to 256 MiB) on each success or error response body; chunked responses are cancelled when they cross it. |
 | `searchRecency` | (unset) | Recency window sent as `search_recency_filter`: `day`, `week`, `month`, or `year`. Unset sends no filter. |
 
 ```yaml

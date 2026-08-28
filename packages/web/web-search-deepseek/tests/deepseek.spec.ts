@@ -164,6 +164,11 @@ describe('DeepSeekSearchProvider availability', () => {
     expect(searchProvider({ ...options, maxUses: 0 }).available()).toBe(false)
     expect(searchProvider({ ...options, maxUses: 1.5 }).available()).toBe(false)
   })
+
+  it('is unavailable when the response byte budget is invalid', () => {
+    expect(searchProvider({ ...options, maxResponseBytes: 0 }).available()).toBe(false)
+    expect(searchProvider({ ...options, maxResponseBytes: 1.5 }).available()).toBe(false)
+  })
 })
 
 describe('DeepSeekSearchProvider request mapping', () => {
@@ -341,6 +346,23 @@ describe('DeepSeekSearchProvider error handling', () => {
     vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({}, { status: 500 })))
     await expect(searchProvider(options).search({ query: 'q' }))
       .rejects.toThrow(expect.objectContaining({ message: 'DeepSeek API error (HTTP 500)' }))
+  })
+
+  it('bounds an oversized success response before JSON parsing', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({ content: [{ type: 'web_search_tool_result', content: [] }], padding: 'x'.repeat(128) }),
+      { status: 200, headers: { 'content-length': '256' } },
+    )))
+    await expect(searchProvider({ ...options, maxResponseBytes: 32 }).search({ query: 'q' }))
+      .rejects.toThrow(/response exceeded/u)
+  })
+
+  it('keeps the HTTP status when an oversized error body is declared', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('x'.repeat(128), {
+      status: 502, headers: { 'content-length': '128' },
+    })))
+    await expect(searchProvider({ ...options, maxResponseBytes: 32 }).search({ query: 'q' }))
+      .rejects.toThrow(expect.objectContaining({ message: 'DeepSeek API error (HTTP 502)' }))
   })
 
   it('maps an abort to WEB_ABORTED', async () => {

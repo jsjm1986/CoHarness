@@ -28,7 +28,13 @@ JSONL 持久会话存储后端：`SessionPersistence` 的一个具体实现（`d
 | `compression` | `'zstd' \| 'none'` | 默认 `'zstd'`；`'none'` 保留换行分隔 UTF-8 文本。 |
 | `preparedSessionCacheSize` | 正整数（默认 `5`） | 冷历史检查后保留、供恢复复用的未发布会话数量上限。 |
 | `writeBatchMaxDelayMs` | 正整数（默认 `200`） | 空闲的活动事件队列收到待写入事件后开启的固定合并窗口。后续事件不会重置窗口；flush 与 teardown 会绕过它。该值不限制事件循环、串行化操作或后端延迟。最大值为 Node 计时器上限 `2_147_483_647` ms。 |
-| `maxPendingEvents` | 正整数（默认 `10,000`） | 单个活动会话写入 controller 可保留的最大事件数；超过上限的生产者会被拒绝。 |
+| `maxPendingEvents` | 正整数（默认 `100,000`） | 单个活动会话写入 controller 可保留的最大事件数；超过上限的生产者会被拒绝。 |
+| `maxPendingBytes` | 正整数（默认 `64 MiB`） | 单个活动会话写入 controller 可保留的最大 UTF-8 JSON 字节数；超过上限的生产者会被拒绝。 |
+| `maxHeaderBytes` | 正整数（默认 `64 KiB`） | 单条换行结尾会话 header 的最大字节数。列表和加载会在解析前拒绝更大的 header。 |
+| `readStableMaxAttempts` | 正整数（默认 `8`） | writer 在修订稳定读取期间修改工件时，允许的最大 stat/read 重试次数。 |
+| `readStableMaxDurationMs` | 正整数（默认 `2,000`） | 修订稳定读取允许消耗的最大毫秒数；不能超过 Node 计时器上限 `2_147_483_647` ms。 |
+| `maxDecompressedBytes` | 正整数（默认 `256 MiB`） | 单个 zstd 工件在 raw、load 或恢复读取中允许解码的最大明文字节总数。 |
+| `maxArtifactBytes` | 正整数（默认 `256 MiB`） | 单个会话工件允许读取的最大物理字节数；有界读取会在将更大文件保留到内存前拒绝它。 |
 
 `locate(meta)` 返回已解析项目/会话目录内固定 transcript 的 `{ kind: 'jsonl', path }`。它不执行文件系统 I/O：可以在目录或文件存在前返回目标，现有文件也只包含最近一次 flush 完成的前缀。
 
@@ -46,7 +52,7 @@ JSONL 持久会话存储后端：`SessionPersistence` 的一个具体实现（`d
 - **崩溃恢复：保留有效尾部工作。**`load` 验证每个完整压缩 frame，并扫描解压 JSONL。最后 frame 结构不完整时，读取器保留其完整解码记录，从 frame 开头截断，并使用共享[持久化约定](../../../.agents/notes/implemented/architecture/2026-06-14-session-persistence.zh.md) 需要的合成工具、步骤和轮次 closer 重新编码这些记录。原始 mode 从第一个不完整行截断。已经存在却没有完整 header frame 的压缩工件、完整 frame 中的 checksum/解压失败，或位于最后已提交的 `turn/end` 处或之前的缺陷都属于损坏，会被拒绝。
 - **非修改式检查。**`inspect()` 返回不可变、平衡的逻辑视图，并可在内存中合成恢复 closer，但不会截断不完整尾部或更改轻量修订。
 - **连续 seq。**`append` 拒绝第一个 `seq` 不继续已存储日志的批次，并拒绝无法 JSON 序列化的 `event.data`，同时命名违规事件类型。
-- **轻量修订。**`listSnapshots(signal?)` 使用 device、inode、size 和纳秒时间戳标识日志，避免解析完整日志；该标识会在 append、修复、替换或存储变更后改变。完整前缀读取要求读取字节前后的身份一致，`readStoredRevision()` 使用同一身份校验保留的 preparation，而不加载日志。快照列表通过产物发现原样转发该信号，并在每个 `stat` 前后检查取消；由于文件系统 `stat` 不可中断，取消会等待活动调用完成，然后在不启动另一次调用的情况下拒绝。
+- **轻量修订。**`revision(id, signal?)` 只解析指定产物，并使用 device、inode、size 和纳秒时间戳标识它，不解析日志；`listSnapshots(signal?)` 对每个已发现产物使用同一身份。该标识会在 append、修复、替换或存储变更后改变。完整前缀读取要求读取字节前后的身份一致，`readStoredRevision()` 也使用同一身份校验保留的 preparation。快照列表通过产物发现原样转发该信号，并在每个 `stat` 前后检查取消；由于文件系统 `stat` 不可中断，取消会等待活动调用完成，然后在不启动另一次调用的情况下拒绝。
 
 ## 写入路径
 

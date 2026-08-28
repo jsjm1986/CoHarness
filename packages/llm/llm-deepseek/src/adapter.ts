@@ -93,6 +93,8 @@ export interface DeepSeekConnectionOptions {
   maxInlineRequestImageBytes: number
   /** Maximum number of represented images in one request. */
   maxImagesPerRequest: number
+  /** Maximum request-image projections prepared concurrently. */
+  imagePreparationConcurrency: number
   /** Raw-byte removal step after the file-reference bound is exceeded. */
   imageOffloadByteQuantum: number
   /** Base64-byte removal step after the inline fallback bound is exceeded. */
@@ -103,6 +105,8 @@ export interface DeepSeekConnectionOptions {
   filesApiTimeoutMs: number
   /** Maximum bytes retained from one non-2xx provider error body. */
   maxErrorResponseBytes: number
+  /** Maximum bytes retained from one Files API success or error body. */
+  maxFilesResponseBytes: number
   /** Maximum parser buffer for one incomplete SSE event. */
   maxSseBufferBytes: number
   /** Maximum accumulated text/reasoning emitted by one response. */
@@ -146,6 +150,10 @@ export const DEFAULT_MAX_REQUEST_FILES_BYTES = 128 * 1024 * 1024
 export const DEFAULT_MAX_INLINE_REQUEST_IMAGE_BYTES = 20 * 1024 * 1024
 /** Provider request image-count limit. */
 export const DEFAULT_MAX_IMAGES_PER_REQUEST = 600
+/** Default number of request-image projections prepared concurrently. */
+export const DEFAULT_IMAGE_PREPARATION_CONCURRENCY = 4
+/** Maximum configurable request-image preparation concurrency. */
+export const MAX_IMAGE_PREPARATION_CONCURRENCY = 32
 /** Total-pixel budget matching DeepSeek's normal vision projection. */
 export const DEFAULT_REQUEST_IMAGE_PIXEL_BUDGET = 640_000
 /** Total-pixel budget matching provider low-detail image input. */
@@ -231,10 +239,13 @@ class FileResolutionFailure extends Error {
 function collectImageRefs(
   content: readonly ContentBlock[],
   refs: Map<AttachmentId, ImageAttachmentRef>,
+  occurrences: AttachmentId[],
 ): void {
   for (const block of content) {
-    if (block.type === 'image') refs.set(block.attachment.attachmentId, block.attachment)
-    else if (block.type === 'tool-result') collectImageRefs(block.content, refs)
+    if (block.type === 'image') {
+      refs.set(block.attachment.attachmentId, block.attachment)
+      occurrences.push(block.attachment.attachmentId)
+    } else if (block.type === 'tool-result') collectImageRefs(block.content, refs, occurrences)
   }
 }
 
@@ -262,17 +273,100 @@ async function prepareRequestImages(
   attachments: AttachmentStore,
   model: DeepSeekCatalogModel,
   signal: AbortSignal,
-): Promise<Map<AttachmentId, RequestImageAttachment>> {
+  limits: {
+    readonly concurrency: number
+    readonly maxBytes: number
+    readonly maxImages: number
+    readonly byteQuantum: number
+    readonly countQuantum: number
+  },
+): Promise<{
+  readonly messages: GenerateOptions['messages']
+  readonly requestImages: Map<AttachmentId, RequestImageAttachment>
+}> {
   const refs = new Map<AttachmentId, ImageAttachmentRef>()
-  for (const message of options.messages) collectImageRefs(message.content, refs)
+  const occurrences: AttachmentId[] = []
+  for (const message of options.messages) collectImageRefs(message.content, refs, occurrences)
   const policy = resolveRequestImagePolicy(model)
   const orderedRefs = [...refs.values()]
-  const projected = await Promise.all(orderedRefs.map(
-    ref => attachments.readImageRequest(ref, policy, signal),
-  ))
-  return new Map(orderedRefs.map((ref, index) => (
-    [ref.attachmentId, projected[index] as RequestImageAttachment]
-  )))
+  const useCounts = new Map<AttachmentId, number>()
+  for (const id of occurrences) useCounts.set(id, (useCounts.get(id) ?? 0) + 1)
+  const remainingUses = new Map(useCounts)
+  const requestImages = new Map<AttachmentId, RequestImageAttachment>()
+  const byteLengths = new Map<AttachmentId, number>()
+  const controller = new AbortController()
+  const workerSignal = AbortSignal.any([signal, controller.signal])
+  let exactTotalBytes = 0
+  let removedBytes = 0
+  let removedCount = 0
+
+  const removeKnownPrefix = (): void => {
+    const excessCount = Math.max(0, occurrences.length - limits.maxImages)
+    const excessBytes = Math.max(0, exactTotalBytes - limits.maxBytes)
+    const targetCount = excessCount === 0 ? 0 : Math.ceil(excessCount / limits.countQuantum) * limits.countQuantum
+    const targetBytes = excessBytes === 0 ? 0 : Math.ceil(excessBytes / limits.byteQuantum) * limits.byteQuantum
+    for (;;) {
+      const byteTargetMet = targetBytes === 0
+        || (limits.byteQuantum === 1 ? removedBytes >= targetBytes : removedBytes > targetBytes)
+      if (removedCount >= targetCount && byteTargetMet) return
+      const id = occurrences[removedCount]
+      if (id === undefined) return
+      const bytes = byteLengths.get(id)
+      if (bytes === undefined) return
+      removedCount += 1
+      removedBytes += bytes
+      const remaining = (remainingUses.get(id) ?? 0) - 1
+      if (remaining <= 0) {
+        remainingUses.delete(id)
+        requestImages.delete(id)
+      } else {
+        remainingUses.set(id, remaining)
+      }
+    }
+  }
+
+  for (let start = 0; start < orderedRefs.length; start += limits.concurrency) {
+    signal.throwIfAborted()
+    const batch = orderedRefs.slice(start, start + limits.concurrency)
+    const settled = await Promise.allSettled(batch.map(async (ref) => {
+      try {
+        return await attachments.readImageRequest(ref, policy, workerSignal)
+      } catch (error: unknown) {
+        controller.abort(error)
+        throw error
+      }
+    }))
+    const failure = settled.find((result): result is PromiseRejectedResult => result.status === 'rejected')
+    if (failure !== undefined) {
+      controller.abort(failure.reason)
+      throw failure.reason
+    }
+    for (const [offset, result] of settled.entries()) {
+      if (result.status !== 'fulfilled') continue
+      const ref = batch[offset] as ImageAttachmentRef
+      byteLengths.set(ref.attachmentId, result.value.bytes)
+      exactTotalBytes += result.value.bytes * (useCounts.get(ref.attachmentId) ?? 0)
+      requestImages.set(ref.attachmentId, result.value)
+      removeKnownPrefix()
+    }
+  }
+  signal.throwIfAborted()
+  removeKnownPrefix()
+  const messages = offloadRequestImagesWithPolicy(options.messages, {
+    representation: 'raw',
+    byteLength: (ref) => {
+      const bytes = byteLengths.get(ref.attachmentId)
+      if (bytes === undefined) {
+        throw new LlmError(`DeepSeek request image ${ref.attachmentId} was not prepared.`, 'INVALID_REQUEST')
+      }
+      return bytes
+    },
+    maxBytes: limits.maxBytes,
+    maxImages: limits.maxImages,
+    byteQuantum: limits.byteQuantum,
+    countQuantum: limits.countQuantum,
+  })
+  return { messages: [...messages], requestImages }
 }
 
 function providerRejectedNormalizedImage(detail: string): boolean {
@@ -577,7 +671,11 @@ export class DeepSeekAdapter extends LlmAdapter {
         : {},
     }
 
-    const fileConnection = { baseURL: connection.baseURL, apiKey }
+    const fileConnection = {
+      baseURL: connection.baseURL,
+      apiKey,
+      maxResponseBytes: connection.maxFilesResponseBytes,
+    }
     const model = connection.models.find(entry => entry.id === options.model)
     const policy = model === undefined ? undefined : resolveRequestImagePolicy(model)
     const requestMessages = policy === undefined ? options.messages : offloadRequestImagesWithPolicy(options.messages, {
@@ -588,10 +686,21 @@ export class DeepSeekAdapter extends LlmAdapter {
       countQuantum: connection.imageOffloadCountQuantum,
       byteLength: ref => Math.min(ref.bytes, policy.maxBytes),
     })
-    const requestOptions = requestMessages === options.messages ? options : { ...options, messages: [...requestMessages] }
-    const requestImages = attachments === undefined || model === undefined
-      ? new Map<AttachmentId, RequestImageAttachment>()
-      : await prepareRequestImages(requestOptions, attachments, model, signal)
+    let requestOptions = requestMessages === options.messages ? options : { ...options, messages: [...requestMessages] }
+    let requestImages = new Map<AttachmentId, RequestImageAttachment>()
+    if (attachments !== undefined && model !== undefined) {
+      const prepared = await prepareRequestImages(requestOptions, attachments, model, signal, {
+        concurrency: connection.imagePreparationConcurrency,
+        maxBytes: connection.maxRequestFilesBytes,
+        maxImages: connection.maxImagesPerRequest,
+        byteQuantum: connection.imageOffloadByteQuantum,
+        countQuantum: connection.imageOffloadCountQuantum,
+      })
+      requestOptions = prepared.messages === requestOptions.messages
+        ? requestOptions
+        : { ...requestOptions, messages: prepared.messages }
+      requestImages = prepared.requestImages
+    }
     let representation: 'file' | 'base64' = 'file'
     let fileAttempt = 0
     while (true) {

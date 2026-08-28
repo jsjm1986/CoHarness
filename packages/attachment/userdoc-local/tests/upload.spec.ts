@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import {
   DOCUMENT_UPLOAD_HASH_CODE,
+  DOCUMENT_UPLOAD_NOT_FOUND_CODE,
   DOCUMENT_UPLOAD_RANGE_CODE,
   UserDocDirectoryId,
 } from '@deepseek-ai/dsh-userdoc'
@@ -176,5 +177,25 @@ describe('resumable local document uploads', () => {
     expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1)
     expect(results.filter(result => result.status === 'rejected')).toHaveLength(1)
     expect((results.find(result => result.status === 'rejected') as PromiseRejectedResult).reason).toMatchObject({ code: 'DOCUMENT_UPLOAD_BUSY' })
+  })
+
+  it('rejects and removes an oversized on-disk manifest before parsing it', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-userdoc-upload-manifest-limit-'))
+    roots.push(root)
+    const service = await store(root, { uploadManifestMaxBytes: 1024 })
+    const session = await service.beginUpload({
+      name: 'manifest-limit.txt', directoryId: UserDocDirectoryId(''), bytes: 1, fingerprint: 'x'.repeat(512),
+    })
+    const directory = join(root, '.upload-sessions', 'v1', String(session.uploadId))
+    const manifestPath = join(directory, 'manifest.json')
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as Record<string, unknown>
+    manifest.fingerprint = 'y'.repeat(512)
+    manifest.padding = 'z'.repeat(2_000)
+    await writeFile(manifestPath, `${JSON.stringify(manifest)}\n`)
+
+    await expect(service.inspectUpload(session.uploadId)).rejects.toMatchObject({ code: DOCUMENT_UPLOAD_NOT_FOUND_CODE })
+    const restarted = await store(root, { uploadManifestMaxBytes: 1024 })
+    await restarted.list()
+    await expect(readFile(manifestPath)).rejects.toMatchObject({ code: 'ENOENT' })
   })
 })

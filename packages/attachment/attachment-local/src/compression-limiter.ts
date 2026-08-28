@@ -4,6 +4,7 @@
 export class CompressionLimiter {
   private active = 0
   private readonly waiting: Array<() => void> = []
+  private waitingHead = 0
 
   /**
    * @param concurrency - positive maximum number of active tasks.
@@ -21,7 +22,15 @@ export class CompressionLimiter {
         this.active += 1
         const release = (): void => {
           this.active -= 1
-          this.waiting.shift()?.()
+          const next = this.waiting[this.waitingHead]
+          if (next !== undefined) {
+            this.waitingHead += 1
+            next()
+            if (this.waitingHead >= 64 && this.waitingHead * 2 >= this.waiting.length) {
+              this.waiting.splice(0, this.waitingHead)
+              this.waitingHead = 0
+            }
+          }
         }
         void Promise.resolve().then(task).then(
           (value) => {

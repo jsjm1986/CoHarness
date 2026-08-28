@@ -6,7 +6,13 @@
  * @module @deepseek-ai/dsh-web-search-exa/provider
  */
 
-import { WebError } from '@deepseek-ai/dsh-web'
+import {
+  DEFAULT_WEB_RESPONSE_MAX_BYTES,
+  MAX_WEB_RESPONSE_MAX_BYTES,
+  readWebResponseJson,
+  WebError,
+  WebResponseTooLargeError,
+} from '@deepseek-ai/dsh-web'
 import type {
   WebSearchProvider,
   WebSearchRequest,
@@ -26,6 +32,8 @@ export const EXA_DEFAULT_SEARCH_TYPE = 'auto'
 
 /** Default number of highlight sentences requested per result. */
 export const EXA_DEFAULT_HIGHLIGHTS_PER_RESULT = 1
+/** Default maximum UTF-8 bytes retained from one search response. */
+export const EXA_DEFAULT_MAX_RESPONSE_BYTES = DEFAULT_WEB_RESPONSE_MAX_BYTES
 
 /** Attribution header sent on every request. Bump with the package version. */
 const USER_AGENT = 'deepseek-harness/0.0.1'
@@ -42,6 +50,8 @@ export interface ExaSearchProviderOptions {
   numResults?: number
   /** Highlight sentences requested per result (Exa's `highlightsPerUrl`). */
   highlightsPerResult: number
+  /** Maximum UTF-8 bytes retained from one success or error response. */
+  maxResponseBytes?: number
 }
 
 /**
@@ -91,9 +101,11 @@ export class ExaSearchProvider implements WebSearchProvider {
       && isValidBaseUrl(this.options.baseURL)
       && isPositiveInteger(this.options.highlightsPerResult)
       && (this.options.numResults === undefined || isPositiveInteger(this.options.numResults))
+      && isPositiveSafeInteger(this.options.maxResponseBytes ?? EXA_DEFAULT_MAX_RESPONSE_BYTES)
   }
 
   async search(request: WebSearchRequest, signal?: AbortSignal): Promise<WebSearchResult> {
+    const responseLimit = this.options.maxResponseBytes ?? EXA_DEFAULT_MAX_RESPONSE_BYTES
     // A per-request bound wins over the configured default; either may be absent.
     const numResults = request.maxResults ?? this.options.numResults
     let response: Response
@@ -124,7 +136,7 @@ export class ExaSearchProvider implements WebSearchProvider {
       const status = response.status
       let message = `Exa API error (HTTP ${status})`
       try {
-        const parsed = await response.json() as ExaError
+        const parsed = await readWebResponseJson(response, responseLimit) as ExaError
         const detail = parsed.error ?? parsed.message
         if (detail !== undefined && detail.length > 0) message = detail
       } catch (error: unknown) {
@@ -140,10 +152,13 @@ export class ExaSearchProvider implements WebSearchProvider {
     }
 
     try {
-      const payload = await response.json() as ExaSearchResponse
+      const payload = await readWebResponseJson(response, responseLimit) as ExaSearchResponse
       return mapExaResponse(payload)
     } catch (error: unknown) {
-      if (isAbortError(error)) throw new WebError('Exa search aborted', 'WEB_ABORTED', { cause: error })
+      if (signal?.aborted === true || isAbortError(error)) throw new WebError('Exa search aborted', 'WEB_ABORTED', { cause: error })
+      if (error instanceof WebResponseTooLargeError) {
+        throw new WebError(`Exa response exceeded the ${String(responseLimit)}-byte limit`, 'WEB_PROVIDER_ERROR', { cause: error })
+      }
       throw new WebError(`Exa returned an unprocessable response body: ${String(error)}`, 'WEB_PROVIDER_ERROR', { cause: error })
     }
   }
@@ -157,6 +172,11 @@ function isValidBaseUrl(baseURL: string): boolean {
 /** True for a request limit that can be sent to Exa (a positive whole number). */
 function isPositiveInteger(value: number): boolean {
   return Number.isInteger(value) && value > 0
+}
+
+/** True for a positive safe integer response byte budget. */
+function isPositiveSafeInteger(value: number): boolean {
+  return Number.isSafeInteger(value) && value > 0 && value <= MAX_WEB_RESPONSE_MAX_BYTES
 }
 
 /** True for a fetch/`AbortSignal` abort, surfaced as `WEB_ABORTED`. */

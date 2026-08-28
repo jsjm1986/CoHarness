@@ -146,4 +146,32 @@ describe('GatewayCollaboration', () => {
     expect(request).toHaveBeenCalledTimes(2)
     await fiber.dispose()
   })
+
+  it('chunks large readable-session requests and deduplicates ids', async () => {
+    const ids = Array.from({ length: 5_001 }, (_, index) => SessionId(`session-${String(index)}`))
+    const request = vi.fn((path: string, init?: RequestInit) => {
+      expect(path).toBe('/internal/runtime/collaboration/readable')
+      if (typeof init?.body !== 'string') throw new Error('test request body is not a string')
+      const body = JSON.parse(init.body) as { sessionIds: string[] }
+      expect(body.sessionIds.length).toBeLessThanOrEqual(5_000)
+      return Promise.resolve(new Response(JSON.stringify({ sessionIds: body.sessionIds }), {
+        status: 200, headers: { 'content-type': 'application/json' },
+      }))
+    })
+    const runtime = {
+      requireCurrent: () => PRINCIPAL,
+      request,
+      sessionCreation: () => undefined,
+    } as unknown as GatewayRuntime
+    const ctx = new Context()
+    ctx.provide('gatewayRuntime', runtime)
+    const fiber = ctx.plugin(GatewayCollaboration)
+    await fiber.await()
+    const authority = ctx.collaboration.capture()
+
+    const result = await authority.readableSessionIds([...ids, ids[0] as SessionId])
+    expect(result).toEqual(new Set(ids))
+    expect(request).toHaveBeenCalledTimes(2)
+    await fiber.dispose()
+  })
 })

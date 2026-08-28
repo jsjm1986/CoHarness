@@ -38,6 +38,10 @@ agent（智能体）的唯一具体实现插件和循环驱动器。其包内部
 ```ts
 interface Config {
   maxParallelToolCalls?: number // default 10; 1 is serial
+  inbox?: {
+    maxMessages?: number // default 256; pending messages per agent
+    maxBytes?: number // default 8 MiB; pending UTF-8 bytes per agent
+  }
   agents: Array<{
     id: string                 // required
     provider?: string

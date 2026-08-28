@@ -26,6 +26,8 @@
 
 提供方注册的是**能力**而非工具。`dsh-tool-web` 是面向模型的名称、描述、提示词指引、JSON Schema 和呈现的唯一归属方。
 
+本包还导出 `readWebResponseBytes()` 和 `readWebResponseJson()`。搜索提供方使用这些 reader，在解析上游 body 前执行正数 `maxResponseBytes` 预算；声明长度和分块响应使用同一个上限，配置值最高为 256 MiB，超限时由 `WebResponseTooLargeError` 标识。
+
 ## 选择
 
 选择绝不依赖注册、配置或 HMR（热模块替换）顺序。能力要么具有显式提供方 id（配置 `searchProvider`／`fetchProvider`，或由环境变量 `$DSH_WEB_SEARCH_PROVIDER`／`$DSH_WEB_FETCH_PROVIDER` 提供相同字段），要么在恰好只注册一个可用提供方时自动选择。`search()`／`fetch()` 会在执行时解析提供方：

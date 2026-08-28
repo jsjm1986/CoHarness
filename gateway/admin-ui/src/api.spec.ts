@@ -195,4 +195,17 @@ describe('admin api URLs', () => {
     }))
     await expect(patchUser(1, { status: 'disabled' })).rejects.toThrow('cannot-remove-last-admin')
   })
+
+  it('rejects an oversized streamed response before parsing it', async () => {
+    let cancelled = false
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('x'.repeat(16 * 1024 * 1024 + 1)))
+      },
+      cancel() { cancelled = true },
+    })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body)))
+    await expect(listUsers()).rejects.toThrow('Admin response is too large.')
+    expect(cancelled).toBe(true)
+  })
 })

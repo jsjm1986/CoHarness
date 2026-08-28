@@ -23,11 +23,13 @@ harness LLM（大语言模型）seam 的 DeepSeek chat-completions 适配器：�
     maxRequestFilesBytes: 134217728 # optional positive integer; 128 MiB raw request-image default
     maxInlineRequestImageBytes: 20971520 # base64 fallback high watermark; 20 MiB default
     maxImagesPerRequest: 600       # provider request image-count limit
+    imagePreparationConcurrency: 4  # request-image projections prepared per batch; maximum 32
     imageOffloadByteQuantum: 67108864 # oldest-image removal advances in 64 MiB steps
     inlineImageOffloadByteQuantum: 10485760 # fallback removal advances in 10 MiB steps
     imageOffloadCountQuantum: 20      # count overflow advances in 20-image steps
     filesApiTimeoutMs: 60000           # per-image Files resolution deadline; one-minute default
     maxErrorResponseBytes: 65536       # non-2xx response body budget; 64 KiB default
+    maxFilesResponseBytes: 16777216    # Files API success/error body budget; 16 MiB default, 256 MiB maximum
     maxSseBufferBytes: 4194304         # incomplete SSE event buffer; 4 MiB default
     maxGeneratedTextBytes: 16777216    # visible/reasoning response budget; 16 MiB default
     maxToolArgumentBytes: 4194304      # one streamed tool-argument budget; 4 MiB default
@@ -109,7 +111,7 @@ DeepSeek 请求身份独立于应用归因。凭据解析成功后，每个提�
 
 #### 模型看到的内容
 
-所选 DeepSeek 模型会收到 harness 系统提示词、消息历史、工具 schema、stop sequence 和调用配置。视觉模型通常通过 Files API 引用收到保留的 user 与工具结果图片，旁边带有稳定附件句柄和请求图片尺寸；Files 解析失败时，所有保留图片改用内联 data URL。超出上限的较旧图片由已记录的占位文本表示。之前 assistant 轮次的推理内容会原文回传，无论该轮次是否调用了工具。
+所选 DeepSeek 模型会收到 harness 系统提示词、消息历史、工具 schema、stop sequence 和调用配置。视觉模型通常通过 Files API 引用收到保留的 user 与工具结果图片，旁边带有稳定附件句柄和请求图片尺寸；Files 解析失败时，所有保留图片改用内联 data URL。请求图片投影按 `imagePreparationConcurrency` 限制的固定批次准备，因此较慢的前置图片不会让整个请求长期保留已经完成的投影。超出上限的较旧图片由已记录的占位文本表示。之前 assistant 轮次的推理内容会原文回传，无论该轮次是否调用了工具。
 
 #### Token 影响
 

@@ -22,6 +22,8 @@ E2B implementation of the [`@deepseek-ai/dsh-subprocess`](../../subprocess/subpr
 
 The default E2B base image supplies the runtime and Bash/GNU utilities this adapter invokes: `node`, `bash`, `setsid`, `ps`, `awk`, `tr`, `env`, `base64`, `chmod`, `tee`, `head`, `rm`, `kill`, `id`, and `getent`.
 
+The collect-mode host tail uses a head-indexed chunk queue. Its byte cap and offset reads retain the same exact tail while highly fragmented remote output avoids repeated array-head copies.
+
 ## Model Experience
 
 Indirectly, through Consumers such as the Bash executor behind `dsh-tool-bash`, which render remote output, exit facts, background deltas, and spill paths.

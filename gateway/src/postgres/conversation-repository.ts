@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
-import { transaction } from './database.ts'
+import { transaction, type Queryable } from './database.ts'
 import { assertSafeAssistantEvent } from '../conversation-safety.ts'
 
 export type ConversationVisibility = 'personal' | 'project' | 'private'
@@ -631,24 +631,32 @@ export class ConversationRepository {
     })
   }
 
-  async readFrom(sessionId: string, fromSeq: number): Promise<ConversationEvent[]> {
-    const result = await this.pool.query<{ event: ConversationEvent }>(
+  private async readFromWith(source: Queryable, sessionId: string, fromSeq: number): Promise<ConversationEvent[]> {
+    const result = await source.query<{ event: ConversationEvent }>(
       'SELECT event FROM harness.conversation_events WHERE session_id=$1 AND seq >= $2 ORDER BY seq',
       [sessionId, fromSeq],
     )
     return result.rows.map(row => row.event)
   }
 
+  async readFrom(sessionId: string, fromSeq: number): Promise<ConversationEvent[]> {
+    return await this.readFromWith(this.pool, sessionId, fromSeq)
+  }
+
+  /** Read metadata, revision, and events from one PostgreSQL snapshot. */
   async load(sessionId: string): Promise<StoredConversation | undefined> {
-    const header = await this.pool.query<StoredHeaderRow>(`SELECT ${HEADER_COLUMNS}
-      FROM harness.conversation_sessions WHERE id=$1 AND status<>'deleted'`, [sessionId])
-    const row = header.rows[0]
-    if (row === undefined) return undefined
-    return {
-      header: headerFromRow(row),
-      events: await this.readFrom(sessionId, 0),
-      revision: `${row.version}:${row.next_seq}`,
-    }
+    return await transaction(this.pool, async (client) => {
+      await client.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
+      const header = await client.query<StoredHeaderRow>(`SELECT ${HEADER_COLUMNS}
+        FROM harness.conversation_sessions WHERE id=$1 AND status<>'deleted'`, [sessionId])
+      const row = header.rows[0]
+      if (row === undefined) return undefined
+      return {
+        header: headerFromRow(row),
+        events: await this.readFromWith(client, sessionId, 0),
+        revision: `${row.version}:${row.next_seq}`,
+      }
+    })
   }
 
   async revision(sessionId: string): Promise<string | undefined> {

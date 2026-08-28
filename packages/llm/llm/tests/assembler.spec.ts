@@ -2,6 +2,18 @@ import { describe, expect, it } from 'vitest'
 import { BlockAssembler, CallId, type StreamChunk } from '@deepseek-ai/dsh-llm'
 
 describe('BlockAssembler', () => {
+  it('keeps highly fragmented text and tool arguments lossless', () => {
+    const assembler = new BlockAssembler()
+    for (const character of 'x'.repeat(20_000)) assembler.push({ type: 'text-delta', index: 0, text: character })
+    for (const character of '{"value":"' + 'y'.repeat(10_000) + '"}') {
+      assembler.push({ type: 'tool-call-delta', index: 1, id: CallId('fragmented'), name: 'echo', argumentsDelta: character })
+    }
+    expect(assembler.blocks()).toEqual([
+      { type: 'text', text: 'x'.repeat(20_000) },
+      { type: 'tool-call', id: CallId('fragmented'), name: 'echo', arguments: `{"value":"${'y'.repeat(10_000)}"}` },
+    ])
+  })
+
   it('assembles interleaved text, reasoning, and tool-call deltas', () => {
     const chunks: StreamChunk[] = [
       { type: 'block-start', index: 0, blockType: 'reasoning' },
@@ -222,6 +234,14 @@ describe('BlockAssembler duplicate-close contract', () => {
     const assembler = new BlockAssembler()
     for (const chunk of chunks) assembler.push(chunk)
     expect(assembler.blocks()).toEqual([{ type: 'reasoning', text: 'first' }])
+  })
+
+  it('ignores a late text delta after a block has closed', () => {
+    const assembler = new BlockAssembler()
+    assembler.push({ type: 'text-delta', index: 0, text: 'first' })
+    assembler.push({ type: 'block-end', index: 0, block: { type: 'text', text: 'first' } })
+    assembler.push({ type: 'text-delta', index: 0, text: 'late' })
+    expect(assembler.blocks()).toEqual([{ type: 'text', text: 'first' }])
   })
 })
 

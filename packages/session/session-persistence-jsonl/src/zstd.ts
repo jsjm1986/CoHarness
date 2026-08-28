@@ -11,6 +11,7 @@ import {
 import { promisify } from 'node:util'
 import { NodePrivateZstdFrameDecoder } from './zstd-private-decoder.ts'
 import { PublicZstdFrameDecoder } from './zstd-public-decoder.ts'
+import { ZstdOutputLimitError } from './zstd-errors.ts'
 
 const ZSTD_MAGIC = 0xFD2FB528
 const zstdCompressAsync = promisify(zstdCompress)
@@ -115,10 +116,24 @@ export async function compressZstdFrame(input: Buffer | string): Promise<Buffer>
 /**
  * Decompress one complete frame and validate its checksum.
  * @param input - one structurally complete Zstandard frame.
+ * @param maxOutputBytes - optional plaintext byte limit.
  * @returns the frame plaintext.
  */
-export async function decompressZstdFrame(input: Buffer): Promise<Buffer> {
-  return zstdDecompressAsync(input)
+export async function decompressZstdFrame(input: Buffer, maxOutputBytes?: number): Promise<Buffer> {
+  try {
+    return await zstdDecompressAsync(
+      input,
+      maxOutputBytes === undefined ? undefined : { maxOutputLength: maxOutputBytes },
+    )
+  } catch (error: unknown) {
+    if (maxOutputBytes !== undefined
+      && error instanceof Error
+      && 'code' in error
+      && (error as { code?: unknown }).code === 'ERR_BUFFER_TOO_LARGE') {
+      throw new ZstdOutputLimitError(maxOutputBytes)
+    }
+    throw error
+  }
 }
 
 /** Common lifecycle for interchangeable synchronous multi-frame decoders. */
@@ -128,9 +143,14 @@ export interface ZstdFrameDecoder {
    * remains valid only until the iterator advances to the next frame.
    * @param source - concatenated Zstandard frame bytes.
    * @param frames - structurally complete ranges within `source`.
+   * @param maxOutputBytes - optional total plaintext budget across all frames.
    * @returns one plaintext buffer per frame.
    */
-  decode(source: Buffer, frames: readonly ZstdFrameRange[]): Generator<Buffer, void, void>
+  decode(
+    source: Buffer,
+    frames: readonly ZstdFrameRange[],
+    maxOutputBytes?: number,
+  ): Generator<Buffer, void, void>
   /** Release decoder-owned resources; repeated calls are harmless. */
   close(): void
 }
@@ -149,8 +169,22 @@ export function createZstdFrameDecoder(): ZstdFrameDecoder {
  * `ZSTD_e_flush` deliberately suppresses final-frame and checksum completion;
  * callers must establish the torn frame boundary before using this helper.
  * @param input - available bytes from a known incomplete Zstandard frame.
+ * @param maxOutputBytes - optional plaintext byte limit.
  * @returns plaintext produced from the available input.
  */
-export async function decompressZstdPrefix(input: Buffer): Promise<Buffer> {
-  return zstdDecompressAsync(input, INCOMPLETE_FRAME_OPTIONS)
+export async function decompressZstdPrefix(input: Buffer, maxOutputBytes?: number): Promise<Buffer> {
+  try {
+    return await zstdDecompressAsync(input, {
+      ...INCOMPLETE_FRAME_OPTIONS,
+      ...(maxOutputBytes === undefined ? {} : { maxOutputLength: maxOutputBytes }),
+    })
+  } catch (error: unknown) {
+    if (maxOutputBytes !== undefined
+      && error instanceof Error
+      && 'code' in error
+      && (error as { code?: unknown }).code === 'ERR_BUFFER_TOO_LARGE') {
+      throw new ZstdOutputLimitError(maxOutputBytes)
+    }
+    throw error
+  }
 }

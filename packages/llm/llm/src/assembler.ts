@@ -14,10 +14,14 @@ import type { ContentBlock, FinishReason, ReplayEnvelope, StreamChunk, TokenUsag
 
 interface PartialBlock {
   blockType: string
-  text: string
+  /** Append-only fragments; joining happens only when the block is read. */
+  textParts: string[]
+  textCache: string | undefined
   toolCallId?: CallId
   toolCallName?: string
-  toolCallArguments: string
+  /** Tool arguments use the same deferred join to avoid O(n²) deltas. */
+  toolCallArgumentParts: string[]
+  toolCallArgumentsCache: string | undefined
   /** Set by `block-end` — authoritative, and freezes the partial. */
   block?: ContentBlock
 }
@@ -52,8 +56,10 @@ export class BlockAssembler {
           this.order.push(chunk.index)
           this.partials.set(chunk.index, {
             blockType: chunk.blockType,
-            text: '',
-            toolCallArguments: '',
+            textParts: [],
+            textCache: undefined,
+            toolCallArgumentParts: [],
+            toolCallArgumentsCache: undefined,
           })
         }
         return
@@ -62,7 +68,8 @@ export class BlockAssembler {
       case 'reasoning-delta': {
         const partial = this.ensure(chunk.index, chunk.type === 'text-delta' ? 'text' : 'reasoning')
         if (partial.block) return // closed by block-end; ignore stragglers
-        partial.text += chunk.text
+        partial.textParts.push(chunk.text)
+        partial.textCache = undefined
         return
       }
       case 'tool-call-delta': {
@@ -70,7 +77,8 @@ export class BlockAssembler {
         if (partial.block) return // closed by block-end; ignore stragglers
         partial.toolCallId = chunk.id
         if (chunk.name) partial.toolCallName = chunk.name
-        partial.toolCallArguments += chunk.argumentsDelta
+        partial.toolCallArgumentParts.push(chunk.argumentsDelta)
+        partial.toolCallArgumentsCache = undefined
         return
       }
       case 'block-end': {
@@ -97,7 +105,13 @@ export class BlockAssembler {
   private ensure(index: number, blockType: string): PartialBlock {
     let partial = this.partials.get(index)
     if (!partial) {
-      partial = { blockType, text: '', toolCallArguments: '' }
+      partial = {
+        blockType,
+        textParts: [],
+        textCache: undefined,
+        toolCallArgumentParts: [],
+        toolCallArgumentsCache: undefined,
+      }
       this.partials.set(index, partial)
       this.order.push(index)
     }
@@ -107,13 +121,13 @@ export class BlockAssembler {
   private assemble(partial: PartialBlock, index: number): ContentBlock {
     if (partial.block) return partial.block
     switch (partial.blockType) {
-      case 'text': return { type: 'text', text: partial.text }
-      case 'reasoning': return { type: 'reasoning', text: partial.text }
+      case 'text': return { type: 'text', text: partial.textCache ??= partial.textParts.join('') }
+      case 'reasoning': return { type: 'reasoning', text: partial.textCache ??= partial.textParts.join('') }
       case 'tool-call': return {
         type: 'tool-call',
         id: partial.toolCallId ?? CallId(`call-${index}`),
         name: partial.toolCallName ?? '',
-        arguments: partial.toolCallArguments,
+        arguments: partial.toolCallArgumentsCache ??= partial.toolCallArgumentParts.join(''),
       }
       default: throw new Error(`cannot assemble incomplete block of type "${partial.blockType}"`)
     }

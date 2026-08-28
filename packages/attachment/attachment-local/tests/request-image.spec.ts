@@ -1,11 +1,12 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import { mkdtemp, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import sharp from 'sharp'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CompressionLimiter } from '../src/compression-limiter.ts'
-import LocalAttachmentStore, { requestImageDimensions } from '../src/index.ts'
+import LocalAttachmentStore, { pruneRequestImageCache, requestImageDimensions } from '../src/index.ts'
 
 const homes: string[] = []
 
@@ -146,6 +147,24 @@ describe('local request-image cache', () => {
       const regenerated = await attachments.readImageRequest(attachment, policy)
       expect(regenerated.data).toEqual(initial.data)
     }
+  })
+
+  it('expires least-recently-used request variants and enforces cache entry and byte limits', async () => {
+    const attachments = await store()
+    const attachment = await attachments.saveImage({ data: await image(64, 32), mediaType: 'image/png' })
+    const first = await attachments.readImageRequest(attachment, { maxPixels: 16 * 16, maxBytes: 4_096 })
+    const second = await attachments.readImageRequest(attachment, { maxPixels: 8 * 8, maxBytes: 4_096 })
+    const firstHash = String(first.variantId).slice('sha256:'.length)
+    const secondHash = String(second.variantId).slice('sha256:'.length)
+    const firstPath = join(attachments.root, 'request-images', firstHash.slice(0, 2), firstHash)
+    const secondPath = join(attachments.root, 'request-images', secondHash.slice(0, 2), secondHash)
+    const old = new Date(Date.now() - 10_000)
+    await utimes(firstPath, old, old)
+
+    await pruneRequestImageCache(attachments.root, { maxBytes: Number.MAX_SAFE_INTEGER, maxEntries: 1, ttlMs: 1_000 })
+
+    expect(existsSync(firstPath)).toBe(false)
+    expect(existsSync(secondPath)).toBe(true)
   })
 
   it('derives stable square and wide previews and separates route budgets in the cache key', async () => {

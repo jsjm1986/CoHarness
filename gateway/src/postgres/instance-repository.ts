@@ -1,6 +1,7 @@
 import type { InstanceRepository, RuntimeTarget } from '../instances.ts'
 import { createHash } from 'node:crypto'
 import { transaction } from './database.ts'
+import { allocateInstancePorts } from './port-allocation.ts'
 import { publicNumber, type PostgresRuntimeContext } from './runtime-context.ts'
 
 function ownerJoin(target: RuntimeTarget): { join: string; predicate: string; noun: string } {
@@ -35,20 +36,22 @@ export class PostgresInstanceRepository implements InstanceRepository {
           SELECT 1 FROM harness.instances i
           WHERE i.organization_id=p.organization_id AND i.project_id=p.id
         ) ORDER BY p.public_id`, [this.context.organizationId, this.context.nodeId])
-      const current = await client.query<{ port: number | null }>(
-        'SELECT MAX(port) port FROM harness.instances WHERE assigned_node_id=$1',
-        [this.context.nodeId],
+      const ports = await allocateInstancePorts(
+        client,
+        this.context.nodeId,
+        this.instancePortBase,
+        missing.rows.length,
+        this.context.nodeName,
       )
-      let port = current.rows[0]?.port === null || current.rows[0]?.port === undefined
-        ? this.instancePortBase
-        : Math.max(this.instancePortBase, current.rows[0].port + 1)
-      if (missing.rows.length > 0 && port + missing.rows.length - 1 > 65535) {
-        throw new Error(`no instance ports remain on node ${this.context.nodeName}`)
-      }
-      for (const row of missing.rows) {
+      if (missing.rows.length > 0) {
         await client.query(`INSERT INTO harness.instances(organization_id,project_id,assigned_node_id,port)
-          VALUES($1,$2,$3,$4)`, [this.context.organizationId, row.project_id, this.context.nodeId, port])
-        port += 1
+          SELECT $1,item.project_id,$2,item.port
+          FROM unnest($3::uuid[],$4::integer[]) AS item(project_id,port)`, [
+          this.context.organizationId,
+          this.context.nodeId,
+          missing.rows.map(row => row.project_id),
+          ports,
+        ])
       }
       if (!instancesOutliveGateway) {
         await client.query(`UPDATE harness.instances SET desired_state='stopped',observed_state='stopped',
@@ -145,6 +148,16 @@ export class PostgresInstanceRepository implements InstanceRepository {
         AND i.last_activity_at < to_timestamp($3/1000.0)
       ORDER BY kind,public_id`, [this.context.organizationId, this.context.nodeId, cutoff])
     return result.rows.map(row => ({ kind: row.kind, id: publicNumber(row.public_id, row.kind) }))
+  }
+
+  async idleTarget(target: RuntimeTarget, cutoff: number): Promise<boolean> {
+    const owner = ownerJoin(target)
+    const result = await this.context.pool.query(`SELECT 1 AS present FROM harness.instances i
+      ${owner.join}
+      WHERE i.organization_id=$1 AND i.assigned_node_id=$2 AND ${owner.predicate}
+        AND i.observed_state='ready' AND i.last_activity_at < to_timestamp($4/1000.0)
+      LIMIT 1`, [this.context.organizationId, this.context.nodeId, target.id, cutoff])
+    return result.rows.length > 0
   }
 
   async markStopping(target: RuntimeTarget): Promise<void> {

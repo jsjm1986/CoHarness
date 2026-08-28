@@ -245,6 +245,33 @@ describe('Gateway document transfer broker', () => {
     ])
   })
 
+  it('applies the scope deadline to the alternate-scope listing broker', async () => {
+    const runtime = fixture()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.stubGlobal('fetch', vi.fn((_input: RequestInfo | URL, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => { reject(init.signal?.reason) }, { once: true })
+    })))
+    const list = createDocumentTransferListHandler({ ...runtime.dependencies, upstreamTimeoutMs: 10 })
+    await expect(list({
+      subject: SUBJECT,
+      principal: PRINCIPAL,
+      payload: { version: 1, scope: { kind: 'project', projectId: 41 } },
+      signal: new AbortController().signal,
+    })).rejects.toMatchObject({ code: 'DOCUMENT_SCOPE_TIMEOUT', status: 504 })
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/operation=list/))
+  })
+
+  it('rejects an invalid document upstream timeout instead of constructing a clamped timer', async () => {
+    const runtime = fixture()
+    const list = createDocumentTransferListHandler({ ...runtime.dependencies, upstreamTimeoutMs: 0 })
+    await expect(list({
+      subject: SUBJECT,
+      principal: PRINCIPAL,
+      payload: { version: 1, scope: { kind: 'project', projectId: 41 } },
+      signal: new AbortController().signal,
+    })).rejects.toThrow(/document upstream timeout/)
+  })
+
   it('forwards a target-scope resumable upload and strips the stored path', async () => {
     const runtime = fixture()
     const fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
@@ -563,6 +590,87 @@ describe('Gateway document transfer broker', () => {
       payload: { version: 1, planId: plan.planId, source: { kind: 'project', projectId: 41 }, target: { kind: 'project', projectId: 43 }, documents: [{ docId: 'report.txt' }] },
       signal: new AbortController().signal,
     })).rejects.toMatchObject({ code: 'DOCUMENT_TRANSFER_PLAN_EXPIRED' })
+  })
+
+  it('rejects a plan that exceeds the actor byte budget before retaining it', async () => {
+    const runtime = fixture()
+    const docId = 'x'.repeat(256)
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ documents: [{
+      docId, name: 'large-id.txt', bytes: 1, mediaType: 'text/plain', modifiedAt: 1,
+    }] }), { status: 200 })))
+    const plan = createDocumentTransferPlanHandler({
+      ...runtime.dependencies,
+      transferPlanLimits: { maxBytesPerActor: 512 },
+    })
+    await expect(plan({
+      subject: SUBJECT,
+      principal: PRINCIPAL,
+      payload: {
+        version: 1,
+        source: { kind: 'project', projectId: 41 },
+        target: { kind: 'project', projectId: 43 },
+        documents: [{ docId }],
+      },
+    })).rejects.toMatchObject({ code: 'DOCUMENT_TRANSFER_PLAN_LIMIT' })
+  })
+
+  it('validates plan limits and rejects a process-wide byte budget', async () => {
+    const runtime = fixture()
+    expect(() => createDocumentTransferPlanHandler({
+      ...runtime.dependencies,
+      transferPlanLimits: { maxPlans: 0 },
+    })).toThrow(/maxPlans must be a positive safe integer/)
+    const docId = 'y'.repeat(256)
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ documents: [{
+      docId, name: 'wide-id.txt', bytes: 1, mediaType: 'text/plain', modifiedAt: 1,
+    }] }), { status: 200 })))
+    const plan = createDocumentTransferPlanHandler({
+      ...runtime.dependencies,
+      transferPlanLimits: { maxBytes: 512, maxBytesPerActor: 1_000_000 },
+    })
+    await expect(plan({
+      subject: SUBJECT,
+      principal: PRINCIPAL,
+      payload: {
+        version: 1,
+        source: { kind: 'project', projectId: 41 },
+        target: { kind: 'project', projectId: 43 },
+        documents: [{ docId }],
+      },
+    })).rejects.toMatchObject({ code: 'DOCUMENT_TRANSFER_PLAN_LIMIT' })
+  })
+
+  it('releases actor and organization plan quotas when a plan is consumed', async () => {
+    const runtime = fixture()
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ documents: [{
+      docId: 'report.txt', name: 'report.txt', bytes: 1, mediaType: 'text/plain', modifiedAt: 1,
+    }] }), { status: 200 }))
+    vi.stubGlobal('fetch', fetch)
+    const limits = { maxPlansPerActor: 1, maxPlansPerOrganization: 1 }
+    const plan = createDocumentTransferPlanHandler({ ...runtime.dependencies, transferPlanLimits: limits })
+    const payload = {
+      version: 1 as const,
+      source: { kind: 'project' as const, projectId: 41 },
+      target: { kind: 'project' as const, projectId: 43 },
+      documents: [{ docId: 'report.txt' }],
+    }
+    const first = await plan({ subject: SUBJECT, principal: PRINCIPAL, payload })
+    await expect(plan({ subject: SUBJECT, principal: PRINCIPAL, payload }))
+      .rejects.toMatchObject({ code: 'DOCUMENT_TRANSFER_PLAN_LIMIT' })
+    const commit = createDocumentTransferCommitHandler({ ...runtime.dependencies, transferPlanLimits: limits })
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response('hello', { status: 200, headers: { 'content-length': '5' } }))
+      .mockResolvedValueOnce(responseForTargetStart())
+      .mockResolvedValueOnce(responseForTargetChunk())
+      .mockResolvedValueOnce(responseForTarget('report.txt'))
+    await expect(commit({
+      request: {} as never,
+      subject: SUBJECT,
+      principal: PRINCIPAL,
+      payload: { ...payload, planId: first.planId },
+      signal: new AbortController().signal,
+    })).resolves.toMatchObject({ items: [{ status: 'copied' }] })
+    await expect(plan({ subject: SUBJECT, principal: PRINCIPAL, payload })).resolves.toMatchObject({ planId: expect.any(String) })
   })
 
   it('projects only safe target labels and writable modes', async () => {

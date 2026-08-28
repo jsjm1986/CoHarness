@@ -78,12 +78,12 @@ export const Config: z<Config> = z.object({
 
 /** All-text content flattened to one UTF-8 string, or `undefined` if any block is non-text. */
 function flattenPlainText(content: ContentBlock[]): string | undefined {
-  let text = ''
+  const parts: string[] = []
   for (const block of content) {
     if (block.type !== 'text') return undefined
-    text += block.text
+    if (block.text.length > 0) parts.push(block.text)
   }
-  return text
+  return parts.join('')
 }
 
 /** The owning session id, or `undefined` for a call with no agent (a direct/test call). */

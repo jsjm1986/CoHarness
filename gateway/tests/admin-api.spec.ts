@@ -28,7 +28,10 @@ async function login(base: string, username: string, password: string): Promise<
   return (loginRes.headers.get('set-cookie') ?? '').split(';')[0] ?? ''
 }
 
-async function setup(archives?: GatewayDeps['archives']) {
+async function setup(
+  archives?: GatewayDeps['archives'],
+  governance?: GatewayDeps['governance'],
+) {
   const root = mkdtempSync(join(tmpdir(), 'hgw-'))
   const db = openDb(join(root, 'g.sqlite'))
   const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), HGW_PROJECTS_ROOT: join(root, 'projects') })
@@ -53,7 +56,7 @@ async function setup(archives?: GatewayDeps['archives']) {
     projects: new ProjectService(db, cfg),
     audit: new AuditService(db),
     instances,
-    governance: new ModelGovernanceService(db),
+    governance: governance ?? new ModelGovernanceService(db),
     ...(archives === undefined ? {} : { archives }),
   }
   const admin = await deps.users.create({ username: 'boss', password: 'pw-12345678', role: 'admin' })
@@ -115,6 +118,47 @@ describe('admin JSON API', () => {
     const health = await fetch(`${base}/admin/api/usage/health?month=2026-08`, { headers: { cookie } })
     expect(health.status).toBe(200)
     expect(await health.json()).toMatchObject({ month: '2026-08', missingUsageCalls: 0, maxIntakeLagMs: 0 })
+  })
+
+  it('bounds per-user usage summary concurrency', async () => {
+    let active = 0
+    let maxActive = 0
+    const completed: number[] = []
+    const governance = {
+      summary: async (subject: { kind: 'user'; id: number }, month?: string) => {
+        active++
+        maxActive = Math.max(maxActive, active)
+        await new Promise<void>(resolve => setTimeout(resolve, 5))
+        active--
+        completed.push(subject.id)
+        return {
+          month: month ?? '2026-08',
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheWriteTokens: 0,
+          totalTokens: 0,
+          estimatedCostMicros: 0,
+          companyCostMicros: 0,
+          calls: 0,
+          missingUsageCalls: 0,
+          tokenLimit: null,
+          companyCostMicrosLimit: null,
+          alerts: [],
+        }
+      },
+    } as unknown as GatewayDeps['governance']
+    const { base, cookie, deps } = await setup(undefined, governance)
+    for (let index = 0; index < 25; index++) {
+      await deps.users.create({ username: `worker-${index}`, password: 'pw-12345678' })
+    }
+
+    const response = await fetch(`${base}/admin/api/usage?month=2026-08`, { headers: { cookie } })
+    expect(response.status).toBe(200)
+    const rows = await response.json() as Array<{ userId: number }>
+    expect(rows).toHaveLength(27)
+    expect(maxActive).toBe(8)
+    expect(completed).toHaveLength(27)
   })
 
   it('lets an admin create a project and assign members; non-admin is 403', async () => {

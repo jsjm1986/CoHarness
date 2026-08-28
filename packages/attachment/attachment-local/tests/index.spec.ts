@@ -5,7 +5,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import sharp from 'sharp'
+import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import LocalAttachmentStore, {
+  DEFAULT_REQUEST_IMAGE_CACHE_GC_INTERVAL_MS,
+  DEFAULT_REQUEST_IMAGE_CACHE_MAX_BYTES,
+  DEFAULT_REQUEST_IMAGE_CACHE_MAX_ENTRIES,
+  DEFAULT_REQUEST_IMAGE_CACHE_TTL_MS,
   DEFAULT_NORMALIZED_IMAGE_MAX_BYTES,
   DEFAULT_NORMALIZED_IMAGE_MAX_DIMENSION,
   DEFAULT_IMAGE_COMPRESSION_CONCURRENCY,
@@ -37,6 +42,10 @@ describe('local attachment service', () => {
       maxBytes: DEFAULT_NORMALIZED_IMAGE_MAX_BYTES,
     })
     expect(service.imageCompressionConcurrency).toBe(DEFAULT_IMAGE_COMPRESSION_CONCURRENCY)
+    expect(DEFAULT_REQUEST_IMAGE_CACHE_MAX_BYTES).toBe(512 * 1024 * 1024)
+    expect(DEFAULT_REQUEST_IMAGE_CACHE_MAX_ENTRIES).toBe(2_048)
+    expect(DEFAULT_REQUEST_IMAGE_CACHE_TTL_MS).toBe(7 * 24 * 60 * 60 * 1000)
+    expect(DEFAULT_REQUEST_IMAGE_CACHE_GC_INTERVAL_MS).toBe(15 * 60 * 1000)
   })
 
   it('resolves and validates the instance image-compression concurrency', () => {
@@ -44,6 +53,25 @@ describe('local attachment service', () => {
     for (const imageCompressionConcurrency of [0, 1.5, 9]) {
       expect(() => new LocalAttachmentStore(new Context(), { imageCompressionConcurrency }))
         .toThrow(/imageCompressionConcurrency must be an integer from 1 through 8/)
+    }
+  })
+
+  it('validates request-image cache limits before creating its cleanup timer', () => {
+    for (const requestImageCacheMaxBytes of [0, 1.5, Infinity]) {
+      expect(() => new LocalAttachmentStore(new Context(), { requestImageCacheMaxBytes }))
+        .toThrow(/requestImageCacheMaxBytes must be a positive safe integer/)
+    }
+    for (const requestImageCacheMaxEntries of [0, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+      expect(() => new LocalAttachmentStore(new Context(), { requestImageCacheMaxEntries }))
+        .toThrow(/requestImageCacheMaxEntries must be a positive safe integer/)
+    }
+    for (const requestImageCacheTtlMs of [0, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+      expect(() => new LocalAttachmentStore(new Context(), { requestImageCacheTtlMs }))
+        .toThrow(/requestImageCacheTtlMs must be a positive safe integer/)
+    }
+    for (const requestImageCacheGcIntervalMs of [0, 1.5, MAX_TIMER_DELAY_MS + 1]) {
+      expect(() => new LocalAttachmentStore(new Context(), { requestImageCacheGcIntervalMs }))
+        .toThrow(/requestImageCacheGcIntervalMs must be a positive safe integer no greater than/)
     }
   })
 

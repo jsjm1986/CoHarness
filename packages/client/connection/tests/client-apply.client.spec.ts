@@ -253,6 +253,39 @@ describe('connection client apply', () => {
     fetch.mockRestore()
   })
 
+  it('closes a stalled downlink when its retained burst exceeds the queue budget', async () => {
+    ;(globalThis as Win).location = { hostname: 'localhost', search: '' }
+    ;(globalThis as WebSocketGlobal).WebSocket = FakeWebSocket as unknown as typeof WebSocket
+    const client = (await mount()).api as WebApiClient
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const abort = new AbortController()
+    const iterator = client.events.mux({}, abort.signal)[Symbol.asyncIterator]()
+    const first = iterator.next()
+    await vi.waitFor(() => { expect(sockets[0]?.readyState).toBe(FakeWebSocket.OPEN) })
+    const frame = JSON.stringify({
+      type: 'server-request',
+      rpcId: 'mux-burst',
+      method: 'session/subscribed',
+      payload: { type: 'session/subscribed', sessionId: 'stalled', lastSeq: 0 },
+    })
+    sockets[0]!.receive(frame)
+    await expect(first).resolves.toMatchObject({ value: { payload: { type: 'session/subscribed' } } })
+    for (let index = 0; index < 1_100; index += 1) sockets[0]!.receive(frame)
+    let ended = false
+    for (let index = 0; index < 1_100; index += 1) {
+      const next = await iterator.next()
+      if (next.done) {
+        ended = true
+        break
+      }
+    }
+    expect(ended).toBe(true)
+    expect(sockets[0]?.readyState).toBe(FakeWebSocket.CLOSED)
+    expect(errors).toHaveBeenCalledWith(expect.stringContaining('downlink queue exceeded'))
+    abort.abort()
+    errors.mockRestore()
+  })
+
   it('maps an HTTPS page origin to a secure WebSocket URL', async () => {
     ;(globalThis as Win).location = {
       hostname: 'harness.example', search: '', origin: 'https://harness.example',
@@ -334,6 +367,13 @@ describe('connection client apply', () => {
         new URL('https://harness.example/api/goals/create'),
         expect.objectContaining({ signal: abort.signal }),
       )
+
+      globalThis.fetch = vi.fn().mockResolvedValue(new Response('{}', {
+        status: 200,
+        headers: { 'content-length': String(16 * 1024 * 1024 + 1) },
+      }))
+      await expect(handle.rpc.call('/api', 'goals/create', {}))
+        .rejects.toThrow(/API response exceeds/u)
 
       ;(globalThis as Win).location = { hostname: 'localhost', search: '', origin: 'null' }
       globalThis.fetch = vi.fn().mockResolvedValue(Response.json({

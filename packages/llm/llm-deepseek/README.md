@@ -23,11 +23,13 @@ The package root exposes the Cordis plugin contract and `DeepSeekAdapter`; wire 
     maxRequestFilesBytes: 134217728 # optional positive integer; 128 MiB raw request-image default
     maxInlineRequestImageBytes: 20971520 # base64 fallback high watermark; 20 MiB default
     maxImagesPerRequest: 600       # provider request image-count limit
+    imagePreparationConcurrency: 4  # request-image projections prepared per batch; maximum 32
     imageOffloadByteQuantum: 67108864 # oldest-image removal advances in 64 MiB steps
     inlineImageOffloadByteQuantum: 10485760 # fallback removal advances in 10 MiB steps
     imageOffloadCountQuantum: 20      # count overflow advances in 20-image steps
     filesApiTimeoutMs: 60000           # per-image Files resolution deadline; one-minute default
     maxErrorResponseBytes: 65536       # non-2xx response body budget; 64 KiB default
+    maxFilesResponseBytes: 16777216    # Files API success/error body budget; 16 MiB default, 256 MiB maximum
     maxSseBufferBytes: 4194304         # incomplete SSE event buffer; 4 MiB default
     maxGeneratedTextBytes: 16777216    # visible/reasoning response budget; 16 MiB default
     maxToolArgumentBytes: 4194304      # one streamed tool-argument budget; 4 MiB default
@@ -109,7 +111,7 @@ Non-2xx responses throw `LlmError` with stable codes: `AUTH` (401/403), `QUOTA` 
 
 #### What the model sees
 
-The selected DeepSeek model receives the harness system prompt, message history, tool schemas, stop sequences, and call config. The vision model normally receives retained user and tool-result images as Files API references beside stable attachment handles and request-image dimensions; a Files resolution failure sends all retained images as inline data URLs instead. An over-budget older image is represented by the documented placeholder. Reasoning content from a prior assistant turn is passed back verbatim, whether or not that turn called a tool.
+The selected DeepSeek model receives the harness system prompt, message history, tool schemas, stop sequences, and call config. The vision model normally receives retained user and tool-result images as Files API references beside stable attachment handles and request-image dimensions; a Files resolution failure sends all retained images as inline data URLs instead. Request-image projections are prepared in fixed batches bounded by `imagePreparationConcurrency`, so a slow early image cannot retain completed projections for the whole request. An over-budget older image is represented by the documented placeholder. Reasoning content from a prior assistant turn is passed back verbatim, whether or not that turn called a tool.
 
 #### Token effect
 

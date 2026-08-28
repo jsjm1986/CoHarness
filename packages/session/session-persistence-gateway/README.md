@@ -12,13 +12,14 @@ Gateway PostgreSQL `SessionPersistence` provider for shared project runtimes. Th
 - Every response is validated before it enters the Session store. The provider supports full load, non-mutating inspect, revision checks, tail reads, snapshots, batched append, flush, and recovery through the shared coordinator.
 - `locate()` returns `undefined` and `supportsRawArtifacts` is false because PostgreSQL owns no independent local transcript file.
 - Browser-created roots reserve a scope-qualified draft id before Agent creation. PostgreSQL returns one canonical Session id for retries, expires an unused reservation after one hour, and stores no prompt text or credentials. The reservation is released after the first materializing append or a successful draft disposal.
-- `listSnapshots()` carries PostgreSQL-maintained `blank`, `visibleContentSeq`, and `lastPromptAt` facts. Draft-only rows stay out of ordinary session lists; command-only rows remain recoverable for maintenance.
+- `revision(id, signal?)` uses the authenticated per-session revision endpoint instead of listing the runtime catalog. `listSnapshots()` carries PostgreSQL-maintained `blank`, `visibleContentSeq`, and `lastPromptAt` facts. Draft-only rows stay out of ordinary session lists; command-only rows remain recoverable for maintenance.
 
 ## Configuration
 
 - `preparedSessionCacheSize` — positive number of cold preparations retained by the coordinator; default `5`.
 - `writeBatchMaxDelayMs` — positive fixed batching window; default `200`, bounded by the shared maximum timer delay.
-- `maxPendingEvents` — maximum events retained by one live session's write controller; default `10,000`.
+- `maxPendingEvents` — maximum events retained by one live session's write controller; default `100,000`.
+- `maxPendingBytes` — maximum UTF-8 JSON bytes retained by one live session's write controller; default `64 MiB`.
 - `requestTimeoutMs` — positive deadline for one internal Gateway request; default `30000`.
 
 ## Model Experience

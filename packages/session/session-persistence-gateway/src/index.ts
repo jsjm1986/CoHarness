@@ -9,6 +9,10 @@ import type {
   GatewayRuntimeRequestInit,
 } from '@deepseek-ai/dsh-gateway-runtime'
 import {
+  DEFAULT_GATEWAY_RESPONSE_MAX_BYTES,
+  readGatewayResponseJson,
+} from '@deepseek-ai/dsh-gateway-runtime'
+import {
   GatewaySessionCreationAuthorization,
   type GatewaySessionCreationAuthorization as SessionCreationAuthorization,
 } from '@deepseek-ai/dsh-gateway-runtime'
@@ -20,6 +24,7 @@ import {
   type SessionPreparation,
 } from '@deepseek-ai/dsh-session'
 import SessionPersistence, {
+  DEFAULT_MAX_PENDING_BYTES_PER_SESSION,
   DEFAULT_PREPARED_SESSION_CACHE_SIZE,
   DEFAULT_MAX_PENDING_EVENTS_PER_SESSION,
   DEFAULT_WRITE_BATCH_MAX_DELAY_MS,
@@ -39,6 +44,7 @@ import SessionPersistence, {
 } from '@deepseek-ai/dsh-session-persistence'
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000
+const GATEWAY_SESSION_RESPONSE_MAX_BYTES = DEFAULT_GATEWAY_RESPONSE_MAX_BYTES
 const EVENT_ENVELOPE_KEYS = new Set([
   'type',
   'seq',
@@ -68,6 +74,8 @@ export interface Config {
   writeBatchMaxDelayMs?: number
   /** Maximum events retained in one live session's pending write queue. */
   maxPendingEvents?: number
+  /** Maximum UTF-8 JSON bytes retained in one live session's pending write queue. */
+  maxPendingBytes?: number
   /** Deadline for one internal Gateway HTTP request. */
   requestTimeoutMs?: number
 }
@@ -203,6 +211,7 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     writeBatchMaxDelayMs: z.number().step(1).min(1).max(MAX_WRITE_BATCH_DELAY_MS)
       .default(DEFAULT_WRITE_BATCH_MAX_DELAY_MS),
     maxPendingEvents: z.number().step(1).min(1).default(DEFAULT_MAX_PENDING_EVENTS_PER_SESSION),
+    maxPendingBytes: z.number().step(1).min(1).default(DEFAULT_MAX_PENDING_BYTES_PER_SESSION),
     requestTimeoutMs: z.number().step(1).min(1).default(DEFAULT_REQUEST_TIMEOUT_MS),
   })
 
@@ -219,6 +228,7 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
       preparedSessionCacheSize: config.preparedSessionCacheSize ?? DEFAULT_PREPARED_SESSION_CACHE_SIZE,
       writeBatchMaxDelayMs: config.writeBatchMaxDelayMs ?? DEFAULT_WRITE_BATCH_MAX_DELAY_MS,
       maxPendingEvents: config.maxPendingEvents ?? DEFAULT_MAX_PENDING_EVENTS_PER_SESSION,
+      maxPendingBytes: config.maxPendingBytes ?? DEFAULT_MAX_PENDING_BYTES_PER_SESSION,
     })
     ctx.on('session/disposed', (session) => {
       void ctx.sessions.flush(session).then(
@@ -400,7 +410,7 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     const response = await this.ctx.gatewayRuntime.request(path, { ...init, signal: this.signal(signal) })
     let value: unknown
     try {
-      value = await response.json()
+      value = await readGatewayResponseJson(response, GATEWAY_SESSION_RESPONSE_MAX_BYTES)
     } catch {
       throw new Error(`Gateway session persistence returned HTTP ${String(response.status)}`)
     }
@@ -417,7 +427,7 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     if (response.status === 404) return undefined
     let value: unknown
     try {
-      value = await response.json()
+      value = await readGatewayResponseJson(response, GATEWAY_SESSION_RESPONSE_MAX_BYTES)
     } catch {
       throw new Error(`Gateway session persistence returned HTTP ${String(response.status)}`)
     }
@@ -500,6 +510,10 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
 
   async list(signal?: AbortSignal): Promise<SessionHeader[]> {
     return (await this.listSnapshots(signal)).map(snapshot => snapshot.header)
+  }
+
+  override revision(id: SessionId, signal?: AbortSignal): Promise<PersistenceRevision | undefined> {
+    return this.readStoredRevision(id, signal)
   }
 
   async listSnapshots(signal?: AbortSignal): Promise<SessionPersistenceSnapshot[]> {

@@ -957,4 +957,63 @@ describe('registry-global session archive', () => {
     expect(result.registry.archiveSnapshot()).toEqual({ revision: 2, archivedSessionIds: [] })
     expect(workspace.sessionIds).toEqual(['s1'])
   })
+
+  it('rejects unsafe stored revisions and refuses to wrap the maximum revision', async () => {
+    const session = header('archive-revision-limit')
+    const unsafe = storedPool([], {
+      initialized: true,
+      workspaceIds: [],
+      archivedSessionIds: [],
+      archiveRevision: Number.MAX_SAFE_INTEGER + 1,
+    })
+    await expect(harness({ pool: unsafe, sessions: [session] })).rejects.toThrow()
+
+    const archivePool = storedPool([], {
+      initialized: true,
+      workspaceIds: [],
+      archivedSessionIds: [],
+      archiveRevision: Number.MAX_SAFE_INTEGER,
+    })
+    const archive = await harness({ pool: archivePool, sessions: [session] })
+    await expect(archive.registry.archiveSession(session.id)).rejects.toThrow(/revision exhausted/)
+    expect(archive.registry.archiveSnapshot()).toEqual({
+      revision: Number.MAX_SAFE_INTEGER,
+      archivedSessionIds: [],
+    })
+
+    const restorePool = storedPool([], {
+      initialized: true,
+      workspaceIds: [],
+      archivedSessionIds: [session.id],
+      archiveRevision: Number.MAX_SAFE_INTEGER,
+    })
+    const restore = await harness({ pool: restorePool, sessions: [session] })
+    await expect(restore.registry.restoreSession(session.id)).rejects.toThrow(/revision exhausted/)
+    expect(restore.registry.archiveSnapshot()).toEqual({
+      revision: Number.MAX_SAFE_INTEGER,
+      archivedSessionIds: [session.id],
+    })
+  })
+
+  it('returns lineage roots and retained positions while preferring persisted headers over live duplicates', async () => {
+    const workspaceDir = await makeDir('archive-entries')
+    const otherDir = await makeDir('archive-entries-other')
+    const root = header('archive-root', workspaceDir, 100)
+    const child = { ...header('archive-child', workspaceDir, 200), parentSession: root.id }
+    const external = header('archive-external', otherDir, 300)
+    const result = await harness({
+      sessions: [root, child, external],
+      // A duplicate live header must not replace the persisted identity.
+      liveSessions: [{ ...root, cwd: otherDir, createdAt: 999 }],
+    })
+    await result.registry.archiveSession(root.id)
+    await result.registry.archiveSession(child.id)
+
+    const entries = await result.registry.archivedEntries()
+    expect(entries.map(entry => entry.sessionId)).toEqual(['archive-root', 'archive-child'])
+    expect(entries.map(entry => entry.rootSessionId)).toEqual(['archive-root', 'archive-root'])
+    expect(entries.map(entry => entry.header.cwd)).toEqual([workspaceDir, workspaceDir])
+    expect(entries.map(entry => entry.workspace?.position)).toEqual([1, 0])
+    expect(entries.every(entry => entry.workspace?.path === workspaceDir)).toBe(true)
+  })
 })

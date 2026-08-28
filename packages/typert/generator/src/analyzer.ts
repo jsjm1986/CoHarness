@@ -517,8 +517,10 @@ export class WorkspaceAnalyzer {
   private registrationHasSurface(registration: PackageRegistration): boolean {
     const seen = new Set<string>()
     const queue = this.entrySourcePaths(registration)
-    while (queue.length > 0) {
-      const file = realPath(queue.shift() as string)
+    let queueHead = 0
+    while (queueHead < queue.length) {
+      const file = realPath(queue[queueHead] as string)
+      queueHead += 1
       if (seen.has(file) || !isWithin(file, registration.root)) continue
       seen.add(file)
       const source = readFileSync(file, 'utf8')
@@ -821,8 +823,10 @@ class FaceAnalyzer {
   ): ts.SourceFile[] {
     const reachable = new Map<string, ts.SourceFile>()
     const queue = [...entryFiles]
-    while (queue.length > 0) {
-      const sourceFile = queue.shift() as ts.SourceFile
+    let queueHead = 0
+    while (queueHead < queue.length) {
+      const sourceFile = queue[queueHead] as ts.SourceFile
+      queueHead += 1
       const fileName = realPath(sourceFile.fileName)
       if (reachable.has(fileName) || !isWithin(fileName, registration.root)) continue
       reachable.set(fileName, sourceFile)

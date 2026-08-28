@@ -94,6 +94,7 @@ class ProjectRepository implements InstanceRepository {
     return Promise.resolve()
   }
   idleTargets(_cutoff: number): Promise<RuntimeTarget[]> { return Promise.resolve([]) }
+  idleTarget(_target: RuntimeTarget, _cutoff: number): Promise<boolean> { return Promise.resolve(false) }
   markStopping(_target: RuntimeTarget): Promise<void> {
     this.state = 'stopping'
     return Promise.resolve()

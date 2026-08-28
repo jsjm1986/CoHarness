@@ -5,6 +5,7 @@ import {
   serverResponseSchema,
   type ClientRequest,
 } from '@deepseek-ai/dsh-host-apiproxy/api'
+import { readApiResponseJson } from '@deepseek-ai/dsh-host-apiproxy/client'
 import type { ClientConnectionRpc } from '../rpc.ts'
 import { randomUuid } from './random-uuid.ts'
 
@@ -44,7 +45,7 @@ export function createWebConnectionRpc(doFetch?: RpcFetch): ClientConnectionRpc 
       if (!response.ok) {
         throw new Error(`transport failure for ${channel}/${endpoint}: HTTP ${response.status}`)
       }
-      const full = serverResponseSchema.parse(await response.json())
+      const full = serverResponseSchema.parse(await readApiResponseJson(response))
       if (full.rpcId !== rpcId) {
         throw new Error(`rpcId mismatch for ${endpoint}: sent ${rpcId}, got ${full.rpcId}`)
       }

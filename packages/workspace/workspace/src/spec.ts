@@ -52,8 +52,8 @@ export const workspaceDomainState = z.object({
   initialized: z.boolean(),
   workspaceIds: z.array(workspaceId),
   archivedSessionIds: z.array(z.string().transform(SessionId)).default([]),
-  /** Monotonic snapshot revision; restore operations require a reset-aware carrier. */
-  archiveRevision: z.number().int().nonnegative().default(0),
+  /** Monotonic safe-integer snapshot revision; restore operations require a reset-aware carrier. */
+  archiveRevision: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).default(0),
   pendingMutation: workspacePendingMutation.optional(),
 })
 

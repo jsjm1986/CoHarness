@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-Gateway quota warnings in the global Web shell. The browser plugin contributes one `shell.overlay` entry. Its apply-side callback reads the authenticated same-origin `/account/api/usage` summary once on mount; the presentation component displays only durable natural-month 80%/100% crossings already computed by the gateway. A failed advisory read leaves the shell unchanged.
+Gateway quota warnings in the global Web shell. The browser plugin contributes one `shell.overlay` entry. Its apply-side callback reads the authenticated same-origin `/account/api/usage` summary once on mount through the shared streaming 16 MiB response budget; the presentation component displays only durable natural-month 80%/100% crossings already computed by the gateway. A failed advisory read leaves the shell unchanged.
 
 ## Model Experience
 

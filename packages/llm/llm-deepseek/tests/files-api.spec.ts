@@ -4,6 +4,7 @@ import { DeepSeekFileId } from '../src/file-id.ts'
 import {
   DeepSeekFilesClient,
   DeepSeekFilesError,
+  DEFAULT_MAX_FILE_RESPONSE_BYTES,
   isFilesQuotaError,
   MAX_FILE_UPLOAD_BYTES,
 } from '../src/files-api.ts'
@@ -27,6 +28,61 @@ function file(overrides: Record<string, unknown> = {}) {
 }
 
 describe('DeepSeekFilesClient', () => {
+  it('uses a bounded Files API response budget', async () => {
+    const client = new DeepSeekFilesClient({
+      baseURL: 'https://api.deepseek.com',
+      apiKey: 'key',
+      maxResponseBytes: 32,
+      fetch: vi.fn(() => Promise.resolve(new Response(JSON.stringify(file({ padding: 'x'.repeat(128) })), { status: 200 }))),
+    })
+    await expect(client.retrieve(DeepSeekFileId('file-api-one'))).rejects.toMatchObject({ code: 'INVALID_RESPONSE' })
+  })
+
+  it('rejects an oversized declared error body while retaining the HTTP classification', async () => {
+    const client = new DeepSeekFilesClient({
+      baseURL: 'https://api.deepseek.com',
+      apiKey: 'key',
+      maxResponseBytes: 32,
+      fetch: vi.fn(() => Promise.resolve(new Response('x'.repeat(128), {
+        status: 503, headers: { 'content-length': '128' },
+      }))),
+    })
+    await expect(client.retrieve(DeepSeekFileId('missing'))).rejects.toMatchObject({
+      name: 'DeepSeekFilesError', code: 'SERVER', detail: '',
+    })
+  })
+
+  it('cancels a chunked success body when it crosses the Files API budget', async () => {
+    let cancelled = false
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(Uint8Array.of(123, 34, 105, 100, 34))
+        controller.enqueue(Uint8Array.of(58, 49, 125))
+      },
+      cancel() { cancelled = true },
+    })
+    const client = new DeepSeekFilesClient({
+      baseURL: 'https://api.deepseek.com',
+      apiKey: 'key',
+      maxResponseBytes: 4,
+      fetch: vi.fn(() => Promise.resolve(new Response(body, { status: 200 }))),
+    })
+    await expect(client.retrieve(DeepSeekFileId('one'))).rejects.toMatchObject({ code: 'INVALID_RESPONSE' })
+    expect(cancelled).toBe(true)
+  })
+
+  it('exports a finite default response budget', () => {
+    expect(DEFAULT_MAX_FILE_RESPONSE_BYTES).toBeGreaterThan(0)
+    expect(Number.isSafeInteger(DEFAULT_MAX_FILE_RESPONSE_BYTES)).toBe(true)
+  })
+
+  it('rejects a response budget above the hard maximum at construction', () => {
+    expect(() => new DeepSeekFilesClient({
+      baseURL: 'https://api.deepseek.com',
+      apiKey: 'key',
+      maxResponseBytes: 256 * 1024 * 1024 + 1,
+    })).toThrow(/within 1/u)
+  })
   it('uploads multipart bytes with the required purpose and explicit expiry', async () => {
     const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
       expect(requestUrl(url)).toBe('https://api.deepseek.com/files')

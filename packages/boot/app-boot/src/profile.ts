@@ -231,7 +231,12 @@ export function healProfilesModuleFallback(installAnchor: string, home: string =
   // BFS over the resolvable dependency graph; the visited set is the link
   // map itself (first resolution wins, matching Node's own nearest-wins).
   const queue: { anchor: string; manifest: ProfileManifest }[] = [{ anchor: installAnchor, manifest: appManifest }]
-  for (let next = queue.shift(); next !== undefined; next = queue.shift()) {
+  let queueHead = 0
+  while (queueHead < queue.length) {
+    const next = queue[queueHead]
+    queueHead += 1
+    /* v8 ignore next -- the loop condition keeps the BFS head present. */
+    if (next === undefined) continue
     // Peer dependencies participate: Service Definition packages (dsh-subprocess,
     // dsh-compaction, ...) are peers of their implementations, never plain
     // dependencies, yet out-of-tree plugins import them directly.

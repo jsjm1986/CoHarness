@@ -13,16 +13,18 @@ import type {
   StoredImageAttachment,
 } from '@deepseek-ai/dsh-attachment'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
+import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import type { NormalizationPolicy } from './normalization.ts'
 import { CompressionLimiter } from './compression-limiter.ts'
 import { commitPreparedImageFile, prepareImageFile, readImageFile, validateImageFile } from './store.ts'
-import { readRequestImageFile, requestImageVariantId } from './request-image.ts'
+import { pruneRequestImageCache, readRequestImageFile, requestImageVariantId } from './request-image.ts'
 
 export { canPassThroughNormalization, normalizeImage } from './normalization.ts'
 export type { NormalizedImage, NormalizationPolicy } from './normalization.ts'
 export { commitPreparedImageFile, prepareImageFile, readImageFile, saveImageFile, validateImageFile } from './store.ts'
 export type { PreparedImageFile } from './store.ts'
-export { readRequestImageFile, requestImageDimensions, requestImageVariantId } from './request-image.ts'
+export { pruneRequestImageCache, readRequestImageFile, requestImageDimensions, requestImageVariantId } from './request-image.ts'
+export type { RequestImageCachePolicy } from './request-image.ts'
 
 /** Default maximum encoded bytes for one submitted image; oversized sources are refused, not shrunk. */
 export const DEFAULT_MAX_IMAGE_BYTES = 20 * 1024 * 1024
@@ -46,6 +48,14 @@ export const DEFAULT_NORMALIZED_IMAGE_MAX_BYTES = 4 * 1024 * 1024
 export const DEFAULT_IMAGE_COMPRESSION_CONCURRENCY = 2
 /** Maximum configurable native image transformations per store. */
 export const MAX_IMAGE_COMPRESSION_CONCURRENCY = 8
+/** Default aggregate bytes retained by derived request-image files. */
+export const DEFAULT_REQUEST_IMAGE_CACHE_MAX_BYTES = 512 * 1024 * 1024
+/** Default number of derived request-image files retained. */
+export const DEFAULT_REQUEST_IMAGE_CACHE_MAX_ENTRIES = 2_048
+/** Default idle age before a derived request-image file is removed. */
+export const DEFAULT_REQUEST_IMAGE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
+/** Default interval between derived request-image cache sweeps. */
+export const DEFAULT_REQUEST_IMAGE_CACHE_GC_INTERVAL_MS = 15 * 60 * 1000
 
 /** Local attachment backend configuration. */
 export interface Config {
@@ -67,6 +77,14 @@ export interface Config {
   normalizedImageMaxBytes?: number
   /** Maximum simultaneous normalization or request-image transformations in this service instance. */
   imageCompressionConcurrency?: number
+  /** Maximum aggregate bytes retained by derived request-image files. */
+  requestImageCacheMaxBytes?: number
+  /** Maximum number of derived request-image files retained. */
+  requestImageCacheMaxEntries?: number
+  /** Maximum idle age of a derived request-image file before cleanup. */
+  requestImageCacheTtlMs?: number
+  /** Interval between derived request-image cache cleanup sweeps. */
+  requestImageCacheGcIntervalMs?: number
 }
 
 function abortReason(signal: AbortSignal): Error {
@@ -74,6 +92,14 @@ function abortReason(signal: AbortSignal): Error {
   return reason instanceof Error
     ? reason
     : new Error('Attachment request cancelled with a non-Error reason.', { cause: reason })
+}
+
+function positiveSafeInteger(value: number | undefined, fallback: number, name: string): number {
+  const resolved = value ?? fallback
+  if (!Number.isSafeInteger(resolved) || resolved <= 0) {
+    throw new Error(`attachment-local: ${name} must be a positive safe integer`)
+  }
+  return resolved
 }
 
 class SharedRequest<T> {
@@ -143,6 +169,10 @@ export class LocalAttachmentStore extends AttachmentStore {
     normalizedImageMaxBytes: z.number().step(1).min(1).default(DEFAULT_NORMALIZED_IMAGE_MAX_BYTES),
     imageCompressionConcurrency: z.number().step(1).min(1).max(MAX_IMAGE_COMPRESSION_CONCURRENCY)
       .default(DEFAULT_IMAGE_COMPRESSION_CONCURRENCY),
+    requestImageCacheMaxBytes: z.number().step(1).min(1).default(DEFAULT_REQUEST_IMAGE_CACHE_MAX_BYTES),
+    requestImageCacheMaxEntries: z.number().step(1).min(1).default(DEFAULT_REQUEST_IMAGE_CACHE_MAX_ENTRIES),
+    requestImageCacheTtlMs: z.number().step(1).min(1).default(DEFAULT_REQUEST_IMAGE_CACHE_TTL_MS),
+    requestImageCacheGcIntervalMs: z.number().step(1).min(1).default(DEFAULT_REQUEST_IMAGE_CACHE_GC_INTERVAL_MS),
   })
 
   /** Absolute versioned storage root. */
@@ -154,6 +184,12 @@ export class LocalAttachmentStore extends AttachmentStore {
   readonly imageCompressionConcurrency: number
   private readonly compression: CompressionLimiter
   private readonly requestInflight = new Map<string, SharedRequest<RequestImageAttachment>>()
+  private readonly requestImageCachePolicy: Readonly<{
+    maxBytes: number
+    maxEntries: number
+    ttlMs: number
+  }>
+  private readonly requestImageCacheGcTimer: ReturnType<typeof setInterval>
 
   constructor(ctx: Context, config: Config) {
     super(ctx)
@@ -180,6 +216,26 @@ export class LocalAttachmentStore extends AttachmentStore {
     }
     this.imageCompressionConcurrency = compressionConcurrency
     this.compression = new CompressionLimiter(compressionConcurrency)
+    this.requestImageCachePolicy = Object.freeze({
+      maxBytes: positiveSafeInteger(config.requestImageCacheMaxBytes, DEFAULT_REQUEST_IMAGE_CACHE_MAX_BYTES, 'requestImageCacheMaxBytes'),
+      maxEntries: positiveSafeInteger(config.requestImageCacheMaxEntries, DEFAULT_REQUEST_IMAGE_CACHE_MAX_ENTRIES, 'requestImageCacheMaxEntries'),
+      ttlMs: positiveSafeInteger(config.requestImageCacheTtlMs, DEFAULT_REQUEST_IMAGE_CACHE_TTL_MS, 'requestImageCacheTtlMs'),
+    })
+    const gcIntervalMs = config.requestImageCacheGcIntervalMs ?? DEFAULT_REQUEST_IMAGE_CACHE_GC_INTERVAL_MS
+    if (!Number.isSafeInteger(gcIntervalMs) || gcIntervalMs <= 0 || gcIntervalMs > MAX_TIMER_DELAY_MS) {
+      throw new Error(
+        `attachment-local: requestImageCacheGcIntervalMs must be a positive safe integer no greater than ${MAX_TIMER_DELAY_MS}`,
+      )
+    }
+    this.requestImageCacheGcTimer = setInterval(() => {
+      void pruneRequestImageCache(this.root, this.requestImageCachePolicy).catch((error: unknown) => {
+        console.error('[attachment-local] request-image cache cleanup failed:', error)
+      })
+    }, gcIntervalMs)
+    this.requestImageCacheGcTimer.unref()
+    ctx.effect(() => {
+      return () => { clearInterval(this.requestImageCacheGcTimer) }
+    }, 'request-image cache cleanup')
   }
 
   async validateImage(input: SaveImageAttachment): Promise<void> {

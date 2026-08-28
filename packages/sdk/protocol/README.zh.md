@@ -6,7 +6,7 @@ DeepSeek Harness SDK 运行时的共享协议格式（wire format）：一个按
 
 ## 传输
 
-`JsonRpcLineTransport` 在调用方持有的字节流上为 JSON-RPC 2.0 分帧，每行一个紧凑 JSON 帧、以 `\n` 结尾。带 `id` 与 `method` 的帧是请求，仅 `id` 是响应，仅 `method` 是通知；非法 JSON 行被忽略。`start()` 挂接流监听器，`close()` 移除监听器并拒绝挂起请求，但不销毁流。缺失请求处理器时应答 `-32601`；处理器返回的 Promise 被拒绝时，则应答携带错误消息的 `-32603`。错误响应会以 `JsonRpcResponseError` 拒绝挂起的 `request()` Promise，并保留协议格式中的 `code` 与可选 `data`。`JsonRpcTransportPeer` 是服务器类据以进行类型声明的出站接口（request/notify）。输入行、挂起请求、并发入站处理器和排队输出均受正数选项限制（默认分别为 1 MiB、1,000、100 和 8 MiB）；超过任一上限会使传输失败并拒绝挂起工作。
+`JsonRpcLineTransport` 在调用方持有的字节流上为 JSON-RPC 2.0 分帧，每行一个紧凑 JSON 帧、以 `\n` 结尾。带 `id` 与 `method` 的帧是请求，仅 `id` 是响应，仅 `method` 是通知；非法 JSON 行被忽略。`start()` 挂接流监听器，`close()` 移除监听器并拒绝挂起请求，但不销毁流。缺失请求处理器时应答 `-32601`；处理器返回的 Promise 被拒绝时，则应答携带错误消息的 `-32603`。错误响应会以 `JsonRpcResponseError` 拒绝挂起的 `request()` Promise，并保留协议格式中的 `code` 与可选 `data`。`JsonRpcTransportPeer` 是服务器类据以进行类型声明的出站接口（request/notify）。输入行以分片保留，并仅在换行完成时合并，因此高度碎片化的 stdio 不会反复复制前缀。输入行、挂起请求、并发入站处理器和排队输出均受正数选项限制（默认分别为 1 MiB、1,000、100 和 8 MiB）；超过任一上限会使传输失败并拒绝挂起工作。
 
 ## 协议类型
 

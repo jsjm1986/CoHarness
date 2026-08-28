@@ -252,4 +252,11 @@ describe('JpushRestSender', () => {
     })
     expect(request).toHaveBeenCalledOnce()
   })
+
+  it('bounds an oversized provider error body before classifying it', async () => {
+    const request = vi.fn(() => Promise.resolve(new Response('x'.repeat(70 * 1024), { status: 500 })))
+    await expect(new JpushRestSender('app-key', 'master-secret', request).send({
+      token: 'registration-id', sessionId: SESSION_ID, eventSeq: 21,
+    })).rejects.toMatchObject({ message: 'JPush send failed with HTTP 500', invalidToken: false })
+  })
 })

@@ -32,6 +32,7 @@
  */
 
 import { Context, Service } from '@deepseek-ai/cordis'
+import z from '@deepseek-ai/schemastery'
 import { scopeTarget } from '@deepseek-ai/dsh-scope'
 import type { Scoped } from '@deepseek-ai/dsh-scope'
 import { assertObjectJsonSchema } from '@deepseek-ai/dsh-tools'
@@ -167,8 +168,36 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
+/** Continuable-subagent residency limits. */
+export interface Config {
+  /** Maximum resident or materializing continuable Activations in this runtime. */
+  maxContinuableActivations?: number
+  /** Maximum resident or materializing continuable Activations with one direct parent. */
+  maxContinuableActivationsPerParent?: number
+}
+
+/** Default process-wide continuable Activation retention. */
+export const DEFAULT_MAX_CONTINUABLE_ACTIVATIONS = 128
+/** Default continuable Activation retention per direct parent Session. */
+export const DEFAULT_MAX_CONTINUABLE_ACTIVATIONS_PER_PARENT = 32
+
+function positiveLimit(value: number | undefined, fallback: number, label: string): number {
+  const resolved = value ?? fallback
+  if (!Number.isSafeInteger(resolved) || resolved < 1) {
+    throw new RangeError(`subagent ${label} must be a positive safe integer`)
+  }
+  return resolved
+}
+
 /** Named provider registry with one-shot runs, durable discovery, and continuable-child operations. */
 export class SubagentRuntime extends Service {
+  static Config: z<Config> = z.object({
+    maxContinuableActivations: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER)
+      .default(DEFAULT_MAX_CONTINUABLE_ACTIVATIONS),
+    maxContinuableActivationsPerParent: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER)
+      .default(DEFAULT_MAX_CONTINUABLE_ACTIVATIONS_PER_PARENT),
+  })
+
   private providers = new Map<string, SubagentProvider>()
   private continuations: SubagentContinuationManager | undefined
   /** Deployment contributions composed into unpublished continuable children. */
@@ -180,14 +209,26 @@ export class SubagentRuntime extends Service {
    */
   private readonly emitLifecycle: LifecycleEmitter
 
-  constructor(ctx: Context) {
+  constructor(ctx: Context, config: Config) {
     super(ctx, 'subagents')
+    const limits = {
+      maxActivations: positiveLimit(
+        config.maxContinuableActivations,
+        DEFAULT_MAX_CONTINUABLE_ACTIVATIONS,
+        'maxContinuableActivations',
+      ),
+      maxActivationsPerParent: positiveLimit(
+        config.maxContinuableActivationsPerParent,
+        DEFAULT_MAX_CONTINUABLE_ACTIVATIONS_PER_PARENT,
+        'maxContinuableActivationsPerParent',
+      ),
+    }
     this.emitLifecycle = createLifecycleEmitter(this.ctx, parent => scopeTarget(this, parent))
     ctx.inject(['agents'], (childCtx: Context) => {
       const manager = new SubagentContinuationManager(childCtx, {
         prepareContinuable: (name, request) => this.prepareContinuable(name, request),
         observeActivation: (provider, childId, parent) => this.observeActivation(provider, childId, parent),
-      }, this.setupRegistry)
+      }, this.setupRegistry, limits)
       this.continuations = manager
       childCtx.effect(() => () => {
         /* v8 ignore else -- one injected binding owns the slot until its fiber disposes. */

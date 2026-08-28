@@ -53,8 +53,10 @@ import {
   DEFAULT_UPLOAD_CHUNK_BYTES,
   DEFAULT_UPLOAD_CLEANUP_INTERVAL_MS,
   DEFAULT_UPLOAD_MAX_CONCURRENT,
+  DEFAULT_UPLOAD_MANIFEST_MAX_BYTES,
   DEFAULT_UPLOAD_MIN_FREE_BYTES,
   DEFAULT_UPLOAD_SESSION_TTL_MS,
+  MAX_UPLOAD_TIMER_DELAY_MS,
   LocalUploadManager,
 } from './upload.ts'
 
@@ -62,8 +64,10 @@ export {
   DEFAULT_UPLOAD_CHUNK_BYTES,
   DEFAULT_UPLOAD_CLEANUP_INTERVAL_MS,
   DEFAULT_UPLOAD_MAX_CONCURRENT,
+  DEFAULT_UPLOAD_MANIFEST_MAX_BYTES,
   DEFAULT_UPLOAD_MIN_FREE_BYTES,
   DEFAULT_UPLOAD_SESSION_TTL_MS,
+  MAX_UPLOAD_TIMER_DELAY_MS,
 } from './upload.ts'
 
 export { DEFAULT_MEDIA_TYPE, mediaTypeFor } from './media-type.ts'
@@ -201,6 +205,8 @@ export interface Config {
   uploadMaxConcurrent?: number
   /** Interval between expired-session cleanup sweeps. */
   uploadCleanupIntervalMs?: number
+  /** Maximum serialized upload manifest bytes read from disk. */
+  uploadManifestMaxBytes?: number
   /** Recoverable document trash retention in days. */
   trashRetentionDays?: number
 }
@@ -218,7 +224,8 @@ export class LocalUserDocStore extends UserDocStore {
     uploadSessionTtlMs: z.number().step(1).min(60 * 1000).default(DEFAULT_UPLOAD_SESSION_TTL_MS),
     uploadMinFreeBytes: z.number().step(1).min(0).default(DEFAULT_UPLOAD_MIN_FREE_BYTES),
     uploadMaxConcurrent: z.number().step(1).min(1).default(DEFAULT_UPLOAD_MAX_CONCURRENT),
-    uploadCleanupIntervalMs: z.number().step(1).min(60 * 1000).default(DEFAULT_UPLOAD_CLEANUP_INTERVAL_MS),
+    uploadCleanupIntervalMs: z.number().step(1).min(60 * 1000).max(MAX_UPLOAD_TIMER_DELAY_MS).default(DEFAULT_UPLOAD_CLEANUP_INTERVAL_MS),
+    uploadManifestMaxBytes: z.number().step(1).min(1024).default(DEFAULT_UPLOAD_MANIFEST_MAX_BYTES),
     trashRetentionDays: z.number().step(1).min(1).default(30),
   })
 
@@ -278,6 +285,7 @@ export class LocalUserDocStore extends UserDocStore {
       minFreeBytes: config.uploadMinFreeBytes ?? DEFAULT_UPLOAD_MIN_FREE_BYTES,
       maxConcurrent: config.uploadMaxConcurrent ?? DEFAULT_UPLOAD_MAX_CONCURRENT,
       cleanupIntervalMs: config.uploadCleanupIntervalMs ?? DEFAULT_UPLOAD_CLEANUP_INTERVAL_MS,
+      manifestMaxBytes: config.uploadManifestMaxBytes ?? DEFAULT_UPLOAD_MANIFEST_MAX_BYTES,
     })
     ctx.effect(() => {
       const timer = setInterval(() => {

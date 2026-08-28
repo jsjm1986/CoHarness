@@ -1,7 +1,8 @@
 /** Deterministic cached image versions for model requests. */
 
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import type { Dirent } from 'node:fs'
+import { mkdir, readFile, readdir, rename, rm, stat, utimes, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import sharp, { type Sharp } from 'sharp'
 import { AttachmentError, ImageVariantId } from '@deepseek-ai/dsh-attachment'
@@ -30,6 +31,16 @@ interface EncodedRequestImage {
 
 interface VerifiedRequestImage extends EncodedRequestImage {
   hasAlpha: boolean
+}
+
+/** Retention policy for the derived request-image cache. */
+export interface RequestImageCachePolicy {
+  /** Maximum aggregate bytes retained by request-image files. */
+  readonly maxBytes: number
+  /** Maximum request-image files retained. */
+  readonly maxEntries: number
+  /** Maximum age since last access before a cache file is eligible for removal. */
+  readonly ttlMs: number
 }
 
 function digest(value: string | Uint8Array): string {
@@ -202,6 +213,10 @@ async function readCached(
     if (data.byteLength > policy.maxBytes || detected.depth !== 'uchar' || detected.space !== 'srgb'
       || detected.width > maximum.width || detected.height > maximum.height
       || !encodedAlphaIsCompatible(expectedAlpha, detected)) return undefined
+    try {
+      const now = new Date()
+      await utimes(path, now, now)
+    } catch { /* cache recency is best effort; validated bytes remain usable */ }
     return { data, mediaType: detected.mediaType, width: detected.width, height: detected.height, hasAlpha: detected.hasAlpha }
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException | null)?.code === 'ENOENT') return undefined
@@ -234,6 +249,66 @@ async function writeCached(path: string, data: Uint8Array): Promise<void> {
     await rename(temporary, path)
   } finally {
     await rm(temporary, { force: true })
+  }
+}
+
+/**
+ * Remove stale or least-recently-used derived request-image files.
+ * @param root - absolute attachment storage root.
+ * @param policy - validated cache retention limits.
+ */
+export async function pruneRequestImageCache(root: string, policy: RequestImageCachePolicy): Promise<void> {
+  if (!Number.isSafeInteger(policy.maxBytes) || policy.maxBytes < 1
+    || !Number.isSafeInteger(policy.maxEntries) || policy.maxEntries < 1
+    || !Number.isSafeInteger(policy.ttlMs) || policy.ttlMs < 1) {
+    throw new TypeError('request-image cache policy values must be positive safe integers')
+  }
+  const cacheRoot = join(root, 'request-images')
+  let prefixes: Dirent[]
+  try {
+    prefixes = await readdir(cacheRoot, { withFileTypes: true, encoding: 'utf8' })
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
+    throw error
+  }
+  const now = Date.now()
+  const entries: Array<{ readonly path: string; readonly size: number; readonly accessedAt: number }> = []
+  for (const prefix of prefixes) {
+    if (!prefix.isDirectory() || !/^[0-9a-f]{2}$/u.test(prefix.name)) continue
+    const directory = join(cacheRoot, prefix.name)
+    let files: Dirent[]
+    try {
+      files = await readdir(directory, { withFileTypes: true, encoding: 'utf8' })
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue
+      throw error
+    }
+    for (const file of files) {
+      if (!file.isFile() || !/^[0-9a-f]{64}$/u.test(file.name)) continue
+      const path = join(directory, file.name)
+      let info: Awaited<ReturnType<typeof stat>>
+      try {
+        info = await stat(path)
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue
+        throw error
+      }
+      if (!info.isFile() || !Number.isSafeInteger(info.size) || info.size < 0) continue
+      if (now - info.mtimeMs >= policy.ttlMs) {
+        await rm(path, { force: true })
+        continue
+      }
+      entries.push({ path, size: info.size, accessedAt: info.mtimeMs })
+    }
+  }
+  entries.sort((left, right) => left.accessedAt - right.accessedAt)
+  let totalBytes = entries.reduce((sum, entry) => sum + entry.size, 0)
+  let retained = entries.length
+  for (const entry of entries) {
+    if (retained <= policy.maxEntries && totalBytes <= policy.maxBytes) break
+    await rm(entry.path, { force: true })
+    retained -= 1
+    totalBytes -= entry.size
   }
 }
 

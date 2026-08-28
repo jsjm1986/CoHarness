@@ -3,11 +3,22 @@ import { GoogleAuth } from 'google-auth-library'
 import type { Pool } from 'pg'
 import type { GatewayConfig } from './config.ts'
 import { internalUserId, type PostgresRuntimeContext } from './postgres/runtime-context.ts'
+import { readResponseBytes, ResponseBodyTooLargeError } from './response-budget.ts'
 
 const FCM_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging'
 const FCM_ENDPOINT = 'https://fcm.googleapis.com/v1/projects'
 const JPUSH_ENDPOINT = 'https://api.jpush.cn/v3/push'
 const PUSH_CHANNEL_ID = 'ai-replies'
+const PUSH_ERROR_RESPONSE_MAX_BYTES = 64 * 1024
+
+async function pushErrorBody(response: Response): Promise<string> {
+  try {
+    return new TextDecoder().decode(await readResponseBytes(response, PUSH_ERROR_RESPONSE_MAX_BYTES))
+  } catch (error: unknown) {
+    if (error instanceof ResponseBodyTooLargeError) return ''
+    throw error
+  }
+}
 
 /** Provider used to address one Android push registration. */
 export type PushProvider = 'fcm' | 'jpush'
@@ -125,7 +136,7 @@ export class FcmHttpV1Sender implements PushSender {
       },
     )
     if (response.ok) return
-    const body = await response.text()
+    const body = await pushErrorBody(response)
     let code: string | undefined
     try {
       const parsed = object(JSON.parse(body))
@@ -191,7 +202,7 @@ export class JpushRestSender implements PushSender {
       }),
     })
     if (response.ok) return
-    const body = await response.text()
+    const body = await pushErrorBody(response)
     const invalidToken = response.status === 400
       && /(registration[_ -]?id|invalid audience|invalid registration|1003|1004)/i.test(body)
     throw new PushSendError(`JPush send failed with HTTP ${String(response.status)}`, invalidToken)

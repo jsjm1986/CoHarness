@@ -3,6 +3,7 @@ import { applyGrantsToUser } from './apply-grants.ts'
 import {
   applyModelGovernanceToProject,
   applyModelGovernanceToUser,
+  refreshModelGovernance,
   scheduleModelGovernanceRefresh,
 } from './apply-model-governance.ts'
 import type { UserRow } from './auth.ts'
@@ -20,7 +21,11 @@ import type { GrantMode } from './projects.ts'
 import type { GatewayDeps, GatewayHandlers } from './server.ts'
 import type { GatewayDocumentAdminHandler } from './document-transfer.ts'
 import { DocumentCatalogError, type DocumentCatalogAdminFilter } from './postgres/document-catalog-service.ts'
-import type { ConversationArchiveAdminFilter, ConversationArchiveState } from './postgres/conversation-archive-service.ts'
+import {
+  ConversationArchiveError,
+  type ConversationArchiveAdminFilter,
+  type ConversationArchiveState,
+} from './postgres/conversation-archive-service.ts'
 import { readResponseJson, ResponseBodyTooLargeError } from './response-budget.ts'
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
@@ -53,8 +58,29 @@ function isCodedError(error: unknown): error is Error & { code: string } {
   return error instanceof Error && 'code' in error && typeof (error as { code: unknown }).code === 'string'
 }
 
+const ADMIN_USAGE_SUMMARY_CONCURRENCY = 8
+
+async function mapInBatches<T, R>(
+  values: readonly T[],
+  concurrency: number,
+  mapper: (value: T) => Promise<R>,
+): Promise<R[]> {
+  const results: Array<R | undefined> = []
+  for (let start = 0; start < values.length; start += concurrency) {
+    const batch = values.slice(start, start + concurrency)
+    const settled = await Promise.allSettled(batch.map(mapper))
+    const failure = settled.find((result): result is PromiseRejectedResult => result.status === 'rejected')
+    if (failure !== undefined) throw failure.reason
+    for (const [offset, result] of settled.entries()) {
+      if (result.status === 'fulfilled') results[start + offset] = result.value
+    }
+  }
+  return results as R[]
+}
+
 function mapError(error: unknown): { status: number; error: string } {
   if (error instanceof DocumentCatalogError) return { status: error.status, error: error.code }
+  if (error instanceof ConversationArchiveError) return { status: error.status, error: error.code }
   if (error instanceof Error && error.message === 'cannot-remove-last-admin') {
     return { status: 409, error: 'cannot-remove-last-admin' }
   }
@@ -91,7 +117,7 @@ function mapError(error: unknown): { status: number; error: string } {
 /**
  * JSON router for `/admin/api/*`. Other `/admin` paths return false so static hosting can serve them.
  * @param deps - users, projects, audit, instances
- * @returns admin handler that writes 200 JSON, 204, or `{ error }` at 400/404/409
+ * @returns admin handler that writes 200 JSON, 204, or `{ error }` at 400/404/409/413
  */
 export function createAdminApiHandler(
   deps: GatewayDeps,
@@ -128,8 +154,7 @@ async function dispatch(
   const refreshModelPolicies = async (): Promise<void> => {
     if (deps.governance === undefined) return
     try {
-      for (const target of await deps.users.list()) await applyModelGovernanceToUser(deps, target.id)
-      for (const project of await deps.projects.list()) await applyModelGovernanceToProject(deps, project.id)
+      await refreshModelGovernance(deps)
     } catch (error: unknown) {
       // The governance transaction is already durable. Keep the request
       // successful and hand the file cache to the bounded retry worker; ready
@@ -857,11 +882,11 @@ async function dispatch(
       const userId = Number(requested); if (await deps.users.getById(userId) === null) { sendError(res, 404, 'user not found'); return true }
       sendJson(res, 200, await deps.governance.summary({ kind: 'user', id: userId }, month)); return true
     }
-    const summaries = await Promise.all((await deps.users.list()).map(async user => ({
+    const summaries = await mapInBatches(await deps.users.list(), ADMIN_USAGE_SUMMARY_CONCURRENCY, async user => ({
       userId: user.id,
       username: user.username,
       ...await deps.governance!.summary({ kind: 'user', id: user.id }, month),
-    })))
+    }))
     sendJson(res, 200, summaries)
     return true
   }

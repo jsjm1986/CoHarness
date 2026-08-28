@@ -92,6 +92,18 @@ export interface GatewayRuntimeRequestInit extends RequestInit {
   principal?: boolean | GatewayRequestPrincipal
 }
 
+/** Default byte budget for JSON bodies returned by the private Gateway API. */
+export const DEFAULT_GATEWAY_RESPONSE_MAX_BYTES = 64 * 1024 * 1024
+
+/** Raised before parsing when a private Gateway response exceeds its byte budget. */
+export class GatewayResponseTooLargeError extends Error {
+  /** @param limit - maximum accepted UTF-8 response bytes. */
+  constructor(readonly limit: number) {
+    super(`Gateway response exceeds the ${String(limit)}-byte limit`)
+    this.name = 'GatewayResponseTooLargeError'
+  }
+}
+
 declare module '@deepseek-ai/cordis' {
   interface Context {
     gatewayRuntime: GatewayRuntime
@@ -112,6 +124,62 @@ function positiveInteger(value: unknown): value is number {
 
 function nonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0
+}
+
+/**
+ * Read a private Gateway response without retaining more than the supplied
+ * byte budget. The caller owns JSON validation; this helper only bounds the
+ * response body and preserves the response stream's cancellation semantics.
+ * @param response - response returned by {@link GatewayRuntime.request}.
+ * @param limit - positive safe-integer UTF-8 byte budget.
+ * @returns the complete response bytes.
+ */
+export async function readGatewayResponseBytes(response: Response, limit = DEFAULT_GATEWAY_RESPONSE_MAX_BYTES): Promise<Uint8Array> {
+  if (!Number.isSafeInteger(limit) || limit < 1) throw new RangeError('Gateway response byte limit must be a positive safe integer')
+  const declared = response.headers.get('content-length')
+  if (declared !== null) {
+    const length = Number(declared)
+    if (!Number.isSafeInteger(length) || length < 0 || length > limit) {
+      await Promise.resolve(response.body?.cancel()).catch(() => {})
+      throw new GatewayResponseTooLargeError(limit)
+    }
+  }
+  if (response.body === null) return new Uint8Array()
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  try {
+    for (;;) {
+      const next = await reader.read()
+      if (next.done) break
+      total += next.value.byteLength
+      if (!Number.isSafeInteger(total) || total > limit) {
+        await reader.cancel().catch(() => {})
+        throw new GatewayResponseTooLargeError(limit)
+      }
+      chunks.push(next.value)
+    }
+  } finally {
+    reader.releaseLock()
+  }
+  const bytes = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return bytes
+}
+
+/**
+ * Read and parse a bounded private Gateway JSON response.
+ * @param response - response returned by {@link GatewayRuntime.request}.
+ * @param limit - positive safe-integer UTF-8 byte budget.
+ * @returns the decoded JSON value.
+ */
+export async function readGatewayResponseJson(response: Response, limit = DEFAULT_GATEWAY_RESPONSE_MAX_BYTES): Promise<unknown> {
+  const bytes = await readGatewayResponseBytes(response, limit)
+  return JSON.parse(new TextDecoder().decode(bytes)) as unknown
 }
 
 function readinessMaterial(

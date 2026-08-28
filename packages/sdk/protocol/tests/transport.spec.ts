@@ -189,6 +189,20 @@ describe('JsonRpcLineTransport', () => {
     transport.close()
   })
 
+  it('assembles a highly fragmented input line without copying its prefix per chunk', async () => {
+    const input = new PassThrough()
+    const output = new PassThrough()
+    const transport = new JsonRpcLineTransport(input, output)
+    const notifications: Record<string, unknown>[] = []
+    transport.onNotification((method, params) => { notifications.push({ method, params }) })
+    transport.start()
+    const frame = `${JSON.stringify({ jsonrpc: '2.0', method: 'fragmented', params: { text: 'x'.repeat(20_000) } })}\n`
+    for (const character of frame) input.write(character)
+    await new Promise(resolve => setTimeout(resolve, 10))
+    expect(notifications).toEqual([{ method: 'fragmented', params: { text: 'x'.repeat(20_000) } }])
+    transport.close()
+  })
+
   it('rejects an oversized complete line before dispatching it', async () => {
     const input = new PassThrough()
     const output = new PassThrough()
@@ -201,6 +215,40 @@ describe('JsonRpcLineTransport', () => {
     expect(seen).toEqual([])
     await expect(transport.request('after-limit', {})).rejects.toThrow('JSON-RPC transport closed')
     transport.close()
+  })
+
+  it('rejects an oversized unterminated line before the peer reaches EOF', async () => {
+    const input = new PassThrough()
+    const output = new PassThrough()
+    const transport = new JsonRpcLineTransport(input, output, { maxLineBytes: 4 })
+    transport.start()
+    input.write('12345')
+    await new Promise(resolve => setImmediate(resolve))
+    await expect(transport.request('after-limit', {})).rejects.toThrow('JSON-RPC transport closed')
+    transport.close()
+  })
+
+  it('returns a busy error when concurrent inbound handlers reach their cap', async () => {
+    const input = new PassThrough()
+    const output = new PassThrough()
+    const transport = new JsonRpcLineTransport(input, output, { maxConcurrentIncoming: 1 })
+    let release!: () => void
+    const held = new Promise<void>((resolve) => { release = resolve })
+    transport.onRequest(async () => { await held; return { ok: true } })
+    transport.start()
+    input.write('{"jsonrpc":"2.0","id":1,"method":"hold"}\n')
+    await new Promise(resolve => setImmediate(resolve))
+    input.write('{"jsonrpc":"2.0","id":2,"method":"busy"}\n')
+    const raw = (await once(output, 'data'))[0] as Buffer | string
+    expect(JSON.parse(String(raw))).toMatchObject({ id: 2, error: { code: -32000 } })
+    release()
+    await new Promise(resolve => setImmediate(resolve))
+    transport.close()
+  })
+
+  it('closes when one outbound frame exceeds the output budget', () => {
+    const transport = new JsonRpcLineTransport(new PassThrough(), new PassThrough(), { maxOutputBytes: 8 })
+    expect(() => { transport.notify('oversized', { value: 'too long' }) }).toThrow(/output queue exceeds 8 bytes/)
   })
 
   it('flush waits for all earlier output writes', async () => {

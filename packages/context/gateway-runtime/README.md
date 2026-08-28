@@ -11,6 +11,7 @@ Authenticated request context and private loopback transport for a Harness runti
 - `request()` accepts only absolute `/internal/runtime/` paths on the credential's loopback origin, adds the private bearer token, and forwards a browser principal only when the caller explicitly requests it.
 - The private `/api/internal/gateway/readiness` endpoint accepts only a nonce plus an HMAC derived from the launch token and exact runtime identity, and returns a matching response proof; an arbitrary listener on the runtime port cannot satisfy Gateway readiness.
 - Credentials and principal assertions fail closed at their parsing and request boundaries. The runtime bearer token is never exposed through the public service fields.
+- Consumers that read a private JSON response use `readGatewayResponseJson()` (or its byte-level companion) with a domain limit; chunked bodies are cancelled when the limit is crossed, so `Content-Length` is not the only protection.
 
 ## Model Experience
 

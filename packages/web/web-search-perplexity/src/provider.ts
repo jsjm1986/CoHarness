@@ -6,7 +6,13 @@
  * @module @deepseek-ai/dsh-web-search-perplexity/provider
  */
 
-import { WebError } from '@deepseek-ai/dsh-web'
+import {
+  DEFAULT_WEB_RESPONSE_MAX_BYTES,
+  MAX_WEB_RESPONSE_MAX_BYTES,
+  readWebResponseJson,
+  WebError,
+  WebResponseTooLargeError,
+} from '@deepseek-ai/dsh-web'
 import type {
   WebSearchProvider,
   WebSearchRequest,
@@ -26,6 +32,8 @@ export const PERPLEXITY_DEFAULT_MODEL = 'sonar'
 
 /** Default upper bound on generated answer tokens. */
 export const PERPLEXITY_DEFAULT_MAX_TOKENS = 1024
+/** Default maximum UTF-8 bytes retained from one search response. */
+export const PERPLEXITY_DEFAULT_MAX_RESPONSE_BYTES = DEFAULT_WEB_RESPONSE_MAX_BYTES
 
 /** Recency filter values Perplexity accepts for `search_recency_filter`. */
 export type PerplexityRecency = 'day' | 'week' | 'month' | 'year'
@@ -43,6 +51,8 @@ export interface PerplexitySearchProviderOptions {
   model: string
   /** Upper bound on generated answer tokens (`max_tokens`). */
   maxTokens: number
+  /** Maximum UTF-8 bytes retained from one success or error response. */
+  maxResponseBytes?: number
   /** Optional recency window sent as `search_recency_filter`; omitted = no filter. */
   searchRecency?: PerplexityRecency
 }
@@ -95,10 +105,12 @@ export class PerplexitySearchProvider implements WebSearchProvider {
     return this.options.apiKey.length > 0
       && URL.canParse(this.options.baseURL)
       && isPositiveInteger(this.options.maxTokens)
+      && isPositiveSafeInteger(this.options.maxResponseBytes ?? PERPLEXITY_DEFAULT_MAX_RESPONSE_BYTES)
   }
   /* jscpd:ignore-end */
 
   async search(request: WebSearchRequest, signal?: AbortSignal): Promise<WebSearchResult> {
+    const responseLimit = this.options.maxResponseBytes ?? PERPLEXITY_DEFAULT_MAX_RESPONSE_BYTES
     let response: Response
     try {
       response = await fetch(`${this.options.baseURL}/chat/completions`, {
@@ -127,7 +139,7 @@ export class PerplexitySearchProvider implements WebSearchProvider {
       const status = response.status
       let message = `Perplexity API error (HTTP ${status})`
       try {
-        const parsed = await response.json() as PerplexityError
+        const parsed = await readWebResponseJson(response, responseLimit) as PerplexityError
         const detail = typeof parsed.error === 'string' ? parsed.error : parsed.error?.message ?? parsed.message
         if (detail !== undefined && detail.length > 0) message = detail
       } catch (error: unknown) {
@@ -143,10 +155,13 @@ export class PerplexitySearchProvider implements WebSearchProvider {
     }
 
     try {
-      const payload = await response.json() as PerplexityResponse
+      const payload = await readWebResponseJson(response, responseLimit) as PerplexityResponse
       return mapPerplexityResponse(payload)
     } catch (error: unknown) {
-      if (isAbortError(error)) throw new WebError('Perplexity search aborted', 'WEB_ABORTED', { cause: error })
+      if (signal?.aborted === true || isAbortError(error)) throw new WebError('Perplexity search aborted', 'WEB_ABORTED', { cause: error })
+      if (error instanceof WebResponseTooLargeError) {
+        throw new WebError(`Perplexity response exceeded the ${String(responseLimit)}-byte limit`, 'WEB_PROVIDER_ERROR', { cause: error })
+      }
       throw new WebError(`Perplexity returned an unprocessable response body: ${String(error)}`, 'WEB_PROVIDER_ERROR', { cause: error })
     }
   }
@@ -163,5 +178,10 @@ function isAbortError(error: unknown): boolean {
 /** True for a request limit that can be sent to Perplexity (a positive whole number). */
 function isPositiveInteger(value: number): boolean {
   return Number.isInteger(value) && value > 0
+}
+
+/** True for a positive safe integer response byte budget. */
+function isPositiveSafeInteger(value: number): boolean {
+  return Number.isSafeInteger(value) && value > 0 && value <= MAX_WEB_RESPONSE_MAX_BYTES
 }
 /* jscpd:ignore-end */

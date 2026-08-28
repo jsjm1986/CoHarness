@@ -130,4 +130,91 @@ describe('resumableUpload', () => {
     expect(result).toEqual(ref)
     expect(xhrs.length).toBe(1)
   })
+
+  it('drops expired local resume metadata before looking up a server session', async () => {
+    const file = new File(['hello'], 'notes.txt')
+    const controller = new AbortController()
+    let firstRequest = true
+    const uploading = {
+      uploadId,
+      name: 'notes.txt',
+      directoryId: '',
+      bytes: 5,
+      fingerprint: 'x',
+      chunkBytes: 65536,
+      receivedBytes: 0,
+      expiresAt: Date.now() + 60_000,
+      state: 'uploading' as const,
+    }
+    await expect(resumableUpload(file, '' as never, controller.signal, undefined, {
+      requestJson: async <T>() => {
+        if (firstRequest) {
+          firstRequest = false
+          controller.abort()
+        }
+        return uploading as T
+      },
+      networkError: () => new Error('offline'),
+      responseError: (status, body) => new Error(`${String(status)}:${String(body)}`),
+    })).rejects.toMatchObject({ name: 'AbortError' })
+
+    const raw = globalThis.localStorage?.getItem('dsh-userdoc-upload-sessions-v1')
+    expect(raw).not.toBeNull()
+    const records = JSON.parse(raw as string) as Record<string, Record<string, unknown>>
+    const key = Object.keys(records)[0]
+    expect(key).toBeDefined()
+    records[key as string] = { ...records[key as string], expiresAt: Date.now() - 1 }
+    globalThis.localStorage?.setItem('dsh-userdoc-upload-sessions-v1', JSON.stringify(records))
+
+    const calls: string[] = []
+    const result = await resumableUpload(file, '' as never, undefined, undefined, {
+      requestJson: async <T>(input: RequestInfo | URL) => {
+        calls.push(urlOf(input))
+        return {
+          ...uploading,
+          state: 'complete' as const,
+          ref,
+          expiresAt: Date.now() + 60_000,
+        } as T
+      },
+      networkError: () => new Error('offline'),
+      responseError: (status, body) => new Error(`${String(status)}:${String(body)}`),
+    })
+    expect(result).toEqual(ref)
+    expect(calls).toEqual(['/api/documents/uploads'])
+  })
+
+  it('bounds local resume metadata by record count', async () => {
+    const records: Record<string, object> = {}
+    for (let index = 0; index < 300; index += 1) {
+      records[`record-${String(index)}`] = {
+        fingerprint: 'a'.repeat(64),
+        uploadId,
+        name: `file-${String(index)}.txt`,
+        directoryId: '',
+        bytes: 1,
+        updatedAt: Date.now() - (300 - index),
+        expiresAt: Date.now() + 60_000,
+      }
+    }
+    globalThis.localStorage?.setItem('dsh-userdoc-upload-sessions-v1', JSON.stringify(records))
+    await resumableUpload(new File(['x'], 'new.txt'), '' as never, undefined, undefined, {
+      requestJson: async <T>() => ({
+        uploadId,
+        name: 'new.txt',
+        directoryId: '',
+        bytes: 1,
+        fingerprint: 'x',
+        chunkBytes: 65536,
+        receivedBytes: 0,
+        expiresAt: Date.now() + 60_000,
+        state: 'complete' as const,
+        ref,
+      } as T),
+      networkError: () => new Error('offline'),
+      responseError: (status, body) => new Error(`${String(status)}:${String(body)}`),
+    })
+    const stored = JSON.parse(globalThis.localStorage?.getItem('dsh-userdoc-upload-sessions-v1') ?? '{}') as Record<string, unknown>
+    expect(Object.keys(stored).length).toBeLessThanOrEqual(256)
+  })
 })

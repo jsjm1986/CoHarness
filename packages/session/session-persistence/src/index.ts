@@ -83,6 +83,7 @@ export interface SessionRawArtifact {
 
 // The backend-agnostic write-path orchestration first-party backends compose.
 export {
+  DEFAULT_MAX_PENDING_BYTES_PER_SESSION,
   DEFAULT_PREPARED_SESSION_CACHE_SIZE,
   DEFAULT_MAX_PENDING_EVENTS_PER_SESSION,
   DEFAULT_WRITE_BATCH_MAX_DELAY_MS,
@@ -282,6 +283,18 @@ export abstract class SessionPersistence extends Service {
    * @returns one header per materialized session.
    */
   abstract list(signal?: AbortSignal): Promise<SessionHeader[]>
+
+  /**
+   * Read one materialized session's opaque source revision without loading its event log.
+   * First-party providers use their per-id storage lookup; the default preserves
+   * third-party compatibility by filtering {@link listSnapshots}.
+   * @param id - persisted session to observe.
+   * @param signal - optional cancellation for backend lookup work.
+   * @returns the current source-qualified revision, or undefined when absent.
+   */
+  async revision(id: SessionId, signal?: AbortSignal): Promise<SessionPersistenceRevision | undefined> {
+    return (await this.listSnapshots(signal)).find(snapshot => snapshot.header.id === id)?.revision
+  }
 
   /**
    * List materialized sessions with cheap per-log change tokens.

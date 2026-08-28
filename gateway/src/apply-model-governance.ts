@@ -27,10 +27,20 @@ interface ModelPolicyProjection {
   }>
 }
 
+/** Services needed to enumerate every subject for a complete projection pass. */
+type ModelGovernanceRefreshDeps = Pick<GatewayDeps, 'cfg' | 'governance'> & {
+  users: Pick<GatewayDeps['users'], 'list'>
+  projects: Pick<GatewayDeps['projects'], 'list'>
+}
+
 /** Per-process projection cache; the durable policy revision remains authoritative. */
 const projectionVersions = new Map<string, number>()
 const projectionQueues = new Map<string, Promise<void>>()
 const refreshTasks = new Map<string, Promise<void>>()
+/** Bound concurrent policy-file work below the PostgreSQL pool size. */
+const MODEL_POLICY_REFRESH_CONCURRENCY = 4
+/** Projection versions are an optimization cache, never an unbounded roster. */
+const MAX_PROJECTION_VERSION_ENTRIES = 10_000
 
 function projectionKey(subject: ModelUsageSubject, dshHome: string): string {
   return `${subject.kind}:${String(subject.id)}:${dshHome}`
@@ -153,9 +163,12 @@ async function ensureProjection(
   await queueProjection(key, async () => {
     const policy = await readPolicy()
     const path = join(dshHome, 'model-governance.json')
-    if (projectionVersions.get(key) === policy.version && existsSync(path)) return
+    if (projectionVersions.get(key) === policy.version && existsSync(path)) {
+      rememberProjectionVersion(key, policy.version)
+      return
+    }
     await writeProjection(cfg, governance, dshHome, subject, policy)
-    projectionVersions.set(key, policy.version)
+    rememberProjectionVersion(key, policy.version)
   })
 }
 
@@ -171,6 +184,51 @@ async function queueProjection<T>(key: string, operation: () => Promise<T>): Pro
   return run
 }
 
+/** Remember one projection version using insertion order as a small LRU. */
+function rememberProjectionVersion(key: string, version: number): void {
+  projectionVersions.delete(key)
+  projectionVersions.set(key, version)
+  while (projectionVersions.size > MAX_PROJECTION_VERSION_ENTRIES) {
+    const oldest = projectionVersions.keys().next().value
+    if (oldest === undefined) return
+    projectionVersions.delete(oldest)
+  }
+}
+
+/**
+ * Run one complete policy refresh with bounded workers and the catalog rows
+ * already fetched for this pass. A worker failure is surfaced only after all
+ * workers settle, so no rejected projection promise becomes detached work.
+ * @param deps - Gateway policy and catalog services.
+ */
+export async function refreshModelGovernance(
+  deps: ModelGovernanceRefreshDeps,
+): Promise<void> {
+  if (deps.governance === undefined) return
+  const [users, projects] = await Promise.all([deps.users.list(), deps.projects.list()])
+  const runBounded = async <T>(values: readonly T[], operation: (value: T) => Promise<void>): Promise<void> => {
+    let cursor = 0
+    const worker = async (): Promise<void> => {
+      for (;;) {
+        const index = cursor
+        cursor += 1
+        if (index >= values.length) return
+        await operation(values[index] as T)
+      }
+    }
+    const settled = await Promise.allSettled(Array.from(
+      { length: Math.min(MODEL_POLICY_REFRESH_CONCURRENCY, values.length) },
+      () => worker(),
+    ))
+    const failure = settled.find((result): result is PromiseRejectedResult => result.status === 'rejected')
+    if (failure !== undefined) throw failure.reason
+  }
+  await runBounded(users, user => writeModelGovernanceFile(deps.cfg, deps.governance!, user).then(() => undefined))
+  await runBounded(projects, project => writeProjectModelGovernanceFile(deps.cfg, deps.governance!, {
+    kind: 'project', id: project.id, name: project.name, path: project.path,
+  }).then(() => undefined))
+}
+
 /** Atomically project one user's effective model policy and stable intake credential. */
 export async function writeModelGovernanceFile(
   cfg: GatewayConfig, governance: GatewayModelGovernanceService, user: UserRow,
@@ -181,7 +239,7 @@ export async function writeModelGovernanceFile(
   return queueProjection(key, async () => {
     const policy = await governance.policyFor(user)
     const path = await writeProjection(cfg, governance, dshHome, subject, policy)
-    projectionVersions.set(key, policy.version)
+    rememberProjectionVersion(key, policy.version)
     return path
   })
 }
@@ -198,7 +256,7 @@ export async function writeProjectModelGovernanceFile(
   return queueProjection(key, async () => {
     const policy = await governance.policyForProject(project.id)
     const path = await writeProjection(cfg, governance, dshHome, subject, policy)
-    projectionVersions.set(key, policy.version)
+    rememberProjectionVersion(key, policy.version)
     return path
   })
 }
@@ -230,7 +288,7 @@ export async function ensureModelGovernanceForProject(
  * mutation into a half-failed request.
  */
 export function scheduleModelGovernanceRefresh(
-  deps: Pick<GatewayDeps, 'cfg' | 'governance' | 'users' | 'projects'>,
+  deps: ModelGovernanceRefreshDeps,
 ): void {
   if (deps.governance === undefined) return
   const key = `${deps.cfg.usersRoot}:${deps.cfg.projectRuntimesRoot}`
@@ -239,8 +297,7 @@ export function scheduleModelGovernanceRefresh(
     let delay = 250
     for (let attempt = 0; attempt < 6; attempt += 1) {
       try {
-        for (const target of await deps.users.list()) await applyModelGovernanceToUser(deps, target.id)
-        for (const project of await deps.projects.list()) await applyModelGovernanceToProject(deps, project.id)
+        await refreshModelGovernance(deps)
         return
       } catch (error: unknown) {
         if (attempt === 5) {

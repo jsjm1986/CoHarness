@@ -250,6 +250,8 @@ export class TextRetainer {
   private readonly prefixChunks: Uint8Array[] = []
   private prefixHeld = 0
   private readonly suffixChunks: Uint8Array[] = []
+  /** Index of the first live suffix chunk; retired prefixes are compacted lazily. */
+  private suffixHead = 0
   private suffixHeld = 0
   private total = 0
 
@@ -302,11 +304,11 @@ export class TextRetainer {
     if (this.suffixCap > 0) {
       this.suffixChunks.push(bytes)
       this.suffixHeld += bytes.length
-      let head = this.suffixChunks[0]
+      let head = this.suffixChunks[this.suffixHead]
       while (head !== undefined && this.suffixHeld - head.length >= this.suffixCap) {
-        this.suffixChunks.shift()
+        this.suffixHead += 1
         this.suffixHeld -= head.length
-        head = this.suffixChunks[0]
+        head = this.suffixChunks[this.suffixHead]
       }
       // The head chunk can still hold leading bytes beyond the last `suffixCap`
       // — a single chunk LARGER than the window is retained whole by the loop
@@ -318,9 +320,10 @@ export class TextRetainer {
       // invariant `suffixHeld - head.length < suffixCap`, so the slice is non-empty.)
       if (head !== undefined && this.suffixHeld > this.suffixCap) {
         const excess = this.suffixHeld - this.suffixCap
-        this.suffixChunks[0] = head.subarray(excess)
+        this.suffixChunks[this.suffixHead] = head.subarray(excess)
         this.suffixHeld -= excess
       }
+      this.compactSuffixChunks()
     }
 
     // Dropped = bytes that no side can keep. Compute cumulative omission the
@@ -331,6 +334,17 @@ export class TextRetainer {
     return {
       kept: !droppedThisChunk,
       truncated: this.omittedAt(this.total) > 0,
+    }
+  }
+
+  /** Reclaim retired suffix slots without shifting the live tail per chunk. */
+  private compactSuffixChunks(): void {
+    if (this.suffixHead === this.suffixChunks.length) {
+      this.suffixChunks.length = 0
+      this.suffixHead = 0
+    } else if (this.suffixHead >= 1024 && this.suffixHead * 2 >= this.suffixChunks.length) {
+      this.suffixChunks.splice(0, this.suffixHead)
+      this.suffixHead = 0
     }
   }
 
@@ -348,11 +362,13 @@ export class TextRetainer {
    * @returns The {@link RetainedText} snapshot (safe to hand to a formatter).
    */
   finish(): RetainedText {
+    this.compactSuffixChunks()
     const prefixLen = Math.min(this.total, this.prefixCap)
     const suffixLen = Math.min(this.total - prefixLen, this.suffixCap)
 
     const prefix = concat(this.prefixChunks) // exactly prefixLen bytes (prefixHeld === prefixLen)
-    const suffix = concat(this.suffixChunks).subarray(this.suffixHeld - suffixLen)
+    const suffix = concat(this.suffixHead === 0 ? this.suffixChunks : this.suffixChunks.slice(this.suffixHead))
+      .subarray(this.suffixHeld - suffixLen)
 
     // With nothing omitted by budget, prefix and suffix are ADJACENT slices of
     // one stream (prefixLen + suffixLen === total), so the head|tail split is

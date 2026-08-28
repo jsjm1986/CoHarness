@@ -165,6 +165,66 @@ export class AdminRequestError extends Error {
   }
 }
 
+const MAX_ADMIN_RESPONSE_BYTES = 16 * 1024 * 1024
+
+/** Read one Admin response without handing an unbounded body to JSON.parse. */
+/* jscpd:ignore-start -- this private Vite app cannot depend on the host package's runtime bundle. */
+async function readResponseJson<T>(response: Response): Promise<T> {
+  const responseLike = response as unknown as {
+    headers?: Pick<Headers, 'get'>
+    body?: ReadableStream<Uint8Array> | null
+    json?: () => Promise<unknown>
+    text?: () => Promise<string>
+  }
+  const headers = responseLike.headers
+  const body = responseLike.body
+  if (body == null && headers === undefined && responseLike.json !== undefined) {
+    return await responseLike.json() as T
+  }
+  const declared = headers?.get('content-length') ?? null
+  if (declared !== null) {
+    const length = Number(declared)
+    if (!Number.isSafeInteger(length) || length < 0 || length > MAX_ADMIN_RESPONSE_BYTES) {
+      await body?.cancel().catch(() => {})
+      throw new Error('Admin response is too large.')
+    }
+  }
+  if (body == null) {
+    if (headers === undefined && responseLike.text !== undefined) {
+      const text = await responseLike.text()
+      if (new TextEncoder().encode(text).byteLength > MAX_ADMIN_RESPONSE_BYTES) throw new Error('Admin response is too large.')
+      return (text === '' ? undefined : JSON.parse(text)) as T
+    }
+    return undefined as T
+  }
+  const reader = body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  try {
+    for (;;) {
+      const next = await reader.read()
+      if (next.done) break
+      total += next.value.byteLength
+      if (total > MAX_ADMIN_RESPONSE_BYTES) {
+        await reader.cancel().catch(() => {})
+        throw new Error('Admin response is too large.')
+      }
+      chunks.push(next.value)
+    }
+  } finally {
+    reader.releaseLock()
+  }
+  const bytes = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  const text = new TextDecoder().decode(bytes)
+  return (text === '' ? undefined : JSON.parse(text)) as T
+}
+/* jscpd:ignore-end */
+
 async function request<T>(url: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(url, {
     ...init,
@@ -174,7 +234,7 @@ async function request<T>(url: string, init: RequestInit = {}): Promise<T> {
   if (!res.ok) {
     let message = `Request failed (${String(res.status)})`
     try {
-      const body = await res.json() as { error?: unknown; message?: unknown }
+      const body = await readResponseJson<{ error?: unknown; message?: unknown }>(res)
       if (typeof body.error === 'string' && body.error !== '') message = body.error
       else if (typeof body.message === 'string' && body.message !== '') message = body.message
     } catch {
@@ -183,7 +243,7 @@ async function request<T>(url: string, init: RequestInit = {}): Promise<T> {
     throw new AdminRequestError(res.status, message)
   }
   if (res.status === 204) return undefined as T
-  return await res.json() as T
+  return await readResponseJson<T>(res)
 }
 
 export function listUsers(): Promise<AdminUser[]> {

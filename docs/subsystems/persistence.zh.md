@@ -383,6 +383,16 @@ abstract readFrom(id: SessionId, fromSeq: number, signal?: AbortSignal): Promise
 abstract list(signal?: AbortSignal): Promise<SessionHeader[]>
 
 /**
+ * Read one materialized session's opaque source revision without loading its event log.
+ * First-party providers use their per-id storage lookup; the default preserves
+ * third-party compatibility by filtering {@link listSnapshots}.
+ * @param id - persisted session to observe.
+ * @param signal - optional cancellation for backend lookup work.
+ * @returns the current source-qualified revision, or undefined when absent.
+ */
+async revision(id: SessionId, signal?: AbortSignal): Promise<SessionPersistenceRevision | undefined>
+
+/**
  * List materialized sessions with cheap per-log change tokens.
  *
  * Repeated observations of an unchanged log return the same revision. A
@@ -418,5 +428,5 @@ releaseDraft(_request: SessionDraftReservationRequest): Promise<void>
 
 Types: [SessionEvent](session.zh.md) · [SessionId](core.zh.md)
 
-Source: [`packages/session/session-persistence/src/index.ts:126`](../../packages/session/session-persistence/src/index.ts)
+Source: [`packages/session/session-persistence/src/index.ts:127`](../../packages/session/session-persistence/src/index.ts)
 <!-- END GENERATED cordis-surface -->

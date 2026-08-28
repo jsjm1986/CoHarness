@@ -1,6 +1,7 @@
 /** Browser download state shared by the Session Header button and `/export`. */
 
 import { createSnapshotStore, type SessionId, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import { readApiResponseText } from '@deepseek-ai/dsh-client-runtime/client'
 
 /** Download phases presented by the shared modal. */
 export type SessionLogDownloadStatus = 'downloading' | 'success' | 'error'
@@ -116,7 +117,7 @@ export class SessionLogDownloadController {
       url.searchParams.set('includeDescendants', 'true')
       const response = await this.fetcher(url, { method: 'HEAD', signal })
       if (!response.ok) {
-        const detail = await response.text().catch(() => '')
+        const detail = await readApiResponseText(response).catch(() => '')
         throw new Error(`Export failed: HTTP ${response.status}${detail === '' ? '' : ` ${detail}`}`)
       }
       this.save(url.toString(), sessionLogZipFilename(sessionId))

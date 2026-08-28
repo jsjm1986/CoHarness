@@ -10,6 +10,23 @@ const USERNAME_RE = /^[a-z][a-z0-9-]{1,30}$/
 export class UserService {
   constructor(private readonly db: Database.Database, private readonly cfg: GatewayConfig) {}
 
+  /** Find the first free port at or above the configured base. */
+  private allocatePort(): number {
+    const base = this.cfg.instancePortBase
+    const row = this.db.prepare(`
+      SELECT MIN(candidate) AS port
+      FROM (
+        SELECT CAST(? AS INTEGER) AS candidate
+        UNION ALL
+        SELECT port + 1 FROM instances WHERE port >= ?
+      ) candidates
+      WHERE candidate BETWEEN ? AND ?
+        AND NOT EXISTS (SELECT 1 FROM instances occupied WHERE occupied.port=candidate)
+    `).get(base, base, base, 65535) as { port: number | null }
+    if (row.port === null) throw new Error('no instance ports remain')
+    return row.port
+  }
+
   count(): number {
     return (this.db.prepare(`SELECT COUNT(*) AS n FROM users WHERE deleted_at IS NULL`).get() as { n: number }).n
   }
@@ -28,9 +45,9 @@ export class UserService {
          VALUES(?, ?, ?, ?, ?, ?, ?)`,
       ).run(input.username, hash, input.displayName ?? input.username, input.role ?? 'user', homePath, now, now)
       const userId = Number(info.lastInsertRowid)
-      const maxPort = (this.db.prepare(`SELECT MAX(port) AS p FROM instances`).get() as { p: number | null }).p
+      const port = this.allocatePort()
       this.db.prepare(`INSERT INTO instances(user_id, port, state) VALUES(?, ?, 'stopped')`)
-        .run(userId, maxPort === null ? this.cfg.instancePortBase : Math.max(this.cfg.instancePortBase, maxPort + 1))
+        .run(userId, port)
       return userId
     })
     const id = insert()
@@ -109,7 +126,10 @@ export class UserService {
       this.db.prepare(
         `UPDATE users SET status = 'disabled', deleted_at = ?, updated_at = ? WHERE id = ?`,
       ).run(now, now, id)
-      this.db.prepare(`UPDATE instances SET state = 'stopped', pid = NULL WHERE user_id = ?`).run(id)
+      // Instance rows are operational assignments, not historical records.
+      // Removing the row releases its node-local port for a later account;
+      // the user's durable audit, usage, and conversation rows remain intact.
+      this.db.prepare(`DELETE FROM instances WHERE user_id = ?`).run(id)
       this.db.prepare(`DELETE FROM auth_sessions WHERE user_id = ?`).run(id)
       this.db.prepare(`DELETE FROM login_attempts WHERE username = (SELECT username FROM users WHERE id = ?)`).run(id)
       this.db.prepare(`DELETE FROM project_members WHERE user_id = ?`).run(id)

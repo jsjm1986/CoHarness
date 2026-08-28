@@ -66,6 +66,8 @@ export class WorkflowExecution {
   private started = 0
   private activeSlots = 0
   private readonly slotWaiters: { resolve(): void; reject(error: unknown): void }[] = []
+  /** Head cursor for FIFO slot waiters; avoids moving the retained tail per release. */
+  private slotWaiterHead = 0
   private cancelReason: string | undefined
   private cancelError: WorkflowError | undefined
   private currentPhase: string | undefined
@@ -147,7 +149,11 @@ export class WorkflowExecution {
     if (this.cancelReason !== undefined) return
     this.cancelReason = reason
     this.cancelError = new WorkflowError(`workflow run cancelled: ${this.cancelReason}`, 'CANCELLED')
-    for (const waiter of this.slotWaiters.splice(0)) waiter.reject(this.cancelledError())
+    for (let index = this.slotWaiterHead; index < this.slotWaiters.length; index += 1) {
+      this.slotWaiters[index]?.reject(this.cancelledError())
+    }
+    this.slotWaiters.length = 0
+    this.slotWaiterHead = 0
   }
 
   /**
@@ -242,7 +248,12 @@ export class WorkflowExecution {
 
   private releaseSlot(): void {
     this.activeSlots -= 1
-    const next = this.slotWaiters.shift()
+    const next = this.slotWaiters[this.slotWaiterHead]
+    if (next !== undefined) this.slotWaiterHead += 1
+    if (this.slotWaiterHead >= 64 && this.slotWaiterHead * 2 >= this.slotWaiters.length) {
+      this.slotWaiters.splice(0, this.slotWaiterHead)
+      this.slotWaiterHead = 0
+    }
     if (next) next.resolve()
   }
 

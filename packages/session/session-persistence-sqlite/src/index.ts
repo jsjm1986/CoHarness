@@ -13,6 +13,7 @@ import type {
   SessionPreparation,
 } from '@deepseek-ai/dsh-session'
 import {
+  DEFAULT_MAX_PENDING_BYTES_PER_SESSION,
   DEFAULT_MAX_PENDING_EVENTS_PER_SESSION,
   DEFAULT_PREPARED_SESSION_CACHE_SIZE,
   DEFAULT_WRITE_BATCH_MAX_DELAY_MS,
@@ -21,6 +22,7 @@ import {
   SessionPersistence,
   type SessionInspection,
   type SessionLocation,
+  type SessionPersistenceRevision as PersistenceRevision,
   type SessionPersistenceSnapshot,
 } from '@deepseek-ai/dsh-session-persistence'
 import type { JournalMode } from './schema.ts'
@@ -47,6 +49,8 @@ export interface Config {
   writeBatchMaxDelayMs?: number
   /** Maximum events retained in one live session's pending write queue. */
   maxPendingEvents?: number
+  /** Maximum UTF-8 JSON bytes retained in one live session's pending write queue. */
+  maxPendingBytes?: number
 }
 
 /**
@@ -66,6 +70,7 @@ export class SqliteSessionPersistence extends SessionPersistence {
     writeBatchMaxDelayMs: z.number().step(1).min(1).max(MAX_WRITE_BATCH_DELAY_MS)
       .default(DEFAULT_WRITE_BATCH_MAX_DELAY_MS),
     maxPendingEvents: z.number().step(1).min(1).default(DEFAULT_MAX_PENDING_EVENTS_PER_SESSION),
+    maxPendingBytes: z.number().step(1).min(1).default(DEFAULT_MAX_PENDING_BYTES_PER_SESSION),
   })
 
   private readonly store: SqliteStore
@@ -78,6 +83,7 @@ export class SqliteSessionPersistence extends SessionPersistence {
     const writeBatchMaxDelayMs = config.writeBatchMaxDelayMs
       ?? DEFAULT_WRITE_BATCH_MAX_DELAY_MS
     const maxPendingEvents = config.maxPendingEvents ?? DEFAULT_MAX_PENDING_EVENTS_PER_SESSION
+    const maxPendingBytes = config.maxPendingBytes ?? DEFAULT_MAX_PENDING_BYTES_PER_SESSION
     this.store = new SqliteStore({
       path: config.path,
       journalMode: config.journalMode ?? 'wal',
@@ -87,6 +93,7 @@ export class SqliteSessionPersistence extends SessionPersistence {
       preparedSessionCacheSize,
       writeBatchMaxDelayMs,
       maxPendingEvents,
+      maxPendingBytes,
     })
   }
 
@@ -132,6 +139,10 @@ export class SqliteSessionPersistence extends SessionPersistence {
 
   list(signal?: AbortSignal): Promise<SessionHeader[]> {
     return this.store.list(signal)
+  }
+
+  override revision(id: SessionId, signal?: AbortSignal): Promise<PersistenceRevision | undefined> {
+    return this.store.readStoredRevision(id, signal)
   }
 
   listSnapshots(signal?: AbortSignal): Promise<SessionPersistenceSnapshot[]> {

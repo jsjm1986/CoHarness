@@ -12,16 +12,19 @@ import type { Context } from '@deepseek-ai/cordis'
 import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-web'
+import { MAX_WEB_RESPONSE_MAX_BYTES } from '@deepseek-ai/dsh-web'
 import {
   ExaSearchProvider,
   EXA_DEFAULT_BASE_URL,
   EXA_DEFAULT_HIGHLIGHTS_PER_RESULT,
+  EXA_DEFAULT_MAX_RESPONSE_BYTES,
   EXA_DEFAULT_SEARCH_TYPE,
 } from './provider.ts'
 
 export {
   EXA_DEFAULT_BASE_URL,
   EXA_DEFAULT_HIGHLIGHTS_PER_RESULT,
+  EXA_DEFAULT_MAX_RESPONSE_BYTES,
   EXA_DEFAULT_SEARCH_TYPE,
   EXA_PROVIDER_ID,
   ExaSearchProvider,
@@ -46,6 +49,8 @@ export interface Config {
   numResults?: number
   /** Highlight sentences requested per result. Defaults to 1. */
   highlightsPerResult?: number
+  /** Maximum UTF-8 bytes retained from one success or error response (up to 256 MiB). */
+  maxResponseBytes?: number
 }
 
 export const Config: z<Config> = z.object({
@@ -54,6 +59,7 @@ export const Config: z<Config> = z.object({
   searchType: z.union(['auto', 'keyword', 'neural'] as const),
   numResults: z.number().step(1).min(1),
   highlightsPerResult: z.number().step(1).min(1),
+  maxResponseBytes: z.number().step(1).min(1).max(MAX_WEB_RESPONSE_MAX_BYTES),
 })
 
 /** Register the Exa search provider with `ctx.web`. */
@@ -65,6 +71,7 @@ export function apply(ctx: Context, config: Config): void {
     baseURL: config.baseURL ?? EXA_DEFAULT_BASE_URL,
     searchType: config.searchType ?? EXA_DEFAULT_SEARCH_TYPE,
     highlightsPerResult: config.highlightsPerResult ?? EXA_DEFAULT_HIGHLIGHTS_PER_RESULT,
+    maxResponseBytes: config.maxResponseBytes ?? EXA_DEFAULT_MAX_RESPONSE_BYTES,
     ...config.numResults !== undefined ? { numResults: config.numResults } : {},
   }))
 }

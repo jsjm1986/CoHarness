@@ -11,6 +11,41 @@ import type { InboxTarget } from './types.ts'
 /** Mutable state privately owned by an {@link Inbox}. */
 type InboxState = Record<InboxTarget, UserMessage[]>
 
+/** Optional admission limits for one live inbox. Omitted limits are unlimited. */
+export interface InboxLimits {
+  /** Maximum number of pending messages across both targets. */
+  readonly maxMessages?: number
+  /** Maximum UTF-8 bytes of the JSON message snapshots held in memory. */
+  readonly maxBytes?: number
+}
+
+interface MessageLocation {
+  target: InboxTarget
+  index: number
+}
+
+const textEncoder = new TextEncoder()
+
+/** Estimate the durable JSON footprint used by the inbox byte budget. */
+function messageBytes(message: UserMessage): number {
+  let serialized: string
+  try {
+    serialized = JSON.stringify(message)
+  } catch (error: unknown) {
+    throw new Error('non-JSON-serializable inbox message', { cause: error })
+  }
+  return textEncoder.encode(serialized).byteLength
+}
+
+/** Validate one optional positive safe-integer inbox limit. */
+function resolveLimit(value: number | undefined, name: string): number | undefined {
+  if (value === undefined) return undefined
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new TypeError(`${name} must be a positive safe integer`)
+  }
+  return value
+}
+
 /** Live notifications committed by inbox mutations. */
 export interface InboxNotifications {
   /** Publish one inserted message. */
@@ -24,11 +59,19 @@ export interface InboxNotifications {
 /** A replay-once projection that incrementally consumes later inbox splices. */
 export class Inbox {
   private readonly state: InboxState = { 'next-turn': [], 'next-step': [] }
+  private readonly locations = new Map<MessageId, MessageLocation>()
+  private readonly sizes = new Map<MessageId, number>()
+  private readonly maxMessages: number | undefined
+  private readonly maxBytes: number | undefined
+  private pendingBytes = 0
 
   constructor(
     private readonly session: Session,
     private readonly notifications: InboxNotifications,
+    limits: InboxLimits = {},
   ) {
+    this.maxMessages = resolveLimit(limits.maxMessages, 'inbox maxMessages')
+    this.maxBytes = resolveLimit(limits.maxBytes, 'inbox maxBytes')
     for (const event of session.events.slice(session.header.seedLength ?? 0)) {
       if (event.type !== 'agent/inbox/spliced') continue
       try {
@@ -147,11 +190,7 @@ export class Inbox {
 
   /** Locate one pending identity across both owned lists. */
   private locate(messageId: MessageId): { target: InboxTarget; index: number } | undefined {
-    for (const target of ['next-turn', 'next-step'] as const) {
-      const index = this.state[target].findIndex(message => message.id === messageId)
-      if (index >= 0) return { target, index }
-    }
-    return undefined
+    return this.locations.get(messageId)
   }
 
   /** Commit one normalized mutation and publish its live notifications. */
@@ -185,6 +224,12 @@ export class Inbox {
     this.validate(splice)
     const event = this.session.append('agent/inbox/spliced', splice)
     const removed = inbox.splice(actualStart, actualDeleteCount, ...event.data.inserted)
+    this.indexMutation(
+      target,
+      actualStart,
+      event.data.inserted,
+      removed,
+    )
     if (discardRemoved) {
       for (const message of removed) this.notifications.discarded(message)
     }
@@ -196,7 +241,9 @@ export class Inbox {
   private apply(splice: SessionEventMap['agent/inbox/spliced']): UserMessage[] {
     this.validate(splice)
     const inbox = this.state[splice.target]
-    return inbox.splice(splice.start, splice.removedCount ?? 0, ...splice.inserted)
+    const removed = inbox.splice(splice.start, splice.removedCount ?? 0, ...splice.inserted)
+    this.indexMutation(splice.target, splice.start, splice.inserted, removed)
+    return removed
   }
 
   /** Validate one normalized splice against the current projection. */
@@ -208,13 +255,62 @@ export class Inbox {
       || splice.start + removedCount > inbox.length) {
       throw new Error('invalid inbox splice')
     }
-    const candidate = inbox.toSpliced(splice.start, removedCount, ...splice.inserted)
-    const ids = new Set<string>()
-    for (const message of splice.target === 'next-turn'
-      ? [...candidate, ...this.nextStep]
-      : [...this.nextTurn, ...candidate]) {
-      if (ids.has(message.id)) throw new Error(`message "${message.id}" is already pending`)
-      ids.add(message.id)
+    const removed = inbox.slice(splice.start, splice.start + removedCount)
+    const removedIds = new Set(removed.map(message => message.id))
+    const insertedIds = new Set<MessageId>()
+    let insertedBytes = 0
+    for (const message of splice.inserted) {
+      if (insertedIds.has(message.id)) {
+        throw new Error(`message "${message.id}" is already pending`)
+      }
+      const existing = this.locations.get(message.id)
+      if (existing !== undefined && !removedIds.has(message.id)) {
+        throw new Error(`message "${message.id}" is already pending`)
+      }
+      insertedIds.add(message.id)
+      insertedBytes += messageBytes(message)
+    }
+    const nextCount = this.nextTurn.length + this.nextStep.length - removedCount + splice.inserted.length
+    if (this.maxMessages !== undefined && nextCount > this.maxMessages) {
+      throw new Error(`inbox message limit reached (limit: ${this.maxMessages})`)
+    }
+    let removedBytes = 0
+    for (const message of removed) {
+      removedBytes += this.sizes.get(message.id) ?? messageBytes(message)
+    }
+    const nextBytes = this.pendingBytes - removedBytes + insertedBytes
+    if (this.maxBytes !== undefined && nextBytes > this.maxBytes) {
+      throw new Error(`inbox byte limit reached (limit: ${this.maxBytes})`)
+    }
+  }
+
+  /** Update identity/index and byte accounting after a durable splice commits. */
+  private indexMutation(
+    target: InboxTarget,
+    start: number,
+    inserted: readonly UserMessage[],
+    removed: readonly UserMessage[],
+  ): void {
+    for (const message of removed) {
+      this.locations.delete(message.id)
+      const size = this.sizes.get(message.id)
+      if (size !== undefined) {
+        this.pendingBytes -= size
+        this.sizes.delete(message.id)
+      }
+    }
+    for (const message of inserted) {
+      const size = messageBytes(message)
+      this.sizes.set(message.id, size)
+      this.pendingBytes += size
+    }
+    const inbox = this.state[target]
+    // Appends and replacements only need to index the inserted range. A
+    // deletion/prepend shifts the suffix once, avoiding a full-list copy and
+    // leaving subsequent locate() calls O(1).
+    for (let index = start; index < inbox.length; index++) {
+      const message = inbox[index] as UserMessage
+      this.locations.set(message.id, { target, index })
     }
   }
 }

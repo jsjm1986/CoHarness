@@ -11,10 +11,18 @@ import type { Context } from '@deepseek-ai/cordis'
 import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-web'
-import { PerplexitySearchProvider, PERPLEXITY_DEFAULT_BASE_URL, PERPLEXITY_DEFAULT_MAX_TOKENS, PERPLEXITY_DEFAULT_MODEL } from './provider.ts'
+import { MAX_WEB_RESPONSE_MAX_BYTES } from '@deepseek-ai/dsh-web'
+import {
+  PerplexitySearchProvider,
+  PERPLEXITY_DEFAULT_BASE_URL,
+  PERPLEXITY_DEFAULT_MAX_RESPONSE_BYTES,
+  PERPLEXITY_DEFAULT_MAX_TOKENS,
+  PERPLEXITY_DEFAULT_MODEL,
+} from './provider.ts'
 
 export {
   PERPLEXITY_DEFAULT_BASE_URL,
+  PERPLEXITY_DEFAULT_MAX_RESPONSE_BYTES,
   PERPLEXITY_DEFAULT_MAX_TOKENS,
   PERPLEXITY_DEFAULT_MODEL,
   PERPLEXITY_PROVIDER_ID,
@@ -38,6 +46,8 @@ export interface Config {
   model?: string
   /** Upper bound on generated answer tokens. Defaults to 1024. */
   maxTokens?: number
+  /** Maximum UTF-8 bytes retained from one success or error response (up to 256 MiB). */
+  maxResponseBytes?: number
   /** Recency window sent as `search_recency_filter`. Omitted = no filter. */
   searchRecency?: 'day' | 'week' | 'month' | 'year'
 }
@@ -47,6 +57,7 @@ export const Config: z<Config> = z.object({
   baseURL: z.string(),
   model: z.string(),
   maxTokens: z.number().step(1).min(1),
+  maxResponseBytes: z.number().step(1).min(1).max(MAX_WEB_RESPONSE_MAX_BYTES),
   searchRecency: z.union(['day', 'week', 'month', 'year'] as const),
 })
 
@@ -59,6 +70,7 @@ export function apply(ctx: Context, config: Config): void {
     baseURL: config.baseURL ?? PERPLEXITY_DEFAULT_BASE_URL,
     model: config.model ?? PERPLEXITY_DEFAULT_MODEL,
     maxTokens: config.maxTokens ?? PERPLEXITY_DEFAULT_MAX_TOKENS,
+    maxResponseBytes: config.maxResponseBytes ?? PERPLEXITY_DEFAULT_MAX_RESPONSE_BYTES,
     ...config.searchRecency !== undefined ? { searchRecency: config.searchRecency } : {},
   }))
 }

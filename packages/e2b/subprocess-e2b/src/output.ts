@@ -64,6 +64,8 @@ export class E2BBase64Decoder {
 /** Offset reader used for one collect-mode E2B stream. */
 export class E2BOutputReader implements SubprocessOutputReader {
   private chunks: Buffer[] = []
+  /** Index of the first retained chunk; retired prefixes are compacted lazily. */
+  private head = 0
   private retainedBytes = 0
   private totalBytes = 0
   private spillValid = true
@@ -101,21 +103,35 @@ export class E2BOutputReader implements SubprocessOutputReader {
     this.chunks.push(chunk)
     this.retainedBytes += chunk.length
     while (this.retainedBytes > this.maxBytes) {
-      const head = this.chunks[0] as Buffer
+      const head = this.chunks[this.head] as Buffer
       const excess = this.retainedBytes - this.maxBytes
       if (head.length <= excess) {
-        this.chunks.shift()
+        this.head += 1
         this.retainedBytes -= head.length
       } else {
-        this.chunks[0] = head.subarray(excess)
+        this.chunks[this.head] = head.subarray(excess)
         this.retainedBytes -= excess
       }
+    }
+    this.compactChunks()
+  }
+
+  /** Reclaim retired chunk slots without moving the active tail per push. */
+  private compactChunks(): void {
+    if (this.head === this.chunks.length) {
+      this.chunks = []
+      this.head = 0
+    } else if (this.head >= 1024 && this.head * 2 >= this.chunks.length) {
+      this.chunks = this.chunks.slice(this.head)
+      this.head = 0
     }
   }
 
   /** @inheritdoc */
   readFrom(fromByte: number): SubprocessOutputRead {
-    const retained = Buffer.concat(this.chunks, this.retainedBytes)
+    this.compactChunks()
+    const retainedChunks = this.head === 0 ? this.chunks : this.chunks.slice(this.head)
+    const retained = Buffer.concat(retainedChunks, this.retainedBytes)
     const firstRetained = this.totalBytes - this.retainedBytes
     const lossy = fromByte < firstRetained
     const start = lossy ? 0 : Math.min(retained.length, Math.max(0, fromByte - firstRetained))

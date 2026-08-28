@@ -16,6 +16,7 @@ import { runCoordinatorContract, type CoordinatorFixture } from '../../session-p
 const statRace = vi.hoisted(() => ({
   path: undefined as string | undefined,
   reads: 0,
+  alwaysChange: false,
 }))
 
 vi.mock('node:fs/promises', async (importOriginal) => {
@@ -26,6 +27,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
       const identity = await actual.stat(...args)
       if (String(args[0]) !== statRace.path || !('mtimeNs' in identity)) return identity
       statRace.reads += 1
+      if (statRace.alwaysChange) return { ...identity, mtimeNs: identity.mtimeNs + BigInt(statRace.reads) }
       if (statRace.reads !== 2) return identity
       return { ...identity, mtimeNs: identity.mtimeNs + 1n }
     }) as typeof actual.stat,
@@ -86,6 +88,7 @@ function rawLogPath(root: string, cwd: string | undefined, id: SessionId): strin
 afterEach(async () => {
   statRace.path = undefined
   statRace.reads = 0
+  statRace.alwaysChange = false
   vi.restoreAllMocks()
   for (const d of dirs.splice(0)) await rm(d, { recursive: true, force: true })
 })
@@ -354,6 +357,28 @@ describe('JsonlSessionPersistence: durability and crash semantics', () => {
     expect(raw).toBeDefined()
     // Two stat calls per iteration; the mocked revision change forces a retry.
     expect(statRace.reads).toBe(4)
+  })
+
+  it('stops retrying when a file never reaches a revision-stable read', async () => {
+    const absoluteRoot = await freshRoot()
+    const localCtx = new Context()
+    await localCtx.plugin(SessionStore)
+    const fiber = await localCtx.plugin(JsonlSessionPersistence, {
+      root: absoluteRoot,
+      compression: 'none',
+      readStableMaxAttempts: 3,
+      readStableMaxDurationMs: 1_000,
+    })
+    const m = meta('raw-revision-never-stable', '/work')
+    await localCtx.sessionPersistence.create(m)
+    await localCtx.sessionPersistence.append(m.id, oneTurnLog())
+    statRace.path = rawLogPath(absoluteRoot, '/work', m.id)
+    statRace.alwaysChange = true
+
+    await expect(localCtx.sessionPersistence.readRaw(m.id))
+      .rejects.toThrow(/did not remain revision-stable after 3 attempts/)
+    expect(statRace.reads).toBe(6)
+    await fiber.dispose()
   })
 
   it('keeps the same location on resume and gives a fork its own location', async () => {
@@ -1323,6 +1348,24 @@ describe('JsonlSessionPersistence: edge cases', () => {
     await writeFile(rawLogPath(root, undefined, id), bigHeader + '\n')
     const ids = (await ctx.sessionPersistence.list()).map(x => x.id)
     expect(ids).toContain('big')
+  })
+
+  it('rejects a header that exceeds the metadata reader budget', async () => {
+    const absoluteRoot = await freshRoot()
+    const localCtx = new Context()
+    await localCtx.plugin(SessionStore)
+    const fiber = await localCtx.plugin(JsonlSessionPersistence, {
+      root: absoluteRoot,
+      compression: 'none',
+      maxHeaderBytes: 128,
+    })
+    const id = SessionId('oversized-header')
+    await mkdir(sessionDir(absoluteRoot, undefined, id), { recursive: true })
+    const header = JSON.stringify({ type: 'session', version: 0, id, createdAt: 1, delegationDepth: 0, pad: 'x'.repeat(200) })
+    await writeFile(rawLogPath(absoluteRoot, undefined, id), header + '\n')
+
+    await expect(localCtx.sessionPersistence.list()).rejects.toThrow(/session header exceeds 128 bytes/)
+    await fiber.dispose()
   })
 
   it.each(['sandboxMode', 'approvalPolicy'] as const)('rejects the retired %s header field', (field) => {

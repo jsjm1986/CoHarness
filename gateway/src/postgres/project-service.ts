@@ -19,6 +19,7 @@ import {
   type ProjectRow,
 } from '../projects.ts'
 import { transaction } from './database.ts'
+import { allocateInstancePorts } from './port-allocation.ts'
 import {
   internalProjectId,
   internalUserId,
@@ -45,6 +46,23 @@ function managedSlug(name: string): string {
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+}
+
+interface InvitationSelectRow {
+  id: string
+  project_public_id: string
+  project_name: string
+  invitee_public_id: string
+  invitee_username: string
+  invitee_display_name: string
+  inviter_public_id: string
+  inviter_username: string
+  inviter_display_name: string
+  mode: GrantMode
+  status: ProjectInvitationStatus
+  expires_at: Date | null
+  created_at: Date
+  responded_at: Date | null
 }
 
 /** PostgreSQL-backed project catalog and node-local mounts for one organization. */
@@ -131,12 +149,13 @@ export class PostgresProjectService {
         await client.query(`INSERT INTO harness.project_members(
           organization_id,project_id,user_id,access_mode
         ) VALUES($1,$2,$3,'rw')`, [this.context.organizationId, row.id, owner ?? createdBy])
-        const ports = await client.query<{ port: number | null }>(`SELECT MAX(port) port FROM harness.instances
-          WHERE assigned_node_id=$1`, [this.context.nodeId])
-        const port = ports.rows[0]?.port === null || ports.rows[0]?.port === undefined
-          ? this.cfg.instancePortBase
-          : Math.max(this.cfg.instancePortBase, ports.rows[0].port + 1)
-        if (port > 65535) throw new Error(`no instance ports remain on node ${this.context.nodeName}`)
+        const [port] = await allocateInstancePorts(
+          client,
+          this.context.nodeId,
+          this.cfg.instancePortBase,
+          1,
+          this.context.nodeName,
+        )
         await client.query(`INSERT INTO harness.instances(
           organization_id,project_id,assigned_node_id,port
         ) VALUES($1,$2,$3,$4)`, [this.context.organizationId, row.id, this.context.nodeId, port])
@@ -198,7 +217,9 @@ export class PostgresProjectService {
     }))
   }
 
-  async getById(id: number): Promise<ProjectDetail | null> {
+  async getByIds(ids: readonly number[]): Promise<ProjectDetail[]> {
+    const uniqueIds = [...new Set(ids)]
+    if (uniqueIds.length === 0) return []
     const project = await this.context.pool.query<{
       internal_id: string
       public_id: string
@@ -224,20 +245,26 @@ export class PostgresProjectService {
       LEFT JOIN harness.project_members m ON m.project_id=p.id AND m.organization_id=p.organization_id
       LEFT JOIN harness.users owner ON owner.id=p.owner_user_id AND owner.organization_id=p.organization_id
       LEFT JOIN harness.users creator ON creator.id=p.created_by AND creator.organization_id=p.organization_id
-      WHERE p.organization_id=$1 AND p.public_id=$3 AND p.status='active'
-      GROUP BY p.id,pm.local_path,owner.id,creator.id`, [this.context.organizationId, this.context.nodeId, id])
-    const row = project.rows[0]
-    if (row === undefined) return null
+      WHERE p.organization_id=$1 AND p.public_id=ANY($3::bigint[]) AND p.status='active'
+      GROUP BY p.id,pm.local_path,owner.id,creator.id ORDER BY p.public_id`, [this.context.organizationId, this.context.nodeId, uniqueIds])
+    if (project.rows.length === 0) return []
     const members = await this.context.pool.query<{
+      project_id: string
       user_id: string
       username: string
       access_mode: GrantMode
-    }>(`SELECT u.public_id::text user_id,u.username::text,m.access_mode
+    }>(`SELECT m.project_id::text project_id,u.public_id::text user_id,u.username::text,m.access_mode
       FROM harness.project_members m
       JOIN harness.users u ON u.id=m.user_id AND u.organization_id=m.organization_id
-      WHERE m.organization_id=$1 AND m.project_id=$2 ORDER BY u.username`,
-    [this.context.organizationId, row.internal_id])
-    return {
+      WHERE m.organization_id=$1 AND m.project_id=ANY($2::uuid[]) ORDER BY m.project_id,u.username`,
+    [this.context.organizationId, project.rows.map(row => row.internal_id)])
+    const membersByProject = new Map<string, Array<{ userId: number; username: string; mode: GrantMode }>>()
+    for (const member of members.rows) {
+      const list = membersByProject.get(member.project_id) ?? []
+      list.push({ userId: publicNumber(member.user_id, 'user'), username: member.username, mode: member.access_mode })
+      membersByProject.set(member.project_id, list)
+    }
+    return project.rows.map(row => ({
       id: publicNumber(row.public_id, 'project'),
       name: row.name,
       path: row.path,
@@ -250,12 +277,12 @@ export class PostgresProjectService {
       createdBy: row.creator_public_id === null ? null : {
         id: publicNumber(row.creator_public_id, 'user'), username: row.creator_username!, displayName: row.creator_display_name!,
       },
-      members: members.rows.map(member => ({
-        userId: publicNumber(member.user_id, 'user'),
-        username: member.username,
-        mode: member.access_mode,
-      })),
-    }
+      members: membersByProject.get(row.internal_id) ?? [],
+    }))
+  }
+
+  async getById(id: number): Promise<ProjectDetail | null> {
+    return (await this.getByIds([id]))[0] ?? null
   }
 
   async rename(id: number, name: string): Promise<void> {
@@ -393,15 +420,22 @@ export class PostgresProjectService {
       values.push(internalProject)
       projectClause = ' AND i.project_id=$3'
     }
-    const result = await this.context.pool.query<{ id: string }>(`SELECT i.id::text FROM harness.project_invitations i
+    const result = await this.context.pool.query<InvitationSelectRow>(`SELECT i.id::text id,
+      p.public_id::text project_public_id,p.name::text project_name,
+      iu.public_id::text invitee_public_id,iu.username::text invitee_username,iu.display_name invitee_display_name,
+      ru.public_id::text inviter_public_id,ru.username::text inviter_username,ru.display_name inviter_display_name,
+      i.access_mode mode,i.status,i.expires_at,i.created_at,i.responded_at
+      FROM harness.project_invitations i
       JOIN harness.projects p ON p.id=i.project_id AND p.organization_id=i.organization_id
+      JOIN harness.users iu ON iu.id=i.invitee_user_id AND iu.organization_id=i.organization_id
+      JOIN harness.users ru ON ru.id=i.inviter_user_id AND ru.organization_id=i.organization_id
       WHERE i.organization_id=$1 AND (i.invitee_user_id=$2 OR i.inviter_user_id=$2 OR p.owner_user_id=$2 OR EXISTS (
         SELECT 1 FROM harness.memberships administrator
         WHERE administrator.organization_id=i.organization_id AND administrator.user_id=$2
           AND administrator.role='admin' AND administrator.status='active'
       ))
-        ${projectClause} ORDER BY i.created_at DESC`, values)
-    return Promise.all(result.rows.map(row => this.invitationById(row.id)))
+        ${projectClause} ORDER BY i.created_at DESC,i.id`, values)
+    return result.rows.map(row => this.invitationFromRow(row.id, row))
   }
 
   async countPendingInvitations(userId: number): Promise<number> {
@@ -444,23 +478,7 @@ export class PostgresProjectService {
     if (result === 'expired') throw new Error('invitation-expired')
   }
 
-  private async invitationById(id: string): Promise<ProjectInvitation> {
-    const result = await this.context.pool.query<{
-      project_public_id: string; project_name: string
-      invitee_public_id: string; invitee_username: string; invitee_display_name: string
-      inviter_public_id: string; inviter_username: string; inviter_display_name: string
-      mode: GrantMode; status: ProjectInvitationStatus; expires_at: Date | null; created_at: Date; responded_at: Date | null
-    }>(`SELECT p.public_id::text project_public_id,p.name::text project_name,
-      iu.public_id::text invitee_public_id,iu.username::text invitee_username,iu.display_name invitee_display_name,
-      ru.public_id::text inviter_public_id,ru.username::text inviter_username,ru.display_name inviter_display_name,
-      i.access_mode mode,i.status,i.expires_at,i.created_at,i.responded_at
-      FROM harness.project_invitations i
-      JOIN harness.projects p ON p.id=i.project_id AND p.organization_id=i.organization_id
-      JOIN harness.users iu ON iu.id=i.invitee_user_id AND iu.organization_id=i.organization_id
-      JOIN harness.users ru ON ru.id=i.inviter_user_id AND ru.organization_id=i.organization_id
-      WHERE i.organization_id=$1 AND i.id=$2`, [this.context.organizationId, id])
-    const row = result.rows[0]
-    if (row === undefined) throw new Error('invitation-not-found')
+  private invitationFromRow(id: string, row: Omit<InvitationSelectRow, 'id'> | InvitationSelectRow): ProjectInvitation {
     return {
       id,
       projectId: publicNumber(row.project_public_id, 'project'),
@@ -473,6 +491,21 @@ export class PostgresProjectService {
       createdAt: row.created_at.toISOString(),
       respondedAt: row.responded_at?.toISOString() ?? null,
     }
+  }
+
+  private async invitationById(id: string): Promise<ProjectInvitation> {
+    const result = await this.context.pool.query<Omit<InvitationSelectRow, 'id'>>(`SELECT p.public_id::text project_public_id,p.name::text project_name,
+      iu.public_id::text invitee_public_id,iu.username::text invitee_username,iu.display_name invitee_display_name,
+      ru.public_id::text inviter_public_id,ru.username::text inviter_username,ru.display_name inviter_display_name,
+      i.access_mode mode,i.status,i.expires_at,i.created_at,i.responded_at
+      FROM harness.project_invitations i
+      JOIN harness.projects p ON p.id=i.project_id AND p.organization_id=i.organization_id
+      JOIN harness.users iu ON iu.id=i.invitee_user_id AND iu.organization_id=i.organization_id
+      JOIN harness.users ru ON ru.id=i.inviter_user_id AND ru.organization_id=i.organization_id
+      WHERE i.organization_id=$1 AND i.id=$2`, [this.context.organizationId, id])
+    const row = result.rows[0]
+    if (row === undefined) throw new Error('invitation-not-found')
+    return this.invitationFromRow(id, row)
   }
 
   async effectiveGrants(userId: number): Promise<EffectiveGrant[]> {

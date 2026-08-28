@@ -17,6 +17,16 @@ import { TextThinkingParser } from './text-thinking.ts'
 
 type NonTerminalAssistantMessageEvent = Exclude<AssistantMessageEvent, { type: 'done' | 'error' }>
 
+/** Fixed safety limits for events held behind an undecided text-thinking prefix. */
+const MAX_ORDERING_QUEUE_EVENTS = 4_096
+const MAX_ORDERING_QUEUE_BYTES = 8 * 1024 * 1024
+const orderingEncoder = new TextEncoder()
+
+interface QueuedEvent {
+  readonly event: NonTerminalAssistantMessageEvent
+  readonly bytes: number
+}
+
 interface TextBlockState {
   parser: TextThinkingParser
   nativeIndex: number
@@ -24,10 +34,23 @@ interface TextBlockState {
   reasoningIndex: number | undefined
   /** Assigned when the text side is first emitted, or when an empty block is preserved. */
   textIndex: number | undefined
-  reasoningText: string
-  textText: string
+  /** Incremental fragments joined only when a block-end is emitted. */
+  reasoningParts: string[]
+  /** Incremental fragments joined only when a block-end is emitted. */
+  textParts: string[]
   textStarted: boolean
   textClosed: boolean
+}
+
+/** Estimate one provider event's JSON footprint without retaining an unbounded queue. */
+function queuedEventBytes(event: NonTerminalAssistantMessageEvent): number {
+  try {
+    const serialized = JSON.stringify(event) as string | undefined
+    if (serialized === undefined) return MAX_ORDERING_QUEUE_BYTES + 1
+    return orderingEncoder.encode(serialized).byteLength
+  } catch {
+    return MAX_ORDERING_QUEUE_BYTES + 1
+  }
 }
 
 function textStateOf(states: Map<number, TextBlockState>, nativeIndex: number): TextBlockState {
@@ -38,8 +61,8 @@ function textStateOf(states: Map<number, TextBlockState>, nativeIndex: number): 
       nativeIndex,
       reasoningIndex: undefined,
       textIndex: undefined,
-      reasoningText: '',
-      textText: '',
+      reasoningParts: [],
+      textParts: [],
       textStarted: false,
       textClosed: false,
     }
@@ -57,9 +80,9 @@ function* applyTextUpdate(
   for (const part of update.parts) {
     if (part.type === 'reasoning') {
       yield { type: 'block-start', index: indexes.reasoningIndex, blockType: 'reasoning' }
-      state.reasoningText += part.text
+      state.reasoningParts.push(part.text)
       yield { type: 'reasoning-delta', index: indexes.reasoningIndex, text: part.text }
-      yield { type: 'block-end', index: indexes.reasoningIndex, block: { type: 'reasoning', text: state.reasoningText } }
+      yield { type: 'block-end', index: indexes.reasoningIndex, block: { type: 'reasoning', text: state.reasoningParts.join('') } }
       continue
     }
 
@@ -69,11 +92,11 @@ function* applyTextUpdate(
     }
     /* v8 ignore next -- pi-ai emits no text delta after text_end; retain containment for extension streams. */
     if (state.textClosed) continue
-    state.textText += part.text
+    state.textParts.push(part.text)
     yield { type: 'text-delta', index: indexes.textIndex, text: part.text }
     if (part.complete) {
       state.textClosed = true
-      yield { type: 'block-end', index: indexes.textIndex, block: { type: 'text', text: state.textText } }
+      yield { type: 'block-end', index: indexes.textIndex, block: { type: 'text', text: state.textParts.join('') } }
     }
   }
 }
@@ -86,12 +109,12 @@ function* applyTextUpdate(
  * @returns the remaining block-end chunks.
  */
 function* closeTextState(state: TextBlockState, finalText?: string): Generator<StreamChunk> {
-  if (!state.parser.transformed && finalText !== undefined) state.textText = finalText
+  if (!state.parser.transformed && finalText !== undefined) state.textParts = [finalText]
   if (state.textStarted && !state.textClosed) {
     /* v8 ignore next -- every emitted text part receives indexesForText before this close path. */
     if (state.textIndex === undefined) throw new Error('text-thinking text index was not assigned')
     state.textClosed = true
-    yield { type: 'block-end', index: state.textIndex, block: { type: 'text', text: state.textText } }
+    yield { type: 'block-end', index: state.textIndex, block: { type: 'text', text: state.textParts.join('') } }
   }
 }
 
@@ -272,7 +295,29 @@ export async function* toStreamChunks(
   const toolIds = new Map<number, { id: string; name: string }>()
   const textStates = new Map<number, TextBlockState>()
   const expandedTextIndices = new Set<number>()
-  const queuedEvents: NonTerminalAssistantMessageEvent[] = []
+  const queuedEvents: QueuedEvent[] = []
+  let queuedHead = 0
+  let queuedBytes = 0
+
+  function queuedCount(): number {
+    return queuedEvents.length - queuedHead
+  }
+
+  function queuedPeek(): NonTerminalAssistantMessageEvent | undefined {
+    return queuedEvents[queuedHead]?.event
+  }
+
+  function queuedShift(): NonTerminalAssistantMessageEvent | undefined {
+    const entry = queuedEvents[queuedHead]
+    if (entry === undefined) return undefined
+    queuedBytes = Math.max(0, queuedBytes - entry.bytes)
+    queuedHead += 1
+    if (queuedHead >= 64 && queuedHead * 2 >= queuedEvents.length) {
+      queuedEvents.splice(0, queuedHead)
+      queuedHead = 0
+    }
+    return entry.event
+  }
 
   function expansionCountBefore(nativeIndex: number): number {
     let count = 0
@@ -455,13 +500,14 @@ export async function* toStreamChunks(
   }
 
   function* drainQueued(): Generator<StreamChunk> {
-    while (true) {
-      const next = queuedEvents.shift()
+    while (queuedCount() > 0) {
+      const next = queuedPeek()
+      /* v8 ignore next -- the count check above keeps the queue head present. */
       if (next === undefined) return
       if (shouldQueue(next)) {
-        queuedEvents.unshift(next)
         return
       }
+      queuedShift()
       yield* emitNonTerminal(next)
     }
   }
@@ -475,7 +521,7 @@ export async function* toStreamChunks(
         do {
           yield* flushTextStates(event.message)
           yield* drainQueued()
-        } while (queuedEvents.length > 0 || pendingNativeIndex() !== undefined)
+        } while (queuedCount() > 0 || pendingNativeIndex() !== undefined)
       }
       const transformedTextThinking = [...textStates.values()]
         .some(state => state.parser.transformed)
@@ -494,7 +540,7 @@ export async function* toStreamChunks(
         do {
           yield* flushTextStates(event.error)
           yield* drainQueued()
-        } while (queuedEvents.length > 0 || pendingNativeIndex() !== undefined)
+        } while (queuedCount() > 0 || pendingNativeIndex() !== undefined)
       }
       yield { type: 'usage', usage: mapUsage(event.error.usage) }
       yield { type: 'finish', reason: mapStopReason(event.error, contextWindow, response?.()) }
@@ -510,7 +556,17 @@ export async function* toStreamChunks(
       }
     }
     if (shouldQueue(event)) {
-      queuedEvents.push(event)
+      const bytes = queuedEventBytes(event)
+      if (queuedCount() >= MAX_ORDERING_QUEUE_EVENTS
+        || bytes > MAX_ORDERING_QUEUE_BYTES
+        || queuedBytes + bytes > MAX_ORDERING_QUEUE_BYTES) {
+        throw new LlmError(
+          `pi-ai response ordering buffer exceeded ${String(MAX_ORDERING_QUEUE_BYTES)} bytes or ${String(MAX_ORDERING_QUEUE_EVENTS)} events`,
+          'RESPONSE_TOO_LARGE',
+        )
+      }
+      queuedEvents.push({ event, bytes })
+      queuedBytes += bytes
       continue
     }
     yield* emitNonTerminal(event)

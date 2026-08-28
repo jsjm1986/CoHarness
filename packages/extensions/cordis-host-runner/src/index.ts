@@ -24,6 +24,7 @@ import type {
   DynamicCordisPluginInspection,
   DynamicCordisReference, DynamicCordisRun,
 } from './registry.ts'
+import type { DynamicCordisRegistryConfig } from './registry.ts'
 import { createSandbox, evaluateHostCode, precheckCode } from './sandbox.ts'
 import type {
   ApprovalRequestId, CordisDynamicPackageId, CordisDynamicPluginId, CordisDynamicPluginRunId, CordisErrorDetails,
@@ -91,10 +92,44 @@ declare module '@deepseek-ai/cordis' {
 export interface Config {
   /** Maximum synchronous VM evaluation time in milliseconds. */
   vmTimeoutMs?: number
+  /** Maximum live dynamic Plugins retained by this runner. */
+  maxPlugins?: number
+  /** Maximum dynamic Plugins owned by one Session. */
+  maxPluginsPerSession?: number
+  /** Maximum immutable Packages retained by one Plugin. */
+  maxPackagesPerPlugin?: number
+  /** Maximum UTF-8 source bytes retained across all definitions. */
+  maxSourceBytes?: number
+  /** Maximum UTF-8 source bytes retained by one Session. */
+  maxSourceBytesPerSession?: number
+  /** Maximum pending run requests retained by this runner. */
+  maxPendingApprovals?: number
+  /** Maximum pending run requests owned by one Session. */
+  maxPendingApprovalsPerSession?: number
 }
 
 type ResolvedConfig = Required<Config>
 const MAX_TIMER_DELAY_MS = 2_147_483_647
+/** Default global Plugin retention. */
+export const DEFAULT_DYNAMIC_MAX_PLUGINS = 128
+/** Default per-Session Plugin retention. */
+export const DEFAULT_DYNAMIC_MAX_PLUGINS_PER_SESSION = 32
+/** Default immutable Package retention per Plugin. */
+export const DEFAULT_DYNAMIC_MAX_PACKAGES_PER_PLUGIN = 32
+/** Default global source retention in bytes. */
+export const DEFAULT_DYNAMIC_MAX_SOURCE_BYTES = 32 * 1024 * 1024
+/** Default per-Session source retention in bytes. */
+export const DEFAULT_DYNAMIC_MAX_SOURCE_BYTES_PER_SESSION = 8 * 1024 * 1024
+/** Default global pending run-request retention. */
+export const DEFAULT_DYNAMIC_MAX_PENDING_APPROVALS = 256
+/** Default per-Session pending run-request retention. */
+export const DEFAULT_DYNAMIC_MAX_PENDING_APPROVALS_PER_SESSION = 32
+
+function positiveLimit(value: number | undefined, fallback: number, label: string): number {
+  const resolved = value ?? fallback
+  if (!Number.isSafeInteger(resolved) || resolved < 1) throw new RangeError(`${label} must be a positive safe integer`)
+  return resolved
+}
 
 /** Host-only snapshot consumed by inspect and tool result rendering. */
 export interface DynamicCordisSnapshotRow {
@@ -145,10 +180,21 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
 
   static Config: z<Config> = z.object({
     vmTimeoutMs: z.number().min(1).max(MAX_TIMER_DELAY_MS).default(5000),
+    maxPlugins: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULT_DYNAMIC_MAX_PLUGINS),
+    maxPluginsPerSession: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULT_DYNAMIC_MAX_PLUGINS_PER_SESSION),
+    maxPackagesPerPlugin: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULT_DYNAMIC_MAX_PACKAGES_PER_PLUGIN),
+    maxSourceBytes: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULT_DYNAMIC_MAX_SOURCE_BYTES),
+    maxSourceBytesPerSession: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULT_DYNAMIC_MAX_SOURCE_BYTES_PER_SESSION),
+    maxPendingApprovals: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULT_DYNAMIC_MAX_PENDING_APPROVALS),
+    maxPendingApprovalsPerSession: z.number()
+      .step(1)
+      .min(1)
+      .max(Number.MAX_SAFE_INTEGER)
+      .default(DEFAULT_DYNAMIC_MAX_PENDING_APPROVALS_PER_SESSION),
   })
 
   private readonly rootCtx: Context
-  private readonly registry = new DynamicCordisRegistry()
+  private readonly registry: DynamicCordisRegistry
   private readonly inspectRegistry: CordisInspectRegistryService
   private readonly starting = new Map<CordisDynamicPluginId, Promise<DynamicCordisHostHalfResult>>()
   /** Serializes competing browser answers for one approval request. */
@@ -165,7 +211,26 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
     if (!Number.isFinite(vmTimeoutMs) || vmTimeoutMs < 1 || vmTimeoutMs > MAX_TIMER_DELAY_MS) {
       throw new RangeError(`vmTimeoutMs must be between 1 and ${String(MAX_TIMER_DELAY_MS)}ms`)
     }
-    this.resolved = { vmTimeoutMs }
+    this.resolved = {
+      vmTimeoutMs,
+      maxPlugins: positiveLimit(config.maxPlugins, DEFAULT_DYNAMIC_MAX_PLUGINS, 'maxPlugins'),
+      maxPluginsPerSession: positiveLimit(config.maxPluginsPerSession, DEFAULT_DYNAMIC_MAX_PLUGINS_PER_SESSION, 'maxPluginsPerSession'),
+      maxPackagesPerPlugin: positiveLimit(config.maxPackagesPerPlugin, DEFAULT_DYNAMIC_MAX_PACKAGES_PER_PLUGIN, 'maxPackagesPerPlugin'),
+      maxSourceBytes: positiveLimit(config.maxSourceBytes, DEFAULT_DYNAMIC_MAX_SOURCE_BYTES, 'maxSourceBytes'),
+      maxSourceBytesPerSession: positiveLimit(config.maxSourceBytesPerSession, DEFAULT_DYNAMIC_MAX_SOURCE_BYTES_PER_SESSION, 'maxSourceBytesPerSession'),
+      maxPendingApprovals: positiveLimit(config.maxPendingApprovals, DEFAULT_DYNAMIC_MAX_PENDING_APPROVALS, 'maxPendingApprovals'),
+      maxPendingApprovalsPerSession: positiveLimit(config.maxPendingApprovalsPerSession, DEFAULT_DYNAMIC_MAX_PENDING_APPROVALS_PER_SESSION, 'maxPendingApprovalsPerSession'),
+    }
+    const registryConfig: DynamicCordisRegistryConfig = {
+      maxPlugins: this.resolved.maxPlugins,
+      maxPluginsPerSession: this.resolved.maxPluginsPerSession,
+      maxPackagesPerPlugin: this.resolved.maxPackagesPerPlugin,
+      maxSourceBytes: this.resolved.maxSourceBytes,
+      maxSourceBytesPerSession: this.resolved.maxSourceBytesPerSession,
+      maxPendingApprovals: this.resolved.maxPendingApprovals,
+      maxPendingApprovalsPerSession: this.resolved.maxPendingApprovalsPerSession,
+    }
+    this.registry = new DynamicCordisRegistry(registryConfig)
     this.inspectRegistry = new CordisInspectRegistryService(ctx)
     ctx.on('agent/disposed', ({ agent }) => {
       for (const plugin of this.registry.ofSession(agent.id)) {
@@ -252,6 +317,10 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
       if (!/^[a-z]{3,6}$/.test(prefix)) {
         throw new Error('cordis_define `plugin.idPrefix` must contain 3–6 lowercase English letters')
       }
+      this.registry.assertDefinitionCapacity(request.sessionId, undefined, {
+        ...(request.code.host === undefined ? {} : { hostCode: request.code.host }),
+        ...(request.code.client === undefined ? {} : { clientCode: request.code.client }),
+      })
       const pluginId = CordisDynamicPluginId(this.registry.mintPluginId(prefix))
       plugin = {
         pluginId,
@@ -267,6 +336,10 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
         throw new Error(missingPluginMessage(request.plugin.pluginId))
       }
       plugin = found
+      this.registry.assertDefinitionCapacity(request.sessionId, plugin, {
+        ...(request.code.host === undefined ? {} : { hostCode: request.code.host }),
+        ...(request.code.client === undefined ? {} : { clientCode: request.code.client }),
+      })
     }
 
     const packageId = CordisDynamicPackageId(this.registry.mintPackageId())
@@ -277,7 +350,7 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
       ...request.code.host === undefined ? {} : { hostCode: request.code.host },
       ...request.code.client === undefined ? {} : { clientCode: request.code.client },
     }
-    plugin.packages.set(packageId, definition)
+    this.registry.addPackage(plugin, definition)
     return {
       pluginId: plugin.pluginId,
       packageId,
@@ -355,6 +428,7 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
     if (this.registry.pendingRequestFor(pluginId) !== undefined) {
       return { ok: false, reason: 'transition-in-flight', message: `dynamic plugin "${pluginId}" already has a pending run request` }
     }
+    if (plan.definition.clientCode !== undefined) this.registry.assertPendingRequestCapacity(agent.id)
     const attempt = this.createAttempt(plan)
     plan.plugin.nextPackageId = packageId
     plan.plugin.latestRun = attempt

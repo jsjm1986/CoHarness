@@ -1020,4 +1020,4 @@ Source: [`packages/context/userdoc-context/src/index.ts:25`](../packages/context
 'web/deepseek-search-llm-request': DeepSeekSearchLlmRequest
 ```
 
-Source: [`packages/web/web-search-deepseek/src/provider.ts:83`](../packages/web/web-search-deepseek/src/provider.ts)
+Source: [`packages/web/web-search-deepseek/src/provider.ts:91`](../packages/web/web-search-deepseek/src/provider.ts)

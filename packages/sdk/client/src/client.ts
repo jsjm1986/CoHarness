@@ -74,11 +74,49 @@ export class SdkProtocolError extends Error {
 }
 
 interface SubscriptionState {
-  readonly queue: HarnessNotification[]
+  readonly queue: FifoQueue<HarnessNotification>
   readonly maxQueue: number
-  readonly waiters: { resolve: (item: HarnessNotification) => void; reject: (error: Error) => void }[]
+  readonly waiters: FifoQueue<{ resolve: (item: HarnessNotification) => void; reject: (error: Error) => void }>
   readonly filter: NotificationFilter | undefined
   failure: Error | undefined
+}
+
+/**
+ * Head-indexed FIFO used by notification queues and waiter lists. Repeated
+ * `Array#shift()` moves the remaining tail on every delivery; retaining a
+ * cursor keeps each operation amortized O(1) and compacts only retired prefixes.
+ */
+class FifoQueue<T> {
+  private values: T[] = []
+  private head = 0
+
+  /** Number of live entries. */
+  get length(): number {
+    return this.values.length - this.head
+  }
+
+  /** Append one entry. */
+  push(value: T): void {
+    this.values.push(value)
+  }
+
+  /** Remove the oldest entry, if any. */
+  shift(): T | undefined {
+    if (this.head >= this.values.length) return undefined
+    const value = this.values[this.head]
+    this.head += 1
+    if (this.head >= 64 && this.head * 2 >= this.values.length) {
+      this.values = this.values.slice(this.head)
+      this.head = 0
+    }
+    return value
+  }
+
+  /** Drop every queued entry. */
+  clear(): void {
+    this.values = []
+    this.head = 0
+  }
 }
 
 /** One client-side notification stream returned by {@link HarnessClient.subscribe}. */
@@ -136,7 +174,7 @@ class NotificationSubscriptionImpl implements NotificationSubscription {
     this.unsubscribe()
     // The drop is part of this method's contract; a runtime-death fail() keeps
     // the queue so already-delivered notifications remain drainable.
-    this.state.queue.length = 0
+    this.state.queue.clear()
     this.fail(new TransportClosedError('notification subscription closed'))
   }
 
@@ -147,7 +185,11 @@ class NotificationSubscriptionImpl implements NotificationSubscription {
    */
   fail(error: Error): void {
     this.state.failure ??= error
-    for (const waiter of this.state.waiters.splice(0)) waiter.reject(this.state.failure)
+    for (;;) {
+      const waiter = this.state.waiters.shift()
+      if (waiter === undefined) break
+      waiter.reject(this.state.failure)
+    }
   }
 
   /**
@@ -382,7 +424,9 @@ export class HarnessClient {
     if (!Number.isSafeInteger(maxQueue) || maxQueue < 1) {
       throw new RangeError('maxNotificationQueue must be a positive safe integer')
     }
-    const state: SubscriptionState = { queue: [], maxQueue, waiters: [], filter, failure: undefined }
+    const state: SubscriptionState = {
+      queue: new FifoQueue(), maxQueue, waiters: new FifoQueue(), filter, failure: undefined,
+    }
     const subscription = new NotificationSubscriptionImpl(state, () => { this.subscriptions.delete(id) })
     if (this.closeTask !== undefined || this.exitCode !== undefined || this.spawnError !== undefined) {
       subscription.fail(this.closedError('DeepSeek Harness runtime closed'))

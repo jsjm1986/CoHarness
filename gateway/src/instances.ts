@@ -36,6 +36,7 @@ import { readResponseJson } from './response-budget.ts'
 
 const POLL_INTERVAL_MS = 300
 const STOP_GRACE_MS = 5000
+const STOP_ALL_CONCURRENCY = 8
 const MANAGED_CREDENTIALS_FILENAME = '.credentials.yaml'
 const ADMIN_GUARD_PATCH_FILENAME = 'cordis.admin.patch.yml'
 const PROJECT_RUNTIME_PATCH = `- id: session-persistence-jsonl
@@ -148,15 +149,6 @@ function leaseKey(target: RuntimeTarget, generation: number | undefined): string
   return generation === undefined ? targetKey(target) : `${targetKey(target)}@${String(generation)}`
 }
 
-function leaseCount(refs: ReadonlyMap<string, number>, target: RuntimeTarget): number {
-  const prefix = `${targetKey(target)}@`
-  let total = refs.get(targetKey(target)) ?? 0
-  for (const [key, count] of refs) {
-    if (key.startsWith(prefix)) total += count
-  }
-  return total
-}
-
 /** Durable instance rows required by {@link InstanceManager}. */
 export interface InstanceRepository {
   initialize(instancesOutliveGateway: boolean): Promise<void>
@@ -167,6 +159,8 @@ export interface InstanceRepository {
   beginStart(target: RuntimeTarget, at: number, runtimeTokenHash: Buffer): Promise<number>
   markReady(target: RuntimeTarget, generation: number): Promise<void>
   idleTargets(cutoff: number): Promise<RuntimeTarget[]>
+  /** Re-check one idle candidate without rescanning the whole instance table. */
+  idleTarget(target: RuntimeTarget, cutoff: number): Promise<boolean>
   markStopping(target: RuntimeTarget): Promise<void>
   markStopped(target: RuntimeTarget): Promise<void>
   owner(target: RuntimeTarget): Promise<InstanceOwner | null>
@@ -228,6 +222,14 @@ class SqliteInstanceRepository implements InstanceRepository {
     return rows.map(row => ({ kind: 'user' as const, id: row.user_id }))
   }
 
+  async idleTarget(target: RuntimeTarget, cutoff: number): Promise<boolean> {
+    const userId = this.userId(target)
+    const row = this.db.prepare(
+      `SELECT 1 AS present FROM instances WHERE user_id = ? AND state = 'ready' AND last_activity_at < ? LIMIT 1`,
+    ).get(userId, cutoff) as { present: number } | undefined
+    return row !== undefined
+  }
+
   async markStopping(target: RuntimeTarget): Promise<void> {
     const userId = this.userId(target)
     this.db.prepare(`UPDATE instances SET state = 'stopping' WHERE user_id = ?`).run(userId)
@@ -253,8 +255,12 @@ export class InstanceManager {
   private readonly initialized: Promise<void>
   private readonly procs = new Map<string, InstanceProc>()
   private readonly wsRefs = new Map<string, number>()
+  /** Aggregate WebSocket leases by runtime, independent of generation. */
+  private readonly wsTotals = new Map<string, number>()
   /** Active HTTP/data-plane operations that must keep a runtime warm. */
   private readonly operationRefs = new Map<string, number>()
+  /** Aggregate operation leases by runtime, independent of generation. */
+  private readonly operationTotals = new Map<string, number>()
   /** Per-runtime operation chain: serializes start vs stop so a reap cannot orphan a fresh spawn. */
   private readonly ops = new Map<string, Promise<unknown>>()
 
@@ -329,9 +335,11 @@ export class InstanceManager {
         throw new RuntimeLeaseUnavailableError(resolved)
       }
       const key = leaseKey(resolved, generation)
-      const next = Math.max(0, (this.wsRefs.get(key) ?? 0) + delta)
+      const prior = this.wsRefs.get(key) ?? 0
+      const next = Math.max(0, prior + delta)
       if (next === 0) this.wsRefs.delete(key)
       else this.wsRefs.set(key, next)
+      this.adjustLeaseTotal(this.wsTotals, resolved, next - prior)
       // A close edge is activity too, but it must be ordered after the ref
       // change so the reaper cannot observe a stale count or timestamp.
       await this.repository.touch(resolved, Date.now())
@@ -350,9 +358,11 @@ export class InstanceManager {
         throw new RuntimeLeaseUnavailableError(resolved)
       }
       const key = leaseKey(resolved, generation)
-      const next = Math.max(0, (this.operationRefs.get(key) ?? 0) + delta)
+      const prior = this.operationRefs.get(key) ?? 0
+      const next = Math.max(0, prior + delta)
       if (next === 0) this.operationRefs.delete(key)
       else this.operationRefs.set(key, next)
+      this.adjustLeaseTotal(this.operationTotals, resolved, next - prior)
       await this.repository.touch(resolved, Date.now())
     })
   }
@@ -646,11 +656,10 @@ export class InstanceManager {
       const didStop = await this.serialize(target, async () => {
         // Re-check the durable idle predicate after waiting for queued touch
         // and lease operations. The initial query is only a candidate scan.
-        const stillIdle = (await this.repository.idleTargets(cutoff))
-          .some(candidate => targetKey(candidate) === key)
+        const stillIdle = await this.repository.idleTarget(target, cutoff)
         if (!stillIdle
-          || leaseCount(this.wsRefs, target) > 0
-          || leaseCount(this.operationRefs, target) > 0) return false
+          || (this.wsTotals.get(targetKey(target)) ?? 0) > 0
+          || (this.operationTotals.get(targetKey(target)) ?? 0) > 0) return false
         await this.terminate(target)
         return true
       })
@@ -711,7 +720,22 @@ export class InstanceManager {
     this.operationRefs.delete(key)
     for (const refKey of this.wsRefs.keys()) if (refKey.startsWith(prefix)) this.wsRefs.delete(refKey)
     for (const refKey of this.operationRefs.keys()) if (refKey.startsWith(prefix)) this.operationRefs.delete(refKey)
+    this.wsTotals.delete(key)
+    this.operationTotals.delete(key)
     await this.repository.markStopped(target)
+  }
+
+  /** Apply one generation's lease delta to the O(1) runtime aggregate. */
+  private adjustLeaseTotal(
+    totals: Map<string, number>,
+    target: RuntimeTarget,
+    delta: number,
+  ): void {
+    if (delta === 0) return
+    const key = targetKey(target)
+    const next = Math.max(0, (totals.get(key) ?? 0) + delta)
+    if (next === 0) totals.delete(key)
+    else totals.set(key, next)
   }
 
   async stopAll(): Promise<void> {
@@ -726,6 +750,21 @@ export class InstanceManager {
       }
       return { kind, id } as RuntimeTarget
     }))
-    await Promise.all(targets.map(target => this.stop(target)))
+    let cursor = 0
+    const worker = async (): Promise<void> => {
+      for (;;) {
+        const index = cursor
+        cursor += 1
+        const target = targets[index]
+        if (target === undefined) return
+        await this.stop(target)
+      }
+    }
+    const settled = await Promise.allSettled(Array.from(
+      { length: Math.min(STOP_ALL_CONCURRENCY, targets.length) },
+      () => worker(),
+    ))
+    const failure = settled.find((result): result is PromiseRejectedResult => result.status === 'rejected')
+    if (failure !== undefined) throw failure.reason
   }
 }

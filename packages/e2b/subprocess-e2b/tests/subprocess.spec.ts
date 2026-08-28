@@ -382,6 +382,14 @@ describe('E2BOutputReader', () => {
     overCap.push(Buffer.from('abcd'))
     expect(overCap.readFrom(0)).toEqual({ text: 'cd', nextOffset: 4, lossy: true })
   })
+
+  it('preserves the exact tail for highly fragmented remote output', () => {
+    const reader = new E2BOutputReader(64, undefined, '/unused')
+    for (let index = 0; index < 10_000; index += 1) reader.push(Uint8Array.of(index % 256))
+    const result = reader.readFrom(9_936)
+    const expected = Buffer.from(Array.from({ length: 64 }, (_, index) => (9_936 + index) % 256))
+    expect(result).toMatchObject({ text: expected.toString('utf8'), nextOffset: 10_000, lossy: false })
+  })
 })
 
 describe('E2BSubprocessHandle', () => {

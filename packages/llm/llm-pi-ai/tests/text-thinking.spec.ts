@@ -133,6 +133,19 @@ describe('TextThinkingParser', () => {
     })
   })
 
+  it('keeps highly fragmented reasoning input lossless', () => {
+    const parser = new TextThinkingParser()
+    const body = 'x'.repeat(20_000)
+    const parts = [...parser.append('<thinking>').parts]
+    for (const fragment of body) parts.push(...parser.append(fragment).parts)
+    parts.push(...parser.append('</thinking>answer').parts)
+    parts.push(...parser.finish().parts)
+    expect(parts).toEqual([
+      { type: 'reasoning', text: body, complete: true },
+      { type: 'text', text: 'answer', complete: false },
+    ])
+  })
+
   it('classifies the same content independently of stream chunk boundaries', () => {
     fc.assert(fc.property(fc.array(fc.string(), { minLength: 1 }), (chunks) => {
       expect(parsed(chunks)).toEqual(parsed([chunks.join('')]))

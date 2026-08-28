@@ -679,13 +679,14 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
 
     if (pathname === '/account/api/context' && req.method === 'GET') {
       const scopes = await deps.collaboration?.projectsForUser(user.id) ?? []
-      // `projectsForUser` already establishes the membership set. Fetch the
-      // project catalog once for the owner flags instead of issuing one
-      // detail query per membership; the response still exposes only the
-      // authorized scope rows.
-      const details = new Map(
-        (scopes.length === 0 ? [] : await deps.projects.list()).map(project => [project.id, project]),
-      )
+      // `projectsForUser` already establishes the membership set. Use one
+      // scoped batch detail query for owner flags instead of scanning the
+      // organization catalog or issuing one detail query per membership.
+      const scopedIds = scopes.map(scope => scope.projectId)
+      const scopedDetails = deps.projects.getByIds === undefined
+        ? (scopedIds.length === 0 ? [] : await deps.projects.list())
+        : await deps.projects.getByIds(scopedIds)
+      const details = new Map(scopedDetails.map(project => [project.id, project]))
       const projects = await Promise.all(scopes.map(async (scope) => {
         const detail = details.get(scope.projectId)
         // Older in-process project catalogs may omit owner metadata. Preserve
@@ -749,7 +750,9 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       try {
         if (req.method === 'GET') {
           const scopes = await deps.collaboration?.projectsForUser(user.id) ?? []
-          const details = await Promise.all(scopes.map(scope => deps.projects.getById(scope.projectId)))
+          const details = deps.projects.getByIds === undefined
+            ? await Promise.all(scopes.map(scope => deps.projects.getById(scope.projectId)))
+            : await deps.projects.getByIds(scopes.map(scope => scope.projectId))
           send(res, 200, JSON.stringify(details.filter((project): project is NonNullable<typeof project> => project !== null).map(project => ({
             ...project,
             canManage: user.role === 'admin' || project.owner?.id === user.id,

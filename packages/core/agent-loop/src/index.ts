@@ -16,6 +16,7 @@ import type {
   AgentOptions,
   AgentSetup,
   CreateAgentOptions,
+  InboxLimits,
   ResumeAgentOptions,
   SessionStartSource,
 } from '@deepseek-ai/dsh-agent'
@@ -27,7 +28,11 @@ import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tools'
 import type { SessionPersistence } from '@deepseek-ai/dsh-session-persistence'
 import { ReactLoopAgent } from './agent.ts'
-import { DEFAULT_MAX_PARALLEL_TOOL_CALLS } from './constants.ts'
+import {
+  DEFAULT_MAX_INBOX_BYTES,
+  DEFAULT_MAX_INBOX_MESSAGES,
+  DEFAULT_MAX_PARALLEL_TOOL_CALLS,
+} from './constants.ts'
 
 /** Fiber states that cannot own or serve a new lifecycle. */
 const INACTIVE_STATES: ReadonlySet<FiberState> = new Set([
@@ -184,7 +189,11 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
-export { DEFAULT_MAX_PARALLEL_TOOL_CALLS }
+export {
+  DEFAULT_MAX_INBOX_BYTES,
+  DEFAULT_MAX_INBOX_MESSAGES,
+  DEFAULT_MAX_PARALLEL_TOOL_CALLS,
+}
 
 /**
  * One launcher-selected session identity for a configured agent. `resume`
@@ -246,6 +255,9 @@ export interface AgentLoopSettings {
   maxParallelToolCalls: number
 }
 
+/** Per-agent pending-input quota applied to both inbox targets. */
+export interface InboxConfig extends InboxLimits {}
+
 /** Schema of the agent-loop settings section. */
 export const AGENT_LOOP_SETTINGS_SCHEMA: z<AgentLoopSettings> = z.object({
   maxParallelToolCalls: z.number().step(1).min(1).default(DEFAULT_MAX_PARALLEL_TOOL_CALLS),
@@ -258,6 +270,8 @@ export interface Config {
    * omission defaults to {@link DEFAULT_MAX_PARALLEL_TOOL_CALLS}.
    */
   maxParallelToolCalls?: number
+  /** Pending-input quota; defaults prevent unbounded per-agent memory growth. */
+  inbox?: InboxConfig
   /** Agents created or resumed at plugin startup. */
   agents: (AgentOptions & {
     /** Stable config label used in logs and as the fresh combined-id prefix. */
@@ -272,7 +286,10 @@ export interface Config {
 }
 
 /** Agent-loop configuration after defaults and load-time validation. */
-type ResolvedConfig = Config & { maxParallelToolCalls: number }
+type ResolvedConfig = Config & {
+  maxParallelToolCalls: number
+  inbox: { maxMessages: number; maxBytes: number }
+}
 
 /** Reject self-contained identity conflicts before any configured agent starts. */
 function validateConfiguredAgents(agents: Config['agents']): void {
@@ -299,6 +316,13 @@ export class AgentLoop extends Service implements AgentFactory {
   /** Runtime schema for declarative agents. */
   static Config = z.object({
     maxParallelToolCalls: z.number().step(1).min(1).default(DEFAULT_MAX_PARALLEL_TOOL_CALLS),
+    inbox: z.object({
+      maxMessages: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULT_MAX_INBOX_MESSAGES),
+      maxBytes: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULT_MAX_INBOX_BYTES),
+    }).default({
+      maxMessages: DEFAULT_MAX_INBOX_MESSAGES,
+      maxBytes: DEFAULT_MAX_INBOX_BYTES,
+    }),
     agents: z.array(z.object({
       id: z.string().required(),
       sessionId: z.string().min(1),
@@ -322,8 +346,19 @@ export class AgentLoop extends Service implements AgentFactory {
       maxParallelToolCalls: resolveMaxParallelToolCalls(config.maxParallelToolCalls),
     }
     let source: () => AgentLoopSettings = () => entry
+    const inbox = {
+      maxMessages: config.inbox?.maxMessages ?? DEFAULT_MAX_INBOX_MESSAGES,
+      maxBytes: config.inbox?.maxBytes ?? DEFAULT_MAX_INBOX_BYTES,
+    }
+    if (!Number.isSafeInteger(inbox.maxMessages) || inbox.maxMessages < 1) {
+      throw new Error('inbox.maxMessages must be a positive safe integer')
+    }
+    if (!Number.isSafeInteger(inbox.maxBytes) || inbox.maxBytes < 1) {
+      throw new Error('inbox.maxBytes must be a positive safe integer')
+    }
     this.config = {
       ...config,
+      inbox,
       agents: applyLauncherIdentities(config.agents, ctx.get(CONFIGURED_AGENT_IDENTITIES_KEY)),
       // Read through on every scheduler decision: `tool-calls.ts` destructures
       // this at the start of each group, so a committed change caps the next
@@ -546,7 +581,7 @@ export class AgentLoop extends Service implements AgentFactory {
       throw abort.signal.reason instanceof Error ? abort.signal.reason : new Error(String(abort.signal.reason))
     }
     try {
-      const agent = machine = new ReactLoopAgent(loopCtx, id, options, session)
+      const agent = machine = new ReactLoopAgent(loopCtx, id, options, session, this.config.inbox)
       machineReady.resolve()
       assertLive()
 

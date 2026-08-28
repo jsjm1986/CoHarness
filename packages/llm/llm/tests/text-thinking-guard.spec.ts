@@ -78,6 +78,36 @@ describe('guardTextThinkingStream', () => {
     expect(chunks[1]).toMatchObject({ type: 'finish', reason: { kind: 'error', failure: { code: UNSAFE_MODEL_OUTPUT_CODE } } })
   })
 
+  it('checks a fragmented close tag without rebuilding the pending body', async () => {
+    const body = 'private'
+    const chunks = await collect(guardTextThinkingStream(feed([
+      { type: 'block-start', index: 0, blockType: 'text' },
+      { type: 'text-delta', index: 0, text: '<thinking>private' },
+      { type: 'text-delta', index: 0, text: '</thi' },
+      { type: 'text-delta', index: 0, text: 'nking>answer' },
+      { type: 'block-end', index: 0, block: { type: 'text', text: `<thinking>${body}</thinking>answer` } },
+      finish(),
+    ])))
+    expect(chunks).toHaveLength(2)
+    expect(chunks.at(-1)).toMatchObject({
+      type: 'finish',
+      reason: { kind: 'error', failure: { code: UNSAFE_MODEL_OUTPUT_CODE } },
+    })
+  })
+
+  it('caps a pending thinking prefix even when later chunks share its index', async () => {
+    const source: StreamChunk[] = [
+      { type: 'block-start', index: 0, blockType: 'text' },
+      { type: 'text-delta', index: 0, text: '<thinking>private' },
+      ...Array.from({ length: 4_096 }, () => ({ type: 'text-delta' as const, index: 0, text: 'x' })),
+    ]
+    const chunks = await collect(guardTextThinkingStream(feed(source)))
+    expect(chunks.at(-1)).toMatchObject({
+      type: 'finish',
+      reason: { kind: 'error', failure: { code: 'RESPONSE_TOO_LARGE' } },
+    })
+  })
+
   it('rejects a tagged terminal block even when the provider omitted deltas', async () => {
     const chunks = await collect(guardTextThinkingStream(feed([
       { type: 'block-end', index: 0, block: { type: 'text', text: '<analysis>private</analysis>answer' } },
@@ -107,6 +137,25 @@ describe('guardTextThinkingStream', () => {
     expect(chunks).toHaveLength(3)
     expect(chunks[1]).toEqual({ type: 'usage', usage: { inputTokens: 4, outputTokens: 5 } })
     expect(chunks[2]).toMatchObject({ type: 'finish', reason: { kind: 'error', failure: { code: UNSAFE_MODEL_OUTPUT_CODE } } })
+  })
+
+  it('fails with a bounded-response error when the ordering buffer grows too large', async () => {
+    const source: StreamChunk[] = [
+      { type: 'block-start', index: 0, blockType: 'text' },
+      { type: 'text-delta', index: 0, text: '<thi' },
+      ...Array.from({ length: 4_097 }, (_, index) => ({
+        type: 'tool-call-delta' as const,
+        index: 1,
+        id: CallId(`call-${String(index)}`),
+        name: 'noop',
+        argumentsDelta: '{}',
+      })),
+    ]
+    const chunks = await collect(guardTextThinkingStream(feed(source)))
+    expect(chunks.at(-1)).toMatchObject({
+      type: 'finish',
+      reason: { kind: 'error', failure: { code: 'RESPONSE_TOO_LARGE' } },
+    })
   })
 
   it('rejects case-insensitive and attribute-bearing thinking tags', async () => {

@@ -284,11 +284,11 @@ describe('cold history recovery view', () => {
       surfaceOp: 'append',
     }]
     const inspect = vi.fn(async () => ({ meta, events }))
-    const listSnapshots = vi.fn(async () => [{ header: meta, revision }])
+    const revisionOf = vi.fn(async () => revision)
     ctx.provide('sessionPersistence', {
       list: () => Promise.resolve([meta]),
       inspect,
-      listSnapshots,
+      revision: revisionOf,
       locate: () => undefined,
     } as never)
     const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })
@@ -300,7 +300,7 @@ describe('cold history recovery view', () => {
     if (!second.result.ok) throw new Error('second history failed')
     expect(second.result.value.events).toHaveLength(1)
     expect(inspect).toHaveBeenCalledOnce()
-    expect(listSnapshots).toHaveBeenCalledTimes(3)
+    expect(revisionOf).toHaveBeenCalledTimes(3)
 
     revision = SessionPersistenceRevision('tail:2')
     events = [...events, {
@@ -314,7 +314,7 @@ describe('cold history recovery view', () => {
     if (!third.result.ok) throw new Error('third history failed')
     expect(third.result.value.events).toHaveLength(2)
     expect(inspect).toHaveBeenCalledTimes(2)
-    expect(listSnapshots).toHaveBeenCalledTimes(5)
+    expect(revisionOf).toHaveBeenCalledTimes(5)
   })
 
   it('shows in-memory interruption repair without activating the session', async () => {
