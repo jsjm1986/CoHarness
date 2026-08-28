@@ -222,6 +222,26 @@ describe('ScopeControl', () => {
     expect(screen.queryByText('新对话可见范围')).toBeNull()
   })
 
+  it('keeps project settings discoverable for a read-only member and explains the owner boundary', async () => {
+    const loadProjectConfiguration = vi.fn().mockResolvedValue({
+      project: { id: 9, name: '支付重构', themePolicy: 'follow-user' },
+      canManage: false,
+      capabilities: {
+        themePolicy: false, runtimeSettings: false, projectModels: false, members: false, filesystem: false,
+      },
+    })
+    const setProjectThemePolicy = vi.fn()
+    render(<ScopeControl {...scopeProps(snapshot(), {
+      loadProjectConfiguration,
+      setProjectThemePolicy,
+    })} />)
+    fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '项目设置' }))
+    expect(await screen.findByText('只有项目 owner 或组织管理员可以修改项目策略。')).toBeTruthy()
+    expect(loadProjectConfiguration).toHaveBeenCalledWith(9)
+    expect(setProjectThemePolicy).not.toHaveBeenCalled()
+  })
+
   it('shows switching and failure states on the trigger', () => {
     const view = render(<ScopeControl {...scopeProps(snapshot({ scopeBusy: true }))} />)
     expect(screen.getByRole('button', { name: '切换个人或项目空间' }).getAttribute('title')).toBe('正在切换空间')

@@ -63,7 +63,9 @@ export interface CustomProviderCardProps {
   /** Disable writes (read-only settings provider). */
   readOnly: boolean
   /** Credential namespace used when the new profile names its key reference. */
-  credentialScope?: 'personal' | 'organization'
+  credentialScope?: 'personal' | 'organization' | 'project'
+  /** Project id paired with a project credential scope. */
+  projectId?: number
   /** Route validation pattern; personal routes use the default pattern. */
   routePattern?: RegExp
   /** Close the card; `changed` reports whether a provider was created. */
@@ -99,7 +101,8 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
   const profileDisabled = disabled || committed
 
   const routeId = route.trim()
-  const routeReserved = props.credentialScope !== 'organization' && routeId.startsWith('org-')
+  const routeReserved = props.credentialScope !== 'organization'
+    && (routeId.startsWith('org-') || routeId.startsWith('project-'))
   const routeInvalid = route.length > 0 && (invalidRoute(route, props.routePattern) || routeReserved)
   const routeTaken = taken.includes(routeId)
   // Rows are checked by the same per-row validator the editor cards use, so a
@@ -134,7 +137,7 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
 
   /** Perform the create, returning a failure message or undefined. */
   const createOnce = async (): Promise<string | undefined> => {
-    const keyRef = deriveKeyRef(routeId, props.credentialScope ?? 'personal')
+    const keyRef = deriveKeyRef(routeId, props.credentialScope ?? 'personal', props.projectId)
     const storesKey = keyValue.length > 0
     if (!committed) {
       const profile = {

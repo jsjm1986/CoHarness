@@ -10,7 +10,9 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { BoundActions } from '@deepseek-ai/dsh-client-ui-slots'
 import { settingsControlState } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ClientContext, SettingsScope } from '@deepseek-ai/dsh-client-runtime/client'
+import type {
+  ClientContext, ProjectUiPolicyRuntime, SettingsScope,
+} from '@deepseek-ai/dsh-client-runtime/client'
 // Type-only: the ctx.settingsScope Context merge. Cross-plugin collaboration
 // goes through the service, never a value import (client bundle purity gate).
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
@@ -86,6 +88,8 @@ export interface ThemeSnapshot {
   themes: readonly ThemeDefinition[]
   /** Monotonic change counter (registry or active changes). */
   revision: number
+  /** Forced project theme, when the active project overrides the account choice. */
+  projectOverride?: 'light' | 'dark'
 }
 
 /** One theme token exposed to pre-definition Cordis inspection. */
@@ -170,6 +174,7 @@ const BUILTIN_INSPECT_TOKENS: readonly ThemeTokenInspection[] = Object.freeze([
 export class ThemeRuntime {
   private readonly ctx: Context
   private readonly host: SettingsScope<ThemeSettings>
+  private readonly projectUiPolicy: ProjectUiPolicyRuntime | undefined
   private themes: ThemeDefinition[] = [...BUILTIN_THEMES]
   private preference: ThemePreference
   private revision = 0
@@ -184,9 +189,10 @@ export class ThemeRuntime {
    * media-query and scope listeners are released through ctx.effect on dispose).
    * @param host - durable preference scope owned by the same plugin.
    */
-  constructor(ctx: Context, host: SettingsScope<ThemeSettings>) {
+  constructor(ctx: Context, host: SettingsScope<ThemeSettings>, projectUiPolicy?: ProjectUiPolicyRuntime) {
     this.ctx = ctx
     this.host = host
+    this.projectUiPolicy = projectUiPolicy
     this.preference = DEFAULT_PREFERENCE
     // Non-browser runs (node e2e booting the client tree) have no matchMedia.
     this.media = typeof matchMedia === 'undefined' ? undefined : matchMedia('(prefers-color-scheme: dark)')
@@ -194,7 +200,7 @@ export class ThemeRuntime {
     if (this.media !== undefined) {
       const media = this.media
       const onChange = (): void => {
-        if (this.preference !== 'system') return
+        if (this.preference !== 'system' || this.forcedProjectTheme() !== undefined) return
         this.publish()
       }
       ctx.effect(() => {
@@ -202,6 +208,9 @@ export class ThemeRuntime {
       }, 'ui-theme: prefers-color-scheme listener')
     }
     ctx.effect(() => host.subscribe(() => { this.adopt() }), 'ui-theme: settings scope adoption')
+    if (projectUiPolicy !== undefined) {
+      ctx.effect(() => projectUiPolicy.subscribe(() => { this.publish() }), 'ui-theme: project policy adoption')
+    }
     this.adopt()
   }
 
@@ -322,9 +331,11 @@ export class ThemeRuntime {
   }
 
   private buildSnapshot(): ThemeSnapshot {
-    const resolvedId = this.preference === 'system'
-      ? (this.media?.matches === true ? 'dark' : 'light')
-      : this.preference
+    const projectOverride = this.forcedProjectTheme()
+    const resolvedId = projectOverride
+      ?? (this.preference === 'system'
+        ? (this.media?.matches === true ? 'dark' : 'light')
+        : this.preference)
     // Both built-ins always exist; a registered preference id resolves or has
     // been reset by its disposer, so the lookup cannot miss.
     const active = this.themes.find(t => t.id === resolvedId)
@@ -335,7 +346,14 @@ export class ThemeRuntime {
       active: this.composeActive(active),
       themes: Object.freeze([...this.themes]),
       revision: this.revision,
+      ...(projectOverride === undefined ? {} : { projectOverride }),
     })
+  }
+
+  /** Resolve a project-level forced theme without changing the account preference. */
+  private forcedProjectTheme(): 'light' | 'dark' | undefined {
+    const policy = this.projectUiPolicy?.getSnapshot()
+    return policy?.scope === 'project' && policy.theme !== 'follow-user' ? policy.theme : undefined
   }
 
   /**
@@ -415,8 +433,11 @@ export const inject = ['slots', 'locale', 'connection', 'remote', 'settingsScope
  */
 export function apply(ctx: ClientContext): void {
   installThemeStyles(ctx)
-  const host = ctx.settingsScope.bind<ThemeSettings>({ namespace: THEME_SETTINGS_NAMESPACE })
-  const theme = new ThemeRuntime(ctx, host)
+  const host = ctx.settingsScope.bind<ThemeSettings>({
+    namespace: THEME_SETTINGS_NAMESPACE,
+    source: 'account-or-host',
+  })
+  const theme = new ThemeRuntime(ctx, host, ctx.get('projectUiPolicy'))
   ctx.provide('theme', theme)
 
   ctx.effect(() => ctx.locale.register(SETTINGS_NS, { zh, en }), 'ui-theme: settings row dictionaries')
@@ -424,7 +445,12 @@ export function apply(ctx: ClientContext): void {
   const store = createAppearanceRowStore()
   let bound: BoundActions<typeof store> | undefined
   const sync = (snapshot: ThemeSnapshot = theme.getTheme()): void => {
-    bound?.sync(snapshot.preference, snapshot.revision, settingsControlState(host.getSnapshot()))
+    bound?.sync(
+      snapshot.preference,
+      snapshot.revision,
+      settingsControlState(host.getSnapshot()),
+      snapshot.projectOverride,
+    )
   }
   ctx.on('theme/change', sync)
   ctx.effect(() => host.subscribe(() => { sync() }), 'ui-theme: settings row state')

@@ -36,6 +36,11 @@ import type {} from '@deepseek-ai/dsh-api-remotes/types'
 import type {} from '@deepseek-ai/dsh-settings/types'
 import type { SettingsSchemaService } from './schema.ts'
 import { SettingsDescribeMirror, type SettingsDescribeFace } from './settings-mirror.ts'
+import {
+  AccountOrHostSettingsScopeController,
+  AccountPreferencesMirror,
+  AccountSettingsScopeController,
+} from './account-scope.ts'
 
 type SettingsFace = Pick<IApiClient, 'settings'>
 
@@ -215,12 +220,17 @@ export class SettingsScopeController<T> implements SettingsScope<T> {
       return
     }
     const decoded = this.decode(view)
+    const namespaceWritable = view.writable ?? writable
+    const namespaceReason = view.writableReason ?? writableReason
     this.store.update((draft) => {
       draft.revision = view.revision
       draft.base = view.base
       draft.user = view.user
-      draft.writable = writable
-      draft.writableReason = writableReason
+      draft.writable = namespaceWritable
+      draft.writableReason = namespaceReason
+      if (view.owner === undefined) delete draft.owner
+      else draft.owner = view.owner
+      draft.mode = 'host'
       if (decoded === undefined) return
       draft.status = 'ready'
       draft.value = decoded
@@ -276,6 +286,7 @@ declare module '@deepseek-ai/cordis' {
  */
 export class SettingsScopeBinder extends Service {
   private readonly mirror: SettingsDescribeMirror
+  private readonly accountMirror: AccountPreferencesMirror
   private readonly schema: SettingsSchemaService
 
   /**
@@ -283,9 +294,14 @@ export class SettingsScopeBinder extends Service {
    * @param config - the shared describe mirror every bound scope derives from,
    * plus the settings-owned schema operations.
    */
-  constructor(ctx: Context, config: { mirror: SettingsDescribeMirror; schema: SettingsSchemaService }) {
+  constructor(ctx: Context, config: {
+    mirror: SettingsDescribeMirror
+    accountMirror?: AccountPreferencesMirror
+    schema: SettingsSchemaService
+  }) {
     super(ctx, 'settingsScope')
     this.mirror = config.mirror
+    this.accountMirror = config.accountMirror ?? new AccountPreferencesMirror(undefined)
     this.schema = config.schema
   }
 
@@ -313,19 +329,42 @@ export class SettingsScopeBinder extends Service {
   bind<T>(spec: SettingsScopeSpec<T>): SettingsScope<T> {
     const ctx = this.ctx
     const connection = ctx.get('connection') as ConnectionHandle
-    const controller = new SettingsScopeController<T>(
+    const source = spec.source ?? 'host'
+    const host = source === 'account' ? undefined : new SettingsScopeController<T>(
       connection.api,
       spec,
       this.mirror,
       'host',
       this.schema,
     )
+    const account = source === 'host'
+      ? undefined
+      : new AccountSettingsScopeController<T>(connection.accountPreferences, spec, this.accountMirror)
+    const controller: SettingsScope<T> = source === 'account'
+      ? account as SettingsScope<T>
+      : source === 'account-or-host'
+        ? new AccountOrHostSettingsScopeController(
+          account as AccountSettingsScopeController<T>,
+          host as SettingsScope<T>,
+          this.accountMirror,
+        )
+        : host as SettingsScope<T>
     ctx.effect(() => {
-      void this.mirror.ensure()
+      if (source === 'host') void this.mirror.ensure()
+      else if (source === 'account') void this.accountMirror.ensure()
+      else {
+        void this.accountMirror.ensure()
+        void this.mirror.ensure()
+      }
       return async () => {
-        await controller.dispose()
+        await disposeScope(controller)
       }
     }, `ui-settings: ${spec.namespace} settings scope`)
     return controller
   }
+}
+
+async function disposeScope(scope: SettingsScope<unknown>): Promise<void> {
+  const candidate = scope as SettingsScope<unknown> & { dispose?: () => void | Promise<void> }
+  await candidate.dispose?.()
 }

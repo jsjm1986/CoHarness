@@ -12,6 +12,7 @@ import type {
 import {
   createSnapshotStore, type SnapshotStore,
 } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SettingsWritableReason } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   SchemaNode, SettingsDescribeFace, SettingsSchemaService,
 } from '@deepseek-ai/dsh-client-ui-settings/client'
@@ -33,6 +34,7 @@ export interface PermissionSettingsState {
   status: 'idle' | 'loading' | 'ready' | 'saving' | 'unavailable' | 'error'
   error: string | null
   writable: boolean
+  writableReason?: SettingsWritableReason
   currentValue: string
   options: readonly PermissionDefaultOption[]
   revision: number
@@ -173,6 +175,7 @@ export class PermissionPresetSettingsController {
       this.store.update((state) => {
         state.status = 'unavailable'
         state.writable = false
+        delete state.writableReason
         state.currentValue = ''
         state.options = []
       })
@@ -189,6 +192,7 @@ export class PermissionPresetSettingsController {
       this.store.update((state) => {
         state.status = 'unavailable'
         state.writable = false
+        delete state.writableReason
         state.currentValue = ''
         state.options = []
       })
@@ -196,11 +200,14 @@ export class PermissionPresetSettingsController {
     }
     try {
       const resolved = permissionDefaultOf(view, this.schema)
-      const { writable } = mirrored.view
+      const writable = view.writable ?? mirrored.view.writable
+      const writableReason = view.writableReason ?? mirrored.view.writableReason
       this.store.update((state) => {
         state.status = 'ready'
         state.error = null
         state.writable = writable
+        if (writableReason === undefined) delete state.writableReason
+        else state.writableReason = writableReason
         state.currentValue = resolved.currentValue
         state.options = resolved.options
         state.revision = view.revision

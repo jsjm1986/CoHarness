@@ -222,6 +222,7 @@ async function harness(options?: {
   /** Skip the provider-directory registration while keeping its settings namespace available. */
   configurableProviders?: false
   projectScope?: 'ro' | 'rw'
+  projectManager?: boolean
 }): Promise<Context> {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
@@ -252,6 +253,7 @@ async function harness(options?: {
           projectId: 41,
           projectName: 'Compiler',
           mode: options.projectScope,
+          ...(options.projectManager === true ? { canManage: true } : {}),
         },
       },
       expiresAt: Date.now() + 60_000,
@@ -691,6 +693,117 @@ describe('settings domain', () => {
         details: { action: 'write', reason: 'forbidden' },
       })
     }
+  })
+
+  it('lets a project manager write only namespaces explicitly owned by the project', async () => {
+    const ctx = await harness({
+      projectScope: 'rw',
+      projectManager: true,
+      settings: { documentPath: '/tmp/settings.yaml' },
+    })
+    ctx.settings.register(settingsNamespace('permission'), z.object({
+      defaultPreset: z.string(),
+    }), { base: { defaultPreset: 'read-only' }, owner: 'project', projectWrite: 'manager' })
+    ctx.settings.register(settingsNamespace('ui-theme'), z.object({
+      preference: z.union(['light', 'dark', 'system']).default('system'),
+    }), { owner: 'account', projectWrite: 'never' })
+    ctx.settings.register(settingsNamespace('organization-settings'), z.object({
+      enabled: z.boolean().default(true),
+    }), { owner: 'organization', projectWrite: 'never' })
+    ctx.settings.register(settingsNamespace('deployment-settings'), z.object({
+      enabled: z.boolean().default(true),
+    }))
+    const api = createApiProxy(ctx, DEFAULTS)
+    const described = expectOk(await api.settings.describe(request({})))
+    expect(described.writable).toBe(true)
+    expect(described.namespaces.map(view => [view.ns, view.writable, view.writableReason])).toEqual([
+      ['permission', true, undefined],
+      ['ui-theme', false, 'account'],
+    ])
+
+    expect(expectOk(await api.settings.mutate(request({
+      ns: 'permission',
+      ops: [{ op: 'set', path: ['defaultPreset'], value: 'workspace-write' }],
+    })))).toMatchObject({ value: { defaultPreset: 'workspace-write' } })
+
+    const dangerous = expectErr(await api.settings.mutate(request({
+      ns: 'permission',
+      ops: [{ op: 'set', path: ['defaultPreset'], value: 'danger-full-access' }],
+    })))
+    expect(dangerous).toMatchObject({
+      code: 'settings-rejected',
+      details: { ns: 'permission', reason: 'project' },
+    })
+
+    for (const ns of ['ui-theme', 'organization-settings', 'deployment-settings']) {
+      const error = expectErr(await api.settings.update(request({ ns, patch: {} })))
+      expect(error).toMatchObject({ code: 'settings-rejected', details: { ns } })
+    }
+    expect(expectErr(await api.settings.openDocument(request({}), new AbortController().signal))).toMatchObject({
+      code: 'collaboration-forbidden', details: { action: 'write', reason: 'forbidden' },
+    })
+  })
+
+  it('enforces project-manager path restrictions for otherwise writable namespaces', async () => {
+    const ctx = await harness({
+      projectScope: 'rw', projectManager: true, settings: { documentPath: '/tmp/settings.yaml' },
+    })
+    ctx.settings.register(settingsNamespace('shell'), z.object({
+      cwd: z.string(), timeoutMs: z.number().default(120_000), maxOutputBytes: z.number().default(64_000),
+    }), {
+      owner: 'project', projectWrite: 'manager',
+      projectWritePaths: [['timeoutMs'], ['maxOutputBytes']],
+    })
+    const api = createApiProxy(ctx, DEFAULTS)
+    const described = expectOk(await api.settings.describe(request({})))
+    expect(described.namespaces[0]).toMatchObject({
+      writable: true, projectWritePaths: [['timeoutMs'], ['maxOutputBytes']],
+    })
+    expect(expectOk(await api.settings.mutate(request({
+      ns: 'shell', ops: [{ op: 'set', path: ['timeoutMs'], value: 5_000 }],
+    })))).toMatchObject({ value: { timeoutMs: 5_000 } })
+    const cwd = expectErr(await api.settings.mutate(request({
+      ns: 'shell', ops: [{ op: 'set', path: ['cwd'], value: '/outside' }],
+    })))
+    expect(cwd).toMatchObject({ code: 'settings-rejected', details: { ns: 'shell', reason: 'project' } })
+    const wholesale = expectErr(await api.settings.replace(request({ ns: 'shell', section: {} })))
+    expect(wholesale).toMatchObject({ code: 'settings-rejected', details: { ns: 'shell', reason: 'project' } })
+  })
+
+  it('discovers newly registered project namespaces from ownership metadata', async () => {
+    const ctx = await harness({ projectScope: 'rw', projectManager: true })
+    ctx.settings.register(settingsNamespace('future-project-setting'), z.object({
+      enabled: z.boolean().default(true),
+    }), { owner: 'project', projectWrite: 'manager' })
+    ctx.settings.register(settingsNamespace('future-deployment-setting'), z.object({
+      enabled: z.boolean().default(true),
+    }), { owner: 'deployment' })
+    const api = createApiProxy(ctx, DEFAULTS)
+
+    const described = expectOk(await api.settings.describe(request({})))
+    expect(described.namespaces.map(view => view.ns)).toEqual(['future-project-setting'])
+    expect(described.namespaces[0]).toMatchObject({ writable: true, owner: 'project' })
+  })
+
+  it('keeps project-scope secret fields on the credentials seam', async () => {
+    const ctx = await harness({
+      projectScope: 'rw',
+      projectManager: true,
+      settings: { documentPath: '/tmp/settings.yaml' },
+    })
+    ctx.settings.register(settingsNamespace('project-secret'), z.object({
+      apiKey: z.string().role('secret'), safe: z.string().default('safe'),
+    }), { owner: 'project', projectWrite: 'manager' })
+    const api = createApiProxy(ctx, DEFAULTS)
+    const error = expectErr(await api.settings.update(request({
+      ns: 'project-secret', patch: { apiKey: 'secret-value' },
+    })))
+    expect(error).toMatchObject({
+      code: 'settings-rejected', details: { ns: 'project-secret', reason: 'project' },
+    })
+    expect(expectOk(await api.settings.update(request({
+      ns: 'project-secret', patch: { safe: 'updated' },
+    }))).value).toMatchObject({ safe: 'updated' })
   })
 })
 

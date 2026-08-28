@@ -33,12 +33,32 @@ export function settingsNamespace(value: string): SettingsNamespace {
 /** When a namespace's changes take effect for its owner. */
 export type SettingsApplies = 'live' | 'restart'
 
+/** Logical owner of a settings namespace for scoped configuration surfaces. */
+export type SettingsOwner = 'account' | 'project' | 'organization' | 'deployment'
+
+/** Whether a project manager may edit a namespace in a shared runtime. */
+export type SettingsProjectWrite = 'never' | 'manager'
+
+/** One section path a project manager may mutate in a shared runtime. */
+export type SettingsProjectWritePath = readonly string[]
+
 /** Registration options beyond the namespace schema. */
 export interface SettingsRegisterOptions<T> {
   /** Composition-layer values resolved below the user layer (entry-config subset). */
   base?: Partial<T>
   /** Owner's effect timing, surfaced to configuration UIs; defaults to `live`. */
   applies?: SettingsApplies
+  /** Logical owner shown by remote configuration surfaces. */
+  owner?: SettingsOwner
+  /** Project-scope write policy; `manager` requires `owner: 'project'`; defaults to `never`. */
+  projectWrite?: SettingsProjectWrite
+  /**
+   * Optional allowlist for project-manager writes. Each path permits that
+   * exact value and descendants; omission keeps the whole namespace writable
+   * when `projectWrite` is `manager`. Paths must be non-empty and cannot name
+   * object-prototype keys.
+   */
+  projectWritePaths?: readonly SettingsProjectWritePath[]
   /**
    * Reject a resolved section the owner could not act on, for constraints its
    * schema cannot express — a cross-field requirement, or one field's validity
@@ -85,6 +105,12 @@ export interface SettingsDescriptor {
   user?: unknown
   /** Owner's declared effect timing. */
   applies: SettingsApplies
+  /** Logical owner of this namespace. */
+  owner: SettingsOwner
+  /** Whether a project manager may edit this namespace. */
+  projectWrite: SettingsProjectWrite
+  /** Optional project-manager path allowlist; absent means the whole namespace. */
+  projectWritePaths?: string[][]
   /** Schema-declared secret positions; present only under `redactSecrets`. */
   secrets?: RedactedSecret[]
 }
@@ -191,6 +217,40 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
   const proto: unknown = Object.getPrototypeOf(value)
   return proto === Object.prototype || proto === null
+}
+
+/** Whether an unknown value is a non-empty path made only of safe strings. */
+function isSafeSettingsPath(value: unknown): value is readonly string[] {
+  return Array.isArray(value) && value.length > 0 && value.every((segment: unknown): segment is string =>
+    typeof segment === 'string' && segment.length > 0
+      && segment !== '__proto__' && segment !== 'prototype' && segment !== 'constructor')
+}
+
+/** Normalize and validate project-manager path restrictions at registration. */
+function projectWritePathsOf(
+  owner: SettingsOwner,
+  projectWrite: SettingsProjectWrite,
+  paths: readonly SettingsProjectWritePath[] | undefined,
+  ns: SettingsNamespace,
+): string[][] | undefined {
+  if (paths === undefined) return undefined
+  if (projectWrite !== 'manager' || owner !== 'project') {
+    throw new Error(`settings namespace "${ns}" may declare project write paths only with project manager writes`)
+  }
+  if (!Array.isArray(paths) || paths.length === 0) {
+    throw new Error(`settings namespace "${ns}" project write paths must be a non-empty array`)
+  }
+  const normalized: string[][] = []
+  for (const path of paths) {
+    if (!isSafeSettingsPath(path)) {
+      throw new Error(`settings namespace "${ns}" project write paths must contain non-empty safe paths`)
+    }
+    normalized.push([...path])
+  }
+  const duplicate = normalized.some((path, index) => normalized.slice(0, index).some(previous =>
+    previous.length === path.length && previous.every((segment, offset) => segment === path[offset])))
+  if (duplicate) throw new Error(`settings namespace "${ns}" project write paths must not contain duplicates`)
+  return normalized
 }
 
 /**
@@ -350,6 +410,10 @@ interface SettingsRegistration {
   schema: z<unknown>
   base: unknown
   applies: SettingsApplies
+  owner: SettingsOwner
+  projectWrite: SettingsProjectWrite
+  /** Optional path allowlist for project-manager writes. */
+  projectWritePaths?: string[][]
   /** Owner-supplied check for constraints the schema cannot express. */
   validate?: (value: unknown) => void
   resolved: unknown
@@ -464,11 +528,20 @@ export abstract class SettingsProvider extends Service {
     if (this.registrations.has(ns)) {
       throw new Error(`settings namespace "${ns}" is already registered`)
     }
+    const owner = options?.owner ?? 'deployment'
+    const projectWrite = options?.projectWrite ?? 'never'
+    if (projectWrite === 'manager' && owner !== 'project') {
+      throw new Error(`settings namespace "${ns}" may be project-writable only when owner is project`)
+    }
+    const projectWritePaths = projectWritePathsOf(owner, projectWrite, options?.projectWritePaths, ns)
     const registration: SettingsRegistration = {
       ns,
       schema: schema as z<unknown>,
       base: options?.base,
       applies: options?.applies ?? 'live',
+      owner,
+      projectWrite,
+      ...projectWritePaths === undefined ? {} : { projectWritePaths },
       ...options?.validate === undefined
         ? {}
         : { validate: options.validate as (value: unknown) => void },
@@ -535,6 +608,11 @@ export abstract class SettingsProvider extends Service {
         ...base === undefined ? {} : { base },
         ...detachedUser === undefined ? {} : { user: detachedUser },
         applies: registration.applies,
+        owner: registration.owner,
+        projectWrite: registration.projectWrite,
+        ...registration.projectWritePaths === undefined
+          ? {}
+          : { projectWritePaths: registration.projectWritePaths.map(path => [...path]) },
       }
       if (options?.redactSecrets !== true) return descriptor
       const schema = registration.schema as z<never>
@@ -897,6 +975,12 @@ export interface SettingsSectionHooks<T> {
    * @param value - the resolved section, schema-valid by construction.
    */
   validate?: (value: T) => void
+  /** Logical owner exposed to scoped configuration surfaces. */
+  owner?: SettingsOwner
+  /** Whether a project manager may edit this section. */
+  projectWrite?: SettingsProjectWrite
+  /** Optional path allowlist for project-manager writes. */
+  projectWritePaths?: readonly SettingsProjectWritePath[]
 }
 
 /**
@@ -923,6 +1007,9 @@ export function installSettingsSection<T>(
     const scope = sctx.settings.register(ns, schema, {
       base: entry,
       ...hooks.validate === undefined ? {} : { validate: hooks.validate },
+      ...hooks.owner === undefined ? {} : { owner: hooks.owner },
+      ...hooks.projectWrite === undefined ? {} : { projectWrite: hooks.projectWrite },
+      ...hooks.projectWritePaths === undefined ? {} : { projectWritePaths: hooks.projectWritePaths },
     })
     hooks.setSource(() => scope.get())
     sctx.effect(() => () => {

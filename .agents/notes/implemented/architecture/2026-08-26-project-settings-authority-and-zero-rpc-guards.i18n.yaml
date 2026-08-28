@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-26-project-settings-authority-and-zero-rpc-guards.md
-2026-08-26-project-settings-authority-and-zero-rpc-guards.md: 66225451895e0c768ed5f004a752584f953acaa7
-2026-08-26-project-settings-authority-and-zero-rpc-guards.zh.md: a12704bf910c981676af134b2f180d26b949609e
+2026-08-26-project-settings-authority-and-zero-rpc-guards.md: 8bd093d9f5322c9fb194e17c4787f4bcb5658cdb
+2026-08-26-project-settings-authority-and-zero-rpc-guards.zh.md: bc39a000a35e4d555218aef4f343dfb5e7f6a514

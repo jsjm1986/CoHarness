@@ -57,7 +57,13 @@ export function EnterBehaviorRow({ useBusyEnter, useSettings, setBusyEnter, t }:
             ? t('settings.enter.projectReadOnly')
             : blocked === 'provider' || settings.writableReason === 'provider'
               ? t('settings.enter.providerReadOnly')
-              : undefined
+              : blocked === 'account' || settings.writableReason === 'account'
+                ? t('settings.enter.accountReadOnly')
+                : blocked === 'organization' || settings.writableReason === 'organization'
+                  ? t('settings.enter.organizationReadOnly')
+                  : blocked === 'deployment' || settings.writableReason === 'deployment'
+                    ? t('settings.enter.deploymentReadOnly')
+                    : undefined
 
   useEffect(() => {
     if (disabled) setOpen(false)

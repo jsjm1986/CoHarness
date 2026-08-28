@@ -136,7 +136,10 @@ export function apply(ctx: Context): void {
   // Apply-time construction keeps store identity bound to this fiber.
   const chatStore = createChatStore()
   const submissionPolicy = new ComposerSubmissionPolicy(
-    ctx.settingsScope.bind<ConversationSettings>({ namespace: CONVERSATION_SETTINGS_NAMESPACE }),
+    ctx.settingsScope.bind<ConversationSettings>({
+      namespace: CONVERSATION_SETTINGS_NAMESPACE,
+      source: 'account-or-host',
+    }),
   )
   ctx.effect(() => () => { submissionPolicy.dispose() }, 'ui-conversation: settings policy observer')
 

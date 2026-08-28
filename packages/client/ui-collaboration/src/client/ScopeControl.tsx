@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   IconChevronDownOutline14, IconCloseFill14, IconGlobeOutline14, IconSearchOutline16,
-  IconShareOutline16, IconPlusOutline16, IconUserOutline16, IconWarningOutline16,
+  IconShareOutline16, IconPlusOutline16, IconSettingsOutline16, IconUserOutline16, IconWarningOutline16,
   Menu, type MenuEntry,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
@@ -11,6 +11,7 @@ import type {
 } from './collaboration-client.ts'
 import type { NS } from './locales.ts'
 import { ProjectManagerModal, type ProjectManagerMode } from './ProjectManagerModal.tsx'
+import { ProjectSettingsModal } from './ProjectSettingsModal.tsx'
 import { ScopeSwitchStatus } from './ScopeSwitchStatus.tsx'
 import css from './ScopeControl.module.css'
 
@@ -33,6 +34,12 @@ export interface ScopeControlInjected {
   listUsers?: () => Promise<import('./collaboration-client.ts').UserSummary[]>
   /** Count pending invitations where the current user is the invitee. */
   getInvitationCount?: () => Promise<{ pending: number }>
+  /** Load and mutate the logical project configuration panel. */
+  loadProjectConfiguration?: (projectId: number) => Promise<import('./collaboration-client.ts').ProjectConfiguration>
+  setProjectThemePolicy?: (
+    projectId: number,
+    policy: import('./collaboration-client.ts').ProjectThemePolicy,
+  ) => Promise<import('./collaboration-client.ts').ProjectConfiguration>
 }
 
 /** Full sidebar collaboration-control props. */
@@ -50,11 +57,13 @@ export type ScopeControlProps =
  */
 export function ScopeControl({
   wide, useCollaboration, switchScope, stageVisibility,
-  createProject, listInvitations, inviteMember, acceptInvitation, listUsers, getInvitationCount, t,
+  createProject, listInvitations, inviteMember, acceptInvitation, listUsers, getInvitationCount,
+  loadProjectConfiguration, setProjectThemePolicy, t,
 }: ScopeControlProps) {
   const state = useCollaboration(snapshot => snapshot)
   const [open, setOpen] = useState(false)
   const [managerMode, setManagerMode] = useState<ProjectManagerMode>()
+  const [projectSettingsOpen, setProjectSettingsOpen] = useState(false)
   const [invitationCount, setInvitationCount] = useState(0)
   const [projectQuery, setProjectQuery] = useState('')
   const context = state.context
@@ -135,6 +144,17 @@ export function ScopeControl({
         </span>
       ),
       icon: <IconShareOutline16 size={16} />,
+    })
+  }
+  // Keep the entry visible to every project member. The panel explains which
+  // namespaces are owner-managed, so a disabled action is understandable
+  // instead of looking like a missing feature.
+  if (projectScope !== undefined
+    && loadProjectConfiguration !== undefined && setProjectThemePolicy !== undefined) {
+    managerEntries.push({
+      id: 'project:settings',
+      label: t('manager.settingsAction'),
+      icon: <IconSettingsOutline16 size={16} />,
     })
   }
 
@@ -226,6 +246,10 @@ export function ScopeControl({
             setManagerMode('members')
             return
           }
+          if (id === 'project:settings') {
+            setProjectSettingsOpen(true)
+            return
+          }
           stageVisibility(id.slice('visibility:'.length) as CollaborationVisibility)
         }}
         side="top"
@@ -279,6 +303,21 @@ export function ScopeControl({
         }}
         onClose={() => { setManagerMode(undefined) }}
       />
+      {projectScope !== undefined && currentProject !== undefined
+        && loadProjectConfiguration !== undefined && setProjectThemePolicy !== undefined ? (
+          <ProjectSettingsModal
+            open={projectSettingsOpen}
+            project={currentProject}
+            t={t}
+            load={loadProjectConfiguration}
+            setThemePolicy={setProjectThemePolicy}
+            onMembers={() => {
+              setProjectSettingsOpen(false)
+              setManagerMode('members')
+            }}
+            onClose={() => { setProjectSettingsOpen(false) }}
+          />
+        ) : null}
       {state.scopeBusy && state.scopeTarget !== undefined && (
         <ScopeSwitchStatus target={state.scopeTarget} t={t} />
       )}

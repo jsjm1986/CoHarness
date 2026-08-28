@@ -1,4 +1,5 @@
 import type { AuditRow } from './audit.ts'
+import type { GatewayAccountPreferencesService } from './account-preferences.ts'
 import type { UserRow } from './auth.ts'
 import type {
   CollaborationAction,
@@ -26,6 +27,9 @@ import type {
   UsageOverview,
   UsageSummary,
   ProjectQuotaView,
+  ProjectCredentialView,
+  ProjectModelProviderRow,
+  ProjectModelSettingsView,
 } from './model-governance.ts'
 import type {
   EffectiveGrant,
@@ -33,6 +37,7 @@ import type {
   ProjectDetail,
   ProjectInvitation,
   ProjectRow,
+  ProjectThemePolicy,
 } from './projects.ts'
 import type { PostgresDocumentCatalogService } from './postgres/document-catalog-service.ts'
 
@@ -50,6 +55,9 @@ export interface GatewayAuthService {
   validate(token: string): Awaitable<UserRow | null>
   revoke(token: string): Awaitable<void>
 }
+
+/** Account-scoped browser preferences shared by personal and project pages. */
+export type GatewayUserPreferencesService = GatewayAccountPreferencesService
 
 /** User administration operations consumed by the Gateway. */
 export interface GatewayUserService {
@@ -101,6 +109,8 @@ export interface GatewayProjectService {
   listInvitations?(userId: number, projectId?: number): Awaitable<ProjectInvitation[]>
   acceptInvitation?(invitationId: string, userId: number): Awaitable<void>
   countPendingInvitations?(userId: number): Awaitable<number>
+  /** Update the explicit project UI theme policy when the provider supports it. */
+  setThemePolicy?(projectId: number, policy: ProjectThemePolicy): Awaitable<void>
 }
 
 /** Project membership and shared-conversation authorization operations. */
@@ -177,6 +187,26 @@ export interface GatewayModelGovernanceService {
     api?: string
     apiKey?: string
   }): Awaitable<Array<{ id: string; name?: string; contextWindow?: number; maxTokens?: number }>>
+  /** Project-scoped Provider settings used by the user-facing project UI. */
+  describeProjectModelSettings?(projectId: number): Awaitable<ProjectModelSettingsView>
+  mutateProjectModelSettings?(
+    projectId: number,
+    ops: ModelSettingsPathOp[],
+    expectedRevision?: number,
+  ): Awaitable<ProjectModelSettingsView>
+  listProjectProviders?(projectId: number): Awaitable<ProjectModelProviderRow[]>
+  describeProjectCredentials?(projectId: number, refs: string[]): Awaitable<Record<string, ProjectCredentialView>>
+  setProjectCredential?(projectId: number, ref: string, value: string): Awaitable<void>
+  unsetProjectCredential?(projectId: number, ref: string): Awaitable<void>
+  discoverProjectModels?(request: {
+    projectId: number
+    provider?: string
+    baseURL?: string
+    api?: string
+    apiKey?: string
+  }): Awaitable<Array<{ id: string; name?: string; contextWindow?: number; maxTokens?: number }>>
+  /** Resolve either an organization or project-owned reference for a runtime. */
+  resolveManagedCredential?(subject: ModelUsageSubject, ref: string): Awaitable<string | null>
   issueIntakeToken(subject: ModelUsageSubject): Awaitable<string>
   subjectForIntakeToken(token: string): Awaitable<ModelUsageSubject | null>
   setQuota(

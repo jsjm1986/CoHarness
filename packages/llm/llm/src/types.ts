@@ -184,6 +184,10 @@ export interface LlmConfigurableProvider {
    * from outside.
    */
   declared?: boolean
+  /** Optional ownership label supplied by a scoped configuration provider. */
+  management?: 'personal' | 'organization' | 'project' | 'external'
+  /** Public project id when this route belongs to a project. */
+  projectId?: number
 }
 
 /**

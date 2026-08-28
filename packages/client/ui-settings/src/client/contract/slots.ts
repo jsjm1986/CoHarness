@@ -122,6 +122,10 @@ export interface SettingsHeaderOwnerProps {
 export interface SettingsSectionOwnerProps {
   /** Close the settings panel (the shell owns the open state). */
   close: () => void
+  /** Scope requested by a project entry point; absent means the account view. */
+  settingsScope?: 'personal' | 'project'
+  /** Project id paired with a project-scoped settings request. */
+  projectId?: number
 }
 
 /** Owner share of the currently active settings-backed onboarding step. */

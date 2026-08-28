@@ -136,7 +136,8 @@ async function writeProjection(
     intakeUrl: `http://127.0.0.1:${cfg.intakePort}/usage`,
     intakeToken: token,
     // A personal runtime honors user-declared (BYOK) routes; a shared project
-    // runtime stays catalog-only because members share one settings document.
+    // runtime receives only the organization catalog and project-owned routes
+    // selected by the Gateway policy.
     userDeclaredAllowed: subject.kind === 'user',
   }
   // The base bundle's legacy default is intentionally not authorized by the

@@ -178,6 +178,15 @@ describe('request-level dynamic profiles', () => {
     })).rejects.toThrow(/credential reference .* reserved for organization configuration/)
   })
 
+  it('keeps managed project route prefixes out of personal settings', async () => {
+    const dir = await home()
+    const ctx = await boot(dir, {})
+
+    await expect(ctx.settings.update(NS, {
+      providers: { 'project-42-relay': { apiKeyEnv: 'PROJECT_RELAY_API_KEY' } },
+    })).rejects.toThrow(/provider route .* reserved for organization configuration/)
+  })
+
   it('keeps serving its routes when a settings-born route collides with another adapter', async () => {
     const dir = await home()
     await writeFile(

@@ -57,7 +57,13 @@ export function AgentPresetRow({ load, select, useAgentPreset, t }: AgentPresetR
   const chosen = state.options.find(option => option.id === state.currentValue)
   const chosenText = chosen === undefined ? undefined : presetDisplayText(chosen, t)
   const label = state.currentValue === '' ? t('loading') : (chosenText?.name ?? state.currentValue)
-  const description: string = state.error ?? t('description')
+  const description: string = state.error
+    ?? (state.writableReason === 'project' ? t('managedByProject')
+      : state.writableReason === 'account' ? t('managedByAccount')
+        : state.writableReason === 'organization' ? t('managedByOrganization')
+          : state.writableReason === 'provider' || state.writableReason === 'deployment'
+            ? t('managedByDeployment')
+            : t('description'))
 
   return (
     <div className={css.row}>

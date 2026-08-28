@@ -70,7 +70,9 @@ export interface ProviderEditorProps {
   /** Disable writes (read-only settings provider). */
   readOnly: boolean
   /** Credential namespace used when this card materializes a new key reference. */
-  credentialScope?: 'personal' | 'organization'
+  credentialScope?: 'personal' | 'organization' | 'project'
+  /** Project id paired with a project credential scope. */
+  projectId?: number
   /** Render only the credential field and actions, without provider settings. */
   credentialOnly?: boolean
   /** Require a newly entered credential before this editor can submit. */
@@ -140,13 +142,14 @@ function refFor(
   namespace: SettingsNamespaceView,
   path: readonly string[],
   provider: string,
-  scope: 'personal' | 'organization',
+  scope: 'personal' | 'organization' | 'project',
+  projectId?: number,
 ): string {
   const profile = schema.getPath(namespace.value, path)
   const named = typeof profile === 'object' && profile !== null
     ? (profile as { apiKeyEnv?: unknown }).apiKeyEnv
     : undefined
-  return typeof named === 'string' && named.length > 0 ? named : deriveKeyRef(provider, scope)
+  return typeof named === 'string' && named.length > 0 ? named : deriveKeyRef(provider, scope, projectId)
 }
 
 /**
@@ -173,7 +176,7 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
   const fallback = schema.getPath(namespace.value, settingsPath)
   const disabled = props.readOnly || busy
   const layout = layoutOf(namespace.ns)
-  const keyRef = refFor(schema, namespace, settingsPath, props.provider, props.credentialScope ?? 'personal')
+  const keyRef = refFor(schema, namespace, settingsPath, props.provider, props.credentialScope ?? 'personal', props.projectId)
   // The same schema read the create card makes, so the choices offered here
   // and there cannot drift apart: both come from the adapter's own `Config`.
   // Only the pi-ai layout has a per-route protocol for the read to find, and

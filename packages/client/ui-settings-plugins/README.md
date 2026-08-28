@@ -10,6 +10,8 @@ The configurable tab reads which settings namespaces the Host serves and dispatc
 
 The cards this package ships cover the shell executor (`bash`), the agent loop's tool-call parallelism (`agent-loop`), and the DeepSeek search provider (`web-search-deepseek`).
 
+In a project scope these cards expose only namespaces whose Host registration declares `owner: project` and `projectWrite: manager`. The project owner and organization administrators can save those shared runtime values; other members see the card and an inline owner explanation but no write request is sent. Account, organization, deployment, and model-provider settings stay on their owning surfaces.
+
 ## Extension point
 
 The section declares `settings.plugins.tab`, a root list slot whose labels become ordered tabs. It keeps a tab mounted after its first selection, so local drafts and read-only snapshots survive tab switches. The package registers its own `configurable` contribution, which declares the nested `settings.plugin.item` slot — keyed on the settings namespace a card edits. A plugin that ships a browser half registers its own card under its own namespace and owns every part of it: chrome, controls, and copy. Keying on the namespace is what lets a plugin distributed outside this repository appear here — it registers the namespace on the Host and the card in the browser, and the tab pairs the two without learning what the namespace means. Tabs follow the contribution's `order`; cards follow registration order.

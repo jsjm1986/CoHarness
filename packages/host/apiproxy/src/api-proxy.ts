@@ -45,7 +45,7 @@ import {
 import {
   InvalidPresetIdError, PresetExistsError, PresetMountError,
   PresetNotWritableError, resolveSessionPreset,
-  SETTINGS_NAMESPACE as AGENT_PRESET_SETTINGS_NAMESPACE, UnknownPresetError,
+  UnknownPresetError,
 } from '@deepseek-ai/dsh-agent-presets'
 import type { PresetBearingSession } from '@deepseek-ai/dsh-agent-presets'
 import type {} from '@deepseek-ai/dsh-tools'
@@ -141,11 +141,6 @@ import { canOpenNativePath, openNativePath, openNativeTextFile } from './native-
 
 /** Page size when history is called without maxMessages. */
 const DEFAULT_MAX_MESSAGES = 50
-
-/** Non-model settings namespaces visible from a shared project runtime. */
-const PROJECT_SETTINGS_NAMESPACES = [
-  'agent-loop', 'shell', 'locale', 'permission', 'ui-conversation', 'ui-theme', 'web-search-deepseek',
-] as const
 
 /** Provider work budget: at most 100 calls and 2,000 inspected hits. */
 const SESSION_SEARCH_PROVIDER_CALL_LIMIT = 100
@@ -365,9 +360,6 @@ function referencedImage(events: readonly SessionEvent[], attachmentId: string):
   }
   return undefined
 }
-
-/** Product settings intentionally exposed beside model-provider namespaces. */
-const PRODUCT_SETTINGS_NAMESPACES = new Set(['ui-onboarding', AGENT_PRESET_SETTINGS_NAMESPACE])
 
 /** Strict browser-zone profile: UTC or an IANA Area/Location-style identifier. */
 const IANA_TIME_ZONE = /^[A-Za-z][A-Za-z0-9_+.-]*(?:\/[A-Za-z0-9_+.-]+)+$/
@@ -1695,12 +1687,39 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     return { authority }
   }
 
-  /** Keep shared project runtime configuration under deployment ownership. */
-  function authorizePersonalConfiguration(): { error?: RpcError } {
+  /** Keep shared project configuration on the owner/admin authorization path. */
+  function authorizePersonalConfiguration(allowProjectManager = false): { error?: RpcError } {
     const captured = captureCollaboration('write')
     if ('error' in captured) return captured
-    if (captured.authority?.participant.scope.kind === 'project') {
+    if (captured.authority?.participant.scope.kind === 'project'
+      && (!allowProjectManager || captured.authority.participant.scope.canManage !== true)) {
       return { error: collaborationRefusal(new CollaborationError('forbidden'), 'write') }
+    }
+    return {}
+  }
+
+  /** Authorize a project manager for one namespace explicitly marked manager-writable. */
+  function authorizeSettingsNamespace(ns: string, settings: NonNullable<ReturnType<typeof ctx.get<'settings'>>>): { error?: RpcError } {
+    const captured = captureCollaboration('write')
+    if ('error' in captured) return captured
+    const participant = captured.authority?.participant
+    if (participant?.scope.kind !== 'project') return {}
+    if (participant.scope.canManage !== true) {
+      return { error: collaborationRefusal(new CollaborationError('forbidden'), 'write') }
+    }
+    const descriptor = settings.describe().find(candidate => String(candidate.ns) === ns)
+    if (descriptor?.owner !== 'project' || descriptor.projectWrite !== 'manager') {
+      const reason = descriptor?.owner === 'account' || descriptor?.owner === 'organization'
+        || descriptor?.owner === 'deployment' ? descriptor.owner : 'project'
+      const ownerLabel = reason === 'account' ? 'the account' : reason === 'organization'
+        ? 'the organization' : reason === 'deployment' ? 'the deployment' : 'the project'
+      return {
+        error: {
+          code: 'settings-rejected',
+          message: `settings namespace "${ns}" is managed by ${ownerLabel} in project scope`,
+          details: { ns, reason },
+        },
+      }
     }
     return {}
   }
@@ -2670,7 +2689,26 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   }
 
   /** Map one redacted settings descriptor to its wire view. */
-  function namespaceView(descriptor: SettingsDescriptor): SettingsNamespaceView {
+  function namespaceView(
+    descriptor: SettingsDescriptor,
+    projectScope = false,
+    projectManager = false,
+    providerWritable = true,
+  ): SettingsNamespaceView {
+    const namespaceWritable = projectScope
+      ? projectManager && descriptor.owner === 'project' && descriptor.projectWrite === 'manager' && providerWritable
+      : providerWritable
+    const writableReason = namespaceWritable
+      ? undefined
+      : !providerWritable
+        ? 'provider' as const
+        : projectScope && descriptor.owner === 'account'
+          ? 'account' as const
+          : projectScope
+            ? 'project' as const
+            : descriptor.owner === 'organization'
+              ? 'organization' as const
+              : 'provider' as const
     return {
       ns: String(descriptor.ns),
       schema: descriptor.schema,
@@ -2680,15 +2718,134 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       applies: descriptor.applies,
       secrets: (descriptor.secrets ?? []).map(secret => ({ path: [...secret.path], set: secret.set })),
       revision: descriptor.revision,
+      writable: namespaceWritable,
+      owner: descriptor.owner,
+      ...writableReason === undefined ? {} : { writableReason },
+      ...descriptor.projectWritePaths === undefined
+        ? {}
+        : { projectWritePaths: descriptor.projectWritePaths.map(path => [...path]) },
     }
   }
 
-  /** Settings namespaces safe to inspect from a shared project runtime. */
-  function projectVisibleNamespaces(): Set<string> {
-    const visible = new Set(ctx.llm.listConfigurableProviders().map(entry => entry.settingsNs))
-    for (const ns of PROJECT_SETTINGS_NAMESPACES) visible.add(ns)
-    for (const ns of PRODUCT_SETTINGS_NAMESPACES) visible.add(ns)
+  /**
+   * Select project-safe settings from the registrant's ownership metadata.
+   * Account preferences remain visible as read-only context, while project
+   * namespaces are visible only when their registrant explicitly opts into
+   * project management. Provider adapters may add a project-owned namespace
+   * without changing this Host package, so the policy does not depend on a
+   * copy of the namespace list.
+   * @param descriptors - settings registrations in this runtime.
+   * @returns namespace names that may be inspected in project scope.
+   */
+  function projectVisibleNamespaces(descriptors: readonly SettingsDescriptor[]): Set<string> {
+    const visible = new Set(descriptors
+      .filter(descriptor => descriptor.owner === 'project' || descriptor.owner === 'account')
+      .map(descriptor => String(descriptor.ns)))
+    for (const entry of ctx.llm.listConfigurableProviders()) {
+      if (entry.management === 'project' && entry.settingsNs !== '') visible.add(entry.settingsNs)
+    }
     return visible
+  }
+
+  /** Read an explicitly submitted permission default without resolving secrets. */
+  function submittedPermissionPreset(
+    ns: string,
+    mode: 'update' | 'replace' | 'mutate',
+    section: object,
+  ): unknown {
+    if (ns !== 'permission') return undefined
+    if (mode === 'mutate') {
+      if (!Array.isArray(section)) return undefined
+      const operations = section as unknown[]
+      const operation = operations.find((candidate: unknown) => {
+        if (candidate === null || typeof candidate !== 'object' || Array.isArray(candidate)) return false
+        const row = candidate as Record<string, unknown>
+        return row.op === 'set' && Array.isArray(row.path)
+          && row.path.length === 1 && row.path[0] === 'defaultPreset'
+      })
+      return operation === undefined ? undefined : (operation as { value?: unknown }).value
+    }
+    return (section as Record<string, unknown>).defaultPreset
+  }
+
+  /** Return whether a project-scope write would carry or delete a secret field. */
+  function projectSecretWrite(
+    descriptor: SettingsDescriptor,
+    mode: 'update' | 'replace' | 'mutate',
+    section: object,
+  ): boolean {
+    const secrets = descriptor.secrets ?? []
+    if (secrets.length === 0) return false
+    if (mode === 'replace') return true
+    const overlaps = (left: readonly string[], right: readonly string[]): boolean => {
+      const length = Math.min(left.length, right.length)
+      return left.slice(0, length).every((segment, index) => segment === right[index])
+    }
+    if (mode === 'mutate') {
+      if (!Array.isArray(section)) return false
+      return section.some((candidate: unknown) => {
+        if (candidate === null || typeof candidate !== 'object' || Array.isArray(candidate)) return false
+        const operation = candidate as Record<string, unknown>
+        return Array.isArray(operation.path) && secrets.some(secret =>
+          overlaps(secret.path, operation.path as string[]) || overlaps(operation.path as string[], secret.path))
+      })
+    }
+    let current: unknown = section
+    for (const secret of secrets) {
+      current = section
+      for (const segment of secret.path) {
+        if (current === null || typeof current !== 'object' || Array.isArray(current)
+          || !Object.hasOwn(current, segment)) {
+          current = undefined
+          break
+        }
+        current = (current as Record<string, unknown>)[segment]
+      }
+      if (current !== undefined) return true
+    }
+    return false
+  }
+
+  /** Whether one submitted path is below an allowed project path. */
+  function projectPathAllowed(path: readonly string[], allowed: readonly (readonly string[])[]): boolean {
+    return path.length > 0 && allowed.some(prefix => prefix.length <= path.length
+      && prefix.every((segment, index) => segment === path[index]))
+  }
+
+  /** Enumerate leaf paths a merge patch can replace, including empty objects. */
+  function mergePatchPaths(value: unknown, prefix: string[] = []): string[][] {
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) return [prefix]
+    const entries = Object.entries(value as Record<string, unknown>)
+    if (entries.length === 0) return [prefix]
+    return entries.flatMap(([key, nested]) => mergePatchPaths(nested, [...prefix, key]))
+  }
+
+  /** Return a refusal message when a project manager targets a protected field. */
+  function projectWritePathError(
+    descriptor: SettingsDescriptor,
+    mode: 'update' | 'replace' | 'mutate',
+    section: object,
+  ): string | undefined {
+    const allowed = descriptor.projectWritePaths
+    if (allowed === undefined) return undefined
+    if (mode === 'replace') {
+      return `settings namespace "${String(descriptor.ns)}" cannot be replaced wholesale in project scope; edit only its permitted fields`
+    }
+    const paths = mode === 'mutate'
+      ? Array.isArray(section)
+        ? section.flatMap((candidate: unknown) => {
+          if (candidate === null || typeof candidate !== 'object' || Array.isArray(candidate)) return [[]]
+          const path = (candidate as Record<string, unknown>).path
+          return Array.isArray(path) && path.every((segment: unknown): segment is string => typeof segment === 'string')
+            ? [path]
+            : [[]]
+        })
+        : [[]]
+      : mergePatchPaths(section)
+    const rejected = paths.find(path => !projectPathAllowed(path, allowed))
+    if (rejected === undefined) return undefined
+    const rendered = rejected.length === 0 ? '<section>' : rejected.join('.')
+    return `settings namespace "${String(descriptor.ns)}" does not allow project writes to ${rendered}`
   }
 
   /**
@@ -2704,10 +2861,44 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     section: object,
     expectedRevision?: number,
   ): Promise<RpcResponse<SettingsNamespaceView>> {
-    const authorized = authorizePersonalConfiguration()
-    if (authorized.error !== undefined) return err(request, authorized.error)
+    // Capture collaboration before looking up the optional settings service so
+    // a project member receives the authorization refusal even in a minimal
+    // composition that does not mount settings at all.
+    const preAuthorized = authorizePersonalConfiguration(true)
+    if (preAuthorized.error !== undefined) return err(request, preAuthorized.error)
+    const captured = captureCollaboration('write')
+    if ('error' in captured) return err(request, captured.error)
+    if (captured.authority?.participant.scope.kind === 'project'
+      && captured.authority.participant.role !== 'admin'
+      && submittedPermissionPreset(ns, mode, section) === 'danger-full-access') {
+      return err(request, {
+        code: 'settings-rejected',
+        message: 'permission preset "danger-full-access" is administrator-only',
+        details: { ns, reason: 'project' },
+      })
+    }
     const settings = ctx.get('settings')
     if (settings === undefined) return err(request, settingsAbsent())
+    const authorized = authorizeSettingsNamespace(ns, settings)
+    if (authorized.error !== undefined) return err(request, authorized.error)
+    if (captured.authority?.participant.scope.kind === 'project') {
+      const descriptor = settings.describe({ redactSecrets: true }).find(candidate => String(candidate.ns) === ns)
+      if (descriptor !== undefined) {
+        const pathError = projectWritePathError(descriptor, mode, section)
+        if (pathError !== undefined) {
+          return err(request, {
+            code: 'settings-rejected', message: pathError, details: { ns, reason: 'project' },
+          })
+        }
+        if (projectSecretWrite(descriptor, mode, section)) {
+          return err(request, {
+            code: 'settings-rejected',
+            message: `settings namespace "${ns}" stores secrets through the credentials service in project scope`,
+            details: { ns, reason: 'project' },
+          })
+        }
+      }
+    }
     const rejected = (error: unknown): RpcResponse<SettingsNamespaceView> => {
       // A stale writer is its own outcome, not a malformed request: the client
       // must re-read and re-apply rather than treat the write as invalid.
@@ -4157,6 +4348,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         const captured = captureCollaboration('read')
         if ('error' in captured) return err(request, captured.error)
         const projectScope = captured.authority?.participant.scope.kind === 'project'
+        const projectManager = captured.authority?.participant.scope.kind === 'project'
+          && captured.authority.participant.scope.canManage === true
         const presets = ctx.get('agentPresets')
         if (presets === undefined) return ok(request, { presets: [], authorable: false, hasDocument: false })
         const defaultId = presets.defaultId
@@ -4169,7 +4362,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             ...preset.description === undefined ? {} : { description: preset.description },
             ...preset.broken === undefined ? {} : { broken: preset.broken },
           })),
-          authorable: !projectScope && presets.authorable,
+          authorable: (!projectScope || projectManager) && presets.authorable,
           hasDocument: !projectScope && canOpenPaths(),
         })
       },
@@ -4234,7 +4427,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       // drive the host desktop.
       /* jscpd:ignore-start -- preset authoring methods intentionally share one refusal ladder. */
       async read(request) {
-        const authorized = authorizePersonalConfiguration()
+        const authorized = authorizePersonalConfiguration(true)
         if (authorized.error !== undefined) return err(request, authorized.error)
         const { agentPreset } = request.payload
         const presets = ctx.get('agentPresets')
@@ -4254,7 +4447,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       },
 
       async copy(request) {
-        const authorized = authorizePersonalConfiguration()
+        const authorized = authorizePersonalConfiguration(true)
         if (authorized.error !== undefined) return err(request, authorized.error)
         const { from, agentPreset, name } = request.payload
         const presets = ctx.get('agentPresets')
@@ -4293,7 +4486,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       },
 
       async remove(request) {
-        const authorized = authorizePersonalConfiguration()
+        const authorized = authorizePersonalConfiguration(true)
         if (authorized.error !== undefined) return err(request, authorized.error)
         const { agentPreset } = request.payload
         const presets = ctx.get('agentPresets')
@@ -4370,18 +4563,26 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         const captured = captureCollaboration('read')
         if ('error' in captured) return Promise.resolve(err(request, captured.error))
         const projectScope = captured.authority?.participant.scope.kind === 'project'
+        const projectManager = captured.authority?.participant.scope.kind === 'project'
+          && captured.authority.participant.scope.canManage === true
         const settings = ctx.get('settings')
         if (settings === undefined) return Promise.resolve(err(request, settingsAbsent()))
         const descriptors = settings.describe({ redactSecrets: true })
-        const visible = projectScope
-          ? descriptors.filter(descriptor => projectVisibleNamespaces().has(String(descriptor.ns)))
-          : descriptors
-        const writable = settings.writable && !projectScope
+        const visibleNamespaces = projectScope ? projectVisibleNamespaces(descriptors) : undefined
+        const visible = visibleNamespaces === undefined
+          ? descriptors
+          : descriptors.filter(descriptor => visibleNamespaces.has(String(descriptor.ns)))
+        const writable = settings.writable && (!projectScope || projectManager)
+        const writableReason = writable
+          ? undefined
+          : !settings.writable
+            ? 'provider' as const
+            : projectScope ? 'project' as const : 'provider' as const
         return Promise.resolve(ok(request, {
           writable,
-          ...writable ? {} : { writableReason: projectScope ? 'project' as const : 'provider' as const },
+          ...writableReason === undefined ? {} : { writableReason },
           hasDocument: settings.documentPath !== undefined && !projectScope,
-          namespaces: visible.map(namespaceView),
+          namespaces: visible.map(descriptor => namespaceView(descriptor, projectScope, projectManager, settings.writable)),
         }))
       },
       async openDocument(request, signal) {
@@ -4499,27 +4700,43 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         const organization = new Set(
           ctx.get('modelProviderConfig')?.snapshot().providers.map(provider => provider.provider) ?? [],
         )
-        const views: ConfigurableProviderView[] = directory.map(entry => ({
-          provider: entry.provider,
-          displayName: entry.displayName,
-          settingsNs: entry.settingsNs,
-          settingsPath: [...entry.settingsPath],
-          active: active.has(entry.provider),
-          management: organization.has(entry.provider) ? 'organization' : 'personal',
-          ...entry.declared === undefined ? {} : { declared: entry.declared },
-        }))
+        const managed = new Map(
+          ctx.get('modelProviderConfig')?.snapshot().providers.map(provider => [provider.provider, provider]) ?? [],
+        )
+        const views: ConfigurableProviderView[] = directory.map((entry) => {
+          const managedEntry = managed.get(entry.provider)
+          return {
+            provider: entry.provider,
+            displayName: entry.displayName,
+            settingsNs: entry.settingsNs,
+            settingsPath: [...entry.settingsPath],
+            active: active.has(entry.provider),
+            management: entry.management
+              ?? (managedEntry?.scope === 'project'
+                ? 'project'
+                : organization.has(entry.provider) ? 'organization' : 'personal'),
+            ...entry.declared === undefined ? {} : { declared: entry.declared },
+            ...(entry.projectId !== undefined
+              ? { projectId: entry.projectId }
+              : managedEntry?.projectId === undefined ? {} : { projectId: managedEntry.projectId }),
+          }
+        })
         // Routes registered without a directory declaration still appear —
         // they exist and serve models — just with no settings address. No
         // adapter claimed them, so nothing can say whether they are shipped.
         for (const provider of registered) {
           if (declared.has(provider.id)) continue
+          const managedEntry = managed.get(provider.id)
           views.push({
             provider: provider.id,
             displayName: provider.name,
             settingsNs: '',
             settingsPath: [],
             active: true,
-            management: organization.has(provider.id) ? 'organization' : 'external',
+            management: managedEntry?.scope === 'project'
+              ? 'project'
+              : organization.has(provider.id) ? 'organization' : 'external',
+            ...(managedEntry?.projectId === undefined ? {} : { projectId: managedEntry.projectId }),
           })
         }
         return Promise.resolve(ok(request, { providers: views }))

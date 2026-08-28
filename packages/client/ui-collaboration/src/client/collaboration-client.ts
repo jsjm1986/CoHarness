@@ -1,7 +1,14 @@
 import { createSnapshotStore, readApiResponseJson } from '@deepseek-ai/dsh-client-runtime/client'
+import type {
+  ProjectModelSettingsTransport,
+  ProjectModelSettingsView,
+} from '@deepseek-ai/dsh-client-connection/client'
 
 /** Visibility of a root conversation inside one project. */
 export type CollaborationVisibility = 'project' | 'private'
+
+/** Project UI policy returned by the Gateway. */
+export type ProjectThemePolicy = 'follow-user' | 'light' | 'dark'
 
 /** One project membership exposed by the Gateway account context. */
 export interface ProjectMembership {
@@ -11,6 +18,12 @@ export interface ProjectMembership {
   mode: 'ro' | 'rw'
   /** Whether the account may invite members or rename this project. */
   canManage?: boolean
+  /** Whether this is a server-admin or user-created project. */
+  origin?: 'admin' | 'user'
+  /** Project owner; administrator projects intentionally have no owner. */
+  owner?: { id: number; username: string; displayName: string } | null
+  /** Theme policy applied while this project is active. */
+  uiThemePolicy?: ProjectThemePolicy
 }
 
 /** One project invitation returned by the account API. */
@@ -45,7 +58,7 @@ export interface UserSummary {
 /** Active Gateway scope for the browser page. */
 export type CollaborationScope =
   | { kind: 'personal' }
-  | { kind: 'project'; projectId: number; projectName: string; mode: 'ro' | 'rw' }
+  | { kind: 'project'; projectId: number; projectName: string; mode: 'ro' | 'rw'; canManage?: boolean; uiThemePolicy?: ProjectThemePolicy }
 
 /** Target scope shown while the Gateway prepares the next runtime. */
 export type CollaborationScopeTarget =
@@ -59,6 +72,25 @@ export interface CollaborationContext {
   projects: ProjectMembership[]
   /** Whether the current account may select the administrator full-access preset. */
   fullAccess?: boolean
+}
+
+/** Project configuration facts consumed by the user-facing project panel. */
+export interface ProjectConfiguration {
+  project: {
+    id: number
+    name: string
+    origin?: 'admin' | 'user'
+    owner?: { id: number; username: string; displayName: string } | null
+    themePolicy: ProjectThemePolicy
+  }
+  canManage: boolean
+  capabilities: {
+    themePolicy: boolean
+    runtimeSettings: boolean
+    projectModels: boolean
+    members: boolean
+    filesystem: false
+  }
 }
 
 /** One user who has contributed to a shared root conversation. */
@@ -122,6 +154,12 @@ export interface CollaborationTransport {
   switchScope: (scope: { kind: 'personal' } | { kind: 'project'; projectId: number }, signal: AbortSignal) => Promise<void>
   loadConversation: (sessionId: string, signal: AbortSignal) => Promise<ConversationDetail>
   setVisibility: (sessionId: string, visibility: CollaborationVisibility, signal: AbortSignal) => Promise<void>
+  /** Load the logical project configuration without exposing host paths. */
+  loadProjectConfiguration?: (projectId: number, signal: AbortSignal) => Promise<ProjectConfiguration>
+  /** Persist the project UI theme policy after an authorization check. */
+  setProjectThemePolicy?: (projectId: number, policy: ProjectThemePolicy, signal: AbortSignal) => Promise<ProjectConfiguration>
+  /** Gateway-owned project Provider settings; available to project managers. */
+  projectModels?: ProjectModelSettingsTransport
   /** Optional account project-management operations. */
   createProject?: (name: string, signal: AbortSignal) => Promise<{ projectId: number }>
   listInvitations?: (projectId: number | undefined, signal: AbortSignal) => Promise<ProjectInvitation[]>
@@ -175,6 +213,11 @@ function mode(value: unknown): 'ro' | 'rw' {
   return value
 }
 
+function themePolicy(value: unknown): ProjectThemePolicy {
+  if (value !== 'follow-user' && value !== 'light' && value !== 'dark') throw new Error('invalid collaboration response')
+  return value
+}
+
 function actor(value: unknown): { id: number; username: string; displayName: string } {
   const row = object(value)
   return { id: integer(row.id), username: string(row.username), displayName: string(row.displayName) }
@@ -204,6 +247,9 @@ function project(value: unknown): ProjectMembership {
     path: string(row.path),
     mode: mode(row.mode),
     ...(row.canManage === true ? { canManage: true } : {}),
+    ...(row.origin === 'admin' || row.origin === 'user' ? { origin: row.origin } : {}),
+    ...(row.owner === null ? { owner: null } : row.owner === undefined ? {} : { owner: actor(row.owner) }),
+    ...(row.uiThemePolicy === undefined ? {} : { uiThemePolicy: themePolicy(row.uiThemePolicy) }),
   }
 }
 
@@ -246,6 +292,8 @@ export function parseCollaborationContext(value: unknown): CollaborationContext 
         projectId: integer(scope.projectId),
         projectName: string(scope.projectName),
         mode: mode(scope.mode),
+        ...(scope.canManage === true ? { canManage: true } : {}),
+        ...(scope.uiThemePolicy === undefined ? {} : { uiThemePolicy: themePolicy(scope.uiThemePolicy) }),
       }
       : (() => { throw new Error('invalid collaboration response') })()
   return {
@@ -258,6 +306,46 @@ export function parseCollaborationContext(value: unknown): CollaborationContext 
     scope: parsedScope,
     projects: root.projects.map(project),
     ...(root.fullAccess === true ? { fullAccess: true } : {}),
+  }
+}
+
+/** Decode a project configuration response at the browser trust boundary.
+ * @param value - untrusted JSON response.
+ * @returns the validated project configuration.
+ */
+export function parseProjectConfiguration(value: unknown): ProjectConfiguration {
+  const root = object(value)
+  const projectValue = object(root.project)
+  const capabilities = object(root.capabilities)
+  if (typeof root.canManage !== 'boolean'
+    || capabilities.filesystem !== false
+    || typeof capabilities.themePolicy !== 'boolean'
+    || typeof capabilities.runtimeSettings !== 'boolean'
+    || typeof capabilities.projectModels !== 'boolean'
+    || typeof capabilities.members !== 'boolean') {
+    throw new Error('invalid project configuration response')
+  }
+  const origin = projectValue.origin
+  if (origin !== undefined && origin !== 'admin' && origin !== 'user') throw new Error('invalid project configuration response')
+  const owner = projectValue.owner === undefined || projectValue.owner === null
+    ? projectValue.owner
+    : actor(projectValue.owner)
+  return {
+    project: {
+      id: integer(projectValue.id),
+      name: string(projectValue.name),
+      ...(origin === undefined ? {} : { origin }),
+      ...(owner === undefined ? {} : { owner }),
+      themePolicy: themePolicy(projectValue.themePolicy),
+    },
+    canManage: root.canManage,
+    capabilities: {
+      themePolicy: capabilities.themePolicy,
+      runtimeSettings: capabilities.runtimeSettings,
+      projectModels: capabilities.projectModels,
+      members: capabilities.members,
+      filesystem: false,
+    },
   }
 }
 
@@ -342,10 +430,12 @@ async function emptyRequest(fetcher: typeof fetch, path: string, init: RequestIn
 export function createBrowserCollaborationTransport(options: {
   fetch?: typeof fetch
   reload?: () => void
+  projectModels?: ProjectModelSettingsTransport
 } = {}): CollaborationTransport {
   const fetcher = options.fetch ?? globalThis.fetch
   const reload = options.reload ?? window.location.reload.bind(window.location)
   const jsonHeaders = { 'content-type': 'application/json' }
+  const projectModels = options.projectModels
   return {
     loadContext: signal => jsonRequest(fetcher, '/account/api/context', { signal }, parseCollaborationContext),
     switchScope: (scope, signal) => emptyRequest(fetcher, '/account/api/scope', {
@@ -365,6 +455,22 @@ export function createBrowserCollaborationTransport(options: {
         body: JSON.stringify({ visibility: nextVisibility }),
       },
     ),
+    loadProjectConfiguration: (projectId, signal) => jsonRequest(
+      fetcher,
+      `/account/api/projects/${String(projectId)}/configuration`,
+      { signal },
+      parseProjectConfiguration,
+    ),
+    setProjectThemePolicy: (projectId, policy, signal) => jsonRequest(
+      fetcher,
+      `/account/api/projects/${String(projectId)}/configuration`,
+      {
+        method: 'PATCH', signal, headers: jsonHeaders,
+        body: JSON.stringify({ themePolicy: policy }),
+      },
+      parseProjectConfiguration,
+    ),
+    ...(projectModels === undefined ? {} : { projectModels }),
     createProject: (name, signal) => jsonRequest(
       fetcher, '/account/api/projects', {
         method: 'POST', signal, headers: jsonHeaders, body: JSON.stringify({ name }),
@@ -435,6 +541,24 @@ export class CollaborationClient {
    * @param transport - Gateway account transport.
    */
   constructor(private readonly transport: CollaborationTransport) {}
+
+  /** Load one project's redacted Provider settings.
+   * @param projectId - public project id.
+   * @returns the project model settings view.
+   */
+  loadProjectModelSettings(projectId: number): Promise<ProjectModelSettingsView> {
+    if (this.disposed) return Promise.reject(new CollaborationRequestError(499, 'client-disposed'))
+    const projectModels = this.transport.projectModels
+    if (projectModels === undefined) return Promise.reject(new CollaborationRequestError(503, 'project-model-settings-unavailable'))
+    return projectModels.get(projectId, this.abortController.signal)
+  }
+
+  /** Return the shared project-model wire face for a project settings surface.
+   * @returns the transport, or undefined when the carrier is absent.
+   */
+  projectModelSettingsTransport(): ProjectModelSettingsTransport | undefined {
+    return this.transport.projectModels
+  }
 
   /**
    * Return the stable collaboration snapshot.
@@ -619,6 +743,31 @@ export class CollaborationClient {
     const operation = this.transport.getInvitationCount
     if (operation === undefined) return Promise.reject(new CollaborationRequestError(503, 'invitations-unavailable'))
     return operation(this.abortController.signal)
+  }
+
+  /** Load one project's logical configuration for the current account.
+   * @param projectId - public project id.
+   * @returns the validated project configuration.
+   */
+  loadProjectConfiguration(projectId: number): Promise<ProjectConfiguration> {
+    if (this.disposed) return Promise.reject(new CollaborationRequestError(499, 'client-disposed'))
+    const operation = this.transport.loadProjectConfiguration
+    if (operation === undefined) return Promise.reject(new CollaborationRequestError(503, 'project-configuration-unavailable'))
+    return operation(projectId, this.abortController.signal)
+  }
+
+  /** Persist one project theme policy and refresh the account context.
+   * @param projectId - public project id.
+   * @param policy - theme policy to store.
+   * @returns the updated project configuration.
+   */
+  async setProjectThemePolicy(projectId: number, policy: ProjectThemePolicy): Promise<ProjectConfiguration> {
+    if (this.disposed) throw new CollaborationRequestError(499, 'client-disposed')
+    const operation = this.transport.setProjectThemePolicy
+    if (operation === undefined) throw new CollaborationRequestError(503, 'project-configuration-unavailable')
+    const value = await operation(projectId, policy, this.abortController.signal)
+    await this.load(true)
+    return value
   }
 
   /**

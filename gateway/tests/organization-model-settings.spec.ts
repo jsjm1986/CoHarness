@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   discoverOrganizationModels,
   organizationModelSettingsSchema,
+  validateProjectProfiles,
   validateOrganizationProfiles,
 } from '../src/organization-model-settings.ts'
 
@@ -52,6 +53,12 @@ describe('organization model settings validation', () => {
     })).toThrow(/must use an organization credential reference beginning with DSH_/)
   })
 
+  it('rejects a project-scoped credential reference in an organization profile', () => {
+    expect(() => validateOrganizationProfiles({
+      providers: { 'org-primary': { ...profile, apiKeyEnv: 'DSH_PROJECT_7_RELAY_API_KEY' } },
+    })).toThrow(/must not use a project credential reference/)
+  })
+
   it('rejects non-empty catalog overrides because organization models are explicit', () => {
     expect(() => validateOrganizationProfiles({
       providers: { 'org-primary': { ...profile, modelOverrides: { chat: { name: 'Renamed' } } } },
@@ -77,6 +84,18 @@ describe('organization model settings validation', () => {
     expect(validateOrganizationProfiles({
       providers: { 'org-primary': { ...profile, compat: {}, models: [{ id: 'chat', compat: {} }] } },
     })).toMatchObject({ 'org-primary': { compat: {}, models: [{ compat: {} }] } })
+  })
+
+  it('rejects literal API keys in project profiles', () => {
+    expect(() => validateProjectProfiles({
+      providers: {
+        relay: {
+          ...profile,
+          apiKey: 'must-not-be-persisted',
+          apiKeyEnv: 'DSH_PROJECT_7_RELAY_API_KEY',
+        },
+      },
+    })).toThrow(/must be stored through the project credentials service/)
   })
 
   it.each([

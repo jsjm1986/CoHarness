@@ -10,6 +10,9 @@ import { Context, Service } from '@deepseek-ai/cordis'
 /** Wire protocols supported by the initial organization Provider Consumer. */
 export type ManagedModelProviderProtocol = 'openai-completions' | 'openai-responses' | 'anthropic-messages'
 
+/** Ownership scope of a Provider snapshot entry. */
+export type ManagedModelProviderScope = 'organization' | 'project'
+
 /** Model request modalities accepted by the pi-ai adapter. */
 export type ManagedModelModality = 'text' | 'image'
 
@@ -42,12 +45,16 @@ export interface ManagedModelProfile {
 
 /** One organization-managed Provider profile consumed by an LLM adapter. */
 export interface ManagedModelProviderProfile {
-  /** Reserved organization route id. */
+  /** Runtime route id. Organization and project prefixes are deployment-owned. */
   provider: string
   /** Display name shown by Provider selectors. */
   displayName: string
   /** Adapter family that consumes this profile. */
   driver: 'pi-ai'
+  /** Owning scope; omitted by older policy files and treated as organization. */
+  scope?: ManagedModelProviderScope
+  /** Public project id when the Provider belongs to a project. */
+  projectId?: number
   /** Wire protocol spoken by every model on the route. */
   protocol: ManagedModelProviderProtocol
   /** Provider endpoint. */
@@ -86,7 +93,7 @@ export interface ManagedModelProviderProfile {
   models: readonly ManagedModelProfile[]
 }
 
-/** Complete organization Provider configuration at one monotonic revision. */
+/** Complete managed Provider configuration at one monotonic revision. */
 export interface ModelProviderConfigSnapshot {
   /** Organization-wide configuration revision. */
   revision: number
@@ -109,7 +116,7 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
-/** Organization Provider configuration published as `ctx.modelProviderConfig`. */
+/** Managed Provider configuration published as `ctx.modelProviderConfig`. */
 export abstract class ModelProviderConfig extends Service {
   constructor(ctx: Context) {
     super(ctx, 'modelProviderConfig')

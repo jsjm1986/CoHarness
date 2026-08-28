@@ -18,6 +18,9 @@ export type ModelProviderStatus = 'draft' | 'enabled' | 'disabled' | 'archived'
 /** Persistence origin; legacy catalog rows remain drafts until replaced explicitly. */
 export type ModelProviderSource = 'managed' | 'legacy-catalog'
 
+/** Ownership scope of a provider projected into a runtime. */
+export type ModelProviderScope = 'organization' | 'project'
+
 /** Authentication supported by the initial organization Provider implementation. */
 export type ModelProviderAuthMode = 'api-key' | 'none'
 
@@ -48,6 +51,12 @@ export interface ModelProviderRow {
   credentialRef: string | null
   credentialConfigured: boolean
   source: ModelProviderSource
+  /** Provider ownership scope; organization rows omit this for old callers. */
+  scope?: ModelProviderScope
+  /** Public project id for project-owned rows. */
+  projectId?: number
+  /** Runtime route id when the UI-facing provider key is scoped. */
+  runtimeProvider?: string
   revision: number
   modelCount: number
   /** Complete redacted pi-ai profile used by the shared organization editor. */
@@ -73,6 +82,9 @@ export interface RuntimeModelProvider {
     reasoningEfforts?: false | Partial<Record<'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max', string | null>>
     compat?: { thinkingFormat?: string; supportsReasoningEffort?: boolean }
   }>
+  /** Ownership metadata used to keep project routes out of personal runtimes. */
+  scope?: ModelProviderScope
+  projectId?: number
 }
 
 /** Complete authorization and Provider projection consumed by the runtime plugin. */
@@ -99,9 +111,68 @@ export interface OrganizationModelSettingsView {
     base?: unknown
     user?: unknown
     applies: 'live'
+    /** Logical owner of this settings projection. */
+    owner?: 'account' | 'project' | 'organization' | 'deployment'
+    /** Whether a project manager may edit this projection. */
+    projectWrite?: 'never' | 'manager'
     secrets: Array<{ path: string[]; set: boolean }>
     revision: number
   }>
+}
+
+/** Project-owned model settings returned by the account configuration API. */
+export interface ProjectModelSettingsView {
+  projectId: number
+  /** Monotonic project settings revision used for optimistic writes. */
+  revision: number
+  writable: boolean
+  hasDocument: false
+  namespaces: Array<OrganizationModelSettingsView['namespaces'][number]>
+  /** Project route directory and model catalog used by the browser editor. */
+  providers: ProjectModelProviderRow[]
+  models: { groups: Array<{ id: string; name: string; models: Array<{
+    id: string
+    name: string
+    contextWindow?: number
+    maxTokens?: number
+    inputModalities?: Array<'text' | 'image'>
+  }> }>; failures: Array<{ id: string; name: string; message: string }> }
+}
+
+/** Project-owned Provider metadata returned without credential values. */
+export interface ProjectModelProviderRow {
+  provider: string
+  runtimeProvider: string
+  displayName: string
+  driver: 'pi-ai'
+  protocol: ModelProviderProtocol | null
+  baseURL: string | null
+  authMode: ModelProviderAuthMode
+  status: ModelProviderStatus
+  credentialRef: string | null
+  credentialConfigured: boolean
+  revision: number
+  modelCount: number
+  profile?: Record<string, unknown>
+  models?: Array<{ id: string; name: string }>
+}
+
+/** Value-free project credential state for the project Models surface. */
+export interface ProjectCredentialView {
+  configured: boolean
+  source: 'project'
+  /** Whether the current account may replace or remove this credential. */
+  writable: boolean
+}
+
+/** Optimistic-concurrency failure for a project model settings write. */
+export class ProjectModelSettingsConflictError extends Error {
+  readonly code = 'settings-conflict'
+
+  constructor(readonly expected: number, readonly actual: number) {
+    super('project model settings revision conflict')
+    this.name = 'ProjectModelSettingsConflictError'
+  }
 }
 
 /** Credential state exposed by the organization settings facade. */
@@ -310,7 +381,7 @@ const nonnegative = (value: number, name: string): number => {
 
 function credentialClassOf(source: string): CredentialClass {
   if (source === 'file' || source === 'project-env' || source === 'request') return 'personal'
-  if (source === 'organization' || source === 'env' || source === 'process' || source === 'user-env') return 'company'
+  if (source === 'organization' || source === 'project' || source === 'env' || source === 'process' || source === 'user-env') return 'company'
   return 'unknown'
 }
 

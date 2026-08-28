@@ -42,21 +42,30 @@ const CUBES: readonly { id: ThemePreference; labelKey: ThemeKey; Icon: typeof Ic
 export function AppearanceRow({ t, setTheme, useStore }: AppearanceRowComponentProps) {
   const preference = useStore(s => s.preference)
   const settings = useStore(s => s.settings)
+  const projectOverride = useStore(s => s.projectOverride)
   const disabled = settings.status !== 'ready' || !settings.writable || settings.write.status === 'saving'
   const blocked = settings.write.status === 'blocked' ? settings.write.reason : undefined
-  const notice = settings.write.status === 'error'
-    ? t('appearance.saveFailed')
-    : settings.write.status === 'saving'
-      ? t('appearance.saving')
-      : blocked === 'loading' || settings.status === 'loading'
-        ? t('appearance.loading')
-        : blocked === 'unavailable' || settings.status === 'unavailable'
-          ? t('appearance.unavailable')
-          : blocked === 'project' || settings.writableReason === 'project'
-            ? t('appearance.projectReadOnly')
-            : blocked === 'provider' || settings.writableReason === 'provider'
-              ? t('appearance.providerReadOnly')
-              : undefined
+  const notice = projectOverride !== undefined
+    ? t(projectOverride === 'light' ? 'appearance.projectForcedLight' : 'appearance.projectForcedDark')
+    : settings.write.status === 'error'
+      ? t('appearance.saveFailed')
+      : settings.write.status === 'saving'
+        ? t('appearance.saving')
+        : blocked === 'loading' || settings.status === 'loading'
+          ? t('appearance.loading')
+          : blocked === 'unavailable' || settings.status === 'unavailable'
+            ? t('appearance.unavailable')
+            : blocked === 'project' || settings.writableReason === 'project'
+              ? t('appearance.projectReadOnly')
+              : blocked === 'provider' || settings.writableReason === 'provider'
+                ? t('appearance.providerReadOnly')
+                : settings.writableReason === 'account'
+                  ? t('appearance.accountReadOnly')
+                  : settings.writableReason === 'organization'
+                    ? t('appearance.organizationReadOnly')
+                    : settings.writableReason === 'deployment'
+                      ? t('appearance.deploymentReadOnly')
+                      : undefined
   return (
     <div className={css.group}>
       <div className={css.title}>{t('appearance.title')}</div>

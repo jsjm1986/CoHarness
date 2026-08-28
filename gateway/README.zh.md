@@ -30,6 +30,7 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 | `HGW_PRINCIPAL_KEY_DIR` | `~/.harness-gateway/principal-keys` | 用于签发浏览器请求 principal 的仅所有者可读 Ed25519 密钥对 |
 | `HGW_PRINCIPAL_ASSERTION_TTL_MS` | 30 秒 | 一份签名 principal 的生命周期；WebSocket 客户端会在过期前重连 |
 | `HGW_RUNTIME_CREDENTIAL_DIR` | `~/.harness-gateway/runtime-credentials` | systemd 用户/项目运行时加载的宿主私有凭据文件 |
+| `HGW_ORGANIZATION_MODEL_CREDENTIAL_KEY_FILE` | `~/.harness-gateway/organization-model-credentials.key` | 用于加密组织和项目 Provider API Key 的仅所有者可读 AES-GCM 密钥 |
 | `HGW_RUNTIME_API_BODY_LIMIT_BYTES` | 64 MiB | 单次认证私有运行时 API 请求允许的最大 body 大小 |
 | `HGW_ARCHIVE_RETENTION_DAYS` | 30 | 归档进入回收站后自动清理前的可恢复天数 |
 | `HGW_DATABASE_STARTUP_RETRY_INITIAL_MS` | 1 秒 | PostgreSQL 启动连接暂时失败时的初始重试间隔，最大 2,147,483,647 毫秒 |
@@ -65,6 +66,8 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 成员为 `ro` 或 `rw`，普通用户的有效列表（私有 home 加成员身份，每条带 `label`）写入 `$DSH_HOME/directory-grants.json`。管理员在个人和项目 scope 都得到文件系统根目录的 `rw` 授权和 Full access 预设。该预设只改变 dsh 的应用内 sandbox 与审批旋钮；项目运行时仍受内核项目路径约束。角色变化会重写这份投影，并重启正在运行的个人实例。用户删除是逻辑删除：停止个人实例、释放其运行时端口分配、吊销会话、移除项目与模型访问、在登录和管理列表中隐藏账号，并保留审计、用量、对话和 home 历史；用户名保持占用。
 
 管理端的用户、项目、模型、用量和审计页面共用一套视觉系统：克制的表面色、统一的页面与分区标题、状态徽标、共享指标卡、明确的加载/空状态/错误状态、键盘焦点环，以及用于变更操作的弹窗表单。项目详情包含成员、实例状态、生效的按路由模型授权（含全部开启与全部关闭）、项目默认跟随模式和单模型例外、自然月 token/成本/缺失用量汇总、默认使用项目独立 Token 与公司成本额度的配置弹窗（也可改为继承普通成员额度），以及额度来源、路径、发起方式、所有者、成员和生效模型的配置摘要。个人 Provider 与模型登记使用带可见标签、明确 `YYYY-MM-DD` 日期格式以及应用/重置操作的筛选器，编辑草稿时不会为每个字符发起请求，日期无效时不会发起请求。视口宽度大于 `840px` 时使用固定侧栏和便于横向比较的数据表；宽度不超过 `840px` 时，侧栏变为吸顶品牌栏加七项固定底部导航，表格行切换为易读的卡片，模型视图控件保持单行。宽度不超过 `560px` 时，表单网格改为单列、操作按钮填满可用宽度，弹窗接近全屏并让正文独立滚动。粗指针控件预留 `44px` 触控目标，同时遵循深色配色和减少动画偏好。修改界面后运行 `npm run build --prefix gateway/admin-ui` 重新生成静态资源；运行中的网关直接提供生成后的 `gateway/public/admin` 文件，不需要数据库迁移。
+
+项目逻辑设置与服务器资源使用不同的所有权路径。`/account/api/preferences` 按账户保存语言、主题和忙碌 Enter 选择，即使当前处于项目作用域也仍然属于个人。`/account/api/projects/:id/configuration` 返回项目主题策略和能力标记；项目 owner 与组织管理员可以更新它。`/account/api/projects/:id/model-settings` 及其凭据/发现子路径通过加密 PostgreSQL 行和 revision 栅栏管理项目 Provider。其他成员看到的项目设置面板保持只读，但仍会解释每项所有权边界。`/admin` 只汇总这些设置并链接到选定的项目作用域；目录路径、挂载、生命周期、额度和组织模型授权仍由管理员操作。
 
 Admin 的**归档**频道从 Gateway 归档索引列出组织级根对话。它支持按状态、标题／正文／Session ID、用户和项目筛选，打开以聊天方式展示、并把完整事件收进可折叠技术详情的分页阅读器，导出 JSON，并通过确认弹窗批量恢复、移入回收站或永久清理。个人正文仍由所属运行时保存并按需读取；项目正文使用 PostgreSQL。每次查看、导出和变更都会写入审计，但审计行不复制消息正文；运行时归档快照携带 revision，Admin 离线变更会在运行时恢复后对账。
 
@@ -104,7 +107,7 @@ Gateway 还负责 `/api/documents/transfer/uploads` 下的目标作用域可续�
 
 ## PostgreSQL 控制面
 
-钉死版本的 PostgreSQL 17 部署位于 [`deploy/postgres/`](deploy/postgres/README.zh.md)。Gateway 入口会应用其不可变 migration，并在配置的活跃企业与计算节点无法解析时拒绝监听。认证、用户、项目、个人/项目实例、共享项目对话、协作抢占、审计、模型治理、额度与用量都由 PostgreSQL 支撑。内部 UUID 保留企业外键，数字公共 ID 保持现有 HTTP API 稳定。SQLite 只保留为停止写入后的最终导入源和回滚备份；运行中的 Gateway 不会打开它。
+钉死版本的 PostgreSQL 17 部署位于 [`deploy/postgres/`](deploy/postgres/README.zh.md)。Gateway 入口会应用其不可变 migration，并在配置的活跃企业与计算节点无法解析时拒绝监听。认证、用户、账户偏好、项目、个人/项目实例、共享项目对话、协作抢占、审计、模型治理、项目 Provider 配置与加密凭据、额度和用量都由 PostgreSQL 支撑。内部 UUID 保留企业外键，数字公共 ID 保持现有 HTTP API 稳定。SQLite 只保留为停止写入后的最终导入源和回滚备份；运行中的 Gateway 不会打开它。
 
 每次调用都会先以 UUID 写入运行时本地的崩溃安全 outbox。仅回环的 intake 在 PostgreSQL 中按 UUID 去重，按调用时间选择生效价格版本，并根据非秘密凭据来源标签归属公司成本（`file`/`project-env`/`request` 为个人，启动环境来源为公司，未知来源按公司成本保守计入）。账本不写 API Key、提示词或回复内容。自然月使用 `HGW_USAGE_TIME_ZONE`；Token 与公司成本额度支持角色默认、按用户继承/不限/自定义，以及项目继承或显式额度。额度只在 80% 和 100% 提醒，不阻断调用。账务归属始终只属于一个用户或项目；共享项目记录在可确认时额外保存已验证的参与者 ID，用于非计费活动分析；无法还原的历史项目记录保持未归属。用户在 Web shell 看到持久阈值提醒；管理员看到分开的个人、项目和贡献者汇总、缺失计量次数以及明确的价格覆盖状态。
 Admin 用量 API 保留原有主体汇总，并新增 `/admin/api/usage/overview`、`/admin/api/usage/contributors` 与 `/admin/api/usage/health`；贡献者行只是活动投影，绝不会加到项目账务总量中。归档身份仍会保留在 overview 中，使历史个人用量与已确认的项目活动能够继续和主体总量对账。

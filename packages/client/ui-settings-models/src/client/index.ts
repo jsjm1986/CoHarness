@@ -22,6 +22,7 @@ import type { DeepSeekOnboardingInjected } from './DeepSeekOnboardingDialog.tsx'
 import { ModelsSettingsStore } from './store.ts'
 import { createSettingsSchemaOperations } from './schema-operations.ts'
 import { en, zh, type ModelsKey } from './locales.ts'
+import { ProjectModelsBridge } from './project-store.ts'
 
 export type { ModelsSectionInjected, ModelsSectionProps } from './ModelsSection.tsx'
 export type { ModelsKey } from './locales.ts'
@@ -66,6 +67,21 @@ export function apply(ctx: ClientContext): void {
   const connection = ctx.get('connection') as ConnectionHandle
   const schema = createSettingsSchemaOperations(ctx.settingsSchema)
   const controller = new ModelsSettingsStore(connection.api, schema, ctx.settingsScope.describe())
+  const projectTransport = connection.projectModelSettings
+  const projectBindings = new Map<number, {
+    bridge: ProjectModelsBridge
+    controller: ModelsSettingsStore
+  }>()
+  const projectBinding = (projectId: number): { controller: ModelsSettingsStore; api: ProjectModelsBridge['api'] } | undefined => {
+    if (projectTransport === undefined) return undefined
+    const existing = projectBindings.get(projectId)
+    if (existing !== undefined) return { controller: existing.controller, api: existing.bridge.api }
+    const bridge = new ProjectModelsBridge(projectId, projectTransport)
+    const projectController = new ModelsSettingsStore(bridge.api, schema, bridge.describe())
+    const binding = { bridge, controller: projectController }
+    projectBindings.set(projectId, binding)
+    return { controller: projectController, api: bridge.api }
+  }
   // Registration-time text (the nav label thunk) and the inject faces share
   // one bound translate; copy freshness rides the locale revision.
   const t = ctx.locale.bind(NS) as ModelsSectionInjected['t']
@@ -75,6 +91,7 @@ export function apply(ctx: ClientContext): void {
     api: connection.api,
     schema,
     t,
+    projectBinding,
   })
   const deepSeekOnboardingInjected = (): DeepSeekOnboardingInjected => ({
     controller,
@@ -88,14 +105,29 @@ export function apply(ctx: ClientContext): void {
   // dispatch preserves listener order; its listener therefore starts the
   // mirror refresh before this store joins that refresh.
   ctx.effect(() => {
-    const refreshModels = (): void => { refreshIfLoaded(controller) }
+    const refreshModels = (): void => {
+      refreshIfLoaded(controller)
+      for (const { bridge, controller: projectController } of projectBindings.values()) {
+        if (projectController.store.getSnapshot().status !== 'idle') {
+          // A pushed invalidation may race a temporary Gateway failure. The
+          // project store owns the visible error state; keep that rejection
+          // inside the refresh chain instead of creating an unhandled promise.
+          void bridge.refresh()
+            .catch(() => undefined)
+            .then(() => { void projectController.load() })
+        }
+      }
+    }
     const disposers = [
       ctx.remote.$on('settings/document-updated', () => { refreshModels() }),
       ctx.remote.$on('credentials/reference-updated', refreshModels),
       ctx.remote.$on('llm/adapters-updated', refreshModels),
       ctx.on('connection/reset', refreshModels),
     ]
-    return () => { for (const dispose of disposers) dispose() }
+    return () => {
+      for (const dispose of disposers) dispose()
+      projectBindings.clear()
+    }
   }, 'ui-settings-models: pushed invalidations')
 
   ctx.slots.inject('settings.section', () => ctx.slots.register({

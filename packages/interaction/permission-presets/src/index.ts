@@ -250,6 +250,9 @@ export class PermissionPresetService extends Service {
       defaultPreset: z.union(presetChoices).required(),
     })
     installSettingsSection(ctx, PERMISSION_SETTINGS_NAMESPACE, settingsSchema, baseSettings, {
+      owner: 'project',
+      projectWrite: 'manager',
+      projectWritePaths: [['defaultPreset']],
       setSource: (current) => {
         this.defaultSettings = current
       },

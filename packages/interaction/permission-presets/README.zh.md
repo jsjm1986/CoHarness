@@ -6,7 +6,7 @@
 
 `set(session, name)` 会先在仅写日志的 `permissionPresets/preset` 事件中记录已变更的选择，再仅对实际值发生变化的调节项调用 setter。选择事件先于调节项事件，并在多个预设共享同一组取值时保留用户意图；净变化为零的选择不会追加任何内容。`current(events)` 优先返回仍与当前调节项匹配的已记录选择，其次返回表中第一个匹配项，否则返回 `custom`。客户端可以把 `custom` 显示为当前值，但不能选择它。
 
-该服务拥有 `permissionPresets` Settings namespace。其 `defaultPreset` 是未来会话的默认值：组合项使用 `Config.defaultPreset`；省略时，则推断与组合后的沙箱和审批默认值匹配的 preset。已提交的 Settings 变更会在下一个会话创建时读取；创建过程将 `permissionPresets/preset`、`sandbox/mode` 和 `approval/policy` 固定到该会话中，因此后续变更绝不会改变现有会话。恢复的 seed，包括由 `session/end-seed` 标记的显式空 seed，都会保留其有效权限，只补齐缺失的持久事实，而不会采用最新的用户默认值。挂载服务时还会遍历所有已存活会话，因此 HMR（热模块替换）会固定插件缺席期间创建的所有会话。
+该服务拥有 `permissionPresets` Settings namespace。其 `defaultPreset` 是未来会话的默认值：组合项使用 `Config.defaultPreset`；省略时，则推断与组合后的沙箱和审批默认值匹配的 preset。在 Gateway 项目作用域中，只有项目 owner 或组织管理员可以更改这份共享默认值；普通成员继续使用当前有效预设。已提交的 Settings 变更会在下一个会话创建时读取；创建过程将 `permissionPresets/preset`、`sandbox/mode` 和 `approval/policy` 固定到该会话中，因此后续变更绝不会改变现有会话。恢复的 seed，包括由 `session/end-seed` 标记的显式空 seed，都会保留其有效权限，只补齐缺失的持久事实，而不会采用最新的用户默认值。挂载服务时还会遍历所有已存活会话，因此 HMR（热模块替换）会固定插件缺席期间创建的所有会话。
 
 该服务要求存在具有约束能力的 `ctx.shell` 执行器和 `ctx.approval`。表中名为 `custom` 的条目会在加载时抛出异常。当组合默认值与任何 preset 都不匹配时，插件要求显式配置 `defaultPreset`；独立构造的零事件会话仍可能推导出 `custom`。详见[沙箱切换设计](../../../.agents/notes/implemented/feature/2026-07-06-sandbox.zh.md)。
 

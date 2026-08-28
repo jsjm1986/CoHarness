@@ -83,6 +83,7 @@ interface RuntimeApiDependencies {
   archives?: Pick<ConversationArchiveService, 'syncRuntimeSnapshot' | 'acknowledgeCommand'>
   principals: GatewayPrincipalSigner
   governance: Pick<GatewayModelGovernanceService, 'resolveOrganizationCredential'>
+    & Partial<Pick<GatewayModelGovernanceService, 'resolveManagedCredential'>>
   /** Optional FCM delivery; omitted in keyless/unit-test compositions. */
   push?: Pick<GatewayPushService, 'notifyCompleted'>
   /** Optional cross-scope document broker; absent in standalone test compositions. */
@@ -445,9 +446,11 @@ export function createRuntimeApiHandler(
         const payload = record(JSON.parse(body))
         const ref = payload?.ref
         if (typeof ref !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(ref)) {
-          throw new Error('invalid organization credential reference')
+          throw new Error('invalid managed credential reference')
         }
-        const value = await deps.governance.resolveOrganizationCredential(subject.target, ref)
+        const resolveCredential = deps.governance.resolveManagedCredential
+          ?? deps.governance.resolveOrganizationCredential
+        const value = await resolveCredential(subject.target, ref)
         res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
         res.end(JSON.stringify(value === null ? { configured: false } : { configured: true, value }))
         return true

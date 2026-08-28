@@ -166,6 +166,9 @@ export class PwshLocalExecutor extends ShellExecutor {
     this.declaredPwshPath = entry.pwshPath
     this.resolvedPwshPath = resolvePwshPath(entry.pwshPath)
     installSettingsSection(ctx, SHELL_SETTINGS_NAMESPACE, PwshLocalExecutor.Config, entry, {
+      owner: 'project',
+      projectWrite: 'manager',
+      projectWritePaths: [['timeoutMs'], ['maxTimeoutMs'], ['maxOutputBytes'], ['maxSpillBytes'], ['graceMs']],
       validate: assertServiceablePwshConfig,
       setSource: (current) => {
         this.source = current as () => ResolvedConfig

@@ -28,3 +28,6 @@
   - menuitem "Invitations and tasks":
     - img
     - text: Invitations and tasks
+  - menuitem "Project settings":
+    - img
+    - text: Project settings

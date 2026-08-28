@@ -312,6 +312,55 @@ describe('discoverModelsAtEndpoint', () => {
     expect(requests).toEqual(['https://gateway.example/models'])
   })
 
+  it('keeps a relay balance diagnostic from a JSON authorization response', async () => {
+    vi.stubGlobal('fetch', async () => jsonResponse({
+      code: 'INSUFFICIENT_BALANCE', message: 'Insufficient account balance',
+    }, 403))
+    await expect(discoverModelsAtEndpoint({
+      baseURL: 'https://gateway.example', api: 'anthropic-messages', apiKey: 'relay-key',
+    })).rejects.toMatchObject({
+      code: 'DISCOVERY_FAILED',
+      message: expect.stringContaining('INSUFFICIENT_BALANCE: Insufficient account balance') as unknown,
+      failure: { status: 403 },
+    })
+  })
+
+  it('recognizes account-qualified insufficient-balance wording without an error code', async () => {
+    vi.stubGlobal('fetch', async () => jsonResponse({ message: 'Insufficient account balance' }, 403))
+    await expect(discoverModelsAtEndpoint({
+      baseURL: 'https://gateway.example', api: 'anthropic-messages', apiKey: 'relay-key',
+    })).rejects.toMatchObject({
+      message: expect.not.stringContaining('check the API key') as unknown,
+    })
+  })
+
+  it('redacts a credential echoed by a provider error', async () => {
+    const key = 'relay-secret-key'
+    vi.stubGlobal('fetch', async () => jsonResponse({
+      code: 'AUTH_FAILED', message: `the supplied key ${key} was rejected`,
+    }, 401))
+    await expect(discoverModelsAtEndpoint({
+      baseURL: 'https://gateway.example', api: 'openai-completions', apiKey: key,
+    })).rejects.toMatchObject({
+      message: expect.stringContaining('[redacted]') as unknown,
+    })
+    await expect(discoverModelsAtEndpoint({
+      baseURL: 'https://gateway.example', api: 'openai-completions', apiKey: key,
+    })).rejects.not.toThrow(key)
+  })
+
+  it('keeps payment-required relay diagnostics', async () => {
+    vi.stubGlobal('fetch', async () => jsonResponse({
+      type: 'quota_error', message: 'credits exhausted',
+    }, 402))
+    await expect(discoverModelsAtEndpoint({
+      baseURL: 'https://gateway.example', api: 'openai-completions', apiKey: 'relay-key',
+    })).rejects.toMatchObject({
+      message: expect.stringContaining('quota_error: credits exhausted') as unknown,
+      failure: { status: 402 },
+    })
+  })
+
   it('does not duplicate an existing Anthropic v1 path and permits unauthenticated probes', async () => {
     const requests = stubResponse(jsonResponse({ data: [] }))
 
@@ -324,6 +373,25 @@ describe('discoverModelsAtEndpoint', () => {
     const headers = new Headers(requests[0]?.init.headers)
     expect(headers.has('x-api-key')).toBe(false)
     expect(headers.get('anthropic-version')).toBe('2023-06-01')
+  })
+
+  it('tries an unversioned Anthropic model directory when a relay omits /v1', async () => {
+    const requests: string[] = []
+    vi.stubGlobal('fetch', async (input: string | URL) => {
+      requests.push(String(input))
+      return requests.length === 1
+        ? new Response('', { status: 404 })
+        : jsonResponse({ data: [{ id: 'claude-relay' }] })
+    })
+
+    await expect(discoverModelsAtEndpoint({
+      baseURL: 'https://gateway.example/v1',
+      api: 'anthropic-messages',
+    })).resolves.toEqual([{ id: 'claude-relay' }])
+    expect(requests).toEqual([
+      'https://gateway.example/v1/models',
+      'https://gateway.example/models',
+    ])
   })
 
   it('rejects unsupported protocols and blank endpoints before fetching', async () => {

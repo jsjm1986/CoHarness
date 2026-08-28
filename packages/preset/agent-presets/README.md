@@ -103,7 +103,7 @@ The SHIPPED root stays an assembly fact: it sits beside the installed app's own 
 
 ### The default preset is a user setting
 
-When a settings provider is composed, this plugin registers the `agent-presets` namespace with `config.default` as its composition base, so the user document layers over the deployment's engineering default:
+When a settings provider is composed, this plugin registers the `agent-presets` namespace with `config.default` as its composition base, so the user document layers over the deployment's engineering default. In a Gateway project scope, the namespace is writable only for the project owner or an organization administrator; ordinary members can inspect the roster but cannot change the shared default:
 
 ```yaml
 agent-presets:

@@ -16,8 +16,9 @@ export const configurableProviderViewSchema = z.object({
   settingsNs: z.string(),
   settingsPath: z.array(z.string()),
   active: z.boolean(),
-  management: z.enum(['personal', 'organization', 'external']),
+  management: z.enum(['personal', 'organization', 'project', 'external']),
   declared: z.boolean().optional(),
+  projectId: z.number().int().positive().optional(),
 }) satisfies z.ZodType<Wire<ConfigurableProviderView>>
 
 /** llm.providers request payload. */

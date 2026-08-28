@@ -16,6 +16,7 @@ import {
   type ProjectInvitation,
   type ProjectInvitationStatus,
   type ProjectOrigin,
+  type ProjectThemePolicy,
   type ProjectRow,
 } from '../projects.ts'
 import { transaction } from './database.ts'
@@ -182,6 +183,7 @@ export class PostgresProjectService {
       member_count: string
       origin: ProjectOrigin
       model_access_default_allowed: boolean
+      ui_theme_policy: ProjectThemePolicy
       owner_id: string | null
       owner_public_id: string | null
       owner_username: string | null
@@ -190,7 +192,7 @@ export class PostgresProjectService {
       creator_username: string | null
       creator_display_name: string | null
     }>(`SELECT p.public_id::text,p.name::text,pm.local_path path,COUNT(m.user_id)::text member_count,
-      p.origin,p.model_access_default_allowed,
+      p.origin,p.model_access_default_allowed,p.ui_theme_policy,
       owner.id owner_id,owner.public_id::text owner_public_id,owner.username::text owner_username,owner.display_name owner_display_name,
       creator.public_id::text creator_public_id,creator.username::text creator_username,creator.display_name creator_display_name
       FROM harness.projects p
@@ -208,6 +210,7 @@ export class PostgresProjectService {
       memberCount: Number(row.member_count),
       origin: row.origin,
       modelAccessDefaultAllowed: row.model_access_default_allowed,
+      uiThemePolicy: row.ui_theme_policy,
       owner: row.owner_id === null ? null : {
         id: publicNumber(row.owner_public_id!, 'user'), username: row.owner_username!, displayName: row.owner_display_name!,
       },
@@ -228,6 +231,7 @@ export class PostgresProjectService {
       member_count: string
       origin: ProjectOrigin
       model_access_default_allowed: boolean
+      ui_theme_policy: ProjectThemePolicy
       owner_id: string | null
       owner_public_id: string | null
       owner_username: string | null
@@ -236,7 +240,7 @@ export class PostgresProjectService {
       creator_username: string | null
       creator_display_name: string | null
     }>(`SELECT p.id internal_id,p.public_id::text,p.name::text,pm.local_path path,
-      COUNT(m.user_id)::text member_count,p.origin,p.model_access_default_allowed,
+      COUNT(m.user_id)::text member_count,p.origin,p.model_access_default_allowed,p.ui_theme_policy,
       owner.id owner_id,owner.public_id::text owner_public_id,owner.username::text owner_username,owner.display_name owner_display_name,
       creator.public_id::text creator_public_id,creator.username::text creator_username,creator.display_name creator_display_name
       FROM harness.projects p
@@ -271,6 +275,7 @@ export class PostgresProjectService {
       memberCount: Number(row.member_count),
       origin: row.origin,
       modelAccessDefaultAllowed: row.model_access_default_allowed,
+      uiThemePolicy: row.ui_theme_policy,
       owner: row.owner_id === null ? null : {
         id: publicNumber(row.owner_public_id!, 'user'), username: row.owner_username!, displayName: row.owner_display_name!,
       },
@@ -294,6 +299,19 @@ export class PostgresProjectService {
       if (isCodedError(error) && error.code === '23505') throw new Error(`duplicate project name: ${normalized}`)
       throw error
     }
+  }
+
+  /** Update the project UI theme policy without changing its filesystem identity. */
+  async setThemePolicy(id: number, policy: ProjectThemePolicy): Promise<void> {
+    if (policy !== 'follow-user' && policy !== 'light' && policy !== 'dark') {
+      throw new Error('invalid project theme policy')
+    }
+    const result = await this.context.pool.query(
+      `UPDATE harness.projects SET ui_theme_policy=$3,updated_at=now(),version=version+1
+       WHERE organization_id=$1 AND public_id=$2`,
+      [this.context.organizationId, id, policy],
+    )
+    if (result.rowCount !== 1) throw new Error(`unknown project ${String(id)}`)
   }
 
   async remove(id: number): Promise<number[]> {

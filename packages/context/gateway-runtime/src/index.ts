@@ -34,7 +34,7 @@ export interface GatewayRuntimeIdentity {
 /** Scope selected by the authenticated browser request. */
 export type GatewayPrincipalScope =
   | { kind: 'personal' }
-  | { kind: 'project'; projectId: number; projectName: string; mode: 'ro' | 'rw' }
+  | { kind: 'project'; projectId: number; projectName: string; mode: 'ro' | 'rw'; canManage?: boolean }
 
 /** Validated Gateway assertion claims available for one request. */
 export interface GatewayPrincipalClaims {
@@ -261,7 +261,8 @@ function principalClaims(value: unknown): GatewayPrincipalClaims {
     throw new Error('invalid Gateway principal assertion')
   }
   if (scope.kind === 'project' && (!positiveInteger(scope.projectId)
-    || !nonEmptyString(scope.projectName) || (scope.mode !== 'ro' && scope.mode !== 'rw'))) {
+    || !nonEmptyString(scope.projectName) || (scope.mode !== 'ro' && scope.mode !== 'rw')
+    || (scope.canManage !== undefined && typeof scope.canManage !== 'boolean'))) {
     throw new Error('invalid Gateway principal assertion')
   }
   return value as GatewayPrincipalClaims

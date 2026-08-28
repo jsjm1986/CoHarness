@@ -8,6 +8,14 @@ import type { HostDescription, IApiClient } from './api.ts'
 import { ConnectionController, type ConnectionConfig, type ConnectionSinks, type ConnectionState } from './connection.ts'
 import { FixtureApiClient } from './fixture.ts'
 import { WebApiClient } from './web-api-client.ts'
+import {
+  createBrowserAccountPreferencesTransport,
+  type AccountPreferencesTransport,
+} from './account-preferences.ts'
+import {
+  createBrowserProjectModelSettingsTransport,
+  type ProjectModelSettingsTransport,
+} from './project-models.ts'
 import { createWebConnectionRpc, type RpcFetch } from './rpc.ts'
 import { isLoopbackHostname } from '../loopback-hostname.ts'
 import type { ClientConnectionRpc } from '../rpc.ts'
@@ -27,7 +35,7 @@ export type {
   ClientRequest, ServerResponse, ServerRequest, ClientResponse, RpcMessage, RpcReceipt,
   HostDescription, IApiClient, SessionDraftId, SessionId, SessionEvent, ContentBlock, StreamChunk,
   GoalsApi, GoalRef,
-  SettingsApi, SettingsNamespaceView, SettingsPathOpView, SettingsSecretView,
+  SettingsApi, SettingsNamespaceView, SettingsOwner, SettingsPathOpView, SettingsSecretView, SettingsWritableReason,
   CredentialsApi, CredentialView, ConfigurableProviderView, DiscoveredModelView, LlmApi,
 } from './api.ts'
 export {
@@ -41,6 +49,16 @@ export {
 export type { ConnectionConfig, ConnectionSinks, ConnectionState }
 export type { ClientConnectionRpc } from '../rpc.ts'
 export type { RpcFetch } from './rpc.ts'
+export type {
+  AccountPreferenceMutation, AccountPreferenceNamespace, AccountPreferencesTransport, AccountPreferencesView,
+} from './account-preferences.ts'
+export { AccountPreferencesRequestError, createBrowserAccountPreferencesTransport, parseAccountPreferences } from './account-preferences.ts'
+export type {
+  ProjectModelGroup, ProjectModelProviderView, ProjectModelSettingsTransport, ProjectModelSettingsView,
+} from './project-models.ts'
+export {
+  createBrowserProjectModelSettingsTransport, parseProjectModelSettings, ProjectModelSettingsRequestError,
+} from './project-models.ts'
 
 /** Observable Host description published by each completed connection handshake. */
 export interface HostDescriptionSource {
@@ -63,6 +81,10 @@ export interface ClientTransportHooks {
   createApiClient(): IApiClient
   /** Transport for generic unary RPC channels. */
   fetch: RpcFetch
+  /** Optional account-preference carrier for embedded hosts. */
+  createAccountPreferencesTransport?(): AccountPreferencesTransport
+  /** Optional project-Provider carrier for embedded hosts. */
+  createProjectModelSettingsTransport?(): ProjectModelSettingsTransport
   /** Bundle transport for hosts whose carrier owns plugin bundle bytes. */
   loadBundle?(url: string): Promise<void>
 }
@@ -79,6 +101,10 @@ interface ClientTransportGlobal {
 export interface ConnectionHandle {
   /** Shared api client (fixture or real, decided at boot from the page URL). */
   readonly api: IApiClient
+  /** Optional Gateway account-preference transport; absent in fixture-only hosts. */
+  readonly accountPreferences?: AccountPreferencesTransport
+  /** Gateway project Provider transport shared by project settings surfaces. */
+  readonly projectModelSettings?: ProjectModelSettingsTransport
   /** Whether the current page authority is loopback; non-browser contexts default to true. */
   readonly isLoopback: boolean
   /** Generation-scoped Host facts, including the account home and native path-open capability. */
@@ -106,6 +132,12 @@ export function apply(ctx: Context): void {
   const fixtureClient = fixture ? new FixtureApiClient() : undefined
   const transport = (globalThis as ClientTransportGlobal).__DSH_TRANSPORT__
   const api: IApiClient = fixtureClient ?? transport?.createApiClient() ?? new WebApiClient()
+  const accountPreferences = fixtureClient === undefined
+    ? transport?.createAccountPreferencesTransport?.() ?? createBrowserAccountPreferencesTransport()
+    : undefined
+  const projectModelSettings = fixtureClient === undefined
+    ? transport?.createProjectModelSettingsTransport?.() ?? createBrowserProjectModelSettingsTransport()
+    : undefined
   const rpc = fixtureClient?.rpc ?? createWebConnectionRpc(transport?.fetch)
   let started = false
   let description: HostDescription | undefined
@@ -123,6 +155,8 @@ export function apply(ctx: Context): void {
   }
   const handle: ConnectionHandle = {
     api,
+    ...(accountPreferences === undefined ? {} : { accountPreferences }),
+    ...(projectModelSettings === undefined ? {} : { projectModelSettings }),
     isLoopback: pageLocation === undefined || isLoopbackHostname(pageLocation.hostname),
     hostDescription: {
       getSnapshot: () => description,

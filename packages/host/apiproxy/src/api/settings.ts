@@ -8,8 +8,11 @@
 
 import type { RpcRequest, RpcResponse } from './rpc.ts'
 
-/** Why a settings document is read-only for the current browser authority. */
-export type SettingsWritableReason = 'project' | 'provider'
+/** Why a settings document or namespace is read-only for the current authority. */
+export type SettingsWritableReason = 'project' | 'provider' | 'organization' | 'deployment' | 'account'
+
+/** Owner of a settings namespace. */
+export type SettingsOwner = 'account' | 'project' | 'organization' | 'deployment'
 
 /** One schema-declared secret slot inside a redacted namespace value. */
 export interface SettingsSecretView {
@@ -41,6 +44,14 @@ export interface SettingsNamespaceView {
    * than silently overwriting a concurrent change.
    */
   revision: number
+  /** Whether this namespace accepts writes in the current scope. */
+  writable?: boolean
+  /** Why this namespace is read-only, when applicable. */
+  writableReason?: SettingsWritableReason
+  /** Logical owner used by settings UIs to explain its scope. */
+  owner?: SettingsOwner
+  /** Optional project-manager path allowlist; absent means all namespace paths. */
+  projectWritePaths?: string[][]
 }
 
 /**

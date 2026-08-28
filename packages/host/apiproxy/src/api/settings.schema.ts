@@ -24,6 +24,15 @@ export const settingsNamespaceViewSchema = z.object({
   applies: z.union([z.literal('live'), z.literal('restart')]),
   secrets: z.array(settingsSecretViewSchema),
   revision: z.number(),
+  writable: z.boolean().optional(),
+  writableReason: z.union([
+    z.literal('project'), z.literal('provider'), z.literal('organization'),
+    z.literal('deployment'), z.literal('account'),
+  ]).optional(),
+  owner: z.union([
+    z.literal('account'), z.literal('project'), z.literal('organization'), z.literal('deployment'),
+  ]).optional(),
+  projectWritePaths: z.array(z.array(z.string())).optional(),
 }) satisfies z.ZodType<Wire<SettingsNamespaceView>>
 
 /** settings.describe request payload. */
@@ -32,7 +41,10 @@ export const settingsDescribeRequestSchema = z.object({}) satisfies z.ZodType<Wi
 /** settings.describe response value. */
 export const settingsDescribeValueSchema = z.object({
   writable: z.boolean(),
-  writableReason: z.union([z.literal('project'), z.literal('provider')]).optional(),
+  writableReason: z.union([
+    z.literal('project'), z.literal('provider'), z.literal('organization'),
+    z.literal('deployment'), z.literal('account'),
+  ]).optional(),
   hasDocument: z.boolean(),
   namespaces: z.array(settingsNamespaceViewSchema),
 }) satisfies z.ZodType<Wire<ResponseValue<'settings.describe'>>>

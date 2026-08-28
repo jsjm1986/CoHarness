@@ -14,7 +14,7 @@
 
 ## 设置权限与兼容性
 
-外观控件仍显示项目当前有效值，但绑定 scope 报告 `loading`、`writable: false` 或写入处于 `saving` 时会禁用控件。项目与提供方限制会以内联状态显示；服务自身也会在取得可写的 Host 视图前拒绝直接调用 `setTheme`，因此禁用行无法绕过界面发起 mutation。主题监听器同时支持 `addEventListener` 与旧版 `addListener` MediaQueryList 实现。设计样式表提供 `100vh` 视口回退，客户端可视视口测量就绪后覆盖该值；token-contract 测试会检查所有 `--ds-*` 与 `--dsw-*` 引用均有 CSS 声明，视口高度这一运行时变量是明确例外。
+外观控件显示账户偏好；项目策略可以强制当前界面使用浅色或深色方案。账户级 scope 在报告 `loading`、`writable: false` 或写入处于 `saving` 时禁用选择；项目和提供方限制会在行内显示，服务在取得可写账户视图前也会拒绝直接调用 `setTheme`。主题监听器同时支持 `addEventListener` 与旧版 `addListener` MediaQueryList 实现。设计样式表提供 `100vh` 视口回退，客户端可视视口测量就绪后覆盖该值；token-contract 测试会检查所有 `--ds-*` 与 `--dsw-*` 引用均有 CSS 声明，视口高度这一运行时变量是明确例外。
 
 ## 模型体验
 

@@ -8,7 +8,7 @@
 
 import { attributionHeaders } from './attribution.ts'
 import { normalizeApiKey } from './api-key.ts'
-import { INVALID_CREDENTIAL_CODE, LlmError } from './error.ts'
+import { INVALID_CREDENTIAL_CODE, isQuotaExceededError, LlmError } from './error.ts'
 import type { LlmDiscoveredModel } from './types.ts'
 
 /** Protocols whose documented `GET /models` response this helper can read. */
@@ -23,6 +23,8 @@ export type ModelListingProtocol = (typeof MODEL_LISTING_PROTOCOLS)[number]
 
 /** Maximum response bytes accepted from a caller-supplied model-listing URL. */
 const MAX_RESPONSE_BYTES = 4 * 1024 * 1024
+/** Keep provider error text useful without allowing a diagnostic to grow with the reply. */
+const MAX_ERROR_DETAIL_CHARS = 240
 
 /** Response facts used to decide whether an endpoint path is mismatched. */
 export interface LlmEndpointResponseMetadata {
@@ -227,10 +229,14 @@ function label(...candidates: readonly unknown[]): string | undefined {
 }
 
 /** Build a model-listing URL from one already validated candidate base URL. */
-function listingUrl(candidate: string, api: ModelListingProtocol): string {
+function listingUrl(
+  candidate: string,
+  api: ModelListingProtocol,
+  variant: 'versioned' | 'unversioned' = 'versioned',
+): string {
   const endpoint = new URL(candidate)
   const path = endpoint.pathname.replace(/\/+$/, '')
-  endpoint.pathname = `${path}${api === 'anthropic-messages' ? '/v1' : ''}/models`
+  endpoint.pathname = `${path}${api === 'anthropic-messages' && variant === 'versioned' ? '/v1' : ''}/models`
   return endpoint.toString()
 }
 
@@ -331,6 +337,40 @@ function readListing(body: unknown): LlmDiscoveredModel[] {
   return models
 }
 
+/** Extract a short, non-secret diagnostic from a provider error response. */
+function errorDetail(body: string, secret: string | undefined): string | undefined {
+  const trim = body.trim()
+  if (trim === '' || trim.startsWith('<')) return undefined
+  let value: unknown
+  try { value = JSON.parse(trim) } catch { value = trim }
+  const strings: string[] = []
+  const add = (candidate: unknown): void => {
+    if (typeof candidate !== 'string' || candidate.trim() === '') return
+    const normalized = candidate.replace(/[\u0000-\u001f\u007f]/gu, ' ').replace(/\s+/gu, ' ').trim()
+    const redacted = secret === undefined || secret === '' ? normalized : normalized.split(secret).join('[redacted]')
+    if (redacted !== '' && !strings.includes(redacted)) strings.push(redacted)
+  }
+  if (typeof value === 'string') add(value)
+  else if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+    const root = value as Record<string, unknown>
+    add(root.code)
+    add(root.type)
+    add(root.message)
+    const nested = root.error
+    if (nested !== null && typeof nested === 'object' && !Array.isArray(nested)) {
+      const row = nested as Record<string, unknown>
+      add(row.code)
+      add(row.type)
+      add(row.message)
+    } else add(nested)
+  }
+  if (strings.length === 0) return undefined
+  const result = strings.join(': ')
+  return result.length > MAX_ERROR_DETAIL_CHARS
+    ? `${result.slice(0, MAX_ERROR_DETAIL_CHARS - 1)}…`
+    : result
+}
+
 /** The successful endpoint and the candidates it advertised. */
 export interface LlmEndpointModelDiscoveryResult {
   /** Models returned by the successful listing response. */
@@ -369,8 +409,9 @@ async function fetchListingCandidate(
   api: ModelListingProtocol,
   baseURL: string,
   apiKey: string | undefined,
+  variant: 'versioned' | 'unversioned' = 'versioned',
 ): Promise<{ kind: 'ok'; models: LlmDiscoveredModel[] } | { kind: 'path-mismatch'; url: string }> {
-  const url = listingUrl(baseURL, api)
+  const url = listingUrl(baseURL, api, variant)
   let response: Response
   try {
     response = await fetch(url, {
@@ -397,8 +438,23 @@ async function fetchListingCandidate(
       await cancelCandidate(response)
       return { kind: 'path-mismatch', url }
     }
+    let detail: string | undefined
+    // Error bodies from relays commonly explain a 403 (for example an
+    // exhausted balance) more accurately than the status line. Read them only
+    // for statuses that a user can act on and retain the generic diagnostic if
+    // the body is malformed or exceeds the response bound.
+    if (response.status === 400 || response.status === 401 || response.status === 402
+      || response.status === 403 || response.status === 429) {
+      try { detail = errorDetail(await readBounded(response, url), apiKey) } catch { detail = undefined }
+    } else {
+      await cancelCandidate(response)
+    }
+    const hint = (response.status === 401 || response.status === 403)
+      && !(detail !== undefined && isQuotaExceededError(detail))
+      ? '; check the API key' : ''
+    const suffix = detail === undefined ? '' : `: ${detail}`
     throw new LlmError(
-      `${url} answered ${String(response.status)}${response.status === 401 || response.status === 403 ? '; check the API key' : ''}`,
+      `${url} answered ${String(response.status)}${hint}${suffix}`,
       'DISCOVERY_FAILED',
       { status: response.status },
     )
@@ -453,19 +509,29 @@ export async function discoverModelListingAtEndpoint(
   const cacheGeneration = cache?.generation
   const mismatches: string[] = []
   for (const [index, baseURL] of candidates.entries()) {
-    const result = await fetchListingCandidate(request, api, baseURL, apiKey)
-    if (result.kind === 'ok') {
-      if (cache !== undefined && cache.generation === cacheGeneration) {
-        cache.set(api, request.baseURL, baseURL)
+    // Anthropic message requests always normalize to a base without `/v1`,
+    // but relays disagree on whether their model directory is versioned.
+    // Keep the standard `/v1/models` first and try `/models` only after an
+    // explicit path/HTML mismatch. A healthy standard endpoint still incurs
+    // exactly one request, and the message URL remains unchanged.
+    const variants: readonly ('versioned' | 'unversioned')[] = api === 'anthropic-messages'
+      ? ['versioned', 'unversioned']
+      : ['versioned']
+    for (const [variantIndex, variant] of variants.entries()) {
+      const result = await fetchListingCandidate(request, api, baseURL, apiKey, variant)
+      if (result.kind === 'ok') {
+        if (cache !== undefined && cache.generation === cacheGeneration) {
+          cache.set(api, request.baseURL, baseURL)
+        }
+        return { models: result.models, baseURL }
       }
-      return { models: result.models, baseURL }
-    }
-    mismatches.push(result.url)
-    if (index === candidates.length - 1) {
-      throw new LlmError(
-        `model listing was not available at any candidate endpoint: ${mismatches.join(', ')}`,
-        'DISCOVERY_FAILED',
-      )
+      mismatches.push(result.url)
+      if (variantIndex === variants.length - 1 && index === candidates.length - 1) {
+        throw new LlmError(
+          `model listing was not available at any candidate endpoint: ${mismatches.join(', ')}`,
+          'DISCOVERY_FAILED',
+        )
+      }
     }
   }
   /* v8 ignore next -- candidates is a non-empty tuple, so the loop always returns or throws. */

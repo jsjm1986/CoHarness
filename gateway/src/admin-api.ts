@@ -1017,11 +1017,43 @@ async function dispatch(
     const project = await deps.projects.getById(projectId)
     if (project === null) { sendError(res, 404, 'project not found'); return true }
     if (method === 'GET') {
+      const target = { kind: 'project' as const, id: projectId }
+      let runtimeState = 'unavailable'
+      let runtimeGeneration = 0
+      try {
+        runtimeState = await deps.instances.stateOf(target)
+        runtimeGeneration = await deps.instances.generationOf(target)
+      } catch {
+        // The legacy SQLite repository has no shared project runtime rows;
+        // configuration summaries remain useful without inventing lifecycle data.
+      }
+      let projectModelSummary: { providerCount: number; revision: number } | undefined
+      if (deps.governance?.listProjectProviders !== undefined && deps.governance.describeProjectModelSettings !== undefined) {
+        try {
+          const [providers, settings] = await Promise.all([
+            deps.governance.listProjectProviders(projectId),
+            deps.governance.describeProjectModelSettings(projectId),
+          ])
+          projectModelSummary = { providerCount: providers.filter(provider => provider.status !== 'archived').length, revision: settings.revision }
+        } catch {
+          // A project can outlive an optional model-settings provider; leave the
+          // summary absent rather than turning the server-resource page into a
+          // model-control dependency.
+        }
+      }
       sendJson(res, 200, {
         ...project,
         quota: deps.governance === undefined
           ? { source: 'inherit', tokenLimit: null, companyCostMicrosLimit: null }
           : await deps.governance.projectQuota(projectId),
+        configurationSummary: {
+          themePolicy: project.uiThemePolicy ?? 'follow-user',
+          managementSurface: 'user-frontend',
+          runtimeState,
+          runtimeGeneration,
+          filesystemManagedIn: '/admin',
+          ...(projectModelSummary === undefined ? {} : { projectModels: projectModelSummary }),
+        },
       })
       return true
     }

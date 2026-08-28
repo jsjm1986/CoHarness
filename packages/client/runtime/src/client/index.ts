@@ -16,6 +16,7 @@ import type { SessionBlankReuseRequest, SessionCreateOptions } from './contract/
 import type { UseProjection } from './sessions/projection-store.ts'
 import { ConversationEventRegistry } from './conversation/event-registry.ts'
 import { ConversationViewRegistry } from './conversation/view-registry.ts'
+import { ProjectUiPolicyRuntime } from './project-policy.ts'
 
 export { isAppendSurfaceEvent, isReplacementSurfaceEvent } from '@deepseek-ai/dsh-session/surface'
 
@@ -51,9 +52,14 @@ export { abbreviateHomePath, resolveWorkspacePath } from './workspaces/path.ts'
 // Contract only: the scope implementation and its Host transport belong to
 // dsh-client-ui-settings (see that package's settings-scope.ts).
 export type {
-  SettingsControlState, SettingsScope, SettingsScopeSnapshot, SettingsScopeSpec, SettingsWritableReason, SettingsWriteState,
+  SettingsControlState, SettingsOwner, SettingsScope, SettingsScopeSnapshot, SettingsScopeSource, SettingsScopeSpec,
+  SettingsWritableReason, SettingsWriteState,
 } from './contract/settings-scope.ts'
 export { settingsControlState } from './contract/settings-scope.ts'
+export { onSettingsNavigation, requestSettingsSection } from './contract/settings-navigation.ts'
+export type { SettingsNavigationRequest } from './contract/settings-navigation.ts'
+export { ProjectUiPolicyRuntime } from './project-policy.ts'
+export type { ProjectThemePolicy, ProjectUiPolicySnapshot } from './project-policy.ts'
 export type { Session } from './sessions/session.ts'
 export type { ISession, ProjectionsFace, SessionFace } from './contract/session.ts'
 export type { AgentContext, ISessions } from './contract/sessions.ts'
@@ -210,6 +216,8 @@ declare module '@deepseek-ai/cordis' {
     sessions: import('./contract/sessions.ts').ISessions
     /** The outward face only; the concrete service stays inside the runtime. */
     workspaces: import('./contract/workspaces.ts').IWorkspaces
+    /** Active project UI policy shared by theme and project settings surfaces. */
+    projectUiPolicy: import('./project-policy.ts').ProjectUiPolicyRuntime
   }
 }
 
@@ -221,6 +229,7 @@ export const inject = ['connection', 'typert', 'remote', 'remote.commands']
  */
 export function apply(ctx: Context): void {
   ctx.plugin(SlotRegistry)
+  ctx.provide('projectUiPolicy', new ProjectUiPolicyRuntime())
   const conversation = {
     events: new ConversationEventRegistry(ctx),
     views: new ConversationViewRegistry(ctx),

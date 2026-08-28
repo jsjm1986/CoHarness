@@ -1,11 +1,19 @@
 export type CollaborationAction = 'read' | 'write' | 'manage' | 'approve'
 
+/** Project-level theme policy exposed to the user frontend. */
+export type ProjectThemePolicy = 'follow-user' | 'light' | 'dark'
+
 /** Active project available to one authenticated account. */
 export interface ProjectScopeView {
   projectId: number
   name: string
   path: string
   mode: 'ro' | 'rw'
+  /** Whether this account may manage the project's shared configuration. */
+  canManage?: boolean
+  origin?: 'admin' | 'user'
+  owner?: { id: number; username: string; displayName: string } | null
+  uiThemePolicy?: ProjectThemePolicy
 }
 
 /** Current project authority used by Gateway authorization decisions. */

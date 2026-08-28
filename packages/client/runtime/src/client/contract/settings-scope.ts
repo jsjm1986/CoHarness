@@ -7,8 +7,14 @@
  * otherwise close a reference cycle.
  */
 
-/** Why a Host settings document cannot accept browser writes. */
-export type SettingsWritableReason = 'project' | 'provider'
+/** Why a settings document or namespace cannot accept browser writes. */
+export type SettingsWritableReason = 'project' | 'provider' | 'organization' | 'deployment' | 'account'
+
+/** Logical owner shown by settings surfaces. */
+export type SettingsOwner = 'account' | 'project' | 'organization' | 'deployment'
+
+/** Persistence source selected by a settings scope. */
+export type SettingsScopeSource = 'host' | 'account' | 'account-or-host'
 
 /** State of the most recent settings write attempt. */
 export type SettingsWriteState =
@@ -25,6 +31,10 @@ export interface SettingsControlState {
   writable: boolean
   /** Host reason for a read-only document, when known. */
   writableReason: SettingsWritableReason | undefined
+  /** Logical owner of the displayed value, when known. */
+  owner?: SettingsOwner
+  /** Persistence source for the displayed value, when known. */
+  mode?: 'host' | 'account' | 'memory'
   /** Latest write state. */
   write: SettingsWriteState
 }
@@ -40,6 +50,8 @@ export function settingsControlState<T>(snapshot: SettingsScopeSnapshot<T>): Set
     writable: snapshot.writable,
     writableReason: snapshot.writableReason,
     write: snapshot.write,
+    ...(snapshot.owner === undefined ? {} : { owner: snapshot.owner }),
+    mode: snapshot.mode,
   }
 }
 
@@ -72,14 +84,18 @@ export interface SettingsScopeSnapshot<T> {
   writableReason: SettingsWritableReason | undefined
   /** State of the most recent write attempt, including blocked and failed writes. */
   write: SettingsWriteState
-  /** `host` syncs with the Host document; `memory` is an explicit process-local mode. */
-  mode: 'host' | 'memory'
+  /** Persistence source; `memory` is an explicit process-local mode. */
+  mode: 'host' | 'account' | 'memory'
+  /** Logical owner of the accepted value, when known. */
+  owner?: SettingsOwner
 }
 
 /** Domain-owned description of one settings namespace consumed by a browser plugin. */
 export interface SettingsScopeSpec<T> {
   /** Settings namespace registered by the owning Host plugin. */
   namespace: string
+  /** Select account preferences, Host settings, or account with local fallback. */
+  source?: SettingsScopeSource
   /**
    * Narrow one wire section; undefined keeps the last accepted value. The
    * default validates the section against the namespace's own serialized wire

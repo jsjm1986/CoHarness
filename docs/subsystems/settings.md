@@ -26,6 +26,17 @@ interface SettingsRegisterOptions<T> {
   base?: Partial<T>
   /** Owner's effect timing, surfaced to configuration UIs; defaults to `live`. */
   applies?: SettingsApplies
+  /** Logical owner shown by remote configuration surfaces. */
+  owner?: SettingsOwner
+  /** Project-scope write policy; `manager` requires `owner: 'project'`; defaults to `never`. */
+  projectWrite?: SettingsProjectWrite
+  /**
+   * Optional allowlist for project-manager writes. Each path permits that
+   * exact value and descendants; omission keeps the whole namespace writable
+   * when `projectWrite` is `manager`. Paths must be non-empty and cannot name
+   * object-prototype keys.
+   */
+  projectWritePaths?: readonly SettingsProjectWritePath[]
   /**
    * Reject a resolved section the owner could not act on, for constraints its
    * schema cannot express — a cross-field requirement, or one field's validity
@@ -120,12 +131,20 @@ interface SettingsDescriptor {
   user?: unknown
   /** Owner's declared effect timing. */
   applies: SettingsApplies
+  /** Logical owner of this namespace. */
+  owner: SettingsOwner
+  /** Whether a project manager may edit this namespace. */
+  projectWrite: SettingsProjectWrite
+  /** Optional project-manager path allowlist; absent means the whole namespace. */
+  projectWritePaths?: string[][]
   /** Schema-declared secret positions; present only under `redactSecrets`. */
   secrets?: RedactedSecret[]
 }
 ```
 
 A caller that holds only the redacted descriptor cannot safely rebuild a section, so removals travel as path ops instead. Each descriptor also carries a `revision` over the raw section; a write may send it back as `expectedRevision`, and one that no longer matches is refused rather than applied over the writer that landed first.
+
+In a shared project runtime, the Gateway exposes only namespaces whose registration owner is `project` or `account`. A project manager can write a namespace only when it declares `projectWrite: 'manager'`; `projectWritePaths` further limits writes to the listed paths and their descendants. Account, organization, deployment, and secret fields remain read-only in that scope, and secret values are changed through the credentials service rather than a settings patch. The project UI reports the owner and reason for each unavailable control; filesystem paths and mounts remain administrator operations in `/admin`.
 ```ts type-equiv
 /**
  * One path-addressed edit to a namespace's user section. Path mutation exists
@@ -253,7 +272,7 @@ async replace(ns: SettingsNamespace, section: object, expectedRevision?: number)
 async mutate(ns: SettingsNamespace, ops: readonly SettingsPathOp[], expectedRevision?: number): Promise<void>
 ```
 
-Source: [`packages/settings/settings/src/index.ts:376`](../../packages/settings/settings/src/index.ts)
+Source: [`packages/settings/settings/src/index.ts:440`](../../packages/settings/settings/src/index.ts)
 
 <a id="settings-events"></a>
 

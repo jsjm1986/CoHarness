@@ -40,7 +40,7 @@ const READY: AgentPresetSectionState = {
  */
 function renderSection(
   state: Partial<AgentPresetSectionState> = {},
-  options: { creator?: boolean } = {},
+  options: { creator?: boolean; project?: boolean } = {},
 ) {
   const store = createSnapshotStore<AgentPresetSectionState>({ ...READY, ...state })
   const actions = {
@@ -62,6 +62,7 @@ function renderSection(
   }
   const props = {
     ...actions,
+    ...(options.project === true ? { settingsScope: 'project' as const } : {}),
     useAgentPresetSection: bindSnapshotSelector(store),
     t: (key: keyof typeof en) => en[key],
   } as unknown as AgentPresetSectionProps
@@ -213,6 +214,16 @@ describe('the preset list', () => {
     renderSection({ hasDocument: false })
 
     expect(within(rowFor('mine')).getByRole('button', { name: `${en.showLocation}: mine` })).toBeTruthy()
+  })
+
+  it('keeps project filesystem actions disabled and explains the admin owner', () => {
+    renderSection({ hasDocument: false }, { project: true })
+
+    const location = within(rowFor('mine')).getByRole('button', {
+      name: `${en.projectFilesystem}: mine`,
+    })
+    expect(location).toHaveProperty('disabled', true)
+    expect(screen.getByText(en.projectFilesystem)).toBeTruthy()
   })
 
   it('shows a revealed directory on its row', () => {

@@ -9,7 +9,7 @@
  * through {@link SettingsDescribeMirror.acceptView}.
  */
 
-import type { IApiClient, SettingsNamespaceView } from '@deepseek-ai/dsh-api-remotes/client'
+import type { IApiClient, SettingsNamespaceView, SettingsWritableReason } from '@deepseek-ai/dsh-api-remotes/client'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 
 type SettingsFace = Pick<IApiClient, 'settings'>
@@ -21,7 +21,7 @@ export interface SettingsDescribeView {
   /** Whether the settings provider accepts writes. */
   writable: boolean
   /** Why the current browser authority cannot write, when read-only. */
-  writableReason?: 'project' | 'provider'
+  writableReason?: SettingsWritableReason
   /** Whether a native settings document exists for the Host to open. */
   hasDocument: boolean
 }
