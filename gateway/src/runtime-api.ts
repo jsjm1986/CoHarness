@@ -448,9 +448,9 @@ export function createRuntimeApiHandler(
         if (typeof ref !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(ref)) {
           throw new Error('invalid managed credential reference')
         }
-        const resolveCredential = deps.governance.resolveManagedCredential
-          ?? deps.governance.resolveOrganizationCredential
-        const value = await resolveCredential(subject.target, ref)
+        const value = deps.governance.resolveManagedCredential !== undefined
+          ? await deps.governance.resolveManagedCredential(subject.target, ref)
+          : await deps.governance.resolveOrganizationCredential(subject.target, ref)
         res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
         res.end(JSON.stringify(value === null ? { configured: false } : { configured: true, value }))
         return true

@@ -524,6 +524,31 @@ describe('runtime organization credentials', () => {
       body: { ref: '../secret' },
     })).toMatchObject({ handled: true, status: 400 })
   })
+
+  it('preserves the governance service receiver for managed credentials', async () => {
+    const runtime = fixture()
+    const governance = {
+      marker: 'project-secret-test',
+      async resolveManagedCredential(this: { marker: string }, _subject: unknown, ref: string): Promise<string | null> {
+        return ref === 'DSH_PROJECT_PRIMARY_API_KEY' ? this.marker : null
+      },
+      async resolveOrganizationCredential(_subject: unknown, _ref: string): Promise<string | null> {
+        return null
+      },
+    }
+    const handler = createRuntimeApiHandler({
+      ...runtime.deps,
+      governance,
+    } as RuntimeDependencies)
+
+    await expect(request(handler, '/internal/runtime/model-credential', {
+      body: { ref: 'DSH_PROJECT_PRIMARY_API_KEY' },
+    })).resolves.toMatchObject({
+      handled: true,
+      status: 200,
+      body: { configured: true, value: 'project-secret-test' },
+    })
+  })
 })
 
 describe('runtime archive synchronization', () => {
