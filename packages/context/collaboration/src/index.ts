@@ -25,6 +25,7 @@ export interface CollaborationParticipant {
       readonly projectId: number
       readonly projectName: string
       readonly mode: 'ro' | 'rw'
+      readonly canManage?: boolean
     }
 }
 

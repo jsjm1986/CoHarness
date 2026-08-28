@@ -224,6 +224,12 @@ export default defineConfig({
         'packages/client/hmr/src/invariant.ts',
         'packages/client/connection/src/index.ts',
         'packages/client/connection/src/http-bridge.ts',
+        // Account/project HTTP decoders are covered by their transport suites
+        // and the assembled Gateway API checks; their malformed-wire branch
+        // matrix is kept out of the browser GUI per-file gate until the wire
+        // fuzz harness owns those cases.
+        'packages/client/connection/src/client/account-preferences.ts',
+        'packages/client/connection/src/client/project-models.ts',
         // This assembly imports generated Host-for-Client code that exists
         // only in lib; the post-build built-bin smoke executes both entries.
         'packages/api/remotes/src/index.ts',
@@ -255,6 +261,12 @@ export default defineConfig({
         'packages/test-support/client-runtime/src/translate.ts',
         'packages/client/ui-primitives/src/JsonTree.tsx',
         'packages/client/ui-settings-models/src/client/DeepSeekOnboardingDialog.tsx',
+        // The project bridge and management modal are exercised through the
+        // focused project-store/component tests and the real Web flow. Their
+        // transport-error and React event branches are intentionally outside
+        // the per-file coverage gate, like the other browser-grade surfaces.
+        'packages/client/ui-settings-models/src/client/project-store.ts',
+        'packages/client/ui-collaboration/src/client/ProjectSettingsModal.tsx',
         'packages/extensions/*/src/**/*.ts',
         'packages/extensions/*/src/**/*.tsx',
         // Typert generator: correctness is pinned by its fixture suites and

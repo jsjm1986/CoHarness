@@ -399,7 +399,10 @@ export const inject = ['slots', 'connection', 'remote', 'settingsScope']
  * @param ctx - client cordis context.
  */
 export function apply(ctx: ClientContext): void {
-  const host = ctx.settingsScope.bind<LocaleSettings>({ namespace: LOCALE_SETTINGS_NAMESPACE })
+  const host = ctx.settingsScope.bind<LocaleSettings>({
+    namespace: LOCALE_SETTINGS_NAMESPACE,
+    source: 'account-or-host',
+  })
   const locale = new LocaleRuntime(ctx, host)
   locale.register(COMMON_NS, { zh, en })
   locale.register(SETTINGS_NS, { zh: settingsZh, en: settingsEn })

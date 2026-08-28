@@ -20,6 +20,7 @@
     "better-sqlite3": "^12.4.1",
     "google-auth-library": "10.7.0",
     "http-proxy": "^1.18.1",
+    "js-yaml": "^4.2.0",
     "pg": "8.16.3"
   },
   "devDependencies": {

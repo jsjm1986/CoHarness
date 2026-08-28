@@ -19,7 +19,7 @@ export const inject = ['llm']
 
 function credentialClass(source: string): UsageRecord['credentialClass'] {
   if (source === 'file' || source === 'project-env' || source === 'request') return 'personal'
-  if (source === 'organization' || source === 'env' || source === 'process' || source === 'user-env') return 'company'
+  if (source === 'organization' || source === 'project' || source === 'env' || source === 'process' || source === 'user-env') return 'company'
   return 'unknown'
 }
 
@@ -160,7 +160,7 @@ export function apply(ctx: Context): void {
     const initiatorId = ctx.get('agents')?.currentInitiator()?.session.id
     const explicitId = options.sessionId
     const attributedId = explicitId ?? initiatorId
-    const actor = policy.userDeclaredAllowed ? undefined : participantIdentity(options.messages)
+    const actor = personalRuntime ? undefined : participantIdentity(options.messages)
     const base = {
       eventId: randomUUID(), occurredAt: Date.now(), provider: options.provider, model: options.model,
       purpose: options.purpose ?? 'assistant', ...attributedId === undefined ? {} : { sessionId: String(attributedId) },

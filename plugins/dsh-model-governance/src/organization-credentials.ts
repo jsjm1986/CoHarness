@@ -24,9 +24,9 @@ function organizationCredentialResponse(value: unknown): OrganizationCredentialR
   throw new Error('model-governance: invalid organization credential response')
 }
 
-/** Gateway-backed read-only credentials named by the active organization Provider snapshot. */
+/** Gateway-backed read-only credentials named by the active managed Provider snapshot. */
 export class OrganizationCredentialLayer implements ReadOnlyCredentialLayer {
-  readonly id = 'organization-model-providers'
+  readonly id = 'managed-model-providers'
 
   constructor(
     private readonly gateway: Pick<GatewayRuntime, 'request'>,
@@ -42,7 +42,7 @@ export class OrganizationCredentialLayer implements ReadOnlyCredentialLayer {
   async resolve(ref: CredentialRef): Promise<ResolvedCredential | undefined> {
     const credential = await this.fetch(ref)
     return credential.configured
-      ? { value: credential.value, source: 'organization' }
+      ? { value: credential.value, source: this.sourceOf(ref) }
       : undefined
   }
 
@@ -51,14 +51,14 @@ export class OrganizationCredentialLayer implements ReadOnlyCredentialLayer {
     const credential = await this.fetch(ref)
     return {
       configured: credential.configured,
-      ...credential.configured ? { source: 'organization' } : {},
+      ...credential.configured ? { source: this.sourceOf(ref) } : {},
       writable: false,
     }
   }
 
   private async fetch(ref: CredentialRef): Promise<OrganizationCredentialResponse> {
     if (!this.owns(ref)) {
-      throw new Error(`model-governance: credential reference "${ref}" is not owned by an organization Provider`)
+      throw new Error(`model-governance: credential reference "${ref}" is not owned by a managed Provider`)
     }
     const response = await this.gateway.request('/internal/runtime/model-credential', {
       method: 'POST',
@@ -66,14 +66,19 @@ export class OrganizationCredentialLayer implements ReadOnlyCredentialLayer {
       body: JSON.stringify({ ref }),
     })
     if (!response.ok) {
-      throw new Error(`model-governance: organization credential request failed with HTTP ${String(response.status)}`)
+      throw new Error(`model-governance: managed credential request failed with HTTP ${String(response.status)}`)
     }
     let value: unknown
     try {
       value = await response.json()
     } catch {
-      throw new Error('model-governance: organization credential response is not valid JSON')
+      throw new Error('model-governance: managed credential response is not valid JSON')
     }
     return organizationCredentialResponse(value)
+  }
+
+  /** Return the source label used for usage attribution and UI diagnostics. */
+  private sourceOf(ref: CredentialRef): 'organization' | 'project' {
+    return String(ref).startsWith('DSH_PROJECT_') ? 'project' : 'organization'
   }
 }

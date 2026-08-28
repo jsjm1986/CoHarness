@@ -10,6 +10,7 @@
 import type { IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SettingsDescribeFace } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { SettingsWritableReason } from '@deepseek-ai/dsh-client-runtime/client'
 
 /** The agent-preset settings namespace on the host wire. */
 export const AGENT_PRESET_SETTINGS_NS = 'agent-presets'
@@ -173,6 +174,7 @@ export interface AgentPresetSettingsState {
    * offering a write the gateway will refuse.
    */
   writable: boolean
+  writableReason?: SettingsWritableReason
   currentValue: string
   options: readonly AgentPresetOption[]
 }
@@ -228,7 +230,14 @@ export class AgentPresetSettingsController {
     this.set({
       status: 'ready',
       error: null,
-      writable: this.describeFace.getSnapshot().view?.writable ?? false,
+      writable: this.describeFace.getSnapshot().view?.namespaces
+        .find(view => view.ns === AGENT_PRESET_SETTINGS_NS)?.writable
+        ?? this.describeFace.getSnapshot().view?.writable ?? false,
+      ...(() => {
+        const view = this.describeFace.getSnapshot().view?.namespaces
+          .find(candidate => candidate.ns === AGENT_PRESET_SETTINGS_NS)
+        return view?.writableReason === undefined ? {} : { writableReason: view.writableReason }
+      })(),
       options: presetOptions(presets),
       // A roster can mark nothing default: settings can name a preset that
       // was since deleted, and the picker still has to show something.
@@ -248,7 +257,10 @@ export class AgentPresetSettingsController {
     if (before.status === 'saving' || !before.writable || id === before.currentValue) return
     const authority = this.describeFace.getSnapshot().view
     if (authority === undefined || !authority.writable) {
-      this.set({ writable: false })
+      this.set({
+        writable: false,
+        ...(authority?.writableReason === undefined ? {} : { writableReason: authority.writableReason }),
+      })
       return
     }
     this.set({ status: 'saving', error: null, currentValue: id })

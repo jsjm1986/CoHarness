@@ -19,6 +19,7 @@ export type Project = {
   modelAccessDefaultAllowed?: boolean
   owner?: { id: number; username: string; displayName: string } | null
   createdBy?: { id: number; username: string; displayName: string } | null
+  uiThemePolicy?: 'follow-user' | 'light' | 'dark'
 }
 
 export type GrantMode = 'ro' | 'rw'
@@ -32,6 +33,14 @@ export type ProjectQuota = {
 export type ProjectDetail = Project & {
   members: Array<{ userId: number; username: string; mode: GrantMode }>
   quota?: ProjectQuota
+  configurationSummary?: {
+    themePolicy: 'follow-user' | 'light' | 'dark'
+    managementSurface: 'user-frontend'
+    runtimeState: string
+    runtimeGeneration: number
+    filesystemManagedIn: '/admin'
+    projectModels?: { providerCount: number; revision: number }
+  }
 }
 
 export type ProjectDirectoryListing = {

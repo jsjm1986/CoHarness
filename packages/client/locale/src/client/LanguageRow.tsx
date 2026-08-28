@@ -47,7 +47,13 @@ export function LanguageRow({ t, setLocale, useStore }: LanguageRowComponentProp
             ? t('language.projectReadOnly')
             : blocked === 'provider' || settings.writableReason === 'provider'
               ? t('language.providerReadOnly')
-              : undefined
+              : blocked === 'account' || settings.writableReason === 'account'
+                ? t('language.accountReadOnly')
+                : blocked === 'organization' || settings.writableReason === 'organization'
+                  ? t('language.organizationReadOnly')
+                  : blocked === 'deployment' || settings.writableReason === 'deployment'
+                    ? t('language.deploymentReadOnly')
+                    : undefined
 
   useEffect(() => {
     if (disabled) setOpen(false)

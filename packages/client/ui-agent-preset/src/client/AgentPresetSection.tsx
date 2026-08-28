@@ -177,6 +177,7 @@ function CardDescription({ text }: { text: string }): ReactNode {
  */
 export function AgentPresetSection(props: AgentPresetSectionProps): ReactNode {
   const { useAgentPresetSection, t, load } = props
+  const projectScope = props.settingsScope === 'project'
   const state = useAgentPresetSection(snapshot => snapshot)
   const viewedId = state.view?.id
   const viewedRow = viewedId === undefined ? undefined : state.rows.find(row => row.id === viewedId)
@@ -232,6 +233,7 @@ export function AgentPresetSection(props: AgentPresetSectionProps): ReactNode {
     <div className={css.section}>
       <h2 className={css.title}>{t('nav')}</h2>
       <p className={css.intro}>{t('sectionIntro')}</p>
+      {projectScope ? <p className={css.intro} role="status">{t('projectFilesystem')}</p> : null}
       {state.error === null ? null : <p className={css.error} role="alert">{state.error}</p>}
       {([['system', t('builtInGroup')], ['user', t('customGroup')]] as const).map(([trust, heading]) => {
         const group = state.rows
@@ -313,9 +315,13 @@ export function AgentPresetSection(props: AgentPresetSectionProps): ReactNode {
                           <button
                             type="button"
                             className={css.iconButton}
-                            data-tip={state.hasDocument ? t('openLocation') : t('showLocation')}
-                            aria-label={`${state.hasDocument ? t('openLocation') : t('showLocation')}: ${text.name}`}
-                            disabled={!state.authorable}
+                            data-tip={projectScope
+                              ? t('projectFilesystem')
+                              : state.hasDocument ? t('openLocation') : t('showLocation')}
+                            aria-label={`${projectScope
+                              ? t('projectFilesystem')
+                              : state.hasDocument ? t('openLocation') : t('showLocation')}: ${text.name}`}
+                            disabled={!state.authorable || projectScope}
                             onClick={() => { void props.openLocation(row.id) }}
                           >
                             <IconFolderOpenOutline16 />

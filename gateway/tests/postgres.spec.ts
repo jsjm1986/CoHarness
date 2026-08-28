@@ -1,5 +1,5 @@
 import { createHash, generateKeyPairSync, randomUUID } from 'node:crypto'
-import { access, copyFile, mkdir, mkdtemp, readFile, readdir, realpath, rm } from 'node:fs/promises'
+import { access, copyFile, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -11,12 +11,16 @@ import { loadConfig } from '../src/config.ts'
 import { writeProjectModelGovernanceFile } from '../src/apply-model-governance.ts'
 import { openDb, SCHEMA_VERSION } from '../src/db.ts'
 import { PostgresAuditService } from '../src/postgres/audit-service.ts'
+import { PostgresAccountPreferencesService } from '../src/postgres/account-preferences-service.ts'
 import { PostgresAuthService } from '../src/postgres/auth-service.ts'
 import { PostgresCollaborationService } from '../src/postgres/collaboration-service.ts'
 import { ConversationRepository } from '../src/postgres/conversation-repository.ts'
 import { createPostgresPool, runMigrations } from '../src/postgres/database.ts'
 import { PostgresInstanceRepository } from '../src/postgres/instance-repository.ts'
-import { PostgresModelGovernanceService } from '../src/postgres/model-governance-service.ts'
+import {
+  PostgresModelGovernanceService,
+  projectProviderCredentialRef,
+} from '../src/postgres/model-governance-service.ts'
 import { OrganizationModelCredentialCipher } from '../src/organization-model-credentials.ts'
 import { PostgresProjectService } from '../src/postgres/project-service.ts'
 import {
@@ -156,7 +160,7 @@ describePg('PostgreSQL baseline', () => {
         session_id,seq,event_type,occurred_at,event,payload_bytes
       ) VALUES('legacy-nul-session',0,'user/message',now(),$1::json,octet_length($1::text))`, [legacyEvent])
       const migrated = await runMigrations(pool, MIGRATIONS)
-      expect(migrated).toEqual({ applied: [16, 17, 18, 19], current: 19 })
+      expect(migrated).toEqual({ applied: [16, 17, 18, 19, 20, 21, 22], current: 22 })
       const legacyFacts = await pool.query<{
         has_visible_content: boolean
         visible_content_seq: string | null
@@ -172,7 +176,7 @@ describePg('PostgreSQL baseline', () => {
       await rm(legacyMigrations, { recursive: true, force: true })
     }
     expect(await runMigrations(pool, MIGRATIONS))
-      .toEqual({ applied: [], current: 19 })
+      .toEqual({ applied: [], current: 22 })
     const pushTables = await pool.query<{ table_name: string }>(`SELECT table_name
       FROM information_schema.tables
       WHERE table_schema='harness' AND table_name IN ('push_devices','push_deliveries')
@@ -524,6 +528,89 @@ describePg('PostgreSQL baseline', () => {
       credentialRef: newRef,
       credentialConfigured: true,
     })
+  })
+
+  it('reuses stored organization and project credentials for model discovery', async () => {
+    const suffix = randomUUID().slice(0, 8)
+    const organizationProvider = `org-discovery-${suffix}`
+    const organizationCredential = `DSH_DISCOVERY_${suffix.toUpperCase()}_API_KEY`
+    const projectPublicId = 20_000_000 + Number.parseInt(suffix, 16)
+    const projectProvider = 'relay'
+    const projectCredential = projectProviderCredentialRef(projectPublicId, projectProvider)
+    const seenKeys: string[] = []
+    const seenRequests: Array<{ path: string; key: string }> = []
+    const relay = await serveRuntime(async (req, res, pathname) => {
+      const authorization = req.headers.authorization
+      const key = typeof authorization === 'string' && authorization.startsWith('Bearer ')
+        ? authorization.slice('Bearer '.length)
+        : ''
+      seenRequests.push({ path: pathname, key })
+      if (req.method !== 'GET' || pathname !== '/models') return false
+      seenKeys.push(key)
+      res.writeHead(200, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ data: [{ id: 'discovered-chat', name: 'Discovered Chat' }] }))
+      return true
+    })
+    try {
+      const governance = new PostgresModelGovernanceService(
+        {
+          pool,
+          organizationId,
+          organizationSlug: 'test',
+          nodeId: '00000000-0000-0000-0000-000000000000',
+          nodeName: 'test-node',
+        },
+        new OrganizationModelCredentialCipher(Buffer.alloc(32, 13)),
+      )
+      await governance.mutateOrganizationModelSettings([{
+        op: 'set',
+        path: ['providers', organizationProvider],
+        value: {
+          displayName: 'Discovery organization route',
+          api: 'openai-completions',
+          baseURL: relay.base,
+          apiKeyEnv: organizationCredential,
+          models: [{ id: 'configured-chat', name: 'Configured Chat' }],
+        },
+      }])
+      await governance.setOrganizationCredential(organizationCredential, 'organization-discovery-key')
+      await expect(governance.discoverOrganizationModels({
+        provider: organizationProvider,
+        baseURL: relay.base,
+        api: 'openai-completions',
+      })).resolves.toEqual([{ id: 'discovered-chat', name: 'Discovered Chat' }])
+      await expect(governance.discoverOrganizationModels({
+        provider: organizationProvider,
+        baseURL: `${relay.base}/different-endpoint`,
+        api: 'openai-completions',
+      })).rejects.toThrow(/model listing was not available/)
+      expect(seenRequests.at(-1)?.key).toBe('')
+
+      await pool.query(`INSERT INTO harness.projects(
+        organization_id,public_id,name,created_by
+      ) VALUES($1,$2,$3,$4)`, [organizationId, projectPublicId, `Discovery project ${suffix}`, userId])
+      await governance.mutateProjectModelSettings(projectPublicId, [{
+        op: 'set',
+        path: ['providers', projectProvider],
+        value: {
+          displayName: 'Discovery project route',
+          api: 'openai-completions',
+          baseURL: relay.base,
+          apiKeyEnv: projectCredential,
+          models: [{ id: 'configured-chat', name: 'Configured Chat' }],
+        },
+      }])
+      await governance.setProjectCredential(projectPublicId, projectCredential, 'project-discovery-key')
+      await expect(governance.discoverProjectModels({
+        projectId: projectPublicId,
+        provider: projectProvider,
+        baseURL: relay.base,
+        api: 'openai-completions',
+      })).resolves.toEqual([{ id: 'discovered-chat', name: 'Discovered Chat' }])
+      expect(seenKeys).toEqual(['organization-discovery-key', 'project-discovery-key'])
+    } finally {
+      await relay.close()
+    }
   })
 
   it('stores arbitrary session ids, full JSON strings, and searchable nested tool results', async () => {
@@ -1463,6 +1550,29 @@ describePg('PostgreSQL baseline', () => {
       await users.changeOwnPassword(member.id, 'pw-abcdefgh')
       expect((await users.getById(member.id))?.mustChangePassword).toBe(false)
 
+      const accountPreferences = new PostgresAccountPreferencesService(context, cfg)
+      await writeFile(join(cfg.usersRoot, member.username, 'dsh', 'settings.yaml'), [
+        'ui-theme:',
+        '  preference: dark',
+        'ui-conversation:',
+        '  busyEnter: steer',
+      ].join('\n') + '\n')
+      const migratedPreferences = await accountPreferences.describe(member)
+      expect(migratedPreferences).toMatchObject({
+        revision: 1,
+        migrated: true,
+        values: { 'ui-theme': { preference: 'dark' }, 'ui-conversation': { busyEnter: 'steer' } },
+      })
+      const changedPreferences = await accountPreferences.mutate(member, {
+        namespace: 'ui-theme', field: 'preference', operation: 'set', value: 'light',
+        expectedRevision: migratedPreferences.revision,
+      })
+      expect(changedPreferences).toMatchObject({ revision: 2, values: { 'ui-theme': { preference: 'light' } } })
+      await expect(accountPreferences.mutate(member, {
+        namespace: 'locale', field: 'preference', operation: 'set', value: 'en',
+        expectedRevision: migratedPreferences.revision,
+      })).rejects.toThrow(/stale/)
+
       const shared = join(root, 'shared')
       await mkdir(shared)
       const project = await projects.create({ name: 'Runtime Project', path: shared, createdBy: admin.id })
@@ -1569,6 +1679,15 @@ describePg('PostgreSQL baseline', () => {
         credentialConfigured: false,
         modelCount: 1,
       })
+      await pool.query(`UPDATE harness.model_providers SET profile = profile || $3::jsonb
+        WHERE organization_id=$1 AND provider_key=$2`, [context.organizationId, 'org-runtime', JSON.stringify({
+          apiKey: 'legacy-secret', headers: { 'x-provider-secret': 'header-secret' },
+          nested: { apiKey: 'nested-secret' },
+        })])
+      const listedProvider = (await governance.listProviders())[0]
+      expect(JSON.stringify(listedProvider)).not.toContain('legacy-secret')
+      expect(JSON.stringify(listedProvider)).not.toContain('header-secret')
+      expect(JSON.stringify(listedProvider)).not.toContain('nested-secret')
       expect((await governance.listModels())[0]).toMatchObject({
         provider: 'org-runtime',
         model: 'chat',
@@ -1597,6 +1716,7 @@ describePg('PostgreSQL baseline', () => {
         providerView => providerView.provider === 'org-runtime',
       )
       expect(normalizedRuntimeProvider?.profile?.baseURL).toBe('https://models.example.test/v1')
+      expect(normalizedRuntimeProvider?.profile).not.toHaveProperty('apiKey')
       await governance.setUserAccess(member.id, 'org-runtime', 'chat', false)
       expect((await governance.policyFor(member)).models[0]?.allowed).toBe(false)
       expect((await governance.policyFor(member)).defaultAllowed).toBe(false)
@@ -1643,6 +1763,64 @@ describePg('PostgreSQL baseline', () => {
         summary: { providerCount: 1, eventCount: 1 },
         rows: [{ provider: 'personal-gateway', userId: member.id, action: 'provider-created' }],
       })
+
+      const projectSettingsBefore = await governance.describeProjectModelSettings(project.id)
+      const projectCredentialRef = `DSH_PROJECT_${String(project.id)}_RELAY_API_KEY`
+      const projectSettingsAfterProfile = await governance.mutateProjectModelSettings(project.id, [{
+        op: 'set',
+        path: ['providers', 'relay'],
+        value: {
+          displayName: 'Project relay',
+          api: 'anthropic-messages',
+          baseURL: 'https://project-relay.example/v1/',
+          apiKeyEnv: projectCredentialRef,
+          headers: { 'x-project-token': 'project-header-secret' },
+          models: [{ id: 'claude-sonnet', name: 'Claude Sonnet', contextWindow: 200_000 }],
+        },
+      }], projectSettingsBefore.revision)
+      expect(projectSettingsAfterProfile.revision).toBe(projectSettingsBefore.revision + 1)
+      expect(projectSettingsAfterProfile.providers).toEqual([expect.objectContaining({
+        provider: 'relay',
+        runtimeProvider: `project-${String(project.id)}-relay`,
+        status: 'draft',
+        credentialConfigured: false,
+        modelCount: 1,
+      })])
+      expect(JSON.stringify(projectSettingsAfterProfile)).not.toContain('project-secret')
+      expect(JSON.stringify(projectSettingsAfterProfile)).not.toContain('project-header-secret')
+      await expect(governance.mutateProjectModelSettings(project.id, [], projectSettingsBefore.revision))
+        .rejects.toThrow(/revision conflict/)
+      await governance.setProjectCredential(project.id, projectCredentialRef, 'project-secret')
+      const projectSettingsReady = await governance.describeProjectModelSettings(project.id)
+      expect(projectSettingsReady.providers).toEqual([expect.objectContaining({
+        provider: 'relay', status: 'enabled', credentialConfigured: true,
+      })])
+      expect(await governance.describeProjectCredentials(project.id, [projectCredentialRef])).toEqual({
+        [projectCredentialRef]: { configured: true, source: 'project', writable: true },
+      })
+      expect(await governance.resolveManagedCredential({ kind: 'project', id: project.id }, projectCredentialRef))
+        .toBe('project-secret')
+      expect(await governance.resolveManagedCredential({ kind: 'user', id: member.id }, projectCredentialRef))
+        .toBeNull()
+      const projectPolicyWithProvider = await governance.policyForProject(project.id)
+      expect(projectPolicyWithProvider.providers).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          provider: `project-${String(project.id)}-relay`,
+          scope: 'project', projectId: project.id,
+          protocol: 'anthropic-messages',
+          credentialRef: projectCredentialRef,
+          models: [expect.objectContaining({ id: 'claude-sonnet' })],
+          profile: expect.objectContaining({ headers: { 'x-project-token': 'project-header-secret' } }),
+        }),
+      ]))
+      expect(projectPolicyWithProvider.models).toEqual(expect.arrayContaining([
+        { provider: `project-${String(project.id)}-relay`, model: 'claude-sonnet', allowed: true },
+      ]))
+      const projectSettingsAfterCredential = await governance.describeProjectModelSettings(project.id)
+      await governance.mutateProjectModelSettings(project.id, [{ op: 'unset', path: ['providers', 'relay'] }], projectSettingsAfterCredential.revision)
+      expect(await governance.resolveManagedCredential({ kind: 'project', id: project.id }, projectCredentialRef)).toBeNull()
+      expect((await governance.policyForProject(project.id)).providers.some(providerView =>
+        providerView.provider === `project-${String(project.id)}-relay`)).toBe(false)
 
       expect(await governance.policyForProject(project.id)).toMatchObject({
         defaultAllowed: false,

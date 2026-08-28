@@ -38,12 +38,16 @@ interface ManagedModelProfile {
 ```ts type-equiv
 /** One organization-managed Provider profile consumed by an LLM adapter. */
 interface ManagedModelProviderProfile {
-  /** Reserved organization route id. */
+  /** Runtime route id. Organization and project prefixes are deployment-owned. */
   provider: string
   /** Display name shown by Provider selectors. */
   displayName: string
   /** Adapter family that consumes this profile. */
   driver: 'pi-ai'
+  /** Owning scope; omitted by older policy files and treated as organization. */
+  scope?: ManagedModelProviderScope
+  /** Public project id when the Provider belongs to a project. */
+  projectId?: number
   /** Wire protocol spoken by every model on the route. */
   protocol: ManagedModelProviderProtocol
   /** Provider endpoint. */
@@ -84,7 +88,7 @@ interface ManagedModelProviderProfile {
 ```
 
 ```ts type-equiv
-/** Complete organization Provider configuration at one monotonic revision. */
+/** Complete managed Provider configuration at one monotonic revision. */
 interface ModelProviderConfigSnapshot {
   /** Organization-wide configuration revision. */
   revision: number
@@ -542,6 +546,10 @@ interface LlmConfigurableProvider {
    * from outside.
    */
   declared?: boolean
+  /** Optional ownership label supplied by a scoped configuration provider. */
+  management?: 'personal' | 'organization' | 'project' | 'external'
+  /** Public project id when this route belongs to a project. */
+  projectId?: number
 }
 ```
 
@@ -1034,7 +1042,7 @@ Source: [`packages/llm/model-access/src/index.ts:22`](../../packages/llm/model-a
 
 ### `ctx.modelProviderConfig` — `ModelProviderConfig` (abstract seam)
 
-Organization Provider configuration published as `ctx.modelProviderConfig`.
+Managed Provider configuration published as `ctx.modelProviderConfig`.
 
 ```ts cordis-catalog
 /**
@@ -1044,7 +1052,7 @@ Organization Provider configuration published as `ctx.modelProviderConfig`.
 abstract snapshot(): ModelProviderConfigSnapshot
 ```
 
-Source: [`packages/llm/model-provider-config/src/index.ts:113`](../../packages/llm/model-provider-config/src/index.ts)
+Source: [`packages/llm/model-provider-config/src/index.ts:120`](../../packages/llm/model-provider-config/src/index.ts)
 
 <a id="llm-events"></a>
 
@@ -1114,5 +1122,5 @@ Committed replacement of the organization Provider snapshot.
 'model-provider-config/updated'(revision: number): void
 ```
 
-Source: [`packages/llm/model-provider-config/src/index.ts:108`](../../packages/llm/model-provider-config/src/index.ts)
+Source: [`packages/llm/model-provider-config/src/index.ts:115`](../../packages/llm/model-provider-config/src/index.ts)
 <!-- END GENERATED cordis-surface -->

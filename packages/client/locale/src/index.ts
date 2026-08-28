@@ -18,6 +18,7 @@ export function apply(ctx: Context): void {
     settingsCtx.settings.register(
       settingsNamespace(LOCALE_SETTINGS_NAMESPACE),
       LocaleSettingsSchema,
+      { owner: 'account', projectWrite: 'never' },
     )
   })
 }

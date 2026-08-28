@@ -37,11 +37,10 @@ export function WebSearchCard(props: WebSearchCardProps) {
       <SecretField
         id="plugin-config-web-search-key"
         label={t('webSearchApiKey')}
-        hint={t('webSearchApiKeyHint')}
-        // The credentials domain accepts a key even when the settings document
-        // itself is read-only; they are separate stores with separate refusals.
-        // Its own writability is what disables this control — a key sourced
-        // from the process environment cannot be written from here.
+        hint={state.apiKeyWritable ? t('webSearchApiKeyHint') : t('webSearchApiKeyManaged')}
+        // The credentials domain owns this control independently from the
+        // settings namespace. In a project runtime the endpoint and quota may
+        // be project-managed while the shared deployment key remains read-only.
         disabled={!state.apiKeyWritable}
         text={state.apiKey.text}
         configured={state.apiKeyConfigured}

@@ -6,6 +6,9 @@ import { assertProjectImportPathAllowed } from './project-directories.ts'
 
 export type GrantMode = 'ro' | 'rw'
 
+/** Project-level theme policy; account preferences remain independent. */
+export type ProjectThemePolicy = 'follow-user' | 'light' | 'dark'
+
 /** Whether a project was provisioned by an administrator or its owner. */
 export type ProjectOrigin = 'admin' | 'user'
 
@@ -50,6 +53,8 @@ export interface ProjectRow {
   modelAccessDefaultAllowed?: boolean
   owner?: ProjectActor | null
   createdBy?: ProjectActor | null
+  /** Effective theme policy for the project UI. */
+  uiThemePolicy?: ProjectThemePolicy
 }
 
 export interface ProjectDetail extends ProjectRow {

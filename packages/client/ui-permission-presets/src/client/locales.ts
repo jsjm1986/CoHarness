@@ -4,6 +4,10 @@
 export const zh = {
   'title': '权限',
   'description': '选择新会话的默认权限模式',
+  'managedByProject': '项目 owner 或组织管理员管理新会话的默认权限。',
+  'managedByAccount': '此账户负责管理新会话的默认权限。',
+  'managedByOrganization': '组织管理员负责管理新会话的默认权限。',
+  'managedByDeployment': '此部署负责管理默认权限模式。',
   'loading': '加载中',
   'unavailable': '不可用',
   'confirm.title': '确认启用 Full access？',
@@ -20,6 +24,10 @@ export type PermissionSettingsKey = keyof typeof zh
 export const en = {
   'title': 'Permission',
   'description': 'Choose the default permission mode for new sessions',
+  'managedByProject': 'The project owner or an organization administrator manages the default for new sessions.',
+  'managedByAccount': 'This account manages the default permission mode for new sessions.',
+  'managedByOrganization': 'An organization administrator manages the default permission mode for new sessions.',
+  'managedByDeployment': 'This deployment manages the default permission mode.',
   'loading': 'Loading',
   'unavailable': 'Unavailable',
   'confirm.title': 'Enable Full access?',

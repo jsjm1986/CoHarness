@@ -12,18 +12,23 @@
  * re-renders from pushed invalidations or the post-apply reload.
  */
 
-import { useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import type { IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
 import { Button, IconPlusOutline16, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace } from '@deepseek-ai/dsh-client-ui-slots'
+import type { SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { CustomProviderCard } from './CustomProviderCard.tsx'
 import { deriveKeyRef, messageOf, protocolChoices, providerUsable } from './store.ts'
 import type { ModelsSettingsStore, ProviderRow } from './store.ts'
 import type { SettingsSchemaOperations } from './schema-operations.ts'
 import { ProviderEditor, type ProviderEditorProps } from './ProviderEditor.tsx'
+import type { ProjectModelsApi } from './project-store.ts'
 import type { en } from './locales.ts'
 import styles from './ModelsSection.module.css'
+
+/** Project Provider ids are persisted in a slug column and become runtime route suffixes. */
+const PROJECT_PROVIDER_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
 
 /** Injected dependencies of {@link ModelsSection} (slot `inject`). */
 export interface ModelsSectionInjected {
@@ -40,7 +45,14 @@ export interface ModelsSectionInjected {
   /** Section copy. */
   t: (key: keyof typeof en) => string
   /** Which ownership layer this surface edits. Personal is the default. */
-  managementScope?: 'personal' | 'organization'
+  managementScope?: 'personal' | 'organization' | 'project'
+  /** Project id paired with project-owned Provider settings. */
+  projectId?: number
+  /** Resolve a cached project-owned Models binding for the requested scope. */
+  projectBinding?: (projectId: number) => {
+    controller: ModelsSettingsStore
+    api: ProjectModelsApi
+  } | undefined
   /** Route pattern used by the custom-provider creation card. */
   providerIdPattern?: RegExp
 }
@@ -49,9 +61,9 @@ export interface ModelsSectionInjected {
  * Props delivered by the slot outlet: the inject face spread flat (the
  * renderer erases the share boundary at the render call).
  */
-export type ModelsSectionProps = Partial<InjectFace<ModelsSectionInjected>>
+export type ModelsSectionProps = Partial<SettingsSectionOwnerProps> & Partial<InjectFace<ModelsSectionInjected>>
 
-type ModelsSectionFace = InjectFace<ModelsSectionInjected>
+type ModelsSectionFace = InjectFace<ModelsSectionInjected> & Partial<SettingsSectionOwnerProps>
 
 /** Provider identity shared by row actions and confirmation copy. */
 export interface ProviderIdentity {
@@ -74,7 +86,7 @@ interface EditorTarget extends ProviderIdentity {
 /** Values that vary around the shared provider-editor rendering. */
 interface ProviderEditorRenderProps extends Pick<
   ProviderEditorProps,
-  'namespace' | 'schema' | 'api' | 't' | 'readOnly' | 'credentialScope' | 'onClose'
+  'namespace' | 'schema' | 'api' | 't' | 'readOnly' | 'credentialScope' | 'projectId' | 'onClose'
 > {
   target: EditorTarget
 }
@@ -142,12 +154,12 @@ export function needsSetup(row: ProviderRow, anyUsable: boolean): boolean {
   return row.credential?.configured !== true
 }
 
-function targetOf(row: ProviderRow, managementScope: 'personal' | 'organization'): EditorTarget {
-  const managedRef = deriveKeyRef(row.entry.provider, managementScope)
+function targetOf(row: ProviderRow, managementScope: 'personal' | 'organization' | 'project', projectId?: number): EditorTarget {
+  const managedRef = deriveKeyRef(row.entry.provider, managementScope, projectId)
   const credentialRef = row.apiKeyEnv !== undefined
     && row.credential?.configured === true
     && row.credential.writable
-    && (managementScope === 'organization' || row.apiKeyEnv === managedRef)
+    && (managementScope !== 'personal' || row.apiKeyEnv === managedRef)
     ? row.apiKeyEnv
     : undefined
   return {
@@ -189,12 +201,16 @@ export function ModelsSection(props: ModelsSectionProps): ReactNode {
   return (
     <Loaded
       injected={{
+        close: props.close ?? (() => {}),
         controller,
         useSnapshot,
         api,
         schema,
         t,
         ...props.managementScope === undefined ? {} : { managementScope: props.managementScope },
+        ...props.projectId === undefined ? {} : { projectId: props.projectId },
+        ...props.projectBinding === undefined ? {} : { projectBinding: props.projectBinding },
+        ...props.settingsScope === undefined ? {} : { settingsScope: props.settingsScope },
         ...props.providerIdPattern === undefined ? {} : { providerIdPattern: props.providerIdPattern },
       }}
     />
@@ -202,9 +218,30 @@ export function ModelsSection(props: ModelsSectionProps): ReactNode {
 }
 
 function Loaded({ injected }: { injected: ModelsSectionFace }): ReactNode {
-  const { controller, api, schema, t } = injected
-  const managementScope = injected.managementScope ?? 'personal'
-  const state = injected.useSnapshot(snapshot => snapshot)
+  const projectRequested = injected.settingsScope === 'project'
+  const binding = projectRequested && injected.projectId !== undefined
+    ? injected.projectBinding?.(injected.projectId)
+    : undefined
+  const controller = binding?.controller ?? injected.controller
+  const api = binding?.api ?? injected.api
+  const { schema, t } = injected
+  const managementScope = injected.settingsScope === 'project'
+    ? 'project'
+    : injected.managementScope ?? 'personal'
+  const projectId = injected.projectId
+  // The slot's baked hook points at the personal controller because the
+  // registration is root-scoped. Project navigation selects a different
+  // controller at render time, so subscribe to that controller directly;
+  // otherwise the project editor would display and mutate two different
+  // snapshots.
+  const state = useSyncExternalStore(
+    listener => controller.store.subscribe(listener),
+    () => controller.store.getSnapshot(),
+    () => controller.store.getSnapshot(),
+  )
+  const projectUnavailable = projectRequested && (binding === undefined
+    || state.error === 'project-model-settings-unsupported'
+    || state.error === 'project-model-settings-unavailable')
   const [editing, setEditing] = useState<EditorTarget | undefined>(undefined)
   const [adding, setAdding] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<EditorTarget | undefined>(undefined)
@@ -213,6 +250,14 @@ function Loaded({ injected }: { injected: ModelsSectionFace }): ReactNode {
   const [savedTarget, setSavedTarget] = useState<ProviderIdentity | undefined>(undefined)
   const [declaring, setDeclaring] = useState(false)
   const [dismissedSetup, setDismissedSetup] = useState<ReadonlySet<string>>(() => new Set())
+
+  useEffect(() => {
+    setEditing(undefined)
+    setAdding(false)
+    setDeleteTarget(undefined)
+    setDeclaring(false)
+    setDismissedSetup(new Set())
+  }, [managementScope, projectId])
 
   const announceSaved = (target: ProviderIdentity): void => {
     // Announced only once the refreshed directory is in the snapshot the
@@ -262,6 +307,14 @@ function Loaded({ injected }: { injected: ModelsSectionFace }): ReactNode {
       .finally(() => { setDeleting(false) })
   }
 
+  if (projectUnavailable) {
+    return (
+      <div className={styles['section']}>
+        <h2 className={styles['title']}>{t('projectTitle')}</h2>
+        <p className={styles['notice']} role="status">{t('projectUnavailable')}</p>
+      </div>
+    )
+  }
   if (state.status === 'idle') void controller.load()
   if (state.status === 'error') {
     /* v8 ignore next -- an error status always carries text; the fallback satisfies the nullable type */
@@ -309,9 +362,16 @@ function Loaded({ injected }: { injected: ModelsSectionFace }): ReactNode {
 
   return (
     <div className={styles['section']}>
-      <h2 className={styles['title']}>{t('title')}</h2>
-      <p className={styles['intro']}>{t('intro')}</p>
-      {!state.writable && state.status === 'ready' ? <p className={styles['notice']}>{t('readOnly')}</p> : null}
+      <h2 className={styles['title']}>{managementScope === 'project' ? t('projectTitle') : t('title')}</h2>
+      <p className={styles['intro']}>{managementScope === 'project' ? t('projectIntro') : t('intro')}</p>
+      {!state.writable && state.status === 'ready' ? (
+        <p className={styles['notice']}>
+          {state.writableReason === 'project' ? t('readOnlyProject')
+            : state.writableReason === 'account' ? t('readOnlyAccount')
+              : state.writableReason === 'organization' ? t('readOnlyOrganization')
+                : state.writableReason === 'deployment' ? t('readOnlyDeployment') : t('readOnly')}
+        </p>
+      ) : null}
       {savedIdentity === undefined
         ? null
         : (
@@ -355,7 +415,7 @@ function Loaded({ injected }: { injected: ModelsSectionFace }): ReactNode {
       )}
       <ul className={styles['rows']}>
         {configured.map((row) => {
-          const target = targetOf(row, managementScope)
+          const target = targetOf(row, managementScope, projectId)
           const namespace = state.namespaces.get(target.settingsNs)
           /* v8 ignore next -- the join marks a row configured only when its namespace resolved */
           if (namespace === undefined) return null
@@ -372,6 +432,7 @@ function Loaded({ injected }: { injected: ModelsSectionFace }): ReactNode {
                   t,
                   readOnly: !state.writable,
                   credentialScope: managementScope,
+                  ...projectId === undefined ? {} : { projectId },
                   onClose: (changed) => { closeSetup(changed, target) },
                 })}
               </li>
@@ -458,6 +519,7 @@ function Loaded({ injected }: { injected: ModelsSectionFace }): ReactNode {
                   t,
                   readOnly: !state.writable,
                   credentialScope: managementScope,
+                  ...projectId === undefined ? {} : { projectId },
                   onClose: (changed) => { closeEditor(changed, target) },
                 })
                 : null}
@@ -479,7 +541,7 @@ function Loaded({ injected }: { injected: ModelsSectionFace }): ReactNode {
                     const row = addable.find(candidate => candidate.entry.provider === event.target.value)
                     /* v8 ignore next -- the select only lists addable rows */
                     if (row === undefined) return
-                    setEditing(targetOf(row, managementScope))
+                    setEditing(targetOf(row, managementScope, projectId))
                   }}
                 >
                   {addable.map(row => (
@@ -499,6 +561,7 @@ function Loaded({ injected }: { injected: ModelsSectionFace }): ReactNode {
                 t={t}
                 readOnly={!state.writable}
                 credentialScope={managementScope}
+                {...projectId === undefined ? {} : { projectId }}
                 onClose={(changed) => { closeEditor(changed, addTarget) }}
               />
             </div>
@@ -509,13 +572,18 @@ function Loaded({ injected }: { injected: ModelsSectionFace }): ReactNode {
                 <CustomProviderCard
                   taken={scopedRows.map(row => row.entry.provider)}
                   protocols={protocols}
-                  {...injected.providerIdPattern === undefined ? {} : { routePattern: injected.providerIdPattern }}
+                  {...(managementScope === 'project'
+                    ? { routePattern: PROJECT_PROVIDER_PATTERN }
+                    : injected.providerIdPattern === undefined
+                      ? {}
+                      : { routePattern: injected.providerIdPattern })}
                   /* v8 ignore next -- the card only opens from a button disabled without this namespace */
                   revision={state.namespaces.get('llm-pi-ai')?.revision ?? 0}
                   api={api}
                   t={t}
                   readOnly={!state.writable}
                   credentialScope={managementScope}
+                  {...projectId === undefined ? {} : { projectId }}
                   onClose={(changed) => {
                     setDeclaring(false)
                     if (changed) void controller.load()
@@ -540,7 +608,7 @@ function Loaded({ injected }: { injected: ModelsSectionFace }): ReactNode {
                       setSavedTarget(undefined)
                       setDeclaring(false)
                       setAdding(true)
-                      setEditing(targetOf(first, managementScope))
+                      setEditing(targetOf(first, managementScope, projectId))
                     }}
                   >
                     {/* Same glyph as the composer's attach button. */}

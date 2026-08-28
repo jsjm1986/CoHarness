@@ -134,6 +134,9 @@ function resolveOptions(ctx: Context, config: Config): DeepSeekSearchProviderOpt
 export function apply(ctx: Context, config: Config): void {
   let current: () => Config = () => config
   installSettingsSection(ctx, WEB_SEARCH_DEEPSEEK_SETTINGS_NAMESPACE, Config, config, {
+    owner: 'project',
+    projectWrite: 'manager',
+    projectWritePaths: [['baseURL'], ['model'], ['apiVersion'], ['maxTokens'], ['maxUses'], ['maxResponseBytes']],
     setSource: (source) => {
       current = source
     },

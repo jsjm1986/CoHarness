@@ -2179,6 +2179,46 @@ a {
   font-size: 13px;
 }
 
+.projectConfigurationSection {
+  border-left: 3px solid var(--accent);
+}
+
+.projectConfigurationSummary {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.6fr) repeat(3, minmax(130px, 1fr));
+  gap: 16px;
+  padding: 16px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.projectConfigurationSummary > div {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 5px;
+}
+
+.projectConfigurationSummary strong {
+  font-size: 13px;
+}
+
+.projectConfigurationSummary p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.definitionLabel {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
 .projectDetailPage .pageHeader {
   min-height: 0;
 }
@@ -2904,6 +2944,10 @@ a {
   .projectConfigPanel {
     border-left: none;
   }
+
+  .projectConfigurationSummary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 560px) {
@@ -2947,6 +2991,10 @@ a {
 
   .projectDetailPage .pageActions {
     max-width: none;
+  }
+
+  .projectConfigurationSummary {
+    grid-template-columns: 1fr;
   }
 
   .projectMetadata {

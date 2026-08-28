@@ -89,6 +89,7 @@ class GatewayAuthority implements CollaborationAuthority {
           projectId: claims.scope.projectId,
           projectName: claims.scope.projectName,
           mode: claims.scope.mode,
+          ...(claims.scope.canManage === true ? { canManage: true } : {}),
         },
     }
   }

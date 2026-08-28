@@ -1367,6 +1367,8 @@ describe('DeepSeekAdapter against a mock server', () => {
   it('distinguishes terminal quota exhaustion from transient HTTP 429 throttling', () => {
     expect(httpErrorCode(429, { code: 'insufficient_quota', message: 'account credits exhausted' }))
       .toBe(QUOTA_EXCEEDED_CODE)
+    expect(httpErrorCode(403, { code: 'INSUFFICIENT_BALANCE', message: 'account balance is insufficient' }))
+      .toBe(QUOTA_EXCEEDED_CODE)
     expect(httpErrorCode(429, { message: 'request rate limit exceeded' })).toBe('RATE_LIMIT')
   })
 

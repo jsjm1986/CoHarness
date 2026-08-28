@@ -22,14 +22,15 @@ import { ScopeControl, type ScopeControlInjected } from './ScopeControl.tsx'
 import { en, NS, zh, type CollaborationKey } from './locales.ts'
 
 export type {
-  CollaborationContext, CollaborationScope, CollaborationSnapshot,
+  CollaborationContext, CollaborationScope, CollaborationSnapshot, ProjectConfiguration,
   CollaborationScopeTarget, CollaborationVisibility, ConversationAccess, ConversationCollaboration,
-  ConversationDetail, ConversationParticipant, ProjectInvitation, ProjectMembership, UserSummary,
+  ConversationDetail, ConversationParticipant, ProjectInvitation, ProjectMembership, ProjectThemePolicy, UserSummary,
 } from './collaboration-client.ts'
 export type { ConversationShareActionProps, ConversationShareInjected } from './ConversationShareAction.tsx'
 export type { LogoutButtonInjected, LogoutButtonProps } from './LogoutButton.tsx'
 export type { ProjectReadOnlyMatch, ReadOnlyComposerProps } from './ReadOnlyComposer.tsx'
 export type { ScopeControlInjected, ScopeControlProps } from './ScopeControl.tsx'
+export type { ProjectSettingsModalProps } from './ProjectSettingsModal.tsx'
 export type { ProjectManagerMode, ProjectManagerModalProps } from './ProjectManagerModal.tsx'
 export type { CollaborationKey } from './locales.ts'
 
@@ -64,9 +65,23 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-collaboration: dictionaries')
 
   const collaboration = new CollaborationClient(createBrowserCollaborationTransport())
+  const projectUiPolicy = ctx.get('projectUiPolicy')
   ctx.effect(() => {
     void collaboration.load()
-    return () => { collaboration.dispose() }
+    const syncPolicy = (): void => {
+      const scope = collaboration.getSnapshot().context?.scope
+      if (scope?.kind !== 'project') projectUiPolicy?.set('personal')
+      else projectUiPolicy?.set('project', scope.uiThemePolicy ?? 'follow-user', {
+        projectId: scope.projectId,
+        canManage: scope.canManage === true,
+      })
+    }
+    const unsubscribe = collaboration.subscribe(syncPolicy)
+    syncPolicy()
+    return () => {
+      unsubscribe()
+      collaboration.dispose()
+    }
   }, 'ui-collaboration: account context')
   ctx.on('connection/reset', () => { void collaboration.refresh() })
 
@@ -100,6 +115,8 @@ export function apply(ctx: ClientContext): void {
     acceptInvitation: id => collaboration.acceptInvitation(id),
     listUsers: () => collaboration.listUsers(),
     getInvitationCount: () => collaboration.getInvitationCount(),
+    loadProjectConfiguration: projectId => collaboration.loadProjectConfiguration(projectId),
+    setProjectThemePolicy: (projectId, policy) => collaboration.setProjectThemePolicy(projectId, policy),
   })
   const conversationInjected = (sessionId: SessionId): ConversationShareInjected => ({
     hooks,

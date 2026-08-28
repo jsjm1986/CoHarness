@@ -27,6 +27,8 @@ export interface GovernancePolicyFile {
 
 const ORGANIZATION_PROVIDER_PATTERN = /^org-[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
 const ORGANIZATION_CREDENTIAL_REF_PATTERN = /^DSH_[A-Z0-9_]+$/
+const PROJECT_PROVIDER_PATTERN = /^project-[1-9][0-9]*-[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
+const PROJECT_CREDENTIAL_REF_PATTERN = /^DSH_PROJECT_[1-9][0-9]*_[A-Z0-9_]+$/
 const PROTOCOLS = new Set<ManagedModelProviderProtocol>([
   'openai-completions',
   'openai-responses',
@@ -198,12 +200,13 @@ function validateEmbeddedProfile(
   protocol: ManagedModelProviderProtocol,
   baseURL: string,
   credentialRef: string | undefined,
+  credentialPattern: RegExp,
 ): Record<string, unknown> | undefined {
   const profile = objectCopy(value, field)
   if (profile === undefined) return undefined
   if (profile.apiKeyEnv !== undefined) {
     const nestedRef = requiredString(profile.apiKeyEnv, `${field}.apiKeyEnv`)
-    if (!ORGANIZATION_CREDENTIAL_REF_PATTERN.test(nestedRef)
+    if (!credentialPattern.test(nestedRef)
       || credentialRef === undefined || nestedRef !== credentialRef) {
       throw new Error(`model-governance: ${field}.apiKeyEnv must match the Provider credentialRef`)
     }
@@ -297,10 +300,34 @@ function providerProfiles(value: unknown): ManagedModelProviderProfile[] {
     }
     const row = entry as Record<string, unknown>
     const provider = requiredString(row.provider, `providers[${String(index)}].provider`)
-    if (!ORGANIZATION_PROVIDER_PATTERN.test(provider)) {
+    const declaredScope = row.scope
+    if (declaredScope !== undefined && declaredScope !== 'organization' && declaredScope !== 'project') {
+      throw new Error(`model-governance: providers[${String(index)}].scope is unsupported`)
+    }
+    // Policy files written before project routes existed had no scope field;
+    // keep those entries on the organization path. A project route can still
+    // be inferred from its deployment-owned prefix when an intermediate
+    // writer omitted the optional metadata.
+    const scope: 'organization' | 'project' = declaredScope === undefined
+      ? provider.startsWith('project-') ? 'project' : 'organization'
+      : declaredScope
+    const providerPattern = scope === 'project' ? PROJECT_PROVIDER_PATTERN : ORGANIZATION_PROVIDER_PATTERN
+    const credentialPattern = scope === 'project' ? PROJECT_CREDENTIAL_REF_PATTERN : ORGANIZATION_CREDENTIAL_REF_PATTERN
+    if (!providerPattern.test(provider)) {
       throw new Error(
-        `model-governance: providers[${String(index)}].provider must match ${String(ORGANIZATION_PROVIDER_PATTERN)}`,
+        `model-governance: providers[${String(index)}].provider must match ${String(providerPattern)}`,
       )
+    }
+    const projectId = row.projectId
+    if (scope === 'project') {
+      if (!Number.isSafeInteger(projectId) || Number(projectId) <= 0) {
+        throw new Error(`model-governance: providers[${String(index)}].projectId must be a positive safe integer`)
+      }
+      if (!provider.startsWith(`project-${String(projectId)}-`)) {
+        throw new Error(`model-governance: providers[${String(index)}].provider does not belong to project ${String(projectId)}`)
+      }
+    } else if (projectId !== undefined) {
+      throw new Error(`model-governance: organization Provider cannot carry projectId`)
     }
     if (seen.has(provider)) throw new Error(`model-governance: duplicate Provider ${provider}`)
     seen.add(provider)
@@ -311,8 +338,15 @@ function providerProfiles(value: unknown): ManagedModelProviderProfile[] {
     const protocol = row.protocol as ManagedModelProviderProtocol
     const credentialRef = row.credentialRef
     if (credentialRef !== undefined
-      && (typeof credentialRef !== 'string' || !ORGANIZATION_CREDENTIAL_REF_PATTERN.test(credentialRef))) {
-      throw new Error(`model-governance: providers[${String(index)}].credentialRef must be an organization credential reference`)
+      && (typeof credentialRef !== 'string' || !credentialPattern.test(credentialRef))) {
+      throw new Error(`model-governance: providers[${String(index)}].credentialRef must be a scoped credential reference`)
+    }
+    if (scope === 'project' && credentialRef !== undefined
+      && !credentialRef.startsWith(`DSH_PROJECT_${String(projectId)}_`)) {
+      throw new Error(`model-governance: providers[${String(index)}].credentialRef does not belong to project ${String(projectId)}`)
+    }
+    if (scope === 'organization' && credentialRef?.startsWith('DSH_PROJECT_')) {
+      throw new Error(`model-governance: providers[${String(index)}].credentialRef must not use a project credential reference`)
     }
     if (!Array.isArray(row.models) || row.models.length === 0) {
       throw new Error(`model-governance: providers[${String(index)}].models must be a non-empty array`)
@@ -333,6 +367,7 @@ function providerProfiles(value: unknown): ManagedModelProviderProfile[] {
       protocol,
       baseURL,
       credentialRef,
+      credentialPattern,
     )
     const defaultContextWindow = optionalPositiveInteger(row.defaultContextWindow, `providers/${String(index)}.defaultContextWindow`)
     const defaultMaxTokens = optionalPositiveInteger(row.defaultMaxTokens, `providers/${String(index)}.defaultMaxTokens`)
@@ -376,6 +411,7 @@ function providerProfiles(value: unknown): ManagedModelProviderProfile[] {
       driver: 'pi-ai',
       protocol,
       baseURL,
+      ...scope === 'project' ? { scope: 'project' as const, projectId: projectId as number } : {},
       ...credentialRef === undefined ? {} : { credentialRef },
       ...profile === undefined ? {} : { profile },
       ...defaultContextWindow === undefined ? {} : { defaultContextWindow },

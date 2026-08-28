@@ -52,7 +52,9 @@
 }
 
 .selector:disabled {
-  cursor: default;
+  color: var(--dsw-alias-label-dimmed);
+  cursor: not-allowed;
+  opacity: .72;
 }
 
 .chevron {

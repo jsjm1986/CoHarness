@@ -25,13 +25,15 @@ export interface ConfigurableProviderView {
   /** Whether the route is currently registered (its models are requestable). */
   active: boolean
   /** Which configuration owner controls this route. */
-  management: 'personal' | 'organization' | 'external'
+  management: 'personal' | 'organization' | 'project' | 'external'
   /**
    * Whether the owning adapter knows this route only because configuration
    * declared it. Absent when the adapter draws no such distinction, so a
    * surface must treat absence as "unknown", not as "shipped".
    */
   declared?: boolean
+  /** Public project id for a project-owned route. */
+  projectId?: number
 }
 
 /** Llm-domain unary methods (the map keys llm.* of RpcMethodMap). */

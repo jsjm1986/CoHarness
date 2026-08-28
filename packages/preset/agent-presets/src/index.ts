@@ -142,7 +142,10 @@ export class AgentPresets extends Service {
       this.settings = settingsCtx.settings.register(
         settingsNamespace(SETTINGS_NAMESPACE),
         AgentPresetSettingsSchema,
-        { base: { default: config.default } },
+        {
+          base: { default: config.default }, owner: 'project', projectWrite: 'manager',
+          projectWritePaths: [['default']],
+        },
       )
       this.settingsService = settingsCtx.settings
       settingsCtx.effect(() => () => {

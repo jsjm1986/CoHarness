@@ -69,7 +69,7 @@ export interface RpcErrorDetailsMap {
    * A settings write was refused (schema validation, unknown namespace,
    * read-only provider, or storage failure); the message is the seam's text.
    */
-  'settings-rejected': { ns: string }
+  'settings-rejected': { ns: string; reason?: 'project' | 'provider' | 'organization' | 'deployment' | 'account' }
   /**
    * A settings write carried an `expectedRevision` the namespace has already
    * moved past: another writer (tab, editor, or an external file edit) landed

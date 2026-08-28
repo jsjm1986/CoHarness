@@ -60,7 +60,13 @@ export function PermissionRow({ load, select, usePermission, t }: PermissionRowP
   const busy = state.status === 'loading' || state.status === 'saving' || confirmingFullAccess
   const label = selected?.label
     ?? (busy ? t('loading') : t('unavailable'))
-  const description: string = state.error ?? t('description')
+  const description: string = state.error
+    ?? (state.writableReason === 'project' ? t('managedByProject')
+      : state.writableReason === 'account' ? t('managedByAccount')
+        : state.writableReason === 'organization' ? t('managedByOrganization')
+          : state.writableReason === 'provider' || state.writableReason === 'deployment'
+            ? t('managedByDeployment')
+            : t('description'))
 
   return (
     <>

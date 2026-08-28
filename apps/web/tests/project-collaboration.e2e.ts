@@ -162,19 +162,19 @@ async function seedSubagents(scaffold: WebScaffold, parentId: SessionId, count: 
 
 function renderHeaderGeometry(metrics: {
   singleLine: boolean
-  titleBeforeSharing: boolean
+  titleBeforeSubagents: boolean
+  subagentsBeforeSharing: boolean
   sharingBeforePreset: boolean
-  presetBeforeSubagents: boolean
-  subagentsBeforeUtility: boolean
+  presetBeforeUtility: boolean
   participantsMenuOnly: boolean
   subagentsNoWrap: boolean
 }): string {
   return [
     '# Project session header actions',
     '',
-    '| single row | title before sharing | sharing before preset | preset before subagents | subagents before utility | participants menu-only | subagents no-wrap |',
+    '| single row | title before subagents | subagents before sharing | sharing before preset | preset before utility | participants menu-only | subagents no-wrap |',
     '| --- | --- | --- | --- | --- | --- | --- |',
-    `| ${String(metrics.singleLine)} | ${String(metrics.titleBeforeSharing)} | ${String(metrics.sharingBeforePreset)} | ${String(metrics.presetBeforeSubagents)} | ${String(metrics.subagentsBeforeUtility)} | ${String(metrics.participantsMenuOnly)} | ${String(metrics.subagentsNoWrap)} |`,
+    `| ${String(metrics.singleLine)} | ${String(metrics.titleBeforeSubagents)} | ${String(metrics.subagentsBeforeSharing)} | ${String(metrics.sharingBeforePreset)} | ${String(metrics.presetBeforeUtility)} | ${String(metrics.participantsMenuOnly)} | ${String(metrics.subagentsNoWrap)} |`,
   ].join('\n')
 }
 
@@ -345,26 +345,26 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     const tolerance = 1
     const metrics = {
       singleLine: rowBox.height <= 32 + tolerance,
-      titleBeforeSharing: titleBox.x + titleBox.width <= sharingBox.x + tolerance,
+      titleBeforeSubagents: titleBox.x + titleBox.width <= subagentBox.x + tolerance,
+      subagentsBeforeSharing: subagentBox.x + subagentBox.width <= sharingBox.x + tolerance,
       sharingBeforePreset: sharingBox.x + sharingBox.width <= presetBox.x + tolerance,
-      presetBeforeSubagents: presetBox.x + presetBox.width <= subagentBox.x + tolerance,
-      subagentsBeforeUtility: subagentBox.x + subagentBox.width <= utilityBox.x + tolerance,
+      presetBeforeUtility: presetBox.x + presetBox.width <= utilityBox.x + tolerance,
       participantsMenuOnly: await page.getByText('Participants (2)', { exact: true }).count() === 0,
       subagentsNoWrap: await subagents.evaluate(element => getComputedStyle(element).whiteSpace === 'nowrap'),
     }
     expect(metrics).toEqual({
       singleLine: true,
-      titleBeforeSharing: true,
+      titleBeforeSubagents: true,
+      subagentsBeforeSharing: true,
       sharingBeforePreset: true,
-      presetBeforeSubagents: true,
-      subagentsBeforeUtility: true,
+      presetBeforeUtility: true,
       participantsMenuOnly: true,
       subagentsNoWrap: true,
     })
     await compareOrRefreshGolden(HEADER_GEOMETRY_EXPECTED, renderHeaderGeometry(metrics), MODE)
   }, 60_000)
 
-  it('creates a private blank instead of reusing a project blank, then reuses the matching private blank', async () => {
+  it('creates a private draft instead of reusing a project blank, then idempotently reuses that draft', async () => {
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
     const gateway = await mockGateway(page, 'rw')
@@ -390,13 +390,17 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     }, { timeout: 10_000 }).toBe(1)
     expect(privateSessionId).not.toBe(BLANK_SESSION_ID)
     expect(gateway.conversationReads).toContain(BLANK_SESSION_ID)
+    expect(scaffold.ctx.agents.get(SessionId(privateSessionId))).toBeDefined()
 
-    gateway.visibilityBySession.set(privateSessionId, 'private')
     const agentCount = scaffold.ctx.agents.list().length
     await newSession.click()
-    await expect.poll(() => gateway.conversationReads.at(-1), { timeout: 10_000 })
-      .toBe(privateSessionId)
-    await page.waitForTimeout(100)
+    // Empty drafts stay deferred and are not workspace members yet. The
+    // persisted draft identity makes the second create idempotent, so the
+    // client checks the visible project candidate again but does not issue a
+    // conversation discovery request for the already-reserved private draft.
+    await expect.poll(() => gateway.conversationReads.filter(id => id === BLANK_SESSION_ID).length, { timeout: 10_000 })
+      .toBe(2)
+    await expect.poll(() => scaffold.ctx.agents.list().length, { timeout: 10_000 }).toBe(agentCount)
     expect(scaffold.ctx.agents.list()).toHaveLength(agentCount)
     expect(scaffold.ctx.agents.get(SessionId(privateSessionId))).toBeDefined()
   }, 60_000)

@@ -26,9 +26,9 @@
 
 Provider ID 是永久的，因为请求、已保存会话、模型默认值和凭据引用都会使用它。如需重命名提供方，请添加新提供方并删除旧提供方。显示名称、基础 URL、协议、凭据和模型仍可编辑。
 
-在**模型目录**中选择**获取可用模型**，可查询表单当前显示的基础 URL 和凭据。选择候选项只会更新草稿；保存前不会存储提供方。目录提供方使用已安装目录，不发起网络请求。
+在**模型目录**中选择**获取可用模型**，可查询表单当前显示的基础 URL 和凭据。已保存的组织或项目受管理路由在密钥框留空时会复用加密保存的密钥；个人路由也会继续使用已存密钥。选择候选项只会更新草稿；保存前不会存储提供方。目录提供方使用已安装目录，不发起网络请求。
 
-发现请求遵循所选协议。`openai-completions` 与 `openai-responses` 使用 bearer 认证请求 `GET {baseURL}/models`；`anthropic-messages` 使用 `x-api-key` 和 `anthropic-version: 2023-06-01` 请求 `GET {baseURL}/v1/models`。Anthropic Messages 会同时为模型发现和消息请求规范化末尾的 `/v1`，因此中转站根地址和带版本的 base 都可使用。对于 OpenAI 兼容中转站，根前缀和带 `/v1` 的前缀都可以填写：宿主先请求输入前缀，只有响应明确表示路径不匹配时才尝试另一个，并把成功选择只记在进程内。请填写 API 前缀而不是完整操作路径；返回网站 HTML 只会作为尝试另一个前缀的信号。
+发现请求遵循所选协议。`openai-completions` 与 `openai-responses` 使用 bearer 认证请求 `GET {baseURL}/models`；`anthropic-messages` 使用 `x-api-key` 和 `anthropic-version: 2023-06-01` 请求 `GET {baseURL}/v1/models`，如果中转站明确没有版本目录，再尝试 `{baseURL}/models`。Anthropic Messages 会在消息请求前规范化末尾的 `/v1`，因此中转站根地址和带版本的 base 都可使用。对于 OpenAI 兼容中转站，根前缀和带 `/v1` 的前缀都可以填写：宿主先请求输入前缀，只有响应明确表示路径不匹配时才尝试另一个，并把成功选择只记在进程内。请填写 API 前缀而不是完整操作路径；返回网站 HTML 只会作为尝试另一个前缀的信号。中转站返回非成功 JSON 时，系统只保留经过脱敏的短 code/type/message 诊断；例如 `INSUFFICIENT_BALANCE: Insufficient account balance` 表示中转账户余额不足，而不是错误地提示密钥无效。
 
 ### 图片输入
 
@@ -127,8 +127,8 @@ llm-pi-ai:
 
 - **`MISSING_CREDENTIAL`**：通过模型页存储提供方密钥，或提供被引用的环境变量。
 - **`UNKNOWN_MODEL`**：选择已配置的模型，或向自定义提供方添加缺失的模型。
-- **获取可用模型返回 401**：检查密钥和协议。OpenAI 兼容发现使用 bearer 认证请求 `GET {baseURL}/models`；Anthropic Messages 使用 `x-api-key` 请求 `GET {baseURL}/v1/models`。
-- **获取可用模型返回 HTML，或出现 `Stream ended without finish_reason`**：对于 OpenAI 兼容路由，宿主已经在响应明确表示路径不匹配时尝试过唯一的根／`/v1` 备用项。两个候选都失败时，请确认 `baseURL` 是 API 前缀而不是网站或完整操作路径；Anthropic Messages 应设 `api: anthropic-messages`，并使用中转站根地址，让请求到达 `/v1/models` 和 `/v1/messages`。
+- **获取可用模型返回 401**：检查密钥和协议。OpenAI 兼容发现使用 bearer 认证请求 `GET {baseURL}/models`；Anthropic Messages 使用 `x-api-key` 请求 `GET {baseURL}/v1/models`。已保存的受管理路由在表单留空密钥时会使用其已存密钥进行探测。
+- **获取可用模型返回 HTML，或出现 `Stream ended without finish_reason`**：对于 OpenAI 兼容路由，宿主已经在响应明确表示路径不匹配时尝试过唯一的根／`/v1` 备用项；Anthropic Messages 还会在 `/v1/models` 不存在时尝试 `/models`。两个候选都失败时，请确认 `baseURL` 是 API 前缀而不是网站或完整操作路径；Anthropic Messages 应设 `api: anthropic-messages`，并使用中转站根地址，让消息请求到达 `/v1/messages`。
 - **密钥与地址都正确，网关却拒绝每一个请求**：它的请求形状与 OpenAI 不同。先在路由上设 `compat.supportsDeveloperRole: false` 与 `compat.maxTokensField: max_tokens`。
 - **只有推理模型失败**：pi-ai 把它们的系统提示词以 `developer` 角色发出，而网关拒绝该角色。设 `compat.supportsDeveloperRole: false`。
 - **某个 compat 开关因没有值而被拒绝**：冒号后什么都没写。给它一个值，或删掉该键以沿用已安装 catalog 的值。

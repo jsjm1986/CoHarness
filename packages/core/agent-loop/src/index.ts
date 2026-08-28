@@ -372,6 +372,9 @@ export class AgentLoop extends Service implements AgentFactory {
       // owns the whole rule, so refusing here keeps the running scheduler on
       // its last good cap instead of failing at the next tool group.
       validate: value => void resolveMaxParallelToolCalls(value.maxParallelToolCalls),
+      owner: 'project',
+      projectWrite: 'manager',
+      projectWritePaths: [['maxParallelToolCalls']],
       setSource: (current) => {
         source = current
       },

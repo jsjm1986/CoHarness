@@ -26,6 +26,17 @@ interface SettingsRegisterOptions<T> {
   base?: Partial<T>
   /** Owner's effect timing, surfaced to configuration UIs; defaults to `live`. */
   applies?: SettingsApplies
+  /** Logical owner shown by remote configuration surfaces. */
+  owner?: SettingsOwner
+  /** Project-scope write policy; `manager` requires `owner: 'project'`; defaults to `never`. */
+  projectWrite?: SettingsProjectWrite
+  /**
+   * Optional allowlist for project-manager writes. Each path permits that
+   * exact value and descendants; omission keeps the whole namespace writable
+   * when `projectWrite` is `manager`. Paths must be non-empty and cannot name
+   * object-prototype keys.
+   */
+  projectWritePaths?: readonly SettingsProjectWritePath[]
   /**
    * Reject a resolved section the owner could not act on, for constraints its
    * schema cannot express — a cross-field requirement, or one field's validity
@@ -120,12 +131,20 @@ interface SettingsDescriptor {
   user?: unknown
   /** Owner's declared effect timing. */
   applies: SettingsApplies
+  /** Logical owner of this namespace. */
+  owner: SettingsOwner
+  /** Whether a project manager may edit this namespace. */
+  projectWrite: SettingsProjectWrite
+  /** Optional project-manager path allowlist; absent means the whole namespace. */
+  projectWritePaths?: string[][]
   /** Schema-declared secret positions; present only under `redactSecrets`. */
   secrets?: RedactedSecret[]
 }
 ```
 
 只持有脱敏 descriptor 的调用方无法安全地重建分节，因此删除改以路径 op 传递。每个 descriptor 还携带针对原始分节的 `revision`；写入可以把它作为 `expectedRevision` 送回，不再匹配的写入会被拒绝，而不会覆盖先落地的写入。
+
+在共享项目运行时中，Gateway 只暴露注册时 owner 为 `project` 或 `account` 的 namespace。项目管理员只有在 namespace 声明 `projectWrite: 'manager'` 时才能写入；`projectWritePaths` 会进一步把写入限制在列出的路径及其子路径。账户、组织、部署和 secret 字段在该作用域保持只读，secret 值必须通过凭据服务修改，而不能放进 settings patch。项目 UI 会说明每个不可用控件的所有者和原因；文件系统路径与挂载仍由 `/admin` 中的管理员操作。
 ```ts type-equiv
 /**
  * One path-addressed edit to a namespace's user section. Path mutation exists
@@ -253,7 +272,7 @@ async replace(ns: SettingsNamespace, section: object, expectedRevision?: number)
 async mutate(ns: SettingsNamespace, ops: readonly SettingsPathOp[], expectedRevision?: number): Promise<void>
 ```
 
-Source: [`packages/settings/settings/src/index.ts:376`](../../packages/settings/settings/src/index.ts)
+Source: [`packages/settings/settings/src/index.ts:440`](../../packages/settings/settings/src/index.ts)
 
 <a id="settings-events"></a>
 

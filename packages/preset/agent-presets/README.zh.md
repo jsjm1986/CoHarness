@@ -103,7 +103,7 @@ description: 仅提供持久 bash 与 str_replace_editor 的双工具编码 Agen
 
 ### 默认 preset 是一项用户设置
 
-当组装中存在 settings 提供方时，本插件会注册 `agent-presets` 命名空间，并以 `config.default` 作为其组装 base，因此用户文档会层叠覆盖部署方的工程默认值：
+当组装中存在 settings 提供方时，本插件会注册 `agent-presets` 命名空间，并以 `config.default` 作为其组装 base，因此用户文档会层叠覆盖部署方的工程默认值。在 Gateway 项目作用域中，只有项目 owner 或组织管理员可以写入该命名空间；普通成员可以查看名单，但不能更改共享默认值：
 
 ```yaml
 agent-presets:

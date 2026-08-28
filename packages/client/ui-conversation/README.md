@@ -58,7 +58,7 @@ A finished turn materializes one ordered `turn-tail` Conversation Node. Its engi
 
 ## Settings authority
 
-The busy-state Enter preference is a feature-owned settings scope. Its row and `ComposerSubmissionPolicy` refuse changes until a ready writable Host view exists, project/provider restrictions are shown inline, and a failed latest write adopts the recovered value. The policy releases its scope subscription with the conversation plugin, so HMR and teardown do not retain a settings listener.
+The busy-state Enter preference is an account-owned settings scope. Its row and `ComposerSubmissionPolicy` use the account transport while a project is active, refuse changes until a ready writable view exists, show provider restrictions inline, and adopt the recovered value after a failed latest write. The policy releases its scope subscription with the conversation plugin, so HMR and teardown do not retain a settings listener.
 
 ## Model Experience
 

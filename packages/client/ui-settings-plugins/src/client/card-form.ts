@@ -13,7 +13,7 @@
  * override equal to the composition default is still an override.
  */
 
-import type { SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SettingsScope, SettingsScopeSnapshot, SettingsWritableReason } from '@deepseek-ai/dsh-client-runtime/client'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 
 /** The write one field's staged text performs when the card is saved. */
@@ -66,6 +66,8 @@ export interface CardShell {
   available: boolean
   /** Whether the Host document accepts writes. */
   writable: boolean
+  /** Why the namespace is read-only, when known. */
+  writableReason?: SettingsWritableReason
   /** Whether the form holds edits that a save would write. */
   dirty: boolean
   /** Whether any staged draft is invalid, which blocks the save. */
@@ -196,6 +198,7 @@ export class CardForm<T> {
     return {
       available: snapshot.status === 'ready',
       writable: snapshot.writable,
+      ...snapshot.writableReason === undefined ? {} : { writableReason: snapshot.writableReason },
       dirty: plan.length > 0,
       invalid: plan.some(item => item.run === undefined),
       saving: this.saving,

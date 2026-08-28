@@ -21,6 +21,7 @@ import type {} from '@deepseek-ai/dsh-settings/types'
 import { SettingsSchemaService } from './schema.ts'
 import { SettingsScopeBinder } from './settings-scope.ts'
 import { SettingsDescribeMirror } from './settings-mirror.ts'
+import { AccountPreferencesMirror } from './account-scope.ts'
 
 export type {
   SettingsGeneralItemOwnerProps, SettingsHeaderOwnerProps, SettingsOnboardingOwnerProps,
@@ -30,6 +31,10 @@ export type { SettingsScopeController, SettingsScopeBinder } from './settings-sc
 export type { SettingsSchemaService } from './schema.ts'
 export type { SchemaNode } from './schema.ts'
 export type { SettingsDescribeFace, SettingsDescribeView, SettingsMirrorSnapshot } from './settings-mirror.ts'
+export { SettingsDescribeMirror } from './settings-mirror.ts'
+export {
+  AccountPreferencesMirror, AccountOrHostSettingsScopeController, AccountSettingsScopeController,
+} from './account-scope.ts'
 
 /**
  * Required services: the wire handle for the mirror's reads and the forwarded
@@ -54,6 +59,7 @@ export function apply(ctx: ClientContext): void {
   // itself is served from a public origin; the Host privileged-method fence is
   // the authority for rejecting direct, unauthenticated remote requests.
   const mirror = new SettingsDescribeMirror(connection.api)
+  const accountMirror = new AccountPreferencesMirror(connection.accountPreferences)
   ctx.effect(() => {
     const disposers = [
       (ctx.get('remote') as ClientContext['remote']).$on('settings/document-updated', () => { void mirror.load() }),
@@ -64,7 +70,18 @@ export function apply(ctx: ClientContext): void {
     // fold does not merge them into one; it guarantees at most one pending
     // read at a time and that no invalidation arriving mid-read is lost.
     void mirror.ensure()
-    return () => { for (const dispose of disposers) dispose() }
+    const onFocus = (): void => { void accountMirror.load() }
+    const onVisibility = (): void => {
+      if (typeof document === 'undefined' || document.visibilityState === 'visible') onFocus()
+    }
+    if (typeof window !== 'undefined') window.addEventListener('focus', onFocus)
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      for (const dispose of disposers) dispose()
+      if (typeof window !== 'undefined') window.removeEventListener('focus', onFocus)
+      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibility)
+    }
   }, 'ui-settings: describe mirror invalidations')
-  new SettingsScopeBinder(ctx, { mirror, schema })
+  ctx.on('connection/reset', () => { void accountMirror.load() })
+  new SettingsScopeBinder(ctx, { mirror, accountMirror, schema })
 }

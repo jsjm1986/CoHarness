@@ -2,8 +2,8 @@
 
 /** Locale keys these surfaces render. */
 export type AgentPresetSettingsKey =
-  | 'title' | 'description' | 'loading' | 'error' | 'userTrust' | 'seatHint' | 'headerHint'
-  | 'nav' | 'sectionIntro' | 'builtIn' | 'setDefault' | 'view'
+  | 'title' | 'description' | 'managedByProject' | 'managedByAccount' | 'managedByOrganization' | 'managedByDeployment' | 'loading' | 'error' | 'userTrust' | 'seatHint' | 'headerHint'
+  | 'nav' | 'sectionIntro' | 'projectFilesystem' | 'builtIn' | 'setDefault' | 'view'
   | 'presetStandardName' | 'presetStandardDescription'
   | 'presetCodeName' | 'presetCodeDescription'
   | 'presetMinimalName' | 'presetMinimalDescription'
@@ -22,6 +22,10 @@ export type AgentPresetSettingsKey =
 export const en: Record<AgentPresetSettingsKey, string> = {
   title: 'Agent preset',
   description: 'Applies to sessions you start from now on. Running sessions keep the preset they began with.',
+  managedByProject: 'The project owner or an organization administrator manages the default for new project sessions.',
+  managedByAccount: 'This account manages the default Agent preset.',
+  managedByOrganization: 'An organization administrator manages the default Agent preset.',
+  managedByDeployment: 'This deployment manages the default Agent preset.',
   loading: 'Loading presets…',
   error: 'Could not load agent presets.',
   userTrust: 'Custom',
@@ -31,6 +35,7 @@ export const en: Record<AgentPresetSettingsKey, string> = {
   sectionIntro:
     'A preset is the plugin composition one session\'s agent runs — its tools, prompt, and capabilities. '
     + 'Duplicate an existing one and make it yours, or let the agent draft one for you in Creator mode.',
+  projectFilesystem: 'Project folders and server files are managed in the admin console.',
   builtIn: 'Built-in',
   setDefault: 'Set as default',
   view: 'View',
@@ -88,6 +93,10 @@ export const en: Record<AgentPresetSettingsKey, string> = {
 export const zh: Record<AgentPresetSettingsKey, string> = {
   title: 'Agent 预设',
   description: '对此后新建的会话生效。运行中的会话保持它开始时的预设。',
+  managedByProject: '项目 owner 或组织管理员管理项目中新会话使用的默认预设。',
+  managedByAccount: '此账户负责管理默认 Agent 预设。',
+  managedByOrganization: '组织管理员负责管理默认 Agent 预设。',
+  managedByDeployment: '此部署负责管理默认 Agent 预设。',
   loading: '正在加载预设…',
   error: '无法加载 Agent 预设。',
   userTrust: '自定义',
@@ -95,6 +104,7 @@ export const zh: Record<AgentPresetSettingsKey, string> = {
   headerHint: '本会话运行的 Agent 预设，开始时即固定',
   nav: 'Agent 预设',
   sectionIntro: '预设即一个会话的 Agent 所运行的插件组装 —— 它的工具、提示词与能力。复制一份既有预设改成自己的，或用「创造模式」让 Agent 帮你创建。',
+  projectFilesystem: '项目目录和服务器文件由管理端负责。',
   builtIn: '内置',
   setDefault: '设为默认',
   view: '查看',

@@ -26,7 +26,7 @@ export type GatewayPrincipalPurpose = 'archive-read' | 'document-admin'
 
 export type PrincipalScope =
   | { kind: 'personal' }
-  | { kind: 'project'; projectId: number; projectName: string; mode: 'ro' | 'rw' }
+  | { kind: 'project'; projectId: number; projectName: string; mode: 'ro' | 'rw'; canManage?: boolean }
 
 export interface GatewayPrincipalClaims {
   version: 1
@@ -231,7 +231,8 @@ function principalClaims(value: unknown): GatewayPrincipalClaims {
     throw new Error('invalid principal assertion')
   }
   if (scope.kind === 'project' && (!positiveId(scope.projectId) || typeof scope.projectName !== 'string'
-    || scope.projectName === '' || (scope.mode !== 'ro' && scope.mode !== 'rw'))) {
+    || scope.projectName === '' || (scope.mode !== 'ro' && scope.mode !== 'rw')
+    || (scope.canManage !== undefined && typeof scope.canManage !== 'boolean'))) {
     throw new Error('invalid principal assertion')
   }
   return value as GatewayPrincipalClaims

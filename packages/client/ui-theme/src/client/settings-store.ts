@@ -23,6 +23,8 @@ export interface AppearanceRowState {
   revision: number
   /** Host writability and write status shown by the row. */
   settings: SettingsControlState
+  /** Forced project theme, when the project policy overrides this preference. */
+  projectOverride?: 'light' | 'dark'
 }
 
 /** Declared action shape giving the exported factory a stable return type. */
@@ -32,6 +34,7 @@ type AppearanceRowActions = {
     preference: ThemePreference,
     revision: number,
     settings?: SettingsControlState,
+    projectOverride?: 'light' | 'dark',
   ) => void
 }
 
@@ -47,12 +50,18 @@ export function createAppearanceRowStore(): EngineStoreHandle<AppearanceRowState
       settings: { status: 'loading', writable: false, writableReason: undefined, write: { status: 'idle' } },
     }),
     actions: {
-      sync: (d, preference: ThemePreference, revision: number, settings: SettingsControlState = LOCAL_SETTINGS) => {
+      sync: (
+        d, preference: ThemePreference, revision: number,
+        settings: SettingsControlState = LOCAL_SETTINGS,
+        projectOverride?: 'light' | 'dark',
+      ) => {
         if (revision > d.revision) {
           d.preference = preference
           d.revision = revision
         }
         d.settings = settings
+        if (projectOverride === undefined) delete d.projectOverride
+        else d.projectOverride = projectOverride
       },
     },
   })

@@ -6,7 +6,7 @@ Locale plugin: LocaleRuntime — the `zh`/`en` preference stored as `locale.pref
 
 ## Settings authority
 
-The Language row follows the bound settings scope's effective locale and disables selection while the first view is loading, the scope is unavailable, the provider is read-only, or a project runtime owns the value. `LocaleRuntime.setLocale` applies the same writable-view guard, so programmatic callers cannot turn a disabled row into a mutation; failed writes are adopted back from the recovered Host value.
+The Language row follows the bound account-backed settings scope and disables selection while the first view is loading, the scope is unavailable, or its provider is read-only. A Gateway project runtime does not take ownership of this preference: the account transport persists it for the authenticated member, with a Host fallback only when the account route is explicitly unsupported. `LocaleRuntime.setLocale` applies the same writable-view guard, so programmatic callers cannot turn a disabled row into a mutation; failed writes are adopted back from the recovered value.
 
 ## Model Experience
 

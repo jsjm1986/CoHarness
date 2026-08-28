@@ -3,13 +3,13 @@
 /** Locale keys these surfaces render. */
 export type PluginsSettingsLocaleKey =
   | 'nav' | 'title' | 'intro' | 'tabs' | 'configurableTab' | 'empty'
-  | 'overridden' | 'reset' | 'readOnly' | 'expand' | 'collapse'
+  | 'overridden' | 'reset' | 'readOnly' | 'readOnlyProject' | 'readOnlyAccount' | 'readOnlyOrganization' | 'readOnlyDeployment' | 'expand' | 'collapse'
   | 'save' | 'saving' | 'discard' | 'unsaved' | 'saveFailed' | 'invalidNumber'
   | 'bashTitle' | 'bashDescription' | 'bashTimeoutMs' | 'bashTimeoutMsHint'
   | 'bashMaxOutputBytes' | 'bashMaxOutputBytesHint'
   | 'agentLoopTitle' | 'agentLoopDescription' | 'agentLoopMaxParallel' | 'agentLoopMaxParallelHint'
   | 'webSearchTitle' | 'webSearchDescription'
-  | 'webSearchApiKey' | 'webSearchApiKeyHint' | 'webSearchApiKeySet' | 'webSearchApiKeyUnset'
+  | 'webSearchApiKey' | 'webSearchApiKeyHint' | 'webSearchApiKeyManaged' | 'webSearchApiKeySet' | 'webSearchApiKeyUnset'
   | 'webSearchBaseUrl' | 'webSearchBaseUrlHint' | 'webSearchMaxUses' | 'webSearchMaxUsesHint'
 
 /** English copy. */
@@ -23,6 +23,10 @@ export const en: Record<PluginsSettingsLocaleKey, string> = {
   overridden: 'Overridden',
   reset: 'Reset to default',
   readOnly: 'This deployment stores settings read-only.',
+  readOnlyProject: 'This setting affects the shared project runtime and is managed by the project owner or an organization administrator.',
+  readOnlyAccount: 'This setting belongs to the current account.',
+  readOnlyOrganization: 'This setting is managed by the organization.',
+  readOnlyDeployment: 'This setting is managed by the deployment.',
   expand: 'Show settings',
   collapse: 'Hide settings',
   save: 'Save',
@@ -45,6 +49,7 @@ export const en: Record<PluginsSettingsLocaleKey, string> = {
   webSearchDescription: 'The DeepSeek search provider.',
   webSearchApiKey: 'API key',
   webSearchApiKeyHint: 'Stored outside the settings file. Leave blank to keep the current key.',
+  webSearchApiKeyManaged: 'This key is managed by the deployment and cannot be changed in the project scope.',
   webSearchApiKeySet: 'A key is configured.',
   webSearchApiKeyUnset: 'No key is configured; search is unavailable until one is.',
   webSearchBaseUrl: 'Endpoint',
@@ -64,6 +69,10 @@ export const zh: Record<PluginsSettingsLocaleKey, string> = {
   overridden: '已覆盖',
   reset: '恢复默认',
   readOnly: '本部署的设置为只读。',
+  readOnlyProject: '此设置会影响项目共享运行时，由项目 owner 或组织管理员管理。',
+  readOnlyAccount: '此设置属于当前账户。',
+  readOnlyOrganization: '此设置由组织管理员管理。',
+  readOnlyDeployment: '此设置由部署管理员管理。',
   expand: '展开设置',
   collapse: '收起设置',
   save: '保存',
@@ -86,6 +95,7 @@ export const zh: Record<PluginsSettingsLocaleKey, string> = {
   webSearchDescription: 'DeepSeek 搜索提供方。',
   webSearchApiKey: 'API Key',
   webSearchApiKeyHint: '不写入设置文件。留空表示保持当前密钥。',
+  webSearchApiKeyManaged: '此密钥由部署管理员管理，项目空间中不能修改。',
   webSearchApiKeySet: '已配置密钥。',
   webSearchApiKeyUnset: '未配置密钥；配置之前搜索不可用。',
   webSearchBaseUrl: '接口地址',

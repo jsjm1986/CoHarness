@@ -1,4 +1,4 @@
-import { ArrowLeft, Pencil, Settings2, Sparkles, Trash2, Users } from 'lucide-react'
+import { ArrowLeft, ExternalLink, Pencil, Settings2, Sparkles, Trash2, Users } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
@@ -321,6 +321,42 @@ export function ProjectDetailPage() {
             <span>所有者：{project.owner?.displayName || project.owner?.username || '组织管理'}</span>
             <span>创建者：{project.createdBy?.displayName || project.createdBy?.username || '未知'}</span>
           </div>
+          <Section className="projectConfigurationSection" title="项目配置归属" meta="用户前端管理" actions={(
+            <a className="button button-secondary" href={`/admin/projects/${String(project.id)}/settings`}>
+              <ExternalLink size={15} aria-hidden="true" />打开项目设置
+            </a>
+          )}>
+            <div className="projectConfigurationSummary" aria-label="项目配置归属摘要">
+              <div>
+                <span className="definitionLabel">项目设置</span>
+                <strong>由用户前端的项目设置面板管理</strong>
+                <p>这里仅展示服务器资源和当前生效摘要，不提供用户个人偏好或项目逻辑配置编辑。</p>
+              </div>
+              <div>
+                <span className="definitionLabel">项目主题策略</span>
+                <StatusBadge tone={project.configurationSummary?.themePolicy === 'follow-user' ? 'neutral' : 'info'}>
+                  {themePolicyLabel(project.configurationSummary?.themePolicy ?? project.uiThemePolicy)}
+                </StatusBadge>
+              </div>
+              <div>
+                <span className="definitionLabel">共享运行时</span>
+                <span>{project.configurationSummary === undefined
+                  ? '状态未知'
+                  : `${project.configurationSummary.runtimeState} · generation ${String(project.configurationSummary.runtimeGeneration)}`}</span>
+              </div>
+              <div>
+                <span className="definitionLabel">项目 Provider</span>
+                <span>{project.configurationSummary?.projectModels === undefined
+                  ? '未启用项目 Provider'
+                  : `${String(project.configurationSummary.projectModels.providerCount)} 个 · revision ${String(project.configurationSummary.projectModels.revision)}`}</span>
+              </div>
+              <div>
+                <span className="definitionLabel">服务器目录</span>
+                <span>仅管理员可在 /admin 管理</span>
+              </div>
+            </div>
+            <p className="sectionHint">管理员需要修改项目 Provider、运行时策略或界面策略时，请在用户端切换到该项目后打开「项目设置」；普通成员只能查看说明。</p>
+          </Section>
           <Section
             className="projectUsageSection"
             title="项目用量"
@@ -682,6 +718,12 @@ function formatQuotaTokens(limit: number | null | undefined): string {
 
 function formatQuotaCost(limit: number | null | undefined): string {
   return limit === null || limit === undefined ? '不限' : formatMoney(limit, 2)
+}
+
+function themePolicyLabel(policy: 'follow-user' | 'light' | 'dark' | undefined): string {
+  if (policy === 'light') return '强制浅色'
+  if (policy === 'dark') return '强制深色'
+  return '跟随成员偏好'
 }
 
 function changeMode(

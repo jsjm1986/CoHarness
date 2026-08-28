@@ -75,7 +75,15 @@ export const rpcErrorSchema: z.ZodType<RpcError> = z.discriminatedUnion('code', 
   z.object({ code: z.literal('steer-unavailable'), message: z.string(), details: z.object({ itemId: z.string() }) }),
   z.object({ code: z.literal('command-error'), message: z.string(), details: z.object({}) }),
   z.object({ code: z.literal('unknown-command'), message: z.string(), details: z.object({}) }),
-  z.object({ code: z.literal('settings-rejected'), message: z.string(), details: z.object({ ns: z.string() }) }),
+  z.object({
+    code: z.literal('settings-rejected'), message: z.string(), details: z.object({
+      ns: z.string(),
+      reason: z.union([
+        z.literal('project'), z.literal('provider'), z.literal('organization'),
+        z.literal('deployment'), z.literal('account'),
+      ]).optional(),
+    }),
+  }),
   z.object({ code: z.literal('settings-conflict'), message: z.string(), details: z.object({ ns: z.string(), expected: z.number(), actual: z.number() }) }),
   z.object({ code: z.literal('credential-rejected'), message: z.string(), details: z.object({ ref: z.string() }) }),
   z.object({ code: z.literal('model-discovery-failed'), message: z.string(), details: z.object({ settingsNs: z.string(), baseURL: z.string().optional() }) }),

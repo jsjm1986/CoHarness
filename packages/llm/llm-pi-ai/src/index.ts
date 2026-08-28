@@ -101,6 +101,7 @@ export const inject = ['llm']
 
 const NS = settingsNamespace('llm-pi-ai')
 const ORGANIZATION_PROVIDER_PREFIX = 'org-'
+const PROJECT_PROVIDER_PREFIX = 'project-'
 const ORGANIZATION_CREDENTIAL_PREFIX = 'DSH_'
 
 function managedCompat(compat: ManagedModelCompat | undefined): PiAiCompatProfile | undefined {
@@ -157,10 +158,22 @@ function managedProfiles(snapshot: ModelProviderConfigSnapshot | undefined): Rec
   ]))
 }
 
+/** Return ownership metadata for a managed route without leaking it into pi-ai config. */
+function managedProviderMeta(snapshot: ModelProviderConfigSnapshot | undefined): ReadonlyMap<string, {
+  management: 'organization' | 'project'
+  projectId?: number
+}> {
+  return new Map((snapshot?.providers ?? []).map(provider => [provider.provider, {
+    management: provider.scope === 'project' ? 'project' : 'organization',
+    ...provider.projectId === undefined ? {} : { projectId: provider.projectId },
+  }]))
+}
+
 function assertPersonalProfiles(config: Config): void {
-  const reserved = Object.keys(config.providers ?? {}).find(provider => provider.startsWith(ORGANIZATION_PROVIDER_PREFIX))
+  const reserved = Object.keys(config.providers ?? {}).find(provider =>
+    provider.startsWith(ORGANIZATION_PROVIDER_PREFIX) || provider.startsWith(PROJECT_PROVIDER_PREFIX))
   if (reserved !== undefined) {
-    throw new Error(`llm-pi-ai: provider route "${reserved}" is reserved for organization configuration`)
+    throw new Error(`llm-pi-ai: provider route "${reserved}" is reserved for organization configuration or managed project configuration`)
   }
   const reservedCredential = Object.entries(config.providers ?? {}).find(([, profile]) =>
     profile.apiKeyEnv?.startsWith(ORGANIZATION_CREDENTIAL_PREFIX) === true)
@@ -205,10 +218,13 @@ function registrationFacts(profiles: ReadonlyMap<string, ResolvedPiAiProviderPro
  */
 function directoryEntries(
   profiles: ReadonlyMap<string, ResolvedPiAiProviderProfile>,
+  managed: ModelProviderConfigSnapshot | undefined,
 ): LlmConfigurableProvider[] {
   const catalog = new Set(catalogProviderIds())
   const entries = new Map<string, LlmConfigurableProvider>()
+  const managedMeta = managedProviderMeta(managed)
   const declare = (provider: string, displayName: string): void => {
+    const metadata = managedMeta.get(provider)
     entries.set(provider, {
       provider,
       displayName,
@@ -218,6 +234,10 @@ function directoryEntries(
       // narrowing a shipped provider's models stores a profile too, and that
       // route is still one pi-ai knows.
       declared: !catalog.has(provider),
+      ...metadata === undefined ? {} : {
+        management: metadata.management,
+        ...metadata.projectId === undefined ? {} : { projectId: metadata.projectId },
+      },
     })
   }
   // A provider whose only native method is OAuth leaves this adapter nothing
@@ -313,7 +333,7 @@ export function apply(ctx: Context, config: Config): void {
   let directory: DirectoryRegistrationHandle | undefined
   let directoryFacts: unknown
   const ensureDirectory = (): void => {
-    const entries = directoryEntries(profiles())
+    const entries = directoryEntries(profiles(), ctx.get('modelProviderConfig')?.snapshot())
     if (deepEqualJson(entries, directoryFacts)) return
     // Atomic replace, never dispose-then-register: a route another adapter
     // family already declares (a profile keyed `deepseek-official`) would

@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto'
 import type { Server } from 'node:http'
 import { join } from 'node:path'
 import { createAdminApiHandler } from './admin-api.ts'
+import { PostgresAccountPreferencesService } from './postgres/account-preferences-service.ts'
 import { refreshModelGovernance } from './apply-model-governance.ts'
 import { loadConfig } from './config.ts'
 import { InstanceManager, RuntimeLeaseUnavailableError } from './instances.ts'
@@ -120,6 +121,7 @@ const context = await (async () => {
 })()
 const auth = new PostgresAuthService(context, cfg)
 const users = new PostgresUserService(context, cfg)
+const userPreferences = new PostgresAccountPreferencesService(context, cfg)
 const projects = new PostgresProjectService(context, cfg)
 const audit = new PostgresAuditService(context)
 const governance = new PostgresModelGovernanceService(
@@ -227,6 +229,7 @@ const deps: GatewayDeps = {
   cfg,
   auth,
   users,
+  userPreferences,
   projects,
   audit,
   governance,

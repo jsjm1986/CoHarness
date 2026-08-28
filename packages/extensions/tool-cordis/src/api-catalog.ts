@@ -1170,8 +1170,8 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   },
   {
     key: 'modelProviderConfig',
-    summary: 'Organization Provider configuration published as `ctx.modelProviderConfig`.',
-    description: 'Organization Provider configuration published as `ctx.modelProviderConfig`.',
+    summary: 'Managed Provider configuration published as `ctx.modelProviderConfig`.',
+    description: 'Managed Provider configuration published as `ctx.modelProviderConfig`.',
     methods: [
       {
         signature: 'abstract snapshot(): ModelProviderConfigSnapshot',
@@ -3496,7 +3496,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'CollaborationParticipant',
-    declaration: 'export interface CollaborationParticipant {\n    readonly userId: number;\n    readonly username: string;\n    readonly displayName: string;\n    readonly role: \'admin\' | \'user\';\n    readonly scope: {\n        readonly kind: \'personal\';\n    } | {\n        readonly kind: \'project\';\n        readonly projectId: number;\n        readonly projectName: string;\n        readonly mode: \'ro\' | \'rw\';\n    };\n}',
+    declaration: 'export interface CollaborationParticipant {\n    readonly userId: number;\n    readonly username: string;\n    readonly displayName: string;\n    readonly role: \'admin\' | \'user\';\n    readonly scope: {\n        readonly kind: \'personal\';\n    } | {\n        readonly kind: \'project\';\n        readonly projectId: number;\n        readonly projectName: string;\n        readonly mode: \'ro\' | \'rw\';\n        readonly canManage?: boolean;\n    };\n}',
   },
   {
     name: 'CollaborationSessionCreation',
@@ -3852,7 +3852,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'GatewayPrincipalScope',
-    declaration: 'export type GatewayPrincipalScope = {\n    kind: \'personal\';\n} | {\n    kind: \'project\';\n    projectId: number;\n    projectName: string;\n    mode: \'ro\' | \'rw\';\n};',
+    declaration: 'export type GatewayPrincipalScope = {\n    kind: \'personal\';\n} | {\n    kind: \'project\';\n    projectId: number;\n    projectName: string;\n    mode: \'ro\' | \'rw\';\n    canManage?: boolean;\n};',
   },
   {
     name: 'GatewayRequestPrincipal',
@@ -4080,7 +4080,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'LlmConfigurableProvider',
-    declaration: 'export interface LlmConfigurableProvider {\n    provider: string;\n    displayName: string;\n    settingsNs: string;\n    settingsPath: readonly string[];\n    declared?: boolean;\n}',
+    declaration: 'export interface LlmConfigurableProvider {\n    provider: string;\n    displayName: string;\n    settingsNs: string;\n    settingsPath: readonly string[];\n    declared?: boolean;\n    management?: \'personal\' | \'organization\' | \'project\' | \'external\';\n    projectId?: number;\n}',
   },
   {
     name: 'LlmDiscoveredModel',
@@ -4176,11 +4176,15 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ManagedModelProviderProfile',
-    declaration: 'export interface ManagedModelProviderProfile {\n    provider: string;\n    displayName: string;\n    driver: \'pi-ai\';\n    protocol: ManagedModelProviderProtocol;\n    baseURL: string;\n    credentialRef?: string;\n    profile?: Record<string, unknown>;\n    defaultContextWindow?: number;\n    defaultMaxTokens?: number;\n    defaultInput?: ManagedModelModality[];\n    headers?: Record<string, string>;\n    reasoning?: \'off\' | \'minimal\' | \'low\' | \'medium\' | \'high\' | \'xhigh\' | \'max\';\n    thinkingBudgets?: {\n        minimal: number;\n        low: number;\n        medium: number;\n        high: number;\n    };\n    cacheRetention?: \'none\' | \'short\' | \'long\';\n    transport?: \'sse\' | \'websocket\' | \'websocket-cached\' | \'auto\';\n    timeoutMs?: number;\n    websocketConnectTimeoutMs?: number;\n    streamIdleTimeoutMs?: number;\n    retryPolicy?: {\n        mode: \'normal\';\n        maxRetries?: number;\n        retryableCodes?: string[];\n        backoff?: {\n            initialDelayMs?: number;\n            maxDelayMs?: number;\n            jitterRatio?: number;\n        };\n    } | {\n        mode: \'always\';\n        backoff?: {\n            initialDelayMs?: number;\n            maxDelayMs?: number;\n            jitterRatio?: number;\n        };\n    };\n    models: readonly ManagedModelProfile[];\n}',
+    declaration: 'export interface ManagedModelProviderProfile {\n    provider: string;\n    displayName: string;\n    driver: \'pi-ai\';\n    scope?: ManagedModelProviderScope;\n    projectId?: number;\n    protocol: ManagedModelProviderProtocol;\n    baseURL: string;\n    credentialRef?: string;\n    profile?: Record<string, unknown>;\n    defaultContextWindow?: number;\n    defaultMaxTokens?: number;\n    defaultInput?: ManagedModelModality[];\n    headers?: Record<string, string>;\n    reasoning?: \'off\' | \'minimal\' | \'low\' | \'medium\' | \'high\' | \'xhigh\' | \'max\';\n    thinkingBudgets?: {\n        minimal: number;\n        low: number;\n        medium: number;\n        high: number;\n    };\n    cacheRetention?: \'none\' | \'short\' | \'long\';\n    transport?: \'sse\' | \'websocket\' | \'websocket-cached\' | \'auto\';\n    timeoutMs?: number;\n    websocketConnectTimeoutMs?: number;\n    streamIdleTimeoutMs?: number;\n    retryPolicy?: {\n        mode: \'normal\';\n        maxRetries?: number;\n        retryableCodes?: string[];\n        backoff?: {\n            initialDelayMs?: number;\n            maxDelayMs?: number;\n            jitterRatio?: number;\n        };\n    } | {\n        mode: \'always\';\n        backoff?: {\n            initialDelayMs?: number;\n            maxDelayMs?: number;\n            jitterRatio?: number;\n        };\n    };\n    models: readonly ManagedModelProfile[];\n}',
   },
   {
     name: 'ManagedModelProviderProtocol',
     declaration: 'export type ManagedModelProviderProtocol = \'openai-completions\' | \'openai-responses\' | \'anthropic-messages\';',
+  },
+  {
+    name: 'ManagedModelProviderScope',
+    declaration: 'export type ManagedModelProviderScope = \'organization\' | \'project\';',
   },
   {
     name: 'ManagedModelReasoningEfforts',
@@ -4848,7 +4852,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SettingsDescriptor',
-    declaration: 'export interface SettingsDescriptor {\n    ns: SettingsNamespace;\n    schema: unknown;\n    value: unknown;\n    revision: number;\n    base?: unknown;\n    user?: unknown;\n    applies: SettingsApplies;\n    secrets?: RedactedSecret[];\n}',
+    declaration: 'export interface SettingsDescriptor {\n    ns: SettingsNamespace;\n    schema: unknown;\n    value: unknown;\n    revision: number;\n    base?: unknown;\n    user?: unknown;\n    applies: SettingsApplies;\n    owner: SettingsOwner;\n    projectWrite: SettingsProjectWrite;\n    projectWritePaths?: string[][];\n    secrets?: RedactedSecret[];\n}',
   },
   {
     name: 'SettingsNamespace',
@@ -4859,8 +4863,16 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type SettingsPathOp = {\n    op: \'set\';\n    path: readonly string[];\n    value: unknown;\n} | {\n    op: \'unset\';\n    path: readonly string[];\n};',
   },
   {
+    name: 'SettingsProjectWrite',
+    declaration: 'export type SettingsProjectWrite = \'never\' | \'manager\';',
+  },
+  {
+    name: 'SettingsProjectWritePath',
+    declaration: 'export type SettingsProjectWritePath = readonly string[];',
+  },
+  {
     name: 'SettingsRegisterOptions',
-    declaration: 'export interface SettingsRegisterOptions<T> {\n    base?: Partial<T>;\n    applies?: SettingsApplies;\n    validate?: (value: T) => void;\n}',
+    declaration: 'export interface SettingsRegisterOptions<T> {\n    base?: Partial<T>;\n    applies?: SettingsApplies;\n    owner?: SettingsOwner;\n    projectWrite?: SettingsProjectWrite;\n    projectWritePaths?: readonly SettingsProjectWritePath[];\n    validate?: (value: T) => void;\n}',
   },
   {
     name: 'SettingsUpdateSource',

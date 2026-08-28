@@ -18,6 +18,7 @@ export function apply(ctx: Context): void {
     settingsCtx.settings.register(
       settingsNamespace(CONVERSATION_SETTINGS_NAMESPACE),
       ConversationSettingsSchema,
+      { owner: 'account', projectWrite: 'never' },
     )
   })
 }

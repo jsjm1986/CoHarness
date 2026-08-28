@@ -86,6 +86,26 @@ describe('settingsNamespace', () => {
 })
 
 describe('registration', () => {
+  it('requires project ownership for manager-writable namespaces', async () => {
+    const { ctx } = await boot()
+    expect(() => ctx.settings.register(settingsNamespace('account-owned'), ThemeSchema, {
+      owner: 'account', projectWrite: 'manager',
+    })).toThrow(/may be project-writable only when owner is project/)
+  })
+
+  it('retains a project-manager field allowlist in descriptors', async () => {
+    const { ctx } = await boot()
+    ctx.settings.register(settingsNamespace('project-owned'), ThemeSchema, {
+      owner: 'project', projectWrite: 'manager', projectWritePaths: [['fontSize']],
+    })
+    expect(ctx.settings.describe()[0]).toMatchObject({
+      owner: 'project', projectWrite: 'manager', projectWritePaths: [['fontSize']],
+    })
+    expect(() => ctx.settings.register(settingsNamespace('bad-paths'), ThemeSchema, {
+      owner: 'project', projectWrite: 'manager', projectWritePaths: [[]],
+    })).toThrow(/project write paths must contain non-empty safe paths/)
+  })
+
   it('resolves schema defaults, then composition base, then the user layer', async () => {
     const { ctx } = await boot({ doc: { 'ui-theme': { theme: 'light' } } })
     const scope = ctx.settings.register(settingsNamespace('ui-theme'), ThemeSchema, {

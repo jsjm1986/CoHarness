@@ -9,7 +9,7 @@
 import type {
   ConfigurableProviderView, CredentialView, IApiClient, ModelProviderGroup, SettingsNamespaceView,
 } from '@deepseek-ai/dsh-api-remotes/client'
-import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SettingsWritableReason, SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SettingsDescribeFace } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { SettingsSchemaOperations } from './schema-operations.ts'
@@ -47,6 +47,8 @@ export interface ModelsSettingsState {
   credentialError: string | null
   /** Whether the settings provider accepts writes. */
   writable: boolean
+  /** Why model configuration is read-only, when known. */
+  writableReason?: SettingsWritableReason
   /** Every configurable provider joined with its configured/credential state. */
   rows: readonly ProviderRow[]
   /** Namespace views by ns, for the editor's schema/layers/secrets. */
@@ -72,10 +74,22 @@ export function messageOf(error: unknown): string {
  * distinct from personal credentials.
  * @param provider - provider route id (e.g. `anthropic`, `minimax-cn`).
  * @param scope - ownership scope; organization references use the `DSH_` prefix.
+ * @param projectId - public project id required for project scope.
  * @returns the derived reference name (e.g. `MINIMAX_CN_API_KEY` or `DSH_ORG_PRIMARY_API_KEY`).
  */
-export function deriveKeyRef(provider: string, scope: 'personal' | 'organization' = 'personal'): string {
-  const prefix = scope === 'organization' ? 'DSH_' : ''
+export function deriveKeyRef(
+  provider: string,
+  scope: 'personal' | 'organization' | 'project' = 'personal',
+  projectId?: number,
+): string {
+  if (scope === 'project' && (!Number.isSafeInteger(projectId) || (projectId as number) <= 0)) {
+    throw new Error('project credential derivation requires a positive project id')
+  }
+  const prefix = scope === 'organization'
+    ? 'DSH_'
+    : scope === 'project'
+      ? `DSH_PROJECT_${String(projectId ?? 0)}_`
+      : ''
   const normalized = provider.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '')
   // Keep the familiar names for conventional routes, but add a short stable
   // suffix for arbitrary ids so `a-b` and `a_b` cannot share one credential.
@@ -224,6 +238,9 @@ export class ModelsSettingsStore {
       s.error = null
       s.credentialError = credentialError
       s.writable = writable
+      const reason = this.describeFace.getSnapshot().view?.writableReason
+      if (reason === undefined) delete s.writableReason
+      else s.writableReason = reason
       s.rows = rows.map(row => ({
         ...row,
         ...row.apiKeyEnv !== undefined && credentials[row.apiKeyEnv] !== undefined

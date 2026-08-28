@@ -19,6 +19,7 @@ import {
   handleDialogKeyDown, IconAgentPresetOutline16, IconCloseOutline16, IconDataOutline16,
   IconPersonalizationOutline16, IconSettingsOutline16, holdInert,
 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { onSettingsNavigation } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SettingsRootComponentProps, SettingsSectionRow } from './shell-contract.ts'
 import css from './SettingsRoot.module.css'
 
@@ -45,6 +46,8 @@ type PanelProps = {
   activeId: string | undefined
   onSelect: (id: string) => void
   onClose: () => void
+  settingsScope?: 'personal' | 'project'
+  projectId?: number
 }
 
 /**
@@ -52,7 +55,7 @@ type PanelProps = {
  * header button, a mask click, and document-level Escape (mounted only while
  * open, so the listener lifetime is the panel's).
  */
-function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose }: PanelProps) {
+function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose, settingsScope, projectId }: PanelProps) {
   // Entries can unmount underneath the requested id, so the render-time
   // projection falls back to the first row when the id is gone.
   const active = rows.find(r => r.id === activeId)?.id ?? rows[0]?.id
@@ -134,7 +137,11 @@ function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose }: PanelP
             </button>
           </div>
           <div className={css.options}>
-            {active !== undefined && renderSlot('settings.section', { close: onClose }, { only: active })}
+            {active !== undefined && renderSlot('settings.section', {
+              close: onClose,
+              ...settingsScope === undefined ? {} : { settingsScope },
+              ...projectId === undefined ? {} : { projectId },
+            }, { only: active })}
           </div>
         </div>
       </div>
@@ -151,15 +158,27 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
   const { wide, useSections, useOnboardingSteps, useSessions, renderSlot } = props
   const [open, setOpen] = useState(false)
   const [activeId, setActiveId] = useState<string | undefined>(undefined)
+  const [navigationScope, setNavigationScope] = useState<{ scope?: 'personal' | 'project'; projectId?: number }>({})
   const [completedOnboarding, setCompletedOnboarding] = useState<ReadonlySet<string>>(() => new Set())
   const close = useCallback(() => {
     setOpen(false)
     setActiveId(undefined)
+    setNavigationScope({})
   }, [])
   const openSection = useCallback((id: string) => {
     setActiveId(id)
+    setNavigationScope({})
     setOpen(true)
   }, [])
+
+  useEffect(() => onSettingsNavigation((request) => {
+    setActiveId(request.section)
+    setNavigationScope({
+      ...request.scope === undefined ? {} : { scope: request.scope },
+      ...request.projectId === undefined ? {} : { projectId: request.projectId },
+    })
+    setOpen(true)
+  }), [])
 
   // The ledger tick keeps the nav rows fresh: registrants re-register with
   // freshly localized text on locale change, and the trigger/header/close
@@ -192,7 +211,7 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
         className={clsx(css.trigger, !wide && css.rail)}
         aria-haspopup="dialog"
         aria-expanded={open}
-        onClick={() => { setOpen(true) }}
+        onClick={() => { setNavigationScope({}); setOpen(true) }}
       >
         {renderSlot('settings.trigger', { wide })}
       </button>
@@ -203,6 +222,8 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
           activeId={activeId}
           onSelect={setActiveId}
           onClose={close}
+          {...navigationScope.scope === undefined ? {} : { settingsScope: navigationScope.scope }}
+          {...navigationScope.projectId === undefined ? {} : { projectId: navigationScope.projectId }}
         />
       )}
       {/* Dialog chrome and `#root` inert ownership live inside each step's

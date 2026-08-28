@@ -69,7 +69,19 @@ export function PluginCard(props: PluginCardProps) {
       {open
         ? (
           <div className={css.body}>
-            {!state.writable ? <p className={css.readOnly} role="status">{props.t('readOnly')}</p> : null}
+            {!state.writable ? (
+              <p className={css.readOnly} role="status">
+                {state.writableReason === 'project'
+                  ? props.t('readOnlyProject')
+                  : state.writableReason === 'account'
+                    ? props.t('readOnlyAccount')
+                    : state.writableReason === 'organization'
+                      ? props.t('readOnlyOrganization')
+                      : state.writableReason === 'deployment'
+                        ? props.t('readOnlyDeployment')
+                        : props.t('readOnly')}
+              </p>
+            ) : null}
             {props.children}
             <div className={css.footer}>
               {state.failed ? <p className={css.failed} role="status">{props.t('saveFailed')}</p> : null}

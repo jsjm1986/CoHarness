@@ -8,6 +8,8 @@
   "files": [
     "src/api-path.ts",
     "src/client/api.ts",
+    "src/client/account-preferences.ts",
+    "src/client/project-models.ts",
     "src/client/connection.ts",
     "src/client/fixture.ts",
     "src/client/index.ts",

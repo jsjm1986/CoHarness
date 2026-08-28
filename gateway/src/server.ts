@@ -3,6 +3,11 @@ import { createServer } from 'node:http'
 import { once } from 'node:events'
 import type { Duplex } from 'node:stream'
 import type { UserRow } from './auth.ts'
+import {
+  AccountPreferencesConflictError,
+  AccountPreferencesInputError,
+  normalizeAccountPreferenceMutation,
+} from './account-preferences.ts'
 import { CollaborationDeniedError } from './collaboration.ts'
 import type { GatewayConfig } from './config.ts'
 import type { ProjectRuntime } from './instances.ts'
@@ -29,10 +34,15 @@ import type {
   GatewayModelGovernanceService,
   GatewayProjectService,
   GatewayUserService,
+  GatewayUserPreferencesService,
 } from './services.ts'
 import type { ConversationArchiveService } from './postgres/conversation-archive-service.ts'
 import { isAdminPath, serveAdmin } from './static.ts'
 import { ResponseBodyTooLargeError } from './response-budget.ts'
+import type { ProjectConfigurationView } from './project-configuration.ts'
+import type { ProjectThemePolicy } from './projects.ts'
+import { applyModelGovernanceToProject, scheduleModelGovernanceRefresh } from './apply-model-governance.ts'
+import { ProjectModelSettingsConflictError, type ModelSettingsPathOp } from './model-governance.ts'
 
 export interface GatewayDeps {
   cfg: GatewayConfig
@@ -43,6 +53,8 @@ export interface GatewayDeps {
   instances: GatewayInstanceService
   governance?: GatewayModelGovernanceService
   collaboration?: GatewayCollaborationService
+  /** PostgreSQL-backed account preferences; absent in legacy test compositions. */
+  userPreferences?: GatewayUserPreferencesService
   /** Optional organization-level document metadata catalog. */
   documents?: GatewayDocumentCatalogService
   /** Optional organization-wide archived conversation index and lifecycle service. */
@@ -241,21 +253,57 @@ function stringField(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() !== '' ? value.trim() : undefined
 }
 
+/** Decode path-addressed settings edits at the Gateway HTTP boundary. */
+function projectSettingsOps(value: unknown): ModelSettingsPathOp[] | undefined {
+  if (!Array.isArray(value) || value.length === 0) return undefined
+  const result: ModelSettingsPathOp[] = []
+  for (const entry of value) {
+    if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) return undefined
+    const row = entry as Record<string, unknown>
+    if (!Array.isArray(row.path) || row.path.some(segment => typeof segment !== 'string'
+      || segment.length === 0 || segment === '__proto__' || segment === 'prototype' || segment === 'constructor')) return undefined
+    if (row.op === 'set' && Object.hasOwn(row, 'value')) {
+      result.push({ op: 'set', path: row.path as string[], value: row.value })
+    } else if (row.op === 'unset' && !Object.hasOwn(row, 'value')) {
+      result.push({ op: 'unset', path: row.path as string[] })
+    } else return undefined
+  }
+  return result
+}
+
 function accountProjectError(error: unknown): { status: number; error: string } {
+  if (error instanceof BodyTooLargeError) {
+    return { status: 413, error: 'request-too-large' }
+  }
   if (error instanceof CollaborationDeniedError) {
     return { status: error.code === 'conversation-not-found' ? 404 : 403, error: error.code }
   }
   if (error instanceof Error) {
-    const status = error.message === 'invitation-already-pending' || error.message === 'invitation-already-member' ? 409
+    const status = error.message === 'invitation-already-pending' || error.message === 'invitation-already-member'
+      || error.message.startsWith('settings-conflict:') ? 409
       : error.message === 'invitation-not-found' || error.message === 'project-not-found' ? 404
         : error.message === 'invitation-forbidden' ? 403
           : error.message === 'invitation-expired' ? 410
             : error.message === 'invitation-not-pending' ? 409
               : error.message === 'owner-protected' || error.message === 'owner-must-be-rw' || error.message === 'user-disabled' ? 409
-                : error.message.startsWith('duplicate ') ? 409 : 400
-    return { status, error: error.message }
+                : error.message.startsWith('duplicate ') ? 409
+                  : error.message.startsWith('unknown project') ? 404 : 400
+    return { status, error: error.message.startsWith('settings-conflict:') ? 'settings-conflict' : error.message }
   }
   return { status: 400, error: String(error) }
+}
+
+/** Project database writes remain successful while a file projection retries. */
+async function applyProjectGovernanceBestEffort(
+  deps: Pick<GatewayDeps, 'cfg' | 'governance' | 'projects' | 'users'>,
+  projectId: number,
+): Promise<void> {
+  try {
+    await applyModelGovernanceToProject(deps, projectId)
+  } catch (error: unknown) {
+    console.error('[gateway] project model policy projection deferred:', error)
+    scheduleModelGovernanceRefresh(deps)
+  }
 }
 
 export interface GatewayRequestContext {
@@ -311,10 +359,15 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     if (project === null) {
       return { context: { user, scope: { kind: 'personal' }, runtime: user }, resetScope: true }
     }
+    const detail = await deps.projects.getById(projectId)
+    const canManage = user.role === 'admin' || project.administrator || detail?.owner?.id === user.id
     return {
       context: {
         user,
-        scope: { kind: 'project', projectId, projectName: project.name, mode: project.mode },
+        scope: {
+          kind: 'project', projectId, projectName: project.name, mode: project.mode, canManage,
+          ...(detail?.uiThemePolicy === undefined ? {} : { uiThemePolicy: detail.uiThemePolicy }),
+        },
         runtime: { kind: 'project', id: projectId, name: project.name, path: project.path },
       },
       resetScope: false,
@@ -323,8 +376,14 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
 
   const server = createServer((req, res) => {
     void handle(req, res).catch((error: unknown) => {
-      if (!res.writableEnded) send(res, 500, 'internal error', 'text/plain')
-      console.error('[gateway] request failed:', error)
+      if (!res.writableEnded) {
+        if (error instanceof BodyTooLargeError) {
+          send(res, 413, JSON.stringify({ error: 'request-too-large' }), 'application/json')
+        } else {
+          send(res, 500, 'internal error', 'text/plain')
+        }
+      }
+      if (!(error instanceof BodyTooLargeError)) console.error('[gateway] request failed:', error)
     })
   })
 
@@ -678,6 +737,8 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     }
 
     if (pathname === '/account/api/context' && req.method === 'GET') {
+      res.setHeader('cache-control', 'no-store')
+      const resolved = await requestContext(req, user)
       const scopes = await deps.collaboration?.projectsForUser(user.id) ?? []
       // `projectsForUser` already establishes the membership set. Use one
       // scoped batch detail query for owner flags instead of scanning the
@@ -695,9 +756,28 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         const owner = detail?.owner !== undefined
           ? detail.owner
           : (await deps.projects.getById(scope.projectId))?.owner
-        const canManage = user.role === 'admin' || owner?.id === user.id
-        return canManage ? { ...scope, canManage: true } : scope
+        const canManage = scope.canManage === true || user.role === 'admin' || owner?.id === user.id
+        return {
+          ...scope,
+          ...(canManage ? { canManage: true } : {}),
+          ...(detail?.origin === undefined ? {} : { origin: detail.origin }),
+          ...(detail?.owner === undefined ? {} : { owner: detail.owner }),
+          ...(detail?.uiThemePolicy === undefined ? {} : { uiThemePolicy: detail.uiThemePolicy }),
+        }
       }))
+      const activeProjectId = resolved.context.scope.kind === 'project'
+        ? resolved.context.scope.projectId
+        : undefined
+      const activeProject = activeProjectId === undefined
+        ? undefined
+        : projects.find(project => project.projectId === activeProjectId)
+      const activeScope = activeProject === undefined
+        ? resolved.context.scope
+        : {
+          ...resolved.context.scope,
+          canManage: activeProject.canManage === true,
+          ...(activeProject.uiThemePolicy === undefined ? {} : { uiThemePolicy: activeProject.uiThemePolicy }),
+        }
       send(res, 200, JSON.stringify({
         user: {
           id: user.id,
@@ -705,12 +785,313 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
           displayName: user.displayName,
           role: user.role,
         },
-        scope: resolved.context.scope,
+        scope: activeScope,
         projects,
         // The shared project runtime remains confined to its project path;
         // this flag only advertises the administrator-only preset choice.
         fullAccess: user.role === 'admin',
       }), 'application/json')
+      return
+    }
+
+    if (pathname === '/account/api/preferences') {
+      if (deps.userPreferences === undefined) {
+        // Older/embedded hosts do not own account storage. A 501 lets the
+        // browser scope intentionally fall back to the Host settings file;
+        // 503 is reserved for a configured service that is temporarily down.
+        send(res, 501, JSON.stringify({ error: 'account-preferences-unsupported' }), 'application/json')
+        return
+      }
+      try {
+        if (req.method === 'GET') {
+          const value = await deps.userPreferences.describe(user)
+          res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+          res.end(JSON.stringify(value))
+          return
+        }
+        if (req.method === 'PATCH') {
+          const mutation = normalizeAccountPreferenceMutation(jsonObject(await readBody(req)))
+          const value = await deps.userPreferences.mutate(user, mutation)
+          await audit.write({
+            userId: user.id,
+            action: 'account-preference.updated',
+            detail: JSON.stringify({ namespace: mutation.namespace, field: mutation.field, operation: mutation.operation }),
+            ip: clientIp(req),
+          })
+          res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+          res.end(JSON.stringify(value))
+          return
+        }
+        send(res, 405, JSON.stringify({ error: 'method-not-allowed' }), 'application/json')
+      } catch (error: unknown) {
+        if (error instanceof AccountPreferencesConflictError) {
+          send(res, 409, JSON.stringify({ error: error.code, expected: error.expected, actual: error.actual }), 'application/json')
+          return
+        }
+        if (error instanceof AccountPreferencesInputError) {
+          send(res, 400, JSON.stringify({ error: error.code, message: error.message }), 'application/json')
+          return
+        }
+        throw error
+      }
+      return
+    }
+
+    const projectConfiguration = /^\/account\/api\/projects\/(\d+)\/configuration$/.exec(pathname)
+    if (projectConfiguration !== null) {
+      res.setHeader('cache-control', 'no-store')
+      const projectId = Number(projectConfiguration[1])
+      if (!Number.isSafeInteger(projectId) || projectId <= 0) {
+        send(res, 400, JSON.stringify({ error: 'invalid-project-id' }), 'application/json')
+        return
+      }
+      if (deps.collaboration === undefined) {
+        send(res, 503, JSON.stringify({ error: 'project-configuration-unavailable' }), 'application/json')
+        return
+      }
+      const authority = await deps.collaboration.projectForUser(projectId, user.id)
+      if (authority === null) {
+        send(res, 403, JSON.stringify({ error: 'not-member' }), 'application/json')
+        return
+      }
+      const project = await deps.projects.getById(projectId)
+      if (project === null) {
+        send(res, 404, JSON.stringify({ error: 'project-not-found' }), 'application/json')
+        return
+      }
+      const canManage = user.role === 'admin' || project.owner?.id === user.id
+        || authority.administrator
+      const capabilities: ProjectConfigurationView['capabilities'] = {
+        themePolicy: deps.projects.setThemePolicy !== undefined && canManage,
+        runtimeSettings: canManage,
+        projectModels: canManage && deps.governance?.describeProjectModelSettings !== undefined
+          && deps.governance.mutateProjectModelSettings !== undefined,
+        members: canManage,
+        filesystem: false,
+      }
+      try {
+        if (req.method === 'GET') {
+          const value: ProjectConfigurationView = {
+            project: {
+              id: project.id,
+              name: project.name,
+              ...(project.origin === undefined ? {} : { origin: project.origin }),
+              ...(project.owner === undefined ? {} : { owner: project.owner }),
+              themePolicy: project.uiThemePolicy ?? 'follow-user',
+            },
+            canManage,
+            capabilities,
+          }
+          res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+          res.end(JSON.stringify(value))
+          return
+        }
+        if (req.method === 'PATCH') {
+          if (!canManage) {
+            send(res, 403, JSON.stringify({ error: 'forbidden' }), 'application/json')
+            return
+          }
+          if (deps.projects.setThemePolicy === undefined) {
+            send(res, 501, JSON.stringify({ error: 'project-configuration-unsupported' }), 'application/json')
+            return
+          }
+          const input = jsonObject(await readBody(req))
+          const policy = input?.themePolicy
+          if (policy !== 'follow-user' && policy !== 'light' && policy !== 'dark') {
+            send(res, 400, JSON.stringify({ error: 'invalid-project-theme-policy' }), 'application/json')
+            return
+          }
+          await deps.projects.setThemePolicy(projectId, policy as ProjectThemePolicy)
+          await audit.write({
+            userId: user.id,
+            action: 'projects.configuration.theme-policy',
+            detail: JSON.stringify({ projectId, themePolicy: policy }),
+            ip: clientIp(req),
+          })
+          const next = await deps.projects.getById(projectId)
+          if (next === null) throw new Error('project disappeared after configuration update')
+          const value: ProjectConfigurationView = {
+            project: {
+              id: next.id,
+              name: next.name,
+              ...(next.origin === undefined ? {} : { origin: next.origin }),
+              ...(next.owner === undefined ? {} : { owner: next.owner }),
+              themePolicy: next.uiThemePolicy ?? policy as ProjectThemePolicy,
+            },
+            canManage,
+            capabilities,
+          }
+          res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+          res.end(JSON.stringify(value))
+          return
+        }
+        send(res, 405, JSON.stringify({ error: 'method-not-allowed' }), 'application/json')
+      } catch (error: unknown) {
+        const mapped = accountProjectError(error)
+        send(res, mapped.status, JSON.stringify({ error: mapped.error }), 'application/json')
+      }
+      return
+    }
+
+    // Project Provider settings deliberately use a Gateway-owned API instead
+    // of the runtime's local settings document. This keeps encrypted keys and
+    // the shared policy projection authoritative across every member device.
+    const projectModelSettings = /^\/account\/api\/projects\/(\d+)\/model-settings(?:\/(credentials|discover))?$/.exec(pathname)
+    if (projectModelSettings !== null) {
+      res.setHeader('cache-control', 'no-store')
+      const projectId = Number(projectModelSettings[1])
+      const suffix = projectModelSettings[2]
+      if (!Number.isSafeInteger(projectId) || projectId <= 0) {
+        send(res, 400, JSON.stringify({ error: 'invalid-project-model-settings-request' }), 'application/json')
+        return
+      }
+      if (deps.collaboration === undefined) {
+        send(res, 503, JSON.stringify({ error: 'project-model-settings-unavailable' }), 'application/json')
+        return
+      }
+      if (deps.governance === undefined) {
+        send(res, 501, JSON.stringify({ error: 'project-model-settings-unsupported' }), 'application/json')
+        return
+      }
+      const authority = await deps.collaboration.projectForUser(projectId, user.id)
+      if (authority === null) {
+        send(res, 403, JSON.stringify({ error: 'not-member' }), 'application/json')
+        return
+      }
+      const detail = await deps.projects.getById(projectId)
+      if (detail === null) {
+        send(res, 404, JSON.stringify({ error: 'project-not-found' }), 'application/json')
+        return
+      }
+      const canManage = user.role === 'admin' || authority.administrator || detail.owner?.id === user.id
+      try {
+        if (suffix === 'discover') {
+          if (deps.governance.discoverProjectModels === undefined) {
+            send(res, 501, JSON.stringify({ error: 'project-model-settings-unsupported' }), 'application/json')
+            return
+          }
+          if (req.method !== 'POST' || !canManage) {
+            send(res, canManage ? 405 : 403, JSON.stringify({ error: canManage ? 'method-not-allowed' : 'forbidden' }), 'application/json')
+            return
+          }
+          const input = jsonObject(await readBody(req))
+          const models = await deps.governance.discoverProjectModels({
+            projectId,
+            ...stringField(input?.provider) === undefined ? {} : { provider: stringField(input?.provider) },
+            ...stringField(input?.baseURL) === undefined ? {} : { baseURL: stringField(input?.baseURL) },
+            ...stringField(input?.api) === undefined ? {} : { api: stringField(input?.api) },
+            ...stringField(input?.apiKey) === undefined ? {} : { apiKey: stringField(input?.apiKey) },
+          })
+          send(res, 200, JSON.stringify({ models }), 'application/json')
+          return
+        }
+        if (suffix === 'credentials') {
+          if (req.method === 'GET') {
+            const query = new URL(req.url ?? '/', 'http://gateway').searchParams
+            const refs = query.getAll('refs').flatMap(value => value.split(',')).map(value => value.trim()).filter(value => value !== '')
+            if (deps.governance.describeProjectCredentials === undefined) {
+              send(res, 501, JSON.stringify({ error: 'project-model-settings-unsupported' }), 'application/json')
+              return
+            }
+            const described = await deps.governance.describeProjectCredentials(projectId, [...new Set(refs)])
+            send(res, 200, JSON.stringify({
+              credentials: Object.fromEntries(Object.entries(described).map(([ref, value]) => [
+                ref, { ...value, writable: canManage && value.writable },
+              ])),
+            }), 'application/json')
+            return
+          }
+          if (!canManage) {
+            send(res, 403, JSON.stringify({ error: 'forbidden' }), 'application/json')
+            return
+          }
+          const input = jsonObject(await readBody(req))
+          const ref = stringField(input?.ref)
+          if (ref === undefined) {
+            send(res, 400, JSON.stringify({ error: 'ref-required' }), 'application/json')
+            return
+          }
+          if (req.method === 'PUT') {
+            const value = typeof input?.value === 'string' ? input.value : undefined
+            if (deps.governance.setProjectCredential === undefined) {
+              send(res, 501, JSON.stringify({ error: 'project-model-settings-unsupported' }), 'application/json')
+              return
+            }
+            if (value === undefined || value.trim() === '') {
+              send(res, 400, JSON.stringify({ error: 'credential-required' }), 'application/json')
+              return
+            }
+            await deps.governance.setProjectCredential(projectId, ref, value)
+            await applyProjectGovernanceBestEffort(deps, projectId)
+            await audit.write({ userId: user.id, action: 'projects.model-credential.set', detail: JSON.stringify({ projectId, ref }), ip: clientIp(req) })
+            res.writeHead(204); res.end()
+            return
+          }
+          if (req.method === 'DELETE') {
+            if (deps.governance.unsetProjectCredential === undefined) {
+              send(res, 501, JSON.stringify({ error: 'project-model-settings-unsupported' }), 'application/json')
+              return
+            }
+            await deps.governance.unsetProjectCredential(projectId, ref)
+            await applyProjectGovernanceBestEffort(deps, projectId)
+            await audit.write({ userId: user.id, action: 'projects.model-credential.unset', detail: JSON.stringify({ projectId, ref }), ip: clientIp(req) })
+            res.writeHead(204); res.end()
+            return
+          }
+          send(res, 405, JSON.stringify({ error: 'method-not-allowed' }), 'application/json')
+          return
+        }
+        if (req.method === 'GET') {
+          if (deps.governance.describeProjectModelSettings === undefined) {
+            send(res, 501, JSON.stringify({ error: 'project-model-settings-unsupported' }), 'application/json')
+            return
+          }
+          const view = await deps.governance.describeProjectModelSettings(projectId)
+          if (canManage) {
+            send(res, 200, JSON.stringify(view), 'application/json')
+          } else {
+            send(res, 200, JSON.stringify({
+              ...view,
+              writable: false,
+              namespaces: view.namespaces.map(namespace => ({
+                ...namespace, writable: false, writableReason: 'project' as const,
+              })),
+            }), 'application/json')
+          }
+          return
+        }
+        if (req.method === 'PUT' || req.method === 'PATCH') {
+          if (!canManage) {
+            send(res, 403, JSON.stringify({ error: 'forbidden' }), 'application/json')
+            return
+          }
+          if (deps.governance.mutateProjectModelSettings === undefined) {
+            send(res, 501, JSON.stringify({ error: 'project-model-settings-unsupported' }), 'application/json')
+            return
+          }
+          const input = jsonObject(await readBody(req))
+          const ops = projectSettingsOps(input?.ops)
+          const expectedRevision = input?.expectedRevision
+          if (ops === undefined || (expectedRevision !== undefined
+            && (typeof expectedRevision !== 'number' || !Number.isSafeInteger(expectedRevision) || expectedRevision < 0))) {
+            send(res, 400, JSON.stringify({ error: 'invalid-project-model-settings' }), 'application/json')
+            return
+          }
+          const view = await deps.governance.mutateProjectModelSettings(projectId, ops, expectedRevision as number | undefined)
+          await applyProjectGovernanceBestEffort(deps, projectId)
+          await audit.write({ userId: user.id, action: 'projects.model-settings.mutate', detail: JSON.stringify({ projectId, opCount: ops.length }), ip: clientIp(req) })
+          send(res, 200, JSON.stringify(view), 'application/json')
+          return
+        }
+        send(res, 405, JSON.stringify({ error: 'method-not-allowed' }), 'application/json')
+      } catch (error: unknown) {
+        if (error instanceof ProjectModelSettingsConflictError) {
+          send(res, 409, JSON.stringify({ error: error.code, expected: error.expected, actual: error.actual }), 'application/json')
+          return
+        }
+        const mapped = accountProjectError(error)
+        send(res, mapped.status, JSON.stringify({ error: mapped.error }), 'application/json')
+      }
       return
     }
 
@@ -917,6 +1298,20 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
 
     if (isAdminPath(pathname)) {
       if (user.role !== 'admin') { sendAdminGate(res, pathname, 'forbidden'); return }
+      const projectSettingsRedirect = /^\/admin\/projects\/(\d+)\/settings$/.exec(pathname)
+      if (projectSettingsRedirect !== null && req.method === 'GET') {
+        const projectId = Number(projectSettingsRedirect[1])
+        const project = Number.isSafeInteger(projectId) && projectId > 0
+          ? await deps.projects.getById(projectId)
+          : null
+        if (project === null) {
+          send(res, 404, 'not found', 'text/plain')
+          return
+        }
+        await deps.instances.ensureRunning({ kind: 'project', id: project.id, name: project.name, path: project.path })
+        redirect(res, '/', [scopeCookie(`project:${project.id}`, cfg)])
+        return
+      }
       const body = req.method === 'GET' || req.method === 'HEAD' ? '' : await readBody(req)
       if (handlers.admin !== undefined && await handlers.admin(req, res, user, pathname, body)) return
       if (serveAdmin(req, res, pathname, handlers.adminRoot)) return

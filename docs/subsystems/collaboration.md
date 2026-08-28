@@ -23,7 +23,7 @@ The selected browser scope carries the current effective project mode. Organizat
 /** Scope selected by the authenticated browser request. */
 type GatewayPrincipalScope =
   | { kind: 'personal' }
-  | { kind: 'project'; projectId: number; projectName: string; mode: 'ro' | 'rw' }
+  | { kind: 'project'; projectId: number; projectName: string; mode: 'ro' | 'rw'; canManage?: boolean }
 ```
 
 ```ts type-equiv
@@ -138,6 +138,7 @@ interface CollaborationParticipant {
       readonly projectId: number
       readonly projectName: string
       readonly mode: 'ro' | 'rw'
+      readonly canManage?: boolean
     }
 }
 ```
@@ -267,7 +268,7 @@ abstract currentCreation(): CollaborationSessionCreation | undefined
 abstract withSessionCreation<T>( creation: CollaborationSessionCreation, operation: () => Promise<T>, ): Promise<T>
 ```
 
-Source: [`packages/context/collaboration/src/index.ts:157`](../../packages/context/collaboration/src/index.ts)
+Source: [`packages/context/collaboration/src/index.ts:158`](../../packages/context/collaboration/src/index.ts)
 
 <a id="ctxgatewayruntime--gatewayruntime"></a>
 
@@ -314,7 +315,7 @@ request(path: string, options: GatewayRuntimeRequestInit = {}): Promise<Response
 
 Types: [SessionId](core.md)
 
-Source: [`packages/context/gateway-runtime/src/index.ts:352`](../../packages/context/gateway-runtime/src/index.ts)
+Source: [`packages/context/gateway-runtime/src/index.ts:353`](../../packages/context/gateway-runtime/src/index.ts)
 
 <a id="typert-gateway-events"></a>
 

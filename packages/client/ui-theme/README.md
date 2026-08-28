@@ -14,7 +14,7 @@ The two paths are mutually exclusive by construction. `scrollbar-width`/`scrollb
 
 ## Settings authority and compatibility
 
-Appearance controls render the effective project value but are disabled when the bound scope reports `loading`, `writable: false`, or a `saving` write. Project and provider restrictions are shown inline; the service also refuses a direct `setTheme` call until a writable Host view exists, so a disabled row cannot be bypassed into a mutation. The theme listener supports both `addEventListener` and legacy `addListener` MediaQueryList implementations. The design stylesheet supplies a `100vh` viewport fallback and the client visual-viewport measurement overrides it when available; all `--ds-*` and `--dsw-*` references are checked against CSS declarations by the token-contract test, with runtime-owned viewport height as the explicit exception.
+Appearance controls render the account preference while a project policy may force the active light or dark scheme. The account-backed scope disables selection when it reports `loading`, `writable: false`, or a `saving` write; project and provider restrictions are shown inline, and the service refuses a direct `setTheme` call until a writable account view exists. The theme listener supports both `addEventListener` and legacy `addListener` MediaQueryList implementations. The design stylesheet supplies a `100vh` viewport fallback and the client visual-viewport measurement overrides it when available; all `--ds-*` and `--dsw-*` references are checked against CSS declarations by the token-contract test, with runtime-owned viewport height as the explicit exception.
 
 ## Model Experience
 

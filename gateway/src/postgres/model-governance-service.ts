@@ -23,15 +23,21 @@ import type {
   UsagePricingView,
   UsageSummary,
   ProjectQuotaView,
+  ProjectCredentialView,
+  ProjectModelProviderRow,
+  ProjectModelSettingsView,
 } from '../model-governance.ts'
-import { ORGANIZATION_PROVIDER_PATTERN } from '../model-governance.ts'
+import { ORGANIZATION_PROVIDER_PATTERN, ProjectModelSettingsConflictError } from '../model-governance.ts'
 import { OrganizationModelCredentialCipher } from '../organization-model-credentials.ts'
+import { modelEndpointCandidates } from '@deepseek-ai/dsh-llm/discovery'
 import type { Queryable } from './database.ts'
 import { transaction } from './database.ts'
 import { internalProjectId, internalUserId, type PostgresRuntimeContext } from './runtime-context.ts'
 import {
   discoverOrganizationModels,
   organizationModelSettingsSchema,
+  PROJECT_CREDENTIAL_REF_PATTERN,
+  validateProjectProfiles,
   validateOrganizationProfiles,
 } from '../organization-model-settings.ts'
 import type {
@@ -53,7 +59,7 @@ const nonnegative = (value: number, name: string): number => {
 
 function credentialClassOf(source: string): CredentialClass {
   if (source === 'file' || source === 'project-env' || source === 'request') return 'personal'
-  if (source === 'organization' || source === 'env' || source === 'process' || source === 'user-env') return 'company'
+  if (source === 'organization' || source === 'project' || source === 'env' || source === 'process' || source === 'user-env') return 'company'
   return 'unknown'
 }
 
@@ -165,6 +171,16 @@ function providerCredentialRef(provider: string): string {
   return `DSH_${provider.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_API_KEY`
 }
 
+/** Runtime route id for a project-local Provider; the project id prevents cross-project collisions. */
+export function projectRuntimeProviderKey(projectId: number, provider: string): string {
+  return `project-${String(projectId)}-${provider}`
+}
+
+/** Stable encrypted-credential reference for one project-local Provider. */
+export function projectProviderCredentialRef(projectId: number, provider: string): string {
+  return `DSH_PROJECT_${String(projectId)}_${provider.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_API_KEY`
+}
+
 function providerBaseURL(value: string): string {
   const accepted = nonEmpty(value, 'baseURL')
   let parsed: URL
@@ -182,6 +198,41 @@ function providerBaseURL(value: string): string {
   return accepted.replace(/\/$/, '')
 }
 
+/** Whether a discovery draft still addresses the stored Provider endpoint. */
+function sameProviderEndpoint(
+  draftBaseURL: string | undefined,
+  draftApi: string | undefined,
+  storedBaseURL: string | null,
+  storedApi: ModelProviderProtocol | null,
+): boolean {
+  if (draftBaseURL === undefined || storedBaseURL === null || storedApi === null) return false
+  // An omitted protocol means OpenAI Chat Completions, matching the discovery
+  // helper's default. Other protocol changes must be explicit before a stored
+  // key can be reused, even when the endpoint text is unchanged.
+  const effectiveApi = draftApi ?? (storedApi === 'openai-completions' ? storedApi : undefined)
+  if (effectiveApi !== storedApi) return false
+  try {
+    const draftCandidates = modelEndpointCandidates(draftBaseURL, storedApi)
+    const storedCandidates = modelEndpointCandidates(storedBaseURL, storedApi)
+    return draftCandidates.some(candidate => storedCandidates.includes(candidate))
+  } catch {
+    return false
+  }
+}
+
+/** Read legacy profile endpoint facts when normalized governance columns are absent. */
+function storedProviderEndpoint(row: {
+  base_url: string | null
+  protocol: ModelProviderProtocol | null
+  profile: Record<string, unknown>
+}): { baseURL: string | null; api: ModelProviderProtocol | null } {
+  const profileBaseURL = typeof row.profile.baseURL === 'string' ? row.profile.baseURL : null
+  const profileApi = typeof row.profile.api === 'string' && PROVIDER_PROTOCOLS.has(row.profile.api as ModelProviderProtocol)
+    ? row.profile.api as ModelProviderProtocol
+    : null
+  return { baseURL: row.base_url ?? profileBaseURL, api: row.protocol ?? profileApi }
+}
+
 function jsonObject(value: unknown, name: string): Record<string, unknown> {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${name} must be an object`)
   return value as Record<string, unknown>
@@ -191,7 +242,39 @@ function cloneJson<T>(value: T): T {
   return structuredClone(value)
 }
 
+/** Remove legacy literal API-key fields while retaining ordinary profile data. */
+function stripLegacyApiKeys(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stripLegacyApiKeys)
+  if (value === null || typeof value !== 'object') return value
+  return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+    .filter(([key]) => key !== 'apiKey' && key !== 'api_key')
+    .map(([key, entry]) => [key, stripLegacyApiKeys(entry)]))
+}
+
+/** Remove literal keys and header values before a model profile reaches a client. */
+function redactedModelProfile(value: Record<string, unknown>): Record<string, unknown> {
+  const profile = stripLegacyApiKeys(cloneJson(value)) as Record<string, unknown>
+  if (profile.headers !== null && typeof profile.headers === 'object' && !Array.isArray(profile.headers)) {
+    profile.headers = Object.fromEntries(Object.keys(profile.headers as Record<string, unknown>)
+      .map(name => [name, '[redacted]']))
+  }
+  return profile
+}
+
+/** Keep provider headers for runtime calls while excluding legacy literal keys. */
+function runtimeManagedProfile(value: Record<string, unknown>): Record<string, unknown> {
+  return stripLegacyApiKeys(cloneJson(value)) as Record<string, unknown>
+}
+
+/** Reject object-prototype keys before applying a client-supplied JSON path. */
+function assertSafeJsonPath(path: readonly string[]): void {
+  if (path.some(segment => segment === '__proto__' || segment === 'prototype' || segment === 'constructor')) {
+    throw new Error('settings path contains a reserved object key')
+  }
+}
+
 function setJsonPath(root: Record<string, unknown>, path: readonly string[], value: unknown): void {
+  assertSafeJsonPath(path)
   let cursor = root
   for (const segment of path.slice(0, -1)) {
     const existing = cursor[segment]
@@ -204,6 +287,7 @@ function setJsonPath(root: Record<string, unknown>, path: readonly string[], val
 }
 
 function unsetJsonPath(root: Record<string, unknown>, path: readonly string[]): void {
+  assertSafeJsonPath(path)
   if (path.length === 0) throw new Error('settings path must not be empty')
   let cursor: Record<string, unknown> | undefined = root
   for (const segment of path.slice(0, -1)) {
@@ -400,7 +484,10 @@ export class PostgresModelGovernanceService {
       source: row.source,
       revision: safeCount(row.revision, 'provider revision'),
       modelCount: safeCount(row.model_count, 'provider model count'),
-      ...row.profile === undefined ? {} : { profile: row.profile },
+      // The admin response is still a browser-facing surface. Keep the
+      // provider metadata useful while applying the same literal-key and
+      // header redaction used by settings.describe.
+      ...row.profile === undefined ? {} : { profile: redactedModelProfile(row.profile) },
     }))
   }
 
@@ -541,7 +628,10 @@ export class PostgresModelGovernanceService {
         // The shared editor owns completeness, not a second lifecycle switch.
         // A previously disabled route becomes usable once its complete profile
         // is saved; incomplete edits remain drafts.
-        const status = complete ? 'enabled' : 'draft'
+        // An administrator may deliberately disable a route. Editing its
+        // profile must not silently re-enable it; readiness only decides the
+        // draft/enabled state for routes that were not explicitly disabled.
+        const status = old?.status === 'disabled' ? 'disabled' : complete ? 'enabled' : 'draft'
         const stored = await client.query<{ id: string }>(`INSERT INTO harness.model_providers(
           organization_id,provider_key,display_name,driver,protocol,base_url,auth_mode,credential_ref,status,profile
         ) VALUES($1,$2,$3,'pi-ai',$4,$5,$6,$7,$8,$9)
@@ -627,7 +717,202 @@ export class PostgresModelGovernanceService {
     api?: string
     apiKey?: string
   }): Promise<Array<{ id: string; name?: string; contextWindow?: number; maxTokens?: number }>> {
-    return discoverOrganizationModels(request)
+    // The browser only receives a configured/missing flag. Reuse the stored
+    // value for an existing route when the editor leaves its write-only field
+    // blank; an explicitly typed key always wins in the discovery helper.
+    const stored = request.apiKey === undefined
+      ? await this.organizationCredentialForProvider(request.provider, request.baseURL, request.api)
+      : undefined
+    return discoverOrganizationModels({
+      ...request,
+      ...request.apiKey !== undefined || stored === undefined ? {} : { apiKey: stored },
+    })
+  }
+
+  /** List the active project-owned Provider rows without returning key values. */
+  async listProjectProviders(projectId: number): Promise<ProjectModelProviderRow[]> {
+    const project = await internalProjectId(this.context.pool, this.context.organizationId, projectId)
+    if (project === null) throw new Error(`unknown project ${String(projectId)}`)
+    return this.projectProviderRows(this.context.pool, project, projectId)
+  }
+
+  /** Describe the project-owned pi-ai namespace used by the project settings UI. */
+  async describeProjectModelSettings(projectId: number): Promise<ProjectModelSettingsView> {
+    const project = await internalProjectId(this.context.pool, this.context.organizationId, projectId)
+    if (project === null) throw new Error(`unknown project ${String(projectId)}`)
+    const revisionResult = await this.context.pool.query<{ revision: string }>(`SELECT
+      project_model_configuration_revision::text revision FROM harness.projects
+      WHERE organization_id=$1 AND id=$2`, [this.context.organizationId, project])
+    const revision = safeCount(revisionResult.rows[0]?.revision ?? '0', 'project model configuration revision')
+    const profiles = await this.projectProfiles(this.context.pool, project)
+    return this.projectSettingsView(projectId, profiles, revision, this.context.pool, project)
+  }
+
+  /** Apply path edits to a project-owned Provider dictionary atomically. */
+  async mutateProjectModelSettings(
+    projectId: number,
+    ops: ModelSettingsPathOp[],
+    expectedRevision?: number,
+  ): Promise<ProjectModelSettingsView> {
+    return transaction(this.context.pool, async (client) => {
+      const project = await internalProjectId(client, this.context.organizationId, projectId)
+      if (project === null) throw new Error(`unknown project ${String(projectId)}`)
+      const revisionResult = await client.query<{ revision: string }>(`SELECT
+        project_model_configuration_revision::text revision FROM harness.projects
+        WHERE organization_id=$1 AND id=$2 FOR UPDATE`, [this.context.organizationId, project])
+      const revision = safeCount(revisionResult.rows[0]?.revision ?? '0', 'project model configuration revision')
+      if (expectedRevision !== undefined && expectedRevision !== revision) {
+        throw new ProjectModelSettingsConflictError(expectedRevision, revision)
+      }
+      const current = await this.projectProfiles(client, project)
+      const section: Record<string, unknown> = { providers: Object.fromEntries(current) }
+      for (const op of ops) {
+        if (op.path.length < 2 || op.path[0] !== 'providers') {
+          throw new Error('project settings path must address providers')
+        }
+        if (op.op === 'set') setJsonPath(section, op.path, op.value)
+        else unsetJsonPath(section, op.path)
+      }
+      const profilesObject = validateProjectProfiles(section)
+      const profiles = new Map<string, Record<string, unknown>>(Object.entries(profilesObject))
+      const existing = await client.query<{
+        id: string
+        provider_key: string
+        status: 'draft' | 'enabled' | 'disabled' | 'archived'
+        credential_ref: string | null
+      }>(`SELECT id,provider_key,status,credential_ref FROM harness.project_model_providers
+        WHERE organization_id=$1 AND project_id=$2 AND status <> 'archived' FOR UPDATE`, [this.context.organizationId, project])
+      const oldByProvider = new Map(existing.rows.map(row => [row.provider_key, row]))
+      for (const [provider, profile] of profiles) {
+        const expectedCredential = projectProviderCredentialRef(projectId, provider)
+        const credentialRef = apiKeyRefOf(profile)
+        if (credentialRef !== undefined && credentialRef !== expectedCredential) {
+          throw new Error(`project provider ${provider} must use its generated credential reference`)
+        }
+        const displayName = typeof profile.displayName === 'string' && profile.displayName.trim() !== ''
+          ? profile.displayName.trim() : provider
+        const protocol = typeof profile.api === 'string' ? profile.api as ModelProviderProtocol : null
+        const baseURL = typeof profile.baseURL === 'string' ? providerBaseURL(profile.baseURL) : null
+        const old = oldByProvider.get(provider)
+        const credentialConfigured = credentialRef !== undefined
+          && old?.credential_ref === credentialRef
+          && await this.projectCredentialExists(client, old?.id)
+        const models = profileModelsOf(profile)
+        const complete = protocol !== null && baseURL !== null && models.length > 0
+          && (credentialRef === undefined || credentialConfigured)
+        // Preserve an explicit operational disable across profile edits. A
+        // complete profile is otherwise enabled automatically so the shared
+        // editor does not maintain a second lifecycle switch.
+        const status = old?.status === 'disabled' ? 'disabled' : complete ? 'enabled' : 'draft'
+        const stored = await client.query<{ id: string }>(`INSERT INTO harness.project_model_providers(
+          organization_id,project_id,provider_key,display_name,driver,protocol,base_url,auth_mode,credential_ref,status,profile
+        ) VALUES($1,$2,$3,$4,'pi-ai',$5,$6,$7,$8,$9,$10)
+        ON CONFLICT(project_id,provider_key) DO UPDATE SET
+          display_name=excluded.display_name,protocol=excluded.protocol,base_url=excluded.base_url,
+          auth_mode=excluded.auth_mode,credential_ref=excluded.credential_ref,status=excluded.status,
+          profile=excluded.profile,revision=harness.project_model_providers.revision+1,updated_at=now()
+        RETURNING id`, [this.context.organizationId, project, provider, displayName, protocol, baseURL,
+          credentialRef === undefined ? 'none' : 'api-key', credentialRef, status, profile])
+        const providerId = stored.rows[0]?.id
+        if (providerId === undefined) throw new Error(`project provider ${provider} upsert returned no row`)
+        if (old?.credential_ref !== null && old?.credential_ref !== undefined && old.credential_ref !== credentialRef) {
+          await client.query(`DELETE FROM harness.project_model_credentials
+            WHERE organization_id=$1 AND project_id=$2 AND provider_id=$3`, [this.context.organizationId, project, providerId])
+        }
+        await this.syncProjectProviderModels(client, project, providerId, provider, models)
+      }
+      for (const old of existing.rows) {
+        if (profiles.has(old.provider_key)) continue
+        await client.query(`DELETE FROM harness.project_model_credentials
+          WHERE organization_id=$1 AND project_id=$2 AND provider_id=$3`, [this.context.organizationId, project, old.id])
+        await client.query(`UPDATE harness.project_model_providers SET status='archived',profile='{}'::jsonb,
+          revision=revision+1,updated_at=now() WHERE organization_id=$1 AND project_id=$2 AND id=$3`,
+        [this.context.organizationId, project, old.id])
+        await client.query(`UPDATE harness.project_model_catalog SET enabled=false,updated_at=now()
+          WHERE organization_id=$1 AND project_id=$2 AND provider_id=$3`, [this.context.organizationId, project, old.id])
+      }
+      await this.bumpProjectConfigurationRevision(client, project)
+      return this.projectSettingsView(projectId, profiles, revision + 1, client, project)
+    })
+  }
+
+  /** Describe project-owned credential state without exposing values. */
+  async describeProjectCredentials(projectId: number, refs: string[]): Promise<Record<string, ProjectCredentialView>> {
+    const project = await internalProjectId(this.context.pool, this.context.organizationId, projectId)
+    if (project === null) throw new Error(`unknown project ${String(projectId)}`)
+    const accepted = [...new Set(refs)].filter(ref => PROJECT_CREDENTIAL_REF_PATTERN.test(ref))
+    const result = await this.context.pool.query<{ credential_ref: string }>(`SELECT provider.credential_ref
+      FROM harness.project_model_providers provider
+      JOIN harness.project_model_credentials credential
+        ON credential.organization_id=provider.organization_id AND credential.project_id=provider.project_id
+        AND credential.provider_id=provider.id
+      WHERE provider.organization_id=$1 AND provider.project_id=$2 AND provider.status <> 'archived'
+        AND provider.credential_ref = ANY($3::text[])`, [this.context.organizationId, project, accepted])
+    const configured = new Set(result.rows.map(row => row.credential_ref))
+    const rows: Record<string, ProjectCredentialView> = Object.create(null) as Record<string, ProjectCredentialView>
+    for (const ref of accepted) rows[ref] = { configured: configured.has(ref), source: 'project', writable: true }
+    return rows
+  }
+
+  /** Store one encrypted project credential and update Provider readiness. */
+  async setProjectCredential(projectId: number, ref: string, value: string): Promise<void> {
+    const accepted = nonEmpty(value, 'credential')
+    await transaction(this.context.pool, async (client) => {
+      const project = await internalProjectId(client, this.context.organizationId, projectId)
+      if (project === null) throw new Error(`unknown project ${String(projectId)}`)
+      // Settings mutations take this project lock before replacing provider
+      // rows. Keep the same order here so credential rotation cannot deadlock
+      // with a concurrent provider edit or project deletion.
+      await this.lockProjectConfiguration(client, project)
+      const provider = await this.projectProviderForCredential(client, project, projectId, ref)
+      if (provider === undefined) throw new Error(`unknown project credential ${ref}`)
+      const encrypted = this.credentialCipher.encrypt(this.context.organizationId, provider.id, accepted)
+      await client.query(`INSERT INTO harness.project_model_credentials(
+        organization_id,project_id,provider_id,key_version,nonce,ciphertext,auth_tag
+      ) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(provider_id) DO UPDATE SET
+        key_version=excluded.key_version,nonce=excluded.nonce,ciphertext=excluded.ciphertext,
+        auth_tag=excluded.auth_tag,updated_at=now()`, [
+        this.context.organizationId, project, provider.id, encrypted.keyVersion, encrypted.nonce,
+        encrypted.ciphertext, encrypted.authTag,
+      ])
+      await this.refreshProjectProviderReadiness(client, project, provider.id)
+      await this.bumpProjectConfigurationRevision(client, project)
+    })
+  }
+
+  /** Remove one encrypted project credential. */
+  async unsetProjectCredential(projectId: number, ref: string): Promise<void> {
+    await transaction(this.context.pool, async (client) => {
+      const project = await internalProjectId(client, this.context.organizationId, projectId)
+      if (project === null) throw new Error(`unknown project ${String(projectId)}`)
+      await this.lockProjectConfiguration(client, project)
+      const provider = await this.projectProviderForCredential(client, project, projectId, ref)
+      if (provider === undefined) return
+      await client.query(`DELETE FROM harness.project_model_credentials
+        WHERE organization_id=$1 AND project_id=$2 AND provider_id=$3`, [this.context.organizationId, project, provider.id])
+      await this.refreshProjectProviderReadiness(client, project, provider.id)
+      await this.bumpProjectConfigurationRevision(client, project)
+    })
+  }
+
+  /** Reuse the shared pi-ai endpoint interrogation for a project draft. */
+  async discoverProjectModels(request: {
+    projectId: number
+    provider?: string
+    baseURL?: string
+    api?: string
+    apiKey?: string
+  }): Promise<Array<{ id: string; name?: string; contextWindow?: number; maxTokens?: number }>> {
+    const project = await internalProjectId(this.context.pool, this.context.organizationId, request.projectId)
+    if (project === null) throw new Error(`unknown project ${String(request.projectId)}`)
+    const stored = request.apiKey === undefined
+      ? await this.projectCredentialForProvider(project, request.provider, request.baseURL, request.api)
+      : undefined
+    const { projectId: _projectId, ...draft } = request
+    return discoverOrganizationModels({
+      ...draft,
+      ...request.apiKey !== undefined || stored === undefined ? {} : { apiKey: stored },
+    })
   }
 
   async listModels(): Promise<ModelRow[]> {
@@ -879,20 +1164,48 @@ export class PostgresModelGovernanceService {
         WHERE model.organization_id=$1 AND provider.source='managed' AND provider.status <> 'archived'
         ORDER BY model.provider_key,model.model_key`,
       [this.context.organizationId, project])
+      const projectModels = await client.query<{
+        provider: string
+        model: string
+        provider_enabled: boolean
+        model_enabled: boolean
+      }>(`SELECT model.provider_key provider,model.model_key model,
+        (provider.status='enabled') provider_enabled,model.enabled model_enabled
+        FROM harness.project_model_catalog model
+        JOIN harness.project_model_providers provider ON provider.id=model.provider_id
+          AND provider.project_id=model.project_id
+        WHERE model.organization_id=$1 AND model.project_id=$2
+          AND provider.status <> 'archived'
+        ORDER BY model.provider_key,model.model_key`, [this.context.organizationId, project])
+      const projectRoutes = projectModels.rows.map(row => ({
+        provider: projectRuntimeProviderKey(projectId, row.provider),
+        model: row.model,
+        allowed: row.provider_enabled && row.model_enabled,
+      }))
       return {
         version,
         defaultAllowed: false,
-        models: result.rows.map(row => ({
+        models: [
+          ...result.rows.map(row => ({
           provider: row.provider,
           model: row.model,
           allowed: row.provider_enabled && row.model_enabled && row.allowed,
-        })),
-        providers: await this.runtimeProviders(client),
+          })),
+          ...projectRoutes,
+        ],
+        providers: [
+          ...await this.runtimeProviders(client),
+          ...await this.runtimeProjectProviders(client, project, projectId),
+        ],
       }
     })
   }
 
-  async resolveOrganizationCredential(subject: ModelUsageSubject, ref: string): Promise<string | null> {
+  /** Resolve a credential owned by either the organization or the active project. */
+  async resolveManagedCredential(subject: ModelUsageSubject, ref: string): Promise<string | null> {
+    if (subject.kind === 'project' && ref.startsWith('DSH_PROJECT_')) {
+      return this.resolveProjectCredential(subject.id, ref)
+    }
     const subjectId = subject.kind === 'user'
       ? await internalUserId(this.context.pool, this.context.organizationId, subject.id)
       : await internalProjectId(this.context.pool, this.context.organizationId, subject.id)
@@ -938,6 +1251,11 @@ export class PostgresModelGovernanceService {
       ciphertext: row.ciphertext,
       authTag: row.auth_tag,
     })
+  }
+
+  /** Backward-compatible name used by older runtime compositions. */
+  async resolveOrganizationCredential(subject: ModelUsageSubject, ref: string): Promise<string | null> {
+    return this.resolveManagedCredential(subject, ref)
   }
 
   async issueIntakeToken(subject: ModelUsageSubject): Promise<string> {
@@ -1697,6 +2015,15 @@ export class PostgresModelGovernanceService {
     if (updated.rowCount !== 1) throw new Error('organization model configuration revision update failed')
   }
 
+  /** Advance both the project-local fence and the global projection fence. */
+  private async bumpProjectConfigurationRevision(queryable: Queryable, projectId: string): Promise<void> {
+    const project = await queryable.query(`UPDATE harness.projects
+      SET project_model_configuration_revision=project_model_configuration_revision+1,updated_at=now()
+      WHERE organization_id=$1 AND id=$2`, [this.context.organizationId, projectId])
+    if (project.rowCount !== 1) throw new Error('project model configuration revision update failed')
+    await this.bumpConfigurationRevision(queryable)
+  }
+
   private async organizationProfiles(queryable: Queryable): Promise<Map<string, Record<string, unknown>>> {
     const providers = await queryable.query<{
       provider_key: string
@@ -1741,7 +2068,7 @@ export class PostgresModelGovernanceService {
     revision: number,
     queryable: Queryable = this.context.pool,
   ): Promise<OrganizationModelSettingsView> {
-    const profileObject = Object.fromEntries([...profiles.entries()].map(([provider, profile]) => [provider, cloneJson(profile)]))
+    const profileObject = Object.fromEntries([...profiles.entries()].map(([provider, profile]) => [provider, redactedModelProfile(profile)]))
     const value: unknown = { providers: profileObject }
     const refs = [...profiles.values()].flatMap(profile => {
       const ref = apiKeyRefOf(profile)
@@ -1774,6 +2101,285 @@ export class PostgresModelGovernanceService {
         revision,
       }],
     }
+  }
+
+  /** Read project Provider profiles and hydrate their model catalog rows. */
+  private async projectProfiles(
+    queryable: Queryable,
+    projectId: string,
+  ): Promise<Map<string, Record<string, unknown>>> {
+    const providers = await queryable.query<{
+      provider_key: string
+      display_name: string
+      protocol: ModelProviderProtocol | null
+      base_url: string | null
+      credential_ref: string | null
+      profile: Record<string, unknown>
+    }>(`SELECT provider_key,display_name,protocol,base_url,credential_ref,profile
+      FROM harness.project_model_providers
+      WHERE organization_id=$1 AND project_id=$2 AND status <> 'archived'
+      ORDER BY provider_key`, [this.context.organizationId, projectId])
+    const catalog = await queryable.query<{
+      provider_key: string
+      model_key: string
+      display_name: string
+    }>(`SELECT provider_key,model_key,display_name FROM harness.project_model_catalog
+      WHERE organization_id=$1 AND project_id=$2 AND enabled ORDER BY provider_key,model_key`,
+    [this.context.organizationId, projectId])
+    const modelsByProvider = new Map<string, Array<Record<string, unknown>>>()
+    for (const row of catalog.rows) {
+      const models = modelsByProvider.get(row.provider_key) ?? []
+      models.push({ id: row.model_key, name: row.display_name })
+      modelsByProvider.set(row.provider_key, models)
+    }
+    return new Map(providers.rows.map(row => {
+      const profile = jsonObject(cloneJson(row.profile), `project provider ${row.provider_key}`)
+      const configuredModels = profileModelsOf(profile)
+      const inheritedModels = modelsByProvider.get(row.provider_key) ?? []
+      const hydrated: Record<string, unknown> = {
+        ...profile,
+        ...profile.displayName === undefined ? { displayName: row.display_name } : {},
+        ...profile.api === undefined && row.protocol !== null ? { api: row.protocol } : {},
+        ...profile.baseURL === undefined && row.base_url !== null ? { baseURL: row.base_url } : {},
+        ...profile.apiKeyEnv === undefined && row.credential_ref !== null ? { apiKeyEnv: row.credential_ref } : {},
+        ...configuredModels.length === 0 && inheritedModels.length > 0 ? { models: inheritedModels } : {},
+      }
+      return [row.provider_key, hydrated]
+    }))
+  }
+
+  /** Build the settings-compatible redacted view for project-owned profiles. */
+  private async projectSettingsView(
+    projectId: number,
+    profiles: Map<string, Record<string, unknown>>,
+    revision: number,
+    queryable: Queryable,
+    projectInternalId: string,
+  ): Promise<ProjectModelSettingsView> {
+    const profileObject = Object.fromEntries([...profiles.entries()].map(([provider, profile]) => [provider, redactedModelProfile(profile)]))
+    const value: unknown = { providers: profileObject }
+    const refs = [...profiles.values()].flatMap(profile => {
+      const ref = apiKeyRefOf(profile)
+      return ref === undefined ? [] : [ref]
+    })
+    const configured = new Set<string>()
+    if (refs.length > 0) {
+      const result = await queryable.query<{ credential_ref: string }>(`SELECT provider.credential_ref
+        FROM harness.project_model_providers provider
+        JOIN harness.project_model_credentials credential
+          ON credential.organization_id=provider.organization_id AND credential.project_id=provider.project_id
+          AND credential.provider_id=provider.id
+        WHERE provider.organization_id=$1 AND provider.project_id=$2 AND provider.status <> 'archived'
+          AND provider.credential_ref = ANY($3::text[])`, [this.context.organizationId, projectInternalId, refs])
+      for (const row of result.rows) configured.add(row.credential_ref)
+    }
+    const secrets = [...profiles.entries()].flatMap(([provider, profile]) => {
+      const ref = apiKeyRefOf(profile)
+      return ref === undefined ? [] : [{ path: ['providers', provider, 'apiKeyEnv'], set: configured.has(ref) }]
+    })
+    const providerRows = await this.projectProviderRows(queryable, projectInternalId, projectId)
+    const groups = providerRows
+      .filter(row => row.status !== 'archived')
+      .map(row => {
+        const profile = row.profile === undefined ? {} : row.profile
+        const models = profileModelsOf(profile).map(model => ({
+          id: typeof model.id === 'string' ? model.id : '',
+          name: typeof model.name === 'string' && model.name.trim() !== ''
+            ? model.name
+            : typeof model.id === 'string' ? model.id : '',
+          ...typeof model.contextWindow === 'number' ? { contextWindow: model.contextWindow } : {},
+          ...typeof model.maxTokens === 'number' ? { maxTokens: model.maxTokens } : {},
+          ...Array.isArray(model.input) ? {
+            inputModalities: model.input.filter((value): value is 'text' | 'image' => value === 'text' || value === 'image'),
+          } : {},
+        })).filter(model => model.id !== '')
+        return { id: row.provider, name: row.displayName, models }
+      })
+    return {
+      projectId,
+      revision,
+      writable: true,
+      hasDocument: false,
+      namespaces: [{
+        ns: 'llm-pi-ai',
+        schema: organizationModelSettingsSchema(),
+        value,
+        base: { providers: {} },
+        user: { providers: profileObject },
+        applies: 'live',
+        owner: 'project',
+        projectWrite: 'manager',
+        secrets,
+        revision,
+      }],
+      providers: providerRows,
+      models: { groups, failures: [] },
+    }
+  }
+
+  /** Return project Provider rows joined with value-free credential state. */
+  private async projectProviderRows(
+    queryable: Queryable,
+    projectInternalId: string,
+    projectId: number,
+  ): Promise<ProjectModelProviderRow[]> {
+    const result = await queryable.query<{
+      provider: string
+      display_name: string
+      protocol: ModelProviderProtocol | null
+      base_url: string | null
+      auth_mode: 'api-key' | 'none'
+      status: 'draft' | 'enabled' | 'disabled' | 'archived'
+      credential_ref: string | null
+      credential_configured: boolean
+      revision: string
+      model_count: string
+      profile: Record<string, unknown>
+    }>(`SELECT provider.provider_key provider,provider.display_name,provider.protocol,provider.base_url,
+      provider.auth_mode,provider.status,provider.credential_ref,provider.revision::text,
+      COUNT(model.id)::text model_count,provider.profile,
+      (credential.provider_id IS NOT NULL) credential_configured
+      FROM harness.project_model_providers provider
+      LEFT JOIN harness.project_model_catalog model ON model.provider_id=provider.id
+        AND model.project_id=provider.project_id AND model.enabled
+      LEFT JOIN harness.project_model_credentials credential ON credential.provider_id=provider.id
+        AND credential.project_id=provider.project_id
+      WHERE provider.organization_id=$1 AND provider.project_id=$2
+      GROUP BY provider.id,credential.provider_id ORDER BY provider.provider_key`,
+    [this.context.organizationId, projectInternalId])
+    return result.rows.map(row => ({
+      provider: row.provider,
+      runtimeProvider: projectRuntimeProviderKey(projectId, row.provider),
+      displayName: row.display_name,
+      driver: 'pi-ai' as const,
+      protocol: row.protocol,
+      baseURL: row.base_url,
+      authMode: row.auth_mode,
+      status: row.status,
+      credentialRef: row.credential_ref,
+      credentialConfigured: row.credential_configured,
+      revision: safeCount(row.revision, 'project provider revision'),
+      modelCount: safeCount(row.model_count, 'project provider model count'),
+      ...row.profile === undefined ? {} : { profile: redactedModelProfile(row.profile) },
+    }))
+  }
+
+  /** Keep project catalog rows exactly aligned with the submitted profile. */
+  private async syncProjectProviderModels(
+    queryable: Queryable,
+    projectId: string,
+    providerId: string,
+    provider: string,
+    models: Array<Record<string, unknown>>,
+  ): Promise<void> {
+    const ids: string[] = []
+    for (const [index, model] of models.entries()) {
+      const id = typeof model.id === 'string' ? model.id.trim() : ''
+      if (id === '') throw new Error(`project provider ${provider} model ${String(index + 1)} must have an id`)
+      const name = typeof model.name === 'string' && model.name.trim() !== '' ? model.name.trim() : id
+      ids.push(id)
+      await queryable.query(`INSERT INTO harness.project_model_catalog(
+        organization_id,project_id,provider_id,provider_key,model_key,display_name,enabled
+      ) VALUES($1,$2,$3,$4,$5,$6,true)
+      ON CONFLICT(project_id,provider_key,model_key) DO UPDATE SET
+        provider_id=excluded.provider_id,display_name=excluded.display_name,enabled=true,updated_at=now()`,
+      [this.context.organizationId, projectId, providerId, provider, id, name])
+    }
+    await queryable.query(`UPDATE harness.project_model_catalog SET enabled=false,updated_at=now()
+      WHERE organization_id=$1 AND project_id=$2 AND provider_id=$3 AND NOT (model_key = ANY($4::text[]))`,
+    [this.context.organizationId, projectId, providerId, ids])
+  }
+
+  /** Test whether a project Provider already has an encrypted credential. */
+  private async projectCredentialExists(queryable: Queryable, providerId: string | undefined): Promise<boolean> {
+    if (providerId === undefined) return false
+    const result = await queryable.query<{ exists: boolean }>(`SELECT EXISTS(SELECT 1
+      FROM harness.project_model_credentials WHERE organization_id=$1 AND provider_id=$2) exists`,
+    [this.context.organizationId, providerId])
+    return result.rows[0]?.exists === true
+  }
+
+  /** Find the project Provider addressed by its generated credential reference. */
+  private async projectProviderForCredential(
+    queryable: Queryable,
+    projectInternalId: string,
+    projectId: number,
+    ref: string,
+  ): Promise<{ id: string; credential_ref: string } | undefined> {
+    const result = await queryable.query<{ id: string; credential_ref: string }>(`SELECT id,credential_ref
+      FROM harness.project_model_providers
+      WHERE organization_id=$1 AND project_id=$2 AND status <> 'archived' AND credential_ref=$3
+      FOR UPDATE`,
+    [this.context.organizationId, projectInternalId, ref])
+    const row = result.rows[0]
+    // The generated reference is checked by profile mutation. This prefix
+    // guard also rejects a legacy row imported with another project's name.
+    if (row === undefined || !ref.startsWith(`DSH_PROJECT_${String(projectId)}_`)) return undefined
+    return row
+  }
+
+  /** Lock the project-wide configuration fence before provider-row locks. */
+  private async lockProjectConfiguration(queryable: Queryable, projectId: string): Promise<void> {
+    const result = await queryable.query(
+      'SELECT id FROM harness.projects WHERE organization_id=$1 AND id=$2 FOR UPDATE',
+      [this.context.organizationId, projectId],
+    )
+    if (result.rowCount !== 1) throw new Error('project configuration target disappeared')
+  }
+
+  /** Recompute enabled/draft status after a project credential mutation. */
+  private async refreshProjectProviderReadiness(queryable: Queryable, projectId: string, providerId: string): Promise<void> {
+    const result = await queryable.query<{
+      status: 'draft' | 'enabled' | 'disabled' | 'archived'
+      credential_ref: string | null
+      profile: Record<string, unknown>
+      models: string
+      credential_configured: boolean
+    }>(`SELECT provider.status,provider.credential_ref,provider.profile,COUNT(model.id)::text models,
+      EXISTS(SELECT 1 FROM harness.project_model_credentials credential
+        WHERE credential.organization_id=provider.organization_id AND credential.project_id=provider.project_id
+          AND credential.provider_id=provider.id) credential_configured
+      FROM harness.project_model_providers provider
+      LEFT JOIN harness.project_model_catalog model ON model.organization_id=provider.organization_id
+        AND model.project_id=provider.project_id AND model.provider_id=provider.id AND model.enabled
+      WHERE provider.organization_id=$1 AND provider.project_id=$2 AND provider.id=$3 GROUP BY provider.id`,
+    [this.context.organizationId, projectId, providerId])
+    const row = result.rows[0]
+    if (row === undefined || row.status === 'disabled' || row.status === 'archived') return
+    const profile = jsonObject(row.profile, 'project provider profile')
+    const ready = typeof profile.api === 'string' && typeof profile.baseURL === 'string'
+      && safeCount(row.models, 'project provider model count') > 0
+      && (row.credential_ref === null || row.credential_configured)
+    await queryable.query(`UPDATE harness.project_model_providers SET status=$4,updated_at=now()
+      WHERE organization_id=$1 AND project_id=$2 AND id=$3`, [this.context.organizationId, projectId, providerId, ready ? 'enabled' : 'draft'])
+  }
+
+  /** Resolve one project-owned encrypted credential after policy authorization. */
+  private async resolveProjectCredential(projectId: number, ref: string): Promise<string | null> {
+    const project = await internalProjectId(this.context.pool, this.context.organizationId, projectId)
+    if (project === null) return null
+    const result = await this.context.pool.query<{
+      provider_id: string
+      key_version: number
+      nonce: Buffer
+      ciphertext: Buffer
+      auth_tag: Buffer
+    }>(`SELECT provider.id provider_id,credential.key_version,credential.nonce,credential.ciphertext,credential.auth_tag
+      FROM harness.project_model_providers provider
+      JOIN harness.project_model_credentials credential ON credential.organization_id=provider.organization_id
+        AND credential.project_id=provider.project_id AND credential.provider_id=provider.id
+      JOIN harness.project_model_catalog model ON model.organization_id=provider.organization_id
+        AND model.project_id=provider.project_id AND model.provider_id=provider.id AND model.enabled
+      WHERE provider.organization_id=$1 AND provider.project_id=$2 AND provider.credential_ref=$3
+        AND provider.status='enabled' LIMIT 1`, [this.context.organizationId, project, ref])
+    const row = result.rows[0]
+    if (row === undefined) return null
+    return this.credentialCipher.decrypt(this.context.organizationId, row.provider_id, {
+      keyVersion: row.key_version as 1,
+      nonce: row.nonce,
+      ciphertext: row.ciphertext,
+      authTag: row.auth_tag,
+    })
   }
 
   private async organizationCredentialExists(queryable: Queryable, providerId: string | undefined): Promise<boolean> {
@@ -1829,6 +2435,88 @@ export class PostgresModelGovernanceService {
     return result.rows[0]
   }
 
+  /** Resolve an existing organization route's stored key for discovery only. */
+  private async organizationCredentialForProvider(
+    provider: string | undefined,
+    draftBaseURL: string | undefined,
+    draftApi: string | undefined,
+  ): Promise<string | undefined> {
+    if (provider === undefined || provider.trim() === '') return undefined
+    const route = await this.context.pool.query<{
+      id: string
+      credential_ref: string | null
+      base_url: string | null
+      protocol: ModelProviderProtocol | null
+      profile: Record<string, unknown>
+    }>(`SELECT id,credential_ref,base_url,protocol,profile FROM harness.model_providers
+      WHERE organization_id=$1 AND source='managed' AND status <> 'archived' AND provider_key=$2`,
+    [this.context.organizationId, provider])
+    const row = route.rows[0]
+    if (row === undefined) return undefined
+    const stored = storedProviderEndpoint(row)
+    if (!sameProviderEndpoint(draftBaseURL, draftApi, stored.baseURL, stored.api)) return undefined
+    const ref = row.credential_ref ?? apiKeyRefOf(row.profile)
+    if (ref === undefined) return undefined
+    const credential = await this.context.pool.query<{
+      key_version: number
+      nonce: Buffer
+      ciphertext: Buffer
+      auth_tag: Buffer
+    }>(`SELECT key_version,nonce,ciphertext,auth_tag
+      FROM harness.organization_model_credentials
+      WHERE organization_id=$1 AND provider_id=$2`, [this.context.organizationId, row.id])
+    const encrypted = credential.rows[0]
+    if (encrypted === undefined) return undefined
+    return this.credentialCipher.decrypt(this.context.organizationId, row.id, {
+      keyVersion: encrypted.key_version as 1,
+      nonce: encrypted.nonce,
+      ciphertext: encrypted.ciphertext,
+      authTag: encrypted.auth_tag,
+    })
+  }
+
+  /** Resolve an existing project route's stored key for discovery only. */
+  private async projectCredentialForProvider(
+    projectInternalId: string,
+    provider: string | undefined,
+    draftBaseURL: string | undefined,
+    draftApi: string | undefined,
+  ): Promise<string | undefined> {
+    if (provider === undefined || provider.trim() === '') return undefined
+    const route = await this.context.pool.query<{
+      id: string
+      credential_ref: string | null
+      base_url: string | null
+      protocol: ModelProviderProtocol | null
+      profile: Record<string, unknown>
+    }>(`SELECT id,credential_ref,base_url,protocol,profile FROM harness.project_model_providers
+      WHERE organization_id=$1 AND project_id=$2 AND status <> 'archived' AND provider_key=$3`,
+    [this.context.organizationId, projectInternalId, provider])
+    const row = route.rows[0]
+    if (row === undefined) return undefined
+    const stored = storedProviderEndpoint(row)
+    if (!sameProviderEndpoint(draftBaseURL, draftApi, stored.baseURL, stored.api)) return undefined
+    const ref = row.credential_ref ?? apiKeyRefOf(row.profile)
+    if (ref === undefined) return undefined
+    const credential = await this.context.pool.query<{
+      key_version: number
+      nonce: Buffer
+      ciphertext: Buffer
+      auth_tag: Buffer
+    }>(`SELECT key_version,nonce,ciphertext,auth_tag
+      FROM harness.project_model_credentials
+      WHERE organization_id=$1 AND project_id=$2 AND provider_id=$3`,
+    [this.context.organizationId, projectInternalId, row.id])
+    const encrypted = credential.rows[0]
+    if (encrypted === undefined) return undefined
+    return this.credentialCipher.decrypt(this.context.organizationId, row.id, {
+      keyVersion: encrypted.key_version as 1,
+      nonce: encrypted.nonce,
+      ciphertext: encrypted.ciphertext,
+      authTag: encrypted.auth_tag,
+    })
+  }
+
   private async refreshProviderReadiness(queryable: Queryable, providerId: string): Promise<void> {
     const result = await queryable.query<{
       status: 'draft' | 'enabled' | 'disabled' | 'archived'
@@ -1880,7 +2568,7 @@ export class PostgresModelGovernanceService {
       ORDER BY provider.provider_key,model.model_key`, [this.context.organizationId])
     const providers = new Map<string, RuntimeModelProvider>()
     for (const row of result.rows) {
-      const profile = cloneJson(row.profile)
+      const profile = runtimeManagedProfile(row.profile)
       // Runtime validation requires an embedded profile URL to equal the
       // canonical Provider URL; older settings may retain a trailing slash.
       if (profile.baseURL !== undefined) profile.baseURL = row.base_url
@@ -1895,11 +2583,83 @@ export class PostgresModelGovernanceService {
           ...row.credential_ref === null ? {} : { credentialRef: row.credential_ref },
           profile,
           models: [],
+          scope: 'organization',
         }
         providers.set(row.provider, provider)
       }
       const configured = profileModelsOf(profile)
         .find(model => model.id === row.model_id)
+      const contextWindow = typeof configured?.contextWindow === 'number' ? configured.contextWindow : undefined
+      const maxTokens = typeof configured?.maxTokens === 'number' ? configured.maxTokens : undefined
+      const input = Array.isArray(configured?.input)
+        ? configured.input.filter((value): value is 'text' | 'image' => value === 'text' || value === 'image')
+        : undefined
+      const reasoningEfforts = configured?.reasoningEfforts === false
+        ? false
+        : configured?.reasoningEfforts !== undefined
+          && typeof configured.reasoningEfforts === 'object' && configured.reasoningEfforts !== null
+          ? configured.reasoningEfforts as RuntimeModelProvider['models'][number]['reasoningEfforts']
+          : undefined
+      const compat = configured?.compat !== undefined && typeof configured.compat === 'object' && configured.compat !== null
+        ? configured.compat as RuntimeModelProvider['models'][number]['compat']
+        : undefined
+      provider.models.push({
+        id: row.model_id,
+        name: row.model_name,
+        ...contextWindow === undefined ? {} : { contextWindow },
+        ...maxTokens === undefined ? {} : { maxTokens },
+        ...input === undefined ? {} : { input },
+        ...reasoningEfforts === undefined ? {} : { reasoningEfforts },
+        ...compat === undefined ? {} : { compat },
+      })
+    }
+    return [...providers.values()]
+  }
+
+  /** Project-owned Provider projection, with runtime-prefixed route ids. */
+  private async runtimeProjectProviders(
+    queryable: Queryable,
+    projectInternalId: string,
+    projectId: number,
+  ): Promise<RuntimeModelProvider[]> {
+    const result = await queryable.query<{
+      provider: string
+      display_name: string
+      protocol: ModelProviderProtocol
+      base_url: string
+      credential_ref: string | null
+      profile: Record<string, unknown>
+      model_id: string
+      model_name: string
+    }>(`SELECT provider.provider_key provider,provider.display_name,provider.protocol,
+      provider.base_url,provider.credential_ref,provider.profile,model.model_key model_id,model.display_name model_name
+      FROM harness.project_model_providers provider
+      JOIN harness.project_model_catalog model ON model.organization_id=provider.organization_id
+        AND model.project_id=provider.project_id AND model.provider_id=provider.id AND model.enabled
+      WHERE provider.organization_id=$1 AND provider.project_id=$2 AND provider.status='enabled'
+      ORDER BY provider.provider_key,model.model_key`, [this.context.organizationId, projectInternalId])
+    const providers = new Map<string, RuntimeModelProvider>()
+    for (const row of result.rows) {
+      const runtimeProvider = projectRuntimeProviderKey(projectId, row.provider)
+      const profile = runtimeManagedProfile(row.profile)
+      if (profile.baseURL !== undefined) profile.baseURL = row.base_url
+      let provider = providers.get(runtimeProvider)
+      if (provider === undefined) {
+        provider = {
+          provider: runtimeProvider,
+          displayName: row.display_name,
+          driver: 'pi-ai',
+          protocol: row.protocol,
+          baseURL: row.base_url,
+          ...row.credential_ref === null ? {} : { credentialRef: row.credential_ref },
+          profile,
+          models: [],
+          scope: 'project',
+          projectId,
+        }
+        providers.set(runtimeProvider, provider)
+      }
+      const configured = profileModelsOf(profile).find(model => model.id === row.model_id)
       const contextWindow = typeof configured?.contextWindow === 'number' ? configured.contextWindow : undefined
       const maxTokens = typeof configured?.maxTokens === 'number' ? configured.maxTokens : undefined
       const input = Array.isArray(configured?.input)
