@@ -28,6 +28,7 @@ import {
   createUserDocClient, UserDocHttpError, UserDocServiceUnavailableError,
   type UserDocUploadPhase,
 } from './userdoc-client.ts'
+import { readApiResponseJson } from '@deepseek-ai/dsh-client-runtime/client'
 
 export type {
   UserDocDirectoryIdType,
@@ -136,7 +137,7 @@ export async function readDocumentsScopeResult(signal?: AbortSignal): Promise<Do
         ? { cache: 'no-store' }
         : { cache: 'no-store', signal })
       if (!response.ok) return { scope: { kind: 'personal' }, available: false }
-      const result = { scope: parseDocumentsScope(await response.json() as unknown), available: true }
+      const result = { scope: parseDocumentsScope(await readApiResponseJson(response)), available: true }
       return result
     } catch (error) {
       if (signal?.aborted) throw error

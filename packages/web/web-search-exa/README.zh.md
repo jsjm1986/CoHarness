@@ -15,6 +15,7 @@
 | `searchType` | `auto` | 以 Exa `type` 发送的检索模式：`auto`（由 Exa 决定）、`keyword` 或 `neural`。 |
 | `numResults` | （未设置） | 请求不含 `maxResults` 时使用的默认结果数。未设置时不发送默认值。必须是正整数。 |
 | `highlightsPerResult` | `1` | 每个结果请求的 highlight 句子数（Exa `highlightsPerUrl`）。必须是正整数。 |
+| `maxResponseBytes` | `16 MiB` | 每次成功或错误响应正文的正安全整数上限（最高 256 MiB）；分块响应超过上限时会被取消。 |
 
 ```yaml
 - id: web-search-exa

@@ -30,6 +30,10 @@ import type { SubagentIdentityProjection } from './projection-types.ts'
  * persistence backend appear, promote it to a validated `Config` field.
  */
 const COLD_READ_CONCURRENCY = 4
+/** Maximum cold candidates admitted to one listing operation. */
+const MAX_COLD_CANDIDATES = 10_000
+/** Maximum serialized header bytes retained while preparing cold reads. */
+const MAX_COLD_HEADER_BYTES = 16 * 1024 * 1024
 
 /**
  * One entry of a {@link listChildren} result, ordered by header `createdAt`
@@ -248,9 +252,29 @@ async function resolveCandidateRows(
   const { projections, persistence, cache, subagentParents } = listing
   const rows: (SubagentListEntry | undefined)[] = Array.from({ length: candidates.length })
   const coldReads: { index: number; header: SessionHeader }[] = []
+  let coldHeaderBytes = 0
   candidates.forEach((candidate, index) => {
     const childId = candidate.header.id
     if (candidate.live === undefined) {
+      if (coldReads.length >= MAX_COLD_CANDIDATES) {
+        throw new SubagentError(
+          `subagent listing exceeds the cold-candidate limit of ${String(MAX_COLD_CANDIDATES)}`,
+          'SUBAGENT_LIST_CAPACITY_EXCEEDED',
+        )
+      }
+      let headerBytes: number
+      try {
+        headerBytes = Buffer.byteLength(JSON.stringify(candidate.header), 'utf8')
+      } catch (error: unknown) {
+        throw new SubagentError('subagent listing encountered a non-serializable session header', 'SUBAGENT_LIST_CAPACITY_EXCEEDED', { cause: error })
+      }
+      if (!Number.isSafeInteger(headerBytes) || headerBytes < 0 || coldHeaderBytes + headerBytes > MAX_COLD_HEADER_BYTES) {
+        throw new SubagentError(
+          `subagent listing exceeds the cold-header byte limit of ${String(MAX_COLD_HEADER_BYTES)}`,
+          'SUBAGENT_LIST_CAPACITY_EXCEEDED',
+        )
+      }
+      coldHeaderBytes += headerBytes
       coldReads.push({ index, header: candidate.header })
       return
     }
@@ -277,11 +301,13 @@ async function resolveCandidateRows(
   // Cold candidates exist only when persistence listed them, so the narrow
   // re-check is about types, not reachability.
   if (persistence !== undefined && coldReads.length > 0) {
-    const queue = [...coldReads]
+    let cursor = 0
     await Promise.all(Array.from(
-      { length: Math.min(COLD_READ_CONCURRENCY, queue.length) },
+      { length: Math.min(COLD_READ_CONCURRENCY, coldReads.length) },
       async () => {
-        for (let job = queue.shift(); job !== undefined; job = queue.shift()) {
+        for (;;) {
+          const job = coldReads[cursor++]
+          if (job === undefined) break
           rows[job.index] = await resolveColdIdentity(
             persistence, projections, cache, job.header,
             subagentParents.has(job.header.id), signal,

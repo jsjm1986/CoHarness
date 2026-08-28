@@ -166,20 +166,21 @@ export async function admitAcpPrompt(
   }
 
   const content: ContentBlock[] = []
-  let pendingText = ''
+  const pendingText: string[] = []
   let imageIndex = 0
   const flushText = (): void => {
     if (pendingText.length === 0) return
-    content.push({ type: 'text', text: pendingText })
-    pendingText = ''
+    content.push({ type: 'text', text: pendingText.join('') })
+    pendingText.length = 0
   }
   for (const block of prompt) {
     switch (block.type) {
       case 'text':
-        pendingText += block.text
+        if (block.text.length > 0) pendingText.push(block.text)
         break
       case 'resource_link':
-        pendingText += resourceLinkText(block)
+        const linked = resourceLinkText(block)
+        if (linked.length > 0) pendingText.push(linked)
         break
       case 'image': {
         flushText()

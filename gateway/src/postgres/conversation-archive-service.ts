@@ -39,6 +39,18 @@ export interface EmptyDraftPreview {
 }
 
 const DEFAULT_EMPTY_DRAFT_AGE_MS = 60 * 60 * 1000
+const MAX_ARCHIVE_DETAIL_DESCENDANTS = 10_000
+const MAX_ARCHIVE_DETAIL_EVENTS = 100_000
+const MAX_ARCHIVE_DETAIL_EVENT_BYTES = 64 * 1024 * 1024
+
+/** Stable refusal raised when an archive detail cannot fit the service budget. */
+export class ConversationArchiveError extends Error {
+  /** @param code - stable error code. @param status - HTTP status for admin callers. @param message - safe diagnostic. */
+  constructor(readonly code: 'ARCHIVE_TOO_LARGE', readonly status: 413, message: string) {
+    super(message)
+    this.name = 'ConversationArchiveError'
+  }
+}
 
 /** One root conversation row shown by the Admin archive channel. */
 export interface ConversationArchiveRow {
@@ -98,7 +110,7 @@ export interface ConversationArchiveSnapshot {
   }[]
 }
 
-/** Complete runtime archive carrier received over the authenticated loopback API. */
+/** One bounded runtime archive projection batch received over the authenticated loopback API. */
 export interface ConversationArchiveRuntimeSnapshot {
   readonly runtime: { readonly kind: 'user' | 'project'; readonly id: number }
   readonly revision: number
@@ -109,6 +121,7 @@ export interface ConversationArchiveRuntimeSnapshot {
     header: { createdAt?: number; cwd?: string; parentSession?: string; agentPreset?: string; draft?: boolean }
     title?: string
     messageCount?: number
+    rootMessageCount?: number
     workspace?: { path: string; title: string; position: number }
   }[]
   readonly search?: readonly ArchiveSearchInput[]
@@ -138,11 +151,58 @@ interface ArchiveSearchInput {
   readonly occurredAt: number
 }
 
+const MAX_ARCHIVE_SEARCH_ROWS = 20_000
+const MAX_ARCHIVE_SEARCH_TOTAL_BYTES = 16 * 1024 * 1024
+const MAX_ARCHIVE_SEARCH_CONTENT_BYTES = 64 * 1024
+/** Fixed SQL batch size; five typed arrays stay well below PostgreSQL parameter limits. */
+const ARCHIVE_SEARCH_BATCH_SIZE = 1_000
+const ARCHIVE_COMMAND_BATCH_SIZE = 1_000
+const ARCHIVE_FILE_CLEANUP_BATCH_SIZE = 200
+const ARCHIVE_FILE_CLEANUP_LEASE_MS = 5 * 60 * 1_000
+const ARCHIVE_FILE_CLEANUP_INITIAL_BACKOFF_MS = 5 * 1_000
+const ARCHIVE_FILE_CLEANUP_MAX_BACKOFF_MS = 60 * 60 * 1_000
+
+/** Validate and deduplicate runtime search rows before they enter a transaction. */
+function normalizeArchiveSearch(search: readonly ArchiveSearchInput[] | undefined): readonly ArchiveSearchInput[] {
+  if (search === undefined) return []
+  if (search.length > MAX_ARCHIVE_SEARCH_ROWS) {
+    throw new ConversationArchiveError('ARCHIVE_TOO_LARGE', 413, 'archive search exceeds the row limit')
+  }
+  let totalBytes = 0
+  const unique = new Map<string, ArchiveSearchInput>()
+  for (const item of search) {
+    if (item.sessionId.length === 0 || item.sessionId.length > 512
+      || !Number.isSafeInteger(item.seq) || item.seq < 0
+      || (item.role !== 'user' && item.role !== 'assistant')
+      || !Number.isSafeInteger(item.occurredAt) || item.occurredAt < 0) {
+      throw new Error('invalid archive search row')
+    }
+    const contentBytes = Buffer.byteLength(item.content, 'utf8')
+    if (contentBytes > MAX_ARCHIVE_SEARCH_CONTENT_BYTES) {
+      throw new ConversationArchiveError('ARCHIVE_TOO_LARGE', 413, 'archive search row exceeds the content limit')
+    }
+    totalBytes += contentBytes
+    if (totalBytes > MAX_ARCHIVE_SEARCH_TOTAL_BYTES) {
+      throw new ConversationArchiveError('ARCHIVE_TOO_LARGE', 413, 'archive search exceeds the byte limit')
+    }
+    // Runtime retries can repeat a session/seq row. Preserve the previous
+    // loop's last-write-wins behavior without triggering a PostgreSQL
+    // cardinality violation inside one multi-row INSERT.
+    unique.set(JSON.stringify([item.sessionId, item.seq]), item)
+  }
+  return [...unique.values()]
+}
+
 /** Public runtime identity supplied by an authenticated runtime caller. */
 export interface ConversationArchiveRuntimeIdentity {
   readonly kind: 'user' | 'project'
   readonly id: number
 }
+
+/** Outcome of one safe filesystem cleanup attempt. */
+type ContentFileCleanupResult =
+  | { readonly status: 'deleted' | 'missing' | 'retained' }
+  | { readonly status: 'deferred'; readonly error: string }
 
 /**
  * Remove one database-recorded content file without traversing a replaced
@@ -150,7 +210,7 @@ export interface ConversationArchiveRuntimeIdentity {
  * cannot assume a single configured root; rejecting a non-canonical parent is
  * safer than attempting a recursive cleanup through an untrusted path.
  */
-async function unlinkContentFile(path: string): Promise<void> {
+async function unlinkContentFile(path: string): Promise<ContentFileCleanupResult> {
   // Walk every ancestor, not only the immediate parent. A replaced grandparent
   // can otherwise redirect an apparently ordinary child path outside the
   // originally recorded tree. Refuse cleanup when any component is link-shaped
@@ -160,7 +220,13 @@ async function unlinkContentFile(path: string): Promise<void> {
   const root = parse(parent).root
   while (parent !== root) {
     let parentEntry
-    try { parentEntry = await lstat(parent) } catch { return }
+    try {
+      parentEntry = await lstat(parent)
+    } catch (error: unknown) {
+      return isMissingPathError(error)
+        ? { status: 'missing' }
+        : { status: 'deferred', error: errorMessage(error) }
+    }
     if (parentEntry.isSymbolicLink()) {
       // macOS exposes /var (and sometimes /tmp) as a root-level alias into
       // /private. Those OS-owned aliases are not an archive-controlled
@@ -169,17 +235,50 @@ async function unlinkContentFile(path: string): Promise<void> {
       const canonical = await realpath(parent).catch(() => undefined)
       const rootAlias = parent.startsWith('/') && !parent.slice(1).includes('/')
         && canonical === `/private${parent}`
-      if (!rootAlias) return
+      if (!rootAlias) return { status: 'deferred', error: 'refused a symbolic-link parent' }
     } else if (!parentEntry.isDirectory()) {
-      return
+      return { status: 'deferred', error: 'parent is not a directory' }
     }
     parent = dirname(parent)
   }
   let parentEntry
-  try { parentEntry = await lstat(root) } catch { return }
-  if (!parentEntry.isDirectory() || parentEntry.isSymbolicLink()) return
-  const file = await lstat(path)
-  if (file.isFile() || file.isSymbolicLink()) await unlink(path)
+  try {
+    parentEntry = await lstat(root)
+  } catch (error: unknown) {
+    return isMissingPathError(error)
+      ? { status: 'missing' }
+      : { status: 'deferred', error: errorMessage(error) }
+  }
+  if (!parentEntry.isDirectory() || parentEntry.isSymbolicLink()) {
+    return { status: 'deferred', error: 'filesystem root is not a real directory' }
+  }
+  let file
+  try {
+    file = await lstat(path)
+  } catch (error: unknown) {
+    return isMissingPathError(error)
+      ? { status: 'missing' }
+      : { status: 'deferred', error: errorMessage(error) }
+  }
+  if (!file.isFile() && !file.isSymbolicLink()) {
+    return { status: 'deferred', error: 'refused to remove a non-file path' }
+  }
+  try {
+    await unlink(path)
+    return { status: 'deleted' }
+  } catch (error: unknown) {
+    return isMissingPathError(error)
+      ? { status: 'missing' }
+      : { status: 'deferred', error: errorMessage(error) }
+  }
+}
+
+function isMissingPathError(error: unknown): boolean {
+  return error !== null && typeof error === 'object' && (error as { code?: unknown }).code === 'ENOENT'
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }
 
 interface ArchiveDbRow {
@@ -206,6 +305,13 @@ interface ArchiveDbRow {
   record_kind: 'conversation' | 'empty-draft'
 }
 
+interface ArchiveFileCleanupDbRow {
+  id: string
+  root_session_id: string
+  local_path: string
+  attempts: number
+}
+
 interface EmptyDraftDbRow {
   root_session_id: string
   runtime_kind: 'user' | 'project'
@@ -226,12 +332,36 @@ function safeNumber(value: string | number | null, label: string, nullable = fal
   return number
 }
 
+function nextArchiveRevision(value: string | number, label: string): number {
+  const current = safeNumber(value, label) as number
+  if (current >= Number.MAX_SAFE_INTEGER) {
+    throw new RangeError(`${label} exhausted the non-negative safe-integer range`)
+  }
+  return current + 1
+}
+
 function boundedLimit(value: number | undefined, maximum = 200): number {
   return Math.min(Math.max(value ?? 50, 1), maximum)
 }
 
 function boundedOffset(value: number | undefined): number {
   return Math.min(Math.max(value ?? 0, 0), Number.MAX_SAFE_INTEGER)
+}
+
+/** Reject a runtime read that exceeds the same work budget as the SQL fallback. */
+function assertRuntimeReadBudget(
+  value: ConversationArchiveRuntimeRead,
+  limit: number,
+): void {
+  if (value.descendants.length > MAX_ARCHIVE_DETAIL_DESCENDANTS
+    || value.events.length > limit) {
+    throw new ConversationArchiveError('ARCHIVE_TOO_LARGE', 413, 'runtime archive detail exceeds the response budget')
+  }
+  let encoded: string | undefined
+  try { encoded = JSON.stringify(value) } catch { encoded = undefined }
+  if (encoded === undefined || Buffer.byteLength(encoded, 'utf8') > MAX_ARCHIVE_DETAIL_EVENT_BYTES) {
+    throw new ConversationArchiveError('ARCHIVE_TOO_LARGE', 413, 'runtime archive detail exceeds the event byte limit')
+  }
 }
 
 function archiveRow(row: ArchiveDbRow): ConversationArchiveRow {
@@ -288,6 +418,123 @@ export class ConversationArchiveService {
   /** Install the Gateway-owned callback used to hydrate personal transcript bodies. */
   setRuntimeReader(reader: ConversationArchiveRuntimeReader): void {
     this.runtimeReader = reader
+  }
+
+  /** Queue one archive tree's filesystem paths inside its purge transaction. */
+  private async enqueueFileCleanup(
+    client: PoolClient,
+    rootSessionId: string,
+    paths: readonly string[],
+  ): Promise<void> {
+    const unique = [...new Set(paths)]
+    if (unique.length === 0) return
+    if (unique.some(path => path.length === 0 || path.length > 4_096)) {
+      throw new Error('archive content path is outside the cleanup path limit')
+    }
+    await client.query(`INSERT INTO harness.conversation_archive_file_cleanup(
+        organization_id,root_session_id,local_path
+      ) SELECT $1,$2,path FROM unnest($3::text[]) AS path
+      ON CONFLICT (organization_id,root_session_id,local_path) DO NOTHING`, [
+      this.context.organizationId, rootSessionId, unique,
+    ])
+  }
+
+  /** Claim a bounded cleanup page with a lease so another Gateway cannot race it. */
+  private async claimFileCleanupRows(
+    rootSessionId: string | undefined,
+    limit = ARCHIVE_FILE_CLEANUP_BATCH_SIZE,
+  ): Promise<ArchiveFileCleanupDbRow[]> {
+    const pageLimit = Math.min(Math.max(limit, 1), ARCHIVE_FILE_CLEANUP_BATCH_SIZE)
+    return await transaction(this.context.pool, async client => {
+      const values: unknown[] = [this.context.organizationId]
+      const rootClause = rootSessionId === undefined ? '' : ' AND root_session_id=$2'
+      if (rootSessionId !== undefined) values.push(rootSessionId)
+      values.push(pageLimit)
+      const limitArg = `$${String(values.length)}`
+      const rows = await client.query<ArchiveFileCleanupDbRow>(`SELECT id::text,root_session_id,local_path,attempts
+        FROM harness.conversation_archive_file_cleanup
+        WHERE organization_id=$1${rootClause}
+          AND next_attempt_at<=now() AND (lease_until IS NULL OR lease_until<=now())
+        ORDER BY next_attempt_at,created_at,id
+        LIMIT ${limitArg} FOR UPDATE SKIP LOCKED`, values)
+      if (rows.rows.length === 0) return []
+      const ids = rows.rows.map(row => row.id)
+      await client.query(`UPDATE harness.conversation_archive_file_cleanup
+        SET attempts=attempts+1,lease_until=now()+($2::bigint*interval '1 millisecond')
+        WHERE organization_id=$1 AND id=ANY($3::uuid[])`, [
+        this.context.organizationId, ARCHIVE_FILE_CLEANUP_LEASE_MS, ids,
+      ])
+      return rows.rows
+    })
+  }
+
+  /** Read remaining database references for a cleanup page in one indexed query. */
+  private async referencedContentPaths(paths: readonly string[]): Promise<Set<string> | undefined> {
+    if (paths.length === 0) return new Set()
+    try {
+      const references = await this.context.pool.query<{ local_path: string }>(`SELECT local_path
+        FROM harness.content_files
+        WHERE organization_id=$1 AND local_path=ANY($2::text[])`, [this.context.organizationId, paths])
+      return new Set(references.rows.map(row => row.local_path))
+    } catch {
+      return undefined
+    }
+  }
+
+  /** Check one path's remaining database references before unlinking it. */
+  private async cleanupFilePath(
+    path: string,
+    references?: ReadonlySet<string>,
+  ): Promise<ContentFileCleanupResult> {
+    const knownReferences = references ?? await this.referencedContentPaths([path])
+    if (knownReferences === undefined) {
+      return { status: 'deferred', error: 'content reference check failed' }
+    }
+    if (knownReferences.has(path)) return { status: 'retained' }
+    return await unlinkContentFile(path)
+  }
+
+  /** Complete or reschedule one claimed cleanup task. */
+  private async finishFileCleanup(
+    row: ArchiveFileCleanupDbRow,
+    outcome: ContentFileCleanupResult,
+  ): Promise<void> {
+    if (outcome.status !== 'deferred') {
+      await this.context.pool.query(`DELETE FROM harness.conversation_archive_file_cleanup
+        WHERE organization_id=$1 AND id=$2`, [this.context.organizationId, row.id])
+      return
+    }
+    const attempts = Math.min(row.attempts + 1, 30)
+    const backoff = Math.min(
+      ARCHIVE_FILE_CLEANUP_MAX_BACKOFF_MS,
+      ARCHIVE_FILE_CLEANUP_INITIAL_BACKOFF_MS * 2 ** Math.min(attempts - 1, 16),
+    )
+    await this.context.pool.query(`UPDATE harness.conversation_archive_file_cleanup
+      SET lease_until=NULL,last_error=$3,
+          next_attempt_at=now()+($4::bigint*interval '1 millisecond')
+      WHERE organization_id=$1 AND id=$2`, [
+      this.context.organizationId, row.id, outcome.error.slice(0, 2_048), backoff,
+    ])
+  }
+
+  /** Process a claimed page serially, limiting filesystem and database pressure. */
+  private async processFileCleanupRows(rows: readonly ArchiveFileCleanupDbRow[]): Promise<number> {
+    const references = await this.referencedContentPaths([...new Set(rows.map(row => row.local_path))])
+    let completed = 0
+    for (const row of rows) {
+      const outcome = references === undefined
+        ? { status: 'deferred' as const, error: 'content reference check failed' }
+        : await this.cleanupFilePath(row.local_path, references)
+      await this.finishFileCleanup(row, outcome)
+      if (outcome.status !== 'deferred') completed += 1
+    }
+    return completed
+  }
+
+  /** Retry due archive-file cleanup tasks left by a prior purge or failed worker. */
+  async cleanupDue(limit = ARCHIVE_FILE_CLEANUP_BATCH_SIZE): Promise<number> {
+    const rows = await this.claimFileCleanupRows(undefined, limit)
+    return await this.processFileCleanupRows(rows)
   }
 
   /** List root archive rows with organization-scoped filters and bounded pagination. */
@@ -421,7 +668,7 @@ export class ConversationArchiveService {
           WHERE r.organization_id=$1 AND r.id=$2`, [this.context.organizationId, rootSessionId])
         const ownerRow = owner.rows[0]
         if (ownerRow === undefined) continue
-        const nextRevision = Number(existing.rows[0]?.sync_revision ?? 0) + 1
+        const nextRevision = nextArchiveRevision(existing.rows[0]?.sync_revision ?? 0, 'archive sync revision')
         const purgeAfter = Date.now() + this.retentionDays * 86_400_000
         await client.query(`INSERT INTO harness.conversation_archive_records(
           organization_id,root_session_id,runtime_kind,runtime_public_id,project_id,creator_user_id,
@@ -486,7 +733,10 @@ export class ConversationArchiveService {
       id: string; parent_session_id: string | null; title: string | null
     }>(`SELECT id,parent_session_id,title FROM harness.conversation_sessions
       WHERE organization_id=$1 AND root_session_id=$2 AND status<>'deleted'
-      ORDER BY created_at,id`, [this.context.organizationId, rootSessionId])
+      ORDER BY created_at,id LIMIT $3`, [this.context.organizationId, rootSessionId, MAX_ARCHIVE_DETAIL_DESCENDANTS + 1])
+    if (descendants.rows.length > MAX_ARCHIVE_DETAIL_DESCENDANTS) {
+      throw new ConversationArchiveError('ARCHIVE_TOO_LARGE', 413, 'archive detail exceeds the descendant limit')
+    }
     const events = await this.context.pool.query<{
       session_id: string; seq: string; event_type: string; occurred_at_ms: string; event: unknown
     }>(`SELECT e.session_id,e.seq::text,e.event_type,
@@ -502,13 +752,22 @@ export class ConversationArchiveService {
         parentSessionId: item.parent_session_id,
         title: item.title ?? '未命名会话',
       }))
-    let projectedEvents = events.rows.slice(0, bounded).map(event => ({
+    let eventBytes = 0
+    const projectedEventsAll = events.rows.map(event => {
+      const projected = {
         sessionId: event.session_id,
         seq: safeNumber(event.seq, 'event sequence')!,
         type: event.event_type,
         time: safeNumber(event.occurred_at_ms, 'event time')!,
         data: event.event,
-      }))
+      }
+      eventBytes += Buffer.byteLength(JSON.stringify(projected), 'utf8')
+      if (eventBytes > MAX_ARCHIVE_DETAIL_EVENT_BYTES) {
+        throw new ConversationArchiveError('ARCHIVE_TOO_LARGE', 413, 'archive detail exceeds the event byte limit')
+      }
+      return projected
+    })
+    let projectedEvents = projectedEventsAll.slice(0, bounded)
     let projectedHasMore = events.rows.length > bounded
     if (row.runtime_kind === 'user' && row.state !== 'purged' && this.runtimeReader !== undefined) {
       try {
@@ -519,6 +778,7 @@ export class ConversationArchiveService {
           bounded,
         )
         if (remote !== undefined) {
+          assertRuntimeReadBudget(remote, bounded)
           projectedRecord = remote.title === undefined ? projectedRecord : { ...projectedRecord, title: remote.title }
           projectedDescendants = [...remote.descendants]
           projectedEvents = [...remote.events]
@@ -539,6 +799,10 @@ export class ConversationArchiveService {
 
   /** Create or refresh an archive row from a runtime snapshot. */
   async syncSnapshot(snapshot: ConversationArchiveSnapshot): Promise<void> {
+    if (!Number.isSafeInteger(snapshot.syncRevision) || snapshot.syncRevision < 0) {
+      throw new Error('invalid runtime archive revision')
+    }
+    const search = normalizeArchiveSearch(snapshot.search)
     await transaction(this.context.pool, async client => {
       const creator = snapshot.creatorUserId === undefined
         ? null : await this.internalUserId(client, snapshot.creatorUserId)
@@ -569,26 +833,32 @@ export class ConversationArchiveService {
         snapshot.workspace?.title ?? null, snapshot.workspace?.position ?? null, snapshot.messageCount ?? 0,
         snapshot.archivedAt ?? Date.now(), snapshot.syncRevision,
       ])
-      if (snapshot.search !== undefined) {
-        for (const item of snapshot.search) {
-          await client.query(`INSERT INTO harness.conversation_archive_search(
-            organization_id,root_session_id,session_id,event_seq,role,content,occurred_at
-          ) VALUES($1,$2,$3,$4,$5,$6,to_timestamp($7/1000.0))
-          ON CONFLICT (organization_id,session_id,event_seq) DO UPDATE SET
-            root_session_id=EXCLUDED.root_session_id,role=EXCLUDED.role,content=EXCLUDED.content,occurred_at=EXCLUDED.occurred_at`, [
-            this.context.organizationId, snapshot.rootSessionId, item.sessionId, item.seq,
-            item.role, item.content, item.occurredAt,
-          ])
-        }
+      for (let offset = 0; offset < search.length; offset += ARCHIVE_SEARCH_BATCH_SIZE) {
+        const batch = search.slice(offset, offset + ARCHIVE_SEARCH_BATCH_SIZE)
+        await client.query(`INSERT INTO harness.conversation_archive_search(
+          organization_id,root_session_id,session_id,event_seq,role,content,occurred_at
+        ) SELECT $1,$2,item.session_id,item.event_seq,item.role,item.content,
+            to_timestamp(item.occurred_at_ms/1000.0)
+          FROM unnest($3::text[],$4::bigint[],$5::text[],$6::text[],$7::bigint[])
+            AS item(session_id,event_seq,role,content,occurred_at_ms)
+        ON CONFLICT (organization_id,session_id,event_seq) DO UPDATE SET
+          root_session_id=EXCLUDED.root_session_id,role=EXCLUDED.role,content=EXCLUDED.content,occurred_at=EXCLUDED.occurred_at`, [
+          this.context.organizationId, snapshot.rootSessionId,
+          batch.map(item => item.sessionId), batch.map(item => item.seq),
+          batch.map(item => item.role), batch.map(item => item.content), batch.map(item => item.occurredAt),
+        ])
       }
     })
   }
 
-  /** Persist one complete runtime snapshot and return commands awaiting acknowledgement. */
+  /** Persist one idempotent runtime projection batch and return a bounded command page. */
   async syncRuntimeSnapshot(
     snapshot: ConversationArchiveRuntimeSnapshot,
     caller?: ConversationArchiveRuntimeIdentity,
   ): Promise<readonly { id: string; rootSessionId: string; action: 'restore' | 'trash' | 'purge' }[]> {
+    if (!Number.isSafeInteger(snapshot.revision) || snapshot.revision < 0) {
+      throw new Error('invalid runtime archive revision')
+    }
     if (caller !== undefined
       && (caller.kind !== snapshot.runtime.kind || caller.id !== snapshot.runtime.id)) {
       throw new Error('archive snapshot runtime identity does not match the authenticated runtime')
@@ -599,7 +869,7 @@ export class ConversationArchiveService {
     ]))
     const rootFor = (sessionId: string): string => {
       const explicit = bySession.get(sessionId)?.rootSessionId
-      if (explicit !== undefined && (explicit === sessionId || bySession.has(explicit))) return explicit
+      if (explicit !== undefined) return explicit
       const seen = new Set<string>()
       let current = sessionId
       while (true) {
@@ -610,8 +880,9 @@ export class ConversationArchiveService {
         current = parent
       }
     }
+    const search = normalizeArchiveSearch(snapshot.search)
     const searchBySession = new Map<string, ArchiveSearchInput[]>()
-    for (const item of snapshot.search ?? []) {
+    for (const item of search) {
       const list = searchBySession.get(item.sessionId)
       if (list === undefined) searchBySession.set(item.sessionId, [item])
       else list.push(item)
@@ -620,8 +891,12 @@ export class ConversationArchiveService {
       await this.assertRuntimeSessionOwnership(caller, [
         ...snapshot.archivedSessionIds,
         ...snapshot.sessions.map(item => item.sessionId),
+        ...snapshot.sessions.flatMap(item => item.rootSessionId === undefined ? [] : [item.rootSessionId]),
         ...(snapshot.search ?? []).map(item => item.sessionId),
-      ])
+      ], snapshot.sessions.flatMap(item => item.rootSessionId === undefined ? [] : [{
+        sessionId: item.sessionId,
+        rootSessionId: item.rootSessionId,
+      }]))
     }
     const grouped = new Map<string, string[]>()
     for (const sessionId of snapshot.archivedSessionIds) {
@@ -635,10 +910,14 @@ export class ConversationArchiveService {
       const workspace = root?.workspace ?? sessionIds.map(sessionId => bySession.get(sessionId)?.workspace)
         .find(value => value !== undefined)
       const search = sessionIds.flatMap(sessionId => searchBySession.get(sessionId) ?? [])
-      const messageCount = sessionIds.reduce((total, sessionId) => {
+      const partialMessageCount = sessionIds.reduce((total, sessionId) => {
         const item = bySession.get(sessionId)
         return total + (item?.messageCount ?? searchBySession.get(sessionId)?.length ?? 0)
       }, 0)
+      const rootMessageCount = sessionIds.reduce<number | undefined>((total, sessionId) => {
+        const candidate = bySession.get(sessionId)?.rootMessageCount
+        return candidate === undefined ? total : Math.max(total ?? 0, candidate)
+      }, undefined)
       await this.syncSnapshot({
         rootSessionId,
         runtime: snapshot.runtime,
@@ -646,7 +925,7 @@ export class ConversationArchiveService {
         syncRevision: snapshot.revision,
         ...(root?.title === undefined ? {} : { title: root.title }),
         ...(workspace === undefined ? {} : { workspace }),
-        messageCount,
+        messageCount: rootMessageCount ?? partialMessageCount,
         ...(search.length === 0 ? {} : { search }),
       })
     }
@@ -657,7 +936,9 @@ export class ConversationArchiveService {
       JOIN harness.conversation_archive_records a
         ON a.organization_id=c.organization_id AND a.root_session_id=c.root_session_id
       WHERE c.organization_id=$1 AND a.runtime_kind=$2 AND a.runtime_public_id=$3 AND c.status='pending'
-      ORDER BY c.requested_at,c.id`, [this.context.organizationId, snapshot.runtime.kind, snapshot.runtime.id])
+      ORDER BY c.requested_at,c.id LIMIT $4`, [
+      this.context.organizationId, snapshot.runtime.kind, snapshot.runtime.id, ARCHIVE_COMMAND_BATCH_SIZE,
+    ])
     return pending.rows.map(row => ({ id: row.id, rootSessionId: row.root_session_id, action: row.action }))
   }
 
@@ -682,6 +963,9 @@ export class ConversationArchiveService {
       if (command.status !== 'pending') return
       const desiredRevision = Number(command.desired_revision)
       if (!Number.isSafeInteger(runtimeRevision) || runtimeRevision < 0) throw new Error('invalid runtime archive revision')
+      if (!Number.isSafeInteger(desiredRevision) || desiredRevision < 0) {
+        throw new Error('stored archive revision is outside the safe integer range')
+      }
       await client.query(`UPDATE harness.conversation_archive_commands
         SET status=$2,error=$3,applied_at=CASE WHEN $2='applied' THEN now() ELSE NULL END
         WHERE organization_id=$1 AND id=$4`, [this.context.organizationId, status, error ?? null, commandId])
@@ -716,7 +1000,7 @@ export class ConversationArchiveService {
       const current = row.rows[0]
       if (current === undefined) return null
       if (current.state === 'purged') throw new Error('archive-already-purged')
-      const nextRevision = Number(current.sync_revision) + 1
+      const nextRevision = nextArchiveRevision(current.sync_revision, 'archive sync revision')
       const now = new Date()
       if (state === 'archived') {
         await client.query(`UPDATE harness.conversation_archive_records SET state='archived',restored_at=now(),restored_by_user_id=$3,
@@ -759,11 +1043,13 @@ export class ConversationArchiveService {
       const current = row.rows[0]
       if (current === undefined) return { found: false, paths: [] as string[] }
       if (current.state === 'purged') return { found: true, paths: [] as string[] }
-      const nextRevision = Number(current.sync_revision) + 1
+      const nextRevision = nextArchiveRevision(current.sync_revision, 'archive sync revision')
       const files = await client.query<{ local_path: string }>(`SELECT DISTINCT f.local_path
         FROM harness.content_files f JOIN harness.conversation_sessions s
           ON s.id=f.session_id AND s.organization_id=f.organization_id
         WHERE f.organization_id=$1 AND s.root_session_id=$2`, [this.context.organizationId, rootSessionId])
+      const paths = [...new Set(files.rows.map(row => row.local_path))]
+      await this.enqueueFileCleanup(client, rootSessionId, paths)
       await client.query(`DELETE FROM harness.content_files WHERE organization_id=$1 AND session_id IN
         (SELECT id FROM harness.conversation_sessions WHERE organization_id=$1 AND root_session_id=$2)`, [this.context.organizationId, rootSessionId])
       await client.query(`DELETE FROM harness.conversation_events WHERE session_id IN
@@ -780,15 +1066,33 @@ export class ConversationArchiveService {
       ) VALUES($1,$2,'purge',$3,$4,$5) ON CONFLICT (organization_id,idempotency_key) DO NOTHING`, [
         this.context.organizationId, rootSessionId, actor, nextRevision, idempotencyKey ?? null,
       ])
-      return { found: true, paths: files.rows.map(row => row.local_path) }
+      return { found: true, paths }
     })
     if (!result.found) return false
-    for (const path of result.paths) {
+    if (result.paths.length > 0) {
       try {
-        await unlinkContentFile(path)
-      } catch (_error: unknown) {
-        // The durable database purge is authoritative; an unavailable local file
-        // is retained for the deployment's separate storage-reconciliation pass.
+        let claimed: ArchiveFileCleanupDbRow[] = []
+        try {
+          claimed = await this.claimFileCleanupRows(rootSessionId, Math.min(result.paths.length, ARCHIVE_FILE_CLEANUP_BATCH_SIZE))
+        } catch {
+          // A test double or a rolling migration may not expose the cleanup
+          // ledger; preserve the database purge and use the safe direct path
+          // operation as a compatibility fallback.
+        }
+        if (claimed.length > 0) {
+          await this.processFileCleanupRows(claimed)
+        } else {
+          for (const path of result.paths.slice(0, ARCHIVE_FILE_CLEANUP_BATCH_SIZE)) {
+            // The durable ledger is authoritative when present. A direct
+            // fallback is intentionally best effort and still performs the
+            // database-reference check before unlinking.
+            await this.cleanupFilePath(path)
+          }
+        }
+      } catch {
+        // The database purge has already committed. A cleanup/readback fault
+        // leaves the leased ledger task for the next maintenance sweep and
+        // must not report the completed purge as a failed mutation.
       }
     }
     return true
@@ -802,6 +1106,7 @@ export class ConversationArchiveService {
       ORDER BY purge_after,root_session_id LIMIT $2`, [this.context.organizationId, Math.min(Math.max(limit, 1), 200)])
     let purged = 0
     for (const row of due.rows) if (await this.purge(row.root_session_id)) purged++
+    await this.cleanupDue(ARCHIVE_FILE_CLEANUP_BATCH_SIZE)
     return purged
   }
 
@@ -809,6 +1114,7 @@ export class ConversationArchiveService {
   private async assertRuntimeSessionOwnership(
     runtime: ConversationArchiveRuntimeIdentity,
     sessionIds: readonly string[],
+    rootPairs: readonly { sessionId: string; rootSessionId: string }[] = [],
   ): Promise<void> {
     const unique = [...new Set(sessionIds)]
     if (unique.length === 0) return
@@ -819,7 +1125,7 @@ export class ConversationArchiveService {
       ? await this.internalProjectId(this.context.pool, runtime.id)
       : await this.internalUserId(this.context.pool, runtime.id)
     if (owner === null) throw new Error('archive runtime owner is unavailable')
-    const result = await this.context.pool.query<{ id: string }>(`SELECT s.id
+    const result = await this.context.pool.query<{ id: string; root_session_id: string }>(`SELECT s.id,s.root_session_id
       FROM harness.conversation_sessions s
       WHERE s.organization_id=$1 AND s.id=ANY($2::text[])
         AND (($3::text='project' AND s.project_id=$4::uuid)
@@ -831,6 +1137,12 @@ export class ConversationArchiveService {
     ])
     if (result.rows.length !== unique.length) {
       throw new Error('archive snapshot contains a session outside the authenticated runtime')
+    }
+    const roots = new Map(result.rows.map(row => [row.id, row.root_session_id]))
+    for (const pair of rootPairs) {
+      if (roots.get(pair.sessionId) !== pair.rootSessionId) {
+        throw new Error('archive snapshot contains a session with an incorrect lineage root')
+      }
     }
   }
 

@@ -10,6 +10,8 @@ Process-local implementation of the [`@deepseek-ai/dsh-jobs`](../jobs/README.md)
 
 At capacity, `start()` fails before producer execution and id allocation with an error that names the limit and tells the model to use `job_kill`, wait for the job to finish stopping, and retry. The registry does not queue, preempt, or maintain a second mutable counter.
 
+Terminal records are reclaimed when they exceed `terminalRetentionMs` (24 hours by default), `maxTerminalJobs` (1,000), or `maxTerminalOutputBytes` (64 MiB). Active records and records with waiters are retained; the limits apply only after a terminal outcome is published. `terminalRetentionMs` is capped at Node's maximum timer delay (`2,147,483,647` ms), so invalid timer values cannot turn the periodic cleanup into a busy loop.
+
 ## Lifecycle
 
 Jobs belong to their owner and backend, not the producer tool fiber, so producer and controller reloads do not stop them. The first job for an owner attaches one awaited effect to the exact `Agent` scope. Owner disposal cancels that object's jobs, awaits producer quiescence, and removes their snapshots; reused agent or session ids cannot redirect an old cleanup.

@@ -26,6 +26,8 @@ Search and fetch share no request schema and no business logic, but they are del
 
 Providers register **capabilities**, not tools. `dsh-tool-web` is the only owner of model-facing names, descriptions, prompt guidance, JSON schemas, and presentation.
 
+The package also exports `readWebResponseBytes()` and `readWebResponseJson()`. Search providers use these readers to enforce a positive `maxResponseBytes` budget before parsing an upstream body; declared and chunked responses share the same limit, the configured cap cannot exceed 256 MiB, and `WebResponseTooLargeError` identifies the refusal.
+
 ## Selection
 
 Selection never depends on registration, config, or HMR order. A capability has an explicit provider id (config `searchProvider`/`fetchProvider`, or env `$DSH_WEB_SEARCH_PROVIDER`/`$DSH_WEB_FETCH_PROVIDER` feeding the same fields), or auto-selects when exactly one usable provider is registered. `search()`/`fetch()` resolve the provider at execution time:

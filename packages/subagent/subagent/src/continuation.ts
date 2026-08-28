@@ -276,6 +276,11 @@ interface Materialization {
   readonly settled: Promise<void>
 }
 
+interface ActivationQuotaReservation {
+  transfer(): void
+  release(): void
+}
+
 /**
  * Read one Activation's current disposal transaction. This indirection exists
  * because TypeScript would otherwise narrow repeated reads of the mutable field
@@ -355,8 +360,13 @@ class ChildLock {
 export class SubagentContinuationManager {
   /** Child session id → its live Activation. Process-local, never durable. */
   private activations = new Map<SessionId, Activation>()
+  /** Child session id → the exact live Activation that owns it. */
+  private readonly childOwners = new Map<SessionId, Activation>()
   /** Materializations admitted before drain, tracked through publication or rollback. */
   private readonly materializations = new Set<Materialization>()
+  private pendingActivations = 0
+  private readonly pendingActivationsByParent = new Map<SessionId, number>()
+  private readonly activationsByParent = new Map<SessionId, number>()
   private readonly locks = new ChildLock()
   /** Structural Cordis owner of every Activation handle. */
   private readonly ownerCtx: Context
@@ -373,6 +383,7 @@ export class SubagentContinuationManager {
     private readonly ctx: Context,
     private readonly host: ContinuationHost,
     private readonly setupRegistry: SubagentActivationSetupRegistry,
+    private readonly limits: { maxActivations: number; maxActivationsPerParent: number },
   ) {
     // Ordinary Cordis owner effects unwind in reverse registration order, which
     // cannot express the dynamic child graph. Register the private scope's
@@ -919,6 +930,58 @@ export class SubagentContinuationManager {
     )
   }
 
+  /** Reserve one global and direct-parent Activation slot across asynchronous materialization. */
+  private reserveActivation(parentSession: SessionId): ActivationQuotaReservation {
+    if (this.activations.size + this.pendingActivations >= this.limits.maxActivations) {
+      throw new SubagentError(
+        `continuable subagent Activation limit reached (limit: ${String(this.limits.maxActivations)})`,
+        'ACTIVATION_CAPACITY_EXCEEDED',
+      )
+    }
+    const parentCount = (this.activationsByParent.get(parentSession) ?? 0)
+      + (this.pendingActivationsByParent.get(parentSession) ?? 0)
+    if (parentCount >= this.limits.maxActivationsPerParent) {
+      throw new SubagentError(
+        `continuable subagent Activation limit for parent "${parentSession}" reached `
+        + `(limit: ${String(this.limits.maxActivationsPerParent)})`,
+        'ACTIVATION_CAPACITY_EXCEEDED',
+      )
+    }
+
+    this.pendingActivations++
+    this.pendingActivationsByParent.set(parentSession, (this.pendingActivationsByParent.get(parentSession) ?? 0) + 1)
+    let state: 'pending' | 'live' | 'released' = 'pending'
+    const releasePending = (): void => {
+      this.pendingActivations--
+      this.decrementCount(this.pendingActivationsByParent, parentSession)
+    }
+    return {
+      transfer: () => {
+        if (state !== 'pending') throw new Error('subagent Activation quota reservation is not pending')
+        releasePending()
+        this.activationsByParent.set(parentSession, (this.activationsByParent.get(parentSession) ?? 0) + 1)
+        state = 'live'
+      },
+      release: () => {
+        if (state !== 'pending') return
+        releasePending()
+        state = 'released'
+      },
+    }
+  }
+
+  private decrementCount(counts: Map<SessionId, number>, sessionId: SessionId): void {
+    const next = (counts.get(sessionId) ?? 0) - 1
+    if (next > 0) counts.set(sessionId, next)
+    else counts.delete(sessionId)
+  }
+
+  private removeActivation(activation: Activation): void {
+    if (this.activations.get(activation.childId) !== activation) return
+    this.activations.delete(activation.childId)
+    this.decrementCount(this.activationsByParent, activation.parentSession)
+  }
+
   /**
    * Derive residency from Agent quiescence and the owned-child set. `running`
    * covers an active admission, an open turn, or accepted waking inbox work.
@@ -1026,6 +1089,7 @@ export class SubagentContinuationManager {
    */
   private materialize(inputs: MaterializeInputs): Promise<Activation> {
     this.assertAdmitting(inputs.parent)
+    const quota = this.reserveActivation(inputs.parent.id)
     const settled = Promise.withResolvers<void>()
     const lineage = this.liveLineage(inputs.parent)
     const materialization: Materialization = {
@@ -1033,8 +1097,9 @@ export class SubagentContinuationManager {
       settled: settled.promise,
     }
     this.materializations.add(materialization)
-    return this.materializeTracked(inputs, lineage).finally(() => {
+    return this.materializeTracked(inputs, lineage, quota).finally(() => {
       this.materializations.delete(materialization)
+      quota.release()
       settled.resolve()
     })
   }
@@ -1047,6 +1112,7 @@ export class SubagentContinuationManager {
   private async materializeTracked(
     inputs: MaterializeInputs,
     parentLineage: readonly Agent[],
+    quota: ActivationQuotaReservation,
   ): Promise<Activation> {
     const { childId, provider, parent, create } = inputs
     // No id pre-check here: the child lock serializes each durable child, both
@@ -1101,6 +1167,7 @@ export class SubagentContinuationManager {
     }
     // After transfer, any failure must dispose the created handle, remove the
     // Activation, and roll back parent ownership before rejecting.
+    quota.transfer()
     this.activations.set(childId, activation)
     try {
       inputs.signal.throwIfAborted()
@@ -1146,7 +1213,7 @@ export class SubagentContinuationManager {
       try {
         await activation.handle.dispose()
       } finally {
-        this.activations.delete(activation.childId)
+        this.removeActivation(activation)
         this.releaseOwnership(activation.childId)
       }
     })())
@@ -1167,14 +1234,23 @@ export class SubagentContinuationManager {
         'ACTIVATION_CLOSING',
       )
     }
+    const existingOwner = this.childOwners.get(childId)
+    if (existingOwner !== undefined && existingOwner !== parentActivation) {
+      throw new SubagentError(
+        `subagent "${childId}" is already owned by another activation`,
+        'ACTIVATION_OWNERSHIP_CONFLICT',
+      )
+    }
     parentActivation.ownedChildren.add(childId)
+    this.childOwners.set(childId, parentActivation)
   }
 
   /** Remove one child from its live owner's set and let that owner re-check settlement. */
   private releaseOwnership(childId: SessionId): void {
-    for (const candidate of this.activations.values()) {
-      if (candidate.ownedChildren.delete(childId)) this.wake(candidate)
-    }
+    const owner = this.childOwners.get(childId)
+    if (owner === undefined) return
+    this.childOwners.delete(childId)
+    if (owner.ownedChildren.delete(childId)) this.wake(owner)
   }
 
   /** Let a settlement watcher re-observe quiescence after ownership or inbox changes. */
@@ -1424,7 +1500,7 @@ export class SubagentContinuationManager {
     // Only now is the Activation gone: keeping the entry until disposal settles
     // makes a racing delivery wait for release rather than cold-resume into the
     // still-registered agent.
-    this.activations.delete(childId)
+    this.removeActivation(activation)
     // BEFORE releasing ownership, while the parent still counts this child and
     // therefore cannot be judged settled. Delivering after the release would
     // race a parent watcher that resumes one microtask later, finds itself

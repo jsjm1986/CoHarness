@@ -7,8 +7,11 @@ import { SessionId } from '@deepseek-ai/dsh-session'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { GatewayPrincipalClaims, GatewayRuntimeCredential } from '../src/index.ts'
 import GatewayRuntime, {
+  GatewayResponseTooLargeError,
   GATEWAY_PRINCIPAL_HEADER,
   GatewaySessionCreationAuthorization,
+  readGatewayResponseBytes,
+  readGatewayResponseJson,
   parseGatewayRuntimeCredential,
   verifyGatewayPrincipal,
 } from '../src/index.ts'
@@ -241,5 +244,43 @@ describe('Gateway request context', () => {
     expect(reached).toBe(false)
     await fiber.dispose()
     await rm(root, { recursive: true, force: true })
+  })
+})
+
+describe('bounded Gateway responses', () => {
+  it('reads and parses a chunked JSON response within its byte budget', async () => {
+    const response = new Response(new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('{"ok":'))
+        controller.enqueue(new TextEncoder().encode('true}'))
+        controller.close()
+      },
+    }))
+    await expect(readGatewayResponseJson(response, 32)).resolves.toEqual({ ok: true })
+  })
+
+  it('rejects a declared oversized response before parsing', async () => {
+    const response = new Response('12345')
+    await expect(readGatewayResponseBytes(response, 4)).rejects.toBeInstanceOf(GatewayResponseTooLargeError)
+  })
+
+  it('cancels a chunked response when the body crosses its budget', async () => {
+    let cancelled = false
+    const response = new Response(new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(3))
+      },
+      pull(controller) {
+        controller.enqueue(new Uint8Array(3))
+      },
+      cancel() { cancelled = true },
+    }))
+    await expect(readGatewayResponseBytes(response, 4)).rejects.toBeInstanceOf(GatewayResponseTooLargeError)
+    expect(cancelled).toBe(true)
+  })
+
+  it('rejects invalid response limits and malformed JSON', async () => {
+    await expect(readGatewayResponseBytes(new Response('{}'), 0)).rejects.toThrow(/positive safe integer/)
+    await expect(readGatewayResponseJson(new Response('not-json'), 32)).rejects.toThrow(SyntaxError)
   })
 })

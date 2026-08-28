@@ -6,6 +6,7 @@
 import { constants as bufferConstants } from 'node:buffer'
 import { createZstdDecompress } from 'node:zlib'
 import type { ZstdFrameDecoder, ZstdFrameRange } from './zstd.ts'
+import { ZstdOutputLimitError } from './zstd-errors.ts'
 
 const DECODE_CHUNK_SIZE = 1024 * 1024
 
@@ -94,15 +95,23 @@ export class NodePrivateZstdFrameDecoder implements ZstdFrameDecoder {
   }
 
   /** @inheritdoc */
-  public *decode(source: Buffer, frames: readonly ZstdFrameRange[]): Generator<Buffer, void, void> {
+  public *decode(
+    source: Buffer,
+    frames: readonly ZstdFrameRange[],
+    maxOutputBytes?: number,
+  ): Generator<Buffer, void, void> {
     if (this.started) throw new Error('Zstandard frame decoder was already started')
     if (this.closed) throw new Error('cannot start a closed Zstandard frame decoder')
     this.started = true
+    let totalOutputBytes = 0
     try {
       for (const frame of frames) {
         try {
-          yield this.decodeFrame(source.subarray(frame.start, frame.end))
+          const decoded = this.decodeFrame(source.subarray(frame.start, frame.end), maxOutputBytes, totalOutputBytes)
+          totalOutputBytes += decoded.length
+          yield decoded
         } catch (error) {
+          if (error instanceof ZstdOutputLimitError) throw error
           throw new Error(`corrupt Zstandard session log: frame at byte ${frame.start} failed validation`, {
             cause: error,
           })
@@ -114,7 +123,7 @@ export class NodePrivateZstdFrameDecoder implements ZstdFrameDecoder {
   }
 
   /** Decode one frame; its returned scratch view remains valid until the next call. */
-  private decodeFrame(input: Buffer): Buffer {
+  private decodeFrame(input: Buffer, maxOutputBytes: number | undefined, previousOutputBytes: number): Buffer {
     const handle = this.stream._handle
     /* v8 ignore next -- decode() rejects closed instances before entering this private frame operation. */
     if (this.closed || handle === null) throw new Error('cannot decode with a closed Zstandard frame decoder')
@@ -146,6 +155,9 @@ export class NodePrivateZstdFrameDecoder implements ZstdFrameDecoder {
       const produced = this.output.length - outputAfter
       if (produced > 0) {
         outputBytes += produced
+        if (maxOutputBytes !== undefined && previousOutputBytes + outputBytes > maxOutputBytes) {
+          throw new ZstdOutputLimitError(maxOutputBytes)
+        }
         /* v8 ignore next -- Buffer cannot materialize a frame beyond its own process-wide maximum length. */
         if (outputBytes > bufferConstants.MAX_LENGTH) {
           throw new Error(`Zstandard frame output exceeds ${bufferConstants.MAX_LENGTH} bytes`)

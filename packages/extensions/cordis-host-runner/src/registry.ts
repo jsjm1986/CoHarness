@@ -10,6 +10,24 @@ import type {
   CordisDynamicRunMode, DynamicCordisRenderFailure, DynamicCordisRunAttempt,
 } from './types.ts'
 
+/** Admission limits for process-local dynamic definitions and approvals. */
+export interface DynamicCordisRegistryConfig {
+  /** Maximum number of live Plugins in the process. */
+  readonly maxPlugins: number
+  /** Maximum number of Plugins owned by one Session. */
+  readonly maxPluginsPerSession: number
+  /** Maximum immutable Packages retained by one Plugin. */
+  readonly maxPackagesPerPlugin: number
+  /** Maximum UTF-8 source bytes retained across all definitions. */
+  readonly maxSourceBytes: number
+  /** Maximum UTF-8 source bytes retained by one Session. */
+  readonly maxSourceBytesPerSession: number
+  /** Maximum pending run requests in the process. */
+  readonly maxPendingApprovals: number
+  /** Maximum pending run requests owned by one Session. */
+  readonly maxPendingApprovalsPerSession: number
+}
+
 /** One Host method exposed to this package's Client half. */
 export type DynamicCordisHandler = (args: unknown) => Promise<unknown>
 
@@ -81,6 +99,13 @@ export interface DynamicCordisPendingRequest {
   requiresApproval: boolean
 }
 
+const sourceEncoder = new TextEncoder()
+
+function definitionSourceBytes(definition: Pick<DynamicCordisDefinition, 'hostCode' | 'clientCode'>): number {
+  return (definition.hostCode === undefined ? 0 : sourceEncoder.encode(definition.hostCode).byteLength)
+    + (definition.clientCode === undefined ? 0 : sourceEncoder.encode(definition.clientCode).byteLength)
+}
+
 /** Request accepted by `define`; it never crosses the Remote transport. */
 export interface DynamicCordisDefineRequest {
   /** Session that owns the plugin. */
@@ -139,12 +164,22 @@ export interface DynamicCordisPackageInspection extends DynamicCordisReference {
 
 /** Registry, identity mints, and pending approval index. */
 export class DynamicCordisRegistry {
+  private readonly config: DynamicCordisRegistryConfig
   private readonly plugins = new Map<CordisDynamicPluginId, DynamicCordisPlugin>()
   private readonly pendingRequests = new Map<ApprovalRequestId, DynamicCordisPendingRequest>()
+  private readonly pendingBySession = new Map<SessionId, number>()
+  private readonly pluginsBySession = new Map<SessionId, number>()
+  private readonly sourceBytesBySession = new Map<SessionId, number>()
+  private sourceBytes = 0
   private nextPlugin = 1
   private nextPackage = 1
   private nextRun = 1
   private nextApproval = 1
+
+  /** Create an empty registry with explicit admission limits. */
+  constructor(config: DynamicCordisRegistryConfig) {
+    this.config = config
+  }
 
   /**
    * Mint a semantic plugin ID without reusing a prior suffix.
@@ -187,7 +222,56 @@ export class DynamicCordisRegistry {
    * @param plugin - Plugin record to retain under its stable ID.
    */
   add(plugin: DynamicCordisPlugin): void {
+    if (this.plugins.has(plugin.pluginId)) throw new Error(`dynamic plugin "${plugin.pluginId}" already exists`)
     this.plugins.set(plugin.pluginId, plugin)
+    this.pluginsBySession.set(plugin.sessionId, (this.pluginsBySession.get(plugin.sessionId) ?? 0) + 1)
+    const bytes = [...plugin.packages.values()].reduce((sum, definition) => sum + definitionSourceBytes(definition), 0)
+    this.sourceBytes += bytes
+    this.sourceBytesBySession.set(plugin.sessionId, (this.sourceBytesBySession.get(plugin.sessionId) ?? 0) + bytes)
+  }
+
+  /**
+   * Check whether a new definition fits every configured registry budget.
+   * @param sessionId - owning Session id.
+   * @param plugin - existing Plugin for a package update, or undefined for a new Plugin.
+   * @param code - Host and Client source whose retained bytes are checked.
+   */
+  assertDefinitionCapacity(
+    sessionId: SessionId,
+    plugin: DynamicCordisPlugin | undefined,
+    code: Pick<DynamicCordisDefinition, 'hostCode' | 'clientCode'>,
+  ): void {
+    if (plugin === undefined) {
+      if (this.plugins.size >= this.config.maxPlugins) {
+        throw new Error(`dynamic Plugin limit reached (limit: ${this.config.maxPlugins})`)
+      }
+      if ((this.pluginsBySession.get(sessionId) ?? 0) >= this.config.maxPluginsPerSession) {
+        throw new Error(`dynamic Plugin limit for Session reached (limit: ${this.config.maxPluginsPerSession})`)
+      }
+    } else if (plugin.packages.size >= this.config.maxPackagesPerPlugin) {
+      throw new Error(`dynamic Package limit for Plugin reached (limit: ${this.config.maxPackagesPerPlugin})`)
+    }
+    const bytes = definitionSourceBytes(code)
+    if (this.sourceBytes + bytes > this.config.maxSourceBytes) {
+      throw new Error(`dynamic source-byte limit reached (limit: ${this.config.maxSourceBytes})`)
+    }
+    if ((this.sourceBytesBySession.get(sessionId) ?? 0) + bytes > this.config.maxSourceBytesPerSession) {
+      throw new Error(`dynamic source-byte limit for Session reached (limit: ${this.config.maxSourceBytesPerSession})`)
+    }
+  }
+
+  /**
+   * Retain one immutable Package after its admission check succeeds.
+   * @param plugin - Plugin that owns the package.
+   * @param definition - immutable package definition to retain.
+   */
+  addPackage(plugin: DynamicCordisPlugin, definition: DynamicCordisDefinition): void {
+    if (plugin.packages.has(definition.packageId)) throw new Error(`dynamic package "${definition.packageId}" already exists`)
+    this.assertDefinitionCapacity(plugin.sessionId, plugin, definition)
+    plugin.packages.set(definition.packageId, definition)
+    const bytes = definitionSourceBytes(definition)
+    this.sourceBytes += bytes
+    this.sourceBytesBySession.set(plugin.sessionId, (this.sourceBytesBySession.get(plugin.sessionId) ?? 0) + bytes)
   }
 
   /**
@@ -205,7 +289,21 @@ export class DynamicCordisRegistry {
    * @returns whether a Plugin record was removed.
    */
   delete(id: CordisDynamicPluginId): boolean {
-    return this.plugins.delete(id)
+    const plugin = this.plugins.get(id)
+    if (plugin === undefined) return false
+    this.plugins.delete(id)
+    const pluginCount = (this.pluginsBySession.get(plugin.sessionId) ?? 1) - 1
+    if (pluginCount <= 0) this.pluginsBySession.delete(plugin.sessionId)
+    else this.pluginsBySession.set(plugin.sessionId, pluginCount)
+    const bytes = [...plugin.packages.values()].reduce((sum, definition) => sum + definitionSourceBytes(definition), 0)
+    this.sourceBytes -= bytes
+    const sessionBytes = (this.sourceBytesBySession.get(plugin.sessionId) ?? bytes) - bytes
+    if (sessionBytes <= 0) this.sourceBytesBySession.delete(plugin.sessionId)
+    else this.sourceBytesBySession.set(plugin.sessionId, sessionBytes)
+    for (const [requestId, request] of this.pendingRequests) {
+      if (request.pluginId === id) this.removePendingRequest(requestId)
+    }
+    return true
   }
 
   /**
@@ -231,7 +329,16 @@ export class DynamicCordisRegistry {
    * @param pending - resolver and Plugin metadata retained until settlement.
    */
   armRequest(id: ApprovalRequestId, pending: DynamicCordisPendingRequest): void {
+    if (this.pendingRequests.has(id)) throw new Error(`dynamic approval "${id}" already exists`)
+    if (this.pendingRequests.size >= this.config.maxPendingApprovals) {
+      throw new Error(`dynamic pending-approval limit reached (limit: ${this.config.maxPendingApprovals})`)
+    }
+    const pendingForSession = this.pendingBySession.get(pending.agentId) ?? 0
+    if (pendingForSession >= this.config.maxPendingApprovalsPerSession) {
+      throw new Error(`dynamic pending-approval limit for Session reached (limit: ${this.config.maxPendingApprovalsPerSession})`)
+    }
     this.pendingRequests.set(id, pending)
+    this.pendingBySession.set(pending.agentId, pendingForSession + 1)
   }
 
   /**
@@ -250,7 +357,7 @@ export class DynamicCordisRegistry {
    */
   claimRequest(id: ApprovalRequestId): DynamicCordisPendingRequest | undefined {
     const pending = this.pendingRequests.get(id)
-    if (pending !== undefined) this.pendingRequests.delete(id)
+    if (pending !== undefined) this.removePendingRequest(id)
     return pending
   }
 
@@ -259,7 +366,7 @@ export class DynamicCordisRegistry {
    * @param id - approval request ID to remove.
    */
   disarmRequest(id: ApprovalRequestId): void {
-    this.pendingRequests.delete(id)
+    this.removePendingRequest(id)
   }
 
   /**
@@ -272,5 +379,27 @@ export class DynamicCordisRegistry {
       if (request.pluginId === pluginId) return requestId
     }
     return undefined
+  }
+
+  private removePendingRequest(id: ApprovalRequestId): void {
+    const pending = this.pendingRequests.get(id)
+    if (pending === undefined) return
+    this.pendingRequests.delete(id)
+    const count = (this.pendingBySession.get(pending.agentId) ?? 1) - 1
+    if (count <= 0) this.pendingBySession.delete(pending.agentId)
+    else this.pendingBySession.set(pending.agentId, count)
+  }
+
+  /**
+   * Reject a new pending run before the caller mutates its latest attempt.
+   * @param sessionId - Session that would own the pending request.
+   */
+  assertPendingRequestCapacity(sessionId: SessionId): void {
+    if (this.pendingRequests.size >= this.config.maxPendingApprovals) {
+      throw new Error(`dynamic pending-approval limit reached (limit: ${this.config.maxPendingApprovals})`)
+    }
+    if ((this.pendingBySession.get(sessionId) ?? 0) >= this.config.maxPendingApprovalsPerSession) {
+      throw new Error(`dynamic pending-approval limit for Session reached (limit: ${this.config.maxPendingApprovalsPerSession})`)
+    }
   }
 }

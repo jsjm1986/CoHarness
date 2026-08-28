@@ -66,4 +66,16 @@ describe('runtime document catalog handlers', () => {
     await expect(runtime.handlers.overview({ subject, principal })).resolves.toMatchObject({ version: 1, documents: [] })
     expect(runtime.catalog.authorize).toHaveBeenCalledWith({ actorUserId: 7, scope: { kind: 'project', projectId: 41 }, action: 'delete', docIds: ['a.txt'] })
   })
+
+  it('uses the provider batch deletion path when a runtime sends removed ids', async () => {
+    const runtime = fixture()
+    const markDeletedBatch = vi.fn(async () => {})
+    ;(runtime.catalog as typeof runtime.catalog & { markDeletedBatch?: typeof markDeletedBatch }).markDeletedBatch = markDeletedBatch
+    await expect(runtime.handlers.sync({
+      subject, principal,
+      payload: { version: 1, documents: [], removed: ['a.txt', 'b.txt'] },
+    })).resolves.toEqual({ version: 1, accepted: 0 })
+    expect(markDeletedBatch).toHaveBeenCalledWith(7, { kind: 'project', projectId: 41 }, ['a.txt', 'b.txt'])
+    expect(runtime.catalog.markDeleted).not.toHaveBeenCalled()
+  })
 })

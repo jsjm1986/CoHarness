@@ -81,6 +81,11 @@ describe('PerplexitySearchProvider availability', () => {
     expect(new PerplexitySearchProvider({ ...options, maxTokens: 0 }).available()).toBe(false)
     expect(new PerplexitySearchProvider({ ...options, maxTokens: 1.5 }).available()).toBe(false)
   })
+
+  it('is unavailable when the response byte budget is invalid', () => {
+    expect(new PerplexitySearchProvider({ ...options, maxResponseBytes: 0 }).available()).toBe(false)
+    expect(new PerplexitySearchProvider({ ...options, maxResponseBytes: 1.5 }).available()).toBe(false)
+  })
 })
 
 describe('PerplexitySearchProvider request mapping', () => {
@@ -144,6 +149,15 @@ describe('PerplexitySearchProvider error handling', () => {
     vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({}, { status: 500 })))
     await expect(new PerplexitySearchProvider(options).search({ query: 'q' }))
       .rejects.toThrow(expect.objectContaining({ message: 'Perplexity API error (HTTP 500)' }))
+  })
+
+  it('bounds an oversized success response before JSON parsing', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({ choices: [{ message: { content: 'answer' } }], padding: 'x'.repeat(128) }),
+      { status: 200, headers: { 'content-length': '256' } },
+    )))
+    await expect(new PerplexitySearchProvider({ ...options, maxResponseBytes: 32 }).search({ query: 'q' }))
+      .rejects.toThrow(/response exceeded/u)
   })
 
   it('maps an abort to WEB_ABORTED', async () => {

@@ -85,6 +85,8 @@ export interface GatewayProjectService {
   createManaged?(input: { name: string; ownerUserId: number; createdBy?: number }): Awaitable<ProjectRow>
   list(): Awaitable<ProjectRow[]>
   getById(id: number): Awaitable<ProjectDetail | null>
+  /** Batch detail lookup used by account catalog pages to avoid N+1 queries. */
+  getByIds?(ids: readonly number[]): Awaitable<ProjectDetail[]>
   rename(id: number, name: string): Awaitable<void>
   remove(id: number): Awaitable<number[]>
   setMember(projectId: number, userId: number, mode: GrantMode): Awaitable<void>

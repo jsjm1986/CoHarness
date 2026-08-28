@@ -8,13 +8,16 @@
 
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
+import { constants as bufferConstants } from 'node:buffer'
 import { readdirSync } from 'node:fs'
-import { open, mkdir, readFile, readdir, realpath, link, rm, stat, truncate } from 'node:fs/promises'
+import { open, mkdir, readdir, realpath, link, rm, stat, truncate } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { scheduler } from 'node:timers/promises'
 import { randomBytes } from 'node:crypto'
+import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import {
+  DEFAULT_MAX_PENDING_BYTES_PER_SESSION,
   DEFAULT_MAX_PENDING_EVENTS_PER_SESSION, DEFAULT_PREPARED_SESSION_CACHE_SIZE, DEFAULT_WRITE_BATCH_MAX_DELAY_MS, MAX_WRITE_BATCH_DELAY_MS,
   SessionPersistence, SessionPersistenceRevision, PersistenceCoordinator, SessionFormatUnsupportedError,
   sessionContentMetadata,
@@ -31,12 +34,18 @@ import {
 import {
   compressZstdFrame, createZstdFrameDecoder, decompressZstdFrame, decompressZstdPrefix, scanZstdFrames,
 } from './zstd.ts'
+import { ZstdOutputLimitError } from './zstd-errors.ts'
 import { ensureDurableDirectoryWin32, publishNewFileWin32 } from './win32.ts'
 
 export type { JsonlCompression } from './format.ts'
 
 const DEFAULT_PACK_CHUNKS = true
 const DEFAULT_COMPRESSION: JsonlCompression = 'zstd'
+const DEFAULT_MAX_HEADER_BYTES = 64 * 1024
+const DEFAULT_READ_STABLE_MAX_ATTEMPTS = 8
+const DEFAULT_READ_STABLE_MAX_DURATION_MS = 2_000
+const DEFAULT_MAX_DECOMPRESSED_BYTES = 256 * 1024 * 1024
+const DEFAULT_MAX_ARTIFACT_BYTES = 256 * 1024 * 1024
 /**
  * Internal scheduling constant, not deployment configuration: balance
  * frame-boundary event-loop yields against `setImmediate` overhead. One frame
@@ -45,10 +54,25 @@ const DEFAULT_COMPRESSION: JsonlCompression = 'zstd'
 const ZSTD_DECODE_YIELD_INTERVAL_MS = 500
 
 /** Assert that the independently decodable first frame contains only the header record. */
-function assertZstdHeaderFrame(plaintext: Buffer): void {
+function assertZstdHeaderFrame(plaintext: Buffer, maxHeaderBytes: number): void {
+  if (plaintext.length > maxHeaderBytes) {
+    throw new Error(`session header exceeds ${maxHeaderBytes} bytes`)
+  }
   if (plaintext.length === 0 || plaintext.indexOf(0x0A) !== plaintext.length - 1) {
     throw new Error('corrupt Zstandard session log: first frame is not exactly one header line')
   }
+}
+
+/** Validate a positive integer supplied by a programmatic backend mount. */
+function assertPositiveSafeInteger(name: string, value: number): void {
+  if (!Number.isSafeInteger(value) || value < 1) {
+    throw new TypeError(`${name} must be a positive safe integer`)
+  }
+}
+
+/** Reject a header record that would exceed the metadata reader's allocation budget. */
+function assertHeaderBytes(recordBytes: number, maxHeaderBytes: number): void {
+  if (recordBytes > maxHeaderBytes) throw new Error(`session header exceeds ${maxHeaderBytes} bytes`)
 }
 
 /** Loader schema for the JSONL artifact's physical encoding. */
@@ -83,6 +107,18 @@ export interface Config {
   writeBatchMaxDelayMs?: number
   /** Maximum events retained in one live session's pending write queue. */
   maxPendingEvents?: number
+  /** Maximum UTF-8 JSON bytes retained in one live session's pending write queue. */
+  maxPendingBytes?: number
+  /** Maximum bytes in the newline-terminated session header record. */
+  maxHeaderBytes?: number
+  /** Maximum stat/read attempts used to obtain one revision-stable artifact. */
+  readStableMaxAttempts?: number
+  /** Maximum elapsed milliseconds spent retrying one revision-stable artifact read. */
+  readStableMaxDurationMs?: number
+  /** Maximum total plaintext bytes accepted while decoding one zstd artifact. */
+  maxDecompressedBytes?: number
+  /** Maximum physical bytes read from one session artifact. */
+  maxArtifactBytes?: number
 }
 
 /** Opaque coordinator token for replacing bytes recovered from a torn frame. */
@@ -134,6 +170,12 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     writeBatchMaxDelayMs: z.number().step(1).min(1).max(MAX_WRITE_BATCH_DELAY_MS)
       .default(DEFAULT_WRITE_BATCH_MAX_DELAY_MS),
     maxPendingEvents: z.number().step(1).min(1).default(DEFAULT_MAX_PENDING_EVENTS_PER_SESSION),
+    maxPendingBytes: z.number().step(1).min(1).default(DEFAULT_MAX_PENDING_BYTES_PER_SESSION),
+    maxHeaderBytes: z.number().step(1).min(1).max(bufferConstants.MAX_LENGTH).default(DEFAULT_MAX_HEADER_BYTES),
+    readStableMaxAttempts: z.number().step(1).min(1).default(DEFAULT_READ_STABLE_MAX_ATTEMPTS),
+    readStableMaxDurationMs: z.number().step(1).min(1).max(MAX_TIMER_DELAY_MS).default(DEFAULT_READ_STABLE_MAX_DURATION_MS),
+    maxDecompressedBytes: z.number().step(1).min(1).max(bufferConstants.MAX_LENGTH).default(DEFAULT_MAX_DECOMPRESSED_BYTES),
+    maxArtifactBytes: z.number().step(1).min(1).max(bufferConstants.MAX_LENGTH).default(DEFAULT_MAX_ARTIFACT_BYTES),
   })
 
   /**
@@ -146,6 +188,11 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
   private root: string
   private packChunks: boolean
   private compression: JsonlCompression
+  private readonly maxHeaderBytes: number
+  private readonly readStableMaxAttempts: number
+  private readonly readStableMaxDurationMs: number
+  private readonly maxDecompressedBytes: number
+  private readonly maxArtifactBytes: number
   private coordinator: PersistenceCoordinator<JsonlTornMarker>
   private rootEncodingCheck: Promise<void> | undefined
 
@@ -159,13 +206,42 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     const writeBatchMaxDelayMs = config.writeBatchMaxDelayMs
       ?? DEFAULT_WRITE_BATCH_MAX_DELAY_MS
     const maxPendingEvents = config.maxPendingEvents ?? DEFAULT_MAX_PENDING_EVENTS_PER_SESSION
+    const maxPendingBytes = config.maxPendingBytes ?? DEFAULT_MAX_PENDING_BYTES_PER_SESSION
+    const maxHeaderBytes = config.maxHeaderBytes ?? DEFAULT_MAX_HEADER_BYTES
+    const readStableMaxAttempts = config.readStableMaxAttempts ?? DEFAULT_READ_STABLE_MAX_ATTEMPTS
+    const readStableMaxDurationMs = config.readStableMaxDurationMs ?? DEFAULT_READ_STABLE_MAX_DURATION_MS
+    const maxDecompressedBytes = config.maxDecompressedBytes ?? DEFAULT_MAX_DECOMPRESSED_BYTES
+    const maxArtifactBytes = config.maxArtifactBytes ?? DEFAULT_MAX_ARTIFACT_BYTES
+    assertPositiveSafeInteger('maxHeaderBytes', maxHeaderBytes)
+    if (maxHeaderBytes > bufferConstants.MAX_LENGTH) {
+      throw new TypeError(`maxHeaderBytes must not exceed ${bufferConstants.MAX_LENGTH}`)
+    }
+    assertPositiveSafeInteger('readStableMaxAttempts', readStableMaxAttempts)
+    assertPositiveSafeInteger('readStableMaxDurationMs', readStableMaxDurationMs)
+    if (readStableMaxDurationMs > MAX_TIMER_DELAY_MS) {
+      throw new TypeError(`readStableMaxDurationMs must not exceed ${MAX_TIMER_DELAY_MS}`)
+    }
+    assertPositiveSafeInteger('maxDecompressedBytes', maxDecompressedBytes)
+    if (maxDecompressedBytes > bufferConstants.MAX_LENGTH) {
+      throw new TypeError(`maxDecompressedBytes must not exceed ${bufferConstants.MAX_LENGTH}`)
+    }
+    assertPositiveSafeInteger('maxArtifactBytes', maxArtifactBytes)
+    if (maxArtifactBytes > bufferConstants.MAX_LENGTH) {
+      throw new TypeError(`maxArtifactBytes must not exceed ${bufferConstants.MAX_LENGTH}`)
+    }
     this.packChunks = config.packChunks ?? DEFAULT_PACK_CHUNKS
     this.compression = config.compression ?? DEFAULT_COMPRESSION
+    this.maxHeaderBytes = maxHeaderBytes
+    this.readStableMaxAttempts = readStableMaxAttempts
+    this.readStableMaxDurationMs = readStableMaxDurationMs
+    this.maxDecompressedBytes = maxDecompressedBytes
+    this.maxArtifactBytes = maxArtifactBytes
     this.assertUsableRoot()
     this.coordinator = new PersistenceCoordinator<JsonlTornMarker>(this.ctx, this, {
       preparedSessionCacheSize,
       writeBatchMaxDelayMs,
       maxPendingEvents,
+      maxPendingBytes,
     })
   }
 
@@ -283,7 +359,7 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
       const plaintexts: Buffer[] = []
       // The decoder yields views into a reused buffer; copy each frame's
       // plaintext immediately so a later concat cannot read overwritten memory.
-      for (const plaintext of decoder.decode(buffer, frames)) {
+      for (const plaintext of decoder.decode(buffer, frames, this.maxDecompressedBytes)) {
         signal?.throwIfAborted()
         plaintexts.push(Buffer.from(plaintext))
       }
@@ -291,7 +367,10 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     } else {
       content = buffer.toString('utf8')
     }
-    const meta = parseHeaderMeta(content.split('\n', 1)[0] as string)
+    const headerEnd = content.indexOf('\n')
+    if (headerEnd === -1) throw new Error(`corrupt session log: invalid header line in "${path}"`)
+    assertHeaderBytes(Buffer.byteLength(content.slice(0, headerEnd + 1), 'utf8'), this.maxHeaderBytes)
+    const meta = parseHeaderMeta(content.slice(0, headerEnd))
     if (meta === undefined || meta.id !== id) {
       throw new Error(`corrupt session log: invalid header line in "${path}"`)
     }
@@ -302,7 +381,7 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
 
   /**
    * Read a file's bytes under a revision-stable loop: a writer appending
-   * between stat and readFile would yield a torn physical file, so retry
+   * between stat and the bounded read would yield a torn physical file, so retry
    * while the stat revision changes.
    * @param path - the artifact file to read.
    * @param signal - optional cancellation for the stat/read work.
@@ -312,13 +391,44 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     path: string,
     signal?: AbortSignal,
   ): Promise<{ buffer: Buffer; revision: PersistenceRevision }> {
-    for (;;) {
+    const startedAt = performance.now()
+    for (let attempt = 1; attempt <= this.readStableMaxAttempts; attempt++) {
       signal?.throwIfAborted()
       const before = fileRevision(await stat(path, { bigint: true }))
-      const buffer = await readFile(path, { signal })
+      const buffer = await this.readBoundedArtifactFile(path, signal)
       signal?.throwIfAborted()
       const after = fileRevision(await stat(path, { bigint: true }))
       if (before === after) return { buffer, revision: after }
+      if (attempt === this.readStableMaxAttempts || performance.now() - startedAt >= this.readStableMaxDurationMs) {
+        throw new Error(
+          `session file did not remain revision-stable after ${attempt} attempt${attempt === 1 ? '' : 's'}`
+          + ` within ${this.readStableMaxDurationMs}ms`,
+        )
+      }
+    }
+    /* v8 ignore next -- the bounded loop always returns or throws. */
+    throw new Error('session stable-read retry budget exhausted')
+  }
+
+  /** Read an artifact without retaining bytes beyond its configured limit. */
+  private async readBoundedArtifactFile(path: string, signal?: AbortSignal): Promise<Buffer> {
+    const handle = await open(path, 'r')
+    const chunks: Buffer[] = []
+    let total = 0
+    const chunk = Buffer.allocUnsafe(64 * 1024)
+    try {
+      for (;;) {
+        signal?.throwIfAborted()
+        const { bytesRead } = await handle.read(chunk, 0, chunk.length, null)
+        if (bytesRead === 0) return Buffer.concat(chunks, total)
+        total += bytesRead
+        if (total > this.maxArtifactBytes) {
+          throw new Error(`session artifact exceeds ${this.maxArtifactBytes} bytes`)
+        }
+        chunks.push(Buffer.from(chunk.subarray(0, bytesRead)))
+      }
+    } finally {
+      await handle.close()
     }
   }
 
@@ -338,6 +448,8 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
         prefix = await this.readZstdPrefix(buffer, signal)
       } else {
         signal?.throwIfAborted()
+        const headerEnd = buffer.indexOf(0x0A)
+        if (headerEnd !== -1) assertHeaderBytes(headerEnd + 1, this.maxHeaderBytes)
         const { meta, events, committedBytes } = scanLog(buffer)
         signal?.throwIfAborted()
         prefix = {
@@ -376,13 +488,13 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     const decoder = createZstdFrameDecoder()
     let yieldDeadline = performance.now() + ZSTD_DECODE_YIELD_INTERVAL_MS
     try {
-      const decodedFrames = decoder.decode(buffer, frames)
+      const decodedFrames = decoder.decode(buffer, frames, this.maxDecompressedBytes)
       signal?.throwIfAborted()
       const headerFrame = decodedFrames.next()
       signal?.throwIfAborted()
       /* v8 ignore next -- a non-empty structural frame list makes the decoder yield its first frame or throw. */
       if (headerFrame.done) throw new Error('empty or header-less Zstandard session log')
-      assertZstdHeaderFrame(headerFrame.value)
+      assertZstdHeaderFrame(headerFrame.value, this.maxHeaderBytes)
       const scanner = new SessionLogScanner(headerFrame.value)
 
       let remainingFrames = frames.length - 1
@@ -409,8 +521,12 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
       let recoveredPlaintext: Buffer = Buffer.alloc(0)
       try {
         signal?.throwIfAborted()
-        recoveredPlaintext = await decompressZstdPrefix(buffer.subarray(tornStart))
-      } catch {
+        const decodedBytes = complete.inputBytes
+        const remainingBudget = this.maxDecompressedBytes - decodedBytes
+        if (remainingBudget < 1) throw new Error(`Zstandard decompressed output exceeds ${this.maxDecompressedBytes} bytes`)
+        recoveredPlaintext = await decompressZstdPrefix(buffer.subarray(tornStart), remainingBudget)
+      } catch (error: unknown) {
+        if (error instanceof ZstdOutputLimitError) throw error
         /* v8 ignore next -- decoder failure plus concurrent abort is timing-dependent */
         if (signal?.aborted) signal.throwIfAborted()
         // A structurally incomplete final frame may end before Node's decoder can
@@ -465,6 +581,10 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
   /** List valid unique stored sessions' metadata (header line only — no full-log parse). */
   async list(signal?: AbortSignal): Promise<SessionHeader[]> {
     return (await this.listArtifacts(signal)).map(artifact => artifact.header)
+  }
+
+  override revision(id: SessionId, signal?: AbortSignal): Promise<PersistenceRevision | undefined> {
+    return this.readStoredRevision(id, signal)
   }
 
   /** List metadata plus a stat-derived identity for each append-only log. */
@@ -741,6 +861,7 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     try {
       signal?.throwIfAborted()
       const chunks: Buffer[] = []
+      let totalBytes = 0
       const buf = Buffer.alloc(8192)
       for (;;) {
         signal?.throwIfAborted()
@@ -750,10 +871,14 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
         const slice = buf.subarray(0, bytesRead)
         const nl = slice.indexOf(0x0a)
         if (nl !== -1) {
+          totalBytes += nl + 1
+          assertHeaderBytes(totalBytes, this.maxHeaderBytes)
           chunks.push(slice.subarray(0, nl))
           signal?.throwIfAborted()
           return Buffer.concat(chunks).toString('utf8')
         }
+        totalBytes += slice.length
+        assertHeaderBytes(totalBytes + 1, this.maxHeaderBytes)
         chunks.push(Buffer.from(slice))
       }
     } finally {
@@ -768,6 +893,7 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     try {
       signal?.throwIfAborted()
       let content = Buffer.alloc(0)
+      let contentBytes = 0
       const chunk = Buffer.alloc(8192)
       for (;;) {
         signal?.throwIfAborted()
@@ -775,22 +901,39 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
         signal?.throwIfAborted()
         if (bytesRead === 0) return undefined
         signal?.throwIfAborted()
-        content = Buffer.concat([content, chunk.subarray(0, bytesRead)])
+        const incoming = chunk.subarray(0, bytesRead)
+        const required = contentBytes + incoming.length
+        const probeLimit = Math.min(bufferConstants.MAX_LENGTH, this.maxHeaderBytes * 2)
+        if (required > probeLimit) {
+          throw new Error(`Zstandard session header frame exceeds ${probeLimit} bytes while probing`)
+        }
+        if (required > content.length) {
+          const nextLength = Math.max(required, Math.max(8192, content.length * 2))
+          const next = Buffer.allocUnsafe(nextLength)
+          content.copy(next, 0, 0, contentBytes)
+          content = next
+        }
+        incoming.copy(content, contentBytes)
+        contentBytes = required
         signal?.throwIfAborted()
-        const first = scanZstdFrames(content, 1).frames[0]
+        const source = content.subarray(0, contentBytes)
+        const first = scanZstdFrames(source, 1).frames[0]
         signal?.throwIfAborted()
         if (first === undefined) continue
         let plaintext: Buffer
         try {
           signal?.throwIfAborted()
-          plaintext = await decompressZstdFrame(content.subarray(first.start, first.end))
+          plaintext = await decompressZstdFrame(source.subarray(first.start, first.end), this.maxHeaderBytes)
         } catch (error) {
+          if (error instanceof ZstdOutputLimitError) {
+            throw new Error(`session header exceeds ${this.maxHeaderBytes} bytes`, { cause: error })
+          }
           /* v8 ignore next -- decoder failure plus concurrent abort is timing-dependent */
           if (signal?.aborted) signal.throwIfAborted()
           throw new Error('corrupt Zstandard session log: header frame failed validation', { cause: error })
         }
         signal?.throwIfAborted()
-        assertZstdHeaderFrame(plaintext)
+        assertZstdHeaderFrame(plaintext, this.maxHeaderBytes)
         return plaintext.subarray(0, -1).toString('utf8')
       }
     } finally {

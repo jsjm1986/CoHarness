@@ -81,7 +81,9 @@ export const DEFAULT_MAX_OUTPUT_BYTES = 8 * 1024 * 1024
  * failures return `-32603`. Notifications without a handler are dropped.
  */
 export class JsonRpcLineTransport implements JsonRpcTransportPeer {
-  private buffer = ''
+  /** Unterminated input fragments; joined only when a newline completes a line. */
+  private bufferParts: string[] = []
+  private bufferBytes = 0
   private readonly decoder = new StringDecoder('utf8')
   private started = false
   private requestHandler: RequestHandler | undefined
@@ -219,32 +221,51 @@ export class JsonRpcLineTransport implements JsonRpcTransportPeer {
 
   private readonly onData = (chunk: Buffer | string): void => {
     if (this.closed) return
-    this.buffer += typeof chunk === 'string' ? chunk : this.decoder.write(chunk)
-    this.drainLines()
-    if (Buffer.byteLength(this.buffer, 'utf8') > this.maxLineBytes) {
-      this.failTransport(new Error(`JSON-RPC input line exceeds ${String(this.maxLineBytes)} bytes`))
-    }
+    this.appendDecoded(typeof chunk === 'string' ? chunk : this.decoder.write(chunk))
   }
 
-  private drainLines(): void {
-    for (;;) {
-      const newline = this.buffer.indexOf('\n')
-      if (newline < 0) break
-      const rawLine = this.buffer.slice(0, newline)
-      this.buffer = this.buffer.slice(newline + 1)
+  /** Process decoded input without rebuilding an unterminated line per chunk. */
+  private appendDecoded(decoded: string): void {
+    let offset = 0
+    while (offset < decoded.length) {
+      const newline = decoded.indexOf('\n', offset)
+      if (newline < 0) {
+        this.appendFragment(decoded.slice(offset))
+        break
+      }
+      this.appendFragment(decoded.slice(offset, newline))
+      const rawLine = this.takeLine()
       // Check the complete line before parsing it. Checking only the residual
-      // buffer in onData() misses an oversized frame that arrives together
-      // with its newline, because drainLines removes it first.
+      // buffer after this loop misses an oversized frame that arrives together
+      // with its newline, because the completed line is removed first.
       if (Buffer.byteLength(rawLine, 'utf8') > this.maxLineBytes) {
         this.failTransport(new Error(`JSON-RPC input line exceeds ${String(this.maxLineBytes)} bytes`))
         return
       }
+      offset = newline + 1
       const line = rawLine.trim()
       if (!line) continue
       void this.handleLine(line).catch((error: unknown) => {
         this.failTransport(error instanceof Error ? error : new Error(String(error)))
       })
+      if (this.closed) return
     }
+    if (this.bufferBytes > this.maxLineBytes) {
+      this.failTransport(new Error(`JSON-RPC input line exceeds ${String(this.maxLineBytes)} bytes`))
+    }
+  }
+
+  private appendFragment(fragment: string): void {
+    if (fragment.length === 0) return
+    this.bufferParts.push(fragment)
+    this.bufferBytes += Buffer.byteLength(fragment, 'utf8')
+  }
+
+  private takeLine(): string {
+    const line = this.bufferParts.join('')
+    this.bufferParts = []
+    this.bufferBytes = 0
+    return line
   }
 
   private readonly onInputError = (error: Error): void => {
@@ -253,8 +274,7 @@ export class JsonRpcLineTransport implements JsonRpcTransportPeer {
 
   private readonly onInputEnd = (): void => {
     if (this.closed) return
-    this.buffer += this.decoder.end()
-    this.drainLines()
+    this.appendDecoded(this.decoder.end())
     this.failTransport(new Error('JSON-RPC input closed'))
   }
 
@@ -365,7 +385,8 @@ export class JsonRpcLineTransport implements JsonRpcTransportPeer {
     this.input.off('data', this.onData)
     this.input.off('error', this.onInputError)
     this.input.off('end', this.onInputEnd)
-    this.buffer = ''
+    this.bufferParts = []
+    this.bufferBytes = 0
     this.failPending(error)
   }
 

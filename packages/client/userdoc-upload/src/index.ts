@@ -37,6 +37,8 @@ interface ResumeRecord {
   readonly directoryId: UserDocDirectoryIdType
   readonly bytes: number
   readonly updatedAt: number
+  /** Server expiry copied at admission; old records fall back to the local TTL. */
+  readonly expiresAt?: number
 }
 
 const RESUME_DB_NAME = 'dsh-userdoc-uploads'
@@ -48,6 +50,10 @@ const RETRY_LIMIT = 4
 const MAX_VERIFY_WAIT_MS = 5 * 60 * 1000
 /** Bound browser-side retained resume metadata when storage is persistent. */
 const MAX_LOCAL_RESUME_RECORDS = 256
+/** Bound total serialized resume metadata in either browser storage backend. */
+const MAX_LOCAL_RESUME_BYTES = 1024 * 1024
+/** Fallback lifetime for records written before server expiry was persisted. */
+const RESUME_RECORD_TTL_MS = 7 * 24 * 60 * 60 * 1000
 /** Prevent a malformed runtime response from forcing an unbounded browser allocation. */
 const MAX_UPLOAD_CHUNK_BYTES = 64 * 1024 * 1024
 
@@ -65,11 +71,60 @@ function resumeKey(directoryId: UserDocDirectoryIdType, fingerprint: string, nam
     : `${namespace}\u0000${String(directoryId)}\u0000${fingerprint}`
 }
 
+function utf8Bytes(value: string): number {
+  return new TextEncoder().encode(value).byteLength
+}
+
+function recordBytes(key: string, record: ResumeRecord): number {
+  return utf8Bytes(JSON.stringify([key, record]))
+}
+
+function isResumeRecord(value: unknown): value is ResumeRecord {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false
+  const record = value as Record<string, unknown>
+  return typeof record.fingerprint === 'string'
+    && /^[0-9a-f]{64}$/u.test(record.fingerprint)
+    && typeof record.uploadId === 'string'
+    && /^[0-9a-f-]{36}$/u.test(record.uploadId)
+    && typeof record.name === 'string'
+    && typeof record.directoryId === 'string'
+    && Number.isSafeInteger(record.bytes) && (record.bytes as number) >= 0
+    && Number.isSafeInteger(record.updatedAt) && (record.updatedAt as number) > 0
+    && (record.expiresAt === undefined
+      || Number.isSafeInteger(record.expiresAt) && (record.expiresAt as number) > 0)
+}
+
+function isFreshResumeRecord(record: unknown, now: number): record is ResumeRecord {
+  if (!isResumeRecord(record)) return false
+  const expiresAt = record.expiresAt ?? record.updatedAt + RESUME_RECORD_TTL_MS
+  return expiresAt > now && now - record.updatedAt <= RESUME_RECORD_TTL_MS
+}
+
+function boundedLocalRecords(records: Record<string, ResumeRecord>): Record<string, ResumeRecord> {
+  const entries = Object.entries(records).sort((left, right) => left[1].updatedAt - right[1].updatedAt)
+  const minimumStart = Math.max(0, entries.length - MAX_LOCAL_RESUME_RECORDS)
+  const make = (start: number): Record<string, ResumeRecord> => {
+    const bounded: Record<string, ResumeRecord> = Object.create(null) as Record<string, ResumeRecord>
+    for (const [key, value] of entries.slice(start)) {
+      Object.defineProperty(bounded, key, { configurable: true, enumerable: true, value, writable: true })
+    }
+    return bounded
+  }
+  let low = minimumStart
+  let high = entries.length
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2)
+    if (utf8Bytes(JSON.stringify(make(middle))) <= MAX_LOCAL_RESUME_BYTES) high = middle
+    else low = middle + 1
+  }
+  return make(low)
+}
+
 function endpoint(root: string, suffix: string, query: string): string {
   return `${root}${suffix}${query}`
 }
 
-function localResumeRecords(): Record<string, ResumeRecord> {
+function localResumeRecords(now = Date.now()): Record<string, ResumeRecord> {
   try {
     if (typeof globalThis.localStorage === 'undefined') return {}
     const raw = globalThis.localStorage.getItem(RESUME_STORAGE_KEY)
@@ -77,12 +132,17 @@ function localResumeRecords(): Record<string, ResumeRecord> {
     const value: unknown = JSON.parse(raw)
     if (value === null || typeof value !== 'object' || Array.isArray(value)) return {}
     const records: Record<string, ResumeRecord> = Object.create(null) as Record<string, ResumeRecord>
+    let changed = false
     for (const [key, entry] of Object.entries(value)) {
-      if (entry !== null && typeof entry === 'object' && !Array.isArray(entry)) {
+      if (isFreshResumeRecord(entry, now)) {
         Object.defineProperty(records, key, { configurable: true, enumerable: true, value: entry, writable: true })
+      } else {
+        changed = true
       }
     }
-    return records
+    const bounded = boundedLocalRecords(records)
+    if (changed || Object.keys(bounded).length !== Object.keys(records).length) saveLocalResumeRecords(bounded)
+    return bounded
   } catch {
     return {}
   }
@@ -91,13 +151,7 @@ function localResumeRecords(): Record<string, ResumeRecord> {
 function saveLocalResumeRecords(records: Record<string, ResumeRecord>): void {
   try {
     if (typeof globalThis.localStorage === 'undefined') return
-    const entries = Object.entries(records)
-      .sort((left, right) => left[1].updatedAt - right[1].updatedAt)
-      .slice(-MAX_LOCAL_RESUME_RECORDS)
-    const bounded: Record<string, ResumeRecord> = Object.create(null) as Record<string, ResumeRecord>
-    for (const [key, value] of entries) {
-      Object.defineProperty(bounded, key, { configurable: true, enumerable: true, value, writable: true })
-    }
+    const bounded = boundedLocalRecords(records)
     globalThis.localStorage.setItem(RESUME_STORAGE_KEY, JSON.stringify(bounded))
   } catch { /* private storage may be disabled */ }
 }
@@ -115,15 +169,23 @@ async function openResumeDb(): Promise<IDBDatabase> {
 
 async function resumeRecord(key: string): Promise<ResumeRecord | undefined> {
   if (typeof indexedDB === 'undefined') return localResumeRecords()[key]
+  let database: IDBDatabase | undefined
   try {
-    const database = await openResumeDb()
+    const opened = await openResumeDb()
+    database = opened
+    await pruneIndexedDbRecords(opened)
     return await new Promise<ResumeRecord | undefined>((resolve, reject) => {
-      const request = database.transaction(RESUME_STORE_NAME, 'readonly').objectStore(RESUME_STORE_NAME).get(key)
-      request.onsuccess = () => { database.close(); resolve(request.result as ResumeRecord | undefined) }
-      request.onerror = () => { database.close(); reject(request.error ?? new Error('IndexedDB read failed')) }
+      const request = opened.transaction(RESUME_STORE_NAME, 'readonly').objectStore(RESUME_STORE_NAME).get(key)
+      request.onsuccess = () => {
+        const value: unknown = request.result
+        resolve(isFreshResumeRecord(value, Date.now()) ? value : undefined)
+      }
+      request.onerror = () => { reject(request.error ?? new Error('IndexedDB read failed')) }
     })
   } catch {
     return localResumeRecords()[key]
+  } finally {
+    database?.close()
   }
 }
 
@@ -134,17 +196,22 @@ async function putResumeRecord(key: string, record: ResumeRecord): Promise<void>
     saveLocalResumeRecords(records)
     return
   }
+  let database: IDBDatabase | undefined
   try {
-    const database = await openResumeDb()
+    const opened = await openResumeDb()
+    database = opened
     await new Promise<void>((resolve, reject) => {
-      const request = database.transaction(RESUME_STORE_NAME, 'readwrite').objectStore(RESUME_STORE_NAME).put(record, key)
-      request.onsuccess = () => { database.close(); resolve() }
-      request.onerror = () => { database.close(); reject(request.error ?? new Error('IndexedDB write failed')) }
+      const request = opened.transaction(RESUME_STORE_NAME, 'readwrite').objectStore(RESUME_STORE_NAME).put(record, key)
+      request.onsuccess = () => { resolve() }
+      request.onerror = () => { reject(request.error ?? new Error('IndexedDB write failed')) }
     })
+    await pruneIndexedDbRecords(opened)
   } catch {
     const records = localResumeRecords()
     records[key] = record
     saveLocalResumeRecords(records)
+  } finally {
+    database?.close()
   }
 }
 
@@ -153,14 +220,59 @@ async function deleteResumeRecord(key: string): Promise<void> {
   Reflect.deleteProperty(records, key)
   saveLocalResumeRecords(records)
   if (typeof indexedDB === 'undefined') return
+  let database: IDBDatabase | undefined
   try {
-    const database = await openResumeDb()
+    const opened = await openResumeDb()
+    database = opened
     await new Promise<void>((resolve, reject) => {
-      const request = database.transaction(RESUME_STORE_NAME, 'readwrite').objectStore(RESUME_STORE_NAME).delete(key)
-      request.onsuccess = () => { database.close(); resolve() }
-      request.onerror = () => { database.close(); reject(request.error ?? new Error('IndexedDB delete failed')) }
+      const request = opened.transaction(RESUME_STORE_NAME, 'readwrite').objectStore(RESUME_STORE_NAME).delete(key)
+      request.onsuccess = () => { resolve() }
+      request.onerror = () => { reject(request.error ?? new Error('IndexedDB delete failed')) }
     })
-  } catch { /* localStorage copy is already removed */ }
+  } catch { /* localStorage copy is already removed */
+  } finally {
+    database?.close()
+  }
+}
+
+/** Remove expired, malformed, and oldest oversized IndexedDB resume records. */
+async function pruneIndexedDbRecords(database: IDBDatabase): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const transaction = database.transaction(RESUME_STORE_NAME, 'readwrite')
+    const store = transaction.objectStore(RESUME_STORE_NAME)
+    const entries: Array<{ readonly key: string; readonly record: ResumeRecord }> = []
+    const now = Date.now()
+    transaction.onerror = () => { reject(transaction.error ?? new Error('IndexedDB cleanup failed')) }
+    transaction.onabort = () => { reject(transaction.error ?? new Error('IndexedDB cleanup aborted')) }
+    transaction.oncomplete = () => { resolve() }
+    const request = store.openCursor()
+    request.onerror = () => { reject(request.error ?? new Error('IndexedDB cleanup read failed')) }
+    request.onsuccess = () => {
+      const cursor = request.result
+      if (cursor === null) {
+        entries.sort((left, right) => left.record.updatedAt - right.record.updatedAt)
+        const keep = new Set<string>()
+        let bytes = 0
+        for (let index = entries.length - 1; index >= 0 && keep.size < MAX_LOCAL_RESUME_RECORDS; index -= 1) {
+          const entry = entries[index] as { readonly key: string; readonly record: ResumeRecord }
+          const size = recordBytes(entry.key, entry.record)
+          if (bytes + size > MAX_LOCAL_RESUME_BYTES) continue
+          keep.add(entry.key)
+          bytes += size
+        }
+        for (const entry of entries) {
+          if (!keep.has(entry.key)) store.delete(entry.key)
+        }
+        return
+      }
+      if (isFreshResumeRecord(cursor.value, now)) {
+        if (typeof cursor.key === 'string') entries.push({ key: cursor.key, record: cursor.value })
+      } else {
+        cursor.delete()
+      }
+      cursor.continue()
+    }
+  })
 }
 
 async function fileFingerprint(file: File, signal?: AbortSignal): Promise<string> {
@@ -368,7 +480,13 @@ export async function resumableUpload(
     }
   }
   await putResumeRecord(key, {
-    fingerprint, uploadId: session.uploadId, name: file.name, directoryId, bytes: file.size, updatedAt: Date.now(),
+    fingerprint,
+    uploadId: session.uploadId,
+    name: file.name,
+    directoryId,
+    bytes: file.size,
+    updatedAt: Date.now(),
+    expiresAt: session.expiresAt,
   })
   if (session.state === 'complete' && session.ref !== undefined) {
     await deleteResumeRecord(key)

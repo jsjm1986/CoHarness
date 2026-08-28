@@ -25,6 +25,49 @@ MAX_STDOUT_READ_CHARS = 4096
 MAX_STDERR_LINE_BYTES = 64 * 1024
 
 
+class _TextLineBuffer:
+    """Collect decoded line fragments without rebuilding the retained prefix."""
+
+    def __init__(self, max_bytes: int, *, truncate: bool = False) -> None:
+        self._max_bytes = max_bytes
+        self._truncate = truncate
+        self._parts: list[str] = []
+        self._bytes = 0
+
+    def append(self, chunk: str) -> list[str]:
+        lines: list[str] = []
+        offset = 0
+        while offset < len(chunk):
+            newline = chunk.find("\n", offset)
+            if newline < 0:
+                self._append_fragment(chunk[offset:])
+                break
+            self._append_fragment(chunk[offset:newline])
+            lines.append("".join(self._parts))
+            self._parts.clear()
+            self._bytes = 0
+            offset = newline + 1
+        return lines
+
+    def remainder(self) -> str:
+        return "".join(self._parts)
+
+    def _append_fragment(self, fragment: str) -> None:
+        if not fragment:
+            return
+        encoded = fragment.encode("utf-8")
+        remaining = self._max_bytes - self._bytes
+        if len(encoded) <= remaining:
+            self._parts.append(fragment)
+            self._bytes += len(encoded)
+            return
+        if not self._truncate:
+            raise ValueError("line exceeds configured byte limit")
+        if remaining > 0:
+            self._parts.append(encoded[:remaining].decode("utf-8", "replace"))
+            self._bytes = self._max_bytes
+
+
 def _validate_timeout(value: float | None, name: str) -> None:
     if value is None:
         return
@@ -378,27 +421,28 @@ class HarnessClient:
         proc = self._proc
         if proc is None or proc.stdout is None:
             return
-        buffer = ""
+        buffer = _TextLineBuffer(self.config.max_line_bytes)
         try:
             while True:
                 chunk = proc.stdout.read(MAX_STDOUT_READ_CHARS)
                 if chunk == "":
                     break
-                buffer += chunk
-                while "\n" in buffer:
-                    line, buffer = buffer.split("\n", 1)
-                    self._handle_line(line)
-                    if self._runtime_dead:
-                        return
-                if len(buffer.encode("utf-8")) > self.config.max_line_bytes:
+                try:
+                    lines = buffer.append(chunk)
+                except ValueError:
                     self._fail_waiters(
                         TransportClosedError("JSON-RPC input line exceeds configured limit")
                     )
                     return
+                for line in lines:
+                    self._handle_line(line)
+                    if self._runtime_dead:
+                        return
             # Preserve the text-wrapper iterator's EOF behavior for a final
             # unterminated frame, while keeping its retained bytes bounded.
-            if buffer != "":
-                self._handle_line(buffer)
+            remainder = buffer.remainder()
+            if remainder != "":
+                self._handle_line(remainder)
         except BaseException as exc:
             self._fail_waiters(exc)
         finally:
@@ -420,14 +464,13 @@ class HarnessClient:
         proc = self._proc
         if proc is None or proc.stderr is None:
             return
-        buffer = ""
+        buffer = _TextLineBuffer(MAX_STDERR_LINE_BYTES, truncate=True)
         for chunk in iter(lambda: proc.stderr.read(MAX_STDOUT_READ_CHARS), ""):
-            buffer += chunk
-            while "\n" in buffer:
-                line, buffer = buffer.split("\n", 1)
-                self._stderr_lines.append(line.encode("utf-8")[:MAX_STDERR_LINE_BYTES].decode("utf-8", "replace"))
-        if buffer:
-            self._stderr_lines.append(buffer.encode("utf-8")[:MAX_STDERR_LINE_BYTES].decode("utf-8", "replace"))
+            for line in buffer.append(chunk):
+                self._stderr_lines.append(line)
+        remainder = buffer.remainder()
+        if remainder:
+            self._stderr_lines.append(remainder)
 
     def _handle_message(self, message: object) -> None:
         if self._runtime_dead:

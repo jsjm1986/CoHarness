@@ -133,6 +133,47 @@ describe('dynamic runner definitions', () => {
     expect(await running(runner, AGENT_A)).toEqual([])
   })
 
+  it('enforces Plugin and Package retention limits before mutating the registry', async () => {
+    const { runner } = await setup({ maxPlugins: 1, maxPluginsPerSession: 1, maxPackagesPerPlugin: 1 })
+    const first = define(runner, { sessionId: AGENT_A.id, name: 'first', purpose: 'p', host: HOST_CODE })
+    expect(() => define(runner, { sessionId: AGENT_A.id, name: 'second', purpose: 'p', host: HOST_CODE }))
+      .toThrow('dynamic Plugin limit')
+    expect(() => runner.define({
+      sessionId: AGENT_A.id,
+      plugin: { kind: 'existing', pluginId: first.pluginId },
+      name: 'second version',
+      purpose: 'p',
+      code: { host: HOST_CODE },
+    })).toThrow('dynamic Package limit')
+    expect((await running(runner, AGENT_A)).map(row => row.id)).toEqual([String(first.pluginId)])
+  })
+
+  it('releases Plugin and source-byte quota when a definition is removed', async () => {
+    const { runner } = await setup({ maxPlugins: 1, maxSourceBytes: 64, maxSourceBytesPerSession: 64 })
+    const first = define(runner, { sessionId: AGENT_A.id, name: 'first', purpose: 'p', host: 'return {}' })
+    expect(() => define(runner, { sessionId: AGENT_A.id, name: 'second', purpose: 'p', host: 'return {}' }))
+      .toThrow('dynamic Plugin limit')
+    await expect(runner.undefine(AGENT_A, first.pluginId)).resolves.toMatchObject({ ok: true })
+    expect(() => define(runner, { sessionId: AGENT_A.id, name: 'second', purpose: 'p', host: 'return {}' })).not.toThrow()
+  })
+
+  it('rejects pending run admission at the configured global and Session limits', async () => {
+    const { runner } = await setup({ maxPendingApprovals: 1, maxPendingApprovalsPerSession: 1 })
+    const first = define(runner, { sessionId: AGENT_A.id, name: 'first', purpose: 'p', client: CLIENT_CODE })
+    const second = define(runner, { sessionId: AGENT_A.id, name: 'second', purpose: 'p', client: CLIENT_CODE })
+    await expect(runner.run(AGENT_A, first.pluginId, first.packageId, 'run')).resolves.toMatchObject({
+      ok: true, status: 'awaiting-approval',
+    })
+    await expect(runner.run(AGENT_A, second.pluginId, second.packageId, 'run'))
+      .rejects.toThrow('dynamic pending-approval limit')
+    const requestId = (await runner.inventory()).find(row => row.pluginId === first.pluginId)?.latestRun?.approvalRequestId
+    if (requestId === undefined) throw new Error('expected pending approval')
+    await expect(runner.resolveRequestRun(requestId, { ok: false, reason: 'rejected' })).resolves.toEqual({ accepted: true })
+    await expect(runner.run(AGENT_A, second.pluginId, second.packageId, 'run')).resolves.toMatchObject({
+      ok: true, status: 'awaiting-approval',
+    })
+  })
+
   it('hides another session\'s definition, so only its own card can address it', async () => {
     const { runner } = await setup()
     const { pluginId, packageId } = define(runner, {

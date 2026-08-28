@@ -314,7 +314,7 @@ request(path: string, options: GatewayRuntimeRequestInit = {}): Promise<Response
 
 Types: [SessionId](core.md)
 
-Source: [`packages/context/gateway-runtime/src/index.ts:284`](../../packages/context/gateway-runtime/src/index.ts)
+Source: [`packages/context/gateway-runtime/src/index.ts:352`](../../packages/context/gateway-runtime/src/index.ts)
 
 <a id="typert-gateway-events"></a>
 

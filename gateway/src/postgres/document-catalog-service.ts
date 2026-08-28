@@ -387,6 +387,26 @@ export class PostgresDocumentCatalogService {
     ])
   }
 
+  /** Insert one fixed-detail history entry for each catalog id in one SQL round-trip. */
+  private async insertHistoryBatch(
+    client: PoolClient,
+    entries: readonly { catalogId: string; eventKind: string }[],
+    actorId: string,
+    detail: unknown,
+  ): Promise<void> {
+    if (entries.length === 0) return
+    await client.query(`INSERT INTO harness.document_history(
+      organization_id,catalog_id,actor_user_id,event_kind,detail
+    ) SELECT $1,item.catalog_id,$2,item.event_kind,$5::jsonb
+      FROM unnest($3::uuid[],$4::text[]) AS item(catalog_id,event_kind)`, [
+      this.context.organizationId,
+      actorId,
+      entries.map(item => item.catalogId),
+      entries.map(item => item.eventKind),
+      JSON.stringify(detail ?? {}),
+    ])
+  }
+
   /** Upsert a runtime listing into one scope; repeated calls are idempotent. */
   async sync(input: {
     actorUserId: number
@@ -396,6 +416,13 @@ export class PostgresDocumentCatalogService {
     ownerSource?: 'upload' | 'transfer' | 'legacy' | 'admin'
   }): Promise<void> {
     for (const document of input.documents) validScopeInput(document)
+    const documentIds = new Set<string>()
+    for (const document of input.documents) {
+      if (documentIds.has(document.docId)) {
+        throw new DocumentCatalogError('INVALID_DOCUMENT_METADATA', 400, 'Duplicate document id in catalog sync.')
+      }
+      documentIds.add(document.docId)
+    }
     await transaction(this.context.pool, async (client) => {
       const actorId = await this.actorInternalId(client, input.actorUserId)
       const scope = await this.scopeIds(client, input.scope)
@@ -411,66 +438,76 @@ export class PostgresDocumentCatalogService {
           FROM harness.projects WHERE organization_id=$1 AND id=$2`, [this.context.organizationId, scope.projectId])
         legacyOwner = owner.rows[0]?.owner_user_id ?? owner.rows[0]?.created_by ?? actorId
       }
-      const seen = new Set<string>()
-      for (const document of input.documents) {
-        seen.add(document.docId)
-        const directoryId = document.directoryId ?? ''
-        const existing = await client.query<{ id: string; owner_user_id: string | null; state: DocumentCatalogState }>(`SELECT id,owner_user_id,state
+      const existing = input.documents.length === 0
+        ? { rows: [] as { id: string; runtime_doc_id: string; owner_user_id: string | null; state: DocumentCatalogState }[] }
+        : await client.query<{ id: string; runtime_doc_id: string; owner_user_id: string | null; state: DocumentCatalogState }>(`SELECT id,runtime_doc_id,owner_user_id,state
           FROM harness.document_catalog
           WHERE organization_id=$1 AND scope_kind=$2
             AND ((scope_kind='personal' AND scope_user_id=$3) OR (scope_kind='project' AND scope_project_id=$4))
-            AND runtime_doc_id=$5`, [this.context.organizationId, scope.kind, scope.userId, scope.projectId, document.docId])
-        const row = existing.rows[0]
-        // A permanent purge is an immutable catalog fact.  A stale runtime
-        // listing (or a later file reusing the same provider id) must not make
-        // that metadata readable again through an ordinary reconciliation.
-        if (row?.state === 'purged') continue
-        const owner = row?.owner_user_id ?? (input.ownerSource === 'upload' || input.ownerSource === 'transfer' ? actorId : legacyOwner)
-        if (row === undefined) {
-          const inserted = await client.query<{ id: string }>(`INSERT INTO harness.document_catalog(
+            AND runtime_doc_id=ANY($5::text[])`, [
+          this.context.organizationId, scope.kind, scope.userId, scope.projectId, input.documents.map(document => document.docId),
+        ])
+      const existingByDocId = new Map(existing.rows.map(row => [row.runtime_doc_id, row]))
+      // A permanent purge is an immutable catalog fact. Stale runtime listings
+      // are excluded from the upsert instead of reactivating their tombstones.
+      const incoming = input.documents.filter(document => existingByDocId.get(document.docId)?.state !== 'purged')
+      const source = input.ownerSource ?? 'legacy'
+      const ownerFor = (document: DocumentCatalogInput): string | null => {
+        const prior = existingByDocId.get(document.docId)
+        return prior?.owner_user_id ?? (source === 'upload' || source === 'transfer' ? actorId : legacyOwner)
+      }
+      const upserted = incoming.length === 0
+        ? { rows: [] as { id: string; runtime_doc_id: string }[] }
+        : await client.query<{ id: string; runtime_doc_id: string }>(`INSERT INTO harness.document_catalog(
             organization_id,scope_kind,scope_user_id,scope_project_id,runtime_doc_id,directory_id,name,bytes,media_type,
             modified_at_ms,owner_user_id,owner_source,state,legacy
-          ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'active',$13)
-          RETURNING id`, [this.context.organizationId, scope.kind, scope.userId, scope.projectId, document.docId,
-            directoryId, document.name, document.bytes, document.mediaType, Math.trunc(document.modifiedAt), owner,
-            input.ownerSource ?? 'legacy', input.ownerSource === undefined || input.ownerSource === 'legacy'])
-          await this.insertHistory(client, {
-            catalogId: inserted.rows[0]!.id,
-            actorId,
-            eventKind: 'created',
-            detail: { source: input.ownerSource ?? 'legacy' },
-          })
-        } else {
-          await client.query(`UPDATE harness.document_catalog SET directory_id=$3,name=$4,bytes=$5,media_type=$6,
-            modified_at_ms=$7,state='active',deleted_at=NULL,trashed_at=NULL,trashed_by_user_id=NULL,
+          ) SELECT $1,$2,$3,$4,item.runtime_doc_id,item.directory_id,item.name,item.bytes,item.media_type,
+            item.modified_at_ms,item.owner_user_id,item.owner_source,'active',item.legacy
+            FROM unnest($5::text[],$6::text[],$7::text[],$8::bigint[],$9::text[],$10::bigint[],$11::uuid[],$12::text[],$13::boolean[])
+              AS item(runtime_doc_id,directory_id,name,bytes,media_type,modified_at_ms,owner_user_id,owner_source,legacy)
+          ON CONFLICT ${scope.kind === 'personal'
+            ? "(organization_id,scope_user_id,runtime_doc_id) WHERE scope_kind='personal'"
+            : "(organization_id,scope_project_id,runtime_doc_id) WHERE scope_kind='project'"} DO UPDATE SET
+            directory_id=EXCLUDED.directory_id,name=EXCLUDED.name,bytes=EXCLUDED.bytes,media_type=EXCLUDED.media_type,
+            modified_at_ms=EXCLUDED.modified_at_ms,state='active',deleted_at=NULL,trashed_at=NULL,trashed_by_user_id=NULL,
             purge_after=NULL,purged_at=NULL,purged_by_user_id=NULL,
-            restored_at=CASE WHEN state='trash' THEN now() ELSE restored_at END,
-            restored_by_user_id=CASE WHEN state='trash' THEN $11 ELSE restored_by_user_id END,updated_at=now(),
-            owner_user_id=COALESCE(owner_user_id,$8),owner_source=CASE WHEN owner_user_id IS NULL THEN $9 ELSE owner_source END,
-            legacy=CASE WHEN owner_user_id IS NULL THEN $10 ELSE legacy END
-            WHERE id=$1 AND organization_id=$2`, [row.id, this.context.organizationId, directoryId, document.name,
-            document.bytes, document.mediaType, Math.trunc(document.modifiedAt), owner, input.ownerSource ?? 'legacy',
-            input.ownerSource === undefined || input.ownerSource === 'legacy', actorId])
-          await this.insertHistory(client, {
-            catalogId: row.id,
-            actorId,
-            eventKind: row.state === 'active' ? 'updated' : 'restored',
-            detail: { source: input.ownerSource ?? 'legacy' },
-          })
-        }
-      }
+            restored_at=CASE WHEN document_catalog.state='trash' THEN now() ELSE document_catalog.restored_at END,
+            restored_by_user_id=CASE WHEN document_catalog.state='trash' THEN $14 ELSE document_catalog.restored_by_user_id END,
+            updated_at=now(),owner_user_id=COALESCE(document_catalog.owner_user_id,EXCLUDED.owner_user_id),
+            owner_source=CASE WHEN document_catalog.owner_user_id IS NULL THEN EXCLUDED.owner_source ELSE document_catalog.owner_source END,
+            legacy=CASE WHEN document_catalog.owner_user_id IS NULL THEN EXCLUDED.legacy ELSE document_catalog.legacy END
+          WHERE document_catalog.state<>'purged'
+          RETURNING id,runtime_doc_id`, [
+          this.context.organizationId, scope.kind, scope.userId, scope.projectId,
+          incoming.map(document => document.docId), incoming.map(document => document.directoryId ?? ''),
+          incoming.map(document => document.name), incoming.map(document => document.bytes),
+          incoming.map(document => document.mediaType), incoming.map(document => Math.trunc(document.modifiedAt)),
+          incoming.map(document => ownerFor(document)), incoming.map(() => source),
+          incoming.map(() => source === 'legacy'), actorId,
+        ])
+      await this.insertHistoryBatch(client, upserted.rows.map(row => ({
+        catalogId: row.id,
+        eventKind: existingByDocId.get(row.runtime_doc_id)?.state === 'active' ? 'updated'
+          : existingByDocId.get(row.runtime_doc_id) === undefined ? 'created' : 'restored',
+      })), actorId, { source })
       if (input.replace === true && canReconcileMissing) {
         const active = await client.query<{ id: string; runtime_doc_id: string }>(`SELECT id,runtime_doc_id
           FROM harness.document_catalog WHERE organization_id=$1 AND scope_kind=$2
             AND ((scope_kind='personal' AND scope_user_id=$3) OR (scope_kind='project' AND scope_project_id=$4))
             AND state='active'`, [this.context.organizationId, scope.kind, scope.userId, scope.projectId])
-        for (const row of active.rows) {
-          if (seen.has(row.runtime_doc_id)) continue
+        const missing = active.rows.filter(row => !documentIds.has(row.runtime_doc_id))
+        if (missing.length > 0) {
           const trashedAt = new Date()
-          const purgeAfter = retentionDeadline(trashedAt, this.retentionDays)
-          await client.query(`UPDATE harness.document_catalog SET state='trash',deleted_at=$2,trashed_at=$2,
-            trashed_by_user_id=$3,purge_after=$4,updated_at=now() WHERE id=$1`, [row.id, trashedAt, actorId, purgeAfter])
-          await this.insertHistory(client, { catalogId: row.id, actorId, eventKind: 'deleted', detail: { reason: 'runtime-reconcile' } })
+          const updated = await client.query<{ id: string }>(`UPDATE harness.document_catalog AS catalog SET state='trash',deleted_at=$2,
+            trashed_at=$2,trashed_by_user_id=$3,purge_after=$4,updated_at=now()
+            FROM unnest($5::uuid[]) AS missing(id)
+            WHERE catalog.organization_id=$1 AND catalog.id=missing.id
+            RETURNING catalog.id`, [
+            this.context.organizationId, trashedAt, actorId, retentionDeadline(trashedAt, this.retentionDays),
+            missing.map(row => row.id),
+          ])
+          await this.insertHistoryBatch(client, updated.rows.map(row => ({ catalogId: row.id, eventKind: 'deleted' })),
+            actorId, { reason: 'runtime-reconcile' })
         }
       }
     })
@@ -498,6 +535,41 @@ export class PostgresDocumentCatalogService {
         row.rows[0].id, trashedAt, actorId, retentionDeadline(trashedAt, this.retentionDays),
       ])
       await this.insertHistory(client, { catalogId: row.rows[0].id, actorId, eventKind: 'deleted', detail: { reason: 'runtime' } })
+    })
+  }
+
+  /**
+   * Mark several runtime-local documents deleted in one transaction.
+   * @param actorUserId - public id of the authenticated actor.
+   * @param scope - personal or project document scope.
+   * @param docIds - runtime-local document ids; duplicate ids are harmless.
+   * @returns a promise that settles after metadata and history are committed.
+   */
+  async markDeletedBatch(actorUserId: number, scope: DocumentCatalogScope, docIds: readonly string[]): Promise<void> {
+    if (docIds.length === 0) return
+    if (docIds.length > 2_000) {
+      throw new DocumentCatalogError('INVALID_DOCUMENT_METADATA', 400, 'Document deletion batch is too large.')
+    }
+    await transaction(this.context.pool, async (client) => {
+      const actorId = await this.actorInternalId(client, actorUserId)
+      const ids = await this.scopeIds(client, scope)
+      if (ids.kind === 'project') {
+        const authority = await this.projectAuthority(client, ids.projectId!, actorId)
+        if (authority === null || authority.mode !== 'rw') {
+          throw new DocumentCatalogError('COLLABORATION_FORBIDDEN', 403, 'You cannot remove project document metadata.')
+        }
+      }
+      const trashedAt = new Date()
+      const updated = await client.query<{ id: string }>(`UPDATE harness.document_catalog AS catalog SET
+          state='trash',deleted_at=$5,trashed_at=$5,trashed_by_user_id=$6,purge_after=$7,updated_at=now()
+        WHERE catalog.organization_id=$1 AND catalog.scope_kind=$2
+          AND ((catalog.scope_kind='personal' AND catalog.scope_user_id=$3) OR (catalog.scope_kind='project' AND catalog.scope_project_id=$4))
+          AND catalog.runtime_doc_id=ANY($8::text[]) AND catalog.state='active'
+        RETURNING catalog.id`, [
+        this.context.organizationId, ids.kind, ids.userId, ids.projectId, trashedAt, actorId,
+        retentionDeadline(trashedAt, this.retentionDays), [...new Set(docIds)],
+      ])
+      await this.insertHistoryBatch(client, updated.rows.map(row => ({ catalogId: row.id, eventKind: 'deleted' })), actorId, { reason: 'runtime' })
     })
   }
 

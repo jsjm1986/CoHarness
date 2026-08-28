@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto'
 import type { Server } from 'node:http'
 import { join } from 'node:path'
 import { createAdminApiHandler } from './admin-api.ts'
-import { applyModelGovernanceToProject, applyModelGovernanceToUser } from './apply-model-governance.ts'
+import { refreshModelGovernance } from './apply-model-governance.ts'
 import { loadConfig } from './config.ts'
 import { InstanceManager, RuntimeLeaseUnavailableError } from './instances.ts'
 import type { RuntimeTarget } from './instances.ts'
@@ -248,8 +248,7 @@ if (await deps.users.count() === 0) {
 // Reconcile every projection on Gateway startup so a surviving runtime and a
 // never-started account receive the same current organization default. The
 // operation is idempotent and does not alter authorization rows.
-for (const target of await deps.users.list()) await applyModelGovernanceToUser(deps, target.id)
-for (const project of await deps.projects.list()) await applyModelGovernanceToProject(deps, project.id)
+await refreshModelGovernance(deps)
 
 const proxyHandlers = createProxyHandlers(deps, principalKeys.signer)
 const documentAdmin = createGatewayDocumentAdminHandler({

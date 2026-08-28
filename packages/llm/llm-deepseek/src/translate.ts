@@ -17,7 +17,8 @@ import type { WireChunk, WireUsage } from './types.ts'
 interface OpenBlock {
   index: number
   kind: 'text' | 'reasoning' | 'tool-call'
-  text: string
+  /** Incremental fragments; joined once at block close to avoid O(n²) concatenation. */
+  parts: string[]
   /** tool-call only */
   callId?: string
   name?: string
@@ -186,14 +187,15 @@ function parseChunk(value: unknown): WireChunk {
 
 /** Assemble the final ContentBlock for one open block. */
 function closeBlock(block: OpenBlock): ContentBlock {
+  const text = block.parts.join('')
   switch (block.kind) {
-    case 'text': return { type: 'text', text: block.text }
-    case 'reasoning': return { type: 'reasoning', text: block.text }
+    case 'text': return { type: 'text', text }
+    case 'reasoning': return { type: 'reasoning', text }
     case 'tool-call': return {
       type: 'tool-call',
       id: CallId(block.callId ?? ''),
       name: block.name ?? '',
-      arguments: block.text,
+      arguments: text,
     }
   }
 }
@@ -228,7 +230,7 @@ export async function* translate(
   const toolArgumentBytes = new Map<number, number>()
 
   function open(kind: OpenBlock['kind']): OpenBlock {
-    const block: OpenBlock = { index: nextIndex++, kind, text: '' }
+    const block: OpenBlock = { index: nextIndex++, kind, parts: [] }
     order.push(block)
     return block
   }
@@ -278,7 +280,7 @@ export async function* translate(
           reasoningBlock = open('reasoning')
           yield { type: 'block-start', index: reasoningBlock.index, blockType: 'reasoning' }
         }
-        reasoningBlock.text += reasoning
+        reasoningBlock.parts.push(reasoning)
         yield { type: 'reasoning-delta', index: reasoningBlock.index, text: reasoning }
       }
 
@@ -292,7 +294,7 @@ export async function* translate(
           textBlock = open('text')
           yield { type: 'block-start', index: textBlock.index, blockType: 'text' }
         }
-        textBlock.text += content
+        textBlock.parts.push(content)
         yield { type: 'text-delta', index: textBlock.index, text: content }
       }
 
@@ -320,7 +322,7 @@ export async function* translate(
           throw new LlmError('DeepSeek tool-call arguments exceeded the configured response limit', 'RESPONSE_TOO_LARGE')
         }
         toolArgumentBytes.set(call.index, bytes)
-        block.text += fragment
+        block.parts.push(fragment)
         yield {
           type: 'tool-call-delta',
           index: block.index,

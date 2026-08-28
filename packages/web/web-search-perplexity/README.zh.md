@@ -14,6 +14,7 @@
 | `baseURL` | `https://api.perplexity.ai` | 端点基址；追加 `/chat/completions`。无法解析时提供方不可用。 |
 | `model` | `sonar` | 搜索模型名称。 |
 | `maxTokens` | `1024` | 生成答案 token 上限（`max_tokens`）。必须是正整数。 |
+| `maxResponseBytes` | `16 MiB` | 每次成功或错误响应正文的正安全整数上限（最高 256 MiB）；分块响应超过上限时会被取消。 |
 | `searchRecency` | （未设置） | 以 `search_recency_filter` 发送的新近程度窗口：`day`、`week`、`month` 或 `year`。未设置时不发送过滤条件。 |
 
 ```yaml

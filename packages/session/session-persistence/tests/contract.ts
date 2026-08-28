@@ -287,6 +287,7 @@ export function runPersistenceContract(name: string, make: () => Promise<Contrac
 
         await expect(persistence.list(controller.signal)).rejects.toBe(reason)
         await expect(persistence.listSnapshots(controller.signal)).rejects.toBe(reason)
+        await expect(persistence.revision(SessionId('cancelled-revision'), controller.signal)).rejects.toBe(reason)
         await expect(persistence.inspect(SessionId('cancelled-inspect'), controller.signal))
           .rejects.toBe(reason)
         await expect(persistence.readFrom(SessionId('cancelled-read-from'), 0, controller.signal))
@@ -342,6 +343,8 @@ export function runPersistenceContract(name: string, make: () => Promise<Contrac
         const repeated = (await persistence.listSnapshots()).find(snapshot => snapshot.header.id === m.id)
         expect(first).toBeDefined()
         expect(repeated?.revision).toBe(first?.revision)
+        await expect(persistence.revision(m.id)).resolves.toBe(first?.revision)
+        await expect(persistence.revision(SessionId('absent-revision'))).resolves.toBeUndefined()
 
         await persistence.append(m.id, [{
           type: 'turn/start',
@@ -351,6 +354,7 @@ export function runPersistenceContract(name: string, make: () => Promise<Contrac
         }])
         const changed = (await persistence.listSnapshots()).find(snapshot => snapshot.header.id === m.id)
         expect(changed?.revision).not.toBe(first?.revision)
+        await expect(persistence.revision(m.id)).resolves.toBe(changed?.revision)
       } finally {
         await dispose()
       }

@@ -41,6 +41,18 @@ describe('UserService', () => {
     expect(users.list().find(user => user.id === current.id)?.port).toBe(47000)
   })
 
+  it('reuses the first free port after an account is removed', async () => {
+    const { users } = setup()
+    await users.create({ username: 'admin', password: 'pw-123456', role: 'admin' })
+    const first = await users.create({ username: 'first', password: 'pw-123456' })
+    await users.create({ username: 'second', password: 'pw-123456' })
+    expect(users.list().map(user => user.port)).toEqual([42000, 42001, 42002])
+
+    expect(users.remove(first.id)).toBe(true)
+    const replacement = await users.create({ username: 'replacement', password: 'pw-123456' })
+    expect(users.list().find(user => user.id === replacement.id)?.port).toBe(42001)
+  })
+
   it('logically deletes a user and removes active access without erasing history', async () => {
     const { db, users } = setup()
     const admin = await users.create({ username: 'admin', password: 'pw-123456', role: 'admin' })
@@ -59,7 +71,7 @@ describe('UserService', () => {
     })).toMatchObject({ status: 'disabled' })
     expect((db.prepare(`SELECT COUNT(*) AS n FROM project_members WHERE user_id = ?`).get(member.id) as { n: number }).n).toBe(0)
     expect((db.prepare(`SELECT COUNT(*) AS n FROM audit_log WHERE user_id = ?`).get(member.id) as { n: number }).n).toBe(1)
-    expect(db.prepare(`SELECT state, pid FROM instances WHERE user_id = ?`).get(member.id)).toEqual({ state: 'stopped', pid: null })
+    expect(db.prepare(`SELECT state, pid FROM instances WHERE user_id = ?`).get(member.id)).toBeUndefined()
     expect(users.getById(admin.id)).not.toBeNull()
     await expect(users.create({ username: 'member', password: 'pw-123456' })).rejects.toThrow()
   })

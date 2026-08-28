@@ -7,6 +7,7 @@ import { bindScopeParent, createScope, scopeOf } from '@deepseek-ai/dsh-scope'
 import type { ScopeKey } from '@deepseek-ai/dsh-scope'
 import { JobId } from '@deepseek-ai/dsh-jobs'
 import type { JobHooks, JobKind, JobOutcome, JobSnapshot, JobStart } from '@deepseek-ai/dsh-jobs'
+import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import LocalJobRegistry, { type Config as JobsConfig } from '@deepseek-ai/dsh-jobs-local'
 
 declare module '@deepseek-ai/dsh-jobs' {
@@ -175,6 +176,20 @@ describe('LocalJobRegistry.start', () => {
     },
   )
 
+  it.each(['maxTerminalJobs', 'maxTerminalOutputBytes', 'terminalRetentionMs'] as const)(
+    'rejects invalid %s retention config',
+    async (key) => {
+      const ctx = new Context()
+      await expect(ctx.plugin(LocalJobRegistry, { [key]: 0 })).rejects.toThrow()
+    },
+  )
+
+  it('rejects a terminal retention interval that Node would clamp', async () => {
+    const ctx = new Context()
+    await expect(ctx.plugin(LocalJobRegistry, { terminalRetentionMs: MAX_TIMER_DELAY_MS + 1 }))
+      .rejects.toThrow(/terminalRetentionMs/)
+  })
+
   it('accepts the largest safe integer limit', async () => {
     const ctx = await harness({ maxConcurrentJobsPerOwner: Number.MAX_SAFE_INTEGER })
     expect(ctx.jobs).toBeInstanceOf(LocalJobRegistry)
@@ -234,6 +249,45 @@ describe('LocalJobRegistry.start', () => {
       expect(() => ctx.jobs.start(producer().spec)).not.toThrow()
     },
   )
+
+  it('evicts the oldest terminal record at the configured count budget', async () => {
+    const ctx = await harness({ maxTerminalJobs: 1 })
+    const first = producer()
+    const firstId = ctx.jobs.start(first.spec)
+    first.settle({ status: 'completed', output: 'first result' })
+    await tick()
+
+    const second = producer()
+    const secondId = ctx.jobs.start(second.spec)
+    expect(ctx.jobs.get(secondId).status).toBe('running')
+    second.settle({ status: 'completed' })
+    await tick()
+    expect(() => ctx.jobs.get(firstId)).toThrow(`unknown job ${firstId}`)
+  })
+
+  it('evicts terminal output when the global output budget is exceeded', async () => {
+    const ctx = await harness({ maxTerminalOutputBytes: 4 })
+    const first = producer()
+    const firstId = ctx.jobs.start(first.spec)
+    first.settle({ status: 'completed', output: '12345' })
+    await tick()
+    expect(() => ctx.jobs.get(firstId)).toThrow(`unknown job ${firstId}`)
+  })
+
+  it('retains terminal records while a waiter remains active', async () => {
+    const ctx = await harness({ maxTerminalJobs: 1 })
+    const first = producer()
+    const firstId = ctx.jobs.start(first.spec)
+    const waiter = ctx.jobs.wait(firstId, 5_000)
+    first.settle({ status: 'completed' })
+    const second = producer()
+    const secondId = ctx.jobs.start(second.spec)
+    second.settle({ status: 'completed' })
+    await expect(waiter).resolves.toMatchObject({ id: firstId, status: 'completed' })
+    await tick()
+    expect(ctx.jobs.get(firstId).status).toBe('completed')
+    expect(() => ctx.jobs.get(secondId)).toThrow(`unknown job ${secondId}`)
+  })
 
   it('isolates exact owners, replacement objects with the same session id, and the unowned bucket', async () => {
     const ctx = await harness({ maxConcurrentJobsPerOwner: 1 })

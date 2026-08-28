@@ -589,6 +589,22 @@ describe('toPiContext', () => {
 })
 
 describe('toStreamChunks', () => {
+  it('rejects an unbounded ordering backlog before retaining it', async () => {
+    const pending: AssistantMessageEvent[] = [
+      { type: 'text_start', contentIndex: 0, partial: assistant() },
+      { type: 'text_delta', contentIndex: 0, delta: '<thi', partial: assistant() },
+      ...Array.from({ length: 4_097 }, (_, index) => ({
+        type: 'thinking_delta' as const,
+        contentIndex: 1,
+        delta: `fragment-${String(index)}`,
+        partial: assistant(),
+      })),
+    ]
+    await expect(collect(toStreamChunks(feed(...pending), undefined, true))).rejects.toMatchObject({
+      name: 'LlmError', code: 'RESPONSE_TOO_LARGE',
+    })
+  })
+
   const partialWithToolCall = assistant({
     content: [{ type: 'toolCall', id: 'call-1', name: 'f', arguments: {} }],
   })

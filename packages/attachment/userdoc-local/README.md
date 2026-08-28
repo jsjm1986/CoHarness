@@ -16,6 +16,8 @@ Identical in-flight listings share one filesystem scan; a caller's abort only ca
 
 The local provider implements the `resumable-v1` upload session used by the Web client. It accepts one request-sized chunk at a time, verifies each chunk with SHA-256, persists a private manifest and partial file below `.upload-sessions/v1/`, and publishes the final file only after a complete SHA-256 verification. A session survives a runtime restart and remains resumable for the configured 24-hour default retention; expired session records and their temporary bytes are removed automatically. The default chunk size is 8 MiB, safely below the public Cloudflare request-body limit, and all upload safety values are configurable through the provider config.
 
+`uploadManifestMaxBytes` bounds every manifest read (256 KiB by default). `uploadMaxConcurrent` bounds both expired-session cleanup and finalization workers; queued finalizations are cancelled when the store stops or an upload is cancelled. `uploadCleanupIntervalMs` is capped at Node's maximum timer delay (`2,147,483,647` ms), so an invalid interval cannot be clamped into a busy one-millisecond loop.
+
 ## Model Experience
 
 Indirectly, through the host prompt-assembly consumer that turns a stored reference into inlined text or a path the agent reads with its ordinary tools.

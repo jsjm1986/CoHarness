@@ -25,6 +25,7 @@ It reuses the `DEEPSEEK_API_KEY` credential reference (no new secret) but **not*
 | `apiVersion` | `2023-06-01` | `anthropic-version` header value. |
 | `maxTokens` | `4096` | Positive-integer upper bound on generated tokens for the Messages request. |
 | `maxUses` | `5` | Positive-integer maximum `web_search` server-tool uses per request. |
+| `maxResponseBytes` | `16 MiB` | Positive safe-integer cap (up to 256 MiB) on each success or error response body; chunked responses are cancelled when they cross it. |
 
 ```yaml
 - id: web-search-deepseek

@@ -717,6 +717,37 @@ for line in sys.stdin:
         assert init.serverInfo.name == "fake-dsh"
 
 
+def test_client_accepts_highly_fragmented_stdout_without_rebuilding_the_line(tmp_path: Path) -> None:
+    script = tmp_path / "fragmented_bridge.py"
+    script.write_text(
+        """
+import json
+import sys
+
+def send(message):
+    for character in json.dumps(message):
+        sys.stdout.write(character)
+        sys.stdout.flush()
+    sys.stdout.write("\\n")
+    sys.stdout.flush()
+
+for line in sys.stdin:
+    msg = json.loads(line)
+    if msg.get("method") == "initialize":
+        send({"jsonrpc": "2.0", "id": msg["id"], "result": {"serverInfo": {"name": "fragmented-dsh"}}})
+    elif msg.get("method") == "shutdown":
+        send({"jsonrpc": "2.0", "id": msg["id"], "result": {}})
+        break
+""".strip()
+    )
+
+    with HarnessClient(
+        HarnessConfig(launch_args_override=(sys.executable, str(script)))
+    ) as client:
+        init = client.initialize(provider="deepseek-official", cwd="/workspace", model="dsagent")
+        assert init.serverInfo.name == "fragmented-dsh"
+
+
 def test_client_request_times_out_when_bridge_does_not_respond(tmp_path: Path) -> None:
     script = tmp_path / "fake_bridge.py"
     script.write_text(

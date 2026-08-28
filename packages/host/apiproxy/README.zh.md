@@ -28,7 +28,7 @@ Settings 分节中的 `reasoningEffort` 在 agent-default-model 插件配置中�
 
 首个回答认领待处理请求之前，系统会对照该请求校验问题响应。多选题的回答项可以同时携带 `selected` 中的请求选项标签与非空 `custom` 文本；单选题的回答项必须二选一。标签重复、标签未知、id 不匹配、批次不完整以及自定义文本为空都会以 `bad-response` 拒绝。
 
-`session.history` 会读取已附加 Session 的内存状态，或通过持久化检查冷日志，而不会恢复或发布 agent，然后按追加来源的消息边界分页：`maxMessages` 统计以追加方式进入 surface 的 `user/message` 和 `assistant/message` 事件，因此仅供模型使用的替换副本不占用配额。每一页仍是一段连续的原始事件区间，从而让压缩（compaction）的仅日志 `compaction/summary` 记录与引用它的替换留在同一页。Web 的 `detail: 'conversation'` 尾页会在每个 Runtime 内按已附加/分离的来源类型、追加日志身份（分离来源还使用持久化版本）、请求页大小和投影注册集版本放入有界缓存；会话事件、工具注册表或投影 key 变化会使其失效，其他历史请求仍走未缓存路径。
+`session.history` 会读取已附加 Session 的内存状态，或通过持久化检查冷日志，而不会恢复或发布 agent，然后按追加来源的消息边界分页：`maxMessages` 统计以追加方式进入 surface 的 `user/message` 和 `assistant/message` 事件，因此仅供模型使用的替换副本不占用配额。每一页仍是一段连续的原始事件区间，从而让压缩（compaction）的仅日志 `compaction/summary` 记录与引用它的替换留在同一页。Web 的 `detail: 'conversation'` 尾页会在每个 Runtime 内按已附加／分离的来源类型、追加日志身份（分离来源还使用持久化 revision）、请求页大小和投影注册集 revision 放入有界缓存。分离来源校验使用按 id 查询的 `SessionPersistence.revision()`，不扫描会话目录；会话事件、工具注册表或投影 key 变化会使条目失效，其他历史请求仍走未缓存路径。
 
 `session.history` 与 `subagent.history` 会在该会话记录的组合中计算工具卡片 presenter：已附着会话使用现有 Agent 作用域，冷读则使用 preset 的 standing 作用域而不恢复 Agent。因此已附着的 subagent 会显示 child-local presenter；冷读对于只存在于 child 作用域的 presenter 保留通用卡片。
 
@@ -72,7 +72,7 @@ Workspace 列表与 Session 列表是相互独立的重连基线。`workspace.cr
 
 ## 载体层（`/client` + 根路径）
 
-`AbstractApiClient` 持有全部协议不变量：签发 rpcId、包装／解包信封、Zod 解析、SSE 帧解码、一元请求超时，以及按微任务批处理的信封观测（`subscribeEnvelopes`）；平台子类只提供 `doFetch` 传输环节。SSE reader 会拒绝未终止的分片，并在保留帧超过 8 MiB 时取消；Host mux／host 事件队列把积压输出限制为 64 KiB，溢出时发送一条 `internal` stream 错误后结束。`InProcessApiClient` 以 `toFetchHandler(api)` 为基础，仍是同构接点：它运行完整的协议序列化与校验路径而不经过网络，供需要该路径的调用方和载体测试使用。产品的 `dsh --profile headless` 是直连 core 的入口，不挂载本包。
+`AbstractApiClient` 持有全部协议不变量：签发 rpcId、包装／解包信封、Zod 解析、SSE 帧解码、一元请求超时，以及按微任务批处理的信封观测（`subscribeEnvelopes`）；平台子类只提供 `doFetch` 传输环节。成功的一元 JSON 响应会在 schema 解析前通过可配置的 16 MiB 字节预算（最高 256 MiB）读取，超限 body 由 `ApiResponseTooLargeError` 标识。相同的有界 reader 也会导出给直接浏览器消费方读取文本响应。SSE reader 会拒绝未终止的分片，并在保留帧超过 8 MiB 时取消；分片 frame 文本每个 frame 只合并一次。Host mux／host 事件队列把积压输出限制为 64 KiB，溢出时发送一条 `internal` stream 错误后结束。`InProcessApiClient` 以 `toFetchHandler(api)` 为基础，仍是同构接点：它运行完整的协议序列化与校验路径而不经过网络，供需要该路径的调用方和载体测试使用。产品的 `dsh --profile headless` 是直连 core 的入口，不挂载本包。
 
 直接的 `SessionsApi` / `SubagentsApi` 与 `IApiClient` 历史结果仍是展开后的 `{ events, hasMore, projections? }`，外加可选的 `omittedSpans`。`detail: 'conversation'` 在分页之后省略已完成追加来源 `assistant/message` 之下的历史 `assistant/chunk` 游程，并报告这些闭区间 seq 范围；缺失的 `detail` 与 `'full'` 保留全部事件。成功的 Fetch `session.history` 与 `subagent.history` 响应使用物理 `records`（含无损打包的剩余 chunk 行），并往返 `omittedSpans`；客户端先校验并展开，再暴露逻辑结果。大小目标按完整未压缩 `server-response` JSON 的 UTF-8 字节计量，且只在完整的追加来源消息组处截断；后缀裁切会把 `omittedSpans` 限制到返回后缀内的 seq。一个不可分割的消息组可以超过该目标。畸形打包记录会在运行时状态变更前失败；未知的普通或扩展 chunk 事件仍按普通事件处理。持久化、会话格式与 Conversation 组装不变。[`historyPageTargetBytes`](../../client/connection/README.zh.md) 持有部署目标；[无损历史线分页决策](../../../.agents/notes/implemented/architecture/2026-08-14-lossless-history-wire-pagination.zh.md) 与 [两档会话历史传输](../../../.agents/notes/implemented/architecture/2026-08-18-conversation-history-tier.zh.md) 记录原委。
 

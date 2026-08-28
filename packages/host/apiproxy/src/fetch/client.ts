@@ -228,12 +228,201 @@ const DEFAULT_TIMEOUT_MS = 30_000
 const MAX_TIMER_DELAY_MS = 2_147_483_647
 /** Maximum UTF-8 bytes retained while waiting for one SSE frame terminator. */
 const MAX_SSE_FRAME_BYTES = 8 * 1024 * 1024
+/** Maximum UTF-8 bytes retained for one successful unary JSON response. */
+export const DEFAULT_UNARY_RESPONSE_MAX_BYTES = 16 * 1024 * 1024
+/** Hard upper bound for a configured unary response budget. */
+export const MAX_UNARY_RESPONSE_BYTES = 256 * 1024 * 1024
+
+/** Raised when a unary API response crosses the carrier's byte budget. */
+export class ApiResponseTooLargeError extends Error {
+  /** @param limit - maximum accepted response bytes. */
+  constructor(readonly limit: number) {
+    super(`API response exceeds the ${String(limit)}-byte limit`)
+    this.name = 'ApiResponseTooLargeError'
+  }
+}
+
+/**
+ * Incremental SSE frame accumulator. Newline-delimited fragments stay in an
+ * append-only list and are joined once per complete frame; retaining one
+ * growing string would copy the frame prefix for every small transport read.
+ */
+class SseFrameBuffer {
+  private readonly parts: string[] = []
+  private readonly encoder = new TextEncoder()
+  private pendingNewline = false
+  private bytes = 0
+
+  constructor(private readonly limit: number, private readonly path: string) {}
+
+  /** Append decoded text and return every frame completed by this fragment. */
+  append(value: string): string[] {
+    const frames: string[] = []
+    let offset = 0
+    while (offset < value.length) {
+      if (this.pendingNewline) {
+        if (value.charCodeAt(offset) === 10) {
+          this.pendingNewline = false
+          frames.push(this.parts.join(''))
+          this.parts.length = 0
+          this.bytes = 0
+          offset += 1
+          continue
+        }
+        this.push('\n')
+        this.pendingNewline = false
+      }
+
+      const newline = value.indexOf('\n', offset)
+      if (newline < 0) {
+        this.push(value.slice(offset))
+        break
+      }
+      if (newline > offset) this.push(value.slice(offset, newline))
+      this.pendingNewline = true
+      offset = newline + 1
+    }
+    return frames
+  }
+
+  /** Whether an unterminated frame tail remains after the decoder reaches EOF. */
+  hasTail(): boolean {
+    return this.pendingNewline || this.parts.length > 0
+  }
+
+  private push(value: string): void {
+    const bytes = this.encoder.encode(value).byteLength
+    if (bytes > this.limit || this.bytes > this.limit - bytes) {
+      throw new Error(`SSE frame on ${this.path} exceeds ${String(this.limit)} bytes`)
+    }
+    this.parts.push(value)
+    this.bytes += bytes
+  }
+}
 
 /** Whether a unary call uses the transport health deadline or only caller/connection cancellation. */
 type UnaryTimeoutPolicy = 'default' | 'caller-signal-only'
 
 /** URL base for in-process handler injection (fake authority, opencode precedent). */
 const INTERNAL_BASE = 'http://dsh.internal'
+
+/** Read a unary response body with an explicit byte budget before JSON parsing. */
+/* jscpd:ignore-start -- this carrier has an independent response boundary from gateway-runtime and web providers. */
+type ResponseLike = {
+  headers?: Pick<Headers, 'get'>
+  body?: ReadableStream<Uint8Array> | null
+  json?: () => Promise<unknown>
+  text?: () => Promise<string>
+}
+
+function validateResponseLimit(limit: number): void {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > MAX_UNARY_RESPONSE_BYTES) {
+    throw new RangeError(`maxResponseBytes must be within 1..${String(MAX_UNARY_RESPONSE_BYTES)}`)
+  }
+}
+
+async function readBoundedBytes(response: Response, limit: number): Promise<Uint8Array> {
+  const responseLike = response as unknown as {
+    headers?: Pick<Headers, 'get'>
+    body?: ReadableStream<Uint8Array> | null
+    text?: () => Promise<string>
+  }
+  validateResponseLimit(limit)
+  const headers = responseLike.headers
+  const body = responseLike.body
+  const declared = headers?.get('content-length') ?? null
+  if (declared !== null) {
+    const length = Number(declared)
+    if (!Number.isSafeInteger(length) || length < 0 || length > limit) {
+      await body?.cancel().catch(() => {})
+      throw new ApiResponseTooLargeError(limit)
+    }
+  }
+  if (body === null || body === undefined) {
+    if (headers === undefined && responseLike.text !== undefined) {
+      const text = await responseLike.text()
+      const bytes = new TextEncoder().encode(text)
+      if (bytes.byteLength > limit) throw new ApiResponseTooLargeError(limit)
+      return bytes
+    }
+    return new Uint8Array(0)
+  }
+  const reader = body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  try {
+    for (;;) {
+      const next = await reader.read()
+      if (next.done) break
+      total += next.value.byteLength
+      if (!Number.isSafeInteger(total) || total > limit) {
+        await reader.cancel().catch(() => {})
+        throw new ApiResponseTooLargeError(limit)
+      }
+      chunks.push(next.value)
+    }
+  } finally {
+    reader.releaseLock()
+  }
+  const bytes = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return bytes
+}
+
+async function readBoundedText(response: Response, limit: number): Promise<string> {
+  const responseLike = response as unknown as ResponseLike
+  validateResponseLimit(limit)
+  if (responseLike.body === null || responseLike.body === undefined) {
+    if (responseLike.headers === undefined && responseLike.text !== undefined) {
+      const text = await responseLike.text()
+      if (new TextEncoder().encode(text).byteLength > limit) throw new ApiResponseTooLargeError(limit)
+      return text
+    }
+    return ''
+  }
+  return new TextDecoder().decode(await readBoundedBytes(response, limit))
+}
+
+async function readBoundedJson(response: Response, limit: number): Promise<unknown> {
+  const responseLike = response as unknown as ResponseLike
+  if (responseLike.body == null && responseLike.headers === undefined && responseLike.json !== undefined) {
+    return await responseLike.json()
+  }
+  const text = await readBoundedText(response, limit)
+  if (text === '') return undefined
+  return JSON.parse(text) as unknown
+}
+/* jscpd:ignore-end */
+
+/**
+ * Read one unary API response with the carrier's default or caller-supplied byte budget.
+ * @param response - Fetch response returned by an API carrier.
+ * @param limit - positive safe-integer response byte budget.
+ * @returns the decoded JSON value.
+ */
+export function readApiResponseJson(
+  response: Response,
+  limit = DEFAULT_UNARY_RESPONSE_MAX_BYTES,
+): Promise<unknown> {
+  return readBoundedJson(response, limit)
+}
+
+/**
+ * Read one API response as text with the carrier's byte budget.
+ * @param response - Fetch response returned by an API carrier.
+ * @param limit - positive safe-integer response byte budget.
+ * @returns the decoded UTF-8 body; an empty body returns an empty string.
+ */
+export function readApiResponseText(
+  response: Response,
+  limit = DEFAULT_UNARY_RESPONSE_MAX_BYTES,
+): Promise<string> {
+  return readBoundedText(response, limit)
+}
 
 /**
  * Abstract fetch-carrier client. Subclasses supply the transport (doFetch) and may refine the
@@ -249,10 +438,21 @@ export abstract class AbstractApiClient implements IApiClient {
   private flushScheduled = false
   private readonly envelopeListeners = new Set<(batch: readonly RpcMessage[]) => void>()
 
-  /** @param timeoutMs - timeout for bounded unary calls; user-paced calls and streams do not use it. */
-  constructor(protected readonly timeoutMs: number = DEFAULT_TIMEOUT_MS) {
+  /**
+   * @param timeoutMs - timeout for bounded unary calls; user-paced calls and streams do not use it.
+   * @param maxResponseBytes - maximum successful unary JSON response size.
+   */
+  constructor(
+    protected readonly timeoutMs: number = DEFAULT_TIMEOUT_MS,
+    protected readonly maxResponseBytes: number = DEFAULT_UNARY_RESPONSE_MAX_BYTES,
+  ) {
     if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > MAX_TIMER_DELAY_MS) {
       throw new RangeError(`timeoutMs must be a positive safe integer no greater than ${String(MAX_TIMER_DELAY_MS)}`)
+    }
+    if (!Number.isSafeInteger(maxResponseBytes)
+      || maxResponseBytes < 1
+      || maxResponseBytes > MAX_UNARY_RESPONSE_BYTES) {
+      throw new RangeError(`maxResponseBytes must be within 1..${String(MAX_UNARY_RESPONSE_BYTES)}`)
     }
   }
 
@@ -348,7 +548,7 @@ export abstract class AbstractApiClient implements IApiClient {
     const message: ClientRequest = { type: 'client-request', rpcId: this.mintRpcId(), method, payload }
     this.onEnvelope(message)
     const response = await this.postJson(`/api/${method}`, message, signal, timeoutPolicy)
-    const full = serverResponseSchema.parse(await response.json())
+    const full = serverResponseSchema.parse(await readBoundedJson(response, this.maxResponseBytes))
     this.onEnvelope(full)
     if (full.rpcId !== message.rpcId) throw new Error(`rpcId mismatch for ${method}: sent ${message.rpcId}, got ${full.rpcId}`)
     if (!full.result.ok) return { rpcId: full.rpcId, result: full.result }
@@ -394,44 +594,38 @@ export abstract class AbstractApiClient implements IApiClient {
     }
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
-    const encoder = new TextEncoder()
-    let buffer = ''
+    const frameBuffer = new SseFrameBuffer(MAX_SSE_FRAME_BYTES, path)
+    const parseFrame = (chunk: string): { message: ServerRequest; request: RpcRequest<F> } | undefined => {
+      const data = chunk.split('\n').filter(line => line.startsWith('data: ')).map(line => line.slice(6)).join('')
+      if (data === '') return undefined
+      try {
+        const full = serverRequestSchema.parse(JSON.parse(data))
+        const frame = frameSchema.parse(full.payload)
+        return { message: full, request: { rpcId: full.rpcId, payload: frame } }
+      } catch (error) {
+        console.error(`[apiproxy] dropping malformed SSE frame on ${path}:`, error)
+        return undefined
+      }
+    }
     try {
       while (true) {
         const { done, value } = await reader.read()
         if (done) {
-          buffer += decoder.decode()
-          if (buffer !== '') throw new Error(`truncated SSE frame on ${path}`)
+          for (const chunk of frameBuffer.append(decoder.decode())) {
+            const request = parseFrame(chunk)
+            if (request === undefined) continue
+            this.onEnvelope(request.message)
+            yield request.request
+          }
+          if (frameBuffer.hasTail()) throw new Error(`truncated SSE frame on ${path}`)
           return
         }
         const decoded = decoder.decode(value, { stream: true })
-        buffer += decoded
-        let boundary: number
-        while ((boundary = buffer.indexOf('\n\n')) !== -1) {
-          const chunk = buffer.slice(0, boundary)
-          buffer = buffer.slice(boundary + 2)
-          // Bound one complete frame, not the aggregate of a burst that
-          // happened to arrive in one transport chunk.
-          if (encoder.encode(chunk).byteLength > MAX_SSE_FRAME_BYTES) {
-            throw new Error(`SSE frame on ${path} exceeds ${String(MAX_SSE_FRAME_BYTES)} bytes`)
-          }
-          const data = chunk.split('\n').filter(line => line.startsWith('data: ')).map(line => line.slice(6)).join('')
-          if (data === '') continue
-          let full: ServerRequest
-          let frame: F
-          try {
-            full = serverRequestSchema.parse(JSON.parse(data))
-            frame = frameSchema.parse(full.payload)
-          } catch (error) {
-            console.error(`[apiproxy] dropping malformed SSE frame on ${path}:`, error)
-            continue
-          }
-          this.onEnvelope(full)
-          yield { rpcId: full.rpcId, payload: frame }
-        }
-        // Only the unterminated tail is retained for the next read.
-        if (encoder.encode(buffer).byteLength > MAX_SSE_FRAME_BYTES) {
-          throw new Error(`SSE frame on ${path} exceeds ${String(MAX_SSE_FRAME_BYTES)} bytes`)
+        for (const chunk of frameBuffer.append(decoded)) {
+          const request = parseFrame(chunk)
+          if (request === undefined) continue
+          this.onEnvelope(request.message)
+          yield request.request
         }
       }
     } finally {
@@ -540,7 +734,7 @@ export abstract class AbstractApiClient implements IApiClient {
   async respond(message: ClientResponse, signal?: AbortSignal): Promise<RpcReceipt> {
     this.onEnvelope(message)
     const response = await this.postJson('/api/respond', message, signal)
-    return rpcReceiptSchema.parse(await response.json())
+    return rpcReceiptSchema.parse(await readBoundedJson(response, this.maxResponseBytes))
   }
 }
 
@@ -550,8 +744,12 @@ export abstract class AbstractApiClient implements IApiClient {
  * in-process injection is this package's own capability (handler and client are both local).
  */
 export class InProcessApiClient extends AbstractApiClient {
-  constructor(private readonly handler: { fetch: typeof fetch }, timeoutMs?: number) {
-    super(timeoutMs)
+  constructor(
+    private readonly handler: { fetch: typeof fetch },
+    timeoutMs?: number,
+    maxResponseBytes?: number,
+  ) {
+    super(timeoutMs, maxResponseBytes)
   }
 
   /**

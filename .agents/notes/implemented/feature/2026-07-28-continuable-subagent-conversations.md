@@ -32,6 +32,8 @@ An Activation is one residency epoch for a reconstructed child Agent. It may exe
 
 The continuation manager owns activation admission, authority checks, the live ownership graph, cold resume, and child-first disposal. The Agent loop owns all turn ordering and execution. No continuable subagent has a Task, an Activation FIFO, or queued Activation state.
 
+Activation admission reserves both a runtime-global slot and a direct-parent slot before asynchronous Agent creation or resume. `maxContinuableActivations` defaults to `128`, and `maxContinuableActivationsPerParent` defaults to `32`; both limits count resident Activations plus admitted materializations. Rejection uses `ACTIVATION_CAPACITY_EXCEEDED`, rollback and completed disposal release the exact slots, and inactive durable Sessions consume neither quota.
+
 ### Materialization and public operations
 
 The named subagent provider participates only in preparing the initial creation spec, where `spawn` and `fork` differ. Its optional `prepareContinuable(request): Promise<ContinuableCreateSpec>` method is the continuable-creation capability. The returned spec contains only detached provider-specific creation inputs such as the optional parent-history seed; it contains no Agent, `AgentHandle`, prompt delivery, result, disposal, or resume operation. The manager reserves the child identity, resolves the durable descriptor and common Agent setup, calls `ctx.agents.create()` through a private activation-owner scope, installs the returned `AgentHandle` into the Activation, establishes any continuable-parent ownership, and then calls `Agent.followup(initialPrompt)`. Inbox acceptance yields a `MessageId`; at that boundary `ctx.subagents.startContinuable()` returns `{ childId, messageId }` without waiting for the turn to start or for the message to enter the Session log.
@@ -145,7 +147,7 @@ Session and descriptor persistence survive restart. Activation state, Agent inbo
 
 This version covers continuable in-process children and leaves one-shot delegation unchanged. Remote providers require a separate Activation handle with equivalent authenticated control and child-first quiescence contracts before they can support the same behavior.
 
-It adds no host-user continuation, subagent steering operation, durable mailbox, cross-process lease, automatic replay of interrupted inbox work, team authority, workflow authority, public residency query, new live-Activation or descendant limit, or runtime cache; the later [current-turn interrupt](2026-08-06-continuable-subagent-interrupt.md) added the one public stop operation on top of this lifecycle. Existing delegation-depth policy remains unchanged. Optional child-to-parent reporting is a later consumer of this lifecycle rather than part of the base continuable capability.
+It adds no host-user continuation, subagent steering operation, durable mailbox, cross-process lease, automatic replay of interrupted inbox work, team authority, workflow authority, public residency query, total durable-descendant limit, or runtime cache; the later [current-turn interrupt](2026-08-06-continuable-subagent-interrupt.md) added the one public stop operation on top of this lifecycle. Existing delegation-depth policy remains unchanged. Optional child-to-parent reporting is a later consumer of this lifecycle rather than part of the base continuable capability.
 
 ## Alternatives considered
 
@@ -154,6 +156,8 @@ It adds no host-user continuation, subagent steering operation, durable mailbox,
 **Create one Activation per `next-turn`.** This restores independent result and cancellation boundaries, but it requires a manager FIFO beside the Agent inbox and makes a retained Agent cross artificial Activation boundaries. One Activation per residency epoch is smaller and follows the `AgentHandle` lifetime directly.
 
 **Dispose the Agent while waiting.** Reconstructing a parent while its child still belongs to the previous process-local ownership graph would require a durable ownership and teardown protocol. Retaining the `AgentHandle` only for the unfinished graph preserves child-first teardown without keeping settled history resident.
+
+**Use delegation depth as the only residency bound.** Rejected because depth limits nesting but not the number of siblings or concurrent top-level parent forests. Global and direct-parent admission quotas bound breadth without imposing retention on inactive durable Sessions.
 
 **Let the provider create, resume, or deliver through an Agent handle.** Initial providers own only `prepareContinuable()` and its detached creation-spec distinction: whether a child begins fresh or with a parent prefix. The manager must call `ctx.agents.create()` through its private activation-owner scope so that scope is a structural owner of every handle. A persisted in-process Session already contains the initial prefix and generic reconstruction descriptor, while delivery belongs to the Agent inbox. Giving providers any later handle, `SubagentRun`, or message ownership would retain provider ownership with no shipped behavior to justify it.
 
@@ -178,6 +182,7 @@ It adds no host-user continuation, subagent steering operation, durable mailbox,
 The implementation pins these behaviors:
 
 - A continuable child has at most one live Activation and one Agent inbox; the continuation manager has no Activation FIFO or queued Activation state.
+- Runtime-global and direct-parent quotas count resident plus materializing Activations; capacity rejection occurs before Agent creation, and rollback or final disposal releases the slot.
 - `SubagentProvider.prepareContinuable?()` returns only a detached `ContinuableCreateSpec`; configured continuable mode requires that capability, while `backgroundMode` remains an independent policy choice.
 - The manager calls `ctx.agents.create()` through its private activation-owner scope, installs the returned `AgentHandle` and parent ownership, calls `Agent.followup(initialPrompt)`, and returns `{ childId, messageId }` when inbox acceptance yields the `MessageId`, without waiting for turn start or a Session-log write.
 - Every failure before initial-prompt inbox acceptance rejects without ids and rolls back any created handle, Activation, and parent `ownedChildren` membership through a closing transaction visible to concurrent delivery and drain; lifecycle publication failure emits no unmatched terminal edge.
@@ -196,7 +201,7 @@ The implementation pins these behaviors:
 - The base lifecycle has no implicit report behavior; the optional report package contributes an explicit child-scoped tool through the setup hook.
 - Session logs reconstruct only messages that were actually written, with the source that supplied each message; inbox-accepted but unlogged messages have no restart guarantee.
 - No continuable-subagent path creates or depends on a Task, `JobId`, Task completion notice, Task cancellation, or intermediate result-bearing execution wrapper.
-- Unit coverage pins the `startContinuable()` inbox-acceptance return boundary, complete rollback for each pre-acceptance and lifecycle-publication failure, global and parent-scoped drain quiescence for materialization caught between Agent publication and Activation registration, sibling-forest isolation, exact ancestry after an intermediate Agent leaves the registry, provider-independent cold resume, final exact-parent reauthorization after cold-resume materialization, caller-signal and teardown ownership on both sides of acceptance, and the absence of automatic replay for accepted-but-unlogged messages.
+- Unit coverage pins the `startContinuable()` inbox-acceptance return boundary, pending and resident Activation quota admission and release, complete rollback for each pre-acceptance and lifecycle-publication failure, global and parent-scoped drain quiescence for materialization caught between Agent publication and Activation registration, sibling-forest isolation, exact ancestry after an intermediate Agent leaves the registry, provider-independent cold resume, final exact-parent reauthorization after cold-resume materialization, caller-signal and teardown ownership on both sides of acceptance, and the absence of automatic replay for accepted-but-unlogged messages.
 - Unit coverage pins the residency-only routing table, single-inbox ordering, `MessageId` correlation through inbox events, follow-up during an open turn, waiting wakeup, cold resume, ownership registration and release, child-first disposal, send-versus-dispose races, best-effort final flush with absent and failing listeners, and the absence of public subagent cancellation and steering.
 - Report-package unit coverage separately pins child-only visibility, setup revocation, authority, delivery modes, stable message identity, and lifecycle races.
 - A keyless assembled-app snapshot covers parent delegation and follow-up queueing, the absence of subagent steering and implicit report delivery, retained waiting `AgentHandle`, and child-first disposal. A separate report snapshot covers the optional explicit return channel.
@@ -205,7 +210,7 @@ The implementation pins these behaviors:
 
 Removing Jobs gives up generic background-work inspection, result collection, and exact Task cancellation. If those product features become requirements, they need a request ticket or inbox capability that does not reintroduce a second execution queue.
 
-Retaining an Activation while descendants run consumes Agent resources proportional to the unfinished ownership graph. The existing delegation-depth policy still bounds nesting, but this version adds no live-Activation or total-descendant limit; settled historical Sessions retain no `AgentHandle`.
+Retaining an Activation while descendants run consumes Agent resources proportional to the unfinished ownership graph. Delegation depth bounds nesting, while the runtime-global and direct-parent quotas bound live breadth. There is no total durable-descendant limit; settled historical Sessions retain no `AgentHandle` and consume no Activation slot.
 
 The process-local inbox and ownership graph do not coordinate two harness processes. Deployments allowing concurrent access to one persistence store still require a durable lease and mailbox protocol.
 

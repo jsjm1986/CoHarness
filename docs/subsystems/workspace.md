@@ -242,7 +242,7 @@ async resolveByPath(path: string): Promise<Workspace | undefined>
 
 Types: [SessionId](core.md)
 
-Source: [`packages/workspace/workspace/src/index.ts:115`](../../packages/workspace/workspace/src/index.ts)
+Source: [`packages/workspace/workspace/src/index.ts:123`](../../packages/workspace/workspace/src/index.ts)
 
 <a id="workspace-events"></a>
 

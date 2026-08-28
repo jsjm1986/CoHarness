@@ -5,9 +5,9 @@ import { createReadStream } from 'node:fs'
 import {
   mkdir,
   open,
-  readFile,
   readdir,
   rm,
+  stat,
   statfs,
 } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
@@ -45,6 +45,10 @@ export const DEFAULT_UPLOAD_MIN_FREE_BYTES = 512 * 1024 * 1024
 export const DEFAULT_UPLOAD_MAX_CONCURRENT = 2
 /** Default interval between expired-session sweeps. */
 export const DEFAULT_UPLOAD_CLEANUP_INTERVAL_MS = 15 * 60 * 1000
+/** Default maximum serialized manifest size accepted from disk. */
+export const DEFAULT_UPLOAD_MANIFEST_MAX_BYTES = 256 * 1024
+/** Largest delay Node schedules without clamping it to a one-millisecond timer. */
+export const MAX_UPLOAD_TIMER_DELAY_MS = 2_147_483_647
 
 /** Configurable safety policy for local resumable uploads. */
 export interface LocalUploadConfig {
@@ -58,6 +62,8 @@ export interface LocalUploadConfig {
   readonly maxConcurrent?: number
   /** Expired-session sweep interval. */
   readonly cleanupIntervalMs?: number
+  /** Maximum serialized manifest bytes read from disk. */
+  readonly manifestMaxBytes?: number
 }
 
 /** Callbacks that connect the session manager to the ordinary document store. */
@@ -111,6 +117,16 @@ interface ManifestError {
 interface ActiveJob {
   readonly controller: AbortController
   readonly promise: Promise<void>
+}
+
+interface FinalizationTask {
+  readonly uploadId: string
+  readonly manifest: Manifest
+  readonly controller: AbortController
+  readonly promise: Promise<void>
+  readonly resolve: () => void
+  readonly reject: (error: unknown) => void
+  started: boolean
 }
 
 const ID_PATTERN = /^[0-9a-f-]{36}$/u
@@ -235,9 +251,28 @@ function parseManifest(value: unknown): Manifest {
   }
 }
 
-async function readManifest(path: string): Promise<Manifest> {
+async function readManifest(path: string, maxBytes: number): Promise<Manifest> {
   try {
-    return parseManifest(JSON.parse(await readFile(path, 'utf8')) as unknown)
+    const info = await stat(path)
+    if (!Number.isSafeInteger(info.size) || info.size < 0 || info.size > maxBytes) {
+      throw new UserDocError('The resumable upload manifest exceeds its size limit.', DOCUMENT_UPLOAD_NOT_FOUND_CODE)
+    }
+    const stream = createReadStream(path)
+    const chunks: Buffer[] = []
+    let bytes = 0
+    try {
+      for await (const chunk of stream) {
+        const buffer = Buffer.from(chunk as Uint8Array)
+        bytes += buffer.byteLength
+        if (bytes > maxBytes) {
+          throw new UserDocError('The resumable upload manifest exceeds its size limit.', DOCUMENT_UPLOAD_NOT_FOUND_CODE)
+        }
+        chunks.push(buffer)
+      }
+    } finally {
+      stream.destroy()
+    }
+    return parseManifest(JSON.parse(Buffer.concat(chunks, bytes).toString('utf8')) as unknown)
   } catch (error) {
     if (error instanceof UserDocError) throw error
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
@@ -306,7 +341,12 @@ export class LocalUploadManager {
   private readonly minFreeBytes: number
   private readonly maxConcurrent: number
   private readonly cleanupIntervalMs: number
+  private readonly manifestMaxBytes: number
   private readonly jobs = new Map<string, ActiveJob>()
+  private readonly finalizationTasks = new Map<string, FinalizationTask>()
+  private finalizationQueue: FinalizationTask[] = []
+  private finalizationCursor = 0
+  private activeFinalizations = 0
   private cleanupTimer: ReturnType<typeof setInterval> | undefined
   private cleanupTask: Promise<void> | undefined
   private stopped = false
@@ -316,6 +356,10 @@ export class LocalUploadManager {
    * @param config - validated local upload safety settings.
    */
   constructor(dependencies: LocalUploadDependencies, config: Required<LocalUploadConfig>) {
+    if (!Number.isSafeInteger(config.cleanupIntervalMs) || config.cleanupIntervalMs < 1
+      || config.cleanupIntervalMs > MAX_UPLOAD_TIMER_DELAY_MS) {
+      throw new RangeError(`cleanupIntervalMs must be a positive safe integer no greater than ${MAX_UPLOAD_TIMER_DELAY_MS}`)
+    }
     this.root = dependencies.root
     this.limits = dependencies.limits
     this.resolveTarget = dependencies.resolveTarget
@@ -325,6 +369,7 @@ export class LocalUploadManager {
     this.minFreeBytes = config.minFreeBytes
     this.maxConcurrent = config.maxConcurrent
     this.cleanupIntervalMs = config.cleanupIntervalMs
+    this.manifestMaxBytes = config.manifestMaxBytes
   }
 
   /** Start periodic expired-session cleanup after the document root is ready. */
@@ -358,10 +403,22 @@ export class LocalUploadManager {
     this.stopCleanup()
     const jobs = [...this.jobs.values()]
     for (const job of jobs) job.controller.abort()
+    for (const task of this.finalizationTasks.values()) {
+      if (!task.started) {
+        task.resolve()
+        this.finalizationTasks.delete(task.uploadId)
+        this.jobs.delete(task.uploadId)
+      }
+    }
+    this.compactFinalizationQueue()
     await Promise.all([
       ...jobs.map(job => job.promise.catch(() => {})),
       ...(this.cleanupTask === undefined ? [] : [this.cleanupTask]),
     ])
+    this.finalizationQueue = []
+    this.finalizationCursor = 0
+    this.finalizationTasks.clear()
+    this.jobs.clear()
   }
 
   /**
@@ -382,28 +439,37 @@ export class LocalUploadManager {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
       throw error
     }
-    await Promise.all(entries.filter(entry => entry.isDirectory()).map(async (entry) => {
-      // A live finalizer owns the session even if its original retention
-      // deadline passes while it is hashing or publishing. It refreshes the
-      // manifest when the commit completes; removing it here would lose a
-      // document that is already in the publication path.
-      if (this.jobs.has(entry.name)) return
-      const path = join(directory, entry.name, 'manifest.json')
-      try {
-        await withFileLock(path, async () => {
-          if (this.jobs.has(entry.name)) return
-          const manifest = await readManifest(path)
-          if (manifest.expiresAt <= now) await rm(join(directory, entry.name), { recursive: true, force: true })
-        }, { waitMs: LOCK_WAIT_MS })
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
-        if (error instanceof UserDocError && error.code === DOCUMENT_UPLOAD_NOT_FOUND_CODE) {
-          await rm(join(directory, entry.name), { recursive: true, force: true })
-          return
+    const candidates = entries.filter(entry => entry.isDirectory())
+    let cursor = 0
+    const sweepOne = async (): Promise<void> => {
+      for (;;) {
+        const index = cursor++
+        if (index >= candidates.length) return
+        const entry = candidates[index] as (typeof candidates)[number]
+        // A live finalizer owns the session even if its original retention
+        // deadline passes while it is hashing or publishing. It refreshes the
+        // manifest when the commit completes; removing it here would lose a
+        // document that is already in the publication path.
+        if (this.jobs.has(entry.name)) continue
+        const path = join(directory, entry.name, 'manifest.json')
+        try {
+          await withFileLock(path, async () => {
+            if (this.jobs.has(entry.name)) return
+            const manifest = await readManifest(path, this.manifestMaxBytes)
+            if (manifest.expiresAt <= now) await rm(join(directory, entry.name), { recursive: true, force: true })
+          }, { waitMs: LOCK_WAIT_MS })
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue
+          if (error instanceof UserDocError && error.code === DOCUMENT_UPLOAD_NOT_FOUND_CODE) {
+            await rm(join(directory, entry.name), { recursive: true, force: true })
+            continue
+          }
+          throw error
         }
-        throw error
       }
-    }))
+    }
+    const workerCount = Math.min(this.maxConcurrent, candidates.length)
+    await Promise.all(Array.from({ length: workerCount }, () => sweepOne()))
   }
 
   /**
@@ -605,11 +671,7 @@ export class LocalUploadManager {
    */
   async cancel(uploadId: UserDocUploadId): Promise<void> {
     const id = String(uploadId)
-    const job = this.jobs.get(id)
-    if (job !== undefined) {
-      job.controller.abort()
-      await job.promise.catch(() => {})
-    }
+    await this.cancelFinalization(id)
     const path = manifestPath(this.root, id)
     await withFileLock(path, async () => {
       const manifest = await this.load(uploadId)
@@ -621,7 +683,7 @@ export class LocalUploadManager {
   private async load(uploadId: UserDocUploadId, options: { readonly allowExpired?: boolean } = {}): Promise<Manifest> {
     const id = String(uploadId)
     if (!ID_PATTERN.test(id)) throw new UserDocError('The upload identifier is invalid.', DOCUMENT_UPLOAD_NOT_FOUND_CODE)
-    const manifest = await readManifest(manifestPath(this.root, id))
+    const manifest = await readManifest(manifestPath(this.root, id), this.manifestMaxBytes)
     try {
       const target = pathForDocId(this.root, manifest.docId)
       if (manifest.uploadId !== id || target !== manifest.targetPath || basename(target) !== manifest.name
@@ -675,7 +737,7 @@ export class LocalUploadManager {
     for (const entry of entries) {
       if (!entry.isDirectory() || !ID_PATTERN.test(entry.name)) continue
       try {
-        const manifest = await readManifest(manifestPath(this.root, entry.name))
+        const manifest = await readManifest(manifestPath(this.root, entry.name), this.manifestMaxBytes)
         if (manifest.expiresAt > Date.now() && (manifest.state === 'uploading' || manifest.state === 'verifying')) count += 1
       } catch {
         // Malformed sessions are removed by the next cleanup pass.
@@ -713,13 +775,84 @@ export class LocalUploadManager {
   }
 
   private startFinalization(manifest: Manifest): void {
-    if (this.jobs.has(manifest.uploadId)) return
+    if (this.stopped || this.jobs.has(manifest.uploadId)) return
     const controller = new AbortController()
-    const promise = this.finalize(manifest, controller.signal).finally(() => {
-      this.jobs.delete(manifest.uploadId)
+    let resolve!: () => void
+    let reject!: (error: unknown) => void
+    const promise = new Promise<void>((res, rej) => {
+      resolve = res
+      reject = rej
     })
+    const task: FinalizationTask = {
+      uploadId: manifest.uploadId,
+      manifest,
+      controller,
+      promise,
+      resolve,
+      reject,
+      started: false,
+    }
     this.jobs.set(manifest.uploadId, { controller, promise })
+    this.finalizationTasks.set(manifest.uploadId, task)
+    this.finalizationQueue.push(task)
+    this.pumpFinalizations()
     void promise.catch(() => {})
+  }
+
+  /** Start queued finalizers with a fixed worker count and preserve FIFO order. */
+  private pumpFinalizations(): void {
+    if (this.stopped) return
+    while (this.activeFinalizations < this.maxConcurrent && this.finalizationCursor < this.finalizationQueue.length) {
+      const task = this.finalizationQueue[this.finalizationCursor++] as FinalizationTask
+      if (this.finalizationTasks.get(task.uploadId) !== task) continue
+      if (task.controller.signal.aborted) {
+        task.resolve()
+        this.finalizationTasks.delete(task.uploadId)
+        this.jobs.delete(task.uploadId)
+        continue
+      }
+      task.started = true
+      this.activeFinalizations += 1
+      void this.finalize(task.manifest, task.controller.signal)
+        .then(task.resolve, task.reject)
+        .finally(() => {
+          this.activeFinalizations -= 1
+          if (this.finalizationTasks.get(task.uploadId) === task) this.finalizationTasks.delete(task.uploadId)
+          const current = this.jobs.get(task.uploadId)
+          if (current?.promise === task.promise) this.jobs.delete(task.uploadId)
+          this.compactFinalizationQueue()
+          this.pumpFinalizations()
+        })
+        .catch(() => {})
+    }
+    this.compactFinalizationQueue()
+  }
+
+  /** Drop retired queue prefixes without shifting every queued task. */
+  private compactFinalizationQueue(): void {
+    if (this.finalizationCursor === this.finalizationQueue.length) {
+      this.finalizationQueue = []
+      this.finalizationCursor = 0
+    } else if (this.finalizationCursor >= 1024 && this.finalizationCursor * 2 >= this.finalizationQueue.length) {
+      this.finalizationQueue = this.finalizationQueue.slice(this.finalizationCursor)
+      this.finalizationCursor = 0
+    }
+  }
+
+  /** Cancel a queued or running finalization and wait for its completion. */
+  private async cancelFinalization(uploadId: string): Promise<void> {
+    const task = this.finalizationTasks.get(uploadId)
+    if (task === undefined) return
+    task.controller.abort()
+    if (!task.started) {
+      task.resolve()
+      this.finalizationTasks.delete(uploadId)
+      this.jobs.delete(uploadId)
+      this.compactFinalizationQueue()
+      this.pumpFinalizations()
+      return
+    }
+    await task.promise.catch(() => {})
   }
 
   private async finalize(manifest: Manifest, signal: AbortSignal): Promise<void> {

@@ -125,7 +125,7 @@ entry config 与可编辑的 `llm-pi-ai` settings namespace 属于个人 Provide
 
 受支持的 profile 字段是 `apiKeyEnv`、`displayName`、`api`、`baseURL`、`models`、`modelOverrides`、`compat`、`defaultContextWindow`、`defaultMaxTokens`、`defaultInput`、`headers`、`reasoning`、`thinkingBudgets`、`cacheRetention`、`transport`、`timeoutMs`、`websocketConnectTimeoutMs`、`streamIdleTimeoutMs`、`maxRequestImageBytes` 和 `retryPolicy`。每条 profile 解析后的重试策略会随该提供方路由一同捕获；省略时使用共享的有界 normal 默认值并重试五次。流空闲间隔必须是正的有限 Node 定时器延迟，默认为五分钟，且只覆盖未完成提供方读取，不包括消费方思考时间。`maxRequestImageBytes` 约束单个请求的 base64 编码图片载荷（默认 20MiB，正整数）：历史中的每张图片都会重新编码进每个请求，累积载荷超过上限时，从最老的图片开始替换为固定文本占位，直到请求装得下，使图片较多的会话保持可用，而不是被网关请求体上限永久拒绝。默认值为系统提示词、历史、工具与 JSON 保留请求容量；网关更严格的部署按路由调低该值。若已配置标头中有同名项，则以 Harness 应用归因为准。
 
-适配器强制 pi-ai SDK `maxRetries` 为零。只有明确的端点路径不匹配才会额外发起一次 URL 兼容请求；认证失败（401/403）、限流（429）、服务端失败（5xx）、网络失败和真正的 SSE 截断都会直接返回，不会切换 URL。已移除 profile 字段 `maxRetries` 和 `maxRetryDelayMs` 会使加载失败，而不是静默倍增或隐藏单独组合的 agent（智能体）级重试预算。空闲超时会 abort SDK 的稳定请求信号，并以 `TIMEOUT` 呈现；较早的调用方 abort 仍为 `ABORTED`。
+适配器强制 pi-ai SDK `maxRetries` 为零。只有明确的端点路径不匹配才会额外发起一次 URL 兼容请求；认证失败（401/403）、限流（429）、服务端失败（5xx）、网络失败和真正的 SSE 截断都会直接返回，不会切换 URL。已移除 profile 字段 `maxRetries` 和 `maxRetryDelayMs` 会使加载失败，而不是静默倍增或隐藏单独组合的 agent（智能体）级重试预算。空闲超时会 abort SDK 的稳定请求信号，并以 `TIMEOUT` 呈现；较早的调用方 abort 仍为 `ABORTED`。OpenAI 兼容文本思考前缀尚未确定时使用的临时顺序队列最多保留 4,096 个事件或 8 MiB，流式文本／工具分片会在块结束时一次合并。
 
 ## 端点询问
 

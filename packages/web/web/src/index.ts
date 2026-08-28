@@ -17,10 +17,16 @@ import type {
   WebSearchResult,
 } from './types.ts'
 import { WebError } from './types.ts'
-
 export {
   WebError,
 } from './types.ts'
+export {
+  DEFAULT_WEB_RESPONSE_MAX_BYTES,
+  MAX_WEB_RESPONSE_MAX_BYTES,
+  readWebResponseBytes,
+  readWebResponseJson,
+  WebResponseTooLargeError,
+} from './response.ts'
 export type {
   WebFetchBody,
   WebFetchProvider,

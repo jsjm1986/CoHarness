@@ -11,6 +11,8 @@ export interface SessionWriteBehindOptions {
   readonly maxDelayMs: number
   /** Maximum events retained across the pending queue and active write. */
   readonly maxPendingEvents?: number
+  /** Maximum UTF-8 JSON bytes retained across the pending queue and active write. */
+  readonly maxPendingBytes?: number
   /** Persist one stable ordered prefix; resolves only after backend durability. */
   readonly write: (events: readonly SessionEvent[]) => Promise<void>
   /** Observe a detached background write failure without rejecting the producer. */
@@ -19,6 +21,13 @@ export interface SessionWriteBehindOptions {
 
 /** Default pending-event bound for one live session controller. */
 export const DEFAULT_MAX_PENDING_EVENTS = 100_000
+/** Default UTF-8 byte bound for one live session's pending write queue. */
+export const DEFAULT_MAX_PENDING_BYTES = 64 * 1024 * 1024
+
+function serializedBytes(event: SessionEvent): number {
+  const encoded = JSON.stringify(event)
+  return Buffer.byteLength(encoded, 'utf8')
+}
 
 /**
  * Owns one live session's pending events, fixed batching deadline, active write,
@@ -26,9 +35,11 @@ export const DEFAULT_MAX_PENDING_EVENTS = 100_000
  */
 export class SessionWriteBehind {
   private pending: SessionEvent[] = []
+  private pendingBytes = 0
   private timer: ReturnType<typeof setTimeout> | undefined
   private active: Promise<void> | undefined
   private activeBatchSize = 0
+  private activeBatchBytes = 0
   private barrier: Promise<void> | undefined
   private deadlineExpired = false
   private automaticPaused = false
@@ -37,6 +48,7 @@ export class SessionWriteBehind {
    * @param options - fixed scheduling policy and durable batch sink.
    */
   private readonly maxPendingEvents: number
+  private readonly maxPendingBytes: number
 
   constructor(private readonly options: SessionWriteBehindOptions) {
     const maxPendingEvents = options.maxPendingEvents ?? DEFAULT_MAX_PENDING_EVENTS
@@ -44,6 +56,11 @@ export class SessionWriteBehind {
       throw new TypeError('maxPendingEvents must be a positive safe integer')
     }
     this.maxPendingEvents = maxPendingEvents
+    const maxPendingBytes = options.maxPendingBytes ?? DEFAULT_MAX_PENDING_BYTES
+    if (!Number.isSafeInteger(maxPendingBytes) || maxPendingBytes < 1) {
+      throw new TypeError('maxPendingBytes must be a positive safe integer')
+    }
+    this.maxPendingBytes = maxPendingBytes
   }
 
   /** Whether this controller owns queued events or an active durable write. */
@@ -57,13 +74,22 @@ export class SessionWriteBehind {
    * @param event - frozen live event to retain independently of its producer.
    */
   enqueue(event: SessionEvent): void {
+    const retained = structuredClone(event)
+    const eventBytes = serializedBytes(retained)
     if (this.pending.length + this.activeBatchSize >= this.maxPendingEvents) {
       const error = new Error(`session write-behind pending-event limit exceeded (${String(this.maxPendingEvents)})`)
       this.options.reportBackgroundFailure(error)
       throw error
     }
+    const available = this.maxPendingBytes - this.pendingBytes - this.activeBatchBytes
+    if (eventBytes > available) {
+      const error = new Error(`session write-behind pending-byte limit exceeded (${String(this.maxPendingBytes)})`)
+      this.options.reportBackgroundFailure(error)
+      throw error
+    }
     const wasEmpty = this.pending.length === 0
-    this.pending.push(structuredClone(event))
+    this.pending.push(retained)
+    this.pendingBytes += eventBytes
     if (this.barrier !== undefined) return
     if (this.automaticPaused) {
       this.automaticPaused = false
@@ -157,21 +183,28 @@ export class SessionWriteBehind {
   /** Start one stable pending prefix, retaining it in order if durability fails. */
   private startWrite(background: boolean): Promise<void> {
     const batch = this.pending.splice(0)
+    const batchBytes = this.pendingBytes
+    this.pendingBytes = 0
     this.activeBatchSize = batch.length
+    this.activeBatchBytes = batchBytes
     this.cancelTimer()
     this.deadlineExpired = false
     const operation = Promise.resolve().then(() => this.options.write(batch))
     const active = operation
       .catch((error: unknown) => {
         this.pending = batch.concat(this.pending)
+        this.pendingBytes = batchBytes + this.pendingBytes
         this.cancelTimer()
         this.deadlineExpired = false
         this.automaticPaused = true
+        this.activeBatchSize = 0
+        this.activeBatchBytes = 0
         if (background) this.options.reportBackgroundFailure(error)
         throw error
       })
       .finally(() => {
         this.activeBatchSize = 0
+        this.activeBatchBytes = 0
         this.active = undefined
       })
     this.active = active

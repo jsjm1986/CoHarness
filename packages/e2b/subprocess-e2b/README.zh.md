@@ -22,6 +22,8 @@
 
 E2B 默认基础镜像提供该适配器调用的运行时和 Bash/GNU 工具：`node`、`bash`、`setsid`、`ps`、`awk`、`tr`、`env`、`base64`、`chmod`、`tee`、`head`、`rm`、`kill`、`id` 和 `getent`。
 
+collect 模式的宿主尾部使用带 head index 的分片队列。它保留相同的精确字节尾部和偏移读取语义，同时避免高度碎片化的远程输出反复复制数组头部。
+
 ## 模型体验
 
 通过 Consumer 间接影响模型，例如 `dsh-tool-bash` 背后的 Bash 执行器；这些 Consumer 会渲染远程输出、退出事实、后台增量和 spill 路径。

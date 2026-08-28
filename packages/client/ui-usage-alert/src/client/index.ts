@@ -1,4 +1,5 @@
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import { readApiResponseJson } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import { UsageAlert } from './UsageAlert.tsx'
 
@@ -18,7 +19,7 @@ export function apply(ctx: ClientContext): void {
       loadUsage: async () => {
         try {
           const response = await fetch('/account/api/usage', { credentials: 'same-origin' })
-          return response.ok ? await response.json() as UsageView : null
+          return response.ok ? await readApiResponseJson(response) as UsageView : null
         } catch {
           // Advisory usage transport never disrupts the shell.
           return null

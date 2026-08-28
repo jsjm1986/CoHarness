@@ -24,16 +24,24 @@ const MAX_DOCUMENT_ID_BYTES = 4096
 const TRANSFER_PLAN_TTL_MS = 300_000
 /** Upper bound for a target's asynchronous checksum/publication phase. */
 const TRANSFER_VERIFY_MAX_WAIT_MS = TRANSFER_PLAN_TTL_MS
-const MAX_TRANSFER_PLANS = 10_000
+const DEFAULT_MAX_TRANSFER_PLANS = 10_000
+const DEFAULT_MAX_TRANSFER_PLAN_BYTES = 128 * 1024 * 1024
+const DEFAULT_MAX_TRANSFER_PLANS_PER_ORGANIZATION = 2_000
+const DEFAULT_MAX_TRANSFER_PLAN_BYTES_PER_ORGANIZATION = 32 * 1024 * 1024
+const DEFAULT_MAX_TRANSFER_PLANS_PER_ACTOR = 100
+const DEFAULT_MAX_TRANSFER_PLAN_BYTES_PER_ACTOR = 8 * 1024 * 1024
 const DEFAULT_TRANSFER_RESPONSE_LIMIT_BYTES = 64 * 1024 * 1024
 /** Default deadline for metadata operations forwarded to a document runtime. */
 const DEFAULT_DOCUMENT_SCOPE_TIMEOUT_MS = 30_000
+/** Largest delay accepted by Node's timer-backed AbortSignal helper. */
+const MAX_DOCUMENT_TIMEOUT_MS = 2_147_483_647
 /** Bound one buffered transfer chunk even when a runtime advertises a bad value. */
 const MAX_TRANSFER_CHUNK_BYTES = 64 * 1024 * 1024
 /** Public Gateway path for resumable uploads into a non-current scope. */
 export const DOCUMENT_TRANSFER_UPLOADS_PATH = '/api/documents/transfer/uploads'
 
 interface TransferPlanRecord {
+  readonly organization: string
   readonly actorId: number
   readonly source: DocumentTransferScope
   readonly target: DocumentTransferScope
@@ -41,23 +49,127 @@ interface TransferPlanRecord {
   readonly directory?: string
   readonly documents: readonly DocumentTransferSelection[]
   readonly expiresAt: number
+  /** Approximate UTF-8 bytes retained by this plan's durable request fields. */
+  readonly bytes: number
+}
+
+interface TransferPlanBucket {
+  count: number
+  bytes: number
 }
 
 const transferPlans = new Map<string, TransferPlanRecord>()
+const transferPlanOrganizations = new Map<string, TransferPlanBucket>()
+const transferPlanActors = new Map<string, TransferPlanBucket>()
+let transferPlanBytesTotal = 0
 let transferPlanCleanupTimer: ReturnType<typeof setTimeout> | undefined
+
+/** Optional admission limits for process-local transfer-plan retention. */
+export interface DocumentTransferPlanLimits {
+  /** Maximum plans retained in this Gateway process. */
+  readonly maxPlans?: number
+  /** Maximum serialized plan bytes retained in this Gateway process. */
+  readonly maxBytes?: number
+  /** Maximum plans retained for one organization. */
+  readonly maxPlansPerOrganization?: number
+  /** Maximum serialized plan bytes retained for one organization. */
+  readonly maxBytesPerOrganization?: number
+  /** Maximum plans retained for one actor within one organization. */
+  readonly maxPlansPerActor?: number
+  /** Maximum serialized plan bytes retained for one actor within one organization. */
+  readonly maxBytesPerActor?: number
+}
+
+interface ResolvedDocumentTransferPlanLimits {
+  readonly maxPlans: number
+  readonly maxBytes: number
+  readonly maxPlansPerOrganization: number
+  readonly maxBytesPerOrganization: number
+  readonly maxPlansPerActor: number
+  readonly maxBytesPerActor: number
+}
+
+function positivePlanLimit(value: number | undefined, fallback: number, label: string): number {
+  const resolved = value ?? fallback
+  if (!Number.isSafeInteger(resolved) || resolved < 1) {
+    throw new RangeError(`${label} must be a positive safe integer`)
+  }
+  return resolved
+}
+
+function resolvePlanLimits(limits: DocumentTransferPlanLimits | undefined): ResolvedDocumentTransferPlanLimits {
+  return {
+    maxPlans: positivePlanLimit(limits?.maxPlans, DEFAULT_MAX_TRANSFER_PLANS, 'transfer plan maxPlans'),
+    maxBytes: positivePlanLimit(limits?.maxBytes, DEFAULT_MAX_TRANSFER_PLAN_BYTES, 'transfer plan maxBytes'),
+    maxPlansPerOrganization: positivePlanLimit(
+      limits?.maxPlansPerOrganization,
+      DEFAULT_MAX_TRANSFER_PLANS_PER_ORGANIZATION,
+      'transfer plan maxPlansPerOrganization',
+    ),
+    maxBytesPerOrganization: positivePlanLimit(
+      limits?.maxBytesPerOrganization,
+      DEFAULT_MAX_TRANSFER_PLAN_BYTES_PER_ORGANIZATION,
+      'transfer plan maxBytesPerOrganization',
+    ),
+    maxPlansPerActor: positivePlanLimit(
+      limits?.maxPlansPerActor,
+      DEFAULT_MAX_TRANSFER_PLANS_PER_ACTOR,
+      'transfer plan maxPlansPerActor',
+    ),
+    maxBytesPerActor: positivePlanLimit(
+      limits?.maxBytesPerActor,
+      DEFAULT_MAX_TRANSFER_PLAN_BYTES_PER_ACTOR,
+      'transfer plan maxBytesPerActor',
+    ),
+  }
+}
+
+function actorPlanKey(organization: string, actorId: number): string {
+  return `${organization.length}:${organization}:${String(actorId)}`
+}
+
+function adjustPlanBucket(
+  buckets: Map<string, TransferPlanBucket>,
+  key: string,
+  countDelta: number,
+  bytesDelta: number,
+): void {
+  const prior = buckets.get(key)
+  const count = (prior?.count ?? 0) + countDelta
+  const bytes = (prior?.bytes ?? 0) + bytesDelta
+  if (count <= 0 || bytes <= 0) buckets.delete(key)
+  else buckets.set(key, { count, bytes })
+}
+
+function retainTransferPlan(id: string, plan: TransferPlanRecord): void {
+  transferPlans.set(id, plan)
+  transferPlanBytesTotal += plan.bytes
+  adjustPlanBucket(transferPlanOrganizations, plan.organization, 1, plan.bytes)
+  adjustPlanBucket(transferPlanActors, actorPlanKey(plan.organization, plan.actorId), 1, plan.bytes)
+}
+
+function releaseTransferPlan(id: string): TransferPlanRecord | undefined {
+  const plan = transferPlans.get(id)
+  if (plan === undefined) return undefined
+  transferPlans.delete(id)
+  transferPlanBytesTotal = Math.max(0, transferPlanBytesTotal - plan.bytes)
+  adjustPlanBucket(transferPlanOrganizations, plan.organization, -1, -plan.bytes)
+  adjustPlanBucket(transferPlanActors, actorPlanKey(plan.organization, plan.actorId), -1, -plan.bytes)
+  return plan
+}
 
 function pruneTransferPlans(now = Date.now()): void {
   for (const [id, record] of transferPlans) {
-    if (record.expiresAt <= now) transferPlans.delete(id)
+    if (record.expiresAt <= now) releaseTransferPlan(id)
   }
 }
 
 function scheduleTransferPlanCleanup(): void {
   if (transferPlanCleanupTimer !== undefined) return
-  const nextExpiry = [...transferPlans.values()].reduce<number | undefined>(
-    (earliest, record) => earliest === undefined ? record.expiresAt : Math.min(earliest, record.expiresAt),
-    undefined,
-  )
+  let nextExpiry: number | undefined
+  for (const record of transferPlans.values()) {
+    nextExpiry = nextExpiry === undefined ? record.expiresAt : Math.min(nextExpiry, record.expiresAt)
+  }
   if (nextExpiry === undefined) return
   const delay = Math.max(0, nextExpiry - Date.now())
   transferPlanCleanupTimer = setTimeout(() => {
@@ -327,6 +439,8 @@ export interface DocumentTransferDependencies {
   readonly maxResponseBytes?: number
   /** Deadline for one forwarded document metadata operation. */
   readonly upstreamTimeoutMs?: number
+  /** Optional process, organization, and actor transfer-plan retention limits. */
+  readonly transferPlanLimits?: DocumentTransferPlanLimits
 }
 
 interface ScopeIdentity {
@@ -547,7 +661,28 @@ function responseLimit(deps: Pick<DocumentTransferDependencies, 'maxResponseByte
 function documentScopeTimeoutMs(
   deps: Pick<DocumentTransferDependencies, 'upstreamTimeoutMs'>,
 ): number {
-  return deps.upstreamTimeoutMs ?? DEFAULT_DOCUMENT_SCOPE_TIMEOUT_MS
+  const timeoutMs = deps.upstreamTimeoutMs ?? DEFAULT_DOCUMENT_SCOPE_TIMEOUT_MS
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > MAX_DOCUMENT_TIMEOUT_MS) {
+    throw new RangeError(`document upstream timeout must be a positive safe integer no greater than ${MAX_DOCUMENT_TIMEOUT_MS}`)
+  }
+  return timeoutMs
+}
+
+interface DocumentUpstreamSignal {
+  readonly signal: AbortSignal
+  readonly timeoutSignal: AbortSignal
+}
+
+/** Combine caller cancellation with the bounded deadline for one runtime request. */
+function documentUpstreamSignal(
+  deps: Pick<DocumentTransferDependencies, 'upstreamTimeoutMs'>,
+  signal: AbortSignal | undefined,
+): DocumentUpstreamSignal {
+  const timeoutSignal = AbortSignal.timeout(documentScopeTimeoutMs(deps))
+  return {
+    timeoutSignal,
+    signal: signal === undefined ? timeoutSignal : AbortSignal.any([signal, timeoutSignal]),
+  }
 }
 
 function documentScopeLogKey(scope: DocumentTransferScope): string {
@@ -565,6 +700,49 @@ function documentScopeTimeoutError(
   return new DocumentTransferError('DOCUMENT_SCOPE_TIMEOUT', 504, 'Document scope request timed out.')
 }
 
+function transferPlanBytes(
+  organization: string,
+  actorId: number,
+  request: Pick<DocumentTransferRequest, 'source' | 'target' | 'targets' | 'directory' | 'documents'>,
+): number {
+  const encoded = JSON.stringify({
+    organization,
+    actorId,
+    source: request.source,
+    target: request.target,
+    ...(request.targets === undefined ? {} : { targets: request.targets }),
+    ...(request.directory === undefined ? {} : { directory: request.directory }),
+    documents: request.documents,
+  })
+  // Include a small fixed allowance for the Map entry and object bookkeeping;
+  // the exact V8 object size is not stable, while the serialized request is a
+  // deterministic lower bound on data retained for the plan.
+  return Buffer.byteLength(encoded, 'utf8') + 256
+}
+
+function assertTransferPlanCapacity(
+  organization: string,
+  actorId: number,
+  bytes: number,
+  limits: ResolvedDocumentTransferPlanLimits,
+): void {
+  if (bytes > limits.maxBytes) {
+    throw new DocumentTransferError('DOCUMENT_TRANSFER_PLAN_LIMIT', 503, 'The transfer plan exceeds the process retention budget.')
+  }
+  const organizationBucket = transferPlanOrganizations.get(organization)
+  if ((organizationBucket?.count ?? 0) >= limits.maxPlansPerOrganization
+    || (organizationBucket?.bytes ?? 0) + bytes > limits.maxBytesPerOrganization) {
+    throw new DocumentTransferError('DOCUMENT_TRANSFER_PLAN_LIMIT', 503, 'This organization has too many transfer plans pending; retry shortly.')
+  }
+  const actorBucket = transferPlanActors.get(actorPlanKey(organization, actorId))
+  if ((actorBucket?.count ?? 0) >= limits.maxPlansPerActor
+    || (actorBucket?.bytes ?? 0) + bytes > limits.maxBytesPerActor) {
+    throw new DocumentTransferError('DOCUMENT_TRANSFER_PLAN_LIMIT', 503, 'This actor has too many transfer plans pending; retry shortly.')
+  }
+  if (transferPlans.size >= limits.maxPlans || transferPlanBytesTotal + bytes > limits.maxBytes) {
+    throw new DocumentTransferError('DOCUMENT_TRANSFER_PLAN_LIMIT', 503, 'Too many transfer plans are pending; retry shortly.')
+  }
+}
 async function responseJson(response: Response, limit = DEFAULT_TRANSFER_RESPONSE_LIMIT_BYTES): Promise<unknown> {
   return readResponseJson(response, limit)
 }
@@ -1298,8 +1476,10 @@ export function createDocumentTransferCommitHandler(
       throw new DocumentTransferError('DOCUMENT_TRANSFER_PLAN_REQUIRED', 400, 'A transfer plan is required before commit.')
     }
     const plan = transferPlans.get(request.planId)
-    if (plan === undefined || plan.expiresAt <= Date.now() || plan.actorId !== input.principal.user.id) {
-      transferPlans.delete(request.planId)
+    if (plan === undefined || plan.expiresAt <= Date.now()
+      || plan.actorId !== input.principal.user.id
+      || plan.organization !== input.principal.organization) {
+      releaseTransferPlan(request.planId)
       scheduleTransferPlanCleanup()
       throw new DocumentTransferError('DOCUMENT_TRANSFER_PLAN_EXPIRED', 409, 'The transfer plan has expired or belongs to another actor.')
     }
@@ -1310,7 +1490,7 @@ export function createDocumentTransferCommitHandler(
       || JSON.stringify(plan.documents) !== JSON.stringify(request.documents)) {
       throw new DocumentTransferError('DOCUMENT_TRANSFER_PLAN_MISMATCH', 409, 'The transfer request does not match its plan.')
     }
-    transferPlans.delete(request.planId)
+    releaseTransferPlan(request.planId)
     scheduleTransferPlanCleanup()
     return transfer({ ...input, payload: { ...record(input.payload), planId: undefined } })
   }
@@ -1416,19 +1596,32 @@ async function listDocumentsForActor(
     if (typeof candidate.type === 'string' && candidate.type !== 'all') runtimeUrl.searchParams.set('type', candidate.type)
     if (typeof candidate.sort === 'string') runtimeUrl.searchParams.set('sort', candidate.sort)
     if (typeof candidate.state === 'string' && candidate.state !== 'active') runtimeUrl.searchParams.set('state', candidate.state)
+    const startedAt = Date.now()
+    const upstream = documentUpstreamSignal(deps, signal)
     let response: Response
     try {
       response = await fetch(runtimeUrl.toString(), {
         method: 'GET',
         headers: headersFor(authorized.runtime, authorized.assertion),
         redirect: 'error',
-        ...(signal === undefined ? {} : { signal }),
+        signal: upstream.signal,
       })
     } catch (error) {
       if (signal?.aborted) throw signal.reason
+      if (upstream.timeoutSignal.aborted) throw documentScopeTimeoutError('list', requested, startedAt)
       throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document scope listing is unavailable.')
     }
-    const body = await responseJson(response, responseLimit(deps))
+    let body: unknown
+    try {
+      body = await responseJson(response, responseLimit(deps))
+    } catch (error) {
+      if (signal?.aborted) throw signal.reason
+      if (upstream.timeoutSignal.aborted) throw documentScopeTimeoutError('list', requested, startedAt)
+      if (error instanceof ResponseBodyTooLargeError) {
+        throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime response is too large.')
+      }
+      throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned invalid listing JSON.')
+    }
     if (!response.ok) {
       const error = responseError(body)
       const status = response.status >= 400 && response.status < 500 ? response.status : 503
@@ -1717,7 +1910,8 @@ export function createGatewayDocumentScopeHandler(
     // the metadata deadline; all JSON document operations get the bounded
     // Gateway timeout so a stalled runtime cannot leave the browser loading
     // forever.
-    const timeoutSignal = operation === 'content' ? undefined : AbortSignal.timeout(documentScopeTimeoutMs(deps))
+    const configuredTimeoutMs = documentScopeTimeoutMs(deps)
+    const timeoutSignal = operation === 'content' ? undefined : AbortSignal.timeout(configuredTimeoutMs)
     const upstreamSignal = timeoutSignal === undefined ? signal : AbortSignal.any([signal, timeoutSignal])
     let response: Response
     try {
@@ -1811,16 +2005,19 @@ export function createGatewayDocumentAdminHandler(
       const target = new URL(path, `http://127.0.0.1:${String(authorized.runtime.port)}`)
       target.searchParams.set('id', docId)
       const method = action === 'purge' ? 'DELETE' : 'POST'
+      const startedAt = Date.now()
+      const upstream = documentUpstreamSignal(deps, signal)
       let response: Response
       try {
         response = await fetch(target, {
           method,
           headers: headersFor(authorized.runtime, authorized.assertion),
           redirect: 'error',
-          signal,
+          signal: upstream.signal,
         })
       } catch (error) {
         if (signal.aborted) throw signal.reason
+        if (upstream.timeoutSignal.aborted) throw documentScopeTimeoutError(action, requested, startedAt)
         throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document runtime is unavailable.')
       }
       if (response.status === 204) {
@@ -1830,6 +2027,8 @@ export function createGatewayDocumentAdminHandler(
       }
       let body: unknown
       try { body = await responseJson(response, responseLimit(deps)) } catch (error) {
+        if (signal.aborted) throw signal.reason
+        if (upstream.timeoutSignal.aborted) throw documentScopeTimeoutError(action, requested, startedAt)
         if (error instanceof ResponseBodyTooLargeError) throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The runtime response is too large.')
         throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The runtime returned invalid document metadata.')
       }
@@ -1854,17 +2053,30 @@ export function createDocumentTransferDirectoriesHandler(
     const actor = syntheticUser(principal)
     const authorized = await authorizedScope(deps, actor, requested, 'read')
     return withRuntimeLeases(deps, [authorized.runtime], async () => {
+      const startedAt = Date.now()
+      const upstream = documentUpstreamSignal(deps, signal)
       let response: Response
       try {
         response = await fetch(`http://127.0.0.1:${String(authorized.runtime.port)}/api/documents/directories`, {
           method: 'GET', headers: headersFor(authorized.runtime, authorized.assertion),
-          ...(signal === undefined ? {} : { signal }),
+          signal: upstream.signal,
         })
       } catch (error) {
         if (signal?.aborted) throw signal.reason
+        if (upstream.timeoutSignal.aborted) throw documentScopeTimeoutError('directories', requested, startedAt)
         throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document directory listing is unavailable.')
       }
-      const body = await responseJson(response, responseLimit(deps))
+      let body: unknown
+      try {
+        body = await responseJson(response, responseLimit(deps))
+      } catch (error) {
+        if (signal?.aborted) throw signal.reason
+        if (upstream.timeoutSignal.aborted) throw documentScopeTimeoutError('directories', requested, startedAt)
+        if (error instanceof ResponseBodyTooLargeError) {
+          throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime response is too large.')
+        }
+        throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned invalid directory JSON.')
+      }
       if (!response.ok) throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Document directory listing is unavailable.')
       const value = record(body)
       if (!Array.isArray(value?.directories) || value.directories.length > 2000) {
@@ -1899,17 +2111,30 @@ export function createDocumentTransferDirectoryCreateHandler(
     const directory = candidate.directory as string
     const name = candidate.name as string
     return withRuntimeLeases(deps, [authorized.runtime], async () => {
+      const startedAt = Date.now()
+      const upstream = documentUpstreamSignal(deps, signal)
       let response: Response
       try {
         response = await fetch(`http://127.0.0.1:${String(authorized.runtime.port)}/api/documents/folders?directory=${encodeURIComponent(directory)}&name=${encodeURIComponent(name)}`, {
           method: 'POST', headers: headersFor(authorized.runtime, authorized.assertion),
-          ...(signal === undefined ? {} : { signal }),
+          signal: upstream.signal,
         })
       } catch (error) {
         if (signal?.aborted) throw signal.reason
+        if (upstream.timeoutSignal.aborted) throw documentScopeTimeoutError('folders', requested, startedAt)
         throw new DocumentTransferError('COLLABORATION_UNAVAILABLE', 503, 'Target folder creation is unavailable.')
       }
-      const body = await responseJson(response, responseLimit(deps))
+      let body: unknown
+      try {
+        body = await responseJson(response, responseLimit(deps))
+      } catch (error) {
+        if (signal?.aborted) throw signal.reason
+        if (upstream.timeoutSignal.aborted) throw documentScopeTimeoutError('folders', requested, startedAt)
+        if (error instanceof ResponseBodyTooLargeError) {
+          throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime response is too large.')
+        }
+        throw new DocumentTransferError('DOCUMENT_TRANSFER_FAILED', 502, 'The document runtime returned invalid folder JSON.')
+      }
       if (!response.ok) {
         const error = responseError(body)
         throw new DocumentTransferError(error.code, response.status, error.message)
@@ -1928,6 +2153,7 @@ export function createDocumentTransferPlanHandler(
   deps: DocumentTransferDependencies,
 ): RuntimeDocumentTransferPlanHandler {
   const list = createDocumentTransferListHandler(deps)
+  const limits = resolvePlanLimits(deps.transferPlanLimits)
   return async ({ subject, principal, payload, signal }) => {
     const input = requestValue(payload)
     if (input.targets !== undefined && input.targets.length > 1 && principal.user.role !== 'admin') {
@@ -1986,12 +2212,12 @@ export function createDocumentTransferPlanHandler(
     const documents = input.documents.map(document => found.get(document.docId)!)
     const now = Date.now()
     pruneTransferPlans(now)
-    if (transferPlans.size >= MAX_TRANSFER_PLANS) {
-      throw new DocumentTransferError('DOCUMENT_TRANSFER_PLAN_LIMIT', 503, 'Too many transfer plans are pending; retry shortly.')
-    }
+    const bytes = transferPlanBytes(principal.organization, principal.user.id, input)
+    assertTransferPlanCapacity(principal.organization, principal.user.id, bytes, limits)
     const planId = randomUUID()
     const expiresAt = now + TRANSFER_PLAN_TTL_MS
-    transferPlans.set(planId, {
+    retainTransferPlan(planId, {
+      organization: principal.organization,
       actorId: principal.user.id,
       source: input.source,
       target: input.target,
@@ -1999,6 +2225,7 @@ export function createDocumentTransferPlanHandler(
       ...(input.directory === undefined ? {} : { directory: input.directory }),
       documents: input.documents,
       expiresAt,
+      bytes,
     })
     scheduleTransferPlanCleanup()
     return {

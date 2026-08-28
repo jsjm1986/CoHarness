@@ -52,7 +52,7 @@ The controller tests use a fake clock to prove the fixed, non-resetting 200 ms w
 
 High-frequency event bursts normally produce fewer durable append operations while preserving the exact logical event count. The reduction depends on arrival rate and backend latency: a burst inside one 200 ms window becomes one batch, while mandatory flushes and sparse events can still produce small batches.
 
-This decision does not cap pending event count or bytes behind a slow backend, and it does not reduce SQLite rows or the decoded logical log. A demonstrated memory bound or logical-retention policy would require its own failure and replay contract rather than another hidden timer rule.
+The batching window itself does not reduce SQLite rows or the decoded logical log. Live write-behind retention is bounded separately by `maxPendingEvents` and `maxPendingBytes`; the [bounded retention decision](../bug-fix/2026-08-27-bounded-session-write-behind-retention.md) defines their admission and retry behavior.
 
 An admitted event can remain only in memory during the configured window, and then while scheduling or backend work is outstanding. Deployments choose a smaller value for a narrower ordinary loss window or a larger value for stronger batching. Explicit durability boundaries remain unchanged and bypass the wait.
 

@@ -4,6 +4,7 @@ import type { UserRow } from '../auth.ts'
 import type { GatewayConfig } from '../config.ts'
 import { hashPassword } from '../password.ts'
 import { transaction } from './database.ts'
+import { allocateInstancePorts } from './port-allocation.ts'
 import { publicNumber, type PostgresRuntimeContext } from './runtime-context.ts'
 
 const USERNAME_RE = /^[a-z][a-z0-9-]{1,30}$/
@@ -91,12 +92,13 @@ export class PostgresUserService {
           VALUES($1,$2)`, [row.id, passwordHash])
         await client.query(`INSERT INTO harness.memberships(organization_id,user_id,role)
           VALUES($1,$2,$3)`, [this.context.organizationId, row.id, input.role === 'admin' ? 'admin' : 'member'])
-        const ports = await client.query<{ port: number | null }>(`SELECT MAX(port) port FROM harness.instances
-          WHERE assigned_node_id=$1`, [this.context.nodeId])
-        const port = ports.rows[0]?.port === null || ports.rows[0]?.port === undefined
-          ? this.cfg.instancePortBase
-          : Math.max(this.cfg.instancePortBase, ports.rows[0].port + 1)
-        if (port > 65535) throw new Error(`no instance ports remain on node ${this.context.nodeName}`)
+        const [port] = await allocateInstancePorts(
+          client,
+          this.context.nodeId,
+          this.cfg.instancePortBase,
+          1,
+          this.context.nodeName,
+        )
         await client.query(`INSERT INTO harness.instances(
           organization_id,user_id,assigned_node_id,port
         ) VALUES($1,$2,$3,$4)`, [this.context.organizationId, row.id, this.context.nodeId, port])
@@ -280,9 +282,11 @@ export class PostgresUserService {
         WHERE organization_id=$1 AND user_id=$2`, [this.context.organizationId, row.id])
       await client.query(`UPDATE harness.auth_sessions SET revoked_at=now(),revoked_reason='user-deleted'
         WHERE organization_id=$1 AND user_id=$2 AND revoked_at IS NULL`, [this.context.organizationId, row.id])
-      await client.query(`UPDATE harness.instances SET desired_state='stopped',observed_state='stopped',
-        runtime_token_hash=NULL,runtime_token_issued_at=NULL,updated_at=now()
-        WHERE organization_id=$1 AND user_id=$2`, [this.context.organizationId, row.id])
+      // Instance rows are operational assignments, not historical records.
+      // Removing the row releases its node-local port for a later account;
+      // the user's durable audit, usage, and conversation rows remain intact.
+      await client.query(`DELETE FROM harness.instances WHERE organization_id=$1 AND user_id=$2`,
+        [this.context.organizationId, row.id])
       await client.query(`DELETE FROM harness.login_attempts
         WHERE organization_id=$1 AND username=(SELECT username FROM harness.users WHERE id=$2)`,
       [this.context.organizationId, row.id])

@@ -542,6 +542,7 @@ class FrameQueue<F> {
   static readonly MAX_BYTES = 8 * 1024 * 1024
   static readonly MAX_ITEMS = 1024
   private buffer: Array<{ item: F; bytes: number }> = []
+  private head = 0
   private bufferedBytes = 0
   private waiter: (() => void) | undefined
   private done = false
@@ -550,11 +551,17 @@ class FrameQueue<F> {
 
   push(item: F): void {
     if (this.done) return
+    if (this.head > 0 && (this.head === this.buffer.length
+      || (this.head >= FrameQueue.MAX_ITEMS / 2 && this.head * 2 >= this.buffer.length))) {
+      this.buffer = this.buffer.slice(this.head)
+      this.head = 0
+    }
     const bytes = frameBytes(item)
     if (bytes > FrameQueue.MAX_BYTES
-      || this.buffer.length >= FrameQueue.MAX_ITEMS
+      || this.buffer.length - this.head >= FrameQueue.MAX_ITEMS
       || this.bufferedBytes + bytes > FrameQueue.MAX_BYTES) {
       this.buffer = []
+      this.head = 0
       this.bufferedBytes = 0
       const failure = this.overflow()
       const failureBytes = frameBytes(failure)
@@ -574,6 +581,7 @@ class FrameQueue<F> {
     if (this.done) return
     const bytes = frameBytes(item)
     this.buffer = [{ item, bytes }]
+    this.head = 0
     this.bufferedBytes = bytes
     this.done = true
     this.waiter?.()
@@ -589,11 +597,14 @@ class FrameQueue<F> {
     signal.addEventListener('abort', onAbort, { once: true })
     try {
       while (true) {
-        while (this.buffer.length > 0) {
-          const next = this.buffer.shift() as { item: F; bytes: number }
+        while (this.head < this.buffer.length) {
+          const next = this.buffer[this.head] as { item: F; bytes: number }
+          this.head++
           this.bufferedBytes -= next.bytes
           yield next.item
         }
+        this.buffer = []
+        this.head = 0
         if (this.done || signal.aborted) return
         await new Promise<void>((resolve) => { this.waiter = resolve })
         this.waiter = undefined
@@ -1505,8 +1516,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     const persistence = ctx.get('sessionPersistence')
     if (persistence === undefined) return undefined
     try {
-      if (typeof persistence.listSnapshots !== 'function') return undefined
-      return (await persistence.listSnapshots()).find(snapshot => snapshot.header.id === sessionId)?.revision
+      return await persistence.revision(sessionId)
     } catch {
       // The optimization must not turn a persistence identity probe failure into a history failure.
       return undefined

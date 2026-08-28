@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import WebRuntime, {
+  readWebResponseBytes,
+  readWebResponseJson,
+  WebResponseTooLargeError,
+  DEFAULT_WEB_RESPONSE_MAX_BYTES,
   WebError,
   type WebFetchProvider,
   type WebFetchResult,
@@ -211,5 +215,42 @@ describe('WebError', () => {
     const error = new WebError('boom', 'WEB_INVALID_URL')
     expect(error.code).toBe('WEB_INVALID_URL')
     expect(error.name).toBe('WebError')
+  })
+})
+
+describe('bounded web provider response readers', () => {
+  it('reads a response within the byte budget and parses JSON', async () => {
+    const response = new Response('{"ok":true}', { headers: { 'content-type': 'application/json' } })
+    await expect(readWebResponseJson(response, DEFAULT_WEB_RESPONSE_MAX_BYTES)).resolves.toEqual({ ok: true })
+  })
+
+  it('rejects a declared response larger than the budget before consuming it', async () => {
+    const response = new Response('{}', { headers: { 'content-length': '99' } })
+    await expect(readWebResponseBytes(response, 4)).rejects.toBeInstanceOf(WebResponseTooLargeError)
+  })
+
+  it('cancels a chunked response when a later chunk crosses the budget', async () => {
+    let cancelled = false
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(Uint8Array.of(1, 2, 3))
+        controller.enqueue(Uint8Array.of(4, 5))
+      },
+      cancel() { cancelled = true },
+    })
+    const response = new Response(body)
+    await expect(readWebResponseBytes(response, 4)).rejects.toBeInstanceOf(WebResponseTooLargeError)
+    expect(cancelled).toBe(true)
+  })
+
+  it('preserves an abort rejection from a response-shaped test carrier', async () => {
+    const abort = new DOMException('aborted', 'AbortError')
+    const response = { body: undefined, json: () => Promise.reject(abort) }
+    await expect(readWebResponseJson(response as unknown as Response, 32)).rejects.toBe(abort)
+  })
+
+  it('rejects a configured response budget above the hard maximum', async () => {
+    await expect(readWebResponseBytes(new Response('{}'), 256 * 1024 * 1024 + 1))
+      .rejects.toThrow(/within 1/u)
   })
 })

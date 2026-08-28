@@ -904,6 +904,40 @@ describe('SubagentRuntime.listChildren', () => {
     )
   })
 
+  it('rejects an oversized cold-candidate listing before starting per-session reads', async () => {
+    const { ctx, parent } = await setup([])
+    const headers = Array.from({ length: 10_001 }, (_, index): SessionHeader => ({
+      version: SESSION_FORMAT_VERSION,
+      id: SessionId(`cold-${String(index)}`),
+      createdAt: index,
+      parentSession: parent.id,
+      origin: 'subagent',
+    }))
+    ctx.sessionPersistence.list = async () => headers
+    const inspect = vi.spyOn(ctx.sessionPersistence, 'inspect')
+    await expect(ctx.subagents.listChildren(parent.id)).rejects.toThrow(
+      expect.objectContaining({ code: 'SUBAGENT_LIST_CAPACITY_EXCEEDED' }) as Error,
+    )
+    expect(inspect).not.toHaveBeenCalled()
+  })
+
+  it('rejects a cold listing whose retained headers exceed the byte budget', async () => {
+    const { ctx, parent } = await setup([])
+    const cwd = 'x'.repeat(9_000)
+    const headers = Array.from({ length: 2_000 }, (_, index): SessionHeader => ({
+      version: SESSION_FORMAT_VERSION,
+      id: SessionId(`wide-${String(index)}`),
+      createdAt: index,
+      cwd,
+      parentSession: parent.id,
+      origin: 'subagent',
+    }))
+    ctx.sessionPersistence.list = async () => headers
+    await expect(ctx.subagents.listChildren(parent.id)).rejects.toThrow(
+      expect.objectContaining({ code: 'SUBAGENT_LIST_CAPACITY_EXCEEDED' }) as Error,
+    )
+  })
+
   it('forwards cancellation to a cold inspection and reports the stable subagent error', async () => {
     const { ctx, parent } = await setup([])
     await authorChild(ctx, '00000000-0000-4000-8000-00000000ce11', {

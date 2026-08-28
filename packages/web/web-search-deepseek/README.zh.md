@@ -25,6 +25,7 @@ Exa 和 Perplexity 提供专用搜索端点，DeepSeek 则没有。该提供方�
 | `apiVersion` | `2023-06-01` | `anthropic-version` 标头值。 |
 | `maxTokens` | `4096` | Messages 请求生成 token 的正整数上限。 |
 | `maxUses` | `5` | 每次请求使用 `web_search` 服务器工具的正整数上限。 |
+| `maxResponseBytes` | `16 MiB` | 每次成功或错误响应正文的正安全整数上限（最高 256 MiB）；分块响应超过上限时会被取消。 |
 
 ```yaml
 - id: web-search-deepseek

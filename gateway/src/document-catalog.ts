@@ -134,7 +134,7 @@ function serviceError(error: unknown): never {
 /** Create handlers backed by one PostgreSQL catalog service. */
 export function createDocumentCatalogHandlers(
   catalog: Pick<PostgresDocumentCatalogService, 'sync' | 'markDeleted' | 'authorize' | 'overview' | 'history'>
-    & Partial<Pick<PostgresDocumentCatalogService, 'markPurged'>>,
+    & Partial<Pick<PostgresDocumentCatalogService, 'markDeletedBatch' | 'markPurged'>>,
   audit?: Pick<GatewayAuditService, 'write'>,
 ): {
   sync: RuntimeDocumentCatalogSyncHandler
@@ -150,6 +150,14 @@ export function createDocumentCatalogHandlers(
         throw new DocumentCatalogError('INVALID_DOCUMENT_METADATA', 400, 'Invalid document catalog sync request.')
       }
       const documents = value.documents.map(metadata)
+      let removed: string[] | undefined
+      if (value.removed !== undefined) {
+        if (!Array.isArray(value.removed) || value.removed.length > 2000
+          || !value.removed.every(item => safeRelativeId(item, false))) {
+          throw new DocumentCatalogError('INVALID_DOCUMENT_METADATA', 400, 'Invalid document catalog deletion request.')
+        }
+        removed = [...value.removed]
+      }
       const source = value.source
       const ownerSource = source === 'upload' || source === 'transfer' || source === 'admin' || source === 'legacy'
         ? source : 'legacy'
@@ -160,21 +168,19 @@ export function createDocumentCatalogHandlers(
         replace: value.replace === true,
         ownerSource,
       })
-      if (value.removed !== undefined) {
-        if (!Array.isArray(value.removed) || value.removed.length > 2000
-          || !value.removed.every(item => safeRelativeId(item, false))) {
-          throw new DocumentCatalogError('INVALID_DOCUMENT_METADATA', 400, 'Invalid document catalog deletion request.')
-        }
-        for (const docId of value.removed) {
-          await catalog.markDeleted(principal.user.id, currentScope(subject), docId)
+      if (removed !== undefined && removed.length > 0) {
+        if (catalog.markDeletedBatch !== undefined) {
+          await catalog.markDeletedBatch(principal.user.id, currentScope(subject), removed)
+        } else {
+          for (const docId of removed) await catalog.markDeleted(principal.user.id, currentScope(subject), docId)
         }
       }
-      if (ownerSource !== 'legacy' || (Array.isArray(value.removed) && value.removed.length > 0)) {
+      if (ownerSource !== 'legacy' || (removed !== undefined && removed.length > 0)) {
         await Promise.resolve(audit?.write({
           userId: principal.user.id,
           action: 'documents.catalog.sync',
           status: 200,
-          detail: JSON.stringify({ source: ownerSource, count: documents.length, removed: Array.isArray(value.removed) ? value.removed.length : 0 }),
+          detail: JSON.stringify({ source: ownerSource, count: documents.length, removed: removed?.length ?? 0 }),
         })).catch(() => {})
       }
       return { version: 1, accepted: documents.length }

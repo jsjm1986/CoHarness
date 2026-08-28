@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import JsonlSessionPersistence, { type Config as JsonlConfig } from '@deepseek-ai/dsh-session-persistence-jsonl'
 import { logPath, scanLog, sessionDir, toHeaderLine, type JsonlCompression } from '../src/format.ts'
 import {
   compressZstdFrame, createZstdFrameDecoder, decompressZstdFrame, decompressZstdPrefix, scanZstdFrames,
@@ -40,13 +40,14 @@ async function freshRoot(prefix = 'dsh-jsonl-zstd-'): Promise<string> {
   return root
 }
 
-async function mount(root: string, compression?: JsonlCompression): Promise<Context> {
+async function mount(root: string, compression?: JsonlCompression, overrides: Partial<JsonlConfig> = {}): Promise<Context> {
   const ctx = new Context()
   contexts.push(ctx)
   await ctx.plugin(SessionStore)
   await ctx.plugin(JsonlSessionPersistence, {
     root,
     ...(compression === undefined ? {} : { compression }),
+    ...overrides,
   })
   return ctx
 }
@@ -178,6 +179,22 @@ describe('Zstandard frame structure', () => {
         const plaintext = Array.from(decoder.decode(stream, ranges), chunk => Buffer.from(chunk))
         expect(plaintext).toHaveLength(2)
         expect(Buffer.concat(plaintext).toString()).toBe('first\nsecond\n')
+      } finally {
+        decoder.close()
+      }
+    }
+  })
+
+  it('enforces a total plaintext budget in both decoder implementations', async () => {
+    const frames = [await compressZstdFrame('first\n'), await compressZstdFrame('second\n')]
+    const stream = Buffer.concat(frames)
+    const ranges = scanZstdFrames(stream).frames
+    const privateDecoder = NodePrivateZstdFrameDecoder.create()
+    expect(privateDecoder).toBeDefined()
+
+    for (const decoder of [new PublicZstdFrameDecoder(), privateDecoder!]) {
+      try {
+        expect(() => Array.from(decoder.decode(stream, ranges, 5))).toThrow(/decompressed output exceeds 5 bytes/)
       } finally {
         decoder.close()
       }
@@ -375,6 +392,17 @@ describe('JsonlSessionPersistence: default Zstandard encoding', () => {
     ].join('\n'))
     const scanned = scanLog(Buffer.from(raw!.content))
     expect(scanned.events.map(event => event.type)).toEqual(oneTurnLog().map(event => event.type))
+  })
+
+  it('rejects a zstd artifact whose decoded bytes exceed the configured budget', async () => {
+    const root = await freshRoot()
+    const ctx = await mount(root, undefined, { maxDecompressedBytes: 64 })
+    const header = meta('decode-budget', '/work')
+    await ctx.sessionPersistence.create(header)
+    await ctx.sessionPersistence.append(header.id, oneTurnLog())
+
+    await expect(ctx.sessionPersistence.load(header.id))
+      .rejects.toThrow(/Zstandard decompressed output exceeds 64 bytes/)
   })
 
   it('readRaw rejects a present zstd artifact that carries no frame', async () => {

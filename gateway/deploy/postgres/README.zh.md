@@ -33,11 +33,11 @@ npm run pg:check
 
 ## Schema 与会话数据
 
-`migrations/001_initial.sql` 创建单一 `harness` schema，包含身份、项目、实例、模型治理、用量、审计与会话表。`002_gateway_public_ids.sql` 保留导入的 SQLite 用户/项目数字，并在 UUID 继续只供内部使用时分配数字公共 ID。`003_project_collaboration.sql` 加入共享项目运行时归属、根继承对话可见性、参与者投影、审批/问题原子抢占，以及项目用量/额度主体。`004_conversation_event_json.sql` 把完整事件列改为 PostgreSQL `json`，从而保留包括转义 NUL 在内的所有合法 JSON 字符串，并移除 payload 表达式索引。`005_user_owned_projects.sql` 增加项目来源/所有者元数据和事务化邀请，使账户创建的工作空间与管理员登记的目录使用同一套控制面模型。`006_user_deletion.sql` 加入 `users.deleted_at` 时间戳和活跃账号部分索引，用于用户逻辑删除。`010_push_device_providers.sql` 记录每个 Android 注册使用 FCM 还是 JPush，并把 provider 纳入 Token 唯一性。`011_model_registration_events.sql` 新增不含敏感信息的个人 Provider/model 登记历史，供管理员只读统计。`012_document_catalog.sql` 增加组织级文档元数据、所有权、快照谱系、操作条目和历史，文件字节仍留在运行时根目录。`013_project_model_default_access.sql` 增加项目级默认规则，使新项目跟随可用的组织模型目录。`014_usage_attribution_status.sql` 增加已验证的项目发起人归属和明确的历史/价格覆盖状态，但不改变账务主体。`015_conversation_archives.sql` 增加组织级归档生命周期索引、个人运行时搜索投影、可重试的恢复/回收站/清理命令，以及可配置的回收站保留元数据。`017_document_trash_lifecycle.sql` 将文档目录状态扩展为活跃、回收站和永久清理，并记录恢复/清理时间与保留期限。`018_document_catalog_tenant_fks.sql` 将文档目录中的用户引用替换为带企业范围的复合外键，增加活跃修改时间和 trigram 搜索索引，并确保来自其他企业的导入或扩展 UUID 不能满足所有权或审计引用。会话 envelope 把可查询字段（`session_id`、`seq`、事件类型和时间）放在普通列中；完整的结构化 Harness 事件存入 `conversation_events.event`，可搜索文本则使用专用投影表。连续 chunk 继续由现有 Harness 持久化路径打包，不会把每个 token 写成一行 SQL。
+`migrations/001_initial.sql` 创建单一 `harness` schema，包含身份、项目、实例、模型治理、用量、审计与会话表。`002_gateway_public_ids.sql` 保留导入的 SQLite 用户/项目数字，并在 UUID 继续只供内部使用时分配数字公共 ID。`003_project_collaboration.sql` 加入共享项目运行时归属、根继承对话可见性、参与者投影、审批/问题原子抢占，以及项目用量/额度主体。`004_conversation_event_json.sql` 把完整事件列改为 PostgreSQL `json`，从而保留包括转义 NUL 在内的所有合法 JSON 字符串，并移除 payload 表达式索引。`005_user_owned_projects.sql` 增加项目来源/所有者元数据和事务化邀请，使账户创建的工作空间与管理员登记的目录使用同一套控制面模型。`006_user_deletion.sql` 加入 `users.deleted_at` 时间戳和活跃账号部分索引，用于用户逻辑删除。`010_push_device_providers.sql` 记录每个 Android 注册使用 FCM 还是 JPush，并把 provider 纳入 Token 唯一性。`011_model_registration_events.sql` 新增不含敏感信息的个人 Provider/model 登记历史，供管理员只读统计。`012_document_catalog.sql` 增加组织级文档元数据、所有权、快照谱系、操作条目和历史，文件字节仍留在运行时根目录。`013_project_model_default_access.sql` 增加项目级默认规则，使新项目跟随可用的组织模型目录。`014_usage_attribution_status.sql` 增加已验证的项目发起人归属和明确的历史/价格覆盖状态，但不改变账务主体。`015_conversation_archives.sql` 增加组织级归档生命周期索引、个人运行时搜索投影、可重试的恢复/回收站/清理命令，以及可配置的回收站保留元数据。`017_document_trash_lifecycle.sql` 将文档目录状态扩展为活跃、回收站和永久清理，并记录恢复/清理时间与保留期限。`018_document_catalog_tenant_fks.sql` 将文档目录中的用户引用替换为带企业范围的复合外键，增加活跃修改时间和 trigram 搜索索引，并确保来自其他企业的导入或扩展 UUID 不能满足所有权或审计引用。`019_conversation_archive_file_cleanup.sql` 增加带租约和重试时间的本机归档文件清理台账，使文件系统暂时不可用时数据库清理仍可持久恢复。会话 envelope 把可查询字段（`session_id`、`seq`、事件类型和时间）放在普通列中；完整的结构化 Harness 事件存入 `conversation_events.event`，可搜索文本则使用专用投影表。连续 chunk 继续由现有 Harness 持久化路径打包，不会把每个 token 写成一行 SQL。
 
 图片、归档、生成文件和超大工具输出继续留在本机文件系统。`content_files` 记录用户或项目归属、本机路径、SHA-256、字节数和媒体类型。SQLite 导入器只迁移 Gateway 控制面，绝不导入既有 JSONL 会话日志。个人运行时保留其配置的本地持久化；新的共享项目运行时使用经过认证的 Gateway `SessionPersistence` 提供方，并把完整 Session header/事件存入这些 PostgreSQL 对话表。
 
-文档目录迁移文件编号为 `012_document_catalog.sql`，因为基线分支已经使用 migration 011。`017_document_trash_lifecycle.sql` 增加可恢复的 `trash` 和终态 `purged` 状态、保留时间、组织范围内的操作者引用及清理索引；旧的 `deleted` 行会在迁移时进入 30 天恢复窗口。`018_document_catalog_tenant_fks.sql` 为目录中的用户和项目引用增加企业范围限定，并为活跃文档的更新时间与名称搜索增加索引。
+文档目录迁移文件编号为 `012_document_catalog.sql`，因为基线分支已经使用 migration 011。`017_document_trash_lifecycle.sql` 增加可恢复的 `trash` 和终态 `purged` 状态、保留时间、组织范围内的操作者引用及清理索引；旧的 `deleted` 行会在迁移时进入 30 天恢复窗口。`018_document_catalog_tenant_fks.sql` 为目录中的用户和项目引用增加企业范围限定，并为活跃文档的更新时间与名称搜索增加索引。`019_conversation_archive_file_cleanup.sql` 记录带租约和退避时间的本机归档文件清理任务，因此归档数据库清理在文件系统暂时不可用时仍然可靠。
 
 迁移 `016_session_content_and_drafts.sql` 增加事务内可见内容水位、按 scope 限定的一小时浏览器草稿 reservation，以及仅维护视图使用的 `empty-draft` 归档记录类型。既有行会从事件 JSON 回填；含转义 NUL 的历史事件 JSON 会在不对该值使用 JSON 运算符的情况下采用保守归类。任何行进入回收站前都必须先由管理员审查维护预览。
 
@@ -56,7 +56,7 @@ HGW_COMPUTE_NODE_NAME=mac-mini \
 npm run pg:check
 ```
 
-导入器在一个事务内运行，并可对同一企业重复执行。它保留密码哈希、用户、项目来源/所有者元数据、挂载、停止状态的个人实例分配、成员、待处理和已完成的项目邀请、模型策略、价格、额度、用量、告警与审计记录。导入的邀请 UUID 由企业和 SQLite 旧邀请 ID 稳定派生，重复导入会更新同一行。Migration 3 会在需要时让每个既有项目创建者成为 `rw` 成员；除非 SQLite 行明确带有用户所有者，否则既有项目保持管理员发起来源。Gateway 启动时会用节点范围的 PostgreSQL advisory lock 串行化端口分配，并从 `HGW_INSTANCE_PORT_BASE` 开始为已挂载的活跃项目创建缺失的运行时记录；schema SQL 不嵌入部署端口号。登录会话、锁定尝试、运行时/intake token 和既有 JSONL/Zstd 对话明确不迁移；用户需要重新登录，凭据会重新签发，个人 transcript 继续留在原会话目录，协作 PostgreSQL 历史从切换后新建的项目 scope 对话开始。
+导入器在一个事务内运行，并可对同一企业重复执行。它保留密码哈希、用户、项目来源/所有者元数据、挂载、停止状态的个人实例分配、成员、待处理和已完成的项目邀请、模型策略、价格、额度、用量、告警与审计记录。导入的邀请 UUID 由企业和 SQLite 旧邀请 ID 稳定派生，重复导入会更新同一行。Migration 3 会在需要时让每个既有项目创建者成为 `rw` 成员；除非 SQLite 行明确带有用户所有者，否则既有项目保持管理员发起来源。Gateway 启动时会用节点范围的 PostgreSQL advisory lock 串行化第一个空闲端口的分配，并从 `HGW_INSTANCE_PORT_BASE` 开始为已挂载的活跃项目创建缺失的运行时记录；删除的运行时实例行会释放其节点本地端口，schema SQL 不嵌入部署端口号。登录会话、锁定尝试、运行时/intake token 和既有 JSONL/Zstd 对话明确不迁移；用户需要重新登录，凭据会重新签发，个人 transcript 继续留在原会话目录，协作 PostgreSQL 历史从切换后新建的项目 scope 对话开始。
 
 ## Gateway 运行时与切换
 
@@ -87,4 +87,4 @@ HGW_TEST_SQLITE_FILE=/tmp/gateway-before-postgres.sqlite \
   npm run test:postgres
 ```
 
-测试会删除所提供测试数据库中的 `harness` schema，绝不能指向生产库。覆盖内容包括直到版本 18 的不可变 migration（含转义 NUL 回填回归、文档回收站生命周期字段与保留索引、带企业范围的文档复合外键）、未知 migration ledger 拒绝、企业隔离、任意字符串 Session ID、包含 NUL 字符串的完整 JSON 往返、连续序号约束、并发批次幂等、嵌套工具结果搜索、包含项目邀请的可重复 SQLite 导入、根继承协作 ACL、贡献投影、交互竞态、从空节点配置端口基准分配共享项目运行时、项目文档所有权与谱系、个人 Provider/model 登记历史、项目默认模型授权、项目凭据/额度/用量、归档索引生命周期与保留策略，以及在线认证、用户、项目、节点实例、审计和模型治理服务。
+测试会删除所提供测试数据库中的 `harness` schema，绝不能指向生产库。覆盖内容包括直到版本 19 的不可变 migration（含转义 NUL 回填回归、文档回收站生命周期字段与保留索引、带企业范围的文档复合外键、归档文件清理台账）、未知 migration ledger 拒绝、企业隔离、任意字符串 Session ID、包含 NUL 字符串的完整 JSON 往返、连续序号约束、并发批次幂等、嵌套工具结果搜索、包含项目邀请的可重复 SQLite 导入、根继承协作 ACL、贡献投影、交互竞态、从空节点配置端口基准分配共享项目运行时、项目文档所有权与谱系、个人 Provider/model 登记历史、项目默认模型授权、项目凭据/额度/用量、归档索引生命周期与保留策略，以及在线认证、用户、项目、节点实例、审计和模型治理服务。

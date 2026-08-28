@@ -241,6 +241,23 @@ interface UsageTotalsRow {
   unknown: string
 }
 
+function zeroUsageTotalsRow(): UsageTotalsRow {
+  return {
+    input: '0',
+    output: '0',
+    read: '0',
+    write: '0',
+    cost: '0',
+    company: '0',
+    calls: '0',
+    missing: '0',
+    priced: '0',
+    unpriced: '0',
+    configured_zero: '0',
+    unknown: '0',
+  }
+}
+
 interface UsageAlertRow {
   metric: 'tokens' | 'company-cost'
   threshold: 80 | 100
@@ -1244,41 +1261,74 @@ export class PostgresModelGovernanceService {
       if (!Number.isSafeInteger(filter.toMs) || filter.toMs < 0) throw new Error('toMs must be a non-negative safe integer')
       add('e.occurred_at<to_timestamp(?/1000.0)', filter.toMs)
     }
-    const result = await this.context.pool.query<{
+    const filtered = `FROM harness.model_registration_events e JOIN harness.users u
+        ON u.id=e.user_id AND u.organization_id=e.organization_id
+      WHERE ${clauses.join(' AND ')}`
+    const common = `WITH filtered AS (
+        SELECT e.event_id,e.occurred_at,e.received_at,e.provider_key,e.model_key,e.action,e.scope,
+          u.public_id::text user_id
+        ${filtered}
+      ), provider_state AS (
+        SELECT DISTINCT ON (user_id,provider_key) user_id,provider_key,action
+        FROM filtered
+        WHERE model_key IS NULL
+        ORDER BY user_id,provider_key,occurred_at DESC,received_at DESC,event_id DESC
+      ), model_state AS (
+        SELECT DISTINCT ON (user_id,provider_key,model_key) user_id,provider_key,model_key,action
+        FROM filtered
+        WHERE model_key IS NOT NULL
+        ORDER BY user_id,provider_key,model_key,occurred_at DESC,received_at DESC,event_id DESC
+      ), effective_provider_state AS (
+        SELECT user_id,provider_key,action FROM provider_state
+        UNION ALL
+        SELECT state.user_id,state.provider_key,'provider-created'::text
+        FROM model_state state
+        WHERE state.action <> 'model-deleted'
+          AND NOT EXISTS (
+            SELECT 1 FROM provider_state explicit
+            WHERE explicit.user_id=state.user_id AND explicit.provider_key=state.provider_key
+          )
+      )`
+    const summary = await this.context.pool.query<{
+      provider_count: string
+      model_count: string
+      event_count: string
+      created_count: string
+      modified_count: string
+      deleted_count: string
+    }>(`${common}
+      SELECT
+        (SELECT COUNT(*) FILTER (WHERE action <> 'provider-deleted')::text FROM effective_provider_state) provider_count,
+        (SELECT COUNT(*) FILTER (WHERE action <> 'model-deleted')::text FROM model_state) model_count,
+        (SELECT COUNT(*)::text FROM filtered) event_count,
+        (SELECT COUNT(*) FILTER (WHERE action IN ('provider-created','model-created'))::text FROM filtered) created_count,
+        (SELECT COUNT(*) FILTER (WHERE action IN ('provider-modified','model-modified'))::text FROM filtered) modified_count,
+        (SELECT COUNT(*) FILTER (WHERE action IN ('provider-deleted','model-deleted'))::text FROM filtered) deleted_count`, values)
+    const pageLimit = values.length + 1
+    const pageOffset = values.length + 2
+    const page = await this.context.pool.query<{
       event_id: string; user_id: string; occurred_at: Date; received_at: Date; provider_key: string;
       model_key: string | null; action: ModelRegistrationEvent['action']; scope: 'personal'
-    }>(`SELECT e.event_id,u.public_id::text user_id,e.occurred_at,e.received_at,e.provider_key,e.model_key,e.action,e.scope
-      FROM harness.model_registration_events e JOIN harness.users u
-        ON u.id=e.user_id AND u.organization_id=e.organization_id
-      WHERE ${clauses.join(' AND ')} ORDER BY e.occurred_at DESC,e.event_id DESC`, values)
-    const all: ModelRegistrationRow[] = result.rows.map(row => ({
+    }>(`${common}
+      SELECT event_id,user_id,occurred_at,received_at,provider_key,model_key,action,scope
+      FROM filtered ORDER BY occurred_at DESC,event_id DESC LIMIT $${String(pageLimit)} OFFSET $${String(pageOffset)}`,
+    [...values, limit, offset])
+    const rows: ModelRegistrationRow[] = page.rows.map(row => ({
       eventId: row.event_id, userId: safeCount(row.user_id, 'user id'), occurredAt: row.occurred_at.getTime(),
       receivedAt: row.received_at.getTime(), provider: row.provider_key, model: row.model_key,
       action: row.action, scope: row.scope,
     }))
-    const providerState = new Map<string, ModelRegistrationEvent['action']>()
-    const modelState = new Map<string, ModelRegistrationEvent['action']>()
-    for (const row of [...all].sort((a, b) => a.occurredAt - b.occurredAt
-      || a.receivedAt - b.receivedAt || a.eventId.localeCompare(b.eventId))) {
-      if (row.model === null) providerState.set(`${row.userId}\0${row.provider}`, row.action)
-      else modelState.set(`${row.userId}\0${row.provider}\0${row.model}`, row.action)
-    }
-    for (const [key, action] of modelState) {
-      if (action === 'model-deleted') continue
-      const providerKey = key.slice(0, key.lastIndexOf('\0'))
-      if (!providerState.has(providerKey)) providerState.set(providerKey, 'provider-created')
-    }
-    const actionCount = (prefix: string): number => all.filter(row => row.action.startsWith(prefix)).length
+    const summaryRow = summary.rows[0]!
     return {
       summary: {
-        providerCount: [...providerState.values()].filter(action => action !== 'provider-deleted').length,
-        modelCount: [...modelState.values()].filter(action => action !== 'model-deleted').length,
-        eventCount: all.length,
-        createdCount: actionCount('provider-created') + actionCount('model-created'),
-        modifiedCount: actionCount('provider-modified') + actionCount('model-modified'),
-        deletedCount: actionCount('provider-deleted') + actionCount('model-deleted'),
+        providerCount: safeCount(summaryRow.provider_count, 'provider count'),
+        modelCount: safeCount(summaryRow.model_count, 'model count'),
+        eventCount: safeCount(summaryRow.event_count, 'registration event count'),
+        createdCount: safeCount(summaryRow.created_count, 'registration created count'),
+        modifiedCount: safeCount(summaryRow.modified_count, 'registration modified count'),
+        deletedCount: safeCount(summaryRow.deleted_count, 'registration deleted count'),
       },
-      rows: all.slice(offset, offset + limit),
+      rows,
     }
   }
 
@@ -1320,30 +1370,91 @@ export class PostgresModelGovernanceService {
    * @returns non-overlapping billing totals plus activity projections.
    */
   async usageOverview(month = monthOf(Date.now(), this.timeZone)): Promise<UsageOverview> {
-    const users = await this.context.pool.query<{ public_id: string; username: string; archived: boolean }>(`SELECT
-      u.public_id::text,u.username::text,
-      (u.deleted_at IS NOT NULL OR u.status <> 'active' OR COALESCE(membership.status <> 'active', true)) archived
+    const { start, end } = monthBounds(month, this.timeZone)
+    const users = await this.context.pool.query<{
+      id: string
+      public_id: string
+      username: string
+      archived: boolean
+      token_mode: 'inherit' | 'unlimited' | 'custom' | null
+      user_token_limit: string | null
+      company_cost_mode: 'inherit' | 'unlimited' | 'custom' | null
+      user_company_cost_limit: string | null
+      role_token_limit: string | null
+      role_company_cost_limit: string | null
+    }>(`SELECT
+      u.id::text,u.public_id::text,u.username::text,
+      (u.deleted_at IS NOT NULL OR u.status <> 'active' OR COALESCE(membership.status <> 'active', true)) archived,
+      quota.token_mode,quota.token_limit::text user_token_limit,
+      quota.company_cost_mode,quota.company_cost_limit::text user_company_cost_limit,
+      role_quota.token_limit::text role_token_limit,role_quota.company_cost_limit::text role_company_cost_limit
       FROM harness.users u LEFT JOIN harness.memberships membership
         ON membership.organization_id=u.organization_id AND membership.user_id=u.id
+      LEFT JOIN harness.user_quotas quota ON quota.user_id=u.id
+      LEFT JOIN harness.role_quotas role_quota
+        ON role_quota.organization_id=u.organization_id AND role_quota.role=membership.role
       WHERE u.organization_id=$1
       ORDER BY u.public_id`, [this.context.organizationId])
-    const [personal, projects, unattributed, contributors] = await Promise.all([
+    const [personal, projects, unattributed, contributors, userUsage, alerts] = await Promise.all([
       this.usageTotalsWhere(this.context.pool, 'user_id IS NOT NULL', [], month),
       this.usageTotalsWhere(this.context.pool, 'project_id IS NOT NULL', [], month),
       this.usageTotalsWhere(this.context.pool, 'project_id IS NOT NULL AND actor_user_id IS NULL', [], month),
       this.contributorRows(this.context.pool, month),
+      this.context.pool.query<UsageTotalsRow & { user_id: string }>(`SELECT
+        mu.user_id::text user_id,
+        COALESCE(SUM(mu.input_tokens),0)::text input,COALESCE(SUM(mu.output_tokens),0)::text output,
+        COALESCE(SUM(mu.cache_read_tokens),0)::text read,COALESCE(SUM(mu.cache_write_tokens),0)::text write,
+        COALESCE(SUM(mu.estimated_cost),0)::text cost,COALESCE(SUM(mu.company_cost),0)::text company,
+        COUNT(*)::text calls,COUNT(*) FILTER (WHERE mu.status='missing-usage')::text missing,
+        COUNT(*) FILTER (WHERE mu.pricing_status='priced')::text priced,
+        COUNT(*) FILTER (WHERE mu.pricing_status='unpriced')::text unpriced,
+        COUNT(*) FILTER (WHERE mu.pricing_status='configured-zero')::text configured_zero,
+        COUNT(*) FILTER (WHERE mu.pricing_status='historical-unknown')::text unknown
+        FROM harness.model_usage mu
+        WHERE mu.organization_id=$1 AND mu.user_id IS NOT NULL
+          AND mu.occurred_at>=to_timestamp($2/1000.0) AND mu.occurred_at<to_timestamp($3/1000.0)
+        GROUP BY mu.user_id`, [this.context.organizationId, start, end]),
+      this.context.pool.query<UsageAlertRow & { user_id: string }>(`SELECT a.user_id::text user_id,a.metric,a.threshold,a.created_at
+        FROM harness.model_usage_alerts a JOIN harness.users u ON u.id=a.user_id
+        WHERE u.organization_id=$1 AND a.period_start=$2::date
+        ORDER BY a.user_id,CASE a.metric WHEN 'tokens' THEN 0 ELSE 1 END,a.threshold`,
+      [this.context.organizationId, `${month}-01`]),
     ])
     const contributions = new Map(contributors.map(row => [row.userId, row]))
-    const userRows = await Promise.all(users.rows.map(async user => {
+    const usageByUser = new Map(userUsage.rows.map(row => [row.user_id, row]))
+    const alertsByUser = new Map<string, UsageAlertRow[]>()
+    for (const alert of alerts.rows) {
+      const current = alertsByUser.get(alert.user_id) ?? []
+      current.push(alert)
+      alertsByUser.set(alert.user_id, current)
+    }
+    const userRows = users.rows.map(user => {
       const userId = safeCount(user.public_id, 'user id')
+      const usage = usageByUser.get(user.id) ?? zeroUsageTotalsRow()
+      const inheritedToken = user.role_token_limit === null
+        ? null
+        : safeCount(user.role_token_limit, 'role token limit')
+      const inheritedCost = user.role_company_cost_limit === null
+        ? null
+        : decimalToMicros(user.role_company_cost_limit)
+      const tokenLimit = user.token_mode === null || user.token_mode === 'inherit'
+        ? inheritedToken
+        : user.token_mode === 'unlimited'
+          ? null
+          : safeCount(user.user_token_limit!, 'user token limit')
+      const companyCostMicrosLimit = user.company_cost_mode === null || user.company_cost_mode === 'inherit'
+        ? inheritedCost
+        : user.company_cost_mode === 'unlimited'
+          ? null
+          : decimalToMicros(user.user_company_cost_limit!)
       return {
         userId,
         username: user.username,
         archived: user.archived,
-        personal: await this.userSummaryWith(this.context.pool, userId, month),
+        personal: usageSummary(month, usage, tokenLimit, companyCostMicrosLimit, alertsByUser.get(user.id) ?? []),
         projectContribution: contributions.get(userId) ?? zeroUsageMeasure(),
       }
-    }))
+    })
     return {
       month,
       timeZone: this.timeZone,

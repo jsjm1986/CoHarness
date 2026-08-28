@@ -124,6 +124,13 @@ describe('TextRetainer — tail (exact omission, reads to end)', () => {
     // Only the final 3 bytes survive; earlier whole chunks are dropped.
     expect(r.finish().text).toBe('344')
   })
+
+  it('keeps the exact tail for highly fragmented chunks', () => {
+    const r = new TextRetainer({ kind: 'tail', maxBytes: 64 })
+    for (let index = 0; index < 10_000; index += 1) r.push(Uint8Array.of(index % 256))
+    const expected = Buffer.from(Array.from({ length: 64 }, (_, index) => (9_936 + index) % 256))
+    expect(r.finish().text).toBe(expected.toString('utf8'))
+  })
 })
 
 describe('TextRetainer — headTail (prefix + suffix, omit the middle)', () => {

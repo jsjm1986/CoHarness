@@ -22,6 +22,8 @@ export interface DeepSeekFilePolicy {
 export interface DeepSeekFileConnection {
   baseURL: string
   apiKey: string
+  /** Maximum UTF-8 bytes retained from one Files API response. */
+  maxResponseBytes?: number
 }
 
 /** Result of one file-id resolution. */
@@ -127,6 +129,7 @@ export class DeepSeekFileStore {
     return new DeepSeekFilesClient({
       baseURL: connection.baseURL,
       apiKey: connection.apiKey,
+      ...connection.maxResponseBytes === undefined ? {} : { maxResponseBytes: connection.maxResponseBytes },
       ...this.fetchImpl === undefined ? {} : { fetch: this.fetchImpl },
     })
   }

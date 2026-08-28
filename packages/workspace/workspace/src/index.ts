@@ -80,6 +80,7 @@ declare module '@deepseek-ai/cordis' {
 
 /** Versioned registry-global archive snapshot shared with Gateway adapters. */
 export interface WorkspaceArchiveSnapshot {
+  /** Non-negative safe integer; archive mutations reject instead of wrapping at the maximum. */
   readonly revision: number
   readonly archivedSessionIds: readonly SessionId[]
 }
@@ -104,6 +105,13 @@ const sameIds = (left: readonly WorkspaceId[], right: readonly WorkspaceId[]): b
 
 const compareHeaders = (left: SessionHeader, right: SessionHeader): number =>
   right.createdAt - left.createdAt || String(left.id).localeCompare(String(right.id))
+
+function nextArchiveRevision(revision: number): number {
+  if (!Number.isSafeInteger(revision) || revision < 0 || revision >= Number.MAX_SAFE_INTEGER) {
+    throw new RangeError('workspace archive revision exhausted the non-negative safe-integer range')
+  }
+  return revision + 1
+}
 
 /**
  * Durable workspace registry. Startup waits for `sessionPersistence`, builds
@@ -279,32 +287,48 @@ export class WorkspaceRegistry extends Service {
     const state = this.requireState()
     const headers = await this.ctx.sessionPersistence.list()
     const liveHeaders = this.ctx.get('sessions')?.list().map(session => session.header) ?? []
-    const allHeaders = [...headers, ...liveHeaders.filter(live => !headers.some(header => header.id === live.id))]
+    const persistedIds = new Set(headers.map(header => header.id))
+    const allHeaders = [...headers, ...liveHeaders.filter(live => !persistedIds.has(live.id))]
     await this.indexHeaders(allHeaders)
     const byId = new Map(allHeaders.map(header => [header.id, header]))
+    const rootCache = new Map<SessionId, SessionId>()
     const rootOf = (id: SessionId): SessionId => {
+      const cached = rootCache.get(id)
+      if (cached !== undefined) return cached
       const seen = new Set<SessionId>()
+      const path: SessionId[] = []
       let current = id
       while (true) {
         if (seen.has(current)) throw new Error(`session lineage cycle at '${String(current)}'`)
         seen.add(current)
+        path.push(current)
+        const known = rootCache.get(current)
+        if (known !== undefined) {
+          for (const member of path) rootCache.set(member, known)
+          return known
+        }
         const parent = byId.get(current)?.parentSession
-        if (parent === undefined) return current
+        if (parent === undefined) {
+          for (const member of path) rootCache.set(member, current)
+          return current
+        }
         current = parent
+      }
+    }
+    const placements = new Map<SessionId, ArchivedSessionEntry['workspace']>()
+    for (const workspace of this.list()) {
+      for (let position = 0; position < workspace.sessionIds.length; position += 1) {
+        const sessionId = workspace.sessionIds[position]
+        if (sessionId !== undefined && !placements.has(sessionId)) {
+          placements.set(sessionId, { id: workspace.id, path: workspace.path, title: workspace.title, position })
+        }
       }
     }
     const result: ArchivedSessionEntry[] = []
     for (const sessionId of state.archivedSessionIds) {
       const header = this.headers.get(sessionId)
       if (header === undefined) continue
-      let placement: ArchivedSessionEntry['workspace']
-      for (const workspace of this.list()) {
-        const position = workspace.sessionIds.indexOf(sessionId)
-        if (position >= 0) {
-          placement = { id: workspace.id, path: workspace.path, title: workspace.title, position }
-          break
-        }
-      }
+      const placement = placements.get(sessionId)
       result.push({ sessionId, rootSessionId: rootOf(sessionId), header, ...(placement === undefined ? {} : { workspace: placement }) })
     }
     return result
@@ -329,7 +353,7 @@ export class WorkspaceRegistry extends Service {
       await this.setState({
         ...state,
         archivedSessionIds: [...state.archivedSessionIds, sessionId],
-        archiveRevision: state.archiveRevision + 1,
+        archiveRevision: nextArchiveRevision(state.archiveRevision),
       })
       this.emitArchiveSnapshot()
     })
@@ -346,7 +370,7 @@ export class WorkspaceRegistry extends Service {
       await this.setState({
         ...state,
         archivedSessionIds: state.archivedSessionIds.filter(id => id !== sessionId),
-        archiveRevision: state.archiveRevision + 1,
+        archiveRevision: nextArchiveRevision(state.archiveRevision),
       })
       this.emitArchiveSnapshot()
     })

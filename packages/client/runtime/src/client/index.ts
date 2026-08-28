@@ -74,6 +74,14 @@ export { createSnapshotStore, defineStore, shallowEqual } from './contract/store
 export type {
   EngineStoreHandle, EngineStoreInstance, ObservableSnapshot, SnapshotStore,
 } from './contract/store.ts'
+// Account/document UI consumers share the Host carrier's byte-budgeted JSON
+// reader so a direct same-origin response cannot bypass the transport limit.
+export {
+  ApiResponseTooLargeError,
+  DEFAULT_UNARY_RESPONSE_MAX_BYTES,
+  readApiResponseJson,
+  readApiResponseText,
+} from '@deepseek-ai/dsh-host-apiproxy/client'
 export type {
   AssistantBlock, AssistantMessageNode, AssistantProvenanceView, AssistantRequestConfig,
   AssistantTiming, ChatLocationNodeIndex, ChatNodeStore, ChatSnapshot,

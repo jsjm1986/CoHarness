@@ -103,6 +103,8 @@ function privateSpillDir(): string {
  */
 export class OutputCollector {
   private chunks: Buffer[] = []
+  /** Index of the first retained chunk; retired slots are compacted lazily. */
+  private head = 0
   private bytes = 0
   private dropped = false
   private spillFd: number | undefined
@@ -135,20 +137,32 @@ export class OutputCollector {
     this.chunks.push(chunk)
     this.bytes += chunk.length
     while (this.bytes > this.maxBytes) {
-      const head = this.chunks[0] as Buffer
+      const head = this.chunks[this.head] as Buffer
       const excess = this.bytes - this.maxBytes
       if (head.length <= excess) {
         // Drop the whole head chunk (length ≥ 1 is guaranteed while over cap).
-        this.chunks.shift()
+        this.head++
         this.bytes -= head.length
       } else {
         // Trim the head so the retained window is byte-exact at the cap — a
         // diagnostic tail (an LSP server's stderr) must hold the LAST
         // maxBytes regardless of how the stream was chunked.
-        this.chunks[0] = head.subarray(excess)
+        this.chunks[this.head] = head.subarray(excess)
         this.bytes -= excess
       }
       this.dropped = true
+    }
+    this.compactChunks()
+  }
+
+  /** Reclaim retired chunk slots without moving the active tail per push. */
+  private compactChunks(): void {
+    if (this.head === this.chunks.length) {
+      this.chunks = []
+      this.head = 0
+    } else if (this.head >= 1024 && this.head * 2 >= this.chunks.length) {
+      this.chunks = this.chunks.slice(this.head)
+      this.head = 0
     }
   }
 
@@ -167,7 +181,9 @@ export class OutputCollector {
         `dsh-subprocess-${process.pid}-${++spillCounter}-${randomBytes(6).toString('hex')}-${this.label}.log`,
       )
       this.spillFd = openSync(this.spillFile, 'wx', 0o600)
-      for (const prior of this.chunks) writeSync(this.spillFd, prior)
+      for (let index = this.head; index < this.chunks.length; index++) {
+        writeSync(this.spillFd, this.chunks[index] as Buffer)
+      }
     }
     writeSync(this.spillFd, chunk)
   }
@@ -206,7 +222,8 @@ export class OutputCollector {
    */
   readFrom(fromByte: number): { text: string; nextOffset: number; lossy: boolean; spillPath?: string } {
     const windowStart = this.total - this.bytes
-    const buffer = Buffer.concat(this.chunks)
+    const active = this.head === 0 ? this.chunks : this.chunks.slice(this.head)
+    const buffer = Buffer.concat(active, this.bytes)
     const lossy = fromByte < windowStart
     const slice = lossy ? buffer : buffer.subarray(fromByte - windowStart)
     return {
@@ -243,7 +260,10 @@ export class OutputCollector {
   finalize(): CollectedOutput {
     this.seal()
     return {
-      text: Buffer.concat(this.chunks).toString('utf8'),
+      text: Buffer.concat(
+        this.head === 0 ? this.chunks : this.chunks.slice(this.head),
+        this.bytes,
+      ).toString('utf8'),
       truncated: this.dropped,
       ...this.spillFile !== undefined ? { spillPath: this.spillFile } : {},
     }

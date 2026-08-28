@@ -140,6 +140,48 @@ describe('Inbox', () => {
     inbox.clear()
     expect(session.events).toHaveLength(beforeClear + 2)
   })
+
+  it('enforces count and UTF-8 byte quotas across both targets', () => {
+    const session = Session.create(SessionId('bounded-inbox'))
+    const inbox = new Inbox(
+      session,
+      { inserted: () => {}, discarded: () => {}, claimed: () => {} },
+      { maxMessages: 2, maxBytes: 300 },
+    )
+    const first = createUserMessage({ content: [{ type: 'text', text: 'first' }], source: { kind: 'user' } })
+    const second = createUserMessage({ content: [{ type: 'text', text: 'second' }], source: { kind: 'user' } })
+    const third = createUserMessage({ content: [{ type: 'text', text: 'third' }], source: { kind: 'user' } })
+
+    inbox.append('next-turn', first)
+    inbox.append('next-step', second)
+    expect(() => { inbox.append('next-turn', third) }).toThrow('inbox message limit reached')
+    expect(inbox.nextTurn).toEqual([first])
+    expect(inbox.nextStep).toEqual([second])
+
+    const tiny = new Inbox(
+      Session.create(SessionId('tiny-inbox')),
+      { inserted: () => {}, discarded: () => {}, claimed: () => {} },
+      { maxBytes: 1 },
+    )
+    expect(() => { tiny.append('next-turn', first) }).toThrow('inbox byte limit reached')
+  })
+
+  it('keeps identity lookup correct after prepend, remove, and replacement', () => {
+    const session = Session.create(SessionId('indexed-inbox'))
+    const inbox = new Inbox(session, { inserted: () => {}, discarded: () => {}, claimed: () => {} })
+    const first = createUserMessage({ content: [{ type: 'text', text: 'first' }], source: { kind: 'user' } })
+    const second = createUserMessage({ content: [{ type: 'text', text: 'second' }], source: { kind: 'user' } })
+    const third = createUserMessage({ content: [{ type: 'text', text: 'third' }], source: { kind: 'user' } })
+    inbox.append('next-turn', first)
+    inbox.append('next-turn', second)
+    inbox.prepend('next-turn', third)
+    expect(inbox.remove(first.id)).toBe(true)
+    expect(inbox.replace(second.id, first)).toBe(true)
+    expect(inbox.nextTurn.map(message => message.id)).toEqual([third.id, first.id])
+    expect(inbox.remove(third.id)).toBe(true)
+    expect(inbox.remove(first.id)).toBe(true)
+    expect(inbox.hasPending).toBe(false)
+  })
 })
 
 describe('AgentRegistry', () => {

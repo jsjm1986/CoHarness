@@ -18,6 +18,12 @@ afterEach(() => {
 
 type FetchRecord = { url: string; init: RequestInit }
 
+function requestUrl(input: RequestInfo | URL): string {
+  if (typeof input === 'string') return input
+  if (input instanceof URL) return input.toString()
+  return input.url
+}
+
 function jsonResponse(value: unknown, status = 200): Response {
   return new Response(JSON.stringify(value), {
     status,
@@ -28,7 +34,7 @@ function jsonResponse(value: unknown, status = 200): Response {
 function stubResponse(response: Response): FetchRecord[] {
   const requests: FetchRecord[] = []
   vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
-    requests.push({ url: String(input), init: init ?? {} })
+    requests.push({ url: requestUrl(input), init: init ?? {} })
     return response
   })
   return requests
@@ -252,7 +258,7 @@ describe('discoverModelsAtEndpoint', () => {
       api: 'openai-responses',
     })).rejects.toMatchObject({
       code: 'DISCOVERY_FAILED',
-      message: expect.stringContaining('https://gateway.example/models'),
+      message: expect.stringContaining('https://gateway.example/models') as unknown,
     })
     expect(requests).toEqual([
       'https://gateway.example/models',
@@ -362,7 +368,7 @@ describe('discoverModelsAtEndpoint', () => {
       .rejects.toMatchObject({
         code: 'DISCOVERY_FAILED',
         failure: { status: 401 },
-        message: expect.stringMatching(/check the API key/),
+        message: expect.stringMatching(/check the API key/) as unknown,
       })
     expect(unauthorized).toHaveLength(1)
 
@@ -372,7 +378,7 @@ describe('discoverModelsAtEndpoint', () => {
       .rejects.toMatchObject({
         code: 'DISCOVERY_FAILED',
         failure: { status: 500 },
-        message: expect.stringMatching(/answered 500$/),
+        message: expect.stringMatching(/answered 500$/) as unknown,
       })
     expect(failed).toHaveLength(1)
   })
@@ -382,7 +388,7 @@ describe('discoverModelsAtEndpoint', () => {
     await expect(discoverModelsAtEndpoint({ baseURL: 'https://gateway.example' }))
       .rejects.toMatchObject({
         code: 'DISCOVERY_FAILED',
-        message: expect.stringMatching(/did not answer with JSON/),
+        message: expect.stringMatching(/did not answer with JSON/) as unknown,
       })
 
     vi.unstubAllGlobals()

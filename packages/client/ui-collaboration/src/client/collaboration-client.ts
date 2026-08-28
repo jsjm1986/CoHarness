@@ -1,6 +1,4 @@
-import {
-  createSnapshotStore,
-} from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore, readApiResponseJson } from '@deepseek-ai/dsh-client-runtime/client'
 
 /** Visibility of a root conversation inside one project. */
 export type CollaborationVisibility = 'project' | 'private'
@@ -313,7 +311,7 @@ export function parseConversationDetail(value: unknown): ConversationDetail {
 
 async function errorCode(response: Response): Promise<string | undefined> {
   try {
-    const body = object(await response.json())
+    const body = object(await readApiResponseJson(response))
     return typeof body.error === 'string' ? body.error : undefined
   } catch (_invalidErrorResponse) {
     return undefined
@@ -328,7 +326,7 @@ async function jsonRequest<T>(
 ): Promise<T> {
   const response = await fetcher(path, { credentials: 'same-origin', ...init })
   if (!response.ok) throw new CollaborationRequestError(response.status, await errorCode(response))
-  return parse(await response.json())
+  return parse(await readApiResponseJson(response))
 }
 
 async function emptyRequest(fetcher: typeof fetch, path: string, init: RequestInit): Promise<void> {

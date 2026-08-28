@@ -69,6 +69,14 @@ async function service(): Promise<{ ctx: Context; subagents: SubagentRuntime }> 
 }
 
 describe('SubagentRuntime', () => {
+  it.each([
+    { maxContinuableActivations: 0 },
+    { maxContinuableActivationsPerParent: 1.5 },
+    { maxContinuableActivations: Number.MAX_SAFE_INTEGER + 1 },
+  ])('rejects invalid Activation limits at plugin load', async (config) => {
+    await expect(new Context().plugin(SubagentRuntime, config)).rejects.toThrow()
+  })
+
   it('registers, lists, looks up, starts, and removes providers', async () => {
     const { ctx, subagents } = await service()
     const added: string[] = []

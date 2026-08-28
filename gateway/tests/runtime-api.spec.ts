@@ -527,19 +527,23 @@ describe('runtime organization credentials', () => {
 })
 
 describe('runtime archive synchronization', () => {
-  it('accepts a complete snapshot and returns pending lifecycle commands', async () => {
+  it('accepts a bounded projection batch and returns pending lifecycle commands', async () => {
     const runtime = fixture()
     const response = await request(runtime.handler, '/internal/runtime/archive/snapshot', {
       body: {
         revision: 4,
         archivedSessionIds: ['session-archive'],
-        sessions: [{ sessionId: 'session-archive', header: { createdAt: CREATED_AT, cwd: '/tmp/shared' } }],
+        sessions: [{
+          sessionId: 'session-archive', header: { createdAt: CREATED_AT, cwd: '/tmp/shared' },
+          messageCount: 1, rootMessageCount: 3,
+        }],
         search: [{ sessionId: 'session-archive', seq: 0, role: 'user', content: 'hello', occurredAt: CREATED_AT }],
       },
     })
     expect(response).toMatchObject({ handled: true, status: 200, body: { commands: [{ id: 'command-1', rootSessionId: 'session-archive', action: 'restore' }] } })
     expect(runtime.archiveSnapshot).toHaveBeenCalledWith(expect.objectContaining({
       runtime: { kind: 'project', id: PROJECT_ID }, revision: 4, archivedSessionIds: ['session-archive'],
+      sessions: [expect.objectContaining({ messageCount: 1, rootMessageCount: 3 })],
     }), { kind: 'project', id: PROJECT_ID })
 
     const ack = await request(runtime.handler, '/internal/runtime/archive/ack', {
@@ -560,6 +564,19 @@ describe('runtime archive synchronization', () => {
           header: {},
           workspace: { path: 7, title: 'Workspace', position: 0 },
         }],
+      },
+    })
+    expect(response).toMatchObject({ handled: true, status: 400, body: { error: 'invalid archive session snapshot' } })
+    expect(runtime.archiveSnapshot).not.toHaveBeenCalled()
+  })
+
+  it('rejects an invalid root message aggregate', async () => {
+    const runtime = fixture()
+    const response = await request(runtime.handler, '/internal/runtime/archive/snapshot', {
+      body: {
+        revision: 1,
+        archivedSessionIds: ['session-archive'],
+        sessions: [{ sessionId: 'session-archive', header: {}, rootMessageCount: -1 }],
       },
     })
     expect(response).toMatchObject({ handled: true, status: 400, body: { error: 'invalid archive session snapshot' } })

@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-全局 Web shell 中的网关额度提醒。浏览器插件向 `shell.overlay` 贡献一个条目；apply 侧回调在挂载时读取一次经过认证的同源 `/account/api/usage` 汇总，展示组件只呈现网关已经计算并持久化的自然月 80%/100% 阈值事件。建议性读取失败不会影响 shell。
+全局 Web shell 中的网关额度提醒。浏览器插件向 `shell.overlay` 贡献一个条目；apply 侧回调在挂载时通过共用的 16 MiB 流式响应上限读取一次经过认证的同源 `/account/api/usage` 汇总，展示组件只呈现网关已经计算并持久化的自然月 80%/100% 阈值事件。建议性读取失败不会影响 shell。
 
 ## 模型体验
 

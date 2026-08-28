@@ -4,7 +4,7 @@ import type { ResponseValue } from '../src/api/rpc-map.ts'
 import type { ClientResponse, RpcMessage, RpcReceipt, RpcRequest } from '../src/api/rpc.ts'
 import { RpcId } from '../src/api/rpc.ts'
 import { toFetchHandler } from '../src/fetch/handler.ts'
-import { AbstractApiClient, InProcessApiClient } from '../src/fetch/client.ts'
+import { AbstractApiClient, ApiResponseTooLargeError, InProcessApiClient, readApiResponseText } from '../src/fetch/client.ts'
 
 const SCRIPTED_HISTORY_PAGE = {
   events: [
@@ -365,6 +365,51 @@ describe('unary round trip (handler ⇄ client, no network)', () => {
     const response = await client().sessions.list({})
     expect(response.result).toEqual({ ok: true, value: { items: [] } })
     expect(response.rpcId).toMatch(/[0-9a-f-]{36}/)
+  })
+
+  it('rejects a declared unary response that exceeds the carrier budget', async () => {
+    const oversized = new InProcessApiClient({
+      fetch: async () => new Response('{}', { status: 200, headers: { 'content-length': '99' } }),
+    }, undefined, 32)
+    await expect(oversized.sessions.list({})).rejects.toBeInstanceOf(ApiResponseTooLargeError)
+  })
+
+  it('rejects a unary response budget above the hard maximum', () => {
+    expect(() => new InProcessApiClient({ fetch: async () => new Response('{}') }, undefined, 256 * 1024 * 1024 + 1))
+      .toThrow(/within 1/u)
+  })
+
+  it('cancels a chunked unary response when it crosses the carrier budget', async () => {
+    let cancelled = false
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(Uint8Array.of(123, 125))
+        controller.enqueue(Uint8Array.of(1, 2, 3))
+      },
+      cancel() { cancelled = true },
+    })
+    const client = new InProcessApiClient({
+      fetch: async () => new Response(body, { status: 200 }),
+    }, undefined, 4)
+    await expect(client.sessions.list({})).rejects.toBeInstanceOf(ApiResponseTooLargeError)
+    expect(cancelled).toBe(true)
+  })
+
+  it('reads a bounded text response and supports lightweight test transports', async () => {
+    await expect(readApiResponseText(new Response('hello'), 5)).resolves.toBe('hello')
+    await expect(readApiResponseText({
+      text: async () => 'fixture',
+    } as unknown as Response, 7)).resolves.toBe('fixture')
+  })
+
+  it('rejects an oversized text response before returning its body', async () => {
+    let cancelled = false
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(new TextEncoder().encode('hello')); controller.enqueue(new TextEncoder().encode('!')) },
+      cancel() { cancelled = true },
+    })
+    await expect(readApiResponseText(new Response(body), 5)).rejects.toBeInstanceOf(ApiResponseTooLargeError)
+    expect(cancelled).toBe(true)
   })
 
   it('packs session history on Fetch and restores the exact logical page for IApiClient', async () => {
@@ -873,6 +918,56 @@ describe('SSE streams through the carrier', () => {
     const frames = await collect(c.events.mux({}, new AbortController().signal))
     expect(frames).toHaveLength(2)
     expect(frames.map(frame => frame.rpcId)).toEqual(['burst-1', 'burst-2'])
+  })
+
+  it('assembles a highly fragmented SSE frame without copying its prefix per read', async () => {
+    const frame = `data: ${JSON.stringify({
+      type: 'server-request',
+      rpcId: 'fragmented',
+      method: 'session/subscribed',
+      payload: { type: 'session/subscribed', sessionId: 'fragmented', lastSeq: -1 },
+    })}\n\n`
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const encoder = new TextEncoder()
+        for (const character of frame) controller.enqueue(encoder.encode(character))
+        controller.close()
+      },
+    })
+    const c = new InProcessApiClient({
+      fetch: async () => new Response(body, { headers: { 'content-type': 'text/event-stream' } }),
+    })
+    await expect(collect(c.events.mux({}, new AbortController().signal))).resolves.toMatchObject([
+      { rpcId: 'fragmented', payload: { type: 'session/subscribed' } },
+    ])
+  })
+
+  it('keeps an SSE data line break inside a frame when transport chunks split there', async () => {
+    const json = JSON.stringify({
+      type: 'server-request',
+      rpcId: 'split-data',
+      method: 'session/subscribed',
+      payload: { type: 'session/subscribed', sessionId: 'split-data', lastSeq: -1 },
+    })
+    const encoder = new TextEncoder()
+    const chunks = [
+      encoder.encode(`data: ${json.slice(0, 12)}\n`),
+      encoder.encode(`data: ${json.slice(12)}\n\n`),
+    ]
+    let cursor = 0
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        const next = chunks[cursor++]
+        if (next === undefined) controller.close()
+        else controller.enqueue(next)
+      },
+    })
+    const c = new InProcessApiClient({
+      fetch: async () => new Response(body, { headers: { 'content-type': 'text/event-stream' } }),
+    })
+    await expect(collect(c.events.mux({}, new AbortController().signal))).resolves.toMatchObject([
+      { rpcId: 'split-data', payload: { type: 'session/subscribed' } },
+    ])
   })
 })
 

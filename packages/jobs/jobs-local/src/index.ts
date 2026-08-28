@@ -14,7 +14,7 @@ import z from '@deepseek-ai/schemastery'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { AnonymousEntries, ScopedLayers, scopeOf } from '@deepseek-ai/dsh-scope'
 import type { ScopeLayer } from '@deepseek-ai/dsh-scope'
-import { deadline, timeoutOf } from '@deepseek-ai/dsh-timeout'
+import { deadline, MAX_TIMER_DELAY_MS, timeoutOf } from '@deepseek-ai/dsh-timeout'
 import { JobRegistry, JobId } from '@deepseek-ai/dsh-jobs'
 import type {
   JobDoneListener, JobKind, JobOutcome, JobRead, JobSnapshot, JobStart, JobStatus,
@@ -26,6 +26,12 @@ export const TASK_WAIT_TIMEOUT = 'TASK_WAIT_TIMEOUT'
 
 /** Default maximum number of active jobs in one exact-owner bucket. */
 const DEFAULT_MAX_CONCURRENT_TASKS_PER_OWNER = 10
+/** Default retained terminal-record count across the process-local registry. */
+const DEFAULT_MAX_TERMINAL_JOBS = 1_000
+/** Default retained terminal output bytes across the process-local registry. */
+const DEFAULT_MAX_TERMINAL_OUTPUT_BYTES = 64 * 1024 * 1024
+/** Default age after which an unobserved terminal record may be reclaimed. */
+const DEFAULT_TERMINAL_RETENTION_MS = 24 * 60 * 60 * 1000
 
 /** Configuration for the process-local job registry. */
 export interface Config {
@@ -34,6 +40,12 @@ export interface Config {
    * omission defaults to 10.
    */
   maxConcurrentJobsPerOwner?: number
+  /** Maximum terminal records retained globally; active records are never evicted. */
+  maxTerminalJobs?: number
+  /** Maximum UTF-8 bytes of terminal outputs retained globally. */
+  maxTerminalOutputBytes?: number
+  /** Maximum age of terminal records before they become eligible for eviction. */
+  terminalRetentionMs?: number
 }
 
 /** The registry's mutable per-job record (never handed out — see {@link LocalJobRegistry.snapshot}). */
@@ -60,6 +72,8 @@ interface TrackedTask {
   waiters: number
   /** Removable resolvers for live waits; timeout/abort unregister before the job settles. */
   waitResolvers: Set<() => void>
+  /** UTF-8 bytes retained in the terminal output, if any. */
+  outputBytes: number
 }
 
 /** True for the three terminal {@link JobStatus} values. */
@@ -95,10 +109,28 @@ export class LocalJobRegistry extends JobRegistry {
       .min(1)
       .max(Number.MAX_SAFE_INTEGER)
       .default(DEFAULT_MAX_CONCURRENT_TASKS_PER_OWNER),
+    maxTerminalJobs: z.number()
+      .step(1)
+      .min(1)
+      .max(Number.MAX_SAFE_INTEGER)
+      .default(DEFAULT_MAX_TERMINAL_JOBS),
+    maxTerminalOutputBytes: z.number()
+      .step(1)
+      .min(1)
+      .max(Number.MAX_SAFE_INTEGER)
+      .default(DEFAULT_MAX_TERMINAL_OUTPUT_BYTES),
+    terminalRetentionMs: z.number()
+      .step(1)
+      .min(1)
+      .max(MAX_TIMER_DELAY_MS)
+      .default(DEFAULT_TERMINAL_RETENTION_MS),
   })
 
   /** Schemastery-defaulted active-job limit. */
   private readonly maxConcurrentJobsPerOwner: number
+  private readonly maxTerminalJobs: number
+  private readonly maxTerminalOutputBytes: number
+  private readonly terminalRetentionMs: number
   private store = new Map<JobId, TrackedTask>()
   private counters = new Map<string, number>()
   /**
@@ -119,16 +151,28 @@ export class LocalJobRegistry extends JobRegistry {
   private ownerCleanups = new Map<Agent, () => Promise<void> | void>()
   /** Service context used by detached settlement continuations and teardown. */
   private readonly selfCtx: Context
+  private readonly cleanupTimer: ReturnType<typeof setInterval>
 
   constructor(ctx: Context, config: Config) {
     super(ctx)
     // Schemastery validates and fills the default before constructing the service.
-    this.maxConcurrentJobsPerOwner = (config as Required<Config>).maxConcurrentJobsPerOwner
+    const resolved = config as Required<Config>
+    this.maxConcurrentJobsPerOwner = resolved.maxConcurrentJobsPerOwner
+    this.maxTerminalJobs = resolved.maxTerminalJobs
+    this.maxTerminalOutputBytes = resolved.maxTerminalOutputBytes
+    this.terminalRetentionMs = resolved.terminalRetentionMs
+    if (!Number.isSafeInteger(this.terminalRetentionMs) || this.terminalRetentionMs < 1
+      || this.terminalRetentionMs > MAX_TIMER_DELAY_MS) {
+      throw new RangeError(`terminalRetentionMs must be a positive safe integer no greater than ${MAX_TIMER_DELAY_MS}`)
+    }
     this.selfCtx = ctx
+    this.cleanupTimer = setInterval(() => { this.pruneTerminalRecords() }, this.terminalRetentionMs)
+    this.cleanupTimer.unref()
     ctx.effect(() => () => this.disposeAll(), 'jobs teardown')
   }
 
   start(spec: JobStart): JobId {
+    this.pruneTerminalRecords()
     if (!this.servesOwner(spec.owner)) {
       throw new Error('background jobs unavailable: no job controller serves this agent (load @deepseek-ai/dsh-tool-jobs in its composition)')
     }
@@ -172,6 +216,7 @@ export class LocalJobRegistry extends JobRegistry {
       markSettled,
       waiters: 0,
       waitResolvers: new Set(),
+      outputBytes: 0,
     }
     this.store.set(id, job)
 
@@ -190,6 +235,7 @@ export class LocalJobRegistry extends JobRegistry {
   }
 
   list(caller?: Agent): JobSnapshot[] {
+    this.pruneTerminalRecords()
     const session = caller?.id
     return [...this.store.values()]
       .filter(job => job.owner === undefined || job.owner.id === session)
@@ -197,12 +243,14 @@ export class LocalJobRegistry extends JobRegistry {
   }
 
   get(id: JobId, caller?: Agent): JobSnapshot {
+    this.pruneTerminalRecords()
     const job = this.expect(id)
     this.assertAccess(job, caller)
     return this.snapshot(job)
   }
 
   read(id: JobId, caller?: Agent): JobRead {
+    this.pruneTerminalRecords()
     const job = this.expect(id)
     this.assertAccess(job, caller)
     const text = job.readOutput !== undefined
@@ -213,6 +261,7 @@ export class LocalJobRegistry extends JobRegistry {
   }
 
   kill(id: JobId, caller?: Agent, reason?: string): 'requested' | 'already-finished' {
+    this.pruneTerminalRecords()
     const job = this.expect(id)
     this.assertAccess(job, caller)
     if (isTerminal(job.status)) {
@@ -228,6 +277,7 @@ export class LocalJobRegistry extends JobRegistry {
   }
 
   async wait(id: JobId, timeoutMs: number, caller?: Agent, signal?: AbortSignal): Promise<JobSnapshot> {
+    this.pruneTerminalRecords()
     const job = this.expect(id)
     this.assertAccess(job, caller)
     if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
@@ -418,6 +468,7 @@ export class LocalJobRegistry extends JobRegistry {
     job.status = outcome.status
     job.detail = outcome.detail
     job.output = outcome.output
+    job.outputBytes = outcome.output === undefined ? 0 : new TextEncoder().encode(outcome.output).byteLength
     job.finishedAt = Date.now()
     if (job.waiters > 0) job.reported = true
     const snapshot = this.snapshot(job)
@@ -437,6 +488,38 @@ export class LocalJobRegistry extends JobRegistry {
         this.selfCtx.logger.warn(`jobs: onJobDone listener threw for ${job.id}: ${String(error)}`)
       }
     }
+    this.pruneTerminalRecords()
+  }
+
+  /** Evict only settled records that exceed age/count/output budgets. */
+  private pruneTerminalRecords(now = Date.now()): void {
+    const terminal = [...this.store.values()]
+      .filter(job => isTerminal(job.status))
+      .sort((a, b) => (a.finishedAt ?? 0) - (b.finishedAt ?? 0) || a.id.localeCompare(b.id))
+    const expired = terminal.filter((job) => {
+      const finishedAt = job.finishedAt
+      return job.waiters === 0
+        && finishedAt !== undefined
+        && now - finishedAt >= this.terminalRetentionMs
+    })
+    const remove = new Set<TrackedTask>(expired)
+    let retainedCount = terminal.length - remove.size
+    let retainedBytes = terminal
+      .filter(job => !remove.has(job))
+      .reduce((sum, job) => sum + job.outputBytes, 0)
+    for (const job of terminal) {
+      if (remove.has(job) || job.waiters > 0) continue
+      if (retainedCount <= this.maxTerminalJobs && retainedBytes <= this.maxTerminalOutputBytes) break
+      remove.add(job)
+      retainedCount -= 1
+      retainedBytes -= job.outputBytes
+    }
+    if (remove.size === 0) return
+    const changedOwners = new Set<Agent | undefined>()
+    for (const job of remove) {
+      if (this.store.delete(job.id)) changedOwners.add(job.owner)
+    }
+    for (const owner of changedOwners) this.notifyChanged(owner)
   }
 
   /**
@@ -482,6 +565,7 @@ export class LocalJobRegistry extends JobRegistry {
     // The flag is the whole guard: each layer entry's undo belongs to the fiber
     // that registered it, so this service may not drop them on its own way out.
     this.listenersClosed = true
+    clearInterval(this.cleanupTimer)
     const all = [...this.store.values()]
     this.cancelForTeardown(all, 'jobs service disposed')
     await Promise.all(all.map(job => job.settled))

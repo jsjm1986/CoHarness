@@ -6,7 +6,13 @@
  * @module @deepseek-ai/dsh-web-search-deepseek/provider
  */
 
-import { WebError } from '@deepseek-ai/dsh-web'
+import {
+  DEFAULT_WEB_RESPONSE_MAX_BYTES,
+  MAX_WEB_RESPONSE_MAX_BYTES,
+  readWebResponseJson,
+  WebError,
+  WebResponseTooLargeError,
+} from '@deepseek-ai/dsh-web'
 import type {
   WebSearchProvider,
   WebSearchRequest,
@@ -45,6 +51,8 @@ export const DEEPSEEK_DEFAULT_MAX_TOKENS = 4096
 
 /** Default maximum `web_search` server-tool uses per request. */
 export const DEEPSEEK_DEFAULT_MAX_USES = 5
+/** Default maximum UTF-8 bytes retained from one Messages response. */
+export const DEEPSEEK_DEFAULT_MAX_RESPONSE_BYTES = DEFAULT_WEB_RESPONSE_MAX_BYTES
 
 /** Attribution header sent on every request. Bump with the package version. */
 const USER_AGENT = 'deepseek-harness/0.0.1'
@@ -102,6 +110,8 @@ export interface DeepSeekSearchProviderOptions {
   maxTokens: number
   /** Maximum `web_search` server-tool uses per request. */
   maxUses: number
+  /** Maximum UTF-8 bytes retained from one success or error response. */
+  maxResponseBytes?: number
   /**
    * Record the exact secret-free request immediately before dispatch. A throw
    * prevents dispatch so model-visible auxiliary input cannot escape logging.
@@ -192,6 +202,7 @@ export class DeepSeekSearchProvider implements WebSearchProvider {
       && URL.canParse(options.baseURL)
       && isPositiveInteger(options.maxTokens)
       && isPositiveInteger(options.maxUses)
+      && isPositiveSafeInteger(options.maxResponseBytes ?? DEEPSEEK_DEFAULT_MAX_RESPONSE_BYTES)
   }
 
   async search(request: WebSearchRequest, signal?: AbortSignal): Promise<WebSearchResult> {
@@ -199,6 +210,7 @@ export class DeepSeekSearchProvider implements WebSearchProvider {
     // settings write landing inside that await must not send the key resolved
     // from the old section to the endpoint named by the new one.
     const options = this.resolveOptions()
+    const responseLimit = options.maxResponseBytes ?? DEEPSEEK_DEFAULT_MAX_RESPONSE_BYTES
     const apiKey = await this.apiKey(options, signal)
     throwIfSearchAborted(signal)
     const endpoint = `${options.baseURL}/messages`
@@ -244,7 +256,7 @@ export class DeepSeekSearchProvider implements WebSearchProvider {
       const status = response.status
       let message = `DeepSeek API error (HTTP ${status})`
       try {
-        const parsed = await response.json() as AnthropicError
+        const parsed = await readWebResponseJson(response, responseLimit) as AnthropicError
         const detail = typeof parsed.error === 'string' ? parsed.error : parsed.error?.message ?? parsed.message
         if (detail !== undefined && detail.length > 0) message = detail
       } catch (error: unknown) {
@@ -260,11 +272,14 @@ export class DeepSeekSearchProvider implements WebSearchProvider {
     }
 
     try {
-      const payload = await response.json() as AnthropicResponse
+      const payload = await readWebResponseJson(response, responseLimit) as AnthropicResponse
       return mapAnthropicResponse(payload)
     } catch (error: unknown) {
       if (signal?.aborted === true || isAbortError(error)) throw searchAborted(signal, error)
       if (error instanceof WebError) throw error
+      if (error instanceof WebResponseTooLargeError) {
+        throw new WebError(`DeepSeek response exceeded the ${String(responseLimit)}-byte limit`, 'WEB_PROVIDER_ERROR', { cause: error })
+      }
       throw new WebError(`DeepSeek returned an unprocessable response body: ${String(error)}`, 'WEB_PROVIDER_ERROR', { cause: error })
     }
   }
@@ -344,4 +359,9 @@ function isAbortError(error: unknown): boolean {
 /** True for DeepSeek request limits that can be sent to the Messages API. */
 function isPositiveInteger(value: number): boolean {
   return Number.isInteger(value) && value > 0
+}
+
+/** True for a positive safe integer response byte budget. */
+function isPositiveSafeInteger(value: number): boolean {
+  return Number.isSafeInteger(value) && value > 0 && value <= MAX_WEB_RESPONSE_MAX_BYTES
 }

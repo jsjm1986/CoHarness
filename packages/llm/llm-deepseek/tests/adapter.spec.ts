@@ -228,6 +228,136 @@ describe('DeepSeekAdapter against a mock server', () => {
     expect(policies).toEqual([{ maxPixels: 640_000, maxBytes: 1024 * 1024 }])
   })
 
+  it('bounds concurrent request-image preparation while preserving request order', async () => {
+    const server = await mockServer([{ kind: 'sse', events: textEvents }])
+    const refs = ['a', 'b', 'c', 'd', 'e'].map((digit, index): ImageAttachmentRef => ({
+      ...imageRef,
+      attachmentId: AttachmentId(`sha256:${digit.repeat(64)}`),
+      name: `image-${String(index)}.png`,
+    }))
+    const releases: Array<() => void> = []
+    let active = 0
+    let maximum = 0
+    const attachmentMocks = attachmentStoreOf(async (ref) => {
+      active += 1
+      maximum = Math.max(maximum, active)
+      await new Promise<void>(resolve => releases.push(resolve))
+      active -= 1
+      const index = refs.findIndex(candidate => candidate.attachmentId === ref.attachmentId)
+      return {
+        ...requestImage(ref),
+        variantId: ImageVariantId(`sha256:${String(index).repeat(64)}`),
+      }
+    })
+    let fileIndex = 0
+    const files = fileStoreOf(() => Promise.resolve(fileReference(`file-${String(fileIndex++)}`)))
+    const adapter = adapterOf({
+      baseURL: server.url,
+      imagePreparationConcurrency: 2,
+      models: [{ id: 'vision', inputModalities: ['text', 'image'] }],
+    }, attachmentMocks.store, files.store)
+
+    const pending = drain(adapter.stream({
+      provider: 'deepseek-official',
+      model: 'vision',
+      messages: [createUserMessage({
+        content: refs.map(attachment => ({ type: 'image' as const, attachment })),
+        source: { kind: 'plugin', plugin: 'test' },
+      })],
+    }))
+    await vi.waitFor(() => { expect(attachmentMocks.readImageRequest).toHaveBeenCalledTimes(2) })
+    while (attachmentMocks.readImageRequest.mock.calls.length < refs.length) {
+      const before = attachmentMocks.readImageRequest.mock.calls.length
+      releases.splice(0).forEach((release) => { release() })
+      await vi.waitFor(() => { expect(attachmentMocks.readImageRequest.mock.calls.length).toBeGreaterThan(before) })
+    }
+    releases.splice(0).forEach((release) => { release() })
+    await pending
+
+    expect(maximum).toBe(2)
+    expect(files.ensureUploaded).toHaveBeenCalledTimes(refs.length)
+    const body = JSON.stringify(server.requests[0])
+    for (const ref of refs) expect(body).toContain(String(ref.attachmentId))
+  })
+
+  it('does not start a later preparation batch while an earlier item is still pending', async () => {
+    const server = await mockServer([{ kind: 'sse', events: textEvents }])
+    const refs = ['a', 'b', 'c', 'd'].map((digit, index): ImageAttachmentRef => ({
+      ...imageRef,
+      attachmentId: AttachmentId(`sha256:${digit.repeat(64)}`),
+      name: `image-${String(index)}.png`,
+    }))
+    let releaseFirst!: () => void
+    const first = new Promise<void>((resolve) => { releaseFirst = resolve })
+    const attachmentMocks = attachmentStoreOf(async (ref) => {
+      if (ref.attachmentId === refs[0]?.attachmentId) await first
+      const index = refs.findIndex(candidate => candidate.attachmentId === ref.attachmentId)
+      return {
+        ...requestImage(ref),
+        variantId: ImageVariantId(`sha256:${String(index).repeat(64)}`),
+      }
+    })
+    const files = fileStoreOf(() => Promise.resolve(fileReference('file-retained')))
+    const adapter = adapterOf({
+      baseURL: server.url,
+      imagePreparationConcurrency: 2,
+      models: [{ id: 'vision', inputModalities: ['text', 'image'] }],
+    }, attachmentMocks.store, files.store)
+
+    const pending = drain(adapter.stream({
+      provider: 'deepseek-official',
+      model: 'vision',
+      messages: [createUserMessage({
+        content: refs.map(attachment => ({ type: 'image' as const, attachment })),
+        source: { kind: 'plugin', plugin: 'test' },
+      })],
+    }))
+    await vi.waitFor(() => { expect(attachmentMocks.readImageRequest).toHaveBeenCalledTimes(2) })
+    await Promise.resolve()
+    expect(attachmentMocks.readImageRequest).toHaveBeenCalledTimes(2)
+
+    releaseFirst()
+    await pending
+    expect(attachmentMocks.readImageRequest).toHaveBeenCalledTimes(refs.length)
+  })
+
+  it('releases exact-size overflow before provider file resolution', async () => {
+    const server = await mockServer([{ kind: 'sse', events: textEvents }])
+    const refs = ['a', 'b', 'c'].map(digit => ({
+      ...imageRef,
+      attachmentId: AttachmentId(`sha256:${digit.repeat(64)}`),
+      bytes: 1,
+    }))
+    const attachments = attachmentStoreOf(ref => Promise.resolve({
+      ...requestImage(ref),
+      variantId: ImageVariantId(`sha256:${String(ref.attachmentId).slice(-64)}`),
+      data: Uint8Array.of(1, 2, 3, 4, 5, 6),
+      bytes: 6,
+    })).store
+    const files = fileStoreOf(() => Promise.resolve(fileReference('file-retained')))
+    const adapter = adapterOf({
+      baseURL: server.url,
+      maxRequestFilesBytes: 10,
+      imageOffloadByteQuantum: 1,
+      models: [{ id: 'vision', inputModalities: ['text', 'image'] }],
+    }, attachments, files.store)
+
+    await drain(adapter.stream({
+      provider: 'deepseek-official',
+      model: 'vision',
+      messages: [createUserMessage({
+        content: refs.map(attachment => ({ type: 'image' as const, attachment })),
+        source: { kind: 'plugin', plugin: 'test' },
+      })],
+    }))
+
+    expect(files.ensureUploaded).toHaveBeenCalledTimes(1)
+    const body = JSON.stringify(server.requests[0])
+    expect(body.match(/older images are omitted first/g)).toHaveLength(2)
+    expect(body).toContain(String(refs[2]?.attachmentId))
+    expect(body).not.toContain(String(refs[0]?.attachmentId))
+  })
+
   it('falls back to one all-base64 request when Files API resolution fails', async () => {
     const server = await mockServer([{ kind: 'sse', events: textEvents }])
     const secondRef = { ...imageRef, attachmentId: AttachmentId(`sha256:${'c'.repeat(64)}`) }
@@ -1849,6 +1979,9 @@ describe('plugin registration and config', () => {
     ['fileRefreshMarginSeconds', 604_800, /fileRefreshMarginSeconds must be a non-negative integer/],
     ['fileQuotaCleanupBatch', 0, /fileQuotaCleanupBatch must be an integer from 1 through 1000/],
     ['fileQuotaCleanupBatch', 1_001, /fileQuotaCleanupBatch must be an integer from 1 through 1000/],
+    ['maxFilesResponseBytes', 0, /maxFilesResponseBytes must be a positive safe integer/],
+    ['maxFilesResponseBytes', 1.5, /maxFilesResponseBytes must be a positive safe integer/],
+    ['maxFilesResponseBytes', Number.MAX_SAFE_INTEGER + 1, /maxFilesResponseBytes must be a positive safe integer/],
   ] as const)('rejects %s=%s', (field, value, message) => {
     expect(() => resolveAdapterOptions({ [field]: value })).toThrow(message)
   })

@@ -19,6 +19,7 @@ import { MockAdapter, maxTokensResponse, textResponse, toolCallResponse } from '
 import SubagentRuntime, {
   SubagentError,
   SUBAGENT_DESCRIPTOR_VERSION,
+  type Config as SubagentConfig,
 } from '../src/index.ts'
 import type { SubagentRunEndInfo, SubagentRunInfo } from '../src/index.ts'
 import * as SubagentInvariant from '../src/invariant.ts'
@@ -65,7 +66,10 @@ afterEach(async () => {
 })
 
 /** Boot the full continuable stack: loop, persistence, providers, and subagents. */
-async function setupWith(adapter: LlmAdapter, options: { persistence?: boolean } = {}) {
+async function setupWith(
+  adapter: LlmAdapter,
+  options: { persistence?: boolean; subagent?: SubagentConfig } = {},
+) {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
   let disposePersistence: (() => Promise<void>) | undefined
@@ -81,7 +85,7 @@ async function setupWith(adapter: LlmAdapter, options: { persistence?: boolean }
     })
   }
   await ctx.plugin(AgentLoop, { agents: [] })
-  await ctx.plugin(SubagentRuntime)
+  await ctx.plugin(SubagentRuntime, options.subagent ?? {})
   await ctx.plugin(SubagentSpawn, { providerName: 'spawn' })
   await ctx.plugin(SubagentFork, { providerName: 'fork' })
   ctx.llm.registerAdapter(['mock'], adapter)
@@ -89,7 +93,7 @@ async function setupWith(adapter: LlmAdapter, options: { persistence?: boolean }
   return { ctx, parent, disposePersistence, root }
 }
 
-async function setup(script: Script, options: { persistence?: boolean } = {}) {
+async function setup(script: Script, options: { persistence?: boolean; subagent?: SubagentConfig } = {}) {
   const adapter = new MockAdapter(script)
   const booted = await setupWith(adapter, options)
   return { ...booted, adapter }
@@ -232,6 +236,55 @@ describe('SubagentRuntime.startContinuable', () => {
       childId: reservedId,
     })).rejects.toMatchObject({ code: 'DUPLICATE_CHILD' })
     expect(ctx.agents.get(reservedId)).toBeUndefined()
+  })
+
+  it('counts pending materialization against the parent limit and releases the slot', async () => {
+    const { ctx, parent } = await setup([
+      textResponse('first answer'),
+      textResponse('second answer'),
+    ], {
+      subagent: { maxContinuableActivations: 2, maxContinuableActivationsPerParent: 1 },
+    })
+    const releaseCreate = Promise.withResolvers<undefined>()
+    const create = ctx.agents.create.bind(ctx.agents)
+    const createSpy = vi.spyOn(ctx.agents, 'create').mockImplementation(async (options) => {
+      await releaseCreate.promise
+      return create(options)
+    })
+
+    const first = ctx.subagents.startContinuable(startSpec(parent))
+    await vi.waitFor(() => { expect(createSpy).toHaveBeenCalledOnce() })
+    await expect(ctx.subagents.startContinuable(startSpec(parent))).rejects.toMatchObject({
+      code: 'ACTIVATION_CAPACITY_EXCEEDED',
+    })
+
+    releaseCreate.resolve(undefined)
+    const started = await first
+    await waitNoActivation(ctx, started.childId)
+    const replacement = await ctx.subagents.startContinuable(startSpec(parent))
+    await waitNoActivation(ctx, replacement.childId)
+  })
+
+  it('enforces the global Activation limit across different parents', async () => {
+    const release = Promise.withResolvers<undefined>()
+    const adapter = new GatedAdapter([
+      { chunks: textResponse('first answer'), gate: release.promise },
+      { chunks: textResponse('second answer') },
+    ])
+    const { ctx, parent } = await setupWith(adapter, {
+      subagent: { maxContinuableActivations: 1, maxContinuableActivationsPerParent: 2 },
+    })
+    const otherParent = ctx.agentLoop.create(SessionId('other-parent'), { provider: 'mock', model: 'mock' })
+    const started = await ctx.subagents.startContinuable(startSpec(parent))
+    await vi.waitFor(() => { expect(adapter.requests).toHaveLength(1) })
+
+    await expect(ctx.subagents.startContinuable(startSpec(otherParent))).rejects.toMatchObject({
+      code: 'ACTIVATION_CAPACITY_EXCEEDED',
+    })
+    release.resolve(undefined)
+    await waitNoActivation(ctx, started.childId)
+    const replacement = await ctx.subagents.startContinuable(startSpec(otherParent))
+    await waitNoActivation(ctx, replacement.childId)
   })
 
   it('rejects without ids when the provider has no prepareContinuable capability', async () => {

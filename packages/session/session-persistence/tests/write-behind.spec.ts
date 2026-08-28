@@ -288,6 +288,40 @@ describe('SessionWriteBehind', () => {
     expect(report).toHaveBeenCalledOnce()
   })
 
+  it('fails loudly when serialized pending bytes reach their configured bound', () => {
+    const report = vi.fn()
+    const first = event(0)
+    const maxPendingBytes = Buffer.byteLength(JSON.stringify(first))
+    const controller = new SessionWriteBehind({
+      maxDelayMs: 200,
+      maxPendingBytes,
+      write: async () => {},
+      reportBackgroundFailure: report,
+    })
+    controller.enqueue(first)
+    expect(() => { controller.enqueue(event(1)) }).toThrow(/pending-byte limit exceeded/)
+    expect(report).toHaveBeenCalledOnce()
+  })
+
+  it('counts an active batch against the serialized pending-byte bound', async () => {
+    vi.useFakeTimers()
+    const gate = Promise.withResolvers<undefined>()
+    const first = event(0)
+    const eventBytes = Buffer.byteLength(JSON.stringify(first))
+    const controller = new SessionWriteBehind({
+      maxDelayMs: 200,
+      maxPendingBytes: eventBytes * 2 - 1,
+      write: async () => { await gate.promise },
+      reportBackgroundFailure: vi.fn(),
+    })
+    controller.enqueue(first)
+    await vi.advanceTimersByTimeAsync(200)
+    expect(() => { controller.enqueue(event(1)) }).toThrow(/pending-byte limit exceeded/)
+    gate.resolve(undefined)
+    await vi.advanceTimersByTimeAsync(0)
+    await controller.flush()
+  })
+
   it('counts an active batch against the retained-event bound', async () => {
     vi.useFakeTimers()
     const gate = Promise.withResolvers<undefined>()

@@ -762,6 +762,7 @@ export function createRuntimeApiHandler(
               || sessionIds.has(item.sessionId) || header === undefined
               || (item.rootSessionId !== undefined && (typeof item.rootSessionId !== 'string' || item.rootSessionId === '' || item.rootSessionId.length > 512))
               || (item.messageCount !== undefined && (!safeInteger(item.messageCount) || item.messageCount > 1_000_000))
+              || (item.rootMessageCount !== undefined && !safeInteger(item.rootMessageCount))
               || (item.title !== undefined && !boundedOptionalString(item.title, MAX_ARCHIVE_TEXT_BYTES))
               || (header.createdAt !== undefined && !safeInteger(header.createdAt))
               || !boundedOptionalString(header.cwd, 4096)
@@ -786,6 +787,7 @@ export function createRuntimeApiHandler(
               },
               ...(typeof item.title === 'string' && item.title !== '' ? { title: item.title } : {}),
               ...(safeInteger(item.messageCount) ? { messageCount: item.messageCount } : {}),
+              ...(safeInteger(item.rootMessageCount) ? { rootMessageCount: item.rootMessageCount } : {}),
               ...(workspace === undefined ? {} : {
                 workspace: {
                   path: workspace.path as string,

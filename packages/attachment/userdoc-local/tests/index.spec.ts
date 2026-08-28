@@ -13,6 +13,7 @@ import LocalUserDocStore, {
   DEFAULT_DOCUMENT_DIR_NAME,
   DEFAULT_UPLOAD_CHUNK_BYTES,
   DEFAULT_UPLOAD_SESSION_TTL_MS,
+  MAX_UPLOAD_TIMER_DELAY_MS,
 } from '../src/index.ts'
 
 const roots: string[] = []
@@ -51,6 +52,12 @@ describe('local user-document service', () => {
         resumable: true,
       },
     })
+  })
+
+  it('rejects a cleanup interval that Node would clamp', () => {
+    expect(() => new LocalUserDocStore(new Context(), {
+      uploadCleanupIntervalMs: MAX_UPLOAD_TIMER_DELAY_MS + 1,
+    })).toThrow(/cleanupIntervalMs/)
   })
 
   it('roots uploads under the operating-system home when no root is configured', () => {

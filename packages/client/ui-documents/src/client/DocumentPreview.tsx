@@ -1,5 +1,6 @@
 import { useEffect, useState, type FC } from 'react'
 import { Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { ApiResponseTooLargeError, readApiResponseText } from '@deepseek-ai/dsh-client-runtime/client'
 import { createUserDocClient, type UserDocRef, type UserDocScope } from './documents-client.ts'
 import type { DocumentsKey } from './locales.ts'
 import css from './DocumentPreview.module.css'
@@ -15,45 +16,8 @@ export interface DocumentPreviewProps {
 
 type PreviewState = 'loading' | 'too-large' | 'unsupported' | 'ready'
 
-class PreviewTooLargeError extends Error {}
-
 async function readPreviewText(response: Response, maxBytes: number): Promise<string> {
-  const headers = (response as unknown as { headers?: { get?: (name: string) => string | null } }).headers
-  const declared = Number(headers?.get?.('content-length') ?? '')
-  if (Number.isSafeInteger(declared) && declared > maxBytes) {
-    await (response as unknown as { body?: ReadableStream<Uint8Array> | null }).body?.cancel()
-    throw new PreviewTooLargeError()
-  }
-  const body = (response as unknown as { body?: ReadableStream<Uint8Array> | null }).body
-  if (body === null || body === undefined) {
-    const text = await response.text()
-    if (new TextEncoder().encode(text).byteLength > maxBytes) throw new PreviewTooLargeError()
-    return text
-  }
-  const reader = body.getReader()
-  const chunks: Uint8Array[] = []
-  let bytes = 0
-  try {
-    for (;;) {
-      const next = await reader.read()
-      if (next.done) break
-      bytes += next.value.byteLength
-      if (bytes > maxBytes) throw new PreviewTooLargeError()
-      chunks.push(next.value)
-    }
-  } catch (error) {
-    await reader.cancel(error).catch(() => {})
-    throw error
-  } finally {
-    reader.releaseLock()
-  }
-  const merged = new Uint8Array(bytes)
-  let offset = 0
-  for (const chunk of chunks) {
-    merged.set(chunk, offset)
-    offset += chunk.byteLength
-  }
-  return new TextDecoder().decode(merged)
+  return readApiResponseText(response, maxBytes)
 }
 
 function classifyMediaType(mediaType: string): 'image' | 'pdf' | 'text' | 'unsupported' {
@@ -116,7 +80,7 @@ export const DocumentPreview: FC<DocumentPreviewProps> = ({ doc, scope, maxTextB
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return
-        setState(error instanceof PreviewTooLargeError ? 'too-large' : 'unsupported')
+        setState(error instanceof ApiResponseTooLargeError ? 'too-large' : 'unsupported')
       })
     return () => { controller.abort() }
   }, [doc.docId, doc.bytes, doc.mediaType, maxTextBytes, scope, userDocs])

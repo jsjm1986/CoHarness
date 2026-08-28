@@ -6,7 +6,6 @@
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "allowImportingTsExtensions": true,
-    "baseUrl": ".",
     "paths": {
       "@deepseek-ai/dsh-llm/discovery": ["../packages/llm/llm/src/discovery.ts"]
     },

@@ -146,6 +146,8 @@ export interface Config {
    * omission defaults to {@link DEFAULT_MAX_PARALLEL_TOOL_CALLS}.
    */
   maxParallelToolCalls?: number
+  /** Pending-input quota; defaults prevent unbounded per-agent memory growth. */
+  inbox?: InboxConfig
   /** Agents created or resumed at plugin startup. */
   agents: (AgentOptions & {
     /** Stable config label used in logs and as the fresh combined-id prefix. */
@@ -158,11 +160,14 @@ export interface Config {
     resumeSessionId?: SessionId
   })[]
 }
+
+/** Per-agent pending-input quota applied to both inbox targets. */
+export interface InboxConfig extends InboxLimits {}
 ```
 
-Depends on: [`AgentOptions`](subsystems/core.md) · [`SessionId`](subsystems/core.md)
+Depends on: [`AgentOptions`](subsystems/core.md) · [`InboxLimits`](../packages/core/agent/src/index.ts) · [`SessionId`](subsystems/core.md)
 
-Source: [`packages/core/agent-loop/src/index.ts:255`](../packages/core/agent-loop/src/index.ts)
+Source: [`packages/core/agent-loop/src/index.ts:267`](../packages/core/agent-loop/src/index.ts)
 
 <a id="deepseek-aidsh-agent-presets"></a>
 
@@ -235,6 +240,8 @@ export interface Config {
   agents?: AgentLoopConfig['agents']
   /** Agent-loop concurrency cap; `1` is serial. */
   maxParallelToolCalls?: AgentLoopConfig['maxParallelToolCalls']
+  /** Per-agent pending-input quota forwarded to the agent loop. */
+  inbox?: AgentLoopConfig['inbox']
   /** Whether the system prompt includes the fixed Harness identity (default true). */
   includeHarnessIdentity?: SystemPromptConfig['includeHarnessIdentity']
   /** Whether model history includes dynamic runtime-context snapshots (default true). */
@@ -343,10 +350,18 @@ export interface Config {
   normalizedImageMaxBytes?: number
   /** Maximum simultaneous normalization or request-image transformations in this service instance. */
   imageCompressionConcurrency?: number
+  /** Maximum aggregate bytes retained by derived request-image files. */
+  requestImageCacheMaxBytes?: number
+  /** Maximum number of derived request-image files retained. */
+  requestImageCacheMaxEntries?: number
+  /** Maximum idle age of a derived request-image file before cleanup. */
+  requestImageCacheTtlMs?: number
+  /** Interval between derived request-image cache cleanup sweeps. */
+  requestImageCacheGcIntervalMs?: number
 }
 ```
 
-Source: [`packages/attachment/attachment-local/src/index.ts:51`](../packages/attachment/attachment-local/src/index.ts)
+Source: [`packages/attachment/attachment-local/src/index.ts:61`](../packages/attachment/attachment-local/src/index.ts)
 
 <a id="deepseek-aidsh-bash-local"></a>
 
@@ -556,10 +571,24 @@ Requires: `tools`
 export interface Config {
   /** Maximum synchronous VM evaluation time in milliseconds. */
   vmTimeoutMs?: number
+  /** Maximum live dynamic Plugins retained by this runner. */
+  maxPlugins?: number
+  /** Maximum dynamic Plugins owned by one Session. */
+  maxPluginsPerSession?: number
+  /** Maximum immutable Packages retained by one Plugin. */
+  maxPackagesPerPlugin?: number
+  /** Maximum UTF-8 source bytes retained across all definitions. */
+  maxSourceBytes?: number
+  /** Maximum UTF-8 source bytes retained by one Session. */
+  maxSourceBytesPerSession?: number
+  /** Maximum pending run requests retained by this runner. */
+  maxPendingApprovals?: number
+  /** Maximum pending run requests owned by one Session. */
+  maxPendingApprovalsPerSession?: number
 }
 ```
 
-Source: [`packages/extensions/cordis-host-runner/src/index.ts:91`](../packages/extensions/cordis-host-runner/src/index.ts)
+Source: [`packages/extensions/cordis-host-runner/src/index.ts:92`](../packages/extensions/cordis-host-runner/src/index.ts)
 
 <a id="deepseek-aidsh-credentials-local"></a>
 
@@ -829,7 +858,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/host/apiproxy/src/index.ts:46`](../packages/host/apiproxy/src/index.ts)
+Source: [`packages/host/apiproxy/src/index.ts:54`](../packages/host/apiproxy/src/index.ts)
 
 <a id="deepseek-aidsh-host-directory-picker-browse"></a>
 
@@ -907,10 +936,16 @@ export interface Config {
    * omission defaults to 10.
    */
   maxConcurrentJobsPerOwner?: number
+  /** Maximum terminal records retained globally; active records are never evicted. */
+  maxTerminalJobs?: number
+  /** Maximum UTF-8 bytes of terminal outputs retained globally. */
+  maxTerminalOutputBytes?: number
+  /** Maximum age of terminal records before they become eligible for eviction. */
+  terminalRetentionMs?: number
 }
 ```
 
-Source: [`packages/jobs/jobs-local/src/index.ts:31`](../packages/jobs/jobs-local/src/index.ts)
+Source: [`packages/jobs/jobs-local/src/index.ts:37`](../packages/jobs/jobs-local/src/index.ts)
 
 <a id="deepseek-aidsh-llm-deepseek"></a>
 
@@ -950,6 +985,8 @@ export interface Config {
   maxInlineRequestImageBytes?: number
   /** Maximum number of represented images per chat request (default 600). */
   maxImagesPerRequest?: number
+  /** Maximum request-image projections prepared concurrently (default 4). */
+  imagePreparationConcurrency?: number
   /** Raw-byte removal step after the request exceeds its file bound (default 64 MiB). */
   imageOffloadByteQuantum?: number
   /** Base64-byte removal step after inline fallback exceeds its bound (default 10 MiB). */
@@ -960,6 +997,8 @@ export interface Config {
   filesApiTimeoutMs?: number
   /** Maximum bytes retained from one non-2xx provider error body (default 64 KiB). */
   maxErrorResponseBytes?: number
+  /** Maximum bytes retained from one Files API success or error body (default 16 MiB, up to 256 MiB). */
+  maxFilesResponseBytes?: number
   /** Maximum characters buffered for one incomplete SSE event (default 4 MiB). */
   maxSseBufferBytes?: number
   /** Maximum accumulated visible/reasoning response bytes (default 16 MiB). */
@@ -1001,7 +1040,7 @@ export interface DeepSeekCatalogModel {
 
 Depends on: [`ModelModality`](../packages/llm/llm/src/index.ts) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts)
 
-Source: [`packages/llm/llm-deepseek/src/index.ts:106`](../packages/llm/llm-deepseek/src/index.ts)
+Source: [`packages/llm/llm-deepseek/src/index.ts:120`](../packages/llm/llm-deepseek/src/index.ts)
 
 <a id="deepseek-aidsh-llm-pi-ai"></a>
 
@@ -1746,12 +1785,14 @@ export interface Config {
   writeBatchMaxDelayMs?: number
   /** Maximum events retained in one live session's pending write queue. */
   maxPendingEvents?: number
+  /** Maximum UTF-8 JSON bytes retained in one live session's pending write queue. */
+  maxPendingBytes?: number
   /** Deadline for one internal Gateway HTTP request. */
   requestTimeoutMs?: number
 }
 ```
 
-Source: [`packages/session/session-persistence-gateway/src/index.ts:64`](../packages/session/session-persistence-gateway/src/index.ts)
+Source: [`packages/session/session-persistence-gateway/src/index.ts:70`](../packages/session/session-persistence-gateway/src/index.ts)
 
 <a id="deepseek-aidsh-session-persistence-jsonl"></a>
 
@@ -1786,13 +1827,25 @@ export interface Config {
   writeBatchMaxDelayMs?: number
   /** Maximum events retained in one live session's pending write queue. */
   maxPendingEvents?: number
+  /** Maximum UTF-8 JSON bytes retained in one live session's pending write queue. */
+  maxPendingBytes?: number
+  /** Maximum bytes in the newline-terminated session header record. */
+  maxHeaderBytes?: number
+  /** Maximum stat/read attempts used to obtain one revision-stable artifact. */
+  readStableMaxAttempts?: number
+  /** Maximum elapsed milliseconds spent retrying one revision-stable artifact read. */
+  readStableMaxDurationMs?: number
+  /** Maximum total plaintext bytes accepted while decoding one zstd artifact. */
+  maxDecompressedBytes?: number
+  /** Maximum physical bytes read from one session artifact. */
+  maxArtifactBytes?: number
 }
 
 /** Physical encoding selected for JSONL session artifacts. */
 export type JsonlCompression = 'zstd' | 'none'
 ```
 
-Source: [`packages/session/session-persistence-jsonl/src/index.ts:61`](../packages/session/session-persistence-jsonl/src/index.ts)
+Source: [`packages/session/session-persistence-jsonl/src/index.ts:85`](../packages/session/session-persistence-jsonl/src/index.ts)
 
 <a id="deepseek-aidsh-session-persistence-sqlite"></a>
 
@@ -1815,13 +1868,15 @@ export interface Config {
   writeBatchMaxDelayMs?: number
   /** Maximum events retained in one live session's pending write queue. */
   maxPendingEvents?: number
+  /** Maximum UTF-8 JSON bytes retained in one live session's pending write queue. */
+  maxPendingBytes?: number
 }
 
 /** Durable journal modes accepted by the backend. */
 export type JournalMode = 'wal' | 'delete' | 'truncate' | 'persist'
 ```
 
-Source: [`packages/session/session-persistence-sqlite/src/index.ts:37`](../packages/session/session-persistence-sqlite/src/index.ts)
+Source: [`packages/session/session-persistence-sqlite/src/index.ts:39`](../packages/session/session-persistence-sqlite/src/index.ts)
 
 <a id="deepseek-aidsh-session-projection-cache"></a>
 
@@ -2215,6 +2270,22 @@ export type JournalMode = 'wal' | 'delete' | 'truncate' | 'persist'
 ```
 
 Source: [`packages/storage/storage-sqlite/src/index.ts:24`](../packages/storage/storage-sqlite/src/index.ts)
+
+<a id="deepseek-aidsh-subagent"></a>
+
+## `@deepseek-ai/dsh-subagent`
+
+```ts config-catalog
+/** Continuable-subagent residency limits. */
+export interface Config {
+  /** Maximum resident or materializing continuable Activations in this runtime. */
+  maxContinuableActivations?: number
+  /** Maximum resident or materializing continuable Activations with one direct parent. */
+  maxContinuableActivationsPerParent?: number
+}
+```
+
+Source: [`packages/subagent/subagent/src/index.ts:172`](../packages/subagent/subagent/src/index.ts)
 
 <a id="deepseek-aidsh-subagent-acp"></a>
 
@@ -3131,12 +3202,14 @@ export interface Config {
   uploadMaxConcurrent?: number
   /** Interval between expired-session cleanup sweeps. */
   uploadCleanupIntervalMs?: number
+  /** Maximum serialized upload manifest bytes read from disk. */
+  uploadManifestMaxBytes?: number
   /** Recoverable document trash retention in days. */
   trashRetentionDays?: number
 }
 ```
 
-Source: [`packages/attachment/userdoc-local/src/index.ts:175`](../packages/attachment/userdoc-local/src/index.ts)
+Source: [`packages/attachment/userdoc-local/src/index.ts:179`](../packages/attachment/userdoc-local/src/index.ts)
 
 <a id="deepseek-aidsh-web"></a>
 
@@ -3157,7 +3230,7 @@ export interface WebRuntimeConfig {
 }
 ```
 
-Source: [`packages/web/web/src/index.ts:55`](../packages/web/web/src/index.ts)
+Source: [`packages/web/web/src/index.ts:61`](../packages/web/web/src/index.ts)
 
 <a id="deepseek-aidsh-web-app"></a>
 
@@ -3235,10 +3308,12 @@ export interface Config {
   maxTokens?: number
   /** Maximum `web_search` server-tool uses per request. Defaults to 5. */
   maxUses?: number
+  /** Maximum UTF-8 bytes retained from one success or error response (up to 256 MiB). */
+  maxResponseBytes?: number
 }
 ```
 
-Source: [`packages/web/web-search-deepseek/src/index.ts:46`](../packages/web/web-search-deepseek/src/index.ts)
+Source: [`packages/web/web-search-deepseek/src/index.ts:49`](../packages/web/web-search-deepseek/src/index.ts)
 
 <a id="deepseek-aidsh-web-search-exa"></a>
 
@@ -3259,10 +3334,12 @@ export interface Config {
   numResults?: number
   /** Highlight sentences requested per result. Defaults to 1. */
   highlightsPerResult?: number
+  /** Maximum UTF-8 bytes retained from one success or error response (up to 256 MiB). */
+  maxResponseBytes?: number
 }
 ```
 
-Source: [`packages/web/web-search-exa/src/index.ts:38`](../packages/web/web-search-exa/src/index.ts)
+Source: [`packages/web/web-search-exa/src/index.ts:41`](../packages/web/web-search-exa/src/index.ts)
 
 <a id="deepseek-aidsh-web-search-perplexity"></a>
 
@@ -3281,12 +3358,14 @@ export interface Config {
   model?: string
   /** Upper bound on generated answer tokens. Defaults to 1024. */
   maxTokens?: number
+  /** Maximum UTF-8 bytes retained from one success or error response (up to 256 MiB). */
+  maxResponseBytes?: number
   /** Recency window sent as `search_recency_filter`. Omitted = no filter. */
   searchRecency?: 'day' | 'week' | 'month' | 'year'
 }
 ```
 
-Source: [`packages/web/web-search-perplexity/src/index.ts:32`](../packages/web/web-search-perplexity/src/index.ts)
+Source: [`packages/web/web-search-perplexity/src/index.ts:40`](../packages/web/web-search-perplexity/src/index.ts)
 
 <a id="deepseek-aidsh-workflow-worker-thread"></a>
 
@@ -3391,7 +3470,6 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-session-stats` — requires `sessionProjections` ([`packages/session/session-stats/src/index.ts`](../packages/session/session-stats/src/index.ts))
 - `@deepseek-ai/dsh-skill-badge` — requires `skills` ([`packages/skill/skill-badge/src/index.ts`](../packages/skill/skill-badge/src/index.ts))
 - `@deepseek-ai/dsh-storage` ([`packages/storage/storage/src/index.ts`](../packages/storage/storage/src/index.ts))
-- `@deepseek-ai/dsh-subagent` ([`packages/subagent/subagent/src/index.ts`](../packages/subagent/subagent/src/index.ts))
 - `@deepseek-ai/dsh-subprocess-local` ([`packages/subprocess/subprocess-local/src/index.ts`](../packages/subprocess/subprocess-local/src/index.ts))
 - `@deepseek-ai/dsh-terminal` ([`packages/terminal/terminal/src/index.ts`](../packages/terminal/terminal/src/index.ts))
 - `@deepseek-ai/dsh-tool-ask-user` — requires `tools` · `userQuestions` ([`packages/interaction/tool-ask-user/src/index.ts`](../packages/interaction/tool-ask-user/src/index.ts))

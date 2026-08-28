@@ -26,6 +26,7 @@ import {
   DEFAULT_FILE_QUOTA_CLEANUP_BATCH,
   DEFAULT_FILE_REFRESH_MARGIN_SECONDS,
   DEFAULT_FILES_API_TIMEOUT_MS,
+  DEFAULT_IMAGE_PREPARATION_CONCURRENCY,
   DEFAULT_IMAGE_OFFLOAD_BYTE_QUANTUM,
   DEFAULT_IMAGE_OFFLOAD_COUNT_QUANTUM,
   DEFAULT_INLINE_IMAGE_OFFLOAD_BYTE_QUANTUM,
@@ -38,8 +39,10 @@ import {
   DEFAULT_REQUEST_IMAGE_PIXEL_BUDGET,
   DEFAULT_STREAM_IDLE_TIMEOUT_MS,
   DeepSeekAdapter,
+  MAX_IMAGE_PREPARATION_CONCURRENCY,
 } from './adapter.ts'
 import type { DeepSeekCatalogModel, DeepSeekConnectionOptions } from './adapter.ts'
+import { DEFAULT_MAX_FILE_RESPONSE_BYTES, MAX_FILE_RESPONSE_BYTES } from './files-api.ts'
 
 export {
   DEFAULT_CONTEXT_WINDOW,
@@ -47,6 +50,7 @@ export {
   DEFAULT_FILE_QUOTA_CLEANUP_BATCH,
   DEFAULT_FILE_REFRESH_MARGIN_SECONDS,
   DEFAULT_FILES_API_TIMEOUT_MS,
+  DEFAULT_IMAGE_PREPARATION_CONCURRENCY,
   DEFAULT_IMAGE_OFFLOAD_BYTE_QUANTUM,
   DEFAULT_IMAGE_OFFLOAD_COUNT_QUANTUM,
   DEFAULT_INLINE_IMAGE_OFFLOAD_BYTE_QUANTUM,
@@ -59,11 +63,21 @@ export {
   DEFAULT_REQUEST_IMAGE_PIXEL_BUDGET,
   DEFAULT_STREAM_IDLE_TIMEOUT_MS,
   DeepSeekAdapter,
+  MAX_IMAGE_PREPARATION_CONCURRENCY,
 } from './adapter.ts'
 export type { DeepSeekAdapterOptions, DeepSeekCatalogModel, DeepSeekConnectionOptions } from './adapter.ts'
 export { DeepSeekFileStore, MAX_CHAT_IMAGE_BYTES } from './file-store.ts'
 export type { DeepSeekFileConnection, DeepSeekFilePolicy, DeepSeekFileReference } from './file-store.ts'
-export { DeepSeekFilesClient, MAX_FILE_EXPIRY_SECONDS, MAX_FILE_UPLOAD_BYTES, MAX_STORED_FILE_BYTES, MAX_STORED_FILE_COUNT, MIN_FILE_EXPIRY_SECONDS } from './files-api.ts'
+export {
+  DeepSeekFilesClient,
+  DEFAULT_MAX_FILE_RESPONSE_BYTES,
+  MAX_FILE_RESPONSE_BYTES,
+  MAX_FILE_EXPIRY_SECONDS,
+  MAX_FILE_UPLOAD_BYTES,
+  MAX_STORED_FILE_BYTES,
+  MAX_STORED_FILE_COUNT,
+  MIN_FILE_EXPIRY_SECONDS,
+} from './files-api.ts'
 export type { DeepSeekFileObject, DeepSeekFilePage } from './files-api.ts'
 export { DeepSeekFileId } from './file-id.ts'
 export type { DeepSeekFileId as DeepSeekFileIdType } from './file-id.ts'
@@ -126,6 +140,8 @@ export interface Config {
   maxInlineRequestImageBytes?: number
   /** Maximum number of represented images per chat request (default 600). */
   maxImagesPerRequest?: number
+  /** Maximum request-image projections prepared concurrently (default 4). */
+  imagePreparationConcurrency?: number
   /** Raw-byte removal step after the request exceeds its file bound (default 64 MiB). */
   imageOffloadByteQuantum?: number
   /** Base64-byte removal step after inline fallback exceeds its bound (default 10 MiB). */
@@ -136,6 +152,8 @@ export interface Config {
   filesApiTimeoutMs?: number
   /** Maximum bytes retained from one non-2xx provider error body (default 64 KiB). */
   maxErrorResponseBytes?: number
+  /** Maximum bytes retained from one Files API success or error body (default 16 MiB, up to 256 MiB). */
+  maxFilesResponseBytes?: number
   /** Maximum characters buffered for one incomplete SSE event (default 4 MiB). */
   maxSseBufferBytes?: number
   /** Maximum accumulated visible/reasoning response bytes (default 16 MiB). */
@@ -176,11 +194,14 @@ export const Config: z<Config> = z.object({
   maxRequestFilesBytes: z.number().step(1).min(1).default(DEFAULT_MAX_REQUEST_FILES_BYTES),
   maxInlineRequestImageBytes: z.number().step(1).min(1).default(DEFAULT_MAX_INLINE_REQUEST_IMAGE_BYTES),
   maxImagesPerRequest: z.number().step(1).min(1).default(DEFAULT_MAX_IMAGES_PER_REQUEST),
+  imagePreparationConcurrency: z.number().step(1).min(1).max(MAX_IMAGE_PREPARATION_CONCURRENCY)
+    .default(DEFAULT_IMAGE_PREPARATION_CONCURRENCY),
   imageOffloadByteQuantum: z.number().step(1).min(1).default(DEFAULT_IMAGE_OFFLOAD_BYTE_QUANTUM),
   inlineImageOffloadByteQuantum: z.number().step(1).min(1).default(DEFAULT_INLINE_IMAGE_OFFLOAD_BYTE_QUANTUM),
   imageOffloadCountQuantum: z.number().step(1).min(1).default(DEFAULT_IMAGE_OFFLOAD_COUNT_QUANTUM),
   filesApiTimeoutMs: z.number().min(Number.MIN_VALUE).max(MAX_TIMER_DELAY_MS).default(DEFAULT_FILES_API_TIMEOUT_MS),
   maxErrorResponseBytes: z.number().step(1).min(1).default(64 * 1024),
+  maxFilesResponseBytes: z.number().step(1).min(1).max(MAX_FILE_RESPONSE_BYTES).default(DEFAULT_MAX_FILE_RESPONSE_BYTES),
   maxSseBufferBytes: z.number().step(1).min(1).default(4 * 1024 * 1024),
   maxGeneratedTextBytes: z.number().step(1).min(1).default(16 * 1024 * 1024),
   maxToolArgumentBytes: z.number().step(1).min(1).default(4 * 1024 * 1024),
@@ -318,6 +339,14 @@ export function resolveAdapterOptions(config: Config, environment?: LaunchEnviro
   if (!Number.isSafeInteger(maxImagesPerRequest) || maxImagesPerRequest <= 0) {
     throw new Error('llm-deepseek: maxImagesPerRequest must be a positive safe integer')
   }
+  const imagePreparationConcurrency = config.imagePreparationConcurrency ?? DEFAULT_IMAGE_PREPARATION_CONCURRENCY
+  if (!Number.isSafeInteger(imagePreparationConcurrency)
+    || imagePreparationConcurrency < 1
+    || imagePreparationConcurrency > MAX_IMAGE_PREPARATION_CONCURRENCY) {
+    throw new Error(
+      `llm-deepseek: imagePreparationConcurrency must be an integer from 1 through ${MAX_IMAGE_PREPARATION_CONCURRENCY}`,
+    )
+  }
   const imageOffloadByteQuantum = config.imageOffloadByteQuantum ?? DEFAULT_IMAGE_OFFLOAD_BYTE_QUANTUM
   if (!Number.isSafeInteger(imageOffloadByteQuantum) || imageOffloadByteQuantum <= 0) {
     throw new Error('llm-deepseek: imageOffloadByteQuantum must be a positive safe integer')
@@ -367,11 +396,13 @@ export function resolveAdapterOptions(config: Config, environment?: LaunchEnviro
     throw new Error('llm-deepseek: fileQuotaCleanupBatch must be an integer from 1 through 1000')
   }
   const maxErrorResponseBytes = config.maxErrorResponseBytes ?? 64 * 1024
+  const maxFilesResponseBytes = config.maxFilesResponseBytes ?? DEFAULT_MAX_FILE_RESPONSE_BYTES
   const maxSseBufferBytes = config.maxSseBufferBytes ?? 4 * 1024 * 1024
   const maxGeneratedTextBytes = config.maxGeneratedTextBytes ?? 16 * 1024 * 1024
   const maxToolArgumentBytes = config.maxToolArgumentBytes ?? 4 * 1024 * 1024
   for (const [name, value] of [
     ['maxErrorResponseBytes', maxErrorResponseBytes],
+    ['maxFilesResponseBytes', maxFilesResponseBytes],
     ['maxSseBufferBytes', maxSseBufferBytes],
     ['maxGeneratedTextBytes', maxGeneratedTextBytes],
     ['maxToolArgumentBytes', maxToolArgumentBytes],
@@ -396,11 +427,13 @@ export function resolveAdapterOptions(config: Config, environment?: LaunchEnviro
     maxRequestFilesBytes,
     maxInlineRequestImageBytes,
     maxImagesPerRequest,
+    imagePreparationConcurrency,
     imageOffloadByteQuantum,
     inlineImageOffloadByteQuantum,
     imageOffloadCountQuantum,
     filesApiTimeoutMs,
     maxErrorResponseBytes,
+    maxFilesResponseBytes,
     maxSseBufferBytes,
     maxGeneratedTextBytes,
     maxToolArgumentBytes,

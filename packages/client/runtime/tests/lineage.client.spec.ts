@@ -5,7 +5,7 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import type { SessionId, SessionSummary } from '@deepseek-ai/dsh-api-remotes/client'
-import { flattenLineage } from '../src/client/sessions/lineage.ts'
+import { flattenLineage, MAX_LINEAGE_DEPTH } from '../src/client/sessions/lineage.ts'
 
 const s = (id: string, updatedAt: number, parent?: string): SessionSummary => ({
   sessionId: id as SessionId, updatedAt, running: false, blank: false,
@@ -58,5 +58,33 @@ describe('flattenLineage', () => {
     expect(out.find(e => e.sessionId === 'a')?.completed).toBe(false)
     expect(out.find(e => e.sessionId === 'b')?.completed).toBe(true)
     expect(flattenLineage([s('a', 10)])[0]?.completed).toBe(false)
+  })
+
+  it('bounds expansion depth without dropping descendants', () => {
+    const summaries = Array.from({ length: MAX_LINEAGE_DEPTH + 32 }, (_, index) => (
+      s(`node-${String(index)}`, index, index === 0 ? undefined : `node-${String(index - 1)}`)
+    ))
+    const out = flattenLineage(summaries)
+    expect(out).toHaveLength(summaries.length)
+    expect(Math.max(...out.map(entry => entry.depth))).toBeLessThanOrEqual(MAX_LINEAGE_DEPTH)
+    expect(new Set(out.map(entry => entry.sessionId))).toEqual(new Set(summaries.map(entry => entry.sessionId)))
+  })
+
+  it('bounds child expansion and degrades the remaining rows to roots', () => {
+    const out = flattenLineage([
+      s('root', 10),
+      s('first', 11, 'root'),
+      s('second', 12, 'root'),
+    ], undefined, undefined, { maxExpandedNodes: 0 })
+    expect(out.map(entry => [entry.sessionId, entry.depth])).toEqual([
+      ['root', 0], ['first', 0], ['second', 0],
+    ])
+  })
+
+  it('rejects invalid lineage limits before building the projection', () => {
+    expect(() => flattenLineage([s('root', 1)], undefined, undefined, { maxDepth: -1 }))
+      .toThrow('maxDepth must be a non-negative safe integer')
+    expect(() => flattenLineage([s('root', 1)], undefined, undefined, { maxExpandedNodes: 1.5 }))
+      .toThrow('maxExpandedNodes must be a non-negative safe integer')
   })
 })

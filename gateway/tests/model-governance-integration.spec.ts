@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { applyModelGovernanceToUser, writeModelGovernanceFile } from '../src/apply-model-governance.ts'
+import { applyModelGovernanceToUser, refreshModelGovernance, writeModelGovernanceFile } from '../src/apply-model-governance.ts'
 import { AuditService } from '../src/audit.ts'
 import { loadConfig } from '../src/config.ts'
 import { openDb } from '../src/db.ts'
@@ -112,6 +112,21 @@ describe('model governance integration', () => {
     await expect(applyModelGovernanceToUser({ cfg, users, governance }, user.id)).resolves.toBeUndefined()
     const path = join(cfg.usersRoot, user.username, 'dsh', 'model-governance.json')
     expect(JSON.parse(readFileSync(path, 'utf8'))).toMatchObject({ models: [{ allowed: false }] })
+  })
+
+  it('refreshes the catalog from one bounded pass without per-id catalog lookups', async () => {
+    const { cfg, user, governance } = await fixture()
+    const users = {
+      list: async () => [{ ...user, port: 42000, instanceState: 'stopped' }],
+      getById: async () => { throw new Error('refresh must use the listed user row') },
+    }
+    const projects = {
+      list: async () => [],
+      getById: async () => { throw new Error('refresh must use the listed project row') },
+    }
+    await expect(refreshModelGovernance({ cfg, users, projects, governance })).resolves.toBeUndefined()
+    expect(JSON.parse(readFileSync(join(cfg.usersRoot, user.username, 'dsh', 'model-governance.json'), 'utf8')))
+      .toMatchObject({ models: [{ provider: 'p', model: 'm' }] })
   })
 
   it('uses configured natural-month boundaries and supports per-metric inherit/unlimited/custom', async () => {

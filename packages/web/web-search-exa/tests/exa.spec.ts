@@ -83,6 +83,11 @@ describe('ExaSearchProvider availability', () => {
   it('is misconfigured when numResults is set but not a positive integer', () => {
     expect(new ExaSearchProvider({ ...options, numResults: -1 }).available()).toBe(false)
   })
+
+  it('is unavailable when the response byte budget is invalid', () => {
+    expect(new ExaSearchProvider({ ...options, maxResponseBytes: 0 }).available()).toBe(false)
+    expect(new ExaSearchProvider({ ...options, maxResponseBytes: 1.5 }).available()).toBe(false)
+  })
 })
 
 describe('ExaSearchProvider request mapping', () => {
@@ -157,6 +162,15 @@ describe('ExaSearchProvider error handling', () => {
     vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({}, { status: 500 })))
     await expect(new ExaSearchProvider(options).search({ query: 'q' }))
       .rejects.toThrow(expect.objectContaining({ message: 'Exa API error (HTTP 500)' }))
+  })
+
+  it('bounds an oversized success response before JSON parsing', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({ results: [{ url: 'https://a.test', highlights: ['hi'] }], padding: 'x'.repeat(128) }),
+      { status: 200, headers: { 'content-length': '256' } },
+    )))
+    await expect(new ExaSearchProvider({ ...options, maxResponseBytes: 32 }).search({ query: 'q' }))
+      .rejects.toThrow(/response exceeded/u)
   })
 
   it('maps a network failure to WEB_PROVIDER_ERROR', async () => {

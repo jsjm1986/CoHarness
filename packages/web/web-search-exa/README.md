@@ -15,6 +15,7 @@ This is an **implementation** package: it registers a provider into `ctx.web`, i
 | `searchType` | `auto` | Retrieval mode sent as Exa's `type`: `auto` (Exa decides), `keyword`, or `neural`. |
 | `numResults` | (unset) | Default result count when a request carries no `maxResults`. Unset sends no default. Must be a positive integer. |
 | `highlightsPerResult` | `1` | Highlight sentences requested per result (Exa's `highlightsPerUrl`). Must be a positive integer. |
+| `maxResponseBytes` | `16 MiB` | Positive safe-integer cap (up to 256 MiB) on each success or error response body; chunked responses are cancelled when they cross it. |
 
 ```yaml
 - id: web-search-exa

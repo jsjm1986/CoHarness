@@ -11,6 +11,7 @@ import Collaboration, {
   type CollaborationParticipant,
   type CollaborationSessionCreation,
 } from '@deepseek-ai/dsh-collaboration'
+import { readGatewayResponseJson } from '@deepseek-ai/dsh-gateway-runtime'
 import type { GatewayRequestPrincipal, GatewayRuntime } from '@deepseek-ai/dsh-gateway-runtime'
 import type { PermissionPresetAuthorization } from '@deepseek-ai/dsh-permission-presets'
 import { SessionId, type SessionId as SessionIdentity } from '@deepseek-ai/dsh-session'
@@ -26,6 +27,10 @@ function positiveInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0
 }
 /* jscpd:ignore-end */
+
+/** Maximum session ids sent to one Gateway readability request. */
+const READABLE_SESSION_BATCH_SIZE = 5_000
+const COLLABORATION_RESPONSE_MAX_BYTES = 8 * 1024 * 1024
 
 function accessView(value: unknown): CollaborationAccess {
   const access = record(value)
@@ -103,7 +108,7 @@ class GatewayAuthority implements CollaborationAuthority {
     }
     let value: unknown
     try {
-      value = await response.json()
+      value = await readGatewayResponseJson(response, COLLABORATION_RESPONSE_MAX_BYTES)
     } catch {
       throw new CollaborationError('gateway-unavailable', `Gateway collaboration request returned HTTP ${String(response.status)}`)
     }
@@ -139,24 +144,33 @@ class GatewayAuthority implements CollaborationAuthority {
     this.assertActive()
     if (sessionIds.length === 0) return new Set()
     if (this.participant.scope.kind === 'personal') return new Set(sessionIds)
-    const creationAuthorizations = (await Promise.all(sessionIds.map(async (sessionId) => {
-      const authorization = await this.creationAuthorization(sessionId)
-      return authorization === undefined ? undefined : { sessionId, authorization }
-    }))).filter((entry): entry is { sessionId: SessionIdentity; authorization: string } => entry !== undefined)
-    const value = record(await this.post('/internal/runtime/collaboration/readable', {
-      sessionIds,
-      ...(creationAuthorizations.length === 0 ? {} : { creationAuthorizations }),
-    }))
-    if (!Array.isArray(value?.sessionIds) || !value.sessionIds.every(id => typeof id === 'string')) {
-      throw new CollaborationError('gateway-unavailable', 'Gateway returned invalid readable session ids')
-    }
-    const candidates = new Set(sessionIds.map(String))
+    // Deduplicate before issuing requests: the public result is a Set, so
+    // repeated ids only add authorization work and request bytes. Process
+    // fixed-size batches so a large project inventory cannot create one
+    // Promise.all or one JSON body proportional to the whole inventory.
     const readable = new Set<SessionIdentity>()
-    for (const id of value.sessionIds) {
-      if (!candidates.has(id)) {
-        throw new CollaborationError('gateway-unavailable', 'Gateway returned an unrequested readable session id')
+    const unique = [...new Map(sessionIds.map(id => [String(id), id] as const)).values()]
+    for (let offset = 0; offset < unique.length; offset += READABLE_SESSION_BATCH_SIZE) {
+      this.assertActive()
+      const batch = unique.slice(offset, offset + READABLE_SESSION_BATCH_SIZE)
+      const creationAuthorizations = (await Promise.all(batch.map(async (sessionId) => {
+        const authorization = await this.creationAuthorization(sessionId)
+        return authorization === undefined ? undefined : { sessionId, authorization }
+      }))).filter((entry): entry is { sessionId: SessionIdentity; authorization: string } => entry !== undefined)
+      const value = record(await this.post('/internal/runtime/collaboration/readable', {
+        sessionIds: batch,
+        ...(creationAuthorizations.length === 0 ? {} : { creationAuthorizations }),
+      }))
+      if (!Array.isArray(value?.sessionIds) || !value.sessionIds.every(id => typeof id === 'string')) {
+        throw new CollaborationError('gateway-unavailable', 'Gateway returned invalid readable session ids')
       }
-      readable.add(SessionId(id))
+      const candidates = new Set(batch.map(String))
+      for (const id of value.sessionIds) {
+        if (!candidates.has(id)) {
+          throw new CollaborationError('gateway-unavailable', 'Gateway returned an unrequested readable session id')
+        }
+        readable.add(SessionId(id))
+      }
     }
     return readable
   }

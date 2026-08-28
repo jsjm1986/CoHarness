@@ -55,10 +55,20 @@ function openingAt(value: string): { tag: string; length: number } | undefined {
  * keeps truncated provider responses lossless.
  */
 export class TextThinkingParser {
-  private source = ''
+  /**
+   * Retain source as append-only fragments. The parser may need the complete
+   * spelling once, when a prefix is classified or finalized, but joining on
+   * every provider delta would copy the already-seen response quadratically.
+   */
+  private readonly sourceParts: string[] = []
+  private sourceLength = 0
+  private sourceCache: string | undefined
   private emitted = 0
   private mode: ParserMode = 'probe'
   private tag: string | undefined
+  private firstNonWhitespace: number | undefined
+  /** Suffix retained to detect a close tag split across two deltas. */
+  private closeTail = ''
 
   /** Whether this parser recognized and converted a valid tagged prefix. */
   get transformed(): boolean {
@@ -77,16 +87,30 @@ export class TextThinkingParser {
    */
   append(delta: string): TextThinkingUpdate {
     if (delta.length === 0) return { parts: [], transformed: false }
-    this.source += delta
 
-    if (this.mode === 'plain') return this.plainDelta()
-    if (this.mode === 'transformed') return this.transformedTail()
+    if (this.mode === 'plain') {
+      this.pushSource(delta)
+      this.emitted = this.sourceLength
+      return { parts: [{ type: 'text', text: delta, complete: false }], transformed: false }
+    }
+    if (this.mode === 'transformed') {
+      this.pushSource(delta)
+      this.emitted = this.sourceLength
+      return { parts: [{ type: 'text', text: delta, complete: false }], transformed: true }
+    }
 
-    const first = this.source.search(/\S/u)
-    if (first < 0) return { parts: [], transformed: false }
-    const prefix = this.source.slice(first)
+    const previousLength = this.sourceLength
+    this.pushSource(delta)
+    if (this.firstNonWhitespace === undefined) {
+      const local = delta.search(/\S/u)
+      if (local < 0) return { parts: [], transformed: false }
+      this.firstNonWhitespace = previousLength + local
+    }
 
     if (this.mode === 'probe') {
+      const source = this.sourceText()
+      const first = this.firstNonWhitespace
+      const prefix = source.slice(first)
       const opening = openingAt(prefix)
       if (opening === undefined) {
         // Keep waiting when the current suffix is only a partial opening tag;
@@ -97,37 +121,29 @@ export class TextThinkingParser {
       }
       this.mode = 'waiting-close'
       this.tag = opening.tag
+      const close = `</${opening.tag}>`
+      const openingEnd = first + opening.length
+      const closeIndex = source.indexOf(close, openingEnd)
+      if (closeIndex >= 0) return this.classify(source, first, openingEnd, closeIndex, close)
+      this.closeTail = source.slice(Math.max(openingEnd, source.length - (close.length - 1)))
+      return { parts: [], transformed: false }
     }
 
     const tag = this.tag
     /* v8 ignore next -- waiting-close is entered only after assigning the matched tag above. */
     if (tag === undefined) return { parts: [], transformed: false }
-    const opening = `<${tag}>`
     const close = `</${tag}>`
-    const openingEnd = first + opening.length
-    const closeIndex = this.source.indexOf(close, openingEnd)
-    if (closeIndex < 0) return { parts: [], transformed: false }
-
-    const before = this.source.slice(0, first)
-    const reasoningBody = this.source.slice(openingEnd, closeIndex)
-    if (reasoningBody.trim().length === 0) {
-      // Empty tagged prefixes are more likely formatting or an XML example
-      // than model reasoning; preserve them verbatim.
-      this.mode = 'plain'
-      return this.plainDelta()
+    const closeIndex = (this.closeTail + delta).indexOf(close)
+    if (closeIndex < 0) {
+      this.closeTail = (this.closeTail + delta).slice(-(close.length - 1))
+      return { parts: [], transformed: false }
     }
-
-    this.mode = 'transformed'
-    // Keep leading formatting with the reasoning body. The two emitted blocks
-    // preserve the provider's semantic content while the transport delimiters
-    // themselves are intentionally removed.
-    const reasoning = `${before}${reasoningBody}`
-    const after = this.source.slice(closeIndex + close.length)
-    this.emitted = this.source.length
-    const parts: TextThinkingPart[] = []
-    parts.push({ type: 'reasoning', text: reasoning, complete: true })
-    if (after.length > 0) parts.push({ type: 'text', text: after, complete: false })
-    return { parts, transformed: true }
+    const source = this.sourceText()
+    const opening = `<${tag}>`
+    const first = this.firstNonWhitespace
+    const openingEnd = first + opening.length
+    const globalCloseIndex = previousLength - this.closeTail.length + closeIndex
+    return this.classify(source, first, openingEnd, globalCloseIndex, close)
   }
 
   /**
@@ -144,30 +160,69 @@ export class TextThinkingParser {
    */
   finish(finalText?: string): TextThinkingUpdate {
     const parts: TextThinkingPart[] = []
-    if (finalText !== undefined && finalText.startsWith(this.source) && finalText.length > this.source.length) {
-      const update = this.append(finalText.slice(this.source.length))
+    const source = this.sourceText()
+    if (finalText !== undefined && finalText.length > this.sourceLength
+      && finalText.startsWith(source)) {
+      const update = this.append(finalText.slice(this.sourceLength))
       parts.push(...update.parts)
     }
     if (this.mode === 'transformed') {
       return { parts: parts.map(part => ({ ...part, complete: true })), transformed: true }
     }
 
-    const tail = this.source.slice(this.emitted)
-    this.emitted = this.source.length
+    const tail = this.sourceText().slice(this.emitted)
+    this.emitted = this.sourceLength
     if (tail.length > 0) parts.push({ type: 'text', text: tail, complete: true })
     this.mode = 'plain'
     return { parts: parts.map(part => ({ ...part, complete: true })), transformed: false }
   }
 
   private plainDelta(): TextThinkingUpdate {
-    const text = this.source.slice(this.emitted)
-    this.emitted = this.source.length
+    const text = this.sourceText().slice(this.emitted)
+    this.emitted = this.sourceLength
     return { parts: [{ type: 'text', text, complete: false }], transformed: false }
   }
 
-  private transformedTail(): TextThinkingUpdate {
-    const text = this.source.slice(this.emitted)
-    this.emitted = this.source.length
-    return { parts: [{ type: 'text', text, complete: false }], transformed: true }
+  /** Append one source fragment without copying previously received text. */
+  private pushSource(delta: string): void {
+    this.sourceParts.push(delta)
+    this.sourceLength += delta.length
+    this.sourceCache = undefined
+  }
+
+  /** Join source fragments only at a classification or finalization edge. */
+  private sourceText(): string {
+    return this.sourceCache ??= this.sourceParts.join('')
+  }
+
+  /**
+   * Classify a complete close tag and emit the transformed reasoning prefix.
+   * Empty bodies stay ordinary text, preserving XML-like provider output.
+   */
+  private classify(
+    source: string,
+    first: number,
+    openingEnd: number,
+    closeIndex: number,
+    close: string,
+  ): TextThinkingUpdate {
+    const reasoningBody = source.slice(openingEnd, closeIndex)
+    if (reasoningBody.trim().length === 0) {
+      // Empty tagged prefixes are more likely formatting or an XML example
+      // than model reasoning; preserve them verbatim.
+      this.mode = 'plain'
+      return this.plainDelta()
+    }
+
+    this.mode = 'transformed'
+    // Keep leading formatting with the reasoning body. The two emitted blocks
+    // preserve the provider's semantic content while the transport delimiters
+    // themselves are intentionally removed.
+    const reasoning = `${source.slice(0, first)}${reasoningBody}`
+    const after = source.slice(closeIndex + close.length)
+    this.emitted = this.sourceLength
+    const parts: TextThinkingPart[] = [{ type: 'reasoning', text: reasoning, complete: true }]
+    if (after.length > 0) parts.push({ type: 'text', text: after, complete: false })
+    return { parts, transformed: true }
   }
 }

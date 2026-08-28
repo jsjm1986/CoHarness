@@ -16,6 +16,14 @@ import { HarnessError, UNSAFE_MODEL_OUTPUT_CODE } from './error.ts'
 import type { StreamChunk } from './types.ts'
 
 const TAG_NAMES = ['thinking', 'analysis', 'think'] as const
+const deferredEncoder = new TextEncoder()
+const MAX_OPENING_PROBE_CHARS = 4 * 1024
+const MAX_CLOSE_TAIL_CHARS = 128
+
+/** Maximum later-stream chunks retained while an ordinary-text prefix is undecided. */
+const MAX_DEFERRED_THINKING_GUARD_CHUNKS = 4_096
+/** Maximum UTF-8 bytes retained by the same ordering buffer. */
+const MAX_DEFERRED_THINKING_GUARD_BYTES = 8 * 1024 * 1024
 
 class GuardFailure extends HarnessError {}
 
@@ -24,7 +32,18 @@ type PrefixStatus = 'plain' | 'pending' | 'tagged'
 interface PendingTextBlock {
   readonly index: number
   readonly buffered: StreamChunk[]
-  source: string
+  readonly sourceParts: string[]
+  sourceLength: number
+  sourceBytes: number
+  status: PrefixStatus | undefined
+  probe: string | undefined
+  closePattern: RegExp | undefined
+  closeTail: string
+}
+
+interface DeferredChunk {
+  readonly chunk: StreamChunk
+  readonly bytes: number
 }
 
 /** Optional non-secret route facts used in the fail-closed diagnostic. */
@@ -92,6 +111,120 @@ function assertSafe(value: string, options: TextThinkingGuardOptions): void {
   if (prefixStatus(value) !== 'plain') throw new GuardFailure(unsafeMessage(options), UNSAFE_MODEL_OUTPUT_CODE)
 }
 
+function sourceText(state: PendingTextBlock): string {
+  return state.sourceParts.join('')
+}
+
+function openingState(state: PendingTextBlock, source: string, opening: { name: string; end: number }): void {
+  state.probe = undefined
+  state.closePattern = new RegExp(`</${opening.name}\\s*>`, 'iu')
+  state.closeTail = source.slice(Math.max(opening.end, source.length - MAX_CLOSE_TAIL_CHARS))
+}
+
+function assertPendingCapacity(state: PendingTextBlock, bytes: number): void {
+  if (bytes > MAX_DEFERRED_THINKING_GUARD_BYTES
+    || state.sourceBytes > MAX_DEFERRED_THINKING_GUARD_BYTES
+    || state.buffered.length > MAX_DEFERRED_THINKING_GUARD_CHUNKS) {
+    throw new GuardFailure(
+      `model response prefix exceeded ${String(MAX_DEFERRED_THINKING_GUARD_BYTES)} bytes or ${String(MAX_DEFERRED_THINKING_GUARD_CHUNKS)} chunks while its thinking tag was undecided`,
+      'RESPONSE_TOO_LARGE',
+    )
+  }
+}
+
+/**
+ * Append one text fragment while retaining only append-only fragments. The
+ * undecided prefix is parsed once; after an opening tag is recognized, later
+ * fragments are checked against a short close-tag overlap instead of joining
+ * the complete response on every delta.
+ */
+function appendText(state: PendingTextBlock, text: string): PrefixStatus {
+  const bytes = deferredEncoder.encode(text).byteLength
+  state.sourceParts.push(text)
+  state.sourceLength += text.length
+  state.sourceBytes += bytes
+  if (state.status === 'plain' || state.status === 'tagged') return state.status
+
+  if (state.status === undefined) {
+    const source = sourceText(state)
+    const status = prefixStatus(source)
+    state.status = status
+    if (status === 'pending') {
+      assertPendingCapacity(state, bytes)
+      const opening = openingTag(source)
+      if (opening !== undefined) openingState(state, source, opening)
+      else {
+        if (source.length > MAX_OPENING_PROBE_CHARS) {
+          throw new GuardFailure(
+            `model response prefix exceeded ${String(MAX_OPENING_PROBE_CHARS)} characters while its thinking tag was undecided`,
+            'RESPONSE_TOO_LARGE',
+          )
+        }
+        state.probe = source
+      }
+    }
+    return status
+  }
+
+  assertPendingCapacity(state, bytes)
+  if (state.closePattern !== undefined) {
+    const combined = state.closeTail + text
+    if (state.closePattern.test(combined)) {
+      state.status = 'tagged'
+      return 'tagged'
+    }
+    state.closeTail = combined.slice(-MAX_CLOSE_TAIL_CHARS)
+    return 'pending'
+  }
+
+  const probe = `${state.probe ?? ''}${text}`
+  if (probe.length > MAX_OPENING_PROBE_CHARS) {
+    throw new GuardFailure(
+      `model response prefix exceeded ${String(MAX_OPENING_PROBE_CHARS)} characters while its thinking tag was undecided`,
+      'RESPONSE_TOO_LARGE',
+    )
+  }
+  state.probe = probe
+  const status = prefixStatus(probe)
+  state.status = status
+  if (status === 'pending') {
+    const opening = openingTag(probe)
+    if (opening !== undefined) {
+      const full = sourceText(state)
+      const fullStatus = prefixStatus(full)
+      state.status = fullStatus
+      if (fullStatus === 'pending') openingState(state, full, opening)
+      return fullStatus
+    }
+  }
+  return status
+}
+
+function emptyPendingTextBlock(index: number): PendingTextBlock {
+  return {
+    index,
+    buffered: [],
+    sourceParts: [],
+    sourceLength: 0,
+    sourceBytes: 0,
+    status: undefined,
+    probe: undefined,
+    closePattern: undefined,
+    closeTail: '',
+  }
+}
+
+/** Estimate one deferred chunk's JSON footprint without allowing a serializer fault to grow state. */
+function deferredChunkBytes(chunk: StreamChunk): number {
+  try {
+    const serialized = JSON.stringify(chunk) as string | undefined
+    if (serialized === undefined) return MAX_DEFERRED_THINKING_GUARD_BYTES + 1
+    return deferredEncoder.encode(serialized).byteLength
+  } catch {
+    return MAX_DEFERRED_THINKING_GUARD_BYTES + 1
+  }
+}
+
 function lowestPending(states: ReadonlyMap<number, PendingTextBlock>): number | undefined {
   const iterator = states.keys()
   const first = iterator.next()
@@ -121,8 +254,48 @@ export async function* guardTextThinkingStream(
   options: TextThinkingGuardOptions = {},
 ): AsyncGenerator<StreamChunk> {
   const states = new Map<number, PendingTextBlock>()
-  const deferred: StreamChunk[] = []
+  const deferred: DeferredChunk[] = []
+  let deferredHead = 0
+  let deferredBytes = 0
   const streamState = { finished: false }
+
+  function deferredCount(): number {
+    return deferred.length - deferredHead
+  }
+
+  function deferredPeek(): StreamChunk | undefined {
+    return deferred[deferredHead]?.chunk
+  }
+
+  function deferredShift(): StreamChunk | undefined {
+    const entry = deferred[deferredHead]
+    if (entry === undefined) return undefined
+    deferredBytes = Math.max(0, deferredBytes - entry.bytes)
+    deferredHead += 1
+    if (deferredHead >= 64 && deferredHead * 2 >= deferred.length) {
+      deferred.splice(0, deferredHead)
+      deferredHead = 0
+    }
+    return entry.chunk
+  }
+
+  function deferredValues(): readonly StreamChunk[] {
+    return deferred.slice(deferredHead).map(entry => entry.chunk)
+  }
+
+  function defer(chunk: StreamChunk): void {
+    const bytes = deferredChunkBytes(chunk)
+    if (deferredCount() >= MAX_DEFERRED_THINKING_GUARD_CHUNKS
+      || bytes > MAX_DEFERRED_THINKING_GUARD_BYTES
+      || deferredBytes + bytes > MAX_DEFERRED_THINKING_GUARD_BYTES) {
+      throw new GuardFailure(
+        `model response ordering buffer exceeded ${String(MAX_DEFERRED_THINKING_GUARD_BYTES)} bytes or ${String(MAX_DEFERRED_THINKING_GUARD_CHUNKS)} chunks`,
+        'RESPONSE_TOO_LARGE',
+      )
+    }
+    deferred.push({ chunk, bytes })
+    deferredBytes += bytes
+  }
 
   function* flush(state: PendingTextBlock): Generator<StreamChunk> {
     yield* state.buffered
@@ -140,7 +313,7 @@ export async function* guardTextThinkingStream(
           yield chunk
           return
         }
-        states.set(chunk.index, { index: chunk.index, buffered: [], source: '' })
+        states.set(chunk.index, emptyPendingTextBlock(chunk.index))
         // A block-start carries no model text, so publish it immediately. This
         // keeps cancellation from pulling another provider item merely to
         // decide whether the first text delta is safe.
@@ -148,11 +321,10 @@ export async function* guardTextThinkingStream(
         return
       }
       case 'text-delta': {
-        const state = states.get(chunk.index) ?? { index: chunk.index, buffered: [], source: '' }
+        const state = states.get(chunk.index) ?? emptyPendingTextBlock(chunk.index)
         states.set(chunk.index, state)
         state.buffered.push(chunk)
-        state.source += chunk.text
-        const status = prefixStatus(state.source)
+        const status = appendText(state, chunk.text)
         if (status === 'tagged') throw new GuardFailure(unsafeMessage(options), UNSAFE_MODEL_OUTPUT_CODE)
         if (status === 'plain') yield* flush(state)
         return
@@ -169,7 +341,7 @@ export async function* guardTextThinkingStream(
           return
         }
         state.buffered.push(chunk)
-        const sourceStatus = prefixStatus(state.source)
+        const sourceStatus = state.status ?? prefixStatus(sourceText(state))
         const finalStatus = prefixStatus(chunk.block.text)
         if (sourceStatus !== 'plain' || finalStatus !== 'plain') {
           throw new GuardFailure(unsafeMessage(options), UNSAFE_MODEL_OUTPUT_CODE)
@@ -180,7 +352,7 @@ export async function* guardTextThinkingStream(
       case 'finish': {
         /* v8 ignore next -- a finish is deferred while any pending text state exists. */
         for (const state of [...states.values()].sort((left, right) => left.index - right.index)) {
-          assertSafe(state.source, options)
+          assertSafe(sourceText(state), options)
           yield* flush(state)
         }
         streamState.finished = true
@@ -196,11 +368,11 @@ export async function* guardTextThinkingStream(
   }
 
   function* drain(): Generator<StreamChunk> {
-    while (deferred.length > 0) {
-      const next = deferred[0]
+    while (deferredCount() > 0) {
+      const next = deferredPeek()
       /* v8 ignore next -- the length check above keeps the queue head present. */
       if (next === undefined || shouldDefer(next, states)) return
-      deferred.shift()
+      deferredShift()
       yield* process(next)
     }
   }
@@ -208,20 +380,20 @@ export async function* guardTextThinkingStream(
   try {
     for await (const chunk of source) {
       if (shouldDefer(chunk, states)) {
-        deferred.push(chunk)
+        defer(chunk)
         continue
       }
       yield* process(chunk)
       yield* drain()
     }
 
-    if (deferred.length > 0 || states.size > 0 || !streamState.finished) {
+    if (deferredCount() > 0 || states.size > 0 || !streamState.finished) {
       for (const state of [...states.values()].sort((left, right) => left.index - right.index)) {
-        assertSafe(state.source, options)
+        assertSafe(sourceText(state), options)
         yield* flush(state)
       }
-      while (deferred.length > 0) {
-        const next = deferred.shift()
+      while (deferredCount() > 0) {
+        const next = deferredShift()
         /* v8 ignore next -- the length check above keeps a queued chunk present. */
         if (next !== undefined) yield* process(next)
       }
@@ -233,7 +405,7 @@ export async function* guardTextThinkingStream(
       // Usage carries no model text. Preserve a provider usage sample that was
       // queued behind the undecided prefix so rejecting the response does not
       // silently turn a billable attempt into an unmeasured one.
-      for (const queued of deferred) {
+      for (const queued of deferredValues()) {
         if (queued.type === 'usage') yield queued
       }
       yield { type: 'finish', reason: { kind: 'error', failure: { message: error.message, code: error.code } } }
