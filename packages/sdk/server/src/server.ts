@@ -8,7 +8,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { resolve } from 'node:path'
 import type { Agent, AgentHandle } from '@deepseek-ai/dsh-agent'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { ReasoningEffortId, createUserMessage } from '@deepseek-ai/dsh-llm'
 import { carrierKeyOf, type Scoped } from '@deepseek-ai/dsh-scope'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type SubagentRuntime from '@deepseek-ai/dsh-subagent'
@@ -63,6 +63,7 @@ export class HarnessSdkJsonRpcServer {
   private cwd = process.cwd()
   private provider = 'deepseek-official'
   private model = 'deepseek-official'
+  private reasoningEffort: ReturnType<typeof ReasoningEffortId> | undefined
   private maxTokens: number | undefined
   private llmFiber: { dispose(): Promise<void> } | undefined
   private readonly sessions = new Map<string, SessionRecord>()
@@ -72,7 +73,13 @@ export class HarnessSdkJsonRpcServer {
   private shuttingDown = false
   private initialized = false
   private initializeTask: Promise<InitializeResult> | undefined
-  private initialization: { cwd: string; provider: string; model: string; maxTokens?: number } | undefined
+  private initialization: {
+    cwd: string
+    provider: string
+    model: string
+    reasoningEffort?: ReturnType<typeof ReasoningEffortId>
+    maxTokens?: number
+  } | undefined
   private readonly maxSessions: number
   private readonly maxPromptBytes: number
   private readonly maxPromptBlocks: number
@@ -134,11 +141,16 @@ export class HarnessSdkJsonRpcServer {
       || typeof params.model !== 'string' || params.model.length === 0 || params.model.length > 256) {
       throw new TypeError('initialize cwd, provider, and model must be non-empty bounded strings')
     }
+    if (params.reasoningEffort !== undefined
+      && (typeof params.reasoningEffort !== 'string' || params.reasoningEffort.length === 0)) {
+      throw new TypeError('initialize reasoningEffort must be a non-empty string')
+    }
     const cwd = resolve(params.cwd)
     const requested = {
       cwd,
       provider: params.provider,
       model: params.model,
+      ...params.reasoningEffort === undefined ? {} : { reasoningEffort: ReasoningEffortId(params.reasoningEffort) },
       ...params.maxTokens === undefined ? {} : { maxTokens: params.maxTokens },
     }
     if (requested.maxTokens !== undefined
@@ -149,6 +161,7 @@ export class HarnessSdkJsonRpcServer {
       && this.initialization.cwd === requested.cwd
       && this.initialization.provider === requested.provider
       && this.initialization.model === requested.model
+      && this.initialization.reasoningEffort === requested.reasoningEffort
       && this.initialization.maxTokens === requested.maxTokens
     if (this.initialized) {
       if (sameInitialization) return { serverInfo: { name: 'deepseek-harness-sdk-runtime', version: '0.0.1' } }
@@ -164,9 +177,20 @@ export class HarnessSdkJsonRpcServer {
         if (requested.provider !== 'deepseek-official') throw new Error(`no adapter registered for provider "${requested.provider}"`)
         this.llmFiber = await this.ctx.plugin(LlmDeepSeek, {})
       }
+      const llm = this.ctx.get('llm')
+      if (llm === undefined) throw new Error('SDK server cannot resolve the configured LLM route')
+      if (typeof llm.resolveCallConfig === 'function') {
+        await llm.resolveCallConfig({
+          provider: requested.provider,
+          model: requested.model,
+          ...requested.reasoningEffort === undefined ? {} : { reasoningEffort: requested.reasoningEffort },
+          ...requested.maxTokens === undefined ? {} : { maxTokens: requested.maxTokens },
+        })
+      }
       this.cwd = requested.cwd
       this.provider = requested.provider
       this.model = requested.model
+      this.reasoningEffort = requested.reasoningEffort
       this.maxTokens = requested.maxTokens
       this.initialized = true
       return { serverInfo: { name: 'deepseek-harness-sdk-runtime', version: '0.0.1' } }
@@ -306,6 +330,7 @@ export class HarnessSdkJsonRpcServer {
       agentOptions: {
         provider: this.provider,
         model: this.model,
+        ...this.reasoningEffort === undefined ? {} : { reasoningEffort: this.reasoningEffort },
         ...this.maxTokens === undefined ? {} : { maxTokens: this.maxTokens },
       },
     })

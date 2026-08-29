@@ -455,6 +455,7 @@ export class ReactLoopAgent implements Agent {
         ? requestProposal(persistedHeader!)
         : {
           ...route,
+          ...this.options.reasoningEffort === undefined ? {} : { reasoningEffort: this.options.reasoningEffort },
           ...reasoningEffort === undefined ? {} : { reasoningEffort },
           ...maxTokens === undefined ? {} : { maxTokens },
         },

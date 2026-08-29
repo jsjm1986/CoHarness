@@ -5,7 +5,7 @@
  * @module @deepseek-ai/dsh-sdk-client/types
  */
 
-import type { ContentBlock } from '@deepseek-ai/dsh-llm'
+import type { ContentBlock, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 
 /** One server-to-client notification as received off the wire. */
@@ -64,6 +64,8 @@ export interface DeepSeekHarnessOptions {
   provider?: string
   /** Model for SDK-created agents (default `deepseek-v4-flash`). */
   model?: string
+  /** Optional adapter-owned reasoning effort for SDK-created agents. */
+  reasoningEffort?: ReasoningEffortId
   /** Maximum output tokens for each conversation-model request. */
   maxTokens?: number
 }

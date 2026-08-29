@@ -384,6 +384,8 @@ interface AppIdentity {
 interface TokenUsage {
   inputTokens: number
   outputTokens: number
+  /** Exact aggregate prompt plus output tokens when provider counts agree. */
+  totalTokens?: number
   cacheReadTokens?: number
   cacheWriteTokens?: number
   reasoningTokens?: number

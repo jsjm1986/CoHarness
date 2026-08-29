@@ -121,6 +121,15 @@ async function runCode(
 }
 
 describe('mode-aware wire contribution', () => {
+  it("accepts the canonical 'ptc' spelling with Code Mode behavior", async () => {
+    const { ctx, systemPrompt } = await setup({ mode: 'ptc' })
+    registerEcho(ctx)
+    expect(ToolRuntime.Config({ mode: 'ptc' }).mode).toBe('ptc')
+    expect(ToolRuntime.Config({ mode: 'code' }).mode).toBe('ptc')
+    const assembly = await systemPrompt.assemble()
+    expect(assembly.tools.map(tool => tool.name)).toEqual([RUN_CODE_NAME])
+  })
+
   it("mode 'native' contributes every schema, no run_code, no SDK section — and needs no runtime", async () => {
     const { ctx, systemPrompt } = await setup({ mode: 'native', runtime: false })
     registerEcho(ctx)

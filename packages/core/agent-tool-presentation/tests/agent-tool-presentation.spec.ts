@@ -57,6 +57,15 @@ async function mount(ctx: Context, config: Config, id = 'agent') {
 }
 
 describe('the tool-presentation row', () => {
+  it('accepts the canonical ptc spelling', async () => {
+    const ctx = await host()
+    const { agent } = await mount(ctx, { mode: 'ptc' })
+    expect(Config({ mode: 'ptc' }).mode).toBe('ptc')
+    expect(Config({ mode: 'code' }).mode).toBe('ptc')
+    const assembly = await ctx.systemPrompt.assemble({ scope: agent })
+    expect(assembly.tools.map(tool => tool.name)).toEqual([RUN_CODE_NAME])
+  })
+
   it('declares the services it uses without holding a code runtime hostage', () => {
     // A `native` row must mount where no runtime is composed, so the wait is
     // conditional inside apply rather than static metadata.

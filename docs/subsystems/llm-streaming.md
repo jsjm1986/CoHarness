@@ -380,6 +380,8 @@ Per-call token accounting. Counts are **disjoint**: `inputTokens` is uncached in
 interface TokenUsage {
   inputTokens: number
   outputTokens: number
+  /** Exact aggregate prompt plus output tokens when provider counts agree. */
+  totalTokens?: number
   cacheReadTokens?: number
   cacheWriteTokens?: number
   reasoningTokens?: number

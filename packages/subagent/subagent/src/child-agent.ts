@@ -76,13 +76,27 @@ export function resolveChildAgentOptions(
   const current = parent.session.requestHeader()?.config
   const parentProvider = current?.provider ?? parent.options.provider
   const parentModel = current?.model ?? parent.options.model
+  const parentReasoningEffort = current?.reasoningEffort ?? parent.options.reasoningEffort
   const parentMaxTokens = parent.options.maxTokens
   return {
     ...parentProvider !== undefined ? { provider: parentProvider } : {},
     ...parentModel !== undefined ? { model: parentModel } : {},
+    ...parentReasoningEffort !== undefined ? { reasoningEffort: parentReasoningEffort } : {},
     ...parentMaxTokens !== undefined ? { maxTokens: parentMaxTokens } : {},
     ...requested,
     subagentDepth: childDepth,
+  }
+}
+
+/** Read the parent's current route, falling back to its creation options. */
+export function parentAgentOptionsForDelegation(parent: Agent): AgentOptions {
+  const requestHeader = parent.session as unknown as { requestHeader?: () => { config: AgentOptions } | undefined } | undefined
+  const current = requestHeader?.requestHeader?.()?.config
+  return {
+    ...parent.options,
+    ...current?.provider === undefined ? {} : { provider: current.provider },
+    ...current?.model === undefined ? {} : { model: current.model },
+    ...current?.reasoningEffort === undefined ? {} : { reasoningEffort: current.reasoningEffort },
   }
 }
 

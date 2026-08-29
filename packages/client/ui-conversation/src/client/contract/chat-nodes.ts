@@ -2,6 +2,7 @@ import type {
   AssistantBlock, AssistantMessageNode, ChatConversationViewNode, CommandNode,
   CompactionSummaryNode, ModelRetryNode, RunningToolCall, ToolCallBlock,
 } from '@deepseek-ai/dsh-client-runtime/client'
+import type { TurnTokenUsage } from '@deepseek-ai/dsh-token-meter/client'
 
 /** Merge-extensible payload registry keyed by final Chat renderer kind. */
 export interface ChatNodeDataMap {}
@@ -61,6 +62,8 @@ export interface TurnTailChatData {
   readonly branchUnavailable: boolean
   readonly ttftMs?: number
   readonly tokensPerSecond?: number
+  /** Exact aggregate provider usage for every complete attempt in the Turn. */
+  readonly tokenUsage?: TurnTokenUsage
 }
 
 /**

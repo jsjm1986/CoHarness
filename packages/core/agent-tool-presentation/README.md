@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-The row an [agent preset](../../preset/agent-presets/README.md) carries to say which form of its tools the model sees: `native` (every schema), `code` (only `run_code` plus a generated TypeScript SDK), or `both`.
+The row an [agent preset](../../preset/agent-presets/README.md) carries to say which form of its tools the model sees: `native` (every schema), `ptc` (only `run_code` plus a generated TypeScript SDK), or `both`; `code` remains an accepted compatibility alias.
 
 ## Why a row rather than a registry
 

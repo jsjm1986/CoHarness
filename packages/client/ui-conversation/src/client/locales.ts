@@ -10,6 +10,9 @@ const PLAN_NEXT_ACTION_EN = 'describe your task to generate plan'
 
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
+  'number.thousand': '{value}K',
+  'number.million': '{value}M',
+  'number.groupSeparator': ',',
   'view.chat': '对话',
   'hint.plan': PLAN_NEXT_ACTION_ZH,
   'hint.goal': '输入目标，智能体将持续执行',
@@ -167,6 +170,16 @@ export const zh = {
   'message.ranFor': '用时 {duration}',
   'message.ttft': '首 token {seconds}秒',
   'message.tokensPerSecond': '{tps} tok/s',
+  'message.turnUsage.title': '本轮用量',
+  'message.turnUsage.summaryWithCache': '{total} · 缓存命中率 {percent}%',
+  'message.turnUsage.model': '提供方 / 模型',
+  'message.turnUsage.input': '未缓存输入',
+  'message.turnUsage.cacheRead': '缓存读取',
+  'message.turnUsage.cacheWrite': '缓存写入',
+  'message.turnUsage.output': '输出',
+  'message.turnUsage.reasoning': '（其中推理 {tokens}）',
+  'message.turnUsage.total': '总计',
+  'message.turnUsage.count': '{count} tok',
   'duration.seconds': '{seconds}秒',
   'duration.minutes': '{minutes}分{seconds}秒',
   'command.running': '执行中…',
@@ -220,6 +233,9 @@ export type ConversationKey = keyof typeof zh
 
 /** English dictionary, checked complete against the zh key set. */
 export const en = {
+  'number.thousand': '{value}K',
+  'number.million': '{value}M',
+  'number.groupSeparator': ',',
   'view.chat': 'Chat',
   'hint.plan': PLAN_NEXT_ACTION_EN,
   'hint.goal': 'describe the objective for a long-running task',
@@ -377,6 +393,16 @@ export const en = {
   'message.ranFor': 'Ran for {duration}',
   'message.ttft': 'TTFT {seconds}s',
   'message.tokensPerSecond': '{tps} tok/s',
+  'message.turnUsage.title': 'Turn usage',
+  'message.turnUsage.summaryWithCache': '{total} · Cache hit {percent}%',
+  'message.turnUsage.model': 'Provider / model',
+  'message.turnUsage.input': 'Uncached input',
+  'message.turnUsage.cacheRead': 'Cached input',
+  'message.turnUsage.cacheWrite': 'Cache write',
+  'message.turnUsage.output': 'Output',
+  'message.turnUsage.reasoning': ' ({tokens} reasoning)',
+  'message.turnUsage.total': 'Total',
+  'message.turnUsage.count': '{count} tok',
   'duration.seconds': '{seconds}s',
   'duration.minutes': '{minutes}m {seconds}s',
   'command.running': 'Running…',

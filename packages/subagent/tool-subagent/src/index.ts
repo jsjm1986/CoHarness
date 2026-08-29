@@ -11,13 +11,22 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import type { AgentOptions } from '@deepseek-ai/dsh-agent'
+import type { Agent, AgentOptions } from '@deepseek-ai/dsh-agent'
+import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { JsonValue } from '@deepseek-ai/dsh-session'
-import { assertSubagentMaxDepth, settleRun } from '@deepseek-ai/dsh-subagent'
+import { assertSubagentMaxDepth, parentAgentOptionsForDelegation, settleRun } from '@deepseek-ai/dsh-subagent'
 import type { SubagentProvider, SubagentResult, SubagentRun } from '@deepseek-ai/dsh-subagent'
 import type { JobOutcome } from '@deepseek-ai/dsh-jobs'
 import type {} from '@deepseek-ai/dsh-system-prompt'
+import {
+  assertAllowedModelSelection, hasConfiguredLlmSelection, hasDelegationModelRequest,
+  preflightChildLlmRoute, requestedAgentOptions,
+} from './model-selection.ts'
+import type { DelegationModelRequest, ModelSelectionPolicy } from './model-selection.ts'
+import type {} from './model-selection-settings.ts'
+import { recordSubagentModelSelection, subagentModelSelectionPolicy } from './model-selection-state.ts'
+import { registerListSubagentModels } from './list-models.ts'
 
 export const name = 'tool-subagent'
 export const inject = ['tools', 'subagents', 'systemPrompt']
@@ -34,6 +43,8 @@ export interface Config {
    * a distinct name.
    */
   toolName?: string
+  /** Sample the host model-selection setting for newly published sessions. */
+  modelSelectionSettings?: boolean
   /**
    * Expose `run_in_background` (default true). Disabled instances omit the
    * parameter and reject forced background calls.
@@ -81,14 +92,21 @@ export interface Config {
 export const Config: z<Config> = z.object({
   provider: z.string().required(),
   toolName: z.string().default('subagent'),
+  modelSelectionSettings: z.boolean().default(false),
   enableRunInBackground: z.boolean().default(true),
   backgroundMode: z.union(['one-shot', 'continuable'] as const).default('one-shot'),
   // Prevent Schemastery from materializing omitted agentOptions as `{}`.
   agentOptions: z.object({
     provider: z.string(),
     model: z.string(),
+    reasoningEffort: z.string().min(1) as z<ReturnType<typeof ReasoningEffortId>>,
     maxTokens: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER),
-  }).default(undefined as unknown as { provider: string; model: string; maxTokens: number }),
+  }).default(undefined as unknown as {
+    provider: string
+    model: string
+    reasoningEffort: ReturnType<typeof ReasoningEffortId>
+    maxTokens: number
+  }),
   persona: z.string(),
   // Preserve omission; Schemastery's `{ allow: [] }` default would deny every tool.
   toolFilter: z.object({
@@ -273,6 +291,19 @@ function resolveDelegationRun(
   }
 }
 
+/** Read the current user allowlist and capture it on a parent Session once. */
+function selectionPolicyFor(ctx: Context, parent: Agent): ModelSelectionPolicy | undefined {
+  const session = parent.session as { events?: unknown } | undefined
+  const recorded = session?.events === undefined
+    ? undefined
+    : subagentModelSelectionPolicy(parent.session)
+  if (recorded !== undefined) return { routes: recorded }
+  const settings = ctx.get('subagentModelSelection')?.current()
+  if (settings === undefined || !settings.enabled) return undefined
+  if (session !== undefined) recordSubagentModelSelection(parent.session, settings.allowedModels)
+  return { routes: settings.allowedModels.map(route => ({ ...route })) }
+}
+
 export function apply(ctx: Context, config: Config): void {
   // Direct apply() bypasses Schemastery's numeric constraints. A direct-apply
   // omission stays capless (the schema default only runs through the loader).
@@ -284,6 +315,14 @@ export function apply(ctx: Context, config: Config): void {
   const backgroundEnabled = config.enableRunInBackground !== false
   const continuable = (config.backgroundMode ?? 'one-shot') === 'continuable'
   const toolName = config.toolName ?? 'subagent'
+  const modelSelectionCapable = config.modelSelectionSettings === true
+  const settings = modelSelectionCapable ? ctx.get('subagentModelSelection') : undefined
+  if (modelSelectionCapable && settings === undefined) {
+    throw new Error(
+      'tool-subagent: `modelSelectionSettings` requires @deepseek-ai/dsh-tool-subagent/model-selection-settings in the Host scope',
+    )
+  }
+  let listModelsRegistered = false
   // Mirror provider lifecycle because sibling load order and HMR replacement
   // can change provider availability while this fiber remains active.
   let disposeTool: (() => void) | undefined
@@ -296,6 +335,18 @@ export function apply(ctx: Context, config: Config): void {
         `tool-subagent: provider "${provider.name}" cannot enforce maxDepth (no depthLimit capability) — `
         + 'set maxDepth: \'provider-managed\' to leave the recursion budget to the provider',
       )
+    }
+    if ((config.agentOptions !== undefined || modelSelectionCapable) && provider.capabilities.agentOptions === false) {
+      throw new Error(
+        `tool-subagent: provider "${provider.name}" does not support child model options`,
+      )
+    }
+    if (modelSelectionCapable && !listModelsRegistered) {
+      const current = settings?.current()
+      if (current?.enabled === true && current.allowedModels.length > 0) {
+        registerListSubagentModels(ctx, { routes: current.allowedModels.map(route => ({ ...route })) })
+        listModelsRegistered = true
+      }
     }
     const wording = providerWording(provider.inheritsParentContext)
     if (continuable && provider.prepareContinuable === undefined) {
@@ -324,6 +375,20 @@ export function apply(ctx: Context, config: Config): void {
           required: true,
           description: wording.promptDescription,
         },
+        ...modelSelectionCapable ? {
+          provider: {
+            type: 'string' as const,
+            description: 'Optional child LLM provider. Supply it together with model; omit both to use configured or inherited defaults.',
+          },
+          model: {
+            type: 'string' as const,
+            description: 'Optional child model id. Supply it together with provider; omit both to use configured or inherited defaults.',
+          },
+          reasoning_effort: {
+            type: 'string' as const,
+            description: 'Optional adapter-owned reasoning effort for the effective child route.',
+          },
+        } : {},
         ...backgroundEnabled ? {
           run_in_background: {
             type: 'boolean' as const,
@@ -382,12 +447,47 @@ export function apply(ctx: Context, config: Config): void {
           throw new Error('subagent tool requires a calling agent (exec.agent was undefined)')
         }
 
+        const modelRequest = args as DelegationModelRequest
+        const parentOptions = parentAgentOptionsForDelegation(parent)
+        const providerRouteDefaults = provider.agentRouteDefaults
+        const explicitRouteRequest = hasDelegationModelRequest(modelRequest)
+        const requiresRoutePreflight = explicitRouteRequest
+          || hasConfiguredLlmSelection(config.agentOptions)
+        const configuredChildOptions = requiresRoutePreflight && providerRouteDefaults !== undefined
+          ? { ...providerRouteDefaults, ...config.agentOptions }
+          : config.agentOptions
+        const requestedChildOptions = requestedAgentOptions(
+          parentOptions,
+          configuredChildOptions,
+          modelRequest,
+          modelSelectionCapable,
+        )
+        const selectionPolicy = modelSelectionCapable ? selectionPolicyFor(ctx, parent) : undefined
+        if (modelSelectionCapable) {
+          assertAllowedModelSelection(selectionPolicy, parentOptions, requestedChildOptions, modelRequest)
+        }
+        if (requiresRoutePreflight) {
+          const llm = ctx.get('llm')
+          if (llm === undefined) {
+            if (explicitRouteRequest || modelSelectionCapable) {
+              throw new Error('cannot resolve the selected child LLM route because the `llm` service is unavailable')
+            }
+          } else {
+            await preflightChildLlmRoute(
+              llm,
+              parentOptions,
+              requestedChildOptions,
+              exec.signal,
+              providerRouteDefaults === undefined,
+            )
+          }
+        }
         const maxDepth = typeof config.maxDepth === 'number' ? config.maxDepth : undefined
         const request = {
           label: args.description,
           prompt: [{ type: 'text', text: args.prompt }] as ContentBlock[],
           parent,
-          ...config.agentOptions !== undefined ? { agentOptions: config.agentOptions } : {},
+          ...requestedChildOptions !== undefined ? { agentOptions: requestedChildOptions } : {},
           ...config.persona !== undefined ? { persona: config.persona } : {},
           ...config.toolFilter !== undefined ? { toolFilter: config.toolFilter } : {},
           ...maxDepth !== undefined ? { maxDepth } : {},

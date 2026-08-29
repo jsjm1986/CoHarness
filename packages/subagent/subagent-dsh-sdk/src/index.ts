@@ -12,6 +12,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
+import type { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { SubagentCapabilities, SubagentProvider, SubagentStartRequest } from '@deepseek-ai/dsh-subagent'
 import { assertPositiveFinite, NO_START_CAPABILITIES, resolveChildCwd, validateConfiguredCwd } from '@deepseek-ai/dsh-subagent'
 import {
@@ -46,6 +47,8 @@ export interface Config {
   provider: string
   /** Model the child runtime initializes with (default `deepseek-v4-flash`). */
   model: string
+  /** Optional adapter-owned reasoning effort for the child runtime. */
+  reasoningEffort?: ReasoningEffortId
   /** Optional per-request output-token cap for the child runtime. */
   maxTokens?: number
   /**
@@ -75,6 +78,7 @@ export const Config: z<Config> = z.object({
   cwd: z.string(),
   provider: z.string().default('deepseek-official'),
   model: z.string().default('deepseek-v4-flash'),
+  reasoningEffort: z.string().min(1) as z<ReasoningEffortId>,
   maxTokens: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER),
   env: z.dict(z.string()).default({}),
   shutdownTimeoutMs: z.number().default(DEFAULT_SHUTDOWN_TIMEOUT_MS),
@@ -91,20 +95,29 @@ type ResolvedConfig = Required<Omit<Config, 'cwd' | 'maxTokens'>> & Pick<Config,
  * service rejects a request needing any of them before `start` runs).
  */
 class SdkSubagentProvider implements SubagentProvider {
-  readonly capabilities: SubagentCapabilities = NO_START_CAPABILITIES
+  readonly capabilities: SubagentCapabilities = { ...NO_START_CAPABILITIES, agentOptions: true }
+  readonly agentRouteDefaults: Readonly<{ provider: string; model: string }>
   // Context contract: an out-of-process SDK child starts fresh — no parent conversation crosses the process boundary.
   readonly inheritsParentContext = false
 
-  constructor(readonly name: string, private readonly ctx: Context, private readonly config: ResolvedConfig) {}
+  constructor(readonly name: string, private readonly ctx: Context, private readonly config: ResolvedConfig) {
+    this.agentRouteDefaults = Object.freeze({ provider: config.provider, model: config.model })
+  }
 
   start(request: SubagentStartRequest) {
+    const requested = request.agentOptions
+    const maxTokens = requested?.maxTokens ?? this.config.maxTokens
+    const route = {
+      provider: requested?.provider ?? this.config.provider,
+      model: requested?.model ?? this.config.model,
+      ...requested?.reasoningEffort === undefined ? {} : { reasoningEffort: requested.reasoningEffort },
+      ...maxTokens === undefined ? {} : { maxTokens },
+    }
     const spec: SdkRunSpec = {
       command: this.config.command,
       args: this.config.args,
       cwd: resolveChildCwd('subagent-dsh-sdk', this.config.cwd, request.parent.session.header.cwd),
-      provider: this.config.provider,
-      model: this.config.model,
-      ...this.config.maxTokens === undefined ? {} : { maxTokens: this.config.maxTokens },
+      ...route,
       env: this.config.env,
       shutdownTimeoutMs: this.config.shutdownTimeoutMs,
       disposeEofGraceMs: this.config.disposeEofGraceMs,

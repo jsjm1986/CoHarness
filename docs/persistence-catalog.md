@@ -711,7 +711,18 @@ Source: [`packages/core/session/src/types.ts:269`](../packages/core/session/src/
 'subagent/descriptor': SubagentDescriptorData
 ```
 
-Source: [`packages/subagent/subagent/src/descriptor.ts:37`](../packages/subagent/subagent/src/descriptor.ts)
+Source: [`packages/subagent/subagent/src/descriptor.ts:38`](../packages/subagent/subagent/src/descriptor.ts)
+
+<a id="subagentmodel-selection-policy--log-only"></a>
+
+#### `subagent/model-selection-policy` — log-only
+
+```ts persistence-catalog
+/** Exact child routes exposed by this Session's delegation tool. */
+'subagent/model-selection-policy': { allowedModels: AllowedModelRoute[] }
+```
+
+Source: [`packages/subagent/tool-subagent/src/model-selection-state.ts:9`](../packages/subagent/tool-subagent/src/model-selection-state.ts)
 
 ### `team/*`
 

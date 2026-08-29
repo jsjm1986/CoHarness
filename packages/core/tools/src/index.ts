@@ -648,19 +648,25 @@ function errorInfo(error: unknown): ToolErrorInfo | undefined {
 }
 
 /** How the registry presents its tools to the model (see {@link Config.mode}). */
-export type ToolPresentationMode = 'native' | 'code' | 'both'
+export type ToolPresentationMode = 'native' | 'code' | 'ptc' | 'both'
+
+/** Normalize the canonical PTC spelling while retaining the historical alias. */
+function resolveToolPresentationMode(mode: ToolPresentationMode): Exclude<ToolPresentationMode, 'ptc'> {
+  return mode === 'ptc' ? 'code' : mode
+}
 
 /** Plugin config: how the registered tools are presented to the model. */
 export interface Config {
   /**
-   * Model presentation. `native` (default) sends every visible schema; `code`
+   * Model presentation. `native` (default) sends every visible schema; `ptc`
    * sends only `run_code` plus a generated SDK prompt and collapses the
    * executor to the same surface (a model-direct call may only name
    * `run_code`; `run_code` SDK sub-dispatches keep every visible tool); `both`
-   * sends both forms. Code modes require a `ctx.codeRuntime` whose `language`
+   * sends both forms; legacy `code` input is accepted as an alias. Code modes
+   * require a `ctx.codeRuntime` whose `language`
    * has a registered SDK renderer (TypeScript or Python) and fail prompt
-   * assembly when it is absent or has no renderer. Under `code`, native names
-   * in `toolOrder` are invalid.
+   * assembly when it is absent or has no renderer. Under `ptc` (or `code`),
+   * native names in `toolOrder` are invalid.
    */
   mode?: ToolPresentationMode
   /**
@@ -727,7 +733,7 @@ class ToolLayer implements ScopeLayer {
    * deployment default. One cell rather than an entry table: two answers to
    * "which form does the model see" is a contradiction, not a merge.
    */
-  mode: ToolPresentationMode | undefined
+  mode: Exclude<ToolPresentationMode, 'ptc'> | undefined
 
   constructor(scope: ScopeKey | undefined) {
     this.tools = new NamedEntries(name => new Error(scope === undefined
@@ -804,7 +810,10 @@ export class ToolRuntime extends Service {
   static inject = ['systemPrompt']
 
   static Config: z<Config> = z.object({
-    mode: z.union(['native', 'code', 'both'] as const).default('native'),
+    mode: z.transform(
+      z.union(['native', 'code', 'ptc', 'both'] as const),
+      mode => mode === 'code' ? 'ptc' : mode,
+    ).default('native'),
     maxParallelSubCalls: z.natural().min(1).default(10),
     maxPendingSubCalls: z.natural().min(1).default(100),
   })
@@ -830,7 +839,7 @@ export class ToolRuntime extends Service {
     () => { this.ctx.emit('tools/change') },
   )
   /** Presentation for scopes that declare none; {@link presentAs} shadows it per scope. */
-  private readonly defaultMode: ToolPresentationMode
+  private readonly defaultMode: Exclude<ToolPresentationMode, 'ptc'>
   private readonly maxParallelSubCalls: number
   private readonly maxPendingSubCalls: number
   /**
@@ -845,7 +854,7 @@ export class ToolRuntime extends Service {
     super(ctx, 'tools')
     // The schema already defaulted an omitted mode; the ?? narrows the
     // optional-input type for direct (non-Loader) construction in tests.
-    this.defaultMode = config.mode ?? 'native'
+    this.defaultMode = resolveToolPresentationMode(config.mode ?? 'native')
     this.maxParallelSubCalls = resolveMaxParallelSubCalls(config.maxParallelSubCalls)
     this.maxPendingSubCalls = resolveMaxPendingSubCalls(config.maxPendingSubCalls)
     ctx.systemPrompt.tools(context => this.wireSchemas(context.scope))
@@ -916,7 +925,7 @@ export class ToolRuntime extends Service {
    * @param scope - the calling agent, or undefined for the global view.
    * @returns the resolved presentation mode.
    */
-  private modeFor(scope?: ScopeKey): ToolPresentationMode {
+  private modeFor(scope?: ScopeKey): Exclude<ToolPresentationMode, 'ptc'> {
     // Nearest scope wins along the chain: a preset's standing declaration
     // covers every agent parented under it, and an agent's own (were one ever
     // declared) would override its preset's. The mode decides what the model
@@ -968,6 +977,7 @@ export class ToolRuntime extends Service {
     if (scopeOf(ctx) === undefined) {
       throw new Error('tools.presentAs() requires a scoped context (agent.ctx): a context-global presentation is the `mode` config field on the tools row')
     }
+    const resolvedMode = resolveToolPresentationMode(mode)
     const dispose = ctx.effect(function* (this: ToolRuntime) {
       yield this.layers.effect(
         ctx,
@@ -975,7 +985,7 @@ export class ToolRuntime extends Service {
           if (layer.mode !== undefined) {
             throw new Error(`tools.presentAs("${mode}") conflicts with "${layer.mode}" already declared for this scope; one composition selects one presentation`)
           }
-          layer.mode = mode
+          layer.mode = resolvedMode
           return () => { layer.mode = undefined }
         },
         { label: 'tools.presentAs()' },
@@ -984,7 +994,7 @@ export class ToolRuntime extends Service {
       // mode is. Under a deployment that already defaults to a code mode this
       // shadows the global registration with an identical body, which costs
       // nothing and keeps one rule instead of a case analysis.
-      if (mode !== 'native') {
+      if (resolvedMode !== 'native') {
         yield ctx.systemPrompt.section(this.collapseSection())
         yield ctx.systemPrompt.section(this.sdkSection())
       }

@@ -74,7 +74,8 @@ export function mapFinishReason(reason: string): FinishReason {
  * api/create-chat-completion); the harness TokenUsage convention is
  * DISJOINT counts, so cache reads are subtracted out of `inputTokens`.
  * @param usage - wire usage from the finish chunk or the trailing usage-only chunk.
- * @returns disjoint harness counts; cache/reasoning fields present only when the wire reported them.
+ * @returns disjoint harness counts; an exact total is present only when the
+ *   aggregate prompt/completion counters are valid and agree with any wire total.
  */
 export function mapUsage(usage: WireUsage): TokenUsage {
   const promptTokens = usageInteger(usage.prompt_tokens, 'prompt_tokens')
@@ -101,9 +102,16 @@ export function mapUsage(usage: WireUsage): TokenUsage {
     ? undefined : (completionDetails as { reasoning_tokens?: unknown }).reasoning_tokens
   const reasoning = reasoningRaw === undefined ? undefined : usageInteger(reasoningRaw, 'reasoning_tokens')
   if (reasoning !== undefined && reasoning > completionTokens) throw malformed('usage reasoning tokens exceed completion tokens')
+  const combined = promptTokens + completionTokens
+  const hasExactTotal = Number.isSafeInteger(combined)
+    && (usage.total_tokens === undefined
+      || (Number.isSafeInteger(usage.total_tokens)
+        && usage.total_tokens >= 0
+        && usage.total_tokens === combined))
   return {
     inputTokens: promptTokens - (cacheRead ?? 0),
     outputTokens: completionTokens,
+    ...hasExactTotal ? { totalTokens: combined } : {},
     ...cacheRead !== undefined ? { cacheReadTokens: cacheRead } : {},
     ...reasoning !== undefined ? { reasoningTokens: reasoning } : {},
   }

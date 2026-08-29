@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-[agent preset](../../preset/agent-presets/README.zh.md) 用来声明「模型看到的工具是哪一种形态」的那一行：`native`（全部 schema）、`code`（只有 `run_code` 加一份生成的 TypeScript SDK）或 `both`。
+[agent preset](../../preset/agent-presets/README.zh.md) 用来声明「模型看到的工具是哪一种形态」的那一行：`native`（全部 schema）、`ptc`（只有 `run_code` 加一份生成的 TypeScript SDK）或 `both`；`code` 保留为兼容别名。
 
 ## 为什么是一行插件，而不是把注册表搬下来
 

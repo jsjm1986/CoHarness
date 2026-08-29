@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-Tool registry and execution pipeline. Tool plugins register their schemas and executors; the agent loop executes each call through `tools/pre-execute` (the extensible allow/deny gate) → monotonic registered guards → `tools/execute` (an around-dispatch wrapper for timeout/retry/metrics plugins) → `tools/post-execute` (inspect/replace the result, attach context) → the definition-owned `finalizeContent` boundary → the observe-only `tools/result` notification. The registry also owns HOW its tools are presented to the model — its `mode` config selects native function calling, [Code Mode](#code-mode), or both, and one agent shadows that default for itself with `presentAs`.
+Tool registry and execution pipeline. Tool plugins register their schemas and executors; the agent loop executes each call through `tools/pre-execute` (the extensible allow/deny gate) → monotonic registered guards → `tools/execute` (an around-dispatch wrapper for timeout/retry/metrics plugins) → `tools/post-execute` (inspect/replace the result, attach context) → the definition-owned `finalizeContent` boundary → the observe-only `tools/result` notification. The registry also owns HOW its tools are presented to the model — its `mode` config selects native function calling, [PTC mode](#code-mode), or both; `ptc` is canonical and `code` remains a compatibility alias, and one agent shadows that default for itself with `presentAs`.
 
 ## Service: `ToolRuntime` (ctx key: `tools`)
 
@@ -10,7 +10,7 @@ Tool registry and execution pipeline. Tool plugins register their schemas and ex
 
 ```yaml
 tools:
-  mode: native   # native (default) | code | both
+  mode: native   # native (default) | ptc (code alias) | both
   maxPendingSubCalls: 100 # maximum queued/running/committing Code Mode bindings per run
 ```
 

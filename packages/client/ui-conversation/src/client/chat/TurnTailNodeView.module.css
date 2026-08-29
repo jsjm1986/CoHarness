@@ -4,6 +4,13 @@
   gap: var(--dsw-space-4);
 }
 
+.footer {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .actions {
   margin-left: -6px;
 }

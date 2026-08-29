@@ -40,7 +40,7 @@ describe('translate: text', () => {
       { type: 'text-delta', index: 0, text: 'Hel' },
       { type: 'text-delta', index: 0, text: 'lo' },
       { type: 'block-end', index: 0, block: { type: 'text', text: 'Hello' } },
-      { type: 'usage', usage: { inputTokens: 5, outputTokens: 2 } },
+      { type: 'usage', usage: { inputTokens: 5, outputTokens: 2, totalTokens: 7 } },
       { type: 'finish', reason: { kind: 'stop' } },
     ])
   })
@@ -125,7 +125,7 @@ describe('translate: tool calls', () => {
         index: 0,
         block: { type: 'tool-call', id: 'call_00_x', name: 'get_weather', arguments: '{"city": "Paris"}' },
       },
-      { type: 'usage', usage: { inputTokens: 28, outputTokens: 6 } },
+      { type: 'usage', usage: { inputTokens: 28, outputTokens: 6, totalTokens: 34 } },
       { type: 'finish', reason: { kind: 'tool-calls' } },
     ])
   })
@@ -179,7 +179,7 @@ describe('translate: finish and usage handling', () => {
       { choices: [], usage: { prompt_tokens: 9, completion_tokens: 1 } },
       DONE,
     )))
-    expect(chunks.at(-2)).toEqual({ type: 'usage', usage: { inputTokens: 9, outputTokens: 1 } })
+    expect(chunks.at(-2)).toEqual({ type: 'usage', usage: { inputTokens: 9, outputTokens: 1, totalTokens: 10 } })
     expect(chunks.at(-1)).toEqual({ type: 'finish', reason: { kind: 'stop' } })
   })
 
@@ -191,7 +191,7 @@ describe('translate: finish and usage handling', () => {
       DONE,
     )))
     const usage = chunks.find(chunk => chunk.type === 'usage')
-    expect(usage).toEqual({ type: 'usage', usage: { inputTokens: 2, outputTokens: 2 } })
+    expect(usage).toEqual({ type: 'usage', usage: { inputTokens: 2, outputTokens: 2, totalTokens: 4 } })
   })
 
   it('defaults to finish stop when no finish_reason ever arrives', async () => {
@@ -226,7 +226,7 @@ describe('translate: finish and usage handling', () => {
       DONE,
     )))
     expect(chunks).toEqual([
-      { type: 'usage', usage: { inputTokens: 7, outputTokens: 0 } },
+      { type: 'usage', usage: { inputTokens: 7, outputTokens: 0, totalTokens: 7 } },
       {
         type: 'finish',
         reason: {
@@ -333,6 +333,7 @@ describe('mapUsage', () => {
     expect(mapUsage({
       prompt_tokens: 283,
       completion_tokens: 69,
+      total_tokens: 352,
       prompt_cache_hit_tokens: 256,
       prompt_cache_miss_tokens: 27,
       prompt_tokens_details: { cached_tokens: 256 },
@@ -342,6 +343,7 @@ describe('mapUsage', () => {
       // (TokenUsage counts are disjoint).
       inputTokens: 27,
       outputTokens: 69,
+      totalTokens: 352,
       cacheReadTokens: 256,
       reasoningTokens: 24,
     })
@@ -349,12 +351,20 @@ describe('mapUsage', () => {
 
   it('falls back to prompt_cache_hit_tokens when details are absent', () => {
     expect(mapUsage({ prompt_tokens: 10, completion_tokens: 2, prompt_cache_hit_tokens: 8 }))
-      .toEqual({ inputTokens: 2, outputTokens: 2, cacheReadTokens: 8 })
+      .toEqual({ inputTokens: 2, outputTokens: 2, totalTokens: 12, cacheReadTokens: 8 })
   })
 
-  it('omits optional fields when the wire omits them', () => {
+  it('reconstructs an exact total when the wire omits it', () => {
     expect(mapUsage({ prompt_tokens: 10, completion_tokens: 2 }))
-      .toEqual({ inputTokens: 10, outputTokens: 2 })
+      .toEqual({ inputTokens: 10, outputTokens: 2, totalTokens: 12 })
+  })
+
+  it.each([
+    ['contradictory total', { prompt_tokens: 10, completion_tokens: 2, total_tokens: 99 }],
+    ['unsafe aggregate', { prompt_tokens: Number.MAX_SAFE_INTEGER, completion_tokens: 1 }],
+  ])('omits the exact total for %s without changing existing buckets', (_name, wire) => {
+    const expected = { inputTokens: wire.prompt_tokens, outputTokens: wire.completion_tokens }
+    expect(mapUsage(wire)).toEqual(expected)
   })
 
   it.each([

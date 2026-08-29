@@ -107,6 +107,7 @@ export {
   captureDelegatedPolicyOverrides,
   childSessionMeta,
   resolveChildAgentOptions,
+  parentAgentOptionsForDelegation,
   resolveChildDepth,
   SubagentDepthError,
 } from './child-agent.ts'
@@ -537,13 +538,17 @@ export class SubagentRuntime extends Service {
   /** Reject the first requested capability that the provider lacks. */
   private assertCapabilities(provider: SubagentProvider, request: SubagentStartRequest): void {
     const needs: { when: boolean; cap: keyof SubagentCapabilities }[] = [
+      { when: request.agentOptions !== undefined, cap: 'agentOptions' },
       { when: request.outputSchema !== undefined, cap: 'outputSchema' },
       { when: request.maxDepth !== undefined, cap: 'depthLimit' },
       { when: request.toolFilter !== undefined, cap: 'toolFilter' },
       { when: request.persona !== undefined, cap: 'persona' },
     ]
     for (const { when, cap } of needs) {
-      if (when && !provider.capabilities[cap]) {
+      const supported = cap === 'agentOptions'
+        ? provider.capabilities.agentOptions !== false
+        : provider.capabilities[cap]
+      if (when && !supported) {
         throw new SubagentError(
           `subagent provider "${provider.name}" does not support the "${cap}" capability`,
           'UNSUPPORTED_CAPABILITY',

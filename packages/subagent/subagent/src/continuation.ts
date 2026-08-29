@@ -435,6 +435,7 @@ export class SubagentContinuationManager {
       label: spec.label,
       ...agentOptions.provider !== undefined ? { agentProvider: agentOptions.provider } : {},
       ...agentOptions.model !== undefined ? { agentModel: agentOptions.model } : {},
+      ...agentOptions.reasoningEffort !== undefined ? { agentReasoningEffort: agentOptions.reasoningEffort } : {},
       ...request.persona !== undefined ? { persona: request.persona } : {},
       ...request.toolFilter !== undefined ? { toolFilter: request.toolFilter } : {},
     })
@@ -1043,6 +1044,7 @@ export class SubagentContinuationManager {
         agentOptions: {
           ...descriptor.agentProvider !== undefined ? { provider: descriptor.agentProvider } : {},
           ...descriptor.agentModel !== undefined ? { model: descriptor.agentModel } : {},
+          ...descriptor.agentReasoningEffort !== undefined ? { reasoningEffort: descriptor.agentReasoningEffort } : {},
         },
         composition: { persona: descriptor.persona, toolFilter: descriptor.toolFilter },
         signal: options.signal,
