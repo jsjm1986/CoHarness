@@ -14,13 +14,17 @@
  * @module @deepseek-ai/dsh-agent-presets/discovery
  */
 
+import { existsSync } from 'node:fs'
 import { readdir, readFile, stat } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { isBuiltin } from 'node:module'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { load } from 'js-yaml'
 import { entryListSchema } from '@deepseek-ai/cordis-plugin-include'
 import { expandHomePath } from '@deepseek-ai/dsh-home-paths'
 import { readPresetMetadata } from './metadata.ts'
 import { PRESET_ID, type AgentPreset, type PresetRoot } from './preset.ts'
+import { classifyRowSpecifier, type RowSpecifier } from './specifier.ts'
 
 /** The composition file that makes a directory a preset. */
 export const COMPOSITION_FILE = 'agent.cordis.yml'
@@ -75,15 +79,71 @@ function entryListProblem(rows: unknown, at = ''): string | undefined {
   return undefined
 }
 
+/** Whether a package directory is installed on the harness module path. */
+function packageInstalled(name: string, base: string): boolean {
+  const packageName = name.split('/').slice(0, name.startsWith('@') ? 2 : 1).join('/')
+  let directory = fileURLToPath(base)
+  for (;;) {
+    if (existsSync(join(directory, 'node_modules', packageName, 'package.json'))) return true
+    const parent = dirname(directory)
+    if (parent === directory) return false
+    directory = parent
+  }
+}
+
+/** Check one classified row without importing or evaluating its module. */
+async function rowResolves(row: RowSpecifier, presetBase: string, harnessBase: string): Promise<boolean> {
+  if (row.kind === 'builtin') return true
+  if (row.kind === 'package') return isBuiltin(row.specifier) || packageInstalled(row.specifier, harnessBase)
+  const url = row.kind === 'file' ? new URL(row.specifier) : new URL(row.specifier, presetBase)
+  return await isFile(fileURLToPath(url))
+}
+
+interface UnresolvableRow {
+  readonly label: string
+  readonly name: string
+}
+
+/** Find enabled rows whose modules cannot be found, including nested groups. */
+async function unresolvableRows(
+  rows: readonly unknown[],
+  presetBase: string,
+  harnessBase: string,
+  at = '',
+): Promise<UnresolvableRow[]> {
+  const found: UnresolvableRow[] = []
+  for (const [index, entry] of rows.entries()) {
+    const row = entry as {
+      id?: unknown
+      name: string
+      group?: unknown
+      config?: unknown
+      disabled?: unknown
+    }
+    if (Boolean(row.disabled)) continue
+    const positional = at === '' ? `row ${String(index + 1)}` : `${at} row ${String(index + 1)}`
+    if (row.group === true) {
+      found.push(...await unresolvableRows(row.config as readonly unknown[], presetBase, harnessBase, positional))
+      continue
+    }
+    if (await rowResolves(classifyRowSpecifier(row.name), presetBase, harnessBase)) continue
+    const label = typeof row.id === 'string' && row.id !== '' ? `row "${row.id}"` : positional
+    found.push({ label, name: row.name })
+  }
+  return found
+}
+
 /**
  * Why the composition at `path` cannot mount, or undefined when it looks
  * loadable. Parsed with the loader's own YAML dialect ({@link entryListSchema},
  * the one carrying `!!js`), so health can never call a composition broken
  * that the loader would accept.
  * @param path - absolute path of the composition file.
+ * @param harnessBase - URL used to resolve package-name rows. Omit for the
+ * legacy shape-only helper behavior used by isolated callers.
  * @returns one human-readable reason, or undefined when the file is loadable.
  */
-async function compositionProblem(path: string): Promise<string | undefined> {
+async function compositionProblem(path: string, harnessBase?: string): Promise<string | undefined> {
   let content: string
   try {
     content = await readFile(path, 'utf8')
@@ -102,7 +162,17 @@ async function compositionProblem(path: string): Promise<string | undefined> {
     // the reason is displayed on a roster card, not in a terminal.
     return `the composition is not valid YAML: ${full.replace(/\n[\s\S]*$/, '')}`
   }
-  return entryListProblem(rows)
+  const shape = entryListProblem(rows)
+  if (shape !== undefined || harnessBase === undefined) return shape
+  const presetBase = new URL('.', pathToFileURL(path)).href
+  const unresolved = await unresolvableRows(rows as readonly unknown[], presetBase, harnessBase)
+  const first = unresolved[0]
+  if (first === undefined) return undefined
+  if (unresolved.length === 1) {
+    return `${first.label} names a plugin that cannot be resolved: ${first.name}`
+  }
+  return `${String(unresolved.length)} rows name plugins that cannot be resolved:\n`
+    + unresolved.map(row => `- ${row.label}: ${row.name}`).join('\n')
 }
 
 /**
@@ -134,9 +204,10 @@ async function isFile(path: string): Promise<boolean> {
  * so it blocks nothing, and reporting `.DS_Store`-grade residue as broken
  * presets would teach users to ignore the marker.
  * @param root - the directory and the trust its presets inherit.
+ * @param harnessBase - URL used to resolve package-name rows.
  * @returns the root's presets ordered by id.
  */
-export async function scanRoot(root: PresetRoot): Promise<AgentPreset[]> {
+export async function scanRoot(root: PresetRoot, harnessBase?: string): Promise<AgentPreset[]> {
   const dir = resolve(expandHomePath(root.path))
   let children
   try {
@@ -151,7 +222,7 @@ export async function scanRoot(root: PresetRoot): Promise<AgentPreset[]> {
     const directory = join(dir, child.name)
     const path = join(directory, COMPOSITION_FILE)
     const broken = await isFile(path)
-      ? await compositionProblem(path)
+      ? await compositionProblem(path, harnessBase)
       : `the composition file ${COMPOSITION_FILE} is missing — the directory still occupies the id; delete it or restore the file`
     // Display text only, and never fatal: a preset with unreadable metadata
     // still mounts, it just shows its id.
@@ -172,12 +243,13 @@ export async function scanRoot(root: PresetRoot): Promise<AgentPreset[]> {
 /**
  * Scan every root in precedence order.
  * @param roots - roots in precedence order; an earlier root wins a duplicate id.
+ * @param harnessBase - URL used to resolve package-name rows.
  * @returns every discovered preset, first-root-wins per id.
  */
-export async function discoverPresets(roots: readonly PresetRoot[]): Promise<AgentPreset[]> {
+export async function discoverPresets(roots: readonly PresetRoot[], harnessBase?: string): Promise<AgentPreset[]> {
   const byId = new Map<string, AgentPreset>()
   for (const root of roots) {
-    for (const preset of await scanRoot(root)) {
+    for (const preset of await scanRoot(root, harnessBase)) {
       if (byId.has(preset.id)) continue
       byId.set(preset.id, preset)
     }

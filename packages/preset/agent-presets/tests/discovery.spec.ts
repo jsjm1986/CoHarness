@@ -1,7 +1,7 @@
-import { mkdtemp, mkdir, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { COMPOSITION_FILE, discoverPresets, scanRoot } from '@deepseek-ai/dsh-agent-presets'
 
@@ -27,6 +27,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures')
 const SYSTEM = { path: join(FIXTURES, 'system'), trust: 'system' as const }
 const USER = { path: join(FIXTURES, 'user'), trust: 'user' as const }
+const HARNESS = pathToFileURL(join(FIXTURES, '..', '..', '..', '..')).href
 
 beforeEach(() => {
   fsHarness.nextReadError = undefined
@@ -217,5 +218,44 @@ describe('composition health', () => {
 
   it('accepts an empty list', async () => {
     expect(await scanned('[]\n')).toBeUndefined()
+  })
+})
+
+describe('module resolution health', () => {
+  async function scanned(composition: string, base = HARNESS): Promise<string | undefined> {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-presets-resolve-'))
+    await mkdir(join(root, 'probe'))
+    await writeFile(join(root, 'probe', COMPOSITION_FILE), composition)
+    const [preset] = await scanRoot({ path: root, trust: 'user' }, base)
+    return preset?.broken
+  }
+
+  it('reports unresolved package rows with their ids', async () => {
+    await expect(scanned('- id: stale\n  name: \'@deepseek-ai/dsh-no-such-package\'\n'))
+      .resolves.toBe('row "stale" names a plugin that cannot be resolved: @deepseek-ai/dsh-no-such-package')
+  })
+
+  it('keeps relative files scoped to the preset directory', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-presets-relative-'))
+    await mkdir(join(root, 'probe'))
+    await writeFile(join(root, 'probe', 'plugin.mjs'), 'export function apply() {}\n')
+    await writeFile(join(root, 'probe', COMPOSITION_FILE), '- id: ok\n  name: ./plugin.mjs\n- id: gone\n  name: ./missing.mjs\n')
+    const [preset] = await scanRoot({ path: root, trust: 'user' }, HARNESS)
+    expect(preset?.broken).toBe('row "gone" names a plugin that cannot be resolved: ./missing.mjs')
+  })
+
+  it('skips truthy disabled rows and recognizes builtins', async () => {
+    await expect(scanned('- id: off\n  name: no-such-package\n  disabled: true\n')).resolves.toBeUndefined()
+    await expect(scanned('- id: builtin\n  name: node:fs\n')).resolves.toBeUndefined()
+  })
+
+  it('reports dangling package links', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dsh-presets-dangling-'))
+    await mkdir(join(home, 'node_modules', '@scope'), { recursive: true })
+    await symlink(join(home, 'missing-package'), join(home, 'node_modules', '@scope', 'pkg'))
+    await mkdir(join(home, 'presets', 'probe'), { recursive: true })
+    await writeFile(join(home, 'presets', 'probe', COMPOSITION_FILE), '- id: p\n  name: \'@scope/pkg\'\n')
+    const [preset] = await scanRoot({ path: join(home, 'presets'), trust: 'user' }, pathToFileURL(join(home, 'app')).href)
+    expect(preset?.broken).toContain('cannot be resolved')
   })
 })

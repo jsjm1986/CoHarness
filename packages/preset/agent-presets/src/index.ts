@@ -51,6 +51,7 @@ export const AgentPresetSettingsSchema: z<AgentPresetSettings> = z.object({
 })
 
 export { COMPOSITION_FILE, discoverPresets, scanRoot } from './discovery.ts'
+export { classifyRowSpecifier, type RowSpecifier } from './specifier.ts'
 export {
   METADATA_FILE, readPresetMetadata, renderPresetMetadata, type PresetMetadata,
 } from './metadata.ts'
@@ -103,6 +104,8 @@ export class AgentPresets extends Service {
    * locally authored directory that claimed its name.
    */
   private readonly resolvedRoots: readonly PresetRoot[]
+  /** Base URL where installed package rows are resolved for discovery health. */
+  private readonly harnessBase: string | undefined
 
   /**
    * The user layer over `config.default`, present only while a settings
@@ -130,6 +133,13 @@ export class AgentPresets extends Service {
   constructor(ctx: Context, public config: Config) {
     super(ctx, 'agentPresets')
     this.selfCtx = ctx
+    if (ctx.baseUrl === undefined && (config.roots.length > 0 || config.includeUserRoot)) {
+      throw new Error(
+        'agent-presets: the roster needs `ctx.baseUrl` to resolve the plugins a composition names; '
+        + 'compose it under a Loader, or set the base on the context this plugin is applied to',
+      )
+    }
+    this.harnessBase = ctx.baseUrl
     this.resolvedRoots = config.includeUserRoot
       ? [...config.roots, { path: dshHomePath(USER_PRESET_DIR), trust: 'user' }]
       : [...config.roots]
@@ -200,7 +210,7 @@ export class AgentPresets extends Service {
    * @returns the presets, first-root-wins per id.
    */
   async list(): Promise<AgentPreset[]> {
-    return await discoverPresets(this.resolvedRoots)
+    return await discoverPresets(this.resolvedRoots, this.harnessBase)
   }
 
   /**

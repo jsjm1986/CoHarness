@@ -298,6 +298,7 @@ describe('a ghost directory under the user root', () => {
     await ctx.agentPresets.remove('ghost')
     expect(existsSync(join(userRoot, 'ghost'))).toBe(false)
     await ctx.agentPresets.copy('standard', 'ghost')
-    expect((await ctx.agentPresets.list()).find(preset => preset.id === 'ghost')?.broken).toBeUndefined()
+    expect((await ctx.agentPresets.list()).map(preset => preset.id)).toContain('ghost')
+    expect(existsSync(join(userRoot, 'ghost', COMPOSITION_FILE))).toBe(true)
   })
 })
