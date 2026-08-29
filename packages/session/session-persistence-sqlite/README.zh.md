@@ -8,11 +8,11 @@
 
 ## 存储模型
 
-Schema 18 保留普通 ROWID 表以及复合主键索引 `events(session_id, seq)`。会话元数据携带草稿标记，因此未实体化的浏览器草稿不会在重启后重新成为冷行。标量行存储一个逻辑事件。打包行把 `text-chunks`、`reasoning-chunks` 或 `tool-call-chunks` 用作物理 `type`；`seq` 与 `time` 标识所表示的第一个事件，`data` 保存共享的分片打包 payload。打包行把 `ignorable=0` 用作物理判别值，并让 `source_event_seqs` 与 `surface_op` 保持 `NULL`；标量行仅在逻辑事件可忽略时使用 `ignorable=1`，否则使用 `NULL`。因此，未来的可忽略逻辑事件即使复用了某个存储标签名称，也不会被解码为打包行。这些标签属于存储记录，而不是 `SessionEventMap` 成员。
+Schema 20 使用整数内部会话键和稳定的外部 `session_key`；复合主键索引 `events(session_id, seq)` 仍负责物理查找。CoHarness 专用的 `session_extensions` 保存草稿标记，`event_extensions` 保存逻辑 `ignorable` 标记，因此两种含义不会复用打包行判别字段。标量行存储一个逻辑事件。打包行把 `text-chunks`、`reasoning-chunks` 或 `tool-call-chunks` 用作物理 `type`；`seq` 与 `time` 标识所表示的第一个事件，`data` 保存共享的分片打包 payload。打包行设置 `is_packed=1`；标量行设置 `is_packed=0`，逻辑可忽略事件另有一行 `event_extensions`。这些标签属于存储记录，而不是 `SessionEventMap` 成员。
 
-Schema 18 在本包内拥有 codec，不导入其他持久化格式中可变的实现。只有字段完全匹配、连续且属于同一分片块的文本、推理或工具调用 delta 才会打包。未知字段、surface 元数据、序列缺口、不兼容的块／调用身份以及不安全时间戳仍以标量行存储。一个打包行最多表示 1,024 个事件，未压缩 UTF-8 `data` 最多 1 MiB；更长的连续段会在不改变逻辑事件的前提下分割。读取会在向持久化协调器返回数据前，重建每个原始序列号、时间戳、token 边界、参数片段和 payload。
+Schema 20 在本包内拥有 codec，不导入其他持久化格式中可变的实现。只有字段完全匹配、连续且属于同一分片块的文本、推理或工具调用 delta 才会打包。未知字段、surface 元数据、序列缺口、不兼容的块／调用身份以及不安全时间戳仍以标量行存储。一个打包行最多表示 1,024 个事件，未压缩 UTF-8 `data` 最多 1 MiB；更长的连续段会在不改变逻辑事件的前提下分割。读取会在向持久化协调器返回数据前，重建每个原始序列号、时间戳、token 边界、参数片段和 payload。
 
-序列化后的 `data` 小于 4 KiB 时保持为 SQLite `TEXT`。达到或超过该阈值时，写入方会使用 Zstandard level 3，并且只在 frame 小于原文本的情况下存储 `BLOB`；读取方会先解压，再执行 UTF-8 校验和 JSON 解析。`source_event_seqs` 仍是完整且有序的来源数组。第一个序列使用无符号 varint，后续序列使用 ZigZag varint 编码的有符号差值，并存为 `BLOB`；不会省略任何来源，也不会把数组转换成范围。
+序列化后的 `data` 小于 4 KiB 时保持为 SQLite `TEXT`。达到或超过该阈值时，写入方会使用 Zstandard level 3，并且只在 frame 小于原文本的情况下存储 `BLOB`；读取方会先解压，再执行 UTF-8 校验和 JSON 解析。`source_event_seqs` 仍是完整且有序的来源数组。Schema 20 使用带标签的 varint payload，在连续范围更短时采用紧凑范围编码；稀疏或降序值仍使用 delta 编码。不会省略任何来源。大型 data 单元使用固定的 schema zstd 字典，因此每行都可独立解码。
 
 每次追加持有 `BEGIN IMMEDIATE`，验证有界物理尾部，只打包新的持久批次，插入这些记录，并把会话 revision 递增一次。普通追加绝不删除或替换既有事件行。默认 200 毫秒写后缓冲窗口因此仍能压缩高频流，而物理写入量与新增持久批次成正比，不会反复改写不断增长的打包值。存储层逻辑尾部检查会在陈旧写入方执行变更前拒绝该写入。
 
@@ -20,7 +20,15 @@ Schema 18 在本包内拥有 codec，不导入其他持久化格式中可变的�
 
 ## Schema 兼容性
 
-全新数据库直接初始化为 schema 18。旧 schema、外部 application identity、非空未版本化数据库以及不兼容 schema 对象都会被拒绝；这个预发布提供方不提供迁移。每条语句和固定 pragma 都位于随包发布的 `.sql` 资源中；值使用 SQLite 参数，运行时代码不会拼装查询文本。
+全新数据库直接初始化为 schema 20。旧 schema、外部 application identity、非空未版本化数据库以及不兼容 schema 对象会在打开时拒绝；运行时不会隐式升级文件。停止进程后使用离线工具：
+
+```sh
+pnpm run migrate:session-sqlite-v18-to-v20 -- --input old.db --output new.db
+pnpm run migrate:session-sqlite-v20-to-v18 -- --input new.db --output old.db
+pnpm run migrate:session-sqlite-v18-to-v20 -- --input old.db --verify-only
+```
+
+输入只读，输出必须是不同的新文件；工具返回前会校验逻辑事件 hash。`--replace --keep-backup` 是显式原子替换模式；完成冷加载和回放前保留备份。每条运行时语句和固定 pragma 都位于随包发布的 `.sql` 资源中；值使用 SQLite 参数，运行时代码不会拼装查询文本。
 
 ## 配置（schemastery）
 
@@ -56,7 +64,7 @@ interface Config {
 
 ## 已知限制与延期工作
 
-- **过渡性的 SQLite 专用设计**——这一以效率为重点的实现参考了 [morlay/session-persistence-rdb](https://github.com/morlay/session-persistence-rdb)。支持多种后端与可配置 schema 的统一关系数据库设计尚待后续完善；预发布开发阶段不保证 schema 稳定性或迁移支持。
+- **过渡性的 SQLite 专用设计**——这一以效率为重点的实现参考了 [morlay/session-persistence-rdb](https://github.com/morlay/session-persistence-rdb)。支持多种后端与可配置 schema 的统一关系数据库设计尚待后续完善；schema 20 是当前 CoHarness 格式，后续变更必须再次通过离线迁移。
 - **打包服从持久批次边界**——被写后缓冲窗口或显式 flush 分开的兼容连续段会保留为不同物理记录；这以打包率受时序影响为代价，避免改写既有行。
 - **同步压缩**——Node 的 SQLite 与 Zstandard 调用都会阻塞 JavaScript 线程；4 KiB 阈值限制了小型记录的逐 frame 工作。
 - **`DatabaseSync` 会阻塞事件循环**——减少物理行不会使 SQLite 操作变为异步。

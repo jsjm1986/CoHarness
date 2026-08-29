@@ -14,8 +14,8 @@ import {
 } from '@deepseek-ai/dsh-session'
 import { sql } from './sql.ts'
 
-/** Current physical-record schema with packed and compressed event rows. */
-export const SCHEMA_VERSION = 18
+/** Current physical-record schema with packed rows and CoHarness extensions. */
+export const SCHEMA_VERSION = 20
 /** Application id reserved for DeepSeek Harness SQLite session databases. */
 export const SESSION_PERSISTENCE_SQLITE_APPLICATION_ID = 0x44534850
 
@@ -43,6 +43,7 @@ export interface EventRow {
   readonly data: string | Uint8Array
   readonly source_event_seqs: Uint8Array | null
   readonly surface_op: string | null
+  readonly is_packed: number
   readonly ignorable: number | null
 }
 
@@ -110,6 +111,7 @@ function configureDatabase(
   db: DatabaseSync,
   path: string,
 ): void {
+  db.exec(sql('page-size'))
   db.exec(sql('foreign-keys-on'))
   let began = false
   try {
@@ -207,7 +209,7 @@ function initializeDatabase(db: DatabaseSync): void {
   db.exec(sql('schema'))
   db.prepare(sql('insert-persistence-state')).run(randomUUID())
   db.exec(sql('set-application-id'))
-  db.exec(sql('set-user-version-18'))
+  db.exec(sql('set-user-version-20'))
 }
 
 let canonicalSchema: readonly SchemaObjectRow[] | undefined
@@ -316,10 +318,17 @@ export function decodeSessionRow(value: unknown): SessionRow {
  * @returns a validated physical event row.
  */
 export function decodeEventRow(value: unknown): EventRow {
+  const isPacked = integerField(value, 'is_packed')
+  if (isPacked !== 0 && isPacked !== 1) {
+    throw new Error('stored event is_packed must be 0 or 1')
+  }
   const row = record(value, 'stored event')
   const ignorable = nullableSafeIntegerField(row, 'ignorable')
-  if (ignorable !== null && ignorable !== 0 && ignorable !== 1) {
-    throw new Error('stored event ignorable must be 0, 1, or null')
+  if (ignorable !== null && ignorable !== 1) {
+    throw new Error('stored event ignorable must be 1 or null')
+  }
+  if (isPacked === 1 && ignorable !== null) {
+    throw new Error('packed event rows cannot be logically ignorable')
   }
   return {
     seq: nonnegativeSafeIntegerField(row, 'seq'),
@@ -328,6 +337,7 @@ export function decodeEventRow(value: unknown): EventRow {
     data: stringOrBlobField(row, 'data'),
     source_event_seqs: nullableBlobField(row, 'source_event_seqs'),
     surface_op: nullableStringField(row, 'surface_op'),
+    is_packed: isPacked,
     ignorable,
   }
 }

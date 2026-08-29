@@ -5,6 +5,7 @@
  * @module @deepseek-ai/dsh-session-persistence-sqlite/compression
  */
 
+import { readFileSync } from 'node:fs'
 import { TextDecoder } from 'node:util'
 import { constants, zstdCompressSync, zstdDecompressSync } from 'node:zlib'
 import type { SessionEvent, SurfaceEventType } from '@deepseek-ai/dsh-session'
@@ -24,17 +25,27 @@ export interface BoundRecord {
   readonly data: string | Uint8Array
   readonly sourceEventSeqs: Uint8Array | null
   readonly surfaceOp: string | null
+  readonly isPacked: 0 | 1
   readonly ignorable: number | null
 }
 
-/** Small values stay as SQLite text to avoid per-frame CPU and byte overhead. */
+/** Minimum scalar payload size for attempting zstd compression. */
 export const ZSTD_DATA_THRESHOLD_BYTES = 4_096
 
 const MAX_SAFE_INTEGER = BigInt(Number.MAX_SAFE_INTEGER)
 const MAX_ZIGZAG_INTEGER = MAX_SAFE_INTEGER * 2n
 const UTF8_DECODER = new TextDecoder('utf-8', { fatal: true })
 const ZSTD_COMPRESSION_LEVEL = 3
-const PACKED_ROW_SENTINEL = 0
+const DELTA_TAG = 0
+const RUN_TAG = 1
+
+/** Stable dictionary bytes used by every compressed schema-20 data cell. */
+const ZSTD_DICTIONARY = readFileSync(new URL('../resources/zstd-dictionary.bin', import.meta.url))
+
+const DATA_ZSTD_OPTIONS = {
+  dictionary: ZSTD_DICTIONARY,
+  params: { [constants.ZSTD_c_compressionLevel]: ZSTD_COMPRESSION_LEVEL },
+} as const
 
 const CHUNK_TAGS = ['text-chunks', 'reasoning-chunks', 'tool-call-chunks'] as const
 type ChunkTag = typeof CHUNK_TAGS[number]
@@ -49,7 +60,11 @@ function isChunkTag(value: string): value is ChunkTag {
  * @returns every logical event represented by the row.
  */
 export function decodeRow(row: EventRow): SessionEvent[] {
-  if (row.ignorable !== PACKED_ROW_SENTINEL) return [decodeScalarRow(row)]
+  // The optional fallback keeps hand-authored v18 fixtures readable while all
+  // schema-20 rows carry the explicit physical discriminator.
+  const physical = (row as unknown as { readonly is_packed?: number }).is_packed
+  const isPacked = physical === undefined ? (legacyPackedRow(row) ? 1 : 0) : physical
+  if (isPacked === 0) return [decodeScalarRow(row)]
   if (!isChunkTag(row.type)) {
     throw new Error(`malformed ${row.type} storage row: packed discriminator requires a chunk tag`)
   }
@@ -78,7 +93,8 @@ export function bindRecord(record: StorageRecord): BoundRecord {
       data: encodeData(JSON.stringify(record.data)),
       sourceEventSeqs: null,
       surfaceOp: null,
-      ignorable: PACKED_ROW_SENTINEL,
+      isPacked: 1,
+      ignorable: null,
     }
   }
   const event = record
@@ -92,6 +108,7 @@ export function bindRecord(record: StorageRecord): BoundRecord {
       ? null
       : encodeSourceEventSeqs(surface.sourceEventSeqs),
     surfaceOp: surface.surfaceOp === undefined ? null : JSON.stringify(surface.surfaceOp),
+    isPacked: 0,
     ignorable: event.ignorable === true ? 1 : null,
   }
 }
@@ -99,22 +116,21 @@ export function bindRecord(record: StorageRecord): BoundRecord {
 function encodeData(serialized: string): string | Uint8Array {
   const bytes = Buffer.from(serialized)
   if (bytes.length < ZSTD_DATA_THRESHOLD_BYTES) return serialized
-  const compressed = zstdCompressSync(bytes, {
-    params: { [constants.ZSTD_c_compressionLevel]: ZSTD_COMPRESSION_LEVEL },
-  })
+  const compressed = zstdCompressSync(bytes, DATA_ZSTD_OPTIONS)
   return compressed.length < bytes.length ? compressed : serialized
 }
 
 function decodeData(value: string | Uint8Array, maxOutputLength?: number): string {
   if (typeof value === 'string') return value
   const decoded = maxOutputLength === undefined
-    ? zstdDecompressSync(value)
-    : zstdDecompressSync(value, { maxOutputLength })
+    ? zstdDecompressSync(value, { dictionary: ZSTD_DICTIONARY })
+    : zstdDecompressSync(value, { dictionary: ZSTD_DICTIONARY, maxOutputLength })
   return UTF8_DECODER.decode(decoded)
 }
 
 function encodeSourceEventSeqs(values: readonly number[]): Uint8Array {
-  const bytes: number[] = []
+  if (values.length === 0) return new Uint8Array()
+  const deltas = [DELTA_TAG]
   let previous = 0n
   for (let index = 0; index < values.length; index += 1) {
     const sourceSeq = values[index] as number
@@ -127,10 +143,31 @@ function encodeSourceEventSeqs(values: readonly number[]): Uint8Array {
       : value >= previous
         ? (value - previous) * 2n
         : ((previous - value) * 2n) - 1n
-    appendVarint(bytes, encoded)
+    appendVarint(deltas, encoded)
     previous = value
   }
-  return Buffer.from(bytes)
+  if (!isStrictlyIncreasing(values)) return Uint8Array.from(deltas)
+  const runs = [RUN_TAG]
+  let start = values[0] as number
+  let end = start
+  for (let index = 1; index < values.length; index += 1) {
+    const value = values[index] as number
+    if (value === end + 1) {
+      end = value
+      continue
+    }
+    appendVarint(runs, BigInt(start))
+    appendVarint(runs, BigInt(end - start + 1))
+    start = value
+    end = value
+  }
+  appendVarint(runs, BigInt(start))
+  appendVarint(runs, BigInt(end - start + 1))
+  return Uint8Array.from(runs.length < deltas.length ? runs : deltas)
+}
+
+function isStrictlyIncreasing(values: readonly number[]): boolean {
+  return values.every((value, index) => index === 0 || value > (values[index - 1] as number))
 }
 
 function appendVarint(bytes: number[], value: bigint): void {
@@ -142,10 +179,36 @@ function appendVarint(bytes: number[], value: bigint): void {
   bytes.push(Number(remaining))
 }
 
-function decodeSourceEventSeqs(bytes: Uint8Array): number[] {
+function decodeSourceEventSeqs(bytes: Uint8Array, maxEntries: number): number[] {
+  if (bytes.length === 0) return []
+  if (bytes.length === 1) return decodeDeltaVarints(bytes, 0)
+  switch (bytes[0]) {
+    case DELTA_TAG: return decodeDeltaVarints(bytes, 1)
+    case RUN_TAG: return decodeRunVarints(bytes, 1, maxEntries)
+    // A pre-schema-20 row used an untagged delta stream. Accept it for
+    // forensic fixtures; newly written rows always carry a tag.
+    default: return decodeDeltaVarints(bytes, 0)
+  }
+}
+
+function legacyPackedRow(row: EventRow): boolean {
+  if (row.ignorable === 0) return true
+  if (row.ignorable !== null || !isChunkTag(row.type)) return false
+  if (row.data instanceof Uint8Array) return true
+  if (typeof row.data !== 'string') return false
+  try {
+    const value: unknown = JSON.parse(row.data)
+    return typeof value === 'object' && value !== null
+      && ('texts' in value || 'args' in value)
+  } catch {
+    return false
+  }
+}
+
+function decodeDeltaVarints(bytes: Uint8Array, startOffset: number): number[] {
   const values: number[] = []
   let previous = 0n
-  let offset = 0
+  let offset = startOffset
   while (offset < bytes.length) {
     const first = values.length === 0
     const decoded = readVarint(bytes, offset, first ? MAX_SAFE_INTEGER : MAX_ZIGZAG_INTEGER)
@@ -161,6 +224,28 @@ function decodeSourceEventSeqs(bytes: Uint8Array): number[] {
     }
     values.push(Number(value))
     previous = value
+  }
+  return values
+}
+
+function decodeRunVarints(bytes: Uint8Array, startOffset: number, maxEntries: number): number[] {
+  const values: number[] = []
+  let offset = startOffset
+  let previousEnd = -1
+  while (offset < bytes.length) {
+    const start = readVarint(bytes, offset, MAX_SAFE_INTEGER)
+    const count = readVarint(bytes, start.offset, MAX_SAFE_INTEGER)
+    offset = count.offset
+    const first = Number(start.value)
+    const length = Number(count.value)
+    if (length < 1 || first <= previousEnd || !Number.isSafeInteger(first + length - 1)) {
+      throw new Error('malformed source_event_seqs storage value: invalid ascending range')
+    }
+    if (length > maxEntries - values.length) {
+      throw new Error('malformed source_event_seqs storage value: run exceeds its event sequence')
+    }
+    for (let index = 0; index < length; index += 1) values.push(first + index)
+    previousEnd = first + length - 1
   }
   return values
 }
@@ -198,10 +283,16 @@ function isChunkRow(record: StorageRecord): record is ChunkRow {
 }
 
 function decodeScalarRow(row: EventRow): SessionEvent {
+  const sourceEventSeqs = row.source_event_seqs === null
+    ? undefined
+    : decodeSourceEventSeqs(row.source_event_seqs, row.seq)
+  if (sourceEventSeqs !== undefined && sourceEventSeqs.some(seq => seq > row.seq)) {
+    throw new Error('malformed source_event_seqs storage value: decoded seq is out of range')
+  }
   const surfaceFields = {
-    ...row.source_event_seqs === null
+    ...sourceEventSeqs === undefined
       ? {}
-      : { sourceEventSeqs: decodeSourceEventSeqs(row.source_event_seqs) },
+      : { sourceEventSeqs },
     ...row.surface_op === null
       ? {}
       : { surfaceOp: JSON.parse(row.surface_op) as SessionEvent<SurfaceEventType>['surfaceOp'] },

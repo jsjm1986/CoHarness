@@ -25,6 +25,7 @@ import {
   runPersistenceContract,
 } from '../../session-persistence/tests/contract.ts'
 import { MAX_PACKED_DATA_BYTES } from '../src/codec.ts'
+import { decodeRow } from '../src/compression.ts'
 import {
   decodeEventRow,
   decodeSessionRow,
@@ -217,12 +218,9 @@ runCoordinatorContract('sqlite', async (): Promise<CoordinatorFixture> => {
     mount: async ctx => ctx.plugin(SessionPersistenceSqlite, { path }),
     corruptTail: async (id) => {
       const db = new DatabaseSync(path)
-      const last = db.prepare(testSql('select-last-event'))
-        .get(id) as { seq: number; type: string; data: string }
-      const logicalLength = last.type === 'text-chunks'
-        ? (JSON.parse(last.data) as { texts: string[] }).texts.length
-        : 1
-      const next = last.seq + logicalLength
+      const rows = db.prepare(testSql('select-event-rows')).all(id)
+      const events = rows.flatMap(row => decodeRow(decodeEventRow(row)))
+      const next = (events.at(-1)?.seq ?? -1) + 1
       db.prepare(testSql('insert-corrupt-event'))
         .run(id, next, 'assistant/chunk', 99, '{not valid json', null)
       db.close()
@@ -529,7 +527,7 @@ describe('SessionPersistenceSqlite schema ownership', () => {
 
     const foreignPath = await freshDbPath('dsh-sqlite-foreign-')
     const foreign = new DatabaseSync(foreignPath)
-    foreign.exec(testSql('set-user-version-18'))
+    foreign.exec(testSql('set-user-version-20'))
     foreign.exec(testSql('set-application-id-12345'))
     foreign.close()
     await expect(openDatabase(DatabaseSync, foreignPath, 'wal', DEFAULT_BUSY_TIMEOUT_MS)).rejects.toThrow(/has application id 12345/)
@@ -630,7 +628,7 @@ describe('SessionPersistenceSqlite schema ownership', () => {
 
     const eventRow = {
       seq: 0, type: 'turn/start', time: 1, data: '{}',
-      source_event_seqs: null, surface_op: null, ignorable: null,
+      source_event_seqs: null, surface_op: null, is_packed: 0, ignorable: null,
     }
     for (const [value, message] of [
       [null, /object/],
@@ -639,7 +637,7 @@ describe('SessionPersistenceSqlite schema ownership', () => {
       [{ ...eventRow, time: '1' }, /time.*safe integer/],
       [{ ...eventRow, data: 1 }, /data.*string or blob/],
       [{ ...eventRow, source_event_seqs: 1 }, /source_event_seqs.*blob or null/],
-      [{ ...eventRow, ignorable: 2 }, /ignorable.*0, 1, or null/],
+      [{ ...eventRow, ignorable: 2 }, /ignorable.*1.*null/],
     ] as const) {
       expect(() => decodeEventRow(value)).toThrow(message)
     }

@@ -42,6 +42,8 @@
     "test:snapshot:record": "DSH_SNAPSHOT=record vitest run --config vitest.snapshot.config.ts --update",
     "test:snapshot:refresh": "DSH_SNAPSHOT=refresh vitest run --config vitest.snapshot.config.ts",
     "migrate:packed-session-fixtures": "tsx scripts/migrate-packed-session-fixtures.ts",
+    "migrate:session-sqlite-v18-to-v20": "tsx scripts/migrate-session-sqlite-v18-to-v20.ts",
+    "migrate:session-sqlite-v20-to-v18": "tsx scripts/migrate-session-sqlite-v20-to-v18.ts",
     "test:web": "npm run build && npm run test:web:built",
     "test:web:refresh": "npm run build && DSH_SNAPSHOT=refresh vitest run --config vitest.web.config.ts",
     "test:web:built": "vitest run --config vitest.web.config.ts",

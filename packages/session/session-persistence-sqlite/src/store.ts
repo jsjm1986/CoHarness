@@ -217,8 +217,8 @@ export class SqliteStore implements PersistenceBackend<number> {
         if (current.tornFrom !== tornMarker) {
           throw new Error(`session ${meta.id} repair is stale: physical tail no longer starts at seq ${tornMarker}`)
         }
-        this.db.prepare(sql('delete-events-from'))
-          .run(meta.id, tornMarker)
+        this.db.prepare(sql('delete-event-extensions-from')).run(meta.id, tornMarker)
+        this.db.prepare(sql('delete-events-from')).run(meta.id, tornMarker)
       } else if (current.tornFrom !== undefined) {
         throw new Error(`session ${meta.id} repair omitted current torn tail at seq ${current.tornFrom}`)
       }
@@ -370,20 +370,25 @@ export class SqliteStore implements PersistenceBackend<number> {
   }
 
   private insertRecord(insert: StatementSync, id: SessionId, record: BoundRecord): void {
-    insert.run(
-      id,
+    const result = insert.run(
       record.seq,
       record.type,
       record.time,
       record.data,
       record.sourceEventSeqs,
       record.surfaceOp,
-      record.ignorable,
+      record.isPacked,
+      id,
     )
+    if (Number(result.changes) !== 1) throw new Error(`session ${id} metadata row is missing`)
+    if (record.ignorable === 1) {
+      const extension = this.db.prepare(sql('insert-event-ignorable')).run(record.seq, id)
+      if (Number(extension.changes) !== 1) throw new Error(`session ${id} event ${record.seq} metadata row is missing`)
+    }
   }
 
   private writeRow(meta: SessionHeader): void {
-    this.db.prepare(sql('upsert-session')).run(
+    const result = this.db.prepare(sql('upsert-session')).get(
       meta.id,
       meta.version,
       meta.createdAt,
@@ -393,9 +398,14 @@ export class SqliteStore implements PersistenceBackend<number> {
       meta.origin ?? null,
       meta.delegationDepth ?? null,
       meta.agentPreset ?? null,
-      meta.draft === true ? 1 : 0,
       randomUUID(),
     )
+    if (result === undefined) throw new Error(`session ${meta.id} metadata row is missing after upsert`)
+    const extension = this.db.prepare(sql('upsert-session-extension')).run(
+      meta.draft === true ? 1 : 0,
+      meta.id,
+    )
+    if (Number(extension.changes) !== 1) throw new Error(`session ${meta.id} draft extension row is missing`)
   }
 }
 

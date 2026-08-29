@@ -4,7 +4,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { appendFile, mkdtemp, mkdir, rm, readFile, writeFile, readdir, stat, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
-import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
+import SessionStore, { encodeSeqRanges, SessionId } from '@deepseek-ai/dsh-session'
 import type { Session, SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import {
@@ -1211,9 +1211,15 @@ describe('JsonlSessionPersistence: default packed chunk rows', () => {
     expect(scanned.committedBytes).toBe(Buffer.byteLength(headerAndTurn, 'utf8'))
   })
 
-  it('eventLines(packChunks: false) is byte-identical to the pre-packing layout', () => {
+  it('eventLines(packChunks: false) range-encodes provenance without changing events', () => {
     const log = chunkRunLog()
-    expect(eventLines(log, false)).toBe(log.map(e => JSON.stringify(e)).join('\n'))
+    const expected = log.map((event) => {
+      const sourceEventSeqs = (event as SessionEvent & { sourceEventSeqs?: number[] }).sourceEventSeqs
+      return JSON.stringify(sourceEventSeqs === undefined
+        ? event
+        : { ...event, sourceEventSeqs: encodeSeqRanges(sourceEventSeqs) })
+    }).join('\n')
+    expect(eventLines(log, false)).toBe(expected)
   })
 })
 

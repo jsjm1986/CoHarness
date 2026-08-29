@@ -25,6 +25,7 @@ export type TestSqlName =
   | 'set-user-version-16'
   | 'set-user-version-17'
   | 'set-user-version-18'
+  | 'set-user-version-20'
   | 'update-invalid-session-metadata'
 
 /** Load one fixed test SQL resource. */

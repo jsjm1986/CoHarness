@@ -54,6 +54,8 @@ Session-event import separates ownership from message validation. `snapshotSessi
 
 The shared [storage codec](src/chunk-rows.ts) losslessly converts event sequences to compact rows and back. It preserves unrecognized events verbatim and rejects malformed encoded rows; persistence backends decide whether to enable packed writes.
 
+`encodeSeqRanges()` and `decodeSeqRanges()` provide a second lossless storage helper for surface provenance arrays. Consecutive runs can be represented as inclusive `[start, end]` pairs; the decoder accepts the historical number-only representation as well.
+
 ### Surface types
 
 This package owns ordered surface projection, replacement validation, replay, and the type guards that distinguish append-origin from replacement events. The [surface type catalog](../../../docs/subsystems/session.md#surface-types) owns the exact shapes and field semantics. A human transcript must project append-origin events rather than `session.surface`, because landed replacements shadow history the reader already saw; model-facing consumers continue to read `session.surface`.

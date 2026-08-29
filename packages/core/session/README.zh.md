@@ -54,6 +54,8 @@
 
 共享的[存储编解码器](src/chunk-rows.ts)在事件序列与紧凑行之间无损转换。它会逐字保留无法识别的事件，并拒绝形态错误的编码行；是否启用打包写入由持久化后端决定。
 
+`encodeSeqRanges()` 与 `decodeSeqRanges()` 为 surface 来源数组提供另一组无损存储辅助函数。连续段可以表示为闭区间 `[start, end]`，解码器也接受历史的纯数字数组表示。
+
 ### Surface 类型
 
 此包拥有有序 surface 投影、替换校验、回放，以及区分追加来源事件与替换事件的类型守卫。[surface 类型目录](../../../docs/subsystems/session.zh.md#surface-types)拥有精确形状与字段语义。面向人的 transcript（文本记录）必须投影追加来源事件，而不是 `session.surface`，因为已落地的替换会遮蔽读者已经看到的历史；面向模型的消费方继续读取 `session.surface`。

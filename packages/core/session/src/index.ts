@@ -41,6 +41,8 @@ export {
   materializesSession,
 } from './surface.ts'
 export { canonicalHeader, foldRequestHeader, headerEquals } from './request-header.ts'
+export { decodeSeqRanges, encodeSeqRanges } from './seq-ranges.ts'
+export type { EncodedSeq } from './seq-ranges.ts'
 export { KNOWN_SESSION_EVENT_TYPES } from './known-event-types.ts'
 
 declare module '@deepseek-ai/cordis' {

@@ -9,7 +9,9 @@
  */
 
 import { join } from 'node:path'
-import { decodeStorageRecord, packChunkRuns, SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
+import {
+  decodeSeqRanges, decodeStorageRecord, encodeSeqRanges, packChunkRuns, SESSION_FORMAT_VERSION,
+} from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionHeader, SessionId, StorageRecord } from '@deepseek-ai/dsh-session'
 import { SessionFormatUnsupportedError, sessionFormatVersionRefusal } from '@deepseek-ai/dsh-session-persistence'
 
@@ -225,7 +227,26 @@ export function logPath(
  */
 export function eventLines(events: readonly SessionEvent[], packChunks: boolean): string {
   const records: readonly StorageRecord[] = packChunks ? packChunkRuns(events) : events
-  return records.map(record => JSON.stringify(record)).join('\n')
+  return records.map(record => JSON.stringify(encodeProvenanceForStorage(record))).join('\n')
+}
+
+/** Shrink consecutive provenance runs while retaining every referenced sequence. */
+function encodeProvenanceForStorage(record: StorageRecord): unknown {
+  if (!('sourceEventSeqs' in record)) return record
+  return { ...record, sourceEventSeqs: encodeSeqRanges(record.sourceEventSeqs) }
+}
+
+/** Expand a parsed storage record's range-form provenance before validation. */
+function expandProvenanceFromStorage(parsed: unknown): unknown {
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new TypeError('stored session records must be objects')
+  }
+  const record = parsed as { seq?: unknown; sourceEventSeqs?: unknown }
+  if (record.sourceEventSeqs === undefined) return parsed
+  if (!Number.isSafeInteger(record.seq) || (record.seq as number) < 0) {
+    throw new TypeError('stored session event seq must be a non-negative safe integer')
+  }
+  return { ...record, sourceEventSeqs: decodeSeqRanges(record.sourceEventSeqs, record.seq as number) }
 }
 
 interface SessionLogScan {
@@ -353,7 +374,7 @@ export class SessionLogScanner {
     this.eventLine += 1
     let decoded: SessionEvent[]
     try {
-      decoded = decodeStorageRecord(JSON.parse(line.toString('utf8')))
+      decoded = decodeStorageRecord(expandProvenanceFromStorage(JSON.parse(line.toString('utf8'))))
     } catch {
       this.issue ??= new Error(`corrupt session log: unparsable committed event at line ${this.eventLine}`)
       return

@@ -29,6 +29,7 @@
     "lib/index.js",
     "lib/invariant.js",
     "resources/sql/**/*.sql",
+    "resources/zstd-dictionary.bin",
     "lib/types/**/*.d.ts"
   ],
   "license": "MIT",

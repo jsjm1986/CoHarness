@@ -4,7 +4,8 @@ CREATE TABLE persistence_state (
 ) STRICT;
 
 CREATE TABLE sessions (
-  id               TEXT PRIMARY KEY,
+  id               INTEGER PRIMARY KEY,
+  session_key      TEXT NOT NULL UNIQUE,
   version          INTEGER NOT NULL,
   created_at       INTEGER NOT NULL,
   cwd              TEXT,
@@ -13,19 +14,31 @@ CREATE TABLE sessions (
   origin           TEXT,
   delegation_depth INTEGER,
   agent_preset     TEXT,
-  draft            INTEGER NOT NULL DEFAULT 0 CHECK (draft IN (0, 1)),
   incarnation      TEXT NOT NULL,
   revision         INTEGER NOT NULL
 ) STRICT;
 
 CREATE TABLE events (
-  session_id        TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  session_id        INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
   seq               INTEGER NOT NULL,
   type              TEXT NOT NULL,
   time              INTEGER NOT NULL,
   data              ANY NOT NULL,
   source_event_seqs ANY,
   surface_op        TEXT,
-  ignorable         INTEGER CHECK (ignorable IS NULL OR ignorable IN (0, 1)),
+  is_packed         INTEGER NOT NULL CHECK (is_packed IN (0, 1)),
   PRIMARY KEY (session_id, seq)
+) STRICT;
+
+CREATE TABLE session_extensions (
+  session_id        INTEGER PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
+  draft             INTEGER NOT NULL CHECK (draft IN (0, 1))
+) STRICT;
+
+CREATE TABLE event_extensions (
+  session_id        INTEGER NOT NULL,
+  seq               INTEGER NOT NULL,
+  ignorable         INTEGER NOT NULL CHECK (ignorable = 1),
+  PRIMARY KEY (session_id, seq),
+  FOREIGN KEY (session_id, seq) REFERENCES events(session_id, seq) ON DELETE CASCADE
 ) STRICT;
