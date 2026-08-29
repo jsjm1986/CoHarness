@@ -438,6 +438,8 @@ export interface ConnectionConfig {
    * message group may exceed it.
    */
   historyPageTargetBytes?: number
+  /** Interval between host-side WebSocket Ping control frames. */
+  websocketHeartbeatIntervalMs?: number
 }
 ```
 

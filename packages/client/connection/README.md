@@ -18,6 +18,8 @@ The node half guards every entry under `/api` before bridging or upgrading (`src
 
 ## `/api` WebSocket downlinks
 
+The Host sends a WebSocket Ping control frame to every open downlink at `websocketHeartbeatIntervalMs` (30 seconds by default). Browsers answer with Pong at the protocol layer; these frames never enter the application stream and the timer is stopped during disposal.
+
 Each browser downlink keeps a head-indexed queue capped at 1,024 frames and 8 MiB of encoded data. A stalled consumer closes that socket and lets the connection generation reconnect instead of retaining an unbounded burst.
 
 `/api/events.mux` and `/api/events.host` each accept a WebSocket upgrade and send only the corresponding `ServerRequest` text messages to the browser; the client sends no application data over these sockets. If either socket ends, the current connection generation fails and rebuilds both streams; readiness still requires both sockets to be open and the `host.describe` HTTP call to succeed. Host teardown terminates both sockets, aborts their sources, and waits for source cleanup before returning. Ordinary network GETs to these paths return 426 with no SSE fallback; `toFetchHandler`'s SSE codec serves only the isomorphic in-process carrier.

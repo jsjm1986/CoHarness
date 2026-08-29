@@ -2,6 +2,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { IncomingHttpHeaders } from 'node:http'
 import z from '@deepseek-ai/schemastery'
+import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import type {} from '@deepseek-ai/dsh-attachment'
 // Activates the webServer Context merge used below.
 import type { WebRoute, WebUpgradeRoute } from '@deepseek-ai/dsh-host-webserver'
@@ -95,12 +96,15 @@ export interface ConnectionConfig {
    * message group may exceed it.
    */
   historyPageTargetBytes?: number
+  /** Interval between host-side WebSocket Ping control frames. */
+  websocketHeartbeatIntervalMs?: number
 }
 
 export const Config: z<ConnectionConfig> = z.object({
   trustedHosts: z.array(String).default([]),
   maxRequestBodyBytes: z.natural().min(1).default(DEFAULT_MAX_REQUEST_BODY_BYTES),
   historyPageTargetBytes: z.natural().min(1).default(DEFAULT_HISTORY_PAGE_TARGET_BYTES),
+  websocketHeartbeatIntervalMs: z.number().step(1).min(1).max(MAX_TIMER_DELAY_MS).default(30_000),
 })
 
 /**
@@ -170,6 +174,12 @@ export function apply(ctx: Context, config?: ConnectionConfig): void {
   const maxRequestBodyBytes = config?.maxRequestBodyBytes ?? DEFAULT_MAX_REQUEST_BODY_BYTES
   const historyPageTargetBytes =
     config?.historyPageTargetBytes ?? DEFAULT_HISTORY_PAGE_TARGET_BYTES
+  const websocketHeartbeatIntervalMs = config?.websocketHeartbeatIntervalMs ?? 30_000
+  if (!Number.isSafeInteger(websocketHeartbeatIntervalMs)
+    || websocketHeartbeatIntervalMs < 1
+    || websocketHeartbeatIntervalMs > MAX_TIMER_DELAY_MS) {
+    throw new Error(`client-connection websocketHeartbeatIntervalMs must be a positive safe integer no greater than ${MAX_TIMER_DELAY_MS}`)
+  }
   // Config boundary: a malformed entry fails the load loudly here rather than
   // silently authorizing its hostname prefix at request time.
   for (const entry of trustedHosts) assertTrustedAuthority(entry)
@@ -220,7 +230,7 @@ export function apply(ctx: Context, config?: ConnectionConfig): void {
   ctx.effect(() => ctx.webServer.register(route), 'client-connection: /api route')
   ctx.inject(['apiProxy'], (apiCtx) => {
     assertImageBodyCapacity(apiCtx, maxRequestBodyBytes)
-    const downlinks = new WebSocketDownlinks(apiCtx.apiProxy)
+    const downlinks = new WebSocketDownlinks(apiCtx.apiProxy, websocketHeartbeatIntervalMs)
     const registerDownlink = (
       path: string,
       handle: WebUpgradeRoute['handler'],

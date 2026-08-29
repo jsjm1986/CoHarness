@@ -8,6 +8,7 @@ import type { AddressInfo } from 'node:net'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { ApiProxy } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type { AttachmentStore } from '@deepseek-ai/dsh-attachment'
+import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import { RpcId, type ClientRequest } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type { WebServer, WebRoute, WebUpgradeRoute } from '@deepseek-ai/dsh-host-webserver'
 import {
@@ -17,6 +18,7 @@ import {
   HOST_EVENTS_PATH,
   inject,
   MUX_EVENTS_PATH,
+  Config,
   type ConnectionConfig,
   type HostConnectionHandle,
 } from '../src/index.ts'
@@ -102,6 +104,15 @@ async function mounted(
 }
 
 describe('connection node half', () => {
+  it('validates the WebSocket heartbeat interval', () => {
+    expect(Config({})).toMatchObject({ websocketHeartbeatIntervalMs: 30_000 })
+    expect(Config({ websocketHeartbeatIntervalMs: MAX_TIMER_DELAY_MS }))
+      .toMatchObject({ websocketHeartbeatIntervalMs: MAX_TIMER_DELAY_MS })
+    for (const value of [0, 1.5, MAX_TIMER_DELAY_MS + 1]) {
+      expect(() => Config({ websocketHeartbeatIntervalMs: value })).toThrow()
+    }
+  })
+
   it('fails loud when the carrier cap cannot hold the configured image batch', () => {
     const ctx = new Context()
     const routes: WebRoute[] = []

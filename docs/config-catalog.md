@@ -436,10 +436,12 @@ export interface ConnectionConfig {
    * message group may exceed it.
    */
   historyPageTargetBytes?: number
+  /** Interval between host-side WebSocket Ping control frames. */
+  websocketHeartbeatIntervalMs?: number
 }
 ```
 
-Source: [`packages/client/connection/src/index.ts:80`](../packages/client/connection/src/index.ts)
+Source: [`packages/client/connection/src/index.ts:81`](../packages/client/connection/src/index.ts)
 
 <a id="deepseek-aidsh-client-hmr"></a>
 
@@ -2902,7 +2904,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/fs/tool-str-replace-editor/src/index.ts:497`](../packages/fs/tool-str-replace-editor/src/index.ts)
+Source: [`packages/fs/tool-str-replace-editor/src/index.ts:505`](../packages/fs/tool-str-replace-editor/src/index.ts)
 
 <a id="deepseek-aidsh-tool-subagent"></a>
 

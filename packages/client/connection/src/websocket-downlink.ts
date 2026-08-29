@@ -51,9 +51,16 @@ function failureFrame(error: unknown): RpcRequest<Frame> {
 export class WebSocketDownlinks {
   private readonly server = new WebSocketServer({ noServer: true })
   private readonly pumps = new Set<Promise<void>>()
+  private heartbeatTimer: NodeJS.Timeout | undefined
 
-  /** @param api - host API supplying the typed event streams. */
-  constructor(private readonly api: ApiProxy) {}
+  /**
+   * @param api - host API supplying the typed event streams.
+   * @param heartbeatIntervalMs - interval between protocol Ping frames.
+   */
+  constructor(
+    private readonly api: ApiProxy,
+    private readonly heartbeatIntervalMs = 30_000,
+  ) {}
 
   /**
    * Upgrade one socket and pump the mux stream until either side closes.
@@ -86,6 +93,8 @@ export class WebSocketDownlinks {
    * @returns A promise resolving after every socket and source iterator stops.
    */
   async close(): Promise<void> {
+    clearInterval(this.heartbeatTimer)
+    this.heartbeatTimer = undefined
     for (const socket of this.server.clients) socket.terminate()
     await new Promise<void>((resolve, reject) => {
       this.server.close((error) => {
@@ -96,6 +105,17 @@ export class WebSocketDownlinks {
     await Promise.all(this.pumps)
   }
 
+  /** Start one unref'ed timer after the first upgrade; it remains resident until close(). */
+  private startHeartbeat(): void {
+    if (this.heartbeatTimer !== undefined) return
+    this.heartbeatTimer = setInterval(() => {
+      for (const socket of this.server.clients) {
+        if (socket.readyState === WebSocket.OPEN) socket.ping()
+      }
+    }, this.heartbeatIntervalMs)
+    this.heartbeatTimer.unref()
+  }
+
   private upgrade<F extends Frame>(
     req: IncomingMessage,
     socket: Duplex,
@@ -103,6 +123,7 @@ export class WebSocketDownlinks {
     open: (signal: AbortSignal) => AsyncIterable<RpcRequest<F>>,
   ): void {
     this.server.handleUpgrade(req, socket, head, (websocket) => {
+      this.startHeartbeat()
       const abort = new AbortController()
       websocket.once('close', () => { abort.abort() })
       websocket.once('error', () => { abort.abort() })

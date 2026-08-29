@@ -14,6 +14,8 @@ The real browser carrier opens one independent WebSocket for each downlink strea
 
 WebSocket carries only the host→browser downlink. All client→host unary calls and `respond` operations for server requests continue to use the existing `POST /api/*`; the WebSocket accepts no client application messages. `WebApiClient` therefore holds HTTP `fetch` for uplink and WebSocket for downlink, while the fixture and `InProcessApiClient(toFetchHandler(api))` continue to implement the same two-stream `IApiClient` abstraction. The in-process fetch carrier retains SSE encoding and decoding to verify the channel-independent protocol's isomorphism, but network GET requests to `/api/events.*` answer only Upgrade Required and do not provide a browser compatibility fallback.
 
+The Host sends protocol-level Ping frames to every open downlink at the configured `websocketHeartbeatIntervalMs` interval, defaulting to 30 seconds. Browsers answer with Pong without adding application frames; the unref'ed timer is stopped during teardown.
+
 ## Upgrade and lifecycle boundaries
 
 `dsh-host-webserver` provides an exact upgrade-route registration point alongside ordinary routes, dispatches Node upgrade sockets by pathname only, contains raw-socket errors, and waits for surviving upgraded connections to close during server teardown; it knows nothing about Harness frames or WebSocket messages. `dsh-client-connection` owns the WebSocket handshake, frame output, and stream cancellation, and reuses the `/api` Host/Origin trust fence before upgrade. An untrusted authority or cross-origin Origin is rejected before `ctx.apiProxy.events.*` starts.
