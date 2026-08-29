@@ -14,7 +14,7 @@ import {
   renderConfigDump,
   type ConfigDumpLayer,
 } from '@deepseek-ai/dsh-app-boot'
-import { homePatchPath, prepareProfile, PROFILE_ROOT_FILENAME } from './profile-boot.ts'
+import { composeRows, homePatchPath, prepareProfile, PROFILE_ROOT_FILENAME, resolveShippedPresetPatch } from './profile-boot.ts'
 
 const NAME = 'dsh'
 
@@ -46,6 +46,10 @@ export function runDumpConfig(profile: string, defaultOnly: boolean, patches: re
       const absolute = resolve(file)
       layers.push({ label: absolute, patches: loadOverlayPatches(NAME, absolute) })
     }
+  }
+  const presetPatch = resolveShippedPresetPatch(composeRows(layers.map(layer => layer.patches)))
+  if (presetPatch !== undefined) {
+    layers.push({ label: `${NAME} launcher (shipped agent-preset root)`, patches: [presetPatch] })
   }
   // The dump anchors on the same empty root file the boot includes.
   process.stdout.write(renderConfigDump(NAME, join(loaded.dir, PROFILE_ROOT_FILENAME), layers))

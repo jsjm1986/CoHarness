@@ -1,7 +1,8 @@
 /**
  * Shared profile boot for every `dsh` surface: resolve the profile, stack its
  * patch layers (bundle layers in `dsh.profile.bundles` order, the profile's
- * own `cordis.patch.yml`, `--patch` overlays, the telemetry switch), mount the
+ * own `cordis.patch.yml`, `--patch` overlays, the launcher-derived shipped
+ * preset root, and the telemetry switch), mount the
  * tree over the profile's empty root config, keep the profile patch layer
  * live, and wire fail-loud plus bounded shutdown.
  *
@@ -16,7 +17,7 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { FiberState, type Context } from '@deepseek-ai/cordis'
 import type { PatchOptions } from '@deepseek-ai/cordis-plugin-include'
-import type { EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
+import { isJsExpr, type EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
 import {
   boot,
   composeEntries,
@@ -59,7 +60,8 @@ const TELEMETRY_ROW_ID = 'session-telemetry-otel'
 /** The empty root entry list every profile tree patches over. */
 const PROFILE_ROOT_CONFIG = `# dsh profile root — an empty entry list. The tree is composed as patches:
 # each bundle in package.json's dsh.profile.bundles, then cordis.patch.yml, then any
-# --patch overlays. Edit cordis.patch.yml, not this file.
+# --patch overlays. The launcher adds the shipped preset root after those layers.
+# Edit cordis.patch.yml, not this file.
 []
 `
 
@@ -120,12 +122,61 @@ interface ComposedProfile {
 
 /** The full patch stack of one composed profile, in application order. */
 function allPatches(composed: ComposedProfile): PatchOptions[] {
-  return [
-    ...composed.bundlePatches,
-    ...composed.profile.patches,
-    ...composed.homePatches,
-    ...composed.overlays,
-  ]
+  return composeProfilePatches([
+    composed.bundlePatches,
+    composed.profile.patches,
+    composed.homePatches,
+    composed.overlays,
+  ])
+}
+
+/**
+ * Compose patch layers and index the resulting rows by id.
+ * @param layers - patch lists in application order.
+ * @returns id → composed row, for rows that carry a string id.
+ */
+export function composeRows(layers: readonly PatchOptions[][]): Map<string, EntryOptions> {
+  const rows = new Map<string, EntryOptions>()
+  for (const row of composeEntries(layers)) {
+    if (typeof row.id === 'string') rows.set(row.id, row)
+  }
+  return rows
+}
+
+/**
+ * Derive the shipped agent-preset-root patch from one composed row set.
+ * @param rows - id → row of the composed tree the patch applies over.
+ * @returns the roster patch, or `undefined` when the composition has no roster row.
+ */
+export function resolveShippedPresetPatch(rows: ReadonlyMap<string, EntryOptions>): PatchOptions | undefined {
+  const row = rows.get('agent-presets')
+  if (row === undefined) return undefined
+  const config: unknown = row.config ?? {}
+  if (typeof config !== 'object' || config === null || Array.isArray(config) || isJsExpr(config)) {
+    throw new TypeError(`${NAME}: agent-presets config must be a literal mapping — the launcher prepends the shipped preset root into it`)
+  }
+  const configured = (config as Record<string, unknown>).roots ?? []
+  if (!Array.isArray(configured)) {
+    throw new TypeError(`${NAME}: agent-presets config.roots must be a literal array — the launcher prepends the shipped preset root into it`)
+  }
+  return {
+    id: 'agent-presets',
+    config: {
+      ...(config as Record<string, unknown>),
+      roots: [{ path: SHIPPED_PRESET_ROOT, trust: 'system' }, ...configured],
+    },
+  }
+}
+
+/**
+ * Compose one generation's full patch stack, including the launcher-derived
+ * shipped preset root after all user layers.
+ * @param layers - patch lists in application order.
+ * @returns the flattened stack with the derived roster patch appended.
+ */
+export function composeProfilePatches(layers: readonly PatchOptions[][]): PatchOptions[] {
+  const presetPatch = resolveShippedPresetPatch(composeRows(layers))
+  return [...layers.flat(), ...presetPatch === undefined ? [] : [presetPatch]]
 }
 
 /**
@@ -147,24 +198,8 @@ function composeProfile(
   const homePatches = loadOptionalPatches(NAME, homePatchPath()) ?? []
   const overlays = patchFiles.flatMap(file => loadOverlayPatches(NAME, resolve(file)))
   const bundlePatches = profile.layers.flatMap(layer => layer.patches)
-  const rows = new Map<string, EntryOptions>()
-  for (const row of composeEntries([bundlePatches, profile.patches, homePatches, overlays])) {
-    if (typeof row.id === 'string') rows.set(row.id, row)
-  }
+  const rows = composeRows([bundlePatches, profile.patches, homePatches, overlays])
   const composedOverlays = [...overlays]
-  // The SHIPPED root is the part of the roster only this app can resolve: it
-  // sits beside this app's own config, in both the source and built layouts.
-  // The writable root the roster appends is `dsh-agent-presets`' own, so a
-  // launcher that never reaches this patch still finds a person's presets.
-  if (rows.has('agent-presets')) {
-    composedOverlays.push({
-      id: 'agent-presets',
-      config: {
-        ...(rows.get('agent-presets')?.config ?? {}) as Record<string, unknown>,
-        roots: [{ path: SHIPPED_PRESET_ROOT, trust: 'system' }],
-      },
-    })
-  }
   const telemetryPatch = resolveTelemetryPatch(process.env.DSH_TELEMETRY_DISABLED, rows.has(TELEMETRY_ROW_ID))
   if (telemetryPatch !== undefined) composedOverlays.push(telemetryPatch)
   return { profile, bundlePatches, homePatches, overlays: composedOverlays, rows }
@@ -237,12 +272,12 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
   // objects in place. Reusing one parsed patch object across applications
   // would bake a user override into the bundle's in-memory insert row, so
   // removing the override could never revert the row to the bundle default.
-  const composeLive = (): PatchOptions[] => structuredClone([
-    ...composed.bundlePatches,
-    ...loadOptionalPatches(NAME, composed.profile.patchPath) ?? [],
-    ...loadOptionalPatches(NAME, homePatchPath()) ?? [],
-    ...composed.overlays,
-  ])
+  const composeLive = (): PatchOptions[] => structuredClone(composeProfilePatches([
+    composed.bundlePatches,
+    loadOptionalPatches(NAME, composed.profile.patchPath) ?? [],
+    loadOptionalPatches(NAME, homePatchPath()) ?? [],
+    composed.overlays,
+  ]))
   // Cloned for the same insert-aliasing reason as composeLive: the boot
   // application must not mutate the objects later reloads recompose from.
   const ctx = await boot(NAME, rootConfig, structuredClone(allPatches(composed)), (hostCtx) => {
