@@ -22,6 +22,7 @@ A shipping web-tool deployment sets the provider backstop above the tool budget,
 - Follows only **same-origin** redirects; a cross-origin redirect fails with `WEB_REDIRECT_BLOCKED`, requiring a fresh tool call (the model of Claude Code's WebFetch).
 - Sends an explicit product `User-Agent`, never a browser disguise.
 - Rejects unsupported (e.g. binary) content types with `WEB_UNSUPPORTED_CONTENT_TYPE`.
+- Resolves every hostname before connecting and rejects loopback, private, link-local, multicast, and other non-public addresses (`WEB_BLOCKED_URL`). The validated address set is pinned for the request so a DNS rebinding response cannot switch the connection to a private destination.
 
 ## Config
 
@@ -46,6 +47,6 @@ No direct invalidation; the named consumer owns any request-prefix changes.
 
 ## Known Limitations and Deferred Work
 
-- **SSRF / private-network protection is deferred** — no blocking of private, loopback, link-local, multicast, or otherwise non-public destinations, no DNS-resolve-then-validate, no per-hop re-validation (see [the web capability seam Agent Note](../../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.md)). Until it lands, this provider is an SSRF primitive and **must not be enabled** in a deployment that can reach sensitive internal network targets.
+- **Public-network policy is deliberately strict** — destinations that resolve to any non-public address are rejected, and all same-origin redirect hops are resolved and checked again. Deployments that need private services must provide a separate, explicitly reviewed provider rather than weakening this policy.
 - **Only textual content decodes** — html/xhtml and `text/*`-plus-JSON/XML families; a missing `Content-Type` or any binary type throws `WEB_UNSUPPORTED_CONTENT_TYPE`, and text-extractable PDF decoding is named deferred work.
 - **Charset comes only from the `Content-Type` header** (UTF-8 default) — an HTML `<meta charset>` declaration is ignored, and a declared-but-unrecognized charset label throws rather than falling back.

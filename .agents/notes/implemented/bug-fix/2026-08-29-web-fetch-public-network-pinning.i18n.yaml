@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-29-web-fetch-public-network-pinning.md
+2026-08-29-web-fetch-public-network-pinning.md: e5ed6480375329064a4506943c29814a880d1ece
+2026-08-29-web-fetch-public-network-pinning.zh.md: bcbe88363c178e35582197e21fd3d777a2d656dd

@@ -6,6 +6,7 @@ import WebRuntime from '@deepseek-ai/dsh-web'
 import { HttpFetchProvider, LOCAL_FETCH_PROVIDER_ID } from '@deepseek-ai/dsh-web-fetch-http'
 import type { HttpFetchLimits } from '@deepseek-ai/dsh-web-fetch-http'
 import * as fetchPlugin from '@deepseek-ai/dsh-web-fetch-http'
+import { publicHttpNetwork } from '../src/network.ts'
 import { classifyContentType, decoderForCharset, isSameOrigin, parseCharset, validateFetchUrl } from '../src/policy.ts'
 
 const limits: HttpFetchLimits = {
@@ -29,10 +30,12 @@ beforeEach(async () => {
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   const { port } = server.address() as AddressInfo
   base = `http://127.0.0.1:${port}`
+  vi.spyOn(publicHttpNetwork, 'resolve').mockResolvedValue([{ address: '127.0.0.1', family: 4 }])
 })
 
 afterEach(async () => {
   vi.unstubAllGlobals()
+  vi.restoreAllMocks()
   await new Promise<void>(resolve => server.close(() => { resolve() }))
 })
 
@@ -342,9 +345,16 @@ describe('HttpFetchProvider body cancellation on error paths', () => {
     return { response, cancelled: () => cancelled }
   }
 
+  function stubRequest(response: Response): void {
+    vi.spyOn(publicHttpNetwork, 'request').mockResolvedValue({
+      response: response as import('undici').Response,
+      close: async () => {},
+    })
+  }
+
   it('cancels the body when a cross-origin redirect is blocked', async () => {
     const { response, cancelled } = fakeResponse({ status: 302, headers: {}, location: 'https://elsewhere.test/' })
-    vi.stubGlobal('fetch', vi.fn(async () => response))
+    stubRequest(response)
     await expect(provider().fetch({ url: 'http://127.0.0.1:9/' }))
       .rejects.toThrow(expect.objectContaining({ code: 'WEB_REDIRECT_BLOCKED' }))
     expect(cancelled()).toBe(true)
@@ -352,7 +362,7 @@ describe('HttpFetchProvider body cancellation on error paths', () => {
 
   it('cancels the body when an unsupported charset is rejected', async () => {
     const { response, cancelled } = fakeResponse({ status: 200, headers: { 'content-type': 'text/plain; charset=not-a-charset' } })
-    vi.stubGlobal('fetch', vi.fn(async () => response))
+    stubRequest(response)
     await expect(provider().fetch({ url: 'http://127.0.0.1:9/' }))
       .rejects.toThrow(expect.objectContaining({ code: 'WEB_UNSUPPORTED_CONTENT_TYPE' }))
     expect(cancelled()).toBe(true)
@@ -360,7 +370,7 @@ describe('HttpFetchProvider body cancellation on error paths', () => {
 
   it('cancels the body when a redirect has no Location header', async () => {
     const { response, cancelled } = fakeResponse({ status: 302, headers: {} })
-    vi.stubGlobal('fetch', vi.fn(async () => response))
+    stubRequest(response)
     await expect(provider().fetch({ url: 'http://127.0.0.1:9/' }))
       .rejects.toThrow(expect.objectContaining({ code: 'WEB_PROVIDER_ERROR' }))
     expect(cancelled()).toBe(true)
