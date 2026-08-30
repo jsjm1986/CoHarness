@@ -498,13 +498,13 @@ git diff --check
 - Gateway 认证、项目/组织 ACL、模型治理、凭据隔离、文档/归档、移动端自定义 UI、旧 ApiProxy/history-wire/client-runtime 和 Python 零配置环境注入继续保留；本轮有意不删除旧 endpoint 或旧 composer。
 - I01 的 client batch/HMR 与 WebServer gzip 已实现，但浏览器/生产压缩证据仍待补齐；I02 的 cache-first 行为已有等价实现，C03/C04/C05 的上游 Remote/focused-package/URL-token 形态经审查明确不采用，并在 §4.5 记录兼容边界。schema 20 生产 canary 和任何数据在线迁移仍未执行，不得在发布说明中写成已支持。
 - clean-checkout 审计发现 `@deepseek-ai/dsh-token-meter/client` 的源代码平面 alias 缺失；已在 `tsconfig.base.json` 补齐，并将 Claude Agent SDK、平台载荷、README、NOTICE 和 real-product 期望统一到 lockfile 锁定的 0.3.241/2.1.241。该修复只影响源代码解析与审计资料，不改变已部署的运行时 artifact。
-- macOS 的持久 pwsh PTY 会在 marker 到达前先报告 `inferred_idle`；`tool-pwsh-persistent` 现继续等待 marker，terminal PowerShell 测试改用契约允许的 readiness 断言，避免丢失命令输出。Linux/Windows 行为仍需对应 runner 的远端回归。
+- macOS hosted runner 的持久 pwsh 测试会在 marker/readback 完成前报告 `inferred_idle` 或空 viewport；本轮尝试的 marker-only 等待已撤回，因为它把既有截断结果变成了超时。基线与候选均失败同三个真实 PowerShell 用例，现保留原 prompt fallback，并把平台专项修复列为外部后续，不放宽断言或声称已修复。
 
 ### 11.4 已执行验证
 
 以下记录截至 2026-08-30；历史证据与本轮新增证据分开列出，后续代码、配置或文档变更后必须重新运行受影响检查。
 
-已通过 `pnpm run hygiene`、`pnpm run typecheck`、`pnpm run lint`、`pnpm run build:production`、`pnpm run build:lib:host`、`pnpm run build`、`pnpm run constraints`、`pnpm run verify-client-packages`、`pnpm run verify-third-party-notices`、`git diff --check`、`pnpm run doc-sync`、ACP focused suite（364 tests）、ACP e2e（2 passed，1 keyless skip）、ACP 单文件串行（47 passed）、LSP instance 串行（23 passed）、oxlint/publint（18 passed）、WebFetch/Web spill/theme focused（10 passed）、I01/I02 focused suite（10 files，186 tests）、token-meter/client source-plane focused suite（5 files，113 tests，另有移除 `lib` 后的 clean-artifact smoke 25 tests）、persistent pwsh marker/readiness suite（2 files，26 passed，2 skipped）、shipped Web composition e2e（2 tests）、thread-safe 全量串行（952 files，15,307 passed，9 files/114 tests skipped）和 process-bound 全量串行（8 files，446 passed）。完整 `pnpm run build` 与本轮 `pnpm run build:production` 均通过；构建仅报告 Linux native 载荷在 macOS arm64 上被跳过的预期警告，以及前端 chunk 大小提示。
+已通过 `pnpm run hygiene`、`pnpm run typecheck`、`pnpm run lint`、`pnpm run build:production`、`pnpm run build:lib:host`、`pnpm run build`、`pnpm run constraints`、`pnpm run verify-client-packages`、`pnpm run verify-third-party-notices`、`git diff --check`、`pnpm run doc-sync`、ACP focused suite（364 tests）、ACP e2e（2 passed，1 keyless skip）、ACP 单文件串行（47 passed）、LSP instance 串行（23 passed）、oxlint/publint（18 passed）、WebFetch/Web spill/theme focused（10 passed）、I01/I02 focused suite（10 files，186 tests）、token-meter/client source-plane focused suite（5 files，113 tests，另有移除 `lib` 后的 clean-artifact smoke 25 tests）、persistent pwsh tool/readiness baseline suite（2 files，26 passed，2 skipped）、shipped Web composition e2e（2 tests）、thread-safe 全量串行（952 files，15,307 passed，9 files/114 tests skipped）和 process-bound 全量串行（8 files，446 passed）。完整 `pnpm run build` 与本轮 `pnpm run build:production` 均通过；构建仅报告 Linux native 载荷在 macOS arm64 上被跳过的预期警告，以及前端 chunk 大小提示。
 
 生产 smoke（2026-08-30）：release controller 状态、`http://127.0.0.1:8899/healthz` 和 `https://harness.maycran.com/healthz` 均返回 `ok=true` 与 release `coharness-a5cd5ba34b`；未登录根路径保持 HTTP 401；上一 release `coharness-6464092040` 未删除并可用于回滚。
 
@@ -525,14 +525,15 @@ pnpm exec vitest run --project=process-bound --no-file-parallelism --maxWorkers=
 - I06/C04/C05 的上游形态不采用：InputMachine/slots、旧 ApiProxy/mux/projection-cache 和 Gateway Cookie/CSRF/principal 分别承担等价业务职责；不宣称上游包/API/token wire 兼容。`N01/N02/N04/N05/I10` 已在旧 `ui-conversation` façade 下实现并有 focused 测试，但跨浏览器视觉与生产 Gateway 时序仍需发布前实机验证。
 - `N11` 的 Windows x64 代码和发行 metadata 已改动，但 Windows runner、wheel/exe 安装运行、sidecar 和升级/卸载尚未验证。
 - `N13/N14/C10` 的代码能力已存在，但插件 metadata、Session-log upload 和 WebFetch 均保持默认关闭；生产启用需要脱敏、allowlist、限流、审计和运维/安全批准。
+- 远端 Sandbox 的 Linux bwrap/Landlock legs 与两个 Release workflow 通过；macOS seatbelt 在候选 commit `33285946232` 与基线 `33204060125` 都失败同三个真实 PowerShell 用例，因此记录为既有 hosted-runner/platform 阻塞。远端 real-API E2E 仅因缺少受保护的 `DEEPSEEK_API_KEY_EXTERNAL` 在 preflight 停止；不得把这两项改写成代码通过。
 - 阶段 A 所列机器可读 manifest、依赖/NOTICE 清单和生产数据备份/hash 已生成；manifest 位于 `UPGRADE-MANIFEST-dsh-v0.1.2-alpha.1.json`，备份文件名和 SHA-256 记录在 manifest 中。Profile dump、负责人签字和安全批准仍由发布流程存放在受控外部位置，不能用仓库文本替代。
-- `process.exit` listener 的 per-runtime 注册根因已改为模块级共享 handler，并由 focused/process-bound trace 验证；若 thread-safe 重跑仍报告 Socket listener warning，必须单独定位 teardown owner，不得提高全局 listener 上限。
+- `process.exit` listener 的 per-runtime 注册根因已改为模块级共享 handler，并由 focused/process-bound trace 验证；若 thread-safe 重跑仍报告 Socket listener warning，必须单独定位 teardown owner，不得提高全局 listener 上限。持久 pwsh marker-only 等待提案已撤回并记录在 [rejected Agent Note](.agents/notes/rejected/bug-fix/2026-08-30-pwsh-marker-readiness.md)，真实 PowerShell 三项平台失败保持可见。
 
 ### 11.5 发布前剩余动作与停止条件
 
 本节列出的动作区分为已完成的发布收尾和仍需外部证据的后续门；生产 artifact 已发布，工作树本身仍不能作为发布物。完成本次文档修改后，先重跑受影响检查，再将命令、时间和结果追加到受控发布记录。
 
-1. 本轮代码与文档修改已重新运行并通过 `pnpm run doc-sync`、`pnpm run lint`、`pnpm run typecheck`、`pnpm run hygiene`、`pnpm run build:production`、`pnpm run verify-third-party-notices`、`git diff --check` 以及 I01/I02 相关 focused Vitest；后续任何代码、配置或文档变更都必须重复这些检查。
+1. 本轮代码与文档修改完成后，必须重新运行并通过 `pnpm run doc-sync`、`pnpm run lint`、`pnpm run typecheck`、`pnpm run hygiene`、`pnpm run build:production`、`pnpm run verify-third-party-notices`、`git diff --check` 以及 I01/I02 相关 focused Vitest；本次撤回 marker-only 等待后不得沿用旧的“marker readiness 已修复”结论。
 2. 机器可读的上游 52 项 commit manifest、依赖/NOTICE 清单和数据文件 hash 已生成并随本次审计提交；Profile dump、决策签字和安全批准仍须由发布责任人补入受控发布记录。缺少这些外部材料时不得开启新的 canary 或改变默认出网/迁移策略。
 3. 在隔离 Harness home 上执行 schema 20 `--verify-only`、v18↔v20 双向 round-trip、冷加载、回放和回滚；保留旧文件直到所有 hash、ACL 和业务 smoke 通过。
 4. 只有未来重新打开 C03/C04 时，才要求 Remote 双栈逐事件等价、旧客户端得到明确降级、Gateway ACL/凭据/文档边界通过、完整测试和跨平台构建证据齐全；本 release 不切换或删除旧 API。

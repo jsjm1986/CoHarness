@@ -152,7 +152,7 @@ class StubTerminalSession implements TerminalBackendSession {
     if (this.mode === 'idle-then-normal') {
       this.mode = 'normal'
       this.pendingText = request.text
-      return this.operation(Promise.resolve(this.result(this.motd, 'inferred_idle')))
+      return this.operation(Promise.resolve(this.result('', 'inferred_idle')))
     }
     if (this.mode === 'prompt-after-idle') {
       if (request.text.length > 0) {

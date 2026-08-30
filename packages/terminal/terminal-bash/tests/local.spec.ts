@@ -285,11 +285,8 @@ describe.skipIf(!hasPwsh)('terminal-bash pwsh real shell', () => {
     process.env.DSH_TEST_SECRET = 'must-not-leak'
     try {
       const { ctx, root, agent } = await harness('danger-full-access', {
-        // PowerShell on hosted macOS can publish the prompt before its PTY
-        // output event; leave enough silence budget for the encoding preamble
-        // and command bytes to arrive before readiness is inferred.
-        idleSilenceMs: 1_000,
-        handoffGraceMs: 1_000,
+        idleSilenceMs: 300,
+        handoffGraceMs: 300,
         timeoutMs: 8_000,
       }, 'pwsh')
       const created = await ctx.terminals.spawn(agent, { type: 'shell', name: 'main', cwd: root })
@@ -299,7 +296,7 @@ describe.skipIf(!hasPwsh)('terminal-bash pwsh real shell', () => {
         text: '$env:KEEP = "ok"; Set-Location /',
         submit: true,
       })
-      expectReadyForNextSend((await first.done).waitReason)
+      expect((await first.done).waitReason).toBe('stdin_read')
       const second = ctx.terminals.startSend(agent, created.sessionId, {
         text: 'Write-Output "keep=$env:KEEP secret=$env:DSH_TEST_SECRET"',
         submit: true,
@@ -320,9 +317,8 @@ describe.skipIf(!hasPwsh)('terminal-bash pwsh real shell', () => {
 
   it('pins UTF-8 output encoding so non-ASCII output survives the byte decode', async () => {
     const { ctx, root, agent } = await harness('danger-full-access', {
-      // Keep the command output ahead of the macOS PowerShell prompt handoff.
-      idleSilenceMs: 1_000,
-      handoffGraceMs: 1_000,
+      idleSilenceMs: 300,
+      handoffGraceMs: 300,
       timeoutMs: 8_000,
     }, 'pwsh')
     const created = await ctx.terminals.spawn(agent, { type: 'shell', name: 'main', cwd: root })
