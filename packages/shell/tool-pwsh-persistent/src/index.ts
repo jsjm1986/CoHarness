@@ -406,7 +406,10 @@ async function executeCommand(
         ctx, shells, owner, id, result.sessionStatus, marker, wrapped, fallback, fallbackTruncated, config,
       )
     }
-    if (promptCompleted(result)) {
+    // An inferred-idle result is not proof that the wrapped command finished.
+    // Keep polling when the custom prompt is already visible; a slow pwsh
+    // host can publish that prompt before the marker output reaches the PTY.
+    if (result.waitReason === 'stdin_read' && promptCompleted(result)) {
       const snapshot = retainedScrollback(ctx, owner, id, latest)
       return renderCaptured(
         partialOutput(snapshot, marker, wrapped, fallback, fallbackTruncated),

@@ -13,7 +13,8 @@
   "productionRelease": "coharness-a5cd5ba34b",
   "postReleaseVerification": {
     "sourcePlaneAlias": "tsconfig.base.json maps @deepseek-ai/dsh-token-meter/client to source; clean-artifact smoke passed",
-    "claudeSdkAlignment": "0.3.241 / Claude Code 2.1.241 synchronized across lockfile, notices, README, and e2e expectations"
+    "claudeSdkAlignment": "0.3.241 / Claude Code 2.1.241 synchronized across lockfile, notices, README, and e2e expectations",
+    "pwshMarkerReadiness": "persistent pwsh waits for completion markers after inferred idle; focused suite passed"
   },
   "reviewDate": "2026-08-30",
   "plan": "UPGRADE-PLAN-dsh-v0.1.2-alpha.1.md",
