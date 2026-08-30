@@ -47,9 +47,25 @@ def load_platforms(path: Path = PLATFORM_MANIFEST) -> dict[str, tuple[str, str]]
 PLATFORMS = load_platforms()
 
 
+def runtime_filenames(executable_name: str) -> tuple[str, ...]:
+    """Return the exact executable and sidecar names for one platform."""
+    if executable_name.endswith(".exe"):
+        return (executable_name, f"{executable_name.removesuffix('.exe')}-rg.exe")
+    names = (executable_name, f"{executable_name}-rg")
+    return (*names, f"{executable_name}-spawn-helper") if "-macos-" in executable_name else names
+
+
+def legacy_executable_name(executable_name: str) -> str | None:
+    """Return the pre-alpha carrier name accepted as a release input alias."""
+    prefix = "deepseek-harness-sdk-runtime-"
+    if executable_name.startswith(prefix):
+        return "dsh-jsonrpc-agent-pkg-" + executable_name[len(prefix):]
+    return None
+
+
 def runtime_suffixes(executable_name: str) -> tuple[str, ...]:
-    suffixes = ("", "-rg")
-    return (*suffixes, "-spawn-helper") if "-macos-" in executable_name else suffixes
+    """Compatibility helper returning names relative to the executable path."""
+    return tuple(name[len(executable_name):] for name in runtime_filenames(executable_name))
 
 
 def main() -> None:
@@ -151,6 +167,7 @@ def copy_package(source: Path, destination: Path) -> None:
             "dist",
             "node_modules",
             "dsh-jsonrpc-agent-pkg-*",
+            "deepseek-harness-sdk-runtime-*",
         ),
     )
 
@@ -210,8 +227,19 @@ def stage_runtime(destination: Path, version: str, executable: Path, executable_
     rewrite_version(destination / "pyproject.toml", version)
     runtime_dir = destination / "src" / "deepseek_harness_runtime" / "runtime"
     runtime_dir.mkdir(parents=True, exist_ok=True)
-    for suffix in runtime_suffixes(executable_name):
-        shutil.copy2(Path(f"{executable}{suffix}"), runtime_dir / f"{executable_name}{suffix}")
+    source_directory = executable.parent
+    accepted_names = {executable_name}
+    legacy_name = legacy_executable_name(executable_name)
+    if legacy_name is not None:
+        accepted_names.add(legacy_name)
+    if executable.name not in accepted_names:
+        raise ValueError(
+            f"runtime executable must be named {executable_name} (legacy alias {legacy_name}), got {executable.name}"
+        )
+    source_names = runtime_filenames(executable.name)
+    destination_names = runtime_filenames(executable_name)
+    for source_name, destination_name in zip(source_names, destination_names, strict=True):
+        shutil.copy2(source_directory / source_name, runtime_dir / destination_name)
 
 
 def verify_wheel(
@@ -246,17 +274,19 @@ def verify_wheel(
                 f"{wheel} has license files {license_files}, expected {expected_license_files}"
             )
         runtime_files = [
-            name for name in archive.namelist() if "/runtime/dsh-jsonrpc-agent-pkg-" in name
+            name for name in archive.namelist()
+            if "/runtime/dsh-jsonrpc-agent-pkg-" in name
+            or "/runtime/deepseek-harness-sdk-runtime-" in name
         ]
         if package == "runtime":
             assert platform is not None
-            expected_files = [f"{platform[1]}{suffix}" for suffix in runtime_suffixes(platform[1])]
+            expected_files = list(runtime_filenames(platform[1]))
             found_files = sorted(Path(name).name for name in runtime_files)
             if found_files != expected_files:
                 raise RuntimeError(f"{wheel} runtime payload must be {expected_files}, found {found_files}")
             for runtime_file in runtime_files:
                 mode = archive.getinfo(runtime_file).external_attr >> 16
-                if mode & stat.S_IXUSR == 0:
+                if platform[0] != "win_amd64" and mode & stat.S_IXUSR == 0:
                     raise RuntimeError(f"{wheel} runtime executable lost its executable bit: {runtime_file}")
         elif runtime_files:
             raise RuntimeError(f"SDK wheel unexpectedly contains runtime executables: {runtime_files}")

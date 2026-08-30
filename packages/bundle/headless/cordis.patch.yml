@@ -33,3 +33,4 @@
       inject: [headlessStartup]
       config:
         task: !!js ctx.headlessStartup.task
+        progress: !!js process.env.COHARNESS_HEADLESS_PROGRESS === '1'

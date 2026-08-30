@@ -326,9 +326,9 @@ const VENDORED_LIBRARY = /^@deepseek-ai\\/(cosmokit|schemastery)(\\/|$)/
   {
     id: 'client-purity-vendored-libraries-predicate',
     file: 'packages/client/tsdown.client.ts',
-    find: '        if (INLINE_SAFE.test(source) || GENERATED_REMOTE.test(source)) return null // wire contribution: inline is the point',
+    find: '        if (INLINE_SAFE.test(source) || INLINE_SAFE_TOKEN_METER.test(source) || GENERATED_REMOTE.test(source)) return null // wire contribution: inline is the point',
     replace: `        if (VENDORED_LIBRARY.test(source)) return null // vendored library: inline, no shared identity
-        if (INLINE_SAFE.test(source) || GENERATED_REMOTE.test(source)) return null // wire contribution: inline is the point`,
+        if (INLINE_SAFE.test(source) || INLINE_SAFE_TOKEN_METER.test(source) || GENERATED_REMOTE.test(source)) return null // wire contribution: inline is the point`,
     expect: 1,
   },
   {

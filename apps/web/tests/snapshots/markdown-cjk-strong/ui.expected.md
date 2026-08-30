@@ -1,12 +1,16 @@
 - banner:
+  - tablist:
+    - tab "Chat" [selected]
+    - tab "Trajectory"
   - navigation "Session hierarchy":
     - button "CJK strong emphasis" [disabled]
   - button "Session log":
     - text: Session log
     - img
-  - tablist:
-    - tab "Chat" [selected]
-    - tab "Trajectory"
+- separator "Adjust transcript content width"
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
 - text: Render adjacent CJK strong emphasis. {{clock}}
 - button "Copy":
   - img
@@ -46,6 +50,10 @@
   - img
 - text: {{clock}} Ran for {{duration}}
 - textbox "Message the agent"
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
 - button "Commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write

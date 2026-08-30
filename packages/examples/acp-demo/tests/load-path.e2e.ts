@@ -6,11 +6,11 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
-  ClientSideConnection,
+  client as createClient,
+  methods,
   ndJsonStream,
   PROTOCOL_VERSION,
-  type Agent as AcpAgent,
-  type Client,
+  type ClientContext,
   type RequestPermissionRequest,
   type RequestPermissionResponse,
   type SessionNotification,
@@ -58,7 +58,7 @@ const CORDIS_YML = `
 
 interface Spawned {
   child: ChildProcessWithoutNullStreams
-  client: ClientSideConnection
+  client: ClientContext
   stderr: string[]
 }
 
@@ -102,15 +102,12 @@ async function boot(): Promise<Spawned & { cwd: string }> {
     Writable.toWeb(child.stdin) as WritableStream<Uint8Array>,
     Readable.toWeb(child.stdout) as ReadableStream<Uint8Array>,
   )
-  const makeClient = (_agent: AcpAgent): Client => ({
-    sessionUpdate(_params: SessionNotification): Promise<void> {
-      return Promise.resolve()
-    },
-    requestPermission(_params: RequestPermissionRequest): Promise<RequestPermissionResponse> {
-      return Promise.resolve({ outcome: { outcome: 'cancelled' } })
-    },
-  })
-  const client = new ClientSideConnection(makeClient, stream)
+  const clientApp = createClient({ name: 'dsh-acp-demo-load-path-test' })
+    .onNotification(methods.client.session.update, (_ctx: { params: SessionNotification }) => {})
+    .onRequest(methods.client.session.requestPermission, (_ctx: { params: RequestPermissionRequest }): RequestPermissionResponse => ({
+      outcome: { outcome: 'cancelled' },
+    }))
+  const client = clientApp.connect(stream).agent
   spawned = { child, client, stderr }
   return { ...spawned, cwd }
 }
@@ -120,7 +117,7 @@ describe('dsh-acp-demo real-load-path smoke (bin + Loader, keyless)', () => {
     const { client, cwd, stderr } = await boot()
     // initialize: a broken export shape (collapsed bridge plugin, dropped inject)
     // crashes the tree on the first service read here — see postmortem 0001.
-    const init = await client.initialize({
+    const init = await client.request(methods.agent.initialize, {
       protocolVersion: PROTOCOL_VERSION,
       clientCapabilities: {},
     })
@@ -129,7 +126,7 @@ describe('dsh-acp-demo real-load-path smoke (bin + Loader, keyless)', () => {
     })
 
     // session/new reaches the agent FACTORY (create) without the model.
-    const { sessionId } = await client.newSession({ cwd, mcpServers: [] })
+    const { sessionId } = await client.request(methods.agent.session.new, { cwd, mcpServers: [] })
     expect(sessionId).toBeTruthy()
 
     expect(stderr.join('')).not.toContain('without inject')

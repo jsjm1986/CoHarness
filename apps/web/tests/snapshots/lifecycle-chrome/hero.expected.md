@@ -13,13 +13,20 @@
 - button "Add workspace":
   - img
 - tree "Sessions":
-  - treeitem "workspace" [expanded]:
+  - treeitem "workspace":
     - img
     - text: workspace
+  - treeitem "Ungrouped" [expanded]:
+    - img
+    - text: Ungrouped
   - treeitem "New Session" [selected]
+- button "Documents":
+  - img
+  - text: Documents
 - button "Settings":
   - img
   - text: Settings
+- separator "Adjust transcript content width"
 - text: Into the Unknown Preview
 - button "Choose workspace":
   - img
@@ -30,6 +37,10 @@
   - text: Standard mode
   - img
 - textbox "Describe what you want to build"
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
 - button "Commands":
   - img
 - tooltip "Commands"

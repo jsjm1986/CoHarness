@@ -314,6 +314,15 @@ abstract resolve(path: string, opts?: { cwd?: string; signal?: AbortSignal }): P
 abstract processPath(target: FsTarget): string
 
 /**
+ * Map an absolute host path into this filesystem's execution world.
+ * Host-backed providers may return the canonical path; isolated providers
+ * return `undefined` so callers cannot expose an inaccessible path.
+ * @param _hostPath - absolute path in the harness host filesystem.
+ * @returns an execution-world path, or `undefined` when unmappable.
+ */
+processPathFromHostPath(_hostPath: string): string | undefined
+
+/**
  * Return the canonical `file:` URI for a target in this filesystem's
  * execution world. Backends own URI encoding because the host platform may
  * differ from the execution platform.

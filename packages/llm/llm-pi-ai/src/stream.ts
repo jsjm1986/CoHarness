@@ -259,6 +259,14 @@ export function mapStopReason(
       return { kind: 'stop' }
     case 'length': return { kind: 'max-tokens' }
     case 'toolUse': return { kind: 'tool-calls' }
+    case 'pending': return {
+      kind: 'error',
+      failure: { message: `pi-ai stream for model "${message.model}" ended pending`, code: 'PI_AI_ERROR' },
+    }
+    case 'deferred': return {
+      kind: 'error',
+      failure: { message: `pi-ai deferred response for model "${message.model}" is not supported`, code: 'PI_AI_ERROR' },
+    }
     case 'aborted': return {
       kind: 'aborted',
       failure: { message: message.errorMessage ?? 'pi-ai stream aborted', code: 'ABORTED' },
@@ -278,18 +286,29 @@ export function mapStopReason(
  * `finish` chunks (the harness protocol's other error-delivery style).
  * @param events - one assistant turn's pi-ai event stream.
  * @param contextWindow - resolved catalog capacity for usage-based overflow detection.
- * @param parseTextThinking - recognize a strict tagged reasoning prefix in
- *   ordinary text blocks from an OpenAI-compatible gateway.
+ * @param parseTextThinkingOrCallerSignal - legacy text-thinking switch or the
+ *   canonical caller cancellation signal.
  * @param response - read the HTTP response metadata captured for this stream.
+ * @param callerSignal - caller cancellation signal for the legacy argument form.
  * @returns the harness chunks, ending with `usage` then `finish`; throws
  *   `LlmError` (`STREAM_CLOSED`) if the source ends without a terminal event.
  */
 export async function* toStreamChunks(
   events: AsyncIterable<AssistantMessageEvent>,
   contextWindow?: number,
-  parseTextThinking = false,
+  parseTextThinkingOrCallerSignal: boolean | AbortSignal = false,
   response?: () => ProviderResponse | undefined,
+  callerSignal?: AbortSignal,
 ): AsyncGenerator<StreamChunk> {
+  // The upstream API uses the third argument for caller cancellation. Keep the
+  // CoHarness text-thinking probe and response hook available through the
+  // legacy boolean/fourth-argument form while accepting that canonical call.
+  const parseTextThinking = typeof parseTextThinkingOrCallerSignal === 'boolean'
+    ? parseTextThinkingOrCallerSignal
+    : false
+  const effectiveCallerSignal = typeof parseTextThinkingOrCallerSignal === 'boolean'
+    ? callerSignal
+    : parseTextThinkingOrCallerSignal
   // pi-ai contentIndex ↔ our block index map is 1:1 until a text block is
   // actually split. A transformed block consumes one extra logical slot, and
   // later native indexes are shifted by that one slot. Ordinary text keeps its
@@ -530,7 +549,11 @@ export async function* toStreamChunks(
       yield { type: 'usage', usage: mapUsage(event.message.usage) }
       yield {
         type: 'finish',
-        reason: mapStopReason(event.message, contextWindow, response?.()),
+        reason: mapStopReason(
+          effectiveCallerSignal?.aborted ? { ...event.message, stopReason: 'aborted' } : event.message,
+          contextWindow,
+          response?.(),
+        ),
         ...transformedTextThinking ? {} : { replayState: toPiReplayState(event.message) },
       }
       return
@@ -545,7 +568,14 @@ export async function* toStreamChunks(
         } while (queuedCount() > 0 || pendingNativeIndex() !== undefined)
       }
       yield { type: 'usage', usage: mapUsage(event.error.usage) }
-      yield { type: 'finish', reason: mapStopReason(event.error, contextWindow, response?.()) }
+      yield {
+        type: 'finish',
+        reason: mapStopReason(
+          effectiveCallerSignal?.aborted ? { ...event.error, stopReason: 'aborted' } : event.error,
+          contextWindow,
+          response?.(),
+        ),
+      }
       return
     }
 

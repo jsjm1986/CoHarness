@@ -7,7 +7,7 @@
 import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm/types'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import type { RpcRequest, RpcResponse } from './rpc.ts'
+import type { RpcId, RpcRequest, RpcResponse } from './rpc.ts'
 import type { HistoryDetail, HistoryEntry, HistoryOmittedSpan, SessionProjectionsBlock } from './sessions.ts'
 
 /** Complete durable direct-child catalog row. */
@@ -108,6 +108,8 @@ export interface SubagentsApi {
         content: ContentBlock[]
         /** Optional browser zone sampled for this exact human prompt. */
         clientTimeZone?: string
+        /** Optional browser-owned identity used to reconcile an optimistic submission echo. */
+        requestId?: RpcId
       }
     >,
     signal: AbortSignal,

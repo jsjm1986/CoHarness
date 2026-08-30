@@ -163,7 +163,7 @@ export function resolveShippedPresetPatch(rows: ReadonlyMap<string, EntryOptions
     id: 'agent-presets',
     config: {
       ...(config as Record<string, unknown>),
-      roots: [{ path: SHIPPED_PRESET_ROOT, trust: 'system' }, ...configured],
+      roots: [{ path: SHIPPED_PRESET_ROOT, trust: 'system' }, ...(configured as unknown[])],
     },
   }
 }

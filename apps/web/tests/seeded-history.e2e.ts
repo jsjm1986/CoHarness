@@ -277,6 +277,15 @@ describe('web e2e: seeded history renders through cold resume', () => {
     await sessionRow.click()
     // Settled barrier for history: the recorded final assistant text renders.
     await expect.poll(() => page.getByText('DONE', { exact: true }).count(), { timeout: 15_000 }).toBe(1)
+    // The current Chat surface folds intermediate tool/context nodes behind a
+    // turn-level process summary. Open that view before asserting the nested
+    // cards; persistence and wire assertions remain independent of the fold.
+    const processToggle = page.locator('[data-turn-process="1"]')
+    await expect.poll(() => processToggle.count(), { timeout: 10_000 }).toBe(1)
+    if (await processToggle.getAttribute('aria-expanded') !== 'true') {
+      await processToggle.click()
+      await expect.poll(() => processToggle.getAttribute('aria-expanded'), { timeout: 10_000 }).toBe('true')
+    }
     await expect.poll(() => page.getByText('compact', { exact: true }).count(), { timeout: 10_000 }).toBe(1)
     await expect.poll(() => page.getByText(/^Compacted \d+ history items \(~\d+ tokens\)$/).count(), {
       timeout: 10_000,

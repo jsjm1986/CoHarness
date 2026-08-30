@@ -49,10 +49,10 @@ def test_runtime_requires_spawn_helper_only_on_macos(
 ) -> None:
     runtime_dir = tmp_path / "runtime"
     runtime_dir.mkdir()
-    linux = runtime_dir / "dsh-jsonrpc-agent-pkg-linux-x64"
+    linux = runtime_dir / "deepseek-harness-sdk-runtime-linux-x64"
     linux.touch()
     Path(f"{linux}-rg").touch()
-    macos = runtime_dir / "dsh-jsonrpc-agent-pkg-macos-arm64"
+    macos = runtime_dir / "deepseek-harness-sdk-runtime-macos-arm64"
     macos.touch()
     Path(f"{macos}-rg").touch()
     monkeypatch.setattr(runtime, "bundled_package_dir", lambda: tmp_path)
@@ -64,12 +64,43 @@ def test_runtime_requires_spawn_helper_only_on_macos(
     assert runtime.bundled_runtime_path() == linux
 
 
+def test_legacy_runtime_name_remains_a_lookup_alias(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runtime_dir = tmp_path / "runtime"
+    runtime_dir.mkdir()
+    legacy = runtime_dir / "dsh-jsonrpc-agent-pkg-linux-x64"
+    legacy.touch()
+    Path(f"{legacy}-rg").touch()
+    monkeypatch.setattr(runtime, "bundled_package_dir", lambda: tmp_path)
+    monkeypatch.setattr(runtime, "_current_platform_tag", lambda: "linux-x64")
+
+    assert runtime.bundled_runtime_path() == legacy
+
+
+def test_canonical_runtime_name_wins_over_legacy_alias(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runtime_dir = tmp_path / "runtime"
+    runtime_dir.mkdir()
+    canonical = runtime_dir / "deepseek-harness-sdk-runtime-linux-x64"
+    legacy = runtime_dir / "dsh-jsonrpc-agent-pkg-linux-x64"
+    canonical.touch()
+    legacy.touch()
+    Path(f"{canonical}-rg").touch()
+    Path(f"{legacy}-rg").touch()
+    monkeypatch.setattr(runtime, "bundled_package_dir", lambda: tmp_path)
+    monkeypatch.setattr(runtime, "_current_platform_tag", lambda: "linux-x64")
+
+    assert runtime.bundled_runtime_path() == canonical
+
+
 def test_runtime_requires_ripgrep_sidecar(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     runtime_dir = tmp_path / "runtime"
     runtime_dir.mkdir()
-    (runtime_dir / "dsh-jsonrpc-agent-pkg-linux-x64").touch()
+    (runtime_dir / "deepseek-harness-sdk-runtime-linux-x64").touch()
     monkeypatch.setattr(runtime, "bundled_package_dir", lambda: tmp_path)
     monkeypatch.setattr(runtime, "_current_platform_tag", lambda: "linux-x64")
 

@@ -1,4 +1,7 @@
 - banner:
+  - tablist:
+    - tab "Chat" [selected]
+    - tab "Trajectory"
   - navigation "Session hierarchy":
     - button "/user-invoke-demo and confirm the fixtur" [disabled]
   - img
@@ -6,20 +9,13 @@
   - button "Session log":
     - text: Session log
     - img
-  - tablist:
-    - tab "Chat" [selected]
-    - tab "Trajectory"
+- separator "Adjust transcript content width"
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
 - text: /user-invoke-demo and confirm the fixture wiring {{clock}}
 - button "Copy":
   - img
-- button "Context injection @deepseek-ai/dsh-system-prompt":
-  - img
-  - img
-  - text: Context injection @deepseek-ai/dsh-system-prompt
-- button "Context injection user-invoke-demo":
-  - img
-  - img
-  - text: Context injection user-invoke-demo
 - paragraph: USER_INVOKE_REPLY acknowledged; following the injected skill.
 - button "Copy":
   - img
@@ -31,6 +27,10 @@
   - img
 - text: {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s
 - textbox "Message the agent"
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
 - button "Commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write

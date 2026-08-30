@@ -1,4 +1,7 @@
 - banner:
+  - tablist:
+    - tab "Chat" [selected]
+    - tab "Trajectory"
   - navigation "Session hierarchy":
     - button "Reply with the single word" [disabled]
   - img
@@ -6,16 +9,13 @@
   - button "Session log":
     - text: Session log
     - img
-  - tablist:
-    - tab "Chat" [selected]
-    - tab "Trajectory"
+- separator "Adjust transcript content width"
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
 - text: Reply with the single word LIGHTHOUSE and stop. {{clock}}
 - button "Copy":
   - img
-- button "Context injection @deepseek-ai/dsh-system-prompt":
-  - img
-  - img
-  - text: Context injection @deepseek-ai/dsh-system-prompt
 - button "Think The user wants me to reply with a single word. Let me comply.":
   - img
   - img
@@ -29,8 +29,12 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s
+- text: {{clock}} Ran for {{duration}}
 - textbox "Message the agent"
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
 - button "Commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write

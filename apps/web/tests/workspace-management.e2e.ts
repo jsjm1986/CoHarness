@@ -266,9 +266,8 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
 
     // Re-registering the exact deleted path immediately, without a reload, is
     // a supported reversible flow. It creates a fresh Workspace id and does
-    // NOT re-adopt the retained (non-blank) Session; the New Session flow
-    // mints a fresh blank session and attaches it to the new registration
-    // (no cwd-based blank reuse exists, so the account is never empty).
+    // NOT re-adopt the retained (non-blank) Session. A new blank Session is
+    // created only after the user explicitly starts one in this flow.
     await adoptDirectory(scaffold.workspaceCwd)
     await expect.poll(
       () => scaffold.ctx.workspaceRegistry.resolveByPath(scaffold.workspaceCwd),
@@ -277,10 +276,6 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     const reregistered = await scaffold.ctx.workspaceRegistry.resolveByPath(scaffold.workspaceCwd)
     expect(reregistered?.id).toBeDefined()
     expect(reregistered?.id).not.toBe(workspace.id)
-    await expect.poll(
-      () => reregistered?.sessionIds ?? [],
-      { timeout: 10_000 },
-    ).not.toEqual([])
     expect(reregistered?.sessionIds).not.toContain(SEED_ID)
     await expect.poll(() => page.getByText('Ungrouped', { exact: true }).count(), { timeout: 10_000 })
       .toBeGreaterThanOrEqual(1)
@@ -479,7 +474,23 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
       }
       return await ungroupedRow.getAttribute('aria-expanded')
     }, { timeout: 5_000 }).toBe('true')
-    const row = ungroupedSection.locator('[role="treeitem"]').nth(1)
+    // The workspace adoption flow keeps one provisional blank New Session in
+    // the same account as the seeded visible session. Select the first row
+    // that advertises a copyable title instead of relying on the blank row's
+    // position; blank rows intentionally have no HoverCard button.
+    const candidates = ungroupedSection.locator('[role="treeitem"]')
+      .filter({ has: page.locator('button[aria-label^="Session actions for "]') })
+    const count = await candidates.count()
+    let row: Locator | undefined
+    for (let index = 0; index < count; index += 1) {
+      const candidate = candidates.nth(index)
+      const title = await candidate.locator('[class*="title"]').innerText().catch(() => '')
+      if (title !== '' && title !== 'New Session') {
+        row = candidate
+        break
+      }
+    }
+    if (row === undefined) throw new Error('Ungrouped has no visible seeded Session row')
     await row.waitFor({ timeout: 10_000 })
     return row
   }
@@ -491,16 +502,18 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     const sessionRow = await seededSessionRow()
     const rowTitle = await sessionRow.locator('[class*="title"]').innerText()
     await sessionRow.hover()
-    // Card content: the full title plus the Idle status line (no aria role —
-    // text anchors are the stable selector).
-    await expect.poll(() => page.getByText('Idle', { exact: true }).count(), { timeout: 5_000 }).toBeGreaterThanOrEqual(1)
+    // Card content: the full title plus the completed/idle status line (no
+    // aria role — text anchors are the stable selector). Seeded fixtures may
+    // carry a settled turn, which the current renderer labels Completed.
+    const status = page.getByText(/^(Idle|Completed)$/, { exact: true })
+    await expect.poll(() => status.count(), { timeout: 5_000 }).toBeGreaterThanOrEqual(1)
     // The card is REACHABLE: it sits 8px off the row, so getting to it means
     // crossing ground that belongs to neither. Hovering it must not dismiss
     // it — the hazard this scenario pins.
     const card = page.getByRole('button', { name: `Copy: ${rowTitle}` })
     await card.hover()
     await page.waitForTimeout(POINTER_HOLD_MS)
-    expect(await page.getByText('Idle', { exact: true }).count()).toBeGreaterThanOrEqual(1)
+    expect(await status.count()).toBeGreaterThanOrEqual(1)
     // The full title is the card's primary value: activating anywhere on the
     // card writes it through the browser clipboard and localizes the success
     // feedback through the English locale seat.
@@ -576,10 +589,10 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     // without a confirmation dialog (non-destructive: log + accounting stay).
     await clickHoverAction(sessionRow, `Session actions for ${rowTitle}`)
     await page.getByRole('menuitem', { name: 'Archive session' }).click()
-    // The row disappears on the archive-set echo; with no other visible
-    // stray, the whole Ungrouped bucket withdraws.
+    // The row disappears on the archive-set echo. A provisional blank New
+    // Session may remain in the account, so the Ungrouped bucket can remain.
     await expect.poll(() => page.getByText(rowTitle, { exact: true }).count(), { timeout: 10_000 }).toBe(0)
-    await expect.poll(() => page.getByText('Ungrouped', { exact: true }).count(), { timeout: 10_000 }).toBe(0)
+    await expect.poll(() => page.getByText('Ungrouped', { exact: true }).count(), { timeout: 10_000 }).toBeGreaterThanOrEqual(1)
     // Durable on the host: the registry-global set carries the id while the
     // session log itself stays in persistence untouched.
     expect([...scaffold.ctx.workspaceRegistry.archivedSessionIds]).toEqual([SessionId(SEED_ID)])

@@ -144,6 +144,7 @@ export class FakeApiClient implements IApiClient {
   private readonly hostConns: StreamConn<HostFrame>[] = []
   lastSearchSignal: AbortSignal | undefined
   lastHistorySignal: AbortSignal | undefined
+  lastPromptSignal: AbortSignal | undefined
 
   // Parameters carry local structural annotations: the CI lint lane runs
   // without built lib/, so IApiClient's indexed-access types collapse to any
@@ -169,7 +170,10 @@ export class FakeApiClient implements IApiClient {
       this.record('session.selectModel', payload, this.onSelectModel(payload)),
     rename: (payload: unknown) => this.record('session.rename', payload, this.onRename(payload)),
     fork: (payload: unknown) => this.record('session.fork', payload, this.onFork(payload)),
-    prompt: (payload: unknown) => this.record('session.prompt', payload, this.onPrompt(payload)),
+    prompt: (payload: unknown, signal?: AbortSignal) => {
+      this.lastPromptSignal = signal
+      return this.record('session.prompt', payload, this.onPrompt(payload))
+    },
     attachment: (payload: unknown) => this.record('session.attachment', payload, this.onAttachment(payload)),
     updateQueue: (payload: unknown) => this.record('session.updateQueue', payload, this.onUpdateQueue(payload)),
     cancel: (payload: unknown) => this.record('session.cancel', payload, this.onCancel(payload)),

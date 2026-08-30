@@ -20,14 +20,16 @@ import type {
 } from './types.ts'
 import { contextBreakdownProjectionDefinition } from './breakdown-projection.ts'
 import { contextPressureProjectionDefinition, tokenUsageProjectionDefinition } from './usage-projection.ts'
-import { estimateContent, estimateHeader, estimateMessage, ROLE_OVERHEAD } from './estimate.ts'
+import { estimateHeader, estimateMessage } from './estimate.ts'
 import { foldSurfaceTokens } from './surface-fold.ts'
+import { priceSurface } from './route-pricing.ts'
 
 export type * from './types.ts'
 
 interface MeasurementAnchor {
   readonly header: EpochHeader | undefined
   readonly surfaceTokens: number
+  readonly surfaceNodes: readonly TokenSurfaceNode[]
   readonly baseline: Exclude<TokenMeasurementBaseline, { kind: 'none' }>
 }
 
@@ -119,19 +121,22 @@ export class TokenMeter extends Service {
       ? state.header
       : canonicalHeader(requestHeader)
     const anchor = state.anchor
+    const pricing = this._routeImagePricing(header)
+    const priced = priceSurface(state.surface, pricing)
 
     let baseline: TokenMeasurementBaseline
     let surfaceDeltaTokens: number
     if (anchor !== undefined && optionalHeaderEquals(anchor.header, header)) {
       baseline = anchor.baseline
-      surfaceDeltaTokens = state.surfaceTokens - anchor.surfaceTokens
-    } else if (header === undefined && state.surfaceTokens === 0) {
+      const anchorSurfaceTokens = priceSurface(anchor.surfaceNodes, pricing).surfaceTokens
+      surfaceDeltaTokens = priced.surfaceTokens - anchorSurfaceTokens
+    } else if (header === undefined && priced.surfaceTokens === 0) {
       baseline = { kind: 'none', tokens: 0 }
       surfaceDeltaTokens = 0
     } else {
       baseline = {
         kind: 'estimated',
-        tokens: estimateHeader(header) + state.surfaceTokens,
+        tokens: estimateHeader(header) + priced.surfaceTokens,
       }
       surfaceDeltaTokens = 0
     }
@@ -141,9 +146,16 @@ export class TokenMeter extends Service {
       baseline,
       surfaceDeltaTokens,
       totalTokens: Math.max(0, baseline.tokens + surfaceDeltaTokens),
-      surfaceTokens: state.surfaceTokens,
-      nodes: state.surface,
+      surfaceTokens: priced.surfaceTokens,
+      nodes: priced.nodes,
     }))
+  }
+
+  /** Resolve synchronous provider image pricing for the current route. */
+  private _routeImagePricing(header: EpochHeader | undefined) {
+    const config = header?.config
+    if (config === undefined) return undefined
+    return this.ctx.get('llm')?.imageRequestPricing(config.provider, config.model)
   }
 
   /**
@@ -214,9 +226,10 @@ export class TokenMeter extends Service {
         break
     }
 
-    const surface = isSurfaceEvent(event)
-      ? foldSurfaceTokens(state.surface, event)
-      : undefined
+    const surfaceEvent = isSurfaceEvent(event) ? event : undefined
+    const surface = surfaceEvent === undefined
+      ? undefined
+      : foldSurfaceTokens(state.surface, surfaceEvent)
 
     if (event.type === 'assistant/message') {
       const stepStart = state.stepStart
@@ -225,22 +238,25 @@ export class TokenMeter extends Service {
         || stepStart.step !== event.data.step) {
         throw new Error(`token meter: assistant/message at seq ${event.seq} has no matching step/start event`)
       }
+      if (surfaceEvent === undefined || surface === undefined) {
+        throw new Error(`token meter: assistant/message at seq ${event.seq} is missing its surfaceOp marker`)
+      }
 
       // assistant/message is surface-mandatory at every append/seed boundary.
-      // oxlint-disable-next-line typescript/no-non-null-assertion
-      const eventTokens = surface!.tokens
+      const eventTokens = surface.tokens
       if (event.data.usage !== undefined && nextHeader !== undefined) {
-        const providerAssistantTokens = this._estimateProviderAssistant(
-          session,
-          event,
-          eventTokens,
-        )
+        const providerAssistant = this._providerAssistantMessage(session, event)
+        const providerAssistantTokens = providerAssistant.message === null
+          ? 0
+          : estimateMessage(providerAssistant.message)
         const anchorSurfaceTokens = stepStart.surfaceTokens + providerAssistantTokens
         const providerTokens = usageTokens(event.data.usage)
         const estimatedAnchorTokens = estimateHeader(nextHeader) + anchorSurfaceTokens
+        const providerSurface = foldSurfaceTokens(state.surface, surfaceEvent, providerAssistant.message)
         nextAnchor = {
           header: nextHeader,
           surfaceTokens: anchorSurfaceTokens,
+          surfaceNodes: providerSurface.nodes,
           // Signed heuristic deltas remain conservative only from an anchor
           // that is at least as large as the matching full heuristic price.
           baseline: providerTokens >= estimatedAnchorTokens
@@ -252,6 +268,7 @@ export class TokenMeter extends Service {
         nextAnchor = {
           header: nextHeader,
           surfaceTokens: anchorSurfaceTokens,
+          surfaceNodes: surface.nodes,
           baseline: {
             kind: 'estimated',
             tokens: estimateHeader(nextHeader) + anchorSurfaceTokens,
@@ -274,13 +291,12 @@ export class TokenMeter extends Service {
    * Missing legacy source seqs conservatively treat the durable output as the
    * provider output; an explicit empty list prices a known empty stream.
    */
-  private _estimateProviderAssistant(
+  private _providerAssistantMessage(
     session: Session,
     event: SessionEvent<'assistant/message'>,
-    durableEventTokens: number,
-  ): number {
+  ): { readonly message: Message | null } {
     const sourceSeqs = event.sourceEventSeqs
-    if (sourceSeqs === undefined) return durableEventTokens
+    if (sourceSeqs === undefined) return { message: event.data.message }
 
     const assembler = new BlockAssembler()
     const seen = new Set<number>()
@@ -306,7 +322,8 @@ export class TokenMeter extends Service {
       assembler.push(sourceEvent.data.chunk)
     }
     const providerContent = assembler.blocks()
-    return providerContent.length === 0 ? 0 : estimateContent(providerContent) + ROLE_OVERHEAD
+    if (providerContent.length === 0) return { message: null }
+    return { message: { ...event.data.message, content: providerContent } }
   }
 }
 

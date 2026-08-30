@@ -288,7 +288,7 @@ type StreamChunk =
   | { type: 'block-start'; index: number; blockType: ContentBlockType }
   | { type: 'text-delta'; index: number; text: string }
   | { type: 'reasoning-delta'; index: number; text: string }
-  | { type: 'tool-call-delta'; index: number; id: CallId; name?: string; argumentsDelta: string }
+  | { type: 'tool-call-delta'; index: number; id: ToolCallId; name?: string; argumentsDelta: string }
   | { type: 'block-end'; index: number; block: ContentBlock }
   | {
     type: 'usage'
@@ -841,6 +841,14 @@ declare abstract class LlmAdapter {
    */
   providerRetryPolicy(_provider: string): ResolvedRetryPolicy | undefined;
   /**
+   * Resolve synchronous provider pricing for request images on one exact
+   * route. Adapters that do not declare a provider formula return `undefined`.
+   * @param _provider - registered provider route.
+   * @param _model - exact model id.
+   * @returns route-owned pricing, or `undefined` for neutral heuristic pricing.
+   */
+  imageRequestPricing(_provider: string, _model: string): import('./types.ts').LlmImageRequestPricing | undefined;
+  /**
    * List models this adapter can currently advertise for one owned provider.
    * The result is advisory: an adapter may accept unlisted model ids, and
    * consumers must not turn absence into request rejection.
@@ -890,6 +898,33 @@ declare abstract class LlmAdapter {
 ## Cordis API
 
 Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+
+<a id="ctxdeepseekllmapiextensions--deepseekllmapiextensionregistry"></a>
+
+### `ctx.deepseekLlmApiExtensions` — `DeepSeekLlmApiExtensionRegistry`
+
+Registry of independently owned top-level fields for official DeepSeek requests.
+
+```ts cordis-catalog
+/**
+ * Register the sole provider of one top-level request field. Registration is effect-scoped.
+ * @param field - declaration-merged field owned by the provider.
+ * @param provider - request-time field preparation and optional acceptance behavior.
+ * @returns disposer that releases the field.
+ */
+register<K extends keyof DeepSeekLlmApiExtensionMap>( field: K, provider: DeepSeekLlmApiExtensionProvider<DeepSeekLlmApiExtensionMap[K]>, ): () => Promise<void>
+
+/**
+ * Prepare every currently registered field from one immutable base request.
+ * Preparation failures reject before HTTP dispatch. Field values are cloned and frozen;
+ * providers retain no mutable alias to the outgoing request.
+ * @param request - exact serialized request facts before extension fields.
+ * @returns detached fields and their idempotent joint acceptance transaction.
+ */
+async prepare(request: DeepSeekLlmApiExtensionRequest): Promise<PreparedDeepSeekLlmApiExtensions>
+```
+
+Source: [`packages/llm/deepseek-llm-api-extensions/src/index.ts:66`](../../packages/llm/deepseek-llm-api-extensions/src/index.ts)
 
 <a id="ctxllm--llmruntime"></a>
 
@@ -961,6 +996,16 @@ async discoverModels( settingsNs: string, request: LlmModelDiscoveryRequest, ): 
 providerRetryPolicy(provider: string): ResolvedRetryPolicy
 
 /**
+ * Resolve provider-side request-image pricing for a route. Unknown routes
+ * degrade to neutral pricing so historical sessions remain measurable after
+ * a provider is unloaded.
+ * @param provider - provider route named by a request header.
+ * @param model - exact model id named by that header.
+ * @returns route-owned pricing, or `undefined` when unavailable.
+ */
+imageRequestPricing(provider: string, model: string): import('./types.ts').LlmImageRequestPricing | undefined
+
+/**
  * Discover models advertised by one registered provider. Catalog membership
  * is advisory and never changes routing or request validation.
  * @param provider - registered provider route to inspect.
@@ -1015,7 +1060,7 @@ async prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<Prepared
 stream(options: GenerateOptions): AsyncIterable<StreamChunk>
 ```
 
-Source: [`packages/llm/llm/src/index.ts:261`](../../packages/llm/llm/src/index.ts)
+Source: [`packages/llm/llm/src/index.ts:272`](../../packages/llm/llm/src/index.ts)
 
 <a id="ctxmodelaccess--modelaccessservice"></a>
 

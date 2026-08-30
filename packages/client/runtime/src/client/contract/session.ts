@@ -9,11 +9,35 @@
  */
 import type { AttachmentIdType, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type {
-  MessageId, PromptContentPart, QueueAction, RpcResult, SessionId,
+  MessageId, PromptContentPart, QueueAction, RpcId, RpcResult, SessionId,
 } from '@deepseek-ai/dsh-api-remotes/client'
 import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
 import type { ConversationSnapshot } from '../sessions/conversation.ts'
+import type { PendingSubmissionImage } from '../sessions/conversation.ts'
 import type { ObservableSnapshot } from './store.ts'
+
+/** Why a local submission echo retired from the session snapshot. */
+export type PendingSubmissionRetirement =
+  | { readonly reason: 'observed'; readonly attachments: readonly ImageAttachmentRef[] }
+  | { readonly reason: 'failed' }
+
+/** Input used to register one optimistic local submission echo. */
+export interface BeginSubmissionInput {
+  /** Prompt text exactly as the upcoming request will send it. */
+  readonly text: string
+  /** Ordered browser previews matching the upcoming image parts. */
+  readonly images: readonly PendingSubmissionImage[]
+  /** Called exactly once when the echo retires. */
+  readonly onRetire?: (retirement: PendingSubmissionRetirement) => void
+}
+
+/** Identity and escape hatch returned by {@link ISession.beginSubmission}. */
+export interface SubmissionHandle {
+  /** Prompt identity to pass to {@link ISession.prompt}. */
+  readonly requestId: RpcId
+  /** Retire the echo as failed when serialization cannot reach prompt(). */
+  abandon(): void
+}
 
 /** Key-addressed projection read face (the useProjection resolution path; see ProjectionValueStore). */
 export interface ProjectionsFace {
@@ -32,6 +56,8 @@ export interface ISession {
   readonly sessionId: SessionId
   /** Host-computed projection values by key (the useProjection seat). */
   readonly projections: ProjectionsFace
+  /** Local submission echoes currently awaiting durable admission. */
+  readonly beginSubmission?: (input: BeginSubmissionInput) => SubmissionHandle
   /**
    * Send a prompt into the session.
    * @param content - text plus browser-owned temporary image uploads.
@@ -42,6 +68,7 @@ export interface ISession {
     content: PromptContentPart[],
     mode: 'queue' | 'steer',
     signal?: AbortSignal,
+    requestId?: RpcId,
   ): Promise<RpcResult<{ accepted: true }>>
   /**
    * Resolve one durable image referenced by this session.

@@ -5,6 +5,7 @@ import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { RequestPayload, ResponseValue } from './rpc-map.ts'
 import type { Wire } from './rpc.schema.ts'
 import { contentBlockSchema, sessionIdSchema } from './sessions.schema.ts'
+import { rpcIdSchema } from './rpc.schema.ts'
 import type { SubagentListEntry } from './subagents.ts'
 
 /** Healthy and diagnostic durable catalog rows. */
@@ -60,6 +61,7 @@ export const subagentPromptRequestSchema = z.object({
   mode: z.literal('continuable'),
   content: z.array(contentBlockSchema),
   clientTimeZone: z.string().optional(),
+  requestId: rpcIdSchema.optional(),
 }) as unknown as z.ZodType<RequestPayload<'subagent.prompt'>>
 
 /** subagent.interrupt request payload. */

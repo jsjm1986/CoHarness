@@ -15,7 +15,7 @@
 
 ## `@deepseek-ai/dsh-acp`
 
-需要：`agents`
+需要：`agents` · `llm` · `sessionPersistence` · `sessions`
 
 ```ts config-catalog
 /** Plugin config: the provider/model selection used for each ACP-created agent. */
@@ -24,14 +24,16 @@ export interface AcpConfig {
   provider?: string
   /** Model name for created agents. */
   model?: string
-  /** Runtime-only transport override; production uses stdio. */
+  /** Maximum summaries returned by one session/list page. */
+  sessionListPageSize?: number
+  /** Runtime-only transport override; the caller owns its lifecycle when supplied. */
   stream?: Stream
 }
 ```
 
 依赖：`Stream`（`@agentclientprotocol/sdk`）
 
-来源：[`packages/acp/acp/src/index.ts:71`](../packages/acp/acp/src/index.ts)
+来源：[`packages/acp/acp/src/index.ts:74`](../packages/acp/acp/src/index.ts)
 
 <a id="deepseek-aidsh-acp-demo"></a>
 
@@ -761,10 +763,12 @@ export interface Config {
 export interface Config {
   /** The prompt text for the single run. */
   task: string
+  /** Emit provider reasoning progress to stderr when enabled. */
+  progress: boolean
 }
 ```
 
-来源：[`packages/bundle/headless/src/index.ts:31`](../packages/bundle/headless/src/index.ts)
+来源：[`packages/bundle/headless/src/index.ts:32`](../packages/bundle/headless/src/index.ts)
 
 <a id="deepseek-aidsh-hooks-claude-code"></a>
 
@@ -900,16 +904,22 @@ export interface Config {
 ## `@deepseek-ai/dsh-host-webserver`
 
 ```ts config-catalog
-/** Gateway config: the listen address. */
+/** Web server listen and response-compression config. */
 export interface Config {
   /** Listen host; the two supported values are loopback and all-interfaces. */
   host: '127.0.0.1' | '0.0.0.0'
   /** Listen port; zero requests an OS-assigned port. */
   port: number
+  /** Response compression for socket-backed HTTP requests. @default 'none' */
+  compression?: 'none' | 'gzip'
+  /** Gzip DEFLATE level from 0 through 9. @default 1 */
+  compressionLevel?: number
+  /** Minimum known response length eligible for gzip; unknown-length streams are eligible. @default 1024 */
+  compressionThresholdBytes?: number
 }
 ```
 
-来源：[`packages/host/webserver/src/index.ts:45`](../packages/host/webserver/src/index.ts)
+来源：[`packages/host/webserver/src/index.ts:59`](../packages/host/webserver/src/index.ts)
 
 <a id="deepseek-aidsh-invariants"></a>
 
@@ -1035,17 +1045,18 @@ export interface DeepSeekCatalogModel {
   /** Accepted request modalities; omission is text-only. */
   inputModalities?: ModelModality[]
   /** Total-pixel budget for one deterministic request preview. */
-  imagePixelBudget?: number
+  imagePixelBudget?: number | 'low'
   /** Encoded-byte cap for one deterministic request preview. */
   imageMaxBytes?: number
   /** Provider detail tier; `low` uses the 512-by-512 total-pixel default. */
+  /** Legacy alias for the low-detail preset; new configs use imagePixelBudget: 'low'. */
   imageDetail?: 'auto' | 'low'
 }
 ```
 
 依赖：[`ModelModality`](../packages/llm/llm/src/index.ts) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts)
 
-来源：[`packages/llm/llm-deepseek/src/index.ts:110`](../packages/llm/llm-deepseek/src/index.ts)
+来源：[`packages/llm/llm-deepseek/src/index.ts:127`](../packages/llm/llm-deepseek/src/index.ts)
 
 <a id="deepseek-aidsh-llm-pi-ai"></a>
 
@@ -1230,6 +1241,8 @@ export interface PiAiCompatProfile {
   supportsReasoningEffort?: boolean
   /** Whether the endpoint accepts `stream_options: {include_usage: true}`; `openai-completions`. */
   supportsUsageInStreaming?: boolean
+  /** Whether streams include a finish reason; openai-completions. */
+  supportsFinishReason?: boolean
   /** Which output-cap field the endpoint reads; `openai-completions`. */
   maxTokensField?: NonNullable<OpenAICompletionsCompat['maxTokensField']>
   /** Whether tool results must carry `name`; `openai-completions`. */
@@ -1250,6 +1263,12 @@ export interface PiAiCompatProfile {
    * can read, so kwargs set beside another format are sent nowhere.
    */
   chatTemplateKwargs?: NonNullable<OpenAICompletionsCompat['chatTemplateKwargs']>
+  /** Arguments sent as `chat_template_args` for the baseten format. */
+  chatTemplateArgs?: NonNullable<OpenAICompletionsCompat['chatTemplateArgs']>
+  /** Top-level field used for provider-specific thinking token budgets. */
+  thinkingTokenBudgetField?: ThinkingTokenBudgetField
+  /** Whether the endpoint accepts a vLLM thinking token budget. */
+  supportsThinkingTokenBudget?: boolean
   /**
    * Whether the endpoint accepts `strict` in tool definitions;
    * `openai-completions`, the three Responses protocols, `bedrock-converse-stream`.
@@ -1293,7 +1312,7 @@ export type PiAiReasoningEfforts = Partial<Record<ModelThinkingLevel, string | n
 export type PiAiThinkingFormat = NonNullable<OpenAICompletionsCompat['thinkingFormat']>
 ```
 
-依赖：`Api`（`@earendil-works/pi-ai`）· `CacheRetention`（`@earendil-works/pi-ai`）· `Model`（`@earendil-works/pi-ai`）· `ModelThinkingLevel`（`@earendil-works/pi-ai`）· `OpenAICompletionsCompat`（`@earendil-works/pi-ai`）· [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts) · `ThinkingBudgets`（`@earendil-works/pi-ai`）· `Transport`（`@earendil-works/pi-ai`)
+依赖：`Api`（`@earendil-works/pi-ai`）· `CacheRetention`（`@earendil-works/pi-ai`）· `Model`（`@earendil-works/pi-ai`）· `ModelThinkingLevel`（`@earendil-works/pi-ai`）· `OpenAICompletionsCompat`（`@earendil-works/pi-ai`）· [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts) · `ThinkingBudgets`（`@earendil-works/pi-ai`）· `ThinkingTokenBudgetField`（`@earendil-works/pi-ai`）· `Transport`（`@earendil-works/pi-ai`)
 
 来源：[`packages/llm/llm-pi-ai/src/config.ts:201`](../packages/llm/llm-pi-ai/src/config.ts)
 
@@ -1491,7 +1510,7 @@ export interface ReconnectConfig {
 }
 ```
 
-来源：[`packages/mcp/mcp-client/src/index.ts:98`](../packages/mcp/mcp-client/src/index.ts)
+来源：[`packages/mcp/mcp-client/src/index.ts:99`](../packages/mcp/mcp-client/src/index.ts)
 
 <a id="deepseek-aidsh-message-feedback"></a>
 
@@ -1588,6 +1607,22 @@ export interface PlanModeConfig {
 ```
 
 来源：[`packages/plan/plan-mode/src/index.ts:71`](../packages/plan/plan-mode/src/index.ts)
+
+<a id="deepseek-aidsh-plugin-package-inventory-deepseek"></a>
+
+## `@deepseek-ai/dsh-plugin-package-inventory-deepseek`
+
+需要：`agents` · `deepseekLlmApiExtensions` · `loader`
+
+```ts config-catalog
+/** Plugin-package request contribution configuration. */
+export interface Config {
+  /** Contribute `dsh_plugin_packages` to official DeepSeek requests. Defaults to `true`. */
+  enabled?: boolean
+}
+```
+
+来源：[`packages/llm/plugin-package-inventory-deepseek/src/index.ts:30`](../packages/llm/plugin-package-inventory-deepseek/src/index.ts)
 
 <a id="deepseek-aidsh-pwsh-local"></a>
 
@@ -1774,6 +1809,28 @@ export interface JsonRpcConfig {
 依赖：`Readable`（`node:stream`）· `Writable`（`node:stream`）
 
 来源：[`packages/sdk/server/src/index.ts:29`](../packages/sdk/server/src/index.ts)
+
+<a id="deepseek-aidsh-session-log-deepseek"></a>
+
+## `@deepseek-ai/dsh-session-log-deepseek`
+
+需要：`deepseekLlmApiExtensions` · `sessions`
+
+```ts config-catalog
+/** Session-log request contribution configuration. */
+export interface Config {
+  /** Contribute `dsh_session_log` to official DeepSeek requests. Defaults to `false`. */
+  enabled?: boolean
+  /** Optional exact endpoint allowlist; an empty list preserves the adapter's configured endpoint. */
+  allowedEndpoints?: string[]
+  /** Environment key whose non-empty value disables new deliveries immediately. */
+  killSwitchEnv?: string
+  /** Emit metadata-only delivery audit records through the host logger. */
+  audit?: boolean
+}
+```
+
+来源：[`packages/session/session-log-deepseek/src/index.ts:22`](../packages/session/session-log-deepseek/src/index.ts)
 
 <a id="deepseek-aidsh-session-persistence-gateway"></a>
 
@@ -2352,10 +2409,12 @@ export type PermissionPolicy = 'allow' | 'reject'
 需要：`subagents` · `subprocess`
 
 ```ts config-catalog
-/** Deployment-owned permission, environment, and process-release settings. */
+/** Deployment-owned model, permission, environment, and process-release settings. */
 export interface Config {
   /** Provider name on `ctx.subagents` (default `claude-code`). */
   providerName?: string
+  /** Native Claude model fixed for this instance; omitted to inherit Claude settings. */
+  model?: string
   /**
    * Explicit environment entries layered over the subprocess seam's
    * credential-scrubbed parent environment.
@@ -2385,10 +2444,12 @@ export type ClaudeCodePermissionMode = typeof CLAUDE_CODE_PERMISSION_MODES[numbe
 需要：`subagents` · `subprocess`
 
 ```ts config-catalog
-/** Deployment-owned permission, environment, and process-release settings. */
+/** Deployment-owned model, permission, environment, and process-release settings. */
 export interface Config {
   /** Provider name on `ctx.subagents` (default `codex`). */
   providerName?: string
+  /** Native Codex model fixed for this instance; omitted to inherit Codex settings. */
+  model?: string
   /**
    * Explicit environment entries layered over the subprocess seam's
    * credential-scrubbed parent environment.
@@ -2437,6 +2498,8 @@ export interface Config {
   provider: string
   /** Model the child runtime initializes with (default `deepseek-v4-flash`). */
   model: string
+  /** Optional adapter-owned reasoning effort for the child runtime. */
+  reasoningEffort?: ReasoningEffortId
   /** Optional per-request output-token cap for the child runtime. */
   maxTokens?: number
   /**
@@ -2460,7 +2523,9 @@ export interface Config {
 }
 ```
 
-来源：[`packages/subagent/subagent-dsh-sdk/src/index.ts:29`](../packages/subagent/subagent-dsh-sdk/src/index.ts)
+依赖：[`ReasoningEffortId`](../packages/llm/llm/src/index.ts)
+
+来源：[`packages/subagent/subagent-dsh-sdk/src/index.ts:30`](../packages/subagent/subagent-dsh-sdk/src/index.ts)
 
 <a id="deepseek-aidsh-subagent-fork-in-process"></a>
 
@@ -2535,7 +2600,7 @@ export interface Config {
 }
 ```
 
-来源：[`packages/core/system-prompt/src/index.ts:186`](../packages/core/system-prompt/src/index.ts)
+来源：[`packages/core/system-prompt/src/index.ts:233`](../packages/core/system-prompt/src/index.ts)
 
 <a id="deepseek-aidsh-terminal-bash"></a>
 
@@ -2926,6 +2991,11 @@ export interface Config {
    */
   toolName?: string
   /**
+   * Sample the Host `subagent-model-selection` user setting for each new
+   * top-level session and inherit that decision in its child sessions.
+   */
+  modelSelectionSettings?: boolean
+  /**
    * Expose `run_in_background` (default true). Disabled instances omit the
    * parameter and reject forced background calls.
    */
@@ -2972,7 +3042,7 @@ export interface Config {
 
 依赖：[`AgentOptions`](subsystems/core.zh.md)
 
-来源：[`packages/subagent/tool-subagent/src/index.ts:29`](../packages/subagent/tool-subagent/src/index.ts)
+来源：[`packages/subagent/tool-subagent/src/index.ts:49`](../packages/subagent/tool-subagent/src/index.ts)
 
 <a id="deepseek-aidsh-tool-subagent-report"></a>
 
@@ -3458,6 +3528,7 @@ export interface Config {
 - `@deepseek-ai/dsh-command-goal` — 需要 `commands` · `goals`（[`packages/goal/command-goal/src/index.ts`](../packages/goal/command-goal/src/index.ts)）
 - `@deepseek-ai/dsh-commands`（[`packages/interaction/commands/src/index.ts`](../packages/interaction/commands/src/index.ts)）
 - `@deepseek-ai/dsh-cordis-client-runner`（[`packages/extensions/cordis-client-runner/src/index.ts`](../packages/extensions/cordis-client-runner/src/index.ts)）
+- `@deepseek-ai/dsh-deepseek-llm-api-extensions`（[`packages/llm/deepseek-llm-api-extensions/src/index.ts`](../packages/llm/deepseek-llm-api-extensions/src/index.ts)）
 - `@deepseek-ai/dsh-fs-e2b` — 需要 `e2b`（[`packages/e2b/fs-e2b/src/index.ts`](../packages/e2b/fs-e2b/src/index.ts)）
 - `@deepseek-ai/dsh-fs-observation-policy`（[`packages/fs/fs-observation-policy/src/index.ts`](../packages/fs/fs-observation-policy/src/index.ts)）
 - `@deepseek-ai/dsh-gateway-runtime` — 需要 `connection`（[`packages/context/gateway-runtime/src/index.ts`](../packages/context/gateway-runtime/src/index.ts)）

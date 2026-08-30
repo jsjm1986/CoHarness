@@ -37,6 +37,8 @@ export type ToolEventView =
 export interface QueuedInboxItem {
   /** Message identity used by inbox mutations. */
   id: MessageId
+  /** Prompt identity for a browser-submitted occurrence, when present on the message source. */
+  rpcId?: RpcId
   /** Agent-resolved FIFO placement; queued and steering items render on different surfaces, context items stay invisible until claimed. */
   placement: 'queued' | 'steering' | 'context'
   /** Complete pending message; it is not durable until the Agent claims it. */

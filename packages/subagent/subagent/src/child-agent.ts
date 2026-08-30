@@ -88,7 +88,11 @@ export function resolveChildAgentOptions(
   }
 }
 
-/** Read the parent's current route, falling back to its creation options. */
+/**
+ * Read the parent's current route, falling back to its creation options.
+ * @param parent - agent whose current request route is inspected.
+ * @returns detached agent options suitable for child delegation.
+ */
 export function parentAgentOptionsForDelegation(parent: Agent): AgentOptions {
   const requestHeader = parent.session as unknown as { requestHeader?: () => { config: AgentOptions } | undefined } | undefined
   const current = requestHeader?.requestHeader?.()?.config

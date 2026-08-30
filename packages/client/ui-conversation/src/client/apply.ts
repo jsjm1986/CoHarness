@@ -13,7 +13,7 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { ViewTab } from './contract/views.ts'
 import type {
   ApprovalWait, ChatNodeTurnDataInjected, ChatScrollPosition, ChatViewInjected, ComposerBarInjected,
-  ComposerChainProps, ConversationInjected, ConversationSessionHeaderInjected, ConversationSessionInjected,
+  ComposerChainProps, ConversationInjected, ConversationSessionHeaderInjected, ConversationSessionInjected, MessageImageLoader,
   DetailsInjected, WorkspaceSelectionOptions,
 } from './contract/slots.ts'
 import type { InputNotice } from './input/contract.ts'
@@ -27,6 +27,8 @@ import { ComposerSubmissionPolicy } from './input/submission-policy.ts'
 import { InputBar } from './skeleton/InputBar.tsx'
 import { EnterBehaviorRow } from './settings/EnterBehaviorRow.tsx'
 import type { EnterBehaviorRowInjected } from './settings/EnterBehaviorRow.tsx'
+import { DisplaySettingsRow } from './settings/DisplaySettingsRow.tsx'
+import type { DisplaySettingsRowInjected } from './settings/DisplaySettingsRow.tsx'
 import { ChatView } from './chat/ChatView.tsx'
 import { StatsLine } from './chat/StatsLine.tsx'
 import { ApprovalPanel } from './skeleton/ApprovalPanel.tsx'
@@ -39,6 +41,7 @@ import { en, NS, zh, type ConversationKey } from './locales.ts'
 import { registerConversationNodes } from './conversation-nodes/register.ts'
 import { registerChatNodeRenderers } from './chat/register-node-renderers.ts'
 import { CONVERSATION_SETTINGS_NAMESPACE, type ConversationSettings } from '../submission-settings.ts'
+import { ConversationDisplaySettings } from './display-settings.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -135,13 +138,16 @@ export function apply(ctx: Context): void {
 
   // Apply-time construction keeps store identity bound to this fiber.
   const chatStore = createChatStore()
-  const submissionPolicy = new ComposerSubmissionPolicy(
-    ctx.settingsScope.bind<ConversationSettings>({
-      namespace: CONVERSATION_SETTINGS_NAMESPACE,
-      source: 'account-or-host',
-    }),
-  )
-  ctx.effect(() => () => { submissionPolicy.dispose() }, 'ui-conversation: settings policy observer')
+  const conversationSettings = ctx.settingsScope.bind<ConversationSettings>({
+    namespace: CONVERSATION_SETTINGS_NAMESPACE,
+    source: 'account-or-host',
+  })
+  const submissionPolicy = new ComposerSubmissionPolicy(conversationSettings)
+  const displaySettings = new ConversationDisplaySettings(conversationSettings)
+  ctx.effect(() => () => {
+    submissionPolicy.dispose()
+    displaySettings.dispose()
+  }, 'ui-conversation: settings observers')
 
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({
     name: 'settings.general.item',
@@ -153,6 +159,17 @@ export function apply(ctx: Context): void {
       setBusyEnter: (behavior) => { submissionPolicy.setBusyEnter(behavior) },
     }),
   }, EnterBehaviorRow))
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item',
+    id: 'conversation-display',
+    order: 30,
+    locale: NS,
+    inject: (): DisplaySettingsRowInjected => ({
+      hooks: { displaySettings },
+      setWidth: (value) => { displaySettings.setWidth(value) },
+      setFontSize: (value) => { displaySettings.setFontSize(value) },
+    }),
+  }, DisplaySettingsRow))
 
   // Chat semantic reader positions by session, surviving view switches and
   // width reflow when the tab ring remounts the view. Deliberately not
@@ -220,7 +237,11 @@ export function apply(ctx: Context): void {
       'conversation.hero.agentPreset': { kind: 'single', scope: 'root' },
     },
     inject: (sessionId: SessionId | undefined): ConversationInjected => ({
-      hooks: { composerBlock: sessionId === undefined ? ABSENT_BLOCK : composerBlocks.storeFor(sessionId) },
+      hooks: {
+        composerBlock: sessionId === undefined ? ABSENT_BLOCK : composerBlocks.storeFor(sessionId),
+        displaySettings,
+      },
+      setDisplayWidth: (value) => { displaySettings.setWidth(value) },
       selectWorkspace: async (workspaceId, options: WorkspaceSelectionOptions = {}) => {
         const nextId = await workspaces.openWorkspace(workspaceId)
         // Validate/open first: a race can invalidate a history id between the
@@ -414,6 +435,11 @@ export function apply(ctx: Context): void {
     inject: (sessionId: SessionId, actions: BoundActions<typeof chatStore>): ChatViewInjected => {
       const conversation = concreteConversation(ctx)
       const scoped = scopedConversation(sessions, sessionId)
+      const loadImage: MessageImageLoader = Object.assign(
+        (attachment: import('@deepseek-ai/dsh-attachment').ImageAttachmentRef) =>
+          conversation.resolveImage(sessionId, attachment),
+        { peek: (attachment: import('@deepseek-ai/dsh-attachment').ImageAttachmentRef) => conversation.peekImage(sessionId, attachment) },
+      )
       return {
         openDetails: (target) => {
           actions.select(target)
@@ -425,7 +451,7 @@ export function apply(ctx: Context): void {
           return workspaces.openPath(resolveWorkspacePath(cwd, path))
         },
         loadOlder: () => { void scoped.loadOlder() },
-        loadImage: attachment => conversation.resolveImage(sessionId, attachment),
+        loadImage,
         // Unregistered 'trajectory' id is safe: the tab ring falls back to
         // the first view, and the untouched inspect target stays inert.
         inspectCall: (callId) => {

@@ -186,6 +186,9 @@ export interface PersistenceBackend<TornMarker = unknown> {
    */
   loadStoredFrom?(id: SessionId, fromSeq: number, signal?: AbortSignal): Promise<StoredSuffix | undefined>
 
+  /** Durably create an empty header-only session artifact. */
+  materializeHeader?(meta: SessionHeader): Promise<void>
+
   /**
    * Durably append a CONTIGUOUS batch, lazily materializing the session first
    * when `!isMaterialized`. The materialize-write and the first event batch MUST
@@ -669,6 +672,28 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       return Promise.reject(new TypeError('session metadata createdAt must be a non-negative safe integer'))
     }
     return this.serialize(snapshot.id, () => this.createCore(snapshot))
+  }
+
+  /**
+   * Materialize one exact live session without inventing an event.
+   * @param session - live session already registered through the write path.
+   * @returns after the header-only artifact is durable.
+   */
+  async ensureMaterialized(session: Session): Promise<void> {
+    await this.flush(session)
+    await this.serialize(session.id, async () => {
+      const state = this.states.get(session.id)
+      if (state === undefined || state.owner !== session) {
+        throw new Error(`session "${session.id}" is not registered for persistence`)
+      }
+      if (state.materialized) return
+      if (this.backend.materializeHeader === undefined) {
+        throw new Error('session persistence backend cannot materialize an empty session')
+      }
+      await this.backend.materializeHeader(state.meta)
+      state.materialized = true
+      this.preparations.invalidate(session.id)
+    })
   }
 
   private async createCore(meta: SessionHeader): Promise<void> {

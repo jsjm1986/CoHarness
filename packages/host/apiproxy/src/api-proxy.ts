@@ -2044,9 +2044,19 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         : messages
     }
     return [
-      ...project('next-turn').map(message => ({ id: message.id, placement: 'queued' as const, message })),
+      ...project('next-turn').map(message => ({
+        id: message.id,
+        ...(message.source.kind === 'user' && 'rpcId' in message.source
+          ? { rpcId: message.source.rpcId }
+          : {}),
+        placement: 'queued' as const,
+        message,
+      })),
       ...project('next-step').map(message => ({
         id: message.id,
+        ...(message.source.kind === 'user' && 'rpcId' in message.source
+          ? { rpcId: message.source.rpcId }
+          : {}),
         // Only user-origin messages are steering; injected context (approval
         // notices, task completion, attached snapshots) is not a user action
         // and must not render as a pending steering bubble.
@@ -3557,7 +3567,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       },
 
       async prompt(request) {
-        const { sessionId, mode, content, clientTimeZone } = request.payload
+        const { sessionId, mode, content, clientTimeZone, requestId } = request.payload
         const authorized = await authorizeSession(sessionId, 'write')
         if ('error' in authorized) return err(request, authorized.error)
         const canonicalTimeZone = clientTimeZone === undefined
@@ -3577,7 +3587,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         const participant = projectParticipant(authorized.authority)
         const source = {
           kind: 'user',
-          rpcId: request.rpcId,
+          rpcId: requestId ?? request.rpcId,
           ...(canonicalTimeZone === undefined ? {} : { clientTimeZone: canonicalTimeZone }),
           ...(participant === undefined ? {} : { participant }),
         } satisfies MessageSource
@@ -3873,7 +3883,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       },
 
       async prompt(request, signal) {
-        const { parentSessionId, childSessionId, content, clientTimeZone } = request.payload
+        const { parentSessionId, childSessionId, content, clientTimeZone, requestId } = request.payload
         const parentAccess = await authorizeSession(parentSessionId, 'write')
         if ('error' in parentAccess) return err(request, parentAccess.error)
         const childAccess = await authorizeSession(childSessionId, 'write', parentAccess.authority)
@@ -3905,7 +3915,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           const messageId = await ctx.subagents.followup(parent, childSessionId, content, {
             source: {
               kind: 'user',
-              rpcId: request.rpcId,
+              rpcId: requestId ?? request.rpcId,
               ...(canonicalTimeZone === undefined ? {} : { clientTimeZone: canonicalTimeZone }),
               ...(participant === undefined ? {} : { participant }),
             },

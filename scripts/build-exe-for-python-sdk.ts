@@ -11,15 +11,15 @@ import { existsSync, statSync } from 'node:fs'
 import { chmod, copyFile, cp, lstat, mkdir, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, resolve, sep } from 'node:path'
 import { parseArgs } from 'node:util'
-import { resolveLinuxNodePtyAddon } from './build-exe-for-python-sdk-native-pty.ts'
+import { resolveLinuxNodePtyAddon, resolveWindowsNodePtyAddons } from './build-exe-for-python-sdk-native-pty.ts'
 
 const root = resolve(import.meta.dirname, '..')
 
 /** The closure manifest whose dependencies define the executable. */
-const DEPLOY_ROOT_PACKAGE = 'dsh-jsonrpc-agent-pkg'
+const DEPLOY_ROOT_PACKAGE = 'dsh-python-runtime-closure'
 /** The closed-runtime app entry inside the deployed closure. */
 const ENTRY_BIN = 'node_modules/@deepseek-ai/dsh-sdk-jsonrpc-demo/lib/packaged-bin.js'
-const OUTPUT_BASENAME = 'dsh-jsonrpc-agent-pkg'
+const OUTPUT_BASENAME = 'deepseek-harness-sdk-runtime'
 /** Default Node major; SEA mode requires at least Node 22. */
 const DEFAULT_NODE_RANGE = 'node24'
 /** Pinned for reproducible builds. */
@@ -50,7 +50,7 @@ const ASSET_GLOBS = [
   'node_modules/**/*.wasm',
 ]
 
-const PLATFORMS = ['linux', 'macos'] as const
+const PLATFORMS = ['linux', 'macos', 'win'] as const
 const ARCHES = ['x64', 'arm64'] as const
 type Platform = (typeof PLATFORMS)[number]
 type Arch = (typeof ARCHES)[number]
@@ -104,6 +104,9 @@ class Target {
     if (!isArch(arch)) {
       throw new Error(`build-exe-for-python-sdk: target ${JSON.stringify(spec)}: arch must be one of ${ARCHES.join(', ')}, got ${JSON.stringify(arch)}.`)
     }
+    if (platform === 'win' && arch !== 'x64') {
+      throw new Error(`build-exe-for-python-sdk: target ${JSON.stringify(spec)}: Windows supports x64 only.`)
+    }
     return new Target(nodeRange, platform, arch)
   }
 
@@ -112,13 +115,22 @@ class Target {
    * @returns the host target; throws on an unsupported host platform or arch.
    */
   static host(): Target {
-    const platform = process.platform === 'darwin' ? 'macos' : process.platform === 'linux' ? 'linux' : undefined
+    const platform = process.platform === 'darwin'
+      ? 'macos'
+      : process.platform === 'linux'
+        ? 'linux'
+        : process.platform === 'win32'
+          ? 'win'
+          : undefined
     if (platform === undefined) {
       throw new Error(`build-exe-for-python-sdk: unsupported host platform ${process.platform}; pass --targets explicitly.`)
     }
     const arch = process.arch === 'x64' || process.arch === 'arm64' ? process.arch : undefined
     if (arch === undefined) {
       throw new Error(`build-exe-for-python-sdk: unsupported host arch ${process.arch}; pass --targets explicitly.`)
+    }
+    if (platform === 'win' && arch !== 'x64') {
+      throw new Error('build-exe-for-python-sdk: Windows supports x64 only; use an x64 Node process.')
     }
     return new Target(DEFAULT_NODE_RANGE, platform, arch)
   }
@@ -187,7 +199,7 @@ class BuildCli {
     return [
       'Usage: pnpm exec tsx scripts/build-exe-for-python-sdk.ts [flags]',
       '',
-      '  --targets=<t1,t2,...>  pkg targets, e.g. node24-linux-x64,node24-linux-arm64,node24-macos-arm64.',
+      '  --targets=<t1,t2,...>  pkg targets, e.g. node24-linux-x64,node24-linux-arm64,node24-macos-arm64,node24-win-x64.',
       '                         Default: the host platform only (on node24).',
       '  --skip-build           skip `pnpm run build` (lib/ artifacts must already exist).',
       '  --dry-run              print every command and config patch without executing.',
@@ -381,7 +393,8 @@ class SingleExeBuild {
    * @returns the executable and ripgrep sidecar paths, plus the macOS spawn helper path when required.
    */
   async pack(target: Target): Promise<string[]> {
-    const product = join(this.outDir, `${OUTPUT_BASENAME}-${target.platform}-${target.arch}`)
+    const productBase = join(this.outDir, `${OUTPUT_BASENAME}-${target.platform}-${target.arch}`)
+    const product = target.platform === 'win' ? `${productBase}.exe` : productBase
     await this.prepareNativePty(target)
     if (!this.cli.dryRun) await mkdir(this.outDir, { recursive: true })
     await this.run(`pkg ${target.spec}`, pnpmBin(), [
@@ -412,16 +425,19 @@ class SingleExeBuild {
 
   /** Copy the target ripgrep binary beside the executable so Node can spawn it outside pkg's virtual filesystem. */
   private async copyRipgrepSidecar(target: Target, product: string): Promise<string> {
-    const platform = target.platform === 'macos' ? 'darwin' : target.platform
+    const platform = target.platform === 'macos' ? 'darwin' : target.platform === 'win' ? 'win32' : target.platform
+    const executable = target.platform === 'win' ? 'rg.exe' : 'rg'
     const source = join(
       this.staging,
       'node_modules',
       '@vscode',
       `ripgrep-${platform}-${target.arch}`,
       'bin',
-      'rg',
+      executable,
     )
-    const destination = `${product}-rg`
+    const destination = target.platform === 'win'
+      ? `${product.slice(0, -'.exe'.length)}-rg.exe`
+      : `${product}-rg`
     if (this.cli.dryRun) {
       console.log(`build-exe-for-python-sdk: [dry-run] cp ${source} ${destination}`)
       return destination
@@ -443,7 +459,6 @@ class SingleExeBuild {
     const stagedBuild = join(this.staging, 'node_modules', 'node-pty', 'build')
     if (this.cli.dryRun) console.log(`build-exe-for-python-sdk: [dry-run] rm -rf ${stagedBuild}`)
     else await rm(stagedBuild, { recursive: true, force: true })
-    if (target.platform !== 'linux') return
     const packageDirectory = join(
       root,
       'packages',
@@ -452,6 +467,19 @@ class SingleExeBuild {
       'node_modules',
       'node-pty',
     )
+    if (target.platform === 'win') {
+      if (target.arch !== 'x64') throw new Error('build-exe-for-python-sdk: Windows supports x64 only.')
+      const host = Target.host()
+      if (target.platform !== host.platform || target.arch !== host.arch) {
+        throw new Error(
+          'build-exe-for-python-sdk: build the Windows runtime under x64 Node on its target host; '
+          + `target ${target.platform}-${target.arch} does not match host ${host.platform}-${host.arch}.`,
+        )
+      }
+      resolveWindowsNodePtyAddons(join(this.staging, 'node_modules', 'node-pty'), target.arch)
+      return
+    }
+    if (target.platform !== 'linux') return
     const destination = join(stagedBuild, 'Release', 'pty.node')
     const source = resolveLinuxNodePtyAddon(packageDirectory, target.arch)
     if (this.cli.dryRun) {

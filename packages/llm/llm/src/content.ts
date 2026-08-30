@@ -2,7 +2,20 @@
 
 import type { ContentBlock } from './types.ts'
 import type { Message } from './message.ts'
-import type { ImageAttachmentRef, RequestImageAttachment } from '@deepseek-ai/dsh-attachment'
+import type {
+  AttachmentStore,
+  ImageAttachmentRef,
+  RequestImageAttachment,
+} from '@deepseek-ai/dsh-attachment'
+
+/** Read-only path exposed to model tools for a normalized local image. */
+export interface ImageAttachmentAccess {
+  /** Absolute path in the current tool execution world. */
+  readonlyPath: string
+}
+
+/** Resolve one durable image into the current tool execution world. */
+export type ImageAttachmentAccessResolver = (ref: ImageAttachmentRef) => ImageAttachmentAccess | undefined
 
 /** Model-facing stand-in for an image removed to fit a provider request bound. */
 export const OFFLOADED_IMAGE_TEXT
@@ -23,8 +36,77 @@ export function textOnlyImageText(ref: ImageAttachmentRef): string {
  * @param version - exact request image shown beside the text.
  * @returns attachment handle and request-image dimensions.
  */
-export function requestImageHandleText(version: RequestImageAttachment): string {
-  return `Image ${version.attachment.attachmentId}; request image ${version.width}x${version.height}px.`
+export function requestImageHandleText(version: RequestImageAttachment): string
+/**
+ * Stable model-facing handle for a normalized attachment and its request image.
+ * @param ref - durable normalized image reference.
+ * @param version - request-image dimensions shown beside the text.
+ * @param access - optional read-only path in the current tool execution world.
+ * @returns attachment identity, request dimensions, and optional readable path.
+ */
+export function requestImageHandleText(
+  ref: ImageAttachmentRef,
+  version: Pick<RequestImageAttachment, 'width' | 'height'>,
+  access?: ImageAttachmentAccess,
+): string
+export function requestImageHandleText(
+  first: RequestImageAttachment | ImageAttachmentRef,
+  second?: Pick<RequestImageAttachment, 'width' | 'height'>,
+  access?: ImageAttachmentAccess,
+): string {
+  // Preserve the pre-alpha wording for callers that still pass the complete
+  // request version; the expanded form carries the normalized path contract.
+  if (second === undefined) {
+    const version = first as RequestImageAttachment
+    return `Image ${version.attachment.attachmentId}; request image ${version.width}x${version.height}px.`
+  }
+  const ref = first as ImageAttachmentRef
+  const identity = ref.name === undefined
+    ? String(ref.attachmentId)
+    : `${JSON.stringify(ref.name)} (${ref.attachmentId})`
+  const preview = `Image ${identity}; request preview ${second.width}x${second.height}px.`
+  if (access === undefined) {
+    return `Image ${identity}; request image ${second.width}x${second.height}px.`
+  }
+  return `${preview} Normalized copy (read-only; may be resized or re-encoded): ${JSON.stringify(access.readonlyPath)} (${ref.width}x${ref.height}px, ${ref.mediaType}).`
+    + ' Source dimensions, format, and byte size may differ.'
+}
+
+/**
+ * Build the stable model-visible placeholder for an image removed by request limits.
+ * @param ref - durable normalized image reference omitted from the request.
+ * @param access - optional read-only path in the current tool execution world.
+ * @returns deterministic text-only placeholder.
+ */
+export function offloadedImageText(
+  ref: ImageAttachmentRef,
+  access?: ImageAttachmentAccess,
+): string {
+  const identity = ref.name === undefined
+    ? String(ref.attachmentId)
+    : `${JSON.stringify(ref.name)} (${ref.attachmentId})`
+  if (access === undefined) {
+    return OFFLOADED_IMAGE_TEXT
+  }
+  return `[image omitted to fit request image limits; ${identity}. Normalized copy (read-only): ${JSON.stringify(access.readonlyPath)} (${ref.width}x${ref.height}px, ${ref.mediaType}).]`
+}
+
+/**
+ * Resolve one local attachment path into an execution-world read-only path.
+ * @param attachments - store that owns the durable image reference.
+ * @param mapHostPath - mapper from host storage paths to tool-world paths.
+ * @param ref - durable normalized image reference.
+ * @returns a read-only tool-world path, or `undefined` when it is unavailable.
+ */
+export function resolveImageAttachmentAccess(
+  attachments: AttachmentStore,
+  mapHostPath: (hostPath: string) => string | undefined,
+  ref: ImageAttachmentRef,
+): ImageAttachmentAccess | undefined {
+  const hostPath = attachments.imageHostPath(ref)
+  if (hostPath === undefined) return undefined
+  const readonlyPath = mapHostPath(hostPath)
+  return readonlyPath === undefined ? undefined : { readonlyPath }
 }
 
 /**
@@ -59,6 +141,8 @@ export interface RequestImageOffloadPolicy {
   representation: 'raw' | 'base64'
   /** Resolve the encoded request-version length; omission uses master attachment bytes. */
   byteLength?: (ref: ImageAttachmentRef) => number
+  /** Build the model-visible replacement for an omitted image. */
+  placeholder?: (ref: ImageAttachmentRef) => string
 }
 
 /** Collect represented image lengths in request and nested-block order. */
@@ -83,17 +167,18 @@ function collectImageLengths(
 function replaceOldestImages(
   blocks: readonly ContentBlock[],
   remaining: { count: number },
+  placeholder: (ref: ImageAttachmentRef) => string,
 ): ContentBlock[] {
   let next: ContentBlock[] | undefined
   for (const [index, block] of blocks.entries()) {
     if (block.type === 'image' && remaining.count > 0) {
       remaining.count -= 1
       next ??= blocks.slice(0, index)
-      next.push({ type: 'text', text: OFFLOADED_IMAGE_TEXT })
+      next.push({ type: 'text', text: placeholder(block.attachment) })
       continue
     }
     if (block.type === 'tool-result') {
-      const content = replaceOldestImages(block.content, remaining)
+      const content = replaceOldestImages(block.content, remaining, placeholder)
       if (content !== block.content) {
         next ??= blocks.slice(0, index)
         next.push({ ...block, content })
@@ -161,6 +246,38 @@ export function offloadRequestImages(
 }
 
 /**
+ * Count the oldest image occurrences removed by one deterministic offload
+ * policy. The result is shared by provider pricing and message projection so
+ * both paths choose the same prefix without reading image bytes.
+ * @param lengths - represented image lengths in model-request order.
+ * @param policy - count/byte budgets and removal quanta.
+ * @returns number of leading occurrences replaced by placeholders.
+ */
+export function offloadedImagePrefixCount(
+  lengths: readonly number[],
+  policy: Pick<RequestImageOffloadPolicy, 'maxImages' | 'maxBytes' | 'countQuantum' | 'byteQuantum'>,
+): number {
+  const total = lengths.reduce((sum, bytes) => sum + bytes, 0)
+  const excessCount = policy.maxImages === undefined ? 0 : Math.max(0, lengths.length - policy.maxImages)
+  const excessBytes = policy.maxBytes === undefined ? 0 : Math.max(0, total - policy.maxBytes)
+  if (excessCount === 0 && excessBytes === 0) return 0
+  const countQuantum = policy.countQuantum ?? 1
+  const byteQuantum = policy.byteQuantum ?? 1
+  const removeCount = excessCount === 0 ? 0 : Math.ceil(excessCount / countQuantum) * countQuantum
+  const removeBytes = excessBytes === 0 ? 0 : Math.ceil(excessBytes / byteQuantum) * byteQuantum
+  let count = 0
+  let removedBytes = 0
+  for (const imageBytes of lengths) {
+    const byteTargetMet = removeBytes === 0
+      || (byteQuantum === 1 ? removedBytes >= removeBytes : removedBytes > removeBytes)
+    if (count >= removeCount && byteTargetMet) break
+    removedBytes += imageBytes
+    count += 1
+  }
+  return count
+}
+
+/**
  * Return a deterministic transient projection whose oldest images are replaced
  * in whole count and byte quanta after a route budget is exceeded. The target
  * depends only on complete durable history: at 129 one-megabyte images under
@@ -177,26 +294,12 @@ export function offloadRequestImagesWithPolicy(
 ): readonly Message[] {
   const lengths: number[] = []
   for (const message of messages) collectImageLengths(message.content, lengths, policy)
-  const total = lengths.reduce((sum, bytes) => sum + bytes, 0)
-  const excessCount = policy.maxImages === undefined ? 0 : Math.max(0, lengths.length - policy.maxImages)
-  const excessBytes = policy.maxBytes === undefined ? 0 : Math.max(0, total - policy.maxBytes)
-  if (excessCount === 0 && excessBytes === 0) return messages
-  const countQuantum = policy.countQuantum ?? 1
-  const byteQuantum = policy.byteQuantum ?? 1
-  const removeCount = excessCount === 0 ? 0 : Math.ceil(excessCount / countQuantum) * countQuantum
-  const removeBytes = excessBytes === 0 ? 0 : Math.ceil(excessBytes / byteQuantum) * byteQuantum
-  let count = 0
-  let removedBytes = 0
-  for (const imageBytes of lengths) {
-    const byteTargetMet = removeBytes === 0
-      || (byteQuantum === 1 ? removedBytes >= removeBytes : removedBytes > removeBytes)
-    if (count >= removeCount && byteTargetMet) break
-    removedBytes += imageBytes
-    count += 1
-  }
+  const count = offloadedImagePrefixCount(lengths, policy)
+  if (count === 0) return messages
   const remaining = { count }
+  const placeholder = policy.placeholder ?? (() => OFFLOADED_IMAGE_TEXT)
   return messages.map((message) => {
-    const content = replaceOldestImages(message.content, remaining)
+    const content = replaceOldestImages(message.content, remaining, placeholder)
     return content === message.content ? message : { ...message, content }
   })
 }

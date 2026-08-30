@@ -16,12 +16,12 @@ import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import type { NormalizationPolicy } from './normalization.ts'
 import { CompressionLimiter } from './compression-limiter.ts'
-import { commitPreparedImageFile, prepareImageFile, readImageFile, validateImageFile } from './store.ts'
+import { commitPreparedImageFile, normalizedImagePath, prepareImageFile, readImageFile, validateImageFile } from './store.ts'
 import { pruneRequestImageCache, readRequestImageFile, requestImageVariantId } from './request-image.ts'
 
 export { canPassThroughNormalization, normalizeImage } from './normalization.ts'
 export type { NormalizedImage, NormalizationPolicy } from './normalization.ts'
-export { commitPreparedImageFile, prepareImageFile, readImageFile, saveImageFile, validateImageFile } from './store.ts'
+export { commitPreparedImageFile, normalizedImagePath, prepareImageFile, readImageFile, saveImageFile, validateImageFile } from './store.ts'
 export type { PreparedImageFile } from './store.ts'
 export { pruneRequestImageCache, readRequestImageFile, requestImageDimensions, requestImageVariantId } from './request-image.ts'
 export type { RequestImageCachePolicy } from './request-image.ts'
@@ -261,6 +261,11 @@ export class LocalAttachmentStore extends AttachmentStore {
 
   async readImage(ref: ImageAttachmentRef, signal?: AbortSignal): Promise<StoredImageAttachment> {
     return readImageFile(this.root, ref, signal)
+  }
+
+  /** Expose only the immutable normalized object path to local execution-world adapters. */
+  override imageHostPath(ref: ImageAttachmentRef): string {
+    return normalizedImagePath(this.root, ref)
   }
 
   override async readImageRequest(

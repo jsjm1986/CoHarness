@@ -19,6 +19,15 @@ const BLOCK_OVERHEAD = 4
 export const ROLE_OVERHEAD = 4
 
 /**
+ * Price the structural JSON of a merge-extended block or image reference.
+ * @param block - content block whose serialized structure is priced.
+ * @returns fixed-density structural token estimate.
+ */
+export function estimateStructuralBlock(block: ContentBlock): number {
+  return BLOCK_OVERHEAD + Math.ceil(JSON.stringify(block).length / CHARS_PER_TOKEN)
+}
+
+/**
  * Price content blocks recursively under the fixed density heuristic.
  * @param blocks - content blocks to price without mutation.
  * @returns heuristic tokens including per-block structural overhead.
@@ -42,7 +51,7 @@ export function estimateContent(blocks: readonly ContentBlock[]): number {
       default:
         // ContentBlockMap is merge-extensible; unknown blocks retain a
         // conservative structural JSON price under the fixed heuristic.
-        tokens += BLOCK_OVERHEAD + Math.ceil(JSON.stringify(block).length / CHARS_PER_TOKEN)
+        tokens += estimateStructuralBlock(block)
     }
   }
   return tokens

@@ -1,7 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {
   ChatConversationViewNode, ChatLocationNodeIndex, ChatNodeStore, ChatSnapshot,
-  ConversationLocation, ConversationNode, ConversationTimelineSnapshot,
+  ConversationLocation, ConversationNode, ConversationTimelineSnapshot, ChatTurnNavigationIndex, TurnNavigationItem,
   ConversationViewBuilder, ConversationViewDefinition, LegacyConversationSlice,
   PartialAssistant, RunningToolCall,
 } from '@deepseek-ai/dsh-client-runtime/client'
@@ -12,6 +12,64 @@ import { isRunningTool } from '../contract/chat-nodes.ts'
 const EMPTY_KEYS: readonly string[] = []
 const EMPTY_TURNS: readonly number[] = []
 const EMPTY_LIST: readonly never[] = []
+const PREVIEW_LIMIT = 160
+
+function preview(parts: Iterable<string>): string {
+  let text = ''
+  for (const part of parts) {
+    text += text === '' ? part : ` ${part}`
+    if (text.length >= PREVIEW_LIMIT) break
+  }
+  return text.replace(/\s+/g, ' ').trim().slice(0, PREVIEW_LIMIT)
+}
+
+function turnNavigationItem(
+  turn: number,
+  locations: ChatLocationNodeIndex,
+  nodes: ChatNodeStore,
+): TurnNavigationItem | undefined {
+  const loaded = locations.getTurn(turn)
+    .map(key => nodes.get(key))
+    .filter((node): node is ChatNode => node !== undefined && node.visibility === 'visible')
+  const user = loaded.find(node => node.kind === 'user' || node.kind === 'steering')
+  const anchor = user ?? loaded[0]
+  if (anchor === undefined) return undefined
+  const prompt = user === undefined
+    ? ''
+    : preview(user.data.content.flatMap(block => block.type === 'text' ? [block.text] : []))
+  const responseNode = loaded.findLast(node => node.kind === 'assistant-step'
+    && preview(node.data.blocks.flatMap(block => block.kind === 'text' ? [block.text] : [])) !== '')
+  const response = responseNode?.kind === 'assistant-step'
+    ? preview(responseNode.data.blocks.flatMap(block => block.kind === 'text' ? [block.text] : []))
+    : ''
+  return { turn, anchorKey: anchor.key, prompt, response }
+}
+
+function sameNavigationItem(left: TurnNavigationItem | undefined, right: TurnNavigationItem | undefined): boolean {
+  return left === undefined || right === undefined
+    ? left === right
+    : left.turn === right.turn
+      && left.anchorKey === right.anchorKey
+      && left.prompt === right.prompt
+      && left.response === right.response
+}
+
+class MutableChatTurnNavigationIndex implements ChatTurnNavigationIndex {
+  private current: readonly TurnNavigationItem[] = EMPTY_LIST
+
+  items(): readonly TurnNavigationItem[] {
+    return this.current
+  }
+
+  rebuild(timeline: ConversationTimelineSnapshot, locations: ChatLocationNodeIndex, nodes: ChatNodeStore): void {
+    const next = timeline.turnOrder.flatMap((turn) => {
+      const item = turnNavigationItem(turn, locations, nodes)
+      return item === undefined ? [] : [item]
+    })
+    if (next.length === this.current.length && next.every((item, index) => sameNavigationItem(this.current[index], item))) return
+    this.current = next
+  }
+}
 
 function sameReferences<T>(left: readonly T[], right: readonly T[]): boolean {
   return left.length === right.length && left.every((value, index) => value === right[index])
@@ -477,6 +535,7 @@ function partialContributionChanged(
 export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversationViewNode, ChatSnapshot> {
   private readonly store = new MutableChatNodeStore()
   private readonly locations = new MutableChatLocationIndex()
+  private readonly navigation = new MutableChatTurnNavigationIndex()
   private readonly legacy = new LegacySliceBuilder()
   private readonly referenceLabels = new ReferenceLabelProjector()
   private order: readonly string[] = EMPTY_KEYS
@@ -494,6 +553,7 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
     this.store.replace(nodes)
     this.order = orderedVisible(nodes).map(node => node.key)
     this.locations.rebuild(this.order, this.store)
+    this.navigation.rebuild(input.timeline, this.locations, this.store)
     return this.snapshot(input.timeline, this.legacy.replace(nodes, input.timeline))
   }
 
@@ -520,6 +580,7 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
       this.locations.rebuild(this.order, this.store)
     }
     this.locations.touch(contentOnly)
+    this.navigation.rebuild(input.timeline, this.locations, this.store)
     return this.snapshot(input.timeline, this.legacy.apply(upserts, input.timeline))
   }
 
@@ -531,6 +592,7 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
       order: this.order,
       nodes: this.store,
       locations: this.locations,
+      navigation: this.navigation,
       timeline,
       legacy,
     }

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react'
 import clsx from 'clsx'
 import {
   Button, IconCheckOutline14, IconChevronDownOutline14, IconChevronLeftOutline14,
@@ -10,13 +10,10 @@ import {
   type QuestionAnswer, type QuestionComposerProps,
 } from './contract/slots.ts'
 import { PlanReviewPanel } from './PlanReviewPanel.tsx'
+import type { QuestionDraftAnswer, QuestionDraftState } from './draft-store.ts'
 import css from './QuestionComposer.module.css'
 
-interface DraftAnswer {
-  selected: string[]
-  custom: string
-  skipped: boolean
-}
+type DraftAnswer = QuestionDraftAnswer
 
 /**
  * Displayed feedback: validation feedback is stored as a dictionary KEY and
@@ -105,21 +102,65 @@ function AnswerField(props: AnswerFieldProps) {
  * @returns The question flow, or the intent's own surface, for this request.
  */
 export function QuestionComposer(props: QuestionComposerProps) {
+  // Direct component consumers from the compatibility surface do not carry a
+  // Slot store. Production receives the Session-scoped store; this fallback
+  // retains the pre-store component contract for isolated embeds and tests.
+  const [fallbackState, setFallbackState] = useState<QuestionDraftState>({
+    progress: { index: 0, drafts: [] },
+  })
+  const fallbackActions = useMemo(() => ({
+    replace: (requestKey: string, progress: QuestionDraftState['progress']) => {
+      setFallbackState({ requestKey, progress })
+    },
+    clear: (requestKey: string) => {
+      setFallbackState(current => current.requestKey === requestKey
+        ? { progress: { index: 0, drafts: [] } }
+        : current)
+    },
+  }), [])
+  const useStore = props.useStore ?? (<T,>(select: (state: QuestionDraftState) => T): T => select(fallbackState))
+  const actions = props.actions ?? fallbackActions
   // Domain-face mint rides the carrier's stable identity (never minted in a
   // select/render dispatch — per-dispatch minting would churn memo identity).
   const question = useMemo(() => new PendingQuestion(props.matched), [props.matched])
   const review = useMemo(() => planReviewOf(question.questions), [question])
   return review === undefined
-    ? <QuestionFlow key={question.key} pending={question} t={props.t} />
+    ? (
+      <QuestionFlow
+        key={question.key}
+        pending={question}
+        t={props.t}
+        useStore={useStore}
+        actions={actions}
+      />
+    )
     : <PlanReviewPanel key={question.key} pending={question} review={review} t={props.t} />
 }
 
-function QuestionFlow({ pending, t }: { pending: PendingQuestion } & Pick<QuestionComposerProps, 't'>) {
+function QuestionFlow({ pending, t, useStore, actions }: {
+  pending: PendingQuestion
+  t: QuestionComposerProps['t']
+  useStore: NonNullable<QuestionComposerProps['useStore']>
+  actions: NonNullable<QuestionComposerProps['actions']>
+}) {
   const questions = pending.questions
-  const [index, setIndex] = useState(0)
-  const [drafts, setDrafts] = useState<DraftAnswer[]>(() => questions.map(() => ({
+  const blankDrafts = useMemo<DraftAnswer[]>(() => questions.map(() => ({
     selected: [], custom: '', skipped: false,
-  })))
+  })), [questions])
+  const stored = useStore(state => state)
+  const progress = stored.requestKey === pending.key
+    && stored.progress.drafts.length === questions.length
+    ? stored.progress
+    : { index: 0, drafts: blankDrafts }
+  const index = Math.min(progress.index, Math.max(0, questions.length - 1))
+  const drafts = progress.drafts
+  useEffect(() => {
+    if (stored.requestKey === pending.key && stored.progress.drafts.length === questions.length) return
+    actions.replace(pending.key, { index: 0, drafts: blankDrafts })
+  }, [actions, blankDrafts, pending.key, questions.length, stored.progress.drafts.length, stored.requestKey])
+  const replaceProgress = (nextIndex: number, nextDrafts: DraftAnswer[]): void => {
+    actions.replace(pending.key, { index: nextIndex, drafts: nextDrafts })
+  }
   const [busy, setBusy] = useState<'answer' | 'cancel' | null>(null)
   const [error, setError] = useState<Feedback | null>(null)
   // Collapsed to the header strip so the conversation above stays readable
@@ -139,19 +180,21 @@ function QuestionFlow({ pending, t }: { pending: PendingQuestion } & Pick<Questi
   const cancelFlow = (): void => {
     setBusy('cancel')
     setError(null)
-    void pending.cancel().catch((cause: unknown) => {
+    void pending.cancel().then(() => { actions.clear(pending.key) }).catch((cause: unknown) => {
       setBusy(null)
       setError({ text: cause instanceof Error ? cause.message : String(cause) })
     })
   }
 
-  const updateDraft = (update: (current: DraftAnswer) => DraftAnswer): void => {
-    setDrafts(current => current.map((item, itemIndex) => itemIndex === index ? update(item) : item))
+  const updateDraft = (update: (current: DraftAnswer) => DraftAnswer): DraftAnswer[] => {
+    const next = drafts.map((item, itemIndex) => itemIndex === index ? update(item) : item)
+    replaceProgress(index, next)
     setError(null)
+    return next
   }
 
   const choose = (label: string): void => {
-    updateDraft((current) => {
+    const nextDrafts = updateDraft((current) => {
       if (question.multiSelect === true) {
         const selected = current.selected.includes(label)
           ? current.selected.filter(item => item !== label)
@@ -161,7 +204,7 @@ function QuestionFlow({ pending, t }: { pending: PendingQuestion } & Pick<Questi
       return { selected: [label], custom: '', skipped: false }
     })
     if (question.multiSelect !== true && index < questions.length - 1) {
-      setIndex(current => current + 1)
+      replaceProgress(index + 1, nextDrafts)
     }
   }
 
@@ -173,7 +216,7 @@ function QuestionFlow({ pending, t }: { pending: PendingQuestion } & Pick<Questi
   const submitDrafts = (values: DraftAnswer[]): void => {
     const missing = values.findIndex(item => !completed(item))
     if (missing >= 0) {
-      setIndex(missing)
+      replaceProgress(missing, values)
       setError({ key: 'error.incomplete' })
       return
     }
@@ -191,7 +234,7 @@ function QuestionFlow({ pending, t }: { pending: PendingQuestion } & Pick<Questi
     }
     setBusy('answer')
     setError(null)
-    void pending.answer(answer).catch((cause: unknown) => {
+    void pending.answer(answer).then(() => { actions.clear(pending.key) }).catch((cause: unknown) => {
       setBusy(null)
       setError({ text: cause instanceof Error ? cause.message : String(cause) })
     })
@@ -203,7 +246,7 @@ function QuestionFlow({ pending, t }: { pending: PendingQuestion } & Pick<Questi
       return
     }
     if (index < questions.length - 1) {
-      setIndex(current => current + 1)
+      replaceProgress(index + 1, drafts)
       setError(null)
       return
     }
@@ -233,10 +276,9 @@ function QuestionFlow({ pending, t }: { pending: PendingQuestion } & Pick<Questi
     const nextDrafts = drafts.map((item, itemIndex) => itemIndex === index
       ? { selected: [], custom: '', skipped: true }
       : item)
-    setDrafts(nextDrafts)
+    replaceProgress(index < questions.length - 1 ? index + 1 : index, nextDrafts)
     setError(null)
     if (index < questions.length - 1) {
-      setIndex(current => current + 1)
       return
     }
     submitDrafts(nextDrafts)
@@ -370,7 +412,7 @@ function QuestionFlow({ pending, t }: { pending: PendingQuestion } & Pick<Questi
                 <button
                   type="button" className={css.iconButton} aria-label={t('nav.prev')}
                   disabled={index === 0 || busy !== null}
-                  onClick={() => { setIndex(index - 1); setError(null) }}
+                  onClick={() => { replaceProgress(index - 1, drafts); setError(null) }}
                 >
                   <IconChevronLeftOutline14 />
                 </button>
@@ -378,7 +420,7 @@ function QuestionFlow({ pending, t }: { pending: PendingQuestion } & Pick<Questi
                 <button
                   type="button" className={css.iconButton} aria-label={t('nav.next')}
                   disabled={index === questions.length - 1 || busy !== null}
-                  onClick={() => { setIndex(index + 1); setError(null) }}
+                  onClick={() => { replaceProgress(index + 1, drafts); setError(null) }}
                 >
                   <IconChevronRightOutline14 />
                 </button>

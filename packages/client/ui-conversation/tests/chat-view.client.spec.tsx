@@ -9,7 +9,7 @@ import { useEffect } from 'react'
 import type {
   AssistantMessageNode, CommandNode, CompactionSummaryNode, ConversationNode, ConversationSnapshot,
   ModelRetryNode, RunningToolCall, SessionId, SessionListState, ToolCallBlock, ToolResultNode, TurnErrorNode,
-  TurnMaxTokensNode, UserMessageNode, WorkspaceListState,
+  TurnMaxTokensNode, TurnNavigationItem, UserMessageNode, WorkspaceListState,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import {
@@ -26,6 +26,9 @@ import { ChatView } from '../src/client/chat/ChatView.tsx'
 import { zh } from '../src/client/locales.ts'
 import { AssistantNodeView } from '../src/client/chat/AssistantNodeView.tsx'
 import { CommandNodeView, ManualCompactionNodeView } from '../src/client/chat/CommandNodeView.tsx'
+import { SystemPromptRow } from '../src/client/chat/SystemPromptRow.tsx'
+import { TurnNavigator } from '../src/client/chat/TurnNavigator.tsx'
+import { TurnProcessNodeView } from '../src/client/chat/TurnProcessNodeView.tsx'
 import {
   CompactionNodeView, ContextMessageNodeView, RetryNodeView, TurnErrorNodeView,
   TurnMaxTokensNodeView, UnknownNodeView, UserMessageNodeView,
@@ -328,6 +331,76 @@ function installScrollMetrics(element: HTMLElement, initialHeight: number, clien
   }
 }
 
+describe('Focused Chat disclosures', () => {
+  const t = makeTranslate(zh, commonZh)
+
+  it('renders turn navigation marks, previews focused turns, and dispatches jumps', () => {
+    const onNavigate = vi.fn()
+    const items: TurnNavigationItem[] = [
+      { turn: 1, anchorKey: 'turn-1', prompt: 'first question', response: 'first answer' },
+      { turn: 2, anchorKey: 'turn-2', prompt: 'second question', response: '' },
+      { turn: 3, anchorKey: 'turn-3', prompt: '', response: 'third answer' },
+    ]
+    const view = render(<TurnNavigator items={items} activeTurn={2} onNavigate={onNavigate} t={t} />)
+    const marks = view.getAllByRole('button')
+    expect(marks).toHaveLength(3)
+    expect(marks[1]?.getAttribute('aria-current')).toBe('true')
+    expect(marks[0]?.getAttribute('aria-label')).toBe('跳转到第 1 轮')
+
+    fireEvent.click(marks[2]!)
+    expect(onNavigate).toHaveBeenCalledWith(items[2])
+
+    fireEvent.focus(marks[0]!)
+    expect(view.getByRole('tooltip').textContent).toContain('first question')
+    expect(view.getByRole('tooltip').textContent).toContain('first answer')
+    fireEvent.blur(marks[0]!)
+    expect(view.queryByRole('tooltip')).toBeNull()
+  })
+
+  it('renders turn process counts and toggles the collapsed state', () => {
+    const setOpen = vi.fn()
+    const node = {
+      key: 'turn-process:1',
+      id: '1',
+      kind: 'turn-process',
+      target: 'chat',
+      anchorSeq: 1,
+      location: { kind: 'session' },
+      visibility: 'visible',
+      data: {
+        turn: 1,
+        controlAnchorSeq: 1,
+        messageCount: 2,
+        toolCallCount: 1,
+        subagentCount: 1,
+        answerAnchorSeq: 9,
+      },
+    } as unknown as ChatNode<'turn-process'>
+    const view = render(
+      <TurnProcessNodeView
+        {...({ node, turnProcess: { open: false, setOpen }, t } as unknown as React.ComponentProps<typeof TurnProcessNodeView>)}
+      />,
+    )
+    const button = view.getByRole('button')
+    expect(button.getAttribute('aria-expanded')).toBe('false')
+    expect(button.textContent).toContain('1 次工具调用')
+    expect(button.textContent).toContain('2 条中间消息')
+    expect(button.textContent).toContain('1 个子智能体')
+    fireEvent.click(button)
+    expect(setOpen).toHaveBeenCalledWith(true)
+  })
+
+  it('keeps system prompt content hidden until its disclosure is opened', () => {
+    const view = render(<SystemPromptRow text="system instructions" t={t} />)
+    expect(view.queryByText('system instructions')).toBeNull()
+    const row = view.getByRole('button', { name: '系统提示词' })
+    expect(row.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(row)
+    expect(view.getByText('system instructions')).toBeTruthy()
+    expect(row.getAttribute('aria-expanded')).toBe('true')
+  })
+})
+
 describe('Chat node rendering', () => {
 
   it('threads the injected file-mention vocabulary into the closing prose only', () => {
@@ -557,6 +630,25 @@ describe('ChatView', () => {
 
     expect(view.getAllByText('same steering')).toHaveLength(2)
     expect(view.container.querySelectorAll('[data-pending-steering]')).toHaveLength(1)
+  })
+
+  it('renders a pending submission once and hides it when the durable rpcId arrives', () => {
+    const requestId = RpcId('pending-chat')
+    const h = makeHarness({
+      pendingSubmissions: [{
+        requestId,
+        time: 1_700_000_000_000,
+        text: 'pending prompt',
+        images: [],
+      }],
+    })
+    const view = render(<h.ChatView {...h.props} />)
+    expect(view.getAllByText('pending prompt')).toHaveLength(1)
+
+    act(() => {
+      h.set({ nodes: [user(1, 'pending prompt', { kind: 'user', rpcId: requestId })] })
+    })
+    expect(view.getAllByText('pending prompt')).toHaveLength(1)
   })
 
   it('animates only the latest unresolved model retry', () => {

@@ -259,6 +259,11 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     return this.coordinator.create(meta)
   }
 
+  /** Persist an empty session as a header-only artifact. */
+  override ensureMaterialized(session: import('@deepseek-ai/dsh-session').Session): Promise<void> {
+    return this.coordinator.ensureMaterialized(session)
+  }
+
   append(id: SessionId, events: readonly SessionEvent[]): Promise<void> {
     return this.coordinator.append(id, events)
   }
@@ -560,6 +565,23 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
       await this.appendLines(meta, events)
     } else {
       await this.materialize(meta, events)
+    }
+  }
+
+  /** Durably publish a header-only artifact without inventing an event row. */
+  async materializeHeader(meta: SessionHeader): Promise<void> {
+    await this.ensureRootEncoding()
+    await this.rejectOppositeArtifact(meta.cwd, meta.id)
+    const header = JSON.stringify(toHeaderLine(meta)) + '\n'
+    const content = this.compression === 'zstd' ? await compressZstdFrame(header) : header
+    const project = projectDir(this.root, meta.cwd)
+    const dir = sessionDir(this.root, meta.cwd, meta.id)
+    const finalPath = logPath(this.root, meta.cwd, meta.id, this.compression)
+    /* v8 ignore next -- native Windows coverage exercises this dispatch. */
+    if (process.platform === 'win32') {
+      await this.materializeWin32(project, dir, finalPath, meta.id, content)
+    } else {
+      await this.materializePosix(project, dir, finalPath, meta.id, content)
     }
   }
 

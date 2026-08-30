@@ -371,7 +371,7 @@ function writeV18(path: string, sessions: readonly LogicalSession[], storeId: st
         const sourceEventSeqs = sourceSequences(event)
         insertEvent.run(header.id, event.seq, event.type, event.time, JSON.stringify(event.data),
           sourceEventSeqs === undefined ? null : encodeLegacySource(sourceEventSeqs),
-          event.surfaceOp === undefined ? null : JSON.stringify(event.surfaceOp),
+          eventSurfaceOperation(event),
           event.ignorable === true ? 1 : null)
       }
     }
@@ -391,6 +391,11 @@ function sourceSequences(event: SessionEvent): readonly number[] | undefined {
     throw new Error(`event ${String(event.seq)} has invalid sourceEventSeqs`)
   }
   return value.map(item => item as number)
+}
+
+function eventSurfaceOperation(event: SessionEvent): string | null {
+  const value = (event as unknown as { surfaceOp?: unknown }).surfaceOp
+  return value === undefined ? null : JSON.stringify(value)
 }
 
 function createDatabase(path: string, version: number, schema: string): DatabaseSync {
@@ -472,7 +477,7 @@ function maybeReplace(options: MigrationOptions, input: string, output: string):
 }
 
 /** Parse the small, explicit CLI shared by migration entry points. */
-export function parseMigrationArgs(argv: readonly string[]): MigrationOptions {
+function parseMigrationArgs(argv: readonly string[]): MigrationOptions {
   let input: string | undefined
   let output: string | undefined
   let verifyOnly = false
@@ -494,7 +499,13 @@ export function parseMigrationArgs(argv: readonly string[]): MigrationOptions {
     } else throw new Error(`unknown migration option: ${arg}`)
   }
   if (input === undefined) throw new Error('migration requires --input')
-  return { input, output, verifyOnly, keepBackup, replace }
+  return {
+    input,
+    ...output === undefined ? {} : { output },
+    verifyOnly,
+    keepBackup,
+    replace,
+  }
 }
 
 /** Execute one migration CLI and convert failures into a non-zero exit. */

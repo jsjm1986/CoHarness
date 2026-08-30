@@ -6,10 +6,10 @@
 import { memo, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type {
-  ModelRetryNode, TurnErrorNode, UserMessageNode,
+  ModelRetryNode, PendingSubmission, TurnErrorNode, UserMessageNode,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { JsonBlock, MessageText, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps } from '../contract/slots.ts'
+import type { ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps, MessageImageSource } from '../contract/slots.ts'
 import { ReferenceIcon } from '../ReferenceIcon.tsx'
 import { CompactionItem } from './CompactionItem.tsx'
 import { ContextInjectionRow } from './ContextInjectionRow.tsx'
@@ -21,11 +21,11 @@ type UserImage = Extract<UserMessageNode['content'][number], { type: 'image' }>
 
 function contentParts(content: readonly unknown[]): {
   text: string
-  images: { attachment: UserImage['attachment'] }[]
+  images: MessageImageSource[]
   rest: unknown[]
 } {
   const texts: string[] = []
-  const images: { attachment: UserImage['attachment'] }[] = []
+  const images: MessageImageSource[] = []
   const rest: unknown[] = []
   for (const block of content) {
     const b = block as { type?: string; text?: string; attachment?: unknown }
@@ -215,7 +215,7 @@ function projectUserText(text: string, sessionLabels: readonly string[]): ReactN
 
 /** Right-aligned bubble shared by user and steering rows. */
 function UserStyleBubble({
-  content, source, renderMessageImages, actions, pending = false, referenceLabels = [], t,
+  content, source, renderMessageImages, actions, pending = false, referenceLabels = [], previewImages, t,
 }: {
   content: readonly unknown[]
   source?: unknown
@@ -226,9 +226,12 @@ function UserStyleBubble({
   pending?: boolean
   /** Exact session mention labels associated by the adjacent recall node. */
   referenceLabels?: readonly string[]
+  /** Local submission previews replacing content-derived durable images. */
+  previewImages?: readonly MessageImageSource[]
   t: ChatViewSlotProps['t']
 }): ReactNode {
-  const { text, images, rest } = contentParts(content)
+  const { text, images: contentImages, rest } = contentParts(content)
+  const images = previewImages ?? contentImages
   const truncated = (total: number): string => t('json.truncated', { total })
   const showBubble = text !== '' || rest.length > 0
   const sender = messageSender(source)
@@ -277,6 +280,46 @@ export function PendingSteeringBubble({ content, renderMessageImages, t }: {
       actions={text => (
         <MessageIconActions
           text={text}
+          clock="start"
+          className={css.actions}
+          t={t}
+        />
+      )}
+    />
+  )
+}
+
+/** Render one local submission echo while its durable counterpart is pending. */
+export function PendingSubmissionBubble({ submission, renderMessageImages, t }: {
+  submission: PendingSubmission
+  renderMessageImages: ChatNodeOwnerProps['renderMessageImages']
+  t: ChatViewSlotProps['t']
+}): ReactNode {
+  const content = useMemo(
+    () => (submission.text === '' ? [] : [{ type: 'text', text: submission.text }]),
+    [submission.text],
+  )
+  const previewImages = useMemo<readonly MessageImageSource[]>(
+    () => submission.images.map(image => ({
+      preview: {
+        url: image.previewUrl,
+        ...(image.name === undefined ? {} : { name: image.name }),
+        ...(image.width === undefined ? {} : { width: image.width }),
+        ...(image.height === undefined ? {} : { height: image.height }),
+      },
+    })),
+    [submission.images],
+  )
+  return (
+    <UserStyleBubble
+      content={content}
+      renderMessageImages={renderMessageImages}
+      previewImages={previewImages}
+      t={t}
+      actions={text => (
+        <MessageIconActions
+          text={text}
+          time={submission.time}
           clock="start"
           className={css.actions}
           t={t}

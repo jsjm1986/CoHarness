@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-30-acp-stdio-teardown-listener-cleanup.md
+2026-08-30-acp-stdio-teardown-listener-cleanup.md: 44c61025204eaf5495260390bc9ee9d68fd3e966
+2026-08-30-acp-stdio-teardown-listener-cleanup.zh.md: 493da0d75454af3d017060330b0df335840cb496

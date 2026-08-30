@@ -13,6 +13,8 @@ export type {} from './conversation-nodes/tool.ts'
 export type {} from './conversation-nodes/turn-error.ts'
 export type {} from './conversation-nodes/turn-max-tokens.ts'
 export type {} from './conversation-nodes/turn-tail.ts'
+export type {} from './conversation-nodes/system-prompt.ts'
+export type {} from './conversation-nodes/turn-process.ts'
 
 export { apply, inject } from './apply.ts'
 export { ConversationController } from './service.ts'
@@ -25,6 +27,7 @@ export type {
 export type { ConversationKey } from './locales.ts'
 export type {
   AssistantChatData, ChatNode, ChatNodeDataMap, ChatNodeKind, ManualCompactionChatData,
+  SystemPromptChatData, TurnProcessChatData,
   RetryChatData, ToolChatData, TurnTailChatData,
 } from './contract/chat-nodes.ts'
 export type {
@@ -33,7 +36,8 @@ export type {
   ComposerAttachment, ComposerAttachmentsOwnerProps, ComposerAttachmentsProps, ComposerChainProps, ConversationInjected,
   ConversationSessionHeaderInjected, ConversationSessionInjected, ConversationSlotProps, ConvViewOwnerProps,
   ConvViewProps, DetailsInjected, DetailsSlotProps, DetailsToolOwnerProps, EmptyWorkspaceOwnerProps, HeroBrandMarkOwnerProps,
-  MessageImagesOwnerProps, MessageImagesProps, RenderMessageImages, TurnTailOwnerProps, UseChatNodeTurnData,
+  MessageImageLoader, MessageImageSource, MessageImagesOwnerProps, MessageImagesProps,
+  RenderMessageImages, TurnTailOwnerProps, UseChatNodeTurnData,
 } from './contract/slots.ts'
 // Export discipline: packages/client/AGENTS.md.
 

@@ -158,6 +158,17 @@ export abstract class LlmAdapter {
   }
 
   /**
+   * Resolve synchronous provider pricing for request images on one exact
+   * route. Adapters that do not declare a provider formula return `undefined`.
+   * @param _provider - registered provider route.
+   * @param _model - exact model id.
+   * @returns route-owned pricing, or `undefined` for neutral heuristic pricing.
+   */
+  imageRequestPricing(_provider: string, _model: string): import('./types.ts').LlmImageRequestPricing | undefined {
+    return undefined
+  }
+
+  /**
    * List models this adapter can currently advertise for one owned provider.
    * The result is advisory: an adapter may accept unlisted model ids, and
    * consumers must not turn absence into request rejection.
@@ -545,6 +556,18 @@ export class LlmRuntime extends Service {
    */
   providerRetryPolicy(provider: string): ResolvedRetryPolicy {
     return this.registration(provider).retryPolicy
+  }
+
+  /**
+   * Resolve provider-side request-image pricing for a route. Unknown routes
+   * degrade to neutral pricing so historical sessions remain measurable after
+   * a provider is unloaded.
+   * @param provider - provider route named by a request header.
+   * @param model - exact model id named by that header.
+   * @returns route-owned pricing, or `undefined` when unavailable.
+   */
+  imageRequestPricing(provider: string, model: string): import('./types.ts').LlmImageRequestPricing | undefined {
+    return this.adapters.get(provider)?.adapter.imageRequestPricing(provider, model)
   }
 
   /** Detach typed adapter-owned modality metadata. */

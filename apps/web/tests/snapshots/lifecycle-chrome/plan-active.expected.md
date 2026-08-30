@@ -17,9 +17,13 @@
     - img
     - text: workspace
   - treeitem "New Session" [selected]
+- button "Documents":
+  - img
+  - text: Documents
 - button "Settings":
   - img
   - text: Settings
+- separator "Adjust transcript content width"
 - text: Into the Unknown Preview
 - button "Choose workspace":
   - img
@@ -30,6 +34,10 @@
   - text: Standard mode
   - img
 - textbox "Describe what you want to build"
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
 - button "Commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write

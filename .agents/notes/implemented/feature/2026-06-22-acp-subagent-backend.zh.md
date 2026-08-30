@@ -10,7 +10,7 @@ subagent seam（[seam Agent Note](2026-06-21-subagent-capability-seam.zh.md)）�
 
 ## 决策
 
-`@deepseek-ai/dsh-subagent-acp` 注册一个 `SubagentProvider`，将每个子 agent 运行在一个通过 spawn 启动的子进程中，并以 ACP *客户端*身份驱动它。它是现有服务端桥接 `@deepseek-ai/dsh-acp`（ACP *agent*）的方向反转孪生体：桥接应答 `initialize`/`newSession`/`prompt`；本后端调用它们并实现 `Client` 回调（`sessionUpdate`、`requestPermission`）。将配置的 spawn 命令指向 `acp-agent` 示例，即可让 harness 与自身进程通信。
+`@deepseek-ai/dsh-subagent-acp` 注册一个 `SubagentProvider`，将每个子 agent 运行在一个通过 spawn 启动的子进程中，并以 ACP *客户端*身份驱动它。它是现有服务端桥接 `@deepseek-ai/dsh-acp`（ACP *agent*）的方向反转孪生体：桥接应答类型化的 `initialize`／`newSession`／`prompt` 请求及标准会话／配置控制；本后端调用运行所需的启动与提示词方法，并通过类型化 `client()` 回调注册 `sessionUpdate` 与 `requestPermission`。将配置的 spawn 命令指向 `acp-agent` 示例，即可让 harness 与自身进程通信。
 
 ### 每次运行启动全新进程
 
@@ -18,7 +18,7 @@ subagent seam（[seam Agent Note](2026-06-21-subagent-capability-seam.zh.md)）�
 
 ### 最小化客户端桩
 
-客户端不声明任何可选能力（无 `fs`、无 `terminal`）：子 agent 在自己的进程中自行处理文件/终端访问。`session/update` 通知被消费：后端将 `agent_message_chunk` 文本累积为结果输出，忽略其余内容（思考、工具调用卡片），因此仅暴露子 agent 的最终回答。`session/request_permission` 由配置的策略自动应答（`reject` 拒绝所有提示，`allow` 通过第一个表示允许的选项批准）——不向人类暴露任何权限提示。将 `fs`/`terminal` 代理回父进程（共享工作区模式）仍为后续工作，如 seam Agent Note 所述。
+类型化 `client()` app 不声明任何可选能力（无 `fs`、无 `terminal`）：子 agent 在自己的进程中自行处理文件／终端访问。其 `connection.agent` facade 调用标准 ACP 方法。`session/update` 通知被消费：后端将 `agent_message_chunk` 文本累积为结果输出，忽略其余内容（思考、工具调用卡片），因此仅暴露子 agent 的最终回答。`session/request_permission` 由配置的策略自动应答（`reject` 拒绝所有提示，`allow` 通过第一个表示允许的选项批准）——不向人类暴露任何权限提示。将 `fs`／`terminal` 代理回父进程（共享工作区模式）仍为后续工作，如 seam Agent Note 所述。
 
 ### 无启动时能力
 
@@ -45,9 +45,9 @@ ACP `StopReason` → harness `SubagentStopReason`：`end_turn`→`completed`、`
 
 ## 曾考虑的替代方案
 
-### 为何继续使用 SDK 0.25.1？
+### 为何使用 ACP SDK 1.4.0 类型化 API？
 
-后端只需要 `ClientSideConnection`、`ndJsonStream`、`PROTOCOL_VERSION` 和客户端协议类型，0.25.1 全部支持。0.28 的 fluent API 需要在 ACP 层同时迁移客户端和服务端连接类，却不会改善本后端，因此升级作为独立变更保留。
+仓库在桥接层和该后端统一使用 ACP SDK 1.4.0 的 `client()` app 及类型化 `connection.agent` facade。这样请求与通知方法会从协议映射中推导类型，并提供拆卸阶段使用的连接 `closed` 生命周期 promise，同时从已发布集成中移除已弃用的 `ClientSideConnection`／`AgentSideConnection` 类。该后端仍只调用 `initialize`、`session/new` 和 `session/prompt`，因为一次 subagent 运行只拥有一个全新的子会话；桥接层的列出／恢复／关闭／配置控制继续对其他自动化客户端可用，而不会扩大此提供方的生命周期。
 
 ### 为何不使用持久子进程？
 

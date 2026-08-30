@@ -143,6 +143,14 @@ abstract saveImage(input: SaveImageAttachment): Promise<ImageAttachmentRef>
 abstract readImage(ref: ImageAttachmentRef, signal?: AbortSignal): Promise<StoredImageAttachment>
 
 /**
+ * Locate the provider-owned normalized image in the host filesystem.
+ * Providers that are not host-file-backed return `undefined`.
+ * @param _ref - durable normalized attachment reference.
+ * @returns an absolute host path, or `undefined` when no path is exposed.
+ */
+imageHostPath(_ref: ImageAttachmentRef): string | undefined
+
+/**
  * Generate or read one deterministic model-request version from the stored normalized image.
  * @param ref - durable provider-independent normalized attachment reference.
  * @param policy - exact route pixel and encoded-byte budget.
@@ -152,7 +160,7 @@ abstract readImage(ref: ImageAttachmentRef, signal?: AbortSignal): Promise<Store
 readImageRequest( ref: ImageAttachmentRef, policy: ImageRequestPolicy, signal?: AbortSignal, ): Promise<RequestImageAttachment>
 ```
 
-Source: [`packages/attachment/attachment/src/index.ts:37`](../../packages/attachment/attachment/src/index.ts)
+Source: [`packages/attachment/attachment/src/index.ts:38`](../../packages/attachment/attachment/src/index.ts)
 
 <a id="ctxuserdocs--userdocstore-abstract-seam"></a>
 

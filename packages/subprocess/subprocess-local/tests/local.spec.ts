@@ -46,6 +46,22 @@ describe('LocalSubprocessRuntime', () => {
     }
   })
 
+  it('shares one host-exit listener across concurrently mounted runtimes', async () => {
+    const before = process.listenerCount('exit')
+    const first = new Context()
+    const second = new Context()
+    const firstFiber = await first.plugin(LocalSubprocessRuntime)
+    const secondFiber = await second.plugin(LocalSubprocessRuntime)
+    try {
+      expect(process.listenerCount('exit')).toBe(before + 1)
+      await firstFiber.dispose()
+      expect(process.listenerCount('exit')).toBe(before + 1)
+    } finally {
+      await secondFiber.dispose()
+    }
+    expect(process.listenerCount('exit')).toBe(before)
+  })
+
   it('keeps the host-exit finalizer active until normal disposal reaches quiescence', async () => {
     const before = new Set(process.listeners('exit'))
     const ctx = new Context()

@@ -26,6 +26,7 @@ import type {
   OpenAICompletionsCompat,
   OpenAIResponsesCompat,
   Provider,
+  ThinkingTokenBudgetField,
   ThinkingLevelMap,
 } from '@earendil-works/pi-ai'
 
@@ -100,6 +101,7 @@ const THINKING_FORMAT_GATE: Record<PiAiThinkingFormat, true> = {
   'deepseek': true,
   'openrouter': true,
   'together': true,
+  'baseten': true,
   'zai': true,
   'qwen': true,
   'chat-template': true,
@@ -141,6 +143,7 @@ export type PiAiChatTemplateVar = Extract<ChatTemplateKwargValue, { $var: string
 const CHAT_TEMPLATE_VAR_GATE: Record<PiAiChatTemplateVar, true> = {
   'thinking.enabled': true,
   'thinking.effort': true,
+  'thinking.budget': true,
 }
 
 /** The request-state placeholders a profile may name. */
@@ -237,6 +240,7 @@ const COMPLETIONS_COMPAT_GATE = {
   supportsDeveloperRole: 'offer',
   supportsReasoningEffort: 'offer',
   supportsUsageInStreaming: 'offer',
+  supportsFinishReason: 'offer',
   maxTokensField: 'offer',
   requiresToolResultName: 'offer',
   requiresAssistantAfterToolResult: 'offer',
@@ -244,6 +248,9 @@ const COMPLETIONS_COMPAT_GATE = {
   requiresReasoningContentOnAssistantMessages: 'offer',
   thinkingFormat: 'offer',
   chatTemplateKwargs: 'offer',
+  chatTemplateArgs: 'offer',
+  thinkingTokenBudgetField: 'offer',
+  supportsThinkingTokenBudget: 'offer',
   supportsStrictMode: 'offer',
   cacheControlFormat: 'offer',
   supportsLongCacheRetention: 'offer',
@@ -263,6 +270,7 @@ const RESPONSES_COMPAT_GATE = {
   supportsLongCacheRetention: 'offer',
   sessionAffinityFormat: 'withhold',
   supportsOpenAIGrammarTools: 'withhold',
+  supportsAdditionalTools: 'withhold',
   supportsToolSearch: 'withhold',
   supportsExplicitPromptCacheMode: 'withhold',
 } as const satisfies Record<keyof OpenAIResponsesCompat, CompatDisposition>
@@ -276,6 +284,7 @@ const ANTHROPIC_COMPAT_GATE = {
   forceAdaptiveThinking: 'offer',
   allowEmptySignature: 'offer',
   supportsStrictTools: 'offer',
+  allowedFallbackModels: 'withhold',
   sendSessionAffinityHeaders: 'withhold',
   supportsToolReferences: 'withhold',
 } as const satisfies Record<keyof AnthropicMessagesCompat, CompatDisposition>
@@ -364,6 +373,8 @@ export interface PiAiCompatProfile {
   supportsReasoningEffort?: boolean
   /** Whether the endpoint accepts `stream_options: {include_usage: true}`; `openai-completions`. */
   supportsUsageInStreaming?: boolean
+  /** Whether streams include a finish reason; openai-completions. */
+  supportsFinishReason?: boolean
   /** Which output-cap field the endpoint reads; `openai-completions`. */
   maxTokensField?: NonNullable<OpenAICompletionsCompat['maxTokensField']>
   /** Whether tool results must carry `name`; `openai-completions`. */
@@ -384,6 +395,12 @@ export interface PiAiCompatProfile {
    * can read, so kwargs set beside another format are sent nowhere.
    */
   chatTemplateKwargs?: NonNullable<OpenAICompletionsCompat['chatTemplateKwargs']>
+  /** Arguments sent as `chat_template_args` for the baseten format. */
+  chatTemplateArgs?: NonNullable<OpenAICompletionsCompat['chatTemplateArgs']>
+  /** Top-level field used for provider-specific thinking token budgets. */
+  thinkingTokenBudgetField?: ThinkingTokenBudgetField
+  /** Whether the endpoint accepts a vLLM thinking token budget. */
+  supportsThinkingTokenBudget?: boolean
   /**
    * Whether the endpoint accepts `strict` in tool definitions;
    * `openai-completions`, the three Responses protocols, `bedrock-converse-stream`.
@@ -452,8 +469,8 @@ export type EveryProfileFieldMatchesUpstream = AssertTrue<
  *
  * schemastery materializes an absent dict as `{}` — the behavior
  * `reasoningEfforts` works around with a union — so every parsed profile
- * carries a `chatTemplateKwargs` key whether or not anyone wrote one. An empty
- * one states nothing here: it would send no kwargs, which is exactly what
+ * carries both template-argument keys whether or not anyone wrote one. An empty
+ * one states nothing here: it would send no arguments, which is exactly what
  * leaving the field out does, so absent and empty are the same request and
  * neither may make a route look like it configured a switch. A valueless
  * scalar is the other thing schemastery lets through, and it is refused by

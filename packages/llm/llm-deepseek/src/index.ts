@@ -13,13 +13,15 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { assertUsableApiKey, LlmError, resolveRetryPolicy, RetryPolicySchema } from '@deepseek-ai/dsh-llm'
+import { assertUsableApiKey, LlmError, resolveImageAttachmentAccess, resolveRetryPolicy, RetryPolicySchema } from '@deepseek-ai/dsh-llm'
 import type { ModelModality, RetryPolicyConfig } from '@deepseek-ai/dsh-llm'
+import type {} from '@deepseek-ai/dsh-fs'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import { launchEnvironmentOf, type LaunchEnvironmentSnapshot } from '@deepseek-ai/dsh-launch-environment'
 import { deepEqualJson, installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import { getOrCreateAnonymousUserId, type AnonymousUserId } from '@deepseek-ai/dsh-anonymous-user-id'
+import type {} from '@deepseek-ai/dsh-deepseek-llm-api-extensions'
 import {
   DEFAULT_CONTEXT_WINDOW,
   DEFAULT_FILE_EXPIRY_SECONDS,
@@ -66,6 +68,11 @@ export {
   MAX_IMAGE_PREPARATION_CONCURRENCY,
 } from './adapter.ts'
 export type { DeepSeekAdapterOptions, DeepSeekCatalogModel, DeepSeekConnectionOptions } from './adapter.ts'
+export {
+  deepSeekImageRequestPricing,
+  resolveRequestImagePolicy,
+} from './request-pricing.ts'
+export { deepSeekImageTokens } from './image-tokens.ts'
 export { DeepSeekFileStore, MAX_CHAT_IMAGE_BYTES } from './file-store.ts'
 export type { DeepSeekFileConnection, DeepSeekFilePolicy, DeepSeekFileReference } from './file-store.ts'
 export {
@@ -177,7 +184,7 @@ const catalogModel: z<DeepSeekCatalogModel> = z.object({
   contextWindow: z.number().step(1).min(1),
   maxTokens: z.number().step(1).min(1),
   inputModalities: z.array(z.union(MODEL_MODALITIES)).min(1).default(['text']),
-  imagePixelBudget: z.number().step(1).min(1),
+  imagePixelBudget: z.union([z.number().step(1).min(1), 'low']),
   imageMaxBytes: z.number().step(1).min(1),
   imageDetail: z.union(['auto', 'low']),
 })
@@ -263,8 +270,9 @@ function resolveModels(models: readonly DeepSeekCatalogModel[] | undefined): Dee
       throw new Error(`llm-deepseek: text-only catalog model "${model.id}" cannot declare image request limits`)
     }
     if (model.imagePixelBudget !== undefined
+      && model.imagePixelBudget !== 'low'
       && (!Number.isSafeInteger(model.imagePixelBudget) || model.imagePixelBudget <= 0)) {
-      throw new Error(`llm-deepseek: catalog model "${model.id}" imagePixelBudget must be a positive safe integer`)
+      throw new Error(`llm-deepseek: catalog model "${model.id}" imagePixelBudget must be a positive safe integer or "low"`)
     }
     if (model.imageMaxBytes !== undefined
       && (!Number.isSafeInteger(model.imageMaxBytes) || model.imageMaxBytes <= 0)) {
@@ -281,7 +289,9 @@ function resolveModels(models: readonly DeepSeekCatalogModel[] | undefined): Dee
       inputModalities: [...inputModalities],
       ...hasImage
         ? {
-          imagePixelBudget: model.imagePixelBudget
+          imagePixelBudget: model.imagePixelBudget === 'low'
+            ? DEFAULT_LOW_DETAIL_IMAGE_PIXEL_BUDGET
+            : model.imagePixelBudget
             ?? (model.imageDetail === 'low'
               ? DEFAULT_LOW_DETAIL_IMAGE_PIXEL_BUDGET
               : DEFAULT_REQUEST_IMAGE_PIXEL_BUDGET),
@@ -501,6 +511,13 @@ export function apply(ctx: Context, config: Config): void {
     resolveApiKey,
     resolveUserId,
     resolveAttachments: () => ctx.get('attachments'),
+    resolveImageAccess: (attachments, ref) => resolveImageAttachmentAccess(
+      attachments,
+      hostPath => ctx.get('fs')?.processPathFromHostPath(hostPath),
+      ref,
+    ),
+    prepareExtensions: request => ctx.get('deepseekLlmApiExtensions')?.prepare(request)
+      ?? Promise.resolve({ fields: {}, accept: async () => {} }),
   })
   ctx.llm.registerConfigurableProviders([
     { provider: PROVIDER, displayName: 'DeepSeek', settingsNs: NS, settingsPath: [] },

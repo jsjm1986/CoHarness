@@ -490,6 +490,7 @@ describe('events frame schemas', () => {
       { type: 'session/queue', sessionId: 's', items: [
         {
           id: 'm1',
+          rpcId: 'r9',
           placement: 'queued',
           message: { id: 'm1', role: 'user', content: [{ type: 'text', text: 'queued prompt' }], source: { kind: 'user', rpcId: 'r9' } },
         },
@@ -503,6 +504,11 @@ describe('events frame schemas', () => {
       { type: 'stream/error', error: { code: 'internal', message: 'm', details: {} } },
     ]
     for (const frame of frames) expect(muxFrameSchema.parse(frame)).toMatchObject({ type: frame.type })
+    const queue = muxFrameSchema.parse(frames[6])
+    expect(queue).toMatchObject({
+      type: 'session/queue',
+      items: [{ rpcId: 'r9', message: { source: { rpcId: 'r9' } } }],
+    })
     expect(() => muxFrameSchema.parse({ type: 'unknown/frame' })).toThrow()
     for (const invalid of [
       { type: 'session/projection', sessionId: 's', key: '', value: null, seq: 0 },

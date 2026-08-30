@@ -39,6 +39,7 @@ export function toolChatSnapshot(
       getStep: () => empty,
     },
     timeline: { turnOrder: [], turns: new Map() },
+    navigation: { items: () => [] },
     legacy: {
       nodes: settled,
       runningCalls: running,

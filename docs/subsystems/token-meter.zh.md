@@ -37,6 +37,8 @@ interface TokenSurfaceNode {
   readonly seq: number
   /** Heuristic tokens for the exact message projected by this node. */
   readonly tokens: number
+  /** Fixed heuristic price before a route-specific image repricing, when available. */
+  readonly heuristicTokens?: number
 }
 ```
 
@@ -86,5 +88,5 @@ estimateMessage(message: Message): number
 
 Types: [EpochHeader](session.zh.md) · [Message](llm-streaming.zh.md) · [Session](session.zh.md)
 
-Source: [`packages/llm/token-meter/src/index.ts:74`](../../packages/llm/token-meter/src/index.ts)
+Source: [`packages/llm/token-meter/src/index.ts:76`](../../packages/llm/token-meter/src/index.ts)
 <!-- END GENERATED cordis-surface -->

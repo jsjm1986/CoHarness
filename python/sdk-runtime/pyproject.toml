@@ -18,9 +18,10 @@ Issues = "https://github.com/deepseek-ai/deepseek-harness/issues"
 Source = "https://github.com/deepseek-ai/deepseek-harness"
 
 # Include the injected executable and default config; exclude the dev-only node
-# closure from wheels and sdists.
+# closure from wheels and sdists. Legacy carrier names remain lookup aliases and
+# are intentionally not emitted into new wheels.
 [tool.hatch.build]
-artifacts = ["src/deepseek_harness_runtime/runtime/dsh-jsonrpc-agent-*"]
+artifacts = ["src/deepseek_harness_runtime/runtime/deepseek-harness-sdk-runtime-*"]
 exclude = ["src/deepseek_harness_runtime/runtime/node"]
 
 [tool.hatch.build.targets.wheel]

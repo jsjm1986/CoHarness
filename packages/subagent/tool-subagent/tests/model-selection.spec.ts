@@ -22,17 +22,25 @@ describe('subagent model selection', () => {
     expect(() => requestedAgentOptions(parent, undefined, { provider: '', model: 'x' }, true)).toThrow('non-empty')
     expect(() => requestedAgentOptions(parent, undefined, { model: 'x' }, false)).toThrow('disabled')
     const policy = { routes: [{ provider: 'allowed', model: 'm' }] }
-    expect(() => assertAllowedModelSelection(policy, parent, { provider: 'denied', model: 'm' }, { provider: 'denied', model: 'm' }))
+    expect(() => {
+      assertAllowedModelSelection(policy, parent, { provider: 'denied', model: 'm' }, { provider: 'denied', model: 'm' })
+    })
       .toThrow('not allowed')
-    expect(() => assertAllowedModelSelection(undefined, parent, { provider: 'x', model: 'm' }, { provider: 'x', model: 'm' }))
+    expect(() => {
+      assertAllowedModelSelection(undefined, parent, { provider: 'x', model: 'm' }, { provider: 'x', model: 'm' })
+    })
       .toThrow('no allowed-route policy')
   })
 
   it('validates route allowlists and detects explicit requests', () => {
     expect(hasDelegationModelRequest({})).toBe(false)
     expect(hasDelegationModelRequest({ reasoning_effort: 'high' })).toBe(true)
-    expect(() => assertAllowedModelRoutes([{ provider: 'a', model: 'm' }, { provider: 'a', model: 'm' }]))
+    expect(() => {
+      assertAllowedModelRoutes([{ provider: 'a', model: 'm' }, { provider: 'a', model: 'm' }])
+    })
       .toThrow('repeats route')
-    expect(() => assertAllowedModelRoutes([{ provider: '', model: 'm' }])).toThrow('non-empty')
+    expect(() => {
+      assertAllowedModelRoutes([{ provider: '', model: 'm' }])
+    }).toThrow('non-empty')
   })
 })

@@ -14,11 +14,13 @@
 // lifecycle updates replace only their own row without remounting it.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { ConversationTimelineSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ConversationTimelineSnapshot, TurnNavigationItem } from '@deepseek-ai/dsh-client-runtime/client'
 import { Button, IconChevronDownOutline14, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatViewSlotProps, RenderMessageImages } from '../contract/slots.ts'
-import { PendingSteeringBubble } from './MessageItem.tsx'
+import type { ChatNode, TurnProcessChatData } from '../contract/chat-nodes.ts'
+import { PendingSteeringBubble, PendingSubmissionBubble } from './MessageItem.tsx'
 import { ChatNodeSeat } from './ChatNodeSeat.tsx'
+import { TurnNavigator } from './TurnNavigator.tsx'
 import { formatRunDuration } from './message-chrome.ts'
 import css from './ChatView.module.css'
 
@@ -115,6 +117,37 @@ function runningTurnStartTime(timeline: ConversationTimelineSnapshot): number | 
   return latest
 }
 
+function runningTurnOf(timeline: ConversationTimelineSnapshot): number | undefined {
+  return [...timeline.turns.values()].findLast(value => value.status === 'open')?.turn
+}
+
+function nodeTurn(node: { readonly location: { readonly kind: string; readonly turn?: { readonly turn: number } } }): number | undefined {
+  return node.location.kind === 'turn' || node.location.kind === 'step'
+    ? node.location.turn?.turn
+    : undefined
+}
+
+/** Return submission ids already represented by durable nodes or queue rows. */
+function observedRpcIds(
+  order: readonly string[],
+  nodes: { get(key: string): { readonly kind: string; readonly data: unknown } | undefined },
+  queue: readonly { readonly rpcId?: string }[],
+): ReadonlySet<string> {
+  const observed = new Set<string>()
+  for (const key of order) {
+    const node = nodes.get(key)
+    if (node === undefined || (node.kind !== 'user' && node.kind !== 'steering')) continue
+    const source = (node.data as { readonly source?: unknown }).source as
+      | { readonly kind?: unknown; readonly rpcId?: unknown }
+      | undefined
+    if (source?.kind === 'user' && typeof source.rpcId === 'string') observed.add(source.rpcId)
+  }
+  for (const item of queue) {
+    if (item.rpcId !== undefined) observed.add(item.rpcId)
+  }
+  return observed
+}
+
 /** Turn-level model activity label retained across first-token, tool, and streaming phases. */
 function TurnStatus({ startTime, t }: {
   /** The running turn's logged `turn/start` time; null falls back to mount
@@ -162,7 +195,9 @@ export function ChatView({
   const order = useSession(s => s.chat.order)
   const nodeStore = useSession(s => s.chat.nodes)
   const timeline = useSession(s => s.chat.timeline)
+  const navigation = useSession(s => s.chat.navigation)
   const inbox = useSession(s => s.queue)
+  const pendingSubmissions = useSession(s => s.pendingSubmissions ?? [])
   // Workspace root off the session list row: path summaries display relative to it.
   const cwd = useSessions(s => s.byId[sessionId]?.cwd)
   const running = useSession(s => s.running)
@@ -174,6 +209,8 @@ export function ChatView({
   const selectedCallId = useStore(s => s.selection?.callId)
   const [fileOpenError, setFileOpenError] = useState<{ path: string; message: string } | null>(null)
   const [fileOpenBusy, setFileOpenBusy] = useState(false)
+  const [activeTurn, setActiveTurn] = useState<number | null>(null)
+  const [processOpen, setProcessOpen] = useState<ReadonlyMap<number, boolean>>(new Map())
   // Close/retry must ignore a settlement that started before the latest
   // gesture; otherwise a cancelled in-flight refusal reopens the dialog.
   const fileOpenRequest = useRef(0)
@@ -211,11 +248,45 @@ export function ChatView({
     () => inbox.filter(item => item.placement === 'steering'),
     [inbox],
   )
+  // Keep the local echo hidden during the one-frame overlap in which its
+  // durable event or queue occurrence has landed but retirement is pending.
+  const visibleSubmissions = useMemo(() => {
+    if (pendingSubmissions.length === 0) return pendingSubmissions
+    const observed = observedRpcIds(order, nodeStore, inbox)
+    return pendingSubmissions.filter(item => !observed.has(item.requestId))
+  }, [inbox, nodeStore, order, pendingSubmissions])
   const renderMessageImages = useCallback<RenderMessageImages>(
     owner => renderSlot('conversation.message.images', { ...owner, loadImage }),
     [loadImage, renderSlot],
   )
   const runningTurnStart = useMemo(() => runningTurnStartTime(timeline), [timeline])
+  const runningTurn = useMemo(() => runningTurnOf(timeline), [timeline])
+  // Older snapshots and lightweight fixtures may not carry the optional
+  // navigation reader yet; the rail simply stays absent until the builder
+  // publishes it.
+  const navigationItems = navigation?.items() ?? []
+
+  const processByTurn = useMemo(() => {
+    const result = new Map<number, TurnProcessChatData>()
+    for (const key of order) {
+      const node = nodeStore.get(key) as ChatNode | undefined
+      if (node?.kind === 'turn-process') result.set(node.data.turn, node.data)
+    }
+    return result
+  }, [nodeStore, order])
+  const visibleOrder = useMemo(() => order.filter((key) => {
+    const node = nodeStore.get(key) as ChatNode | undefined
+    if (node === undefined) return false
+    const turn = nodeTurn(node)
+    if (turn === undefined) return true
+    const process = processByTurn.get(turn)
+    if (process === undefined || process.answerAnchorSeq === null || node.kind === 'turn-process') return true
+    const open = processOpen.get(turn) ?? (turn === runningTurn)
+    if (open) return true
+    if (node.kind === 'user' || node.kind === 'steering') return true
+    if (node.kind === 'assistant-step' && node.data.finalNode?.seq === process.answerAnchorSeq) return true
+    return !(node.anchorSeq >= process.controlAnchorSeq && node.anchorSeq < process.answerAnchorSeq)
+  }), [nodeStore, order, processByTurn, processOpen, runningTurn])
 
   const listRef = useRef<HTMLDivElement | null>(null)
   const columnRef = useRef<HTMLDivElement | null>(null)
@@ -240,7 +311,8 @@ export function ChatView({
   const lastKey = order.at(-1) ?? null
   const lastNode = lastKey === null ? undefined : nodeStore.get(lastKey)
   const lastSteeringId = pendingSteering[pendingSteering.length - 1]?.id ?? null
-  const followSig = `${openState}:${firstSeq}:${lastKey}:${order.length}:${running ? 1 : 0}:${lastSteeringId ?? ''}`
+  const lastSubmissionId = visibleSubmissions.at(-1)?.requestId ?? null
+  const followSig = `${openState}:${firstSeq}:${lastKey}:${order.length}:${running ? 1 : 0}:${lastSteeringId ?? ''}:${lastSubmissionId ?? ''}`
 
   const toBottom = (el: HTMLElement): void => {
     anchorRef.current = null
@@ -333,6 +405,12 @@ export function ChatView({
     /* v8 ignore next -- ref-null guard: the handler only fires while mounted. */
     if (local === null) return
     const el = scrollerOf(local)
+    const readerAnchor = pagingAnchor(local, el)
+    const readerNode = readerAnchor?.dataset.chatAnchorKey === undefined
+      ? undefined
+      : nodeStore.get(readerAnchor.dataset.chatAnchorKey)
+    const readerTurn = readerNode === undefined ? undefined : nodeTurn(readerNode)
+    if (readerTurn !== undefined) setActiveTurn(readerTurn)
     // Only reader input may make raw scroll geometry change follow ownership:
     // a delivered position that deviates from the observed-top ledger (every
     // programmatic write records itself there synchronously). This covers
@@ -428,9 +506,25 @@ export function ChatView({
     loadOlder()
   }
 
+  const navigateToTurn = useCallback((item: TurnNavigationItem): void => {
+    const local = listRef.current
+    if (local === null) return
+    const el = scrollerOf(local)
+    const row = anchorElement(local, item.anchorKey)
+    if (row === null) return
+    el.scrollTop = Math.max(0, el.scrollTop + flowTop(row, el) - 24)
+    observedTopRef.current = el.scrollTop
+    atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight <= FOLLOW_THRESHOLD + 1
+    setAtBottom(atBottomRef.current)
+    setActiveTurn(item.turn)
+    const position = atBottomRef.current ? null : scrollPosition(local, el)
+    chatScroll.save(position)
+  }, [chatScroll.save])
+
   return (
     <div className={css.root}>
       <div ref={listRef} className={css.scroll}>
+        <TurnNavigator items={navigationItems} activeTurn={activeTurn} onNavigate={navigateToTurn} t={t} />
         <div ref={columnRef} className={css.column} data-chat-flow="">
           {openState === 'loading' && <div className={css.hint}>{t('chat.loadingHistory')}</div>}
           {openState === 'error' && openError !== null && (
@@ -450,22 +544,40 @@ export function ChatView({
               </button>
             </div>
           )}
-          {order.map(nodeKey => (
-            <ChatNodeSeat
-              key={nodeKey}
-              nodeKey={nodeKey}
-              useSession={useSession}
-              selectedCallId={selectedCallId}
-              cwd={cwd}
-              openFile={requestOpenFile}
-              inspectCall={inspectCall}
-              forkAt={forkAt}
-              renderMessageImages={renderMessageImages}
-              fileMentions={fileMentions}
-              renderSlot={renderSlot}
-              t={t}
-            />
-          ))}
+          {visibleOrder.map((nodeKey) => {
+            const node = nodeStore.get(nodeKey) as ChatNode | undefined
+            const turn = node === undefined ? undefined : nodeTurn(node)
+            const process = turn === undefined ? undefined : processByTurn.get(turn)
+            const open = turn === undefined || process === undefined
+              ? true
+              : processOpen.get(turn) ?? (turn === runningTurn)
+            const turnProcess = node?.kind === 'turn-process' && turn !== undefined
+              ? { open, setOpen: (value: boolean) => {
+                setProcessOpen((previous) => {
+                  const next = new Map(previous)
+                  next.set(turn, value)
+                  return next
+                })
+              } }
+              : undefined
+            return (
+              <ChatNodeSeat
+                key={nodeKey}
+                nodeKey={nodeKey}
+                useSession={useSession}
+                selectedCallId={selectedCallId}
+                cwd={cwd}
+                openFile={requestOpenFile}
+                inspectCall={inspectCall}
+                forkAt={forkAt}
+                renderMessageImages={renderMessageImages}
+                fileMentions={fileMentions}
+                {...turnProcess === undefined ? {} : { turnProcess }}
+                renderSlot={renderSlot}
+                t={t}
+              />
+            )
+          })}
           {/* No pending placeholders: questions (ui-user-questions) and approvals
               (ApprovalPanel) both take over the composer, so a flow card would
               double-render the same wait. */}
@@ -476,6 +588,14 @@ export function ChatView({
             <PendingSteeringBubble
               key={item.id}
               content={item.content}
+              renderMessageImages={renderMessageImages}
+              t={t}
+            />
+          ))}
+          {visibleSubmissions.map(submission => (
+            <PendingSubmissionBubble
+              key={submission.requestId}
+              submission={submission}
               renderMessageImages={renderMessageImages}
               t={t}
             />

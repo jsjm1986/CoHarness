@@ -1,4 +1,7 @@
 - banner:
+  - tablist:
+    - tab "Chat" [selected]
+    - tab "Trajectory"
   - navigation "Session hierarchy":
     - button "workspace" [disabled]
   - img
@@ -6,14 +9,15 @@
   - button "Session log":
     - text: Session log
     - img
-  - tablist:
-    - tab "Chat" [selected]
-    - tab "Trajectory"
+- separator "Adjust transcript content width"
 - group "Command input": /goal Keep the composer context panels aligned
 - 'button "goal Goal created Status: active Objective: Keep the composer context panels aligned Rounds: 0/256 Activation: armed Commands: /goal edit <objective>, /goal pause, /goal clear"':
   - img
   - img
   - text: "goal Goal created Status: active Objective: Keep the composer context panels aligned Rounds: 0/256 Activation: armed Commands: /goal edit <objective>, /goal pause, /goal clear"
+- button "Process details" [expanded]:
+  - text: Process details
+  - img
 - button "Context injection goal":
   - img
   - img
@@ -22,6 +26,10 @@
   - img
   - img
   - text: Context injection @deepseek-ai/dsh-system-prompt
+- button "System prompt":
+  - img
+  - img
+  - text: System prompt
 - paragraph: partial
 - status: Deep diving...
 - region "To-dos":
@@ -36,6 +44,10 @@
   - img
 - button "2 queued messages"
 - textbox "Cmd/Ctrl+Enter steers all queued messages"
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
 - button "Commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write

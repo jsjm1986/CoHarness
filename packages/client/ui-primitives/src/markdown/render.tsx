@@ -35,6 +35,12 @@ export interface MarkdownCodeLabels {
   copiedLabel?: string | undefined
 }
 
+/** Localized Markdown chrome shared by code fences and footnotes. */
+export interface MarkdownLabels {
+  code: MarkdownCodeLabels
+  footnotes: string
+}
+
 function sanitizeUrl(url: string): string {
   try {
     switch (new URL(url).protocol) {
@@ -124,6 +130,8 @@ export interface MarkdownRenderContext {
   readonly streaming: boolean
   /** Localized fence copy-button labels. */
   readonly codeLabels: MarkdownCodeLabels | undefined
+  /** Complete localized Markdown labels; optional for legacy internal callers. */
+  readonly labels?: MarkdownLabels
   /** Inside a blockquote's children: tables there always fill the quote's width. */
   readonly inBlockquote?: boolean
   /** Inline-code file mentions; absent wherever no opener vocabulary exists. */
@@ -316,6 +324,7 @@ function renderCode(node: Md.Code, key: Key, context: MarkdownRenderContext): Re
   // The replaced pipeline recovered the grammar id from the hast class with
   // /language-([\w-]+)/, which truncates at the first non-word character.
   const lang = language === undefined ? undefined : /^[\w-]+/.exec(language)?.[0]
+  const labels = context.labels?.code ?? context.codeLabels ?? { copyLabel: '复制', copiedLabel: '复制成功' }
   if (!context.streaming && lang === 'math') {
     // ```math fences render as display TeX once settled (rehype-katex parity);
     // its text extraction saw the code block's trailing newline.
@@ -328,9 +337,10 @@ function renderCode(node: Md.Code, key: Key, context: MarkdownRenderContext): Re
       // CodeBlock's display trim removes; feeding the bare value would make
       // that trim eat a REAL trailing blank line inside the fence instead.
       code={`${node.value}\n`}
-      lang={context.streaming ? undefined : lang}
-      copyLabel={context.codeLabels?.copyLabel}
-      copiedLabel={context.codeLabels?.copiedLabel}
+      lang={lang}
+      streaming={context.streaming}
+      copyLabel={labels.copyLabel}
+      copiedLabel={labels.copiedLabel}
     />
   )
 }
@@ -588,7 +598,7 @@ export function renderFootnoteSection(context: MarkdownRenderContext): ReactNode
   if (items.length === 0) return null
   return (
     <section key="footnotes" data-footnotes className="footnotes">
-      <h2 id="footnote-label" className="sr-only">Footnotes</h2>
+      <h2 id="footnote-label" className="sr-only">{context.labels?.footnotes ?? 'Footnotes'}</h2>
       <ol>{items}</ol>
     </section>
   )

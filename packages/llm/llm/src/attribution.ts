@@ -7,13 +7,16 @@
  * @module @deepseek-ai/dsh-llm/attribution
  */
 
-import { createRequire, findPackageJSON } from 'node:module'
+import packageManifest from '@deepseek-ai/dsh-llm/package.json' with { type: 'json' }
 
 // The package's own manifest is the single source of the version so the
-// User-Agent cannot drift from what is published. Nearest-package lookup is
-// stable from both bundled `lib/` and TypeScript-emitted `lib/types/` entries.
-const packageJsonPath = findPackageJSON('.', import.meta.url)
-const { version } = createRequire(import.meta.url)(packageJsonPath as string) as { version: string }
+// User-Agent cannot drift from what is published. A static JSON import keeps
+// the value available in single-file runtimes whose virtual snapshot cannot
+// be addressed through a filesystem path.
+if (typeof packageManifest.version !== 'string' || packageManifest.version.length === 0) {
+  throw new Error('@deepseek-ai/dsh-llm package manifest has no non-empty version')
+}
+const { version } = packageManifest
 
 /**
  * Static public application identity sent to LLM providers.

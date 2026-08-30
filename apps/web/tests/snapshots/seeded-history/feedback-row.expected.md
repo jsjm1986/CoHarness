@@ -1,15 +1,26 @@
 - banner:
+  - tablist:
+    - tab "Chat" [selected]
+    - tab "Trajectory"
   - navigation "Session hierarchy":
     - button "Use the read tool twice" [disabled]
   - button "Session log":
     - text: Session log
     - img
-  - tablist:
-    - tab "Chat" [selected]
-    - tab "Trajectory"
+- separator "Adjust transcript content width"
+- navigation "Turn navigation":
+  - button "Jump to turn 1"
+  - button "Jump to turn 2"
+- button "2 tool calls · 2 intermediate messages" [expanded]:
+  - text: 2 tool calls · 2 intermediate messages
+  - img
 - text: "Use the read tool twice in one assistant message: read a.txt and b.txt. Then reply with the single word DONE and stop. 7/25 {{clock}}"
 - button "Copy":
   - img
+- button "System prompt":
+  - img
+  - img
+  - text: System prompt
 - button "Think The user wants me to read a.txt and b.txt, then reply with \"DONE\". Let me do both reads in parallel.":
   - img
   - img
@@ -37,7 +48,7 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s
+- text: 7/25 {{clock}} Ran for {{duration}}
 - button "compact Compacted 5 history items (~{{tokens}} tokens)"
 - button "Context injection AGENTS.md":
   - img
@@ -50,6 +61,10 @@
   - text: "feedback Feedback recorded for session {{seededId}} Anonymous user: {{uuid}}. Session sharing is not configured."
 - text: "Feedback recorded for session {{seededId}} Anonymous user: {{uuid}}. Session sharing is not configured."
 - textbox "Message the agent"
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
 - button "Commands":
   - img
 - 'button "Access mode, current: Read Only"': Read Only

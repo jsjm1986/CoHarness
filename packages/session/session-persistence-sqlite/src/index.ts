@@ -112,6 +112,11 @@ export class SqliteSessionPersistence extends SessionPersistence {
     return this.coordinator.create(meta)
   }
 
+  /** Persist an empty session as a metadata row without an event row. */
+  override ensureMaterialized(session: import('@deepseek-ai/dsh-session').Session): Promise<void> {
+    return this.coordinator.ensureMaterialized(session)
+  }
+
   append(id: SessionId, events: readonly SessionEvent[]): Promise<void> {
     return this.coordinator.append(id, events)
   }

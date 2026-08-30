@@ -4,8 +4,22 @@ import { ImageLightbox } from './ImageLightbox.tsx'
 import type { ImageLightboxLabels } from './ImageLightbox.tsx'
 import css from './MessageImage.module.css'
 
-/** Loads a session-authorized durable image URL. */
-export type ImageLoader = (attachment: ImageAttachmentRef) => Promise<string>
+/** Loads a session-authorized durable image URL and may expose a cached URL synchronously. */
+export type ImageLoader = ((attachment: ImageAttachmentRef) => Promise<string>) & {
+  peek?: (attachment: ImageAttachmentRef) => string | undefined
+}
+
+/** One gallery entry: a durable admitted reference, or a local submission preview. */
+export type MessageImageSpec =
+  | { readonly attachment: ImageAttachmentRef }
+  | {
+    readonly preview: {
+      readonly url: string
+      readonly name?: string
+      readonly width?: number
+      readonly height?: number
+    }
+  }
 
 /** Message-image strings the owner resolves from its own locale namespace. */
 export interface MessageImageLabels {
@@ -28,16 +42,26 @@ export interface MessageImageLabels {
  * `object-fit: cover` — and never upscaled past the image's natural size. The
  * crop anchor keeps the top of very tall images and the left of very wide
  * ones, where the informative content usually starts. */
-function singleFit(attachment: ImageAttachmentRef): { width: number; height: number; objectPosition: string } {
-  const natural = attachment.width / attachment.height
+function singleFit(
+  dimensions: { readonly width: number; readonly height: number },
+): { width: number; height: number; objectPosition: string } {
+  const natural = dimensions.width / dimensions.height
   const ratio = Math.min(4, Math.max(0.25, natural))
   const box = ratio >= 1 ? { width: 240, height: 240 / ratio } : { width: 240 * ratio, height: 240 }
-  const scale = Math.min(1, attachment.width / box.width, attachment.height / box.height)
+  const scale = Math.min(1, dimensions.width / box.width, dimensions.height / box.height)
   return {
     width: Math.max(1, Math.round(box.width * scale)),
     height: Math.max(1, Math.round(box.height * scale)),
     objectPosition: natural < 0.25 ? 'center top' : natural > 4 ? 'left center' : 'center',
   }
+}
+
+/** Intrinsic dimensions for one gallery item, when available. */
+function dimensionsOf(image: MessageImageSpec): { readonly width: number; readonly height: number } | undefined {
+  if ('attachment' in image) return image.attachment
+  return image.preview.width !== undefined && image.preview.height !== undefined
+    ? { width: image.preview.width, height: image.preview.height }
+    : undefined
 }
 
 /**
@@ -51,13 +75,21 @@ function singleFit(attachment: ImageAttachmentRef): { width: number; height: num
  * @param props.labels - resolved strings (tooltip, loading, retry, lightbox).
  * @returns the bounded thumbnail button, or the retry control on failure.
  */
-export function MessageImage({ attachment, load, variant, labels }: {
-  attachment: ImageAttachmentRef
+export function MessageImage({ image, attachment: legacyAttachment, load, variant, labels }: {
+  image?: MessageImageSpec
+  /** Legacy durable prop retained for direct consumers and existing fixtures. */
+  attachment?: ImageAttachmentRef
   load: ImageLoader
   variant: 'single' | 'tile'
   labels: MessageImageLabels
 }) {
-  const [src, setSrc] = useState<string | null>(null)
+  const spec: MessageImageSpec | undefined = image ?? (
+    legacyAttachment === undefined ? undefined : { attachment: legacyAttachment }
+  )
+  const preview = spec !== undefined && 'preview' in spec ? spec.preview : undefined
+  const attachment = spec !== undefined && 'attachment' in spec ? spec.attachment : undefined
+  const [loaded, setLoaded] = useState<string | null>(() =>
+    attachment === undefined ? null : (load.peek?.(attachment) ?? null))
   const [error, setError] = useState(false)
   const [open, setOpen] = useState(false)
   // Retry re-arms the one load effect below, so every attempt — first load or
@@ -65,20 +97,26 @@ export function MessageImage({ attachment, load, variant, labels }: {
   const [attempt, setAttempt] = useState(0)
   const request = useCallback(() => { setAttempt(a => a + 1) }, [])
   const close = useCallback(() => { setOpen(false) }, [])
-  const fit = useMemo(
-    () => (variant === 'single' ? singleFit(attachment) : undefined),
-    [attachment, variant],
-  )
+  const dimensions = useMemo(() => spec === undefined ? undefined : dimensionsOf(spec), [spec])
+  const fit = useMemo(() => {
+    if (variant !== 'single') return undefined
+    return dimensions === undefined
+      ? { width: 240, height: 240, objectPosition: 'center' }
+      : singleFit(dimensions)
+  }, [dimensions, variant])
 
   useEffect(() => {
+    if (attachment === undefined) return
     let live = true
     setError(false)
-    setSrc(null)
-    void load(attachment).then((url) => { if (live) setSrc(url) }).catch(() => { if (live) setError(true) })
+    setLoaded(load.peek?.(attachment) ?? null)
+    void load(attachment).then((url) => { if (live) setLoaded(url) }).catch(() => { if (live) setError(true) })
     return () => { live = false }
   }, [attachment, load, attempt])
 
-  const label = attachment.name ?? labels.image
+  if (spec === undefined) return null
+  const src = preview?.url ?? loaded
+  const label = (preview?.name ?? attachment?.name) ?? labels.image
   if (error) return <button type="button" className={css.error} data-variant={variant} onClick={request}>{labels.loadFailed}</button>
   return (
     <>
@@ -103,7 +141,7 @@ export function MessageImage({ attachment, load, variant, labels }: {
 /** Wrapping image group shared by user and assistant history: a lone image
  * renders large, several render as 64px square tiles (DeepSeek Chat rule). */
 export function ImageGallery({ images, load, align, labels }: {
-  images: readonly { attachment: ImageAttachmentRef }[]
+  images: readonly MessageImageSpec[]
   load: ImageLoader
   align: 'start' | 'end'
   labels: MessageImageLabels
@@ -113,7 +151,13 @@ export function ImageGallery({ images, load, align, labels }: {
   return (
     <div className={css.gallery} data-align={align}>
       {images.map((image, index) => (
-        <MessageImage key={`${image.attachment.attachmentId}:${index}`} {...image} load={load} variant={variant} labels={labels} />
+        <MessageImage
+          key={`${'attachment' in image ? image.attachment.attachmentId : image.preview.url}:${index}`}
+          image={image}
+          load={load}
+          variant={variant}
+          labels={labels}
+        />
       ))}
     </div>
   )

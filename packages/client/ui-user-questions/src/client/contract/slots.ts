@@ -6,12 +6,13 @@
  * cancelled error encoding, receipt checks — lives HERE, with the package
  * that consumes it.
  */
-import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 // Also pulls ui-conversation's SlotMap merge (the 'conversation.composer'
 // entry) into every program that sees this contract, so PropsRuntime resolves.
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { PendingWait } from '@deepseek-ai/dsh-client-runtime/client'
 import type { QuestionResponsePayload } from '@deepseek-ai/dsh-api-remotes/client'
+import type { createQuestionDraftStore } from '../draft-store.ts'
 
 /** The pending question carrier the owner dispatches into the composer slot. */
 export type QuestionWait = PendingWait<'question'>
@@ -140,4 +141,9 @@ export class PendingQuestion {
  * whole behavior surface.
  */
 export type QuestionComposerProps =
-  PropsRuntime<'conversation.composer'> & { matched: QuestionWait } & PropsLocale<'question'>
+  PropsRuntime<'conversation.composer'>
+  // Direct component consumers may omit the Slot-owned store; QuestionComposer
+  // supplies an isolated in-memory fallback for compatibility embeds/tests.
+  & Partial<PropsStore<ReturnType<typeof createQuestionDraftStore>>>
+  & { matched: QuestionWait }
+  & PropsLocale<'question'>

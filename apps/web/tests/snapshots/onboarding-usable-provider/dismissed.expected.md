@@ -18,7 +18,7 @@
     - img
     - text: 关闭
   - heading "模型" [level=2]
-  - paragraph: 填入各提供方的 API 密钥即可使用其模型。
+  - paragraph: 使用组织分配的模型，或通过自己的 API 密钥添加个人提供方。
   - list:
     - listitem:
       - text: DeepSeek
@@ -30,6 +30,7 @@
     - option "ant-ling"
     - option "anthropic"
     - option "azure-openai-responses"
+    - option "baseten"
     - option "cerebras"
     - option "cloudflare-ai-gateway"
     - option "cloudflare-workers-ai"
@@ -48,11 +49,13 @@
     - option "moonshotai-cn"
     - option "nvidia"
     - option "openai"
+    - option "openai-codex"
     - option "opencode"
     - option "opencode-go"
     - option "openrouter"
     - option "qwen-token-plan"
     - option "qwen-token-plan-cn"
+    - option "qwen-token-plan-individual"
     - option "together"
     - option "vercel-ai-gateway"
     - option "xai"

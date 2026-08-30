@@ -32,9 +32,10 @@ function imageRenderer(calls: MessageImagesRenderOwner[]): RenderMessageImages {
     calls.push(owner)
     return (
       <div data-testid="message-images" data-align={owner.align} data-count={owner.images.length}>
-        {owner.images.map(({ attachment: image }, index) => (
-          <span key={`${image.attachmentId}:${String(index)}`}>{image.name}</span>
-        ))}
+        {owner.images.map((image, index) => {
+          if (!('attachment' in image)) return null
+          return <span key={`${image.attachment.attachmentId}:${String(index)}`}>{image.attachment.name}</span>
+        })}
       </div>
     )
   }

@@ -24,8 +24,19 @@
     - id: llm
       name: '@deepseek-ai/dsh-llm'
 
+    # Provider-owned additive request fields. The registry is always present;
+    # individual metadata/log contributors remain explicitly opt-in below.
+    - id: deepseek-llm-api-extensions
+      name: '@deepseek-ai/dsh-deepseek-llm-api-extensions'
+
     - id: session
       name: '@deepseek-ai/dsh-session'
+
+    - id: session-log-deepseek
+      name: '@deepseek-ai/dsh-session-log-deepseek'
+      config:
+        enabled: !!js process.env.COHARNESS_UPLOAD_SESSION_LOG === '1'
+        killSwitchEnv: COHARNESS_DISABLE_SESSION_LOG_UPLOAD
 
     - id: typert
       name: '@deepseek-ai/dsh-typert-registry'
@@ -57,6 +68,11 @@
 
     - id: agent
       name: '@deepseek-ai/dsh-agent'
+
+    - id: plugin-package-inventory-deepseek
+      name: '@deepseek-ai/dsh-plugin-package-inventory-deepseek'
+      config:
+        enabled: !!js process.env.COHARNESS_SEND_PLUGIN_METADATA === '1'
 
     # The transport-independent default for Agents created by entry points.
     # Settings may supply a saved selection; consumers read it at creation time.

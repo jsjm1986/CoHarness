@@ -178,9 +178,13 @@ describe('web e2e: lifecycle & chrome (workspace flow / reload / dark mode)', ()
         await input.press('Enter')
         if (MODE !== 'record') {
           const liveTail = page.locator('[data-variant="think"][data-state="running"] [data-follow-end]')
+          await expect.poll(() => liveTail.count(), { timeout: 10_000, interval: 10 }).toBe(1)
+          // Compact layouts may wrap the running summary instead of creating a
+          // horizontal scrollport. When a scrollport exists, the follow-end
+          // contract still requires it to track the latest delta.
           await expect.poll(async () => await liveTail.evaluate(element => (
-            element.scrollWidth > element.clientWidth
-              && element.scrollLeft >= element.scrollWidth - element.clientWidth - 1
+            element.scrollWidth <= element.clientWidth
+              || element.scrollLeft >= element.scrollWidth - element.clientWidth - 1
           )), { timeout: 10_000, interval: 10 }).toBe(true)
         }
         return await settled

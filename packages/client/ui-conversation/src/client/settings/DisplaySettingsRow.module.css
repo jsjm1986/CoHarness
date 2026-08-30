@@ -1,0 +1,81 @@
+/* General display controls: compact labels, native range inputs, and a
+   readable two-column layout that collapses on phone settings sheets. */
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--dsw-space-4);
+  padding: var(--dsw-space-4) 0;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+}
+
+.rowText {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsw-space-1);
+}
+
+.title {
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.desc,
+.notice {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.notice[role='alert'] {
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.controls {
+  flex: 0 1 360px;
+  display: grid;
+  gap: var(--dsw-space-3);
+  min-width: 260px;
+}
+
+.control {
+  display: grid;
+  grid-template-columns: 74px minmax(96px, 1fr) auto;
+  align-items: center;
+  gap: var(--dsw-space-2);
+  min-width: 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.controlLabel {
+  white-space: nowrap;
+}
+
+.control input {
+  width: 100%;
+  accent-color: var(--dsw-alias-state-business-primary);
+}
+
+.control output {
+  min-width: 46px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-primary);
+}
+
+@media (max-width: 767px) {
+  .row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .controls {
+    flex-basis: auto;
+    min-width: 0;
+  }
+}

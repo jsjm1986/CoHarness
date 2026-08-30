@@ -4,8 +4,9 @@ Two runtime carriers coexist under ``runtime/``, both injected by the repo's
 ``scripts/build-exe-for-python-sdk.ts`` build (neither is checked into git):
 
 - **exe (production)**: single-file Node executables named
-  ``dsh-jsonrpc-agent-pkg-<platform>-<arch>`` (platform in {linux, macos}, arch in
-  {x64, arm64}) with a sibling ``-rg`` executable; macOS also uses a sibling
+  ``deepseek-harness-sdk-runtime-<platform>-<arch>`` (with the legacy
+  ``dsh-jsonrpc-agent-pkg-*`` spelling accepted) and a sibling ripgrep
+  executable; macOS also uses a sibling
   ``-spawn-helper``. The target machine needs no Node installation.
 - **node (dev-only)**: the full deploy closure under ``runtime/node/``
   (``package.json`` + ``node_modules/``), executed as ``node
@@ -31,7 +32,7 @@ PACKAGE_METADATA_FILENAME = "deepseek-harness-runtime.json"
 
 RUNTIME_MODE_ENV_VAR = "DSH_RUNTIME_MODE"
 
-_PLATFORM_TAGS = {"linux": "linux", "darwin": "macos"}
+_PLATFORM_TAGS = {"linux": "linux", "darwin": "macos", "win32": "win"}
 _ARCH_TAGS = {"x86_64": "x64", "amd64": "x64", "arm64": "arm64", "aarch64": "arm64"}
 
 _EXE_ACQUISITION_HINT = (
@@ -78,13 +79,24 @@ def bundled_runtime_path() -> Path:
     touching callers).
     """
     tag = _current_platform_tag()
-    path = bundled_package_dir() / "runtime" / f"dsh-jsonrpc-agent-pkg-{tag}"
+    runtime_dir = bundled_package_dir() / "runtime"
+    extension = ".exe" if tag.startswith("win-") else ""
+    candidates = [
+        runtime_dir / f"deepseek-harness-sdk-runtime-{tag}{extension}",
+        runtime_dir / f"dsh-jsonrpc-agent-pkg-{tag}{extension}",
+    ]
+    path = next((candidate for candidate in candidates if candidate.is_file()), candidates[0])
     if not path.is_file():
         raise FileNotFoundError(
             f"deepseek-harness-runtime-bin is missing the runtime executable at {path}. "
             + _EXE_ACQUISITION_HINT
         )
-    ripgrep = Path(f"{path}-rg")
+    ripgrep_candidates = (
+        [path.with_name(f"{path.stem}-rg.exe"), Path(f"{path}-rg.exe"), Path(f"{path}-rg")]
+        if tag.startswith("win-")
+        else [Path(f"{path}-rg")]
+    )
+    ripgrep = next((candidate for candidate in ripgrep_candidates if candidate.is_file()), ripgrep_candidates[0])
     if not ripgrep.is_file():
         raise FileNotFoundError(
             f"deepseek-harness-runtime-bin is missing the ripgrep sidecar at {ripgrep}. "
@@ -126,25 +138,27 @@ def resolve_bundled_launch_args(mode: str | None = None) -> tuple[str, ...]:
 def _current_platform_tag() -> str:
     plat = _PLATFORM_TAGS.get(sys.platform)
     arch = _ARCH_TAGS.get(platform.machine().lower())
-    if plat is None or arch is None:
+    if (
+        plat is None
+        or arch is None
+        or (plat == "win" and arch != "x64")
+        or (plat == "macos" and arch != "arm64")
+    ):
         raise FileNotFoundError(
             "no bundled dsh-jsonrpc-agent executable exists for this platform "
             f"(sys.platform={sys.platform!r}, machine={platform.machine()!r}); supported: "
-            "linux/macos on x64/arm64. " + _EXE_ACQUISITION_HINT
+            "Linux x64/arm64, macOS arm64, and Windows x64. " + _EXE_ACQUISITION_HINT
         )
     return f"{plat}-{arch}"
 
 
 def _node_launch_args() -> tuple[str, str]:
     node_root = bundled_package_dir() / "runtime" / "node"
-    bin_js = (
-        node_root
-        / "node_modules"
-        / "@deepseek-ai"
-        / "dsh-sdk-jsonrpc-demo"
-        / "lib"
-        / "packaged-bin.js"
-    )
+    candidates = [
+        node_root / "node_modules" / "@deepseek-ai" / "dsh" / "lib" / "bin.js",
+        node_root / "node_modules" / "@deepseek-ai" / "dsh-sdk-jsonrpc-demo" / "lib" / "packaged-bin.js",
+    ]
+    bin_js = next((candidate for candidate in candidates if candidate.is_file()), candidates[0])
     if not bin_js.is_file():
         raise FileNotFoundError(
             f"the dev-only node runtime closure is missing at {node_root} "

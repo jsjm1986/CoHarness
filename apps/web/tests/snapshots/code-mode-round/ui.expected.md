@@ -1,4 +1,7 @@
 - banner:
+  - tablist:
+    - tab "Chat" [selected]
+    - tab "Trajectory"
   - navigation "Session hierarchy":
     - 'button "Using ONE run_code program: run" [disabled]'
   - img
@@ -6,29 +9,13 @@
   - button "Session log":
     - text: Session log
     - img
-  - tablist:
-    - tab "Chat" [selected]
-    - tab "Trajectory"
+- separator "Adjust transcript content width"
+- button "1 tool call · 2 intermediate messages":
+  - text: 1 tool call · 2 intermediate messages
+  - img
 - text: "Using ONE run_code program: run bash `echo CODE_ROUND_OK`, then read the file missing.txt catching its error in the program. Return an object with both outcomes. Then reply DONE and stop. {{clock}}"
 - button "Copy":
   - img
-- button "Context injection @deepseek-ai/dsh-system-prompt":
-  - img
-  - img
-  - text: Context injection @deepseek-ai/dsh-system-prompt
-- 'button "Think The user wants me to write a single `run_code` program that:"':
-  - img
-  - img
-  - text: "Think The user wants me to write a single `run_code` program that:"
-- button "Code Run bash echo and catch missing file read":
-  - img
-  - img
-  - text: Code Run bash echo and catch missing file read
-- img
-- text: Bash Echo CODE_ROUND_OK Failed
-- 'button "Read Error: cannot read \"{{cwd}}/workspace/missing.txt\": not found"':
-  - img
-  - text: "Read Error: cannot read \"{{cwd}}/workspace/missing.txt\": not found"
 - button "Think The program ran successfully. Let me now reply DONE as instructed.":
   - img
   - img
@@ -44,6 +31,10 @@
   - img
 - text: {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s
 - textbox "Message the agent"
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
 - button "Commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write

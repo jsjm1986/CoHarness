@@ -2,13 +2,13 @@
 
 [English](README.md) | 中文
 
-通过 JSON-RPC stdio 提供的仅面向自动化的 [ACP（Agent Client Protocol）](https://agentclientprotocol.com) 服务器。程序化客户端可以创建新 harness agent（智能体）、发送文本／图片提示词、收集已提交的 assistant 文本／图片、按策略响应一次性权限请求并取消工作。仓库中的主要客户端是 [`dsh-subagent-acp`](../../subagent/subagent-acp/README.zh.md)。
+通过 JSON-RPC stdio 提供的仅面向自动化的 [ACP（Agent Client Protocol）](https://agentclientprotocol.com) 服务器。程序化客户端可以创建、列出、恢复、配置和关闭 harness 会话，发送文本／图片提示词，挂载会话级 MCP 服务器，收集已提交的 assistant 文本／图片，按策略响应一次性权限请求并取消工作。仓库中的主要客户端是 [`dsh-subagent-acp`](../../subagent/subagent-acp/README.zh.md)。
 
 此包是传输适配器，而非 UI 集成或能力 seam。它不公开编辑器导航、transcript（文本记录）回放、命令、模式、配置选择器、信息征集、推理（reasoning）、计划、标题或工具展示。交互式渲染与向用户提问属于 Web 宿主和客户端模块。
 
 ## 插件
 
-`apply(ctx, config)` 在 stdin/stdout 上打开 `AgentSideConnection` 并驱动 `ctx.agents`。Stdout 专用于协议帧。
+`apply(ctx, config)` 构建类型化 ACP `agent()` app，连接 stdin/stdout 并驱动 `ctx.agents`。Stdout 专用于协议帧。
 
 | 配置 | 默认值 | 含义 |
 |---|---|---|
@@ -23,12 +23,16 @@
 
 | 方法 | 行为 |
 |---|---|
-| `initialize` | 协商受支持的版本。只有挂载持久附件存储，且配置的确切提供方／模型解析后明确支持图片输入时，才公布图片提示词能力；音频与嵌入上下文保持 false。不公布会话、编辑器、终端、文件系统或 MCP 能力。 |
+| `initialize` | 协商受支持的版本，并公布 HTTP MCP 挂载、会话关闭／列出／恢复和模型配置能力。只有挂载持久附件存储，且配置的确切提供方／模型解析后明确支持图片输入时，才公布图片提示词能力；音频与嵌入上下文保持 false。不公布编辑器、终端或文件系统能力。 |
 | `authenticate` | 空操作，因为服务器不公布身份验证方法。 |
-| `session/new` | 以绝对路径作为主 `cwd` 创建新 agent；接受空的 `additionalDirectories` 和 `mcpServers`，拒绝非空值。 |
+| `session/new` | 以绝对路径作为主 `cwd` 创建新 agent；`additionalDirectories` 必须为空，同时校验并在会话作用域挂载 stdio 与 HTTP `mcpServers`。 |
+| `session/list` | 列出未激活、未处于激活过程且不属于 subagent 的持久主会话。可用绝对 `cwd` 过滤，并使用不透明 cursor 分页，结果按最新创建时间优先。 |
+| `session/resume` | 在确认会话未激活、`cwd` 一致且 MCP 声明有效后恢复持久主会话。历史继续保存在持久层，后续提示词可以使用这些历史，但不会向客户端重放更新。 |
+| `session/set_config_option` | 为后续轮次修改会话的模型或推理强度选择，并返回完整的当前选项状态。无效或不可用的选择会作为无效参数拒绝。 |
+| `session/close` | 取消并释放一个活动会话，同时保留其持久历史，供后续 `session/resume` 使用。 |
 | `session/prompt` | 保留文本与受支持内联图片块的顺序，将资源链接渲染为带方括号的文本引用，并拒绝音频、嵌入资源、格式错误／空输入，或在未公布能力时提交图片。它会先校验完整图片批次并重新检查会话的最新确切路由，再保存任一成员；在用户事件前提交全部图片；每个会话只允许一个正在处理的请求，并等待准入，以及消息入队后的整个 Agent 空闲和有序输出交付全部停稳。正常完全停稳时报告 `end_turn`；显式 ACP 取消、资源释放，或准入被丢弃的提示词（无轮次槽位）时报告 `cancelled`。 |
 | `session/cancel` | 标记并中止正在进行的准入，但不会取消或等待同一 Agent 上无关的既有工作；该提示词进入 Agent inbox 后，才会取消指定的 Agent 并等待自有区间停稳。不发布迟到的用户消息，提示词以 `cancelled` 结算。没有进行中的提示词时会取消自主工作；未知 id 为空操作。 |
-| `session/update` | 为已提交 `assistant/message` 中的每个非空文本或图片块发出一个 `agent_message_chunk`，并保留顺序。图片在以内联 base64 交付前会重新读取并校验完整性。省略原始增量和非消息事件。 |
+| `session/update` | 为已提交 `assistant/message` 中的每个非空文本或图片块发出一个 `agent_message_chunk`，并保留顺序；模型目录变化时发出 `config_option_update`。图片在以内联 base64 交付前会重新读取并校验完整性。省略原始增量和非消息事件。 |
 | `session/request_permission` | 为携带工具调用 id、由桥接层拥有的批准请求提供一次性允许／拒绝选项。客户端可以自动回答。 |
 
 一个连接可以拥有多个会话。桥接层以带品牌的会话 id 作为记录键，并在路由事件或权限请求前检查 agent 是否为同一对象。每个会话都有独立的提示词槽位、工作区、取消路径和资源释放器。
@@ -77,7 +81,7 @@ ACP 要求每个提示词响应都携带 `stopReason`，但桥接层不声称它
 
 ## 已知限制与暂缓事项
 
-- **仅新会话**：不支持加载、列出、恢复、删除和 fork。
-- **仅光栅图片和一个 workspace**：图片提示词要求持久存储以及明确声明支持图片输入的确切路由；只接受 PNG、JPEG、WebP 和 GIF。音频、嵌入资源、非空附加目录和 MCP 服务器都会被拒绝；资源链接只会展平为文本引用，不会获取其内容。
+- **没有 load、删除或 fork 方法**：持久主会话使用标准 `session/list`、`session/resume` 和 `session/close` 控制；ACP 的 `load`、删除和不稳定 fork 操作尚未实现。
+- **仅光栅图片和一个 workspace**：图片提示词要求持久存储以及明确声明支持图片输入的确切路由；只接受 PNG、JPEG、WebP 和 GIF。音频、嵌入资源和非空附加目录都会被拒绝；资源链接只会展平为文本引用，不会获取其内容。会话级 MCP 挂载仅限 ACP stdio 与 Streamable HTTP 声明。
 - **仅已提交答案**：实时进度、推理、工具活动、计划、标题和用量不会通过协议传输。
-- **由连接管理的生命周期**：一个连接会释放其所有会话；尚未实现单个会话关闭功能。
+- **由连接管理的生命周期**：连接关闭时会释放其所有活动会话；连接保持打开时可使用 `session/close`。

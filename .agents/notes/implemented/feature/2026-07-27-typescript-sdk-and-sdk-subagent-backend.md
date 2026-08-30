@@ -40,7 +40,7 @@ Four tiers, per [testing policy](../../../../docs/testing.md):
 
 **Export source modules, normalization helpers, and subscription producer operations.** These are implementation details with no caller need; exposing them would make callers learn how the client validates and distributes wire input. The package roots instead enumerate the supported client and protocol interfaces, and the client re-exports the one protocol error callers must distinguish.
 
-**Reuse `dsh-acp-snapshot`'s `runScenario` for the SDK snapshots.** That harness speaks ACP (`ClientSideConnection`, `InputStep` scripts). The SDK suite's whole point is to drive the *SDK client* as the entry surface; it reuses the normalize/refresh library layer (`normalizeSessionLog`, `refreshFixtureReplacements`, …) and leaves the ACP driver alone.
+**Reuse `dsh-acp-snapshot`'s `runScenario` for the SDK snapshots.** That harness speaks ACP through its typed `client()` app and `InputStep` scripts. The SDK suite's whole point is to drive the *SDK client* as the entry surface; it reuses the normalize/refresh library layer (`normalizeSessionLog`, `refreshFixtureReplacements`, …) and leaves the ACP driver alone.
 
 ## Consequences
 

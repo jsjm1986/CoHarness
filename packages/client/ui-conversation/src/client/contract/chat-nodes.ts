@@ -45,6 +45,21 @@ export interface ManualCompactionChatData {
   readonly compaction: CompactionSummaryNode | null
 }
 
+/** Model-visible system prompt captured from a durable request header. */
+export interface SystemPromptChatData {
+  readonly text: string
+}
+
+/** Turn-level process summary shown before the final answer. */
+export interface TurnProcessChatData {
+  readonly turn: number
+  readonly controlAnchorSeq: number
+  readonly messageCount: number
+  readonly toolCallCount: number
+  readonly subagentCount: number
+  readonly answerAnchorSeq: number | null
+}
+
 /** One durable retry chain rendered as a single row. */
 export interface RetryChatData {
   readonly attempts: readonly ModelRetryNode[]

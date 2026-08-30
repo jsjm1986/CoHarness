@@ -15,6 +15,7 @@ export { AttachmentId, ImageVariantId } from './brand.ts'
 export { AttachmentError, isImageAdmissionError } from './error.ts'
 export type { AttachmentErrorCode, ImageAdmissionErrorCode } from './error.ts'
 export { admitEncodedImages } from './admission.ts'
+export { requestImageDimensions } from './request-projection.ts'
 export type {
   AttachmentId as AttachmentIdType,
   EncodedImageAttachment,
@@ -108,6 +109,16 @@ export abstract class AttachmentStore extends Service {
    * @throws the signal reason when aborted, or a storage error when verification fails.
    */
   abstract readImage(ref: ImageAttachmentRef, signal?: AbortSignal): Promise<StoredImageAttachment>
+
+  /**
+   * Locate the provider-owned normalized image in the host filesystem.
+   * Providers that are not host-file-backed return `undefined`.
+   * @param _ref - durable normalized attachment reference.
+   * @returns an absolute host path, or `undefined` when no path is exposed.
+   */
+  imageHostPath(_ref: ImageAttachmentRef): string | undefined {
+    return undefined
+  }
 
   /**
    * Generate or read one deterministic model-request version from the stored normalized image.

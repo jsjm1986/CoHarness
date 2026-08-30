@@ -1,12 +1,19 @@
 - banner:
+  - tablist:
+    - tab "Chat" [selected]
+    - tab "Trajectory"
   - navigation "Session hierarchy":
     - button "Use the read tool twice" [disabled]
   - button "Session log":
     - text: Session log
     - img
-  - tablist:
-    - tab "Chat" [selected]
-    - tab "Trajectory"
+- separator "Adjust transcript content width"
+- navigation "Turn navigation":
+  - button "Jump to turn 1"
+  - button "Jump to turn 2"
+- button "2 tool calls · 1 intermediate message":
+  - text: 2 tool calls · 1 intermediate message
+  - img
 - text: "Use the read tool twice in one assistant message: read a.txt and b.txt. Then reply with the single word DONE and stop. 7/25 {{clock}}"
 - button "Copy":
   - img
@@ -24,7 +31,7 @@
   - img
 - button "Branch into a new conversation" [disabled]:
   - img
-- text: Available only on the last message of a completed turn 7/25 {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s
+- text: Available only on the last message of a completed turn 7/25 {{clock}} Ran for {{duration}}
 - button "Read a.txt":
   - img
   - img
@@ -39,7 +46,11 @@
   - img
   - img
   - text: Think Both files have been read. a.txt contains "alpha" and b.txt contains "beta". I'll now reply with DONE as instructed.
-- text: Stopped Now give the final answer. 7/25 {{clock}}
+- text: Stopped
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
+- text: Now give the final answer. 7/25 {{clock}}
 - button "Copy":
   - img
 - paragraph: DONE
@@ -53,6 +64,10 @@
   - img
 - text: 7/25 {{clock}} Ran for {{duration}}
 - textbox "Message the agent"
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
 - button "Commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write

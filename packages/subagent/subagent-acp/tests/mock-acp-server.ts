@@ -55,9 +55,11 @@ import { randomUUID } from 'node:crypto'
 import { existsSync, writeFileSync } from 'node:fs'
 import { Readable, Writable } from 'node:stream'
 import {
-  AgentSideConnection,
+  agent as createAgent,
+  methods,
   ndJsonStream,
   PROTOCOL_VERSION,
+  type AgentContext,
   type Agent,
   type CancelNotification,
   type AuthenticateRequest,
@@ -67,6 +69,9 @@ import {
   type NewSessionResponse,
   type PromptRequest,
   type PromptResponse,
+  type RequestPermissionRequest,
+  type RequestPermissionResponse,
+  type SessionNotification,
   type StopReason,
 } from '@agentclientprotocol/sdk'
 
@@ -93,7 +98,14 @@ const NEWSESSION_GATE = process.env.MOCK_NEWSESSION_READY !== undefined && proce
   ? { ready: process.env.MOCK_NEWSESSION_READY, go: process.env.MOCK_NEWSESSION_GO }
   : undefined
 
-function makeAgent(conn: AgentSideConnection): Agent {
+interface AgentClient {
+  /** Request a permission decision from the connected client. */
+  requestPermission(params: RequestPermissionRequest): Promise<RequestPermissionResponse>
+  /** Send one session update to the connected client. */
+  sessionUpdate(params: SessionNotification): Promise<void>
+}
+
+function makeAgent(conn: AgentClient): Agent {
   // Pending cancel resolver for the HANG path: a `session/cancel` resolves the
   // prompt with `cancelled`.
   let resolveCancel: ((reason: StopReason) => void) | undefined
@@ -195,13 +207,32 @@ function makeAgent(conn: AgentSideConnection): Agent {
   }
 }
 
-new AgentSideConnection(
-  makeAgent,
-  ndJsonStream(
-    Writable.toWeb(process.stdout) as WritableStream<Uint8Array>,
-    Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>,
-  ),
-)
+const clientRef: { current: AgentContext | undefined } = { current: undefined }
+const clientBridge: AgentClient = {
+  requestPermission(params) {
+    const client = clientRef.current
+    if (client === undefined) return Promise.reject(new Error('mock ACP agent is not connected to a client'))
+    return client.request(methods.client.session.requestPermission, params)
+  },
+  sessionUpdate(params) {
+    const client = clientRef.current
+    if (client === undefined) return Promise.reject(new Error('mock ACP agent is not connected to a client'))
+    return client.notify(methods.client.session.update, params)
+  },
+}
+const implementation = makeAgent(clientBridge)
+createAgent({ name: 'dsh-subagent-acp-mock' })
+  .onConnect(({ client }) => { clientRef.current = client })
+  .onRequest(methods.agent.initialize, ({ params }) => implementation.initialize(params))
+  .onRequest(methods.agent.session.new, ({ params }) => implementation.newSession(params))
+  .onRequest(methods.agent.session.prompt, ({ params }) => implementation.prompt(params))
+  .onNotification(methods.agent.session.cancel, ({ params }) => implementation.cancel(params))
+  .connect(
+    ndJsonStream(
+      Writable.toWeb(process.stdout) as WritableStream<Uint8Array>,
+      Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>,
+    ),
+  )
 
 // Under MOCK_TRAP_SIGTERM, ignore SIGTERM and keep stdin open so the process
 // neither quiesces on EOF nor dies on the graceful signal — exercising the

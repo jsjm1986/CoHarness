@@ -43,7 +43,7 @@ export interface EventRow {
   readonly data: string | Uint8Array
   readonly source_event_seqs: Uint8Array | null
   readonly surface_op: string | null
-  readonly is_packed: number
+  readonly is_packed?: number
   readonly ignorable: number | null
 }
 

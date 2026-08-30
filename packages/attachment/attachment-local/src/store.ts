@@ -40,6 +40,16 @@ function objectPath(root: string, sha256: string): string {
   return join(root, 'objects', sha256.slice(0, 2), sha256)
 }
 
+/**
+ * Resolve one validated normalized attachment to its immutable object path.
+ * @param root - attachment store root containing content-addressed objects.
+ * @param ref - normalized durable image reference.
+ * @returns the immutable object path for the referenced image.
+ */
+export function normalizedImagePath(root: string, ref: ImageAttachmentRef): string {
+  return objectPath(root, ensureReference(ref))
+}
+
 function ensureReference(ref: ImageAttachmentRef): string {
   const match = ID_PATTERN.exec(String(ref.attachmentId))
   if (match?.[1] === undefined) throw new AttachmentError('Attachment reference is invalid.', 'INVALID_ATTACHMENT_REF')

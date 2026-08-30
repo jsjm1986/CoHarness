@@ -18,6 +18,7 @@ import type {
   ComposerKeyboard, DraftAttachmentId, DraftDocument, DraftDocumentId, EditSelection, InputActions, InputNotice, InputState,
 } from '../input/contract.ts'
 import type { createChatStore } from '../stores.ts'
+import type { ConversationDisplaySettingsSnapshot } from '../display-settings.ts'
 import type { ComposerSubmitGesture, InputSubmitMode } from './composer-submission.ts'
 import type { ChatNode, ChatNodeKind } from './chat-nodes.ts'
 import type { CallId, SelectionTarget, ViewTab } from './views.ts'
@@ -50,11 +51,31 @@ export interface ComposerAttachmentsOwnerProps {
 }
 
 /** Historical image group handed to the optional attachment presentation plugin. */
+export type MessageImageSource =
+  | { readonly attachment: ImageAttachmentRef }
+  | {
+    readonly preview: {
+      /** Browser-owned preview URL (lifecycle stays with the submitter). */
+      readonly url: string
+      readonly name?: string
+      /** Intrinsic pixel width, when known. */
+      readonly width?: number
+      /** Intrinsic pixel height, when known. */
+      readonly height?: number
+    }
+  }
+
+/** Durable image loader with an optional synchronous cache read. */
+export type MessageImageLoader = ((attachment: ImageAttachmentRef) => Promise<string>) & {
+  peek?: (attachment: ImageAttachmentRef) => string | undefined
+}
+
+/** Historical image group handed to the optional attachment presentation plugin. */
 export interface MessageImagesOwnerProps {
-  /** Consecutive image blocks rendered as one gallery. */
-  images: readonly { readonly attachment: ImageAttachmentRef }[]
+  /** Durable references or submission-echo previews in source order. */
+  images: readonly MessageImageSource[]
   /** Session-authorized durable image loader. */
-  loadImage: (attachment: ImageAttachmentRef) => Promise<string>
+  loadImage: MessageImageLoader
   /** Message-side alignment. */
   align: 'start' | 'end'
 }
@@ -443,6 +464,8 @@ export interface ChatNodeOwnerProps {
   /** Render a historical image group through the attachment slot. */
   renderMessageImages: RenderMessageImages
   fileMentions: (owner: TurnTailOwnerProps) => MarkdownFileMentions | undefined
+  /** Turn-process disclosure controller for the process summary row. */
+  turnProcess?: { readonly open: boolean; readonly setOpen: (open: boolean) => void }
 }
 
 /** Full props of one registered keyed Chat business renderer. */
@@ -509,7 +532,13 @@ export interface ConversationInjected {
    * plugin raised one; the reason is the blocker's own localized copy, which
    * the root renders as the inert composer's placeholder.
    */
-  hooks: { composerBlock: ObservableSnapshot<ComposerBlock | undefined> }
+  hooks: {
+    composerBlock: ObservableSnapshot<ComposerBlock | undefined>
+    /** Account-backed transcript width and font-size preferences. */
+    displaySettings: ObservableSnapshot<ConversationDisplaySettingsSnapshot>
+  }
+  /** Persist a transcript width from the desktop resize handle. */
+  setDisplayWidth: (value: number) => void
 }
 
 /** Business callbacks injected into the strict Session body seat. */

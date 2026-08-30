@@ -27,6 +27,31 @@ import { createProcessInspector } from './process-inspector.ts'
 import type { ProcessInspector } from './process-inspector.ts'
 import { LocalTerminalHandle } from './terminal.ts'
 
+/** Active host-exit callbacks share one process listener across all local runtimes. */
+const hostExitHandlers = new Set<() => void>()
+let hostExitListenerInstalled = false
+
+/** Dispatch synchronous finalization without adding one Node listener per runtime. */
+function dispatchHostExit(): void {
+  for (const handler of hostExitHandlers) handler()
+}
+
+/** Register one runtime's finalizer and return its lifecycle disposer. */
+function registerHostExit(handler: () => void): () => void {
+  hostExitHandlers.add(handler)
+  if (!hostExitListenerInstalled) {
+    process.prependListener('exit', dispatchHostExit)
+    hostExitListenerInstalled = true
+  }
+  return () => {
+    if (!hostExitHandlers.delete(handler)) return
+    if (hostExitHandlers.size === 0 && hostExitListenerInstalled) {
+      process.off('exit', dispatchHostExit)
+      hostExitListenerInstalled = false
+    }
+  }
+}
+
 /**
  * Local subprocess service: detached process trees, Node-shaped stdio
  * dispositions (raw pipes, inherit, bounded tail-keep collection with spill
@@ -47,13 +72,12 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
   constructor(ctx: Context) {
     super(ctx)
     ctx.effect(() => {
-      const onHostExit = (): void => { this.terminateForHostExit() }
-      process.prependListener('exit', onHostExit)
+      const releaseHostExit = registerHostExit(() => { this.terminateForHostExit() })
       return async () => {
         try {
           await this.disposeManagedProcesses()
         } finally {
-          process.off('exit', onHostExit)
+          releaseHostExit()
         }
       }
     }, 'local subprocess teardown')

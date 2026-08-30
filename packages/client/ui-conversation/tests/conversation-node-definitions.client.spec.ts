@@ -12,10 +12,12 @@ import { unknownFallbackDefinition } from '../src/client/conversation-nodes/fall
 import { nextStepInboxDefinition, nextTurnInboxDefinition } from '../src/client/conversation-nodes/inbox.ts'
 import { messageDefinition } from '../src/client/conversation-nodes/message.ts'
 import { retryDefinition } from '../src/client/conversation-nodes/retry.ts'
+import { systemPromptDefinition } from '../src/client/conversation-nodes/system-prompt.ts'
 import { toolDefinition } from '../src/client/conversation-nodes/tool.ts'
 import { turnErrorDefinition } from '../src/client/conversation-nodes/turn-error.ts'
 import { turnMaxTokensDefinition } from '../src/client/conversation-nodes/turn-max-tokens.ts'
 import { turnTailDefinition } from '../src/client/conversation-nodes/turn-tail.ts'
+import { turnProcessDefinition } from '../src/client/conversation-nodes/turn-process.ts'
 import type {
   AssistantChatData, ManualCompactionChatData, RetryChatData, ToolChatData, TurnTailChatData,
 } from '../src/client/contract/chat-nodes.ts'
@@ -29,9 +31,11 @@ const DEFINITIONS: readonly ConversationNodeDefinition[] = [
   commandDefinition,
   compactionDefinition,
   retryDefinition,
+  systemPromptDefinition,
   turnErrorDefinition,
   turnMaxTokensDefinition,
   turnTailDefinition,
+  turnProcessDefinition,
 ]
 
 class TestEventDefinitions {
@@ -118,6 +122,91 @@ function toolResult(callId: string, text: string) {
 }
 
 describe('built-in conversation node Definitions', () => {
+  it('projects turn process evidence, counts delegation tools precisely, and keeps answer anchors', () => {
+    const empty = assembler([
+      at(1, 'turn/start', { turn: 1 }),
+      at(2, 'step/start', { turn: 1, step: 1 }),
+      at(3, 'turn/end', { turn: 1, reason: { kind: 'aborted' } }),
+    ])
+    expect(node(snapshot(empty), 'turn-process')).toBeUndefined()
+
+    const value = assembler([
+      at(10, 'turn/start', { turn: 2 }),
+      at(11, 'step/start', { turn: 2, step: 1 }),
+      at(12, 'tool/call', { turn: 2, step: 1, callId: 'ordinary', name: 'manage_agent', arguments: '{}' }),
+      at(13, 'tool/call', { turn: 2, step: 1, callId: 'delegate', name: 'subagent', arguments: '{}' }),
+      at(14, 'step/end', { turn: 2, step: 1 }),
+      at(15, 'step/start', { turn: 2, step: 2 }),
+      at(16, 'tool/call', { turn: 2, step: 2, callId: 'fork', name: 'subagent_fork', arguments: '{}' }),
+      at(17, 'llm/retry', {
+        retryId: 'retry-process', turn: 2, step: 2, provider: 'fake', mode: 'normal',
+        policyKey: 'fake-normal', retry: 1, maxRetries: 2, delayMs: 10,
+        failure: { code: 'TRANSPORT', message: 'temporary' },
+      }),
+      at(18, 'assistant/message', {
+        turn: 2,
+        step: 2,
+        message: assistantMessage('process-answer', 'done'),
+      }, { surfaceOp: 'append' }),
+      at(19, 'turn/end', { turn: 2, reason: { kind: 'completed' } }),
+    ])
+    const process = node(snapshot(value), 'turn-process')
+    expect(process?.data).toMatchObject({
+      turn: 2,
+      messageCount: 1,
+      toolCallCount: 1,
+      subagentCount: 2,
+      answerAnchorSeq: 18,
+    })
+
+    const interrupted = assembler([
+      at(20, 'turn/start', { turn: 3 }),
+      at(21, 'step/start', { turn: 3, step: 1 }),
+      at(22, 'tool/call', { turn: 3, step: 1, callId: 'cancelled', name: 'read', arguments: '{}' }),
+      at(23, 'turn/end', { turn: 3, reason: { kind: 'aborted' } }),
+    ])
+    expect(node(snapshot(interrupted), 'turn-process')?.data).toMatchObject({
+      turn: 3,
+      toolCallCount: 1,
+      answerAnchorSeq: null,
+    })
+  })
+
+  it('keeps system prompts empty-safe and recoverable across repeated headers and pagination', () => {
+    const empty = assembler([
+      at(1, 'request/header', { header: { system: '' } }),
+      at(2, 'request/header', { header: { system: '   ' } }),
+    ])
+    expect(snapshot(empty).nodes.values().filter(candidate => candidate.kind === 'system-prompt')).toHaveLength(0)
+
+    const value = assembler([
+      at(10, 'request/header', { header: { system: 'current system' } }),
+      at(11, 'request/header', { header: { system: 'updated system' } }),
+    ], true)
+    const before = snapshot(value).order
+      .map(key => snapshot(value).nodes.get(key))
+      .filter((candidate): candidate is ChatConversationViewNode => candidate?.kind === 'system-prompt')
+    expect(before.map(candidate => candidate.data)).toEqual([
+      { text: 'current system' },
+      { text: 'updated system' },
+    ])
+
+    value.prepend([
+      at(1, 'request/header', { header: { system: 'cold-recovered system' } }),
+    ], false)
+    value.flush()
+    const current = snapshot(value)
+    const after = current.order
+      .map(key => current.nodes.get(key))
+      .filter((candidate): candidate is ChatConversationViewNode => candidate?.kind === 'system-prompt')
+    expect(after.map(candidate => candidate.data)).toEqual([
+      { text: 'cold-recovered system' },
+      { text: 'current system' },
+      { text: 'updated system' },
+    ])
+    expect(after.slice(1).map(candidate => candidate.key)).toEqual(before.map(candidate => candidate.key))
+  })
+
   it('keeps one keyed Assistant node while streaming settles and materializes interruption from Location', () => {
     const value = assembler([
       at(1, 'turn/start', { turn: 1 }),
@@ -210,7 +299,7 @@ describe('built-in conversation node Definitions', () => {
       }, { surfaceOp: 'append' }),
     ])
     const toolOnlySnapshot = snapshot(toolOnlyValue)
-    expect(toolOnlySnapshot.order).toEqual([])
+    expect(toolOnlySnapshot.order.map(key => toolOnlySnapshot.nodes.get(key)?.kind)).toEqual(['turn-process'])
     expect(node(toolOnlySnapshot, 'assistant-step')?.visibility).toBe('hidden')
     expect(toolOnlySnapshot.legacy.nodes).toMatchObject([{
       kind: 'assistant',
@@ -418,10 +507,10 @@ describe('built-in conversation node Definitions', () => {
     const after = snapshot(value)
     expect(after.nodes).toBe(store)
     expect(after.nodes.get(existing?.key ?? '')).toBe(existing)
-    expect(after.order).toHaveLength(before.order.length + 3)
+    expect(after.order).toHaveLength(before.order.length + 4)
     expect(after.order.map(key => after.nodes.get(key)?.kind)).toEqual([
-      'user', 'assistant-step', 'turn-tail',
-      'user', 'assistant-step', 'turn-tail',
+      'turn-process', 'user', 'assistant-step', 'turn-tail',
+      'turn-process', 'user', 'assistant-step', 'turn-tail',
     ])
   })
 
@@ -451,7 +540,7 @@ describe('built-in conversation node Definitions', () => {
     expect(after.order.slice(0, oldOrder.length)).toEqual(oldOrder)
     expect(oldOrder.map(key => after.nodes.get(key))).toEqual(oldNodes)
     expect(after.order.map(key => after.nodes.get(key)?.kind)).toEqual([
-      'user', 'assistant-step', 'turn-tail', 'user',
+      'turn-process', 'user', 'assistant-step', 'turn-tail', 'user',
     ])
   })
 

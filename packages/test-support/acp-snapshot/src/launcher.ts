@@ -11,10 +11,11 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { join } from 'node:path'
 import { Readable, Writable } from 'node:stream'
 import {
-  ClientSideConnection,
+  client as createClient,
+  methods,
   ndJsonStream,
   type Agent as AcpAgent,
-  type Client,
+  type ClientConnection,
   type RequestPermissionRequest,
   type RequestPermissionResponse,
   type SessionNotification,
@@ -49,6 +50,14 @@ export interface AcpTestLaunchOptions {
   requestPermission?: (params: RequestPermissionRequest) => Promise<RequestPermissionResponse>
 }
 
+/** The ACP agent methods exercised by the snapshot input-script runner. */
+export type AcpTestClient = {
+  [K in 'initialize' | 'newSession' | 'prompt' | 'cancel']:
+  AcpAgent[K] extends (params: infer Params) => infer Result
+    ? (params: Params) => Promise<Awaited<Result>>
+    : never
+}
+
 /** A running ACP test process and its captured client-side outputs. */
 export interface LaunchedAcpTestAgent {
   /** The child process, exposed for process-level assertions. */
@@ -56,7 +65,9 @@ export interface LaunchedAcpTestAgent {
   /** Resolve when the OS spawns the child; reject with its asynchronous spawn failure. */
   spawned: Promise<void>
   /** The SDK connection backed by the child's stdio. */
-  client: ClientSideConnection
+  client: AcpTestClient
+  /** The active SDK connection, used for its lifecycle promise. */
+  connection: ClientConnection
   /** Session updates in receive order. */
   updates: SessionNotification['update'][]
   /** Decode all stdout bytes captured so far. */
@@ -152,8 +163,8 @@ export function launchAcpTestAgent(options: AcpTestLaunchOptions): LaunchedAcpTe
   }
   const requestPermission = options.requestPermission
     ?? (() => Promise.resolve({ outcome: { outcome: 'cancelled' as const } }))
-  const makeClient = (_agent: AcpAgent): Client => ({
-    sessionUpdate(params: SessionNotification): Promise<void> {
+  const clientApp = createClient({ name: 'dsh-acp-snapshot' })
+    .onNotification(methods.client.session.update, ({ params }: { params: SessionNotification }) => {
       return trackClientCallback(() => {
         updates.push(params.update)
         for (let index = updateWaiters.length - 1; index >= 0; index--) {
@@ -173,17 +184,25 @@ export function launchAcpTestAgent(options: AcpTestLaunchOptions): LaunchedAcpTe
           waiter.resolve(params.update)
         }
       })
-    },
-    requestPermission: params => trackClientCallback(() => requestPermission(params)),
-  })
-  const client = new ClientSideConnection(makeClient, stream)
+    })
+    .onRequest(methods.client.session.requestPermission, ({ params }: { params: RequestPermissionRequest }) => (
+      trackClientCallback(() => requestPermission(params))
+    ))
+  const connection = clientApp.connect(stream)
+  const context = connection.agent
+  const client: AcpTestClient = {
+    initialize: params => Promise.resolve(context.request(methods.agent.initialize, params)),
+    newSession: params => Promise.resolve(context.request(methods.agent.session.new, params)),
+    prompt: params => Promise.resolve(context.request(methods.agent.session.prompt, params)),
+    cancel: params => context.notify(methods.agent.session.cancel, params),
+  }
   // `exit` only reports the parent process's status. Descendants may retain
   // inherited stdout/stderr handles and buffered ACP frames may still be
   // crossing the SDK parser. Node's `close` follows stdio closure; the SDK's
   // `closed` follows parser exhaustion. Capture both eagerly so a caller that
   // invokes close after process exit still joins the complete drain boundary.
   const stdioClosed = new Promise<void>(resolve => child.once('close', () => { resolve() }))
-  const drained = Promise.all([stdioClosed, client.closed]).then(async () => {
+  const drained = Promise.all([stdioClosed, connection.closed]).then(async () => {
     // The ACP SDK's readable loop dispatches client callbacks without awaiting
     // them. Once `closed` settles no new callbacks can start, but callbacks
     // already in flight still belong to this launch's teardown boundary.
@@ -194,12 +213,13 @@ export function launchAcpTestAgent(options: AcpTestLaunchOptions): LaunchedAcpTe
   // A caller may await a pending update without calling close(). Make natural
   // stream exhaustion terminal for those waiters too, but only after the
   // parser has dispatched every buffered frame.
-  void client.closed.then(closeUpdateStream)
+  void connection.closed.then(closeUpdateStream)
 
   return {
     child,
     spawned,
     client,
+    connection,
     updates,
     rawStdout: () => Buffer.concat(rawBuffers).toString('utf8'),
     stderr: () => stderrChunks.join(''),

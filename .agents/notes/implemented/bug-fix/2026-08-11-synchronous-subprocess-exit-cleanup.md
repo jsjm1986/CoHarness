@@ -12,7 +12,7 @@ The public subprocess seam correctly promises awaited quiescence during normal d
 
 ## Decision
 
-`LocalSubprocessRuntime` installs one synchronous Node `exit` listener in its Cordis effect. The same effect removes the listener only after normal disposal settles. Ordinary and terminal handles remain in the service's existing live sets while asynchronous cleanup is pending, so a shorter outer exit bound still sees and force-terminates them. If awaited disposal reports a cleanup failure, the service invokes the same synchronous final operations before clearing the sets and removing the listener.
+`LocalSubprocessRuntime` registers a synchronous host-exit callback in its Cordis effect. All live local runtimes share one process-global Node `exit` listener; the listener is installed when the first runtime mounts and removed after the last runtime's normal disposal settles. Ordinary and terminal handles remain in each service's existing live sets while asynchronous cleanup is pending, so a shorter outer exit bound still sees and force-terminates them. If awaited disposal reports a cleanup failure, the service invokes the same synchronous final operations before clearing the sets and releasing its callback.
 
 The listener uses local-only final operations that are absent from the public `SubprocessHandle` and `SubprocessTerminalHandle` interfaces:
 
@@ -46,6 +46,6 @@ Unit evidence pins synchronous POSIX group and Windows taskkill delivery, termin
 
 ## Consequences
 
-Each active local subprocess service contributes one process-global exit listener, removed with the service effect. Fatal exit gives up grace, output draining, and an in-process quiescence proof in exchange for issuing the strongest available local termination before the host disappears. Normal disposal keeps those guarantees and costs unchanged.
+All active local subprocess services share one process-global exit listener, removed when the final service effect disposes. Fatal exit gives up grace, output draining, and an in-process quiescence proof in exchange for issuing the strongest available local termination before the host disappears. Normal disposal keeps those guarantees and costs unchanged; mounting many runtimes no longer exceeds Node's default listener limit.
 
 The listener cannot cover failures that do not execute JavaScript, and it cannot discover a terminal descendant that escaped before the provider ever observed it; that separate ownership gap remains tracked by Issue #1726.

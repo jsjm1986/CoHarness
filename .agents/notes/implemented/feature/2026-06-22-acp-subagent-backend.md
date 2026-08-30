@@ -10,7 +10,7 @@ The subagent seam ([the seam Agent Note](2026-06-21-subagent-capability-seam.md)
 
 ## Decision
 
-`@deepseek-ai/dsh-subagent-acp` registers a `SubagentProvider` that runs each child agent in a SPAWNED SUBPROCESS, driven over ACP as the *client*. It is the direction-inverted twin of the existing server-side bridge `@deepseek-ai/dsh-acp` (the ACP *agent*): the bridge ANSWERS `initialize`/`newSession`/`prompt`; this backend CALLS them and IMPLEMENTS the `Client` callbacks (`sessionUpdate`, `requestPermission`). Pointing the configured spawn command at the `acp-agent` example makes the harness talk to its own process.
+`@deepseek-ai/dsh-subagent-acp` registers a `SubagentProvider` that runs each child agent in a SPAWNED SUBPROCESS, driven over ACP as the *client*. It is the direction-inverted twin of the existing server-side bridge `@deepseek-ai/dsh-acp` (the ACP *agent*): the bridge ANSWERS typed `initialize`/`newSession`/`prompt` requests and standard session/configuration controls; this backend CALLS the startup and prompt methods it needs and registers the typed `client()` callbacks for `sessionUpdate` and `requestPermission`. Pointing the configured spawn command at the `acp-agent` example makes the harness talk to its own process.
 
 ### Fresh process per run
 
@@ -18,7 +18,7 @@ Each `start` spawns a new child, runs exactly one ACP session (`initialize` → 
 
 ### Minimal client stub
 
-The client advertises NO optional capabilities (no `fs`, no `terminal`): the child self-serves file/terminal access in its own process. `session/update` notifications are consumed — the backend accumulates `agent_message_chunk` text as the result output and ignores the rest (thoughts, tool-call cards), so only the child's final answer surfaces. `session/request_permission` is auto-answered by a configured policy (`reject` declines every prompt, `allow` approves via the first allow-shaped option) — no prompt is surfaced to a human. Proxying `fs`/`terminal` back to the parent (a shared-workspace mode) remains future work, as the seam Agent Note noted.
+The typed `client()` app advertises NO optional capabilities (no `fs`, no `terminal`): the child self-serves file/terminal access in its own process. Its `connection.agent` facade calls the standard ACP methods. `session/update` notifications are consumed — the backend accumulates `agent_message_chunk` text as the result output and ignores the rest (thoughts, tool-call cards), so only the child's final answer surfaces. `session/request_permission` is auto-answered by a configured policy (`reject` declines every prompt, `allow` approves via the first allow-shaped option) — no prompt is surfaced to a human. Proxying `fs`/`terminal` back to the parent (a shared-workspace mode) remains future work, as the seam Agent Note noted.
 
 ### No start-time capabilities
 
@@ -45,9 +45,9 @@ The child is a separate process, so it inherits an environment. Credential-shape
 
 ## Alternatives considered
 
-### Why stay on SDK 0.25.1?
+### Why use the ACP SDK 1.4.0 typed API?
 
-The backend needs only `ClientSideConnection`, `ndJsonStream`, `PROTOCOL_VERSION`, and the client protocol types, all supported in 0.25.1. The 0.28 fluent API would require migrating both client and server connection classes across the ACP layer without improving this backend, so that upgrade remains a separate change.
+The repository uses ACP SDK 1.4.0's `client()` app and typed `connection.agent` facade for both the bridge tests and this backend. This keeps request and notification methods inferred from the protocol map, exposes the connection `closed` lifecycle promise used during teardown, and removes the deprecated `ClientSideConnection`/`AgentSideConnection` classes from the shipped integration. The backend still calls only `initialize`, `session/new`, and `session/prompt` because a subagent run owns one fresh child session; the bridge's list/resume/close/configuration controls remain available to other automation clients without expanding this provider's lifecycle.
 
 ### Why not a persistent child process?
 

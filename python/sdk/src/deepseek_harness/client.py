@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import codecs
 import json
 import math
 import os
@@ -11,7 +12,7 @@ import uuid
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, TypeAlias, TypeVar
+from typing import BinaryIO, Callable, TypeAlias, TypeVar
 
 from pydantic import BaseModel
 
@@ -23,6 +24,14 @@ NotificationFilter: TypeAlias = Callable[[Notification], bool]
 MAX_TIMER_DELAY_SECONDS = 2_147_483_647.0
 MAX_STDOUT_READ_CHARS = 4096
 MAX_STDERR_LINE_BYTES = 64 * 1024
+
+
+def _read_available(stream: BinaryIO) -> bytes:
+    """Read currently available pipe bytes without waiting for a full buffer."""
+    read1 = getattr(stream, "read1", None)
+    if callable(read1):
+        return read1(MAX_STDOUT_READ_CHARS)
+    return stream.read(MAX_STDOUT_READ_CHARS)
 
 
 class _TextLineBuffer:
@@ -112,7 +121,7 @@ class HarnessClient:
                 raise ValueError(f"{name} must be a positive integer")
         _validate_timeout(self.config.request_timeout_seconds, "request_timeout_seconds")
         _validate_timeout(self.config.shutdown_timeout_seconds, "shutdown_timeout_seconds")
-        self._proc: subprocess.Popen[str] | None = None
+        self._proc: subprocess.Popen[bytes] | None = None
         self._lock = threading.Lock()
         self._write_lock = threading.Lock()
         self._responses: dict[str, queue.Queue[JsonValue | BaseException]] = {}
@@ -157,11 +166,8 @@ class HarnessClient:
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True,
-                encoding="utf-8",
                 cwd=None if self.config.cwd is None else str(Path(self.config.cwd).resolve()),
                 env=env,
-                bufsize=1,
             )
             self._start_reader_thread()
             self._start_stderr_thread()
@@ -401,10 +407,11 @@ class HarnessClient:
             raise TransportClosedError("DeepSeek Harness runtime is not running")
         try:
             payload = json.dumps(message, separators=(",", ":")) + "\n"
-            if len(payload.encode("utf-8")) > self.config.max_output_bytes:
+            encoded = payload.encode("utf-8")
+            if len(encoded) > self.config.max_output_bytes:
                 raise TransportClosedError("JSON-RPC output frame exceeds configured limit")
             with self._write_lock:
-                proc.stdin.write(payload)
+                proc.stdin.write(encoded)
                 proc.stdin.flush()
         except Exception as exc:
             raise self._runtime_closed_error("Failed to write to DeepSeek Harness runtime") from exc
@@ -422,13 +429,15 @@ class HarnessClient:
         if proc is None or proc.stdout is None:
             return
         buffer = _TextLineBuffer(self.config.max_line_bytes)
+        decoder = codecs.getincrementaldecoder("utf-8")()
         try:
             while True:
-                chunk = proc.stdout.read(MAX_STDOUT_READ_CHARS)
-                if chunk == "":
+                chunk = _read_available(proc.stdout)
+                if chunk == b"":
                     break
+                decoded = decoder.decode(chunk)
                 try:
-                    lines = buffer.append(chunk)
+                    lines = buffer.append(decoded)
                 except ValueError:
                     self._fail_waiters(
                         TransportClosedError("JSON-RPC input line exceeds configured limit")
@@ -438,9 +447,9 @@ class HarnessClient:
                     self._handle_line(line)
                     if self._runtime_dead:
                         return
-            # Preserve the text-wrapper iterator's EOF behavior for a final
-            # unterminated frame, while keeping its retained bytes bounded.
-            remainder = buffer.remainder()
+            # Preserve a final unterminated frame while keeping retained bytes
+            # bounded by the same line buffer used for newline-terminated frames.
+            remainder = buffer.remainder() + decoder.decode(b"", final=True)
             if remainder != "":
                 self._handle_line(remainder)
         except BaseException as exc:
@@ -465,10 +474,14 @@ class HarnessClient:
         if proc is None or proc.stderr is None:
             return
         buffer = _TextLineBuffer(MAX_STDERR_LINE_BYTES, truncate=True)
-        for chunk in iter(lambda: proc.stderr.read(MAX_STDOUT_READ_CHARS), ""):
-            for line in buffer.append(chunk):
+        decoder = codecs.getincrementaldecoder("utf-8")()
+        while True:
+            chunk = _read_available(proc.stderr)
+            if chunk == b"":
+                break
+            for line in buffer.append(decoder.decode(chunk)):
                 self._stderr_lines.append(line)
-        remainder = buffer.remainder()
+        remainder = buffer.remainder() + decoder.decode(b"", final=True)
         if remainder:
             self._stderr_lines.append(remainder)
 
@@ -646,7 +659,14 @@ class HarnessClient:
         if notification.method != "subagent.finished":
             return
         child_id = notification.payload.get("childSessionId")
-        if isinstance(child_id, str) and child_id:
+        parent_id = notification.payload.get("parentSessionId")
+        if (
+            isinstance(child_id, str)
+            and child_id
+            and isinstance(parent_id, str)
+            and parent_id
+            and self._session_parents.get(child_id) == parent_id
+        ):
             self._session_parents.pop(child_id, None)
 
     def _notification_belongs_to_session_tree(self, session_id: str) -> NotificationFilter:

@@ -1,26 +1,33 @@
 - banner:
-  - navigation "Session hierarchy":
-    - button "Ask a research subagent to"
-    - text: /
-    - button "event-sourcing researcher" [disabled]
-  - img
-  - text: Standard mode
-  - button "1 subagent":
-    - text: 1 subagent
-    - img
-  - button "Session log":
-    - text: Session log
-    - img
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
+  - navigation "Session hierarchy":
+    - button "Ask a research subagent to"
+    - text: /
+    - button "3 subagents":
+      - text: 3 subagents
+      - img
+    - text: /
+    - 'button "Switch subagent: event-sourcing researcher"': event-sourcing researcher
+    - button "1 subagent":
+      - text: 1 subagent
+      - img
+  - img
+  - text: Standard mode
+  - button "Session log":
+    - text: Session log
+    - img
+- separator "Adjust transcript content width"
+- navigation "Turn navigation":
+  - button "Jump to turn 1"
+  - button "Jump to turn 2"
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
 - text: Explain event sourcing in one sentence. {{clock}}
 - button "Copy":
   - img
-- button "Context injection @deepseek-ai/dsh-system-prompt":
-  - img
-  - img
-  - text: Context injection @deepseek-ai/dsh-system-prompt
 - button "Think The user is asking for a one-sentence description of event sourcing. This is a straightforward knowledge question that doesn't require any skill loading or tool calls.":
   - img
   - img
@@ -34,7 +41,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s Now give the same explanation to a human reader. {{clock}}
+- text: {{clock}} Ran for {{duration}}
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
+- text: Now give the same explanation to a human reader. {{clock}}
 - button "Copy":
   - img
 - button "Think The user is asking for a one-sentence description of event sourcing. This is a straightforward knowledge question that doesn't require any skill loading or tool calls.":
@@ -52,6 +63,10 @@
   - img
 - text: {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s
 - textbox "Message the agent"
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
 - button "Commands":
   - img
 - 'button "Access mode, current: Custom"': Custom

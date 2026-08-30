@@ -61,7 +61,14 @@ export type { SettingsNavigationRequest } from './contract/settings-navigation.t
 export { ProjectUiPolicyRuntime } from './project-policy.ts'
 export type { ProjectThemePolicy, ProjectUiPolicySnapshot } from './project-policy.ts'
 export type { Session } from './sessions/session.ts'
-export type { ISession, ProjectionsFace, SessionFace } from './contract/session.ts'
+export type {
+  BeginSubmissionInput,
+  ISession,
+  PendingSubmissionRetirement,
+  ProjectionsFace,
+  SessionFace,
+  SubmissionHandle,
+} from './contract/session.ts'
 export type { AgentContext, ISessions } from './contract/sessions.ts'
 export type { IWorkspaces } from './contract/workspaces.ts'
 export type { SessionBlankReuseRequest, SessionCreateOptions } from './contract/session-create.ts'
@@ -90,9 +97,10 @@ export {
 } from '@deepseek-ai/dsh-host-apiproxy/client'
 export type {
   AssistantBlock, AssistantMessageNode, AssistantProvenanceView, AssistantRequestConfig,
-  AssistantTiming, ChatLocationNodeIndex, ChatNodeStore, ChatSnapshot,
-  CommandNode, CompactionSummaryNode,   ComposerPhase,
-  ContextMessageNode, ConversationNode, ConversationSnapshot, HistoryDetailState, HistoryWindowMode, ModelRetryNode, QueuedMessage,
+  AssistantTiming, ChatLocationNodeIndex, ChatNodeStore, ChatSnapshot, ChatTurnNavigationIndex, TurnNavigationItem,
+  CommandNode, CompactionSummaryNode, ComposerPhase,
+  ContextMessageNode, ConversationNode, ConversationSnapshot, HistoryDetailState, HistoryWindowMode,
+  ModelRetryNode, PendingSubmission, PendingSubmissionImage, QueuedMessage,
   LegacyConversationSlice, PartialAssistant, RunningToolCall,
   SteeringMessageNode, TodoItem, ToolCallBlock, ToolResultNode, TurnErrorNode, TurnMaxTokensNode,
   UnknownSurfaceNode, UserMessageNode,

@@ -1,11 +1,11 @@
 # CoHarness 对齐 deepseek-harness dsh-v0.1.2-alpha.1：升级计划
 
-- 审查日期：2026-08-29
-- 文档状态：执行前评审版；每个阶段以验收结果推进，不以预估工时作为完成条件
-- 当前可执行范围：可立即开始阶段 A（基线冻结）和阶段 B（低风险修复）；阶段 C–F 需按 §6.0 冻结决策后推进
+- 审查日期：2026-08-30
+- 文档状态：执行收尾与发布前验证记录；逐项状态、证据和未完成项以 §4.5、§6、§11 为准
+- 当前可执行范围：兼容修复、模型与子代理路由、图片与 token、WebFetch 网络 pinning、Session schema 20、ACP/Python 兼容、Web client 批量启动与可选 gzip、会话 cache-first 等价路径已落地并进入发布验证；Remote/ focused UI/一次性 token 的上游形态有明确的 CoHarness 不采用决策，在线数据迁移和新增出网默认值仍未启用
 - 上游版本：[dsh-v0.1.2-alpha.1](https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.1.2-alpha.1)，release tag commit `cd5ef8148158c3a752a658978873241fdf8e2bbc`
 - 对比范围：上游 `dsh-v0.1.1-rc.2..dsh-v0.1.2-alpha.1`；release 正文列出 14 项新功能、15 项体验优化、13 项修复、10 项其他变更，共 52 项
-- 我方基线：`master`，HEAD `6464092040`；根包和主要 DSH 包仍标记 `0.1.1-rc.1`，不能把版本号当作代码对齐证明
+- 我方基线：`baseline/2026-08-29` 指向 `master@6464092040`；当前分支 `upgrade/dsh-v0.1.2-alpha.1` 的 HEAD 为 `1bb4016f1f`；根包和主要 DSH 包仍标记 `0.1.1-rc.1`，不能把版本号当作代码对齐证明
 
 ## 1. 结论与决策摘要
 
@@ -17,13 +17,15 @@
 
 首个可交付目标不是一次性删除旧架构，而是让新旧通道可以并行运行，并证明会话日志、权限、模型路由、图片和文档引用在切换前后等价；只有在此条件满足后才删除旧包或切换默认网络策略。
 
+矩阵中“当前”统一指升级前 `master` 基线，用于解释影响和兼容要求；当前工作树的实现状态、验证证据和剩余风险见 §11。
+
 ## 2. 基线、依赖关系与二开保护清单
 
 ### 2.1 工作树和来源事实
 
 | 项目 | 当前事实 | 升级约束 |
 | --- | --- | --- |
-| 分支 | `master`，工作树只有本计划文件未跟踪 | 不在升级计划评审阶段改动业务代码 |
+| 分支 | 当前 checkout 为 `upgrade/dsh-v0.1.2-alpha.1`，HEAD `1bb4016f1f`；`baseline/2026-08-29` 指向 `master@6464092040`；工作树非 clean，包含本轮升级代码、测试、文档和新增包 | 不把工作树直接作为发布物；提交和发布前必须完成 §11 的收尾检查，并保留可回滚提交 |
 | 远端 | `origin` 指向 CoHarness，`upstream` 指向 `deepseek-ai/deepseek-harness` | 所有上游对象用 tag/commit 固定，不跟随浮动 `master` |
 | 祖先关系 | `git merge-base master dsh-v0.1.2-alpha.1` 无输出 | 禁止把冲突当作普通三方合并；采用 patch + 语义迁移 |
 | 当前版本 | 主要包为 `0.1.1-rc.1` | 最后阶段才统一更新版本和 lockfile |
@@ -50,7 +52,7 @@ CLI/profile boot
              ├─ 部分 Remote：api/remotes、api/gateway
              └─ CoHarness Gateway：认证、项目/组织 ACL、模型治理、文档、归档、用量
 
-持久化：JSONL/SQLite（当前 Session SQLite schema 18）
+持久化：JSONL/SQLite（当前 Session SQLite schema 20；schema 18 仅由显式离线工具读写）
 Gateway 数据：Gateway SQLite schema 7 + 独立 PostgreSQL migrations
 ```
 
@@ -90,6 +92,8 @@ Gateway 数据：Gateway SQLite schema 7 + 独立 PostgreSQL migrations
 
 优先级按风险而不是开发量划分：数据/协议兼容红线为 I03、C03、C04、C06、C07、C09、N09、N11、N12；安全与出域红线为 N08、N13、N14、C05、C10；产品行为和修复为 N01–N07、N10、I05–I13、F01–F13；性能或展示优化为 I01–I04、I14–I15。红线项目必须先完成双栈/迁移/安全验收，不能以 UI 快照通过替代。
 
+以下各矩阵项中的“当前”均指升级前 `master` 基线，目的是说明上游改动与 CoHarness 自定义逻辑的交叉点；已经落地的实现不改变这些影响评估，具体完成度以 §11 为准。
+
 ### 4.1 新功能（N01–N14）
 
 | 编号 | 上游来源 | 变更、我方影响和处置 | 验收条件 |
@@ -113,7 +117,7 @@ Gateway 数据：Gateway SQLite schema 7 + 独立 PostgreSQL migrations
 
 | 编号 | 上游来源 | 变更、我方影响和处置 | 验收条件 |
 | --- | --- | --- | --- |
-| I01 | `2db3f8d4b0`（#2710，实作 `5bbaf168d9`）、`8bb358d935`（#2674，实作 `08ed5a54a8`） | 页面启动批量加载 client plugins，并对 HTTP 响应启用 gzip。当前 Web 由 `apps/web`、Host webserver 和 Gateway proxy 共同提供；先采纳 client batch，再在 Gateway/静态服务只压缩可缓存文本，不能压缩 WebSocket、二次压缩或改变认证/CORS。 | 首屏请求数、压缩前后字节、HMR、缓存头、认证失败和 WebSocket 流均有基线；页面功能快照不变。 |
+| I01 | `2db3f8d4b0`（#2710，实作 `5bbaf168d9`）、`8bb358d935`（#2674，实作 `08ed5a54a8`） | 页面启动批量加载 client plugins，并对 HTTP 响应启用 gzip。client batch/HMR 已由 `packages/client/modules` 与 `packages/client/hmr` 提供；gzip 采用 `dsh-host-webserver` 内部受维护中间件，Web bundle 显式选择 level 1/1024 字节阈值，通用组合仍默认关闭。Gateway、WebSocket、Worker 隧道、范围/SSE/已有编码响应不压缩，不改变认证/CORS 或 route owner。 | 首屏请求数、压缩前后字节、HMR、缓存头、认证失败和 WebSocket 流均有基线；页面功能快照不变；发布前仍需浏览器和实机压缩性能回归。 |
 | I02 | `fc4c0a02eb`（#3029）、`69fad4b8db`、`e7952d82ed` | 会话初始化改为一次加载、cache-first snapshot/journal stream。当前 `ApiProxy` 有两层 history-wire、projection 水位、项目 ACL 和归档；暂不替换旧端点，在 Remote M1 以双读比较后适配，缓存缺失或陈旧必须回退精确读。 | 冷/热 session、项目 scope、draft、归档、断线重连和权限撤销的双栈结果逐事件等价；传输字节和解析耗时有可重复测量。 |
 | I03 | `df76bc695b`（#3048） | 减少会话磁盘占用并发布 SQLite schema 19，同时让 JSONL provenance 使用 seq-range 编码。当前 schema 18 的 `sessions.id` 是文本、含 `draft`，`events.ignorable` 同时承载逻辑标记/物理判别；上游改为整数 id + `session_key`、`is_packed`、页大小、zstd 字典和新 codec。属于 P0 物理破坏性变更，按 §5 的 CoHarness schema 20 迁移，不能直接 cherry-pick。 | v18 导出/重建、JSONL range 编解码、逻辑事件 hash、draft/ignorable 保留、压缩/解压、崩溃恢复、失败原子性和旧备份恢复全部通过。 |
 | I04 | `a24c71127f`（#3155）、`efd816c0dd`（#3182）、`97e0299f74` | 优化 `/`、`@` 菜单图标、目录加载和文件搜索。当前输入触发器已有项目文档、scope 和引用格式；选择图标/行裁剪/发现缓存等无协议 hunk，适配到现有 `ui-input-trigger`，不删除项目文档候选。 | 菜单键盘/IME/鼠标、目录权限、搜索取消、缓存失效和 compact UI 测试通过；候选顺序和引用序列化不变。 |
@@ -167,18 +171,78 @@ UI 拆分的搬运清单至少包含 `packages/client/ui-conversation/src/client
 N01、N03、N04 会共同修改 ChatView 的分页锚点、尾部折叠和 usage/navigation 渲染；若不采用完整 UI split，必须按上游依赖顺序手工合并这三个 hunk，并以滚动锚点测试证明没有重复或跳屏。
 
 52 项计数校验：`N01–N14 = 14`，`I01–I15 = 15`，`F01–F13 = 13`，`C01–C10 = 10`，合计 `52`，编号不重复且每项都有处置和验收条件。
+### 4.5 逐项实现状态与证据
+
+状态含义：`implemented` 表示当前工作树有对应代码和本地测试；`baseline-equivalent` 表示基线已经具备等价能力，本次不重复搬运但必须回归；`not-adopted` 表示上游 API/包形态经审查后由更适合 CoHarness 的现有设计替代，明确不声称上游 wire/API 兼容；`deferred` 表示本分支没有实现，不能切换默认入口；`unverified` 表示代码已落地但 Windows、生产或跨栈证据尚未取得。
+
+| 编号 | 当前状态 | 代码或证据路径 | 测试、限制与下一步 |
+| --- | --- | --- | --- |
+| N01 | `implemented` | `packages/client/ui-conversation/src/client/chat/{TurnProcessNodeView,SystemPromptRow}.tsx`、`conversation-nodes/{turn-process,system-prompt}.ts` | `chat-view.client.spec.tsx`、`conversation-node-definitions.client.spec.ts` 覆盖折叠/展开与节点注册；折叠状态仅在浏览器视图内，跨浏览器视觉回归仍是发布前工作 |
+| N02 | `implemented` | `packages/client/ui-conversation/src/client/{display-settings.ts,skeleton/ConversationRoot.tsx,settings/DisplaySettingsRow.tsx}` | `display-settings.client.spec.ts`、`skeleton.client.spec.tsx` 覆盖范围夹紧、持久写入、Pointer/键盘拖拽和窄屏；Gateway admin UI 不读取该聊天设置 |
+| N03 | `implemented` | `packages/client/ui-conversation/src/client/chat/TurnUsageDisclosure.tsx`、`packages/llm/token-meter/src/turn-usage.ts` | `turn-usage.spec.ts`、UI disclosure 测试已覆盖；Gateway 计费不变 |
+| N04 | `implemented` | `packages/client/ui-conversation/src/client/chat/TurnNavigator.tsx`、`chat-snapshot-builder.ts`、`ChatView.tsx` | `chat-view.client.spec.tsx` 与节点定义测试覆盖回合标记、预览、跳转和空状态；导航只使用已加载节点，不绕过 Session ACL |
+| N05 | `implemented` | `packages/client/ui-conversation/src/client/display-settings.ts`、`settings/DisplaySettingsRow.tsx`、`skeleton/ConversationRoot.module.css`、`packages/client/ui-theme/src/styles` | `display-settings.client.spec.ts`、skeleton/Markdown focused tests 覆盖 12–17px、宽度轴和表格/代码缩放；只作用于聊天域，默认值保持 748px/14px |
+| N06 | `baseline-equivalent` | `packages/client/ui-settings-models` 已有 settings slot 注册 | 本次无新增生产 hunk；需 Models/Gateway 回归 |
+| N07 | `baseline-equivalent` | 各 `ui-*` 插件已有 locale register/disposer | 没有第三方语言注册的新增实现；需非法 tag/fallback 回归 |
+| N08 | `implemented` | `packages/subagent/tool-subagent/src/model-selection*`、`packages/subagent/subagent/src/child-agent.ts` | `model-selection.spec.ts` 等已覆盖；生产策略仍须由 Gateway 生成 |
+| N09 | `implemented` | `packages/subagent/subagent-{acp,claude-code,codex}`、SDK wire | 子代理和 ACP 测试覆盖 provider/model/reasoning/maxTokens |
+| N10 | `implemented` | `packages/subagent/subagent-{claude-code,codex}/src` | mock/real-product 测试覆盖模型字段；外部 CLI 仍受策略限制 |
+| N11 | `unverified` | `python/sdk-runtime/{platforms.json,hatch_build.py}`、`scripts/build-python-release.py` | 未在 Windows runner 完成 wheel、exe、sidecar、升级/卸载验证 |
+| N12 | `implemented` | `packages/acp/acp/src/{session,mcp,model-control,updates}.ts` | ACP unit/e2e 已覆盖控制面；旧客户端降级仍是发布门 |
+| N13 | `implemented` | `packages/llm/deepseek-llm-api-extensions`、`plugin-package-inventory-deepseek`、`llm-deepseek` | registry/inventory 测试通过；默认关闭，须做出域审计后才能启用 |
+| N14 | `implemented` | `packages/session/session-log-deepseek`、`llm-deepseek` extension hook | upload/invariant 测试通过；默认关闭，须完成脱敏、限流和生产审批 |
+| I01 | `implemented` | `packages/client/modules`、`packages/client/hmr`、`packages/host/webserver`、`packages/host/frontend-static`、`packages/bundle/web-app/cordis.patch.yml` | `packages/host/webserver/tests/webserver.spec.ts` 覆盖 gzip 协商、阈值、流、SSE、range、已有 gzip 内容和 identity；发布前仍需 shipped Web 浏览器/HMR/缓存与压缩性能回归 |
+| I02 | `baseline-equivalent` | `packages/session/session-projection-cache`、`packages/host/apiproxy` 的 cold list/history、`packages/client/runtime` 的 tail/live mux 与 gap repair | 已具备 cache-first snapshot + bounded tail + write-back 和断线重连/序列去重语义；未迁移上游 `remote.*` namespace/session-controller API，继续保留旧 ApiProxy transport，需逐事件双栈比较后才可切换 |
+| I03 | `implemented` | `packages/session/session-persistence-sqlite` schema 20、`scripts/migrate-session-sqlite-*` | SQLite、codec、round-trip、回滚测试已有；仅允许显式离线迁移 |
+| I04 | `baseline-equivalent` | `packages/client/ui-conversation/src/client/input` 已有触发器、scope 和引用序列化 | 本次无对应新增 hunk；需键盘/IME/取消回归 |
+| I05 | `baseline-equivalent` | `packages/client/ui-conversation/src/client/skeleton/InputBar.tsx` 已有运行中 Send/Stop 语义 | 该能力来自基线；需连续发送、队列和失败回归 |
+| I06 | `not-adopted` | `packages/client/ui-conversation/src/client/input` 的 InputMachine 已提供原子引用 chip、span-CAS、IME、粘贴和 undo/redo | Lexical 包形态不引入；现有行为由 `input-machine.client.spec.ts`、`input-bar.client.spec.tsx` 和引用提交测试覆盖；若未来需要富文本 DOM，再以可回退 façade 设计 |
+| I07 | `implemented` | `packages/client/ui-user-questions/src/client/draft-store.ts`、`QuestionComposer.tsx` | `question-draft-store.client.spec.ts` 已覆盖 session/request 隔离 |
+| I08 | `implemented` | `packages/client/ui-primitives/src/markdown/{highlight,CodeBlock,MarkdownText}.tsx` | streaming fixtures、DOM parity 和 streaming code tests 已覆盖 |
+| I09 | `baseline-equivalent` | `packages/client/ui-workflow-run` 已有 cancelled/interrupted 状态投影 | 本次无问答卡新增实现；需 ask-user 历史回归 |
+| I10 | `implemented` | `packages/client/runtime/src/client/{contract/session.ts,sessions/session.ts,sessions/queue-mirror.ts}`、`packages/client/ui-conversation/src/client/{service.ts,chat/ChatView.tsx}`、`packages/client/ui-attachment/src/MessageImage.tsx` | Session/queue/service/ChatView/MessageImage focused tests 覆盖慢编码、业务/传输/取消失败、queue/durable 幂等、image/document-only、并发提交、durable URL 替换、失败重试和 dispose；跨浏览器压缩性能与生产 Gateway 时序仍需实机验证 |
+| I11 | `implemented` | `packages/llm/llm-deepseek/src/{image-tokens,request-pricing}.ts`、`packages/llm/token-meter/src/route-pricing.ts` | image-token/request-pricing/route-pricing 测试通过；provider usage 覆盖估算 |
+| I12 | `baseline-equivalent` | 现有 `packages/client/ui-trajectory` 已有授权历史与图片相关 renderer | 本次无新增 trajectory hunk；需三类图片来源和 ACL 回归 |
+| I13 | `implemented` | `packages/attachment/attachment/src/request-projection.ts`、`attachment-local/src/store.ts`、`llm-deepseek` | 路径投影与 adapter 测试覆盖；仅 local fs 暴露授权路径 |
+| I14 | `baseline-equivalent` | `packages/attachment/attachment-local` 已有 normalization、cache 和并发限制 | 本次没有完整 quality ladder 搬运；需图像基准后再决定 |
+| I15 | `implemented` | `packages/session/session-persistence-jsonl/src/index.ts` | torn-tail warning 测试通过；日志不写完整路径或内容 |
+| F01 | `implemented` | `packages/subprocess/subprocess-local/src/{terminal,process-inspector}.ts` | PTY/process focused tests 已通过；需 macOS/Linux 实机回归 |
+| F02 | `implemented` | `packages/subprocess/subprocess-local/src/terminal.ts`、process inspector | 管道空输出与 readiness 逻辑已适配；需真实 shell e2e |
+| F03 | `implemented` | `packages/subprocess/subprocess-local/src/process-inspector.ts` | 批量 process snapshot/PID fence 已实现；需压力和 teardown 证据 |
+| F04 | `implemented` | `packages/host/directory-picker-native/src/win32-dialog-bindings.ts` | UTF-16 unit 测试已通过；Windows runner 仍缺 |
+| F05 | `baseline-equivalent` | `packages/client/ui-tool` 已有 terminal/generic 展开卡 | 本次只要求 pwsh/错误路径回归；无替换计划 |
+| F06 | `implemented` | `apps/cli/src/profile-boot.ts`、`dump-config.ts` | shipped preset root 测试已通过；旧 profile 需回归 |
+| F07 | `implemented` | `packages/preset/agent-presets/src/{discovery,specifier}.ts` | broken health/diagnostic 测试已通过 |
+| F08 | `baseline-equivalent` | minimal preset 当前不挂载 goal | 只做配置 dump/快照回归，不额外挂载服务 |
+| F09 | `implemented` | `packages/fs/tool-str-replace-editor/src/index.ts` | null placeholder schema/工具测试已通过 |
+| F10 | `implemented` | `packages/core/tools/src/index.ts`、code/PTC tests | direct-call guard 与历史 `code` alias 已覆盖 |
+| F11 | `implemented` | `packages/client/connection/src/websocket-downlink.ts` | heartbeat unit tests 已通过；Gateway lease 语义不变 |
+| F12 | `implemented` | `packages/client/ui-workspace/src/client/WorkspaceBrowser.tsx` | blank-session quota 测试已通过 |
+| F13 | `implemented` | `packages/core/system-prompt/src/index.ts` | prompt order tests 已通过；需组合快照复核 |
+| C01 | `baseline-equivalent` | 当前安全说明与沙箱/审批文档已存在，本次无对应运行时 hunk | 需确认中英文安全表述与部署边界；不构成隔离保证 |
+| C02 | `implemented` | `packages/core/system-prompt/src/index.ts` | Shell/order regression 已覆盖；不改变工具权限 |
+| C03 | `not-adopted` | 不引入 `packages/api/session-controller`、`settings-controller`、`workspace-controller` 或 `packages/client/store`；现有 ApiProxy/mux/projection-cache 已覆盖 CoHarness 的会话行为 | 旧 transport 保留 Gateway ACL、history-wire 和自定义扩展；不声称上游 Remote namespace/API 兼容，只有出现外部 Remote 消费者时才启动双栈项目 |
+| C04 | `not-adopted` | `ui-conversation` 通过 slots、Conversation Node registry 和独立 `ui-*` 消费包实现 focused 责任隔离；Lexical/上游包拆分不会删除现有业务代码 | 保留生产 façade 和自有移动端、文档、工具卡；包拆分仅在独立发布/富文本需求出现时重开，不下线当前入口 |
+| C05 | `not-adopted` | Gateway 已有 HttpOnly 登录 Cookie、SameSite/CSRF、项目 ACL 和短期 Ed25519 principal；本地 `dsh web` 默认只绑定 loopback | 不引入 URL 一次性 token，避免与多用户 Gateway 认证形成第二套不互认入口；认证/来源测试由 Gateway 与 `client-connection` trust fence 覆盖 |
+| C06 | `implemented` | `apps/cli/src/profile-boot.ts`、`python/sdk`、`python/sdk-runtime` | Profile options/carrier alias 已落地；Windows/跨版本仍需验证 |
+| C07 | `implemented` | `packages/llm/llm-pi-ai` 与 lockfile | pi-ai 兼容测试通过；需完整 provider/NOTICE 回归 |
+| C08 | `implemented` | `packages/bundle/headless/src/index.ts`、`cordis.patch.yml` | `progress` 默认 false，显式 `COHARNESS_HEADLESS_PROGRESS=1` 才输出 reasoning；headless tests 已通过 |
+| C09 | `implemented` | `packages/core/tools`、CLI presets、SDK aliases | canonical `ptc` 与历史 `code` 读取已覆盖 |
+| C10 | `implemented` | `packages/web/web-fetch-http/src/{network,provider}.ts` | 公网 DNS/redirect pinning 测试已通过；工具默认仍关闭，生产 canary 未做 |
+
+状态索引不替代验收门：`implemented` 的生产启用、`unverified` 的平台证据、`not-adopted` 的兼容边界和 `deferred` 的后续里程碑仍分别受 §6、§7、§9 约束。
 
 ## 5. Session 数据和协议兼容方案
 
 ### 5.1 Session format 与 SQLite schema
 
-`SESSION_FORMAT_VERSION` 继续为 0。不要把被回滚的 #2698 decoder 引入 CoHarness，也不要把“能解析”当作“可兼容”：当前 `SessionEvent.ignorable` 是未知事件的读取安全标记，缺失时必须拒绝；它与上游 schema 19 的物理 `is_packed` 完全不是同一字段。
+`SESSION_FORMAT_VERSION` 继续为 0。CoHarness 当前 Session SQLite 物理版本为 schema 20；schema 18 文件不会在运行时自动升级，必须通过显式离线工具转换。不要把被回滚的 #2698 decoder 引入 CoHarness，也不要把“能解析”当作“可兼容”：`SessionEvent.ignorable` 是未知事件的读取安全标记，缺失时必须拒绝；它与 schema 20 的物理 `is_packed` 完全不是同一字段。
 
 上游 schema 19 的物理变化如下：`sessions.id` 从文本主键改为整数并新增唯一 `session_key`；`events.session_id` 改为整数外键；`ignorable` 改为非空 `is_packed`；加入 page-size pragma、固定 zstd dictionary、chunk-row codec 和新的压缩限制；上游还移除了我方用于延迟实体化的 `draft` 列。
 
 上游 `openDatabase()` 会同时校验 `user_version`、application id 和完整 schema objects；v18 文件即使手动写成 19 也会因表结构不匹配被拒绝，且 release 没有 v18→v19 的在线 decoder。
 
-CoHarness 采用“上游 v19 codec + 自有扩展”的新物理版本，建议将 `SCHEMA_VERSION` 递增为 20，而不是冒充上游 19。主表使用整数 id/session_key；`draft` 和逻辑 `ignorable` 放入独立 extension 表，确保不会再与 `is_packed` 复用语义。实现应固定以下最小扩展（名称可在 schema review 中调整，但字段语义不可变）：
+CoHarness 已采用“上游 v19 codec + 自有扩展”的 schema 20 物理版本，而不是冒充上游 19。主表使用整数 `id` 与稳定的 `session_key`；`draft` 和逻辑 `ignorable` 放入独立 extension 表，确保不会再与 `is_packed` 复用语义。以下扩展表名和字段已经由 schema ownership 测试固定：
 
 ```sql
 session_extensions(session_id INTEGER PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
@@ -199,7 +263,7 @@ event_extensions(session_id INTEGER NOT NULL, seq INTEGER NOT NULL,
 4. 在事务内检查 seq 连续性、surface/sourceEventSeqs、未知事件、draft 生命周期、ignorable round-trip、事件数量和逻辑 JSON hash；再关闭并 fsync 文件和父目录。
 5. 原子替换路径，保留旧文件直到一轮冷加载、回放和业务 smoke 完成；任一检查失败立即删除临时文件并继续使用旧数据库。
 
-迁移工具应落在 `scripts/migrate-session-sqlite-v18-to-v20.ts`（建议命令 `--input`、`--output`、`--verify-only`、`--keep-backup`），默认只读输入并拒绝 output 与 input 相同；先在 fixture 和 staging home 运行 `--verify-only`，生产切换由运维脚本完成，不把迁移逻辑藏在普通 `openDatabase()` 启动路径。
+迁移实现位于 `scripts/session-sqlite-migration.ts`，入口为 `scripts/migrate-session-sqlite-v18-to-v20.ts` 和 `scripts/migrate-session-sqlite-v20-to-v18.ts`，命令为 `pnpm run migrate:session-sqlite-v18-to-v20 -- --input old.db --output new.db`、对应的反向命令和 `--verify-only`；输入只读、输出必须是新文件，`--replace` 必须同时指定 `--keep-backup`。生产切换仍由运维在停写窗口执行，运行时 `openDatabase()` 不包含隐式迁移。
 
 禁止的做法：只执行 `PRAGMA user_version = 19/20`、直接把 `ignorable=0` 映射为 `is_packed=0`、删除空 draft、在在线写入期间复制数据库、或让上游 reader 直接打开带 CoHarness 扩展的文件。
 
@@ -208,6 +272,10 @@ Gateway 的 SQLite schema 7、PostgreSQL migrations 和 Session schema 20 分开
 JSONL 是另一条物理格式：I03 的 `sourceEventSeqs` range 编码只改变新写入行，读取器应同时接受完整数组和 range 形式；现有 zstd/plain 文件不在打开时就地重写，先通过 layout-blind reader 回放并在新文件生成后切换。
 
 ### 5.2 ApiProxy、Remote 和 Gateway 双栈
+
+当前不直接引入上游完整的 `session-controller` 闭包。CoHarness 已通过 `session-projection-cache`、ApiProxy 的 cold list/history projection baseline，以及 `client/runtime` 的 tail/live mux、序列去重、gap repair 和重连逻辑实现等价的 cache-first snapshot + bounded journal 语义；这些路径保留现有 Gateway ACL、`history-wire` 和自定义 UI 事件，不改变线上 transport。该实现不是上游 `remote.*` namespace 的 API 兼容层，因此 I02 记为 `baseline-equivalent`，C03 记为 `not-adopted`。
+
+若后续需要对外暴露上游 Remote API，必须先在隔离 feature flag 下新增双栈，不得把现有 ApiProxy 删除作为该等价实现的隐含后果。
 
 先在 `packages/api/remotes` 增加 canonical namespace 和 `packages/api/session-controller`、`settings-controller`、`workspace-controller` 等上游包的 CoHarness 实现，再接入 `packages/api/gateway` 的 Remote stream server、`packages/client/connection` 的 RPC schema 和 `packages/client/store`。receiver 内部可以调用现有 `ApiProxyService`，但授权必须在 receiver resolution 前由 Gateway/typert authorization hook 执行。
 
@@ -251,20 +319,24 @@ JSONL 是另一条物理格式：I03 的 `sourceEventSeqs` range 编码只改变
 
 阶段 A 必须生成一份机器可读的基线清单，至少包含 commit、依赖锁文件、Profile dump、每个数据文件的路径/版本/hash、支持平台和上述决策的批准状态；清单缺失时不得开始在线迁移。
 
-依赖审查清单也必须单独记录：`@agentclientprotocol/sdk` 0.25.1→1.4.0、`@earendil-works/pi-ai` 0.82.x→0.84.2、`@xterm/headless`、WebFetch 所需的 `undici`/DNS 解析实现、Lexical 相关包和 SQLite zstd dictionary。每项要有 lockfile 版本、许可证/NOTICE、可选依赖平台载荷、bundle 体积变化和移除方案；未通过 `verify-third-party-notices` 不得发布。
+依赖审查清单也必须单独记录：`@agentclientprotocol/sdk` 0.25.1→1.4.0、`@earendil-works/pi-ai` 0.82.x→0.84.2（当前 lockfile 解析到 0.84.3）、`@xterm/headless`、WebFetch 所需的 `undici`/DNS 解析实现、Lexical 相关包和 SQLite zstd dictionary。每项要有 lockfile 版本、许可证/NOTICE、可选依赖平台载荷、bundle 体积变化和移除方案；未通过 `verify-third-party-notices` 不得发布。
 
 全局停止条件：逻辑事件 hash 不一致、Session/Remote response 丢字段、project/personal ACL 出现越权、凭据或完整 prompt 出现在非授权出口、旧客户端无法得到明确错误/降级、或回滚演练不能恢复服务。触发任一条件即停止后续阶段并保留现场，不通过放宽校验继续推进。
 
 ### 阶段 A：冻结基线和可回滚点
 
-- 建立 `upgrade/dsh-v0.1.2-alpha.1` 分支和 `baseline/2026-08-29` tag；不改 `master`。
-- 保存 `git bundle`、工作树状态、pnpm lock、构建产物清单，以及 Session/Gateway 数据库备份和 hash。
-- 从 upstream tag 导出 52 项 commit manifest；每项记录 commit、变更文件、当前对应文件、处置和验收测试。
-- 建立经 Schemastery 校验的 feature flags（建议名称：`COHARNESS_REMOTE_READS`、`COHARNESS_PUBLIC_WEB_FETCH`、`COHARNESS_SEND_PLUGIN_METADATA`、`COHARNESS_UPLOAD_SESSION_LOG`、`COHARNESS_HEADLESS_PROGRESS`）；环境变量只作为启动器的显式覆盖，默认均不改变现有业务安全行为。
+状态：分支和基线 tag 已冻结；机器可读 manifest、生产数据备份、Profile dump、依赖清单和负责人签字尚未在工作树生成，仍是发布前必补的交付物。
+
+- 已建立 `upgrade/dsh-v0.1.2-alpha.1` 分支和 `baseline/2026-08-29` tag；`master` 未被本轮改写。
+- 待保存 `git bundle`、工作树状态、pnpm lock、构建产物清单，以及由运维生成的 Session/Gateway 数据库备份和 hash；真实数据和凭据不得写入仓库。
+- §4.5 提供可审计的 52 项状态索引；独立机器可读 manifest 尚未生成，生成命令和责任人必须在发布记录中补齐。
+- 当前已接入的开关是 `COHARNESS_SEND_PLUGIN_METADATA`、`COHARNESS_UPLOAD_SESSION_LOG`、`COHARNESS_DISABLE_SESSION_LOG_UPLOAD` 和 `COHARNESS_HEADLESS_PROGRESS`；`COHARNESS_REMOTE_READS`、`COHARNESS_PUBLIC_WEB_FETCH` 尚未有生产代码，不得当作可用开关。所有已接入开关默认不改变现有安全行为。
 
 单个上游改动的应用方式：在 topic branch 上对实现 commit 执行 `git show --format= --binary <commit> > /tmp/dsh-upstream.patch`；若矩阵列的是 merge commit，先用 `git diff <merge>^1 <merge>` 取得相对 first-parent 的 patch。再用 `git apply --reject` 识别文件级冲突，按矩阵中的当前路径手工合流；检查二进制资源、生成文件和中英文 README 后提交一个语义完整的 commit。禁止在无共同祖先的两棵树上直接 `cherry-pick`，也禁止用“全部接受 ours/theirs”消除冲突。
 
 ### 阶段 B：低风险修复和提示词稳定性
+
+状态：已完成 PTY/进程、Windows 路径、preset、torn-tail、heartbeat、编辑器 null、PTC alias 和 system-prompt 稳定性等当前可安全落地的簇；默认入口和 Gateway 安全策略未切换。
 
 按语义簇处理 F01–F04、F09、F11、F13，以及 C01/C02/C07/C08/C09 的不涉及大架构部分；PTY 簇必须按 `4f3a47d792 → 9a12505f86 → 5467685bc1 → 2338f4ad14 → 32ddfcd89c → 9757224349` 的依赖顺序重放，不能只取最后一个 snapshot patch。
 
@@ -272,24 +344,33 @@ JSONL 是另一条物理格式：I03 的 `sourceEventSeqs` range 编码只改变
 
 ### 阶段 C：图片、输入和 UI 增量能力
 
+状态：已完成旧 `ui-conversation` façade 下的 token disclosure、流式 Markdown 高亮、图片请求/计费/路径投影、QuestionComposer draft store、运行中图片即时回显、会话正文宽度/字号设置和 N01/N04 折叠/导航；I06/C04 的 Lexical/focused 包形态经审查明确不采用，保留现有 InputMachine、slots 和自有 UI façade。跨浏览器视觉、图片压缩性能和真实 Gateway 流时序仍需发布前验证。
+
 先做 N03/N05/N07、I04/I05/I07/I08/I09/I10/I11/I12/I13/I14/I15 和 N01/N02/N04 的旧 UI 适配；保留 `ui-conversation` 作为 façade。所有 model-visible 新字段（rpcId、图片路径、usage、pending echo 状态）必须有 Session/Remote 可重放来源，不能只存在 React state。
 
-Lexical（I06/C04）单独作为可撤销里程碑：先实现旧输入机与新 composer 的行为等价测试，再引入包和 slot；未通过时不删除旧 composer。
+Lexical（I06/C04）不作为本 release 的隐式依赖：现有 InputMachine 已通过引用、CAS、粘贴、IME、undo/redo 和序列化测试，focused slots 已隔离 UI 责任；只有未来需要富文本 DOM 或独立发布时，才按可撤销里程碑引入并保留旧 composer。
 
 ### 阶段 D：Remote/session controller 双栈
 
-1. 引入 `client/store` 和上游 session-controller 的最小闭包，先不删除现有文件。
-2. 为 CoHarness Gateway 重放 settings、workspace、history、archive、document、participant、model-governance 适配层；所有 receiver 先做 ACL。
-3. 让 Web 以 feature flag 选择旧 API 或 Remote，并在同一 fixture 上比较逻辑事件、投影水位和错误码。
-4. 迁移 UI domain 后再考虑 C03/C04 的删除步骤；删除前制作恢复旧包的 release artifact。
+状态：上游 Remote API 形态经审查明确不采用；I02 所需的行为等价路径已存在。当前仍保留 `ApiProxy`、`client/runtime` 和现有 Gateway transport；没有执行 Remote 默认切换或旧包删除。
+
+1. 以现有 projection cache、history-wire 和 live mux fixture 为基准，先冻结 I02 的逻辑事件、`asOfSeq`、错误码和权限结果。
+2. 如未来出现上游 Remote API 的外部消费者，再引入 `client/store` 和 session-controller 的最小闭包，先不删除现有文件；本 release 不为假设性消费者增加第二套 transport。
+3. 为 CoHarness Gateway 重放 settings、workspace、history、archive、document、participant、model-governance 适配层；所有 receiver 先做 ACL。
+4. 让 Web 以 feature flag 选择旧 API 或 Remote，并在同一 fixture 上比较逻辑事件、投影水位和错误码。
+5. 迁移 UI domain 后再考虑 C03/C04 的删除步骤；删除前制作恢复旧包的 release artifact。
 
 ### 阶段 E：ACP、子代理和 Python/Profile
+
+状态：已完成当前兼容实现：ACP SDK 1.4.0 控制面、子代理模型/reasoning/maxTokens 选择、Python runtime/carrier alias、Profile 启动兼容和 Windows x64 载荷描述已落地；Windows 原生发行验证、wheel 安装运行和 sidecar 诊断仍未完成。
 
 先升级 ACP SDK 与 Python/TS wire types，再落地 N08–N12；child route 选择必须由 Gateway policy 生成，ACP MCP 必须在 Agent 发布前完成绝对路径/URL、环境/header 和 sandbox 校验。
 
 Python 先支持新 `profile/patches/dsh_home` 选项面，再保留旧环境注入；Windows x64 构建与载荷 hash 通过后才在发行 metadata 中加入平台。
 
 ### 阶段 F：安全开关、数据迁移和默认切换
+
+状态：部分完成。schema 20 双向离线迁移、WebFetch 公网地址 pinning、插件 metadata/session-log upload 扩展和 kill switch 已落地；WebFetch、插件 metadata、Session-log upload 仍默认关闭，未执行生产 canary、在线迁移、出网审计或默认网络策略切换。
 
 在 schema 20 离线迁移工具、数据回放、SSRF、Telemetry 和 auth 测试均通过后，选择一个非生产 Harness home 做 canary；先保持 WebFetch/插件 metadata/session upload 关闭，观察错误率、磁盘和出网审计，再逐项由运维批准开启。
 
@@ -376,7 +457,7 @@ git diff --check
 
 ## 10. 完成定义和交付物
 
-本升级计划完成的判据是：52 项矩阵逐项有代码或明确处置记录；所有“采纳/适配”项有实现 commit、测试和文档；“条件启用/暂缓”项有默认值、启用条件和负责人；Gateway 自定义逻辑、Session 数据和外部协议没有未经记录的破坏性变化。
+本升级计划完成的判据是：52 项矩阵逐项有代码或明确处置记录；所有“采纳/适配”项有实现 commit、测试和文档；“条件启用/暂缓/不采用”项有默认值、启用条件、兼容边界和负责人；Gateway 自定义逻辑、Session 数据和外部协议没有未经记录的破坏性变化。
 
 交付物清单：
 
@@ -388,3 +469,66 @@ git diff --check
 - WebFetch、插件 metadata、Session-log upload、一次性 token 的安全设计、默认配置、审计字段和 kill switch。
 - 单元、组合、Web/Gateway/ACP/Python、跨平台、数据回放、安全和性能检查的可复现日志。
 - 发布说明、回滚步骤、变更后的中英文 README/Agent Note，以及最终 `pnpm run doc-sync` 报告。
+
+## 11. 当前执行状态、验证证据与剩余工作
+
+### 11.1 当前工作树事实
+
+截至 2026-08-30，当前 checkout 为 `upgrade/dsh-v0.1.2-alpha.1`，HEAD 为 `1bb4016f1f76cdd7b08a79df8ee5b6fa3b7d9f72`，`baseline/2026-08-29` 指向 `master@6464092040428805c5d76ed977fa4ab3fac66161`。工作树不是 clean，包含本轮实现、测试、文档、lockfile 和新增包；构建输出属于忽略目录，不能代替提交内容。任何发布或合并操作都必须先审查 `git status --short --untracked-files=all`，确认没有临时文件、凭据或与本升级无关的改动。
+
+### 11.2 已落地的关键 checkpoint
+
+| Commit | 已落地内容 | 仍需注意 |
+| --- | --- | --- |
+| `09a6e49470` | 编辑器 `null` 占位、Windows 路径和相关兼容修复 | Windows 原生发行验证仍需在 Windows runner 完成 |
+| `3e859717e8` | JSONL torn-tail 修复诊断 | 日志仍不得泄露完整路径或内容 |
+| `8a50c19f2e` | WebSocket downlink heartbeat | 仅保持连接，不改变 Gateway 业务 lease |
+| `023663328a`、`e3ad79ba5e`、`b722f735d7` | Profile preset 根目录、坏 preset 诊断、空 session 折叠配额 | 旧 profile 和 Gateway workspace 回归仍是发布门 |
+| `50bba577b6` | 上游兼容、模型路由、子代理模型/reasoning/maxTokens、PTC alias、精确回合 token usage、pi-ai 兼容 | 变更尚有工作树未提交文件，不能以该 checkpoint 单独发布 |
+| `d9f9035bf3` | WebFetch 公网地址解析、逐跳校验和连接 pinning | shipped profile 的 `fetch` 仍为 `false`，未授权开启公网工具 |
+| `1bb4016f1f` | Session SQLite schema 20、packed rows、seq-range、v18↔v20 离线迁移与回滚工具 | 迁移仅离线显式执行，禁止在 `openDatabase()` 中自动升级 |
+
+### 11.3 实现与默认值状态
+
+本节中的“已实现”仅表示代码和本地测试已经存在；Windows、生产出网、Remote 双栈和默认切换仍按 §4.5 的状态与 §11.5 的发布门处理。
+
+- 已在当前工作树实现并配套测试的范围包括 ACP SDK 1.4.0 session/MCP/model/permission/cancel 控制、子代理 provider/model/reasoning/maxTokens 选择、Python runtime/carrier 兼容、SQLite schema 20 与逻辑事件保真迁移、DeepSeek request extensions、插件包清单、Session-log upload、精确 per-turn token usage、图片计费和路由定价、Markdown 流式高亮、图片请求与路径投影、QuestionComposer draft store、即时图片 pending-submission 回显、过程/System prompt 折叠、回合导航、聊天宽度/字号设置、pi-ai 0.84.x、PTY/process inspector、preset/profile 和 WebFetch 公网地址 pinning。
+- `WebFetch`、插件 metadata 和 Session-log upload 均保持默认关闭；`COHARNESS_SEND_PLUGIN_METADATA=1` 与 `COHARNESS_UPLOAD_SESSION_LOG=1` 只是显式覆盖，不代表已获准在生产环境开启。`COHARNESS_DISABLE_SESSION_LOG_UPLOAD` 仍是运行时 kill switch。
+- Gateway 认证、项目/组织 ACL、模型治理、凭据隔离、文档/归档、移动端自定义 UI、旧 ApiProxy/history-wire/client-runtime 和 Python 零配置环境注入继续保留；本轮有意不删除旧 endpoint 或旧 composer。
+- I01 的 client batch/HMR 与 WebServer gzip 已实现，但浏览器/生产压缩证据仍待补齐；I02 的 cache-first 行为已有等价实现，C03/C04/C05 的上游 Remote/focused-package/URL-token 形态经审查明确不采用，并在 §4.5 记录兼容边界。schema 20 生产 canary 和任何数据在线迁移仍未执行，不得在发布说明中写成已支持。
+
+### 11.4 已执行验证
+
+以下记录截至 2026-08-30；历史证据与本轮新增证据分开列出，后续代码、配置或文档变更后必须重新运行受影响检查。
+
+已通过 `pnpm run hygiene`、`pnpm run typecheck`、`pnpm run lint`、`pnpm run build:production`、`pnpm run build:lib:host`、`pnpm run build`、`pnpm run constraints`、`pnpm run verify-client-packages`、`pnpm run verify-third-party-notices`、`git diff --check`、`pnpm run doc-sync`、ACP focused suite（364 tests）、ACP e2e（2 passed，1 keyless skip）、ACP 单文件串行（47 passed）、LSP instance 串行（23 passed）、oxlint/publint（18 passed）、WebFetch/Web spill/theme focused（10 passed）、I01/I02 focused suite（10 files，186 tests）、shipped Web composition e2e（2 tests）、thread-safe 全量串行（951 files passed，15,282 passed，9 files/114 tests skipped）和 process-bound 全量串行（8 files，446 passed）。完整 `pnpm run build` 与本轮 `pnpm run build:production` 均通过；构建仅报告 Linux native 载荷在 macOS arm64 上被跳过的预期警告，以及前端 chunk 大小提示。
+
+默认多项目并行执行的 `pnpm run test` 曾因 thread-safe 与 process-bound 项目争用进程/CPU 出现 7 个超时或失败；本轮已将两个项目分别以 `--no-file-parallelism --maxWorkers=1` 串行跑完并通过。完整 `pnpm run test:web:built` 在旧快照/资源并发下曾出现多项超时；刷新受影响 golden、适配折叠过程行后的 I01/I02 与 shipped composition focused 测试已通过，未把并行失败误记为产品回归。保留以下命令作为发布和 CI 资源受限时的可复现执行方式：
+
+```sh
+pnpm exec vitest run --project=thread-safe --no-file-parallelism --maxWorkers=1
+pnpm exec vitest run --project=process-bound --no-file-parallelism --maxWorkers=1
+```
+
+本轮新增的 headless focused suite（16 tests）、subprocess-local focused suite（24 tests）、ACP dispose/bridge focused suite（64 tests）和带 `NODE_OPTIONS=--trace-warnings` 的 process-bound suite（446 tests）已通过；process-bound 重跑未出现 `MaxListenersExceededWarning`。listener 修复后的 thread-safe 全量串行也已通过（951 files，15,283 passed，114 skipped），未出现 `MaxListenersExceededWarning`。
+
+### 11.4.1 本次审计更正
+
+- Headless reasoning 输出已经改为显式 `progress` 配置；默认 `false`，`COHARNESS_HEADLESS_PROGRESS=1` 才启用，成功运行的默认 stderr 仍为空。
+- I01 不能继续标记为 deferred：client plugin batch/HMR 在基线已有，WebServer gzip 已按上游语义补齐并由 socket、阈值、协商、流、SSE、range 和已有编码 focused 测试覆盖；通用 WebServer 默认仍为 `none`，发布 Web bundle 才显式启用。浏览器缓存头、HMR 和压缩性能仍需发布前实机验证。
+- I02 不能简单标记为“未实现”：`session-projection-cache`、ApiProxy cold list/history 和 `client/runtime` mux/gap-repair 已提供 cache-first snapshot + bounded tail/journal 的等价行为，并保留现有 ACL/transport。上游 `remote.*` namespace/session-controller API 在本 release 明确不采用，因此 C03 记为 `not-adopted`，不能把旧 ApiProxy 删除误解为升级要求。
+- I06/C04/C05 的上游形态不采用：InputMachine/slots、旧 ApiProxy/mux/projection-cache 和 Gateway Cookie/CSRF/principal 分别承担等价业务职责；不宣称上游包/API/token wire 兼容。`N01/N02/N04/N05/I10` 已在旧 `ui-conversation` façade 下实现并有 focused 测试，但跨浏览器视觉与生产 Gateway 时序仍需发布前实机验证。
+- `N11` 的 Windows x64 代码和发行 metadata 已改动，但 Windows runner、wheel/exe 安装运行、sidecar 和升级/卸载尚未验证。
+- `N13/N14/C10` 的代码能力已存在，但插件 metadata、Session-log upload 和 WebFetch 均保持默认关闭；生产启用需要脱敏、allowlist、限流、审计和运维/安全批准。
+- 阶段 A 所列 manifest、Profile dump、数据备份/hash、依赖清单和签字材料不是当前工作树交付物，必须在 canary 前由指定责任人生成并存放在受控外部位置。
+- `process.exit` listener 的 per-runtime 注册根因已改为模块级共享 handler，并由 focused/process-bound trace 验证；若 thread-safe 重跑仍报告 Socket listener warning，必须单独定位 teardown owner，不得提高全局 listener 上限。
+
+### 11.5 发布前剩余动作与停止条件
+
+本节列出的动作仍未全部完成；工作树不能作为发布物。完成本次修改后，先重跑受影响检查，再将命令、时间和结果追加到受控发布记录。
+
+1. 本轮代码与文档修改已重新运行并通过 `pnpm run doc-sync`、`pnpm run lint`、`pnpm run typecheck`、`pnpm run hygiene`、`pnpm run build:production`、`pnpm run verify-third-party-notices`、`git diff --check` 以及 I01/I02 相关 focused Vitest；后续任何代码、配置或文档变更都必须重复这些检查。
+2. 生成并审查机器可读的上游 52 项 commit manifest、依赖/NOTICE 清单、Profile dump、数据文件 hash 和决策签字；这些材料缺失时不得进入 canary。
+3. 在隔离 Harness home 上执行 schema 20 `--verify-only`、v18↔v20 双向 round-trip、冷加载、回放和回滚；保留旧文件直到所有 hash、ACL 和业务 smoke 通过。
+4. 只有未来重新打开 C03/C04 时，才要求 Remote 双栈逐事件等价、旧客户端得到明确降级、Gateway ACL/凭据/文档边界通过、完整测试和跨平台构建证据齐全；本 release 不切换或删除旧 API。
+5. 任何逻辑事件 hash 不一致、越权、未授权出网、session-log 重复/漏传、旧客户端无明确错误、迁移失败不可回滚或测试仅靠并行度调整才能通过，均停止后续阶段并保留现场。

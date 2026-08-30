@@ -1,12 +1,13 @@
 - banner:
+  - tablist:
+    - tab "Chat" [selected]
+    - tab "Trajectory"
   - navigation "Session hierarchy":
     - button "Reference order target" [disabled]
   - button "Session log":
     - text: Session log
     - img
-  - tablist:
-    - tab "Chat" [selected]
-    - tab "Trajectory"
+- separator "Adjust transcript content width"
 - text: Research notes what changed? Referenced session · Research notes {{clock}}
 - button "Copy":
   - img
@@ -15,6 +16,8 @@
   - text: Session recall Research notes
 - textbox "Message the agent"
 - button "Add images or documents":
+  - img
+- button "Choose from Documents":
   - img
 - button "Commands":
   - img

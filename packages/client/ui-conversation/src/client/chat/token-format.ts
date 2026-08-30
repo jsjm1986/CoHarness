@@ -1,6 +1,11 @@
 import type { ComposerBarProps } from '../contract/slots.ts'
 
-/** Compact token count for a footer summary. */
+/**
+ * Format a token count using compact locale-owned units.
+ * @param value - non-negative token count to display.
+ * @param t - translation function for unit labels.
+ * @returns a compact localized token string.
+ */
 export function formatTokens(value: number, t: ComposerBarProps['t']): string {
   const scaled = (candidate: number): string =>
     candidate >= 100 ? String(Math.round(candidate)) : String(Math.round(candidate * 10) / 10)
@@ -9,7 +14,12 @@ export function formatTokens(value: number, t: ComposerBarProps['t']): string {
   return t('number.million', { value: scaled(value / 1_000_000) })
 }
 
-/** Exact integer token count with locale-owned digit grouping. */
+/**
+ * Format an exact integer token count with locale-owned digit grouping.
+ * @param value - integer token count to display.
+ * @param t - translation function for the grouping separator.
+ * @returns the grouped localized integer string.
+ */
 export function formatExactTokens(value: number, t: ComposerBarProps['t']): string {
   const digits = String(value)
   const groups: string[] = []
@@ -44,7 +54,13 @@ function displayPercentUnits(units: number, decimalPlaces: 0 | 1): string {
   return tenths === 0 ? String(whole) : `${whole}.${tenths}`
 }
 
-/** Display a cache-hit percentage without rounding a partial hit to 100%. */
+/**
+ * Display a cache-hit percentage without rounding a partial hit to 100%.
+ * @param cacheReadTokens - number of prompt tokens served from cache.
+ * @param promptTokens - total prompt tokens used as the denominator.
+ * @param decimalPlaces - requested precision, either zero or one decimal place.
+ * @returns the formatted percentage, or `null` when the denominator is zero.
+ */
 export function formatCacheHitPercent(
   cacheReadTokens: number,
   promptTokens: number,

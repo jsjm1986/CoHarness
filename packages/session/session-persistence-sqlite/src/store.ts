@@ -199,6 +199,22 @@ export class SqliteStore implements PersistenceBackend<number> {
     }
   }
 
+  /** Durably insert one header-only session row. */
+  async materializeHeader(meta: SessionHeader): Promise<void> {
+    await this.open()
+    this.db.exec(sql('begin-immediate'))
+    try {
+      validateSchemaForMutation(this.databaseConstructor, this.db, this.databasePath)
+      if (this.rowFor(meta.id) !== undefined) {
+        throw new Error(`session ${meta.id} metadata row already exists`)
+      }
+      this.writeRow(meta)
+      this.db.exec(sql('commit'))
+    } catch (error: unknown) {
+      this.rollback(error, 'materialize')
+    }
+  }
+
   async commitRepair(
     meta: SessionHeader,
     tornMarker: number | undefined,

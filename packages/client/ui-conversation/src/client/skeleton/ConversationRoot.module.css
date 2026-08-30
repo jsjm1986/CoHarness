@@ -20,6 +20,7 @@
      content + 32px at every width. Declared on the root because the
      transcript and the composer seat are sibling subtrees. */
   --dsh-chat-content-width: 748px;
+  --dsh-chat-font-size: 14px;
   --dsh-composer-card-max-width: calc(var(--dsh-chat-content-width) + 32px);
   --dsh-composer-side-clearance: 16px;
   --dsh-composer-dock-inset: 8px;
@@ -227,6 +228,7 @@
 }
 
 .scrollBody {
+  position: relative;
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -245,6 +247,29 @@
      gutter moves the input card sideways by the bar's width whenever the two
      differ ([decision](../../../../../../.agents/notes/implemented/bug-fix/2026-08-04-composer-tab-gutter-reservation.md)). */
   scrollbar-gutter: stable;
+}
+
+/* Desktop-only grabber for the shared transcript width axis. The target is
+   transparent at rest, so it does not steal visual space from the flow. */
+.widthHandle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: clamp(8px, calc(50% + var(--dsh-chat-content-width) / 2), calc(100% - 8px));
+  z-index: 9;
+  width: 12px;
+  margin-left: -6px;
+  border: 0;
+  border-inline: 1px solid transparent;
+  background: transparent;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.widthHandle:hover,
+.widthHandle:focus-visible {
+  border-inline-color: var(--dsw-alias-state-business-primary);
+  outline: none;
 }
 
 .root[data-phase='active'] .viewArea {
@@ -326,6 +351,10 @@
    trajectory list keeps the composer above it and therefore preserves the
    send/queue controls. */
 @media (max-width: 767px) {
+  .widthHandle {
+    display: none;
+  }
+
 .scrollBody:has([data-conversation-composer-overlay]):has([data-trajectory-details-open])
     > :global([data-slot='conversation.session']) {
     position: relative;

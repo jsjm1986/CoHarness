@@ -28,15 +28,30 @@ export function MessageId(id: string): MessageId {
  * Correlates a model-issued tool call with its result. Provider-issued for
  * real adapters; synthesized by mocks/assembler fallbacks.
  */
-export type CallId = Branded<'CallId'>
+export type ToolCallId = Branded<'ToolCallId'>
 
 /**
- * Brand a string as a {@link CallId}.
+ * Brand a string as a {@link ToolCallId}.
  * @param id - the provider-issued (or synthesized) call id.
  * @returns the same string, branded; no validation is performed.
  */
+export function ToolCallId(id: string): ToolCallId {
+  return id as ToolCallId
+}
+
+/**
+ * Compatibility alias for the pre-ACP name. New declarations use
+ * {@link ToolCallId}; both functions produce the same branded identifier.
+ */
+export type CallId = ToolCallId
+
+/**
+ * Brand a string with the compatibility call-id spelling.
+ * @param id - the provider-issued (or synthesized) call id.
+ * @returns the same string, branded as {@link ToolCallId}.
+ */
 export function CallId(id: string): CallId {
-  return id as CallId
+  return ToolCallId(id)
 }
 
 /** Provider-issued request identifier retained for diagnostics across package boundaries. */

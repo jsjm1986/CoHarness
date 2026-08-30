@@ -88,7 +88,7 @@ describe('Linux process inspector', () => {
     expect(parseProcStat('1 () ')).toBeUndefined()
     expect(parseProcStat('1 () S')).toBeUndefined()
     expect(parseProcStat(stat(10, 20, 30, 40, '500', 1, 'SS'))).toBeUndefined()
-    expect(parseProcStat(stat(10, 20, 30, 40, '500'))).toEqual({ pid: 10, parentPid: 1, pgrp: 20, session: 30, state: 'S', tpgid: 40, started: '500' })
+    expect(parseProcStat(stat(10, 20, 30, 40, '500'))).toEqual({ pid: 10, parentPid: 1, pgrp: 20, session: 30, state: 'S', ttyDevice: 99, tpgid: 40, started: '500' })
 
     const fake = fakeInternals()
     fake.dirs.set('/proc', ['x', '10', '11', '12', '13', '14'])

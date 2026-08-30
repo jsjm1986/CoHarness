@@ -19,17 +19,23 @@ import {
   collectReferenceTargets, createReferenceTargets, renderBlocks, renderFootnoteSection,
   wrapBlockChildren,
 } from './render.tsx'
-import type { MarkdownCodeLabels, MarkdownFileMentions, MarkdownRenderContext, ReferenceTargets } from './render.tsx'
+import type { MarkdownCodeLabels, MarkdownFileMentions, MarkdownLabels, MarkdownRenderContext, ReferenceTargets } from './render.tsx'
 import 'katex/dist/katex.min.css'
 import css from './MarkdownText.module.css'
 
-export type { MarkdownCodeLabels, MarkdownFileMentions } from './render.tsx'
+export type { MarkdownCodeLabels, MarkdownFileMentions, MarkdownLabels } from './render.tsx'
+
+const DEFAULT_LABELS: MarkdownLabels = {
+  code: { copyLabel: '复制', copiedLabel: '复制成功' },
+  footnotes: 'Footnotes',
+}
 
 /** One settled full render: parse with math, resolve references, append the footnote section. */
 function renderSettled(
   text: string,
   codeLabels: MarkdownCodeLabels | undefined,
   fileMentions: MarkdownFileMentions | undefined,
+  labels: MarkdownLabels = DEFAULT_LABELS,
 ): ReactNode[] {
   const root = parseGfmWithMath(text)
   const targets = createReferenceTargets()
@@ -37,6 +43,7 @@ function renderSettled(
   const context: MarkdownRenderContext = {
     streaming: false,
     codeLabels,
+    labels,
     fileMentions,
     targets,
     footnoteOrder: [],
@@ -68,7 +75,10 @@ class StreamingRenderer {
   private lastRendered: ReactNode[] = []
 
   /** @param codeLabels - Fence copy labels baked into cached elements; the owner replaces the renderer when they change. */
-  constructor(private readonly codeLabels: MarkdownCodeLabels | undefined) {}
+  constructor(
+    private readonly codeLabels: MarkdownCodeLabels | undefined,
+    private readonly labels: MarkdownLabels = DEFAULT_LABELS,
+  ) {}
 
   /**
    * Render the current accumulated text. Idempotent per text value, so React
@@ -101,6 +111,7 @@ class StreamingRenderer {
       const frozenContext: MarkdownRenderContext = {
         streaming: true,
         codeLabels: this.codeLabels,
+        labels: this.labels,
         fileMentions: undefined,
         targets: frameTargets,
         footnoteOrder: this.frozenFootnoteOrder,
@@ -119,6 +130,7 @@ class StreamingRenderer {
     const tailContext: MarkdownRenderContext = {
       streaming: true,
       codeLabels: this.codeLabels,
+      labels: this.labels,
       fileMentions: undefined,
       targets: frameTargets,
       footnoteOrder: [...this.frozenFootnoteOrder],
@@ -153,24 +165,37 @@ class StreamingRenderer {
  * relative links, and unsafe protocols are disabled, while absolute HTTP(S)
  * images render directly.
  */
-export const MarkdownText = memo(function MarkdownText({ text, streaming = false, codeLabels, fileMentions }: {
+export const MarkdownText = memo(function MarkdownText({ text, streaming = false, codeLabels, labels = DEFAULT_LABELS, fileMentions }: {
   text: string
   streaming?: boolean
   codeLabels?: MarkdownCodeLabels | undefined
+  labels?: MarkdownLabels
   fileMentions?: MarkdownFileMentions | undefined
 }) {
+  const effectiveLabels = useMemo(
+    () => (labels === DEFAULT_LABELS && codeLabels !== undefined
+      ? { ...DEFAULT_LABELS, code: codeLabels }
+      : labels),
+    [codeLabels, labels],
+  )
   const streamRef = useRef<StreamingRenderer | null>(null)
   const streamLabelsRef = useRef<MarkdownCodeLabels | undefined>(codeLabels)
+  const streamFullLabelsRef = useRef<MarkdownLabels>(effectiveLabels)
   const children = useMemo(() => {
     if (!streaming) {
       streamRef.current = null
-      return renderSettled(text, codeLabels, fileMentions)
+      return renderSettled(text, codeLabels, fileMentions, effectiveLabels)
     }
-    if (streamRef.current === null || streamLabelsRef.current !== codeLabels) {
-      streamRef.current = new StreamingRenderer(codeLabels)
+    if (
+      streamRef.current === null
+      || streamLabelsRef.current !== codeLabels
+      || streamFullLabelsRef.current !== effectiveLabels
+    ) {
+      streamRef.current = new StreamingRenderer(codeLabels, effectiveLabels)
       streamLabelsRef.current = codeLabels
+      streamFullLabelsRef.current = effectiveLabels
     }
     return streamRef.current.render(text)
-  }, [text, streaming, codeLabels, fileMentions])
+  }, [text, streaming, codeLabels, effectiveLabels, fileMentions])
   return <div className={css.markdown}>{children}</div>
 })

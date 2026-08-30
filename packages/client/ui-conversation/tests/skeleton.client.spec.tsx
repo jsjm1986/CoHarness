@@ -29,6 +29,7 @@ import type { InputBarProps } from '../src/client/skeleton/InputBar.tsx'
 import type {
   ComposerBarOwnerProps,
 } from '../src/client/contract/slots.ts'
+import type { ConversationDisplaySettingsSnapshot } from '../src/client/display-settings.ts'
 import type { ViewTab } from '../src/client/contract/views.ts'
 
 /** Machine-backed wiring over a sink spy. */
@@ -121,6 +122,11 @@ function mount(
   const session = createSnapshotStore<ConversationSnapshot>(snapshot)
   const useSession = bindSnapshotSelector(session)
   const chat = createChatStore().create()
+  const displaySettings = createSnapshotStore<ConversationDisplaySettingsSnapshot>({
+    chatContentWidth: 748,
+    chatFontSize: 14,
+    settings: { status: 'ready', writable: true, writableReason: undefined, write: { status: 'idle' } },
+  })
   chat.actions.setDraft('ordinary draft')
   const { wiring, sink } = fakeWiring()
   const useInput = bindSnapshotSelector(wiring.state)
@@ -249,6 +255,10 @@ function mount(
     useWorkspaces: bindSnapshotSelector(workspaces),
     useProjection: (() => undefined),
     useComposerBlock: select => select(options.composerBlock),
+    useDisplaySettings: bindSnapshotSelector(displaySettings),
+    setDisplayWidth: (value) => {
+      displaySettings.set({ ...displaySettings.getSnapshot(), chatContentWidth: value })
+    },
     useInput,
     inputActions,
     renderSlot,
@@ -258,7 +268,7 @@ function mount(
   }
   const view = render(<ConversationRoot {...props} />)
   return {
-    view, chat, sink, retargetWorkspace, session, slotCalls, seatOwners, open,
+    view, chat, sink, retargetWorkspace, session, slotCalls, seatOwners, open, displaySettings,
     pickerOwner: () => pickerOwner,
     rerender: () => { view.rerender(<ConversationRoot {...props} />) },
   }
@@ -283,6 +293,45 @@ describe('Hero chrome', () => {
 })
 
 describe('ConversationRoot resident composer', () => {
+  it('resizes the transcript with one captured pointer and ignores other pointers', () => {
+    const b = mount(conversationSnapshot())
+    const root = b.view.container.firstElementChild as HTMLElement
+    Object.defineProperty(root, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({ left: 0, width: 1200, top: 0, right: 1200, bottom: 800, height: 800 }),
+    })
+    const handle = b.view.getByRole('separator', { name: '调整对话内容宽度' })
+
+    fireEvent.pointerDown(handle, { pointerId: 7, clientX: 974 })
+    expect(b.displaySettings.getSnapshot().chatContentWidth).toBe(748)
+    fireEvent.pointerMove(handle, { pointerId: 99, clientX: 1100 })
+    expect(b.displaySettings.getSnapshot().chatContentWidth).toBe(748)
+    fireEvent.pointerMove(handle, { pointerId: 7, clientX: 1000 })
+    expect(b.displaySettings.getSnapshot().chatContentWidth).toBe(800)
+    fireEvent.pointerUp(handle, { pointerId: 99 })
+    expect(b.displaySettings.getSnapshot().chatContentWidth).toBe(800)
+    fireEvent.pointerUp(handle, { pointerId: 7 })
+    fireEvent.pointerMove(handle, { pointerId: 7, clientX: 1050 })
+    expect(b.displaySettings.getSnapshot().chatContentWidth).toBe(800)
+    expect(handle.getAttribute('aria-valuenow')).toBe('800')
+  })
+
+  it('supports keyboard width steps, accelerated steps, and range endpoints', () => {
+    const b = mount(conversationSnapshot())
+    const handle = b.view.getByRole('separator', { name: '调整对话内容宽度' })
+    fireEvent.keyDown(handle, { key: 'ArrowLeft' })
+    expect(b.displaySettings.getSnapshot().chatContentWidth).toBe(732)
+    fireEvent.keyDown(handle, { key: 'ArrowRight', shiftKey: true })
+    expect(b.displaySettings.getSnapshot().chatContentWidth).toBe(796)
+    fireEvent.keyDown(handle, { key: 'Home' })
+    expect(b.displaySettings.getSnapshot().chatContentWidth).toBe(560)
+    fireEvent.keyDown(handle, { key: 'End' })
+    expect(b.displaySettings.getSnapshot().chatContentWidth).toBe(1080)
+    expect(handle.getAttribute('aria-valuenow')).toBe('1080')
+    fireEvent.keyDown(handle, { key: 'PageDown' })
+    expect(b.displaySettings.getSnapshot().chatContentWidth).toBe(1080)
+  })
+
   it('renders the composer inert with the blocker\u2019s own reason', () => {
     const b = mount(conversationSnapshot(), undefined, undefined, {
       composerBlock: { reason: 'select a model first' },

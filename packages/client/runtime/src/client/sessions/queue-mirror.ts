@@ -50,6 +50,7 @@ export class SessionQueueMirror {
     this.current = items.map(item => ({
       id: item.id,
       messageId: item.message.id,
+      ...(item.rpcId === undefined ? {} : { rpcId: item.rpcId }),
       placement: item.placement,
       content: item.message.content,
       preview: previewOf(item.message.content),

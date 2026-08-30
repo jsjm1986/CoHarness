@@ -2,13 +2,13 @@
 
 English | [中文](README.zh.md)
 
-Automation-only [Agent Client Protocol](https://agentclientprotocol.com) server over JSON-RPC stdio. Programmatic clients create fresh harness agents, send text/image prompts, collect committed assistant text/images, resolve one-shot permission requests by policy, and cancel work. The primary in-repository client is [`dsh-subagent-acp`](../../subagent/subagent-acp/README.md).
+Automation-only [Agent Client Protocol](https://agentclientprotocol.com) server over JSON-RPC stdio. Programmatic clients create, list, resume, configure, and close harness sessions, send text/image prompts, mount session-scoped MCP servers, collect committed assistant text/images, resolve one-shot permission requests by policy, and cancel work. The primary in-repository client is [`dsh-subagent-acp`](../../subagent/subagent-acp/README.md).
 
 This package is a transport adapter, not a UI integration or a capability seam. It does not expose editor navigation, transcript replay, commands, modes, configuration pickers, elicitation, reasoning, plans, titles, or tool presentation. Interactive rendering and human questions belong to the Web host and client modules.
 
 ## Plugin
 
-`apply(ctx, config)` opens an `AgentSideConnection` on stdin/stdout and drives `ctx.agents`. Stdout is reserved for protocol frames.
+`apply(ctx, config)` builds a typed ACP `agent()` app, connects it to stdin/stdout, and drives `ctx.agents`. Stdout is reserved for protocol frames.
 
 | Config | Default | Meaning |
 |---|---|---|
@@ -21,12 +21,16 @@ Both fields are optional so another agent/request listener may supply the target
 
 | Method | Behavior |
 |---|---|
-| `initialize` | Negotiates the supported version. Image prompts are advertised only when a durable attachment store is mounted and the configured exact provider/model resolves with explicit image input; audio and embedded context stay false. No session, editor, terminal, filesystem, or MCP capability is advertised. |
+| `initialize` | Negotiates the supported version and advertises HTTP MCP mounting, session close/list/resume, and model configuration. Image prompts are advertised only when a durable attachment store is mounted and the configured exact provider/model resolves with explicit image input; audio and embedded context stay false. Editor, terminal, and filesystem capabilities are not advertised. |
 | `authenticate` | No-op because the server advertises no authentication methods. |
-| `session/new` | Creates a fresh agent with an absolute primary `cwd`; empty `additionalDirectories` and `mcpServers` are accepted, non-empty values reject. |
+| `session/new` | Creates a fresh agent with an absolute primary `cwd`; empty `additionalDirectories` is required, while stdio and HTTP `mcpServers` are validated and mounted in the session scope. |
+| `session/list` | Lists persisted primary sessions that are not active, activating, or subagent-owned. An optional absolute `cwd` filters results, and an opaque cursor provides bounded newest-first pages. |
+| `session/resume` | Restores a persisted primary session after checking that it is not active, its `cwd` matches, and the requested MCP declarations are valid. History remains durable and is available to subsequent prompts without replaying updates to the client. |
+| `session/set_config_option` | Changes the session's model or reasoning-effort selection for later turns and returns the complete current option state. Invalid or unavailable selections reject as invalid parameters. |
+| `session/close` | Cancels and disposes one active session while retaining its durable history for a later `session/resume`. |
 | `session/prompt` | Preserves ordered text and supported inline image blocks, renders resource links as bracketed textual references, and rejects audio, embedded resources, malformed/empty input, or an image when capability was not advertised. It validates the whole image batch and rechecks the session's latest exact route before any save, commits every image before the user event, permits one in-flight request per session, and waits for admission plus, once queued, whole-Agent idle and ordered output delivery. Normal quiescence reports `end_turn`; explicit ACP cancellation, disposal, or a prompt whose admission was discarded (a turnless slot) reports `cancelled`. |
 | `session/cancel` | Marks and aborts any in-progress admission without cancelling or waiting for unrelated Agent work; once this prompt has entered the Agent inbox, it cancels the addressed Agent and waits for the owned interval to quiesce. No late user message is published and the prompt settles as `cancelled`. With no in-flight prompt it cancels autonomous work; unknown ids are no-ops. |
-| `session/update` | Emits one `agent_message_chunk` per non-empty text or image block in a committed `assistant/message`, preserving order. Images are re-read and integrity-verified before inline base64 delivery. Raw deltas and non-message events are omitted. |
+| `session/update` | Emits one `agent_message_chunk` per non-empty text or image block in a committed `assistant/message`, preserving order, and emits `config_option_update` when the model catalog changes. Images are re-read and integrity-verified before inline base64 delivery. Raw deltas and non-message events are omitted. |
 | `session/request_permission` | Offers one-shot allow/reject choices for bridge-owned approval requests carrying a tool call id. Clients may answer automatically. |
 
 One connection may own several sessions. The bridge keys records by branded session id and checks exact agent identity before routing events or permission requests. Each session has an independent prompt slot, workspace, cancellation path, and disposer.
@@ -75,7 +79,7 @@ Append-only through the owning tool result.
 
 ## Known Limitations and Deferred Work
 
-- **Fresh sessions only** — load, list, resume, delete, and fork are unsupported.
-- **Raster images and one workspace only** — image prompts require a durable store plus an exact route that declares image input; only PNG, JPEG, WebP, and GIF are accepted. Audio, embedded resources, non-empty additional directories, and MCP servers reject; resource links flatten to textual references rather than fetched content.
+- **No load, delete, or fork method** — persisted primary sessions use the standard `session/list`, `session/resume`, and `session/close` controls; ACP `load`, deletion, and unstable fork operations are not implemented.
+- **Raster images and one workspace only** — image prompts require a durable store plus an exact route that declares image input; only PNG, JPEG, WebP, and GIF are accepted. Audio, embedded resources, and non-empty additional directories reject; resource links flatten to textual references rather than fetched content. Session MCP mounts are limited to ACP stdio and Streamable HTTP declarations.
 - **Committed answers only** — live progress, reasoning, tool activity, plans, titles, and usage stay off the wire.
-- **Connection-owned lifetime** — one connection releases all of its sessions; per-session close is not implemented.
+- **Connection-owned lifetime** — one connection releases all of its active sessions during teardown; `session/close` is available while the connection is open.

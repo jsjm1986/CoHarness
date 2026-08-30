@@ -312,6 +312,15 @@ describe('web e2e: continuous conversation grown through the composer', () => {
       expect(results[0]?.data.message.content[0].isError).toBe(false)
       expect(toolResultText(results[0]!)).toBe(`${spec.toolResultMarker}\n`)
 
+      // Completed process rows are collapsed by the shipped UI. Expand this
+      // turn before asserting the nested tool presentation; the durable call
+      // and result assertions above remain independent of that view choice.
+      const processToggle = page.locator(`[data-turn-process="${String(spec.index)}"]`)
+      await expect.poll(() => processToggle.count(), { timeout: 10_000 }).toBe(1)
+      if (await processToggle.getAttribute('aria-expanded') !== 'true') {
+        await processToggle.click()
+        await expect.poll(() => processToggle.getAttribute('aria-expanded'), { timeout: 10_000 }).toBe('true')
+      }
       const toolRow = page.locator(`[data-chat-call-id="${spec.callId}"]`)
       await expect.poll(() => toolRow.count(), { timeout: 10_000 }).toBe(1)
       expect(await toolRow.textContent()).toContain(spec.toolResultMarker)

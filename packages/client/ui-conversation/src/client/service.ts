@@ -14,7 +14,9 @@ import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 // Type-only imports: a plugin-to-plugin value import is a bundle purity
 // error, so scope resolution goes through the sessions service (scopeOf
 // method) instead of the standalone helper.
-import type { ISessions, SessionFace, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type {
+  ISessions, PendingSubmissionRetirement, SessionFace, SessionId,
+} from '@deepseek-ai/dsh-client-runtime/client'
 import type { SubmitImageAttachment, SubmitOutcome } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type { ImageAttachmentRef, ImageMediaType } from '@deepseek-ai/dsh-attachment'
 import type { UserDocIdType, UserDocRef } from '@deepseek-ai/dsh-userdoc'
@@ -86,6 +88,7 @@ interface ImageUrlEntry {
   readonly sessionId: SessionId
   readonly generation: number
   readonly pending: Promise<string>
+  readonly current?: string
 }
 
 interface DraftDocumentEntry {
@@ -191,16 +194,57 @@ export class ConversationController extends Service implements IConversation {
     if (documents.length !== documentIds.length) {
       throw new Error('conversation.sendSession: one or more draft documents are no longer available')
     }
-    const uploaded = await this.serializeImages(attachments.map(attachment => attachment.file))
-    const content = [
-      ...uploaded,
-      ...documents.map(document => ({ type: 'document' as const, docId: document.docId })),
-      ...(text === '' ? [] : [{ type: 'text' as const, text }]),
-    ]
-    const result = await session.prompt(content, mode, signal)
+    // Session-backed subagents and legacy structural fakes do not expose the
+    // local echo seam; preserve their existing serialize→prompt choreography.
+    if (session.getSnapshot().subagent !== null || session.beginSubmission === undefined) {
+      const uploaded = await this.serializeImages(attachments.map(attachment => attachment.file))
+      const content = [
+        ...uploaded,
+        ...documents.map(document => ({ type: 'document' as const, docId: document.docId })),
+        ...(text === '' ? [] : [{ type: 'text' as const, text }]),
+      ]
+      const result = await session.prompt(content, mode, signal)
+      if (!result.ok) return { kind: 'error' }
+      this.releaseDraftImages(attachments)
+      this.releaseDraftDocuments(session.sessionId, documentIds)
+      return { kind: 'success' }
+    }
+
+    let finishRetirement: ((retirement: PendingSubmissionRetirement) => void) | undefined
+    const retirement = attachments.length === 0
+      ? undefined
+      : new Promise<PendingSubmissionRetirement>((resolve) => {
+        finishRetirement = resolve
+      })
+    const submission = session.beginSubmission({
+      text,
+      images: attachments.map(attachment => ({
+        previewUrl: attachment.previewUrl,
+        ...(attachment.file.name === '' ? {} : { name: attachment.file.name }),
+      })),
+      onRetire: (settlement) => {
+        this.settleSubmittedImages(session.sessionId, attachments, settlement)
+        finishRetirement?.(settlement)
+      },
+    })
+    let content: Parameters<SessionFace['prompt']>[0]
+    try {
+      // Give React a chance to paint the local echo before expensive encoding.
+      await nextPaint()
+      const uploaded = await this.serializeImages(attachments.map(attachment => attachment.file))
+      content = [
+        ...uploaded,
+        ...documents.map(document => ({ type: 'document' as const, docId: document.docId })),
+        ...(text === '' ? [] : [{ type: 'text' as const, text }]),
+      ]
+    } catch (error) {
+      submission.abandon()
+      throw error
+    }
+    const result = await session.prompt(content, mode, signal, submission.requestId)
     if (!result.ok) return { kind: 'error' }
-    this.releaseDraftImages(attachments)
     this.releaseDraftDocuments(session.sessionId, documentIds)
+    if (retirement !== undefined && (await retirement).reason !== 'observed') return { kind: 'error' }
     return { kind: 'success' }
   }
 
@@ -430,6 +474,28 @@ export class ConversationController extends Service implements IConversation {
   }
 
   /**
+   * Settle submitted image drafts when the Session observes their durable
+   * attachment references. Failed admissions leave drafts untouched so the
+   * composer can restore and retry them.
+   */
+  private settleSubmittedImages(
+    sessionId: SessionId,
+    attachments: readonly ComposerAttachment[],
+    retirement: PendingSubmissionRetirement,
+  ): void {
+    if (retirement.reason !== 'observed') return
+    attachments.forEach((attachment, index) => {
+      const live = this.draftAttachments.get(attachment.id)
+      if (live === undefined) return
+      this.draftAttachments.delete(attachment.id)
+      const ref = retirement.attachments[index]
+      if (ref !== undefined && this.seedImageUrl(sessionId, ref, attachment.previewUrl)) return
+      this.createdImageUrls.delete(attachment.previewUrl)
+      revokePreview(attachment.previewUrl)
+    })
+  }
+
+  /**
    * Resolve and cache one session-authorized historical image URL.
    * @param sessionId - owning session authorization scope.
    * @param attachment - durable image reference.
@@ -445,7 +511,59 @@ export class ConversationController extends Service implements IConversation {
     if (session === undefined) {
       return Promise.reject(new Error(`conversation.resolveImage: unknown session "${sessionId}"`))
     }
-    const pending = session.readAttachment(attachment.attachmentId)
+    const pending = this.loadCanonicalImage(session, sessionId, attachment, generation, key)
+    this.imageUrls.set(key, { sessionId, generation, pending })
+    return pending
+  }
+
+  /**
+   * Return a synchronously available canonical or submission-preview URL.
+   * @param sessionId - session authorization scope that owns the image.
+   * @param attachment - durable image reference.
+   * @returns a cached preview or canonical URL, when one is available.
+   */
+  peekImage(sessionId: SessionId, attachment: ImageAttachmentRef): string | undefined {
+    return this.imageUrls.get(`${sessionId}:${attachment.attachmentId}`)?.current
+  }
+
+  /**
+   * Hand a local submission preview to the durable image cache while the
+   * canonical attachment URL is fetched. The preview is replaced once the
+   * authenticated bytes resolve.
+   * @param sessionId - session authorization scope that owns the image.
+   * @param attachment - durable image reference observed in the accepted message.
+   * @param previewUrl - browser-owned object URL to expose until canonical bytes resolve.
+   * @returns true when the preview was adopted by the image cache.
+   */
+  seedImageUrl(sessionId: SessionId, attachment: ImageAttachmentRef, previewUrl: string): boolean {
+    if (this.disposed) return false
+    const key = `${sessionId}:${attachment.attachmentId}`
+    if (this.imageUrls.has(key)) return false
+    const generation = this.imageGenerations.get(sessionId) ?? 0
+    const session = this.requireSessions().binding(sessionId)?.session
+    if (session === undefined) return false
+    const pending = this.loadCanonicalImage(session, sessionId, attachment, generation, key)
+      .then((url) => {
+        if (this.createdImageUrls.delete(previewUrl)) revokePreview(previewUrl)
+        return url
+      }, (error: unknown) => {
+        if (this.createdImageUrls.delete(previewUrl)) revokePreview(previewUrl)
+        throw error
+      })
+    this.createdImageUrls.add(previewUrl)
+    this.imageUrls.set(key, { sessionId, generation, pending, current: previewUrl })
+    return true
+  }
+
+  /** Load one canonical URL and enforce session-generation ownership. */
+  private loadCanonicalImage(
+    session: SessionFace,
+    sessionId: SessionId,
+    attachment: ImageAttachmentRef,
+    generation: number,
+    key: string,
+  ): Promise<string> {
+    return session.readAttachment(attachment.attachmentId)
       .then((result) => {
         if (!result.ok) throw new Error(`${result.error.code}: ${result.error.message}`)
         if (this.disposed) throw new Error('conversation.resolveImage: service was disposed before loading completed')
@@ -460,12 +578,17 @@ export class ConversationController extends Service implements IConversation {
         this.createdImageUrls.add(url)
         return url
       })
+      .then((url) => {
+        const entry = this.imageUrls.get(key)
+        if (entry !== undefined && entry.generation === generation && entry.current !== undefined) {
+          this.imageUrls.set(key, { ...entry, current: url })
+        }
+        return url
+      })
       .catch((error: unknown) => {
         if (this.imageUrls.get(key)?.generation === generation) this.imageUrls.delete(key)
         throw error
       })
-    this.imageUrls.set(key, { sessionId, generation, pending })
-    return pending
   }
 
   /**
@@ -477,6 +600,12 @@ export class ConversationController extends Service implements IConversation {
     for (const [key, entry] of this.imageUrls) {
       if (entry.sessionId !== sessionId) continue
       this.imageUrls.delete(key)
+      // A seeded submission owns its preview while the canonical bytes are
+      // pending. Releasing the rendered session must revoke that browser URL
+      // immediately; the pending load may never settle after cancellation.
+      if (entry.current !== undefined && this.createdImageUrls.delete(entry.current)) {
+        revokePreview(entry.current)
+      }
       void entry.pending.then((url) => {
         if (!this.createdImageUrls.delete(url)) return
         revokePreview(url)
@@ -626,4 +755,12 @@ function bytesToBase64(data: Uint8Array): string {
 
 function revokePreview(url: string): void {
   if (url.startsWith('blob:')) URL.revokeObjectURL(url)
+}
+
+/** Resolve after the browser has had one paint opportunity. */
+function nextPaint(): Promise<void> {
+  if (typeof requestAnimationFrame === 'function') {
+    return new Promise((resolve) => { requestAnimationFrame(() => { resolve() }) })
+  }
+  return new Promise((resolve) => { setTimeout(resolve, 0) })
 }

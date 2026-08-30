@@ -125,6 +125,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Adapters register provider implementations; the loop and compaction call the provider-neutral stream service.',
   },
   {
+    key: 'deepseekLlmApiExtensions',
+    pkg: 'deepseek-llm-api-extensions',
+    title: 'Official DeepSeek request-extension registry',
+    mode: 'seam',
+    consumers: ['llm-deepseek', 'session-log-deepseek', 'plugin-package-inventory-deepseek'],
+    note: 'The registry owns additive provider-specific request fields and their post-acceptance callbacks; the official adapter prepares them, while extension plugins own field semantics.',
+  },
+  {
     key: 'modelAccess',
     pkg: 'model-access',
     title: 'Model-route authorization policy',
@@ -537,6 +545,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     implementations: ['subagent-spawn-in-process', 'subagent-fork-in-process', 'subagent-acp', 'subagent-codex', 'subagent-claude-code', 'subagent-dsh-sdk'],
     consumers: ['tool-subagent', 'tool-subagent-control', 'tool-ralph'],
     note: 'Providers implement transports; the service also owns optional Activation-based continuation orchestration, tool-subagent selects one-shot or continuable delegation, tool-subagent-control delivers follow-ups, and tool-ralph requires one fresh structured-output route.',
+  },
+  {
+    key: 'subagentModelSelection',
+    pkg: 'tool-subagent',
+    title: 'Opt-in subagent model-selection settings',
+    mode: 'core',
+    consumers: ['tool-subagent'],
+    note: 'The settings service validates and snapshots the host allowlist used by the delegation tool when model-selection support is explicitly enabled; the shipped composition keeps it disabled by default.',
   },
   {
     key: 'agentTeams',

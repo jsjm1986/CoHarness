@@ -88,7 +88,7 @@ def test_stage_sdk_keeps_distribution_module_and_runtime_pin_distinct(tmp_path: 
 def test_stage_runtime_copies_platform_payload(
     tmp_path: Path, target: str, with_helper: bool
 ) -> None:
-    executable = tmp_path / f"dsh-jsonrpc-agent-pkg-{target}"
+    executable = tmp_path / f"deepseek-harness-sdk-runtime-{target}"
     executable.write_bytes(b"runtime")
     executable.chmod(0o755)
     expected = {executable.name: b"runtime"}
@@ -106,7 +106,7 @@ def test_stage_runtime_copies_platform_payload(
     build_python_release.stage_runtime(destination, "1.2.3", executable, executable.name)
 
     runtime_dir = destination / "src" / "deepseek_harness_runtime" / "runtime"
-    assert {path.name: path.read_bytes() for path in runtime_dir.glob("dsh-jsonrpc-agent-pkg-*")} == expected
+    assert {path.name: path.read_bytes() for path in runtime_dir.glob("deepseek-harness-sdk-runtime-*")} == expected
     pyproject = (destination / "pyproject.toml").read_text()
     assert 'license = "MIT"' in pyproject
     assert 'license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]' in pyproject
@@ -117,3 +117,27 @@ def test_stage_runtime_copies_platform_payload(
     assert (destination / "THIRD_PARTY_NOTICES.md").read_bytes() == (
         ROOT / "THIRD_PARTY_NOTICES.md"
     ).read_bytes()
+
+
+def test_stage_runtime_accepts_legacy_executable_name_and_emits_canonical_payload(
+    tmp_path: Path,
+) -> None:
+    executable = tmp_path / "dsh-jsonrpc-agent-pkg-linux-x64"
+    executable.write_bytes(b"runtime")
+    executable.chmod(0o755)
+    legacy_rg = Path(f"{executable}-rg")
+    legacy_rg.write_bytes(b"ripgrep")
+    legacy_rg.chmod(0o755)
+    destination = tmp_path / "staging"
+
+    build_python_release.stage_runtime(
+        destination,
+        "1.2.3",
+        executable,
+        "deepseek-harness-sdk-runtime-linux-x64",
+    )
+
+    runtime_dir = destination / "src" / "deepseek_harness_runtime" / "runtime"
+    assert (runtime_dir / "deepseek-harness-sdk-runtime-linux-x64").read_bytes() == b"runtime"
+    assert (runtime_dir / "deepseek-harness-sdk-runtime-linux-x64-rg").read_bytes() == b"ripgrep"
+    assert not list(runtime_dir.glob("dsh-jsonrpc-agent-pkg-*") )

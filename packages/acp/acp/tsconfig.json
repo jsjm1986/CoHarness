@@ -24,6 +24,18 @@
       "path": "../../core/agent"
     },
     {
+      "path": "../../llm/llm"
+    },
+    {
+      "path": "../../llm/token-meter"
+    },
+    {
+      "path": "../../mcp/mcp-client"
+    },
+    {
+      "path": "../../session/session-persistence"
+    },
+    {
       "path": "../../interaction/user-approval"
     },
     {

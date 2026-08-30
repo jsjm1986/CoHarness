@@ -3,50 +3,57 @@
 import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
-import { assertAllowedModelRoutes, type AllowedModelRoute } from './model-selection.ts'
+import {
+  AllowedModelRouteSchema,
+  assertAllowedModelRoutes,
+  type AllowedModelRoute,
+} from './model-selection.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
-    /** User preference sampled when a new Agent receives delegation tools. */
+    /** User preference sampled when a new Agent receives its delegation tools. */
     subagentModelSelection: SubagentModelSelectionConfig
   }
 }
 
-/** Settings namespace for model-selectable child delegation. */
+/** User-settings section for model-selectable subagent delegation. */
 export const SUBAGENT_MODEL_SELECTION_SETTINGS_NAMESPACE = settingsNamespace('subagent-model-selection')
 
-/** Stored user preference. */
+/** Stored user preference; the shipped composition defaults it off. */
 export interface SubagentModelSelectionSettings {
+  /** Whether newly composed top-level Sessions receive model selection. */
   enabled: boolean
+  /** Exact child LLM routes offered to newly composed top-level Sessions. */
   allowedModels: AllowedModelRoute[]
 }
 
-/** Settings schema exposed to settings clients. */
+/** Schema served to settings clients for the opt-in preference. */
 export const SUBAGENT_MODEL_SELECTION_SETTINGS_SCHEMA: z<SubagentModelSelectionSettings> = z.object({
   enabled: z.boolean().default(false),
-  allowedModels: z.array(z.object({
-    provider: z.string().min(1).required(),
-    model: z.string().min(1).required(),
-  })).default([]),
+  allowedModels: z.array(AllowedModelRouteSchema).default([]),
 })
 
-/** Deployment defaults for the opt-in setting. */
+/** Optional deployment base for the preference. */
 export interface Config {
+  /** Initial enabled state inherited when the user document does not override it. */
   enabled?: boolean
+  /** Initial route list inherited when the user document does not override it. */
   allowedModels?: AllowedModelRoute[]
 }
 
-/** Singleton settings owner sampled by delegation tools at Agent publication. */
+/** Singleton settings owner read by delegation tools when an Agent is published. */
 export class SubagentModelSelectionConfig extends Service {
   static Config: z<Config> = z.object({
     enabled: z.boolean().default(false),
-    allowedModels: z.array(z.object({ provider: z.string().min(1).required(), model: z.string().min(1).required() })).default([]),
+    allowedModels: z.array(AllowedModelRouteSchema).default([]),
   })
 
   private source: () => SubagentModelSelectionSettings
 
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'subagentModelSelection')
+    // Cordis supplies the schema default; the fallback also covers direct construction.
+    /* v8 ignore next */
     const entry: SubagentModelSelectionSettings = {
       enabled: config.enabled ?? false,
       allowedModels: config.allowedModels ?? [],
@@ -61,15 +68,23 @@ export class SubagentModelSelectionConfig extends Service {
       {
         setSource: (source) => { this.source = source },
         validate: (value) => { this.validate(value) },
+        // Consumers sample at Agent publication, so a settings update never
+        // rebuilds the tool definitions of an Agent that is already running.
         onChange: () => {},
       },
     )
   }
 
-  /** Read a detached preference for the next eligible Agent. */
+  /**
+   * Read a detached selection preference for the next eligible Agent publication.
+   * @returns the enabled state and exact allowed routes.
+   */
   current(): SubagentModelSelectionSettings {
     const current = this.source()
-    return { enabled: current.enabled, allowedModels: current.allowedModels.map(route => ({ ...route })) }
+    return {
+      enabled: current.enabled,
+      allowedModels: current.allowedModels.map(route => ({ ...route })),
+    }
   }
 
   private validate(value: SubagentModelSelectionSettings): void {

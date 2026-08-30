@@ -40,7 +40,7 @@ stdio JSON-RPC 对外服务接口（`@deepseek-ai/dsh-sdk-jsonrpc-server`，见[
 
 **导出源模块、规范化辅助函数和订阅投递端操作。** 这些都是调用方不需要的实现细节；暴露它们会让调用方不得不理解客户端如何校验与分发协议输入。各包根转而枚举受支持的客户端接口与协议接口，客户端则只重新导出调用方必须区分的那一种协议错误。
 
-**复用 `dsh-acp-snapshot` 的 `runScenario` 做 SDK 快照。** 那个 harness 说 ACP（`ClientSideConnection`、`InputStep` 脚本）。SDK 套件的全部意义就是以 *SDK 客户端*为入口；它复用 normalize/refresh 库层（`normalizeSessionLog`、`refreshFixtureReplacements`……），不动 ACP 驱动器。
+**复用 `dsh-acp-snapshot` 的 `runScenario` 做 SDK 快照。** 那个 harness 通过类型化 `client()` app 和 `InputStep` 脚本使用 ACP。SDK 套件的全部意义就是以 *SDK 客户端*为入口；它复用 normalize/refresh 库层（`normalizeSessionLog`、`refreshFixtureReplacements`……），不动 ACP 驱动器。
 
 ## 后果
 

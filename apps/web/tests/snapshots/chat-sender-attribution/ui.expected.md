@@ -1,3 +1,10 @@
+- separator "Adjust transcript content width"
+- navigation "Turn navigation":
+  - button "Jump to turn 1"
+  - button "Jump to turn 2"
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
 - text: Zhou ZHOU_PROMPT 7/25 {{clock}}
 - button "Copy":
   - img
@@ -10,7 +17,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}} Lin admin LIN_PROMPT 7/25 {{clock}}
+- text: 7/25 {{clock}} Ran for {{duration}}
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
+- text: Lin admin LIN_PROMPT 7/25 {{clock}}
 - button "Copy":
   - img
 - paragraph: LIN_REPLY
@@ -25,6 +36,8 @@
 - text: 7/25 {{clock}} Ran for {{duration}}
 - textbox "Message the agent"
 - button "Add images or documents":
+  - img
+- button "Choose from Documents":
   - img
 - button "Commands":
   - img

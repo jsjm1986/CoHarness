@@ -2,20 +2,26 @@
 // chain, AND the composer bar (session-maybe slot) stay mounted across
 // no-session/session transitions — the bar renders inert via owner props.
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react'
 import clsx from 'clsx'
 import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConversationSlotProps, InputZone } from '../contract/slots.ts'
 import { HeroGlow, HeroShell, WorkspaceChip, workspaceLabel } from './EmptyHero.tsx'
+import { CHAT_CONTENT_WIDTH_RANGE } from '../../submission-settings.ts'
 import css from './ConversationRoot.module.css'
+
+function invokePointerCapture(target: HTMLElement, method: 'setPointerCapture' | 'releasePointerCapture', pointerId: number): void {
+  const candidate: unknown = Reflect.get(target, method)
+  if (typeof candidate === 'function') Reflect.apply(candidate, target, [pointerId])
+}
 
 /** Full props composed from the slot contract. */
 export type ConversationRootProps = ConversationSlotProps
 
 export function ConversationRoot({
   sessionId, useSession, useSessions, useWorkspaces, useInput, useComposerBlock,
-  renderSlot, renderSlotChain, selectWorkspace, t, compact = false,
+  useDisplaySettings, setDisplayWidth, renderSlot, renderSlotChain, selectWorkspace, t, compact = false,
 }: ConversationRootProps) {
   const openState = useSession(s => s.openState)
   const composerPhase = useSession(s => s.composerPhase)
@@ -28,6 +34,9 @@ export function ConversationRoot({
   // A plugin this package cannot import (ui-model-selection) says this session cannot
   // send; its reason is already localized by whoever raised it.
   const composerBlock = useComposerBlock(block => block)
+  const displaySettings = useDisplaySettings(value => value)
+  const rootRef = useRef<HTMLDivElement | null>(null)
+  const widthPointer = useRef<{ id: number; width: number } | null>(null)
 
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pendingWorkspaceId, setPendingWorkspaceId] = useState<WorkspaceId | undefined>()
@@ -214,10 +223,67 @@ export function ConversationRoot({
     </div>
   )
 
+  const widthStyle = {
+    '--dsh-chat-content-width': `${displaySettings.chatContentWidth}px`,
+    '--dsh-chat-font-size': `${displaySettings.chatFontSize}px`,
+  } as CSSProperties
+  const updateWidth = (clientX: number, startWidth?: number): void => {
+    const root = rootRef.current
+    if (root === null) return
+    const rect = root.getBoundingClientRect()
+    const center = rect.left + rect.width / 2
+    const origin = startWidth ?? displaySettings.chatContentWidth
+    setDisplayWidth(origin + (clientX - (center + origin / 2)) * 2)
+  }
+  const beginWidthResize = (event: PointerEvent<HTMLDivElement>): void => {
+    event.preventDefault()
+    invokePointerCapture(event.currentTarget, 'setPointerCapture', event.pointerId)
+    widthPointer.current = { id: event.pointerId, width: displaySettings.chatContentWidth }
+    updateWidth(event.clientX, displaySettings.chatContentWidth)
+  }
+  const moveWidthResize = (event: PointerEvent<HTMLDivElement>): void => {
+    const active = widthPointer.current
+    if (active?.id !== event.pointerId) return
+    updateWidth(event.clientX, active.width)
+  }
+  const endWidthResize = (event: PointerEvent<HTMLDivElement>): void => {
+    if (widthPointer.current?.id !== event.pointerId) return
+    widthPointer.current = null
+    invokePointerCapture(event.currentTarget, 'releasePointerCapture', event.pointerId)
+  }
+  const onWidthKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+    const step = event.shiftKey ? 64 : 16
+    const current = displaySettings.chatContentWidth
+    const next = event.key === 'ArrowLeft' ? current - step
+      : event.key === 'ArrowRight' ? current + step
+        : event.key === 'Home' ? CHAT_CONTENT_WIDTH_RANGE.min
+          : event.key === 'End' ? CHAT_CONTENT_WIDTH_RANGE.max
+            : undefined
+    if (next === undefined) return
+    event.preventDefault()
+    setDisplayWidth(next)
+  }
+
   return (
-    <div className={css.root} data-phase={phase}>
+    <div ref={rootRef} className={css.root} data-phase={phase} style={widthStyle}>
       {renderSlot('conversation.session.header', { compact })}
       <div className={css.scrollBody} data-conversation-scroll="">
+        <div
+          className={css.widthHandle}
+          role="separator"
+          aria-orientation="vertical"
+          aria-valuemin={CHAT_CONTENT_WIDTH_RANGE.min}
+          aria-valuemax={CHAT_CONTENT_WIDTH_RANGE.max}
+          aria-valuenow={displaySettings.chatContentWidth}
+          aria-label={t('settings.display.widthHandle')}
+          tabIndex={0}
+          data-conversation-width-handle=""
+          onPointerDown={beginWidthResize}
+          onPointerMove={moveWidthResize}
+          onPointerUp={endWidthResize}
+          onPointerCancel={endWidthResize}
+          onKeyDown={onWidthKeyDown}
+        />
         {renderSlot('conversation.session', { compact })}
         {composerSeat}
       </div>

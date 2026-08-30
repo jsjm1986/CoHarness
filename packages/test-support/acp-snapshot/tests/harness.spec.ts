@@ -85,7 +85,7 @@ describe('runScenario', () => {
     let stdioClosed = false
     let clientClosed = false
     launched.child.once('close', () => { stdioClosed = true })
-    void launched.client.closed.then(
+    void launched.connection.closed.then(
       () => { clientClosed = true },
       () => { clientClosed = true },
     )
@@ -343,7 +343,7 @@ describe('runScenario', () => {
     let closeSettled = false
     const closing = launched.close('SIGKILL').then(() => { closeSettled = true })
     await childClosed
-    await launched.client.closed
+    await launched.connection.closed
     expect(closeSettled).toBe(false)
 
     releasePermission?.()

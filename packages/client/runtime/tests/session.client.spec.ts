@@ -7,6 +7,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-commands/types'
 import type { SessionId } from '@deepseek-ai/dsh-api-remotes/client'
@@ -28,6 +29,10 @@ afterEach(() => {
 })
 
 const EMPTY: readonly never[] = []
+
+function flushSubmissionFrame(): Promise<void> {
+  return new Promise((resolve) => { setTimeout(resolve, 0) })
+}
 
 interface TestEventState extends ConversationEventInput {}
 
@@ -820,6 +825,132 @@ describe('rename', () => {
     api.onRename = () => Promise.reject(new Error('rename transport down'))
     const folded = await session.rename('x')
     expect(folded).toMatchObject({ ok: false, error: { code: 'internal' } })
+  })
+})
+
+describe('pending submission echoes', () => {
+  it('forwards requestId and retires one echo for duplicate queue/durable observations', async () => {
+    const { api, session } = makeSession()
+    api.onHistory = () => histResponse([])
+    await session.open()
+    const retired = vi.fn()
+    const imageRef = {
+      attachmentId: 'sha256:submission-image' as never,
+      mediaType: 'image/png' as const,
+      bytes: 4,
+      width: 2,
+      height: 2,
+      name: 'submission.png',
+    }
+    const handle = session.beginSubmission({
+      text: '带图消息',
+      images: [{ previewUrl: 'blob:submission', name: 'submission.png' }],
+      onRetire: retired,
+    })
+    expect(session.getSnapshot().pendingSubmissions).toMatchObject([{
+      requestId: handle.requestId,
+      text: '带图消息',
+      images: [{ previewUrl: 'blob:submission', name: 'submission.png' }],
+    }])
+
+    await expect(session.prompt(
+      [{ type: 'text', text: '带图消息' }],
+      'queue',
+      undefined,
+      handle.requestId,
+    )).resolves.toMatchObject({ ok: true })
+    expect(api.callsOf('session.prompt')).toMatchObject([{
+      sessionId: SID,
+      mode: 'queue',
+      requestId: handle.requestId,
+    }])
+
+    const message = createUserMessage({
+      content: [{ type: 'image', attachment: imageRef }, { type: 'text', text: '带图消息' }] as never,
+      source: { kind: 'user', rpcId: handle.requestId } as never,
+    })
+    const durable = {
+      seq: 0,
+      time: 1_700_000_000_000,
+      type: 'user/message',
+      surfaceOp: 'append',
+      data: message,
+    } as SessionEvent
+    const queue = {
+      type: 'session/queue' as const,
+      sessionId: SID,
+      items: [{
+        id: 'queue-submission' as never,
+        rpcId: handle.requestId,
+        placement: 'queued' as const,
+        message,
+      }],
+    }
+
+    // Both delivery paths can report the same admission before the next
+    // frame; the settlement latch must call the owner exactly once.
+    session.handleMuxEnvelope('queue-1' as never, queue)
+    session.handleMuxEnvelope('durable-1' as never, { type: 'session/event', sessionId: SID, event: durable })
+    session.handleMuxEnvelope('queue-2' as never, queue)
+    session.handleMuxEnvelope('durable-2' as never, { type: 'session/event', sessionId: SID, event: durable })
+    expect(session.getSnapshot().pendingSubmissions).toHaveLength(1)
+    await flushSubmissionFrame()
+    expect(session.getSnapshot().pendingSubmissions).toEqual([])
+    expect(retired).toHaveBeenCalledTimes(1)
+    expect(retired).toHaveBeenCalledWith({ reason: 'observed', attachments: [imageRef] })
+  })
+
+  it('retires failed submissions for business, transport, and abort outcomes', async () => {
+    const cases = [
+      {
+        label: 'business',
+        setup: (api: FakeApiClient) => {
+          api.onPrompt = () => Promise.resolve(err({ code: 'agent-busy', message: 'busy', details: { reason: 'busy' } }))
+        },
+      },
+      {
+        label: 'transport',
+        setup: (api: FakeApiClient) => {
+          api.onPrompt = () => Promise.reject(new Error('wire down'))
+        },
+      },
+      {
+        label: 'abort',
+        setup: (api: FakeApiClient) => {
+          api.onPrompt = () => Promise.reject(new DOMException('aborted', 'AbortError'))
+        },
+      },
+    ] as const
+
+    for (const testCase of cases) {
+      const { api, session } = makeSession()
+      testCase.setup(api)
+      const retired = vi.fn()
+      const handle = session.beginSubmission({ text: testCase.label, images: [], onRetire: retired })
+      const controller = new AbortController()
+      const result = await session.prompt(
+        [{ type: 'text', text: testCase.label }],
+        'queue',
+        controller.signal,
+        handle.requestId,
+      )
+      expect(result.ok).toBe(false)
+      expect(session.getSnapshot().pendingSubmissions).toEqual([])
+      expect(retired).toHaveBeenCalledOnce()
+      expect(retired).toHaveBeenCalledWith({ reason: 'failed' })
+      expect(api.lastPromptSignal).toBe(controller.signal)
+    }
+  })
+
+  it('disposes an unresolved echo once and leaves no pending submission', () => {
+    const { session } = makeSession()
+    const retired = vi.fn()
+    session.beginSubmission({ text: '待处理', images: [], onRetire: retired })
+    session.dispose()
+    session.dispose()
+    expect(session.getSnapshot().pendingSubmissions).toEqual([])
+    expect(retired).toHaveBeenCalledOnce()
+    expect(retired).toHaveBeenCalledWith({ reason: 'failed' })
   })
 })
 

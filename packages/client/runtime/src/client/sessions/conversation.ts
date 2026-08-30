@@ -12,7 +12,7 @@ import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type { LlmRetryEventData } from '@deepseek-ai/dsh-llm-retry/types'
 import type { TodoItem } from '@deepseek-ai/dsh-session/types'
 import type {
-  RpcError, SessionId, SubagentAddress, ToolCallView, ToolResultView,
+  RpcError, RpcId, SessionId, SubagentAddress, ToolCallView, ToolResultView,
 } from '@deepseek-ai/dsh-api-remotes/client'
 import type { PendingInteraction } from './pending.ts'
 import type { ContextProvenanceView, KnownContextForm } from './context-provenance.ts'
@@ -348,6 +348,8 @@ export interface QueuedMessage {
   readonly id: MessageId
   /** Stable message identity used for transient-to-durable steering handoff. */
   readonly messageId: MessageId
+  /** Prompt identity for a browser-submitted occurrence, when present. */
+  readonly rpcId?: RpcId
   /** Agent-resolved placement; only queued rows accept queue mutations. */
   readonly placement: 'queued' | 'steering' | 'context'
   /** Complete content used to render pending steering before it becomes durable. */
@@ -355,6 +357,30 @@ export interface QueuedMessage {
   readonly preview: string
   /** Complete editable text; null when the message contains non-text blocks. */
   readonly text: string | null
+}
+
+/** One image displayed by a local submission echo before durable admission. */
+export interface PendingSubmissionImage {
+  /** Browser-owned preview URL; its lifecycle belongs to the submitter. */
+  readonly previewUrl: string
+  /** Browser file name, when the file had one. */
+  readonly name?: string
+  /** Intrinsic pixel width, when known. */
+  readonly width?: number
+  /** Intrinsic pixel height, when known. */
+  readonly height?: number
+}
+
+/** One local prompt-submission echo awaiting durable event or queue observation. */
+export interface PendingSubmission {
+  /** Prompt identity carried through the host source metadata. */
+  readonly requestId: RpcId
+  /** Client wall-clock ms when the submission began. */
+  readonly time: number
+  /** Prompt text exactly as sent, possibly empty for attachment-only input. */
+  readonly text: string
+  /** Ordered image previews matching the prompt's image parts. */
+  readonly images: readonly PendingSubmissionImage[]
 }
 
 /** In-progress assistant output (chunk accumulator product). */
@@ -420,6 +446,23 @@ export interface ChatNodeStore {
   values(): readonly ChatConversationViewNode[]
 }
 
+/** One loaded Turn projected into the compact Chat navigation rail. */
+export interface TurnNavigationItem {
+  readonly turn: number
+  /** Stable Conversation Context key the rail scrolls to. */
+  readonly anchorKey: string
+  /** Bounded prompt preview; empty when the loaded window starts mid-Turn. */
+  readonly prompt: string
+  /** Bounded assistant-response preview; empty until the Turn answers. */
+  readonly response: string
+}
+
+/** Stable live navigation projection of the loaded Turns. */
+export interface ChatTurnNavigationIndex {
+  /** @returns current navigation items in timeline order. */
+  items(): readonly TurnNavigationItem[]
+}
+
 /**
  * Stable live Location index. An old ChatSnapshot observes later membership
  * changes through this index.
@@ -445,6 +488,8 @@ export interface ChatSnapshot {
   readonly order: readonly string[]
   readonly nodes: ChatNodeStore
   readonly locations: ChatLocationNodeIndex
+  /** Navigation is absent in older lightweight fixtures and compatible consumers. */
+  readonly navigation?: ChatTurnNavigationIndex
   readonly timeline: ConversationTimelineSnapshot
   readonly legacy: LegacyConversationSlice
 }
@@ -467,6 +512,9 @@ export const EMPTY_CHAT_SNAPSHOT: ChatSnapshot = {
   locations: {
     getTurn: () => EMPTY_LIST,
     getStep: () => EMPTY_LIST,
+  },
+  navigation: {
+    items: () => EMPTY_LIST,
   },
   timeline: EMPTY_TIMELINE,
   legacy: {
@@ -494,6 +542,8 @@ export interface ConversationSnapshot {
   partial: PartialAssistant | null
   runningCalls: readonly RunningToolCall[]
   pending: readonly PendingInteraction[]
+  /** Local prompt-submission echoes not yet observed as durable events or queue occurrences. */
+  pendingSubmissions?: readonly PendingSubmission[]
   /** Authoritative transient inbox snapshot, including queued and steering placements. */
   queue: readonly QueuedMessage[]
   running: boolean

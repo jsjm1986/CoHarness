@@ -2,7 +2,8 @@
  * @deepseek-ai/dsh-headless — one-shot direct Agent driver. The bundle patch
  * rides over dsh-base without Host, HTTP, or browser plugins; this runner
  * creates one Agent through the core registry, drives the task to quiescence,
- * flushes its Session, prints the final assistant text, and exits.
+ * optionally streams provider reasoning to stderr, flushes its Session, prints
+ * the final assistant text to stdout, and exits.
  *
  * @module @deepseek-ai/dsh-headless
  */
@@ -11,9 +12,9 @@ import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { installModelSelection } from '@deepseek-ai/dsh-agent'
-import type { ModelSelectionRef } from '@deepseek-ai/dsh-agent'
+import type { Agent, ModelSelectionRef } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-default-model'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { assertNever, createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 // Empty type imports carry the loader Context merge for the settlement await
@@ -31,10 +32,13 @@ export const inject = ['agentDefaultModel', 'agents', 'sessions']
 export interface Config {
   /** The prompt text for the single run. */
   task: string
+  /** Emit provider reasoning progress to stderr when enabled. */
+  progress: boolean
 }
 
 export const Config: z<Config> = z.object({
   task: z.string().required(),
+  progress: z.boolean().default(false),
 })
 
 /** Outcome of one owned run interval. */
@@ -81,6 +85,71 @@ function summarize(events: readonly SessionEvent[], firstSeq: number): RunOutcom
   return { text, reason }
 }
 
+/**
+ * Project provider-reported reasoning from one owned run to stderr as it is
+ * appended, while keeping final outcome derivation on the durable log.
+ * @param ctx - plugin context carrying the Session event feed.
+ * @param agent - the exact Agent whose reasoning belongs to this invocation.
+ * @param stderr - progress output sink.
+ * @returns a disposer that also terminates an unterminated reasoning line.
+ */
+function streamReasoning(
+  ctx: Context,
+  agent: Agent,
+  stderr: HeadlessIo['stderr'],
+): () => void {
+  let started = false
+  let open = false
+  let endsWithNewline = true
+  const close = (): void => {
+    if (!open) return
+    if (!endsWithNewline) stderr.write('\n')
+    open = false
+    endsWithNewline = true
+  }
+  const dispose = ctx.on('session/event', (session, event) => {
+    if (session !== agent.session) return
+    if (event.type === 'turn/start') {
+      close()
+      started = true
+      return
+    }
+    if (!started || event.type !== 'assistant/chunk') return
+    const chunk = event.data.chunk
+    switch (chunk.type) {
+      case 'reasoning-delta':
+        if (chunk.text === '') return
+        if (!open) {
+          stderr.write('dsh: reasoning:\n')
+          open = true
+        }
+        stderr.write(chunk.text)
+        endsWithNewline = chunk.text.endsWith('\n')
+        return
+      case 'block-start':
+        if (chunk.blockType !== 'reasoning') close()
+        return
+      case 'block-end':
+        if (chunk.block.type !== 'reasoning') close()
+        return
+      case 'usage':
+        return
+      case 'text-delta':
+      case 'tool-call-delta':
+      case 'finish':
+        close()
+        return
+      /* v8 ignore next -- closed-union exhaustiveness guard */
+      default:
+        return assertNever(chunk, 'headless reasoning stream')
+    }
+  })
+  return () => {
+    dispose()
+    close()
+  }
+}
+
 /** Report an unexpected direct-driver failure and request a failing exit. */
 function fail(io: HeadlessIo, error: unknown): void {
   io.stderr.write(`dsh: ${error instanceof Error ? error.message : String(error)}\n`)
@@ -90,10 +159,10 @@ function fail(io: HeadlessIo, error: unknown): void {
 /**
  * Run one task through a freshly created Agent and request process exit.
  * @param ctx - plugin context carrying the Agent, default model, Session, and launcher IO services.
- * @param task - one-shot task text.
+ * @param config - validated task and progress configuration.
  * @param io - process-facing effects.
  */
-async function run(ctx: Context, task: string, io: HeadlessIo): Promise<void> {
+async function run(ctx: Context, config: Config, io: HeadlessIo): Promise<void> {
   // Loader siblings mount concurrently. Await the complete application before
   // creating an Agent so its scoped tools and adapters are not half-composed.
   await ctx.get('loader')?.await()
@@ -119,11 +188,18 @@ async function run(ctx: Context, task: string, io: HeadlessIo): Promise<void> {
   })
   await agent.whenIdle()
   const firstSeq = agent.session.seq
-  agent.followup(createUserMessage({
-    content: [{ type: 'text', text: task }],
-    source: { kind: 'user' },
-  }))
-  await agent.whenIdle()
+  const stopReasoning = config.progress
+    ? streamReasoning(ctx, agent, io.stderr)
+    : () => {}
+  try {
+    agent.followup(createUserMessage({
+      content: [{ type: 'text', text: config.task }],
+      source: { kind: 'user' },
+    }))
+    await agent.whenIdle()
+  } finally {
+    stopReasoning()
+  }
   await sessions.flush(agent.session)
   const outcome = summarize(agent.session.events, firstSeq)
   io.stdout.write(outcome.text + '\n')
@@ -146,5 +222,5 @@ export function apply(ctx: Context, config: Config): void {
     throw new Error('headless-runner: the launcher must provide ctx.appExit before the tree mounts')
   }
   const io: HeadlessIo = { stdout: internals.stdout, stderr: internals.stderr, exit }
-  void run(ctx, config.task, io).catch((error: unknown) => { fail(io, error) })
+  void run(ctx, config, io).catch((error: unknown) => { fail(io, error) })
 }

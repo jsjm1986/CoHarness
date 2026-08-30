@@ -13,8 +13,53 @@
 
 import { deriveEventMessage } from '@deepseek-ai/dsh-session'
 import type { SurfaceEvent } from '@deepseek-ai/dsh-session'
+import type { ContentBlock, Message } from '@deepseek-ai/dsh-llm'
+import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type { TokenSurfaceNode } from './types.ts'
-import { estimateMessage } from './estimate.ts'
+import { estimateMessage, estimateStructuralBlock } from './estimate.ts'
+
+/** Internal image facts retained beside a heuristic surface node. */
+export interface SurfaceImageFacts {
+  readonly images: readonly ImageAttachmentRef[]
+  readonly imageFreeTokens: number
+}
+
+const imageFacts = new WeakMap<object, SurfaceImageFacts>()
+
+/**
+ * Read route-pricing metadata for one node created by this fold.
+ * @param node - surface node produced by {@link foldSurfaceTokens}.
+ * @returns image facts retained for route pricing, or `undefined` for text-only nodes.
+ */
+export function surfaceImageFacts(node: TokenSurfaceNode): SurfaceImageFacts | undefined {
+  return imageFacts.get(node)
+}
+
+function collectImageFacts(blocks: readonly ContentBlock[], images: ImageAttachmentRef[]): number {
+  let structural = 0
+  for (const block of blocks) {
+    if (block.type === 'image') {
+      images.push(block.attachment)
+      structural += estimateStructuralBlock(block)
+    } else if (block.type === 'tool-result') {
+      structural += collectImageFacts(block.content, images)
+    }
+  }
+  return structural
+}
+
+function makeNode(seq: number, message: Message | null, tokens: number): TokenSurfaceNode {
+  const node: TokenSurfaceNode = { seq, tokens }
+  if (message !== null) {
+    const images: ImageAttachmentRef[] = []
+    const imageStructural = collectImageFacts(message.content, images)
+    if (images.length > 0) imageFacts.set(node, {
+      images,
+      imageFreeTokens: tokens - imageStructural,
+    })
+  }
+  return node
+}
 
 /** One surface event's placement and cost against the surface preceding it. */
 export interface SurfaceTokenFold {
@@ -34,6 +79,7 @@ export interface SurfaceTokenFold {
  * the same malformed event fails identically on every retry.
  * @param nodes - the priced surface preceding this event, in model-visible order.
  * @param event - the surface event to place.
+ * @param messageOverride - optional message used instead of the event's durable message.
  * @returns the event's price, the next surface, and the signed total delta.
  * @throws when a replacement names a range absent from `nodes` — committed
  *   logs are surface-validated at append time, so an unresolvable range is log
@@ -42,12 +88,13 @@ export interface SurfaceTokenFold {
 export function foldSurfaceTokens(
   nodes: readonly TokenSurfaceNode[],
   event: SurfaceEvent,
+  messageOverride?: Message | null,
 ): SurfaceTokenFold {
-  const message = deriveEventMessage(event)
+  const message = messageOverride === undefined ? deriveEventMessage(event) : messageOverride
   const tokens = message === null ? 0 : estimateMessage(message)
   const op = event.surfaceOp
   if (op === 'append') {
-    return { tokens, nodes: [...nodes, { seq: event.seq, tokens }], deltaTokens: tokens }
+    return { tokens, nodes: [...nodes, makeNode(event.seq, message, tokens)], deltaTokens: tokens }
   }
   const startIdx = nodes.findIndex(node => node.seq === op.start)
   const endIdx = nodes.findIndex(node => node.seq === op.end)
@@ -60,6 +107,6 @@ export function foldSurfaceTokens(
     .slice(startIdx, endIdx + 1)
     .reduce((total, node) => total + node.tokens, 0)
   const next = [...nodes]
-  next.splice(startIdx, endIdx - startIdx + 1, { seq: event.seq, tokens })
+  next.splice(startIdx, endIdx - startIdx + 1, makeNode(event.seq, message, tokens))
   return { tokens, nodes: next, deltaTokens: tokens - removed }
 }

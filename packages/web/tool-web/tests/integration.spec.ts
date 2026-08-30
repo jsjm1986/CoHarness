@@ -18,6 +18,7 @@ import * as WebFetchLocal from '@deepseek-ai/dsh-web-fetch-http'
 import * as WebSearchExa from '@deepseek-ai/dsh-web-search-exa'
 import * as ToolWeb from '@deepseek-ai/dsh-tool-web'
 import * as TimeoutPolicy from '@deepseek-ai/dsh-tool-call-timeout-policy'
+import { publicHttpNetwork } from '../../web-fetch-http/src/network.ts'
 
 const testToolSignal = new AbortController().signal
 
@@ -39,6 +40,10 @@ beforeEach(async () => {
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(WebRuntime, { searchProvider: WebSearchExa.EXA_PROVIDER_ID, fetchProvider: WebFetchLocal.LOCAL_FETCH_PROVIDER_ID })
+  // The provider deliberately rejects loopback/private destinations in production. This
+  // integration suite uses an in-process loopback server, so pin the test hostname to the
+  // server address before constructing the provider, without weakening the production policy.
+  vi.spyOn(publicHttpNetwork, 'resolve').mockResolvedValue([{ address: '127.0.0.1', family: 4 }])
   await ctx.plugin(WebFetchLocal, {})
   await ctx.plugin(WebSearchExa, { apiKey: 'exa-key', baseURL: 'https://api.exa.test' })
   // The shipped deployment shape: the tool-call budget is declared by tool-web
@@ -47,6 +52,7 @@ beforeEach(async () => {
   // policy normally wins.
   await ctx.plugin(TimeoutPolicy)
   fiber = await ctx.plugin(ToolWeb)
+
 })
 
 afterEach(async () => {

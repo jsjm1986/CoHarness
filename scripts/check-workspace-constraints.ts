@@ -160,7 +160,10 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   // also shares its generated FFI code through a hashed runtime chunk.
   '@deepseek-ai/dsh-sandbox-windows-acl': ['lib/runner.js', 'lib/types-*.js'],
   // SQLite loads every statement from immutable package resources at runtime.
-  '@deepseek-ai/dsh-session-persistence-sqlite': ['resources/sql/**/*.sql'],
+  '@deepseek-ai/dsh-session-persistence-sqlite': ['resources/sql/**/*.sql', 'resources/zstd-dictionary.bin'],
+  // The model-selection settings plugin is a separately exported Host entry;
+  // its package-local tsdown config emits an independent runtime bundle.
+  '@deepseek-ai/dsh-tool-subagent': ['lib/model-selection-settings.js'],
   '@deepseek-ai/dsh-skill-badge': ['assets'],
   '@deepseek-ai/dsh-subprocess-local': ['scripts/ensure-spawn-helper.mjs'],
 }

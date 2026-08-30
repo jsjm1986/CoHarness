@@ -29,6 +29,20 @@ const attachment = {
 }
 
 describe('MessageImage', () => {
+  it('renders a local submission preview immediately without a durable load', () => {
+    const load = vi.fn(() => Promise.resolve('blob:durable'))
+    const view = render(
+      <MessageImage
+        image={{ preview: { url: 'blob:local', name: 'draft.png', width: 80, height: 40 } }}
+        load={load}
+        variant="single"
+        labels={labels}
+      />,
+    )
+    expect(view.getByAltText('draft.png').getAttribute('src')).toBe('blob:local')
+    expect(load).not.toHaveBeenCalled()
+  })
+
   it('loads a session-authorized URL, bounds the thumbnail, and clicks into the original', async () => {
     const load = vi.fn().mockResolvedValue('blob:history')
     const view = render(<MessageImage attachment={attachment} load={load} variant="single" labels={labels} />)

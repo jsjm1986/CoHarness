@@ -497,6 +497,7 @@ export class PiAiAdapter extends LlmAdapter {
             model.contextWindow,
             parseTextThinking,
             () => providerResponse,
+            options.signal,
           )[Symbol.asyncIterator]()
           iterator = activeIterator
           while (true) {

@@ -428,6 +428,8 @@ export interface SessionsApi {
     mode: 'queue' | 'steer'
     content: PromptContentPart[]
     clientTimeZone?: string
+    /** Optional browser-owned identity used to reconcile an optimistic submission echo. */
+    requestId?: RpcId
   }>):
   Promise<RpcResponse<{ accepted: true; command?: { kind: 'success'; text?: string } }>>
 

@@ -12,12 +12,14 @@ import type {
 // Value import from the inline-safe wire layer (not the connection plugin):
 // plugin-to-plugin value imports are a bundle purity error.
 import { transportError } from '@deepseek-ai/dsh-host-apiproxy/api'
-import type { SessionFace } from '../contract/session.ts'
+import type {
+  BeginSubmissionInput, PendingSubmissionRetirement, SessionFace, SubmissionHandle,
+} from '../contract/session.ts'
 import { ConversationNodeAssembler } from './conversation-assembler.ts'
 import type { ConversationRuntime } from './conversation-assembler.ts'
 import type { ConversationEventInput, ConversationPublication } from '../contract/conversation.ts'
 import type {
-  ChatSnapshot, ComposerPhase, ConversationSnapshot, HistoryDetailState, HistoryWindowMode, OpenState, PromptError,
+  ChatSnapshot, ComposerPhase, ConversationSnapshot, HistoryDetailState, HistoryWindowMode, OpenState, PendingSubmission, PromptError,
 } from './conversation.ts'
 import { EMPTY_CHAT_SNAPSHOT } from './conversation.ts'
 import type { PendingInteraction } from './pending.ts'
@@ -141,6 +143,13 @@ export class Session implements SessionFace {
   private stitching = false
   /** subscribed.lastSeq baseline (gap detection; null when no subscribed frame arrived — degrade to the liveBuffer dedup path). */
   private subscribedLastSeq: number | null = null
+  /** Local submission echoes retained until their durable event or queue occurrence is observed. */
+  private pendingSubmissions: readonly PendingSubmission[] = []
+  /** Settlement latches prevent queue and durable observations retiring one echo twice. */
+  private readonly submissionSettlements = new Map<RpcId, {
+    readonly onRetire?: ((retirement: PendingSubmissionRetirement) => void) | undefined
+    retiring: boolean
+  }>()
 
   /**
    * Per-session projection value store (push model; see the session-projection
@@ -258,6 +267,28 @@ export class Session implements SessionFace {
   // ---- Operations ----
 
   /**
+   * Register one local submission echo before serialization and transport.
+   * @param input - echo text, image previews, and settlement callback.
+   * @returns prompt identity plus a pre-admission abandon operation.
+   */
+  beginSubmission(input: BeginSubmissionInput): SubmissionHandle {
+    const requestId = globalThis.crypto.randomUUID() as RpcId
+    this.pendingSubmissions = [...this.pendingSubmissions, {
+      requestId,
+      time: Date.now(),
+      text: input.text,
+      images: input.images,
+    }]
+    this.submissionSettlements.set(requestId, { onRetire: input.onRetire, retiring: false })
+    this.promptAttempted = true
+    this.notifier.markDirty()
+    return {
+      requestId,
+      abandon: () => { this.retireFailedSubmission(requestId) },
+    }
+  }
+
+  /**
    * Send (queue/steer passed through 1:1); failures land in the snapshot's promptError.
    * @param content - text plus browser-owned temporary image uploads.
    * @param mode - queue appends after the current turn; steer interrupts it.
@@ -267,6 +298,7 @@ export class Session implements SessionFace {
     content: PromptContentPart[],
     mode: 'queue' | 'steer',
     signal?: AbortSignal,
+    requestId?: RpcId,
   ): Promise<RpcResult<{ accepted: true }>> {
     this.promptError = null
     this.lastAgentError = null
@@ -284,6 +316,7 @@ export class Session implements SessionFace {
           mode,
           content,
           clientTimeZone: resolvedClientTimeZone(),
+          ...(requestId === undefined ? {} : { requestId }),
         }, signal)).result
       } else if (this.address.mode === 'one-shot') {
         result = {
@@ -307,6 +340,7 @@ export class Session implements SessionFace {
         } else {
           const routed = (await this.api.subagents.prompt({
             ...this.address,
+            ...(requestId === undefined ? {} : { requestId }),
             content: content.flatMap(part => part.type === 'text'
               ? [{ type: 'text' as const, text: part.text }]
               : []),
@@ -319,6 +353,7 @@ export class Session implements SessionFace {
       result = transportError(error)
     }
     if (!result.ok) {
+      if (requestId !== undefined) this.retireFailedSubmission(requestId)
       this.promptError = { op: 'send', error: result.error }
       this.notifier.markDirty()
       return result
@@ -553,6 +588,7 @@ export class Session implements SessionFace {
       }
       case 'session/queue': {
         this.queueMirror.replace(frame.items)
+        this.observeSubmissionQueue(frame.items)
         this.notifier.markDirty()
         return
       }
@@ -663,7 +699,11 @@ export class Session implements SessionFace {
   }
 
   /** No-op because session instances remain resident. */
-  dispose(): void {}
+  dispose(): void {
+    for (const requestId of [...this.submissionSettlements.keys()]) {
+      this.retireFailedSubmission(requestId)
+    }
+  }
 
   /** Rebuild the current window after a low-frequency Definition or view registration change. */
   rebuildConversationRegistry(): void {
@@ -755,6 +795,7 @@ export class Session implements SessionFace {
     const visible = this.events.findLast(hasConversationContent)
     if (visible !== undefined) this.markConversationContent(visible.seq)
     if (this.events.some(event => event.type === 'turn/start')) this.firstPromptPendingTurn = false
+    for (const event of this.events) this.observeSubmissionEvent(event)
     this.conversation.replaceWindow(entries.map(conversationInput), hasMore)
     if (projections !== undefined) this.projections.seed(projections)
     const buffered = this.liveBuffer
@@ -772,8 +813,54 @@ export class Session implements SessionFace {
     if (hasConversationContent(event)) this.markConversationContent(event.seq)
     if (event.type === 'turn/start') this.firstPromptPendingTurn = false
     const queueChanged = this.queueMirror.acceptDurable(event)
+    this.observeSubmissionEvent(event)
     const publication = this.conversation.append({ event, view })
     return queueChanged ? 'immediate' : publication
+  }
+
+  /** Observe a durable user message carrying a browser submission identity. */
+  private observeSubmissionEvent(event: SessionEvent): void {
+    if (event.type !== 'user/message' || this.submissionSettlements.size === 0) return
+    const source = event.data.source
+    if (source.kind !== 'user' || !('rpcId' in source) || typeof source.rpcId !== 'string') return
+    this.scheduleObservedRetirement(source.rpcId, imageRefsIn(event.data.content))
+  }
+
+  /** Observe queue occurrences that carry a browser submission identity. */
+  private observeSubmissionQueue(items: readonly {
+    readonly rpcId?: RpcId
+    readonly message: { readonly content: unknown }
+  }[]): void {
+    if (this.submissionSettlements.size === 0) return
+    for (const item of items) {
+      if (item.rpcId !== undefined) this.scheduleObservedRetirement(item.rpcId, imageRefsIn(item.message.content))
+    }
+  }
+
+  /** Latch an observed settlement and retire one frame later. */
+  private scheduleObservedRetirement(requestId: RpcId, attachments: readonly ImageAttachmentRef[]): void {
+    const settlement = this.submissionSettlements.get(requestId)
+    if (settlement === undefined || settlement.retiring) return
+    settlement.retiring = true
+    scheduleFrame(() => { this.finishSubmission(requestId, { reason: 'observed', attachments }) })
+  }
+
+  /** Retire one local echo immediately after a failed prompt or pre-admission abort. */
+  private retireFailedSubmission(requestId: RpcId): void {
+    const settlement = this.submissionSettlements.get(requestId)
+    if (settlement === undefined || settlement.retiring) return
+    settlement.retiring = true
+    this.finishSubmission(requestId, { reason: 'failed' })
+  }
+
+  /** Single removal point for local submission echoes. */
+  private finishSubmission(requestId: RpcId, retirement: PendingSubmissionRetirement): void {
+    const settlement = this.submissionSettlements.get(requestId)
+    if (settlement === undefined) return
+    this.submissionSettlements.delete(requestId)
+    this.pendingSubmissions = this.pendingSubmissions.filter(item => item.requestId !== requestId)
+    this.notifier.markDirty()
+    settlement.onRetire?.(retirement)
   }
 
   /** Land a live session/event (open/repair in flight -> buffer; overlapping seq -> drop;
@@ -1065,6 +1152,7 @@ export class Session implements SessionFace {
       partial: legacy.partial,
       runningCalls: legacy.runningCalls,
       pending: this.pendingCache.value,
+      pendingSubmissions: this.pendingSubmissions,
       queue: this.queueMirror.snapshot(),
       running: this.running,
       subagent: this.address === undefined
@@ -1217,6 +1305,25 @@ function conversationInput(entry: HistoryEntry): ConversationEventInput {
 /** A generic command row alone remains control-plane content; every other visible Chat Node activates the conversation. */
 function hasVisibleConversationContent(chat: ChatSnapshot): boolean {
   return chat.order.some(key => chat.nodes.get(key)?.kind !== 'command')
+}
+
+/** Read durable image references from a model content list without trusting wire data. */
+function imageRefsIn(content: unknown): readonly ImageAttachmentRef[] {
+  if (!Array.isArray(content)) return []
+  const refs: ImageAttachmentRef[] = []
+  for (const block of content) {
+    if (typeof block !== 'object' || block === null) continue
+    const candidate = block as { readonly type?: unknown; readonly attachment?: unknown }
+    if (candidate.type !== 'image' || typeof candidate.attachment !== 'object' || candidate.attachment === null) continue
+    refs.push(candidate.attachment as ImageAttachmentRef)
+  }
+  return refs
+}
+
+/** Run one callback on the next animation frame, or a macrotask in non-visual tests. */
+function scheduleFrame(fn: () => void): void {
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => { fn() })
+  else setTimeout(fn, 0)
 }
 
 /**

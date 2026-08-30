@@ -1,12 +1,45 @@
 - banner:
+  - tablist:
+    - tab "Chat" [selected]
+    - tab "Trajectory"
   - navigation "Session hierarchy":
     - button "{{workspace}}" [disabled]
   - button "Session log":
     - text: Session log
     - img
-  - tablist:
-    - tab "Chat" [selected]
-    - tab "Trajectory"
+- separator "Adjust transcript content width"
+- navigation "Turn navigation":
+  - button "Jump to turn 1"
+  - button "Jump to turn 2"
+  - button "Jump to turn 3"
+  - button "Jump to turn 4"
+  - button "Jump to turn 5"
+  - button "Jump to turn 6"
+  - button "Jump to turn 7"
+  - button "Jump to turn 8"
+  - button "Jump to turn 9"
+  - button "Jump to turn 10"
+  - button "Jump to turn 11"
+  - button "Jump to turn 12"
+  - button "Jump to turn 13"
+  - button "Jump to turn 14"
+  - button "Jump to turn 15"
+  - button "Jump to turn 16"
+  - button "Jump to turn 17"
+  - button "Jump to turn 18"
+  - button "Jump to turn 19"
+  - button "Jump to turn 20"
+  - button "Jump to turn 21"
+  - button "Jump to turn 22"
+  - button "Jump to turn 23"
+  - button "Jump to turn 24"
+  - button "Jump to turn 25"
+  - button "Jump to turn 26"
+  - button "Jump to turn 27"
+  - button "Jump to turn 28"
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
 - text: m1 7/25 {{clock}}
 - button "Copy":
   - img
@@ -19,7 +52,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}} m2 7/25 {{clock}}
+- text: 7/25 {{clock}} Ran for {{duration}}
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
+- text: m2 7/25 {{clock}}
 - button "Copy":
   - img
 - paragraph: r2
@@ -31,7 +68,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}} m3 7/25 {{clock}}
+- text: 7/25 {{clock}} Ran for {{duration}}
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
+- text: m3 7/25 {{clock}}
 - button "Copy":
   - img
 - paragraph: r3
@@ -43,7 +84,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}} m4 7/25 {{clock}}
+- text: 7/25 {{clock}} Ran for {{duration}}
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
+- text: m4 7/25 {{clock}}
 - button "Copy":
   - img
 - paragraph: r4
@@ -55,7 +100,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}} m5 7/25 {{clock}}
+- text: 7/25 {{clock}} Ran for {{duration}}
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
+- text: m5 7/25 {{clock}}
 - button "Copy":
   - img
 - paragraph: r5
@@ -67,7 +116,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}} m6 7/25 {{clock}}
+- text: 7/25 {{clock}} Ran for {{duration}}
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
+- text: m6 7/25 {{clock}}
 - button "Copy":
   - img
 - paragraph: r6
@@ -79,7 +132,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}} m7 7/25 {{clock}}
+- text: 7/25 {{clock}} Ran for {{duration}}
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
+- text: m7 7/25 {{clock}}
 - button "Copy":
   - img
 - paragraph: r7
@@ -91,7 +148,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}} m8 7/25 {{clock}}
+- text: 7/25 {{clock}} Ran for {{duration}}
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
+- text: m8 7/25 {{clock}}
 - button "Copy":
   - img
 - paragraph: r8
@@ -103,7 +164,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}} m9 7/25 {{clock}}
+- text: 7/25 {{clock}} Ran for {{duration}}
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
+- text: m9 7/25 {{clock}}
 - button "Copy":
   - img
 - paragraph: r9
@@ -115,7 +180,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}} m10 7/25 {{clock}}
+- text: 7/25 {{clock}} Ran for {{duration}}
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
+- text: m10 7/25 {{clock}}
 - button "Copy":
   - img
 - paragraph: r10
@@ -127,7 +196,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}} m11 7/25 {{clock}}
+- text: 7/25 {{clock}} Ran for {{duration}}
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
+- text: m11 7/25 {{clock}}
 - button "Copy":
   - img
 - paragraph: r11
@@ -139,7 +212,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}} m12 7/25 {{clock}}
+- text: 7/25 {{clock}} Ran for {{duration}}
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
+- text: m12 7/25 {{clock}}
 - button "Copy":
   - img
 - paragraph: r12
@@ -151,7 +228,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}} m13 7/25 {{clock}}
+- text: 7/25 {{clock}} Ran for {{duration}}
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
+- text: m13 7/25 {{clock}}
 - button "Copy":
   - img
 - paragraph: r13
@@ -163,7 +244,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}} m14 7/25 {{clock}}
+- text: 7/25 {{clock}} Ran for {{duration}}
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
+- text: m14 7/25 {{clock}}
 - button "Copy":
   - img
 - paragraph: r14
@@ -175,7 +260,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}} m15 7/25 {{clock}}
+- text: 7/25 {{clock}} Ran for {{duration}}
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
+- text: m15 7/25 {{clock}}
 - button "Copy":
   - img
 - paragraph: r15
@@ -187,7 +276,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}} m16 7/25 {{clock}}
+- text: 7/25 {{clock}} Ran for {{duration}}
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
+- text: m16 7/25 {{clock}}
 - button "Copy":
   - img
 - paragraph: r16
@@ -199,7 +292,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}} m17 7/25 {{clock}}
+- text: 7/25 {{clock}} Ran for {{duration}}
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
+- text: m17 7/25 {{clock}}
 - button "Copy":
   - img
 - paragraph: r17
@@ -211,7 +308,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}} m18 7/25 {{clock}}
+- text: 7/25 {{clock}} Ran for {{duration}}
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
+- text: m18 7/25 {{clock}}
 - button "Copy":
   - img
 - paragraph: r18
@@ -223,7 +324,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}} m19 7/25 {{clock}}
+- text: 7/25 {{clock}} Ran for {{duration}}
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
+- text: m19 7/25 {{clock}}
 - button "Copy":
   - img
 - paragraph: r19
@@ -235,7 +340,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}} m20 7/25 {{clock}}
+- text: 7/25 {{clock}} Ran for {{duration}}
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
+- text: m20 7/25 {{clock}}
 - button "Copy":
   - img
 - paragraph: r20
@@ -247,7 +356,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}} m21 7/25 {{clock}}
+- text: 7/25 {{clock}} Ran for {{duration}}
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
+- text: m21 7/25 {{clock}}
 - button "Copy":
   - img
 - paragraph: r21
@@ -259,7 +372,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}} m22 7/25 {{clock}}
+- text: 7/25 {{clock}} Ran for {{duration}}
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
+- text: m22 7/25 {{clock}}
 - button "Copy":
   - img
 - paragraph: r22
@@ -271,7 +388,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}} m23 7/25 {{clock}}
+- text: 7/25 {{clock}} Ran for {{duration}}
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
+- text: m23 7/25 {{clock}}
 - button "Copy":
   - img
 - paragraph: r23
@@ -283,7 +404,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}} m24 7/25 {{clock}}
+- text: 7/25 {{clock}} Ran for {{duration}}
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
+- text: m24 7/25 {{clock}}
 - button "Copy":
   - img
 - paragraph: r24
@@ -295,7 +420,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}} m25 7/25 {{clock}}
+- text: 7/25 {{clock}} Ran for {{duration}}
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
+- text: m25 7/25 {{clock}}
 - button "Copy":
   - img
 - paragraph: r25
@@ -307,7 +436,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}} m26 7/25 {{clock}}
+- text: 7/25 {{clock}} Ran for {{duration}}
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
+- text: m26 7/25 {{clock}}
 - button "Copy":
   - img
 - paragraph: r26
@@ -319,7 +452,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}} m27 7/25 {{clock}}
+- text: 7/25 {{clock}} Ran for {{duration}}
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
+- text: m27 7/25 {{clock}}
 - button "Copy":
   - img
 - paragraph: r27
@@ -331,7 +468,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: 7/25 {{clock}} Ran for {{duration}} m28 7/25 {{clock}}
+- text: 7/25 {{clock}} Ran for {{duration}}
+- button "1 intermediate message":
+  - text: 1 intermediate message
+  - img
+- text: m28 7/25 {{clock}}
 - button "Copy":
   - img
 - paragraph: r28
@@ -347,6 +488,10 @@
 - button "Back to bottom":
   - img
 - textbox "Message the agent"
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
 - button "Commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write

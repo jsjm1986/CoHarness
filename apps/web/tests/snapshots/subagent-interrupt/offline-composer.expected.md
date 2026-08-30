@@ -1,16 +1,24 @@
 - banner:
+  - tablist:
+    - tab "Chat" [selected]
+    - tab "Trajectory"
   - navigation "Session hierarchy":
     - button "Ask a research subagent to"
     - text: /
-    - button "event-sourcing researcher" [disabled]
+    - button "1 subagent running":
+      - text: 1 subagent
+      - img
+    - text: /
+    - 'button "Switch subagent: event-sourcing researcher"': event-sourcing researcher
   - img
   - text: Standard mode
   - button "Session log":
     - text: Session log
     - img
-  - tablist:
-    - tab "Chat" [selected]
-    - tab "Trajectory"
+- separator "Adjust transcript content width"
+- button "Process details" [expanded]:
+  - text: Process details
+  - img
 - text: Explain event sourcing in one sentence. {{clock}}
 - button "Copy":
   - img
@@ -18,9 +26,17 @@
   - img
   - img
   - text: Context injection @deepseek-ai/dsh-system-prompt
+- button "System prompt":
+  - img
+  - img
+  - text: System prompt
 - paragraph: partial
 - status: Deep diving...
 - textbox "Parent session offline; sending is unavailable but you can still stop the run" [disabled]
+- button "Add images or documents" [disabled]:
+  - img
+- button "Choose from Documents" [disabled]:
+  - img
 - button "Commands" [disabled]:
   - img
 - 'button "Access mode, current: Custom" [disabled]': Custom

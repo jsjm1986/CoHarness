@@ -1,16 +1,21 @@
 - banner:
-  - navigation "Session hierarchy":
-    - button "Ask a research subagent to"
-    - text: /
-    - button "event-sourcing researcher"
-    - text: /
-    - button "example editor" [disabled]
-  - button "Session log":
-    - text: Session log
-    - img
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
+  - navigation "Session hierarchy":
+    - button "Ask a research subagent to"
+    - text: /
+    - button "3 subagents":
+      - text: 3 subagents
+      - img
+    - text: /
+    - 'button "Switch subagent: event-sourcing researcher"': event-sourcing researcher
+    - text: /
+    - 'button "Switch subagent: example editor"': example editor
+  - button "Session log":
+    - text: Session log
+    - img
+- separator "Adjust transcript content width"
 - text: Give one concrete event sourcing example. {{clock}}
 - button "Copy":
   - img

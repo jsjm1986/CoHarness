@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-30-web-pending-submission-echo.md
+2026-08-30-web-pending-submission-echo.md: d415f80932afe2ef50716ab1447ebbabee9015e3
+2026-08-30-web-pending-submission-echo.zh.md: 5524ff940b65fba083fa80685e61368d46b50ccf

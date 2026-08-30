@@ -1,4 +1,7 @@
 - banner:
+  - tablist:
+    - tab "Chat" [selected]
+    - tab "Trajectory"
   - navigation "Session hierarchy":
     - button "Reply with a one-sentence description" [disabled]
   - img
@@ -6,9 +9,10 @@
   - button "Session log":
     - text: Session log
     - img
-  - tablist:
-    - tab "Chat" [selected]
-    - tab "Trajectory"
+- separator "Adjust transcript content width"
+- button "Process details" [expanded]:
+  - text: Process details
+  - img
 - text: Reply with a one-sentence description of event sourcing, then stop. {{clock}}
 - button "Copy":
   - img
@@ -16,10 +20,18 @@
   - img
   - img
   - text: Context injection @deepseek-ai/dsh-system-prompt
+- button "System prompt":
+  - img
+  - img
+  - text: System prompt
 - paragraph: partial
 - status: Deep diving...
 - button "2 queued messages"
 - textbox "Cmd/Ctrl+Enter steers all queued messages"
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
 - button "Commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write

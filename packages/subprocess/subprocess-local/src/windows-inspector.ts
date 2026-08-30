@@ -12,7 +12,7 @@
 import { spawnSync } from 'node:child_process'
 import koffi from 'koffi'
 import type { SubprocessTerminalSignal } from '@deepseek-ai/dsh-subprocess'
-import type { ProcessIdentity, ProcessInspector } from './process-inspector.ts'
+import type { ProcessIdentity, ProcessInspector, ProcessSnapshot } from './process-inspector.ts'
 
 /** One Toolhelp32 process-table row. */
 export interface ProcessEntry {
@@ -93,7 +93,7 @@ export class WindowsProcessInspector implements ProcessInspector {
     return shellPid
   }
 
-  isStdinWaiting(_pgid: number): boolean {
+  isStdinWaiting(_pgid: number, _shellPid?: number): boolean {
     return false
   }
 
@@ -103,6 +103,19 @@ export class WindowsProcessInspector implements ProcessInspector {
 
   processSession(_sessionId: number): ProcessIdentity[] {
     return []
+  }
+
+  snapshot(): ProcessSnapshot {
+    let entries: ProcessEntry[] | undefined
+    return {
+      tree: rootPid => windowsProcessTree(
+        entries ??= this.internals.snapshot(),
+        rootPid,
+        pid => this.internals.processState(pid)?.started,
+      ),
+      session: () => [],
+      alive: identity => this.isAlive(identity),
+    }
   }
 
   isAlive(identity: ProcessIdentity): boolean {

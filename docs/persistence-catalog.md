@@ -670,6 +670,24 @@ Types: [SessionTitleLlmRequestEventData](subsystems/session-title.md)
 
 Source: [`packages/session/session-title-llm/src/index.ts:43`](../packages/session/session-title-llm/src/index.ts)
 
+### `session-log-deepseek/*`
+
+<a id="session-log-deepseekdelivery-accepted--log-only"></a>
+
+#### `session-log-deepseek/delivery-accepted` — log-only
+
+```ts persistence-catalog
+/** Records that the configured endpoint accepted one delivery through `throughSeq`. */
+'session-log-deepseek/delivery-accepted': {
+  /** Session identity the accepted delivery carried; inherited fork markers retain the parent's id. */
+  sessionId: import('@deepseek-ai/dsh-session/types').SessionId
+  /** Last canonical event included in the accepted request. */
+  throughSeq: number
+}
+```
+
+Source: [`packages/session/session-log-deepseek/src/types.ts:26`](../packages/session/session-log-deepseek/src/types.ts)
+
 ### `step/*`
 
 <a id="stepend--log-only"></a>
@@ -718,11 +736,19 @@ Source: [`packages/subagent/subagent/src/descriptor.ts:38`](../packages/subagent
 #### `subagent/model-selection-policy` — log-only
 
 ```ts persistence-catalog
-/** Exact child routes exposed by this Session's delegation tool. */
-'subagent/model-selection-policy': { allowedModels: AllowedModelRoute[] }
+/**
+ * Records that this session's delegation tool exposes child provider,
+ * model, and reasoning-effort selection. Appended before the first model
+ * request; absence means the fixed-route definition. Log-only: it carries
+ * no `surfaceOp` and never enters model history.
+ */
+'subagent/model-selection-policy': {
+  /** Exact routes this Session may select explicitly for a child. */
+  allowedModels: AllowedModelRoute[]
+}
 ```
 
-Source: [`packages/subagent/tool-subagent/src/model-selection-state.ts:9`](../packages/subagent/tool-subagent/src/model-selection-state.ts)
+Source: [`packages/subagent/tool-subagent/src/model-selection-state.ts:14`](../packages/subagent/tool-subagent/src/model-selection-state.ts)
 
 ### `team/*`
 
