@@ -9,7 +9,8 @@
     "ref": "baseline/2026-08-29",
     "commit": "6464092040428805c5d76ed977fa4ab3fac66161"
   },
-  "implementationCommit": "a5cd5ba34b",
+  "implementationCommit": "2d1b6785ab61f6539024eebee0f41d2df0223071",
+  "candidateRelease": "coharness-2d1b6785ab",
   "productionRelease": "coharness-a5cd5ba34b",
   "postReleaseVerification": {
     "sourcePlaneAlias": "tsconfig.base.json maps @deepseek-ai/dsh-token-meter/client to source; clean-artifact smoke passed",

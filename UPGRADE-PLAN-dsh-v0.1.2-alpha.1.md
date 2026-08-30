@@ -5,7 +5,7 @@
 - 当前可执行范围：兼容修复、模型与子代理路由、图片与 token、WebFetch 网络 pinning、Session schema 20、ACP/Python 兼容、Web client 批量启动与可选 gzip、会话 cache-first 等价路径已落地并进入发布验证；Remote/ focused UI/一次性 token 的上游形态有明确的 CoHarness 不采用决策，在线数据迁移和新增出网默认值仍未启用
 - 上游版本：[dsh-v0.1.2-alpha.1](https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.1.2-alpha.1)，release tag commit `cd5ef8148158c3a752a658978873241fdf8e2bbc`
 - 对比范围：上游 `dsh-v0.1.1-rc.2..dsh-v0.1.2-alpha.1`；release 正文列出 14 项新功能、15 项体验优化、13 项修复、10 项其他变更，共 52 项；另对 tag 全部提交和包清单做了范围审计（126 个 first-parent 提交、796 个非 merge 提交；按 `git diff --no-renames --shortstat` 的稳定口径为 6823 个变更文件、348411 行新增、151493 行删除）
-- 我方基线：`baseline/2026-08-29` 指向 `master@6464092040`；发布来源分支 `upgrade/dsh-v0.1.2-alpha.1` 的已发布实现 checkpoint 为 `a5cd5ba34b`，已快进合入 `master`；本次 tag-wide 审计补丁当前仍在 `master` 工作树，尚未形成新的提交或生产 artifact；根包和主要 DSH 包仍标记 `0.1.1-rc.1`，不能把版本号当作代码对齐证明
+- 我方基线：`baseline/2026-08-29` 指向 `master@6464092040`；发布来源分支 `upgrade/dsh-v0.1.2-alpha.1` 的已发布实现 checkpoint 为 `a5cd5ba34b`，审计补丁已形成候选 checkpoint `2d1b6785ab61f6539024eebee0f41d2df0223071` 并快进位于 `master`；候选 artifact 尚未切换生产；根包和主要 DSH 包仍标记 `0.1.1-rc.1`，不能把版本号当作代码对齐证明
 
 ## 1. 结论与决策摘要
 
@@ -25,7 +25,7 @@
 
 | 项目 | 当前事实 | 升级约束 |
 | --- | --- | --- |
-| 分支 | 发布来源为 `upgrade/dsh-v0.1.2-alpha.1`，已发布实现 checkpoint `a5cd5ba34b` 已快进合入 `master`；`baseline/2026-08-29` 指向 `master@6464092040`；本次审计补丁仍在工作树，构建输出在忽略目录 | 先形成新的不可变提交和 release artifact，再决定是否切换；保留前一 release 作为回滚点 |
+| 分支 | 发布来源为 `upgrade/dsh-v0.1.2-alpha.1`，已发布实现 checkpoint `a5cd5ba34b` 已快进合入 `master`；审计候选 checkpoint 为 `2d1b6785ab61f6539024eebee0f41d2df0223071`；`baseline/2026-08-29` 指向 `master@6464092040`；工作树已清洁，构建输出在忽略目录 | 只从候选 commit 生成不可变 release artifact，再按 controller 原子切换；保留前一 release 作为回滚点 |
 | 远端 | `origin` 指向 CoHarness，`upstream` 指向 `deepseek-ai/deepseek-harness` | 所有上游对象用 tag/commit 固定，不跟随浮动 `master` |
 | 祖先关系 | `git merge-base master dsh-v0.1.2-alpha.1` 无输出 | 禁止把冲突当作普通三方合并；采用 patch + 语义迁移 |
 | 当前版本 | 主要包为 `0.1.1-rc.1` | 最后阶段才统一更新版本和 lockfile |
@@ -335,7 +335,7 @@ JSONL 是另一条物理格式：I03 的 `sourceEventSeqs` range 编码只改变
 状态：分支和基线 tag 已冻结；机器可读 manifest、生产数据备份与发布健康证据已生成，Profile dump、依赖清单和负责人签字仍由发布流程另行保管。
 
 - 已建立 `upgrade/dsh-v0.1.2-alpha.1` 分支和 `baseline/2026-08-29` tag；`master` 未被本轮改写。
-- 已保存 `pnpm-lock.yaml`、既有代码 checkpoint、构建产物清单和由运维生成的 Session/Gateway 数据库备份及 hash；真实数据和凭据未写入仓库。生产仍运行 release 目录 `coharness-a5cd5ba34b`，旧目录 `coharness-6464092040` 保留用于回滚；本次审计补丁需在提交并构建后才可生成新的 release 目录。
+- 已保存 `pnpm-lock.yaml`、候选代码 checkpoint、构建产物清单和由运维生成的 Session/Gateway 数据库备份及 hash；真实数据和凭据未写入仓库。生产仍运行 release 目录 `coharness-a5cd5ba34b`，候选目录名为 `coharness-2d1b6785ab`，旧目录 `coharness-6464092040` 保留用于回滚。
 - §4.5 提供可审计的 52 项状态索引；`UPGRADE-MANIFEST-dsh-v0.1.2-alpha.1.json` 保存上游/基线/实现 commit、逐项状态、验证结果、备份 hash 和生产健康 id。
 - 当前已接入的开关是 `COHARNESS_SEND_PLUGIN_METADATA`、`COHARNESS_UPLOAD_SESSION_LOG`、`COHARNESS_DISABLE_SESSION_LOG_UPLOAD` 和 `COHARNESS_HEADLESS_PROGRESS`；`COHARNESS_REMOTE_READS`、`COHARNESS_PUBLIC_WEB_FETCH` 尚未有生产代码，不得当作可用开关。所有已接入开关默认不改变现有安全行为。
 
@@ -521,7 +521,7 @@ release 正文的 52 项矩阵覆盖用户可见的功能、体验和修复；�
 
 ### 11.1 当前工作树事实
 
-截至 2026-08-30，当前 checkout 为 `master`；已发布实现 checkpoint 为 `a5cd5ba34b`，本次 tag-wide 审计补丁仍未提交；`baseline/2026-08-29` 指向 `master@6464092040428805c5d76ed977fa4ab3fac66161`。生产仍使用不可变目录 `coharness-a5cd5ba34b`，前一版本 `coharness-6464092040` 保留回滚。提交前不得把工作树或忽略目录中的构建输出当作发布物；形成候选提交后必须重新核对 `git status --short --untracked-files=all`，确认没有临时文件、凭据或与本升级无关的改动。
+截至 2026-08-30，当前 checkout 为 `master`；已发布实现 checkpoint 为 `a5cd5ba34b`，候选审计 checkpoint 为 `2d1b6785ab61f6539024eebee0f41d2df0223071`；`baseline/2026-08-29` 指向 `master@6464092040428805c5d76ed977fa4ab3fac66161`。生产仍使用不可变目录 `coharness-a5cd5ba34b`，候选目录名为 `coharness-2d1b6785ab`，前一版本 `coharness-6464092040` 保留回滚。工作树当前已清洁；构建输出属于忽略目录，不能代替提交内容。
 
 ### 11.2 已落地的关键 checkpoint
 
@@ -534,7 +534,8 @@ release 正文的 52 项矩阵覆盖用户可见的功能、体验和修复；�
 | `50bba577b6` | 上游兼容、模型路由、子代理模型/reasoning/maxTokens、PTC alias、精确回合 token usage、pi-ai 兼容 | 已由后续 checkpoint `a5cd5ba34b` 汇总；应以汇总 checkpoint 的构建和发布证据为准 |
 | `d9f9035bf3` | WebFetch 公网地址解析、逐跳校验和连接 pinning | shipped profile 的 `fetch` 仍为 `false`，未授权开启公网工具 |
 | `1bb4016f1f` | Session SQLite schema 20、packed rows、seq-range、v18↔v20 离线迁移与回滚工具 | 迁移仅离线显式执行，禁止在 `openDatabase()` 中自动升级 |
-| `a5cd5ba34b` | 汇总本次 alpha.1 兼容实现、WebServer gzip、I01/I02 等价路径、Web fixture 修复和发布构建 | 生产已激活 `coharness-a5cd5ba34b`；旧 release `coharness-6464092040` 保留回滚；Windows 原生发行和宽范围 Web 历史 fixture 仍按 §4.5/§11.5 处理 |
+| `a5cd5ba34b` | 汇总本次 alpha.1 兼容实现、WebServer gzip、I01/I02 等价路径、Web fixture 修复和发布构建 | 生产旧候选已激活 `coharness-a5cd5ba34b`；旧 release `coharness-6464092040` 保留回滚；Windows 原生发行和宽范围 Web 历史 fixture 仍按 §4.5/§11.5 处理 |
+| `2d1b6785ab` | tag-wide 52 项审计补充、browser-safe crypto、可扩展 locale、Models slots、可读 ask-user 历史、WebFetch 网络测试和严格 Chat navigation contract | 候选待按 §9 controller 流程部署；部署前不改生产默认出网、认证或 schema 迁移策略 |
 
 ### 11.3 实现与默认值状态
 
@@ -553,7 +554,7 @@ release 正文的 52 项矩阵覆盖用户可见的功能、体验和修复；�
 
 已通过 `pnpm run hygiene`、`pnpm run typecheck`、`pnpm run lint`、`pnpm run build:production`、`pnpm run build:lib:host`、`pnpm run build`、`pnpm run constraints`、`pnpm run verify-client-packages`、`pnpm run verify-third-party-notices`、`git diff --check`、`pnpm run doc-sync`、ACP focused suite（364 tests）、ACP e2e（2 passed，1 keyless skip）、ACP 单文件串行（47 passed）、LSP instance 串行（23 passed）、oxlint/publint（18 passed）、WebFetch/Web spill/theme focused（10 passed）、I01/I02 focused suite（10 files，186 tests）、token-meter/client source-plane focused suite（5 files，113 tests，另有移除 `lib` 后的 clean-artifact smoke 25 tests）、persistent pwsh tool/readiness baseline suite（2 files，26 passed，2 skipped）、shipped Web composition e2e（2 tests）、thread-safe 全量串行（955 files，15,346 passed，114 tests skipped）和 process-bound 全量串行（8 files，446 passed）。完整 `pnpm run build` 与本轮 `pnpm run build:production` 均通过；构建仅报告 Linux native 载荷在 macOS arm64 上被跳过的预期警告，以及前端 chunk 大小提示。
 
-生产 smoke（2026-08-30）：release controller 状态、`http://127.0.0.1:8899/healthz` 和 `https://harness.maycran.com/healthz` 均返回 `ok=true` 与 release `coharness-a5cd5ba34b`；未登录根路径保持 HTTP 401；上一 release `coharness-6464092040` 未删除并可用于回滚。
+生产 smoke（2026-08-30，候选部署前）：release controller 状态、`http://127.0.0.1:8899/healthz` 和 `https://harness.maycran.com/healthz` 均返回 `ok=true` 与 release `coharness-a5cd5ba34b`；未登录根路径保持 HTTP 401；上一 release `coharness-6464092040` 未删除并可用于回滚。候选 `coharness-2d1b6785ab` 尚未激活。
 
 默认多项目并行执行的 `pnpm run test` 曾因 thread-safe 与 process-bound 项目争用进程/CPU 出现 7 个超时或失败；本轮已将两个项目分别以 `--no-file-parallelism --maxWorkers=1` 串行跑完并通过。完整 `pnpm run test:web:built` 在旧快照/资源并发下曾出现多项超时；刷新受影响 golden、适配折叠过程行后的 I01/I02 与 shipped composition focused 测试已通过，未把并行失败误记为产品回归。保留以下命令作为发布和 CI 资源受限时的可复现执行方式：
 
@@ -584,7 +585,7 @@ pnpm exec vitest run --project=process-bound --no-file-parallelism --maxWorkers=
 
 ### 11.5 发布前剩余动作与停止条件
 
-本节列出的动作区分为已完成的旧 release 收尾和当前候选仍需的提交、构建及外部证据门；生产 artifact `coharness-a5cd5ba34b` 已发布，但本次审计工作树本身仍不能作为发布物。完成本次文档修改后，先重跑受影响检查，再形成新的不可变 artifact 并将命令、时间和结果追加到受控发布记录。
+本节列出的动作区分为已完成的旧 release 收尾和当前候选仍需的构建、激活及外部证据门；生产 artifact `coharness-a5cd5ba34b` 已发布，候选 `coharness-2d1b6785ab` 必须由 commit `2d1b6785ab61f6539024eebee0f41d2df0223071` 构建，不能把工作树或忽略目录直接当作发布物。
 
 1. 本轮代码与文档修改完成后，必须重新运行并通过 `pnpm run doc-sync`、`pnpm run lint`、`pnpm run typecheck`、`pnpm run hygiene`、`pnpm run build:production`、`pnpm run verify-third-party-notices`、`git diff --check`、翻译/Agent Note/归档门禁，以及覆盖 crypto、autospace、混合 ask-user、I01/I02 的 focused Vitest；本次撤回 marker-only 等待后不得沿用旧的“marker readiness 已修复”结论。
 2. 机器可读的上游 52 项 commit manifest、依赖/NOTICE 清单和数据文件 hash 已生成并随本次审计提交；Profile dump、决策签字和安全批准仍须由发布责任人补入受控发布记录。缺少这些外部材料时不得开启新的 canary 或改变默认出网/迁移策略。
