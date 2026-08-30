@@ -522,7 +522,7 @@ release 正文的 52 项矩阵覆盖用户可见的功能、体验和修复；�
 
 ### 11.1 当前工作树事实
 
-截至 2026-08-30，当前 checkout 为 `master`，HEAD `9a4b3eea4eda2e7d4200fa93594c64e43eefbc07`（运行时实现 commit `19cb32900974acddd926add6baecfaac803207d3`）；`baseline/2026-08-29` 指向 `master@6464092040428805c5d76ed977fa4ab3fac66161`。生产运行不可变目录 `coharness-19cb329009`，上一候选 `coharness-2d1b6785ab`、更早的 `coharness-a5cd5ba34b` 和基线目录 `coharness-6464092040` 均保留回滚；另有 19 个未引用旧 artifact 可恢复地归档在 `~/harness-gateway-release-archive-20260830`。工作树当前已清洁；构建输出属于忽略目录，不能代替提交内容。
+截至 2026-08-30，当前 checkout 为 `master`，运行时实现 commit 为 `19cb32900974acddd926add6baecfaac803207d3`；`baseline/2026-08-29` 指向 `master@6464092040428805c5d76ed977fa4ab3fac66161`。生产运行不可变目录 `coharness-19cb329009`，上一候选 `coharness-2d1b6785ab`、更早的 `coharness-a5cd5ba34b` 和基线目录 `coharness-6464092040` 均保留回滚；另有 19 个未引用旧 artifact 可恢复地归档在 `~/harness-gateway-release-archive-20260830`。工作树当前已清洁；构建输出属于忽略目录，不能代替提交内容。
 
 ### 11.2 已落地的关键 checkpoint
 
