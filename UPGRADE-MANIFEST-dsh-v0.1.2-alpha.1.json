@@ -242,6 +242,16 @@
           "packages/llm/llm/src/brand.ts"
         ],
         "verification": "Custom ApiProxy seam remains; ToolCallId is canonical with CallId compatibility alias"
+      },
+      {
+        "surface": "terminal-protocol-replies",
+        "status": "implemented",
+        "evidence": [
+          "packages/terminal/terminal-bash/src/session.ts",
+          "packages/terminal/terminal-bash/src/index.ts",
+          "packages/terminal/terminal-bash/tests/session.spec.ts"
+        ],
+        "verification": "Headless xterm cursor replies, serialized response draining, foreground re-inspection, and one-deadline pwsh startup are covered; real cross-platform PTY evidence remains an external F01/F02 gate"
       }
     ],
     "fileLevelAudit": {

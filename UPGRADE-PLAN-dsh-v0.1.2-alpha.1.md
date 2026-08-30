@@ -2,7 +2,7 @@
 
 - 审查日期：2026-08-30
 - 文档状态：执行收尾与发布前验证记录；逐项状态、证据和未完成项以 §4.5、§6、§11 为准
-- 当前可执行范围：兼容修复、模型与子代理路由、图片与 token、WebFetch 网络 pinning、Session schema 20、ACP/Python 兼容、Web client 批量启动与可选 gzip、会话 cache-first 等价路径已落地并部署到 `coharness-2d1b6785ab`；Remote/ focused UI/一次性 token 的上游形态有明确的 CoHarness 不采用决策，在线数据迁移和新增出网默认值仍未启用
+- 当前可执行范围：兼容修复、模型与子代理路由、图片与 token、WebFetch 网络 pinning、Session schema 20、ACP/Python 兼容、Web client 批量启动与可选 gzip、会话 cache-first 等价路径以及 PTY 终端协议应答已落地；Remote/ focused UI/一次性 token 的上游形态有明确的 CoHarness 不采用决策，在线数据迁移和新增出网默认值仍未启用
 - 上游版本：[dsh-v0.1.2-alpha.1](https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.1.2-alpha.1)，release tag commit `cd5ef8148158c3a752a658978873241fdf8e2bbc`
 - 对比范围：上游 `dsh-v0.1.1-rc.2..dsh-v0.1.2-alpha.1`；release 正文列出 14 项新功能、15 项体验优化、13 项修复、10 项其他变更，共 52 项；另对 tag 全部提交和包清单做了范围审计（126 个 first-parent 提交、796 个非 merge 提交；按 `git diff --no-renames --shortstat` 的稳定口径为 6823 个变更文件、348411 行新增、151493 行删除）
 - 我方基线：`baseline/2026-08-29` 指向 `master@6464092040`；发布来源分支 `upgrade/dsh-v0.1.2-alpha.1` 的已发布实现 checkpoint 为 `a5cd5ba34b`，审计补丁已形成候选 checkpoint `2d1b6785ab61f6539024eebee0f41d2df0223071` 并快进位于 `master`；候选已构建并由 release controller 激活为 `coharness-2d1b6785ab`；根包和主要 DSH 包仍标记 `0.1.1-rc.1`，不能把版本号当作代码对齐证明
@@ -138,8 +138,8 @@ Gateway 数据：Gateway SQLite schema 7 + 独立 PostgreSQL migrations
 
 | 编号 | 上游来源 | 变更、我方影响和处置 | 验收条件 |
 | --- | --- | --- | --- |
-| F01 | `4f3a47d792`、`c612f2071d`（#3046）及 `9a12505f86`、`5467685bc1`、`2338f4ad14` | 修复 macOS/Linux 持久 PowerShell/Bash 启动过早和输出不完整，并回答 Unix pwsh 的终端协议请求。当前 PTY readiness 在 `subprocess-local` 与 `terminal-bash` 有二开差异；把 `@xterm/headless` 协议状态、stdin 目标、tty device、线程 syscall ABI 和绝对 startup timeout 作为一个语义簇重放，不拆单提交。 | macOS/Linux 持久 pwsh/bash 启动、延迟首输出、heredoc、终端控制响应、取消和重启均返回完整结果；Windows 分支不受影响。 |
-| F02 | `4f3a47d792`、`c612f2071d`、`9a12505f86` | 修复 Linux 管道内部读取提前返回空输出。核心是区分终端 shell stdin 与 pipeline fd，同时先排空 pwsh 协议响应；适配现有 `ProcessInspector.isStdinWaiting` 签名和自定义 readiness grace。 | `{ sleep; printf; } &#124; cat`、多级管道、无输出命令、协议响应、超时和取消的实际 PTY/e2e 通过。 |
+| F01 | `4f3a47d792`、`c612f2071d`（#3046）及 `9a12505f86`、`5467685bc1`、`2338f4ad14` | 修复 macOS/Linux 持久 PowerShell/Bash 启动过早和输出不完整，并回答 Unix pwsh 的终端协议请求。当前 PTY readiness 在 `subprocess-local` 与 `terminal-bash` 有二开差异；已把 `@xterm/headless` 协议状态、stdin 目标、tty device、线程 syscall ABI 和绝对 startup timeout 作为一个语义簇重放，不拆单提交。 | terminal-bash session/index focused 已覆盖协议应答、队列、超时、取消和启动循环；仍需 macOS/Linux 实机与 hosted runner 回归，Windows 分支不受影响。 |
+| F02 | `4f3a47d792`、`c612f2071d`、`9a12505f86` | 修复 Linux 管道内部读取提前返回空输出。核心是区分终端 shell stdin 与 pipeline fd，同时先排空 pwsh 协议响应；适配现有 `ProcessInspector.isStdinWaiting` 签名和自定义 readiness grace。 | terminal-bash 协议排空与 subprocess-local focused tests 已通过；`{ sleep; printf; } &#124; cat`、多级管道和实际 Linux PTY/e2e 仍需平台车道复核。 |
 | F03 | `32ddfcd89c`、`9757224349` | 修复 macOS 大量子进程导致宿主卡顿，并加强 PID reuse fence。引入一次 process-table snapshot 只用于批量观察，发信号前仍按精确 identity 重读；保留我方 process-tree/teardown 语义。 | 生成大量子进程时 poll 延迟不随子进程数线性爆炸；PID 重用、空集合、单个读取失败和 teardown 仍 fail-safe。 |
 | F04 | `947205fb80`（#2956）、`51c242749a` | 修复 Windows picker 对含“开”等字符的 UTF-16 路径截断。当前 `readUtf16()` 按单字节检查 NUL；改为按 UTF-16 code unit 检查两个零字节并保留 surrogate pair。 | Windows 原生测试覆盖中文、emoji、U+XX00、长路径、取消和分配释放；POSIX import 不加载 koffi。 |
 | F05 | `7cc5a053fb`（#3071）、`9b6729d505` | 持久 Bash/PowerShell 结果可展开。当前 CoHarness 的 `ui-tool/toolviews/bash-sample.tsx` 已有可展开 terminal/generic card；以回归为主，只补缺失的 pwsh/错误路径，不替换自定义 inspect 和 compact 样式。 | Bash、pwsh、非零退出、空输出、长输出、键盘操作和手机快照保持展开能力；无重复 listener。 |
@@ -213,8 +213,8 @@ N01、N03、N04 会共同修改 ChatView 的分页锚点、尾部折叠和 usage
 | I13 | `implemented` | `packages/attachment/attachment/src/request-projection.ts`、`attachment-local/src/store.ts`、`llm-deepseek` | 路径投影与 adapter 测试覆盖；仅 local fs 暴露授权路径 |
 | I14 | `baseline-equivalent` | `packages/attachment/attachment-local` 已有 normalization、cache 和并发限制 | 本次没有完整 quality ladder 搬运；需图像基准后再决定 |
 | I15 | `implemented` | `packages/session/session-persistence-jsonl/src/index.ts` | torn-tail warning 测试通过；日志不写完整路径或内容 |
-| F01 | `implemented` | `packages/subprocess/subprocess-local/src/{terminal,process-inspector}.ts` | PTY/process focused tests 已通过；需 macOS/Linux 实机回归 |
-| F02 | `implemented` | `packages/subprocess/subprocess-local/src/terminal.ts`、process inspector | 管道空输出与 readiness 逻辑已适配；需真实 shell e2e |
+| F01 | `implemented` | `packages/terminal/terminal-bash/src/{session,index}.ts`、`packages/subprocess/subprocess-local/src/{terminal,process-inspector}.ts` | `terminal-bash` session/index focused 83 tests（另 2 项平台跳过）覆盖协议应答、启动绝对 deadline、队列、取消和 teardown；仍需 macOS/Linux 实机与 hosted runner 回归 |
+| F02 | `implemented` | `packages/terminal/terminal-bash/src/session.ts`、`packages/subprocess/subprocess-local/src/terminal.ts`、process inspector | 管道 stdin 识别与协议应答排空已适配；focused tests 通过，需真实 Linux shell e2e |
 | F03 | `implemented` | `packages/subprocess/subprocess-local/src/process-inspector.ts` | 批量 process snapshot/PID fence 已实现；需压力和 teardown 证据 |
 | F04 | `implemented` | `packages/host/directory-picker-native/src/win32-dialog-bindings.ts` | UTF-16 unit 测试已通过；Windows runner 仍缺 |
 | F05 | `baseline-equivalent` | `packages/client/ui-tool` 已有 terminal/generic 展开卡 | 本次只要求 pwsh/错误路径回归；无替换计划 |
@@ -462,6 +462,7 @@ release 正文的 52 项矩阵覆盖用户可见的功能、体验和修复；�
 | `packages/util/crypto`（`0bee546177`、`4e6937064c`） | `implemented` | 新增 `packages/util/crypto`，统一浏览器/worker 的 `getRandomValues` UUID 与有界 base64；会话、工作区、附件、RPC、命令、代理和 LLM 消费方已迁移。utility、client 和 web focused tests 必须保持通过；无 Web Crypto 的环境明确失败，不提供 `Math.random` 回退。 |
 | `packages/util/workspace-path`（`64bb0427f9`） | `baseline-equivalent` | `packages/client/runtime/src/client/workspaces/path.ts`、`sessions/service.ts` 已拥有工作区路径解析、home 缩写和标题派生；不重复引入只为匹配上游包名的薄包。跨包公开发布若未来需要稳定路径包，再单独做导出迁移。 |
 | `packages/subprocess/win32-process`（`668da7f507` 及后续修复族） | `baseline-equivalent` | `packages/sandbox/sandbox-windows-acl/src/{ffi,win32-abi,spawn}.ts` 已整合同类 Koffi/句柄/Job/管道原语；保留 CoHarness 的 sandbox seam 和错误语义。Windows native ABI、wheel、sidecar、升级/卸载仍是 N11 的外部验证门。 |
+| terminal protocol replies（`4f3a47d792`，并随 `9a12505f86`、`5467685bc1`、`2338f4ad14` 语义闭包） | `implemented` | `packages/terminal/terminal-bash/src/session.ts` 使用零滚动 headless xterm 维护协议状态，串行排空回复并在 readiness 检查后重取 foreground；`index.ts` 对 pwsh 启动使用单一绝对 deadline。协议 focused tests 已补齐，实机/跨平台证据仍按 F01/F02 保留。 |
 | `packages/test-support/session-snapshot`（`30762b63c9` 等） | `baseline-equivalent` | `packages/test-support/acp-snapshot` 已提供 keyless session replay、规范化、fixture guard 和真实 profile 启动；上游包的名称/目录不作为外部兼容承诺。 |
 | `packages/bundle/acp-app`、`sdk-app`、`sdk-minimal` | `baseline-equivalent` | `packages/examples/acp-demo`、`examples/jsonrpc-demo`、`packages/bundle/base/headless` 与 CLI profile boot 提供相同部署职责；CoHarness 保留自有 bundle/载体命名，避免重复装配。构建和 shipped composition smoke 负责证明入口闭包。 |
 | `packages/api/session-controller`、`settings-controller`、`workspace-controller`、`packages/client/store`、`ui-chat`、`ui-session`、`ui-approval` | `not-adopted`（见 I02/C03/C04） | 现有 `host/apiproxy`、`client/runtime`、`session-projection-cache`、`ui-conversation` slots/façade 承担同等业务职责，并保留 Gateway ACL、history-wire、文档和移动端扩展；不声称上游 `remote.*` API 或包名兼容。 |
@@ -541,12 +542,12 @@ release 正文的 52 项矩阵覆盖用户可见的功能、体验和修复；�
 
 本节中的“已实现”仅表示代码和本地测试已经存在；Windows、生产出网、Remote 双栈和默认切换仍按 §4.5 的状态与 §11.5 的发布门处理。
 
-- 已在当前工作树实现并配套测试的范围包括 ACP SDK 1.4.0 session/MCP/model/permission/cancel 控制、子代理 provider/model/reasoning/maxTokens 选择、Python runtime/carrier 兼容、SQLite schema 20 与逻辑事件保真迁移、DeepSeek request extensions、插件包清单、Session-log upload、精确 per-turn token usage、图片计费和路由定价、Markdown 流式高亮、图片请求与路径投影、QuestionComposer draft store、即时图片 pending-submission 回显、过程/System prompt 折叠、回合导航、聊天宽度/字号设置、pi-ai 0.84.x、PTY/process inspector、preset/profile 和 WebFetch 公网地址 pinning。
+- 已在当前工作树实现并配套测试的范围包括 ACP SDK 1.4.0 session/MCP/model/permission/cancel 控制、子代理 provider/model/reasoning/maxTokens 选择、Python runtime/carrier 兼容、SQLite schema 20 与逻辑事件保真迁移、DeepSeek request extensions、插件包清单、Session-log upload、精确 per-turn token usage、图片计费和路由定价、Markdown 流式高亮、图片请求与路径投影、QuestionComposer draft store、即时图片 pending-submission 回显、过程/System prompt 折叠、回合导航、聊天宽度/字号设置、pi-ai 0.84.x、PTY process inspector 与终端协议应答、preset/profile 和 WebFetch 公网地址 pinning。
 - `WebFetch`、插件 metadata 和 Session-log upload 均保持默认关闭；`COHARNESS_SEND_PLUGIN_METADATA=1` 与 `COHARNESS_UPLOAD_SESSION_LOG=1` 只是显式覆盖，不代表已获准在生产环境开启。`COHARNESS_DISABLE_SESSION_LOG_UPLOAD` 仍是运行时 kill switch。
 - Gateway 认证、项目/组织 ACL、模型治理、凭据隔离、文档/归档、移动端自定义 UI、旧 ApiProxy/history-wire/client-runtime 和 Python 零配置环境注入继续保留；本轮有意不删除旧 endpoint 或旧 composer。
 - I01 的 client batch/HMR 与 WebServer gzip 已实现，但浏览器/生产压缩证据仍待补齐；I02 的 cache-first 行为已有等价实现，C03/C04/C05 的上游 Remote/focused-package/URL-token 形态经审查明确不采用，并在 §4.5 记录兼容边界。schema 20 生产 canary 和任何数据在线迁移仍未执行，不得在发布说明中写成已支持。
 - clean-checkout 审计发现 `@deepseek-ai/dsh-token-meter/client` 的源代码平面 alias 缺失；已在 `tsconfig.base.json` 补齐，并将 Claude Agent SDK、平台载荷、README、NOTICE 和 real-product 期望统一到 lockfile 锁定的 0.3.241/2.1.241。该修复只影响源代码解析与审计资料，不改变已部署的运行时 artifact。
-- macOS hosted runner 的持久 pwsh 测试会在 marker/readback 完成前报告 `inferred_idle` 或空 viewport；本轮尝试的 marker-only 等待已撤回，因为它把既有截断结果变成了超时。基线与候选均失败同三个真实 PowerShell 用例，现保留原 prompt fallback，并把平台专项修复列为外部后续，不放宽断言或声称已修复。
+- macOS hosted runner 的持久 pwsh 测试此前会在 marker/readback 完成前报告 `inferred_idle` 或空 viewport；本轮已引入上游终端协议应答与回复排空，需以新的 hosted runner 结果确认是否消除该现象。任何仍失败的真实 PowerShell 用例都要与基线复跑对照，不放宽断言或声称已修复。
 
 ### 11.4 已执行验证
 
@@ -579,6 +580,7 @@ pnpm exec vitest run --project=process-bound --no-file-parallelism --maxWorkers=
 - 远端 Sandbox 的 Linux bwrap/Landlock legs 与两个 Release workflow 通过；macOS seatbelt 在候选 commit `33285946232` 与基线 `33204060125` 都失败同三个真实 PowerShell 用例，因此记录为既有 hosted-runner/platform 阻塞。远端 real-API E2E 仅因缺少受保护的 `DEEPSEEK_API_KEY_EXTERNAL` 在 preflight 停止；不得把这两项改写成代码通过。
 - 阶段 A 所列机器可读 manifest、依赖/NOTICE 清单和生产数据备份/hash 已生成；manifest 位于 `UPGRADE-MANIFEST-dsh-v0.1.2-alpha.1.json`，备份文件名和 SHA-256 记录在 manifest 中。Profile dump、负责人签字和安全批准仍由发布流程存放在受控外部位置，不能用仓库文本替代。
 - `process.exit` listener 的 per-runtime 注册根因已改为模块级共享 handler，并由 focused/process-bound trace 验证；若 thread-safe 重跑仍报告 Socket listener warning，必须单独定位 teardown owner，不得提高全局 listener 上限。持久 pwsh marker-only 等待提案已撤回并记录在 [rejected Agent Note](.agents/notes/rejected/bug-fix/2026-08-30-pwsh-marker-readiness.md)，真实 PowerShell 三项平台失败保持可见。
+- 上游 `4f3a47d792` 的 terminal protocol replies 先前未进入候选；本轮已补入 `@xterm/headless`、协议回复串行队列、并发 foreground 重检和 pwsh 单一启动 deadline，并以 session/index focused tests 固定该语义。跨平台实机结果仍是 F01/F02 的外部门，不得用本地 fake PTY 代替。
 - 2026-08-30 本次 tag-wide 对照又执行了稳定的 `--no-renames` 统计（6823 文件、348411 新增、151493 删除）、基线/候选 package inventory（250→254，对照上游 254）和源文件残差扫描（按声明过滤条件为 256 个基线缺口、候选仍有 224 个同路径残差，按 §8.2 全部归并，未分类为 0）。这证明了范围覆盖，不代表这些路径都应复制到 CoHarness。
 - 新增安全与兼容覆盖已实测：WebFetch public-network suite 58 tests（`network.ts` 的 statements/branches/functions/lines 均 100%）；locale suite 30 tests（修改后的 `client/index.ts` 四项均 100%）；全量升级相关 focused 集合 20 files/388 tests；client bundle purity、projection restore、模型 slot、pi-ai grant、subagent invariant 等均通过。`packages/client/tsdown.client.ts` 已将无状态 `dsh-util-crypto` 纳入 inline-safe 集合，实际 Client build 已验证不再产生缺失模块表请求。修正 Host locale schema 与 UUID 测试 seam 后，thread-safe 全量为 955 files/15346 passed/114 skipped，process-bound 全量为 8 files/446 passed。
 - 文档/工程门禁在本轮审计验证中通过：`pnpm run doc-sync` 28/28、`pnpm run hygiene`（含 runtime-closure/client-package/package-invariant）、`pnpm run lint`、`pnpm run typecheck`、`pnpm run verify-translation-pairing` 和 `git diff --check`。这些结果针对当前工作树候选；提交、构建或配置再次变化后必须重跑受影响门禁。Windows 原生、真实 API 和生产 canary 仍按下述外部门处理。
@@ -588,7 +590,7 @@ pnpm exec vitest run --project=process-bound --no-file-parallelism --maxWorkers=
 
 本节列出的动作区分为已完成的旧 release 收尾、已完成的候选构建/激活和仍需外部证据门；生产 artifact `coharness-2d1b6785ab` 已发布，上一 release `coharness-a5cd5ba34b` 与回滚目录 `coharness-6464092040` 保留。候选必须由 commit `2d1b6785ab61f6539024eebee0f41d2df0223071` 构建，不能把工作树或忽略目录直接当作发布物。
 
-1. 本轮代码与文档修改已通过 `pnpm run doc-sync`、`pnpm run lint`、`pnpm run typecheck`、`pnpm run hygiene`、`pnpm run build:production`、`pnpm run verify-third-party-notices`、`git diff --check`、翻译/Agent Note/归档门禁，以及覆盖 crypto、autospace、混合 ask-user、I01/I02 的 focused Vitest；完整 thread-safe/process-bound 串行测试也已通过。本次撤回 marker-only 等待后不得沿用旧的“marker readiness 已修复”结论。
+1. 本轮代码与文档修改已通过 `pnpm run doc-sync`、`pnpm run lint`、`pnpm run typecheck`、`pnpm run hygiene`、`pnpm run build:production`、`pnpm run verify-third-party-notices`、`git diff --check`、翻译/Agent Note/归档门禁，以及覆盖 crypto、autospace、混合 ask-user、I01/I02 和 terminal protocol replies 的 focused Vitest；完整 thread-safe/process-bound 串行测试也必须在本次协议补丁后重新通过。旧的 hosted PowerShell 失败不能沿用为最终结论，需以新 runner 结果和基线对照记录。
 2. 机器可读的上游 52 项 commit manifest、依赖/NOTICE 清单和数据文件 hash 已生成并随本次审计提交；Profile dump、决策签字和安全批准仍须由发布责任人补入受控发布记录。当前部署保持所有新增出网和在线迁移关闭，缺少这些外部材料时不得开启 canary 或改变默认策略。
 3. schema 20 `--verify-only`、v18↔v20 双向 round-trip、冷加载、回放和回滚仍需在隔离 Harness home 完成；生产本次没有执行在线迁移，旧文件与 `coharness-a5cd5ba34b`/`coharness-6464092040` 均保留，直到所有 hash、ACL 和业务 smoke 通过。
 4. 只有未来重新打开 C03/C04 时，才要求 Remote 双栈逐事件等价、旧客户端得到明确降级、Gateway ACL/凭据/文档边界通过、完整测试和跨平台构建证据齐全；本 release 不切换或删除旧 API。
