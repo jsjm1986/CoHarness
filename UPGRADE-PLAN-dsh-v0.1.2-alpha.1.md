@@ -138,8 +138,8 @@ Gateway 数据：Gateway SQLite schema 7 + 独立 PostgreSQL migrations
 
 | 编号 | 上游来源 | 变更、我方影响和处置 | 验收条件 |
 | --- | --- | --- | --- |
-| F01 | `4f3a47d792`、`c612f2071d`（#3046）及 `9a12505f86`、`5467685bc1`、`2338f4ad14` | 修复 macOS/Linux 持久 PowerShell/Bash 启动过早和输出不完整，并回答 Unix pwsh 的终端协议请求。当前 PTY readiness 在 `subprocess-local` 与 `terminal-bash` 有二开差异；已把 `@xterm/headless` 协议状态、stdin 目标、tty device、线程 syscall ABI 和绝对 startup timeout 作为一个语义簇重放，不拆单提交。 | terminal-bash session/index focused 已覆盖协议应答、队列、超时、取消和启动循环；仍需 macOS/Linux 实机与 hosted runner 回归，Windows 分支不受影响。 |
-| F02 | `4f3a47d792`、`c612f2071d`、`9a12505f86` | 修复 Linux 管道内部读取提前返回空输出。核心是区分终端 shell stdin 与 pipeline fd，同时先排空 pwsh 协议响应；适配现有 `ProcessInspector.isStdinWaiting` 签名和自定义 readiness grace。 | terminal-bash 协议排空与 subprocess-local focused tests 已通过；`{ sleep; printf; } &#124; cat`、多级管道和实际 Linux PTY/e2e 仍需平台车道复核。 |
+| F01 | `4f3a47d792`、`c612f2071d`（#3046）及 `9a12505f86`、`5467685bc1`、`2338f4ad14` | 修复 macOS/Linux 持久 PowerShell/Bash 启动过早和输出不完整，并回答 Unix pwsh 的终端协议请求。当前 PTY readiness 在 `subprocess-local` 与 `terminal-bash` 有二开差异；已把 `@xterm/headless` 协议状态、stdin 目标、tty device、线程 syscall ABI 和绝对 startup timeout 作为一个语义簇重放，不拆单提交。 | terminal-bash session/index focused 与 Sandbox hosted bwrap、两架构 Landlock、macOS seatbelt 均通过；Windows 分支的发行物证据仍按 N11 处理。 |
+| F02 | `4f3a47d792`、`c612f2071d`、`9a12505f86` | 修复 Linux 管道内部读取提前返回空输出。核心是区分终端 shell stdin 与 pipeline fd，同时先排空 pwsh 协议响应；适配现有 `ProcessInspector.isStdinWaiting` 签名和自定义 readiness grace。 | terminal-bash 协议排空、subprocess-local focused 和 Linux Sandbox PTY/packed-install 车道均通过；真实业务环境仍需按部署平台观察长管道和取消。 |
 | F03 | `32ddfcd89c`、`9757224349` | 修复 macOS 大量子进程导致宿主卡顿，并加强 PID reuse fence。引入一次 process-table snapshot 只用于批量观察，发信号前仍按精确 identity 重读；保留我方 process-tree/teardown 语义。 | 生成大量子进程时 poll 延迟不随子进程数线性爆炸；PID 重用、空集合、单个读取失败和 teardown 仍 fail-safe。 |
 | F04 | `947205fb80`（#2956）、`51c242749a` | 修复 Windows picker 对含“开”等字符的 UTF-16 路径截断。当前 `readUtf16()` 按单字节检查 NUL；改为按 UTF-16 code unit 检查两个零字节并保留 surrogate pair。 | Windows 原生测试覆盖中文、emoji、U+XX00、长路径、取消和分配释放；POSIX import 不加载 koffi。 |
 | F05 | `7cc5a053fb`（#3071）、`9b6729d505` | 持久 Bash/PowerShell 结果可展开。当前 CoHarness 的 `ui-tool/toolviews/bash-sample.tsx` 已有可展开 terminal/generic card；以回归为主，只补缺失的 pwsh/错误路径，不替换自定义 inspect 和 compact 样式。 | Bash、pwsh、非零退出、空输出、长输出、键盘操作和手机快照保持展开能力；无重复 listener。 |
@@ -213,8 +213,8 @@ N01、N03、N04 会共同修改 ChatView 的分页锚点、尾部折叠和 usage
 | I13 | `implemented` | `packages/attachment/attachment/src/request-projection.ts`、`attachment-local/src/store.ts`、`llm-deepseek` | 路径投影与 adapter 测试覆盖；仅 local fs 暴露授权路径 |
 | I14 | `baseline-equivalent` | `packages/attachment/attachment-local` 已有 normalization、cache 和并发限制 | 本次没有完整 quality ladder 搬运；需图像基准后再决定 |
 | I15 | `implemented` | `packages/session/session-persistence-jsonl/src/index.ts` | torn-tail warning 测试通过；日志不写完整路径或内容 |
-| F01 | `implemented` | `packages/terminal/terminal-bash/src/{session,index}.ts`、`packages/subprocess/subprocess-local/src/{terminal,process-inspector}.ts` | `terminal-bash` session/index focused 83 tests（另 2 项平台跳过）覆盖协议应答、启动绝对 deadline、队列、取消和 teardown；仍需 macOS/Linux 实机与 hosted runner 回归 |
-| F02 | `implemented` | `packages/terminal/terminal-bash/src/session.ts`、`packages/subprocess/subprocess-local/src/terminal.ts`、process inspector | 管道 stdin 识别与协议应答排空已适配；focused tests 通过，需真实 Linux shell e2e |
+| F01 | `implemented` | `packages/terminal/terminal-bash/src/{session,index}.ts`、`packages/subprocess/subprocess-local/src/{terminal,process-inspector}.ts` | `terminal-bash` session/index focused 83 tests（另 2 项平台跳过）覆盖协议应答、启动绝对 deadline、队列、取消和 teardown；Sandbox hosted 四腿已通过，Windows 发行物仍未实测 |
+| F02 | `implemented` | `packages/terminal/terminal-bash/src/session.ts`、`packages/subprocess/subprocess-local/src/terminal.ts`、process inspector | 管道 stdin 识别与协议应答排空已适配；focused tests 与 Linux Sandbox PTY/packed-install 通过，生产长管道观测仍按部署平台执行 |
 | F03 | `implemented` | `packages/subprocess/subprocess-local/src/process-inspector.ts` | 批量 process snapshot/PID fence 已实现；需压力和 teardown 证据 |
 | F04 | `implemented` | `packages/host/directory-picker-native/src/win32-dialog-bindings.ts` | UTF-16 unit 测试已通过；Windows runner 仍缺 |
 | F05 | `baseline-equivalent` | `packages/client/ui-tool` 已有 terminal/generic 展开卡 | 本次只要求 pwsh/错误路径回归；无替换计划 |
