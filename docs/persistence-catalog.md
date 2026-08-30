@@ -686,7 +686,7 @@ Source: [`packages/session/session-title-llm/src/index.ts:43`](../packages/sessi
 }
 ```
 
-Source: [`packages/session/session-log-deepseek/src/types.ts:26`](../packages/session/session-log-deepseek/src/types.ts)
+Source: [`packages/session/session-log-deepseek/src/types.ts:25`](../packages/session/session-log-deepseek/src/types.ts)
 
 ### `step/*`
 
