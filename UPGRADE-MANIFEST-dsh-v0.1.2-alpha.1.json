@@ -19,6 +19,17 @@
     "implementationCommit": "19cb32900974acddd926add6baecfaac803207d3",
     "previousRelease": "coharness-2d1b6785ab",
     "rollbackRelease": "coharness-a5cd5ba34b",
+    "releaseRetention": {
+      "activeDirectories": [
+        "coharness-19cb329009",
+        "coharness-2d1b6785ab",
+        "coharness-a5cd5ba34b",
+        "coharness-6464092040"
+      ],
+      "archivedDirectory": "~/harness-gateway-release-archive-20260830",
+      "archivedCount": 19,
+      "archiveMode": "recoverable move; no release payload was hard-deleted"
+    },
     "controller": "~/.local/libexec/harness-gateway/release-control.sh",
     "pid": 32411,
     "localHealth": "{\"ok\":true,\"release\":\"coharness-19cb329009\"}",

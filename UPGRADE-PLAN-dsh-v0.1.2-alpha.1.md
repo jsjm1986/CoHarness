@@ -522,7 +522,7 @@ release 正文的 52 项矩阵覆盖用户可见的功能、体验和修复；�
 
 ### 11.1 当前工作树事实
 
-截至 2026-08-30，当前 checkout 为 `master`，HEAD `19cb32900974acddd926add6baecfaac803207d3`；`baseline/2026-08-29` 指向 `master@6464092040428805c5d76ed977fa4ab3fac66161`。生产运行不可变目录 `coharness-19cb329009`，上一候选 `coharness-2d1b6785ab`、更早的 `coharness-a5cd5ba34b` 和基线目录 `coharness-6464092040` 均保留回滚。工作树当前已清洁；构建输出属于忽略目录，不能代替提交内容。
+截至 2026-08-30，当前 checkout 为 `master`，HEAD `0391a5f3e573e27c715e5ceada2abaa44141fe2c`（运行时实现 commit `19cb32900974acddd926add6baecfaac803207d3`）；`baseline/2026-08-29` 指向 `master@6464092040428805c5d76ed977fa4ab3fac66161`。生产运行不可变目录 `coharness-19cb329009`，上一候选 `coharness-2d1b6785ab`、更早的 `coharness-a5cd5ba34b` 和基线目录 `coharness-6464092040` 均保留回滚；另有 19 个未引用旧 artifact 可恢复地归档在 `~/harness-gateway-release-archive-20260830`。工作树当前已清洁；构建输出属于忽略目录，不能代替提交内容。
 
 ### 11.2 已落地的关键 checkpoint
 
@@ -556,7 +556,7 @@ release 正文的 52 项矩阵覆盖用户可见的功能、体验和修复；�
 
 已通过 `pnpm run hygiene`、`pnpm run typecheck`、`pnpm run lint`、`pnpm run build:production`、`pnpm run build:official`、`pnpm run build:lib:host`、`pnpm run build`、`pnpm run constraints`、`pnpm run verify-client-packages`、`pnpm run verify-third-party-notices`、`git diff --check`、`pnpm run doc-sync`、ACP focused suite（364 tests）、ACP e2e（2 passed，1 keyless skip）、ACP 单文件串行（47 passed）、LSP instance 串行（23 passed）、oxlint/publint（18 passed）、WebFetch/Web spill/theme focused（10 passed）、I01/I02 focused suite（10 files，186 tests）、terminal-bash/subprocess focused suite（10 files，161 passed，3 skipped）、token-meter/client source-plane focused suite（5 files，113 tests，另有移除 `lib` 后的 clean-artifact smoke 25 tests）、persistent pwsh tool/readiness baseline suite（2 files，26 passed，2 skipped）、shipped Web composition e2e（2 tests）、thread-safe 全量串行（955 files，15,357 passed，114 tests skipped）和 process-bound 全量串行（8 files，446 passed）。完整 `pnpm run build`、本轮 `pnpm run build:production` 与官方 247 包打包均通过；构建仅报告 Linux native 载荷在 macOS arm64 上被跳过的预期警告，以及前端 chunk 大小提示。
 
-生产 smoke（2026-08-30，新 artifact 激活后）：release controller 状态、`http://127.0.0.1:8899/healthz` 和 `https://harness.maycran.com/healthz` 均返回 `ok=true` 与 release `coharness-19cb329009`；本地和公网未登录根路径均保持 HTTP 401；artifact 的 client hash 为 `19cb329`，terminal-bash 运行时依赖 `@xterm/headless@6.0.0` 已存在；PostgreSQL `pg:check` 返回 migration 22、8 users、1,196,415 audits、75 conversations、655,477 events；上一 release `coharness-2d1b6785ab`、`coharness-a5cd5ba34b` 与回滚目录 `coharness-6464092040` 均未删除。
+生产 smoke（2026-08-30，新 artifact 激活后）：release controller 状态、`http://127.0.0.1:8899/healthz` 和 `https://harness.maycran.com/healthz` 均返回 `ok=true` 与 release `coharness-19cb329009`；本地和公网未登录根路径均保持 HTTP 401；artifact 的 client hash 为 `19cb329`，terminal-bash 运行时依赖 `@xterm/headless@6.0.0` 已存在；PostgreSQL `pg:check` 返回 migration 22、8 users、1,196,415 audits、75 conversations、655,477 events；上一 release `coharness-2d1b6785ab`、`coharness-a5cd5ba34b` 与回滚目录 `coharness-6464092040` 均保留，另 19 个旧 artifact 已移至可恢复归档目录。
 
 默认多项目并行执行的 `pnpm run test` 曾因 thread-safe 与 process-bound 项目争用进程/CPU 出现 7 个超时或失败；本轮已将两个项目分别以 `--no-file-parallelism --maxWorkers=1` 串行跑完并通过。完整 `pnpm run test:web:built` 在旧快照/资源并发下曾出现多项超时；刷新受影响 golden、适配折叠过程行后的 I01/I02 与 shipped composition focused 测试已通过，未把并行失败误记为产品回归。保留以下命令作为发布和 CI 资源受限时的可复现执行方式：
 
@@ -590,7 +590,7 @@ pnpm exec vitest run --project=process-bound --no-file-parallelism --maxWorkers=
 
 ### 11.5 发布前剩余动作与停止条件
 
-本节列出的动作区分为已完成的旧 release 收尾、已完成的候选构建/激活和仍需外部证据门；生产 artifact `coharness-19cb329009` 已发布，上一 release `coharness-2d1b6785ab`、`coharness-a5cd5ba34b` 与回滚目录 `coharness-6464092040` 保留。候选必须由 commit `19cb32900974acddd926add6baecfaac803207d3` 构建，不能把工作树或忽略目录直接当作发布物。
+本节列出的动作区分为已完成的旧 release 收尾、已完成的候选构建/激活和仍需外部证据门；生产 artifact `coharness-19cb329009` 已发布，上一 release `coharness-2d1b6785ab`、`coharness-a5cd5ba34b` 与回滚目录 `coharness-6464092040` 保留，其他 19 个旧 artifact 位于 `~/harness-gateway-release-archive-20260830`，可按需恢复。候选必须由 commit `19cb32900974acddd926add6baecfaac803207d3` 构建，不能把工作树或忽略目录直接当作发布物。
 
 1. 本轮代码与文档修改已通过 `pnpm run doc-sync`、`pnpm run lint`、`pnpm run typecheck`、`pnpm run hygiene`、`pnpm run build:production`、`pnpm run verify-third-party-notices`、`git diff --check`、翻译/Agent Note/归档门禁，以及覆盖 crypto、autospace、混合 ask-user、I01/I02 和 terminal protocol replies 的 focused Vitest；完整 thread-safe/process-bound 串行测试也必须在本次协议补丁后重新通过。旧的 hosted PowerShell 失败不能沿用为最终结论，需以新 runner 结果和基线对照记录。
 2. 机器可读的上游 52 项 commit manifest、依赖/NOTICE 清单和数据文件 hash 已生成并随本次审计提交；Profile dump、决策签字和安全批准仍须由发布责任人补入受控发布记录。当前部署保持所有新增出网和在线迁移关闭，缺少这些外部材料时不得开启 canary 或改变默认策略。
