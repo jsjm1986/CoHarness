@@ -58,7 +58,7 @@ function styleInjectionModule(
  * Everything else under @deepseek-ai/* is either a module-table entry
  * (external) or a leak the purity gate rejects.
  */
-export const INLINE_SAFE = /^@deepseek-ai\/dsh-(host-apiproxy|file-reference|session|llm|tools|brand|client-userdoc-upload)(\/|$)/
+export const INLINE_SAFE = /^@deepseek-ai\/dsh-(host-apiproxy|file-reference|session|llm|tools|brand|client-userdoc-upload|util-crypto)(\/|$)/
 
 /** Pure per-turn token folds are safe to inline into browser bundles. */
 const INLINE_SAFE_TOKEN_METER = /^@deepseek-ai\/dsh-token-meter\/client$/

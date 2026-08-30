@@ -3,6 +3,7 @@ import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry, { Inbox } from '@deepseek-ai/dsh-agent'
 import type { Agent, AgentCancelCause, InboxTarget } from '@deepseek-ai/dsh-agent'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
+import * as cryptoUtility from '@deepseek-ai/dsh-util-crypto'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import {
   ScheduleId,
@@ -679,7 +680,7 @@ describe('Schedule runtime failure and teardown boundaries', () => {
 
     const runFailure = await harness()
     appendAfter(runFailure, 'schedule-1', 1, Date.now() - 1_000)
-    const uuidSpy = vi.spyOn(globalThis.crypto, 'randomUUID').mockImplementation(() => { throw 'message failed' })
+    const uuidSpy = vi.spyOn(cryptoUtility, 'randomUUID').mockImplementation(() => { throw 'message failed' })
     const failingRuntime = runtimeFor(runFailure)
     failingRuntime.start()
     for (let index = 0; index < 12; index += 1) await Promise.resolve()
@@ -690,7 +691,7 @@ describe('Schedule runtime failure and teardown boundaries', () => {
 
     const departedRun = await harness()
     appendAfter(departedRun, 'schedule-1', 1, Date.now() - 1_000)
-    const departedUuidSpy = vi.spyOn(globalThis.crypto, 'randomUUID').mockImplementation(() => {
+    const departedUuidSpy = vi.spyOn(cryptoUtility, 'randomUUID').mockImplementation(() => {
       departedRun.disposeAgent()
       throw 'message failed after detach'
     })

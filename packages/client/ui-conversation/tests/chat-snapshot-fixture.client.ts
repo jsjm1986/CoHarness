@@ -292,6 +292,7 @@ export function chatSnapshotFixture(input: {
     order,
     nodes: store,
     locations,
+    navigation: { items: () => EMPTY },
     timeline,
     legacy,
   }

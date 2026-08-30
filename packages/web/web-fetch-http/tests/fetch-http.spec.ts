@@ -6,7 +6,7 @@ import WebRuntime from '@deepseek-ai/dsh-web'
 import { HttpFetchProvider, LOCAL_FETCH_PROVIDER_ID } from '@deepseek-ai/dsh-web-fetch-http'
 import type { HttpFetchLimits } from '@deepseek-ai/dsh-web-fetch-http'
 import * as fetchPlugin from '@deepseek-ai/dsh-web-fetch-http'
-import { publicHttpNetwork } from '../src/network.ts'
+import { createPinnedLookup, isPublicIpAddress, publicHttpNetwork, requestPinned, resolvePublicAddresses } from '../src/network.ts'
 import { classifyContentType, decoderForCharset, isSameOrigin, parseCharset, validateFetchUrl } from '../src/policy.ts'
 
 const limits: HttpFetchLimits = {
@@ -78,6 +78,151 @@ describe('policy helpers', () => {
     expect(decoderForCharset(undefined).encoding).toBe('utf-8')
     expect(decoderForCharset('iso-8859-1').encoding).toBe('windows-1252')
     expect(() => decoderForCharset('not-a-charset')).toThrow(expect.objectContaining({ code: 'WEB_UNSUPPORTED_CONTENT_TYPE' }))
+  })
+})
+
+describe('public-network policy', () => {
+  it('accepts only globally reachable unicast addresses', () => {
+    for (const address of ['8.8.8.8', '2001:4860:4860::8888', '::ffff:8.8.8.8']) {
+      expect(isPublicIpAddress(address), address).toBe(true)
+    }
+    for (const address of [
+      '0.0.0.0', '10.0.0.1', '100.64.0.1', '127.0.0.1', '169.254.169.254',
+      '192.0.2.1', '224.0.0.1', '255.255.255.255', '::', '::1', 'fe80::1',
+      'fc00::1', 'ff02::1', '::ffff:127.0.0.1', '64:ff9b::808:808', 'not-an-ip',
+    ]) {
+      expect(isPublicIpAddress(address), address).toBe(false)
+    }
+  })
+
+  it('retains one fully public DNS answer set', async () => {
+    const resolver = vi.fn(async () => [
+      { address: '8.8.4.4', family: 4 },
+      { address: '2001:4860:4860::8888', family: 6 },
+    ])
+    await expect(resolvePublicAddresses('example.test', new AbortController().signal, resolver))
+      .resolves.toEqual([
+        { address: '8.8.4.4', family: 4 },
+        { address: '2001:4860:4860::8888', family: 6 },
+      ])
+  })
+
+  it('rejects the whole DNS answer set when one address is not public', async () => {
+    const resolver = vi.fn(async () => [
+      { address: '8.8.8.8', family: 4 },
+      { address: '127.0.0.1', family: 4 },
+    ])
+    await expect(resolvePublicAddresses('rebinding.test', new AbortController().signal, resolver))
+      .rejects.toThrow(expect.objectContaining({ code: 'WEB_BLOCKED_URL' }))
+  })
+
+  it('rejects empty and invalid resolver results', async () => {
+    await expect(resolvePublicAddresses('empty.test', new AbortController().signal, async () => []))
+      .rejects.toThrow(expect.objectContaining({ code: 'WEB_PROVIDER_ERROR' }))
+    await expect(resolvePublicAddresses('family.test', new AbortController().signal, async () => [{ address: '8.8.8.8', family: 0 }]))
+      .rejects.toThrow(expect.objectContaining({ code: 'WEB_PROVIDER_ERROR' }))
+    await expect(resolvePublicAddresses('mismatch.test', new AbortController().signal, async () => [{ address: '::1', family: 4 }]))
+      .rejects.toThrow(expect.objectContaining({ code: 'WEB_PROVIDER_ERROR' }))
+  })
+
+  it('validates bracketed IPv6 literals after checking for an active DNS64 prefix', async () => {
+    const resolver = vi.fn(async () => [{ address: '192.0.0.170', family: 4 }])
+    await expect(resolvePublicAddresses('[2001:4860:4860::8888]', new AbortController().signal, resolver))
+      .resolves.toEqual([{ address: '2001:4860:4860::8888', family: 6 }])
+    expect(resolver).toHaveBeenCalledWith('ipv4only.arpa', { all: true, order: 'verbatim' })
+  })
+
+  it('rejects a network-specific NAT64 address that translates to private IPv4', async () => {
+    const resolver = vi.fn(async (hostname: string) => hostname === 'ipv4only.arpa'
+      ? [{ address: '2001:4860:64:64::c000:aa', family: 6 }]
+      : [{ address: '2001:4860:64:64::7f00:1', family: 6 }])
+    await expect(resolvePublicAddresses('nat64.test', new AbortController().signal, resolver))
+      .rejects.toThrow(expect.objectContaining({ code: 'WEB_BLOCKED_URL' }))
+  })
+
+  it('accepts a network-specific NAT64 address that translates to public IPv4', async () => {
+    const resolver = vi.fn(async (hostname: string) => hostname === 'ipv4only.arpa'
+      ? [{ address: '2001:4860:64:64::c000:aa', family: 6 }]
+      : [{ address: '2001:4860:64:64::808:808', family: 6 }])
+    await expect(resolvePublicAddresses('nat64.test', new AbortController().signal, resolver))
+      .resolves.toEqual([{ address: '2001:4860:64:64::808:808', family: 6 }])
+  })
+
+  it('deduplicates discovered prefixes and ignores addresses outside their translation layout', async () => {
+    const resolver = vi.fn(async (hostname: string) => hostname === 'ipv4only.arpa'
+      ? [
+        { address: '2001:4860:64:64::c000:aa', family: 6 },
+        { address: '2001:4860:64:64::c000:ab', family: 6 },
+        { address: '2001:4860:64:64:c0:0:aa00:0', family: 6 },
+      ]
+      : [
+        { address: '2001:4860:65:64::808:808', family: 6 },
+        { address: '2001:4860:64:64:100::1', family: 6 },
+      ])
+    await expect(resolvePublicAddresses('native-v6.test', new AbortController().signal, resolver))
+      .resolves.toEqual([
+        { address: '2001:4860:65:64::808:808', family: 6 },
+        { address: '2001:4860:64:64:100::1', family: 6 },
+      ])
+  })
+
+  it('stops waiting for DNS when the request is aborted', async () => {
+    let finish: (value: never[]) => void = () => {}
+    const resolver = vi.fn(() => new Promise<never[]>((resolve) => { finish = resolve }))
+    const controller = new AbortController()
+    const pending = resolvePublicAddresses('slow.test', controller.signal, resolver)
+    controller.abort(new Error('stop'))
+    await expect(pending).rejects.toThrow('web fetch aborted during hostname resolution')
+    finish([])
+
+    const alreadyAborted = new AbortController()
+    alreadyAborted.abort(new Error('already stopped'))
+    await expect(resolvePublicAddresses('slow.test', alreadyAborted.signal, resolver))
+      .rejects.toThrow('web fetch aborted during hostname resolution')
+  })
+
+  it('propagates resolver failures', async () => {
+    await expect(resolvePublicAddresses('broken.test', new AbortController().signal, async () => { throw new Error('dns failed') }))
+      .rejects.toThrow('dns failed')
+  })
+
+  it('serves only the retained addresses through the connector lookup', async () => {
+    const lookup = createPinnedLookup([
+      { address: '8.8.8.8', family: 4 },
+      { address: '2001:4860:4860::8888', family: 6 },
+    ])
+    const call = (options: Parameters<typeof lookup>[1]) => new Promise<{
+      error: NodeJS.ErrnoException | null
+      address: string | import('node:dns').LookupAddress[]
+      family: number | undefined
+    }>((resolve) => {
+      lookup('fixed.test', options, (error, address, family) => { resolve({ error, address, family }) })
+    })
+    await expect(call({ all: true })).resolves.toMatchObject({
+      error: null,
+      address: [{ address: '8.8.8.8', family: 4 }, { address: '2001:4860:4860::8888', family: 6 }],
+    })
+    await expect(call({ family: 4 })).resolves.toMatchObject({ error: null, address: '8.8.8.8', family: 4 })
+    await expect(call({ family: 'IPv6' })).resolves.toMatchObject({ error: null, address: '2001:4860:4860::8888', family: 6 })
+    await expect(call({ family: 'IPv4' })).resolves.toMatchObject({ error: null, address: '8.8.8.8', family: 4 })
+    await expect(call({ family: 7 })).resolves.toMatchObject({ error: { code: 'ENOTFOUND' }, address: '', family: 7 })
+    await expect(call({ family: 7, all: true })).resolves.toMatchObject({ error: { code: 'ENOTFOUND' }, address: [], family: 7 })
+  })
+
+  it('pins the connection to the validated address without resolving the URL hostname again', async () => {
+    handler = (_req, res) => { res.writeHead(200, { 'content-type': 'text/plain' }); res.end('pinned') }
+    const { port } = server.address() as AddressInfo
+    const request = await requestPinned(
+      new URL(`http://does-not-resolve.invalid:${String(port)}/`),
+      [{ address: '127.0.0.1', family: 4 }],
+      {},
+      new AbortController().signal,
+    )
+    try {
+      await expect(request.response.text()).resolves.toBe('pinned')
+    } finally {
+      await request.close()
+    }
   })
 })
 

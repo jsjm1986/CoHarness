@@ -19,6 +19,11 @@ import { zh } from '@deepseek-ai/dsh-client-ui-conversation/src/client/locales.t
 afterEach(cleanup)
 
 const ARGS = JSON.stringify({ questions: [{ id: 'a' }, { id: 'b' }, { id: 'c' }] })
+const READABLE_ARGS = JSON.stringify({ questions: [
+  { id: 'goal', question: 'What do you want to accomplish?' },
+  { id: 'scope', question: 'Which project should this apply to?' },
+  { id: 'notes', question: 'Anything else?' },
+] })
 
 const resultNode = (argsRaw: string, resultText: string | null, over?: Partial<ToolResultNode>): ToolResultNode => ({
   kind: 'tool-result', seq: 10, time: 2_000, callTime: 1_000, callId: 'c1',
@@ -59,6 +64,55 @@ describe('AskQuestionRow', () => {
       { id: 'c', selected: ['y', 'z'], custom: '' },
     ])))} />)
     expect(screen.getByText('3/3 已回答')).toBeTruthy()
+  })
+
+  it('keeps generic diagnostics when a valid answer result includes a non-text block', () => {
+    const resultText = answers([
+      { id: 'a', selected: ['x'] },
+      { id: 'b', selected: [] },
+    ])
+    const view = render(<AskQuestionRow {...rowProps(resultNode(ARGS, resultText, {
+      content: [
+        { type: 'text', text: resultText },
+        { type: 'reasoning', text: 'unexpected diagnostic' },
+      ],
+    }))} />)
+
+    expect(screen.getByText(`ask_user_question · ${ARGS}`)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { expanded: false }))
+    expect(view.container.textContent).toContain('"type": "reasoning"')
+    expect(view.container.textContent).toContain('"text": "unexpected diagnostic"')
+  })
+
+  it('renders answered history as readable question and answer lines', () => {
+    render(<AskQuestionRow {...rowProps(resultNode(READABLE_ARGS, answers([
+      { id: 'scope', selected: ['deepseek-harness'] },
+      { id: 'goal', selected: ['Develop a feature'], custom: 'Keep the API small' },
+      { id: 'notes', selected: [] },
+    ])))} />)
+
+    fireEvent.click(screen.getByRole('button', { expanded: false }))
+
+    expect(screen.getByText('What do you want to accomplish?')).toBeTruthy()
+    expect(screen.getByText('Develop a feature')).toBeTruthy()
+    expect(screen.getByText('Keep the API small')).toBeTruthy()
+    expect(screen.getByText('Which project should this apply to?')).toBeTruthy()
+    expect(screen.getByText('deepseek-harness')).toBeTruthy()
+    expect(screen.getByText('Anything else?')).toBeTruthy()
+    expect(screen.getByText('未回答')).toBeTruthy()
+    expect(screen.queryByText(/"questions"/)).toBeNull()
+    expect(screen.queryByText(/"answers"/)).toBeNull()
+  })
+
+  it('renders unanswered questions and a verdict after cancellation', () => {
+    const view = render(<AskQuestionRow {...rowProps(resultNode(READABLE_ARGS, null,
+      { isError: true, error: { name: 'UserQuestionError', code: 'ASK_CANCELLED' } }))} />)
+
+    expect(screen.getByText('已取消')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { expanded: false }))
+    expect(screen.getByText('本轮已取消，未提交回答')).toBeTruthy()
+    expect(screen.getByText('What do you want to accomplish?')).toBeTruthy()
+    expect(view.container.textContent).not.toContain('UserQuestionError: ASK_CANCELLED')
   })
 
   it('skipped questions (no selection, no custom) stay out of the answered count', () => {

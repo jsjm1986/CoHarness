@@ -13,7 +13,13 @@ import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import { createUserMessage, freezeMessage } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, UserMessage } from '@deepseek-ai/dsh-llm'
 import type { SessionId } from '@deepseek-ai/dsh-session'
-import type { SessionSurfaceSnapshot, SessionTitleObservationResult } from '@deepseek-ai/dsh-session-query'
+// Optional projection faces provide title labels without folding a full log
+// on every `@` keystroke; compositions without them retain the query fallback.
+import type {} from '@deepseek-ai/dsh-session-projection'
+import type {} from '@deepseek-ai/dsh-session-projection-cache'
+import type {
+  SessionRecord, SessionSurfaceSnapshot, SessionTitleObservationResult,
+} from '@deepseek-ai/dsh-session-query'
 import {
   DEFAULT_CANDIDATE_LIMIT,
   DEFAULT_MAX_REFERENCE_BYTES,
@@ -70,6 +76,13 @@ interface PreparedSource {
 interface RenderedSource {
   data: ReferencedSessionData
   stats: ReferenceRetentionStats
+}
+
+/** Listed session plus the display label chosen by a projection or fallback read. */
+interface LabelledSession {
+  record: SessionRecord
+  index: number
+  label: string
 }
 
 /** Exact-read consumer that prepares immutable cross-session message context. */
@@ -180,20 +193,35 @@ export class SessionReferenceResolver extends TypertRemoteService {
           || a.index - b.index)
         .slice(0, limit)
       : records
-    const observations = await settleWithCancellation(
-      this.ctx.sessionQuery.readTitleSnapshots(inspected.map(({ record }) => record.header.id), signal),
-      signal,
-    )
-    return inspected.map(({ record, index }, observationIndex) => {
-      const observation = observations[observationIndex] as SessionTitleObservationResult
-      return {
+    const projectionServices = this.ctx.get('sessionProjections') !== undefined
+      || this.ctx.get('sessionProjectionCache') !== undefined
+    let labelled: LabelledSession[]
+    if (projectionServices) {
+      // Projection-backed compositions answer titles without folding a full
+      // log for every keystroke. A missing projection intentionally falls back
+      // to the stable session id until that session is opened once.
+      labelled = inspected.map(({ record, index }) => ({
         record,
         index,
-        label: observation.status === 'fulfilled'
-          ? observation.value.title?.title ?? record.header.id
-          : record.header.id,
-      }
-    }).filter(({ record, label }) => {
+        label: this.projectedTitle(record) ?? record.header.id,
+      }))
+    } else {
+      const observations = await settleWithCancellation(
+        this.ctx.sessionQuery.readTitleSnapshots(inspected.map(({ record }) => record.header.id), signal),
+        signal,
+      )
+      labelled = inspected.map(({ record, index }, observationIndex) => {
+        const observation = observations[observationIndex] as SessionTitleObservationResult
+        return {
+          record,
+          index,
+          label: observation.status === 'fulfilled'
+            ? observation.value.title?.title ?? record.header.id
+            : record.header.id,
+        }
+      })
+    }
+    return labelled.filter(({ record, label }) => {
       if (needle === '') return true
       return record.header.id.toLocaleLowerCase().includes(needle)
         || record.header.cwd?.toLocaleLowerCase().includes(needle) === true
@@ -207,6 +235,17 @@ export class SessionReferenceResolver extends TypertRemoteService {
         ...record.header.cwd === undefined ? {} : { cwd: record.header.cwd },
         createdAt: record.header.createdAt,
       }))
+  }
+
+  /** Read a title from the live projection or the durable checkpoint cache. */
+  private projectedTitle(record: SessionRecord): string | undefined {
+    const attached = this.ctx.get('sessions')?.get(record.header.id)
+    const projections = this.ctx.get('sessionProjections')
+    if (attached !== undefined && projections !== undefined) {
+      return titleOf(projections.snapshot(attached).values.title)
+    }
+    const cached = this.ctx.get('sessionProjectionCache')?.cachedSnapshot(record.header)
+    return titleOf(cached?.values.title)
   }
 
   /**
@@ -362,6 +401,11 @@ function candidateRank(candidateCwd: string | undefined, targetCwd: string | und
   if (candidateCwd !== undefined && targetCwd !== undefined && candidateCwd === targetCwd) return 0
   if (candidateCwd === undefined) return 1
   return 2
+}
+
+/** Return a non-empty projected title, treating an absent/null title as unknown. */
+function titleOf(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined
 }
 
 function assertNotCancelled(signal: AbortSignal | undefined): void {

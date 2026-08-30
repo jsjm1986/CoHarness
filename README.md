@@ -44,7 +44,7 @@ Practices that work can be reused and strengthened. A successful delegation patt
 | Enforce stronger Linux isolation | Gateway with systemd deployment | Per-runtime accounts, mount namespaces, directory grants, and kernel-level project confinement. |
 | Access a hosted workspace on mobile | Web UI or the Android shell | Browser or Capacitor access to an already deployed Gateway; push notifications are optional. |
 
-CoHarness is in pre-release development. Treat production deployment as an evaluated self-hosting responsibility: public APIs, configuration, database schemas, session formats, and deployment procedures may change. Linux systemd provides stronger process and directory confinement than macOS; the macOS launcher is intended for trusted-team development or deployments whose host permissions provide the required protection. See the [Gateway reference](gateway/README.md) and [deployment runbook](gateway/deploy/README.md) before exposing a service to users.
+CoHarness is in pre-release development. Treat production deployment as an evaluated self-hosting responsibility: public APIs, configuration, database schemas, session formats, and deployment procedures may change. Linux systemd provides stronger process and directory confinement than macOS; the macOS launcher is intended for trusted-team development or deployments whose host permissions provide the required protection. Read the [safety notice](SAFETY.md) ([中文](SAFETY.zh.md)), [Gateway reference](gateway/README.md), and [deployment runbook](gateway/deploy/README.md) before exposing a service to users.
 
 ## Start as a personal user
 

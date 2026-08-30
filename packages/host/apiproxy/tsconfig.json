@@ -118,6 +118,9 @@
     },
     {
       "path": "../../util/native-command"
+    },
+    {
+      "path": "../../util/crypto"
     }
   ]
 }

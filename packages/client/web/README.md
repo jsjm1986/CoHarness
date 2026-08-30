@@ -12,6 +12,8 @@ The optional override parameter `seams` forwards the module system's `loadBundle
 
 Before prefetching or activating dynamic entries, the boot kernel installs compatibility implementations for missing `AbortSignal.any`, `AbortSignal.timeout`, and `AbortSignal.abort` factories. This keeps the browser client usable in Android WebViews that provide `AbortController` but not the newer static factories, while preserving native implementations when they exist.
 
+The shell base styles apply automatic CJK/Latin spacing to ordinary content in supporting browsers. Code, terminal, diff, read, and search output retain literal source spacing and column alignment; engines without `text-autospace` support ignore the declarations.
+
 ## Model Experience
 
 None, as the entry shell boots the browser plugin tree; nothing here reaches a model request.

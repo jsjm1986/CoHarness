@@ -56,6 +56,7 @@
     "@deepseek-ai/cordis": "workspace:^"
   },
   "dependencies": {
+    "@deepseek-ai/dsh-util-crypto": "workspace:^",
     "@deepseek-ai/schemastery": "workspace:^"
   },
   "devDependencies": {

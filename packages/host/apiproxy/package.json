@@ -76,6 +76,7 @@
     "@deepseek-ai/dsh-user-questions": "workspace:^",
     "@deepseek-ai/dsh-userdoc": "workspace:^",
     "@deepseek-ai/dsh-userdoc-context": "workspace:^",
+    "@deepseek-ai/dsh-util-crypto": "workspace:^",
     "@deepseek-ai/dsh-workspace": "workspace:^",
     "@deepseek-ai/schemastery": "workspace:^",
     "fflate": "^0.8.2",

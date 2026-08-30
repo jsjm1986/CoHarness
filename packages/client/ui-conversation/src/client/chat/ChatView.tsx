@@ -264,7 +264,7 @@ export function ChatView({
   // Older snapshots and lightweight fixtures may not carry the optional
   // navigation reader yet; the rail simply stays absent until the builder
   // publishes it.
-  const navigationItems = navigation?.items() ?? []
+  const navigationItems = navigation.items()
 
   const processByTurn = useMemo(() => {
     const result = new Map<number, TurnProcessChatData>()

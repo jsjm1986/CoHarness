@@ -457,8 +457,17 @@ export class SessionProjectionRegistry extends Service {
       }
       let state = usable ? def.stateSchema.parse(row.val) : def.init()
       const from = usable ? row.seq : baseSeq - 1
-      for (const event of events) {
-        if (event.seq > from) state = def.apply(state, event)
+      // `events` is the contiguous suffix beginning at baseSeq. Its index is
+      // therefore the event seq minus baseSeq; skip the checkpointed prefix
+      // without allocating a second tail array.
+      const startIndex = from - baseSeq + 1
+      for (let index = startIndex; index < events.length; index += 1) {
+        const event = events[index]
+        /* v8 ignore next -- restore receives a dense, validated event suffix. */
+        if (event === undefined) {
+          throw new Error(`session projection ${JSON.stringify(def.key)} encountered a sparse event tail`)
+        }
+        state = def.apply(state, event)
       }
       if (def.wire !== undefined) values[def.key] = def.wire.viewSchema.parse(def.wire.view(state))
       refreshed[def.key] = { ver: def.stateVersion, seq: endSeq, val: state }

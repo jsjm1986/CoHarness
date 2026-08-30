@@ -26,6 +26,9 @@
     },
     {
       "path": "../../util/timeout"
+    },
+    {
+      "path": "../../util/crypto"
     }
   ]
 }

@@ -16,6 +16,10 @@ Web 通过 `@deepseek-ai/dsh-client-ui-reference` 暴露一个合并的 `@file` 
 
 选择会话会创建一个结构化输入框引用。可见形式使用聊天气泡图标与业务色会话标题，不使用胶囊容器；剪贴板和模型形式则是宿主生成的规范 `@[label](dsh-session:…)` mention。完整的 `@label` 展示文本会保留在透明 textarea 中，同尺寸 backdrop 会为这段范围着色，并把开头的 marker 替换为对应领域图标。因此宽度、换行、选择区与光标位置都由原生字形度量决定，不会截断。occurrence 范围会保留引用身份以供序列化；在边界按 Backspace 或 Delete 会整段删除引用，在范围内部编辑则会把剩余字符转为普通文本。普通 `session.prompt` 投递会原样携带规范 mention。session-reference 服务会在 `agent/pre-step` 解析已接受的直接用户消息，捕获每个源，在保留直接消息 id 的同时把规范 mention 替换为可读文本，并把冻结快照插入到该消息紧后。召回上下文行使用同一个聊天图标，其他上下文保留文档图标。API Proxy 不包含引用专用路由、依赖或错误码。
 
+补全标签在这些能力存在时使用实时 session projection 或持久 projection-cache checkpoint；没有 projection 的会话在首次打开前回退到稳定 id。这样 `@` 每次击键都不会折叠完整的冷日志，同时在最小组合中保留与传输无关的回退路径。
+
+本地文件索引把无法读取工作区根目录视为索引失败，使后续查询可以重试；无法读取的子目录仍按尽力而为策略省略。默认不排除 `lib`，因为一些生态会把源文件放在那里；部署可以显式加入该目录。
+
 输入状态机在默认 sink 报告宿主已接受前，会保留普通草稿文本和原子引用。它写入会话 store 的镜像会持久化每个 occurrence 的规范剪贴板投影，因此在 occurrence 表缺失的情况下重新挂载时，仍会保留可解析的引用，而不是仅供显示的标签。序列化或提示词传输失败后，同一草稿会回到可编辑状态。接受后，引用准备属于 agent 轮次；格式错误的 mention、源读取失败、取消或预算失败会终止该轮次。已记录的提示词仍是回放权威。聊天界面按照持久的直接消息后接召回行顺序渲染，并且只从紧随其后的带来源召回中关联准确的会话标签，因此既能保留多词标题，也能让连续引用彼此独立。它会把识别到的文件与会话 mention 装饰成图标加文字的引用，把包括无扩展名 basename 在内的未加引号 `@path` token 视为文件，将句末标点留在引用范围之外，并把快照 JSON 保留在默认收起的召回行中。
 
 ## 引用事务
@@ -26,7 +30,7 @@ type @ → parallel file/session Remote calls → pick folder text or atomic fil
        → agent/pre-step parses mentions → capture sources → readable prompt + context
 ```
 
-文件查询仅供参考且可取消；选择操作本身不会读取文件。会话准备针对一个已接受的模型步骤保持全有或全无。queued 消息被领取时会捕获每个源，因此队列编辑和从 queue 移动到 steer 使用同一路径，无需网关协调。
+文件查询仅供参考且可取消；选择操作本身不会读取文件。会话补全在 projection 可用时使用 projection 标签；未挂载 projection 的组合才保留标题日志回退。会话准备针对一个已接受的模型步骤保持全有或全无。queued 消息被领取时会捕获每个源，因此队列编辑和从 queue 移动到 steer 使用同一路径，无需网关协调。
 
 ## 备选方案
 

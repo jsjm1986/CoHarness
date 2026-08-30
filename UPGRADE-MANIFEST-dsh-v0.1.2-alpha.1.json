@@ -24,6 +24,227 @@
     "deepSeekRealApi": "push E2E is blocked by the intentionally required DEEPSEEK_API_KEY_EXTERNAL repository secret",
     "windowsNativeRelease": "wheel/exe/sidecar install, upgrade, and uninstall evidence is not available on this macOS host"
   },
+  "tagSurfaceAudit": {
+    "firstParentCommits": 126,
+    "nonMergeCommits": 796,
+    "diffStatMode": "--no-renames",
+    "changedFiles": 6823,
+    "insertions": 348411,
+    "deletions": 151493,
+    "releaseNoteItems": 52,
+    "releaseNotesSource": "https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.1.2-alpha.1",
+    "packageInventory": {
+      "method": "count package.json paths with git ls-tree -r --name-only <ref> packages | rg '/package\\.json$'",
+      "upstreamPackageDirectories": 254,
+      "baselinePackageDirectories": 250,
+      "coharnessPackageDirectories": 254
+    },
+    "sourceFileAudit": {
+      "upstreamAddedSourceFilesInScope": 256,
+      "candidateMissingSamePathSourceFiles": 224,
+      "unclassifiedRuntimeSourceFiles": 0,
+      "method": "compare git ls-tree paths for dsh-v0.1.2-alpha.1 and baseline/2026-08-29, then compare git ls-files -co --exclude-standard for the candidate; include packages/apps/python source paths under /src with ts/tsx/js/mjs/cjs/py extensions, exclude tests/specs/fixtures and experimental/webhook, and classify same-path gaps by the semantic groups in UPGRADE-PLAN §8.2"
+    },
+    "surfaces": [
+      {
+        "surface": "util-crypto",
+        "status": "implemented",
+        "evidence": [
+          "packages/util/crypto/src/index.ts",
+          "packages/util/crypto/tests/uuid.spec.ts",
+          "packages/client/runtime/src/client/workspaces/service.ts",
+          "packages/client/ui-conversation/src/client/service.ts"
+        ]
+      },
+      {
+        "surface": "text-autospace",
+        "status": "implemented",
+        "evidence": [
+          "packages/client/web/src/base.css",
+          "packages/client/web/tests/base-styles.client.spec.ts"
+        ]
+      },
+      {
+        "surface": "mixed-ask-user-results",
+        "status": "implemented",
+        "evidence": [
+          "packages/client/ui-tool/src/client/tool/models/raw-tool-call.ts",
+          "packages/client/ui-tool/tests/ask-question-row.client.spec.tsx"
+        ]
+      },
+      {
+        "surface": "readable-ask-user-transcripts",
+        "status": "implemented",
+        "evidence": [
+          "packages/client/ui-tool/src/client/tool/models/ask-question-card-model.ts",
+          "packages/client/ui-tool/src/client/tool/components/AskQuestionCard.tsx",
+          "packages/client/ui-tool/tests/ask-question-row.client.spec.tsx"
+        ]
+      },
+      {
+        "surface": "external-client-locale-registration",
+        "status": "implemented",
+        "evidence": [
+          "packages/client/locale/src/client/index.ts",
+          "packages/client/locale/src/locale-settings.ts",
+          "packages/client/locale/tests/locale.client.spec.ts"
+        ]
+      },
+      {
+        "surface": "models-provider-extension-slots",
+        "status": "implemented",
+        "evidence": [
+          "packages/client/ui-settings-models/src/client/slot-contract.ts",
+          "packages/client/ui-settings-models/src/client/ModelsSection.tsx",
+          "packages/client/ui-settings-models/tests/components.client.spec.tsx"
+        ]
+      },
+      {
+        "surface": "pi-ai-grant-json-image",
+        "status": "implemented",
+        "evidence": [
+          "packages/llm/llm-pi-ai/src/auth.ts",
+          "packages/llm/llm-pi-ai/tests/auth.spec.ts"
+        ]
+      },
+      {
+        "surface": "subagent-policy-definition-invariant",
+        "status": "implemented",
+        "evidence": [
+          "packages/subagent/tool-subagent/src/invariant.ts",
+          "packages/subagent/tool-subagent/tests/invariant.spec.ts"
+        ]
+      },
+      {
+        "surface": "preset-structured-refusal-cause",
+        "status": "implemented",
+        "evidence": [
+          "packages/client/ui-agent-preset/src/client/seat-store.ts",
+          "packages/client/ui-agent-preset/tests/settings-store.client.spec.ts"
+        ]
+      },
+      {
+        "surface": "model-selector-description-density",
+        "status": "implemented",
+        "evidence": [
+          "packages/client/ui-model-selection/src/client/ModelSelect.tsx",
+          "packages/client/ui-model-selection/src/client/ModelSelect.module.css",
+          "packages/client/ui-model-selection/tests/model-select.client.spec.tsx"
+        ]
+      },
+      {
+        "surface": "projection-restore-tail-index",
+        "status": "implemented",
+        "evidence": [
+          "packages/session/session-projection/src/index.ts",
+          ".agents/notes/implemented/architecture/2026-08-30-index-projection-restore-tail.md"
+        ]
+      },
+      {
+        "surface": "reference-discovery-root-and-projection-labels",
+        "status": "implemented",
+        "evidence": [
+          "packages/context/file-reference-local/src/search.ts",
+          "packages/context/file-reference-local/tests/search.spec.ts",
+          "packages/context/session-reference/src/index.ts",
+          "packages/context/session-reference/tests/session-reference.spec.ts"
+        ]
+      },
+      {
+        "surface": "safety-notice",
+        "status": "implemented",
+        "evidence": [
+          "SAFETY.md",
+          "SAFETY.zh.md"
+        ]
+      },
+      {
+        "surface": "workspace-path",
+        "status": "baseline-equivalent",
+        "evidence": [
+          "packages/client/runtime/src/client/workspaces/path.ts",
+          "packages/client/runtime/src/client/sessions/service.ts"
+        ]
+      },
+      {
+        "surface": "win32-process",
+        "status": "baseline-equivalent",
+        "evidence": [
+          "packages/sandbox/sandbox-windows-acl/src/ffi.ts",
+          "packages/sandbox/sandbox-windows-acl/src/win32-abi.ts",
+          "packages/sandbox/sandbox-windows-acl/src/spawn.ts"
+        ],
+        "verification": "Windows native ABI and release artifacts remain unverified"
+      },
+      {
+        "surface": "session-snapshot",
+        "status": "baseline-equivalent",
+        "evidence": [
+          "packages/test-support/acp-snapshot"
+        ]
+      },
+      {
+        "surface": "bundle-acp-sdk-variants",
+        "status": "baseline-equivalent",
+        "evidence": [
+          "packages/examples/acp-demo",
+          "examples/jsonrpc-demo",
+          "packages/bundle/base",
+          "packages/bundle/headless"
+        ]
+      },
+      {
+        "surface": "remote-controller-and-focused-ui-package-shape",
+        "status": "not-adopted",
+        "evidence": [
+          "packages/host/apiproxy",
+          "packages/client/runtime",
+          "packages/session/session-projection-cache",
+          "packages/client/ui-conversation"
+        ],
+        "verification": "CoHarness ACL, history-wire, document and mobile extensions remain on the existing transport; upstream remote.* API compatibility is not claimed"
+      },
+      {
+        "surface": "subagent-model-selection-settings-card",
+        "status": "not-adopted",
+        "evidence": [
+          "packages/subagent/tool-subagent/src/model-selection-settings.ts",
+          "packages/subagent/tool-subagent/src/model-selection-state.ts",
+          "packages/subagent/tool-subagent/src/list-models.ts"
+        ],
+        "verification": "Host policy snapshot and list_subagent_models are implemented; the upstream browser allowlist card is intentionally omitted so Gateway/deployment ownership remains the sole writable policy surface"
+      },
+      {
+        "surface": "webhook-and-experimental-inspector-webworker-agent-team",
+        "status": "deferred",
+        "verification": "No public GitHub ingress or production cross-realm runtime is enabled"
+      },
+      {
+        "surface": "connection-contract-and-tool-call-id-renames",
+        "status": "baseline-equivalent",
+        "evidence": [
+          "packages/client/connection/src/client/api.ts",
+          "packages/llm/llm/src/brand.ts"
+        ],
+        "verification": "Custom ApiProxy seam remains; ToolCallId is canonical with CallId compatibility alias"
+      }
+    ],
+    "fileLevelAudit": {
+      "command": "git diff --name-status dsh-v0.1.1-rc.2 dsh-v0.1.2-alpha.1 -- packages apps python scripts",
+      "sourceOnlyRule": "exclude docs, tests, CI, generated output, vendor, and experimental/deferred trees only after a grouped disposition is recorded",
+      "groups": [
+        { "name": "adopted-runtime-source-clusters", "status": "implemented-or-adapted", "local": ["packages/acp/acp", "packages/core/session", "packages/llm", "packages/web/web-fetch-http", "packages/util/crypto", "packages/client/ui-tool", "packages/client/ui-settings-models"] },
+        { "name": "remote-stream-and-browser-auth", "status": "not-adopted", "local": ["packages/host/apiproxy", "packages/client/connection", "gateway"] },
+        { "name": "focused-ui-and-lexical-editor", "status": "not-adopted", "local": ["packages/client/runtime", "packages/client/ui-conversation", "packages/client/ui-slots"] },
+        { "name": "ui-primitives-and-reference-projections", "status": "baseline-equivalent", "local": ["packages/client/ui-conversation", "packages/client/ui-workspace", "packages/client/ui-renderer", "packages/client/ui-trajectory"] },
+        { "name": "versioned-welcome-onboarding", "status": "not-adopted", "local": ["packages/client/ui-settings-models", "packages/client/ui-settings-general"] },
+        { "name": "subagent-settings-card", "status": "not-adopted", "local": ["packages/subagent/tool-subagent/src/model-selection-settings.ts", "packages/subagent/tool-subagent/src/list-models.ts"] },
+        { "name": "persistence-storage-and-cleanup", "status": "baseline-equivalent", "local": ["packages/session", "packages/session-query", "packages/storage", "packages/spill"] },
+        { "name": "sdk-profile-and-native-adapters", "status": "adapted", "local": ["packages/sdk", "packages/boot", "packages/host/directory-picker", "packages/util/native-command"] },
+        { "name": "webhook-and-experimental", "status": "deferred", "local": [] }
+      ]
+    }
+  },
   "reviewDate": "2026-08-30",
   "plan": "UPGRADE-PLAN-dsh-v0.1.2-alpha.1.md",
   "statusLegend": {
@@ -33,14 +254,22 @@
     "deferred": "Not implemented and not enabled by this release.",
     "unverified": "Implemented but an external platform, production, or cross-stack proof is still required."
   },
+  "statusCounts": {
+    "implemented": 41,
+    "baseline-equivalent": 6,
+    "not-adopted": 4,
+    "unverified": 1,
+    "deferred": 0,
+    "totalReleaseItems": 52
+  },
   "items": [
     { "id": "N01", "status": "implemented" },
     { "id": "N02", "status": "implemented" },
     { "id": "N03", "status": "implemented" },
     { "id": "N04", "status": "implemented" },
     { "id": "N05", "status": "implemented" },
-    { "id": "N06", "status": "baseline-equivalent" },
-    { "id": "N07", "status": "baseline-equivalent" },
+    { "id": "N06", "status": "implemented" },
+    { "id": "N07", "status": "implemented" },
     { "id": "N08", "status": "implemented" },
     { "id": "N09", "status": "implemented" },
     { "id": "N10", "status": "implemented" },
@@ -51,12 +280,12 @@
     { "id": "I01", "status": "implemented" },
     { "id": "I02", "status": "baseline-equivalent" },
     { "id": "I03", "status": "implemented" },
-    { "id": "I04", "status": "baseline-equivalent" },
+    { "id": "I04", "status": "implemented" },
     { "id": "I05", "status": "baseline-equivalent" },
     { "id": "I06", "status": "not-adopted" },
     { "id": "I07", "status": "implemented" },
     { "id": "I08", "status": "implemented" },
-    { "id": "I09", "status": "baseline-equivalent" },
+    { "id": "I09", "status": "implemented" },
     { "id": "I10", "status": "implemented" },
     { "id": "I11", "status": "implemented" },
     { "id": "I12", "status": "baseline-equivalent" },
@@ -76,7 +305,7 @@
     { "id": "F11", "status": "implemented" },
     { "id": "F12", "status": "implemented" },
     { "id": "F13", "status": "implemented" },
-    { "id": "C01", "status": "baseline-equivalent" },
+    { "id": "C01", "status": "implemented" },
     { "id": "C02", "status": "implemented" },
     { "id": "C03", "status": "not-adopted" },
     { "id": "C04", "status": "not-adopted" },
@@ -88,8 +317,12 @@
     { "id": "C10", "status": "implemented" }
   ],
   "verification": {
-    "focusedTests": "10 files, 186 tests; token-meter/client source-plane suite 5 files, 113 tests; clean-artifact smoke 25 tests",
-    "threadSafe": "952 files, 15,307 passed, 114 skipped",
+    "auditDate": "2026-08-30",
+    "auditFocusedTests": "20 files, 388 tests; WebFetch network policy included 58 tests; Locale modified client/index.ts and utility coverage at 100% in focused coverage runs",
+    "clientBundleBuild": "pnpm run build:lib:client passed; dsh-util-crypto is inlined through INLINE_SAFE",
+    "sourceAudit": "256 upstream source paths are absent from the frozen baseline under the declared filter; 224 are still absent at the same path in the candidate because of intentional package/API relocation, equivalence, or deferral; all are grouped in UPGRADE-PLAN §8.2 with zero unclassified runtime paths",
+    "focusedTests": "20 files, 388 tests; WebFetch network policy 58 tests; token-meter/client source-plane suite 5 files, 113 tests; clean-artifact smoke 25 tests",
+    "threadSafe": "955 files, 15,346 passed, 114 skipped",
     "processBound": "8 files, 446 passed",
     "shippedWebComposition": "2 tests passed",
     "docSync": "28 gates passed",

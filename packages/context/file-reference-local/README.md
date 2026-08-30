@@ -41,5 +41,5 @@ The stable sentence joins the system-prompt prefix. Mounting or removing this pr
 ## Known Limitations and Deferred Work
 
 - **Host-local namespace** — the provider scans the Harness host filesystem, so remote or virtual `read` implementations require a provider whose namespace matches the tool.
-- **Bounded advisory index** — very large workspaces may omit paths after `maxEntries`, and excluded or unreadable directories do not appear.
+- **Bounded advisory index** — very large workspaces may omit paths after `maxEntries`, and excluded or unreadable descendant directories do not appear. An unreadable workspace root rejects the index so the next query can retry instead of publishing a false empty result.
 - **No ignore-file semantics** — `.gitignore` and other project ignore files do not influence discovery; only configured directory basenames are excluded.

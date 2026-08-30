@@ -130,7 +130,12 @@ export class WorkspaceFileSearch {
       if (directory === undefined) {
         throw new Error('file search selected a missing directory')
       }
-      const entries = await readDirectory(directory.absolute, signal)
+      // The root is not a subtree: an unreadable root means the traversal
+      // learned nothing and must reject so the caller can retry. Descendant
+      // failures remain best-effort and are handled by readDirectory.
+      const entries = cursor === 0
+        ? await readWorkspaceRoot(directory.absolute, signal)
+        : await readDirectory(directory.absolute, signal)
       for (const entry of entries) {
         signal.throwIfAborted()
         const path = directory.relative === '' ? entry.name : `${directory.relative}/${entry.name}`
@@ -168,6 +173,13 @@ export class WorkspaceFileSearch {
     }
     return rankCandidates(candidates, fragment, this.config.maxResults)
   }
+}
+
+async function readWorkspaceRoot(absolute: string, signal: AbortSignal) {
+  signal.throwIfAborted()
+  const entries = await readdir(absolute, { withFileTypes: true })
+  signal.throwIfAborted()
+  return entries.sort((left, right) => compareText(left.name, right.name))
 }
 
 async function resolveDisplayDirectory(

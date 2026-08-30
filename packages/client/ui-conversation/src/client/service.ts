@@ -9,6 +9,7 @@
  */
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
+import { bytesToBase64, randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 // Type-only imports: a plugin-to-plugin value import is a bundle purity
@@ -78,7 +79,7 @@ export interface IConversation {
 function browserDraftAttachment(file: File): ComposerAttachment {
   return {
     kind: 'image',
-    id: crypto.randomUUID() as DraftAttachmentId,
+    id: randomUUID() as DraftAttachmentId,
     previewUrl: URL.createObjectURL(file),
     file,
   }
@@ -349,7 +350,7 @@ export class ConversationController extends Service implements IConversation {
 
     const descriptor: ComposerDocument = {
       kind: 'document',
-      id: crypto.randomUUID() as DraftDocumentId,
+      id: randomUUID() as DraftDocumentId,
       docId: ref.docId,
       name: ref.name,
       bytes: ref.bytes,
@@ -384,7 +385,7 @@ export class ConversationController extends Service implements IConversation {
     for (const file of files) {
       const descriptor: ComposerDocument = {
         kind: 'document',
-        id: crypto.randomUUID() as DraftDocumentId,
+        id: randomUUID() as DraftDocumentId,
         name: file.name || 'document',
         bytes: file.size,
         mediaType: file.type || 'application/octet-stream',
@@ -742,15 +743,6 @@ function imageMediaType(value: string): ImageMediaType {
     default:
       throw new UnsupportedImageMediaTypeError(value)
   }
-}
-
-function bytesToBase64(data: Uint8Array): string {
-  let binary = ''
-  const chunk = 0x8000
-  for (let offset = 0; offset < data.length; offset += chunk) {
-    binary += String.fromCharCode(...data.subarray(offset, offset + chunk))
-  }
-  return btoa(binary)
 }
 
 function revokePreview(url: string): void {

@@ -184,7 +184,7 @@ find(agent: Agent, name: string): CommandDefinition | undefined
 
 Types: [Agent](core.md) · [EncodedImageAttachment](attachment.md)
 
-Source: [`packages/interaction/commands/src/index.ts:250`](../../packages/interaction/commands/src/index.ts)
+Source: [`packages/interaction/commands/src/index.ts:251`](../../packages/interaction/commands/src/index.ts)
 
 <a id="commands-events"></a>
 

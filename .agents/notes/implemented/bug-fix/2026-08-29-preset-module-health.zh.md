@@ -22,8 +22,8 @@ Status: implemented
 
 ## 影响
 
-preset 选择器可以在会话启动前识别过期的包和文件引用，而插件 apply 抛错与缺失注入服务仍保留挂载时诊断。包含根目录的 roster 必须由 Loader 提供 `ctx.baseUrl`，解析基准因此明确。
+preset 选择器可以在会话启动前识别过期的包和文件引用，而插件 apply 抛错与缺失注入服务仍保留挂载时诊断。包含根目录的 roster 必须由 Loader 提供 `ctx.baseUrl`，解析基准因此明确。新会话 preset 席位在选择拒绝包含结构化 `details.reason` 时优先使用该原因，因此 UI 只显示一次可操作的根因，不重复 preset 包装信息。
 
 ## 测试
 
-发现测试覆盖包、相对、绝对／builtin、disabled、悬空链接、嵌套 group 和多行诊断；完整 preset 挂载与 authoring 套件继续覆盖既有生命周期检查。
+发现测试覆盖包、相对、绝对／builtin、disabled、悬空链接、嵌套 group 和多行诊断；席位测试覆盖结构化拒绝原因；完整 preset 挂载与 authoring 套件继续覆盖既有生命周期检查。

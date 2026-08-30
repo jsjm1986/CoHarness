@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-29-preset-module-health.md
-2026-08-29-preset-module-health.md: 5f8c83469e3a09f014c8d767317f8319fa5ea356
-2026-08-29-preset-module-health.zh.md: ee4e054acd729e0bf19922e5191c6af7eda17367
+2026-08-29-preset-module-health.md: ed855909ede1fb5492cb53414e1dc8a0339113eb
+2026-08-29-preset-module-health.zh.md: fe3eecb06fa66b6520360463a6532c1ab5173a6a

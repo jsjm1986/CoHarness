@@ -39,6 +39,8 @@
       "@deepseek-ai/cordis-plugin-logger-console": ["./vendor/logger-console/src"],
       "@deepseek-ai/node-addon-landlock-run": ["./native/landlock-run/packages/entry/src/index.ts"],
       "@deepseek-ai/dsh-invariants": ["./packages/runtime-diagnostics/invariants/src/index.ts"],
+      "@deepseek-ai/dsh-util-crypto": ["./packages/util/crypto/src/index.ts"],
+      "@deepseek-ai/dsh-util-crypto/invariant": ["./packages/util/crypto/src/invariant.ts"],
       "@deepseek-ai/dsh-tool-call-timeout-policy": ["./packages/guard/timeout-policy/src"],
       "@deepseek-ai/dsh-tool-call-timeout-policy/invariant": ["./packages/guard/timeout-policy/src/invariant.ts"],
       "@deepseek-ai/dsh-typert-registry": ["./packages/typert/registry/src/index.ts"],

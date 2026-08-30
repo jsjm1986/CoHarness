@@ -34,7 +34,6 @@ interface EffortChoice {
   key: string
   effort: string | undefined
   label: string
-  description?: string
 }
 
 /**
@@ -107,7 +106,6 @@ export function ModelSelect(
         key: `effort:${effort.id}`,
         effort: effort.id,
         label: effort.name,
-        ...effort.description === undefined ? {} : { description: effort.description },
       })),
     ], [reasoning, t])
   const busy = state.status === 'selecting'
@@ -274,7 +272,6 @@ export function ModelSelect(
                 >
                   <span className={css.optionCopy}>
                     <span className={css.modelName}>{model.name}</span>
-                    {model.description !== undefined && <span className={css.description}>{model.description}</span>}
                   </span>
                   <span className={css.check}>{selected ? <IconCheckOutline16 /> : null}</span>
                 </button>
@@ -304,7 +301,6 @@ export function ModelSelect(
           >
             <span className={css.optionCopy}>
               <span className={css.modelName}>{level.label}</span>
-              {level.description !== undefined && <span className={css.description}>{level.description}</span>}
             </span>
             <span className={css.check}>{effectiveEffort === level.effort ? <IconCheckOutline16 /> : null}</span>
           </button>

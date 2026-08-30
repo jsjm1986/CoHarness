@@ -312,6 +312,27 @@ describe('session reference discovery and preparation', () => {
     }])
   })
 
+  it('uses live projection titles without folding title logs on autocomplete', async () => {
+    const ctx = await harness()
+    const target = ctx.sessions.create(SessionId('target'), { meta: { cwd: '/same', createdAt: 10 } })
+    const projected = ctx.sessions.create(SessionId('projected'), { meta: { cwd: '/same', createdAt: 20 } })
+    const titleReads = vi.spyOn(ctx.sessionQuery, 'readTitleSnapshots')
+    ctx.provide('sessionProjections', {
+      snapshot: (session: typeof projected) => ({
+        asOfSeq: session.seq - 1,
+        values: { title: session.id === projected.id ? 'Projected title' : null },
+      }),
+    } as never)
+
+    await expect(ctx.sessionReferenceResolver.listCandidates(fakeAgent(target))).resolves.toEqual([{
+      sessionId: projected.id,
+      label: 'Projected title',
+      cwd: '/same',
+      createdAt: 20,
+    }])
+    expect(titleReads).not.toHaveBeenCalled()
+  })
+
   it('filters candidates through the active collaboration readable-session ACL', async () => {
     const ctx = await harness()
     const target = ctx.sessions.create(SessionId('target'), { meta: { cwd: '/same', createdAt: 10 } })

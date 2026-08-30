@@ -17,10 +17,20 @@ function importOrder(css: string): string[] {
 }
 
 const imports = importOrder(baseCss)
+const normalizedCss = baseCss
+  .replaceAll(/\/\*[\s\S]*?\*\//g, '')
+  .replaceAll(/\s+/g, ' ')
 
 describe('web shell base.css', () => {
   it('leaves theme styles to the dynamic ui-theme client entry', () => {
     expect(imports).toEqual([])
     expect(baseCss).not.toContain(THEME_PACKAGE)
+  })
+
+  it('auto-spaces prose while preserving literal content', () => {
+    expect(baseCss).toMatch(/body\s*\{[^}]*text-autospace:\s*normal;/)
+    expect(normalizedCss).toContain(
+      'code, pre, [data-diff], [data-read], [data-search], [data-terminal] { text-autospace: no-autospace; }',
+    )
   })
 })

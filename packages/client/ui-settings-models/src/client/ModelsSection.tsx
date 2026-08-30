@@ -16,7 +16,8 @@ import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import type { IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
 import { Button, IconPlusOutline16, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { InjectFace } from '@deepseek-ai/dsh-client-ui-slots'
+import type { InjectFace, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
+import type {} from './slot-contract.ts'
 import type { SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { CustomProviderCard } from './CustomProviderCard.tsx'
 import { deriveKeyRef, messageOf, protocolChoices, providerUsable } from './store.ts'
@@ -61,7 +62,12 @@ export interface ModelsSectionInjected {
  * Props delivered by the slot outlet: the inject face spread flat (the
  * renderer erases the share boundary at the render call).
  */
-export type ModelsSectionProps = Partial<SettingsSectionOwnerProps> & Partial<InjectFace<ModelsSectionInjected>>
+type ModelsChildSlots = 'settings.models.provider-card' | 'settings.models.footer'
+type ModelsRenderSlot = PropsRenderSlots<ModelsChildSlots>['renderSlot']
+
+export type ModelsSectionProps = Partial<SettingsSectionOwnerProps>
+  & Partial<InjectFace<ModelsSectionInjected>>
+  & { renderSlot?: ModelsRenderSlot }
 
 type ModelsSectionFace = InjectFace<ModelsSectionInjected> & Partial<SettingsSectionOwnerProps>
 
@@ -198,6 +204,7 @@ export function ModelsSection(props: ModelsSectionProps): ReactNode {
     controller === undefined || useSnapshot === undefined || api === undefined
     || schema === undefined || t === undefined
   ) return null
+  const renderSlot = props.renderSlot ?? (() => null)
   return (
     <Loaded
       injected={{
@@ -213,11 +220,12 @@ export function ModelsSection(props: ModelsSectionProps): ReactNode {
         ...props.settingsScope === undefined ? {} : { settingsScope: props.settingsScope },
         ...props.providerIdPattern === undefined ? {} : { providerIdPattern: props.providerIdPattern },
       }}
+      renderSlot={renderSlot}
     />
   )
 }
 
-function Loaded({ injected }: { injected: ModelsSectionFace }): ReactNode {
+function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderSlot: ModelsRenderSlot }): ReactNode {
   const projectRequested = injected.settingsScope === 'project'
   const binding = projectRequested && injected.projectId !== undefined
     ? injected.projectBinding?.(injected.projectId)
@@ -354,6 +362,9 @@ function Loaded({ injected }: { injected: ModelsSectionFace }): ReactNode {
   // such route is addable there is no valid target for the generic action.
   const canAdoptProvider = addable.length > 0
   const addTarget = adding ? editing : undefined
+  const addRow = addTarget === undefined
+    ? undefined
+    : addable.find(row => row.entry.provider === addTarget.provider)
   const addNamespace = addTarget === undefined ? undefined : state.namespaces.get(addTarget.settingsNs)
   // Hand-declared routes live in the pi-ai namespace, which is also the only
   // one whose schema names the protocols one may speak; without it mounted
@@ -435,6 +446,11 @@ function Loaded({ injected }: { injected: ModelsSectionFace }): ReactNode {
                   ...projectId === undefined ? {} : { projectId },
                   onClose: (changed) => { closeSetup(changed, target) },
                 })}
+                {renderSlot(
+                  'settings.models.provider-card',
+                  { provider: row.entry, configured: row.configured, keyConfigured: row.credential?.configured === true },
+                  { entryKey: row.entry.settingsNs },
+                )}
               </li>
             )
           }
@@ -510,6 +526,11 @@ function Loaded({ injected }: { injected: ModelsSectionFace }): ReactNode {
                     : null}
                 </span>
               </div>
+              {renderSlot(
+                'settings.models.provider-card',
+                { provider: row.entry, configured: row.configured, keyConfigured: credentialConfigured },
+                { entryKey: row.entry.settingsNs },
+              )}
               {open
                 ? renderProviderEditor({
                   target,
@@ -564,6 +585,13 @@ function Loaded({ injected }: { injected: ModelsSectionFace }): ReactNode {
                 {...projectId === undefined ? {} : { projectId }}
                 onClose={(changed) => { closeEditor(changed, addTarget) }}
               />
+              {addRow === undefined
+                ? null
+                : renderSlot(
+                  'settings.models.provider-card',
+                  { provider: addRow.entry, configured: addRow.configured, keyConfigured: addRow.credential?.configured === true },
+                  { entryKey: addRow.entry.settingsNs },
+                )}
             </div>
           )
           : declaring
@@ -633,6 +661,7 @@ function Loaded({ injected }: { injected: ModelsSectionFace }): ReactNode {
               </div>
             )}
       </div>
+      {renderSlot('settings.models.footer', {})}
       <Modal
         open={deleteTarget !== undefined}
         onClose={closeDelete}

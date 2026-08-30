@@ -22,8 +22,8 @@ Discovery performs a side-effect-free resolution check for enabled rows. Package
 
 ## Consequences
 
-Preset pickers can identify stale package and file references before a session starts, while plugin apply failures and missing injected services retain mount-time diagnostics. A roster with roots requires a Loader-provided `ctx.baseUrl`, making the resolution base explicit.
+Preset pickers can identify stale package and file references before a session starts, while plugin apply failures and missing injected services retain mount-time diagnostics. A roster with roots requires a Loader-provided `ctx.baseUrl`, making the resolution base explicit. The new-session preset seat prefers a structured `details.reason` when a selection refusal supplies one, so the UI shows the actionable cause once instead of repeating the wrapper's preset-specific message.
 
 ## Testing
 
-Discovery tests cover package, relative, absolute/builtin, disabled, dangling-link, nested-group, and multi-row diagnostics; the full preset mount and authoring suites retain their existing lifecycle checks.
+Discovery tests cover package, relative, absolute/builtin, disabled, dangling-link, nested-group, and multi-row diagnostics; the seat tests cover structured refusal reasons; the full preset mount and authoring suites retain their existing lifecycle checks.

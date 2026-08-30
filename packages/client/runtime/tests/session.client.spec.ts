@@ -98,6 +98,7 @@ function testViewDefinition(): ConversationViewDefinition<ChatConversationViewNo
         order: EMPTY,
         nodes: store,
         locations: TEST_LOCATIONS,
+        navigation: { items: () => EMPTY },
         timeline: { turnOrder: EMPTY, turns: new Map() },
         legacy: testLegacy(EMPTY, { turnOrder: EMPTY, turns: new Map() }),
       }
@@ -107,6 +108,7 @@ function testViewDefinition(): ConversationViewDefinition<ChatConversationViewNo
           order: nodes.map(node => node.key),
           nodes: store,
           locations: TEST_LOCATIONS,
+          navigation: { items: () => EMPTY },
           timeline,
           legacy: testLegacy(nodes, timeline),
         }

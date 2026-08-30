@@ -196,4 +196,10 @@ describe('WorkspaceFileSearch', () => {
     nonErrorAbort.abort('cancelled')
     await expect(nonErrorPending).rejects.toThrow('file search aborted')
   })
+
+  it('rejects an unreadable workspace root so a later query can retry', async () => {
+    const missing = join(tmpdir(), `dsh-file-autocomplete-missing-root-${Date.now()}`)
+    const files = search(missing)
+    await expect(files.list('anything', new AbortController().signal)).rejects.toThrow()
+  })
 })

@@ -12,6 +12,8 @@ Web 启动内核：`new AppWebEntry(el, seams?).run()` 分两个阶段挂载客�
 
 在预取或激活动态 entry 之前，启动内核会为缺失的 `AbortSignal.any`、`AbortSignal.timeout` 和 `AbortSignal.abort` 工厂安装兼容实现。这样即使 Android WebView 只提供 `AbortController` 而没有较新的静态工厂，浏览器客户端仍可工作；原生实现存在时则保持不变。
 
+外壳基础样式会在支持的浏览器中为普通内容自动添加中西文间距。代码、终端、diff、读取和搜索输出会保留源码中的原始间距和列对齐；不支持 `text-autospace` 的引擎会忽略这些声明。
+
 ## 模型体验
 
 无。入口外壳负责启动浏览器插件树；这里没有任何内容进入模型请求。

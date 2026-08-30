@@ -12,7 +12,7 @@ Client 工具展示插件。`ui-conversation` 通过 `conversation.chat.node` �
 
 每个 root 和 child 包装层都保留 `data-chat-anchor-key="call:<id>"` 与 `data-chat-call-id` DOM 约定，供分页和 selection 使用。
 
-本包还通过 `ToolDetails` 填充 `conversation.details.tool`。行 renderer 与详情 renderer 共用同一组面向 `terminal`、`read`、`diff`、`search` 和 `web` render intent 的纯 card model。未知的 intent 标签和格式错误的 wire card 数据都会回退为压平的工具结果文本。
+本包还通过 `ToolDetails` 填充 `conversation.details.tool`。行 renderer 与详情 renderer 共用同一组面向 `terminal`、`read`、`diff`、`search` 和 `web` render intent 的纯 card model。已完成的 ask-user 调用使用经过校验、可读的问题／回答卡片；混合或格式错误的结果块会回退为完整的通用输出。未知的 intent 标签和格式错误的 wire card 数据都会回退为压平的工具结果文本。
 
 通用行把已知工具名称归类为 search、read、shell、write、edit、code 或 generic 变体。运行中、成功、失败和中断状态只来自冻结的 call/result slice。只有用户调用 Host 打开文件回调时，文件路径才相对会话 `cwd` 解析；展示代码不读取会话服务。
 
@@ -46,4 +46,4 @@ owner 载荷为 `ToolCallOwnerProps`：`callId`、`toolName`、冻结的 `block`
 
 - Host 不把 `run_code` 暴露为 Code Mode 程序 binding，因此生产事件只产生一层分发；递归的运行时/UI 约定支持嵌套。
 - 第一方工具视图集中在本包，可以通过 keyed slot 独立迁移到各自所属的业务包。
-- 工具文案复用 `ui-conversation` locale namespace。
+- 工具文案复用 `ui-conversation` locale namespace。ask-user 的问题配对是尽力而为；有歧义或混合载荷时保持通用展示，确保不丢弃诊断块。

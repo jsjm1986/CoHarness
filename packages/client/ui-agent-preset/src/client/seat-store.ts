@@ -163,7 +163,10 @@ export class AgentPresetSeatController {
       const response = await this.api.agentPresets.select({ sessionId: session.id, agentPreset: staged })
       this.staged = undefined
       if (!response.result.ok) {
-        this.set({ busy: false, error: response.result.error.message, current: this.fallback })
+        const { error } = response.result
+        const detail = error.details
+        const reason = 'reason' in detail ? detail.reason : undefined
+        this.set({ busy: false, error: reason ?? error.message, current: this.fallback })
         return
       }
       // Consumed: the next new session opens on the deployment default again.

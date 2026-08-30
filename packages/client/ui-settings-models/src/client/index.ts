@@ -15,6 +15,7 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: pulls the ctx.remote merge and the forwarded-event key face
 // (settings/credentials invalidations ride the allowlist) into this program.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
+import type {} from './slot-contract.ts'
 import { ModelsSection } from './ModelsSection.tsx'
 import type { ModelsSectionInjected } from './ModelsSection.tsx'
 import { DeepSeekOnboardingDialog } from './DeepSeekOnboardingDialog.tsx'
@@ -25,6 +26,7 @@ import { en, zh, type ModelsKey } from './locales.ts'
 import { ProjectModelsBridge } from './project-store.ts'
 
 export type { ModelsSectionInjected, ModelsSectionProps } from './ModelsSection.tsx'
+export type { ModelsFooterOwnerProps, ProviderCardExtrasOwnerProps } from './slot-contract.ts'
 export type { ModelsKey } from './locales.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -136,6 +138,10 @@ export function apply(ctx: ClientContext): void {
     order: 10,
     label: () => t('nav'),
     inject: injected,
+    children: {
+      'settings.models.provider-card': { kind: 'keyed', scope: 'root' },
+      'settings.models.footer': { kind: 'list', scope: 'root' },
+    },
   }, ModelsSection))
   ctx.slots.inject('settings.onboarding', () => ctx.slots.register({
     name: 'settings.onboarding',

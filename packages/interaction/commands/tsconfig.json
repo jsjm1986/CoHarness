@@ -33,6 +33,9 @@
       "path": "../../util/brand"
     },
     {
+      "path": "../../util/crypto"
+    },
+    {
       "path": "../../runtime-diagnostics/invariants"
     },
     {

@@ -3618,3 +3618,4 @@ export interface Config {
 - `@deepseek-ai/dsh-typert-generator`（[`packages/typert/generator/src/index.ts`](../packages/typert/generator/src/index.ts)）
 - `@deepseek-ai/dsh-typert-protocol`（[`packages/typert/protocol/src/index.ts`](../packages/typert/protocol/src/index.ts)）
 - `@deepseek-ai/dsh-typert-registry`（[`packages/typert/registry/src/index.ts`](../packages/typert/registry/src/index.ts)）
+- `@deepseek-ai/dsh-util-crypto`（[`packages/util/crypto/src/index.ts`](../packages/util/crypto/src/index.ts)）

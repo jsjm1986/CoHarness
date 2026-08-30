@@ -1,6 +1,7 @@
 /** WorkspaceRuntime projects the Workspace object manager for UI consumers. */
 
 import type { Context } from '@deepseek-ai/cordis'
+import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import type {
   DirectoryListing, IApiClient, RpcError,
   SessionDraftId, SessionId, WorkspaceId, WorkspaceView,
@@ -11,28 +12,14 @@ import type { SessionsPort, SessionsPortList } from '../contract/sessions-port.t
 import type { IWorkspaces } from '../contract/workspaces.ts'
 import { WorkspaceManager, type WorkspaceListPhase } from './manager.ts'
 
-let fallbackDraftCounter = 0
-
 /** Generate one opaque browser draft reservation id. */
 function newDraftId(): SessionDraftId {
-  let uuid: string
-  try {
-    uuid = globalThis.crypto.randomUUID()
-  } catch {
-    uuid = `${Date.now().toString(36)}-${String(++fallbackDraftCounter)}-${Math.random().toString(36).slice(2)}`
-  }
-  return `draft-${uuid}` as SessionDraftId
+  return `draft-${randomUUID()}` as SessionDraftId
 }
 
 /** Generate the Session identity paired with one browser draft. */
 function newDraftSessionId(): SessionId {
-  let uuid: string
-  try {
-    uuid = globalThis.crypto.randomUUID()
-  } catch {
-    uuid = `${Date.now().toString(36)}-${String(++fallbackDraftCounter)}-${Math.random().toString(36).slice(2)}`
-  }
-  return `session-${uuid}` as SessionId
+  return `session-${randomUUID()}` as SessionId
 }
 
 interface ActiveDraft {

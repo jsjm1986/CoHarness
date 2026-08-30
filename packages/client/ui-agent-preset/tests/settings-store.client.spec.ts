@@ -245,7 +245,13 @@ describe('the new-session chip controller', () => {
   function chip(
     presets: { id: string; trust: 'system' | 'user'; isDefault: boolean }[],
     current: { id: string; blank: boolean; agentPreset?: string } | undefined,
-    options: { writes?: Recorded[]; failSelect?: string; failList?: string; throwOn?: 'list' | 'select' } = {},
+    options: {
+      writes?: Recorded[]
+      failSelect?: string
+      failSelectReason?: string
+      failList?: string
+      throwOn?: 'list' | 'select'
+    } = {},
   ): AgentPresetSeatController {
     const api = {
       agentPresets: {
@@ -260,7 +266,10 @@ describe('the new-session chip controller', () => {
           options.writes?.push({ ns: 'select', patch: payload.agentPreset })
           return Promise.resolve(options.failSelect === undefined
             ? { rpcId: 'r', result: { ok: true as const, value: { agentPreset: payload.agentPreset } } }
-            : { rpcId: 'r', result: { ok: false as const, error: { code: 'agent-preset-locked', message: options.failSelect, details: {} } } })
+            : { rpcId: 'r', result: { ok: false as const, error: {
+              code: 'agent-preset-locked', message: options.failSelect,
+              details: options.failSelectReason === undefined ? {} : { reason: options.failSelectReason },
+            } } })
         },
       },
     } as unknown as IApiClient
@@ -385,6 +394,19 @@ describe('the new-session chip controller', () => {
 
     // Showing `minimal` after a refusal would claim a composition the session
     // never got.
+    expect(controller.store.getSnapshot()).toMatchObject({ current: 'standard', error: 'already started' })
+  })
+
+  it('uses a structured refusal reason when the host supplies one', async () => {
+    const controller = chip(
+      ROSTER,
+      { id: 's1', blank: true, agentPreset: 'standard' },
+      { failSelect: 'preset switch refused: already started', failSelectReason: 'already started' },
+    )
+    await controller.load()
+
+    await controller.select('minimal')
+
     expect(controller.store.getSnapshot()).toMatchObject({ current: 'standard', error: 'already started' })
   })
 

@@ -85,7 +85,7 @@ describe('ModelSelect reasoning effort', () => {
     })
   })
 
-  it('renders adapter metadata and submits the effort as part of the session selection', async () => {
+  it('renders effort names without descriptions and submits the effort as part of the session selection', async () => {
     const directory = createSnapshotStore<ModelDirectoryState>(state())
     const select = vi.fn(async (selection: ModelSelection) => {
       directory.set(state({ current: selection }))
@@ -106,7 +106,8 @@ describe('ModelSelect reasoning effort', () => {
     fireEvent.click(trigger)
     fireEvent.click(screen.getByRole('menuitem', { name: /推理等级/ }))
     expect(screen.getAllByRole('menuitemradio').map(item => item.textContent))
-      .toEqual(['Off', 'High', 'MaxLargest budget'])
+      .toEqual(['Off', 'High', 'Max'])
+    expect(screen.queryByText('Largest budget')).toBeNull()
 
     fireEvent.click(screen.getByRole('menuitemradio', { name: /Max/ }))
     await waitFor(() => {

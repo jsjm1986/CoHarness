@@ -198,7 +198,7 @@ type WireFace = ConstructorParameters<typeof ModelsSettingsStore>[0]
 
 async function mountFace(
   scripted: ReturnType<typeof scriptedFace>,
-  section: Pick<ModelsSectionProps, 'managementScope' | 'providerIdPattern'> = {},
+  section: Partial<Pick<ModelsSectionProps, 'managementScope' | 'providerIdPattern' | 'renderSlot'>> = {},
 ) {
   const { face, update, replace, mutate, set, unset } = scripted
   const mirror = new SettingsDescribeMirror(face as never)
@@ -249,6 +249,20 @@ describe('ModelsSection', () => {
     const uninjected = {} as ModelsSectionProps
     render(<ModelsSection {...uninjected} />)
     expect(document.body.textContent).toBe('')
+  })
+
+  it('dispatches provider-card and footer extension slots without changing the page owner', async () => {
+    const calls: string[] = []
+    const renderSlot = ((key: string, _owner: unknown, options?: { entryKey?: string }) => {
+      calls.push(`${key}:${options?.entryKey ?? 'root'}`)
+      return <span data-testid={`slot-${calls.length}`} />
+    }) as NonNullable<ModelsSectionProps['renderSlot']>
+    const view = await mountFace(scriptedFace(), { renderSlot })
+
+    expect(calls).toContain('settings.models.provider-card:llm-pi-ai')
+    expect(calls).toContain('settings.models.provider-card:llm-deepseek')
+    expect(calls.at(-1)).toBe('settings.models.footer:root')
+    expect(view.view.getAllByTestId(/^slot-/u).length).toBeGreaterThanOrEqual(3)
   })
 
   it('renders authorized organization models as read-only rows', async () => {

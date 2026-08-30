@@ -244,15 +244,6 @@
   white-space: nowrap;
 }
 
-.description {
-  overflow: hidden;
-  color: var(--dsw-alias-label-tertiary);
-  font-size: 12px;
-  line-height: 18px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .check {
   display: grid;
   place-items: center;
@@ -426,9 +417,6 @@
     font: var(--dsw-mobile-font-body);
   }
 
-  :global([data-viewport='compact']) .description {
-    font: var(--dsw-mobile-font-caption);
-  }
 }
 
 /* Section rows sit inside SessionSettingsSheet, whose selected state is a

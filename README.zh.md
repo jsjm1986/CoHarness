@@ -44,7 +44,7 @@ CoHarness 把协同看作团队共同构建的方式，而不是团队被动使�
 | 强化 Linux 隔离 | 使用 systemd 部署 Gateway | 每个 runtime 独立账户、mount namespace、目录授权和内核级项目隔离。 |
 | 在移动设备访问托管工作空间 | Web UI 或 Android 壳 | 访问已部署 Gateway 的浏览器或 Capacitor 客户端；推送通知可选。 |
 
-CoHarness 处于发布前开发阶段。生产部署应被视为需要自行评估和负责的自托管工作：公共 API、配置、数据库 schema、Session format 和部署流程可能变化。Linux systemd 提供的进程和目录隔离强于 macOS；macOS 启动器适合可信团队开发，或适合由主机权限提供所需保护的部署。在向用户开放服务前，请阅读 [Gateway 参考](gateway/README.zh.md) 和[部署手册](gateway/deploy/README.zh.md)。
+CoHarness 处于发布前开发阶段。生产部署应被视为需要自行评估和负责的自托管工作：公共 API、配置、数据库 schema、Session format 和部署流程可能变化。Linux systemd 提供的进程和目录隔离强于 macOS；macOS 启动器适合可信团队开发，或适合由主机权限提供所需保护的部署。在向用户开放服务前，请阅读[安全说明](SAFETY.md)（[中文](SAFETY.zh.md)）、[Gateway 参考](gateway/README.zh.md)和[部署手册](gateway/deploy/README.zh.md)。
 
 ## 以个人用户身份开始
 

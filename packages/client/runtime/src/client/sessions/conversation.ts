@@ -488,8 +488,8 @@ export interface ChatSnapshot {
   readonly order: readonly string[]
   readonly nodes: ChatNodeStore
   readonly locations: ChatLocationNodeIndex
-  /** Navigation is absent in older lightweight fixtures and compatible consumers. */
-  readonly navigation?: ChatTurnNavigationIndex
+  /** Stable live navigation projection for the loaded conversation turns. */
+  readonly navigation: ChatTurnNavigationIndex
   readonly timeline: ConversationTimelineSnapshot
   readonly legacy: LegacyConversationSlice
 }

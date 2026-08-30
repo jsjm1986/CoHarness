@@ -2,6 +2,7 @@
 // off-screen; their browser history window is staged and released separately.
 
 import type { Context } from '@deepseek-ai/cordis'
+import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import type { AttachmentIdType, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import { hasConversationContent as hasSessionConversationContent } from '@deepseek-ai/dsh-session/surface'
@@ -272,7 +273,7 @@ export class Session implements SessionFace {
    * @returns prompt identity plus a pre-admission abandon operation.
    */
   beginSubmission(input: BeginSubmissionInput): SubmissionHandle {
-    const requestId = globalThis.crypto.randomUUID() as RpcId
+    const requestId = randomUUID() as RpcId
     this.pendingSubmissions = [...this.pendingSubmissions, {
       requestId,
       time: Date.now(),

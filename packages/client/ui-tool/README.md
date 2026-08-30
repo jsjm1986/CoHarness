@@ -12,7 +12,7 @@ Business UI packages register only their wire Tool names and atomic views. They 
 
 Each root and child wrapper preserves the `data-chat-anchor-key="call:<id>"` and `data-chat-call-id` DOM contract used for paging and selection.
 
-The package also fills `conversation.details.tool` with `ToolDetails`. The row and details renderers share the same pure card models for `terminal`, `read`, `diff`, `search`, and `web` render intents. Unknown intent tags and malformed wire card data fall back to flattened Tool result text.
+The package also fills `conversation.details.tool` with `ToolDetails`. The row and details renderers share the same pure card models for `terminal`, `read`, `diff`, `search`, and `web` render intents. Completed ask-user calls use a validated, readable question/answer card; mixed or malformed result blocks fall back to the complete generic output. Unknown intent tags and malformed wire card data fall back to flattened Tool result text.
 
 Generic rows classify known Tool names into search, read, shell, write, edit, code, or generic variants. Running, successful, failed, and interrupted lifecycle states come only from the frozen call/result slice. File paths resolve against the session `cwd` only when the user invokes the Host open-file callback; presentation code does not read Session services.
 
@@ -46,4 +46,4 @@ None. The package is client-only presentation.
 
 - The Host excludes `run_code` from Code Mode program bindings, so production events produce one dispatch level; the recursive Runtime/UI contract supports nesting.
 - First-party Tool views are colocated here and can move to their owning business packages independently through the keyed slot.
-- Tool copy reuses the `ui-conversation` locale namespace.
+- Tool copy reuses the `ui-conversation` locale namespace. Ask-user transcript pairing is best-effort: ambiguous or mixed payloads remain generic so no diagnostic block is discarded.
