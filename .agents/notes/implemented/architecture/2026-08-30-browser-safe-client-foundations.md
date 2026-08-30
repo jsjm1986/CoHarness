@@ -22,8 +22,8 @@ Browser clients can run on an insecure HTTP origin or in a worker where the secu
 
 ## Consequences
 
-Client identifiers and attachment encoding have one tested owner and remain available across supported browser contexts. Host-side tests that force identifier failures now intercept this owner directly, so lifecycle failure coverage cannot silently drift back to the global Web API. The new CSS improves mixed-script prose while explicit literal selectors preserve rendered source text. The utility requires a functioning Web Crypto `getRandomValues` implementation; environments without it fail loudly instead of silently weakening security.
+Client identifiers and attachment encoding have one tested owner and remain available across supported browser contexts. Host-side tests that force identifier failures now intercept this owner directly, so lifecycle failure coverage cannot silently drift back to the global Web API. The dsh release closure includes the utility tarball in packed-install rehearsal, keeping published consumers from falling back to a registry lookup before the family is released. The new CSS improves mixed-script prose while explicit literal selectors preserve rendered source text. The utility requires a functioning Web Crypto `getRandomValues` implementation; environments without it fail loudly instead of silently weakening security.
 
 ## Testing
 
-The utility tests cover v4 shape, uniqueness, insecure-context method absence, empty/binary/large base64 input. Web stylesheet tests cover the prose rule and literal-output opt-outs. Consumer connection, runtime, conversation, and attachment tests continue to exercise the shared helpers.
+The utility tests cover v4 shape, uniqueness, insecure-context method absence, empty/binary/large base64 input. The packed-install closure includes `packages/util/crypto` so the publish-path rehearsal installs the same local dependency that the dsh release family publishes. Web stylesheet tests cover the prose rule and literal-output opt-outs. Consumer connection, runtime, conversation, and attachment tests continue to exercise the shared helpers.

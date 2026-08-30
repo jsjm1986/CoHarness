@@ -39,6 +39,10 @@ const WORKSPACE_CLOSURE = [
   'packages/typert/protocol',
   'packages/attachment/attachment',
   'packages/util/brand',
+  // Browser-safe client consumers publish this package alongside the rest of
+  // the dsh family; include its local tarball so npm cannot hide a missing
+  // release member behind a registry lookup.
+  'packages/util/crypto',
   'packages/util/timeout',
   'packages/runtime-diagnostics/invariants',
   // The framework and the vendored packages the closure declares outright:

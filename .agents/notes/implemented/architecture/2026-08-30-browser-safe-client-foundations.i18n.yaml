@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-30-browser-safe-client-foundations.md
-2026-08-30-browser-safe-client-foundations.md: 62035b3f4b6443418f5dfc8ff2547f0416a1746f
-2026-08-30-browser-safe-client-foundations.zh.md: 2ebe2085d4086c411fa102025ff99b101d65c231
+2026-08-30-browser-safe-client-foundations.md: 7be93145f44ec9c3f39215107631c8a6d104200f
+2026-08-30-browser-safe-client-foundations.zh.md: cf6fb5a1a4534580152b44a15653e08a2a88653a
