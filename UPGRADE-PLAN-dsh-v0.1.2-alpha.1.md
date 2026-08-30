@@ -5,7 +5,7 @@
 - 当前可执行范围：兼容修复、模型与子代理路由、图片与 token、WebFetch 网络 pinning、Session schema 20、ACP/Python 兼容、Web client 批量启动与可选 gzip、会话 cache-first 等价路径已落地并进入发布验证；Remote/ focused UI/一次性 token 的上游形态有明确的 CoHarness 不采用决策，在线数据迁移和新增出网默认值仍未启用
 - 上游版本：[dsh-v0.1.2-alpha.1](https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.1.2-alpha.1)，release tag commit `cd5ef8148158c3a752a658978873241fdf8e2bbc`
 - 对比范围：上游 `dsh-v0.1.1-rc.2..dsh-v0.1.2-alpha.1`；release 正文列出 14 项新功能、15 项体验优化、13 项修复、10 项其他变更，共 52 项
-- 我方基线：`baseline/2026-08-29` 指向 `master@6464092040`；当前分支 `upgrade/dsh-v0.1.2-alpha.1` 的实现 checkpoint 为 `a5cd5ba34b`；根包和主要 DSH 包仍标记 `0.1.1-rc.1`，不能把版本号当作代码对齐证明
+- 我方基线：`baseline/2026-08-29` 指向 `master@6464092040`；发布来源分支 `upgrade/dsh-v0.1.2-alpha.1` 的实现 checkpoint 为 `a5cd5ba34b`，已快进合入 `master`；根包和主要 DSH 包仍标记 `0.1.1-rc.1`，不能把版本号当作代码对齐证明
 
 ## 1. 结论与决策摘要
 
@@ -25,7 +25,7 @@
 
 | 项目 | 当前事实 | 升级约束 |
 | --- | --- | --- |
-| 分支 | 当前 checkout 为 `upgrade/dsh-v0.1.2-alpha.1`，实现 checkpoint `a5cd5ba34b`；`baseline/2026-08-29` 指向 `master@6464092040`；代码工作树已提交，构建输出在忽略目录 | 发布只使用不可变 release artifact，并保留前一 release 作为回滚点 |
+| 分支 | 发布来源为 `upgrade/dsh-v0.1.2-alpha.1`，实现 checkpoint `a5cd5ba34b`，已快进合入 `master`；`baseline/2026-08-29` 指向 `master@6464092040`；代码工作树已提交，构建输出在忽略目录 | 发布只使用不可变 release artifact，并保留前一 release 作为回滚点 |
 | 远端 | `origin` 指向 CoHarness，`upstream` 指向 `deepseek-ai/deepseek-harness` | 所有上游对象用 tag/commit 固定，不跟随浮动 `master` |
 | 祖先关系 | `git merge-base master dsh-v0.1.2-alpha.1` 无输出 | 禁止把冲突当作普通三方合并；采用 patch + 语义迁移 |
 | 当前版本 | 主要包为 `0.1.1-rc.1` | 最后阶段才统一更新版本和 lockfile |
@@ -474,7 +474,7 @@ git diff --check
 
 ### 11.1 当前工作树事实
 
-截至 2026-08-30，当前 checkout 为 `upgrade/dsh-v0.1.2-alpha.1`，实现 checkpoint 为 `a5cd5ba34b`，`baseline/2026-08-29` 指向 `master@6464092040428805c5d76ed977fa4ab3fac66161`。实现代码、测试、文档和 lockfile 已提交；当前工作树只允许保留本计划与机器可读 manifest 的待提交审计变更，构建输出属于忽略目录，不能代替提交内容。生产发布使用不可变目录 `coharness-a5cd5ba34b`，前一版本 `coharness-6464092040` 保留回滚。任何后续发布或合并操作都必须先审查 `git status --short --untracked-files=all`，确认没有临时文件、凭据或与本升级无关的改动。
+截至 2026-08-30，当前 checkout 为 `master`；本次发布来源为 `upgrade/dsh-v0.1.2-alpha.1`，实现 checkpoint 为 `a5cd5ba34b`，已与审计文档一起快进合入主干；`baseline/2026-08-29` 指向 `master@6464092040428805c5d76ed977fa4ab3fac66161`。实现代码、测试、文档和 lockfile 已提交，当前工作树 clean；构建输出属于忽略目录，不能代替提交内容。生产发布使用不可变目录 `coharness-a5cd5ba34b`，前一版本 `coharness-6464092040` 保留回滚。任何后续发布或合并操作都必须先审查 `git status --short --untracked-files=all`，确认没有临时文件、凭据或与本升级无关的改动。
 
 ### 11.2 已落地的关键 checkpoint
 
