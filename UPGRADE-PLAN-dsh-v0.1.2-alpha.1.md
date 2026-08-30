@@ -594,6 +594,6 @@ pnpm exec vitest run --project=process-bound --no-file-parallelism --maxWorkers=
 
 1. 本轮代码与文档修改已通过 `pnpm run doc-sync`、`pnpm run lint`、`pnpm run typecheck`、`pnpm run hygiene`、`pnpm run build:production`、`pnpm run verify-third-party-notices`、`git diff --check`、翻译/Agent Note/归档门禁，以及覆盖 crypto、autospace、混合 ask-user、I01/I02 和 terminal protocol replies 的 focused Vitest；完整 thread-safe/process-bound 串行测试也必须在本次协议补丁后重新通过。旧的 hosted PowerShell 失败不能沿用为最终结论，需以新 runner 结果和基线对照记录。
 2. 机器可读的上游 52 项 commit manifest、依赖/NOTICE 清单和数据文件 hash 已生成并随本次审计提交；Profile dump、决策签字和安全批准仍须由发布责任人补入受控发布记录。当前部署保持所有新增出网和在线迁移关闭，缺少这些外部材料时不得开启 canary 或改变默认策略。
-3. schema 20 `--verify-only`、v18↔v20 双向 round-trip、冷加载、回放和回滚仍需在隔离 Harness home 完成；生产本次没有执行在线迁移，旧文件与 `coharness-2d1b6785ab`、`coharness-a5cd5ba34b`、`coharness-6464092040` 均保留，直到所有 hash、ACL 和业务 smoke 通过。
+3. schema 20 `--verify-only`、v18↔v20 双向 round-trip、冷加载、回放和回滚的隔离 focused suite 已通过（132 tests）；生产本次没有执行在线迁移，旧文件与 `coharness-2d1b6785ab`、`coharness-a5cd5ba34b`、`coharness-6464092040` 均保留，在线 canary 仍须由数据负责人批准后单独执行。
 4. 只有未来重新打开 C03/C04 时，才要求 Remote 双栈逐事件等价、旧客户端得到明确降级、Gateway ACL/凭据/文档边界通过、完整测试和跨平台构建证据齐全；本 release 不切换或删除旧 API。
 5. 任何逻辑事件 hash 不一致、越权、未授权出网、session-log 重复/漏传、旧客户端无明确错误、迁移失败不可回滚或测试仅靠并行度调整才能通过，均停止后续阶段并保留现场。
