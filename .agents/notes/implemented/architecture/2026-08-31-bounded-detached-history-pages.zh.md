@@ -12,7 +12,7 @@ Status: implemented
 
 `SessionPersistence` 暴露 `readHeader`、`readRevision` 和 `readPage`。页面具有明确的字节、事件和组数限制，不透明 cursor 绑定会话、源 revision 与读取方向。追加或修复会改变 revision 并使 cursor 失效。提供方把有界读取失败区分为 `too-large`、`aborted`、`timeout`、`dependency` 和 `protocol`。
 
-PostgreSQL conversation repository 使用只读 repeatable-read 事务和 `(session_id, seq)` keyset 索引实现 `readHeader` 与 `readPage`。Gateway runtime 暴露元数据和分页 endpoint，在缓冲内部请求 body 前完成认证，应用响应预算并保留有类型的分页失败。没有带索引分页方法的兼容 repository 保留原有完整读取路径。
+PostgreSQL conversation repository 使用只读 repeatable-read 事务和 `(session_id, seq)` keyset 索引实现 `readHeader` 与 `readPage`。查询只在结果列中把 bigint 序号转换为文本，并在 `ORDER BY` 中限定底层 bigint 列，保持 keyset 的数值顺序。Gateway runtime 暴露元数据和分页 endpoint，在缓冲内部请求 body 前完成认证，应用响应预算并保留有类型的分页失败。没有带索引分页方法的兼容 repository 保留原有完整读取路径。
 
 Host 对冷 session 和 subagent history 使用带索引的页面，只沿 revision 绑定的 older cursor 读取到覆盖请求消息窗口为止，让一次 detached 常规窗口低于 4 MiB，并在累计 512 MiB 或 1,024 次分页时 fail closed。Host 会在呈现页面前校验 continuation 元数据、字节统计和相邻序号范围。公共 RPC envelope 仍为 `{ events, hasMore, projections?, omittedSpans? }`；cursor 细节留在 persistence 与 Gateway 层。detached projection baseline 在可用时使用经过身份校验的 projection cache，兼容 inspection 可以折叠其完整事件区间。请求取消会传到分页读取和 response body 解码，并映射为现有 `cancelled` RPC 结果；其他有类型失败使用按类别区分的安全消息，同时在 Host 日志中保留诊断。
 

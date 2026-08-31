@@ -37,7 +37,7 @@ describe('ConversationRepository load', () => {
       query: vi.fn(async (text: string) => {
         calls.push(text)
         if (text.startsWith('SELECT id,organization_id')) return { rows: [headerRow], rowCount: 1 }
-        if (text.startsWith('SELECT seq::text,event FROM')) return { rows: [{ seq: '0', event }], rowCount: 1 }
+        if (text.startsWith('SELECT e.seq::text,e.event FROM')) return { rows: [{ seq: '0', event }], rowCount: 1 }
         return { rows: [], rowCount: null }
       }),
       release: vi.fn(),
@@ -53,7 +53,7 @@ describe('ConversationRepository load', () => {
       'BEGIN',
       'SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY',
       expect.stringMatching(/^SELECT id,organization_id/),
-      'SELECT seq::text,event FROM harness.conversation_events WHERE session_id=$1 AND seq >= $2 ORDER BY seq',
+      'SELECT e.seq::text,e.event FROM harness.conversation_events e WHERE e.session_id=$1 AND e.seq >= $2 ORDER BY e.seq',
       'COMMIT',
     ])
     expect(client.release).toHaveBeenCalledOnce()
@@ -71,7 +71,7 @@ describe('ConversationRepository load', () => {
     const pool = { connect: vi.fn(async () => client) } as unknown as Pool
 
     await expect(new ConversationRepository(pool).load('missing')).resolves.toBeUndefined()
-    expect(calls.filter(text => text.startsWith('SELECT seq::text,event FROM'))).toHaveLength(0)
+    expect(calls.filter(text => text.startsWith('SELECT e.seq::text,e.event FROM'))).toHaveLength(0)
     expect(calls.at(-1)).toBe('COMMIT')
     expect(client.release).toHaveBeenCalledOnce()
   })
@@ -86,7 +86,7 @@ describe('ConversationRepository bounded pages', () => {
         if (text === 'BEGIN' || text === 'COMMIT' || text === 'ROLLBACK'
           || text.startsWith('SET TRANSACTION')) return { rows: [], rowCount: null }
         if (text.startsWith('SELECT id,organization_id')) return { rows: [header], rowCount: 1 }
-        if (text.startsWith('SELECT seq::text,event,payload_bytes')) {
+        if (text.startsWith('SELECT e.seq::text,e.event,e.payload_bytes')) {
           const anchor = Number(values?.[1] ?? 0)
           const older = text.includes('seq < $2')
           const rows = allEvents
@@ -114,15 +114,20 @@ describe('ConversationRepository bounded pages', () => {
     const fixture = pagePool(header, rows)
     const repository = new ConversationRepository(fixture.pool)
 
+    const newer = await repository.readPage('session-1', { direction: 'newer', fromSeq: 0, maxEvents: 2 })
+    expect(newer?.events.map(event => event.seq)).toEqual([0, 1])
+    expect(fixture.calls.some(call => call.text.includes('ORDER BY e.seq ASC LIMIT $3'))).toBe(true)
+
     const tail = await repository.readPage('session-1', { maxEvents: 2 })
     expect(tail?.events.map(event => event.seq)).toEqual([3, 4])
     expect(tail?.hasMore).toBe(true)
     expect(tail?.nextCursor).toEqual(expect.any(String))
     const older = await repository.readPage('session-1', { cursor: tail?.nextCursor, maxEvents: 2 })
     expect(older?.events.map(event => event.seq)).toEqual([1, 2])
-    expect(fixture.calls.filter(call => call.text.startsWith('SELECT seq::text,event,payload_bytes'))
-      .every(call => call.text.includes('WHERE session_id=$1 AND seq < $2'))).toBe(true)
-    expect(fixture.calls.some(call => call.text.includes('ORDER BY seq DESC LIMIT $3'))).toBe(true)
+    const olderCalls = fixture.calls.filter(call => call.text.startsWith('SELECT e.seq::text,e.event,e.payload_bytes')
+      && call.text.includes('WHERE e.session_id=$1 AND e.seq < $2'))
+    expect(olderCalls.length).toBeGreaterThan(0)
+    expect(fixture.calls.some(call => call.text.includes('ORDER BY e.seq DESC LIMIT $3'))).toBe(true)
   })
 
   it('returns an empty page at either end without manufacturing a cursor', async () => {

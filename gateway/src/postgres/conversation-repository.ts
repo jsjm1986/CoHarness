@@ -1001,7 +1001,7 @@ export class ConversationRepository {
     signal?: AbortSignal,
   ): Promise<ConversationEvent[]> {
     const result = await checkedQuery<{ event: ConversationEvent; seq: string }>(source,
-      'SELECT seq::text,event FROM harness.conversation_events WHERE session_id=$1 AND seq >= $2 ORDER BY seq',
+      'SELECT e.seq::text,e.event FROM harness.conversation_events e WHERE e.session_id=$1 AND e.seq >= $2 ORDER BY e.seq',
       [sessionId, fromSeq], signal,
     )
     validateReadRows(result.rows, fromSeq)
@@ -1084,10 +1084,10 @@ export class ConversationRepository {
           anchor = fromSeq ?? 0
         }
         const query = direction === 'older'
-          ? `SELECT seq::text,event,payload_bytes FROM harness.conversation_events
-            WHERE session_id=$1 AND seq < $2 ORDER BY seq DESC LIMIT $3`
-          : `SELECT seq::text,event,payload_bytes FROM harness.conversation_events
-            WHERE session_id=$1 AND seq >= $2 ORDER BY seq ASC LIMIT $3`
+          ? `SELECT e.seq::text,e.event,e.payload_bytes FROM harness.conversation_events e
+            WHERE e.session_id=$1 AND e.seq < $2 ORDER BY e.seq DESC LIMIT $3`
+          : `SELECT e.seq::text,e.event,e.payload_bytes FROM harness.conversation_events e
+            WHERE e.session_id=$1 AND e.seq >= $2 ORDER BY e.seq ASC LIMIT $3`
         const result = await checkedQuery<ConversationEventRow>(client, query, [sessionId, anchor, queryLimit], signal)
         const rows = direction === 'older' ? [...result.rows].reverse() : result.rows
         validatePageAnchor(rows, direction, anchor, Number(headerRow.next_seq))
