@@ -25,6 +25,8 @@ import { formatRunDuration } from './message-chrome.ts'
 import css from './ChatView.module.css'
 
 const FOLLOW_THRESHOLD = 24
+/** Start the next older-page request before the reader reaches the exact head. */
+const OLDER_AUTO_LOAD_THRESHOLD = 240
 
 /** Active column host when present; otherwise the view-local scroller. */
 function scrollerOf(from: HTMLElement): HTMLElement {
@@ -297,6 +299,8 @@ export function ChatView({
   /** Paging anchor: semantic row/position at click, updated by reader scrolls
    * while the request is pending and restored after the prepend lands. */
   const anchorRef = useRef<PagingAnchor | null>(null)
+  /** Head identity already requested by the automatic top sentinel. */
+  const autoLoadHeadRef = useRef<string | undefined>(undefined)
   const firstSeqRef = useRef<number | null>(null)
   const openedRef = useRef(false)
   const lastKeyRef = useRef<string | null>(null)
@@ -313,6 +317,36 @@ export function ChatView({
   const lastSteeringId = pendingSteering[pendingSteering.length - 1]?.id ?? null
   const lastSubmissionId = visibleSubmissions.at(-1)?.requestId ?? null
   const followSig = `${openState}:${firstSeq}:${lastKey}:${order.length}:${running ? 1 : 0}:${lastSteeringId ?? ''}:${lastSubmissionId ?? ''}`
+
+  const loadOlderAnchored = useCallback((): void => {
+    const local = listRef.current
+    /* v8 ignore next -- ref-null guard: the paging control and scroll listener run after mount. */
+    if (local !== null) {
+      const el = scrollerOf(local)
+      const row = pagingAnchor(local, el)
+      if (row !== null && row.dataset.chatAnchorKey !== undefined) {
+        anchorRef.current = {
+          key: row.dataset.chatAnchorKey,
+          top: flowTop(row, el),
+        }
+      }
+    }
+    loadOlder()
+  }, [loadOlder])
+
+  /** Request one older page when the reader is near the head, with one request per head. */
+  const maybeAutoLoadOlder = useCallback((el: HTMLElement): void => {
+    if (el.scrollTop > OLDER_AUTO_LOAD_THRESHOLD) {
+      autoLoadHeadRef.current = undefined
+      return
+    }
+    if (el.scrollHeight <= 0 || openState !== 'open' || !hasMore || running
+      || historyWindowMode !== 'tail' || loadingOlder) return
+    const head = `${sessionId}:${firstSeq === null ? 'empty' : String(firstSeq)}:${String(order.length)}`
+    if (autoLoadHeadRef.current === head) return
+    autoLoadHeadRef.current = head
+    loadOlderAnchored()
+  }, [firstSeq, hasMore, historyWindowMode, loadOlderAnchored, loadingOlder, openState, order.length, running, sessionId])
 
   const toBottom = (el: HTMLElement): void => {
     anchorRef.current = null
@@ -399,12 +433,21 @@ export function ChatView({
     lastNode?.kind, lastSteeringId, loadingOlder, openState,
   ])
 
+  // A short history can already be at the head after the initial bottom jump;
+  // run the same guarded probe once after layout so it does not require a
+  // synthetic scroll event from the browser.
+  useEffect(() => {
+    const local = listRef.current
+    if (local !== null) maybeAutoLoadOlder(scrollerOf(local))
+  }, [maybeAutoLoadOlder])
+
   const onScrollRef = useRef(() => {})
   onScrollRef.current = () => {
     const local = listRef.current
     /* v8 ignore next -- ref-null guard: the handler only fires while mounted. */
     if (local === null) return
     const el = scrollerOf(local)
+    maybeAutoLoadOlder(el)
     const readerAnchor = pagingAnchor(local, el)
     const readerNode = readerAnchor?.dataset.chatAnchorKey === undefined
       ? undefined
@@ -489,22 +532,6 @@ export function ChatView({
   useEffect(() => {
     if (!loadingOlder) anchorRef.current = null
   }, [loadingOlder])
-
-  const loadOlderAnchored = (): void => {
-    const local = listRef.current
-    /* v8 ignore next -- ref-null guard: the paging button renders inside the list tree. */
-    if (local !== null) {
-      const el = scrollerOf(local)
-      const row = pagingAnchor(local, el)
-      if (row !== null && row.dataset.chatAnchorKey !== undefined) {
-        anchorRef.current = {
-          key: row.dataset.chatAnchorKey,
-          top: flowTop(row, el),
-        }
-      }
-    }
-    loadOlder()
-  }
 
   const navigateToTurn = useCallback((item: TurnNavigationItem): void => {
     const local = listRef.current

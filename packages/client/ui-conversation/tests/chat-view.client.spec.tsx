@@ -1507,6 +1507,23 @@ describe('ChatView', () => {
     expect(view.getByText('加载中…')).toBeTruthy()
   })
 
+  it('automatically loads older history near the reader head', () => {
+    const h = makeHarness({ nodes: [user(5, 'later')], hasMore: true })
+    const view = render(<h.ChatView {...h.props} />)
+    const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
+    let scrollTop = 100
+    Object.defineProperty(scroller, 'scrollHeight', { configurable: true, value: 1_000 })
+    Object.defineProperty(scroller, 'clientHeight', { configurable: true, value: 300 })
+    Object.defineProperty(scroller, 'scrollTop', {
+      configurable: true,
+      get: () => scrollTop,
+      set: (value: number) => { scrollTop = value },
+    })
+    fireEvent.scroll(scroller)
+    fireEvent.scroll(scroller)
+    expect(h.loadOlder).toHaveBeenCalledOnce()
+  })
+
   it('keeps the older-history control out of an active or expanding conversation', () => {
     const h = makeHarness({ nodes: [user(5, '当前')], hasMore: true, running: true, historyWindowMode: 'expanding' })
     const view = render(<h.ChatView {...h.props} />)

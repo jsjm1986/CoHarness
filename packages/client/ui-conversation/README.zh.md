@@ -16,7 +16,7 @@
 
 在 composer 中直接选择的文件也使用与文档管理器相同的可续传上传会话，包括有界分片、SHA-256 校验、重试，以及重新选择同一文件后继续上传。
 
-视图环是一个 slot：严格会话主体注册在 `children` 表中声明会话作用域的 `'conversation.view'` 列表，并通过自身的 renderSlot share 渲染活跃配置项（`only: <active id>`）；视图标签页则从注册选项（`id`／`order`／`label`）投影而来。聊天视图是该包自身的配置项；ui-trajectory 等插件通过 `ctx.slots.register` 贡献标签页，每个视图负责自己的 chrome。Chat 留在 conversation 档历史快照上；处于舞台的活动会话会补齐更早页面而不替换已显示行，较早历史入口只属于舞台重进后的空闲尾页。inspect 交接与 Trajectory 标签页调用 `ensureHistoryDetail()`（[两档会话历史传输](../../../.agents/notes/implemented/architecture/2026-08-18-conversation-history-tier.zh.md)）。
+视图环是一个 slot：严格会话主体注册在 `children` 表中声明会话作用域的 `'conversation.view'` 列表，并通过自身的 renderSlot share 渲染活跃配置项（`only: <active id>`）；视图标签页则从注册选项（`id`／`order`／`label`）投影而来。聊天视图是该包自身的配置项；ui-trajectory 等插件通过 `ctx.slots.register` 贡献标签页，每个视图负责自己的 chrome。Chat 留在 conversation 档历史快照上；处于舞台的活动会话会补齐更早页面而不替换已显示行，空闲且处于舞台的会话在阅读器接近顶部时会自动请求一页更早历史。较早历史控件保留为自动读取失败或未完成时的无障碍重试入口。inspect 交接与 Trajectory 标签页调用 `ensureHistoryDetail()`（[两档会话历史传输](../../../.agents/notes/implemented/architecture/2026-08-18-conversation-history-tier.zh.md)）。
 
 Chat 业务行是彼此独立的注册表贡献，不是封闭的内建联合。Client 插件通过 declaration merging 增加类型化 `ChatNodeDataMap` key，在 `ctx.conversationEvents` 上注册 `ConversationNodeDefinition`，再向 `conversation.chat.node` 注册匹配的 keyed renderer；它无须修改会话 fold 或中央 renderer switch。稳定事件 id、append/prepend 回放、Location data 与 renderer 约束见 [Conversation Node 实操手册](../../../docs/cookbook/adding-a-conversation-node.zh.md)。
 

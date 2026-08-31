@@ -18,7 +18,7 @@ Host 对冷 session 和 subagent history 使用带索引的页面，只沿 revis
 
 启用 preset roster 时，带索引的冷读取还会只遍历 blank 前缀以恢复日志中的 `agent-preset/selected` 事实，在遇到首个可见对话事件或达到小型前缀预算后停止。这样无需重新打开完整事件日志也能保持 presenter 选择；前缀不可用时降级到 header／全局 presenter。
 
-浏览器 runtime 将 reconnect 后的历史重建限制为最多四个并发会话，并优先当前可见会话。Session scope dispose 会取消未完成的 open 或 history 操作并注销订阅。HTTP carrier 在外层 Node bridge 与内层 Fetch parser 使用同一请求 body 上限，response reader 也可响应调用方取消。Gateway 生产 release 现在把 Gateway 源码图编译到 `gateway/lib/index.js`；systemd 与 launchd 通过纯 Node 执行该产物，`tsx` 入口只保留给开发。
+浏览器 runtime 将 reconnect 后的历史重建限制为最多四个并发会话，并优先当前可见会话。空闲且处于舞台的阅读器接近顶部时会请求一页更早历史；可见控件在自动读取失败或触及上限时保留为无障碍重试入口。Session scope dispose 会取消未完成的 open 或 history 操作并注销订阅。HTTP carrier 在外层 Node bridge 与内层 Fetch parser 使用同一请求 body 上限，response reader 也可响应调用方取消。Gateway 生产 release 现在把 Gateway 源码图编译到 `gateway/lib/index.js`；systemd 与 launchd 通过纯 Node 执行该产物，`tsx` 入口只保留给开发。
 
 Composer scope dispose 现在也会取消进行中的附件编码，命令图片序列化会接收提交尝试信号，因此放弃大型 payload 后不会继续进行 base64 工作。
 
