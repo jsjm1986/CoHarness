@@ -185,15 +185,15 @@ function groupByWorkspace(
 ): Group[] {
   const groups: Group[] = []
   const accounted = new Set<SessionId>()
-  const workspaceMembers = new Set(workspaces.flatMap(workspace => workspace.sessionIds))
-  const hintedByWorkspace = new Map<WorkspaceId, SessionSummary[]>()
-  for (const id of list.ids) {
-    const summary = list.byId[id]
-    if (summary?.blank !== true || summary.workspaceId === undefined) continue
-    const hinted = hintedByWorkspace.get(summary.workspaceId) ?? []
-    hinted.push(summary)
-    hintedByWorkspace.set(summary.workspaceId, hinted)
-  }
+  // Only the current blank row can be visible; avoid rescanning a large list
+  // of hidden blank reservations on every live event.
+  const currentSummary = list.current === undefined ? undefined : list.byId[list.current]
+  const currentHint = currentSummary?.blank === true && currentSummary.workspaceId !== undefined
+    ? currentSummary
+    : undefined
+  const workspaceMembers = currentHint === undefined
+    ? undefined
+    : new Set(workspaces.flatMap(workspace => workspace.sessionIds))
   for (const workspace of workspaces) {
     const members: SessionSummary[] = []
     for (const id of workspace.sessionIds) {
@@ -206,14 +206,13 @@ function groupByWorkspace(
     // A newly reserved draft is not attached by the Host until its first
     // visible message. Its client-local Workspace hint keeps the current
     // placeholder in the intended group during that short interval.
-    for (const summary of hintedByWorkspace.get(workspace.workspaceId) ?? []) {
-      if (workspaceMembers.has(summary.id) || accounted.has(summary.id)) continue
-      accounted.add(summary.id)
-      if (!sessionVisible(summary, list.current, archived)) continue
+    if (currentHint !== undefined && currentHint.workspaceId === workspace.workspaceId
+      && workspaceMembers?.has(currentHint.id) !== true && !accounted.has(currentHint.id)
+      && sessionVisible(currentHint, list.current, archived)) {
+      accounted.add(currentHint.id)
       // Keep the current provisional row at the top even before Workspace
       // membership arrives, matching the render-time pin for attached drafts.
-      if (summary.id === list.current) members.unshift(summary)
-      else members.push(summary)
+      members.unshift(currentHint)
     }
     groups.push(buildGroup(
       workspace.workspaceId, workspace.workspaceId, workspace.path,
