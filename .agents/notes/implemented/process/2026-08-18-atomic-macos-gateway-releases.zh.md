@@ -10,7 +10,7 @@ launchd 任务可以在 `current` 已切换到新目录后，继续把旧 releas
 
 ## 决策
 
-macOS 部署把 `gateway/deploy/macos/release-control.sh` 安装到所有 release 之外的稳定控制目录。launchd 以 releases 根目录作为工作目录来运行这份稳定副本。控制器在 Gateway 启动时只解析一次 `current`，把规范目标导出为 `HGW_RELEASE_ROOT`，移除独立配置的 Gateway、CLI、仓库和策略插件路径，再从同一目标启动 Gateway 源码入口。
+macOS 部署把 `gateway/deploy/macos/release-control.sh` 安装到所有 release 之外的稳定控制目录。launchd 以 releases 根目录作为工作目录来运行这份稳定副本。控制器在 Gateway 启动时只解析一次 `current`，把规范目标导出为 `HGW_RELEASE_ROOT`，移除独立配置的 Gateway、CLI、仓库和策略插件路径，再从同一目标启动编译后的 Gateway 入口。构建过程会创建独立 Gateway 所需的相对链接 `gateway/node_modules/@deepseek-ai/dsh-llm`；控制器只在回滚目标是旧的源码 release 时接受源码入口，因此编译版激活失败时仍能恢复旧 release。
 
 存在 `HGW_RELEASE_ROOT` 时，Gateway 配置会验证正在运行的 Gateway 目录属于该 release，从中派生已构建 CLI 命令和 release 自有插件路径，并拒绝冲突的覆盖值。`/healthz` 把不可变目录名作为 `release` 返回，但不暴露宿主机绝对路径。
 

@@ -149,6 +149,38 @@ set -euo pipefail
     ].join('\n'))
   })
 
+  it('keeps a legacy source release usable as a rollback target', () => {
+    const root = mkdtempSync(join(tmpdir(), 'hgw-release-legacy-'))
+    const legacy = release(root, 'legacy-release')
+    for (const path of [
+      'gateway/lib/index.js',
+      'gateway/lib/config.js',
+      'gateway/lib/server.js',
+      'gateway/lib/runtime-api.js',
+    ]) unlinkSync(join(legacy, path))
+    mkdirSync(join(legacy, 'gateway/src'), { recursive: true })
+    mkdirSync(join(legacy, 'gateway/node_modules/tsx'), { recursive: true })
+    writeFileSync(join(legacy, 'gateway/src/index.ts'), 'export {}\n')
+    writeFileSync(join(legacy, 'gateway/node_modules/tsx/package.json'), '{}\n')
+    pointCurrent(root, legacy)
+    const capture = join(root, 'capture')
+    const fakeNode = join(root, 'fake-node')
+    executable(fakeNode, `#!/bin/bash
+set -euo pipefail
+printf '%s\n' "$*" > "$CAPTURE"
+`)
+    const envFile = environmentFile(root, fakeNode)
+    const result = spawnSync('/bin/bash', [control, 'run'], {
+      encoding: 'utf8',
+      env: { ...process.env, CAPTURE: capture, HGW_GATEWAY_ENV_FILE: envFile },
+    })
+
+    expect(result.status, result.stderr).toBe(0)
+    expect(readFileSync(capture, 'utf8')).toBe(
+      `--import tsx/esm ${realpathSync(legacy)}/gateway/src/index.ts\n`,
+    )
+  })
+
   it('activates only after the new pid, cwd, and health release agree, then rolls back a failed release', () => {
     const root = mkdtempSync(join(tmpdir(), 'hgw-release-activate-'))
     const r1 = release(root, 'release-one')

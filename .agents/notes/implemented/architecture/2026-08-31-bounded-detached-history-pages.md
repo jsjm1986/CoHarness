@@ -24,7 +24,7 @@ Composer scope disposal now also cancels in-flight attachment encoding, and comm
 
 Abort-aware waiters recheck signals after listener registration, cancel response readers and shared attachment/file work on the last abandoned waiter, and release their listeners on every settlement. Session and manager disposal also invalidates queued history fills before they can start.
 
-Indexed header reads also serve ownership and cwd checks before a cold resume performs the full inspection needed to rebuild the recorded composition.
+Indexed header reads also serve ownership and cwd checks before a cold resume performs the full inspection needed to rebuild the recorded composition. Production packaging now creates the release-local Gateway package link required by compiled ESM imports, and the macOS controller retains a legacy source fallback solely for rollback.
 
 Future bootstrap passwords are delivered through an owner-only one-time file and are never interpolated into Gateway logs. Existing deployments retain their credentials until an operator rotates them.
 

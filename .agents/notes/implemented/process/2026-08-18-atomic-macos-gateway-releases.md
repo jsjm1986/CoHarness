@@ -10,7 +10,7 @@ A launchd job can retain an old release as its cwd while `current` is changed to
 
 ## Decision
 
-The macOS deployment installs `gateway/deploy/macos/release-control.sh` in a stable control directory outside every release. launchd runs that stable copy with the releases root as its working directory. The controller resolves `current` once at Gateway start, exports the canonical target as `HGW_RELEASE_ROOT`, removes independently configured Gateway, CLI, repository, and policy-plugin paths, and starts the Gateway source entry from that same target.
+The macOS deployment installs `gateway/deploy/macos/release-control.sh` in a stable control directory outside every release. launchd runs that stable copy with the releases root as its working directory. The controller resolves `current` once at Gateway start, exports the canonical target as `HGW_RELEASE_ROOT`, removes independently configured Gateway, CLI, repository, and policy-plugin paths, and starts the compiled Gateway entry from that same target. A build creates the relative `gateway/node_modules/@deepseek-ai/dsh-llm` link required by the standalone Gateway package; the controller accepts a source-only legacy release only when it is the rollback target, so a failed compiled activation can restore an older release.
 
 When `HGW_RELEASE_ROOT` is present, Gateway configuration verifies that the running Gateway directory belongs to that release, derives the built CLI command and release-owned plugin paths from it, and rejects conflicting overrides. `/healthz` reports the immutable directory name as `release` without exposing its absolute host path.
 

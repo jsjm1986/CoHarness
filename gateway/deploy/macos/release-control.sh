@@ -46,19 +46,15 @@ assert_direct_release() {
 
 validate_release() {
   local release="$1"
+  local allow_legacy="${2:-false}"
   local required
   for required in \
     apps/cli/lib/bin.js \
     apps/web/dist/index.html \
-    gateway/lib/index.js \
-    gateway/lib/config.js \
-    gateway/lib/server.js \
-    gateway/lib/runtime-api.js \
     gateway/public/admin/index.html \
     gateway/node_modules/pg/package.json \
     gateway/node_modules/argon2/package.json \
     gateway/node_modules/better-sqlite3/package.json \
-    packages/llm/llm/lib/types/discovery.js \
     plugins/dsh-directory-guard/lib/index.js \
     plugins/dsh-directory-guard/cordis.patch.yml \
     plugins/dsh-model-governance/lib/index.js \
@@ -66,6 +62,19 @@ validate_release() {
   do
     [[ -s "$release/$required" ]] || fail "release payload is missing or empty: $release/$required"
   done
+  if [[ -s "$release/gateway/lib/index.js" \
+    && -s "$release/gateway/lib/config.js" \
+    && -s "$release/gateway/lib/server.js" \
+    && -s "$release/gateway/lib/runtime-api.js" \
+    && -s "$release/packages/llm/llm/lib/types/discovery.js" ]]; then
+    return 0
+  fi
+  if [[ "$allow_legacy" == true \
+    && -s "$release/gateway/src/index.ts" \
+    && -s "$release/gateway/node_modules/tsx/package.json" ]]; then
+    return 0
+  fi
+  fail "release has no complete compiled Gateway payload: $release"
 }
 
 current_release() {
@@ -167,7 +176,10 @@ run_gateway() {
   local release
   release="$(current_release)" || fail "current does not resolve to a release"
   assert_direct_release "$release"
-  validate_release "$release"
+  # A legacy source release is accepted only when it is already current and
+  # launchd is restarting after a failed activation. New activations remain
+  # compiled-only; this branch keeps rollback reliable across that upgrade.
+  validate_release "$release" true
 
   export HGW_RELEASE_ROOT="$release"
   unset HGW_DSH_COMMAND HGW_DSH_REPO_ROOT HGW_MODEL_GOVERNANCE_PACKAGE HGW_GATEWAY_DIR
@@ -175,7 +187,10 @@ run_gateway() {
 
   cd "$release/gateway"
   printf '[gateway-launcher] starting release %s\n' "$(basename "$release")"
-  exec "$NODE" "$release/gateway/lib/index.js"
+  if [[ -s "$release/gateway/lib/index.js" ]]; then
+    exec "$NODE" "$release/gateway/lib/index.js"
+  fi
+  exec "$NODE" --import tsx/esm "$release/gateway/src/index.ts"
 }
 
 activate_release() {

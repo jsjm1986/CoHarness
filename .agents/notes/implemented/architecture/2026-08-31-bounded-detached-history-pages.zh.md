@@ -24,7 +24,7 @@ Composer scope dispose 现在也会取消进行中的附件编码，命令图片
 
 支持取消的等待器会在注册监听器后再次检查信号；最后一个放弃等待器会取消 response reader 及共享的附件／文件工作，并在所有结算路径释放监听器。Session 和 manager dispose 也会在排队的 history fill 启动前使其失效。
 
-带索引的 header 读取还会在冷 resume 执行重建记录组合所需的完整 inspection 前完成 ownership 与 cwd 校验。
+带索引的 header 读取还会在冷 resume 执行重建记录组合所需的完整 inspection 前完成 ownership 与 cwd 校验。生产打包现在会创建编译 ESM 导入所需的 release 内 Gateway 包链接，macOS controller 仅为回滚保留旧源码入口回退。
 
 后续首次引导密码通过仅所有者可读的一次性文件交付，不再插入 Gateway 日志。既有部署的凭据保持不变，需由运维人员自行轮换。
 
