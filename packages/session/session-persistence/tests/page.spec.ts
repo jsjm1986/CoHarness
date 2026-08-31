@@ -214,6 +214,22 @@ describe('session persistence page protocol', () => {
   })
 
   it('honors group and byte boundaries and preserves cancellation', async () => {
+    const chunks = Array.from({ length: 4 }, (_, seq) => ({
+      type: 'assistant/chunk',
+      seq,
+      time: seq,
+      data: { turn: 2, step: 1, chunk: { type: 'text-delta', index: seq, text: 'x' } },
+    })) as SessionEvent[]
+    const chunkPage = selectSessionPersistencePage(
+      chunks,
+      'newer',
+      Number.MAX_SAFE_INTEGER,
+      10,
+      1,
+    )
+    expect(chunkPage.events).toHaveLength(4)
+    expect(chunkPage.hasMore).toBe(false)
+
     const selected = selectSessionPersistencePage(
       [event(0), event(1), event(2)],
       'newer',

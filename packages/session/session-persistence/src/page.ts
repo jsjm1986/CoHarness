@@ -248,6 +248,17 @@ export interface SelectedSessionPersistencePage {
   readonly hasMore: boolean
 }
 
+function eventNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined
+}
+
+/**
+ * Return the logical page group for one event. Stream chunks do not carry
+ * `sourceEventSeqs`, so grouping every chunk by its own sequence silently
+ * reduced a page to a few dozen tokens. Turn/step coordinates keep all
+ * chunks from one model step in one group while call ids keep tool lifecycles
+ * independent.
+ */
 function eventGroupKey(event: SessionEvent): string {
   const candidate = event as SessionEvent & { sourceEventSeqs?: readonly number[] }
   const sources = candidate.sourceEventSeqs
@@ -256,9 +267,17 @@ function eventGroupKey(event: SessionEvent): string {
     for (const seq of sources) if (seq < start) start = seq
     return `source:${String(start)}`
   }
-  if (event.type === 'user/message' || event.type === 'assistant/message' || event.type === 'tool/result') {
-    return `message:${String(event.seq)}`
+  const data = event.data as { turn?: unknown; step?: unknown; callId?: unknown }
+  const turn = eventNumber(data.turn)
+  const step = eventNumber(data.step)
+  if (event.type === 'user/message') return `message:${String(event.seq)}`
+  if ((event.type === 'tool/call' || event.type === 'tool/result')
+    && turn !== undefined && step !== undefined && typeof data.callId === 'string' && data.callId !== '') {
+    return `call:${String(turn)}:${String(step)}:${data.callId}`
   }
+  if (turn !== undefined && step !== undefined) return `step:${String(turn)}:${String(step)}`
+  if (turn !== undefined) return `turn:${String(turn)}`
+  if (event.type === 'assistant/message' || event.type === 'tool/result') return `message:${String(event.seq)}`
   return `event:${String(event.seq)}`
 }
 

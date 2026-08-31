@@ -130,6 +130,28 @@ describe('ConversationRepository bounded pages', () => {
     expect(fixture.calls.some(call => call.text.includes('ORDER BY e.seq DESC LIMIT $3'))).toBe(true)
   })
 
+  it('keeps one model step in one page group instead of paging every stream chunk', async () => {
+    const header = { ...headerRow, version: '7', next_seq: '5' }
+    const rows = Array.from({ length: 5 }, (_, seq) => ({
+      seq,
+      event: {
+        type: 'assistant/chunk',
+        seq,
+        time: seq,
+        data: { turn: 1, step: 1, chunk: { type: 'text-delta', index: seq, text: 'x' } },
+      },
+      payload_bytes: 60,
+    }))
+    const fixture = pagePool(header, rows)
+    const page = await new ConversationRepository(fixture.pool).readPage('session-1', {
+      maxBytes: 10_000,
+      maxEvents: 10,
+      maxGroups: 1,
+    })
+    expect(page?.events.map(event => event.seq)).toEqual([0, 1, 2, 3, 4])
+    expect(page?.hasMore).toBe(false)
+  })
+
   it('returns an empty page at either end without manufacturing a cursor', async () => {
     const header = { ...headerRow, version: '7', next_seq: '0' }
     const fixture = pagePool(header, [])

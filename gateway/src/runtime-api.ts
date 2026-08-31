@@ -17,6 +17,7 @@ import {
   ConversationPageRequest,
   ConversationPageTooLargeError,
   ConversationReadError,
+  conversationEventGroupKey,
   decodePageCursor,
   encodePageCursor,
   type ConversationRepository,
@@ -436,15 +437,7 @@ export function createRuntimeApiHandler(
       if (encoded === undefined) throw new ConversationReadError('protocol', 'conversation event is not JSON serializable')
       const size = Buffer.byteLength(encoded, 'utf8')
       if (selected.length === 0 && size > maxBytes) throw new ConversationPageTooLargeError(size, maxBytes)
-      const sources = event.sourceEventSeqs
-      let group = `event:${String(event.seq)}`
-      if (sources !== undefined && sources.length > 0) {
-        let first = event.seq
-        for (const seq of sources) if (seq < first) first = seq
-        group = `source:${String(first)}`
-      } else if (event.type === 'user/message' || event.type === 'assistant/message' || event.type === 'tool/result') {
-        group = `message:${String(event.seq)}`
-      }
+      const group = conversationEventGroupKey(event)
       if (selected.length >= maxEvents || bytes + size > maxBytes
         || (!groups.has(group) && groups.size >= maxGroups)) break
       selected.push(event)

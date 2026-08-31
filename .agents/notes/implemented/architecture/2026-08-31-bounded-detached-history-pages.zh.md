@@ -12,7 +12,7 @@ Status: implemented
 
 `SessionPersistence` 暴露 `readHeader`、`readRevision` 和 `readPage`。页面具有明确的字节、事件和组数限制，不透明 cursor 绑定会话、源 revision 与读取方向。追加或修复会改变 revision 并使 cursor 失效。提供方把有界读取失败区分为 `too-large`、`aborted`、`timeout`、`dependency` 和 `protocol`。
 
-PostgreSQL conversation repository 使用只读 repeatable-read 事务和 `(session_id, seq)` keyset 索引实现 `readHeader` 与 `readPage`。查询只在结果列中把 bigint 序号转换为文本，并在 `ORDER BY` 中限定底层 bigint 列，保持 keyset 的数值顺序。Gateway runtime 暴露元数据和分页 endpoint，在缓冲内部请求 body 前完成认证，应用响应预算并保留有类型的分页失败。没有带索引分页方法的兼容 repository 保留原有完整读取路径。
+PostgreSQL conversation repository 使用只读 repeatable-read 事务和 `(session_id, seq)` keyset 索引实现 `readHeader` 与 `readPage`。查询只在结果列中把 bigint 序号转换为文本，并在 `ORDER BY` 中限定底层 bigint 列，保持 keyset 的数值顺序。分页分组使用 turn/step 坐标聚合 assistant 流式 chunk，并使用 call id 区分工具生命周期；长 token 流因此只占用一个逻辑 step 分组，而不是每个 chunk 各占一组。Gateway runtime 暴露元数据和分页 endpoint，在缓冲内部请求 body 前完成认证，应用响应预算并保留有类型的分页失败。没有带索引分页方法的兼容 repository 保留原有完整读取路径。
 
 Host 对冷 session 和 subagent history 使用带索引的页面，只沿 revision 绑定的 older cursor 读取到覆盖请求消息窗口为止，让一次 detached 常规窗口低于 4 MiB，并在累计 512 MiB 或 1,024 次分页时 fail closed。Host 会在呈现页面前校验 continuation 元数据、字节统计和相邻序号范围。公共 RPC envelope 仍为 `{ events, hasMore, projections?, omittedSpans? }`；cursor 细节留在 persistence 与 Gateway 层。detached projection baseline 在可用时使用经过身份校验的 projection cache，兼容 inspection 可以折叠其完整事件区间。请求取消会传到分页读取和 response body 解码，并映射为现有 `cancelled` RPC 结果；其他有类型失败使用按类别区分的安全消息，同时在 Host 日志中保留诊断。
 
@@ -44,4 +44,4 @@ Gateway 冷历史现在读取有界的带索引区间，不会因普通大型会
 
 ## Verification
 
-Host 聚焦测试证明大型 detached history 使用 `readPage` 而不调用 `inspect`；persistence 测试覆盖 cursor 的方向／会话／revision 绑定、字节／事件／组数限制、不可分割超大事件和取消；Gateway 测试覆盖带索引 keyset 页面、cursor 失效、runtime 分页响应、body 读取前认证和 supervisor survivor 重连。Client 测试覆盖 assistant 增量累加、reconnect resync admission、scope dispose、response body 取消和 listener 清理。`pnpm run typecheck`、Gateway 产物／类型检查、export-JSDoc、契约 lint 及受影响 Vitest 套件已在源码树通过。
+Host 聚焦测试证明大型 detached history 使用 `readPage` 而不调用 `inspect`；persistence 测试覆盖 cursor 的方向／会话／revision 绑定、字节／事件／组数限制、流式 chunk 分组、不可分割超大事件和取消；Gateway 测试覆盖带索引 keyset 页面、数值排序、流式 chunk 分组、cursor 失效、runtime 分页响应、body 读取前认证和 supervisor survivor 重连。针对 137,382 条事件的生产规模只读探针把完整有界遍历从 2,771 页降为 165 页，且每页均未超过配置的字节／事件限制。Client 测试覆盖 assistant 增量累加、reconnect resync admission、scope dispose、response body 取消和 listener 清理。`pnpm run typecheck`、Gateway 产物／类型检查、export-JSDoc、契约 lint 及受影响 Vitest 套件已在源码树通过。

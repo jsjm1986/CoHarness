@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-31-bounded-detached-history-pages.md
-2026-08-31-bounded-detached-history-pages.md: 9f296151bcb0c2220a792be76314015e2659e05c
-2026-08-31-bounded-detached-history-pages.zh.md: 7a63c35b9e2a6505fcd1a889de66caa32dcff25e
+2026-08-31-bounded-detached-history-pages.md: fc30aadbd7d43403cab31501eddd43128fabd7f6
+2026-08-31-bounded-detached-history-pages.zh.md: 8e6319af3cd25bbd28ec4b4ff455b228e04bc017
