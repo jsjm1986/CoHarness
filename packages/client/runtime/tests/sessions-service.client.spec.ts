@@ -526,6 +526,10 @@ describe('create', () => {
     // list; the local row remains addressable until its first visible event.
     await feedList(b, [])
     expect(b.svc.list.getSnapshot().byId[draft]).toMatchObject({ workspaceId: 'workspace', blank: true })
+    // If the Host does return the row before membership is attached, the
+    // local hint enriches that baseline rather than being replaced by it.
+    await feedList(b, [{ id: 'draft', blank: true }])
+    expect(b.svc.list.getSnapshot().byId[draft]).toMatchObject({ workspaceId: 'workspace', blank: true })
 
     b.svc.handleMuxEnvelope({
       rpcId: 'event' as never,

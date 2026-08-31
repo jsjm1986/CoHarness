@@ -496,10 +496,11 @@ export class SessionManager {
               this.engagedSessions.add(summary.sessionId)
             }
           }
-          const baseline = baselineWithDrafts.map(summary =>
-            this.engagedSessions.has(summary.sessionId) && summary.blank
-              ? { ...summary, blank: false }
-              : summary)
+          const baseline = baselineWithDrafts.map((summary) => {
+            if (!this.engagedSessions.has(summary.sessionId)) return summary
+            const { workspaceId: _workspaceId, ...engaged } = summary
+            return summary.blank ? { ...engaged, blank: false } : engaged
+          })
           // Seed first observations from the pull-time baseline BEFORE replaying
           // in-flight mutations, then reconcile the reminders after EVERY
           // replayed mutation: an edge that happens entirely between mutations
