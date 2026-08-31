@@ -105,6 +105,32 @@ export interface HistoryOmittedSpan {
   endSeq: number
 }
 
+/** One bounded turn marker used by the conversation navigation rail. */
+export interface SessionHistoryIndexItem {
+  /** Durable turn number. */
+  turn: number
+  /** First event sequence in the turn. */
+  startSeq: number
+  /** Last event sequence in the turn. */
+  endSeq: number
+  /** Optional prompt preview, bounded by the response schema. */
+  prompt?: string
+  /** Optional assistant preview, bounded by the response schema. */
+  response?: string
+}
+
+/** Bounded navigation metadata independent from the chat event payload. */
+export interface SessionHistoryIndex {
+  /** Last sequence reflected by this index, or -1 for an empty session. */
+  asOfSeq: number
+  /** Total turns before any sampling limit. */
+  totalTurns: number
+  /** Returned markers in ascending sequence order. */
+  items: SessionHistoryIndexItem[]
+  /** True when the provider sampled markers to stay within the item limit. */
+  truncated: boolean
+}
+
 /**
  * The projection baseline riding the history tail page: one synchronous cut
  * over every registered projection unit, read from the registry's watermark
@@ -362,6 +388,19 @@ export interface SessionsApi {
     projections?: SessionProjectionsBlock
     omittedSpans?: readonly HistoryOmittedSpan[]
   }>>
+
+  /**
+   * Reads bounded navigation metadata without loading event or chunk payloads.
+   * The result is advisory and must be refreshed after the session revision
+   * changes; an unavailable index does not make `session.history` unavailable.
+   * @param request - session identity and optional marker limit.
+   * @param signal - in-process cancellation for the indexed read.
+   * @returns turn markers and their bounded previews.
+   */
+  historyIndex(request: RpcRequest<{
+    sessionId: SessionId
+    maxItems?: number
+  }>, signal?: AbortSignal): Promise<RpcResponse<SessionHistoryIndex>>
 
   /**
    * Reads a fresh advisory model directory for an ordinary session. Provider

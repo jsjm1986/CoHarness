@@ -1866,7 +1866,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/session/session-persistence-gateway/src/index.ts:79`](../packages/session/session-persistence-gateway/src/index.ts)
+Source: [`packages/session/session-persistence-gateway/src/index.ts:82`](../packages/session/session-persistence-gateway/src/index.ts)
 
 <a id="deepseek-aidsh-session-persistence-jsonl"></a>
 

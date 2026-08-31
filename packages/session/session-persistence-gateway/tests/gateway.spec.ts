@@ -125,6 +125,27 @@ class GatewayTransport {
       })
     }
 
+    if (url.pathname === '/internal/runtime/session/index') {
+      const stored = this.sessions.get(sessionId)
+      if (stored === undefined) return json(404, { error: 'conversation-not-found' })
+      const starts = stored.events.filter((candidate) => {
+        const event = candidate as { type?: unknown }
+        return event.type === 'turn/start'
+      }) as Array<{ seq: number; data?: { turn?: number } }>
+      return json(200, {
+        header: structuredClone(stored.header),
+        revision: `revision-${String(stored.revision)}`,
+        asOfSeq: (stored.events.at(-1) as { seq?: number } | undefined)?.seq ?? -1,
+        totalTurns: starts.length,
+        items: starts.map((start, index) => ({
+          turn: start.data?.turn ?? index,
+          startSeq: start.seq,
+          endSeq: ((starts[index + 1]?.seq ?? ((stored.events.at(-1) as { seq?: number } | undefined)?.seq ?? start.seq) + 1) - 1),
+        })),
+        truncated: false,
+      })
+    }
+
     if (url.pathname === '/internal/runtime/session/page') {
       const stored = this.sessions.get(sessionId)
       if (stored === undefined) return json(404, { error: 'conversation-not-found' })
@@ -441,6 +462,21 @@ describe('GatewaySessionPersistence bounded page transport', () => {
       if (first.nextCursor === undefined) throw new Error('first page did not return a cursor')
       const second = await ctx.sessionPersistence.readPage(id, { cursor: first.nextCursor, maxEvents: 2 })
       expect(second.events.map(item => item.seq)).toEqual([2, 3])
+    } finally {
+      await fiber.dispose()
+    }
+  })
+
+  it('reads a bounded history index independently from event pages', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const transport = new GatewayTransport()
+    transport.seed('indexed', oneTurnLog())
+    const fiber = await mountBackend(ctx, transport)
+    try {
+      const index = await ctx.sessionPersistence.readHistoryIndex(SessionId('indexed'))
+      expect(index).toMatchObject({ totalTurns: 1, asOfSeq: 5, truncated: false })
+      expect(index?.items).toEqual([{ turn: 1, startSeq: 0, endSeq: 5 }])
     } finally {
       await fiber.dispose()
     }

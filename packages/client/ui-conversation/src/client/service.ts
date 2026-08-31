@@ -64,6 +64,8 @@ export interface IConversation {
    * @returns completion of the page pull.
    */
   loadOlder(): Promise<void>
+  /** Materialize older pages until an indexed turn marker is resident. */
+  loadHistoryUntil(targetSeq: number): Promise<boolean>
   /**
    * Attach one already-stored user document to a session's composer without
    * uploading a second copy.
@@ -644,6 +646,12 @@ export class ConversationController extends Service implements IConversation {
   /** Pull one older history page for the scoped Session. */
   async loadOlder(): Promise<void> {
     await this.scopedSession('loadOlder').loadOlder()
+  }
+
+  /** Materialize older pages for a navigation marker without blocking model work. */
+  async loadHistoryUntil(targetSeq: number): Promise<boolean> {
+    const session = this.scopedSession('loadHistoryUntil')
+    return await session.loadHistoryUntil?.(targetSeq) ?? false
   }
 
   /** Resolve the caller scope's session face or throw on root contexts. */

@@ -25,6 +25,7 @@ function preview(parts: Iterable<string>): string {
 
 function turnNavigationItem(
   turn: number,
+  timeline: ConversationTimelineSnapshot,
   locations: ChatLocationNodeIndex,
   nodes: ChatNodeStore,
 ): TurnNavigationItem | undefined {
@@ -42,7 +43,19 @@ function turnNavigationItem(
   const response = responseNode?.kind === 'assistant-step'
     ? preview(responseNode.data.blocks.flatMap(block => block.kind === 'text' ? [block.text] : []))
     : ''
-  return { turn, anchorKey: anchor.key, prompt, response }
+  const location = timeline.turns.get(turn)
+  const startSeq = location?.start?.seq
+  const endSeq = location?.end?.seq
+    ?? Math.max(startSeq ?? anchor.anchorSeq, ...loaded.map(node => node.anchorSeq))
+  return {
+    turn,
+    anchorKey: anchor.key,
+    ...(startSeq === undefined ? {} : { startSeq }),
+    endSeq,
+    loaded: true,
+    prompt,
+    response,
+  }
 }
 
 function sameNavigationItem(left: TurnNavigationItem | undefined, right: TurnNavigationItem | undefined): boolean {
@@ -50,6 +63,9 @@ function sameNavigationItem(left: TurnNavigationItem | undefined, right: TurnNav
     ? left === right
     : left.turn === right.turn
       && left.anchorKey === right.anchorKey
+      && left.startSeq === right.startSeq
+      && left.endSeq === right.endSeq
+      && left.loaded === right.loaded
       && left.prompt === right.prompt
       && left.response === right.response
 }
@@ -63,7 +79,7 @@ class MutableChatTurnNavigationIndex implements ChatTurnNavigationIndex {
 
   rebuild(timeline: ConversationTimelineSnapshot, locations: ChatLocationNodeIndex, nodes: ChatNodeStore): void {
     const next = timeline.turnOrder.flatMap((turn) => {
-      const item = turnNavigationItem(turn, locations, nodes)
+      const item = turnNavigationItem(turn, timeline, locations, nodes)
       return item === undefined ? [] : [item]
     })
     if (next.length === this.current.length && next.every((item, index) => sameNavigationItem(this.current[index], item))) return

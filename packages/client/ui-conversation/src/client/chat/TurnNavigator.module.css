@@ -60,6 +60,10 @@
 
 .markPreview::before { width: 18px; background: var(--dsw-alias-label-tertiary); }
 .markActive::before { width: 20px; background: var(--dsw-alias-label-primary); }
+.markIndexed::before {
+  background: var(--dsw-alias-border-l3);
+  opacity: 0.72;
+}
 .mark:focus-visible::before { width: 20px; background: var(--dsw-alias-state-business-primary); }
 .mark:focus-visible { outline: 1px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; }
 

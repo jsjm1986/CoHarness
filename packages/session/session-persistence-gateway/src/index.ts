@@ -28,6 +28,7 @@ import SessionPersistence, {
   DEFAULT_PREPARED_SESSION_CACHE_SIZE,
   DEFAULT_MAX_PENDING_EVENTS_PER_SESSION,
   DEFAULT_WRITE_BATCH_MAX_DELAY_MS,
+  DEFAULT_SESSION_HISTORY_INDEX_MAX_ITEMS,
   MAX_WRITE_BATCH_DELAY_MS,
   PersistenceCoordinator,
   SessionPersistenceRevision,
@@ -38,6 +39,8 @@ import SessionPersistence, {
   type SessionInspection,
   type SessionLocation,
   type SessionPersistenceSnapshot,
+  type SessionHistoryIndex,
+  type SessionHistoryIndexItem,
   type SessionPersistenceRevision as PersistenceRevision,
   SessionPersistenceReadError,
   SessionPersistenceReadCursor,
@@ -230,6 +233,46 @@ function eventsFrom(value: unknown): SessionEvent[] {
     }
     return candidate as SessionEvent
   })
+}
+
+function historyIndexFrom(value: unknown, maxItems: number): SessionHistoryIndex {
+  const root = record(value)
+  if (typeof root?.revision !== 'string' || root.revision === ''
+    || !safeInteger(root.asOfSeq) || root.asOfSeq < -1
+    || !nonNegativeInteger(root.totalTurns) || typeof root.truncated !== 'boolean'
+    || !Array.isArray(root.items) || root.items.length > maxItems
+    || root.items.length > root.totalTurns) {
+    throw new SessionPersistenceReadError('protocol', 'Gateway returned an invalid history index')
+  }
+  const items: SessionHistoryIndexItem[] = root.items.map((candidate) => {
+    const item = record(candidate)
+    const prompt = item?.prompt
+    const response = item?.response
+    const turn = item?.turn
+    const startSeq = item?.startSeq
+    const endSeq = item?.endSeq
+    const textValid = (text: unknown): text is string | undefined => text === undefined
+      || (typeof text === 'string' && Array.from(text).length <= 160)
+    if (!nonNegativeInteger(turn) || !nonNegativeInteger(startSeq)
+      || !nonNegativeInteger(endSeq) || startSeq > endSeq
+      || !textValid(prompt) || !textValid(response)) {
+      throw new SessionPersistenceReadError('protocol', 'Gateway returned an invalid history index item')
+    }
+    return {
+      turn,
+      startSeq,
+      endSeq,
+      ...(prompt === undefined ? {} : { prompt }),
+      ...(response === undefined ? {} : { response }),
+    }
+  })
+  return {
+    revision: SessionPersistenceRevision(root.revision),
+    asOfSeq: root.asOfSeq,
+    totalTurns: root.totalTurns,
+    items,
+    truncated: root.truncated,
+  }
 }
 
 function deterministicBatchId(kind: 'append' | 'repair', sessionId: SessionId, value: unknown): string {
@@ -428,6 +471,23 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
   /** Read one revision without loading the session event log. */
   override readRevision(id: SessionId, signal?: AbortSignal): Promise<PersistenceRevision | undefined> {
     return this.readStoredRevision(id, signal)
+  }
+
+  /** Read the bounded turn navigation index from the authenticated Gateway. */
+  override async readHistoryIndex(
+    id: SessionId,
+    maxItems = DEFAULT_SESSION_HISTORY_INDEX_MAX_ITEMS,
+    signal?: AbortSignal,
+  ): Promise<SessionHistoryIndex | undefined> {
+    if (!Number.isSafeInteger(maxItems) || maxItems < 1 || maxItems > DEFAULT_SESSION_HISTORY_INDEX_MAX_ITEMS) {
+      throw new SessionPersistenceReadError('protocol', 'session history index maxItems is invalid')
+    }
+    const value = await this.optional(
+      `/internal/runtime/session/index?sessionId=${encodeURIComponent(id)}&maxItems=${String(maxItems)}`,
+      signal,
+    )
+    if (value === undefined) return undefined
+    return historyIndexFrom(value, maxItems)
   }
 
   /** Read a bounded page from the Gateway's indexed event range endpoint. */

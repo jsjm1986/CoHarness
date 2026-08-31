@@ -559,6 +559,74 @@ describe('paging', () => {
   })
 })
 
+describe('history navigation index', () => {
+  it('loads bounded turn markers after the tail without delaying the first page', async () => {
+    const { api, session } = makeSession()
+    const tail = plainTurn(12, 3, '当前问题', '当前回答')
+    api.onHistory = () => histResponse(tail, true)
+    api.onHistoryIndex = () => Promise.resolve(ok({
+      asOfSeq: 17,
+      totalTurns: 3,
+      items: [
+        { turn: 1, startSeq: 0, endSeq: 5, prompt: '第一问', response: '第一答' },
+        { turn: 2, startSeq: 6, endSeq: 11, prompt: '第二问', response: '第二答' },
+        { turn: 3, startSeq: 12, endSeq: 17, prompt: '当前问题', response: '当前回答' },
+      ],
+      truncated: false,
+    }))
+
+    session.enterStage()
+    await session.open()
+    // The open promise settles on the history page; the index is deliberately
+    // scheduled separately so a slow metadata query cannot block first paint.
+    expect(session.getSnapshot().openState).toBe('open')
+    await vi.waitFor(() => { expect(api.callsOf('session.historyIndex')).toHaveLength(1) })
+    await vi.waitFor(() => { expect(session.getSnapshot().historyNavigation?.state).toBe('ready') })
+    expect(session.getSnapshot().historyNavigation?.items).toHaveLength(3)
+    expect(session.getSnapshot().historyNavigation?.items[0]?.startSeq).toBe(0)
+  })
+
+  it('materializes only the pages needed for an index jump and propagates stage cancellation', async () => {
+    const { api, session } = makeSession()
+    const older = plainTurn(0, 1, '旧问题', '旧回答')
+    const newer = plainTurn(6, 2, '新问题', '新回答')
+    api.onHistory = payload => payload.beforeSeq === undefined
+      ? histResponse(newer, true)
+      : histResponse(older, false)
+    api.onHistoryIndex = () => Promise.resolve(ok({
+      asOfSeq: 11,
+      totalTurns: 2,
+      items: [
+        { turn: 1, startSeq: 0, endSeq: 5, prompt: '旧问题' },
+        { turn: 2, startSeq: 6, endSeq: 11, prompt: '新问题' },
+      ],
+      truncated: false,
+    }))
+    session.enterStage()
+    await session.open()
+    await vi.waitFor(() => { expect(api.callsOf('session.historyIndex')).toHaveLength(1) })
+    expect(await session.loadHistoryUntil(0)).toBe(true)
+    expect(api.callsOf('session.history')).toHaveLength(2)
+    expect(session.getSnapshot().nodes.map(node => node.seq)).toEqual([1, 3, 7, 9])
+
+    vi.useFakeTimers()
+    const gate = deferred<Awaited<ReturnType<FakeApiClient['onHistoryIndex']>>>()
+    try {
+      api.onHistoryIndex = () => gate.promise
+      session.handleMuxEnvelope('turn-end' as never, {
+        type: 'session/event', sessionId: SID, event: ev.turnEnd(12, 2),
+      })
+      await vi.advanceTimersByTimeAsync(750)
+      await vi.waitFor(() => { expect(api.lastHistoryIndexSignal).toBeDefined() })
+      session.leaveStage()
+      expect(api.lastHistoryIndexSignal?.aborted).toBe(true)
+      gate.resolve(ok({ asOfSeq: 12, totalTurns: 2, items: [], truncated: false }))
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
 describe('conversation-tier history', () => {
   it('treats omittedSpans as the logical base so loadOlder stays continuous', async () => {
     const { api, session } = makeSession()

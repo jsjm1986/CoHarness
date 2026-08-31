@@ -33,8 +33,8 @@ import type { CommandDescriptor, CommandExecution, CommandResult } from '@deepse
 import { deriveEventMessage, foldSurface } from '@deepseek-ai/dsh-session/surface'
 import type {
   ApiProxy, ClientRequest, ClientResponse, HistoryEntry, HostFrame, MuxFrame, RpcReceipt,
-  ModelProviderGroup, ModelSelection, RpcRequest, RpcResponse, RpcResult, ServerRequest, ServerResponse, SessionSummary,
-  ToolCallView, ToolEventView, ToolResultView, WorkspaceId, WorkspaceView,
+  ModelProviderGroup, ModelSelection, RpcRequest, RpcResponse, RpcResult, ServerRequest, ServerResponse,
+  SessionHistoryIndex, SessionSummary, ToolCallView, ToolEventView, ToolResultView, WorkspaceId, WorkspaceView,
 } from './api.ts'
 import type { RequestPayload, ResponseValue, RpcMethodMap } from '@deepseek-ai/dsh-host-apiproxy/api'
 import { AbstractApiClient, RpcId, SESSION_SEARCH_RESULT_LIMIT } from './api.ts'
@@ -1238,6 +1238,51 @@ function pageOf(
     return view === undefined ? { event } : { event, view }
   })
   return { events, hasMore: start > 0 }
+}
+
+/** Fixture mirror of the bounded navigation index; previews never include stream chunks. */
+function historyIndexOf(log: readonly SessionEvent[], maxItems: number): SessionHistoryIndex {
+  const starts = log.flatMap(event => event.type === 'turn/start' && typeof event.data.turn === 'number'
+    ? [{ turn: event.data.turn, startSeq: event.seq }]
+    : [])
+  let ordinals: number[]
+  if (starts.length <= maxItems) {
+    ordinals = Array.from({ length: starts.length }, (_, index) => index)
+  } else if (maxItems === 1) {
+    ordinals = [0]
+  } else {
+    ordinals = [...new Set(Array.from({ length: maxItems }, (_, index) =>
+      Math.round(index * (starts.length - 1) / (maxItems - 1))))].sort((left, right) => left - right)
+  }
+  const selected = ordinals.map((ordinal) => {
+    const start = starts[ordinal]
+    if (start === undefined) throw new Error('fixture history index ordinal is invalid')
+    return start
+  })
+  const items: SessionHistoryIndex['items'] = selected.map((start, index) => ({
+    turn: start.turn,
+    startSeq: start.startSeq,
+    endSeq: (starts[ordinals[index + 1] ?? starts.length]?.startSeq ?? (log.at(-1)?.seq ?? start.startSeq) + 1) - 1,
+  }))
+  for (const event of log) {
+    if (event.type !== 'user/message' && event.type !== 'assistant/message') continue
+    const rawTurn = (event.data as unknown as { turn?: unknown }).turn
+    const turn = typeof rawTurn === 'number' ? rawTurn : undefined
+    if (turn === undefined) continue
+    const item = items.find(candidate => candidate.turn === turn)
+    if (item === undefined) continue
+    const text = searchEventText(event).replace(/\s+/gu, ' ').trim()
+    if (text === '') continue
+    const clipped = Array.from(text).slice(0, 160).join('')
+    if (event.type === 'user/message' && item.prompt === undefined) item.prompt = clipped
+    if (event.type === 'assistant/message') item.response = clipped
+  }
+  return {
+    asOfSeq: log.at(-1)?.seq ?? -1,
+    totalTurns: starts.length,
+    items,
+    truncated: items.length < starts.length,
+  }
 }
 
 /** Fixture mirror of host session-scoped attachment authorization. */
@@ -2489,6 +2534,11 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         if (doomed) throw new Error('fixture: simulated history transport failure')
         return ok(request, { ...page, ...projections === undefined ? {} : { projections } })
       },
+      historyIndex: async (request, signal) => {
+        signal?.throwIfAborted()
+        const log = logs.get(request.payload.sessionId) ?? []
+        return ok(request, historyIndexOf(log, request.payload.maxItems ?? 2_000))
+      },
       models: request => ok(request, {
         current: modelSelections.get(request.payload.sessionId)
           ?? { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
@@ -3214,6 +3264,7 @@ export class FixtureApiClient extends AbstractApiClient {
       case 'session.search': return this.api.sessions.search(request, signal)
       case 'session.create': return this.api.sessions.create(request)
       case 'session.history': return this.api.sessions.history(request, signal)
+      case 'session.historyIndex': return this.api.sessions.historyIndex(request, signal)
       case 'session.models': return this.api.sessions.models(request)
       case 'session.selectModel': return this.api.sessions.selectModel(request)
       case 'session.rename': return this.api.sessions.rename(request)

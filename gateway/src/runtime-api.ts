@@ -17,6 +17,7 @@ import {
   ConversationPageRequest,
   ConversationPageTooLargeError,
   ConversationReadError,
+  conversationHistoryIndexFromEvents,
   conversationEventGroupKey,
   decodePageCursor,
   encodePageCursor,
@@ -83,7 +84,7 @@ interface RuntimeApiDependencies {
   instances: Pick<PostgresInstanceRepository, 'authenticateRuntimeToken'>
   conversations: Pick<ConversationRepository, 'append' | 'listScoped' | 'load' | 'removeTree'>
     & Partial<Pick<ConversationRepository,
-      'readHeader' | 'readFrom' | 'readPage' | 'revision'
+      'readHeader' | 'readFrom' | 'readPage' | 'readHistoryIndex' | 'revision'
       | 'reserveDraft' | 'heartbeatDraftForOwner' | 'releaseDraftForOwner'>>
   collaboration: Pick<
     PostgresCollaborationService,
@@ -202,6 +203,39 @@ function validateConversationRange(events: readonly ConversationEvent[], fromSeq
   for (const event of events) {
     if (event.seq !== expected) throw new ConversationReadError('protocol', 'conversation event range is not contiguous')
     expected += 1
+  }
+}
+
+/** Validate bounded navigation metadata before it crosses the runtime wire. */
+function validateHistoryIndex(value: {
+  readonly asOfSeq: number
+  readonly totalTurns: number
+  readonly items: readonly {
+    readonly turn: number
+    readonly startSeq: number
+    readonly endSeq: number
+    readonly prompt?: string
+    readonly response?: string
+  }[]
+  readonly truncated: boolean
+}, maxItems: number): void {
+  if (!safeInteger(value.asOfSeq, -1) || !safeInteger(value.totalTurns)
+    || value.items.length > maxItems || value.items.length > value.totalTurns
+    || typeof value.truncated !== 'boolean') {
+    throw new ConversationReadError('protocol', 'conversation history index metadata is invalid')
+  }
+  let previousTurn = -1
+  let previousEnd = -1
+  for (const item of value.items) {
+    const previewValid = (text: string | undefined): boolean => text === undefined || Array.from(text).length <= 160
+    if (!safeInteger(item.turn) || !safeInteger(item.startSeq) || !safeInteger(item.endSeq)
+      || item.startSeq > item.endSeq || item.turn <= previousTurn || item.startSeq <= previousEnd
+      || (value.asOfSeq >= 0 && item.endSeq > value.asOfSeq)
+      || !previewValid(item.prompt) || !previewValid(item.response)) {
+      throw new ConversationReadError('protocol', 'conversation history index item is invalid')
+    }
+    previousTurn = item.turn
+    previousEnd = item.endSeq
   }
 }
 
@@ -1076,6 +1110,51 @@ export function createRuntimeApiHandler(
         send(res, 200, {
           header: runtimeHeader(header),
           revision: revisionFor(subject, revision),
+        })
+        return true
+      }
+
+      if (pathname === '/internal/runtime/session/index' && req.method === 'GET') {
+        const sessionId = url.searchParams.get('sessionId') ?? ''
+        const rawMaxItems = url.searchParams.get('maxItems')
+        const maxItems = rawMaxItems === null ? 2_000 : Number(rawMaxItems)
+        if (!safeInteger(maxItems) || maxItems < 1 || maxItems > 2_000) {
+          throw new ConversationReadError('protocol', 'invalid conversation history index maxItems')
+        }
+        const signal = requestSignal(req, res)
+        const header = await storedHeader(sessionId, subject, signal)
+        if (header === undefined) throw new CollaborationDeniedError('conversation-not-found')
+        const indexed = deps.conversations.readHistoryIndex === undefined
+          ? undefined
+          : await deps.conversations.readHistoryIndex(sessionId, maxItems, signal)
+        if (indexed === undefined) {
+          // Compatibility repositories without a bounded index retain their
+          // existing complete-read fallback; first-party PostgreSQL never
+          // reaches this branch.
+          const value = await stored(sessionId, subject)
+          if (value === undefined) throw new CollaborationDeniedError('conversation-not-found')
+          const fallback = conversationHistoryIndexFromEvents(value.events, value.revision, maxItems)
+          send(res, 200, {
+            header: runtimeHeader(header),
+            revision: revisionFor(subject, fallback.revision),
+            asOfSeq: fallback.asOfSeq,
+            totalTurns: fallback.totalTurns,
+            items: fallback.items,
+            truncated: fallback.truncated,
+          })
+          return true
+        }
+        if (typeof indexed.revision !== 'string' || indexed.revision === '') {
+          throw new ConversationReadError('protocol', 'conversation history index revision is invalid')
+        }
+        validateHistoryIndex(indexed, maxItems)
+        send(res, 200, {
+          header: runtimeHeader(header),
+          revision: revisionFor(subject, indexed.revision),
+          asOfSeq: indexed.asOfSeq,
+          totalTurns: indexed.totalTurns,
+          items: indexed.items,
+          truncated: indexed.truncated,
         })
         return true
       }

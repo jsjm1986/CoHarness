@@ -3,7 +3,7 @@
 // deferred-controlled timing). Streams are hand pumps: pushMux/pushHost.
 import type {
   HostFrame, IApiClient, ModelSelection, MuxFrame,
-  RpcRequest, RpcResponse, SessionId, SessionModels, SessionSearchItem, SkillEntry, WorkspaceId,
+  RpcRequest, RpcResponse, SessionHistoryIndex, SessionId, SessionModels, SessionSearchItem, SkillEntry, WorkspaceId,
 } from '../src/client/api.ts'
 import { RpcId } from '../src/client/api.ts'
 
@@ -55,6 +55,10 @@ export class FakeApiClient implements IApiClient {
       hasMore: false,
       modelSelection: { provider: 'deepseek-official', model: 'deepseek-chat' },
     }))
+  onHistoryIndex: (payload: { sessionId: SessionId; maxItems?: number })
+  => Promise<RpcResponse<SessionHistoryIndex>> = () => Promise.resolve(ok({
+    asOfSeq: -1, totalTurns: 0, items: [], truncated: false,
+  }))
 
   onModels: (payload: unknown) => Promise<RpcResponse<SessionModels>> = () => Promise.resolve(ok({
     current: { provider: 'deepseek-official', model: 'deepseek-chat' },
@@ -113,6 +117,8 @@ export class FakeApiClient implements IApiClient {
     create: (payload: unknown) => this.record('session.create', payload, this.onCreate(payload)),
     history: (payload: { sessionId: SessionId; beforeSeq?: number; maxMessages?: number }) =>
       this.record('session.history', payload, this.onHistory(payload)),
+    historyIndex: (payload: { sessionId: SessionId; maxItems?: number }) =>
+      this.record('session.historyIndex', payload, this.onHistoryIndex(payload)),
     models: (payload: unknown) => this.record('session.models', payload, this.onModels(payload)),
     selectModel: (payload: ModelSelection & { sessionId: SessionId }) =>
       this.record('session.selectModel', payload, this.onSelectModel(payload)),

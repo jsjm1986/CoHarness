@@ -408,6 +408,39 @@ export type HistoryDetailState = 'conversation' | 'filling' | 'full'
  */
 export type HistoryWindowMode = 'tail' | 'expanding' | 'live'
 
+/** Lifecycle of the bounded turn index used by the navigation rail. */
+export type HistoryNavigationState = 'idle' | 'loading' | 'ready' | 'error'
+
+/** Snapshot of navigation metadata; event payloads remain outside this value. */
+export interface HistoryNavigationItem {
+  /** Durable turn number. */
+  readonly turn: number
+  /** First event sequence in the turn. */
+  readonly startSeq: number
+  /** Last event sequence in the turn. */
+  readonly endSeq: number
+  /** Optional bounded prompt preview. */
+  readonly prompt?: string
+  /** Optional bounded assistant preview. */
+  readonly response?: string
+}
+
+/** Immutable state published for the full-session turn navigation rail. */
+export interface HistoryNavigationSnapshot {
+  /** Current indexed-read lifecycle. */
+  readonly state: HistoryNavigationState
+  /** Last sequence reflected by the index, or -1 before a successful read. */
+  readonly asOfSeq: number
+  /** Total turns represented by the source, before optional sampling. */
+  readonly totalTurns: number
+  /** Bounded markers and previews returned by the host. */
+  readonly items: readonly HistoryNavigationItem[]
+  /** Whether the provider sampled markers to respect its item budget. */
+  readonly truncated: boolean
+  /** Safe transport error retained for diagnostics; the rail uses loaded data when present. */
+  readonly error: RpcError | null
+}
+
 /**
  * Input-area shape of an OPEN session, derived at snapshot assembly (the one
  * place that knows the predicate — consumers switch, never re-derive):
@@ -451,6 +484,11 @@ export interface TurnNavigationItem {
   readonly turn: number
   /** Stable Conversation Context key the rail scrolls to. */
   readonly anchorKey: string
+  /** Durable range used to materialize an index-only marker on demand. */
+  readonly startSeq?: number
+  readonly endSeq?: number
+  /** False for a marker whose event range is not currently resident in the browser. */
+  readonly loaded?: boolean
   /** Bounded prompt preview; empty when the loaded window starts mid-Turn. */
   readonly prompt: string
   /** Bounded assistant-response preview; empty until the Turn answers. */
@@ -572,6 +610,8 @@ export interface ConversationSnapshot {
    * is `'filling'` then `'full'`.
    */
   historyDetail: HistoryDetailState
+  /** Lightweight full-session turn index; absent only in older external fixtures. */
+  historyNavigation?: HistoryNavigationSnapshot
   promptError: PromptError | null
   /**
    * Whether this session still has no visible conversation message.

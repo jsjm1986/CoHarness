@@ -16,6 +16,8 @@ PostgreSQL conversation repository 使用只读 repeatable-read 事务和 `(sess
 
 Host 对冷 session 和 subagent history 使用带索引的页面，只沿 revision 绑定的 older cursor 读取到覆盖请求消息窗口为止，让一次 detached 常规窗口低于 4 MiB，并在累计 512 MiB 或 1,024 次分页时 fail closed。Host 会在呈现页面前校验 continuation 元数据、字节统计和相邻序号范围。公共 RPC envelope 仍为 `{ events, hasMore, projections?, omittedSpans? }`；cursor 细节留在 persistence 与 Gateway 层。detached projection baseline 在可用时使用经过身份校验的 projection cache，兼容 inspection 可以折叠其完整事件区间。请求取消会传到分页读取和 response body 解码，并映射为现有 `cancelled` RPC 结果；其他有类型失败使用按类别区分的安全消息，同时在 Host 日志中保留诊断。
 
+`SessionPersistence.readHistoryIndex` 是导航元数据的可选加速能力。PostgreSQL 提供方在 repeatable-read 事务中只读取 `turn/start` 边界和有界的 `conversation_search` 预览，最多返回 2,000 个与 revision 关联的标记，不包含事件正文。Host 通过 `session.historyIndex` 暴露该读取；浏览器在首个尾页之后请求它，刷新期间保留上一次成功结果，并只读取到尚未加载标记所需的更早页面。实时轮次继续由驻留的 Conversation 索引显示，因此元数据刷新不会阻塞模型准入或流式输出。
+
 启用 preset roster 时，带索引的冷读取还会只遍历 blank 前缀以恢复日志中的 `agent-preset/selected` 事实，在遇到首个可见对话事件或达到小型前缀预算后停止。这样无需重新打开完整事件日志也能保持 presenter 选择；前缀不可用时降级到 header／全局 presenter。
 
 浏览器 runtime 将 reconnect 后的历史重建限制为最多四个并发会话，并优先当前可见会话。空闲且处于舞台的阅读器接近顶部时会请求一页更早历史；可见控件在自动读取失败或触及上限时保留为无障碍重试入口。Session scope dispose 会取消未完成的 open 或 history 操作并注销订阅。HTTP carrier 在外层 Node bridge 与内层 Fetch parser 使用同一请求 body 上限，response reader 也可响应调用方取消。Gateway 生产 release 现在把 Gateway 源码图编译到 `gateway/lib/index.js`；systemd 与 launchd 通过纯 Node 执行该产物，`tsx` 入口只保留给开发。
@@ -38,10 +40,12 @@ Composer scope dispose 现在也会取消进行中的附件编码，命令图片
 
 ## Consequences
 
-Gateway 冷历史现在读取有界的带索引区间，不会因普通大型会话跨过 64 MiB runtime 响应上限。单个超过页面预算的事件会以稳定安全消息 fail closed；源发生变化时 continuation 会失效，不会混合两个 revision。Gateway 提供方的 write-behind 默认上限为 48 MiB，为 64 MiB 请求上限预留 envelope 空间。无法 seek 的提供方仍有兼容回退，因此使用顺序存储的部署在增加索引实现前保留原有读取成本。
+Gateway 冷历史现在读取有界的带索引区间，不会因普通大型会话跨过 64 MiB runtime 响应上限。导航元数据是独立的小型读取，因此显示完整轮次导航条不会扩大事件响应，也不会在浏览器内复制流式 chunk。单个超过页面预算的事件会以稳定安全消息 fail closed；源发生变化时 continuation 会失效，不会混合两个 revision。Gateway 提供方的 write-behind 默认上限为 48 MiB，为 64 MiB 请求上限预留 envelope 空间。无法 seek 的提供方仍有兼容回退，因此使用顺序存储的部署在增加索引实现前保留原有读取成本。
 
 通过 wire-level cancel protocol 的 PostgreSQL 查询取消、segment 压缩表、批量 `COPY` 追加、完整观测 dashboard、迁移演练、WebSocket principal 续期、Chat 列表窗口化、持久化失败 admission 栅栏、凭据轮换以及生产 canary／回滚执行仍属于部署工作；本次变更不修改生产数据，也不执行迁移。公共 RPC 错误 schema 对取消之外的有类型 history 失败仍使用 `internal`，专用本地化错误码需要另一次协调协议变更。
 
 ## Verification
 
-Host 聚焦测试证明大型 detached history 使用 `readPage` 而不调用 `inspect`；persistence 测试覆盖 cursor 的方向／会话／revision 绑定、字节／事件／组数限制、流式 chunk 分组、不可分割超大事件和取消；Gateway 测试覆盖带索引 keyset 页面、数值排序、流式 chunk 分组、cursor 失效、runtime 分页响应、body 读取前认证和 supervisor survivor 重连。针对 137,382 条事件的生产规模只读探针把完整有界遍历从 2,771 页降为 165 页，且每页均未超过配置的字节／事件限制。Client 测试覆盖 assistant 增量累加、reconnect resync admission、scope dispose、response body 取消和 listener 清理。`pnpm run typecheck`、Gateway 产物／类型检查、export-JSDoc、契约 lint 及受影响 Vitest 套件已在源码树通过。
+Host 聚焦测试证明大型 detached history 使用 `readPage` 而不调用 `inspect`；persistence 测试覆盖 cursor 的方向／会话／revision 绑定、字节／事件／组数限制、流式 chunk 分组、不可分割超大事件、导航索引解析和取消；Gateway 测试覆盖带索引 keyset 页面、轮次索引边界与预览、数值排序、流式 chunk 分组、cursor 失效、runtime 页面／索引响应、body 读取前认证和 supervisor survivor 重连。针对 137,382 条事件的生产规模只读探针把完整有界遍历从 2,771 页降为 165，并在不选择事件正文的情况下返回 30 个轮次标记。Client 测试覆盖 assistant 增量累加、reconnect resync admission、索引加载／取消、未加载标记分页、scope dispose、response body 取消和 listener 清理。`pnpm run typecheck`、Gateway 产物／类型检查、export-JSDoc、契约 lint 及受影响 Vitest 套件已在源码树通过。
+
+Host 聚焦测试证明大型 detached history 使用 `readPage` 而不调用 `inspect`；persistence 测试覆盖 cursor 的方向／会话／revision 绑定、字节／事件／组数限制、流式 chunk 分组、不可分割超大事件、导航索引解析和取消；Gateway 测试覆盖带索引 keyset 页面、轮次索引边界与预览、数值排序、流式 chunk 分组、cursor 失效、runtime 页面／索引响应、body 读取前认证和 supervisor survivor 重连。针对 137,382 条事件的生产规模只读探针把完整有界遍历从 2,771 页降为 165，并在不选择事件正文的情况下返回 30 个轮次标记。Client 测试覆盖 assistant 增量累加、reconnect resync admission、索引加载／取消、未加载标记分页、scope dispose、response body 取消和 listener 清理。`pnpm run typecheck`、Gateway 产物／类型检查、export-JSDoc、契约 lint 及受影响 Vitest 套件已在源码树通过。

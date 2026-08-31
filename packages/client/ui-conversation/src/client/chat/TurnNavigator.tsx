@@ -73,14 +73,16 @@ function TurnNavigatorRail({ items, activeTurn, onNavigate, t }: TurnNavigatorPr
           {items.map((item, index) => {
             const active = item.turn === activeTurn
             const showingPreview = item.turn === previewTurn
+            const indexedOnly = item.loaded === false || item.anchorKey === ''
             const markClass = active
               ? `${css.mark} ${css.markActive}`
               : showingPreview ? `${css.mark} ${css.markPreview}` : css.mark
+            const displayClass = indexedOnly ? `${markClass} ${css.markIndexed}` : markClass
             return (
               <div key={item.turn} className={css.markPosition} style={itemPosition(index, items.length)}>
                 <button
                   type="button"
-                  className={markClass}
+                  className={displayClass}
                   aria-label={t('chat.turnNavigation.jump', { turn: item.turn })}
                   aria-current={active ? 'true' : undefined}
                   aria-describedby={showingPreview ? previewId : undefined}

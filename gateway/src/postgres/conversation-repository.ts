@@ -56,6 +56,24 @@ export interface ConversationPage {
   uncompressedBytes: number
 }
 
+/** One bounded turn marker returned by the history navigation index. */
+export interface ConversationHistoryIndexItem {
+  turn: number
+  startSeq: number
+  endSeq: number
+  prompt?: string
+  response?: string
+}
+
+/** Revision-bound, payload-light index for navigating a conversation. */
+export interface ConversationHistoryIndex {
+  revision: string
+  asOfSeq: number
+  totalTurns: number
+  items: ConversationHistoryIndexItem[]
+  truncated: boolean
+}
+
 /** Stable failure category for a bounded conversation observation. */
 export type ConversationReadErrorCode = 'too-large' | 'aborted' | 'timeout' | 'dependency' | 'protocol'
 
@@ -180,6 +198,99 @@ function messageText(message: { content?: unknown } | undefined): string {
   return contentText(message?.content)
 }
 
+function historyIndexPreview(value: string): string | undefined {
+  const normalized = value.replace(/\s+/gu, ' ').trim()
+  if (normalized === '') return undefined
+  return Array.from(normalized).slice(0, MAX_HISTORY_INDEX_PREVIEW_CODE_POINTS).join('')
+}
+
+function eventTurn(event: ConversationEvent): number | undefined {
+  if (typeof event.data !== 'object' || event.data === null) return undefined
+  const value = (event.data as { turn?: unknown }).turn
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined
+}
+
+function sampledIndexes(total: number, maximum: number): number[] {
+  if (total <= maximum) return Array.from({ length: total }, (_, index) => index)
+  if (maximum === 1) return [0]
+  const indexes = new Set<number>([0, total - 1])
+  for (let index = 0; index < maximum; index++) {
+    indexes.add(Math.round(index * (total - 1) / (maximum - 1)))
+  }
+  return [...indexes].sort((left, right) => left - right)
+}
+
+function turnOrdinalAtSeq(starts: readonly { startSeq: number }[], seq: number): number {
+  let low = 0
+  let high = starts.length - 1
+  let found = -1
+  while (low <= high) {
+    const middle = low + Math.floor((high - low) / 2)
+    const candidate = starts[middle]
+    if (candidate === undefined || candidate.startSeq > seq) high = middle - 1
+    else {
+      found = middle
+      low = middle + 1
+    }
+  }
+  return found
+}
+
+/**
+ * Fold an already available event range into bounded turn markers. This is
+ * used for attached sessions and keeps the same output rules as the indexed
+ * PostgreSQL reader without copying raw chunk payloads into the result.
+ * @param events - ordered session events.
+ * @param revision - source revision represented by the events.
+ * @param maxItems - maximum markers to return.
+ * @returns a bounded navigation index.
+ */
+export function conversationHistoryIndexFromEvents(
+  events: readonly ConversationEvent[],
+  revision: string,
+  maxItems = DEFAULT_HISTORY_INDEX_MAX_ITEMS,
+): ConversationHistoryIndex {
+  if (!Number.isSafeInteger(maxItems) || maxItems < 1 || maxItems > DEFAULT_HISTORY_INDEX_MAX_ITEMS) {
+    throw new ConversationReadError('protocol', 'conversation history index maxItems is invalid')
+  }
+  const starts = events
+    .filter(event => event.type === 'turn/start' && eventTurn(event) !== undefined)
+    .map(event => ({ turn: eventTurn(event) as number, startSeq: event.seq }))
+  const selected = sampledIndexes(starts.length, maxItems)
+  const selectedByOrdinal = new Map(selected.map((ordinal, index) => [ordinal, index]))
+  const ordinalByTurn = new Map(starts.map((start, index) => [start.turn, index]))
+  const items: ConversationHistoryIndexItem[] = selected.map((ordinal) => {
+    const start = starts[ordinal]!
+    const next = starts[ordinal + 1]
+    return {
+      turn: start.turn,
+      startSeq: start.startSeq,
+      endSeq: (next?.startSeq ?? (events.at(-1)?.seq ?? start.startSeq)) - 1,
+    }
+  })
+  for (const event of events) {
+    if (event.type !== 'user/message' && event.type !== 'assistant/message') continue
+    const turn = eventTurn(event)
+    if (turn === undefined) continue
+    const ordinal = ordinalByTurn.get(turn) ?? turnOrdinalAtSeq(starts, event.seq)
+    const itemIndex = selectedByOrdinal.get(ordinal)
+    if (itemIndex === undefined) continue
+    const item = items[itemIndex]!
+    const content = eventText(event)?.content ?? ''
+    const preview = historyIndexPreview(content)
+    if (preview === undefined) continue
+    if (event.type === 'user/message' && item.prompt === undefined) item.prompt = preview
+    if (event.type === 'assistant/message') item.response = preview
+  }
+  return {
+    revision,
+    asOfSeq: events.at(-1)?.seq ?? -1,
+    totalTurns: starts.length,
+    items,
+    truncated: selected.length < starts.length,
+  }
+}
+
 function participantUserId(event: ConversationEvent): number | undefined {
   if (event.type !== 'user/message' || typeof event.data !== 'object' || event.data === null) return undefined
   const source = (event.data as { source?: unknown }).source
@@ -264,6 +375,9 @@ const DEFAULT_PAGE_MAX_EVENTS = 2_000
 const DEFAULT_PAGE_MAX_GROUPS = 50
 const MAX_PAGE_QUERY_EVENTS = 10_000
 const MAX_PAGE_CURSOR_LENGTH = 16 * 1024
+const DEFAULT_HISTORY_INDEX_MAX_ITEMS = 2_000
+const MAX_HISTORY_INDEX_PREVIEW_CODE_POINTS = 160
+const MAX_HISTORY_INDEX_SEARCH_ROWS = 20_000
 /** Keep one multi-row INSERT comfortably below PostgreSQL's parameter limit. */
 const APPEND_INSERT_BATCH_SIZE = 500
 /** Keep SQL text and parameter buffers bounded when one event is unusually large. */
@@ -273,6 +387,20 @@ interface ConversationEventRow {
   event: ConversationEvent
   seq: string
   payload_bytes: number
+}
+
+interface HistoryIndexStartRow {
+  start_seq: string
+  end_seq: string
+  turn: string
+  ordinal: string
+  total: string
+}
+
+interface HistoryIndexSearchRow {
+  event_seq: string
+  role: 'user' | 'assistant'
+  content: string
 }
 
 interface ConversationSearchInsertRow {
@@ -1049,6 +1177,115 @@ export class ConversationRepository {
         FROM harness.conversation_sessions WHERE id=$1 AND status<>'deleted'`, [sessionId], signal)
       const row = result.rows[0]
       return row === undefined ? undefined : headerFromRow(row)
+    } catch (error: unknown) {
+      const normalized = normalizeReadError(error, signal)
+      if (normalized !== undefined) throw normalized
+      throw error
+    }
+  }
+
+  /**
+   * Read bounded turn markers and short previews without loading event
+   * payloads. Turn boundaries come from the event-type index; previews come
+   * from the already-maintained conversation search rows.
+   */
+  async readHistoryIndex(
+    sessionId: string,
+    maxItems = DEFAULT_HISTORY_INDEX_MAX_ITEMS,
+    signal?: AbortSignal,
+  ): Promise<ConversationHistoryIndex | undefined> {
+    if (!Number.isSafeInteger(maxItems) || maxItems < 1 || maxItems > DEFAULT_HISTORY_INDEX_MAX_ITEMS) {
+      throw new ConversationReadError('protocol', 'conversation history index maxItems is invalid')
+    }
+    try {
+      return await transaction(this.pool, async (client) => {
+        await checkedQuery(client, 'SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY', [], signal)
+        const headerResult = await checkedQuery<StoredHeaderRow>(client, `SELECT ${HEADER_COLUMNS}
+          FROM harness.conversation_sessions WHERE id=$1 AND status<>'deleted'`, [sessionId], signal)
+        const headerRow = headerResult.rows[0]
+        if (headerRow === undefined) return undefined
+        const nextSeq = Number(headerRow.next_seq)
+        if (!Number.isSafeInteger(nextSeq) || nextSeq < 0) {
+          throw new ConversationReadError('protocol', 'conversation history index next sequence is invalid')
+        }
+        const starts = await checkedQuery<HistoryIndexStartRow>(client, `WITH raw AS (
+            SELECT e.seq,
+              CASE WHEN json_typeof(e.event->'data'->'turn')='number'
+                AND (e.event->'data'->>'turn') ~ '^[0-9]+$'
+                THEN (e.event->'data'->>'turn')::bigint ELSE NULL END AS turn
+            FROM harness.conversation_events e
+            WHERE e.session_id=$1 AND e.event_type='turn/start'
+          ), indexed AS (
+            SELECT seq,turn,
+              lead(seq,1,$2::bigint) OVER (ORDER BY seq)-1 AS end_seq,
+              row_number() OVER (ORDER BY seq)-1 AS ordinal,
+              count(*) OVER () AS total
+            FROM raw WHERE turn IS NOT NULL
+          )
+          SELECT seq::text AS start_seq,end_seq::text,turn::text,
+            ordinal::text,total::text
+          FROM indexed
+          WHERE total <= $3::bigint
+            OR ordinal=0 OR ordinal=total-1
+            OR ordinal % GREATEST(1,ceil(total::numeric/$3::numeric)::bigint)=0
+          ORDER BY seq`, [sessionId, nextSeq, maxItems], signal)
+        const totalTurns = starts.rows.length === 0 ? 0 : Number(starts.rows[0]!.total)
+        if (!Number.isSafeInteger(totalTurns) || totalTurns < 0) {
+          throw new ConversationReadError('protocol', 'conversation history index turn count is invalid')
+        }
+        const items = starts.rows.map((row): ConversationHistoryIndexItem => {
+          const startSeq = Number(row.start_seq)
+          const endSeq = Number(row.end_seq)
+          const turn = Number(row.turn)
+          if (!Number.isSafeInteger(startSeq) || !Number.isSafeInteger(endSeq)
+            || !Number.isSafeInteger(turn) || startSeq < 0 || endSeq < startSeq || turn < 0) {
+            throw new ConversationReadError('protocol', 'conversation history index row is invalid')
+          }
+          return { turn, startSeq, endSeq }
+        })
+        // `conversation_search` does not persist a turn number. Its sequence
+        // range is exact only when every turn marker was returned; sampled
+        // indexes therefore omit previews rather than reading event JSON (a
+        // valid escaped NUL in a JSON column makes PostgreSQL JSON operators
+        // reject the whole row with 22P05).
+        if (items.length > 0 && items.length === totalTurns) {
+          const first = items[0]!
+          const last = items.at(-1)!
+          const search = await checkedQuery<HistoryIndexSearchRow>(client, `SELECT event_seq::text,role,
+              left(content,320) AS content
+            FROM harness.conversation_search
+            WHERE session_id=$1 AND role IN ('user','assistant')
+              AND event_seq >= $2 AND event_seq <= $3
+            ORDER BY event_seq LIMIT $4`, [sessionId, first.startSeq, last.endSeq, MAX_HISTORY_INDEX_SEARCH_ROWS], signal)
+          for (const row of search.rows) {
+            const seq = Number(row.event_seq)
+            if (!Number.isSafeInteger(seq) || seq < 0) continue
+            let low = 0
+            let high = items.length - 1
+            let found = -1
+            while (low <= high) {
+              const middle = low + Math.floor((high - low) / 2)
+              const candidate = items[middle]!
+              if (seq < candidate.startSeq) high = middle - 1
+              else if (seq > candidate.endSeq) low = middle + 1
+              else { found = middle; break }
+            }
+            if (found < 0) continue
+            const preview = historyIndexPreview(row.content)
+            if (preview === undefined) continue
+            const item = items[found]!
+            if (row.role === 'user' && item.prompt === undefined) item.prompt = preview
+            if (row.role === 'assistant') item.response = preview
+          }
+        }
+        return {
+          revision: `${headerRow.version}:${headerRow.next_seq}`,
+          asOfSeq: nextSeq - 1,
+          totalTurns,
+          items,
+          truncated: items.length < totalTurns,
+        }
+      }, signal)
     } catch (error: unknown) {
       const normalized = normalizeReadError(error, signal)
       if (normalized !== undefined) throw normalized

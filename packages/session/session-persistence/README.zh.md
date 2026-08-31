@@ -22,6 +22,7 @@
 | `readHeader(id, signal?): Promise<SessionHeader \| undefined>` | 只读取会话 header，不实体化事件行。第一方带索引的提供方按会话 id 查询；默认实现过滤 `listSnapshots()`，兼容第三方提供方。 |
 | `readRevision(id, signal?): Promise<SessionPersistenceRevision \| undefined>` | 供只需要新鲜度的调用方使用的具名轻量 revision 查询。第一方提供方使用按 id 的索引；默认实现委托给 `revision()`。 |
 | `readPage(id, request, signal?): Promise<SessionPersistencePage>` | 读取一个有界的升序事件区间，限制为 `maxBytes`（512 KiB）、`maxEvents`（2,000）和 `maxGroups`（50）。组数统计会把同一 turn/step 的 assistant 流式 chunk 归为一组，并让每个工具调用生命周期保持独立，因此 token chunk 不会各自消耗一组。绑定 revision 的 cursor 可沿相同方向续取，并在追加或修复后失效。提供方区分 `too-large`、`aborted`、`timeout`、`dependency` 和 `protocol` 失败；没有 seek 实现的提供方保留完整读取兼容回退。 |
+| `readHistoryIndex(id, maxItems?, signal?): Promise<SessionHistoryIndex \| undefined>` | 在不实体化事件正文的情况下读取有界轮次范围及简短问答预览。第一方带索引提供方最多返回 2,000 个标记，并让结果绑定源 revision；`undefined` 表示后端没有此可选加速能力，调用方继续使用普通分页。 |
 | `list(signal?): Promise<SessionHeader[]>` | 从元数据轻量列出，不解析完整日志。可选信号取消后端列表工作。零事件延迟实体化会话不在 `list` 中。 |
 | `revision(id, signal?): Promise<SessionPersistenceRevision \| undefined>` | 在不加载事件的情况下读取一份已实体化日志不透明、来源限定的修订值。第一方提供方使用按 id 的存储查询；`undefined` 表示该 id 不存在。默认实现会筛选 `listSnapshots`，使第三方提供方保持兼容，但可能扫描其目录。 |
 | `listSnapshots(signal?): Promise<SessionPersistenceSnapshot[]>` | 返回轻量元数据和每份日志一个不透明、带品牌类型的修订值，不加载事件日志。日志及其后端存储不变时，修订保持相等；append 或变更性 load 修复后会改变；不会仅因两个存储使用相同本地计数器而冲突。可选信号请求取消后端发现工作；第一方后端会先等待所有已启动的列出工作结束，再予以拒绝，因此调用返回拒绝时，相关工作已完全停稳。 |

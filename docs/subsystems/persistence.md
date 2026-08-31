@@ -4,7 +4,7 @@ English | [中文](persistence.zh.md)
 
 The **durability seam** for the event log. [session.md](session.md) describes the in-memory `Session` — the append-only `SessionEvent` log that is the source of truth. This page describes how that log is made durable: the abstract `SessionPersistence` service, its backends, the flush checkpoint, crash recovery, and the metadata header that travels alongside the log. The event vocabulary the log carries is enumerated, member by member, in the generated [persistence log event catalog](../persistence-catalog.md).
 
-The seam is a [capability seam](../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md): one abstract service ([dsh-session-persistence](../../packages/session/session-persistence), `ctx.sessionPersistence`) defining locate/create/append, reusable Session preparation, logical load/inspect, physical suffix reads, and lightweight list/snapshot observation over the existing `SessionEvent` — **no parallel persisted event type** — and three interchangeable providers implementing the same contract. See the [session-persistence Agent Note](../../.agents/notes/implemented/architecture/2026-06-14-session-persistence.md).
+The seam is a [capability seam](../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md): one abstract service ([dsh-session-persistence](../../packages/session/session-persistence), `ctx.sessionPersistence`) defining locate/create/append, reusable Session preparation, logical load/inspect, bounded page and turn-index reads, physical suffix reads, and lightweight list/snapshot observation over the existing `SessionEvent` — **no parallel persisted event type** — and three interchangeable providers implementing the same contract. See the [session-persistence Agent Note](../../.agents/notes/implemented/architecture/2026-06-14-session-persistence.md).
 
 ## The flush checkpoint
 
@@ -432,6 +432,17 @@ async readRevision(id: SessionId, signal?: AbortSignal): Promise<SessionPersiste
 async readPage( id: SessionId, request: SessionPersistencePageRequest = {}, signal?: AbortSignal, ): Promise<SessionPersistencePage>
 
 /**
+ * Read a bounded turn index without materializing the event log. Providers
+ * with a searchable boundary index override this method; the default leaves
+ * the optional navigation capability absent for compatibility providers.
+ * @param _id - persisted session identity.
+ * @param _maxItems - maximum marker count requested by the caller.
+ * @param signal - optional cancellation for backend lookup work.
+ * @returns the index, or undefined when this backend has no bounded index.
+ */
+readHistoryIndex( _id: SessionId, _maxItems: number = DEFAULT_SESSION_HISTORY_INDEX_MAX_ITEMS, signal?: AbortSignal, ): Promise<SessionHistoryIndex | undefined>
+
+/**
  * List materialized sessions with cheap per-log change tokens.
  *
  * Repeated observations of an unchanged log return the same revision. A
@@ -467,5 +478,5 @@ releaseDraft(_request: SessionDraftReservationRequest): Promise<void>
 
 Types: [Session](session.md) · [SessionEvent](session.md) · [SessionId](core.md)
 
-Source: [`packages/session/session-persistence/src/index.ts:164`](../../packages/session/session-persistence/src/index.ts)
+Source: [`packages/session/session-persistence/src/index.ts:195`](../../packages/session/session-persistence/src/index.ts)
 <!-- END GENERATED cordis-surface -->

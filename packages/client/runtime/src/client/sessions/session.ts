@@ -20,7 +20,8 @@ import { ConversationNodeAssembler } from './conversation-assembler.ts'
 import type { ConversationRuntime } from './conversation-assembler.ts'
 import type { ConversationEventInput, ConversationPublication } from '../contract/conversation.ts'
 import type {
-  ChatSnapshot, ComposerPhase, ConversationSnapshot, HistoryDetailState, HistoryWindowMode, OpenState, PendingSubmission, PromptError,
+  ChatSnapshot, ComposerPhase, ConversationSnapshot, HistoryDetailState, HistoryNavigationSnapshot, HistoryWindowMode,
+  OpenState, PendingSubmission, PromptError,
 } from './conversation.ts'
 import { EMPTY_CHAT_SNAPSHOT } from './conversation.ts'
 import type { PendingInteraction } from './pending.ts'
@@ -38,6 +39,9 @@ export const PAGE_MESSAGES = 50
 
 /** Safety bound for one background history expansion. */
 const MAX_HISTORY_EXPANSION_PAGES = 64
+
+/** Delay between completed-turn index refreshes; keeps a streaming session off the RPC hot path. */
+const HISTORY_INDEX_REFRESH_DELAY_MS = 750
 
 /** One validated history page used by window mutations. */
 interface HistoryPage {
@@ -105,6 +109,18 @@ export class Session implements SessionFace {
   private historyOperation: Promise<void> | null = null
   private historyExpansionPromise: Promise<void> | null = null
   private historyAbortController: AbortController | null = null
+  /** Full-session turn markers are fetched separately from the event window. */
+  private historyNavigation: HistoryNavigationSnapshot = {
+    state: 'idle',
+    asOfSeq: -1,
+    totalTurns: 0,
+    items: [],
+    truncated: false,
+    error: null,
+  }
+  private historyNavigationPromise: Promise<void> | null = null
+  private historyNavigationAbortController: AbortController | null = null
+  private historyNavigationRefreshTimer: ReturnType<typeof setTimeout> | null = null
   /** Inclusive seq ranges of omitted historical chunks; part of the logical window. */
   private omittedSpans: HistoryOmittedSpan[] = []
   /**
@@ -232,6 +248,7 @@ export class Session implements SessionFace {
     if (this.stageActive) return
     this.stageActive = true
     if (this.openState !== 'open') void this.open()
+    else this.scheduleHistoryNavigationRead()
     if (this.running) this.beginLiveHistory()
     else this.notifier.markDirty()
   }
@@ -247,6 +264,7 @@ export class Session implements SessionFace {
     this.openGeneration++
     this.historyAbortController?.abort()
     this.historyAbortController = null
+    this.resetHistoryNavigation()
     this.historyExpansionPromise = null
     this.openPromise = null
     this.openState = 'cold'
@@ -498,6 +516,59 @@ export class Session implements SessionFace {
   }
 
   /**
+   * Materialize enough older pages for one index marker to become visible.
+   * User navigation cancels a background expansion so an explicit jump is not
+   * queued behind an unattended full-history walk.
+   * @param targetSeq - the marker's durable turn-start sequence.
+   * @returns true when the target sequence is now inside the resident window.
+   */
+  async loadHistoryUntil(targetSeq: number): Promise<boolean> {
+    if (!Number.isSafeInteger(targetSeq) || targetSeq < 0) return false
+    if (this.openState !== 'open') await this.open()
+    if (this.openState !== 'open') return false
+    if (this.windowContains(targetSeq)) return true
+    if (!this.hasMore) return false
+    // A reader gesture has priority over the automatic live expansion. The
+    // expansion operation observes this abort and leaves the ordinary paging
+    // state available for the explicit request below.
+    if (this.historyExpansionPromise !== null) this.historyAbortController?.abort()
+    const generation = this.openGeneration
+    try {
+      await this.enqueueHistoryOperation(async (signal) => {
+        if (generation !== this.openGeneration || this.openState !== 'open') return
+        const pages: HistoryPage[] = []
+        let beforeSeq = this.baseSeq
+        let hasMore = this.hasMore
+        let previousOldest = Number.POSITIVE_INFINITY
+        for (let guard = 0; guard < MAX_HISTORY_EXPANSION_PAGES && hasMore; guard++) {
+          signal.throwIfAborted()
+          const page = await this.fetchHistoryPage({ beforeSeq, maxMessages: PAGE_MESSAGES }, signal)
+          if (page === undefined) return
+          const oldest = logicalBaseSeq(page.entries.map(entry => entry.event), page.omittedSpans)
+          const pageTail = logicalTailSeq(page.entries.map(entry => entry.event), page.omittedSpans)
+          if (oldest === null || pageTail === null || pageTail + 1 !== beforeSeq
+            || oldest >= beforeSeq || oldest >= previousOldest) return
+          pages.push(page)
+          hasMore = page.hasMore
+          if (targetSeq >= oldest) break
+          previousOldest = oldest
+          beforeSeq = oldest
+        }
+        // oxlint-disable-next-line typescript/no-unnecessary-condition -- the queued operation may be superseded while a page awaits.
+        if (generation !== this.openGeneration || this.openState !== 'open' || pages.length === 0) return
+        this.applyOlderPages(pages, hasMore)
+        this.notifier.markDirty()
+      }, true)
+    } catch (error: unknown) {
+      if (!(error instanceof Error && error.name === 'AbortError')) {
+        console.error('[web-runtime] history navigation jump failed:', error)
+      }
+    }
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- the generation/state can change after the awaited operation.
+    return generation === this.openGeneration && this.openState === 'open' && this.windowContains(targetSeq)
+  }
+
+  /**
    * Download omitted historical chunks for the installed window. Idempotent
    * once `historyDetail` is `'full'`.
    * @returns when fill settles or is already complete.
@@ -540,6 +611,7 @@ export class Session implements SessionFace {
     this.openGeneration++
     this.historyAbortController?.abort()
     this.historyAbortController = null
+    this.resetHistoryNavigation()
     this.historyExpansionPromise = null
     this.openPromise = null
     this.openState = 'cold'
@@ -648,6 +720,7 @@ export class Session implements SessionFace {
     if (this.running === running) return
     this.running = running
     if (running) this.beginLiveHistory()
+    else this.scheduleHistoryNavigationRefresh()
     this.notifier.markDirty()
   }
 
@@ -711,6 +784,7 @@ export class Session implements SessionFace {
     this.openGeneration++
     this.historyAbortController?.abort(new Error('session disposed'))
     this.historyAbortController = null
+    this.resetHistoryNavigation()
     this.historyExpansionPromise = null
     this.openPromise = null
     this.fillPromise = null
@@ -737,6 +811,100 @@ export class Session implements SessionFace {
     wait.markSettled()
     this.pending.delete(wait.key)
     this.pendingRev++
+  }
+
+  /** Schedule the first index read after the initial history page has painted. */
+  private scheduleHistoryNavigationRead(): void {
+    if (this.address !== undefined || !this.stageActive || this.openState !== 'open') return
+    queueMicrotask(() => {
+      if (this.address === undefined && this.stageActive && this.openState === 'open') {
+        this.beginHistoryNavigation()
+      }
+    })
+  }
+
+  /** Coalesce live turn completions into one bounded index refresh. */
+  private scheduleHistoryNavigationRefresh(): void {
+    if (this.address !== undefined || !this.stageActive || this.openState !== 'open') return
+    if (this.historyNavigationRefreshTimer !== null) return
+    this.historyNavigationRefreshTimer = setTimeout(() => {
+      this.historyNavigationRefreshTimer = null
+      this.beginHistoryNavigation()
+    }, HISTORY_INDEX_REFRESH_DELAY_MS)
+  }
+
+  /** Start one generation-scoped index request without delaying history open. */
+  private beginHistoryNavigation(): void {
+    if (this.address !== undefined || !this.stageActive || this.openState !== 'open') return
+    if (this.historyNavigationPromise !== null) return
+    const generation = this.openGeneration
+    const controller = new AbortController()
+    this.historyNavigationAbortController = controller
+    this.updateHistoryNavigation({ state: 'loading', error: null })
+    const operation = (async (): Promise<void> => {
+      try {
+        const response = await this.api.sessions.historyIndex(
+          { sessionId: this.sessionId, maxItems: 2_000 },
+          controller.signal,
+        )
+        if (controller.signal.aborted || generation !== this.openGeneration || this.openState !== 'open') return
+        if (!response.result.ok) {
+          this.updateHistoryNavigation({ state: 'error', error: response.result.error })
+          return
+        }
+        const value = response.result.value
+        this.updateHistoryNavigation({
+          state: 'ready',
+          asOfSeq: value.asOfSeq,
+          totalTurns: value.totalTurns,
+          items: value.items,
+          truncated: value.truncated,
+          error: null,
+        })
+      } catch (error: unknown) {
+        if (controller.signal.aborted || generation !== this.openGeneration || this.openState !== 'open') return
+        const folded = transportError<never>(error)
+        this.updateHistoryNavigation({ state: 'error', error: folded.ok ? null : folded.error })
+      } finally {
+        if (this.historyNavigationAbortController === controller) this.historyNavigationAbortController = null
+      }
+    })()
+    this.historyNavigationPromise = operation
+    void operation.finally(() => {
+      if (this.historyNavigationPromise === operation) this.historyNavigationPromise = null
+    }).catch(() => undefined)
+  }
+
+  /** Replace navigation metadata only when a field actually changed. */
+  private updateHistoryNavigation(patch: Partial<HistoryNavigationSnapshot>): void {
+    const next: HistoryNavigationSnapshot = { ...this.historyNavigation, ...patch }
+    if (next.state === this.historyNavigation.state
+      && next.asOfSeq === this.historyNavigation.asOfSeq
+      && next.totalTurns === this.historyNavigation.totalTurns
+      && next.items === this.historyNavigation.items
+      && next.truncated === this.historyNavigation.truncated
+      && next.error === this.historyNavigation.error) return
+    this.historyNavigation = next
+    this.notifier.markDirty()
+  }
+
+  /** Abort and forget navigation metadata owned by the current stage/generation. */
+  private resetHistoryNavigation(): void {
+    this.historyNavigationAbortController?.abort()
+    this.historyNavigationAbortController = null
+    this.historyNavigationPromise = null
+    if (this.historyNavigationRefreshTimer !== null) {
+      clearTimeout(this.historyNavigationRefreshTimer)
+      this.historyNavigationRefreshTimer = null
+    }
+    this.historyNavigation = {
+      state: 'idle',
+      asOfSeq: -1,
+      totalTurns: 0,
+      items: [],
+      truncated: false,
+      error: null,
+    }
   }
 
   /** @param generation - openGeneration at launch; every await re-checks it and a stale pass
@@ -776,6 +944,7 @@ export class Session implements SessionFace {
         }
       }
       this.openState = 'open'
+      this.scheduleHistoryNavigationRead()
       if (this.stageActive && this.running) this.beginLiveHistory()
     } catch (error) {
       if (generation !== this.openGeneration) return
@@ -829,6 +998,7 @@ export class Session implements SessionFace {
     this.views.push(view)
     if (hasConversationContent(event)) this.markConversationContent(event.seq)
     if (event.type === 'turn/start') this.firstPromptPendingTurn = false
+    if (event.type === 'turn/end') this.scheduleHistoryNavigationRefresh()
     const queueChanged = this.queueMirror.acceptDurable(event)
     this.observeSubmissionEvent(event)
     const publication = this.conversation.append({ event, view })
@@ -1153,6 +1323,12 @@ export class Session implements SessionFace {
     return logicalTailSeq(this.events, this.omittedSpans)
   }
 
+  /** Whether a durable sequence is represented by the current contiguous window. */
+  private windowContains(seq: number): boolean {
+    const tail = this.windowTailSeq()
+    return tail !== null && seq >= this.baseSeq && seq <= tail
+  }
+
   private buildSnapshot(): ConversationSnapshot {
     if (this.pendingCache === null || this.pendingCache.rev !== this.pendingRev) {
       this.pendingCache = { rev: this.pendingRev, value: [...this.pending.values()] }
@@ -1189,6 +1365,7 @@ export class Session implements SessionFace {
       loadingOlder: this.loadingOlder,
       historyWindowMode: this.historyWindowMode,
       historyDetail: this.historyDetail,
+      historyNavigation: this.historyNavigation,
       promptError: this.promptError,
       blank: this.blankBit,
       lastAgentError: this.lastAgentError,

@@ -107,6 +107,14 @@ export interface ISession {
    */
   loadOlder(): Promise<void>
   /**
+   * Materialize older pages until an indexed turn-start sequence is resident.
+   * Optional for lightweight external session doubles; the built-in Session
+   * implements it for navigation markers that are outside the current tail.
+   * @param targetSeq - durable turn-start sequence from the history index.
+   * @returns true when the target is available in the current window.
+   */
+  loadHistoryUntil?(targetSeq: number): Promise<boolean>
+  /**
    * Download omitted historical `assistant/chunk` events for the installed
    * window. Trajectory and inspect handoff call this; Chat does not. No-op
    * when the window already has detail.

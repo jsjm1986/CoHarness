@@ -157,6 +157,7 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
   const openDetails = vi.fn<(t: SelectionTarget) => void>()
   const openFile = vi.fn<(path: string) => Promise<void>>().mockResolvedValue(undefined)
   const loadOlder = vi.fn()
+  const loadHistoryUntil = vi.fn<(targetSeq: number) => Promise<boolean>>().mockResolvedValue(true)
   const inspectCall = vi.fn<(callId: string) => void>()
   // In-memory scroll memory matching the apply.ts per-session map contract.
   let savedScroll: ReturnType<ChatViewSlotProps['chatScroll']['read']> = null
@@ -289,6 +290,7 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
     openDetails,
     openFile,
     loadOlder,
+    loadHistoryUntil,
     loadImage: vi.fn(() => Promise.reject(new Error('not used'))),
     inspectCall,
     chatScroll,
@@ -300,7 +302,7 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
   }
   const setSelection = (next: SelectionTarget | null): void => { chat.actions.select(next) }
   return {
-    set, ChatView, props, openDetails, openFile, loadOlder, inspectCall,
+    set, ChatView, props, openDetails, openFile, loadOlder, loadHistoryUntil, inspectCall,
     chatScroll, forkAt, setSelection, toolOwners,
   }
 }
@@ -1522,6 +1524,29 @@ describe('ChatView', () => {
     fireEvent.scroll(scroller)
     fireEvent.scroll(scroller)
     expect(h.loadOlder).toHaveBeenCalledOnce()
+  })
+
+  it('keeps indexed turns visible in the rail and asks the session to materialize an unloaded jump', async () => {
+    const h = makeHarness({
+      nodes: [user(5, '当前')],
+      historyNavigation: {
+        state: 'ready',
+        asOfSeq: 17,
+        totalTurns: 3,
+        items: [
+          { turn: 1, startSeq: 0, endSeq: 5, prompt: '旧一' },
+          { turn: 2, startSeq: 6, endSeq: 11, prompt: '旧二' },
+          { turn: 3, startSeq: 12, endSeq: 17, prompt: '当前' },
+        ],
+        truncated: false,
+        error: null,
+      },
+    })
+    const view = render(<h.ChatView {...h.props} />)
+    const marks = view.getAllByRole('button').filter(button => button.getAttribute('aria-label')?.startsWith('跳转到第'))
+    expect(marks).toHaveLength(3)
+    fireEvent.click(marks[0]!)
+    await waitFor(() => { expect(h.loadHistoryUntil).toHaveBeenCalledWith(0) })
   })
 
   it('keeps the older-history control out of an active or expanding conversation', () => {

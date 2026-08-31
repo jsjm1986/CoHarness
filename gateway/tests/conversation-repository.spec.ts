@@ -206,3 +206,87 @@ describe('ConversationRepository bounded pages', () => {
       .toMatchObject({ code: 'protocol' })
   })
 })
+
+describe('ConversationRepository history index', () => {
+  it('reads turn boundaries and bounded search previews without selecting event payloads', async () => {
+    const calls: string[] = []
+    const client = {
+      query: vi.fn(async (text: string) => {
+        calls.push(text)
+        if (text === 'BEGIN' || text === 'COMMIT' || text === 'ROLLBACK'
+          || text.startsWith('SET TRANSACTION')) return { rows: [], rowCount: null }
+        if (text.startsWith('SELECT id,organization_id')) {
+          return { rows: [{ ...headerRow, next_seq: '12', version: '9' }], rowCount: 1 }
+        }
+        if (text.startsWith('WITH raw AS')) {
+          return {
+            rows: [
+              { start_seq: '0', end_seq: '5', turn: '1', ordinal: '0', total: '2' },
+              { start_seq: '6', end_seq: '11', turn: '2', ordinal: '1', total: '2' },
+            ],
+            rowCount: 2,
+          }
+        }
+        if (text.startsWith('SELECT event_seq::text,role')) {
+          return {
+            rows: [
+              { event_seq: '1', role: 'user', content: '  first question  ', turn: '1' },
+              { event_seq: '3', role: 'assistant', content: 'first answer', turn: '1' },
+              { event_seq: '7', role: 'user', content: 'second question', turn: '2' },
+              { event_seq: '9', role: 'assistant', content: 'second answer', turn: '2' },
+            ],
+            rowCount: 4,
+          }
+        }
+        throw new Error(`unexpected query: ${text}`)
+      }),
+      release: vi.fn(),
+    } as unknown as PoolClient
+    const pool = { connect: vi.fn(async () => client) } as unknown as Pool
+
+    await expect(new ConversationRepository(pool).readHistoryIndex('session-1')).resolves.toEqual({
+      revision: '9:12',
+      asOfSeq: 11,
+      totalTurns: 2,
+      items: [
+        { turn: 1, startSeq: 0, endSeq: 5, prompt: 'first question', response: 'first answer' },
+        { turn: 2, startSeq: 6, endSeq: 11, prompt: 'second question', response: 'second answer' },
+      ],
+      truncated: false,
+    })
+    expect(calls.some(text => text.includes('SELECT e.seq::text,e.event FROM'))).toBe(false)
+    expect(calls.some(text => text.startsWith('WITH raw AS'))).toBe(true)
+    expect(calls.some(text => text.startsWith('SELECT event_seq::text,role'))).toBe(true)
+    expect(client.release).toHaveBeenCalledOnce()
+  })
+
+  it('samples deterministically when the requested marker budget is smaller than the turn count', async () => {
+    const client = {
+      query: vi.fn(async (text: string) => {
+        if (text === 'BEGIN' || text === 'COMMIT' || text === 'ROLLBACK'
+          || text.startsWith('SET TRANSACTION')) return { rows: [], rowCount: null }
+        if (text.startsWith('SELECT id,organization_id')) {
+          return { rows: [{ ...headerRow, next_seq: '30' }], rowCount: 1 }
+        }
+        if (text.startsWith('WITH raw AS')) {
+          return {
+            rows: [
+              { start_seq: '0', end_seq: '9', turn: '1', ordinal: '0', total: '3' },
+              { start_seq: '20', end_seq: '29', turn: '3', ordinal: '2', total: '3' },
+            ],
+            rowCount: 2,
+          }
+        }
+        throw new Error(`unexpected query: ${text}`)
+      }),
+      release: vi.fn(),
+    } as unknown as PoolClient
+    const pool = { connect: vi.fn(async () => client) } as unknown as Pool
+    const result = await new ConversationRepository(pool).readHistoryIndex('session-1', 2)
+    expect(result?.items.map(item => item.turn)).toEqual([1, 3])
+    expect(result?.items[0]?.prompt).toBeUndefined()
+    expect(result?.items[1]?.prompt).toBeUndefined()
+    expect(result?.totalTurns).toBe(3)
+    expect(result?.truncated).toBe(true)
+  })
+})

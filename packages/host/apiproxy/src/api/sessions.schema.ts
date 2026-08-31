@@ -13,7 +13,8 @@ import { rpcIdSchema } from './rpc.schema.ts'
 import type { Wire } from './rpc.schema.ts'
 import type {
   HistoryEntry, HistoryOmittedSpan, ModelCatalogFailure, ModelCatalogModel, ModelProviderGroup, ModelReasoning,
-  ModelReasoningEffort, ModelSelection, SessionDraftId, SessionListMetadata, SessionProjectionsBlock, SessionSearchItem, SessionSummary,
+  ModelReasoningEffort, ModelSelection, SessionDraftId, SessionHistoryIndexItem,
+  SessionListMetadata, SessionProjectionsBlock, SessionSearchItem, SessionSummary,
 } from './sessions.ts'
 import type { ToolEventView } from './events.ts'
 import type { AttachmentIdType, ImageAttachmentLimits, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
@@ -103,6 +104,29 @@ export const sessionSearchValueSchema = z.object({
   items: z.array(sessionSearchItemSchema).max(SESSION_SEARCH_RESULT_LIMIT),
   hasMore: z.boolean(),
 }) satisfies z.ZodType<Wire<ResponseValue<'session.search'>>>
+
+/** session.historyIndex marker; previews stay short so the index is not a second transcript. */
+export const sessionHistoryIndexItemSchema: z.ZodType<Wire<SessionHistoryIndexItem>> = z.object({
+  turn: z.number().int().nonnegative(),
+  startSeq: z.number().int().nonnegative(),
+  endSeq: z.number().int().nonnegative(),
+  prompt: z.string().refine(value => truncateUnicodeCodePoints(value, 160) === value).optional(),
+  response: z.string().refine(value => truncateUnicodeCodePoints(value, 160) === value).optional(),
+}).refine(item => item.startSeq <= item.endSeq, { message: 'history index startSeq must be <= endSeq' })
+
+/** session.historyIndex request payload. */
+export const sessionHistoryIndexRequestSchema = z.object({
+  sessionId: sessionIdSchema,
+  maxItems: z.number().int().min(1).max(2_000).optional(),
+}) satisfies z.ZodType<Wire<RequestPayload<'session.historyIndex'>>>
+
+/** session.historyIndex response value. */
+export const sessionHistoryIndexValueSchema: z.ZodType<Wire<ResponseValue<'session.historyIndex'>>> = z.object({
+  asOfSeq: z.number().int().min(-1),
+  totalTurns: z.number().int().nonnegative(),
+  items: z.array(sessionHistoryIndexItemSchema).max(2_000),
+  truncated: z.boolean(),
+}).refine(value => value.items.length <= value.totalTurns, { message: 'history index item count exceeds totalTurns' })
 
 /** session.create request payload (at most one of workspaceId / cwd). */
 export const sessionCreateRequestSchema = z.object({

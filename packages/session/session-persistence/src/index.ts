@@ -108,6 +108,37 @@ export const DEFAULT_SESSION_PAGE_MAX_EVENTS = 2_000
 /** Default message-group hint used by seek-capable persistence providers. */
 export const DEFAULT_SESSION_PAGE_MAX_GROUPS = 50
 
+/** Maximum number of turn markers returned by one history-index read. */
+export const DEFAULT_SESSION_HISTORY_INDEX_MAX_ITEMS = 2_000
+
+/** One bounded turn marker used by navigation surfaces. */
+export interface SessionHistoryIndexItem {
+  /** Durable turn number carried by the turn boundaries. */
+  readonly turn: number
+  /** First event sequence in the turn. */
+  readonly startSeq: number
+  /** Last event sequence in the turn. */
+  readonly endSeq: number
+  /** Short, optional prompt preview with no event payload. */
+  readonly prompt?: string
+  /** Short, optional response preview with no event payload. */
+  readonly response?: string
+}
+
+/** Bounded, revision-aware turn index for a session's navigation rail. */
+export interface SessionHistoryIndex {
+  /** Source revision captured with the index. */
+  readonly revision: SessionPersistenceRevision
+  /** Last stored sequence reflected by this index, or -1 for an empty log. */
+  readonly asOfSeq: number
+  /** Total turn count before any sampling limit is applied. */
+  readonly totalTurns: number
+  /** Returned markers in ascending sequence order. */
+  readonly items: readonly SessionHistoryIndexItem[]
+  /** True when the provider sampled markers to stay within the item limit. */
+  readonly truncated: boolean
+}
+
 /** A backend's own raw artifact text for one session, verbatim. */
 export interface SessionRawArtifact {
   /** The session header parsed from the artifact's own first line. */
@@ -470,6 +501,24 @@ export abstract class SessionPersistence extends Service {
       ...(nextCursor === undefined ? {} : { nextCursor }),
       uncompressedBytes: selected.bytes,
     }
+  }
+
+  /**
+   * Read a bounded turn index without materializing the event log. Providers
+   * with a searchable boundary index override this method; the default leaves
+   * the optional navigation capability absent for compatibility providers.
+   * @param _id - persisted session identity.
+   * @param _maxItems - maximum marker count requested by the caller.
+   * @param signal - optional cancellation for backend lookup work.
+   * @returns the index, or undefined when this backend has no bounded index.
+   */
+  readHistoryIndex(
+    _id: SessionId,
+    _maxItems: number = DEFAULT_SESSION_HISTORY_INDEX_MAX_ITEMS,
+    signal?: AbortSignal,
+  ): Promise<SessionHistoryIndex | undefined> {
+    signal?.throwIfAborted()
+    return Promise.resolve(undefined)
   }
 
   /**

@@ -829,6 +829,8 @@ export interface ChatViewInjected {
    */
   openFile: (path: string) => Promise<void>
   loadOlder: () => void
+  /** Materialize older pages for an index-only turn marker before scrolling. */
+  loadHistoryUntil?: (targetSeq: number) => Promise<boolean>
   /** Resolve a session-authorized historical image for inline display. */
   loadImage: (attachment: ImageAttachmentRef) => Promise<string>
   /** Hand a call off to the trajectory view: write the one-shot inspect target and switch tabs. */

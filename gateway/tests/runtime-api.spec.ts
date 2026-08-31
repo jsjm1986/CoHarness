@@ -557,6 +557,89 @@ describe('runtime bounded session history', () => {
       body: { error: 'conversation-protocol', code: 'protocol' },
     })
   })
+
+  it('serves the lightweight history index from the repository without invoking load()', async () => {
+    const runtime = fixture()
+    const header: ConversationHeader = {
+      id: 'indexed-session',
+      organizationId: ORGANIZATION_ID,
+      creatorUserId: CREATOR_INTERNAL_ID,
+      projectId: PROJECT_INTERNAL_ID,
+      rootSessionId: 'indexed-session',
+      visibility: 'project',
+      sessionFormatVersion: 0,
+      createdAt: CREATED_AT,
+      cwd: '/tmp/shared',
+    }
+    const readHeader = vi.fn(async () => header)
+    const readHistoryIndex = vi.fn(async () => ({
+      revision: '8:12',
+      asOfSeq: 11,
+      totalTurns: 2,
+      items: [
+        { turn: 1, startSeq: 0, endSeq: 5, prompt: 'one' },
+        { turn: 2, startSeq: 6, endSeq: 11, response: 'two' },
+      ],
+      truncated: false,
+    }))
+    const conversations = runtime.deps.conversations as typeof runtime.deps.conversations & {
+      readHeader: typeof readHeader
+      readHistoryIndex: typeof readHistoryIndex
+    }
+    conversations.readHeader = readHeader
+    conversations.readHistoryIndex = readHistoryIndex
+
+    const response = await request(runtime.handler, '/internal/runtime/session/index?sessionId=indexed-session', {
+      method: 'GET', body: {},
+    })
+    expect(response).toMatchObject({
+      handled: true,
+      status: 200,
+      body: {
+        header: { id: 'indexed-session' },
+        asOfSeq: 11,
+        totalTurns: 2,
+        items: [{ turn: 1, startSeq: 0, endSeq: 5 }, { turn: 2, startSeq: 6, endSeq: 11 }],
+      },
+    })
+    expect(readHeader).toHaveBeenCalledOnce()
+    expect(readHistoryIndex).toHaveBeenCalledOnce()
+    expect(runtime.deps.conversations.load).not.toHaveBeenCalled()
+  })
+
+  it('rejects an invalid history index item before sending it to the runtime', async () => {
+    const runtime = fixture()
+    const header: ConversationHeader = {
+      id: 'invalid-indexed-session',
+      organizationId: ORGANIZATION_ID,
+      creatorUserId: CREATOR_INTERNAL_ID,
+      projectId: PROJECT_INTERNAL_ID,
+      rootSessionId: 'invalid-indexed-session',
+      visibility: 'project',
+      sessionFormatVersion: 0,
+      createdAt: CREATED_AT,
+      cwd: '/tmp/shared',
+    }
+    const conversations = runtime.deps.conversations as typeof runtime.deps.conversations & {
+      readHeader: () => Promise<ConversationHeader>
+      readHistoryIndex: () => Promise<{
+        revision: string
+        asOfSeq: number
+        totalTurns: number
+        items: { turn: number; startSeq: number; endSeq: number }[]
+        truncated: boolean
+      }>
+    }
+    conversations.readHeader = async () => header
+    conversations.readHistoryIndex = async () => ({
+      revision: '1:2', asOfSeq: 1, totalTurns: 1,
+      items: [{ turn: 1, startSeq: 2, endSeq: 1 }], truncated: false,
+    })
+    const response = await request(runtime.handler, '/internal/runtime/session/index?sessionId=invalid-indexed-session', {
+      method: 'GET', body: {},
+    })
+    expect(response).toMatchObject({ status: 400, body: { error: 'conversation-protocol', code: 'protocol' } })
+  })
 })
 
 describe('runtime organization credentials', () => {

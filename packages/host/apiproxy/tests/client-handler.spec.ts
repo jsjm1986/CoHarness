@@ -43,6 +43,7 @@ function scriptedApi(overrides: {
         hasMore: false,
         modelSelection: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
       }),
+      historyIndex: r => ok(r, { asOfSeq: -1, totalTurns: 0, items: [], truncated: false }),
       models: r => ok(r, {
         current: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
         routable: true,

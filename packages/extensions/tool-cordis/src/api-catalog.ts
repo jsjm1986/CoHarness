@@ -1435,6 +1435,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'one immutable page and a continuation cursor.',
       },
       {
+        signature: 'readHistoryIndex( _id: SessionId, _maxItems: number = DEFAULT_SESSION_HISTORY_INDEX_MAX_ITEMS, signal?: AbortSignal, ): Promise<SessionHistoryIndex | undefined>',
+        description: 'Read a bounded turn index without materializing the event log. Providers with a searchable boundary index override this method; the default leaves the optional navigation capability absent for compatibility providers.',
+        parameters: [{ name: '_id', description: 'persisted session identity.' }, { name: '_maxItems', description: 'maximum marker count requested by the caller.' }, { name: 'signal', description: 'optional cancellation for backend lookup work.' }],
+        returns: 'the index, or undefined when this backend has no bounded index.',
+      },
+      {
         signature: 'abstract listSnapshots(signal?: AbortSignal): Promise<SessionPersistenceSnapshot[]>',
         description: 'List materialized sessions with cheap per-log change tokens.\n\nRepeated observations of an unchanged log return the same revision. A successful mutating load repair changes the next listed revision. Revisions also distinguish independently backed stores so backend-local counters cannot compare equal across different persistence sources.',
         parameters: [{ name: 'signal', description: 'optional cancellation for backend snapshot-listing work.' }],

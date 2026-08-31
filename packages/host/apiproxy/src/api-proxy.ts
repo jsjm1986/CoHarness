@@ -32,6 +32,7 @@ import {
   DEFAULT_SESSION_PAGE_MAX_BYTES,
   DEFAULT_SESSION_PAGE_MAX_EVENTS,
   DEFAULT_SESSION_PAGE_MAX_GROUPS,
+  DEFAULT_SESSION_HISTORY_INDEX_MAX_ITEMS,
   default as SessionPersistenceDefinition,
   SessionPersistenceRevision,
   SessionPersistenceReadError,
@@ -65,7 +66,8 @@ import type {
   ApiProxy, ConfigurableProviderView, CredentialView, DiscoveredModelView, GoalRef, HistoryDetail, HistoryEntry, HistoryOmittedSpan,
   HostFrame,
   ModelCatalogFailure, ModelProviderGroup,
-  ModelReasoning, MuxFrame, PromptContentPart, QuestionResponsePayload, SessionListMetadata, SessionProjectionsBlock, SessionSearchItem,
+  ModelReasoning, MuxFrame, PromptContentPart, QuestionResponsePayload, SessionHistoryIndex, SessionListMetadata,
+  SessionProjectionsBlock, SessionSearchItem,
   QueuedInboxItem, SessionSummary, SettingsNamespaceView, SubagentAddress, JobView, ToolEventView,
   WorkspaceId, WorkspaceView,
 } from './api/index.ts'
@@ -80,6 +82,7 @@ import {
 } from './session-export.ts'
 import { applyHistoryDetail } from './fetch/history-detail.ts'
 import type { SessionRawArtifact } from '@deepseek-ai/dsh-session-persistence'
+import { historyIndexFromEvents } from './history-index.ts'
 import {
   SESSION_SEARCH_RESULT_LIMIT,
   SESSION_SEARCH_SNIPPET_MAX_CODE_POINTS,
@@ -2594,6 +2597,46 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   }
 
   /**
+   * Resolve navigation metadata without using the detached full-log path.
+   * Attached sessions can fold their resident events; cold sessions require a
+   * provider-owned bounded index implementation.
+   */
+  async function historyIndexFor(
+    sessionId: SessionId,
+    maxItems: number,
+    signal?: AbortSignal,
+  ): Promise<SessionHistoryIndex | undefined> {
+    const attached = ctx.sessions.get(sessionId)
+    if (attached !== undefined) {
+      const index = historyIndexFromEvents(attached.events, `attached:${String(attached.events.at(-1)?.seq ?? -1)}`, maxItems)
+      return {
+        asOfSeq: index.asOfSeq,
+        totalTurns: index.totalTurns,
+        items: index.items,
+        truncated: index.truncated,
+      }
+    }
+    const persistence = ctx.get('sessionPersistence')
+    const hasIndex = persistence !== undefined
+      && typeof persistence.readHistoryIndex === 'function'
+    if (!hasIndex) return undefined
+    const index = await persistence.readHistoryIndex(sessionId, maxItems, signal)
+    if (index === undefined) return undefined
+    return {
+      asOfSeq: index.asOfSeq,
+      totalTurns: index.totalTurns,
+      items: index.items.map(item => ({
+        turn: item.turn,
+        startSeq: item.startSeq,
+        endSeq: item.endSeq,
+        ...(item.prompt === undefined ? {} : { prompt: item.prompt }),
+        ...(item.response === undefined ? {} : { response: item.response }),
+      })),
+      truncated: index.truncated,
+    }
+  }
+
+  /**
    * The header and events {@link presenterScopeFor} reads to decide which
    * composition a transcript ran under.
    * @param source - the live or detached session this read is served from.
@@ -3748,6 +3791,51 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           return err(request, {
             code: 'internal',
             message: `history unavailable for session "${sessionId}"`,
+            details: {},
+          })
+        }
+      },
+
+      async historyIndex(request, signal) {
+        const { sessionId, maxItems } = request.payload
+        if (signal?.aborted) {
+          return err(request, { code: 'cancelled', message: 'history index read was cancelled', details: {} })
+        }
+        const authorized = await authorizeSession(sessionId, 'read')
+        if ('error' in authorized) return err(request, authorized.error)
+        try {
+          signal?.throwIfAborted()
+          const index = await historyIndexFor(
+            sessionId,
+            maxItems ?? DEFAULT_SESSION_HISTORY_INDEX_MAX_ITEMS,
+            signal,
+          )
+          signal?.throwIfAborted()
+          if (index === undefined) {
+            return err(request, {
+              code: 'internal',
+              message: 'history navigation index is unavailable; the conversation remains pageable',
+              details: {},
+            })
+          }
+          return ok(request, index)
+        } catch (error: unknown) {
+          if (signal?.aborted) {
+            return err(request, { code: 'cancelled', message: 'history index read was cancelled', details: {} })
+          }
+          const persistenceError = asHistoryPersistenceError(error)
+          if (persistenceError !== undefined) {
+            ctx.logger.warn(`session.historyIndex: ${persistenceError.code} for ${sessionId}: ${persistenceError.message}`)
+            return err(request, {
+              code: 'internal',
+              message: 'history navigation index is temporarily unavailable; the conversation remains pageable',
+              details: {},
+            })
+          }
+          ctx.logger.warn(`session.historyIndex: failed for ${sessionId}: ${String(error)}`)
+          return err(request, {
+            code: 'internal',
+            message: 'history navigation index is temporarily unavailable; the conversation remains pageable',
             details: {},
           })
         }

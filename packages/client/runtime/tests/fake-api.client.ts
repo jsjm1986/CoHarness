@@ -7,6 +7,7 @@ import type {
   WorkspaceId, WorkspaceView,
 } from '@deepseek-ai/dsh-api-remotes/client'
 import { RpcId } from '@deepseek-ai/dsh-client-connection/client'
+import type { SessionHistoryIndex } from '@deepseek-ai/dsh-client-connection/client'
 import type { SessionRemotes } from '../src/client/sessions/remotes.ts'
 
 /** Programmable-default workspace row (branded id, ISO-ish times). */
@@ -94,6 +95,12 @@ export class FakeApiClient implements IApiClient {
   }>> =
     () => Promise.resolve(ok({ events: [], hasMore: false }))
 
+  onHistoryIndex: (payload: { sessionId: SessionId; maxItems?: number })
+  => Promise<RpcResponse<SessionHistoryIndex>> = () => Promise.resolve(ok({
+    asOfSeq: -1, totalTurns: 0, items: [], truncated: false,
+  }))
+  lastHistoryIndexSignal: AbortSignal | undefined
+
   onModels: (payload: unknown) => Promise<RpcResponse<SessionModels>> = () => Promise.resolve(ok({
     current: this.defaultModel,
     routable: true,
@@ -164,6 +171,10 @@ export class FakeApiClient implements IApiClient {
     }, signal?: AbortSignal) => {
       this.lastHistorySignal = signal
       return this.record('session.history', payload, this.onHistory(payload))
+    },
+    historyIndex: (payload: { sessionId: SessionId; maxItems?: number }, signal?: AbortSignal) => {
+      this.lastHistoryIndexSignal = signal
+      return this.record('session.historyIndex', payload, this.onHistoryIndex(payload))
     },
     models: (payload: unknown) => this.record('session.models', payload, this.onModels(payload)),
     selectModel: (payload: { provider: string; model: string }) =>

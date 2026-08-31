@@ -191,13 +191,15 @@ function TurnStatus({ startTime, t }: {
  * ordered business Node crosses the keyed renderer seat.
  */
 export function ChatView({
-  useSession, useSessions, useStore, renderSlot, sessionId, openFile, loadOlder, loadImage, inspectCall, chatScroll, forkAt,
+  useSession, useSessions, useStore, renderSlot, sessionId, openFile, loadOlder,
+  loadHistoryUntil, loadImage, inspectCall, chatScroll, forkAt,
   fileMentions, t,
 }: ChatViewSlotProps) {
   const order = useSession(s => s.chat.order)
   const nodeStore = useSession(s => s.chat.nodes)
   const timeline = useSession(s => s.chat.timeline)
   const navigation = useSession(s => s.chat.navigation)
+  const historyNavigation = useSession(s => s.historyNavigation)
   const inbox = useSession(s => s.queue)
   const pendingSubmissions = useSession(s => s.pendingSubmissions ?? [])
   // Workspace root off the session list row: path summaries display relative to it.
@@ -263,10 +265,51 @@ export function ChatView({
   )
   const runningTurnStart = useMemo(() => runningTurnStartTime(timeline), [timeline])
   const runningTurn = useMemo(() => runningTurnOf(timeline), [timeline])
-  // Older snapshots and lightweight fixtures may not carry the optional
-  // navigation reader yet; the rail simply stays absent until the builder
-  // publishes it.
-  const navigationItems = navigation.items()
+  /**
+   * Merge the full-session index with loaded anchors. Index-only markers keep
+   * their durable range and become clickable after `loadHistoryUntil` brings
+   * that range into the resident window. Loaded rows always win for previews
+   * and anchor identity; live-only turns are retained until the next refresh.
+   */
+  const navigationItems = useMemo(() => {
+    const loaded = navigation.items()
+    // Keep the last successful index visible while a debounced refresh is in
+    // flight; a transient network failure must not make the rail collapse.
+    const indexed = historyNavigation?.items ?? []
+    if (indexed.length === 0) return loaded
+    const loadedByTurn = new Map(loaded.map(item => [item.turn, item]))
+    const indexedByTurn = new Map(indexed.map(item => [item.turn, item]))
+    const turns = [...new Set([...indexedByTurn.keys(), ...loadedByTurn.keys()])]
+      .map(turn => ({ turn, marker: indexedByTurn.get(turn), loaded: loadedByTurn.get(turn) }))
+      .sort((left, right) => {
+        const leftSeq = left.marker?.startSeq ?? left.loaded?.startSeq ?? Number.MAX_SAFE_INTEGER
+        const rightSeq = right.marker?.startSeq ?? right.loaded?.startSeq ?? Number.MAX_SAFE_INTEGER
+        return leftSeq - rightSeq || left.turn - right.turn
+      })
+    return turns.map(({ turn, marker }) => {
+      const current = loadedByTurn.get(turn)
+      if (current !== undefined) {
+        return marker === undefined
+          ? current
+          : {
+            ...current,
+            startSeq: marker.startSeq,
+            endSeq: marker.endSeq,
+            loaded: true,
+          }
+      }
+      if (marker === undefined) return undefined
+      return {
+        turn: marker.turn,
+        anchorKey: '',
+        startSeq: marker.startSeq,
+        endSeq: marker.endSeq,
+        loaded: false,
+        prompt: marker.prompt ?? '',
+        response: marker.response ?? '',
+      }
+    }).filter((item): item is TurnNavigationItem => item !== undefined)
+  }, [historyNavigation, navigation])
 
   const processByTurn = useMemo(() => {
     const result = new Map<number, TurnProcessChatData>()
@@ -309,6 +352,8 @@ export function ChatView({
    *  scroll-driven at-bottom chrome re-render (which would snap inertial
    *  scrolls the rest of the way to the floor). */
   const followSigRef = useRef<string | null>(null)
+  /** Invalidates a previous marker click while its range is being materialized. */
+  const navigationRequestRef = useRef(0)
 
   const firstKey = order[0]
   const firstSeq = firstKey === undefined ? null : nodeStore.get(firstKey)?.anchorSeq ?? null
@@ -534,19 +579,33 @@ export function ChatView({
   }, [loadingOlder])
 
   const navigateToTurn = useCallback((item: TurnNavigationItem): void => {
-    const local = listRef.current
-    if (local === null) return
-    const el = scrollerOf(local)
-    const row = anchorElement(local, item.anchorKey)
-    if (row === null) return
-    el.scrollTop = Math.max(0, el.scrollTop + flowTop(row, el) - 24)
-    observedTopRef.current = el.scrollTop
-    atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight <= FOLLOW_THRESHOLD + 1
-    setAtBottom(atBottomRef.current)
-    setActiveTurn(item.turn)
-    const position = atBottomRef.current ? null : scrollPosition(local, el)
-    chatScroll.save(position)
-  }, [chatScroll.save])
+    const request = ++navigationRequestRef.current
+    const jump = async (): Promise<void> => {
+      let target = item
+      if ((target.loaded === false || target.anchorKey === '') && target.startSeq !== undefined) {
+        if (loadHistoryUntil === undefined || !await loadHistoryUntil(target.startSeq)) return
+        // Session publication is batched; wait one task for the corresponding
+        // keyed row to commit before measuring its flow position.
+        await new Promise<void>((resolve) => { setTimeout(resolve, 0) })
+        if (request !== navigationRequestRef.current) return
+        target = navigation.items().find(candidate => candidate.turn === item.turn && candidate.anchorKey !== '') ?? target
+      }
+      if (request !== navigationRequestRef.current || target.anchorKey === '') return
+      const local = listRef.current
+      if (local === null) return
+      const el = scrollerOf(local)
+      const row = anchorElement(local, target.anchorKey)
+      if (row === null) return
+      el.scrollTop = Math.max(0, el.scrollTop + flowTop(row, el) - 24)
+      observedTopRef.current = el.scrollTop
+      atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight <= FOLLOW_THRESHOLD + 1
+      setAtBottom(atBottomRef.current)
+      setActiveTurn(target.turn)
+      const position = atBottomRef.current ? null : scrollPosition(local, el)
+      chatScroll.save(position)
+    }
+    void jump()
+  }, [chatScroll.save, loadHistoryUntil, navigation])
 
   return (
     <div className={css.root}>
