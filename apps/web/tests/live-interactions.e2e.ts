@@ -8,7 +8,7 @@
 // CONTENT is authored here (single-sourced against the fixture via
 // deriveReplayScript — no committed copy of recorded chunks); the file is a
 // per-run artifact in the temp workspace. One recorded base fixture serves all
-// four scenarios.
+// five scenarios.
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -29,15 +29,17 @@ import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './suppor
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/live-interactions', import.meta.url))
 const FIXTURE = join(SNAPSHOT_DIR, 'session.jsonl')
 // One golden pins the empty mid-turn loading state, one pins the sendable draft
-// state, and the other three capture what the user is left looking at after
-// cancel, after a non-retryable failure, and after retry recovery.
+// state, and the remaining four capture cancel, failure, persistence guidance,
+// and retry recovery end states.
 const CANCEL_EXPECTED = join(SNAPSHOT_DIR, 'cancel.expected.md')
 const LOADING_EXPECTED = join(SNAPSHOT_DIR, 'loading.expected.md')
 const RUNNING_DRAFT_EXPECTED = join(SNAPSHOT_DIR, 'running-draft.expected.md')
 const ERROR_EXPECTED = join(SNAPSHOT_DIR, 'error-auth.expected.md')
+const PERSISTENCE_ERROR_EXPECTED = join(SNAPSHOT_DIR, 'persistence-error.expected.md')
 const RETRY_EXPECTED = join(SNAPSHOT_DIR, 'retry.expected.md')
 const MODE = webSnapshotMode()
 const AUTH_PROVIDER_MESSAGE = 'Authentication Fails, Your api key: sk-preview-secret is invalid'
+const PERSISTENCE_FAILURE_MESSAGE = 'Gateway session persistence returned invalid JSON: internal error'
 
 // The recorded base: one text-only turn whose derived script the sidecars
 // patch. Kept deliberately tool-free so the derived script is exactly one
@@ -230,6 +232,25 @@ describe('web e2e: live-turn interactions (cancel / error / retry)', () => {
     expect(tripwire.warnings).toEqual([])
   }, 120_000)
 
+  it.skipIf(MODE === 'record')('shows safe retry guidance for a persistence failure', async () => {
+    await launch(() => ({
+      patches: [{ at: 0, entry: { kind: 'throw', chunks: [], message: PERSISTENCE_FAILURE_MESSAGE, code: 'UNKNOWN' } }],
+    }))
+    const { settled } = await sendPrompt()
+    await settled
+    await expect.poll(() => page.locator('textarea').first().isEnabled(), { timeout: 10_000 }).toBe(true)
+    const errorStatus = page.getByRole('status').filter({ hasText: 'This turn failed' })
+    await errorStatus.waitFor({ timeout: 10_000 })
+    expect(await errorStatus.textContent()).toContain('The session could not be saved.')
+    expect(await errorStatus.textContent()).not.toContain('invalid JSON')
+    expect(await errorStatus.textContent()).not.toContain('internal error')
+    expect(await errorStatus.textContent()).not.toContain('UNKNOWN')
+    const snapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold!.workspaceCwd)
+    await compareOrRefreshGolden(PERSISTENCE_ERROR_EXPECTED, snapshot, MODE)
+    expect(tripwire.pageErrors).toEqual([])
+    expect(tripwire.warnings).toEqual([])
+  }, 120_000)
+
   it.skipIf(MODE === 'record')('recovers a transient SERVER failure through llm-retry and completes', async () => {
     const derived = deriveReplayScript(parseSessionLog(await readFile(FIXTURE, 'utf8')))
     expect(derived).toHaveLength(1)
@@ -260,7 +281,7 @@ describe('web e2e: live-turn interactions (cancel / error / retry)', () => {
 
   it.skipIf(MODE === 'record')('keeps the fixture inventory closed', async () => {
     await assertFixtureInventory(SNAPSHOT_DIR, [
-      'session.jsonl', 'cancel.expected.md', 'loading.expected.md', 'running-draft.expected.md', 'error-auth.expected.md', 'retry.expected.md',
+      'session.jsonl', 'cancel.expected.md', 'loading.expected.md', 'running-draft.expected.md', 'error-auth.expected.md', 'persistence-error.expected.md', 'retry.expected.md',
     ])
   })
 })

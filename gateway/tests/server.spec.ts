@@ -235,6 +235,26 @@ describe('gateway server', () => {
     expect(received).toEqual(['1234567890123456'])
   })
 
+  it('returns a safe JSON envelope when an unexpected runtime request fails', async () => {
+    const { base } = await setup({}, {
+      runtimeAuthorize: async () => true,
+      runtime: async () => { throw new Error('database details must stay server-side') },
+    })
+
+    const response = await fetch(`${base}/internal/runtime/session/append`, {
+      method: 'POST',
+      body: '{}',
+    })
+
+    expect(response.status).toBe(500)
+    expect(response.headers.get('content-type')).toMatch(/application\/json/)
+    expect(await response.json()).toEqual({
+      error: 'runtime-internal',
+      code: 'internal',
+      message: 'The runtime could not complete this request.',
+    })
+  })
+
   it('rejects an unauthenticated runtime request before reading its body', async () => {
     const authorize = vi.fn(async () => false)
     const runtime = vi.fn(async () => true)

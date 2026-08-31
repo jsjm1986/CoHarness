@@ -106,9 +106,9 @@ const retry = (seq: number): ModelRetryNode => ({
   retry: 1, maxRetries: 2, delayMs: 450,
   failure: { code: 'TRANSPORT', message: '连接被重置' },
 })
-const turnError = (seq: number, code?: string): TurnErrorNode => ({
+const turnError = (seq: number, code?: string, message?: string): TurnErrorNode => ({
   kind: 'turn-error', seq, time: seq * 1_000, turn: 1, step: 0,
-  message: seq === 2 ? 'API key is invalid' : 'plugin exploded',
+  message: message ?? (seq === 2 ? 'API key is invalid' : 'plugin exploded'),
   ...(code === undefined ? {} : { code }),
 })
 const turnMaxTokens = (seq: number): TurnMaxTokensNode => ({
@@ -704,6 +704,19 @@ describe('ChatView', () => {
       '本轮运行失败API key is invalidAUTH',
       '本轮运行失败plugin exploded',
     ])
+  })
+
+  it('replaces persistence internals with retry guidance and hides UNKNOWN', () => {
+    const h = makeHarness({ nodes: [turnError(
+      2,
+      'UNKNOWN',
+      'Gateway session persistence returned invalid JSON: Unexpected token in "internal error"',
+    )] })
+    const view = render(<h.ChatView {...h.props} />)
+    expect(view.getAllByRole('status').map(status => status.textContent)).toEqual([
+      '本轮运行失败会话暂时无法保存，请稍后重试；如果问题持续，请联系管理员。',
+    ])
+    expect(view.queryByText('UNKNOWN')).toBeNull()
   })
 
   it('renders the max-tokens notice with localized guidance, distinct from turn errors', () => {

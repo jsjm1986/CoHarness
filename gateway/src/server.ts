@@ -458,6 +458,15 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       if (!res.writableEnded) {
         if (error instanceof BodyTooLargeError) {
           send(res, 413, JSON.stringify({ error: 'request-too-large' }), 'application/json')
+        } else if ((req.url ?? '').startsWith('/internal/runtime/')) {
+          // Runtime consumers require JSON even when an unexpected exception
+          // escapes a route. Keep stack details in the server log only; paths,
+          // SQL errors, and provider diagnostics are not browser copy.
+          send(res, 500, JSON.stringify({
+            error: 'runtime-internal',
+            code: 'internal',
+            message: 'The runtime could not complete this request.',
+          }), 'application/json')
         } else {
           send(res, 500, 'internal error', 'text/plain')
         }

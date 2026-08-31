@@ -905,6 +905,7 @@ describePg('PostgreSQL baseline', () => {
     const rootId = `collaboration-root-${suffix}`
     const childId = `collaboration-child-${suffix}`
     const privateId = `collaboration-private-${suffix}`
+    const administratorRootId = `collaboration-administrator-root-${suffix}`
     const rejectedCreatorId = `collaboration-rejected-creator-${suffix}`
     const now = Date.now()
     await expect(sessions.create({
@@ -945,6 +946,16 @@ describePg('PostgreSQL baseline', () => {
       createdAt: now + 2,
       cwd: `/tmp/project-${suffix}`,
     })
+    await sessions.create({
+      id: administratorRootId,
+      organizationId,
+      creatorUserId: administratorId,
+      projectId,
+      visibility: 'private',
+      sessionFormatVersion: 0,
+      createdAt: now + 3,
+      cwd: `/tmp/project-${suffix}`,
+    })
     await expect(projectService.removeMember(projectPublicId, creatorPublicId))
       .rejects.toMatchObject({ code: 'visibility-locked' })
 
@@ -974,6 +985,24 @@ describePg('PostgreSQL baseline', () => {
       surfaceOp: 'append',
     }
     await sessions.append(rootId, randomUUID(), [memberMessage])
+    const administratorMessage = {
+      ...memberMessage,
+      time: now + 4,
+      data: {
+        ...memberMessage.data,
+        source: {
+          ...memberMessage.data.source,
+          participant: {
+            ...memberMessage.data.source.participant,
+            userId: administratorPublicId,
+            username: `administrator-${suffix}`,
+            displayName: 'Administrator',
+            role: 'admin',
+          },
+        },
+      },
+    }
+    await expect(sessions.append(administratorRootId, randomUUID(), [administratorMessage])).resolves.toBe('inserted')
     await pool.query('UPDATE harness.conversation_sessions SET updated_at=to_timestamp(1) WHERE id=$1', [rootId])
     await sessions.append(childId, randomUUID(), [{
       type: 'turn/start', seq: 0, time: now + 4, data: { turn: 1 },
@@ -1037,7 +1066,7 @@ describePg('PostgreSQL baseline', () => {
       projectPublicId,
       [rootId, childId, privateId],
     )).sort()).toEqual([rootId, childId, privateId].sort())
-    expect(await collaboration.listConversations(administratorPublicId, projectPublicId)).toHaveLength(2)
+    expect(await collaboration.listConversations(administratorPublicId, projectPublicId)).toHaveLength(3)
     await collaboration.setVisibility(administratorPublicId, privateId, 'project')
     await collaboration.setVisibility(administratorPublicId, privateId, 'private')
     await expect(collaboration.claimInteraction(
@@ -1050,6 +1079,8 @@ describePg('PostgreSQL baseline', () => {
 
     await pool.query(`UPDATE harness.memberships SET role='member'
       WHERE organization_id=$1 AND user_id=$2`, [organizationId, administratorId])
+    await expect(sessions.append(privateId, randomUUID(), [{ ...administratorMessage, time: now + 7 }]))
+      .rejects.toThrow(/not an active rw project member/)
     await expect(collaboration.projectForUser(projectPublicId, administratorPublicId)).resolves.toBeNull()
     await expect(collaboration.access(administratorPublicId, privateId, 'read'))
       .rejects.toMatchObject({ code: 'not-member' })
@@ -1060,6 +1091,7 @@ describePg('PostgreSQL baseline', () => {
       .rejects.toMatchObject({ code: 'visibility-locked' })
     await collaboration.setVisibility(creatorPublicId, privateId, 'project')
     await collaboration.setVisibility(creatorPublicId, privateId, 'private')
+    await expect(sessions.append(privateId, randomUUID(), [administratorMessage])).resolves.toBe('inserted')
 
     const visibilityRaceId = `collaboration-visibility-race-${suffix}`
     await sessions.create({

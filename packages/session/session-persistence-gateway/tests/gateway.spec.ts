@@ -519,7 +519,20 @@ describe('GatewaySessionPersistence bounded page transport', () => {
         headers: { 'content-type': 'application/json' },
       }))
       await expect(ctx.sessionPersistence.readPage(SessionId('malformed'), { maxEvents: 1 }))
-        .rejects.toMatchObject({ code: 'protocol' })
+        .rejects.toMatchObject({
+          code: 'protocol',
+          message: 'Gateway session persistence returned invalid JSON',
+        })
+
+      request.mockResolvedValueOnce(new Response('internal error', {
+        status: 500,
+        headers: { 'content-type': 'text/plain' },
+      }))
+      await expect(ctx.sessionPersistence.readPage(SessionId('internal'), { maxEvents: 1 }))
+        .rejects.toMatchObject({
+          code: 'dependency',
+          message: 'Gateway session persistence is temporarily unavailable',
+        })
     } finally {
       request.mockRestore()
       await fiber.dispose()

@@ -146,7 +146,9 @@ function classifyGatewayReadError(
     return new SessionPersistenceReadError('too-large', 'Gateway session persistence response exceeds its byte limit', { cause: error })
   }
   if (error instanceof SyntaxError) {
-    return new SessionPersistenceReadError('protocol', 'Gateway session persistence returned invalid JSON', { cause: error })
+    // The parser detail is an implementation diagnostic (and may include a
+    // proxy body); keep it out of the durable turn failure shown to users.
+    return new SessionPersistenceReadError('protocol', 'Gateway session persistence returned invalid JSON')
   }
   const code = typeof error === 'object' && error !== null
     ? (error as { code?: unknown }).code
@@ -155,6 +157,26 @@ function classifyGatewayReadError(
     return new SessionPersistenceReadError('timeout', 'Gateway session persistence request timed out', { cause: error })
   }
   return new SessionPersistenceReadError('dependency', 'Gateway session persistence is temporarily unavailable', { cause: error })
+}
+
+function throwGatewayResponseError(response: Response, value: unknown): never {
+  const recordValue = record(value)
+  const code = recordValue?.code
+  if (response.status >= 500 || code === 'internal' || code === 'runtime-internal') {
+    throw new SessionPersistenceReadError('dependency', 'Gateway session persistence is temporarily unavailable')
+  }
+  if (response.status === 401 || response.status === 403 || code === 'forbidden') {
+    throw new SessionPersistenceReadError('dependency', 'Gateway session persistence rejected this operation')
+  }
+  if (code === 'too-large' || code === 'aborted' || code === 'timeout'
+    || code === 'dependency' || code === 'protocol') {
+    const detail = recordValue?.message
+    throw new SessionPersistenceReadError(
+      code,
+      typeof detail === 'string' ? detail : `Gateway session persistence request failed (${code})`,
+    )
+  }
+  throw new SessionPersistenceReadError('dependency', 'Gateway session persistence request was rejected')
 }
 
 /** Convert response-shape validation failures into the public protocol category. */
@@ -659,21 +681,13 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
       try {
         value = await readGatewayResponseJson(response, responseLimit, deadline.signal)
       } catch (error: unknown) {
+        if (!response.ok) {
+          throwGatewayResponseError(response, undefined)
+        }
         throw classifyGatewayReadError(error, signal, deadline.signal)
       }
       if (!response.ok) {
-        const recordValue = record(value)
-        const code = recordValue?.code
-        if (code === 'too-large' || code === 'aborted' || code === 'timeout'
-          || code === 'dependency' || code === 'protocol') {
-          const detail = recordValue?.message
-          throw new SessionPersistenceReadError(
-            code,
-            typeof detail === 'string' ? detail : `Gateway session persistence request failed (${code})`,
-          )
-        }
-        const detail = recordValue?.error
-        throw new Error(`Gateway session persistence failed: ${typeof detail === 'string' ? detail : `HTTP ${String(response.status)}`}`)
+        throwGatewayResponseError(response, value)
       }
       return value
     } finally {
@@ -699,20 +713,13 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
       try {
         value = await readGatewayResponseJson(response, GATEWAY_SESSION_RESPONSE_MAX_BYTES, deadline.signal)
       } catch (error: unknown) {
+        if (!response.ok) {
+          throwGatewayResponseError(response, undefined)
+        }
         throw classifyGatewayReadError(error, signal, deadline.signal)
       }
       if (!response.ok) {
-        const recordValue = record(value)
-        const code = recordValue?.code
-        if (code === 'too-large' || code === 'aborted' || code === 'timeout'
-          || code === 'dependency' || code === 'protocol') {
-          const detail = recordValue?.message
-          throw new SessionPersistenceReadError(
-            code,
-            typeof detail === 'string' ? detail : `Gateway session persistence request failed (${code})`,
-          )
-        }
-        throw new Error(`Gateway session persistence failed with HTTP ${String(response.status)}`)
+        throwGatewayResponseError(response, value)
       }
       return value
     } finally {

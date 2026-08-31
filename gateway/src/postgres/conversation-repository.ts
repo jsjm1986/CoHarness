@@ -725,20 +725,41 @@ function validatePageAnchor(
 export class ConversationRepository {
   constructor(private readonly pool: Pool) {}
 
+  /** Resolve an active project writer, including organization administrators. */
+  private async projectWriter(
+    client: PoolClient,
+    organizationId: string,
+    projectId: string,
+    selector: { readonly internalId: string } | { readonly publicId: number },
+  ): Promise<{ id: string; administrator: boolean } | undefined> {
+    const predicate = 'internalId' in selector ? 'u.id=$2' : 'u.public_id=$2'
+    const result = await client.query<{ id: string; administrator: boolean }>(`SELECT u.id,
+      EXISTS (SELECT 1 FROM harness.memberships om
+        WHERE om.organization_id=u.organization_id AND om.user_id=u.id
+          AND om.status='active' AND om.role='admin') administrator
+      FROM harness.users u
+      JOIN harness.projects p ON p.organization_id=u.organization_id
+        AND p.id=$3 AND p.status='active'
+      WHERE u.organization_id=$1 AND ${predicate} AND u.status='active'
+        AND (EXISTS (SELECT 1 FROM harness.project_members pm
+          WHERE pm.organization_id=u.organization_id AND pm.project_id=p.id
+            AND pm.user_id=u.id AND pm.access_mode='rw')
+          OR EXISTS (SELECT 1 FROM harness.memberships om
+            WHERE om.organization_id=u.organization_id AND om.user_id=u.id
+              AND om.status='active' AND om.role='admin'))
+      FOR SHARE OF u,p`, [organizationId,
+      'internalId' in selector ? selector.internalId : selector.publicId, projectId])
+    const row = result.rows[0]
+    return row === undefined ? undefined : { id: row.id, administrator: row.administrator }
+  }
+
   private async assertProjectCreatorMembership(
     client: PoolClient,
     organizationId: string,
     projectId: string,
     creatorUserId: string,
   ): Promise<void> {
-    const membership = await client.query<{ id: string }>(`SELECT u.id
-      FROM harness.users u
-      JOIN harness.project_members m ON m.user_id=u.id AND m.organization_id=u.organization_id
-      JOIN harness.projects p ON p.id=m.project_id AND p.organization_id=m.organization_id
-      WHERE u.organization_id=$1 AND u.id=$2 AND u.status='active'
-        AND p.id=$3 AND p.status='active' AND m.access_mode='rw'
-      FOR SHARE OF u,m,p`, [organizationId, creatorUserId, projectId])
-    if (membership.rows[0] === undefined) {
+    if (await this.projectWriter(client, organizationId, projectId, { internalId: creatorUserId }) === undefined) {
       throw new Error(`conversation creator ${creatorUserId} is not an active rw project member`)
     }
   }
@@ -1090,20 +1111,21 @@ export class ConversationRepository {
       await insertConversationEvents(client, sessionId, encodedEvents)
       await insertConversationSearch(client, sessionId, searchRows)
       for (const [publicUserId, contribution] of contributions) {
-        const contributor = sessionRow.project_id === null
-          ? await client.query<{ id: string }>(`SELECT u.id FROM harness.users u
+        let writer: { id: string; administrator: boolean } | undefined
+        if (sessionRow.project_id === null) {
+          const user = await client.query<{ id: string }>(`SELECT u.id FROM harness.users u
               WHERE u.organization_id=$1 AND u.public_id=$2 AND u.status='active'
               FOR SHARE OF u`, [sessionRow.organization_id, publicUserId])
-          : await client.query<{ id: string }>(`SELECT u.id FROM harness.users u
-              JOIN harness.project_members m ON m.user_id=u.id AND m.organization_id=u.organization_id
-              WHERE u.organization_id=$1 AND u.public_id=$2 AND u.status='active'
-                AND m.project_id=$3 AND m.access_mode='rw'
-              FOR SHARE OF u,m`, [sessionRow.organization_id, publicUserId, sessionRow.project_id])
-        const contributorId = contributor.rows[0]?.id
+          const id = user.rows[0]?.id
+          writer = id === undefined ? undefined : { id, administrator: false }
+        } else {
+          writer = await this.projectWriter(client, sessionRow.organization_id, sessionRow.project_id, { publicId: publicUserId })
+        }
+        const contributorId = writer?.id
         if (contributorId === undefined) {
           throw new Error(`conversation contributor ${String(publicUserId)} is not an active rw project member`)
         }
-        if (sessionRow.visibility === 'private' && contributorId !== sessionRow.creator_user_id) {
+        if (sessionRow.visibility === 'private' && contributorId !== sessionRow.creator_user_id && writer?.administrator !== true) {
           throw new Error(`private conversation ${sessionRow.root_session_id} rejects another contributor`)
         }
         await client.query(`INSERT INTO harness.conversation_participants(
@@ -1210,7 +1232,8 @@ export class ConversationRepository {
         }
         const starts = await checkedQuery<HistoryIndexStartRow>(client, `WITH raw AS (
             SELECT e.seq,
-              CASE WHEN json_typeof(e.event->'data'->'turn')='number'
+              CASE WHEN position(chr(92) || '\\u0000' IN e.event::text) > 0 THEN NULL
+                WHEN json_typeof(e.event->'data'->'turn')='number'
                 AND (e.event->'data'->>'turn') ~ '^[0-9]+$'
                 THEN (e.event->'data'->>'turn')::bigint ELSE NULL END AS turn
             FROM harness.conversation_events e

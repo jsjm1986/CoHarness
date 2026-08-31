@@ -8,6 +8,7 @@ import type { ReactNode } from 'react'
 import type {
   ModelRetryNode, PendingSubmission, TurnErrorNode, UserMessageNode,
 } from '@deepseek-ai/dsh-client-runtime/client'
+import { isSessionPersistenceFailureMessage } from '@deepseek-ai/dsh-client-runtime/client'
 import { JsonBlock, MessageText, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps, MessageImageSource } from '../contract/slots.ts'
 import { ReferenceIcon } from '../ReferenceIcon.tsx'
@@ -118,14 +119,17 @@ function TurnErrorItem({ node, t }: {
   node: TurnErrorNode
   t: ChatViewSlotProps['t']
 }) {
+  const persistenceFailure = isSessionPersistenceFailureMessage(node.message)
+  const message = persistenceFailure ? t('message.turnError.persistence') : node.message
+  const code = node.code === 'UNKNOWN' || persistenceFailure ? undefined : node.code
   return (
     <div className={css.turnErrorRow} role="status">
       <StateDot state="error" className={css.turnErrorDot} />
       <div className={css.turnErrorCopy}>
         <span className={css.turnErrorTitle}>{t('message.turnError')}</span>
-        <span className={css.turnErrorMessage}>{node.message}</span>
+        <span className={css.turnErrorMessage}>{message}</span>
       </div>
-      {node.code !== undefined && <code className={css.turnErrorCode}>{node.code}</code>}
+      {code !== undefined && <code className={css.turnErrorCode}>{code}</code>}
     </div>
   )
 }
