@@ -10,7 +10,7 @@
 
 共享的一元载体默认通过 16 MiB 字节预算读取成功 JSON 响应；`AbstractApiClient` 与 `InProcessApiClient` 接受正数覆盖值，以便部署选择更小的上限。有界 reader 接受可选的 `AbortSignal`，调用方断开时会取消 response body。超限响应会在 envelope 解析前被拒绝。
 
-浏览器 connection 还会按需提供 Gateway 的账户偏好和项目 Provider 设置 transport。账户偏好请求使用同源、revision 校验和不含值的响应；项目模型请求覆盖项目 Provider 描述、加密凭据状态、端点发现和 mutation 应答，凭据值不会进入响应。不提供这些路由的 Host 会让 transport 保持缺失，调用方应显示明确的不可用状态，而不是回退到另一个账户的设置。
+浏览器 connection 还会按需提供 Gateway 的账户偏好和项目 Provider 设置 transport。账户偏好请求使用同源、revision 校验和不含敏感值的响应，覆盖语言、主题、忙碌 Enter、对话宽度和字号；项目模型请求覆盖项目 Provider 描述、加密凭据状态、端点发现和 mutation 应答，凭据值不会进入响应。不提供这些路由的 Host 会让 transport 保持缺失，调用方应显示明确的不可用状态，而不是回退到另一个账户的设置。
 
 ## /api 浏览器信任栅栏
 

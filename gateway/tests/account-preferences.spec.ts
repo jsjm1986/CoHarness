@@ -2,7 +2,7 @@ import { mkdtempSync } from 'node:fs'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AuthService } from '../src/auth.ts'
 import type {
   AccountPreferenceMutation, AccountPreferencesView, GatewayAccountPreferencesService,
@@ -24,12 +24,12 @@ const VIEW: AccountPreferencesView = {
   values: {
     locale: { preference: 'zh' },
     'ui-theme': { preference: 'dark' },
-    'ui-conversation': { busyEnter: 'steer' },
+    'ui-conversation': { busyEnter: 'steer', chatContentWidth: 840, chatFontSize: 15 },
   },
   overrides: {
     locale: { preference: 'zh' },
     'ui-theme': { preference: 'dark' },
-    'ui-conversation': { busyEnter: 'steer' },
+    'ui-conversation': { busyEnter: 'steer', chatContentWidth: 840, chatFontSize: 15 },
   },
 }
 
@@ -48,7 +48,30 @@ async function setup() {
       if (mutation.expectedRevision !== undefined && mutation.expectedRevision !== current.revision) {
         throw new Error('account preference revision conflict')
       }
-      current = { ...current, revision: current.revision + 1 }
+      if (mutation.namespace === 'ui-conversation'
+        && (mutation.field === 'chatContentWidth' || mutation.field === 'chatFontSize')
+        && mutation.operation === 'set') {
+        current = {
+          ...current,
+          revision: current.revision + 1,
+          values: {
+            ...current.values,
+            'ui-conversation': {
+              ...current.values['ui-conversation'],
+              [mutation.field]: mutation.value,
+            },
+          },
+          overrides: {
+            ...current.overrides,
+            'ui-conversation': {
+              ...current.overrides['ui-conversation'],
+              [mutation.field]: mutation.value,
+            },
+          },
+        }
+      } else {
+        current = { ...current, revision: current.revision + 1 }
+      }
       return structuredClone(current)
     },
   }
@@ -118,6 +141,31 @@ describe('Gateway account preferences route', () => {
     })
     expect(bad.status).toBe(400)
     expect(calls).toBe(0)
+  })
+
+  it('accepts account-owned conversation display fields', async () => {
+    const { base, cookie } = await setup()
+    const write = await fetch(`${base}/account/api/preferences`, {
+      method: 'PATCH', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        namespace: 'ui-conversation', field: 'chatContentWidth', operation: 'set', value: 920, expectedRevision: 4,
+      }),
+    })
+    expect(write.status).toBe(200)
+    expect((await write.json()).values['ui-conversation']).toMatchObject({ chatContentWidth: 920, chatFontSize: 15 })
+  })
+
+  it('rejects out-of-range conversation display fields before the service runs', async () => {
+    const { base, cookie, deps } = await setup()
+    const mutate = vi.spyOn(deps.userPreferences!, 'mutate')
+    const write = await fetch(`${base}/account/api/preferences`, {
+      method: 'PATCH', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        namespace: 'ui-conversation', field: 'chatFontSize', operation: 'set', value: 99, expectedRevision: 4,
+      }),
+    })
+    expect(write.status).toBe(400)
+    expect(mutate).not.toHaveBeenCalled()
   })
 
   it('marks an absent account store as unsupported so embedded Hosts can fall back', async () => {

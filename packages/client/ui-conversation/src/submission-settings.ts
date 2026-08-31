@@ -1,4 +1,4 @@
-/** Busy-Enter preference stored in the Host user-settings document. */
+/** Account-owned conversation preferences, with a Host-settings fallback. */
 
 import z from '@deepseek-ai/schemastery'
 

@@ -160,7 +160,7 @@ describePg('PostgreSQL baseline', () => {
         session_id,seq,event_type,occurred_at,event,payload_bytes
       ) VALUES('legacy-nul-session',0,'user/message',now(),$1::json,octet_length($1::text))`, [legacyEvent])
       const migrated = await runMigrations(pool, MIGRATIONS)
-      expect(migrated).toEqual({ applied: [16, 17, 18, 19, 20, 21, 22], current: 22 })
+      expect(migrated).toEqual({ applied: [16, 17, 18, 19, 20, 21, 22, 23], current: 23 })
       const legacyFacts = await pool.query<{
         has_visible_content: boolean
         visible_content_seq: string | null
@@ -176,7 +176,7 @@ describePg('PostgreSQL baseline', () => {
       await rm(legacyMigrations, { recursive: true, force: true })
     }
     expect(await runMigrations(pool, MIGRATIONS))
-      .toEqual({ applied: [], current: 22 })
+      .toEqual({ applied: [], current: 23 })
     const pushTables = await pool.query<{ table_name: string }>(`SELECT table_name
       FROM information_schema.tables
       WHERE table_schema='harness' AND table_name IN ('push_devices','push_deliveries')
@@ -1561,13 +1561,24 @@ describePg('PostgreSQL baseline', () => {
       expect(migratedPreferences).toMatchObject({
         revision: 1,
         migrated: true,
-        values: { 'ui-theme': { preference: 'dark' }, 'ui-conversation': { busyEnter: 'steer' } },
+        values: {
+          'ui-theme': { preference: 'dark' },
+          'ui-conversation': { busyEnter: 'steer', chatContentWidth: 748, chatFontSize: 14 },
+        },
       })
       const changedPreferences = await accountPreferences.mutate(member, {
         namespace: 'ui-theme', field: 'preference', operation: 'set', value: 'light',
         expectedRevision: migratedPreferences.revision,
       })
       expect(changedPreferences).toMatchObject({ revision: 2, values: { 'ui-theme': { preference: 'light' } } })
+      const changedDisplay = await accountPreferences.mutate(member, {
+        namespace: 'ui-conversation', field: 'chatContentWidth', operation: 'set', value: 920,
+        expectedRevision: changedPreferences.revision,
+      })
+      expect(changedDisplay).toMatchObject({
+        revision: 3,
+        values: { 'ui-conversation': { chatContentWidth: 920, chatFontSize: 14 } },
+      })
       await expect(accountPreferences.mutate(member, {
         namespace: 'locale', field: 'preference', operation: 'set', value: 'en',
         expectedRevision: migratedPreferences.revision,

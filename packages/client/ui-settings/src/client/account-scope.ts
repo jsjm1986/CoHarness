@@ -93,7 +93,11 @@ export class AccountPreferencesMirror {
       ? {}
       : ns === 'ui-theme'
         ? { preference: 'system' }
-        : { busyEnter: 'queue' }
+        : {
+          busyEnter: 'queue',
+          chatContentWidth: 748,
+          chatFontSize: 14,
+        }
     const value = ns === 'locale'
       ? view.values.locale
       : ns === 'ui-theme'
@@ -218,7 +222,7 @@ export class AccountSettingsScopeController<T> implements SettingsScope<T> {
         namespace: this.spec.namespace as AccountPreferenceMutation['namespace'],
         field: input.field as AccountPreferenceMutation['field'],
         operation: input.operation,
-        ...(input.operation === 'set' ? { value: String(input.value) } : {}),
+        ...(input.operation === 'set' ? { value: input.value as string | number } : {}),
         /* v8 ignore next -- a ready account namespace always carries the mirror revision. */
         ...(revision === undefined ? {} : { expectedRevision: revision }),
       }

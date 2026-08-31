@@ -2,6 +2,13 @@
 
 import { readApiResponseJson } from '@deepseek-ai/dsh-host-apiproxy/client'
 
+const DEFAULT_CHAT_CONTENT_WIDTH = 748
+const CHAT_CONTENT_WIDTH_MIN = 560
+const CHAT_CONTENT_WIDTH_MAX = 1080
+const DEFAULT_CHAT_FONT_SIZE = 14
+const CHAT_FONT_SIZE_MIN = 12
+const CHAT_FONT_SIZE_MAX = 17
+
 /** Account preference namespace accepted by the Gateway. */
 export type AccountPreferenceNamespace = 'locale' | 'ui-theme' | 'ui-conversation'
 
@@ -11,12 +18,20 @@ export interface AccountPreferencesView {
   values: {
     locale: { preference?: 'zh' | 'en' }
     'ui-theme': { preference: 'light' | 'dark' | 'system' }
-    'ui-conversation': { busyEnter: 'queue' | 'steer' }
+    'ui-conversation': {
+      busyEnter: 'queue' | 'steer'
+      chatContentWidth: number
+      chatFontSize: number
+    }
   }
   overrides: {
     locale: { preference?: 'zh' | 'en' }
     'ui-theme': { preference?: 'light' | 'dark' | 'system' }
-    'ui-conversation': { busyEnter?: 'queue' | 'steer' }
+    'ui-conversation': {
+      busyEnter?: 'queue' | 'steer'
+      chatContentWidth?: number
+      chatFontSize?: number
+    }
   }
   migrated: boolean
 }
@@ -24,9 +39,9 @@ export interface AccountPreferencesView {
 /** Narrow account preference mutation sent to the Gateway. */
 export interface AccountPreferenceMutation {
   namespace: AccountPreferenceNamespace
-  field: 'preference' | 'busyEnter'
+  field: 'preference' | 'busyEnter' | 'chatContentWidth' | 'chatFontSize'
   operation: 'set' | 'unset'
-  value?: string
+  value?: string | number
   expectedRevision?: number
 }
 
@@ -98,6 +113,49 @@ function busyEnter(value: unknown): { busyEnter: 'queue' | 'steer' } {
   return { busyEnter: row.busyEnter }
 }
 
+function numberPreference(value: unknown, fallback: number, min: number, max: number): number {
+  if (value === undefined) return fallback
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) {
+    throw new Error('invalid account preferences response')
+  }
+  return value
+}
+
+function optionalNumberPreference(value: unknown, min: number, max: number): number | undefined {
+  if (value === undefined) return undefined
+  return numberPreference(value, min, min, max)
+}
+
+function conversation(value: unknown): {
+  busyEnter: 'queue' | 'steer'
+  chatContentWidth: number
+  chatFontSize: number
+} {
+  const row = object(value)
+  return {
+    busyEnter: busyEnter(value).busyEnter,
+    chatContentWidth: numberPreference(
+      row.chatContentWidth, DEFAULT_CHAT_CONTENT_WIDTH, CHAT_CONTENT_WIDTH_MIN, CHAT_CONTENT_WIDTH_MAX,
+    ),
+    chatFontSize: numberPreference(row.chatFontSize, DEFAULT_CHAT_FONT_SIZE, CHAT_FONT_SIZE_MIN, CHAT_FONT_SIZE_MAX),
+  }
+}
+
+function optionalConversation(value: unknown): {
+  busyEnter?: 'queue' | 'steer'
+  chatContentWidth?: number
+  chatFontSize?: number
+} {
+  const row = object(value)
+  const chatContentWidth = optionalNumberPreference(row.chatContentWidth, CHAT_CONTENT_WIDTH_MIN, CHAT_CONTENT_WIDTH_MAX)
+  const chatFontSize = optionalNumberPreference(row.chatFontSize, CHAT_FONT_SIZE_MIN, CHAT_FONT_SIZE_MAX)
+  return {
+    ...optionalBusyEnter(value),
+    ...(chatContentWidth === undefined ? {} : { chatContentWidth }),
+    ...(chatFontSize === undefined ? {} : { chatFontSize }),
+  }
+}
+
 /** Decode a Gateway account preference response at the browser trust boundary.
  * @param value - untrusted JSON response.
  * @returns the validated account preference view.
@@ -111,12 +169,12 @@ export function parseAccountPreferences(value: unknown): AccountPreferencesView 
     values: {
       locale: optionalLocale(values.locale),
       'ui-theme': theme(values['ui-theme']),
-      'ui-conversation': busyEnter(values['ui-conversation']),
+      'ui-conversation': conversation(values['ui-conversation']),
     },
     overrides: {
       locale: optionalLocale(object(root.overrides).locale),
       'ui-theme': optionalTheme(object(root.overrides)['ui-theme']),
-      'ui-conversation': optionalBusyEnter(object(root.overrides)['ui-conversation']),
+      'ui-conversation': optionalConversation(object(root.overrides)['ui-conversation']),
     },
     migrated: root.migrated,
   }

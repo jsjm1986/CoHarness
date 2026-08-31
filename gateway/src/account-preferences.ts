@@ -7,13 +7,29 @@ export type AccountPreferenceNamespace = 'locale' | 'ui-theme' | 'ui-conversatio
 export type AccountPreferenceField =
   | { namespace: 'locale'; field: 'preference' }
   | { namespace: 'ui-theme'; field: 'preference' }
-  | { namespace: 'ui-conversation'; field: 'busyEnter' }
+  | { namespace: 'ui-conversation'; field: 'busyEnter' | 'chatContentWidth' | 'chatFontSize' }
+
+/** Account-owned transcript width limits shared by the browser controls. */
+export const ACCOUNT_CHAT_CONTENT_WIDTH_RANGE = { min: 560, max: 1080 } as const
+
+/** Account-owned transcript font-size limits shared by the browser controls. */
+export const ACCOUNT_CHAT_FONT_SIZE_RANGE = { min: 12, max: 17 } as const
+
+/** Default transcript width when an account has no explicit override. */
+export const DEFAULT_ACCOUNT_CHAT_CONTENT_WIDTH = 748
+
+/** Default transcript font size when an account has no explicit override. */
+export const DEFAULT_ACCOUNT_CHAT_FONT_SIZE = 14
 
 /** Effective account preferences returned to browser clients. */
 export interface AccountPreferenceValues {
   locale: { preference?: 'zh' | 'en' }
   'ui-theme': { preference: 'light' | 'dark' | 'system' }
-  'ui-conversation': { busyEnter: 'queue' | 'steer' }
+  'ui-conversation': {
+    busyEnter: 'queue' | 'steer'
+    chatContentWidth: number
+    chatFontSize: number
+  }
 }
 
 /** Redacted account preference response. Values never contain credentials. */
@@ -26,7 +42,11 @@ export interface AccountPreferencesView {
   overrides: {
     locale: { preference?: 'zh' | 'en' }
     'ui-theme': { preference?: 'light' | 'dark' | 'system' }
-    'ui-conversation': { busyEnter?: 'queue' | 'steer' }
+    'ui-conversation': {
+      busyEnter?: 'queue' | 'steer'
+      chatContentWidth?: number
+      chatFontSize?: number
+    }
   }
   /** Whether the account row has been migrated from the legacy settings file. */
   migrated: boolean
@@ -35,7 +55,7 @@ export interface AccountPreferencesView {
 /** One narrow account preference mutation. */
 export type AccountPreferenceMutation = AccountPreferenceField & {
   operation: 'set' | 'unset'
-  value?: string
+  value?: string | number
   expectedRevision?: number
 }
 
@@ -69,7 +89,11 @@ export class AccountPreferencesInputError extends Error {
 export const ACCOUNT_PREFERENCE_DEFAULTS: AccountPreferenceValues = {
   locale: {},
   'ui-theme': { preference: 'system' },
-  'ui-conversation': { busyEnter: 'queue' },
+  'ui-conversation': {
+    busyEnter: 'queue',
+    chatContentWidth: DEFAULT_ACCOUNT_CHAT_CONTENT_WIDTH,
+    chatFontSize: DEFAULT_ACCOUNT_CHAT_FONT_SIZE,
+  },
 }
 
 /** Validate a positive, finite revision received from a browser. */
@@ -93,14 +117,22 @@ export function normalizeAccountPreferenceMutation(
   if (namespace !== 'locale' && namespace !== 'ui-theme' && namespace !== 'ui-conversation') {
     throw new AccountPreferencesInputError('unsupported account preference namespace')
   }
-  const validField = namespace === 'ui-conversation' ? field === 'busyEnter' : field === 'preference'
+  const validField = namespace === 'ui-conversation'
+    ? field === 'busyEnter' || field === 'chatContentWidth' || field === 'chatFontSize'
+    : field === 'preference'
   if (!validField) throw new AccountPreferencesInputError('unsupported account preference field')
   if (operation !== 'set' && operation !== 'unset') {
     throw new AccountPreferencesInputError('account preference operation must be set or unset')
   }
   assertPreferenceRevision(row.expectedRevision)
   const raw = row.value
-  if (operation === 'set' && typeof raw !== 'string') {
+  const numericConversationField = namespace === 'ui-conversation'
+    && (field === 'chatContentWidth' || field === 'chatFontSize')
+  if (operation === 'set' && numericConversationField
+    && typeof raw !== 'number' && typeof raw !== 'string') {
+    throw new AccountPreferencesInputError('conversation display preference requires a number')
+  }
+  if (operation === 'set' && !numericConversationField && typeof raw !== 'string') {
     throw new AccountPreferencesInputError('account preference set requires a string value')
   }
   if (namespace === 'locale' && field === 'preference' && operation === 'set'
@@ -114,6 +146,24 @@ export function normalizeAccountPreferenceMutation(
   if (namespace === 'ui-conversation' && field === 'busyEnter' && operation === 'set'
     && raw !== 'queue' && raw !== 'steer') {
     throw new AccountPreferencesInputError('busyEnter preference must be queue or steer')
+  }
+  if (numericConversationField && operation === 'set') {
+    const numberValue = typeof raw === 'number' ? raw : Number(raw)
+    const range = field === 'chatContentWidth'
+      ? ACCOUNT_CHAT_CONTENT_WIDTH_RANGE
+      : ACCOUNT_CHAT_FONT_SIZE_RANGE
+    if (!Number.isSafeInteger(numberValue) || numberValue < range.min || numberValue > range.max) {
+      throw new AccountPreferencesInputError(
+        `${field} must be an integer between ${String(range.min)} and ${String(range.max)}`,
+      )
+    }
+    return {
+      namespace,
+      field: field as AccountPreferenceField['field'],
+      operation,
+      value: numberValue,
+      ...(row.expectedRevision === undefined ? {} : { expectedRevision: row.expectedRevision as number }),
+    } as AccountPreferenceMutation
   }
   return {
     namespace,

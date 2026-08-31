@@ -11,12 +11,12 @@ function view(overrides: Partial<Record<string, unknown>> = {}): Record<string, 
     values: {
       locale: { preference: 'zh' },
       'ui-theme': { preference: 'dark' },
-      'ui-conversation': { busyEnter: 'steer' },
+      'ui-conversation': { busyEnter: 'steer', chatContentWidth: 840, chatFontSize: 15 },
     },
     overrides: {
       locale: { preference: 'zh' },
       'ui-theme': { preference: 'dark' },
-      'ui-conversation': { busyEnter: 'steer' },
+      'ui-conversation': { busyEnter: 'steer', chatContentWidth: 840, chatFontSize: 15 },
     },
     ...overrides,
   }
@@ -29,6 +29,9 @@ describe('account preference browser transport', () => {
         status: 200, headers: { 'content-type': 'application/json' },
       }))
       .mockResolvedValueOnce(new Response(JSON.stringify(view({ revision: 3 })), {
+        status: 200, headers: { 'content-type': 'application/json' },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(view({ revision: 4 })), {
         status: 200, headers: { 'content-type': 'application/json' },
       }))
     const transport = createBrowserAccountPreferencesTransport(fetcher)
@@ -44,6 +47,15 @@ describe('account preference browser transport', () => {
       method: 'PATCH',
       body: JSON.stringify({
         namespace: 'ui-theme', field: 'preference', operation: 'set', value: 'light', expectedRevision: 2,
+      }),
+    }))
+    await expect(transport.mutate({
+      namespace: 'ui-conversation', field: 'chatContentWidth', operation: 'set', value: 920, expectedRevision: 3,
+    })).resolves.toMatchObject({ values: { 'ui-conversation': { chatContentWidth: 840 } } })
+    expect(fetcher).toHaveBeenNthCalledWith(3, '/account/api/preferences', expect.objectContaining({
+      method: 'PATCH',
+      body: JSON.stringify({
+        namespace: 'ui-conversation', field: 'chatContentWidth', operation: 'set', value: 920, expectedRevision: 3,
       }),
     }))
   })
@@ -65,5 +77,33 @@ describe('account preference browser transport', () => {
       status: 501,
       code: 'account-preferences-unsupported',
     })
+  })
+
+  it('uses display defaults for an older account response and rejects invalid display values', async () => {
+    const legacy = view()
+    const legacyValues = legacy.values as Record<string, unknown>
+    const legacyConversation = legacyValues['ui-conversation'] as Record<string, unknown>
+    delete legacyConversation.chatContentWidth
+    delete legacyConversation.chatFontSize
+    const legacyFetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(legacy), {
+      status: 200, headers: { 'content-type': 'application/json' },
+    }))
+    await expect(createBrowserAccountPreferencesTransport(legacyFetcher).describe()).resolves.toMatchObject({
+      values: { 'ui-conversation': { chatContentWidth: 748, chatFontSize: 14 } },
+    })
+    const invalidBase = view()
+    const invalidValues = invalidBase.values as Record<string, unknown>
+    const invalid = view({
+      values: {
+        ...invalidValues,
+        'ui-conversation': { busyEnter: 'queue', chatContentWidth: 99, chatFontSize: 14 },
+      },
+    })
+    const invalidFetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(invalid), {
+      status: 200, headers: { 'content-type': 'application/json' },
+    }))
+    await expect(createBrowserAccountPreferencesTransport(invalidFetcher).describe()).rejects.toThrow(
+      'invalid account preferences response',
+    )
   })
 })

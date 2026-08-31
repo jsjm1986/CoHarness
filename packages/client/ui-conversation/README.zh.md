@@ -60,7 +60,7 @@ composer 的文档控件通过浏览器附加命令打开文档管理器；conve
 
 ## 设置权限
 
-忙碌状态下的 Enter 偏好属于账户级 settings scope。即使处于项目作用域，其设置行与 `ComposerSubmissionPolicy` 也会使用账户 transport；在取得可写视图前拒绝变更，提供方限制以内联状态显示，最新写入失败时采用恢复后的值。policy 会随 conversation 插件释放自己的 scope 订阅，因此 HMR 与销毁不会留下设置监听器。
+忙碌状态下的 Enter 偏好以及对话显示偏好都属于账户级 settings 字段。即使处于项目作用域，它们的设置行也会使用账户 transport；在取得可写视图前拒绝变更，提供方限制以内联状态显示，最新写入失败时采用恢复后的值。宽度和字号写入使用数值，并与 Enter 偏好共用同一个账户 revision 栅栏，因此一个字段不会污染另一个字段的写入状态。policy 与显示控制器会随 conversation 插件释放自己的 scope 订阅，因此 HMR 与销毁不会留下设置监听器。
 
 ## 模型体验
 

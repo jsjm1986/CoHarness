@@ -10,7 +10,7 @@ Wire consumer layer: the client plugin's apply mounts `ctx.connection` (shared a
 
 The shared unary carrier reads successful JSON responses through a 16 MiB byte budget by default; `AbstractApiClient` and `InProcessApiClient` accept a positive override where a deployment needs a smaller limit. The bounded reader accepts an optional `AbortSignal` and cancels a response body when the caller disconnects. An over-limit response is rejected before envelope parsing.
 
-The browser connection also exposes optional Gateway transports for account preferences and project-owned model settings. Account preference requests are same-origin, revision-fenced, and value-safe; project model requests cover the project Provider descriptor, encrypted-credential state, endpoint discovery, and mutation responses without putting a key value in a response. A host that does not provide these routes leaves the transports absent, so callers show an explicit unavailable state instead of falling back to another account's settings.
+The browser connection also exposes optional Gateway transports for account preferences and project-owned model settings. Account preference requests are same-origin, revision-fenced, and value-safe; they cover locale, theme, busy-Enter, transcript width, and transcript font size. Project model requests cover the project Provider descriptor, encrypted-credential state, endpoint discovery, and mutation responses without putting a key value in a response. A host that does not provide these routes leaves the transports absent, so callers show an explicit unavailable state instead of falling back to another account's settings.
 
 ## /api browser-trust fence
 
