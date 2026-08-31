@@ -716,6 +716,15 @@ describe('running and lock semantics', () => {
     await vi.waitFor(() => { expect(button.getAttribute('aria-label')).toBe('停止生成') })
   })
 
+  it('running treats a ready document-only draft as Send', async () => {
+    const document = documentDraft()
+    const { button, sink } = bench({ running: true, documents: [document] })
+    expect(button.getAttribute('aria-label')).toBe('发送消息')
+    fireEvent.click(button)
+    expect(sink).toHaveBeenCalledWith('', [], ['document-1'], 'queue', expect.any(AbortSignal))
+    await vi.waitFor(() => { expect(button.getAttribute('aria-label')).toBe('停止生成') })
+  })
+
   it('running blocked composer keeps Stop with a retained draft', () => {
     const { button, sink, stop, textarea } = bench({
       running: true,
