@@ -7,9 +7,10 @@
  * ToggleButton) shows both: model name + effort in the caption tone.
  * Data and submission ride the SAME per-session ModelDirectory as the
  * /model popup; exact-model reasoning metadata and the selected effort come
- * from the Host rather than a client-owned vocabulary. A rejected selection
- * announces through the shared transient Toast anchored to the composer
- * card; the in-menu strip with Retry remains the catalog-load surface.
+ * from the Host rather than a client-owned vocabulary. Model rows show the
+ * input capability the catalog disclosed. A rejected selection announces
+ * through the shared transient Toast anchored to the composer card; the
+ * in-menu strip with Retry remains the catalog-load surface.
  */
 import {
   useEffect, useId, useMemo, useRef, useState, useSyncExternalStore,
@@ -23,6 +24,7 @@ import {
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ModelSelectInjected } from './slots.ts'
+import { modelInputCapability } from './capabilities.ts'
 import css from './ModelSelect.module.css'
 
 /** Which pane the dropdown shows: the two-row root or one drilled-in list. */
@@ -258,6 +260,12 @@ export function ModelSelect(
             <div className={css.groupTitle} id={headingId}>{group.name}</div>
             {group.models.map((model) => {
               const selected = state.current?.provider === group.id && state.current.model === model.id
+              const capability = modelInputCapability(model)
+              const capabilityLabel = capability === 'image'
+                ? t('capability.image')
+                : capability === 'text'
+                  ? t('capability.text')
+                  : undefined
               return (
                 <button
                   ref={itemRef()}
@@ -272,6 +280,9 @@ export function ModelSelect(
                 >
                   <span className={css.optionCopy}>
                     <span className={css.modelName}>{model.name}</span>
+                    {capabilityLabel !== undefined && (
+                      <span className={css.capability}>{capabilityLabel}</span>
+                    )}
                   </span>
                   <span className={css.check}>{selected ? <IconCheckOutline16 /> : null}</span>
                 </button>

@@ -14,9 +14,12 @@
  */
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
-import type { ConnectionHandle, SessionId } from '@deepseek-ai/dsh-api-remotes/client'
+import type {
+  ConnectionHandle, ModelSelection, RpcError, SessionId,
+} from '@deepseek-ai/dsh-api-remotes/client'
 import type { SessionRuntime } from '@deepseek-ai/dsh-client-runtime/client'
 import { ModelDirectory } from './directory.ts'
+import type { ModelInputCapability } from './capabilities.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -38,14 +41,30 @@ export class ModelDirectoryResolver extends Service {
 
   /** Localized composer-block copy; this plugin owns the string it raises. */
   private readonly blockReason: () => string
+  /** Product copy for a rejected model selection, shared by both entries. */
+  private readonly formatSelectionError: ((
+    error: RpcError,
+    selection: ModelSelection,
+    modelName: string,
+    capability: ModelInputCapability | undefined,
+  ) => string) | undefined
 
   /**
    * @param ctx - owning root context (the service registers itself as `models`).
-   * @param config - the bound translator for this plugin's own dictionary.
+   * @param config - localized callbacks for composer blocking and selection failures.
    */
-  constructor(ctx: Context, config: { blockReason: () => string }) {
+  constructor(ctx: Context, config: {
+    blockReason: () => string
+    formatSelectionError?: (
+      error: RpcError,
+      selection: ModelSelection,
+      modelName: string,
+      capability: ModelInputCapability | undefined,
+    ) => string
+  }) {
     super(ctx, 'modelDirectories')
     this.blockReason = config.blockReason
+    this.formatSelectionError = config.formatSelectionError
     ctx.on('connection/reset', () => {
       for (const directory of this.live.directories.values()) directory.resetConnected()
     })
@@ -78,6 +97,7 @@ export class ModelDirectoryResolver extends Service {
       connection.api.sessions,
       sessionId,
       () => sessions.subagentAddress(sessionId) === undefined,
+      this.formatSelectionError,
     )
     live.directories.set(sessionId, directory)
     // The composer cannot read this plugin (the dependency runs one way), so

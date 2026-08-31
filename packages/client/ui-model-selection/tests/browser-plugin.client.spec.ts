@@ -14,7 +14,7 @@ import { createScope } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { TestRemote } from '@deepseek-ai/dsh-client-test-runtime'
-import type { ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
+import type { ModelSelection, RpcError } from '@deepseek-ai/dsh-api-remotes/client'
 import type { CommandContribution, SelectOption } from '@deepseek-ai/dsh-client-ui-commands/client'
 import type { ModelSelectInjected } from '../src/client/slots.ts'
 import { apply, inject } from '../src/client/index.ts'
@@ -29,6 +29,7 @@ const GROUPS = [{
     {
       id: 'deepseek-v4-flash',
       name: 'DeepSeek-V4-Flash',
+      inputModalities: ['text'],
       reasoning: {
         efforts: [
           { id: 'off', name: 'Off' },
@@ -41,6 +42,7 @@ const GROUPS = [{
     {
       id: 'deepseek-v4-pro',
       name: 'DeepSeek-V4-Pro',
+      inputModalities: ['text', 'image'],
       reasoning: {
         efforts: [
           { id: 'off', name: 'Off' },
@@ -57,6 +59,7 @@ const GROUPS = [{
 async function bench() {
   const ctx = new Context()
   let current: ModelSelection = { provider: 'deepseek-official', model: 'deepseek-v4-flash' }
+  let selectionFailure: RpcError | undefined
   const calls = { models: 0, select: 0 }
   ctx.provide('connection', { api: { sessions: {
     models: () => {
@@ -67,6 +70,9 @@ async function bench() {
     },
     selectModel: (payload: { provider: string; model: string; reasoningEffort?: string }) => {
       calls.select += 1
+      if (selectionFailure !== undefined) {
+        return Promise.resolve({ result: { ok: false as const, error: selectionFailure } })
+      }
       current = {
         provider: payload.provider,
         model: payload.model,
@@ -133,6 +139,7 @@ async function bench() {
     seat: () => seats.get('conversation.input.model')!,
     hostCurrent: () => current,
     setHostCurrent: (selection: ModelSelection) => { current = selection },
+    setSelectionFailure: (error: RpcError | undefined) => { selectionFailure = error },
     address: (id: SessionId) => { addressed.add(id) },
     setRoutable: (next: boolean) => { routable = next },
     blockOf: (key: string) => blocks.get(sid(key)),
@@ -151,13 +158,38 @@ describe('ui-model-selection dual entry', () => {
     expect(b.seat().locale).toBe('model')
   })
 
-  it('popup options mark the host current active with the provider group in the detail', async () => {
+  it('popup options mark the host current and explain each model input capability', async () => {
     const b = await bench()
     b.mint('s1')
     const options = await b.contribution().ui.options(projection('s1'), new AbortController().signal)
     expect(options.map((o: SelectOption) => o.label)).toEqual(['DeepSeek-V4-Flash', 'DeepSeek-V4-Pro'])
-    expect(options[0]).toMatchObject({ active: true, detail: 'DeepSeek' })
+    expect(options[0]).toMatchObject({ active: true, detail: 'DeepSeek · 仅文本' })
+    expect(options[1]).toMatchObject({ detail: 'DeepSeek · 支持图片' })
     expect(options[1]?.active).toBeUndefined()
+  })
+
+  it('uses actionable localized copy when an image-bearing session rejects a text-only model', async () => {
+    const b = await bench()
+    b.mint('s1')
+    b.setSelectionFailure({
+      code: 'model-unavailable',
+      message: 'Model "deepseek-v4-flash" does not accept image input, but this session already contains images; select an image-capable model.',
+      details: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+    })
+    const face = b.seat().inject!(sid('s1'))
+    await b.contribution().ui.options(projection('s1'), new AbortController().signal)
+    await expect(face.select({
+      provider: 'deepseek-official',
+      model: 'deepseek-v4-flash',
+    })).resolves.toBe(false)
+    expect(face.directory.getSnapshot().error).toBe(
+      '当前对话含有图片，DeepSeek-V4-Flash 仅支持文本。请选择“支持图片”的模型，或新建纯文本对话。',
+    )
+    const options = await b.contribution().ui.options(projection('s1'), new AbortController().signal)
+    const flash = options.find((o: SelectOption) => o.label === 'DeepSeek-V4-Flash')!
+    await expect(b.contribution().ui.onSelect(flash, projection('s1'))).rejects.toThrow(
+      '当前对话含有图片，DeepSeek-V4-Flash 仅支持文本。请选择“支持图片”的模型，或新建纯文本对话。',
+    )
   })
 
   it('a seat selection is the current the popup marks active next — one shared state', async () => {

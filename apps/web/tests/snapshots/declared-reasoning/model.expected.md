@@ -1,0 +1,10 @@
+- menu "模型与推理等级":
+  - group "DeepSeek":
+    - text: DeepSeek
+    - menuitemradio "DeepSeek-V4-Flash"
+  - group "Acme Gateway":
+    - text: Acme Gateway
+    - menuitemradio "Acme Think 支持图片" [checked]:
+      - text: Acme Think 支持图片
+      - img
+    - menuitemradio "Acme Text 仅文本"
