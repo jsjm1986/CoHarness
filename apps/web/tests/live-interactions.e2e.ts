@@ -1,13 +1,14 @@
-// Web e2e scenarios: live-turn interactions — cancellation, error surfacing,
-// and transient-retry recovery, all through the real composition and wire.
-// The model adapter is dsh-llm-replay with override sidecars: `hang` (+ a
-// readyFile marker) makes mid-stream cancel deterministic by construction,
-// `throw` entries express provider failures by stable code, and `{ patches }`
-// augmentation injects a transient throw before the recorded success so
-// llm-retry's recovery is proven end-to-end in the browser. Sidecar CONTENT
-// is authored here (single-sourced against the fixture via deriveReplayScript
-// — no committed copy of recorded chunks); the file is a per-run artifact in
-// the temp workspace. One recorded base fixture serves all three scenarios.
+// Web e2e scenarios: live-turn interactions — running-draft submission,
+// cancellation, error surfacing, and transient-retry recovery, all through the
+// real composition and wire. The model adapter is dsh-llm-replay with override
+// sidecars: `hang` (+ a readyFile marker) makes mid-stream cancel deterministic
+// by construction, `throw` entries express provider failures by stable code,
+// and `{ patches }` augmentation injects a transient throw before the recorded
+// success so llm-retry's recovery is proven end-to-end in the browser. Sidecar
+// CONTENT is authored here (single-sourced against the fixture via
+// deriveReplayScript — no committed copy of recorded chunks); the file is a
+// per-run artifact in the temp workspace. One recorded base fixture serves all
+// four scenarios.
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -27,11 +28,12 @@ import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './suppor
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/live-interactions', import.meta.url))
 const FIXTURE = join(SNAPSHOT_DIR, 'session.jsonl')
-// One golden pins the stable mid-turn loading state; the other three capture
-// what the user is left looking at after cancel, after a non-retryable failure,
-// and after retry recovery.
+// One golden pins the empty mid-turn loading state, one pins the sendable draft
+// state, and the other three capture what the user is left looking at after
+// cancel, after a non-retryable failure, and after retry recovery.
 const CANCEL_EXPECTED = join(SNAPSHOT_DIR, 'cancel.expected.md')
 const LOADING_EXPECTED = join(SNAPSHOT_DIR, 'loading.expected.md')
+const RUNNING_DRAFT_EXPECTED = join(SNAPSHOT_DIR, 'running-draft.expected.md')
 const ERROR_EXPECTED = join(SNAPSHOT_DIR, 'error-auth.expected.md')
 const RETRY_EXPECTED = join(SNAPSHOT_DIR, 'retry.expected.md')
 const MODE = webSnapshotMode()
@@ -41,6 +43,7 @@ const AUTH_PROVIDER_MESSAGE = 'Authentication Fails, Your api key: sk-preview-se
 // patch. Kept deliberately tool-free so the derived script is exactly one
 // model call.
 const PROMPT = 'Reply with a one-sentence description of event sourcing, then stop.'
+const RUNNING_DRAFT = 'Queue this follow-up while the current turn is running.'
 
 /** turn/end reasons observed, in order. */
 function turnEndReasons(events: SessionEvent[]): string[] {
@@ -140,6 +143,22 @@ describe('web e2e: live-turn interactions (cancel / error / retry)', () => {
     ).toBe(true)
     const loadingSnapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold!.workspaceCwd)
     await compareOrRefreshGolden(LOADING_EXPECTED, loadingSnapshot, MODE)
+
+    const input = page.locator('textarea').first()
+    await input.fill(RUNNING_DRAFT)
+    const send = page.getByRole('button', { name: 'Send message', exact: true })
+    await send.waitFor({ timeout: 10_000 })
+    expect(await page.getByRole('button', { name: 'Stop generating', exact: true }).count()).toBe(0)
+    const runningDraftSnapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold!.workspaceCwd)
+    await compareOrRefreshGolden(RUNNING_DRAFT_EXPECTED, runningDraftSnapshot, MODE)
+    await send.click()
+    await expect.poll(() => input.inputValue(), { timeout: 10_000 }).toBe('')
+    const queuedRow = page.locator('[data-queue-dock]').getByRole('listitem').filter({ hasText: RUNNING_DRAFT })
+    await queuedRow.waitFor({ timeout: 10_000 })
+    await page.getByRole('button', { name: 'Stop generating', exact: true }).waitFor({ timeout: 10_000 })
+    await queuedRow.getByRole('button', { name: 'Remove queued message' }).click()
+    await expect.poll(() => queuedRow.count(), { timeout: 10_000 }).toBe(0)
+
     await page.getByRole('button', { name: 'Stop generating' }).click()
     await settled
     expect(turnEndReasons(sessionEvents).at(-1)).toBe('aborted')
@@ -241,7 +260,7 @@ describe('web e2e: live-turn interactions (cancel / error / retry)', () => {
 
   it.skipIf(MODE === 'record')('keeps the fixture inventory closed', async () => {
     await assertFixtureInventory(SNAPSHOT_DIR, [
-      'session.jsonl', 'cancel.expected.md', 'loading.expected.md', 'error-auth.expected.md', 'retry.expected.md',
+      'session.jsonl', 'cancel.expected.md', 'loading.expected.md', 'running-draft.expected.md', 'error-auth.expected.md', 'retry.expected.md',
     ])
   })
 })
