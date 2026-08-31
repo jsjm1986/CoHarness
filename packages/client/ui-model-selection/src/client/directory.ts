@@ -6,10 +6,11 @@
  * either entry is what the other shows next.
  */
 import type {
-  IApiClient, ModelCatalogFailure, ModelProviderGroup, ModelSelection, SessionId, SessionModels,
+  IApiClient, ModelCatalogFailure, ModelProviderGroup, ModelSelection, RpcError, SessionId, SessionModels,
 } from '@deepseek-ai/dsh-api-remotes/client'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import { modelInputCapability, type ModelInputCapability } from './capabilities.ts'
 
 /** Directory snapshot both entries render from. */
 export interface ModelDirectoryState {
@@ -33,6 +34,13 @@ export interface ModelDirectoryState {
   error: string | null
 }
 
+type SelectionErrorFormatter = (
+  error: RpcError,
+  selection: ModelSelection,
+  modelName: string,
+  capability: ModelInputCapability | undefined,
+) => string
+
 /** One session's shared directory controller; disposed with the session scope. */
 export class ModelDirectory {
   /** The shared snapshot both entries render from (uSES-safe store). */
@@ -48,11 +56,13 @@ export class ModelDirectory {
    * @param sessions - the session wire face (captured from the plugin's root connection).
    * @param sessionId - the owning session.
    * @param available - whether this session may use Agent-bound model RPCs.
+   * @param formatSelectionError - optional product copy for a rejected model selection.
    */
   constructor(
     private readonly sessions: Pick<IApiClient['sessions'], 'models' | 'selectModel'>,
     private readonly sessionId: SessionId,
     private readonly available: () => boolean,
+    private readonly formatSelectionError?: SelectionErrorFormatter,
   ) {}
 
   /**
@@ -108,8 +118,11 @@ export class ModelDirectory {
       return
     }
     if (!result.ok) {
-      this.store.update((s) => { s.status = 'error'; s.error = `${result.error.code}: ${result.error.message}` })
-      throw new Error(`session.selectModel failed: ${result.error.code}: ${result.error.message}`)
+      const model = this.modelInfo(selection)
+      const message = this.formatSelectionError?.(result.error, selection, model.name, model.capability)
+        ?? `${result.error.code}: ${result.error.message}`
+      this.store.update((s) => { s.status = 'error'; s.error = message })
+      throw new Error(message)
     }
     // The Host validated the route before accepting it, so a selection that
     // landed is by construction one it can serve.
@@ -150,5 +163,14 @@ export class ModelDirectory {
     if (!this.available()) {
       throw new Error('model selection is unavailable for addressed subagent sessions')
     }
+  }
+
+  private modelInfo(selection: ModelSelection): { name: string; capability: ModelInputCapability | undefined } {
+    for (const group of this.store.getSnapshot().groups) {
+      if (group.id !== selection.provider) continue
+      const model = group.models.find(candidate => candidate.id === selection.model)
+      if (model !== undefined) return { name: model.name, capability: modelInputCapability(model) }
+    }
+    return { name: selection.model, capability: undefined }
   }
 }

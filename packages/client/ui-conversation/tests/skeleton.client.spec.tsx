@@ -100,6 +100,8 @@ function mount(
     summaryOrigin?: 'subagent'
     /** A composer block another plugin raised for this session. */
     composerBlock?: { reason: string }
+    /** Client-local Workspace hint retained while a blank draft awaits Host attachment. */
+    summaryWorkspaceId?: WorkspaceId
     /** Mutable view ledger used by registration-order regressions. */
     viewTabs?: ViewTab[]
   } = {},
@@ -109,6 +111,7 @@ function mount(
   const childRow = {
     id: SID, displayTitle: 'Child', parentId: root, cwd: '/projects/one',
     running: false, blank: options.summaryBlank ?? false, updatedAt: 2,
+    ...(options.summaryWorkspaceId === undefined ? {} : { workspaceId: options.summaryWorkspaceId }),
     ...(options.summaryOrigin === undefined ? {} : { origin: options.summaryOrigin }),
   }
   const listed = options.omitSummaryRow !== true
@@ -132,6 +135,7 @@ function mount(
   const useInput = bindSnapshotSelector(wiring.state)
   const inputActions = wiring.actions
   const stop = vi.fn()
+  const newSession = vi.fn()
   const open = vi.fn()
   const slotCalls: string[] = []
   const viewTabs = options.viewTabs ?? [
@@ -264,11 +268,12 @@ function mount(
     renderSlot,
     renderSlotChain,
     selectWorkspace: retargetWorkspace,
+    newSession,
     t,
   }
   const view = render(<ConversationRoot {...props} />)
   return {
-    view, chat, sink, retargetWorkspace, session, slotCalls, seatOwners, open, displaySettings,
+    view, chat, sink, retargetWorkspace, newSession, session, slotCalls, seatOwners, open, displaySettings,
     pickerOwner: () => pickerOwner,
     rerender: () => { view.rerender(<ConversationRoot {...props} />) },
   }
@@ -376,6 +381,34 @@ describe('ConversationRoot resident composer', () => {
       settingsSection: 'model',
     })
     expect(typeof (modelSeat as { onOpenSettings?: unknown } | undefined)?.onOpenSettings).toBe('function')
+  })
+
+  it('offers an explicit New conversation action in the Hero', () => {
+    const b = mount(conversationSnapshot({ composerPhase: 'blank', blank: true }))
+    fireEvent.click(b.view.getByRole('button', { name: '新建对话' }))
+    expect(b.newSession).toHaveBeenCalledWith(wid('one'))
+  })
+
+  it('uses the local Workspace hint while a blank draft is not attached yet', () => {
+    const b = mount(
+      conversationSnapshot({ composerPhase: 'blank', blank: true }),
+      [workspace('pending')],
+      undefined,
+      { summaryBlank: true, summaryWorkspaceId: wid('pending') },
+    )
+    expect(b.view.getByText('pending')).toBeTruthy()
+    fireEvent.click(b.view.getByRole('button', { name: '新建对话' }))
+    expect(b.newSession).toHaveBeenCalledWith(wid('pending'))
+  })
+
+  it('does not keep a deleted Workspace as a New conversation target', () => {
+    const b = mount(
+      conversationSnapshot({ composerPhase: 'blank', blank: true }),
+      [],
+      undefined,
+      { summaryBlank: true, summaryWorkspaceId: wid('deleted') },
+    )
+    expect(b.view.queryByRole('button', { name: '新建对话' })).toBeNull()
   })
 
   it('keeps composer text in the machine, mirrors to the chat store, and submits through the sink', () => {

@@ -98,8 +98,9 @@ function rowHalf(e: { clientY: number; currentTarget: HTMLElement }): 'before' |
 
 /**
  * Project (workspace) header row: folder + title;
- * hover reveals the chevron and create button, and dwelling on a real
- * Workspace shows its hover card (the ungrouped bucket has none).
+ * hover reveals the chevron and management actions, while the create button
+ * remains visible. Dwelling on a real Workspace shows its hover card (the
+ * ungrouped bucket has none).
  * `containsCurrent` arrives on the node (derivation fact, no renderer scan).
  * @param props.group - derived group node.
  * @param props.onToggle - expand/collapse the group.
@@ -155,6 +156,16 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, home,
       <span className={css.projectText}>
         <span className={css.title}>{label}</span>
       </span>
+      {row.workspaceId !== undefined && (
+        <button
+          type="button"
+          className={css.iconButton}
+          aria-label={t('actions.newSession.aria', { name: label })}
+          onClick={(e) => { e.stopPropagation(); onCreate() }}
+        >
+          <IconPlusOutline16 />
+        </button>
+      )}
       <span className={css.rowActions}>
         {actions !== undefined && (
           <Menu
@@ -184,14 +195,16 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, home,
             )}
           />
         )}
-        <button
-          type="button"
-          className={css.iconButton}
-          aria-label={t('actions.newSession.aria', { name: label })}
-          onClick={(e) => { e.stopPropagation(); onCreate() }}
-        >
-          <IconPlusOutline16 />
-        </button>
+        {row.workspaceId === undefined && (
+          <button
+            type="button"
+            className={css.iconButton}
+            aria-label={t('actions.newSession.aria', { name: label })}
+            onClick={(e) => { e.stopPropagation(); onCreate() }}
+          >
+            <IconPlusOutline16 />
+          </button>
+        )}
       </span>
     </div>
   )

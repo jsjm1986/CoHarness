@@ -7,12 +7,14 @@
  * so the host-reported current selection is the single fact both surfaces echo
  * — a switch made in either entry is what the other shows next. Failures
  * ride each entry's own retry surface (popup shell error/retry; seat menu
- * inline error) without forking the state. Addressed subagent sessions expose
- * neither entry because those Agent-bound RPCs would activate persisted
- * history outside the direct-parent continuation path.
+ * inline error) without forking the state. Model rows identify the input
+ * capability the catalog disclosed, and an image-history mismatch gets
+ * localized recovery guidance. Addressed subagent sessions expose neither
+ * entry because those Agent-bound RPCs would activate persisted history
+ * outside the direct-parent continuation path.
  */
 // Type-only: the carrier types, the forwarded Host-event face and the ctx.remote merge.
-import type { ModelSelection, SessionModels } from '@deepseek-ai/dsh-api-remotes/client'
+import type { ModelSelection, RpcError, SessionModels } from '@deepseek-ai/dsh-api-remotes/client'
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type { CommandUiContract, SelectOption } from '@deepseek-ai/dsh-client-ui-commands/client'
 // Type-only: pulls the ui-conversation SlotMap merge (the input.model seat).
@@ -24,6 +26,7 @@ import type { ModelDirectoryState } from './directory.ts'
 import { ModelDirectoryResolver } from './service.ts'
 import type { ModelSelectInjected } from './slots.ts'
 import { ModelSelect } from './ModelSelect.tsx'
+import { modelInputCapability, type ModelInputCapability } from './capabilities.ts'
 import { en, zh, type ModelKey } from './locales.ts'
 
 export { ModelDirectory } from './directory.ts'
@@ -49,10 +52,21 @@ function optionsOf(directory: SessionModels, t: TranslateNS<'model'>): SelectOpt
   const rows: SelectOption[] = []
   for (const group of directory.groups) {
     for (const model of group.models) {
+      const capability = modelInputCapability(model)
+      const capabilityLabel = capability === 'image'
+        ? t('capability.image')
+        : capability === 'text'
+          ? t('capability.text')
+          : undefined
+      const detail = [
+        group.name,
+        model.description,
+        capabilityLabel,
+      ].filter((part): part is string => part !== undefined && part !== '')
       rows.push({
         id: rowId(group.id, model.id),
         label: model.name,
-        detail: model.description !== undefined ? `${group.name} · ${model.description}` : group.name,
+        detail: detail.join(' · '),
         ...(directory.current.provider === group.id && directory.current.model === model.id
           ? { active: true } : {}),
       })
@@ -66,6 +80,24 @@ function optionsOf(directory: SessionModels, t: TranslateNS<'model'>): SelectOpt
     })
   }
   return rows
+}
+
+/** Keep model-selection failures actionable without changing the shared wire error vocabulary. */
+function formatSelectionError(
+  error: RpcError,
+  selection: ModelSelection,
+  modelName: string,
+  capability: ModelInputCapability | undefined,
+  t: TranslateNS<'model'>,
+): string {
+  // The catalog is the capability authority. The message check only confirms
+  // that this particular Host refusal is the image-history case; it prevents
+  // an unavailable text route from being mislabeled as a modality conflict.
+  if (error.code === 'model-unavailable' && capability === 'text'
+    && /image/i.test(error.message)) {
+    return t('error.imageConflict', { model: modelName || selection.model })
+  }
+  return `${error.code}: ${error.message}`
 }
 
 /**
@@ -114,7 +146,12 @@ export function apply(ctx: ClientContext): void {
 
   // The composer-block reason is this plugin's own copy, read at raise time so
   // a locale change reaches the next publish.
-  ctx.plugin(ModelDirectoryResolver, { blockReason: () => t('blocked.composer') })
+  ctx.plugin(ModelDirectoryResolver, {
+    blockReason: () => t('blocked.composer'),
+    formatSelectionError: (error, selection, modelName, capability) => (
+      formatSelectionError(error, selection, modelName, capability, t)
+    ),
+  })
 
   // Entry 1: the /model popupSelect over the shared directory. The command
   // description is registry-held text: it reads t() once at registration and

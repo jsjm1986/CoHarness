@@ -511,6 +511,51 @@ describe('create', () => {
     expect(b.svc.scope(born)).toBeDefined()
   })
 
+  it('keeps a workspace hint for a blank draft across list refreshes', async () => {
+    const b = bench()
+    await feedList(b, [])
+    b.api.onCreate = () => Promise.resolve(ok({ sessionId: sid('draft') }))
+    const draft = await b.svc.create({
+      workspaceId: 'workspace' as never,
+      sessionId: sid('draft'),
+      draftId: 'draft-reservation' as never,
+    })
+    expect(b.svc.list.getSnapshot().byId[draft]).toMatchObject({ workspaceId: 'workspace', blank: true })
+
+    // The Gateway omits an unmaterialized draft from the next authoritative
+    // list; the local row remains addressable until its first visible event.
+    await feedList(b, [])
+    expect(b.svc.list.getSnapshot().byId[draft]).toMatchObject({ workspaceId: 'workspace', blank: true })
+    // If the Host does return the row before membership is attached, the
+    // local hint enriches that baseline rather than being replaced by it.
+    await feedList(b, [{ id: 'draft', blank: true }])
+    expect(b.svc.list.getSnapshot().byId[draft]).toMatchObject({ workspaceId: 'workspace', blank: true })
+
+    b.svc.handleMuxEnvelope({
+      rpcId: 'event' as never,
+      payload: {
+        type: 'session/event', sessionId: draft,
+        event: {
+          type: 'user/message', seq: 1, time: 2,
+          data: createUserMessage({ content: [{ type: 'text', text: 'first message' }], source: { kind: 'user' } }),
+          surfaceOp: 'append',
+        },
+      } as never,
+    })
+    await Promise.resolve()
+    expect(b.svc.list.getSnapshot().byId[draft]).toMatchObject({ blank: false })
+    expect(b.svc.list.getSnapshot().byId[draft]?.workspaceId).toBeUndefined()
+
+    // A non-blank Host upsert is also authoritative even if it races the
+    // first visible mux event.
+    b.svc.handleHostEnvelope({
+      rpcId: 'upsert' as never,
+      payload: { type: 'host/session-added', sessionId: draft, blank: false },
+    })
+    await Promise.resolve()
+    expect(b.svc.list.getSnapshot().byId[draft]?.workspaceId).toBeUndefined()
+  })
+
   it('lists the published id after Workspace attachment fails (publication precedes attachment)', async () => {
     const b = bench()
     b.api.onCreate = () => Promise.resolve({

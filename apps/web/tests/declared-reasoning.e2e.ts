@@ -1,6 +1,7 @@
-// Web e2e scenario: a hand-declared model's `reasoningEfforts` reaches the
-// composer's effort pane — the levels a settings profile declares are exactly
-// what the picker offers, and picking one records it with the Agent default.
+// Web e2e scenario: a hand-declared model's input capability and
+// `reasoningEfforts` reach the composer picker — the model labels and effort
+// levels a settings profile declares are exactly what the picker offers, and
+// picking one records it with the Agent default.
 // Zero model calls: declaring, describing, and switching are settings/llm
 // traffic only, so there is no fixture and a stray stream would fail loud.
 import { readFile } from 'node:fs/promises'
@@ -20,6 +21,7 @@ import { ZH_BROWSER_LOCALE, connectFreshWorkspaceZh, saveFailureShot } from './s
 const OVERLAY = fileURLToPath(new URL('./declared-reasoning.overlay.yml', import.meta.url))
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/declared-reasoning', import.meta.url))
 const UI_EXPECTED = fileURLToPath(new URL('./snapshots/declared-reasoning/ui.expected.md', import.meta.url))
+const MODEL_EXPECTED = fileURLToPath(new URL('./snapshots/declared-reasoning/model.expected.md', import.meta.url))
 const MODE = webSnapshotMode()
 
 describe.skipIf(MODE === 'record')('web e2e: declared reasoning efforts reach the composer', () => {
@@ -43,7 +45,12 @@ describe.skipIf(MODE === 'record')('web e2e: declared reasoning efforts reach th
           models: [{
             id: 'acme-think',
             name: 'Acme Think',
+            input: ['text', 'image'],
             reasoningEfforts: { off: null, high: 'high', max: 'ultra' },
+          }, {
+            id: 'acme-text',
+            name: 'Acme Text',
+            input: ['text'],
           }],
         },
       },
@@ -65,6 +72,11 @@ describe.skipIf(MODE === 'record')('web e2e: declared reasoning efforts reach th
     onTestFailed(() => saveFailureShot(page, 'web-e2e-declared-reasoning'))
     const trigger = page.getByRole('button', { name: /^选择模型/ })
     await trigger.waitFor({ timeout: 15_000 })
+    await trigger.click()
+    await page.getByRole('menuitem', { name: /模型/ }).click()
+    const modelSnapshot = await captureStableAria(page, '[role="menu"]', scaffold.workspaceCwd)
+    await compareOrRefreshGolden(MODEL_EXPECTED, modelSnapshot, MODE)
+    await page.getByRole('menuitemradio', { name: /Acme Think/ }).click()
     await trigger.click()
     await page.getByRole('menuitem', { name: /推理等级/ }).click()
 
@@ -90,6 +102,6 @@ describe.skipIf(MODE === 'record')('web e2e: declared reasoning efforts reach th
   }, 60_000)
 
   it('keeps its snapshot inventory closed', async () => {
-    await assertFixtureInventory(SNAPSHOT_DIR, ['ui.expected.md'])
+    await assertFixtureInventory(SNAPSHOT_DIR, ['model.expected.md', 'ui.expected.md'])
   })
 })

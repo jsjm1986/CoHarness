@@ -150,6 +150,34 @@ describe('ModelSelect reasoning effort', () => {
       .toEqual(['Default', 'Standard'])
   })
 
+  it('labels the input capability beside each model without changing the selection id', () => {
+    const directory = createSnapshotStore(state({
+      groups: [{
+        id: 'provider',
+        name: 'Provider',
+        models: [
+          { id: 'text', name: 'Text', inputModalities: ['text'] },
+          { id: 'vision', name: 'Vision', inputModalities: ['text', 'image'] },
+        ],
+      }],
+      current: { provider: 'provider', model: 'text' },
+    }))
+    render(<ModelSelect
+      locked={false}
+      available
+      directory={directory}
+      load={vi.fn()}
+      select={vi.fn().mockResolvedValue(true)}
+      t={t}
+    />)
+
+    fireEvent.click(screen.getByRole('button', { name: '选择模型，当前 Text' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /模型/ }))
+    expect(screen.getByText('仅文本')).toBeTruthy()
+    expect(screen.getByText('支持图片')).toBeTruthy()
+    expect(screen.getByRole('menuitemradio', { name: /Vision/ }).textContent).toContain('支持图片')
+  })
+
   it('prompts for a selection when the current model is no longer advertised', () => {
     const directory = createSnapshotStore(state({
       current: { provider: 'deepseek-official', model: 'removed-model' },
@@ -184,7 +212,11 @@ describe('ModelSelect reasoning effort', () => {
     }]
     const directory = createSnapshotStore<ModelDirectoryState>(state({ groups }))
     const select = vi.fn(async () => {
-      directory.set(state({ groups, status: 'error', error: 'model-unavailable: session already contains images' }))
+      directory.set(state({
+        groups,
+        status: 'error',
+        error: '当前对话含有图片，DeepSeek-V4-Pro 仅支持文本。请选择“支持图片”的模型，或新建纯文本对话。',
+      }))
       return false
     })
     render(<ModelSelect
@@ -200,7 +232,9 @@ describe('ModelSelect reasoning effort', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /模型/ }))
     fireEvent.click(screen.getByRole('menuitemradio', { name: /DeepSeek-V4-Pro/ }))
     const toast = await screen.findByRole('alert')
-    expect(toast.textContent).toContain('模型操作失败：model-unavailable: session already contains images')
+    expect(toast.textContent).toContain(
+      '无法切换模型：当前对话含有图片，DeepSeek-V4-Pro 仅支持文本。请选择“支持图片”的模型，或新建纯文本对话。',
+    )
     // The selection failure does not render the in-menu load strip (no Retry).
     expect(screen.queryByRole('button', { name: '重试' })).toBeNull()
   })

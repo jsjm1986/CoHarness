@@ -21,6 +21,8 @@ export interface SessionsPortSummary {
   /** Durable subagent origin; Workspace entry never selects these as the default conversation. */
   origin?: 'subagent'
   cwd?: string
+  /** Client-local Workspace association retained while a Session is blank. */
+  workspaceId?: WorkspaceId
   updatedAt: number
 }
 

@@ -30,6 +30,8 @@ export interface SessionNode {
   /** Finished running while not selected and not yet opened (the green "done" reminder dot). */
   completed: boolean
   updatedAt: number
+  /** Client-local Workspace hint for a blank draft before Host attachment. */
+  workspaceId?: WorkspaceId
   /** Collaboration visibility; present only for project-scoped sessions. */
   visibility?: 'project' | 'private'
   /** Owning project id for project-scoped sessions. */
@@ -183,6 +185,15 @@ function groupByWorkspace(
 ): Group[] {
   const groups: Group[] = []
   const accounted = new Set<SessionId>()
+  // Only the current blank row can be visible; avoid rescanning a large list
+  // of hidden blank reservations on every live event.
+  const currentSummary = list.current === undefined ? undefined : list.byId[list.current]
+  const currentHint = currentSummary?.blank === true && currentSummary.workspaceId !== undefined
+    ? currentSummary
+    : undefined
+  const workspaceMembers = currentHint === undefined
+    ? undefined
+    : new Set(workspaces.flatMap(workspace => workspace.sessionIds))
   for (const workspace of workspaces) {
     const members: SessionSummary[] = []
     for (const id of workspace.sessionIds) {
@@ -191,6 +202,17 @@ function groupByWorkspace(
       accounted.add(id)
       if (!sessionVisible(summary, list.current, archived)) continue
       members.push(summary)
+    }
+    // A newly reserved draft is not attached by the Host until its first
+    // visible message. Its client-local Workspace hint keeps the current
+    // placeholder in the intended group during that short interval.
+    if (currentHint !== undefined && currentHint.workspaceId === workspace.workspaceId
+      && workspaceMembers?.has(currentHint.id) !== true && !accounted.has(currentHint.id)
+      && sessionVisible(currentHint, list.current, archived)) {
+      accounted.add(currentHint.id)
+      // Keep the current provisional row at the top even before Workspace
+      // membership arrives, matching the render-time pin for attached drafts.
+      members.unshift(currentHint)
     }
     groups.push(buildGroup(
       workspace.workspaceId, workspace.workspaceId, workspace.path,
@@ -227,6 +249,7 @@ function sessionNode(
     runningSubagentCount: descendants.get(s.id)?.runningCount ?? 0,
     completed: s.completed === true,
     updatedAt: s.updatedAt,
+    ...(s.workspaceId === undefined ? {} : { workspaceId: s.workspaceId }),
     ...(s.pendingInteraction === undefined ? {} : { pendingInteraction: s.pendingInteraction }),
     ...(s.visibility === undefined ? {} : { visibility: s.visibility }),
     ...(s.projectId === undefined ? {} : { projectId: s.projectId }),
@@ -256,9 +279,11 @@ export function deriveGroups(
   const archived = new Set(archivedSessionIds)
   const expandedGroups = new Set(view.expandedGroups)
   const descendants = indexSubagentDescendants(list.byId)
+  const currentSummary = list.current === undefined ? undefined : list.byId[list.current]
   const currentGroup = list.current === undefined
     ? undefined
     : (workspaces.find(w => w.sessionIds.includes(list.current as SessionId))?.workspaceId as string | undefined)
+        ?? currentSummary?.workspaceId
         ?? UNGROUPED_KEY
   const groups: GroupNode[] = []
   for (const g of groupByWorkspace(list, workspaces, archived, view.ungroupedOrder)) {

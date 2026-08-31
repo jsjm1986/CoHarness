@@ -490,6 +490,21 @@ describe('WorkspaceBrowser', () => {
     expect(screen.queryByText('新会话')).toBeNull()
   })
 
+  it('keeps a newly reserved blank draft in its hinted Workspace and exposes its add action', () => {
+    const draft = summary('alpha-draft', 9, { blank: true, workspaceId: wid('alpha') })
+    const startSession = vi.fn()
+    mount({
+      useSessions: hook(sessionState([draft], { current: draft.id })),
+      useWorkspaces: hook(workspaceState([workspace('alpha', [])])),
+      startSession,
+    })
+    expect(screen.getByText('新会话')).toBeTruthy()
+    const add = screen.getByRole('button', { name: '在“alpha”中新建会话' })
+    expect(add).toBeTruthy()
+    fireEvent.click(add)
+    expect(startSession).toHaveBeenCalledWith(wid('alpha'))
+  })
+
   it('promotes the blank selected by New Session in its grouped and flat orders', async () => {
     const items = [
       summary('old', 100),

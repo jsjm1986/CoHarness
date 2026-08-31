@@ -407,6 +407,34 @@
   padding-left: var(--dsw-space-5);
 }
 
+/* The hero keeps Workspace selection and New conversation as two explicit
+   actions so choosing a Workspace never hides the way to start a fresh chat. */
+.newSession {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--dsw-space-1);
+  min-height: 28px;
+  padding: 0 var(--dsw-space-2);
+  border: none;
+  border-radius: var(--dsw-radius-xl);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.newSession:hover,
+.newSession:focus-visible {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.newSession:focus-visible {
+  outline: 2px solid var(--dsw-alias-border-l3);
+  outline-offset: 2px;
+}
+
 :global([data-viewport='compact']) .root {
   --dsh-composer-side-clearance: 12px;
 }
@@ -504,6 +532,10 @@
   justify-content: center;
   gap: var(--dsw-space-1);
   padding-left: 0;
+}
+
+:global([data-viewport='compact']) .newSession {
+  min-height: var(--dsw-touch-target);
 }
 
 :global([data-viewport-short]) .composerHero {

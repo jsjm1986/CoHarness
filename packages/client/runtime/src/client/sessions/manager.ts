@@ -4,7 +4,7 @@
 
 import type {
   IApiClient, HostFrame, MuxFrame, RpcError, RpcRequest, RpcResult, SessionId,
-  SessionSummary, SubagentAddress, SubagentCatalog, JobView,
+  SessionSummary as WireSessionSummary, SubagentAddress, SubagentCatalog, JobView, WorkspaceId,
 } from '@deepseek-ai/dsh-api-remotes/client'
 // Value import from the inline-safe wire layer (not the connection plugin):
 // plugin-to-plugin value imports are a bundle purity error.
@@ -73,12 +73,15 @@ interface CatalogInflight {
 const MAX_RESYNC_CONCURRENCY = 4
 
 type SessionListMutation =
-  | { kind: 'upsert'; summary: SessionSummary }
+  | { kind: 'upsert'; summary: ClientSessionSummary }
   | { kind: 'remove'; sessionId: SessionId }
   | { kind: 'status'; sessionId: SessionId; running: boolean }
   | { kind: 'activity'; sessionId: SessionId; updatedAt: number }
   /** Local first-send flip: the sender clears blank without waiting for a host frame. */
   | { kind: 'engaged'; sessionId: SessionId; seq: number }
+
+/** Wire summary plus the local Workspace hint retained for a blank draft. */
+type ClientSessionSummary = WireSessionSummary & { workspaceId?: WorkspaceId }
 
 /** Stable identity of a frame retained until an uninstantiated Session can consume it. */
 function bufferedRequestKey(envelope: RpcRequest<MuxFrame>): string | undefined {
@@ -133,7 +136,9 @@ export class SessionManager {
   private readonly projectionStores = new Map<SessionId, ProjectionValueStore>()
   /** Session ids with durable evidence of non-empty conversation content. */
   private readonly engagedSessions = new Set<SessionId>()
-  private summaries: SessionSummary[] = []
+  /** Workspace hints for blank Sessions until the Host attaches their first visible message. */
+  private readonly draftWorkspaceIds = new Map<SessionId, WorkspaceId>()
+  private summaries: ClientSessionSummary[] = []
   private listState: 'idle' | 'loading' | 'error' = 'idle'
   /** Arrival phase; the pending → ready edge fires on the first successful pull (see SessionListPhase). */
   private listPhase: SessionListPhase = 'pending'
@@ -242,6 +247,7 @@ export class SessionManager {
   dispose(): void {
     this.resyncGeneration++
     this.resyncQueue = []
+    this.draftWorkspaceIds.clear()
     for (const session of this.sessions.values()) session.dispose()
     for (const timer of this.catalogDebounce.values()) clearTimeout(timer)
     this.catalogDebounce.clear()
@@ -480,18 +486,21 @@ export class SessionManager {
           const rawBaseline = this.listPhase === 'pending'
             ? result.value.items
             : mergeOrderedBaseline(established, result.value.items, summary => summary.sessionId)
+          const baselineWithDrafts = this.retainDraftSummaries(rawBaseline)
           // Only a durable content watermark is portable evidence. A bare
           // blank=false from an older carrier must not become permanent local
           // state and mask a later authoritative blank baseline.
-          for (const summary of rawBaseline) {
+          for (const summary of baselineWithDrafts) {
+            if (!summary.blank) this.draftWorkspaceIds.delete(summary.sessionId)
             if (!summary.blank && summary.visibleContentSeq !== undefined) {
               this.engagedSessions.add(summary.sessionId)
             }
           }
-          const baseline = rawBaseline.map(summary =>
-            this.engagedSessions.has(summary.sessionId) && summary.blank
-              ? { ...summary, blank: false }
-              : summary)
+          const baseline = baselineWithDrafts.map((summary) => {
+            if (!this.engagedSessions.has(summary.sessionId)) return summary
+            const { workspaceId: _workspaceId, ...engaged } = summary
+            return summary.blank ? { ...engaged, blank: false } : engaged
+          })
           // Seed first observations from the pull-time baseline BEFORE replaying
           // in-flight mutations, then reconcile the reminders after EVERY
           // replayed mutation: an edge that happens entirely between mutations
@@ -595,9 +604,13 @@ export class SessionManager {
         : { ...(opts.cwd === undefined ? {} : { cwd: opts.cwd }), ...shared }
       const { result } = await this.api.sessions.create(payload)
       if (result.ok) {
+        if (opts.workspaceId !== undefined) {
+          this.draftWorkspaceIds.set(result.value.sessionId, opts.workspaceId)
+        }
         this.recordMutation({ kind: 'upsert', summary: {
           sessionId: result.value.sessionId, updatedAt: Date.now(), running: false, blank: true,
           ...(opts.cwd !== undefined ? { cwd: opts.cwd } : {}),
+          ...(opts.workspaceId === undefined ? {} : { workspaceId: opts.workspaceId }),
           ...(result.value.agentPreset !== undefined ? { agentPreset: result.value.agentPreset } : {}),
         } })
       } else {
@@ -606,11 +619,15 @@ export class SessionManager {
         // so expose it immediately as Ungrouped while the caller keeps the
         // prompt buffer and decides whether to retry attachment.
         if (publishedSessionId !== undefined) {
+          if (opts.workspaceId !== undefined) {
+            this.draftWorkspaceIds.set(publishedSessionId, opts.workspaceId)
+          }
           this.recordMutation({ kind: 'upsert', summary: {
             sessionId: publishedSessionId,
             updatedAt: Date.now(),
             running: false,
             blank: true,
+            ...(opts.workspaceId === undefined ? {} : { workspaceId: opts.workspaceId }),
           } })
         }
       }
@@ -660,7 +677,7 @@ export class SessionManager {
    * create() echo race — whichever lands second must fill the placeholder's
    * missing cwd/parentSessionId, never overwrite list-refresh data).
    */
-  private mergeSummary(summary: SessionSummary): void {
+  private mergeSummary(summary: ClientSessionSummary): void {
     this.recordMutation({ kind: 'upsert', summary })
   }
 
@@ -677,13 +694,37 @@ export class SessionManager {
 
   /** Apply immediately and retain for replay when a list response is in flight. */
   private recordMutation(mutation: SessionListMutation): void {
-    if (mutation.kind === 'engaged') this.engagedSessions.add(mutation.sessionId)
-    else if (mutation.kind === 'remove') this.engagedSessions.delete(mutation.sessionId)
+    if (mutation.kind === 'engaged') {
+      this.engagedSessions.add(mutation.sessionId)
+      this.draftWorkspaceIds.delete(mutation.sessionId)
+    } else if (mutation.kind === 'upsert' && !mutation.summary.blank) {
+      this.draftWorkspaceIds.delete(mutation.summary.sessionId)
+    } else if (mutation.kind === 'remove') {
+      this.engagedSessions.delete(mutation.sessionId)
+      this.draftWorkspaceIds.delete(mutation.sessionId)
+    }
     this.listMutations?.push(mutation)
     this.summaries = applyMutation(this.summaries, mutation)
     // Eager edge reconciliation — a snapshot-build-time pass would miss consecutive status frames.
     this.syncCompletedNotifications()
     this.notifier.markDirty()
+  }
+
+  /** Keep a locally created blank Session through list refreshes that omit it from the Host baseline. */
+  private retainDraftSummaries(baseline: readonly ClientSessionSummary[]): ClientSessionSummary[] {
+    if (this.draftWorkspaceIds.size === 0) return [...baseline]
+    const present = new Set(baseline.map(summary => summary.sessionId))
+    const retained = baseline.map((summary) => {
+      const workspaceId = this.draftWorkspaceIds.get(summary.sessionId)
+      return workspaceId === undefined || !summary.blank ? summary : { ...summary, workspaceId }
+    })
+    for (const summary of this.summaries) {
+      const workspaceId = this.draftWorkspaceIds.get(summary.sessionId)
+      if (workspaceId === undefined || present.has(summary.sessionId) || !summary.blank) continue
+      retained.push({ ...summary, workspaceId })
+      present.add(summary.sessionId)
+    }
+    return retained
   }
 
   // ---- Subscription API (for useSessionList) ----
@@ -1157,6 +1198,7 @@ export class SessionManager {
         && prev.blank === entry.blank && prev.agentPreset === entry.agentPreset
         && prev.visibleContentSeq === entry.visibleContentSeq
         && prev.parentSessionId === entry.parentSessionId && prev.cwd === entry.cwd
+        && prev.workspaceId === entry.workspaceId
         && prev.origin === entry.origin && prev.title === entry.title && prev.depth === entry.depth
         && prev.pendingInteraction === entry.pendingInteraction
         && prev.projectionValues === entry.projectionValues
@@ -1192,12 +1234,18 @@ export class SessionManager {
 }
 
 /** Apply one list mutation without deriving display order. */
-function applyMutation(summaries: readonly SessionSummary[], mutation: SessionListMutation): SessionSummary[] {
+function applyMutation(summaries: readonly ClientSessionSummary[], mutation: SessionListMutation): ClientSessionSummary[] {
   switch (mutation.kind) {
     case 'upsert': {
       const existing = summaries.find(summary => summary.sessionId === mutation.summary.sessionId)
-      if (existing === undefined) return [mutation.summary, ...summaries]
-      const filled: SessionSummary = {
+      if (existing === undefined) {
+        if (!mutation.summary.blank && mutation.summary.workspaceId !== undefined) {
+          const { workspaceId: _workspaceId, ...engaged } = mutation.summary
+          return [engaged, ...summaries]
+        }
+        return [mutation.summary, ...summaries]
+      }
+      const filled: ClientSessionSummary = {
         ...existing,
         // Blank only lowers: a stale true (session-added racing the local
         // first send) never re-hides an already-surfaced session.
@@ -1206,6 +1254,8 @@ function applyMutation(summaries: readonly SessionSummary[], mutation: SessionLi
           ? {}
           : { visibleContentSeq: Math.max(existing.visibleContentSeq ?? -1, mutation.summary.visibleContentSeq ?? -1) }),
         ...(existing.cwd === undefined && mutation.summary.cwd !== undefined ? { cwd: mutation.summary.cwd } : {}),
+        ...(existing.workspaceId === undefined && mutation.summary.workspaceId !== undefined
+          ? { workspaceId: mutation.summary.workspaceId } : {}),
         ...(existing.parentSessionId === undefined && mutation.summary.parentSessionId !== undefined
           ? { parentSessionId: mutation.summary.parentSessionId } : {}),
         ...(existing.origin === undefined && mutation.summary.origin !== undefined
@@ -1216,7 +1266,12 @@ function applyMutation(summaries: readonly SessionSummary[], mutation: SessionLi
         ...(mutation.summary.agentPreset !== undefined
           ? { agentPreset: mutation.summary.agentPreset } : {}),
       }
-      if (filled.cwd === existing.cwd && filled.parentSessionId === existing.parentSessionId
+      if (!filled.blank && filled.workspaceId !== undefined) {
+        const { workspaceId: _workspaceId, ...engaged } = filled
+        return summaries.map(summary => summary.sessionId === mutation.summary.sessionId ? engaged : summary)
+      }
+      if (filled.cwd === existing.cwd && filled.workspaceId === existing.workspaceId
+        && filled.parentSessionId === existing.parentSessionId
         && filled.origin === existing.origin && filled.blank === existing.blank
         && filled.visibleContentSeq === existing.visibleContentSeq
         && filled.agentPreset === existing.agentPreset) return [...summaries]
@@ -1238,11 +1293,14 @@ function applyMutation(summaries: readonly SessionSummary[], mutation: SessionLi
         : summary)
     case 'engaged':
       return summaries.map(summary => summary.sessionId === mutation.sessionId
-        ? {
-          ...summary,
-          blank: false,
-          visibleContentSeq: Math.max(summary.visibleContentSeq ?? -1, mutation.seq),
-        }
+        ? (() => {
+          const { workspaceId: _workspaceId, ...engaged } = summary
+          return {
+            ...engaged,
+            blank: false,
+            visibleContentSeq: Math.max(summary.visibleContentSeq ?? -1, mutation.seq),
+          }
+        })()
         : summary)
   }
 }

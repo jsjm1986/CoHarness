@@ -251,6 +251,7 @@ export function apply(ctx: Context): void {
           inputHub.discardDraft(sessionId)
         }
       },
+      newSession: (workspaceId) => { workspaces.startSession(workspaceId) },
     }),
   }, ConversationRoot)
 

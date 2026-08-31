@@ -16,7 +16,7 @@
  */
 import type { Context, Fiber } from '@deepseek-ai/cordis'
 import type {
-  IApiClient, RpcError, RpcResult, SessionId, SubagentAddress, JobView,
+  IApiClient, RpcError, RpcResult, SessionId, SubagentAddress, WorkspaceId, JobView,
 } from '@deepseek-ai/dsh-api-remotes/client'
 // Value import from the inline-safe wire layer (not the connection plugin):
 // plugin-to-plugin value imports are a bundle purity error.
@@ -47,6 +47,12 @@ export interface SessionSummary {
   /** Human-facing label: durable title, project basename, then session id. */
   displayTitle: string
   cwd?: string
+  /**
+   * Client-local Workspace association for a blank Session while Host
+   * membership is catching up. It keeps the current blank row beside the
+   * Workspace during that interval and is never sent on the wire.
+   */
+  workspaceId?: WorkspaceId
   /**
    * Agent preset this session's agent was composed from; absent when the
    * deployment composes no presets. The session header labels what the
@@ -772,6 +778,7 @@ export class SessionRuntime implements ISessions {
           : { projectionValues: entry.projectionValues }),
         ...(entry.title !== undefined ? { title: entry.title } : {}),
         ...(entry.cwd !== undefined ? { cwd: entry.cwd } : {}),
+        ...(entry.workspaceId !== undefined ? { workspaceId: entry.workspaceId } : {}),
         ...(entry.parentSessionId !== undefined ? { parentId: entry.parentSessionId } : {}),
         ...(entry.origin !== undefined ? { origin: entry.origin } : {}),
         ...(entry.agentPreset !== undefined ? { agentPreset: entry.agentPreset } : {}),

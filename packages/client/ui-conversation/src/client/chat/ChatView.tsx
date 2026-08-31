@@ -271,8 +271,10 @@ export function ChatView({
    * that range into the resident window. Loaded rows always win for previews
    * and anchor identity; live-only turns are retained until the next refresh.
    */
+  // The builder replaces its items array only on an actual rebuild, so the
+  // array identity below — not the stable index object — tracks loaded turns.
+  const loaded = navigation.items()
   const navigationItems = useMemo(() => {
-    const loaded = navigation.items()
     // Keep the last successful index visible while a debounced refresh is in
     // flight; a transient network failure must not make the rail collapse.
     const indexed = historyNavigation?.items ?? []
@@ -309,7 +311,7 @@ export function ChatView({
         response: marker.response ?? '',
       }
     }).filter((item): item is TurnNavigationItem => item !== undefined)
-  }, [historyNavigation, navigation])
+  }, [historyNavigation, loaded])
 
   const processByTurn = useMemo(() => {
     const result = new Map<number, TurnProcessChatData>()
