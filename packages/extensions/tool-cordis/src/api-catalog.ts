@@ -1405,6 +1405,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the header and the stored events with `seq >= fromSeq`.',
       },
       {
+        signature: 'async readHeader(id: SessionId, signal?: AbortSignal): Promise<SessionHeader | undefined>',
+        description: 'Read one session header without loading its event log. First-party providers override this with an indexed lookup; the default filters the lightweight snapshot list for third-party compatibility.',
+        parameters: [{ name: 'id', description: 'persisted session to observe.' }, { name: 'signal', description: 'optional cancellation for backend lookup work.' }],
+        returns: 'the immutable header, or undefined when the session is absent.',
+      },
+      {
         signature: 'abstract list(signal?: AbortSignal): Promise<SessionHeader[]>',
         description: 'Lightweight listing from metadata, without a full-log parse.',
         parameters: [{ name: 'signal', description: 'optional cancellation for backend listing work.' }],
@@ -1415,6 +1421,18 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Read one materialized session\'s opaque source revision without loading its event log. First-party providers use their per-id storage lookup; the default preserves third-party compatibility by filtering listSnapshots.',
         parameters: [{ name: 'id', description: 'persisted session to observe.' }, { name: 'signal', description: 'optional cancellation for backend lookup work.' }],
         returns: 'the current source-qualified revision, or undefined when absent.',
+      },
+      {
+        signature: 'async readRevision(id: SessionId, signal?: AbortSignal): Promise<SessionPersistenceRevision | undefined>',
+        description: 'Read one lightweight source revision. This named alias keeps callers from accidentally choosing a full-log operation when they only need freshness.',
+        parameters: [{ name: 'id', description: 'persisted session to observe.' }, { name: 'signal', description: 'optional cancellation for backend lookup work.' }],
+        returns: 'the current revision, or undefined when the session is absent.',
+      },
+      {
+        signature: 'async readPage( id: SessionId, request: SessionPersistencePageRequest = {}, signal?: AbortSignal, ): Promise<SessionPersistencePage>',
+        description: 'Read a bounded event-log page. Third-party providers inherit a safe compatibility fallback through readFrom; seek-capable providers override this method so source acquisition remains bounded.',
+        parameters: [{ name: 'id', description: 'persisted session to read.' }, { name: 'request', description: 'revision-aware page request.' }, { name: 'signal', description: 'optional cancellation for backend read work.' }],
+        returns: 'one immutable page and a continuation cursor.',
       },
       {
         signature: 'abstract listSnapshots(signal?: AbortSignal): Promise<SessionPersistenceSnapshot[]>',
@@ -4204,7 +4222,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'LlmRuntime',
-    declaration: 'export class LlmRuntime extends Service {\n    constructor(ctx: Context);\n    registerAdapter(providers: string[], adapter: LlmAdapter): AdapterRegistrationHandle;\n    listProviders(): LlmProviderInfo[];\n    registerConfigurableProviders(entries: readonly LlmConfigurableProvider[]): DirectoryRegistrationHandle;\n    listConfigurableProviders(): LlmConfigurableProvider[];\n    registerModelDiscovery(settingsNs: string, discover: (request: LlmModelDiscoveryRequest) => Promise<readonly LlmDiscoveredModel[]>): () => void;\n    async discoverModels(settingsNs: string, request: LlmModelDiscoveryRequest): Promise<LlmDiscoveredModel[]>;\n    providerRetryPolicy(provider: string): ResolvedRetryPolicy;\n    imageRequestPricing(provider: string, model: string): import(\'./types.ts\').LlmImageRequestPricing | undefined;\n    async listModels(provider: string): Promise<LlmModelInfo[]>;\n    async resolveModelInfo(provider: string, model: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo>;\n    async resolveCallConfig(config: LlmCallConfig, signal?: AbortSignal): Promise<LlmCallConfig>;\n    async prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<PreparedLlmCall>;\n    stream(options: GenerateOptions): AsyncIterable<StreamChunk>;\n}',
+    declaration: 'export class LlmRuntime extends Service {\n    static Config: z<LlmRuntimeConfig>;\n    constructor(ctx: Context, config: LlmRuntimeConfig = {});\n    registerAdapter(providers: string[], adapter: LlmAdapter): AdapterRegistrationHandle;\n    listProviders(): LlmProviderInfo[];\n    registerConfigurableProviders(entries: readonly LlmConfigurableProvider[]): DirectoryRegistrationHandle;\n    listConfigurableProviders(): LlmConfigurableProvider[];\n    registerModelDiscovery(settingsNs: string, discover: (request: LlmModelDiscoveryRequest) => Promise<readonly LlmDiscoveredModel[]>): () => void;\n    async discoverModels(settingsNs: string, request: LlmModelDiscoveryRequest): Promise<LlmDiscoveredModel[]>;\n    providerRetryPolicy(provider: string): ResolvedRetryPolicy;\n    imageRequestPricing(provider: string, model: string): import(\'./types.ts\').LlmImageRequestPricing | undefined;\n    async listModels(provider: string): Promise<LlmModelInfo[]>;\n    async resolveModelInfo(provider: string, model: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo>;\n    async resolveCallConfig(config: LlmCallConfig, signal?: AbortSignal): Promise<LlmCallConfig>;\n    async prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<PreparedLlmCall>;\n    stream(options: GenerateOptions): AsyncIterable<StreamChunk>;\n}',
+  },
+  {
+    name: 'LlmRuntimeConfig',
+    declaration: 'export interface LlmRuntimeConfig {\n    streamCloseTimeoutMs?: number;\n}',
   },
   {
     name: 'LspHover',
@@ -4793,6 +4815,22 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SessionLogSnapshot',
     declaration: 'export interface SessionLogSnapshot {\n    session: SessionHeader;\n    events: SessionEvent[];\n}',
+  },
+  {
+    name: 'SessionPersistencePage',
+    declaration: 'export interface SessionPersistencePage {\n    readonly meta: SessionHeader;\n    readonly revision: SessionPersistenceRevision;\n    readonly events: SessionEvent[];\n    readonly startSeq: number | null;\n    readonly endSeq: number | null;\n    readonly hasMore: boolean;\n    readonly nextCursor?: SessionPersistenceReadCursor;\n    readonly uncompressedBytes: number;\n}',
+  },
+  {
+    name: 'SessionPersistencePageDirection',
+    declaration: 'export type SessionPersistencePageDirection = \'older\' | \'newer\';',
+  },
+  {
+    name: 'SessionPersistencePageRequest',
+    declaration: 'export interface SessionPersistencePageRequest {\n    readonly cursor?: SessionPersistenceReadCursor;\n    readonly beforeSeq?: number;\n    readonly fromSeq?: number;\n    readonly direction?: SessionPersistencePageDirection;\n    readonly maxBytes?: number;\n    readonly maxEvents?: number;\n    readonly maxGroups?: number;\n}',
+  },
+  {
+    name: 'SessionPersistenceReadCursor',
+    declaration: 'export type SessionPersistenceReadCursor = Branded<\'SessionPersistenceReadCursor\'>;',
   },
   {
     name: 'SessionPersistenceRevision',

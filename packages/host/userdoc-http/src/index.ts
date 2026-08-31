@@ -1,6 +1,5 @@
 /** Streaming HTTP consumer for user-uploaded documents. @module @deepseek-ai/dsh-host-userdoc-http */
 
-import { once } from 'node:events'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { Readable } from 'node:stream'
 import type { Context } from '@deepseek-ai/cordis'
@@ -1058,32 +1057,36 @@ async function transferDocuments(
   }
   const payload = await readTransferPayload(req)
   const abort = abortFor(req, res)
-  let response: Response
   try {
-    response = await runtime.request('/internal/runtime/documents/transfer', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: abort.signal,
-      principal: true,
-    })
-  } catch (_error) {
-    if (abort.signal.aborted) return
-    throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope document transfer is unavailable.')
+    let response: Response
+    try {
+      response = await runtime.request('/internal/runtime/documents/transfer', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: abort.signal,
+        principal: true,
+      })
+    } catch (_error) {
+      if (abort.signal.aborted) return
+      throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope document transfer is unavailable.')
+    }
+    let body: unknown
+    try {
+      body = await responseJson(response)
+    } catch {
+      throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope document transfer returned an invalid response.')
+    }
+    if (!response.ok) {
+      const value = object(body)
+      const code = typeof value?.error === 'string' ? value.error : 'DOCUMENT_TRANSFER_FAILED'
+      const message = typeof value?.message === 'string' ? value.message : 'Document transfer failed.'
+      throw new DocumentTransferHttpError(response.status, code, message)
+    }
+    if (!abort.signal.aborted) json(res, 200, safeTransferResponse(body))
+  } finally {
+    abort.dispose()
   }
-  let body: unknown
-  try {
-    body = await responseJson(response)
-  } catch {
-    throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope document transfer returned an invalid response.')
-  }
-  if (!response.ok) {
-    const value = object(body)
-    const code = typeof value?.error === 'string' ? value.error : 'DOCUMENT_TRANSFER_FAILED'
-    const message = typeof value?.message === 'string' ? value.message : 'Document transfer failed.'
-    throw new DocumentTransferHttpError(response.status, code, message)
-  }
-  if (!abort.signal.aborted) json(res, 200, safeTransferResponse(body))
 }
 
 async function transferPhase(ctx: Context, req: IncomingMessage, res: ServerResponse, path: string, plan: boolean): Promise<void> {
@@ -1091,22 +1094,26 @@ async function transferPhase(ctx: Context, req: IncomingMessage, res: ServerResp
   if (runtime === undefined) throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope document transfer is unavailable.')
   const payload = await readTransferPayload(req)
   const abort = abortFor(req, res)
-  let response: Response
   try {
-    response = await runtime.request(path, {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload), signal: abort.signal, principal: true,
-    })
-  } catch {
-    if (abort.signal.aborted) return
-    throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope document transfer is unavailable.')
+    let response: Response
+    try {
+      response = await runtime.request(path, {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload), signal: abort.signal, principal: true,
+      })
+    } catch {
+      if (abort.signal.aborted) return
+      throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope document transfer is unavailable.')
+    }
+    let body: unknown
+    try { body = await responseJson(response) } catch { throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope document transfer returned an invalid response.') }
+    if (!response.ok) {
+      const value = object(body)
+      throw new DocumentTransferHttpError(response.status, typeof value?.error === 'string' ? value.error : 'DOCUMENT_TRANSFER_FAILED', typeof value?.message === 'string' ? value.message : 'Document transfer failed.')
+    }
+    if (!abort.signal.aborted) json(res, 200, plan ? safeTransferPlan(body) : safeTransferResponse(body))
+  } finally {
+    abort.dispose()
   }
-  let body: unknown
-  try { body = await responseJson(response) } catch { throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope document transfer returned an invalid response.') }
-  if (!response.ok) {
-    const value = object(body)
-    throw new DocumentTransferHttpError(response.status, typeof value?.error === 'string' ? value.error : 'DOCUMENT_TRANSFER_FAILED', typeof value?.message === 'string' ? value.message : 'Document transfer failed.')
-  }
-  if (!abort.signal.aborted) json(res, 200, plan ? safeTransferPlan(body) : safeTransferResponse(body))
 }
 
 async function transferCapabilities(ctx: Context, req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -1118,30 +1125,34 @@ async function transferCapabilities(ctx: Context, req: IncomingMessage, res: Ser
     throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope document transfer is unavailable.')
   }
   const abort = abortFor(req, res)
-  let response: Response
   try {
-    response = await runtime.request('/internal/runtime/documents/transfer/capabilities', {
-      method: 'GET',
-      signal: abort.signal,
-      principal: true,
-    })
-  } catch {
-    if (abort.signal.aborted) return
-    throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope document transfer is unavailable.')
+    let response: Response
+    try {
+      response = await runtime.request('/internal/runtime/documents/transfer/capabilities', {
+        method: 'GET',
+        signal: abort.signal,
+        principal: true,
+      })
+    } catch {
+      if (abort.signal.aborted) return
+      throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope document transfer is unavailable.')
+    }
+    let body: unknown
+    try {
+      body = await responseJson(response)
+    } catch {
+      throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope document transfer returned an invalid response.')
+    }
+    if (!response.ok) {
+      const value = object(body)
+      const code = typeof value?.error === 'string' ? value.error : 'DOCUMENT_TRANSFER_FAILED'
+      const message = typeof value?.message === 'string' ? value.message : 'Document transfer failed.'
+      throw new DocumentTransferHttpError(response.status, code, message)
+    }
+    if (!abort.signal.aborted) json(res, 200, safeTransferCapabilities(body))
+  } finally {
+    abort.dispose()
   }
-  let body: unknown
-  try {
-    body = await responseJson(response)
-  } catch {
-    throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope document transfer returned an invalid response.')
-  }
-  if (!response.ok) {
-    const value = object(body)
-    const code = typeof value?.error === 'string' ? value.error : 'DOCUMENT_TRANSFER_FAILED'
-    const message = typeof value?.message === 'string' ? value.message : 'Document transfer failed.'
-    throw new DocumentTransferHttpError(response.status, code, message)
-  }
-  if (!abort.signal.aborted) json(res, 200, safeTransferCapabilities(body))
 }
 
 async function transferList(ctx: Context, req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -1154,32 +1165,36 @@ async function transferList(ctx: Context, req: IncomingMessage, res: ServerRespo
   }
   const payload = await readTransferPayloadForScope(req)
   const abort = abortFor(req, res)
-  let response: Response
   try {
-    response = await runtime.request('/internal/runtime/documents/transfer/list', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: abort.signal,
-      principal: true,
-    })
-  } catch {
-    if (abort.signal.aborted) return
-    throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope document listing is unavailable.')
+    let response: Response
+    try {
+      response = await runtime.request('/internal/runtime/documents/transfer/list', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: abort.signal,
+        principal: true,
+      })
+    } catch {
+      if (abort.signal.aborted) return
+      throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope document listing is unavailable.')
+    }
+    let body: unknown
+    try {
+      body = await responseJson(response)
+    } catch {
+      throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope document listing returned an invalid response.')
+    }
+    if (!response.ok) {
+      const value = object(body)
+      const code = typeof value?.error === 'string' ? value.error : 'DOCUMENT_TRANSFER_FAILED'
+      const message = typeof value?.message === 'string' ? value.message : 'Document listing failed.'
+      throw new DocumentTransferHttpError(response.status, code, message)
+    }
+    if (!abort.signal.aborted) json(res, 200, safeTransferList(body))
+  } finally {
+    abort.dispose()
   }
-  let body: unknown
-  try {
-    body = await responseJson(response)
-  } catch {
-    throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope document listing returned an invalid response.')
-  }
-  if (!response.ok) {
-    const value = object(body)
-    const code = typeof value?.error === 'string' ? value.error : 'DOCUMENT_TRANSFER_FAILED'
-    const message = typeof value?.message === 'string' ? value.message : 'Document listing failed.'
-    throw new DocumentTransferHttpError(response.status, code, message)
-  }
-  if (!abort.signal.aborted) json(res, 200, safeTransferList(body))
 }
 
 async function transferDirectories(ctx: Context, req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -1187,22 +1202,26 @@ async function transferDirectories(ctx: Context, req: IncomingMessage, res: Serv
   if (runtime === undefined) throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope document directories are unavailable.')
   const payload = await readTransferPayloadForScope(req)
   const abort = abortFor(req, res)
-  let response: Response
   try {
-    response = await runtime.request('/internal/runtime/documents/transfer/directories', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload), signal: abort.signal, principal: true,
-    })
-  } catch {
-    if (abort.signal.aborted) return
-    throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope document directories are unavailable.')
+    let response: Response
+    try {
+      response = await runtime.request('/internal/runtime/documents/transfer/directories', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload), signal: abort.signal, principal: true,
+      })
+    } catch {
+      if (abort.signal.aborted) return
+      throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope document directories are unavailable.')
+    }
+    let body: unknown
+    try { body = await responseJson(response) } catch { throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope document directories are invalid.') }
+    if (!response.ok) {
+      const value = object(body)
+      throw new DocumentTransferHttpError(response.status, typeof value?.error === 'string' ? value.error : 'DOCUMENT_TRANSFER_FAILED', typeof value?.message === 'string' ? value.message : 'Document directory listing failed.')
+    }
+    if (!abort.signal.aborted) json(res, 200, safeTransferDirectories(body))
+  } finally {
+    abort.dispose()
   }
-  let body: unknown
-  try { body = await responseJson(response) } catch { throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope document directories are invalid.') }
-  if (!response.ok) {
-    const value = object(body)
-    throw new DocumentTransferHttpError(response.status, typeof value?.error === 'string' ? value.error : 'DOCUMENT_TRANSFER_FAILED', typeof value?.message === 'string' ? value.message : 'Document directory listing failed.')
-  }
-  if (!abort.signal.aborted) json(res, 200, safeTransferDirectories(body))
 }
 
 async function transferDirectoryCreate(ctx: Context, req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -1210,32 +1229,36 @@ async function transferDirectoryCreate(ctx: Context, req: IncomingMessage, res: 
   if (runtime === undefined) throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope folder creation is unavailable.')
   const payload = await readTransferDirectoryCreatePayload(req)
   const abort = abortFor(req, res)
-  let response: Response
   try {
-    response = await runtime.request('/internal/runtime/documents/transfer/directories/create', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload), signal: abort.signal, principal: true,
-    })
-  } catch {
-    if (abort.signal.aborted) return
-    throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope folder creation is unavailable.')
-  }
-  let body: unknown
-  try { body = await responseJson(response) } catch { throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope folder creation returned an invalid response.') }
-  if (!response.ok) {
+    let response: Response
+    try {
+      response = await runtime.request('/internal/runtime/documents/transfer/directories/create', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload), signal: abort.signal, principal: true,
+      })
+    } catch {
+      if (abort.signal.aborted) return
+      throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope folder creation is unavailable.')
+    }
+    let body: unknown
+    try { body = await responseJson(response) } catch { throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope folder creation returned an invalid response.') }
+    if (!response.ok) {
+      const value = object(body)
+      throw new DocumentTransferHttpError(response.status, typeof value?.error === 'string' ? value.error : 'DOCUMENT_TRANSFER_FAILED', typeof value?.message === 'string' ? value.message : 'Folder creation failed.')
+    }
     const value = object(body)
-    throw new DocumentTransferHttpError(response.status, typeof value?.error === 'string' ? value.error : 'DOCUMENT_TRANSFER_FAILED', typeof value?.message === 'string' ? value.message : 'Folder creation failed.')
+    const directory = object(value?.directory)
+    if (value?.version !== 1 || directory === undefined || !safeTransferDocId(directory.directoryId)
+      || typeof directory.name !== 'string' || directory.name === '') {
+      throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope folder creation returned invalid metadata.')
+    }
+    json(res, 201, {
+      version: 1,
+      scope: transferSummary(value.scope),
+      directory: { directoryId: directory.directoryId, name: directory.name },
+    })
+  } finally {
+    abort.dispose()
   }
-  const value = object(body)
-  const directory = object(value?.directory)
-  if (value?.version !== 1 || directory === undefined || !safeTransferDocId(directory.directoryId)
-    || typeof directory.name !== 'string' || directory.name === '') {
-    throw new DocumentTransferHttpError(503, 'DOCUMENT_TRANSFER_UNAVAILABLE', 'Cross-scope folder creation returned invalid metadata.')
-  }
-  json(res, 201, {
-    version: 1,
-    scope: transferSummary(value.scope),
-    directory: { directoryId: directory.directoryId, name: directory.name },
-  })
 }
 
 async function catalogOverview(ctx: Context, req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -1244,50 +1267,58 @@ async function catalogOverview(ctx: Context, req: IncomingMessage, res: ServerRe
     throw new DocumentTransferHttpError(503, 'DOCUMENT_CATALOG_UNAVAILABLE', 'Document metadata overview is unavailable.')
   }
   const abort = abortFor(req, res)
-  let response: Response
   try {
-    const runtimePath = new URL(req.url ?? '/', 'http://host')
-    const query = new URLSearchParams()
-    for (const key of ['q', 'type', 'sort', 'cursor', 'limit'] as const) {
-      const value = runtimePath.searchParams.get(key)
-      if (value !== null) query.set(key === 'q' ? 'query' : key, value)
+    let response: Response
+    try {
+      const runtimePath = new URL(req.url ?? '/', 'http://host')
+      const query = new URLSearchParams()
+      for (const key of ['q', 'type', 'sort', 'cursor', 'limit'] as const) {
+        const value = runtimePath.searchParams.get(key)
+        if (value !== null) query.set(key === 'q' ? 'query' : key, value)
+      }
+      response = await runtime.request(`/internal/runtime/documents/catalog/overview${query.toString() === '' ? '' : `?${query.toString()}`}`, {
+        method: 'GET', signal: abort.signal, principal: true,
+      })
+    } catch {
+      if (abort.signal.aborted) return
+      throw new DocumentTransferHttpError(503, 'DOCUMENT_CATALOG_UNAVAILABLE', 'Document metadata overview is unavailable.')
     }
-    response = await runtime.request(`/internal/runtime/documents/catalog/overview${query.toString() === '' ? '' : `?${query.toString()}`}`, {
-      method: 'GET', signal: abort.signal, principal: true,
-    })
-  } catch {
-    if (abort.signal.aborted) return
-    throw new DocumentTransferHttpError(503, 'DOCUMENT_CATALOG_UNAVAILABLE', 'Document metadata overview is unavailable.')
+    let body: unknown
+    try { body = await responseJson(response) } catch {
+      throw new DocumentTransferHttpError(503, 'DOCUMENT_CATALOG_UNAVAILABLE', 'Document metadata overview is invalid.')
+    }
+    if (!response.ok) {
+      const value = object(body)
+      const code = typeof value?.error === 'string' ? value.error : 'DOCUMENT_CATALOG_UNAVAILABLE'
+      const message = typeof value?.message === 'string' ? value.message : 'Document metadata overview is unavailable.'
+      throw new DocumentTransferHttpError(response.status, code, message)
+    }
+    if (!abort.signal.aborted) json(res, 200, safeCatalogOverview(body))
+  } finally {
+    abort.dispose()
   }
-  let body: unknown
-  try { body = await responseJson(response) } catch {
-    throw new DocumentTransferHttpError(503, 'DOCUMENT_CATALOG_UNAVAILABLE', 'Document metadata overview is invalid.')
-  }
-  if (!response.ok) {
-    const value = object(body)
-    const code = typeof value?.error === 'string' ? value.error : 'DOCUMENT_CATALOG_UNAVAILABLE'
-    const message = typeof value?.message === 'string' ? value.message : 'Document metadata overview is unavailable.'
-    throw new DocumentTransferHttpError(response.status, code, message)
-  }
-  if (!abort.signal.aborted) json(res, 200, safeCatalogOverview(body))
 }
 
 async function catalogHistory(ctx: Context, req: IncomingMessage, res: ServerResponse): Promise<void> {
   const runtime = runtimeForCatalog(ctx)
   if (runtime === undefined) throw new DocumentTransferHttpError(503, 'DOCUMENT_CATALOG_UNAVAILABLE', 'Document history is unavailable.')
   const abort = abortFor(req, res)
-  let response: Response
-  try { response = await runtime.request('/internal/runtime/documents/catalog/history', { method: 'GET', signal: abort.signal, principal: true }) } catch {
-    if (abort.signal.aborted) return
-    throw new DocumentTransferHttpError(503, 'DOCUMENT_CATALOG_UNAVAILABLE', 'Document history is unavailable.')
+  try {
+    let response: Response
+    try { response = await runtime.request('/internal/runtime/documents/catalog/history', { method: 'GET', signal: abort.signal, principal: true }) } catch {
+      if (abort.signal.aborted) return
+      throw new DocumentTransferHttpError(503, 'DOCUMENT_CATALOG_UNAVAILABLE', 'Document history is unavailable.')
+    }
+    let body: unknown
+    try { body = await responseJson(response) } catch { throw new DocumentTransferHttpError(503, 'DOCUMENT_CATALOG_UNAVAILABLE', 'Document history is invalid.') }
+    if (!response.ok) {
+      const value = object(body)
+      throw new DocumentTransferHttpError(response.status, typeof value?.error === 'string' ? value.error : 'DOCUMENT_CATALOG_UNAVAILABLE', typeof value?.message === 'string' ? value.message : 'Document history is unavailable.')
+    }
+    if (!abort.signal.aborted) json(res, 200, safeCatalogHistory(body))
+  } finally {
+    abort.dispose()
   }
-  let body: unknown
-  try { body = await responseJson(response) } catch { throw new DocumentTransferHttpError(503, 'DOCUMENT_CATALOG_UNAVAILABLE', 'Document history is invalid.') }
-  if (!response.ok) {
-    const value = object(body)
-    throw new DocumentTransferHttpError(response.status, typeof value?.error === 'string' ? value.error : 'DOCUMENT_CATALOG_UNAVAILABLE', typeof value?.message === 'string' ? value.message : 'Document history is unavailable.')
-  }
-  if (!abort.signal.aborted) json(res, 200, safeCatalogHistory(body))
 }
 /* jscpd:ignore-end */
 
@@ -1490,12 +1521,52 @@ function requiredDirectoryQuery(url: URL, name: string): ReturnType<typeof UserD
   return UserDocDirectoryId(requiredQuery(url, name))
 }
 
-function abortFor(req: IncomingMessage, res: ServerResponse): AbortController {
+interface RequestAbort {
+  readonly signal: AbortSignal
+  /** Remove request/response listeners after the operation settles. */
+  dispose(): void
+}
+
+function abortFor(req: IncomingMessage, res: ServerResponse): RequestAbort {
   const controller = new AbortController()
-  const abort = (): void => { if (!controller.signal.aborted) controller.abort(new Error('HTTP client disconnected.')) }
+  let disposed = false
+  const dispose = (): void => {
+    if (disposed) return
+    disposed = true
+    req.removeListener('aborted', abort)
+    res.removeListener('close', onResponseClose)
+    res.removeListener('finish', onResponseFinish)
+  }
+  const abort = (): void => {
+    if (!controller.signal.aborted) controller.abort(new Error('HTTP client disconnected.'))
+    dispose()
+  }
+  const onResponseClose = (): void => { if (!res.writableEnded) abort(); else dispose() }
+  const onResponseFinish = (): void => { dispose() }
   req.once('aborted', abort)
-  res.once('close', () => { if (!res.writableEnded) abort() })
-  return controller
+  res.once('close', onResponseClose)
+  res.once('finish', onResponseFinish)
+  return { signal: controller.signal, dispose }
+}
+
+/** Wait for a backpressured response to drain or close without retaining the losing listener. */
+async function waitForResponseWritable(res: ServerResponse): Promise<'drain' | 'close'> {
+  if (res.destroyed || res.writableEnded) return 'close'
+  return new Promise<'drain' | 'close'>((resolve) => {
+    let settled = false
+    const finish = (event: 'drain' | 'close'): void => {
+      if (settled) return
+      settled = true
+      res.removeListener('drain', onDrain)
+      res.removeListener('close', onClose)
+      resolve(event)
+    }
+    const onDrain = (): void => { finish('drain') }
+    const onClose = (): void => { finish('close') }
+    res.once('drain', onDrain)
+    res.once('close', onClose)
+    if (res.destroyed || res.writableEnded) finish('close')
+  })
 }
 
 function publicRef(ref: UserDocRef): UserDocRef {
@@ -1566,6 +1637,8 @@ async function writeUploadChunk(
   } catch (error) {
     req.resume()
     if (!res.writableEnded && !abort.signal.aborted) failure(res, error)
+  } finally {
+    abort.dispose()
   }
 }
 
@@ -1670,7 +1743,7 @@ async function download(ctx: Context, req: IncomingMessage, res: ServerResponse,
     }
     for await (const chunk of opened.body as unknown as AsyncIterable<Uint8Array>) {
       if (requestState.disconnected === true || responseDestroyed()) break
-      if (!res.write(chunk)) await Promise.race([once(res, 'drain'), once(res, 'close')])
+      if (!res.write(chunk) && await waitForResponseWritable(res) === 'close') break
       if (requestState.disconnected === true || responseDestroyed()) break
     }
     if (requestState.disconnected !== true && !res.writableEnded) res.end()
@@ -1689,35 +1762,39 @@ async function download(ctx: Context, req: IncomingMessage, res: ServerResponse,
 async function listTrashDocuments(ctx: Context, req: IncomingMessage, res: ServerResponse): Promise<void> {
   authorizeDocumentAction(ctx, 'read')
   const abort = abortFor(req, res)
-  const paged = req.url !== undefined && new URL(req.url, 'http://dsh.internal').searchParams.toString() !== ''
-  if (!paged) {
-    const documents = await ctx.userDocs.listTrash(abort.signal)
-    if (!abort.signal.aborted) json(res, 200, { version: 1, documents })
-    return
+  try {
+    const paged = req.url !== undefined && new URL(req.url, 'http://dsh.internal').searchParams.toString() !== ''
+    if (!paged) {
+      const documents = await ctx.userDocs.listTrash(abort.signal)
+      if (!abort.signal.aborted) json(res, 200, { version: 1, documents })
+      return
+    }
+    const url = query(req)
+    const options = parseListQuery(url, 'trash')
+    const listPage = (ctx.userDocs as unknown as { listTrashPage?: unknown }).listTrashPage
+    let page: UserDocTrashPage
+    if (typeof listPage === 'function') {
+      const providerPage = await (listPage as (
+        this: UserDocStore,
+        query: UserDocListQuery,
+        signal?: AbortSignal,
+      ) => Promise<UserDocTrashPage>).call(ctx.userDocs, {
+        ...(options.providerCursor === undefined ? {} : { cursor: options.providerCursor }),
+        limit: options.limit,
+        query: options.query,
+        type: options.type,
+        sort: options.sort,
+        state: 'trash',
+      }, abort.signal)
+      page = wrapProviderCursor(providerPage, options)
+    } else {
+      const documents = await ctx.userDocs.listTrash(abort.signal)
+      page = pageTrashListing(documents, options)
+    }
+    if (!abort.signal.aborted) json(res, 200, { version: 1, ...page })
+  } finally {
+    abort.dispose()
   }
-  const url = query(req)
-  const options = parseListQuery(url, 'trash')
-  const listPage = (ctx.userDocs as unknown as { listTrashPage?: unknown }).listTrashPage
-  let page: UserDocTrashPage
-  if (typeof listPage === 'function') {
-    const providerPage = await (listPage as (
-      this: UserDocStore,
-      query: UserDocListQuery,
-      signal?: AbortSignal,
-    ) => Promise<UserDocTrashPage>).call(ctx.userDocs, {
-      ...(options.providerCursor === undefined ? {} : { cursor: options.providerCursor }),
-      limit: options.limit,
-      query: options.query,
-      type: options.type,
-      sort: options.sort,
-      state: 'trash',
-    }, abort.signal)
-    page = wrapProviderCursor(providerPage, options)
-  } else {
-    const documents = await ctx.userDocs.listTrash(abort.signal)
-    page = pageTrashListing(documents, options)
-  }
-  if (!abort.signal.aborted) json(res, 200, { version: 1, ...page })
 }
 
 async function trashDocument(ctx: Context, res: ServerResponse, url: URL): Promise<void> {
@@ -1832,85 +1909,93 @@ export async function handleUserDocHttp(ctx: Context, req: IncomingMessage, res:
     if (url.pathname === USERDOC_HTTP_PATH && req.method === 'GET') {
       authorizeDocumentAction(ctx, 'read')
       const abort = abortFor(req, res)
-      const paged = url.searchParams.has('cursor') || url.searchParams.has('limit')
-        || url.searchParams.has('q') || url.searchParams.has('type') || url.searchParams.has('sort')
-        || url.searchParams.has('state')
-      const listOptions = paged ? parseListQuery(url, 'active') : undefined
-      if (url.searchParams.has('directory')) {
-        const directoryId = directoryQuery(url)
-        const pageMethod = (ctx.userDocs as unknown as { listDirectoryPage?: unknown }).listDirectoryPage
-        const usesProviderPage = listOptions !== undefined && typeof pageMethod === 'function'
-        const providerListing = listOptions === undefined
-          ? await ctx.userDocs.listDirectory(directoryId, abort.signal)
-          : typeof pageMethod === 'function'
-            ? await (pageMethod as (
-              this: UserDocStore,
-              id: UserDocDirectoryId,
-              query: UserDocListQuery,
-              signal?: AbortSignal,
-            ) => Promise<UserDocDirectoryPage>).call(ctx.userDocs, directoryId, {
-              ...(listOptions.providerCursor === undefined ? {} : { cursor: listOptions.providerCursor }),
-              limit: listOptions.limit,
-              query: listOptions.query,
-              type: listOptions.type,
-              sort: listOptions.sort,
-              state: 'active',
-            }, abort.signal)
-            : pageListing(await ctx.userDocs.listDirectory(directoryId, abort.signal), listOptions)
-        const listing = listOptions === undefined || !usesProviderPage
-          ? providerListing
-          : wrapProviderCursor(providerListing as UserDocDirectoryPage, listOptions)
-        if (!abort.signal.aborted) {
-          const response = listOptions === undefined ? {
-            ...listing,
-            totalDocuments: listing.documents.length,
-          } : listing
-          json(res, 200, {
-            limits: ctx.userDocs.limits,
-            ...response,
-            ...(listOptions !== undefined && 'nextCursor' in response && response.nextCursor !== undefined
-              ? { nextCursor: response.nextCursor }
-              : {}),
-            documents: response.documents.map(publicRef),
-            directories: response.directories.map(publicDirectoryRef),
-          })
-          // Catalog reconciliation is metadata maintenance and must not delay
-          // the document page that the user is waiting to see.
-          queueCatalogSync(ctx, providerListing.documents, false)
-        }
-      } else {
-        const documents = listOptions === undefined ? await ctx.userDocs.list(abort.signal) : undefined
-        if (!abort.signal.aborted) {
-          const response = listOptions === undefined
-            ? {
-              documents: documents ?? [],
-              totalDocuments: documents?.length ?? 0,
-            }
-            : await (typeof (ctx.userDocs as unknown as { listDirectoryPage?: unknown }).listDirectoryPage === 'function'
-              ? ctx.userDocs.listDirectoryPage(UserDocDirectoryId(''), {
+      try {
+        const paged = url.searchParams.has('cursor') || url.searchParams.has('limit')
+          || url.searchParams.has('q') || url.searchParams.has('type') || url.searchParams.has('sort')
+          || url.searchParams.has('state')
+        const listOptions = paged ? parseListQuery(url, 'active') : undefined
+        if (url.searchParams.has('directory')) {
+          const directoryId = directoryQuery(url)
+          const pageMethod = (ctx.userDocs as unknown as { listDirectoryPage?: unknown }).listDirectoryPage
+          const usesProviderPage = listOptions !== undefined && typeof pageMethod === 'function'
+          const providerListing = listOptions === undefined
+            ? await ctx.userDocs.listDirectory(directoryId, abort.signal)
+            : typeof pageMethod === 'function'
+              ? await (pageMethod as (
+                this: UserDocStore,
+                id: UserDocDirectoryId,
+                query: UserDocListQuery,
+                signal?: AbortSignal,
+              ) => Promise<UserDocDirectoryPage>).call(ctx.userDocs, directoryId, {
                 ...(listOptions.providerCursor === undefined ? {} : { cursor: listOptions.providerCursor }),
                 limit: listOptions.limit,
                 query: listOptions.query,
                 type: listOptions.type,
                 sort: listOptions.sort,
                 state: 'active',
-              }, abort.signal).then(page => wrapProviderCursor(page, listOptions))
-              : pageListing({
-                directoryId: UserDocDirectoryId(''), directories: [], documents: await ctx.userDocs.list(abort.signal),
-              }, listOptions))
-          json(res, 200, { limits: ctx.userDocs.limits, ...response, documents: response.documents.map(publicRef) })
-          // A full reconciliation runs after the response; mutation
-          // authorization remains synchronous on its dedicated path.
-          queueCatalogSync(ctx, documents ?? response.documents, listOptions === undefined)
+              }, abort.signal)
+              : pageListing(await ctx.userDocs.listDirectory(directoryId, abort.signal), listOptions)
+          const listing = listOptions === undefined || !usesProviderPage
+            ? providerListing
+            : wrapProviderCursor(providerListing as UserDocDirectoryPage, listOptions)
+          if (!abort.signal.aborted) {
+            const response = listOptions === undefined ? {
+              ...listing,
+              totalDocuments: listing.documents.length,
+            } : listing
+            json(res, 200, {
+              limits: ctx.userDocs.limits,
+              ...response,
+              ...(listOptions !== undefined && 'nextCursor' in response && response.nextCursor !== undefined
+                ? { nextCursor: response.nextCursor }
+                : {}),
+              documents: response.documents.map(publicRef),
+              directories: response.directories.map(publicDirectoryRef),
+            })
+            // Catalog reconciliation is metadata maintenance and must not delay
+            // the document page that the user is waiting to see.
+            queueCatalogSync(ctx, providerListing.documents, false)
+          }
+        } else {
+          const documents = listOptions === undefined ? await ctx.userDocs.list(abort.signal) : undefined
+          if (!abort.signal.aborted) {
+            const response = listOptions === undefined
+              ? {
+                documents: documents ?? [],
+                totalDocuments: documents?.length ?? 0,
+              }
+              : await (typeof (ctx.userDocs as unknown as { listDirectoryPage?: unknown }).listDirectoryPage === 'function'
+                ? ctx.userDocs.listDirectoryPage(UserDocDirectoryId(''), {
+                  ...(listOptions.providerCursor === undefined ? {} : { cursor: listOptions.providerCursor }),
+                  limit: listOptions.limit,
+                  query: listOptions.query,
+                  type: listOptions.type,
+                  sort: listOptions.sort,
+                  state: 'active',
+                }, abort.signal).then(page => wrapProviderCursor(page, listOptions))
+                : pageListing({
+                  directoryId: UserDocDirectoryId(''), directories: [], documents: await ctx.userDocs.list(abort.signal),
+                }, listOptions))
+            json(res, 200, { limits: ctx.userDocs.limits, ...response, documents: response.documents.map(publicRef) })
+            // A full reconciliation runs after the response; mutation
+            // authorization remains synchronous on its dedicated path.
+            queueCatalogSync(ctx, documents ?? response.documents, listOptions === undefined)
+          }
         }
+      } finally {
+        abort.dispose()
       }
       return
     }
     if (url.pathname === `${USERDOC_HTTP_PATH}/directories` && req.method === 'GET') {
       authorizeDocumentAction(ctx, 'read')
       const abort = abortFor(req, res)
-      const directories = await ctx.userDocs.listDirectories(abort.signal)
-      if (!abort.signal.aborted) json(res, 200, { directories: directories.map(publicDirectoryRef) })
+      try {
+        const directories = await ctx.userDocs.listDirectories(abort.signal)
+        if (!abort.signal.aborted) json(res, 200, { directories: directories.map(publicDirectoryRef) })
+      } finally {
+        abort.dispose()
+      }
       return
     }
     if (url.pathname === USERDOC_TRANSFER_PATH && req.method === 'POST') {

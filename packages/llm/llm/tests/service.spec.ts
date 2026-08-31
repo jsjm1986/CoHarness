@@ -24,6 +24,7 @@ import type {
   LlmProviderInfo,
   LlmResolvedModelInfo,
 } from '@deepseek-ai/dsh-llm'
+import SourceLlmRuntime from '../src/index.ts'
 
 class ScriptedAdapter extends LlmAdapter {
   constructor(private script: StreamChunk[]) {
@@ -102,6 +103,41 @@ async function collect(stream: AsyncIterable<StreamChunk>): Promise<StreamChunk[
 }
 
 describe('LlmRuntime', () => {
+  it('validates stream cleanup configuration and reports neutral image pricing', () => {
+    expect(() => new SourceLlmRuntime(new Context(), { streamCloseTimeoutMs: 0 })).toThrow(/streamCloseTimeoutMs/)
+    const runtime = new SourceLlmRuntime(new Context())
+    expect(runtime.imageRequestPricing('missing-provider', 'model')).toBeUndefined()
+    runtime.registerAdapter(['neutral-pricing'], new ScriptedAdapter(SCRIPT))
+    expect(runtime.imageRequestPricing('neutral-pricing', 'model')).toBeUndefined()
+  })
+
+  it('detaches modality arrays from discovery and model listings', async () => {
+    const runtime = new SourceLlmRuntime(new Context())
+    runtime.registerModelDiscovery('modalities', () => Promise.resolve([
+      { id: 'vision', inputModalities: ['text', 'image'] as const },
+      { id: 'text-only' },
+    ]))
+    const discovered = await runtime.discoverModels('modalities', { baseURL: 'https://models.example' })
+    expect(discovered).toEqual([
+      { id: 'vision', inputModalities: ['text', 'image'] },
+      { id: 'text-only' },
+    ])
+    runtime.registerAdapter(['modalities-provider'], new class extends LlmAdapter {
+      override listModels(_provider: string): Promise<readonly LlmModelInfo[]> {
+        return Promise.resolve([{
+          provider: 'modalities-provider', id: 'vision', name: 'Vision', inputModalities: ['image'],
+        }])
+      }
+
+      override async * stream(_options: GenerateOptions): AsyncIterable<StreamChunk> {
+        // This adapter is used only for model discovery in this test.
+      }
+    }())
+    await expect(runtime.listModels('modalities-provider')).resolves.toEqual([{
+      provider: 'modalities-provider', id: 'vision', name: 'Vision', inputModalities: ['image'],
+    }])
+  })
+
   it('recognizes structured and model-capacity context-window overflow details', () => {
     expect(isContextWindowExceededError('context_length_exceeded maximum context length')).toBe(true)
     expect(isContextWindowExceededError('context-window-overflowed')).toBe(true)
@@ -557,6 +593,168 @@ describe('LlmRuntime', () => {
     for await (const _chunk of ctx.llm.stream({ provider: 'test', model: 'test', messages: [] })) break
   })
 
+  it('lets cancellation win a pending adapter read and still closes the iterator', async () => {
+    const nextStarted = Promise.withResolvers<undefined>()
+    const nextGate = Promise.withResolvers<IteratorResult<StreamChunk>>()
+    let closeCalls = 0
+    const adapter = new class extends LlmAdapter {
+      stream(_options: GenerateOptions): AsyncIterable<StreamChunk> {
+        return {
+          [Symbol.asyncIterator](): AsyncIterator<StreamChunk> {
+            return {
+              next: () => {
+                nextStarted.resolve(undefined)
+                return nextGate.promise
+              },
+              return: () => {
+                closeCalls += 1
+                return Promise.resolve({ done: true, value: undefined })
+              },
+            }
+          },
+        }
+      }
+    }()
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    ctx.llm.registerAdapter(['test'], adapter)
+    const controller = new AbortController()
+    const iterator = ctx.llm.stream({ provider: 'test', model: 'test', messages: [], signal: controller.signal })[Symbol.asyncIterator]()
+    const first = iterator.next()
+    await nextStarted.promise
+    const reason = new Error('caller disconnected')
+    controller.abort(reason)
+
+    await expect(first).resolves.toMatchObject({
+      done: false,
+      value: { type: 'finish', reason: { kind: 'aborted', failure: { message: 'caller disconnected' } } },
+    })
+    await expect(iterator.next()).resolves.toMatchObject({ done: true })
+    expect(closeCalls).toBe(1)
+    // Reject the adapter demand after the runtime has already won the abort
+    // race; the rejection handler must consume it without a process warning.
+    nextGate.reject('late adapter value')
+    await Promise.resolve()
+  })
+
+  it('normalizes a pre-aborted demand and a pending non-Error rejection', async () => {
+    const preAborted = new AbortController()
+    preAborted.abort('already closed')
+    let preAbortedNextCalls = 0
+    const preContext = new Context()
+    await preContext.plugin(SourceLlmRuntime)
+    preContext.llm.registerAdapter(['pre-aborted'], new class extends LlmAdapter {
+      stream(_options: GenerateOptions): AsyncIterable<StreamChunk> {
+        return {
+          [Symbol.asyncIterator](): AsyncIterator<StreamChunk> {
+            return {
+              next: () => {
+                preAbortedNextCalls += 1
+                return Promise.resolve({ done: false, value: SCRIPT[0]! })
+              },
+              return: () => Promise.resolve({ done: true, value: undefined }),
+            }
+          },
+        }
+      }
+    }())
+    await expect(collect(preContext.llm.stream({
+      provider: 'pre-aborted', model: 'm', messages: [], signal: preAborted.signal,
+    }))).resolves.toMatchObject([{ type: 'finish', reason: { kind: 'aborted' } }])
+    expect(preAbortedNextCalls).toBe(0)
+
+    const rejected = new Context()
+    await rejected.plugin(SourceLlmRuntime)
+    rejected.llm.registerAdapter(['rejecting'], new class extends LlmAdapter {
+      stream(_options: GenerateOptions): AsyncIterable<StreamChunk> {
+        return {
+          [Symbol.asyncIterator](): AsyncIterator<StreamChunk> {
+            // Third-party adapters may reject with arbitrary values.
+            // oxlint-disable-next-line typescript/prefer-promise-reject-errors
+            return { next: () => Promise.reject('adapter rejected') }
+          },
+        }
+      }
+    }())
+    await expect(collect(rejected.llm.stream({
+      provider: 'rejecting', model: 'm', messages: [], signal: new AbortController().signal,
+    }))).resolves.toMatchObject([{
+      type: 'finish', reason: {
+        kind: 'error', failure: { code: 'UNKNOWN', message: 'LLM adapter next() rejected with a non-Error value.' },
+      },
+    }])
+  })
+
+  it('settles a signal-aware next() when it resolves or rejects before cancellation', async () => {
+    const resolved = new SourceLlmRuntime(new Context())
+    resolved.registerAdapter(['signal-resolve'], new class extends LlmAdapter {
+      private count = 0
+      stream(_options: GenerateOptions): AsyncIterable<StreamChunk> {
+        return {
+          [Symbol.asyncIterator]: () => ({
+            next: async () => this.count++ === 0
+              ? { done: false as const, value: SCRIPT[0]! }
+              : { done: true as const, value: undefined },
+          }),
+        }
+      }
+    }())
+    await expect(collect(resolved.stream({
+      provider: 'signal-resolve', model: 'm', messages: [], signal: new AbortController().signal,
+    }))).resolves.toHaveLength(2)
+
+    const rejected = new SourceLlmRuntime(new Context())
+    rejected.registerAdapter(['signal-reject'], new class extends LlmAdapter {
+      stream(_options: GenerateOptions): AsyncIterable<StreamChunk> {
+        return {
+          [Symbol.asyncIterator]: () => ({
+            // oxlint-disable-next-line typescript/prefer-promise-reject-errors
+            next: () => Promise.reject('signal rejection'),
+          }),
+        }
+      }
+    }())
+    await expect(collect(rejected.stream({
+      provider: 'signal-reject', model: 'm', messages: [], signal: new AbortController().signal,
+    }))).resolves.toMatchObject([{ type: 'finish', reason: { kind: 'error' } }])
+
+    const errorRejected = new SourceLlmRuntime(new Context())
+    errorRejected.registerAdapter(['signal-error'], new class extends LlmAdapter {
+      stream(_options: GenerateOptions): AsyncIterable<StreamChunk> {
+        return {
+          [Symbol.asyncIterator]: () => ({
+            next: () => Promise.reject(new Error('signal error')),
+          }),
+        }
+      }
+    }())
+    await expect(collect(errorRejected.stream({
+      provider: 'signal-error', model: 'm', messages: [], signal: new AbortController().signal,
+    }))).resolves.toMatchObject([{
+      type: 'finish', reason: { kind: 'error', failure: { message: 'signal error' } },
+    }])
+  })
+
+  it('bounds a hostile iterator return during stream cleanup', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SourceLlmRuntime, { streamCloseTimeoutMs: 1 })
+    ctx.llm.registerAdapter(['hostile-close'], new class extends LlmAdapter {
+      stream(_options: GenerateOptions): AsyncIterable<StreamChunk> {
+        return {
+          [Symbol.asyncIterator](): AsyncIterator<StreamChunk> {
+            return {
+              next: () => Promise.resolve({ done: false, value: SCRIPT[0]! }),
+              return: () => new Promise(() => {}),
+            }
+          },
+        }
+      }
+    }())
+    await expect((async () => {
+      for await (const _chunk of ctx.llm.stream({ provider: 'hostile-close', model: 'm', messages: [] })) break
+    })()).rejects.toMatchObject({ code: 'ADAPTER_CLOSE_TIMEOUT' })
+  })
+
   it('unregisters adapters when the owning fiber is disposed (HMR safety)', async () => {
     const ctx = new Context()
     await ctx.plugin(LlmRuntime)
@@ -574,7 +772,10 @@ describe('LlmRuntime', () => {
     const ctx = new Context()
     await ctx.plugin(LlmRuntime)
     const provider = { id: 'catalog', name: 'Catalog Provider' }
-    const model = { provider: 'catalog', id: 'fast', name: 'Fast', description: 'Low latency' }
+    const model = {
+      provider: 'catalog', id: 'fast', name: 'Fast', description: 'Low latency',
+      inputModalities: ['text', 'image'] as const,
+    }
     ctx.llm.registerAdapter(['catalog'], new CatalogAdapter(provider, [model]))
 
     const providers = ctx.llm.listProviders()
@@ -589,6 +790,7 @@ describe('LlmRuntime', () => {
     expect(ctx.llm.listProviders()).toEqual([{ id: 'catalog', name: 'Catalog Provider' }])
     await expect(ctx.llm.listModels('catalog')).resolves.toEqual([{
       provider: 'catalog', id: 'fast', name: 'source mutated', description: 'Low latency',
+      inputModalities: ['text', 'image'],
     }])
   })
 

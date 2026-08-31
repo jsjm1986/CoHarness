@@ -7,7 +7,9 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 ## 工具链
 
 - **Node 25**（`.nvmrc`；dsh 仓库 engines `^22.19 || >=24` 亦兼容）。`better-sqlite3` 与 `argon2` 是原生模块，ABI 绑定安装时的 Node 大版本——切换 Node 后运行 `npm rebuild better-sqlite3 argon2`，否则报 `NODE_MODULE_VERSION` 不匹配。
-- 命令：`npm run dev`（tsx 启动）、`npm test`（vitest）、`npm run typecheck`。
+- 命令：`npm run dev`（tsx 源码启动）、`npm run build`（生成生产入口 `lib/index.js`）、`npm test`（vitest）、`npm run typecheck`。
+
+`npm run build` 会把 Gateway 源码图生成到 `lib/`，并将相对导入改写为 `.js`；生产 supervisor 必须在同一个 release 目录中执行 `node lib/index.js`。源码 `tsx` 入口只用于开发和测试。
 
 ## 配置（环境变量，见 src/config.ts）
 
@@ -48,6 +50,7 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 | `HGW_GUARD_PATCH` | `<仓库>/plugins/dsh-directory-guard/cordis.patch.yml` | 实体安装进每个实例的 directory-guard bundle 补丁；release 模式把它固定在 `HGW_RELEASE_ROOT` 内，`off` 可关闭 |
 | `HGW_MODEL_GOVERNANCE_PACKAGE` | `<仓库>/plugins/dsh-model-governance` | 树外实例授权与用量插件；release 模式把它固定在 `HGW_RELEASE_ROOT` 内 |
 | `HGW_DEFAULT_ENV_FILE` | （空） | 每次启动复制到实例 `$DSH_HOME/.env` 的公司默认凭据 |
+| `HGW_BOOTSTRAP_ADMIN_PASSWORD_FILE` | `~/.harness-gateway/bootstrap-admin-password` | 接收首次启动生成的管理员密码的仅所有者可读一次性文件；修改密码后删除 |
 | `HGW_FCM_PROJECT_ID` | （未设置） | 用于 Android 完成通知的 Firebase Cloud Messaging 企业 id |
 | `HGW_FCM_SERVICE_ACCOUNT_FILE` | （未设置） | 仅所有者可读的 Firebase service-account JSON 文件；未设置时仍保存 Token，但不发送 FCM |
 | `HGW_JPUSH_APP_KEY` | （未设置） | JPush 应用 AppKey；必须与 `HGW_JPUSH_MASTER_SECRET` 成对设置 |
@@ -115,4 +118,4 @@ Admin 用量 API 保留原有主体汇总，并新增 `/admin/api/usage/overview
 
 ## 目录强制的分层
 
-网关只做认证与编排；普通用户目录访问由 Linux 生产的 systemd 挂载命名空间和每个实例内加载的 [dsh-directory-guard](../plugins/dsh-directory-guard/README.zh.md) 插件共同强制。普通用户单元会先遮蔽用户根、项目运行时根和已配置项目根，再仅回绑运行时 home、`$DSH_HOME` 与获准项目目录；`ProtectSystem=strict`、`ProtectHome=tmpfs` 和移除 `CAP_SYS_ADMIN` 覆盖整个进程树。home 补丁还会用应用内目录浏览器替代宿主操作系统选择器，由浏览器列出授权根并拒绝根外路径。管理员保留同一插件组合，但得到文件系统根目录授权和 Full access 预设；其 systemd 单元取消普通用户的目录遮蔽与系统/home 只读设置，同时继续使用非 root 运行时账户，并保留 `NoNewPrivileges`、能力限制和 Gateway 目录排除。共享项目单元以 `HGW_PROJECT_RUNTIME_USER` 运行，只绑定项目路径与其私有 `$DSH_HOME`，并把凭据设置暴露为只读。受控用户项目根必须为 `HGW_PROJECT_RUNTIME_USER` 继承组访问（例如由 root 拥有、`harness-project` 作为组且权限为 setgid `2770`，或使用等效默认 ACL），否则新分配的目录无法被项目单元打开。macOS 没有 systemd 挂载命名空间，因此普通用户和共享项目的全进程约束仍属于开发环境限制。
+网关只做认证与编排；普通用户目录访问由 Linux 生产的 systemd 挂载命名空间和每个实例内加载的 [dsh-directory-guard](../plugins/dsh-directory-guard/README.zh.md) 插件共同强制。普通用户单元会先遮蔽用户根、项目运行时根、已配置项目根和 Gateway 私有凭据路径，再仅回绑运行时 home、`$DSH_HOME` 与获准项目目录；`ProtectSystem=strict`、`ProtectHome=tmpfs` 和移除 `CAP_SYS_ADMIN` 覆盖整个进程树。home 补丁还会用应用内目录浏览器替代宿主操作系统选择器，由浏览器列出授权根并拒绝根外路径。管理员保留同一插件组合，但得到文件系统根目录授权和 Full access 预设；其 systemd 单元取消普通用户的目录遮蔽与系统/home 只读设置，同时继续使用非 root 运行时账户，并保留 `NoNewPrivileges`、能力限制和 Gateway 目录排除。共享项目单元以 `HGW_PROJECT_RUNTIME_USER` 运行，只绑定项目路径与其私有 `$DSH_HOME`，并把凭据设置暴露为只读。受控用户项目根必须为 `HGW_PROJECT_RUNTIME_USER` 继承组访问（例如由 root 拥有、`harness-project` 作为组且权限为 setgid `2770`，或使用等效默认 ACL），否则新分配的目录无法被项目单元打开。macOS 没有 systemd 挂载命名空间，因此普通用户和共享项目的全进程约束仍属于开发环境限制。

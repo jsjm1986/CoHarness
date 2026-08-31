@@ -120,6 +120,35 @@ class ProjectRepository implements InstanceRepository {
   }
 }
 
+class SurvivorRepository implements InstanceRepository {
+  constructor(private readonly projectPath: string, private readonly port: number) {}
+
+  initialize(_instancesOutliveGateway: boolean): Promise<void> { return Promise.resolve() }
+  portOf(_target: RuntimeTarget): Promise<number> { return Promise.resolve(this.port) }
+  stateOf(_target: RuntimeTarget): Promise<string> { return Promise.resolve('ready') }
+  generationOf(_target: RuntimeTarget): Promise<number> { return Promise.resolve(7) }
+  touch(_target: RuntimeTarget, _at: number): Promise<void> { return Promise.resolve() }
+  beginStart(_target: RuntimeTarget, _at: number, _runtimeTokenHash: Buffer): Promise<number> {
+    throw new Error('survivor should be reattached, not started')
+  }
+  markReady(_target: RuntimeTarget, _generation: number): Promise<void> { return Promise.resolve() }
+  idleTargets(_cutoff: number): Promise<RuntimeTarget[]> { return Promise.resolve([]) }
+  idleTarget(_target: RuntimeTarget, _cutoff: number): Promise<boolean> { return Promise.resolve(false) }
+  markStopping(_target: RuntimeTarget): Promise<void> { return Promise.resolve() }
+  markStopped(_target: RuntimeTarget): Promise<void> { return Promise.resolve() }
+  owner(_target: RuntimeTarget): Promise<{
+    kind: 'project'
+    id: number
+    username: string
+    homePath: string
+    name: string
+  }> {
+    return Promise.resolve({
+      kind: 'project', id: 41, username: 'project-41', homePath: this.projectPath, name: 'Compiler',
+    })
+  }
+}
+
 describe('InstanceManager', () => {
   it('spawns, reports ready, and dedupes concurrent starts', async () => {
     const { alice, manager } = await setup()
@@ -129,6 +158,32 @@ describe('InstanceManager', () => {
     expect(await manager.stateOf(alice.id)).toBe('ready')
     const response = await fetch(`http://127.0.0.1:${a.port}/`)
     expect(response.status).toBe(200)
+  })
+
+  it('reattaches a healthy supervisor survivor after a Gateway restart', async () => {
+    const { root, cfg } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const projectPath = join(root, 'survivor-project')
+    mkdirSync(projectPath, { recursive: true })
+    const attached = {
+      hasExited: () => false,
+      isAlive: async () => true,
+      terminate: async () => {},
+    }
+    const launcher = {
+      instancesOutliveGateway: true,
+      start: async () => { throw new Error('unexpected survivor start') },
+      attach: () => attached,
+    }
+    const survivorManager = new InstanceManager(
+      new SurvivorRepository(projectPath, 43250),
+      cfg,
+      launcher,
+      { principalPublicKey: '' },
+    )
+    manager = survivorManager
+    const result = await survivorManager.ensureRunning({ kind: 'project', id: 41, name: 'Compiler', path: projectPath })
+    expect(result).toEqual({ port: 43250, generation: 7 })
+    expect(await survivorManager.isLive({ kind: 'project', id: 41 })).toBe(true)
   })
 
   it('reaps idle instances but keeps active ones', async () => {

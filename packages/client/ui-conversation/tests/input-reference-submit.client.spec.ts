@@ -4,10 +4,10 @@
  * accepted prompt.
  */
 import { describe, expect, it, vi } from 'vitest'
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ClientContext, ObservableSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import type { InputTriggerController, SubmitOutcome } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import { SessionInputShell } from '../src/client/input/facade.ts'
-import type { DraftAttachmentId, DraftDocumentId } from '../src/client/input/contract.ts'
+import type { DraftAttachmentId, DraftDocumentId, QueuedMessage } from '../src/client/input/contract.ts'
 
 const mention = '@[Research](dsh-session:InNvdXJjZSI)'
 const spacedMention = '@[Research notes](dsh-session:InNvdXJjZSI)'
@@ -163,6 +163,38 @@ describe('reference submission', () => {
     expect(signal?.aborted).toBe(true)
     expect(shell.snapshot.phase).toBe('plain')
     expect(shell.snapshot.draft).toBe('send this')
+  })
+
+  it('unsubscribes its queue projection exactly once on disposal', () => {
+    let active = true
+    let listener: (() => void) | undefined
+    const unsubscribe = vi.fn(() => { active = false })
+    const queue: ObservableSnapshot<readonly QueuedMessage[]> = {
+      getSnapshot: () => [],
+      subscribe: (received) => {
+        listener = received
+        return unsubscribe
+      },
+    }
+    const shell = new SessionInputShell({
+      actx: {} as ClientContext,
+      defaultSink: vi.fn(),
+      commandImages,
+      queue,
+    })
+    const updates = vi.fn()
+    const stop = shell.state.subscribe(updates)
+
+    shell.dispose()
+    expect(unsubscribe).toHaveBeenCalledOnce()
+
+    const updateCount = updates.mock.calls.length
+    if (active) listener?.()
+    expect(updates).toHaveBeenCalledTimes(updateCount)
+
+    shell.dispose()
+    expect(unsubscribe).toHaveBeenCalledOnce()
+    stop()
   })
 
   it('retains a rejected default message without duplicating its prompt error notice', async () => {

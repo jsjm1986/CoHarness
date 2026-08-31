@@ -25,6 +25,7 @@ describe('loadConfig', () => {
     expect(cfg.projectPathRoots).toEqual([])
     expect(cfg.userProjectsRoot).toMatch(/user-projects$/)
     expect(cfg.projectsRoot).toMatch(/harness-projects$/)
+    expect(cfg.bootstrapAdminPasswordFile).toMatch(/bootstrap-admin-password$/)
     // The default CLI entry must be an ABSOLUTE path (resolved against
     // dshRepoRoot), because instances spawn with cwd = user home.
     const bin = cfg.dshCommand.find(arg => arg.endsWith('apps/cli/src/bin.ts'))
@@ -110,6 +111,7 @@ describe('loadConfig', () => {
       HGW_FCM_SERVICE_ACCOUNT_FILE: '  /srv/harness/firebase.json  ',
       HGW_JPUSH_APP_KEY: '  jpush-app-key  ',
       HGW_JPUSH_MASTER_SECRET: '  jpush-master-secret  ',
+      HGW_BOOTSTRAP_ADMIN_PASSWORD_FILE: '/srv/harness/gateway-data/bootstrap-admin-password',
     })
     expect(cfg.port).toBe(9001)
     expect(cfg.organizationSlug).toBe('internal')
@@ -127,6 +129,7 @@ describe('loadConfig', () => {
     expect(cfg.fcmServiceAccountFile).toBe('/srv/harness/firebase.json')
     expect(cfg.jpushAppKey).toBe('jpush-app-key')
     expect(cfg.jpushMasterSecret).toBe('jpush-master-secret')
+    expect(cfg.bootstrapAdminPasswordFile).toBe('/srv/harness/gateway-data/bootstrap-admin-password')
     expect(cfg.secureCookies).toBe(true)
   })
 

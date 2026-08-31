@@ -8,7 +8,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { ApiProxy, GoalRef, HostFrame, MuxFrame, RpcMessage, RpcRequest, RpcResponse } from '@deepseek-ai/dsh-host-apiproxy'
-import { InProcessApiClient, RpcId, toFetchHandler } from '@deepseek-ai/dsh-host-apiproxy'
+import { InProcessApiClient, readApiResponseJson, RpcId, toFetchHandler } from '@deepseek-ai/dsh-host-apiproxy'
 
 const sid = (id: string): SessionId => id as SessionId
 
@@ -379,6 +379,23 @@ describe('unary round trip', () => {
     const call = hung.sessions.list({}, gate.signal)
     gate.abort(new Error('externally aborted'))
     await expect(call).rejects.toThrow(/externally aborted/)
+  })
+
+  it('cancels a pending unary response body when the caller aborts after headers', async () => {
+    let cancelled = false
+    const body = new ReadableStream<Uint8Array>({
+      start() {},
+      cancel() { cancelled = true },
+    })
+    const gate = new AbortController()
+    const call = readApiResponseJson(
+      new Response(body, { headers: { 'content-type': 'application/json' } }),
+      32,
+      gate.signal,
+    )
+    gate.abort(new Error('response body closed'))
+    await expect(call).rejects.toThrow('response body closed')
+    await vi.waitFor(() => { expect(cancelled).toBe(true) })
   })
 
   it('rejects an already-aborted signal before touching the transport, mapping a string reason to an Error', async () => {

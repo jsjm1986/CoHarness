@@ -4,9 +4,9 @@ import type {
   ConversationNodeContext, ConversationNodeDefinition, PartialAssistant, RequestView,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import {
-  displayFailureMessage, emptyAssistantBlock, isTokenDelta, sanitizeAssistantText, toAssistantBlock,
-  toAssistantBlocks,
+  displayFailureMessage, IncrementalAssistantBlocks, isTokenDelta, sanitizeAssistantText, toAssistantBlocks,
 } from '@deepseek-ai/dsh-client-runtime/client'
+import type { StreamChunk } from '@deepseek-ai/dsh-llm/types'
 import { trajectoryNode } from './trajectory-definition-common.ts'
 
 /* jscpd:ignore-start -- Target-owned Definitions intentionally keep their event
@@ -34,8 +34,7 @@ interface AssistantState {
   readonly startTime: number
   readonly started: boolean
   readonly sawChunk: boolean
-  readonly blocks: readonly (AssistantBlock | undefined)[]
-  readonly rawText: ReadonlyMap<number, string>
+  readonly blocks: IncrementalAssistantBlocks
   readonly firstVisibleSeq: number | undefined
   readonly firstVisibleTime: number | undefined
   readonly firstTokenTime: number | undefined
@@ -59,8 +58,7 @@ function initialState(
     startTime,
     started,
     sawChunk: false,
-    blocks: [],
-    rawText: new Map(),
+    blocks: new IncrementalAssistantBlocks(),
     firstVisibleSeq: undefined,
     firstVisibleTime: undefined,
     firstTokenTime: undefined,
@@ -71,23 +69,35 @@ function initialState(
   }
 }
 
-function compactBlocks(blocks: readonly (AssistantBlock | undefined)[]): AssistantBlock[] {
-  return blocks.filter((block): block is AssistantBlock => block !== undefined)
-}
-
-function hasVisibleContent(blocks: readonly AssistantBlock[]): boolean {
-  return blocks.some((block) => {
-    if (block.kind === 'tool-call') return false
-    if (block.kind === 'text' || block.kind === 'reasoning') return block.text.trim() !== ''
-    return true
-  })
-}
-
 function hasInterruptionEvidence(blocks: readonly AssistantBlock[]): boolean {
   return blocks.some((block) => {
     if (block.kind === 'text' || block.kind === 'reasoning') return block.text.trim() !== ''
     return true
   })
+}
+
+/** Determine visibility from one delta without materializing the accumulated prefix. */
+function firstVisibleFromChunk(chunk: StreamChunk): boolean {
+  switch (chunk.type) {
+    case 'block-start':
+      return chunk.blockType !== 'text' && chunk.blockType !== 'reasoning' && chunk.blockType !== 'tool-call'
+    case 'text-delta':
+      return sanitizeAssistantText(chunk.text).trim() !== ''
+    case 'reasoning-delta':
+      return chunk.text.trim() !== ''
+    case 'tool-call-delta':
+      return false
+    case 'block-end':
+      return chunk.block.type === 'text'
+        ? sanitizeAssistantText(chunk.block.text).trim() !== ''
+        : chunk.block.type === 'reasoning'
+          ? chunk.block.text.trim() !== ''
+          : chunk.block.type !== 'tool-call'
+    case 'usage':
+      return false
+    default:
+      return false
+  }
 }
 
 function addUsage(current: UsageValue | undefined, next: UsageValue): UsageValue {
@@ -112,58 +122,29 @@ function updateChunk(state: AssistantState, match: ConversationMatch): Assistant
   if (chunk.type === 'usage') {
     return { ...state, sawChunk: true, usage: addUsage(state.usage, chunk.usage) }
   }
-  const blocks = [...state.blocks]
-  const rawText = new Map(state.rawText)
   switch (chunk.type) {
     case 'block-start':
-      blocks[chunk.index] = emptyAssistantBlock(chunk.blockType)
-      if (chunk.blockType === 'text') rawText.set(chunk.index, '')
-      else rawText.delete(chunk.index)
+      state.blocks.start(chunk.index, chunk.blockType)
       break
-    case 'text-delta': {
-      const previous = blocks[chunk.index]
-      const text = (rawText.get(chunk.index) ?? (previous?.kind === 'text' ? previous.text : '')) + chunk.text
-      rawText.set(chunk.index, text)
-      blocks[chunk.index] = {
-        kind: 'text',
-        text: sanitizeAssistantText(text),
-      }
+    case 'text-delta':
+      state.blocks.textDelta(chunk.index, chunk.text)
       break
-    }
-    case 'reasoning-delta': {
-      const previous = blocks[chunk.index]
-      blocks[chunk.index] = {
-        kind: 'reasoning',
-        text: (previous?.kind === 'reasoning' ? previous.text : '') + chunk.text,
-      }
+    case 'reasoning-delta':
+      state.blocks.reasoningDelta(chunk.index, chunk.text)
       break
-    }
-    case 'tool-call-delta': {
-      const previous = blocks[chunk.index]
-      const base = previous?.kind === 'tool-call'
-        ? previous
-        : { kind: 'tool-call' as const, callId: '', name: '', argsRaw: '' }
-      blocks[chunk.index] = {
-        kind: 'tool-call',
-        callId: base.callId || String(chunk.id),
-        name: chunk.name ?? base.name,
-        argsRaw: base.argsRaw + chunk.argumentsDelta,
-      }
+    case 'tool-call-delta':
+      state.blocks.toolCallDelta(chunk.index, String(chunk.id), chunk.name, chunk.argumentsDelta)
       break
-    }
     case 'block-end':
-      blocks[chunk.index] = toAssistantBlock(chunk.block)
-      if (chunk.block.type === 'text') rawText.delete(chunk.index)
+      state.blocks.end(chunk.index, chunk.block)
       break
     default:
       return { ...state, sawChunk: true }
   }
-  const visible = hasVisibleContent(compactBlocks(blocks))
+  const visible = firstVisibleFromChunk(chunk)
   return {
     ...state,
     sawChunk: true,
-    blocks,
-    rawText,
     ...(visible && state.firstVisibleSeq === undefined
       ? { firstVisibleSeq: match.event.seq, firstVisibleTime: match.event.time }
       : {}),
@@ -194,10 +175,10 @@ function fallbackState(context: ConversationNodeContext<AssistantState>): Assist
       state = updateChunk(state, match)
     } else if (event.type === 'assistant/message') {
       state ??= initialState(event.data.turn, event.data.step, event.seq, event.time, false)
+      const blocks = toAssistantBlocks(event.data.message.content)
       state = {
         ...state,
-        blocks: toAssistantBlocks(event.data.message.content),
-        rawText: new Map(),
+        blocks: new IncrementalAssistantBlocks(blocks),
         final: match,
         usage: state.usage ?? event.data.usage,
       }
@@ -237,7 +218,7 @@ function finalNode(
     }
   }
   const boundary = closedBoundary(context)
-  const blocks = compactBlocks(state.blocks)
+  const blocks = state.blocks.snapshot()
   if (boundary === undefined || !hasInterruptionEvidence(blocks)) return undefined
   return {
     kind: 'assistant',
@@ -316,10 +297,10 @@ const trajectoryAssistantDefinition: ConversationNodeDefinition<AssistantState> 
   update: (context, match) => {
     if (match.event.type === 'assistant/chunk') return updateChunk(context.state, match)
     if (match.event.type === 'assistant/message') {
+      const blocks = toAssistantBlocks(match.event.data.message.content)
       return {
         ...context.state,
-        blocks: toAssistantBlocks(match.event.data.message.content),
-        rawText: new Map(),
+        blocks: new IncrementalAssistantBlocks(blocks),
         final: match,
         usage: context.state.usage ?? match.event.data.usage,
       }
@@ -357,7 +338,7 @@ const trajectoryAssistantDefinition: ConversationNodeDefinition<AssistantState> 
     const node = finalNode(state, context)
     const boundary = closedBoundary(context)
     const partial: PartialAssistant | null = node === undefined && boundary === undefined && state.sawChunk
-      ? { turn: state.turn, step: state.step, blocks: compactBlocks(state.blocks) }
+      ? { turn: state.turn, step: state.step, blocks: state.blocks.snapshot() }
       : null
     const request = assistantRequest(state, node, boundary)
     if (node === undefined && partial === null && request === undefined) return null

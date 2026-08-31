@@ -152,6 +152,7 @@ class SharedRead<T> {
         reject(abortError(signal))
       }
       signal.addEventListener('abort', onAbort, { once: true })
+      if (signal.aborted) onAbort()
       void this.promise.then((value) => {
         signal.removeEventListener('abort', onAbort)
         release(false)

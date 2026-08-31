@@ -107,7 +107,7 @@ const UNARY_ROUTES: UnaryRoutes = {
   'session.list': { schema: sessionListRequestSchema, invoke: (api, r) => api.sessions.list(r) },
   'session.search': { schema: sessionSearchRequestSchema, invoke: (api, r, signal) => api.sessions.search(r, signal) },
   'session.create': { schema: sessionCreateRequestSchema, invoke: (api, r) => api.sessions.create(r) },
-  'session.history': { schema: sessionHistoryRequestSchema, invoke: (api, r) => api.sessions.history(r) },
+  'session.history': { schema: sessionHistoryRequestSchema, invoke: (api, r, signal) => api.sessions.history(r, signal) },
   'session.models': { schema: sessionModelsRequestSchema, invoke: (api, r) => api.sessions.models(r) },
   'session.selectModel': { schema: sessionSelectModelRequestSchema, invoke: (api, r) => api.sessions.selectModel(r) },
   'session.rename': { schema: sessionRenameRequestSchema, invoke: (api, r) => api.sessions.rename(r) },
@@ -283,7 +283,56 @@ export interface FetchHandlerOptions {
 }
 
 /** Read one Request body with a byte budget before parsing JSON. */
-async function readRequestBody(request: Request, limit: number): Promise<string> {
+const ABORTED_REQUEST_BODY_GRACE_MS = 25
+
+function requestAbortError(signal: AbortSignal): Error {
+  return signal.reason instanceof Error
+    ? signal.reason
+    : new Error('request body read was cancelled', { cause: signal.reason })
+}
+
+/** Read one body chunk while allowing an already-buffered envelope to finish. */
+function readRequestChunk(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  signal: AbortSignal,
+): Promise<ReadableStreamReadResult<Uint8Array>> {
+  const pending = reader.read()
+  return new Promise((resolve, reject) => {
+    let settled = false
+    let graceTimer: ReturnType<typeof setTimeout> | undefined
+    const cleanup = (): void => {
+      signal.removeEventListener('abort', onAbort)
+      if (graceTimer !== undefined) clearTimeout(graceTimer)
+    }
+    const finish = (callback: () => void): void => {
+      if (settled) return
+      settled = true
+      cleanup()
+      callback()
+    }
+    const rejectAborted = (): void => {
+      void reader.cancel().catch(() => {})
+      finish(() => { reject(requestAbortError(signal)) })
+    }
+    const onAbort = (): void => {
+      if (settled || graceTimer !== undefined) return
+      // Fetch bodies are frequently already buffered when the caller aborts.
+      // Keep the in-flight read for a short bounded grace period so the Host
+      // can parse its rpcId and return a structured cancellation envelope.
+      graceTimer = setTimeout(rejectAborted, ABORTED_REQUEST_BODY_GRACE_MS)
+    }
+    signal.addEventListener('abort', onAbort, { once: true })
+    if (signal.aborted) onAbort()
+    void pending.then(
+      (value) => { finish(() => { resolve(value) }) },
+      (error: unknown) => {
+        finish(() => { reject(error instanceof Error ? error : new Error(String(error), { cause: error })) })
+      },
+    )
+  })
+}
+
+async function readRequestBody(request: Request, limit: number, signal: AbortSignal): Promise<string> {
   const declared = request.headers.get('content-length')
   if (declared !== null) {
     const length = Number(declared)
@@ -298,7 +347,7 @@ async function readRequestBody(request: Request, limit: number): Promise<string>
   let total = 0
   try {
     for (;;) {
-      const next = await reader.read()
+      const next = await readRequestChunk(reader, signal)
       if (next.done) break
       total += next.value.byteLength
       if (total > limit) {
@@ -306,6 +355,13 @@ async function readRequestBody(request: Request, limit: number): Promise<string>
         throw new RequestBodyTooLargeError('request body exceeds configured limit')
       }
       chunks.push(next.value)
+      if (signal.aborted) {
+        // Do not keep consuming a disconnected upload. The already-buffered
+        // prefix is enough for the usual JSON envelope and the route receives
+        // the same aborted signal for cooperative cancellation.
+        await reader.cancel().catch(() => {})
+        break
+      }
     }
   } finally {
     reader.releaseLock()
@@ -332,6 +388,9 @@ export function toFetchHandler(
   const historyPageTargetBytes = options.historyPageTargetBytes
     ?? DEFAULT_HISTORY_PAGE_TARGET_BYTES
   const requestBodyMaxBytes = options.requestBodyMaxBytes ?? DEFAULT_REQUEST_BODY_MAX_BYTES
+  if (!Number.isSafeInteger(historyPageTargetBytes) || historyPageTargetBytes < 1) {
+    throw new RangeError('historyPageTargetBytes must be a positive safe integer')
+  }
   if (!Number.isSafeInteger(requestBodyMaxBytes) || requestBodyMaxBytes < 1) {
     throw new RangeError('requestBodyMaxBytes must be a positive safe integer')
   }
@@ -393,10 +452,13 @@ export function toFetchHandler(
 
       let body: unknown
       try {
-        body = JSON.parse(await readRequestBody(req, requestBodyMaxBytes)) as unknown
+        body = JSON.parse(await readRequestBody(req, requestBodyMaxBytes, req.signal)) as unknown
       } catch (error) {
         if (error instanceof RequestBodyTooLargeError) {
           return new Response('request body exceeds configured limit', { status: 413 })
+        }
+        if (req.signal.aborted) {
+          return new Response('request was cancelled', { status: 499 })
         }
         // 400 = carrier layer (body is not even JSON); valid JSON with a bad shape goes 200 + bad-request.
         return new Response('body is not JSON', { status: 400 })

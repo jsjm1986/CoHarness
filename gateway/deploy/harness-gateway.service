@@ -29,11 +29,12 @@ Environment=HGW_RUNTIME_CREDENTIAL_DIR=/srv/harness/gateway-data/runtime-credent
 Environment=HGW_LAUNCHER=systemd
 # Pinned npm dsh (never the source tree): install with
 #   npm install -g @deepseek-ai/dsh@<pinned>
-Environment=HGW_DSH_COMMAND=/usr/local/bin/dsh web --port {port}
+Environment=HGW_DSH_COMMAND=/usr/local/bin/dsh web --no-open --port {port}
 Environment=HGW_GUARD_PATCH=/srv/harness/plugins/dsh-directory-guard/cordis.patch.yml
 Environment=HGW_MODEL_GOVERNANCE_PACKAGE=/srv/harness/plugins/dsh-model-governance
 Environment=HGW_USAGE_TIME_ZONE=Asia/Shanghai
 Environment=HGW_DEFAULT_ENV_FILE=/srv/harness/gateway-data/company.env
+Environment=HGW_BOOTSTRAP_ADMIN_PASSWORD_FILE=/srv/harness/gateway-data/bootstrap-admin-password
 # Enable after placing the Firebase service-account JSON at the host path and
 # setting the project id from the Firebase project configuration:
 # Environment=HGW_FCM_PROJECT_ID=<firebase-project-id>
@@ -42,7 +43,7 @@ Environment=HGW_DEFAULT_ENV_FILE=/srv/harness/gateway-data/company.env
 # (for example in a root-readable EnvironmentFile with mode 0600):
 # Environment=HGW_JPUSH_APP_KEY=<jpush-app-key>
 # Environment=HGW_JPUSH_MASTER_SECRET=<jpush-master-secret>
-ExecStart=/usr/local/bin/node --import tsx/esm src/index.ts
+ExecStart=/usr/local/bin/node lib/index.js
 Restart=always
 RestartSec=3
 LimitNOFILE=65535

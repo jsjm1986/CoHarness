@@ -283,4 +283,18 @@ describe('bounded Gateway responses', () => {
     await expect(readGatewayResponseBytes(new Response('{}'), 0)).rejects.toThrow(/positive safe integer/)
     await expect(readGatewayResponseJson(new Response('not-json'), 32)).rejects.toThrow(SyntaxError)
   })
+
+  it('cancels a pending response body read with the caller signal', async () => {
+    let cancelled = false
+    const response = new Response(new ReadableStream<Uint8Array>({
+      start() {},
+      cancel() { cancelled = true },
+    }))
+    const controller = new AbortController()
+    const pending = readGatewayResponseBytes(response, 32, controller.signal)
+    const reason = new Error('response consumer closed')
+    controller.abort(reason)
+    await expect(pending).rejects.toBe(reason)
+    expect(cancelled).toBe(true)
+  })
 })

@@ -31,6 +31,7 @@ describe('HTTP bridge abort', () => {
     expect(status).toBe(413)
     expect(headers).toMatchObject({ connection: 'close' })
     expect(destroyed).toHaveLength(1)
+    expect(response.listenerCount('close')).toBe(0)
   })
 
   it('aborts a pending native picker request when the browser disconnects', async () => {
@@ -71,5 +72,6 @@ describe('HTTP bridge abort', () => {
     response.emit('close')
     await pending
     expect(carrierSignal?.aborted).toBe(true)
+    expect(response.listenerCount('close')).toBe(0)
   })
 })

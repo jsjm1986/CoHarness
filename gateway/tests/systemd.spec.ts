@@ -7,6 +7,7 @@ const OPTS: SystemdOptions = {
   projectPathRoots: ['/data/projects'],
   execStart: '/usr/local/bin/node /opt/dsh/lib/bin.js web --no-open --port {port}',
   gatewayDir: '/srv/harness/gateway',
+  inaccessiblePaths: ['/srv/harness/gateway-data/bootstrap-admin-password'],
   memoryMax: '1G',
   cpuQuota: '100%',
 }
@@ -72,6 +73,7 @@ describe('renderUserUnit', () => {
 
   it('marks the gateway dir inaccessible', () => {
     expect(unit).toContain('InaccessiblePaths=-/srv/harness/gateway')
+    expect(unit).toContain('InaccessiblePaths=-/srv/harness/gateway-data/bootstrap-admin-password')
   })
 
   it('runs as a per-user system account under the user home with the grants file', () => {

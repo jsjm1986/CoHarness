@@ -5,11 +5,27 @@
 
 import { describe, expect, it } from 'vitest'
 import type { StreamChunk } from '@deepseek-ai/dsh-api-remotes/client'
-import { PartialAccumulator } from '../src/client/sessions/partial.ts'
+import { IncrementalAssistantBlocks, PartialAccumulator } from '../src/client/sessions/partial.ts'
 
 const chunk = (c: Record<string, unknown>): StreamChunk => c as unknown as StreamChunk
 
 describe('PartialAccumulator', () => {
+  it('keeps long reasoning and tool prefixes incremental while snapshots stay stable', () => {
+    const blocks = new IncrementalAssistantBlocks()
+    blocks.start(0, 'reasoning')
+    for (let index = 0; index < 1_000; index += 1) blocks.reasoningDelta(0, 'x')
+    const first = blocks.snapshot()
+    expect(first).toEqual([{ kind: 'reasoning', text: 'x'.repeat(1_000) }])
+    expect(blocks.snapshot()).toBe(first)
+    blocks.start(1, 'tool-call')
+    blocks.toolCallDelta(1, 'call-1', 'read', '{')
+    blocks.toolCallDelta(1, 'call-2', undefined, '}')
+    expect(blocks.snapshot()).toEqual([
+      { kind: 'reasoning', text: 'x'.repeat(1_000) },
+      { kind: 'tool-call', callId: 'call-1', name: 'read', argsRaw: '{}' },
+    ])
+  })
+
   it('builds empty blocks per block-start type, unknown type falls to other', () => {
     const acc = new PartialAccumulator(1, 0)
     acc.push(chunk({ type: 'block-start', index: 0, blockType: 'text' }))

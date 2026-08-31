@@ -4,10 +4,11 @@ import type {
   ConversationNodeContext, ConversationNodeDefinition,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import {
-  emptyAssistantBlock, isAppendSurfaceEvent, isTokenDelta, sanitizeAssistantText,
-  toAssistantBlock, toAssistantBlocks,
+  IncrementalAssistantBlocks, isAppendSurfaceEvent, isTokenDelta, sanitizeAssistantText,
+  toAssistantBlocks,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-llm-retry/types'
+import type { StreamChunk } from '@deepseek-ai/dsh-llm/types'
 import type { AssistantChatData } from '../contract/chat-nodes.ts'
 import { CHAT_SYNTHETIC_SEQ_OFFSETS, chatNode } from './common.ts'
 
@@ -28,8 +29,8 @@ declare module '@deepseek-ai/dsh-client-runtime/client' {
 interface AssistantState {
   readonly turn: number
   readonly step: number
-  readonly blocks: readonly (AssistantBlock | undefined)[]
-  readonly rawText: ReadonlyMap<number, string>
+  /** Sparse stream slots; mutable accumulators keep each chunk O(1). */
+  readonly blocks: IncrementalAssistantBlocks
   readonly firstVisibleSeq: number | undefined
   readonly firstVisibleTime: number | undefined
   readonly firstTokenTime: number | undefined
@@ -38,12 +39,38 @@ interface AssistantState {
   readonly usage: unknown
 }
 
+function firstVisibleFromChunk(chunk: StreamChunk): boolean {
+  switch (chunk.type) {
+    case 'block-start':
+      return chunk.blockType !== 'text' && chunk.blockType !== 'reasoning' && chunk.blockType !== 'tool-call'
+    case 'text-delta':
+      return sanitizeAssistantText(chunk.text).trim() !== ''
+    case 'reasoning-delta':
+      return chunk.text.trim() !== ''
+    case 'tool-call-delta':
+      return false
+    case 'block-end':
+      return chunk.block.type === 'text'
+        ? sanitizeAssistantText(chunk.block.text).trim() !== ''
+        : chunk.block.type === 'reasoning'
+          ? chunk.block.text.trim() !== ''
+          : chunk.block.type !== 'tool-call'
+    case 'usage':
+      return false
+    default:
+      return false
+  }
+}
+
+function materializeBlocks(state: AssistantState): AssistantBlock[] {
+  return state.blocks.snapshot()
+}
+
 function initialState(turn: number, step: number): AssistantState {
   return {
     turn,
     step,
-    blocks: [],
-    rawText: new Map(),
+    blocks: new IncrementalAssistantBlocks(),
     firstVisibleSeq: undefined,
     firstVisibleTime: undefined,
     firstTokenTime: undefined,
@@ -51,10 +78,6 @@ function initialState(turn: number, step: number): AssistantState {
     final: undefined,
     usage: undefined,
   }
-}
-
-function compactBlocks(blocks: readonly (AssistantBlock | undefined)[]): AssistantBlock[] {
-  return blocks.filter((block): block is AssistantBlock => block !== undefined)
 }
 
 function hasVisibleContent(blocks: readonly AssistantBlock[]): boolean {
@@ -83,54 +106,31 @@ function resetForRetry(state: AssistantState): AssistantState {
 function updateChunk(state: AssistantState, match: ConversationMatch): AssistantState {
   if (match.event.type !== 'assistant/chunk') return state
   const chunk = match.event.data.chunk
-  const blocks = [...state.blocks]
-  const rawText = new Map(state.rawText)
   switch (chunk.type) {
     case 'block-start':
-      blocks[chunk.index] = emptyAssistantBlock(chunk.blockType)
-      if (chunk.blockType === 'text') rawText.set(chunk.index, '')
-      else rawText.delete(chunk.index)
+      state.blocks.start(chunk.index, chunk.blockType)
       break
-    case 'text-delta': {
-      const previous = blocks[chunk.index]
-      const text = (rawText.get(chunk.index) ?? (previous?.kind === 'text' ? previous.text : '')) + chunk.text
-      rawText.set(chunk.index, text)
-      blocks[chunk.index] = { kind: 'text', text: sanitizeAssistantText(text) }
+    case 'text-delta':
+      state.blocks.textDelta(chunk.index, chunk.text)
       break
-    }
-    case 'reasoning-delta': {
-      const previous = blocks[chunk.index]
-      blocks[chunk.index] = { kind: 'reasoning', text: (previous?.kind === 'reasoning' ? previous.text : '') + chunk.text }
+    case 'reasoning-delta':
+      state.blocks.reasoningDelta(chunk.index, chunk.text)
       break
-    }
-    case 'tool-call-delta': {
-      const previous = blocks[chunk.index]
-      const base = previous?.kind === 'tool-call'
-        ? previous
-        : { kind: 'tool-call' as const, callId: '', name: '', argsRaw: '' }
-      blocks[chunk.index] = {
-        kind: 'tool-call',
-        callId: base.callId || String(chunk.id),
-        name: chunk.name ?? base.name,
-        argsRaw: base.argsRaw + chunk.argumentsDelta,
-      }
+    case 'tool-call-delta':
+      state.blocks.toolCallDelta(chunk.index, String(chunk.id), chunk.name, chunk.argumentsDelta)
       break
-    }
     case 'block-end':
-      blocks[chunk.index] = toAssistantBlock(chunk.block)
-      if (chunk.block.type === 'text') rawText.delete(chunk.index)
+      state.blocks.end(chunk.index, chunk.block)
       break
     case 'usage':
       return { ...state, usage: chunk.usage }
     default:
       return state
   }
-  const visible = hasVisibleContent(compactBlocks(blocks))
+  const visible = firstVisibleFromChunk(chunk)
   const firstToken = isTokenDelta(chunk)
   return {
     ...state,
-    blocks,
-    rawText,
     hidden: visible ? false : state.hidden,
     ...visible && state.firstVisibleSeq === undefined
       ? { firstVisibleSeq: match.event.seq, firstVisibleTime: match.event.time }
@@ -178,7 +178,7 @@ function finalNode(
   }
   const location = context.start?.location ?? context.matches.at(-1)?.location
   const boundary = location === undefined ? undefined : closedBoundary(location)
-  const blocks = compactBlocks(state.blocks)
+  const blocks = materializeBlocks(state)
   if (boundary === undefined || !hasInterruptionEvidence(blocks)) return undefined
   return {
     kind: 'assistant',
@@ -200,11 +200,11 @@ function fallbackState(context: ConversationNodeContext<AssistantState>): Assist
       continue
     }
     if (match.event.type === 'assistant/message') {
+      const blocks = toAssistantBlocks(match.event.data.message.content)
       state ??= initialState(match.event.data.turn, match.event.data.step)
       state = {
         ...state,
-        blocks: toAssistantBlocks(match.event.data.message.content),
-        rawText: new Map(),
+        blocks: new IncrementalAssistantBlocks(blocks),
         hidden: false,
         final: match,
         usage: match.event.data.usage,
@@ -229,7 +229,7 @@ function projectAssistant(context: ConversationNodeContext<AssistantState>): Ass
   const state = context.state ?? fallbackState(context)
   if (state === undefined) return undefined
   const settled = finalNode(state, context)
-  const blocks = settled?.blocks ?? compactBlocks(state.blocks)
+  const blocks = settled?.blocks ?? materializeBlocks(state)
   const visible = hasVisibleContent(blocks)
   const status = settled?.interrupted === true
     ? 'interrupted'
@@ -274,10 +274,10 @@ export const assistantDefinition: ConversationNodeDefinition<AssistantState> = {
   update: (context, match) => {
     if (match.event.type === 'assistant/chunk') return updateChunk(context.state, match)
     if (match.event.type === 'assistant/message') {
+      const blocks = toAssistantBlocks(match.event.data.message.content)
       return {
         ...context.state,
-        blocks: toAssistantBlocks(match.event.data.message.content),
-        rawText: new Map(),
+        blocks: new IncrementalAssistantBlocks(blocks),
         hidden: false,
         final: match,
         usage: match.event.data.usage,

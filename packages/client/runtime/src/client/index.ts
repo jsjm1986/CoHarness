@@ -108,7 +108,7 @@ export type {
 export {
   EMPTY_CHAT_SNAPSHOT, EMPTY_CONVERSATION_VIEWS, sanitizeAssistantText, toAssistantBlock, toAssistantBlocks,
 } from './sessions/conversation.ts'
-export { emptyAssistantBlock } from './sessions/partial.ts'
+export { emptyAssistantBlock, IncrementalAssistantBlocks } from './sessions/partial.ts'
 export { isTokenDelta } from './sessions/assistant-timing.ts'
 export { contextForm, contextProvenance, sessionRecallLabels } from './sessions/context-provenance.ts'
 export { displayFailureMessage } from './sessions/failure-display.ts'

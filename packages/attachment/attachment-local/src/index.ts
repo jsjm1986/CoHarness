@@ -134,6 +134,10 @@ class SharedRequest<T> {
         reject(abortReason(signal))
       }
       signal.addEventListener('abort', abort, { once: true })
+      // AbortSignal does not replay an already-fired event to a listener
+      // added afterwards. Recheck after registration so a cancellation in the
+      // registration window cannot leave this waiter attached forever.
+      if (signal.aborted) abort()
       void this.promise.then((value) => {
         signal.removeEventListener('abort', abort)
         release(false)
@@ -296,7 +300,7 @@ export class LocalAttachmentStore extends AttachmentStore {
         stored ?? await this.readImage(ref, sharedSignal),
         policy,
         sharedSignal,
-      )))
+      ), { signal: sharedSignal }))
       operation = shared
       this.requestInflight.set(key, shared)
       void shared.promise.finally(() => {

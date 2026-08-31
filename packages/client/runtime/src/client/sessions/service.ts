@@ -315,7 +315,7 @@ export class SessionRuntime implements ISessions {
     })
     // The manager owns wire truth; the store is its projection. Manager
     // notifications are already microtask-batched.
-    this.manager.subscribe(() => { this.projectList() })
+    const disposeManagerSubscription = this.manager.subscribe(() => { this.projectList() })
     // Stage follower: every current write (open() and projection alike)
     // re-evaluates staging, so startup restore (persisted selection validated
     // by the projection) and reconnect resurfacing enter their window with no
@@ -323,10 +323,15 @@ export class SessionRuntime implements ISessions {
     // the follower writes no list state — Session.enterStage()'s synchronous prefix
     // touches only session-side state and its own microtask-batched notifier.
     // The current-provide projection follows the same current writes.
-    this.list.subscribe(() => {
+    const disposeListSubscription = this.list.subscribe(() => {
       this.followCurrent()
       this.provideChannel.publishCurrent()
     })
+    rootCtx.effect(() => () => {
+      disposeManagerSubscription()
+      disposeListSubscription()
+      this.manager.dispose()
+    }, 'sessions: manager and list subscriptions')
     this.provideChannel = new SessionProvideChannel({
       rebuildBundles: () => {
         for (const record of this.scopes.values()) {
@@ -857,6 +862,7 @@ export class SessionRuntime implements ISessions {
 
   /** Dispose one scope and only then release its session-owned dispatch point. */
   private async dropScope(id: SessionId, record: ScopeRecord): Promise<void> {
+    record.session.dispose()
     record.session.leaveStage()
     // Remove the manager instance before awaiting the fiber so a session that
     // is re-added during teardown receives a fresh instance. The identity

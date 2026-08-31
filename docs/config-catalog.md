@@ -960,6 +960,20 @@ export interface Config {
 
 Source: [`packages/jobs/jobs-local/src/index.ts:37`](../packages/jobs/jobs-local/src/index.ts)
 
+<a id="deepseek-aidsh-llm"></a>
+
+## `@deepseek-ai/dsh-llm`
+
+```ts config-catalog
+/** Runtime controls for bounded adapter-stream teardown. */
+export interface LlmRuntimeConfig {
+  /** Maximum time to await an adapter iterator's `return()` during teardown. */
+  streamCloseTimeoutMs?: number
+}
+```
+
+Source: [`packages/llm/llm/src/index.ts:271`](../packages/llm/llm/src/index.ts)
+
 <a id="deepseek-aidsh-llm-deepseek"></a>
 
 ## `@deepseek-ai/dsh-llm-deepseek`
@@ -1852,7 +1866,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/session/session-persistence-gateway/src/index.ts:70`](../packages/session/session-persistence-gateway/src/index.ts)
+Source: [`packages/session/session-persistence-gateway/src/index.ts:79`](../packages/session/session-persistence-gateway/src/index.ts)
 
 <a id="deepseek-aidsh-session-persistence-jsonl"></a>
 
@@ -2648,7 +2662,7 @@ export interface Config {
 export type ShellDialect = 'bash' | 'pwsh'
 ```
 
-Source: [`packages/terminal/terminal-bash/src/config.ts:10`](../packages/terminal/terminal-bash/src/config.ts)
+Source: [`packages/terminal/terminal-bash/src/config.ts:11`](../packages/terminal/terminal-bash/src/config.ts)
 
 <a id="deepseek-aidsh-time-context"></a>
 
@@ -3283,7 +3297,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/attachment/userdoc-local/src/index.ts:179`](../packages/attachment/userdoc-local/src/index.ts)
+Source: [`packages/attachment/userdoc-local/src/index.ts:180`](../packages/attachment/userdoc-local/src/index.ts)
 
 <a id="deepseek-aidsh-web"></a>
 
@@ -3535,7 +3549,6 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-host-directory-picker-native` ([`packages/host/directory-picker-native/src/index.ts`](../packages/host/directory-picker-native/src/index.ts))
 - `@deepseek-ai/dsh-host-plugin-inventory` — requires `loader` ([`packages/host/plugin-inventory/src/index.ts`](../packages/host/plugin-inventory/src/index.ts))
 - `@deepseek-ai/dsh-host-userdoc-http` — requires `connection` · `userDocs` ([`packages/host/userdoc-http/src/index.ts`](../packages/host/userdoc-http/src/index.ts))
-- `@deepseek-ai/dsh-llm` ([`packages/llm/llm/src/index.ts`](../packages/llm/llm/src/index.ts))
 - `@deepseek-ai/dsh-lsp` ([`packages/lsp/lsp/src/index.ts`](../packages/lsp/lsp/src/index.ts))
 - `@deepseek-ai/dsh-schedule` — requires `agents` · `sessions` · `tools` · `sessionPersistence` ([`packages/schedule/schedule/src/index.ts`](../packages/schedule/schedule/src/index.ts))
 - `@deepseek-ai/dsh-session` ([`packages/core/session/src/index.ts`](../packages/core/session/src/index.ts))

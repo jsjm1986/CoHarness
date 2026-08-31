@@ -126,16 +126,56 @@ function nonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0
 }
 
+/** Read one response chunk while allowing the caller to cancel the body. */
+async function readResponseChunk(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  signal?: AbortSignal,
+): Promise<ReadableStreamReadResult<Uint8Array>> {
+  if (signal === undefined) return reader.read()
+  if (signal.aborted) {
+    await reader.cancel().catch(() => {})
+    throw signal.reason instanceof Error ? signal.reason : new Error('Gateway response read was cancelled', { cause: signal.reason })
+  }
+  return new Promise((resolve, reject) => {
+    let settled = false
+    const cleanup = (): void => { signal.removeEventListener('abort', onAbort) }
+    const finish = (): boolean => {
+      if (settled) return false
+      settled = true
+      cleanup()
+      return true
+    }
+    const onAbort = (): void => {
+      if (!finish()) return
+      void reader.cancel().catch(() => {})
+      reject(signal.reason instanceof Error ? signal.reason : new Error('Gateway response read was cancelled', { cause: signal.reason }))
+    }
+    signal.addEventListener('abort', onAbort, { once: true })
+    void reader.read().then(
+      (value) => { if (finish()) resolve(value) },
+      (error: unknown) => {
+        if (finish()) reject(error instanceof Error ? error : new Error(String(error), { cause: error }))
+      },
+    )
+  })
+}
+
 /**
  * Read a private Gateway response without retaining more than the supplied
  * byte budget. The caller owns JSON validation; this helper only bounds the
  * response body and preserves the response stream's cancellation semantics.
  * @param response - response returned by {@link GatewayRuntime.request}.
  * @param limit - positive safe-integer UTF-8 byte budget.
+ * @param signal - optional cancellation for the response body read.
  * @returns the complete response bytes.
  */
-export async function readGatewayResponseBytes(response: Response, limit = DEFAULT_GATEWAY_RESPONSE_MAX_BYTES): Promise<Uint8Array> {
+export async function readGatewayResponseBytes(
+  response: Response,
+  limit = DEFAULT_GATEWAY_RESPONSE_MAX_BYTES,
+  signal?: AbortSignal,
+): Promise<Uint8Array> {
   if (!Number.isSafeInteger(limit) || limit < 1) throw new RangeError('Gateway response byte limit must be a positive safe integer')
+  signal?.throwIfAborted()
   const declared = response.headers.get('content-length')
   if (declared !== null) {
     const length = Number(declared)
@@ -150,7 +190,7 @@ export async function readGatewayResponseBytes(response: Response, limit = DEFAU
   let total = 0
   try {
     for (;;) {
-      const next = await reader.read()
+      const next = await readResponseChunk(reader, signal)
       if (next.done) break
       total += next.value.byteLength
       if (!Number.isSafeInteger(total) || total > limit) {
@@ -175,10 +215,16 @@ export async function readGatewayResponseBytes(response: Response, limit = DEFAU
  * Read and parse a bounded private Gateway JSON response.
  * @param response - response returned by {@link GatewayRuntime.request}.
  * @param limit - positive safe-integer UTF-8 byte budget.
+ * @param signal - optional cancellation for the response body read.
  * @returns the decoded JSON value.
  */
-export async function readGatewayResponseJson(response: Response, limit = DEFAULT_GATEWAY_RESPONSE_MAX_BYTES): Promise<unknown> {
-  const bytes = await readGatewayResponseBytes(response, limit)
+export async function readGatewayResponseJson(
+  response: Response,
+  limit = DEFAULT_GATEWAY_RESPONSE_MAX_BYTES,
+  signal?: AbortSignal,
+): Promise<unknown> {
+  const bytes = await readGatewayResponseBytes(response, limit, signal)
+  signal?.throwIfAborted()
   return JSON.parse(new TextDecoder().decode(bytes)) as unknown
 }
 

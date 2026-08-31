@@ -8,7 +8,7 @@ Wire consumer layer: the client plugin's apply mounts `ctx.connection` (shared a
 
 `historyPageTargetBytes` accepts a positive integer and sets the target size of each complete uncompressed history RPC `server-response` JSON body in UTF-8 bytes. It defaults to 131072 bytes. Because pagination preserves complete append-origin message groups, one indivisible group may exceed the target. Fetch history responses still pack remaining `assistant/chunk` runs and round-trip optional `omittedSpans` from `detail: 'conversation'`; the [two-tier conversation history decision](../../../.agents/notes/implemented/architecture/2026-08-18-conversation-history-tier.md) owns the download gears.
 
-The shared unary carrier reads successful JSON responses through a 16 MiB byte budget by default; `AbstractApiClient` and `InProcessApiClient` accept a positive override where a deployment needs a smaller limit. An over-limit response is rejected before envelope parsing.
+The shared unary carrier reads successful JSON responses through a 16 MiB byte budget by default; `AbstractApiClient` and `InProcessApiClient` accept a positive override where a deployment needs a smaller limit. The bounded reader accepts an optional `AbortSignal` and cancels a response body when the caller disconnects. An over-limit response is rejected before envelope parsing.
 
 The browser connection also exposes optional Gateway transports for account preferences and project-owned model settings. Account preference requests are same-origin, revision-fenced, and value-safe; project model requests cover the project Provider descriptor, encrypted-credential state, endpoint discovery, and mutation responses without putting a key value in a response. A host that does not provide these routes leaves the transports absent, so callers show an explicit unavailable state instead of falling back to another account's settings.
 
@@ -36,5 +36,6 @@ None; this package neither assembles nor sends a provider request.
 
 ## Known Limitations and Deferred Work
 
-- **History resumes an unattached session** — opening history may create the host-side agent and add latency to the first open; there is no persistence-only read path.
+- **History availability follows the Host** — this carrier only transports the bounded `session.history` response; whether a deployment can read a cold log without resuming an Agent belongs to the Host persistence provider.
 - **The `/api` bridge buffers each request body in memory** — `maxRequestBodyBytes` (default 288 MiB, sized for the default 200 MiB aggregate image limit after base64 expansion plus envelope headroom) is therefore also the per-request resident bound; a streaming body path would be needed to lower it without shrinking the image limits.
+- The outer bridge and inner Fetch parser use the same `maxRequestBodyBytes` value, so an admitted image envelope is not rejected a second time by a smaller parser default.

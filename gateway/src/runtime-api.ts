@@ -9,12 +9,18 @@ import {
   type GatewaySessionCreationClaims,
   type GatewaySessionCreationHeader,
 } from './principal.ts'
-import type {
+import {
   ConversationEvent,
   ConversationDraftReservation,
   ConversationHeader,
-  ConversationRepository,
-  StoredConversation,
+  ConversationPage,
+  ConversationPageRequest,
+  ConversationPageTooLargeError,
+  ConversationReadError,
+  decodePageCursor,
+  encodePageCursor,
+  type ConversationRepository,
+  type StoredConversation,
 } from './postgres/conversation-repository.ts'
 import type { PostgresInstanceRepository } from './postgres/instance-repository.ts'
 import type { PostgresCollaborationService } from './postgres/collaboration-service.ts'
@@ -75,7 +81,9 @@ interface RuntimeApiDependencies {
   context: Pick<PostgresRuntimeContext, 'pool' | 'organizationSlug'>
   instances: Pick<PostgresInstanceRepository, 'authenticateRuntimeToken'>
   conversations: Pick<ConversationRepository, 'append' | 'listScoped' | 'load' | 'removeTree'>
-    & Partial<Pick<ConversationRepository, 'reserveDraft' | 'heartbeatDraftForOwner' | 'releaseDraftForOwner'>>
+    & Partial<Pick<ConversationRepository,
+      'readHeader' | 'readFrom' | 'readPage' | 'revision'
+      | 'reserveDraft' | 'heartbeatDraftForOwner' | 'releaseDraftForOwner'>>
   collaboration: Pick<
     PostgresCollaborationService,
     'access' | 'claimInteraction' | 'projectForUser' | 'readableSessionIds'
@@ -187,6 +195,15 @@ function conversationEvents(value: unknown): ConversationEvent[] {
   })
 }
 
+/** Reject a stored event range that would silently skip a durable sequence. */
+function validateConversationRange(events: readonly ConversationEvent[], fromSeq: number): void {
+  let expected = fromSeq
+  for (const event of events) {
+    if (event.seq !== expected) throw new ConversationReadError('protocol', 'conversation event range is not contiguous')
+    expected += 1
+  }
+}
+
 function completedTurnEndSeqs(events: readonly ConversationEvent[]): number[] {
   return events.filter((event) => {
     if (event.type !== 'turn/end') return false
@@ -223,27 +240,63 @@ function authorizationToken(req: IncomingMessage): string | undefined {
   return token === '' ? undefined : token
 }
 
+/** Request-local signal disposers; the outer handler drains these on every exit path. */
+const requestSignalDisposers = new WeakMap<ServerResponse, Set<() => void>>()
+
+interface RequestEventSource {
+  once?: (event: string, listener: () => void) => unknown
+  removeListener?: (event: string, listener: () => void) => unknown
+}
+
+function disposeRequestSignals(res: ServerResponse): void {
+  const disposers = requestSignalDisposers.get(res)
+  if (disposers === undefined) return
+  for (const dispose of [...disposers]) dispose()
+}
+
 /** Abort a broker operation when either side of the loopback request closes. */
 function requestSignal(req: IncomingMessage, res: ServerResponse): AbortSignal {
   const controller = new AbortController()
-  const abort = (): void => {
+  const requestEvents = req as unknown as RequestEventSource
+  const responseEvents = res as unknown as RequestEventSource
+  let disposed = false
+  const onRequestAbort = (): void => {
     if (!controller.signal.aborted) controller.abort(new Error('runtime request aborted'))
+    dispose()
   }
-  const requestEvents = req as IncomingMessage & { once?: IncomingMessage['once'] }
-  if (typeof requestEvents.once === 'function') {
-    requestEvents.once('aborted', abort)
-    requestEvents.once('close', () => {
-      // A normal request emits `close` after its body has been fully parsed;
-      // only an incomplete request indicates a transport disconnect here.
-      if (req.complete === false) abort()
-    })
+  const onRequestClose = (): void => {
+    // A normal request emits `close` after its body has been fully parsed;
+    // only an incomplete request indicates a transport disconnect here.
+    if (req.complete === false) onRequestAbort()
+    else requestEvents.removeListener?.('close', onRequestClose)
   }
-  const responseEvents = res as ServerResponse & { once?: ServerResponse['once'] }
-  if (typeof responseEvents.once === 'function') {
-    responseEvents.once('close', () => {
-      if (!res.writableEnded) abort()
-    })
+  const onResponseClose = (): void => {
+    if (!res.writableEnded) onRequestAbort()
+    else dispose()
   }
+  const onResponseFinish = (): void => { dispose() }
+  const dispose = (): void => {
+    if (disposed) return
+    disposed = true
+    requestEvents.removeListener?.('aborted', onRequestAbort)
+    requestEvents.removeListener?.('close', onRequestClose)
+    responseEvents.removeListener?.('close', onResponseClose)
+    responseEvents.removeListener?.('finish', onResponseFinish)
+    const disposers = requestSignalDisposers.get(res)
+    if (disposers === undefined) return
+    disposers.delete(dispose)
+    if (disposers.size === 0) requestSignalDisposers.delete(res)
+  }
+  requestEvents.once?.('aborted', onRequestAbort)
+  requestEvents.once?.('close', onRequestClose)
+  responseEvents.once?.('close', onResponseClose)
+  responseEvents.once?.('finish', onResponseFinish)
+  let disposers = requestSignalDisposers.get(res)
+  if (disposers === undefined) {
+    disposers = new Set()
+    requestSignalDisposers.set(res, disposers)
+  }
+  disposers.add(dispose)
   return controller.signal
 }
 
@@ -313,6 +366,108 @@ export function createRuntimeApiHandler(
   const stored = async (sessionId: string, subject: RuntimeCredentialSubject): Promise<StoredConversation | undefined> => {
     const value = await deps.conversations.load(sessionId)
     return value !== undefined && belongsToRuntime(value.header, subject) ? value : undefined
+  }
+
+  /** Read only the metadata required to authorize a session operation. */
+  const storedHeader = async (
+    sessionId: string,
+    subject: RuntimeCredentialSubject,
+    signal?: AbortSignal,
+  ): Promise<ConversationHeader | undefined> => {
+    const value = deps.conversations.readHeader !== undefined
+      ? await deps.conversations.readHeader(sessionId, signal)
+      : (await deps.conversations.load(sessionId))?.header
+    return value !== undefined && belongsToRuntime(value, subject) ? value : undefined
+  }
+
+  /** Compatibility page fallback for test/third-party repositories without a seek primitive. */
+  const fallbackPage = async (
+    sessionId: string,
+    subject: RuntimeCredentialSubject,
+    request: ConversationPageRequest,
+    signal: AbortSignal,
+  ): Promise<ConversationPage | undefined> => {
+    const value = await stored(sessionId, subject)
+    signal.throwIfAborted()
+    if (value === undefined) return undefined
+    const cursor = request.cursor === undefined ? undefined : decodePageCursor(request.cursor)
+    const direction = request.direction
+      ?? cursor?.direction
+      ?? (request.beforeSeq !== undefined ? 'older' : request.fromSeq !== undefined ? 'newer' : 'older')
+    if (direction !== 'older' && direction !== 'newer') {
+      throw new ConversationReadError('protocol', 'conversation page direction is invalid')
+    }
+    if (cursor !== undefined && (cursor.sessionId !== sessionId
+      || cursor.revision !== value.revision || cursor.direction !== direction)) {
+      throw new ConversationReadError('protocol', 'conversation page cursor is stale or belongs to another request')
+    }
+    if (request.cursor !== undefined && (request.beforeSeq !== undefined || request.fromSeq !== undefined)) {
+      throw new ConversationReadError('protocol', 'conversation page cursor cannot be combined with a sequence anchor')
+    }
+    if (direction === 'older' && request.fromSeq !== undefined) {
+      throw new ConversationReadError('protocol', 'older conversation pages cannot use fromSeq')
+    }
+    if (direction === 'newer' && request.beforeSeq !== undefined) {
+      throw new ConversationReadError('protocol', 'newer conversation pages cannot use beforeSeq')
+    }
+    const maxEvents = request.maxEvents ?? 2_000
+    const maxBytes = request.maxBytes ?? 512 * 1024
+    const maxGroups = request.maxGroups ?? 50
+    if (!safeInteger(maxEvents) || maxEvents < 1 || maxEvents > 2_000
+      || !safeInteger(maxBytes) || maxBytes < 1 || maxBytes > 512 * 1024
+      || !safeInteger(maxGroups) || maxGroups < 1 || maxGroups > 50) {
+      throw new ConversationReadError('protocol', 'invalid conversation page limits')
+    }
+    const tailSeq = value.events.at(-1)?.seq
+    const anchor = cursor?.anchor ?? (direction === 'older'
+      ? request.beforeSeq ?? (tailSeq === undefined ? 0 : tailSeq + 1)
+      : request.fromSeq ?? 0)
+    const window = direction === 'older'
+      ? value.events.filter(event => event.seq < anchor)
+      : value.events.filter(event => event.seq >= anchor)
+    const selected: ConversationEvent[] = []
+    const groups = new Set<string>()
+    let bytes = 0
+    const start = direction === 'older' ? window.length - 1 : 0
+    const step = direction === 'older' ? -1 : 1
+    for (let index = start; index >= 0 && index < window.length; index += step) {
+      const event = window[index]!
+      const encoded = JSON.stringify(event)
+      if (encoded === undefined) throw new ConversationReadError('protocol', 'conversation event is not JSON serializable')
+      const size = Buffer.byteLength(encoded, 'utf8')
+      if (selected.length === 0 && size > maxBytes) throw new ConversationPageTooLargeError(size, maxBytes)
+      const sources = event.sourceEventSeqs
+      let group = `event:${String(event.seq)}`
+      if (sources !== undefined && sources.length > 0) {
+        let first = event.seq
+        for (const seq of sources) if (seq < first) first = seq
+        group = `source:${String(first)}`
+      } else if (event.type === 'user/message' || event.type === 'assistant/message' || event.type === 'tool/result') {
+        group = `message:${String(event.seq)}`
+      }
+      if (selected.length >= maxEvents || bytes + size > maxBytes
+        || (!groups.has(group) && groups.size >= maxGroups)) break
+      selected.push(event)
+      groups.add(group)
+      bytes += size
+    }
+    const events = direction === 'older' ? selected.reverse() : selected
+    const first = events[0]
+    const last = events.at(-1)
+    const hasMore = selected.length < window.length
+    const nextAnchor = direction === 'older'
+      ? (first?.seq ?? anchor)
+      : (last?.seq === undefined ? anchor : last.seq + 1)
+    return {
+      header: value.header,
+      events,
+      revision: value.revision,
+      startSeq: first?.seq ?? null,
+      endSeq: last?.seq ?? null,
+      hasMore,
+      ...(hasMore ? { nextCursor: encodePageCursor({ version: 1, sessionId, revision: value.revision, direction, anchor: nextAnchor }) } : {}),
+      uncompressedBytes: bytes,
+    }
   }
 
   const createHeader = async (
@@ -861,7 +1016,7 @@ export function createRuntimeApiHandler(
           throw new Error('invalid append request')
         }
         if (header === undefined && creationAuthorization === undefined
-          && await stored(payload.sessionId, subject) === undefined) {
+          && await storedHeader(payload.sessionId, subject, requestSignal(req, res)) === undefined) {
           throw new CollaborationDeniedError('conversation-not-found')
         }
         const materialization = creationAuthorization === undefined
@@ -902,20 +1057,97 @@ export function createRuntimeApiHandler(
         const sessionId = url.searchParams.get('sessionId') ?? ''
         const fromSeq = Number(url.searchParams.get('fromSeq'))
         if (!safeInteger(fromSeq)) throw new Error('invalid fromSeq')
-        const value = await stored(sessionId, subject)
-        if (value === undefined) throw new CollaborationDeniedError('conversation-not-found')
+        const signal = requestSignal(req, res)
+        const header = await storedHeader(sessionId, subject, signal)
+        if (header === undefined) throw new CollaborationDeniedError('conversation-not-found')
+        const events = deps.conversations.readFrom !== undefined
+          ? await deps.conversations.readFrom(sessionId, fromSeq, signal)
+          : (await stored(sessionId, subject))?.events.filter(event => event.seq >= fromSeq) ?? []
+        validateConversationRange(events, fromSeq)
         send(res, 200, {
-          header: runtimeHeader(value.header),
-          events: value.events.filter(event => event.seq >= fromSeq),
+          header: runtimeHeader(header),
+          events,
+        })
+        return true
+      }
+
+      if (pathname === '/internal/runtime/session/meta' && req.method === 'GET') {
+        const sessionId = url.searchParams.get('sessionId') ?? ''
+        const signal = requestSignal(req, res)
+        const header = await storedHeader(sessionId, subject, signal)
+        if (header === undefined) throw new CollaborationDeniedError('conversation-not-found')
+        const revision = deps.conversations.revision !== undefined
+          ? await deps.conversations.revision(sessionId, signal)
+          : (await stored(sessionId, subject))?.revision
+        if (revision === undefined) throw new CollaborationDeniedError('conversation-not-found')
+        send(res, 200, {
+          header: runtimeHeader(header),
+          revision: revisionFor(subject, revision),
+        })
+        return true
+      }
+
+      if (pathname === '/internal/runtime/session/page' && req.method === 'GET') {
+        const sessionId = url.searchParams.get('sessionId') ?? ''
+        const cursor = url.searchParams.get('cursor') ?? undefined
+        const directionParam = url.searchParams.get('direction')
+        const direction = directionParam === null ? undefined : directionParam
+        if (direction !== undefined && direction !== 'older' && direction !== 'newer') {
+          throw new ConversationReadError('protocol', 'invalid conversation page direction')
+        }
+        const parseOptional = (name: string): number | undefined => {
+          const raw = url.searchParams.get(name)
+          if (raw === null) return undefined
+          const value = Number(raw)
+          if (!safeInteger(value)) throw new ConversationReadError('protocol', `invalid conversation page ${name}`)
+          return value
+        }
+        const pageRequest: ConversationPageRequest = {
+          ...(cursor === undefined ? {} : { cursor }),
+          ...(direction === undefined ? {} : { direction }),
+          ...(url.searchParams.has('beforeSeq') ? { beforeSeq: parseOptional('beforeSeq') } : {}),
+          ...(url.searchParams.has('fromSeq') ? { fromSeq: parseOptional('fromSeq') } : {}),
+          ...(url.searchParams.has('maxBytes') ? { maxBytes: parseOptional('maxBytes') } : {}),
+          ...(url.searchParams.has('maxEvents') ? { maxEvents: parseOptional('maxEvents') } : {}),
+          ...(url.searchParams.has('maxGroups') ? { maxGroups: parseOptional('maxGroups') } : {}),
+        }
+        const signal = requestSignal(req, res)
+        // Authorize from the indexed header before asking a repository for
+        // event rows; the post-read check below covers a concurrent ownership
+        // change without exposing a foreign page in the response.
+        const header = await storedHeader(sessionId, subject, signal)
+        if (header === undefined) throw new CollaborationDeniedError('conversation-not-found')
+        const page = deps.conversations.readPage !== undefined
+          ? await deps.conversations.readPage(sessionId, pageRequest, signal)
+          : await fallbackPage(sessionId, subject, pageRequest, signal)
+        if (page === undefined || !belongsToRuntime(page.header, subject) || page.header.id !== header.id) {
+          throw new CollaborationDeniedError('conversation-not-found')
+        }
+        validateConversationRange(page.events, page.startSeq ?? (pageRequest.fromSeq ?? 0))
+        send(res, 200, {
+          header: runtimeHeader(page.header),
+          events: page.events,
+          revision: revisionFor(subject, page.revision),
+          startSeq: page.startSeq,
+          endSeq: page.endSeq,
+          hasMore: page.hasMore,
+          ...(page.nextCursor === undefined ? {} : { nextCursor: page.nextCursor }),
+          uncompressedBytes: page.uncompressedBytes,
         })
         return true
       }
 
       if (pathname === '/internal/runtime/session/revision' && req.method === 'GET') {
         const sessionId = url.searchParams.get('sessionId') ?? ''
-        const value = await stored(sessionId, subject)
+        const signal = requestSignal(req, res)
+        const value = await storedHeader(sessionId, subject, signal)
+        const revision = value === undefined
+          ? undefined
+          : deps.conversations.revision !== undefined
+            ? await deps.conversations.revision(sessionId, signal)
+            : (await stored(sessionId, subject))?.revision
         send(res, 200, {
-          revision: value === undefined ? null : revisionFor(subject, value.revision),
+          revision: revision === undefined ? null : revisionFor(subject, revision),
         })
         return true
       }
@@ -928,7 +1160,7 @@ export function createRuntimeApiHandler(
           send(res, 409, { error: 'personal-session-removal-is-runtime-local' })
           return true
         }
-        if (await stored(sessionId, subject) === undefined) {
+        if (await storedHeader(sessionId, subject, requestSignal(req, res)) === undefined) {
           throw new CollaborationDeniedError('conversation-not-found')
         }
         await deps.conversations.removeTree(subject.organizationId, sessionId)
@@ -955,7 +1187,9 @@ export function createRuntimeApiHandler(
         if (typeof payload?.sessionId !== 'string' || typeof payload.batchId !== 'string') {
           throw new Error('invalid repair request')
         }
-        if (await stored(payload.sessionId, subject) === undefined) throw new CollaborationDeniedError('conversation-not-found')
+        if (await storedHeader(payload.sessionId, subject, requestSignal(req, res)) === undefined) {
+          throw new CollaborationDeniedError('conversation-not-found')
+        }
         const closers = conversationEvents(payload.closers)
         if (closers.length > 0) {
           const result = await deps.conversations.append(payload.sessionId, payload.batchId, closers)
@@ -985,12 +1219,12 @@ export function createRuntimeApiHandler(
           throw new Error('invalid authorization request')
         }
         if (subject.target.kind === 'user') {
-          const value = await stored(payload.sessionId, subject)
+          const value = await storedHeader(payload.sessionId, subject, requestSignal(req, res))
           if (value === undefined) throw new CollaborationDeniedError('conversation-not-found')
           send(res, 200, {
             access: {
-              sessionId: value.header.id,
-              rootSessionId: value.header.rootSessionId ?? value.header.id,
+              sessionId: value.id,
+              rootSessionId: value.rootSessionId ?? value.id,
               mode: 'rw',
               canRead: true,
               canWrite: true,
@@ -1070,7 +1304,7 @@ export function createRuntimeApiHandler(
         for (const candidate of authorizations) {
           const entry = record(candidate)!
           const sessionId = entry.sessionId as string
-          if (await stored(sessionId, subject) !== undefined) continue
+          if (await storedHeader(sessionId, subject, requestSignal(req, res)) !== undefined) continue
           try {
             await creationAccess(
               entry.authorization as string,
@@ -1101,6 +1335,12 @@ export function createRuntimeApiHandler(
         send(res, error.status, { error: error.code, message: error.message })
         return true
       }
+      if (error instanceof ConversationReadError) {
+        const status = error.code === 'too-large' ? 413 : error.code === 'protocol' ? 400
+          : error.code === 'aborted' ? 499 : error.code === 'timeout' ? 504 : 503
+        send(res, status, { error: `conversation-${error.code}`, code: error.code, message: error.message })
+        return true
+      }
       if (error instanceof CollaborationDeniedError) {
         const status = error.code === 'conversation-not-found' ? 404
           : error.code === 'visibility-locked' ? 409 : 403
@@ -1112,6 +1352,11 @@ export function createRuntimeApiHandler(
         return true
       }
       throw error
+    } finally {
+      // A route may create more than one request signal while checking
+      // metadata and ACLs. Dispose all listeners once the route has returned,
+      // including error and cancellation paths.
+      disposeRequestSignals(res)
     }
   }
 }

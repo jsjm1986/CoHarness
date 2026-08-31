@@ -175,6 +175,12 @@ export function apply(ctx: Context, config?: ConnectionConfig): void {
   const historyPageTargetBytes =
     config?.historyPageTargetBytes ?? DEFAULT_HISTORY_PAGE_TARGET_BYTES
   const websocketHeartbeatIntervalMs = config?.websocketHeartbeatIntervalMs ?? 30_000
+  if (!Number.isSafeInteger(maxRequestBodyBytes) || maxRequestBodyBytes < 1) {
+    throw new Error('client-connection maxRequestBodyBytes must be a positive safe integer')
+  }
+  if (!Number.isSafeInteger(historyPageTargetBytes) || historyPageTargetBytes < 1) {
+    throw new Error('client-connection historyPageTargetBytes must be a positive safe integer')
+  }
   if (!Number.isSafeInteger(websocketHeartbeatIntervalMs)
     || websocketHeartbeatIntervalMs < 1
     || websocketHeartbeatIntervalMs > MAX_TIMER_DELAY_MS) {
@@ -185,6 +191,10 @@ export function apply(ctx: Context, config?: ConnectionConfig): void {
   for (const entry of trustedHosts) assertTrustedAuthority(entry)
   if (ctx.get('apiProxy') !== undefined) assertImageBodyCapacity(ctx, maxRequestBodyBytes)
   const connection = new HostConnectionService(ctx, trustedHosts)
+  // Construct the Fetch carrier once per resident ApiProxy. Rebuilding its
+  // route tables on every request adds avoidable allocations on the hot path;
+  // a WeakMap still lets HMR replace the proxy without retaining the old one.
+  const fetchHandlers = new WeakMap<object, ReturnType<typeof toFetchHandler>>()
   const fetchHandler = connection.createSharedFetchHandler(API_PATH, {
     async fetch(request) {
       const pathname = new URL(request.url).pathname
@@ -204,7 +214,18 @@ export function apply(ctx: Context, config?: ConnectionConfig): void {
       }
       const apiProxy = ctx.get('apiProxy')
       if (apiProxy === undefined) return new Response('not found', { status: 404 })
-      return toFetchHandler(apiProxy, { historyPageTargetBytes }).fetch(request)
+      // Keep the inner Fetch parser on the same budget as the outer node:http
+      // bridge. Otherwise a valid aggregate image body would be buffered by
+      // the bridge and then rejected by the inner parser's smaller default.
+      let carrier = fetchHandlers.get(apiProxy)
+      if (carrier === undefined) {
+        carrier = toFetchHandler(apiProxy, {
+          historyPageTargetBytes,
+          requestBodyMaxBytes: maxRequestBodyBytes,
+        })
+        fetchHandlers.set(apiProxy, carrier)
+      }
+      return carrier.fetch(request)
     },
   })
   const route: WebRoute = {

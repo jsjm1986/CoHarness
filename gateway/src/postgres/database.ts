@@ -1,10 +1,22 @@
 import { createHash } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import { setTimeout as delay } from 'node:timers/promises'
 import { Pool, type PoolClient, type PoolConfig, type QueryResultRow } from 'pg'
 
 const MIGRATION_LOCK_KEY = 0x48475750
 const MAX_TIMER_DELAY_MS = 2_147_483_647
+/** Default upper bound for one PostgreSQL statement issued by the Gateway. */
+export const DEFAULT_DATABASE_STATEMENT_TIMEOUT_MS = 30_000
+/** Default wait bound for PostgreSQL row/table locks. */
+export const DEFAULT_DATABASE_LOCK_TIMEOUT_MS = 5_000
+/** Default bound for a transaction left idle while holding a checked-out client. */
+export const DEFAULT_DATABASE_IDLE_TRANSACTION_TIMEOUT_MS = 60_000
+/** Maximum time a migration runner waits for another process's advisory lock. */
+export const DEFAULT_MIGRATION_LOCK_TIMEOUT_MS = 30_000
+/** Maximum number of Gateway callers waiting for a PostgreSQL checkout. */
+export const DEFAULT_DATABASE_MAX_CHECKOUT_QUEUE = 256
+const MIGRATION_LOCK_POLL_MS = 100
 const TRANSIENT_DATABASE_CODES = new Set([
   'ECONNABORTED',
   'ECONNREFUSED',
@@ -30,6 +42,26 @@ export interface Queryable {
   query<R extends QueryResultRow = QueryResultRow>(text: string, values?: readonly unknown[]): Promise<{ rows: R[]; rowCount: number | null }>
 }
 
+/** Gateway-only pool option; pg itself does not expose a pending-queue bound. */
+export interface GatewayPoolConfig extends PoolConfig {
+  maxCheckoutQueue?: number
+}
+
+interface CheckoutState {
+  pending: number
+  limit: number
+}
+
+const checkoutStates = new WeakMap<Pool, CheckoutState>()
+
+function checkoutLimit(value: number | undefined): number {
+  const resolved = value ?? DEFAULT_DATABASE_MAX_CHECKOUT_QUEUE
+  if (!Number.isSafeInteger(resolved) || resolved < 1) {
+    throw new RangeError(`maxCheckoutQueue must be a positive safe integer`)
+  }
+  return resolved
+}
+
 export function databaseUrlFromEnv(env: NodeJS.ProcessEnv = process.env): string {
   if (env.HGW_DATABASE_URL !== undefined && env.HGW_DATABASE_URL.trim() !== '') return env.HGW_DATABASE_URL.trim()
   if (env.HGW_DATABASE_URL_FILE !== undefined && env.HGW_DATABASE_URL_FILE.trim() !== '') {
@@ -47,8 +79,54 @@ export async function databaseUrlFromFile(env: NodeJS.ProcessEnv = process.env):
   return value
 }
 
-export function createPostgresPool(connectionString: string, overrides: PoolConfig = {}): Pool {
-  return new Pool({ connectionString, max: 10, idleTimeoutMillis: 30_000, connectionTimeoutMillis: 5_000, ...overrides })
+export function createPostgresPool(connectionString: string, overrides: GatewayPoolConfig = {}): Pool {
+  const { maxCheckoutQueue, ...poolOverrides } = overrides
+  const checkoutQueueLimit = checkoutLimit(maxCheckoutQueue)
+  const pool = new Pool({
+    connectionString,
+    max: 10,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 5_000,
+    application_name: 'dsh-gateway',
+    statement_timeout: DEFAULT_DATABASE_STATEMENT_TIMEOUT_MS,
+    lock_timeout: DEFAULT_DATABASE_LOCK_TIMEOUT_MS,
+    idle_in_transaction_session_timeout: DEFAULT_DATABASE_IDLE_TRANSACTION_TIMEOUT_MS,
+    ...poolOverrides,
+  })
+  checkoutStates.set(pool, { pending: 0, limit: checkoutQueueLimit })
+  // `pg.Pool` emits an `error` event when an idle client is terminated by the
+  // server or network.  Without a listener Node treats that event as
+  // uncaught and takes the Gateway down, even though a later checkout could
+  // recover with a fresh connection.  Keep the diagnostic deliberately
+  // metadata-only; the pool owns reconnection and callers observe the failed
+  // query through its normal promise.
+  pool.on('error', (error: unknown) => {
+    console.error(`[gateway] PostgreSQL pool error (${errorCodeForDiagnostics(error)})`)
+  })
+  return pool
+}
+
+/** Acquire one pool client without allowing an unbounded pg-pool wait list. */
+function connectFromPool(pool: Pool): Promise<PoolClient> {
+  const state = checkoutStates.get(pool)
+  /* v8 ignore next -- every production pool is created by createPostgresPool; the
+     fallback keeps transaction tests and injected pools compatible. */
+  const current = state ?? { pending: 0, limit: DEFAULT_DATABASE_MAX_CHECKOUT_QUEUE }
+  if (current.pending >= current.limit) {
+    const error = new Error(`PostgreSQL checkout queue is full (${String(current.limit)})`)
+    Object.assign(error, { code: 'DB_CHECKOUT_QUEUE_FULL' })
+    return Promise.reject(error)
+  }
+  current.pending += 1
+  if (state === undefined) checkoutStates.set(pool, current)
+  let connecting: Promise<PoolClient>
+  try {
+    connecting = pool.connect()
+  } catch (error: unknown) {
+    current.pending -= 1
+    return Promise.reject(error)
+  }
+  return connecting.finally(() => { current.pending -= 1 })
 }
 
 function errorCode(error: unknown): string | undefined {
@@ -108,6 +186,7 @@ function waitForRetry(delayMs: number, signal: AbortSignal | undefined): Promise
     }
     timer = setTimeout(finish, delayMs)
     signal?.addEventListener('abort', abort, { once: true })
+    if (signal?.aborted) abort()
   })
 }
 
@@ -136,11 +215,54 @@ export async function withDatabaseStartupRetry<T>(
   }
 }
 
-export async function transaction<T>(pool: Pool, operation: (client: PoolClient) => Promise<T>): Promise<T> {
-  const client = await pool.connect()
+async function connectWithSignal(pool: Pool, signal?: AbortSignal): Promise<PoolClient> {
+  signal?.throwIfAborted()
+  const connecting = connectFromPool(pool)
+  if (signal === undefined) return connecting
+  return new Promise<PoolClient>((resolve, reject) => {
+    let settled = false
+    const cleanup = (): void => { signal.removeEventListener('abort', onAbort) }
+    const onAbort = (): void => {
+      if (settled) return
+      settled = true
+      cleanup()
+      reject(signal.reason instanceof Error ? signal.reason : new Error('database checkout aborted'))
+      void connecting.then(client => { client.release() }, () => {})
+    }
+    signal.addEventListener('abort', onAbort, { once: true })
+    if (signal.aborted) onAbort()
+    void connecting.then(
+      client => {
+        if (settled) {
+          client.release()
+          return
+        }
+        settled = true
+        cleanup()
+        resolve(client)
+      },
+      error => {
+        if (settled) return
+        settled = true
+        cleanup()
+        reject(error)
+      },
+    )
+  })
+}
+
+export async function transaction<T>(
+  pool: Pool,
+  operation: (client: PoolClient) => Promise<T>,
+  signal?: AbortSignal,
+): Promise<T> {
+  const client = await connectWithSignal(pool, signal)
   try {
+    signal?.throwIfAborted()
     await client.query('BEGIN')
+    signal?.throwIfAborted()
     const result = await operation(client)
+    signal?.throwIfAborted()
     await client.query('COMMIT')
     return result
   } catch (error) {
@@ -178,10 +300,20 @@ async function migrationFiles(directory: string): Promise<MigrationFile[]> {
 /** Apply immutable SQL migrations under one PostgreSQL advisory lock. */
 export async function runMigrations(pool: Pool, directory: string): Promise<{ applied: number[]; current: number }> {
   const migrations = await migrationFiles(directory)
-  const client = await pool.connect()
+  const client = await connectFromPool(pool)
   const applied: number[] = []
   try {
-    await client.query('SELECT pg_advisory_lock($1)', [MIGRATION_LOCK_KEY])
+    const deadline = Date.now() + DEFAULT_MIGRATION_LOCK_TIMEOUT_MS
+    let locked = false
+    while (!locked) {
+      const result = await client.query<{ locked: boolean }>('SELECT pg_try_advisory_lock($1) AS locked', [MIGRATION_LOCK_KEY])
+      locked = result.rows[0]?.locked === true
+      if (locked) break
+      if (Date.now() >= deadline) {
+        throw new Error(`PostgreSQL migration advisory lock was not acquired within ${String(DEFAULT_MIGRATION_LOCK_TIMEOUT_MS)}ms`)
+      }
+      await delay(Math.min(MIGRATION_LOCK_POLL_MS, Math.max(1, deadline - Date.now())))
+    }
     await client.query('CREATE SCHEMA IF NOT EXISTS harness')
     await client.query(`CREATE TABLE IF NOT EXISTS harness.schema_migrations (
       version integer PRIMARY KEY,

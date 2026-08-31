@@ -102,53 +102,8 @@ function appendMessageCount(entries: readonly HistoryEntry[]): number {
   return appendGroupStarts(entries).length
 }
 
-function seqSet(entries: readonly HistoryEntry[]): Set<number> {
-  return new Set(entries.map(entry => entry.event.seq))
-}
-
-/** Whether `bigger` contains every seq in `smaller` plus at least one more. */
-function isStrictEventSuperset(bigger: readonly HistoryEntry[], smaller: readonly HistoryEntry[]): boolean {
-  const small = seqSet(smaller)
-  const big = seqSet(bigger)
-  if (big.size <= small.size) return false
-  for (const seq of small) {
-    /* v8 ignore next -- suffix candidates nest by cut seq, so a larger set always contains the previous */
-    if (!big.has(seq)) return false
-  }
-  return true
-}
-
-interface SuffixCandidate {
-  entries: HistoryEntry[]
-  groupCount: number
-  omitsPrefix: boolean
-  cutSeq: number
-}
-
-/**
- * Distinct suffix candidates from newest append message to older ones.
- * Each step accumulates `min(seq, ...sourceEventSeqs)` so a later message that
- * cites an earlier seq cannot drop that seq; a step is kept only when it is a
- * strict event-set superset of the previous candidate.
- */
-function suffixCandidates(entries: readonly HistoryEntry[]): SuffixCandidate[] {
-  const starts = appendGroupStarts(entries)
-  const out: SuffixCandidate[] = []
-  let accCut = Number.POSITIVE_INFINITY
-  for (let i = starts.length - 1; i >= 0; i--) {
-    accCut = Math.min(accCut, starts[i] as number)
-    const suffix = suffixEntries(entries, accCut)
-    const prev = out[out.length - 1]
-    if (prev !== undefined && !isStrictEventSuperset(suffix, prev.entries)) continue
-    out.push({
-      entries: suffix,
-      groupCount: appendMessageCount(suffix),
-      omitsPrefix: omittedPrefix(entries, accCut),
-      cutSeq: accCut,
-    })
-  }
-  return out
-}
+/** Maximum suffix candidates inspected for one physical history response. */
+const MAX_SUFFIX_CANDIDATES = 512
 
 function candidate(
   rpcId: RpcId,
@@ -198,36 +153,43 @@ export function encodeHistoryServerResponse(
   value: HistoryValue,
   targetBytes: number,
 ): ServerResponse {
+  if (!Number.isSafeInteger(targetBytes) || targetBytes < 1) {
+    throw new RangeError('history response target must be a positive safe integer')
+  }
   const full: SizedPage = {
     body: candidate(rpcId, value, value.events, false),
     groupCount: appendMessageCount(value.events),
     eventCount: value.events.length,
   }
-  const suffixes = suffixCandidates(value.events)
-  if (suffixes.length === 0) return full.body
+  if (utf8JsonBytes(full.body) <= targetBytes) return full.body
 
-  const indivisible = suffixes[0] as SuffixCandidate
-  const indivisiblePage: SizedPage = {
-    body: candidate(rpcId, value, indivisible.entries, indivisible.omitsPrefix, indivisible.cutSeq),
-    groupCount: indivisible.groupCount,
-    eventCount: indivisible.entries.length,
-  }
-
-  const pages: SizedPage[] = [full]
-  for (const suffix of suffixes) {
-    pages.push({
-      body: candidate(rpcId, value, suffix.entries, suffix.omitsPrefix, suffix.cutSeq),
-      groupCount: suffix.groupCount,
-      eventCount: suffix.entries.length,
-    })
-  }
+  const starts = appendGroupStarts(value.events)
+  if (starts.length === 0) return full.body
 
   let best: SizedPage | undefined
-  for (const page of pages) {
-    if (utf8JsonBytes(page.body) > targetBytes) continue
+  let indivisible: SizedPage | undefined
+  let cutSeq = Number.POSITIVE_INFINITY
+  let candidates = 0
+  // As the cut moves backwards each suffix is a strict superset of the prior
+  // one and its packed JSON cannot shrink. Stop at the first over-target page;
+  // the bounded candidate count protects a malformed log with many tiny groups.
+  for (let index = starts.length - 1; index >= 0 && candidates < MAX_SUFFIX_CANDIDATES; index -= 1) {
+    const nextCut = Math.min(cutSeq, starts[index] as number)
+    if (nextCut === cutSeq) continue
+    cutSeq = nextCut
+    const entries = suffixEntries(value.events, cutSeq)
+    const page: SizedPage = {
+      body: candidate(rpcId, value, entries, omittedPrefix(value.events, cutSeq), cutSeq),
+      groupCount: appendMessageCount(entries),
+      eventCount: entries.length,
+    }
+    indivisible ??= page
+    candidates += 1
+    if (utf8JsonBytes(page.body) > targetBytes) break
     best = best === undefined ? page : preferPage(best, page)
   }
-  return best?.body ?? indivisiblePage.body
+  // `indivisible` always exists when the input contains an append-origin group.
+  return best?.body ?? indivisible?.body ?? full.body
 }
 
 function isRecordObject(value: unknown): value is Record<string, unknown> {

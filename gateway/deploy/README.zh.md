@@ -14,12 +14,12 @@
 
 在精确的发布 checkout 中执行 `pnpm install --frozen-lockfile && pnpm run build:production`。该生产入口会构建 Harness 库与 Web 应用、两个树外插件和 Admin SPA，对 Gateway 做类型检查，并在缺少任何 CLI、Web、Gateway、Admin、插件、管理员覆盖层或协作 migration 产物时拒绝发布。
 
-1. 把构建完成的 `gateway/` 目录复制到 `/srv/harness/gateway`，把 `packages/llm/llm/` 复制到 `/srv/harness/packages/llm/llm`，并保留这一相对布局；用生产 Node 在 Gateway 目录执行 `npm install && npm rebuild better-sqlite3 argon2`。Gateway 通过 `tsx` 运行，并把 `@deepseek-ai/dsh-llm/discovery` 映射到该相邻包的源码，因此组织模型发现与 Harness 使用同一份实现，不依赖单独发布的 npm 版本。`public/admin` 已被 gitignore，因此只能在 `build:production` 生成该目录后再从 checkout 复制。
+1. 把构建完成的 `gateway/` 目录复制到 `/srv/harness/gateway`，把 `packages/llm/llm/` 复制到 `/srv/harness/packages/llm/llm`，并保留这一相对布局；`build:production` 会在 `gateway/lib/` 生成 Gateway 入口及其本地模块。使用生产 Node 在 Gateway 目录执行 `npm install && npm rebuild better-sqlite3 argon2`，然后由纯 Node 启动 `lib/index.js`。编译后的 Gateway 保留 `@deepseek-ai/dsh-llm/discovery` 包导入，因此相邻包的构建 `lib/` 必须包含在 release 中；生产不使用源码 `tsx` loader。`public/admin` 已被 gitignore，因此只能在 `build:production` 生成该目录后再从 checkout 复制。
 2. 把构建完成的 `plugins/dsh-directory-guard/` 目录复制到 `/srv/harness/plugins/dsh-directory-guard`，把 `plugins/dsh-model-governance/` 复制到 `/srv/harness/plugins/dsh-model-governance`。钉死的 npm dsh 以纯 Node 运行插件 `lib/`，不使用 tsx。即使 `HGW_GUARD_PATCH=off`，模型治理仍是强制项。
 3. 把公司默认凭据写入 `/srv/harness/gateway-data/company.env`（`DEEPSEEK_API_KEY=...`，权限 600）。每次运行时启动都会把它复制到 `$DSH_HOME/.env`；用户在 Settings 里设置的个人 key 存放于 `.credentials.yaml`，优先级更高，共享项目运行时则把凭据设置暴露为只读并使用公司来源。
 4. 启动 [`deploy/postgres/`](postgres/README.zh.md)，应用 migration，并创建权限为 `0600` 的数据库 URL 文件。在启动 Gateway 前，导入冻结的 SQLite 控制面，或创建配置的企业与计算节点。
 5. 创建仅所有者可访问的 `/srv/harness/gateway-data/principal-keys` 和 `/srv/harness/gateway-data/runtime-credentials`，以及 `/srv/harness/project-runtimes` 和项目根目录。为两个受控根配置组继承，例如执行 `install -d -o root -g harness-project -m 2770 /srv/harness/projects/admin /srv/harness/projects/user-projects`；通过显式路径导入的目录仍需显式授予 `harness-project` 读写权限。把 `deploy/harness-gateway.service` 复制到 `/etc/systemd/system/`；调整数据库 URL 文件、`HGW_ORGANIZATION_SLUG`、`HGW_COMPUTE_NODE_NAME`、`HGW_PUBLIC_ORIGINS`、`HGW_PROJECT_PATH_ROOTS`、`HGW_PROJECTS_ROOT`、`HGW_USER_PROJECTS_ROOT`、项目运行时账户/根目录、principal/凭据目录、插件路径和其他宿主机路径，然后执行 `systemctl daemon-reload && systemctl enable --now harness-gateway`。
-6. 数据库中没有用户时，首次启动会把引导管理员密码打进 journal：`journalctl -u harness-gateway | grep 'bootstrap admin'`。
+6. 数据库中没有用户时，首次启动会创建权限为 `0600` 的 `/srv/harness/gateway-data/bootstrap-admin-password`，日志只记录文件路径。以 root 读取后登录一次、修改密码，再用 `shred -u` 或等效的仅所有者删除方式清理文件。曾把密码写入 journal 的既有部署必须人工轮换管理员凭据并检查留存日志。
 
 Admin 归档频道由 PostgreSQL migration 015 启用。可通过 `HGW_ARCHIVE_RETENTION_DAYS`（默认 `30`）设置回收站保留窗口。运行时归档快照通过私有 Gateway API 对账；运行时 home 与 Gateway 归档索引必须纳入同一套备份方案。个人正文仍保存在运行时自己的存储中，由管理员阅读器按需读取。
 

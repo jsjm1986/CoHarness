@@ -22,7 +22,7 @@ Workspace 归档枚举会先索引持久化 ID、谱系根和保留位置，再�
 
 运行时归档同步器还会在带 generation 围栏的 LRU 中保留有界的标题、数量和搜索投影；连续的 live 事件会以常量队列工作扩展缓存会话，而序号缺口、标题事件或与异步读取竞争的事件只使对应会话失效，不能发布过期缓存数据。generation token 会随移除或淘汰的会话离开，不会形成无界的伴随映射。仅元数据的 transfer plan 另外携带进程、企业和操作者三级的数量及序列化字节额度；过期和提交会消费同一组索引计数，因此单个操作者不能用很长的文档 ID 占满进程 Map。
 
-分离会话尾部缓存通过 `SessionPersistence.revision(id)` 校验，不列出每个持久化会话。第一方 JSONL、SQLite 与 Gateway 提供方会把该服务方法委托给按 id 的 revision 查询；Service Definition 为第三方提供方保留 `listSnapshots()` 回退。因此，缓存命中可以避免扫描目录，同时不削弱冷历史读取前后的 revision 复核。
+分离会话尾部缓存通过 `SessionPersistence.readRevision(id)`（并保留 `revision()` 兼容回退）校验，不列出每个持久化会话。第一方 JSONL、SQLite 与 Gateway 提供方会把该服务方法委托给按 id 的 revision 查询；Service Definition 为第三方提供方保留 `listSnapshots()` 回退。因此，缓存命中可以避免扫描目录，同时不削弱冷历史读取前后的 revision 复核。
 
 可继续 subagent 物化会在创建或恢复 Agent 前，预留可配置的运行时全局及直接 parent Activation 配额。待处理物化与驻留 Activation 一起计数，回滚和最终 dispose 会释放确切配额；不活跃的持久化 child 会话不占用配额。[可继续 subagent 决策](../feature/2026-07-28-continuable-subagent-conversations.zh.md)规定驻留与容量语义。
 

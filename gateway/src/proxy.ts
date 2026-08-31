@@ -161,11 +161,16 @@ export function createProxyHandlers(
     scrubRuntimeHeaders(req)
     let ready = await ensureReady(req, res, context)
     if (ready === null) return
-    await instances.touch(ready.target)
     let operationLease = false
     try {
-      await instances.operationRef?.(ready.target, 1, ready.generation)
-      operationLease = instances.operationRef !== undefined
+      if (instances.operationRef !== undefined) {
+        // operationRef also updates the activity timestamp while holding the
+        // lease, so a separate touch would serialize a redundant DB write.
+        await instances.operationRef(ready.target, 1, ready.generation)
+        operationLease = true
+      } else {
+        await instances.touch(ready.target)
+      }
     } catch (error) {
       if (!(error instanceof RuntimeLeaseUnavailableError)) throw error
       // The idle reaper may have won the serialized admission race after the
@@ -174,8 +179,12 @@ export function createProxyHandlers(
       try {
         const restarted = await instances.ensureRunning(context.runtime)
         ready = { ...restarted, target: ready.target }
-        await instances.operationRef?.(ready.target, 1, ready.generation)
-        operationLease = instances.operationRef !== undefined
+        if (instances.operationRef !== undefined) {
+          await instances.operationRef(ready.target, 1, ready.generation)
+          operationLease = true
+        } else {
+          await instances.touch(ready.target)
+        }
       } catch {
         const retryHeaders = { 'cache-control': 'no-store', 'retry-after': '2' }
         if (wantsHtml(req)) {
@@ -190,24 +199,24 @@ export function createProxyHandlers(
         return
       }
     }
-    const principal = principalSigner?.issue({
-      user: context.user,
-      scope: context.scope,
-      runtime: { kind: ready.target.kind, id: ready.target.id, generation: ready.generation },
-    })
-    const pathname = new URL(req.url ?? '/', 'http://x').pathname
-    if (pathname.startsWith('/api/') && !isDocumentUploadDataPath(req.method, pathname)) {
-      res.once('finish', () => {
-        void Promise.resolve(audit.write({
-          userId: context.user.id,
-          action: 'api',
-          methodPath: `${req.method} ${pathname}`,
-          status: res.statusCode,
-          ip: req.socket.remoteAddress ?? '',
-        })).catch(error => { console.error('[gateway] API audit write failed:', error) })
-      })
-    }
     try {
+      const principal = principalSigner?.issue({
+        user: context.user,
+        scope: context.scope,
+        runtime: { kind: ready.target.kind, id: ready.target.id, generation: ready.generation },
+      })
+      const pathname = new URL(req.url ?? '/', 'http://x').pathname
+      if (pathname.startsWith('/api/') && !isDocumentUploadDataPath(req.method, pathname)) {
+        res.once('finish', () => {
+          void Promise.resolve(audit.write({
+            userId: context.user.id,
+            action: 'api',
+            methodPath: `${req.method} ${pathname}`,
+            status: res.statusCode,
+            ip: req.socket.remoteAddress ?? '',
+          })).catch(error => { console.error('[gateway] API audit write failed:', error) })
+        })
+      }
       await new Promise<void>((resolve) => {
         let settled = false
         const finish = (): void => {
@@ -250,7 +259,14 @@ export function createProxyHandlers(
         }
       })
     } finally {
-      if (operationLease) await instances.operationRef?.(ready.target, -1, ready.generation)
+      if (operationLease) {
+        await Promise.resolve(instances.operationRef?.(ready.target, -1, ready.generation)).catch((error: unknown) => {
+          // The response has already settled; retain the lease for the
+          // manager's next stop/retry cycle and keep a transient DB failure
+          // from replacing a successful user response with an unhandled error.
+          console.error('[gateway] HTTP operation lease release failed:', error)
+        })
+      }
     }
   }
 
@@ -266,7 +282,6 @@ export function createProxyHandlers(
       socket.destroy()
       return
     }
-    await instances.touch(ready.target)
     let admitted = false
     let released = false
     const releaseWebSocketLease = (): void => {
@@ -296,12 +311,17 @@ export function createProxyHandlers(
       socket.destroy()
       return
     }
-    const principal = principalSigner?.issue({
-      user: context.user,
-      scope: context.scope,
-      runtime: { kind: ready.target.kind, id: ready.target.id, generation: ready.generation },
-    })
-    server.ws(req, socket as Duplex & NodeJS.WritableStream, head, targetOptions(ready.port, principal), () => socket.destroy())
+    try {
+      const principal = principalSigner?.issue({
+        user: context.user,
+        scope: context.scope,
+        runtime: { kind: ready.target.kind, id: ready.target.id, generation: ready.generation },
+      })
+      server.ws(req, socket as Duplex & NodeJS.WritableStream, head, targetOptions(ready.port, principal), () => socket.destroy())
+    } catch (error: unknown) {
+      releaseWebSocketLease()
+      socket.destroy(error instanceof Error ? error : undefined)
+    }
   }
 
   return { proxy, upgrade, close: () => server.close() }

@@ -103,7 +103,11 @@ export const turnProcessDefinition: ConversationNodeDefinition<TurnProcessState>
     return initial(match.event.data.turn, match.event.seq)
   },
   update: (context, match) => update(context.state, match.event),
-  publication: () => 'immediate',
+  publication: (match) => {
+    if (match.event.type !== 'assistant/chunk') return 'immediate'
+    const type = match.event.data.chunk.type
+    return type === 'usage' || type === 'finish' ? 'none' : 'animation-frame'
+  },
   buildViewNode: (context) => {
     const state = context.state
     const location = turnLocation(context)

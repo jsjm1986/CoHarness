@@ -388,7 +388,7 @@ describe('live event path', () => {
     )).toContain('command-input')
   })
 
-  it('publishes animation-frame Definitions once per frame and lets an immediate event supersede the pending frame', async () => {
+  it('publishes hot animation-frame Definitions on a bounded cadence and lets an immediate event supersede the pending frame', async () => {
     const frames: FrameRequestCallback[] = []
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
       frames.push(callback)
@@ -409,6 +409,10 @@ describe('live event path', () => {
     expect(published).toEqual([])
     expect(frames).toHaveLength(1)
 
+    // Hot streams use a three-frame cadence. Each callback advances the
+    // cadence; only the final callback publishes the accumulated snapshot.
+    frames.shift()!(0)
+    frames.shift()!(0)
     frames.shift()!(0)
     expect(published).toEqual([[0, 1, 2, 3, 4, 5, 6, 7, 8]])
 
@@ -647,6 +651,19 @@ describe('conversation-tier history', () => {
     expect(session.getSnapshot().historyDetail).toBe('full')
     expect(api.callsOf('session.history').filter(call =>
       (call as { detail?: string }).detail === 'full')).toHaveLength(0)
+  })
+
+  it('returns a failed detail fill to the retryable conversation tier', async () => {
+    const { api, session } = makeSession()
+    api.onHistory = (payload) => {
+      if (payload.detail !== 'full') {
+        return histResponse([ev.user(1, '问'), ev.assistant(2, 1, '答')], false, [{ startSeq: 3, endSeq: 4 }])
+      }
+      return Promise.reject(new Error('history detail unavailable'))
+    }
+    await session.open()
+    await expect(session.ensureHistoryDetail()).rejects.toThrow('history detail unavailable')
+    expect(session.getSnapshot().historyDetail).toBe('conversation')
   })
 
   it('keeps prompt sendable while conversation-tier open is still loading', async () => {
@@ -1229,9 +1246,21 @@ describe('remaining branches', () => {
     expect(session.getSnapshot().promptError).toBeNull()
   })
 
-  it('dispose is a reserved no-op on resident instances', () => {
+  it('dispose is idempotent on resident instances', () => {
     const { session } = makeSession()
     expect(() => { session.dispose() }).not.toThrow()
+  })
+
+  it('dispose aborts an in-flight initial history read', async () => {
+    const { api, session } = makeSession()
+    const gate = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()
+    api.onHistory = () => gate.promise
+    const opening = session.open()
+    await vi.waitFor(() => { expect(api.lastHistorySignal?.aborted).toBe(false) })
+    session.dispose()
+    expect(api.lastHistorySignal?.aborted).toBe(true)
+    gate.resolve(ok({ events: [], hasMore: false }))
+    await opening
   })
 
   it('carries history-entry and mux-frame views into the business-neutral Event input', async () => {

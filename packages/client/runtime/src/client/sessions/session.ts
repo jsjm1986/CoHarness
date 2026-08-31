@@ -510,7 +510,14 @@ export class Session implements SessionFace {
     if (this.fillPromise !== null) return this.fillPromise
     // oxlint-disable-next-line typescript/no-unnecessary-condition -- open() can settle the mutable detail state while awaited.
     if (this.historyDetail !== 'conversation' && this.historyDetail !== 'filling') return
-    const promise = this.enqueueHistoryOperation(signal => this.fillHistoryDetail(signal), false)
+    const generation = this.openGeneration
+    const promise = this.enqueueHistoryOperation(async (signal) => {
+      // The operation may have waited behind an older page. Do not start a
+      // detail fill after the owning Session scope has been disposed or
+      // superseded during that wait.
+      if (generation !== this.openGeneration || this.openState !== 'open') return
+      await this.fillHistoryDetail(signal)
+    }, false)
     this.fillPromise = promise
     try {
       await promise
@@ -699,8 +706,14 @@ export class Session implements SessionFace {
     this.notifier.markDirty()
   }
 
-  /** No-op because session instances remain resident. */
+  /** Stop in-flight history work and release submission observers for this scope. */
   dispose(): void {
+    this.openGeneration++
+    this.historyAbortController?.abort(new Error('session disposed'))
+    this.historyAbortController = null
+    this.historyExpansionPromise = null
+    this.openPromise = null
+    this.fillPromise = null
     for (const requestId of [...this.submissionSettlements.keys()]) {
       this.retireFailedSubmission(requestId)
     }
@@ -732,8 +745,10 @@ export class Session implements SessionFace {
     this.openState = 'loading'
     this.openError = null
     this.notifier.markDirty()
+    const controller = new AbortController()
+    this.historyAbortController = controller
     try {
-      let { result } = await this.history({ maxMessages: PAGE_MESSAGES })
+      let { result } = await this.history({ maxMessages: PAGE_MESSAGES }, controller.signal)
       if (generation !== this.openGeneration) return
       if (!result.ok) {
         this.openState = 'error'
@@ -749,7 +764,7 @@ export class Session implements SessionFace {
       // Gap detection: baseline past the window tail and liveBuffer did not cover it -> pull the tail page once more.
       const tailSeq = this.windowTailSeq()
       if (this.subscribedLastSeq !== null && tailSeq !== null && this.subscribedLastSeq > tailSeq) {
-        result = (await this.history({ maxMessages: PAGE_MESSAGES })).result
+        result = (await this.history({ maxMessages: PAGE_MESSAGES }, controller.signal)).result
         if (generation !== this.openGeneration) return
         if (result.ok) {
           this.installWindow(
@@ -769,6 +784,7 @@ export class Session implements SessionFace {
       /* v8 ignore next -- the `? null` arm is unreachable: transportError always returns ok:false. */
       this.openError = folded.ok ? null : folded.error
     } finally {
+      if (this.historyAbortController === controller) this.historyAbortController = null
       if (generation === this.openGeneration) this.notifier.markDirty()
     }
   }
@@ -887,7 +903,7 @@ export class Session implements SessionFace {
   /** Route assembler cadence into the Session's existing microtask/RAF notifier. */
   private scheduleConversation(publication: ConversationPublication): void {
     if (publication === 'immediate') this.notifier.markDirty()
-    else if (publication === 'animation-frame') this.notifier.markFrameDirty()
+    else if (publication === 'animation-frame') this.notifier.markFrameDirtyThrottled()
   }
 
   /** Mark durable non-empty content and report its latest sequence to the list owner. */
@@ -1241,6 +1257,14 @@ export class Session implements SessionFace {
       if (generation === this.openGeneration) {
         this.historyDetail = this.omittedSpans.length === 0 ? 'full' : 'conversation'
       }
+    } catch (error) {
+      // A transport/dependency failure must leave the retryable conversation
+      // tier visible; retaining `filling` would make the control look busy
+      // after the request has already settled.
+      if (generation === this.openGeneration) {
+        this.historyDetail = 'conversation'
+      }
+      throw error
     } finally {
       if (generation === this.openGeneration) this.notifier.markDirty()
     }
@@ -1264,12 +1288,17 @@ export class Session implements SessionFace {
 
   /** Drop omitted spans whose seqs are now present as loaded events. */
   private dropCoveredSpans(): void {
-    const seqs = new Set(this.events.map(event => event.seq))
     this.omittedSpans = this.omittedSpans.filter((span) => {
-      for (let seq = span.startSeq; seq <= span.endSeq; seq++) {
-        if (!seqs.has(seq)) return true
+      // Count loaded rows inside the span instead of iterating the numeric
+      // interval. A malformed or very old span can be millions of sequence
+      // numbers wide while the actual window contains only a few rows.
+      const expected = span.endSeq - span.startSeq + 1
+      if (!Number.isSafeInteger(expected) || expected > this.events.length) return true
+      let covered = 0
+      for (const event of this.events) {
+        if (event.seq >= span.startSeq && event.seq <= span.endSeq) covered++
       }
-      return false
+      return covered !== expected
     })
   }
 }

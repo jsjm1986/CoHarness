@@ -198,7 +198,7 @@ export class ConversationController extends Service implements IConversation {
     // Session-backed subagents and legacy structural fakes do not expose the
     // local echo seam; preserve their existing serialize→prompt choreography.
     if (session.getSnapshot().subagent !== null || session.beginSubmission === undefined) {
-      const uploaded = await this.serializeImages(attachments.map(attachment => attachment.file))
+      const uploaded = await this.serializeImages(attachments.map(attachment => attachment.file), signal)
       const content = [
         ...uploaded,
         ...documents.map(document => ({ type: 'document' as const, docId: document.docId })),
@@ -283,14 +283,19 @@ export class ConversationController extends Service implements IConversation {
    * sending or releasing them (the composer releases only after the command
    * settles successfully).
    * @param imageIds - ordered draft-local attachment ids.
+   * @param signal - optional cancellation checked around each file read.
    * @returns base64 payloads in id order.
    */
-  async serializeDraftImages(imageIds: readonly DraftAttachmentId[]): Promise<readonly SubmitImageAttachment[]> {
+  async serializeDraftImages(
+    imageIds: readonly DraftAttachmentId[],
+    signal?: AbortSignal,
+  ): Promise<readonly SubmitImageAttachment[]> {
+    signal?.throwIfAborted()
     const attachments = this.draftImages(imageIds)
     if (attachments.length !== imageIds.length) {
       throw new Error('conversation.serializeDraftImages: one or more draft images are no longer available')
     }
-    return Promise.all(attachments.map(attachment => this.encodeImage(attachment.file)))
+    return Promise.all(attachments.map(attachment => this.encodeImage(attachment.file, signal)))
   }
 
   /**
@@ -667,15 +672,21 @@ export class ConversationController extends Service implements IConversation {
   }
 
   /** Convert browser files to canonical base64 prompt parts. */
-  private serializeImages(images: readonly File[]): Promise<Parameters<SessionFace['prompt']>[0]> {
-    return Promise.all(images.map(async file => ({ type: 'image' as const, ...await this.encodeImage(file) })))
+  private serializeImages(
+    images: readonly File[],
+    signal?: AbortSignal,
+  ): Promise<Parameters<SessionFace['prompt']>[0]> {
+    return Promise.all(images.map(async file => ({ type: 'image' as const, ...await this.encodeImage(file, signal) })))
   }
 
   /** Canonical base64 wire form of one browser image file. */
-  private async encodeImage(file: File): Promise<SubmitImageAttachment> {
+  private async encodeImage(file: File, signal?: AbortSignal): Promise<SubmitImageAttachment> {
+    signal?.throwIfAborted()
+    const bytes = await file.arrayBuffer()
+    signal?.throwIfAborted()
     return {
       mediaType: imageMediaType(file.type),
-      data: bytesToBase64(new Uint8Array(await file.arrayBuffer())),
+      data: bytesToBase64(new Uint8Array(bytes)),
       ...(file.name === '' ? {} : { name: file.name }),
     }
   }

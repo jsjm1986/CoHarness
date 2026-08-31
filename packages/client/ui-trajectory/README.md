@@ -8,6 +8,8 @@ On compact viewports the ledger keeps its durable selection but projects events 
 
 While a staged session is running, the shared Session window expands older pages in the background and the older-page row stays out of the ledger; the row returns when a later stage entry intentionally starts from a bounded tail.
 
+Trajectory assistant streams use the shared incremental block accumulator, joining reasoning and tool-argument parts only when a visible row is published. Long reasoning streams therefore avoid copying their complete prefix for every chunk.
+
 ## Model Experience
 
 None, as the trajectory views render session data in the browser; nothing here reaches a model request.

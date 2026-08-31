@@ -84,6 +84,26 @@ describe('Notifier', () => {
     expect(order).toEqual(['rebuild', 'notify'])
   })
 
+  it('coalesces hot stream updates across a bounded frame interval', () => {
+    const frames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      frames.push(callback)
+      return frames.length
+    })
+    let notifications = 0
+    const notifier = new Notifier(() => undefined)
+    notifier.subscribe(() => { notifications++ })
+
+    notifier.markFrameDirtyThrottled(3)
+    expect(frames).toHaveLength(1)
+    frames.shift()!(0)
+    expect(notifications).toBe(0)
+    frames.shift()!(0)
+    expect(notifications).toBe(0)
+    frames.shift()!(0)
+    expect(notifications).toBe(1)
+  })
+
   it('lets a structural microtask publication supersede a pending frame', async () => {
     const frames: FrameRequestCallback[] = []
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {

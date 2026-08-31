@@ -13,13 +13,14 @@
 - `locate()` 返回 `undefined`，且 `supportsRawArtifacts` 为 false，因为 PostgreSQL 不拥有独立本地文本记录文件。
 - 浏览器创建根会话前会预留按 scope 限定的草稿 id。PostgreSQL 为重试返回同一个 canonical Session id，未使用的 reservation 在一小时后过期，且不保存 prompt 文本或凭据。首个实体化 append 或草稿成功 dispose 后会释放 reservation。
 - `revision(id, signal?)` 使用认证的逐会话 revision 端点，不列出运行时目录。`listSnapshots()` 携带 PostgreSQL 维护的 `blank`、`visibleContentSeq` 和 `lastPromptAt` 事实。仅草稿行不会进入普通会话列表；仅命令行仍可恢复并供维护视图处理。
+- `readHeader(id, signal?)` 和 `readRevision(id, signal?)` 使用带索引的元数据 endpoint。`readPage(id, request, signal?)` 使用 PostgreSQL 的 `(session_id, seq)` keyset 查询，每页最多返回 512 KiB／2,000 个事件／50 个组，并把续传 cursor 绑定到源 revision。提供方保留有类型的分页失败，Gateway page 路径不会传输完整 detached 历史。
 
 ## 配置
 
 - `preparedSessionCacheSize` — coordinator 保留的冷 preparation 正数数量；默认 `5`。
 - `writeBatchMaxDelayMs` — 正数固定批处理窗口；默认 `200`，上限为共享最大定时器延迟。
 - `maxPendingEvents` — 单个活动会话写入 controller 可保留的最大事件数；默认 `100,000`。
-- `maxPendingBytes` — 单个活动会话写入 controller 可保留的最大 UTF-8 JSON 字节数；默认 `64 MiB`。
+- `maxPendingBytes` — 单个活动会话写入 controller 可保留的最大 UTF-8 JSON 字节数；默认 `48 MiB`，为 Gateway 的 64 MiB 请求上限预留 envelope 空间。
 - `requestTimeoutMs` — 单次 Gateway 内部请求的正数期限；默认 `30000`。
 
 ## 模型体验

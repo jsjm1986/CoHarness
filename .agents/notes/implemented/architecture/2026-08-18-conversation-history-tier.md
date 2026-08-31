@@ -10,7 +10,7 @@ A public Web session's first `session.history` call with `maxMessages: 50` can r
 
 ## Decision
 
-`session.history` and `subagent.history` accept `detail?: 'conversation' | 'full'`. Missing `detail` and `'full'` return every event on the already-paginated page. The Web `Session` requests `conversation` on `open()` / `loadOlder()` unless that session already filled detail. The Host still paginates a contiguous raw range, then omits eligible historical chunk runs from `events` and reports them as `omittedSpans` so the client keeps a hole-free seq ledger. Trajectory, Chat inspect handoff, and a persisted `view === 'trajectory'` restore request `full` for the same window and merge by seq. Fetch continues to pack whatever chunks remain.
+`session.history` and `subagent.history` accept `detail?: 'conversation' | 'full'`. Missing `detail` and `'full'` return every event on the already-paginated page. The Web `Session` requests `conversation` on `open()` / `loadOlder()` unless that session already filled detail. The Host obtains cold pages through the indexed persistence `readPage` primitive when available, keeps the detached range within the page and materialization budgets, then omits eligible historical chunk runs from `events` and reports them as `omittedSpans` so the client keeps a hole-free seq ledger. Providers without a seek page implementation retain the compatibility inspection path. Trajectory, Chat inspect handoff, and a persisted `view === 'trajectory'` restore request `full` for the same window and merge by seq. Fetch continues to pack whatever chunks remain.
 
 `omittedSpans` are inclusive `{ startSeq, endSeq }` ranges of omitted historical chunk runs; the field is absent or `[]` when nothing was omitted.
 

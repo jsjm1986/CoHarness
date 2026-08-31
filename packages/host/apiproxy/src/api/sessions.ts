@@ -338,21 +338,24 @@ export interface SessionsApi {
    * the client needs a fresh baseline already pulls the tail page, and
    * loadOlder (the only beforeSeq path) is the only path that never needs one.
    * A deployment without the registry serves histories without the block.
-   * Reading history uses an attached Session or persistence inspection and
-   * never resumes or publishes an Agent.
+   * Reading history uses an attached Session or a bounded persistence page and
+   * never resumes or publishes an Agent. Providers without the page capability
+   * may use their compatibility inspection path.
    * `detail` selects the download gear after pagination: `'conversation'`
    * omits historical `assistant/chunk` runs that sit under a completed
    * append-origin `assistant/message` and reports them as `omittedSpans`;
    * omitted or `'full'` returns every event on the page. In-flight and
    * interrupted streams without that message keep their chunks. Persistence
    * and model context are unchanged.
+   * @param signal - optional in-process cancellation for the persistence read
+   * and presenter derivation; it is never serialized on the wire.
    */
   history(request: RpcRequest<{
     sessionId: SessionId
     beforeSeq?: number
     maxMessages?: number
     detail?: HistoryDetail
-  }>):
+  }>, signal?: AbortSignal):
   Promise<RpcResponse<{
     events: HistoryEntry[]
     hasMore: boolean

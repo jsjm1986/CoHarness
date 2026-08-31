@@ -7,7 +7,7 @@
 ## 运行时约定
 
 - `capture()` 将当前已验证 principal 固化为一份 authority，其参与者、过期时间和提供方生命周期在该请求或流操作期间保持稳定。
-- 项目授权、可读会话过滤和交互抢占调用 `/internal/runtime/collaboration/*`，同时携带运行时 bearer token 与捕获的 principal。未知 HTTP 失败和格式错误的响应都会成为 `gateway-unavailable`。
+- 项目授权、可读会话过滤和交互抢占调用 `/internal/runtime/collaboration/*`，同时携带运行时 bearer token 与捕获的 principal。捕获的取消信号会传到请求和响应 body reader，因此历史或流被取消后不会继续解码 ACL 响应。未知 HTTP 失败和格式错误的响应都会成为 `gateway-unavailable`。
 - 个人 scope 将已有会话 id 视为可读并接受交互抢占；项目 scope 始终向 Gateway 请求权威结果。
 - 创建项目根对话要求 `rw` 成员身份，并在请求的可见性下运行。个人创建直接通过，不附加项目元数据。
 - 卸载提供方会中止其生命周期信号，并使每份已捕获 authority 在再次请求前失败关闭。

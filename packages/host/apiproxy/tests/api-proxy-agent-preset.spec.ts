@@ -726,6 +726,57 @@ describe('session.history presenter scope', () => {
     expect(standingKeyRequests).toEqual(['minimal'])
   })
 
+  it('recovers a switched preset from an indexed prefix without inspecting a large tail', async () => {
+    const meta = { id: SessionId('p-indexed'), createdAt: 1, cwd: '/tmp/p-indexed', agentPreset: 'standard' }
+    const selection = {
+      type: 'agent-preset/selected' as const,
+      seq: 1,
+      time: 2,
+      data: { agentPreset: 'minimal' },
+    }
+    const visible = {
+      type: 'user/message' as const,
+      seq: 2,
+      time: 3,
+      data: createUserMessage({ content: [{ type: 'text', text: 'hello' }], source: { kind: 'user' } }),
+      surfaceOp: 'append' as const,
+    }
+    const inspected = () => Promise.reject(new Error('full inspection must not run'))
+    const persistence = {
+      list: () => Promise.resolve([meta]),
+      revision: () => Promise.resolve('indexed:1' as never),
+      inspect: inspected,
+      readPage: (_id: SessionId, request: { direction?: string }) => Promise.resolve(
+        request.direction === 'newer'
+          ? {
+            meta,
+            revision: 'indexed:1' as never,
+            events: [selection, visible],
+            startSeq: 1,
+            endSeq: 2,
+            hasMore: false,
+            uncompressedBytes: 4096,
+          }
+          : {
+            meta,
+            revision: 'indexed:1' as never,
+            events: [visible],
+            startSeq: 2,
+            endSeq: 2,
+            hasMore: false,
+            uncompressedBytes: 4096,
+          },
+      ),
+    }
+    const { api } = await harness(['standard', 'minimal'], persistence)
+
+    standingKeyRequests.length = 0
+    const response = await api.sessions.history(request({ sessionId: meta.id }))
+
+    expect(response.result.ok).toBe(true)
+    expect(standingKeyRequests).toEqual(['minimal'])
+  })
+
   it('serves a COLD transcript whose standing mount is no longer usable', async () => {
     // A genuinely cold session: persistence knows it, no live agent exists.
     const meta = { id: SessionId('p3'), createdAt: 1, cwd: '/tmp/p3', agentPreset: 'standard' }

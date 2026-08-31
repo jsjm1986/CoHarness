@@ -30,12 +30,15 @@ function release(root: string, name: string): string {
   for (const path of [
     'apps/cli/lib/bin.js',
     'apps/web/dist/index.html',
-    'gateway/src/index.ts',
+    'gateway/lib/index.js',
+    'gateway/lib/config.js',
+    'gateway/lib/server.js',
+    'gateway/lib/runtime-api.js',
     'gateway/public/admin/index.html',
-    'gateway/node_modules/tsx/package.json',
     'gateway/node_modules/pg/package.json',
     'gateway/node_modules/argon2/package.json',
     'gateway/node_modules/better-sqlite3/package.json',
+    'packages/llm/llm/lib/types/discovery.js',
     'plugins/dsh-directory-guard/lib/index.js',
     'plugins/dsh-directory-guard/cordis.patch.yml',
     'plugins/dsh-model-governance/lib/index.js',
@@ -141,7 +144,7 @@ set -euo pipefail
       'dsh_repo_root=',
       'model_package=',
       'gateway_dir=',
-      `args=--import tsx/esm ${realpathSync(r1)}/gateway/src/index.ts`,
+      `args=${realpathSync(r1)}/gateway/lib/index.js`,
       '',
     ].join('\n'))
   })

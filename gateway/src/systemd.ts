@@ -26,6 +26,8 @@ export interface SystemdOptions {
   execStart: readonly string[] | string
   /** Gateway code/data directory made inaccessible to instances. */
   gatewayDir: string
+  /** Additional Gateway-owned files or directories hidden from every instance. */
+  inaccessiblePaths?: readonly string[]
   /** systemd `MemoryMax` value, e.g. `1G`. */
   memoryMax: string
   /** systemd `CPUQuota` value, e.g. `100%`. */
@@ -170,6 +172,7 @@ export function renderUserUnit(
     opts.projectRuntimesRoot,
     ...opts.projectPathRoots,
     opts.gatewayDir,
+    ...(opts.inaccessiblePaths ?? []),
   ]) assertSafePath(path)
   const execArgs = execStartArgs(opts.execStart)
   assertResourceValue(opts.memoryMax, 'MemoryMax')
@@ -239,8 +242,8 @@ CapabilityBoundingSet=~CAP_SYS_ADMIN
 # Hide managed user, project-runtime, and project-data roots, then re-bind only this runtime's paths.
 ${masks.join('\n')}
 ${binds.join('\n')}
-# Never expose the gateway's own code/state to an instance.
-InaccessiblePaths=-${opts.gatewayDir}
+# Never expose the gateway's own code/state or private credential material to an instance.
+${[opts.gatewayDir, ...(opts.inaccessiblePaths ?? [])].filter((path, index, all) => all.indexOf(path) === index).map(path => `InaccessiblePaths=-${path}`).join('\n')}
 
 # ── resource limits ──
 MemoryMax=${opts.memoryMax}

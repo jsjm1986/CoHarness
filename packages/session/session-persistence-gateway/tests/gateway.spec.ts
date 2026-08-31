@@ -7,7 +7,13 @@ import type {
   GatewaySessionCreationAuthorization,
 } from '@deepseek-ai/dsh-gateway-runtime'
 import SessionStore, { SessionDraftId, SessionId } from '@deepseek-ai/dsh-session'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import {
+  decodeSessionPersistenceCursor,
+  encodeSessionPersistenceCursor,
+  SessionPersistenceReadCursor,
+  SessionPersistenceReadError,
+} from '@deepseek-ai/dsh-session-persistence'
 import {
   appendLog,
   oneTurnLog,
@@ -109,6 +115,67 @@ class GatewayTransport {
     if (url.pathname === '/internal/runtime/session/revision') {
       const stored = this.sessions.get(sessionId)
       return json(200, { revision: stored === undefined ? null : `revision-${String(stored.revision)}` })
+    }
+
+    if (url.pathname === '/internal/runtime/session/meta') {
+      const stored = this.sessions.get(sessionId)
+      return stored === undefined ? json(404, { error: 'conversation-not-found' }) : json(200, {
+        header: structuredClone(stored.header),
+        revision: `revision-${String(stored.revision)}`,
+      })
+    }
+
+    if (url.pathname === '/internal/runtime/session/page') {
+      const stored = this.sessions.get(sessionId)
+      if (stored === undefined) return json(404, { error: 'conversation-not-found' })
+      const cursorText = url.searchParams.get('cursor')
+      const cursor = cursorText === null
+        ? undefined
+        : decodeSessionPersistenceCursor(SessionPersistenceReadCursor(cursorText))
+      const directionParam = url.searchParams.get('direction')
+      const direction: 'older' | 'newer' = directionParam === 'newer'
+        ? 'newer'
+        : cursor?.direction ?? 'older'
+
+      const anchor = cursor?.anchor
+        ?? (direction === 'older'
+          ? Number(url.searchParams.get('beforeSeq') ?? stored.events.length)
+          : Number(url.searchParams.get('fromSeq') ?? 0))
+      const maxEvents = Number(url.searchParams.get('maxEvents') ?? 2_000)
+      const maxBytes = Number(url.searchParams.get('maxBytes') ?? 512 * 1024)
+      const candidates = stored.events.filter((candidate) => {
+        const seq = (candidate as { seq?: unknown }).seq
+        return typeof seq === 'number' && (direction === 'older' ? seq < anchor : seq >= anchor)
+      })
+      const ordered = direction === 'older' ? [...candidates].sort((a, b) => (a as { seq: number }).seq - (b as { seq: number }).seq) : candidates
+      const selected = direction === 'older' ? ordered.slice(-maxEvents) : ordered.slice(0, maxEvents)
+      const bytes = Buffer.byteLength(JSON.stringify(selected), 'utf8')
+      if (bytes > maxBytes) return json(413, {
+        error: 'conversation-too-large', code: 'too-large', message: 'conversation page exceeds the byte limit',
+      })
+      const first = selected[0] as { seq?: number } | undefined
+      const last = selected.at(-1) as { seq?: number } | undefined
+      const hasMore = candidates.length > selected.length
+      const nextAnchor = direction === 'older' ? (first?.seq ?? anchor) : (last?.seq === undefined ? anchor : last.seq + 1)
+      const nextCursor = hasMore
+        ? encodeSessionPersistenceCursor({
+          version: 1,
+          sessionId,
+          revision: `revision-${String(stored.revision)}`,
+          direction,
+          anchor: nextAnchor,
+        })
+        : undefined
+      return json(200, {
+        header: structuredClone(stored.header),
+        events: structuredClone(selected),
+        revision: `revision-${String(stored.revision)}`,
+        startSeq: first?.seq ?? null,
+        endSeq: last?.seq ?? null,
+        hasMore,
+        ...(nextCursor === undefined ? {} : { nextCursor }),
+        uncompressedBytes: selected.reduce<number>((sum, item) => sum + Buffer.byteLength(JSON.stringify(item), 'utf8'), 0),
+      })
     }
 
     if (url.pathname === '/internal/runtime/session/read-from') {
@@ -355,5 +422,71 @@ describe('GatewaySessionPersistence response validation', () => {
     )).rejects.toThrow('Gateway returned an invalid session event list')
 
     await fiber.dispose()
+  })
+})
+
+describe('GatewaySessionPersistence bounded page transport', () => {
+  it('reads metadata and follows revision-bound cursor pages without loading the full log', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const transport = new GatewayTransport()
+    transport.seed('paged', oneTurnLog())
+    const fiber = await mountBackend(ctx, transport)
+    try {
+      const id = SessionId('paged')
+      await expect(ctx.sessionPersistence.readHeader(id)).resolves.toMatchObject({ id })
+      const first = await ctx.sessionPersistence.readPage(id, { maxEvents: 2 })
+      expect(first.events.map(item => item.seq)).toEqual([4, 5])
+      expect(first.hasMore).toBe(true)
+      if (first.nextCursor === undefined) throw new Error('first page did not return a cursor')
+      const second = await ctx.sessionPersistence.readPage(id, { cursor: first.nextCursor, maxEvents: 2 })
+      expect(second.events.map(item => item.seq)).toEqual([2, 3])
+    } finally {
+      await fiber.dispose()
+    }
+  })
+
+  it('maps a bounded page HTTP error to a stable persistence error', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const transport = new GatewayTransport()
+    transport.seed('large-page', [
+      {
+        type: 'turn/start', seq: 0, time: 1, data: { text: 'x'.repeat(100) },
+      },
+    ])
+    const fiber = await mountBackend(ctx, transport)
+    try {
+      await expect(ctx.sessionPersistence.readPage(SessionId('large-page'), { maxBytes: 10 }))
+        .rejects.toMatchObject({ code: 'too-large' })
+      await expect(ctx.sessionPersistence.readPage(SessionId('large-page'), { maxBytes: 10 }))
+        .rejects.toBeInstanceOf(SessionPersistenceReadError)
+    } finally {
+      await fiber.dispose()
+    }
+  })
+
+  it('classifies transport timeouts and malformed Gateway JSON', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const transport = new GatewayTransport()
+    const request = vi.spyOn(transport, 'request')
+    const fiber = await mountBackend(ctx, transport)
+    try {
+      const timeout = Object.assign(new Error('upstream timeout'), { code: 'ETIMEDOUT' })
+      request.mockRejectedValueOnce(timeout)
+      await expect(ctx.sessionPersistence.readPage(SessionId('timeout'), { maxEvents: 1 }))
+        .rejects.toMatchObject({ code: 'timeout' })
+
+      request.mockResolvedValueOnce(new Response('not-json', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }))
+      await expect(ctx.sessionPersistence.readPage(SessionId('malformed'), { maxEvents: 1 }))
+        .rejects.toMatchObject({ code: 'protocol' })
+    } finally {
+      request.mockRestore()
+      await fiber.dispose()
+    }
   })
 })

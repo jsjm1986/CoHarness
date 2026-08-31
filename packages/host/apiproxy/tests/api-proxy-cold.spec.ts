@@ -13,7 +13,7 @@ import SessionStore from '@deepseek-ai/dsh-session'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import { TypertLookupFailure } from '@deepseek-ai/dsh-typert-protocol'
 import TypertRegistry from '@deepseek-ai/dsh-typert-registry'
-import { createUserMessage, MessageId } from '@deepseek-ai/dsh-llm'
+import { createAssistantMessage, createUserMessage, MessageId } from '@deepseek-ai/dsh-llm'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { UserDocId, type UserDocPromptAttachment } from '@deepseek-ai/dsh-userdoc'
 import UserQuestionService from '@deepseek-ai/dsh-user-questions'
@@ -21,6 +21,8 @@ import type { SessionEvent, SessionHeader, SessionId } from '@deepseek-ai/dsh-se
 import {
   PersistenceCoordinator,
   SessionPersistenceRevision,
+  SessionPersistenceReadError,
+  type SessionPersistencePage,
   type PersistenceBackend,
   type StoredPrefix,
 } from '@deepseek-ai/dsh-session-persistence'
@@ -269,6 +271,208 @@ describe('attached updatedAt tracks human prompts', () => {
 })
 
 describe('cold history recovery view', () => {
+  it('maps bounded persistence cancellation and capacity failures without retrying', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(UserQuestionService)
+    const sessionId = sid('session-page-errors')
+    const meta = header(sessionId, 1000)
+    const readPage = vi.fn(async () => {
+      throw new SessionPersistenceReadError('too-large', 'page limit reached')
+    })
+    ctx.provide('sessionPersistence', {
+      list: () => Promise.resolve([meta]),
+      readPage,
+      revision: () => Promise.resolve(SessionPersistenceRevision('page-errors:1')),
+      locate: () => undefined,
+    } as never)
+    const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })
+
+    const tooLarge = await api.sessions.history(request({ sessionId, detail: 'conversation' }))
+    expect(tooLarge.result).toEqual({
+      ok: false,
+      error: {
+        code: 'internal',
+        message: 'history page is too large; request a smaller page',
+        details: {},
+      },
+    })
+    expect(readPage).toHaveBeenCalledOnce()
+
+    const controller = new AbortController()
+    controller.abort(new Error('caller closed'))
+    const cancelled = await api.sessions.history(request({ sessionId }), controller.signal)
+    expect(cancelled.result).toEqual({
+      ok: false,
+      error: { code: 'cancelled', message: 'history read was cancelled', details: {} },
+    })
+    expect(readPage).toHaveBeenCalledOnce()
+  })
+
+  it('uses a bounded persistence page for a large detached log without inspecting it', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(UserQuestionService)
+    const sessionId = sid('session-large-bounded')
+    // A valid legacy header may omit cwd; page presence is identified by the
+    // session id, not by an unrelated optional metadata field.
+    const meta = { ...header(sessionId, 1000) }
+    Reflect.deleteProperty(meta, 'cwd')
+    const inspect = vi.fn(() => Promise.reject(new Error('full inspection must not run')))
+    const revision = SessionPersistenceRevision('postgres:test:large:137382')
+    const readPage = vi.fn(async (
+      id: SessionId,
+      pageRequest: { beforeSeq?: number; maxBytes?: number; maxEvents?: number; maxGroups?: number },
+      signal?: AbortSignal,
+    ): Promise<SessionPersistencePage> => {
+      expect(id).toBe(sessionId)
+      signal?.throwIfAborted()
+      expect(pageRequest).toMatchObject({
+        direction: 'older',
+        maxBytes: 512 * 1024,
+        maxEvents: 2_000,
+        maxGroups: 1,
+      })
+      const seq = pageRequest.beforeSeq === undefined ? 137_381 : pageRequest.beforeSeq - 1
+      const event: SessionEvent = {
+        type: 'user/message',
+        seq,
+        time: 2000,
+        data: createUserMessage({ content: [{ type: 'text', text: 'tail' }], source: { kind: 'user' } }),
+        surfaceOp: 'append',
+      }
+      return {
+        meta,
+        revision,
+        events: [event],
+        startSeq: seq,
+        endSeq: seq,
+        hasMore: true,
+        nextCursor: 'large-history-next' as never,
+        uncompressedBytes: Buffer.byteLength(JSON.stringify(event), 'utf8'),
+      }
+    })
+    const revisionOf = vi.fn(async () => revision)
+    ctx.provide('sessionPersistence', {
+      list: () => Promise.resolve([meta]),
+      inspect,
+      readPage,
+      revision: revisionOf,
+      locate: () => undefined,
+    } as never)
+    const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })
+
+    const response = await api.sessions.history(request({ sessionId, detail: 'conversation', maxMessages: 1 }))
+    expect(response.result.ok).toBe(true)
+    if (!response.result.ok) throw new Error('history failed')
+    expect(response.result.value.events.map(entry => entry.event.seq)).toEqual([137_381])
+    expect(response.result.value.hasMore).toBe(true)
+    expect(readPage).toHaveBeenCalledOnce()
+    expect(inspect).not.toHaveBeenCalled()
+  })
+
+  it('stops a multi-page detached read at the host window budget', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(UserQuestionService)
+    const sessionId = sid('session-window-budget')
+    const meta = header(sessionId, 1000)
+    const revision = SessionPersistenceRevision('postgres:test:window-budget')
+    const readPage = vi.fn(async (
+      _id: SessionId,
+      pageRequest: { cursor?: string },
+    ): Promise<SessionPersistencePage> => {
+      const first = pageRequest.cursor === undefined
+      const seq = first ? 100 : 99
+      const event: SessionEvent = {
+        type: 'user/message',
+        seq,
+        time: 2000,
+        data: createUserMessage({ content: [{ type: 'text', text: `page-${String(seq)}` }], source: { kind: 'user' } }),
+        surfaceOp: 'append',
+      }
+      return {
+        meta,
+        revision,
+        events: [event],
+        startSeq: seq,
+        endSeq: seq,
+        hasMore: true,
+        nextCursor: (first ? 'cursor-next' : 'cursor-last') as never,
+        // Two pages would exceed the host's bounded materialization window.
+        uncompressedBytes: 3 * 1024 * 1024,
+      }
+    })
+    ctx.provide('sessionPersistence', {
+      list: () => Promise.resolve([meta]),
+      readPage,
+      revision: () => Promise.resolve(revision),
+      locate: () => undefined,
+    } as never)
+    const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })
+
+    const response = await api.sessions.history(request({ sessionId, maxMessages: 50 }))
+    expect(response.result.ok).toBe(true)
+    if (!response.result.ok) throw new Error('history failed')
+    expect(response.result.value.events.map(entry => entry.event.seq)).toEqual([100])
+    expect(response.result.value.hasMore).toBe(true)
+    expect(readPage).toHaveBeenCalledTimes(2)
+  })
+
+  it('continues indexed pages until a message source range is complete', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(UserQuestionService)
+    const sessionId = sid('session-source-range')
+    const meta = header(sessionId, 1000)
+    const revision = SessionPersistenceRevision('postgres:test:source-range')
+    const chunk: SessionEvent = {
+      type: 'assistant/chunk',
+      seq: 99,
+      time: 2000,
+      data: { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'tail' } },
+    }
+    const message: SessionEvent = {
+      type: 'assistant/message',
+      seq: 100,
+      time: 2001,
+      data: {
+        turn: 1,
+        step: 1,
+        message: createAssistantMessage({ content: [{ type: 'text', text: 'tail' }], source: { provider: 'p', model: 'm' } }),
+      },
+      surfaceOp: 'append',
+      sourceEventSeqs: [98, 99],
+    }
+    const readPage = vi.fn(async (_id: SessionId, pageRequest: { cursor?: string }): Promise<SessionPersistencePage> => {
+      const first = pageRequest.cursor === undefined
+      const events = first ? [chunk, message] : [{ ...chunk, seq: 98 }]
+      return {
+        meta,
+        revision,
+        events,
+        startSeq: events[0]!.seq,
+        endSeq: events.at(-1)!.seq,
+        hasMore: first,
+        ...(first ? { nextCursor: 'source-range-next' as never } : {}),
+        uncompressedBytes: 4096,
+      }
+    })
+    ctx.provide('sessionPersistence', {
+      list: () => Promise.resolve([meta]),
+      readPage,
+      revision: () => Promise.resolve(revision),
+      locate: () => undefined,
+    } as never)
+    const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })
+
+    const response = await api.sessions.history(request({ sessionId, maxMessages: 1 }))
+    expect(response.result.ok).toBe(true)
+    if (!response.result.ok) throw new Error('history failed')
+    expect(response.result.value.events.map(entry => entry.event.seq)).toEqual([98, 99, 100])
+    expect(readPage).toHaveBeenCalledTimes(2)
+  })
+
   it('reuses a detached conversation tail through the persistence revision', async () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)
@@ -533,7 +737,10 @@ describe('subagent ownership fence', () => {
     if (!create.result.ok) expect(create.result.error.code).toBe('agent-busy')
     expect(resume).not.toHaveBeenCalled()
     expect(ctx.agents.get(sessionId)).toBeUndefined()
-    expect(inspect).toHaveBeenCalledTimes(3)
+    // History and the generic prompt still need one complete inspection each;
+    // explicit-id creation is rejected from the indexed header without a third
+    // full-log read.
+    expect(inspect).toHaveBeenCalledTimes(2)
   })
 
   it('no longer treats a descriptor-only cold child without origin as subagent-owned', async () => {

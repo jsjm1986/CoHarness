@@ -69,6 +69,9 @@ interface CatalogInflight {
   parentAvailableOverride: false | undefined
 }
 
+/** Maximum resident-session history rebuilds admitted after one reconnect. */
+const MAX_RESYNC_CONCURRENCY = 4
+
 type SessionListMutation =
   | { kind: 'upsert'; summary: SessionSummary }
   | { kind: 'remove'; sessionId: SessionId }
@@ -145,6 +148,13 @@ export class SessionManager {
   private readonly catalogStale = new Set<SessionId>()
   private readonly openCatalogs = new Set<SessionId>()
   private readonly catalogDebounce = new Map<SessionId, ReturnType<typeof setTimeout>>()
+  /** Connection generation used to invalidate queued resync work. */
+  private resyncGeneration = 0
+  /** Resident sessions waiting for the current generation's rebuild. */
+  private resyncQueue: Session[] = []
+  private resyncWorkers = 0
+  /** One resync per session at a time; a newer generation waits then retries. */
+  private readonly resyncInflight = new Map<SessionId, Promise<void>>()
   /**
    * Background jobs per session, last-wins from `session/jobs`. An empty set
    * is stored as an absent key, so absence and `[]` are one representation.
@@ -228,6 +238,16 @@ export class SessionManager {
     this.notifier.notifyNow()
   }
 
+  /** Release reconnect queues and delayed catalog work owned by this manager. */
+  dispose(): void {
+    this.resyncGeneration++
+    this.resyncQueue = []
+    for (const session of this.sessions.values()) session.dispose()
+    for (const timer of this.catalogDebounce.values()) clearTimeout(timer)
+    this.catalogDebounce.clear()
+    this.catalogStale.clear()
+  }
+
   /**
    * Return the durable catalog address retained for one child.
    * @param sessionId - possible addressed child id.
@@ -266,6 +286,10 @@ export class SessionManager {
   drop(sessionId: SessionId, expected?: Session): void {
     if (expected !== undefined && this.sessions.get(sessionId) !== expected) return
     this.sessions.delete(sessionId)
+    // A reconnect worker may have queued the instance before its scope was
+    // pruned. Remove that stale reference so disposal cannot resurrect history
+    // work for an instance no longer owned by the manager.
+    this.resyncQueue = this.resyncQueue.filter(session => session.sessionId !== sessionId)
   }
 
   /**
@@ -915,6 +939,12 @@ export class SessionManager {
    * every still-pending request with its live rpcId.
    */
   handleDisconnected(): void {
+    // Drop work that has not started on the dead carrier generation. An
+    // in-flight Session.resync owns its own history AbortController and will
+    // settle against the transport's disconnect; a later connected generation
+    // waits for that promise before retrying the same session.
+    this.resyncGeneration++
+    this.resyncQueue = []
     if (this.pendingInteractions.size > 0) {
       this.pendingInteractions.clear()
       this.notifier.markDirty()
@@ -935,7 +965,58 @@ export class SessionManager {
     if (selectedAddress !== undefined) void this.refreshSubagents(selectedAddress.parentSessionId)
     if (this.selected !== undefined) void this.refreshSubagents(this.selected)
     for (const parentSessionId of this.openCatalogs) void this.refreshSubagents(parentSessionId)
-    for (const session of this.sessions.values()) void session.resync()
+    this.scheduleResync()
+  }
+
+  /** Start at most four resident history rebuilds, prioritizing the visible session. */
+  private scheduleResync(): void {
+    const generation = ++this.resyncGeneration
+    const selected = this.selected
+    this.resyncQueue = [...this.sessions.values()].sort((left, right) => {
+      if (left.sessionId === selected) return -1
+      if (right.sessionId === selected) return 1
+      return 0
+    })
+    const workers = Math.min(MAX_RESYNC_CONCURRENCY, this.resyncQueue.length)
+    for (let index = 0; index < workers; index++) void this.drainResyncQueue(generation)
+  }
+
+  private async drainResyncQueue(generation: number): Promise<void> {
+    this.resyncWorkers++
+    try {
+      while (generation === this.resyncGeneration) {
+        const session = this.resyncQueue.shift()
+        if (session === undefined) return
+        const existing = this.resyncInflight.get(session.sessionId)
+        if (existing !== undefined) await existing.catch(() => undefined)
+        if (generation !== this.resyncGeneration) return
+        // A sibling worker may have started this session while we awaited an
+        // older generation. Reuse that promise instead of issuing a duplicate
+        // history request.
+        const current = this.resyncInflight.get(session.sessionId)
+        if (current !== undefined) {
+          await current.catch(() => undefined)
+          continue
+        }
+        const operation = (async (): Promise<void> => {
+          try {
+            await session.resync()
+          } catch (error: unknown) {
+            if (!(error instanceof Error && error.name === 'AbortError')) {
+              console.error(`[web-runtime] session resync failed for ${session.sessionId}:`, error)
+            }
+          }
+        })()
+        this.resyncInflight.set(session.sessionId, operation)
+        try {
+          await operation
+        } finally {
+          if (this.resyncInflight.get(session.sessionId) === operation) this.resyncInflight.delete(session.sessionId)
+        }
+      }
+    } finally {
+      this.resyncWorkers--
+    }
   }
 
   /** Debounce membership refetches while one parent catalog is selected or open. */

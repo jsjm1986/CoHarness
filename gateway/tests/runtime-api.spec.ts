@@ -58,7 +58,7 @@ function user(id: number, role: UserRow['role'] = 'user'): UserRow {
 async function request(
   handler: RuntimeHandler,
   pathname: string,
-  input: { body: unknown; principal?: string; token?: string },
+  input: { body: unknown; principal?: string; token?: string; method?: string },
 ): Promise<RuntimeResponse> {
   const headers: IncomingHttpHeaders = {
     authorization: `Bearer ${input.token ?? RUNTIME_TOKEN}`,
@@ -66,7 +66,7 @@ async function request(
   }
   if (input.principal !== undefined) headers[PRINCIPAL_HEADER] = input.principal
   const req = {
-    method: 'POST',
+    method: input.method ?? 'POST',
     url: pathname,
     headers,
   } as unknown as IncomingMessage
@@ -82,7 +82,8 @@ async function request(
       return this
     },
   } as unknown as ServerResponse
-  const handled = await handler(req, res, pathname, JSON.stringify(input.body))
+  const routePath = pathname.split('?', 1)[0] ?? pathname
+  const handled = await handler(req, res, routePath, JSON.stringify(input.body))
   return {
     handled,
     status,
@@ -494,6 +495,67 @@ describe('runtime completed-turn push notifications', () => {
     expect(duplicate).toMatchObject({ body: { result: 'duplicate' } })
     expect(nonCompleted).toMatchObject({ body: { result: 'inserted' } })
     expect(runtime.push.notifyCompleted).not.toHaveBeenCalled()
+  })
+})
+
+describe('runtime bounded session history', () => {
+  it('authorizes from metadata and serves an indexed page without loading the log', async () => {
+    const runtime = fixture()
+    const header: ConversationHeader = {
+      id: 'paged-session',
+      organizationId: ORGANIZATION_ID,
+      creatorUserId: CREATOR_INTERNAL_ID,
+      projectId: PROJECT_INTERNAL_ID,
+      rootSessionId: 'paged-session',
+      visibility: 'project',
+      sessionFormatVersion: 0,
+      createdAt: CREATED_AT,
+      cwd: '/tmp/shared',
+    }
+    const readHeader = vi.fn(async () => header)
+    const revision = vi.fn(async () => '7:2')
+    const readPage = vi.fn(async () => ({
+      header,
+      events: [event],
+      revision: '7:2',
+      startSeq: 0,
+      endSeq: 0,
+      hasMore: false,
+      uncompressedBytes: 128,
+    }))
+    const conversations = runtime.deps.conversations as typeof runtime.deps.conversations & {
+      readHeader: typeof readHeader
+      revision: typeof revision
+      readPage: typeof readPage
+    }
+    conversations.readHeader = readHeader
+    conversations.revision = revision
+    conversations.readPage = readPage
+
+    const response = await request(runtime.handler, '/internal/runtime/session/page?sessionId=paged-session', {
+      method: 'GET', body: {},
+    })
+    expect(response).toMatchObject({
+      handled: true,
+      status: 200,
+      body: { header: { id: 'paged-session' }, events: [event], hasMore: false, uncompressedBytes: 128 },
+    })
+    expect(response.body).toMatchObject({ revision: `postgres:${ORGANIZATION_ID}:project:${String(PROJECT_ID)}:7:2` })
+    expect(readHeader).toHaveBeenCalledOnce()
+    expect(readPage).toHaveBeenCalledOnce()
+    expect(runtime.deps.conversations.load).not.toHaveBeenCalled()
+  })
+
+  it('maps malformed page query values to a protocol response', async () => {
+    const runtime = fixture()
+    const response = await request(runtime.handler, '/internal/runtime/session/page?sessionId=x&maxBytes=not-a-number', {
+      method: 'GET', body: {},
+    })
+    expect(response).toMatchObject({
+      handled: true,
+      status: 400,
+      body: { error: 'conversation-protocol', code: 'protocol' },
+    })
   })
 })
 

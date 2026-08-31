@@ -50,12 +50,15 @@ validate_release() {
   for required in \
     apps/cli/lib/bin.js \
     apps/web/dist/index.html \
-    gateway/src/index.ts \
+    gateway/lib/index.js \
+    gateway/lib/config.js \
+    gateway/lib/server.js \
+    gateway/lib/runtime-api.js \
     gateway/public/admin/index.html \
-    gateway/node_modules/tsx/package.json \
     gateway/node_modules/pg/package.json \
     gateway/node_modules/argon2/package.json \
     gateway/node_modules/better-sqlite3/package.json \
+    packages/llm/llm/lib/types/discovery.js \
     plugins/dsh-directory-guard/lib/index.js \
     plugins/dsh-directory-guard/cordis.patch.yml \
     plugins/dsh-model-governance/lib/index.js \
@@ -172,7 +175,7 @@ run_gateway() {
 
   cd "$release/gateway"
   printf '[gateway-launcher] starting release %s\n' "$(basename "$release")"
-  exec "$NODE" --import tsx/esm "$release/gateway/src/index.ts"
+  exec "$NODE" "$release/gateway/lib/index.js"
 }
 
 activate_release() {

@@ -32,7 +32,8 @@ interface ConversationAttachmentFace {
     mode: InputSubmitMode,
     signal?: AbortSignal,
   ): Promise<SubmitOutcome>
-  serializeDraftImages(imageIds: readonly DraftAttachmentId[]): Promise<readonly SubmitImageAttachment[]>
+  /** @param imageIds - draft-local image ids. @param signal - cancellation for byte encoding. */
+  serializeDraftImages(imageIds: readonly DraftAttachmentId[], signal?: AbortSignal): Promise<readonly SubmitImageAttachment[]>
   releaseDraftImage(id: DraftAttachmentId): void
   releaseDraftDocuments(sessionId: SessionId, ids: readonly DraftDocumentId[]): void
 }
@@ -83,7 +84,7 @@ export class InputHub implements SessionInputResolver {
         this.sink(session, text, imageIds, documentIds, mode, signal),
       steerQueue: () => { void this.steerQueue(session, shell) },
       commandImages: {
-        serialize: ids => this.conversation().serializeDraftImages(ids),
+        serialize: (ids, signal) => this.conversation().serializeDraftImages(ids, signal),
         // Asymmetric with serialize on purpose: release settles AFTER the
         // submit RPC, where session teardown may already have unloaded the
         // conversation service (the same tolerance as the scope disposer

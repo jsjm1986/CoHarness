@@ -6,6 +6,14 @@ import { useThrottledVisualUpdate } from './use-throttled-visual-update.ts'
 import a11yCss from './accessibility.module.css'
 import css from './ReasoningRow.module.css'
 
+/** Keep a live reasoning DOM node small; the durable event log retains every chunk. */
+const MAX_STREAMING_REASONING_RENDER_CHARS = 16 * 1024
+
+function renderText(text: string, running: boolean): string {
+  if (!running || text.length <= MAX_STREAMING_REASONING_RENDER_CHARS) return text
+  return `…${text.slice(-MAX_STREAMING_REASONING_RENDER_CHARS)}`
+}
+
 function firstLine(text: string): string {
   const visible = text.trimStart()
   const newline = visible.indexOf('\n')
@@ -28,7 +36,11 @@ function latestLine(text: string): string {
 export function ReasoningRow({ text, running, t }: { text: string; running: boolean; t: ChatViewSlotProps['t'] }) {
   const [expanded, setExpanded] = useState(false)
   const summaryRef = useRef<HTMLSpanElement>(null)
-  const summary = running ? latestLine(text) : firstLine(text)
+  // A long live reasoning stream is intentionally rendered as a bounded tail.
+  // This prevents each animation-frame commit from walking and diffing an
+  // ever-growing text node while preserving the newest reasoning and marker.
+  const visibleText = renderText(text, running)
+  const summary = running ? latestLine(visibleText) : firstLine(visibleText)
   const scheduleSummaryScroll = useThrottledVisualUpdate(() => {
     const element = summaryRef.current
     if (element === null) return
@@ -59,7 +71,7 @@ export function ReasoningRow({ text, running, t }: { text: string; running: bool
           </>
         )}
       >
-        <div className={css.thinkBody}>{text}</div>
+        <div className={css.thinkBody}>{visibleText}</div>
       </DisclosureRow>
     </div>
   )

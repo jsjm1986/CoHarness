@@ -8,7 +8,7 @@
 
 `historyPageTargetBytes` 接受正整数，并设置每个完整、未压缩的 history RPC `server-response` JSON 正文以 UTF-8 字节计的目标大小。默认值为 131072 字节。分页会保留完整的 append 来源消息组，因此一个不可分割的消息组可能超过该目标。Fetch 历史响应仍打包剩余的 `assistant/chunk` 游程，并往返 `detail: 'conversation'` 的可选 `omittedSpans`；下载档见 [两档会话历史传输决策](../../../.agents/notes/implemented/architecture/2026-08-18-conversation-history-tier.zh.md)。
 
-共享的一元载体默认通过 16 MiB 字节预算读取成功 JSON 响应；`AbstractApiClient` 与 `InProcessApiClient` 接受正数覆盖值，以便部署选择更小的上限。超限响应会在 envelope 解析前被拒绝。
+共享的一元载体默认通过 16 MiB 字节预算读取成功 JSON 响应；`AbstractApiClient` 与 `InProcessApiClient` 接受正数覆盖值，以便部署选择更小的上限。有界 reader 接受可选的 `AbortSignal`，调用方断开时会取消 response body。超限响应会在 envelope 解析前被拒绝。
 
 浏览器 connection 还会按需提供 Gateway 的账户偏好和项目 Provider 设置 transport。账户偏好请求使用同源、revision 校验和不含值的响应；项目模型请求覆盖项目 Provider 描述、加密凭据状态、端点发现和 mutation 应答，凭据值不会进入响应。不提供这些路由的 Host 会让 transport 保持缺失，调用方应显示明确的不可用状态，而不是回退到另一个账户的设置。
 
@@ -36,5 +36,6 @@ Host 按 `websocketHeartbeatIntervalMs`（默认 30 秒）向每条打开的下�
 
 ## 已知限制与暂缓事项
 
-- **History 会恢复未附加的会话**：打开 history 可能创建宿主侧 agent，并增加首次打开的延迟；没有仅从持久化读取的路径。
+- **History 可用性由 Host 决定**：该 carrier 只传输有界的 `session.history` 响应；部署能否在不恢复 Agent 的情况下读取冷日志，属于 Host 持久化提供方的职责。
 - **`/api` 桥把每个请求体整体缓冲在内存里**：`maxRequestBodyBytes`（默认 288 MiB，按默认 200 MiB 图片总量上限经 base64 膨胀加信封余量得出）因此同时是单请求的驻留内存上界；要降低它而不缩小图片限额，需要流式请求体路径。
+- 外层桥和内层 Fetch 解析器共用同一个 `maxRequestBodyBytes` 值，因此已准入的图片 envelope 不会再被较小的解析器默认值拒绝一次。

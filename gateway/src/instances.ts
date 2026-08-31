@@ -342,7 +342,14 @@ export class InstanceManager {
       this.adjustLeaseTotal(this.wsTotals, resolved, next - prior)
       // A close edge is activity too, but it must be ordered after the ref
       // change so the reaper cannot observe a stale count or timestamp.
-      await this.repository.touch(resolved, Date.now())
+      try {
+        await this.repository.touch(resolved, Date.now())
+      } catch (error: unknown) {
+        if (prior === 0) this.wsRefs.delete(key)
+        else this.wsRefs.set(key, prior)
+        this.adjustLeaseTotal(this.wsTotals, resolved, prior - next)
+        throw error
+      }
     })
   }
 
@@ -363,7 +370,14 @@ export class InstanceManager {
       if (next === 0) this.operationRefs.delete(key)
       else this.operationRefs.set(key, next)
       this.adjustLeaseTotal(this.operationTotals, resolved, next - prior)
-      await this.repository.touch(resolved, Date.now())
+      try {
+        await this.repository.touch(resolved, Date.now())
+      } catch (error: unknown) {
+        if (prior === 0) this.operationRefs.delete(key)
+        else this.operationRefs.set(key, prior)
+        this.adjustLeaseTotal(this.operationTotals, resolved, prior - next)
+        throw error
+      }
     })
   }
 
@@ -429,10 +443,37 @@ export class InstanceManager {
     return this.serialize(target, async () => {
       const port = await this.portOf(target)
       const proc = this.procs.get(targetKey(target))
-      if (await this.stateOf(target) === 'ready' && proc !== undefined
-        && (proc.isAlive !== undefined ? await proc.isAlive() : !proc.hasExited())) {
-        await this.beforeUse?.(subject)
-        return { port, generation: await this.repository.generationOf(target) }
+      if (await this.stateOf(target) === 'ready') {
+        let live = proc
+        if (live === undefined && this.launcher.attach !== undefined && this.launcher.instancesOutliveGateway) {
+          // Supervisor-owned runtimes survive a Gateway restart. Rebuild the
+          // process handle before deciding to launch a new generation; doing
+          // so preserves the runtime token and avoids needlessly restarting a
+          // healthy survivor.
+          try {
+            live = this.launcher.attach(await this.launchContext(subject))
+            this.procs.set(targetKey(target), live)
+          } catch (error: unknown) {
+            // A stale systemd unit or a transient supervisor lookup failure
+            // must not strand a ready row. Treat the handle as unavailable and
+            // let the normal start path establish a fresh generation.
+            console.error(`[gateway] failed to re-attach ${targetKey(target)} survivor:`, error)
+            live = undefined
+          }
+        }
+        let alive = false
+        if (live !== undefined) {
+          try {
+            alive = live.isAlive !== undefined ? await live.isAlive() : !live.hasExited()
+          } catch (error: unknown) {
+            console.error(`[gateway] survivor liveness probe failed for ${targetKey(target)}:`, error)
+          }
+        }
+        if (alive) {
+          await this.beforeUse?.(subject)
+          return { port, generation: await this.repository.generationOf(target) }
+        }
+        this.procs.delete(targetKey(target))
       }
       return this.start(await this.launchContext(subject), port)
     })

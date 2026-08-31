@@ -11,7 +11,7 @@
 - `request()` 只接受凭据 loopback origin 上的绝对 `/internal/runtime/` 路径，加入私有 bearer token，并且只在调用方明确要求时转发浏览器 principal。
 - 私有 `/api/internal/gateway/readiness` 端点只接受 nonce、由启动 token 和精确运行时身份派生的 HMAC，并返回匹配的响应证明；运行时端口上的任意监听器都不能满足 Gateway 的就绪检查。
 - 凭据和 principal 断言在各自的解析与请求边界失败关闭。运行时 bearer token 不会通过公开服务字段暴露。
-- 读取私有 JSON 响应的 Consumer 使用带领域上限的 `readGatewayResponseJson()`（或字节级配套函数）；分块 body 超过上限时会被取消，因此保护不只依赖 `Content-Length`。
+- 读取私有 JSON 响应的 Consumer 使用带领域上限和可选 `AbortSignal` 的 `readGatewayResponseJson()`（或字节级配套函数）；分块 body 超过上限或收到取消信号时会被取消，因此保护不只依赖 `Content-Length`。
 
 ## 模型体验
 
@@ -25,4 +25,4 @@
 
 - **仅限 Gateway 启动的运行时** — 未提供有效私有启动凭据时加载插件会导致启动失败。
 - **请求局部 principal** — `current()` 在认证 HTTP 或 WebSocket 操作之外不可用；生命周期超过分发过程的消费者必须捕获已验证 principal 或派生 authority。
-- **短期断言** — Gateway 的交付默认值把 `HGW_PRINCIPAL_ASSERTION_TTL_MS` 设为 30 秒。已验证 principal 会固定其项目 scope 模式直到 `expiresAt`；Session 消费方必须使用 `ctx.collaboration` 取得当前成员身份与 ACL 决定。Host 与 Typert stream 会在过期时关闭，而此包不会在已有连接内刷新断言。
+- **短期断言** — Gateway 的交付默认值把 `HGW_PRINCIPAL_ASSERTION_TTL_MS` 设为 30 秒。已验证 principal 会固定其项目 scope 模式直到 `expiresAt`；Session 消费方必须使用 `ctx.collaboration` 取得当前成员身份与 ACL 决定。连接内无感 principal 续期以及长连接过期 watchdog 仍是部署后续工作；当前客户端会在 carrier generation 结束时重连。

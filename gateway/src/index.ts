@@ -52,6 +52,7 @@ import { PostgresDocumentCatalogService } from './postgres/document-catalog-serv
 import { runtimeDirectoryGrants } from './runtime-directory-grants.ts'
 import { createGatewayServer, type GatewayDeps } from './server.ts'
 import { createUsageIntakeServer } from './usage-intake.ts'
+import { removeBootstrapAdminPassword, writeBootstrapAdminPassword } from './bootstrap-admin.ts'
 
 function archiveReadPayload(value: unknown): ConversationArchiveRuntimeRead {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -147,6 +148,12 @@ const launcher = selectLauncher(cfg, () => ({
     projectPathRoots: cfg.projectPathRoots,
     execStart: cfg.dshCommand,
     gatewayDir: cfg.gatewayDir,
+    inaccessiblePaths: [
+      cfg.runtimeCredentialDir,
+      cfg.principalKeyDir,
+      cfg.organizationModelCredentialKeyFile,
+      cfg.bootstrapAdminPasswordFile,
+    ],
     memoryMax: cfg.memoryMax,
     cpuQuota: cfg.cpuQuota,
   },
@@ -238,13 +245,22 @@ const deps: GatewayDeps = {
   archives,
   push,
   instances,
-  readiness: () => checkPostgresReadiness(context),
+  readiness: signal => checkPostgresReadiness(context, signal),
 }
 
 if (await deps.users.count() === 0) {
   const password = randomBytes(12).toString('base64url')
-  await deps.users.create({ username: 'admin', password, role: 'admin' })
-  console.log(`[gateway] bootstrap admin created — username: admin  password: ${password}`)
+  await writeBootstrapAdminPassword(cfg.bootstrapAdminPasswordFile, password)
+  try {
+    await deps.users.create({ username: 'admin', password, role: 'admin' })
+  } catch (error: unknown) {
+    await removeBootstrapAdminPassword(cfg.bootstrapAdminPasswordFile).catch(() => {
+      // Preserve the user-creation failure; a stale file is surfaced on the
+      // next bootstrap attempt instead of hiding the original database error.
+    })
+    throw error
+  }
+  console.log(`[gateway] bootstrap admin created — username: admin; password written to owner-only file ${cfg.bootstrapAdminPasswordFile}`)
   console.log('[gateway] 首次登录后会强制修改密码。')
 }
 
@@ -265,6 +281,21 @@ const documentAdmin = createGatewayDocumentAdminHandler({
 })
 const server = createGatewayServer(deps, {
   ...proxyHandlers,
+  // Authenticate loopback runtime calls before the Gateway starts buffering
+  // their body. The runtime handler repeats the check at dispatch time; this
+  // early probe is deliberately narrow and exists to turn unauthenticated
+  // large-body requests into a cheap 401 instead of a 64 MiB allocation.
+  runtimeAuthorize: async (req) => {
+    const value = req.headers.authorization
+    if (typeof value !== 'string' || !value.startsWith('Bearer ')) return false
+    const token = value.slice('Bearer '.length)
+    if (token === '') return false
+    try {
+      return await instanceRepository.authenticateRuntimeToken(token) !== null
+    } catch {
+      return false
+    }
+  },
   documentTransferList: createGatewayDocumentTransferListHandler({
     instances: deps.instances,
     users,
@@ -388,22 +419,44 @@ intake.listen(cfg.intakePort, '127.0.0.1', () => {
   console.log(`[gateway] usage intake listening on http://127.0.0.1:${cfg.intakePort}`)
 })
 
-const reaper = setInterval(() => {
-  void Promise.resolve(deps.instances.reapIdle()).catch(error => {
-    console.error('[gateway] idle reaper failed:', error)
-  })
-}, 60_000)
-const archiveRetentionSweep = setInterval(() => {
-  void archives.purgeDue().catch(error => {
-    console.error('[gateway] archive retention sweep failed:', error)
-  })
-}, 60 * 60_000)
+interface SingleFlightTask {
+  run: () => void
+  wait: () => Promise<void>
+}
+
+/** Keep periodic maintenance from overlapping itself during a slow database sweep. */
+function singleFlightTask(label: string, operation: () => Promise<void>): SingleFlightTask {
+  let inFlight: Promise<void> | undefined
+  const run = (): void => {
+    if (inFlight !== undefined) return
+    const current = Promise.resolve()
+      .then(operation)
+      .catch(error => { console.error(`[gateway] ${label} failed:`, error) })
+      .finally(() => {
+        if (inFlight === current) inFlight = undefined
+      })
+    inFlight = current
+  }
+  return {
+    run,
+    wait: () => inFlight ?? Promise.resolve(),
+  }
+}
+
+const reaperTask = singleFlightTask('idle reaper', async () => {
+  await deps.instances.reapIdle()
+})
+const archiveRetentionTask = singleFlightTask('archive retention sweep', async () => {
+  await archives.purgeDue()
+})
+const documentRetentionTask = singleFlightTask('document retention sweep', async () => {
+  await documentCatalog.purgeDue?.()
+})
+const reaper = setInterval(reaperTask.run, 60_000)
+const archiveRetentionSweep = setInterval(archiveRetentionTask.run, 60 * 60_000)
+const documentRetentionSweep = setInterval(documentRetentionTask.run, 60 * 60_000)
+reaper.unref()
 archiveRetentionSweep.unref()
-const documentRetentionSweep = setInterval(() => {
-  void Promise.resolve(documentCatalog.purgeDue?.()).catch(error => {
-    console.error('[gateway] document retention sweep failed:', error)
-  })
-}, 60 * 60_000)
 documentRetentionSweep.unref()
 
 const CONNECTION_DRAIN_MS = 3000
@@ -435,6 +488,11 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
   clearInterval(archiveRetentionSweep)
   clearInterval(documentRetentionSweep)
   try {
+    await Promise.all([
+      reaperTask.wait(),
+      archiveRetentionTask.wait(),
+      documentRetentionTask.wait(),
+    ])
     proxyHandlers.close()
     await Promise.all([closeListeningServer(server), closeListeningServer(intake)])
     await deps.instances.stopAll()

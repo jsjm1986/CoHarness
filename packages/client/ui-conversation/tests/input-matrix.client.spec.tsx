@@ -186,7 +186,7 @@ describe('matrix row: claimed with images', () => {
     act(() => { shell.addImages([img]) })
     fireEvent.keyDown(textarea, { key: 'Enter' })
     await vi.waitFor(() => { expect(submit).toHaveBeenCalledWith('', SCTX, [png]) })
-    expect(serialize).toHaveBeenCalledWith([img])
+    expect(serialize).toHaveBeenCalledWith([img], expect.any(AbortSignal))
     await vi.waitFor(() => { expect((textarea).value).toBe('') })
     expect(release).toHaveBeenCalledWith([img])
     expect(shell.snapshot.imageIds).toEqual([])

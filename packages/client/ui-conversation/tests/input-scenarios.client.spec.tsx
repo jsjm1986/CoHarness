@@ -281,7 +281,7 @@ describe('scenario: images ride an accepting command through the real pipeline',
     await vi.waitFor(() => { expect(b.execute).toHaveBeenCalledWith('/vision 这张图是什么', [PNG]) })
     // The envelope the controller forwarded to matchEnter carried the count.
     expect(b.envelopes).toEqual([{ images: 1 }])
-    expect(b.serialize).toHaveBeenCalledWith(['img-1'])
+    expect(b.serialize).toHaveBeenCalledWith(['img-1'], expect.any(AbortSignal))
     await vi.waitFor(() => { expect(b.textarea.value).toBe('') })
     expect(b.release).toHaveBeenCalledWith(['img-1'])
     expect(b.shell.snapshot.imageIds).toEqual([])

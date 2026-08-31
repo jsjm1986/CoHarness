@@ -912,6 +912,40 @@ describe('connected generation', () => {
     })
     expect(manager.getListSnapshot().currentAddress).toEqual(address)
   })
+
+  it('admits at most four reconnect history rebuilds and starts the selected session first', async () => {
+    const api = new FakeApiClient()
+    api.onHistory = () => Promise.resolve(ok({ events: [], hasMore: false }))
+    const ids = Array.from({ length: 6 }, (_value, index) => `fk-resync-${String(index)}` as SessionId)
+    const selected = ids.at(-1)!
+    const manager = new SessionManager(api, fakeRemote(), selected)
+    for (const id of ids) await manager.get(id).open()
+
+    const gates = new Map<SessionId, ReturnType<typeof deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>>>()
+    const started: SessionId[] = []
+    let active = 0
+    let maximum = 0
+    api.onHistory = (payload) => {
+      const id = payload.sessionId
+      const gate = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()
+      gates.set(id, gate)
+      started.push(id)
+      active++
+      maximum = Math.max(maximum, active)
+      return gate.promise.finally(() => { active-- })
+    }
+
+    manager.handleConnected()
+    await vi.waitFor(() => { expect(started).toHaveLength(4) })
+    expect(started[0]).toBe(selected)
+    expect(maximum).toBe(4)
+
+    for (const id of started.slice(0, 4)) gates.get(id)?.resolve(ok({ events: [], hasMore: false }))
+    await vi.waitFor(() => { expect(started).toHaveLength(6) })
+    for (const id of started.slice(4)) gates.get(id)?.resolve(ok({ events: [], hasMore: false }))
+    await vi.waitFor(() => { expect(active).toBe(0) })
+    expect(maximum).toBe(4)
+  })
 })
 
 describe('pending-interaction list status', () => {

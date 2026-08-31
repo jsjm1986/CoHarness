@@ -2,6 +2,7 @@
 
 import z from '@deepseek-ai/schemastery'
 import { resolvePwshPath } from '@deepseek-ai/dsh-pwsh-local'
+import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 
 /** One supported interactive shell dialect. */
 export type ShellDialect = 'bash' | 'pwsh'
@@ -111,6 +112,11 @@ export function validateConfig(config: Config): asserts config is ResolvedConfig
   for (const [name, value] of Object.entries(resolved)) {
     if (typeof value === 'number' && (!Number.isSafeInteger(value) || value <= 0)) {
       throw new Error(`terminal-bash: ${name} must be a positive safe integer`)
+    }
+    if (typeof value === 'number' && value > MAX_TIMER_DELAY_MS
+      && (name === 'pollIntervalMs' || name === 'exactProbeAfterMs' || name === 'idleSilenceMs'
+        || name === 'handoffGraceMs' || name === 'timeoutMs' || name === 'disposeGraceMs')) {
+      throw new Error(`terminal-bash: ${name} must be no greater than ${MAX_TIMER_DELAY_MS}`)
     }
   }
   if (resolved.maxReadBytes > resolved.scrollbackMaxBytes) {

@@ -7,6 +7,8 @@
  */
 
 import { Context, Service } from '@deepseek-ai/cordis'
+import z from '@deepseek-ai/schemastery'
+import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import type {
   GenerateOptions,
   LlmConfigurableProvider,
@@ -265,20 +267,36 @@ export interface DirectoryRegistrationHandle {
   replace(entries: readonly LlmConfigurableProvider[]): void
 }
 
+/** Runtime controls for bounded adapter-stream teardown. */
+export interface LlmRuntimeConfig {
+  /** Maximum time to await an adapter iterator's `return()` during teardown. */
+  streamCloseTimeoutMs?: number
+}
+
 /**
  * The abstract `llm` service: an adapter registry plus a streaming model-call
  * API, interceptable via the `llm/stream` waterfall.
  */
 export class LlmRuntime extends Service {
+  static Config: z<LlmRuntimeConfig> = z.object({
+    streamCloseTimeoutMs: z.number().step(1).min(1).max(MAX_TIMER_DELAY_MS).default(1_000),
+  })
+
   private adapters = new Map<string, AdapterRegistration>()
   private directory = new Map<string, LlmConfigurableProvider>()
   private discoveries = new Map<
     string,
     (request: LlmModelDiscoveryRequest) => Promise<readonly LlmDiscoveredModel[]>
   >()
+  private readonly streamCloseTimeoutMs: number
 
-  constructor(ctx: Context) {
+  constructor(ctx: Context, config: LlmRuntimeConfig = {}) {
     super(ctx, 'llm')
+    const timeout = config.streamCloseTimeoutMs ?? 1_000
+    if (!Number.isSafeInteger(timeout) || timeout <= 0 || timeout > MAX_TIMER_DELAY_MS) {
+      throw new Error(`llm: streamCloseTimeoutMs must be a positive safe integer no greater than ${MAX_TIMER_DELAY_MS}`)
+    }
+    this.streamCloseTimeoutMs = timeout
   }
 
   /** Notify topology observers without letting one broken listener veto the commit. */
@@ -542,7 +560,7 @@ export class LlmRuntime extends Service {
         ...model.contextWindow === undefined ? {} : { contextWindow: model.contextWindow },
         ...model.maxTokens === undefined ? {} : { maxTokens: model.maxTokens },
         ...model.inputModalities === undefined ? {} : {
-          inputModalities: this.detachedModalities(model.inputModalities) ?? [],
+          inputModalities: [...model.inputModalities],
         },
       })
     }
@@ -922,12 +940,16 @@ export class LlmRuntime extends Service {
       while (true) {
         let item: { done: true } | { done: false; value: StreamChunk }
         try {
-          const next = await iterator.next()
+          const next = await nextWithSignal(iterator, options.signal)
           item = next.done
             ? { done: true }
             : { done: false, value: next.value }
         } catch (error: unknown) {
-          completed = true
+          // A transport/adapter rejection is its terminal outcome: do not even
+          // read a potentially hostile `return` getter after iteration fails.
+          // Caller cancellation is different — `nextWithSignal` may have won a
+          // race while the adapter still owns an outstanding read, so close it.
+          completed = options.signal?.aborted !== true
           yield adapterFailureChunk(error, options.signal)
           return
         }
@@ -942,7 +964,7 @@ export class LlmRuntime extends Service {
     } finally {
       if (!completed) {
         const close = iterator.return?.bind(iterator)
-        if (close) await close()
+        if (close) await closeWithDeadline(close, this.streamCloseTimeoutMs)
       }
     }
   }
@@ -986,6 +1008,84 @@ function adapterFailureChunk(error: unknown, signal?: AbortSignal): StreamChunk 
     reason: signal?.aborted || failure.code === 'ABORTED'
       ? { kind: 'aborted', failure }
       : { kind: 'error', failure },
+  }
+}
+
+/** Convert a signal's arbitrary reason into an Error for the stream boundary. */
+function abortError(signal: AbortSignal): LlmError {
+  const reason: unknown = signal.reason
+  const message = reason instanceof Error && reason.message !== ''
+    ? reason.message
+    : typeof reason === 'string' && reason !== ''
+      ? reason
+      : 'LLM stream aborted by caller.'
+  return new LlmError(message, 'ABORTED', { cause: reason })
+}
+
+/** Await one adapter demand while allowing caller cancellation to win the read. */
+async function nextWithSignal<T>(
+  iterator: AsyncIterator<T>,
+  signal: AbortSignal | undefined,
+): Promise<IteratorResult<T>> {
+  if (signal?.aborted) throw abortError(signal)
+  const next = Promise.resolve().then(() => {
+    // Abort may arrive between the synchronous check and this microtask. Do
+    // not invoke an adapter demand after that point; it can allocate or start
+    // provider work that the caller has already abandoned.
+    /* v8 ignore next -- this microtask race is covered by the outer abort
+       race; a caller can cancel before the scheduled adapter demand runs. */
+    if (signal?.aborted) throw abortError(signal)
+    return iterator.next()
+  })
+  if (signal === undefined) return next
+  return new Promise<IteratorResult<T>>((resolve, reject) => {
+    let settled = false
+    const finish = (): boolean => {
+      if (settled) return false
+      settled = true
+      signal.removeEventListener('abort', onAbort)
+      return true
+    }
+    const onAbort = (): void => {
+      /* v8 ignore next -- the abort listener is removed when the first next() settlement wins. */
+      if (finish()) reject(abortError(signal))
+    }
+    signal.addEventListener('abort', onAbort, { once: true })
+    // A signal can fire between the initial check and listener installation;
+    // AbortSignal does not replay that event for late listeners.
+    if (signal.aborted) onAbort()
+    void next.then(
+      (value) => {
+        /* v8 ignore next -- an adapter resolving after cancellation has no consumer left. */
+        if (finish()) resolve(value)
+      },
+      (error: unknown) => {
+        if (finish()) {
+          reject(error instanceof Error
+            ? error
+            : new Error('LLM adapter next() rejected with a non-Error value.', { cause: error }))
+        }
+      },
+    )
+  })
+}
+
+/** Await iterator cleanup without allowing a broken adapter to hang disposal. */
+async function closeWithDeadline(close: () => Promise<unknown> | void, timeoutMs: number): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      reject(new LlmError(`adapter stream cleanup exceeded ${String(timeoutMs)}ms`, 'ADAPTER_CLOSE_TIMEOUT'))
+    }, timeoutMs)
+  })
+  try {
+    await Promise.race([
+      Promise.resolve().then(close),
+      timeout,
+    ])
+  } finally {
+    /* v8 ignore next -- setTimeout always returns a timer handle in supported runtimes. */
+    if (timer !== undefined) clearTimeout(timer)
   }
 }
 

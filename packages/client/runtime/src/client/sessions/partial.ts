@@ -3,8 +3,200 @@
 // block-level immutability (a delta only swaps that block's reference).
 
 import type { StreamChunk } from '@deepseek-ai/dsh-llm/types'
+import type { ContentBlock } from '@deepseek-ai/dsh-llm/types'
 import type { AssistantBlock, PartialAssistant } from './conversation.ts'
 import { sanitizeAssistantText, toAssistantBlock } from './conversation.ts'
+
+interface TextSlot {
+  readonly mutable: true
+  readonly kind: 'text'
+  rawText: string
+  version: number
+  snapshotVersion: number
+  snapshot?: AssistantBlock
+}
+
+interface ReasoningSlot {
+  readonly mutable: true
+  readonly kind: 'reasoning'
+  text: string
+  version: number
+  snapshotVersion: number
+  snapshot?: AssistantBlock
+}
+
+interface ToolCallSlot {
+  readonly mutable: true
+  readonly kind: 'tool-call'
+  callId: string
+  name: string
+  argumentsText: string
+  version: number
+  snapshotVersion: number
+  snapshot?: AssistantBlock
+}
+
+interface OtherSlot {
+  readonly mutable: true
+  readonly kind: 'other'
+  readonly block: unknown
+  version: number
+  snapshotVersion: number
+  snapshot?: AssistantBlock
+}
+
+type MutableSlot = TextSlot | ReasoningSlot | ToolCallSlot | OtherSlot
+type Slot = AssistantBlock | MutableSlot | undefined
+
+function isMutableSlot(value: AssistantBlock | MutableSlot): value is MutableSlot {
+  return 'mutable' in value
+}
+
+function newSlot(blockType: string): MutableSlot {
+  switch (blockType) {
+    case 'text': return { mutable: true, kind: 'text', rawText: '', version: 0, snapshotVersion: -1 }
+    case 'reasoning': return { mutable: true, kind: 'reasoning', text: '', version: 0, snapshotVersion: -1 }
+    case 'tool-call': return {
+      mutable: true, kind: 'tool-call', callId: '', name: '', argumentsText: '', version: 0, snapshotVersion: -1,
+    }
+    default: return { mutable: true, kind: 'other', block: null, version: 0, snapshotVersion: -1 }
+  }
+}
+
+function materializeSlot(value: AssistantBlock | MutableSlot): AssistantBlock {
+  if (!isMutableSlot(value)) return value
+  if (value.snapshot !== undefined && value.snapshotVersion === value.version) return value.snapshot
+  let snapshot: AssistantBlock
+  switch (value.kind) {
+    case 'text': snapshot = { kind: 'text', text: sanitizeAssistantText(value.rawText) }; break
+    case 'reasoning': snapshot = { kind: 'reasoning', text: value.text }; break
+    case 'tool-call': snapshot = {
+      kind: 'tool-call', callId: value.callId, name: value.name, argsRaw: value.argumentsText,
+    }; break
+    case 'other': snapshot = { kind: 'other', block: value.block }; break
+  }
+  value.snapshot = snapshot
+  value.snapshotVersion = value.version
+  return snapshot
+}
+
+/**
+ * Incremental assistant block accumulator shared by Chat, Trajectory, and
+ * partial-stream consumers. Delta admission is constant work; text is joined
+ * and sanitized only when a consumer requests a published snapshot.
+ */
+export class IncrementalAssistantBlocks {
+  private slots: Slot[]
+  private dirty: boolean
+  private value: AssistantBlock[]
+
+  /** @param initialBlocks - materialized blocks already present in the window. */
+  constructor(initialBlocks: readonly AssistantBlock[] = []) {
+    this.slots = [...initialBlocks]
+    this.value = [...initialBlocks]
+    this.dirty = false
+  }
+
+  /**
+   * Start one sparse block slot.
+   * @param index - stream block index.
+   * @param blockType - provider block type.
+   */
+  start(index: number, blockType: string): void {
+    this.slots[index] = newSlot(blockType)
+    this.dirty = true
+  }
+
+  /**
+   * Append one text delta without copying the accumulated prefix.
+   * @param index - stream block index.
+   * @param text - delta text.
+   */
+  textDelta(index: number, text: string): void {
+    const previous = this.slots[index]
+    const slot = previous !== undefined && isMutableSlot(previous) && previous.kind === 'text'
+      ? previous
+      : newSlot('text') as TextSlot
+    if (previous?.kind === 'text' && !isMutableSlot(previous)) slot.rawText = previous.text
+    slot.rawText += text
+    slot.version++
+    this.slots[index] = slot
+    this.dirty = true
+  }
+
+  /**
+   * Append one reasoning delta without copying the accumulated prefix.
+   * @param index - stream block index.
+   * @param text - delta text.
+   */
+  reasoningDelta(index: number, text: string): void {
+    const previous = this.slots[index]
+    const slot = previous !== undefined && isMutableSlot(previous) && previous.kind === 'reasoning'
+      ? previous
+      : newSlot('reasoning') as ReasoningSlot
+    if (previous?.kind === 'reasoning' && !isMutableSlot(previous)) slot.text = previous.text
+    slot.text += text
+    slot.version++
+    this.slots[index] = slot
+    this.dirty = true
+  }
+
+  /**
+   * Append one tool-call argument delta without copying the argument prefix.
+   * @param index - stream block index.
+   * @param id - provider tool-call id.
+   * @param name - optional tool name update.
+   * @param argumentsDelta - raw JSON argument fragment.
+   */
+  toolCallDelta(index: number, id: string, name: string | undefined, argumentsDelta: string): void {
+    const previous = this.slots[index]
+    const slot = previous !== undefined && isMutableSlot(previous) && previous.kind === 'tool-call'
+      ? previous
+      : newSlot('tool-call') as ToolCallSlot
+    if (previous?.kind === 'tool-call' && !isMutableSlot(previous)) {
+      slot.callId = previous.callId
+      slot.name = previous.name
+      slot.argumentsText = previous.argsRaw
+    }
+    if (slot.callId === '') slot.callId = id
+    if (name !== undefined) slot.name = name
+    slot.argumentsText += argumentsDelta
+    slot.version++
+    this.slots[index] = slot
+    this.dirty = true
+  }
+
+  /**
+   * Set one completed provider block.
+   * @param index - stream block index.
+   * @param block - completed provider content block.
+   */
+  end(index: number, block: ContentBlock): void {
+    this.slots[index] = toAssistantBlock(block)
+    this.dirty = true
+  }
+
+  /**
+   * Replace the complete accumulator with finalized blocks.
+   * @param blocks - finalized UI blocks.
+   */
+  replace(blocks: readonly AssistantBlock[]): void {
+    this.slots = [...blocks]
+    this.value = [...blocks]
+    this.dirty = false
+  }
+
+  /**
+   * Materialize a stable snapshot, joining only slots changed since the last call.
+   * @returns the current immutable block array.
+   */
+  snapshot(): AssistantBlock[] {
+    if (!this.dirty) return this.value
+    this.value = this.slots.flatMap(slot => slot === undefined ? [] : [materializeSlot(slot)])
+    this.dirty = false
+    return this.value
+  }
+}
 
 /**
  * Whether a stream chunk changes the partial assistant projection shown by the UI.
@@ -21,9 +213,7 @@ export function isVisibleAssistantChunk(type: string): boolean {
 
 /** assistant/chunk accumulator: folds StreamChunks into AssistantBlock[] with block-level immutability. */
 export class PartialAccumulator {
-  // Sparse on purpose: block-start may arrive out of order, leaving holes until compaction.
-  private blocks: (AssistantBlock | undefined)[] = []
-  private rawText = new Map<number, string>()
+  private readonly accumulator: IncrementalAssistantBlocks
   private changed = true
   private snapshot: PartialAssistant
 
@@ -37,8 +227,8 @@ export class PartialAccumulator {
     readonly step: number,
     initialBlocks: readonly AssistantBlock[] = [],
   ) {
-    this.blocks = [...initialBlocks]
-    this.snapshot = { turn, step, blocks: initialBlocks }
+    this.accumulator = new IncrementalAssistantBlocks(initialBlocks)
+    this.snapshot = { turn, step, blocks: [...initialBlocks] }
   }
 
   /**
@@ -49,40 +239,27 @@ export class PartialAccumulator {
   push(chunk: StreamChunk): boolean {
     switch (chunk.type) {
       case 'block-start': {
-        this.blocks[chunk.index] = emptyAssistantBlock(chunk.blockType)
-        if (chunk.blockType === 'text') this.rawText.set(chunk.index, '')
+        this.accumulator.start(chunk.index, chunk.blockType)
         this.changed = true
         return true
       }
       case 'text-delta': {
-        const prev = this.blocks[chunk.index]
-        const raw = (this.rawText.get(chunk.index) ?? (prev?.kind === 'text' ? prev.text : '')) + chunk.text
-        this.rawText.set(chunk.index, raw)
-        this.blocks[chunk.index] = { kind: 'text', text: sanitizeAssistantText(raw) }
+        this.accumulator.textDelta(chunk.index, chunk.text)
         this.changed = true
         return true
       }
       case 'reasoning-delta': {
-        const prev = this.blocks[chunk.index]
-        this.blocks[chunk.index] = { kind: 'reasoning', text: (prev?.kind === 'reasoning' ? prev.text : '') + chunk.text }
+        this.accumulator.reasoningDelta(chunk.index, chunk.text)
         this.changed = true
         return true
       }
       case 'tool-call-delta': {
-        const prev = this.blocks[chunk.index]
-        const base = prev?.kind === 'tool-call' ? prev : { kind: 'tool-call' as const, callId: '', name: '', argsRaw: '' }
-        this.blocks[chunk.index] = {
-          kind: 'tool-call',
-          callId: base.callId || String(chunk.id),
-          name: chunk.name ?? base.name,
-          argsRaw: base.argsRaw + chunk.argumentsDelta,
-        }
+        this.accumulator.toolCallDelta(chunk.index, String(chunk.id), chunk.name, chunk.argumentsDelta)
         this.changed = true
         return true
       }
       case 'block-end': {
-        this.blocks[chunk.index] = toAssistantBlock(chunk.block)
-        if (chunk.block.type === 'text') this.rawText.delete(chunk.index)
+        this.accumulator.end(chunk.index, chunk.block)
         this.changed = true
         return true
       }
@@ -99,8 +276,7 @@ export class PartialAccumulator {
    */
   toPartial(): PartialAssistant {
     if (this.changed) {
-      // Compact sparse indexes (out-of-order block-start) into render order.
-      this.snapshot = { turn: this.turn, step: this.step, blocks: this.blocks.filter((b): b is AssistantBlock => b !== undefined) }
+      this.snapshot = { turn: this.turn, step: this.step, blocks: this.accumulator.snapshot() }
       this.changed = false
     }
     return this.snapshot

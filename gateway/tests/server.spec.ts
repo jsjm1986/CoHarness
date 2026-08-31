@@ -218,6 +218,7 @@ describe('gateway server', () => {
   it('uses the runtime API body limit and returns JSON 413 before dispatch', async () => {
     const received: string[] = []
     const { base } = await setup({ HGW_RUNTIME_API_BODY_LIMIT_BYTES: '16' }, {
+      runtimeAuthorize: async () => true,
       runtime: async (_req, res, _pathname, body) => {
         received.push(body)
         res.writeHead(200, { 'content-type': 'application/json' })
@@ -232,6 +233,25 @@ describe('gateway server', () => {
     expect(rejected.headers.get('content-type')).toBe('application/json')
     expect(await rejected.json()).toEqual({ error: 'runtime-request-too-large' })
     expect(received).toEqual(['1234567890123456'])
+  })
+
+  it('rejects an unauthenticated runtime request before reading its body', async () => {
+    const authorize = vi.fn(async () => false)
+    const runtime = vi.fn(async () => true)
+    const { base } = await setup({ HGW_RUNTIME_API_BODY_LIMIT_BYTES: '16' }, {
+      runtimeAuthorize: authorize,
+      runtime,
+    })
+
+    const response = await fetch(`${base}/internal/runtime/test`, {
+      method: 'POST',
+      body: '12345678901234567',
+    })
+
+    expect(response.status).toBe(401)
+    expect(await response.json()).toEqual({ error: 'invalid-runtime-token' })
+    expect(authorize).toHaveBeenCalledOnce()
+    expect(runtime).not.toHaveBeenCalled()
   })
 
   it('logs in, enforces csrf origin, logs out', async () => {

@@ -385,6 +385,16 @@ abstract inspect(id: SessionId, signal?: AbortSignal): Promise<SessionInspection
 abstract readFrom(id: SessionId, fromSeq: number, signal?: AbortSignal): Promise<{ meta: SessionHeader; events: SessionEvent[] }>
 
 /**
+ * Read one session header without loading its event log. First-party
+ * providers override this with an indexed lookup; the default filters the
+ * lightweight snapshot list for third-party compatibility.
+ * @param id - persisted session to observe.
+ * @param signal - optional cancellation for backend lookup work.
+ * @returns the immutable header, or undefined when the session is absent.
+ */
+async readHeader(id: SessionId, signal?: AbortSignal): Promise<SessionHeader | undefined>
+
+/**
  * Lightweight listing from metadata, without a full-log parse.
  * @param signal - optional cancellation for backend listing work.
  * @returns one header per materialized session.
@@ -400,6 +410,26 @@ abstract list(signal?: AbortSignal): Promise<SessionHeader[]>
  * @returns the current source-qualified revision, or undefined when absent.
  */
 async revision(id: SessionId, signal?: AbortSignal): Promise<SessionPersistenceRevision | undefined>
+
+/**
+ * Read one lightweight source revision. This named alias keeps callers from
+ * accidentally choosing a full-log operation when they only need freshness.
+ * @param id - persisted session to observe.
+ * @param signal - optional cancellation for backend lookup work.
+ * @returns the current revision, or undefined when the session is absent.
+ */
+async readRevision(id: SessionId, signal?: AbortSignal): Promise<SessionPersistenceRevision | undefined>
+
+/**
+ * Read a bounded event-log page. Third-party providers inherit a safe
+ * compatibility fallback through {@link readFrom}; seek-capable providers
+ * override this method so source acquisition remains bounded.
+ * @param id - persisted session to read.
+ * @param request - revision-aware page request.
+ * @param signal - optional cancellation for backend read work.
+ * @returns one immutable page and a continuation cursor.
+ */
+async readPage( id: SessionId, request: SessionPersistencePageRequest = {}, signal?: AbortSignal, ): Promise<SessionPersistencePage>
 
 /**
  * List materialized sessions with cheap per-log change tokens.
@@ -437,5 +467,5 @@ releaseDraft(_request: SessionDraftReservationRequest): Promise<void>
 
 Types: [Session](session.zh.md) · [SessionEvent](session.zh.md) · [SessionId](core.zh.md)
 
-Source: [`packages/session/session-persistence/src/index.ts:127`](../../packages/session/session-persistence/src/index.ts)
+Source: [`packages/session/session-persistence/src/index.ts:164`](../../packages/session/session-persistence/src/index.ts)
 <!-- END GENERATED cordis-surface -->

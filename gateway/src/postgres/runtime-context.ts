@@ -40,11 +40,13 @@ export async function resolvePostgresRuntimeContext(
 }
 
 /** Verify that PostgreSQL and the configured organization/node remain ready. */
-export async function checkPostgresReadiness(context: PostgresRuntimeContext): Promise<void> {
+export async function checkPostgresReadiness(context: PostgresRuntimeContext, signal?: AbortSignal): Promise<void> {
+  signal?.throwIfAborted()
   const result = await context.pool.query(`SELECT 1 FROM harness.organizations o
     JOIN harness.compute_nodes n ON n.organization_id=o.id
     WHERE o.id=$1 AND o.status='active' AND n.id=$2 AND n.status='active'`,
   [context.organizationId, context.nodeId])
+  signal?.throwIfAborted()
   if (result.rowCount !== 1) throw new Error('PostgreSQL organization or compute node is not active')
 }
 

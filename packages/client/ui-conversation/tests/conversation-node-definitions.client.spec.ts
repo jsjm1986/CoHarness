@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type {
   ChatConversationViewNode, ChatSnapshot, ConversationEventInput,
-  ConversationNodeDefinition, ConversationViewDefinition,
+  ConversationMatch, ConversationNodeDefinition, ConversationViewDefinition,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { ConversationNodeAssembler } from '@deepseek-ai/dsh-client-runtime/client'
 import { assistantDefinition } from '../src/client/conversation-nodes/assistant.ts'
@@ -72,6 +72,14 @@ function at(
   }
 }
 
+function match(input: ConversationEventInput): ConversationMatch {
+  return {
+    ...input,
+    role: 'update',
+    location: { kind: 'unresolved' },
+  }
+}
+
 function assembler(entries: readonly ConversationEventInput[] = [], hasMore = false): ConversationNodeAssembler {
   const value = new ConversationNodeAssembler(new TestEventDefinitions(), new TestViewDefinitions())
   value.replaceWindow(entries, hasMore)
@@ -122,6 +130,39 @@ function toolResult(callId: string, text: string) {
 }
 
 describe('built-in conversation node Definitions', () => {
+  it('frame-batches every assistant chunk while structural updates publish immediately', () => {
+    for (const [seq, chunkType] of [
+      [1, 'text-delta'],
+      [2, 'block-start'],
+      [3, 'block-end'],
+    ] as const) {
+      const chunk = match(at(seq, 'assistant/chunk', { chunk: { type: chunkType } }))
+      expect(assistantDefinition.publication?.(chunk)).toBe('animation-frame')
+      expect(turnProcessDefinition.publication?.(chunk)).toBe('animation-frame')
+    }
+
+    for (const [seq, chunkType] of [[4, 'usage'], [5, 'finish']] as const) {
+      const chunk = match(at(seq, 'assistant/chunk', { chunk: { type: chunkType } }))
+      expect(assistantDefinition.publication?.(chunk)).toBe('none')
+      expect(turnProcessDefinition.publication?.(chunk)).toBe('none')
+    }
+
+    for (const [seq, type] of [
+      [10, 'turn/start'],
+      [11, 'turn/end'],
+      [12, 'step/end'],
+      [13, 'assistant/message'],
+      [14, 'tool/call'],
+      [15, 'tool/result'],
+    ] as const) {
+      const structural = match(at(seq, type, {}))
+      expect(turnProcessDefinition.publication?.(structural)).toBe('immediate')
+      if (type === 'assistant/message') expect(assistantDefinition.publication?.(structural)).toBe('immediate')
+    }
+
+    expect(assistantDefinition.publication?.(match(at(16, 'step/start', {})))).toBe('none')
+  })
+
   it('projects turn process evidence, counts delegation tools precisely, and keeps answer anchors', () => {
     const empty = assembler([
       at(1, 'turn/start', { turn: 1 }),

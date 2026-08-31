@@ -93,4 +93,58 @@ describe('CompressionLimiter', () => {
     })
     await expect(next).resolves.toBe('next')
   })
+
+  it('removes an aborted queued task before it occupies a compression slot', async () => {
+    const limiter = new CompressionLimiter(1)
+    const gate = Promise.withResolvers<undefined>()
+    const active = limiter.run(async () => { await gate.promise })
+    const controller = new AbortController()
+    const queued = limiter.run(() => Promise.resolve('should not run'), { signal: controller.signal })
+
+    controller.abort(new Error('queued image cancelled'))
+    await expect(queued).rejects.toThrow('queued image cancelled')
+    gate.resolve(undefined)
+    await active
+
+    const next = limiter.run(() => Promise.resolve('next'))
+    await expect(next).resolves.toBe('next')
+  })
+
+  it('compacts a long cancelled waiter prefix after releasing a slot', async () => {
+    const limiter = new CompressionLimiter(1)
+    const gate = Promise.withResolvers<undefined>()
+    const active = limiter.run(async () => { await gate.promise })
+    const controllers = Array.from({ length: 70 }, () => new AbortController())
+    const queued = controllers.map(controller => limiter.run(
+      () => Promise.resolve('must not start'),
+      { signal: controller.signal },
+    ))
+    for (const controller of controllers) controller.abort(new Error('cancelled waiter'))
+    await expect(Promise.allSettled(queued)).resolves.toHaveLength(70)
+    gate.resolve(undefined)
+    await active
+    await expect(limiter.run(() => Promise.resolve('after compaction'))).resolves.toBe('after compaction')
+  })
+
+  it('keeps an active task alive when its caller aborts and normalizes a non-Error reason', async () => {
+    const limiter = new CompressionLimiter(1)
+    const gate = Promise.withResolvers<undefined>()
+    const controller = new AbortController()
+    const active = limiter.run(async () => { await gate.promise; return 'finished' }, { signal: controller.signal })
+    await Promise.resolve()
+    controller.abort('caller closed')
+    gate.resolve(undefined)
+    await expect(active).resolves.toBe('finished')
+
+    const queuedLimiter = new CompressionLimiter(1)
+    const hold = Promise.withResolvers<undefined>()
+    const running = queuedLimiter.run(async () => { await hold.promise })
+    await Promise.resolve()
+    const waitingController = new AbortController()
+    const waiting = queuedLimiter.run(() => Promise.resolve('never'), { signal: waitingController.signal })
+    waitingController.abort('string reason')
+    await expect(waiting).rejects.toMatchObject({ message: 'Image compression task cancelled.', cause: 'string reason' })
+    hold.resolve(undefined)
+    await running
+  })
 })

@@ -63,6 +63,33 @@ function failureCode(value: unknown): CollaborationError['code'] {
   return 'gateway-unavailable'
 }
 
+/** Await one authority dependency without retaining an abort listener. */
+function withSignal<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(signal.reason instanceof Error ? signal.reason : new Error('collaboration request cancelled', { cause: signal.reason }))
+  return new Promise<T>((resolve, reject) => {
+    let settled = false
+    const cleanup = (): void => { signal.removeEventListener('abort', onAbort) }
+    const finish = (callback: () => void): void => {
+      if (settled) return
+      settled = true
+      cleanup()
+      callback()
+    }
+    const onAbort = (): void => {
+      finish(() => { reject(signal.reason instanceof Error ? signal.reason : new Error('collaboration request cancelled', { cause: signal.reason })) })
+    }
+    signal.addEventListener('abort', onAbort, { once: true })
+    void promise.then(
+      (value) => { finish(() => { resolve(value) }) },
+      (error: unknown) => {
+        finish(() => {
+          reject(error instanceof Error ? error : new Error(String(error), { cause: error }))
+        })
+      },
+    )
+  })
+}
+
 class GatewayAuthority implements CollaborationAuthority {
   readonly participant: CollaborationParticipant
   readonly expiresAt: number
@@ -103,13 +130,14 @@ class GatewayAuthority implements CollaborationAuthority {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),
         principal: this.principal,
+        signal: this.signal,
       })
     } catch (error: unknown) {
       throw new CollaborationError('gateway-unavailable', `Gateway collaboration request failed: ${String(error)}`)
     }
     let value: unknown
     try {
-      value = await readGatewayResponseJson(response, COLLABORATION_RESPONSE_MAX_BYTES)
+      value = await readGatewayResponseJson(response, COLLABORATION_RESPONSE_MAX_BYTES, this.signal)
     } catch {
       throw new CollaborationError('gateway-unavailable', `Gateway collaboration request returned HTTP ${String(response.status)}`)
     }
@@ -121,7 +149,7 @@ class GatewayAuthority implements CollaborationAuthority {
     const pending = this.runtime.sessionCreation(sessionId)
     if (pending === undefined) return undefined
     try {
-      return await pending
+      return await withSignal(pending, this.signal)
     } catch (error: unknown) {
       throw new CollaborationError(
         'gateway-unavailable',

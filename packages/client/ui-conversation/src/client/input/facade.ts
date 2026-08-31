@@ -55,7 +55,7 @@ export interface SessionInputDeps {
   /** Command-plane image plumbing (the hub owns the conversation face and the copy). */
   commandImages: {
     /** Resolve ordered draft ids to wire payloads without sending them; rejects when an id no longer resolves. */
-    serialize(ids: readonly DraftAttachmentId[]): Promise<readonly SubmitImageAttachment[]>
+    serialize(ids: readonly DraftAttachmentId[], signal?: AbortSignal): Promise<readonly SubmitImageAttachment[]>
     /** Free consumed draft images after a successful command submit. */
     release(ids: readonly DraftAttachmentId[]): void
     /** Localized composer notice for a claimed command that does not accept images. */
@@ -107,13 +107,16 @@ export class SessionInputShell implements SessionInput {
   private documentIds: readonly DraftDocumentId[] = []
   /** One attachment-only send at a time: Enter during the Host round-trip is a no-op. */
   private attachmentSendInFlight = false
+  private attachmentSendController: AbortController | undefined
   private disposed = false
+  /** Queue projection subscription owned by this shell's lifetime. */
+  private queueUnsubscribe: (() => void) | undefined
   /** Draft persistence mirror (chat store write; receives the clipboard projection, never display-only ranges). */
   private mirrorFn: ((text: string) => void) | undefined
 
   constructor(private readonly deps: SessionInputDeps) {
     this.state = createSnapshotStore<InputState>(this.compose())
-    deps.queue?.subscribe(() => { this.publish() })
+    this.queueUnsubscribe = deps.queue?.subscribe(() => { this.publish() })
   }
 
   // ---- SessionInput face ----
@@ -259,13 +262,17 @@ export class SessionInputShell implements SessionInput {
         const imageIds = [...this.imageIds]
         const documentIds = [...this.documentIds]
         this.attachmentSendInFlight = true
-        void this.deps.defaultSink('', imageIds, documentIds, mode, new AbortController().signal).then((outcome) => {
+        const controller = new AbortController()
+        this.attachmentSendController = controller
+        void this.deps.defaultSink('', imageIds, documentIds, mode, controller.signal).then((outcome) => {
           this.attachmentSendInFlight = false
+          if (this.attachmentSendController === controller) this.attachmentSendController = undefined
           if (this.disposed) return
           if (outcome.kind === 'success') this.commitSend(imageIds, documentIds)
           else if (outcome.text !== undefined) this.notify('error', outcome.text)
         }, (error: unknown) => {
           this.attachmentSendInFlight = false
+          if (this.attachmentSendController === controller) this.attachmentSendController = undefined
           if (!this.disposed) this.notify('error', error instanceof Error ? error.message : String(error))
         })
       }
@@ -439,7 +446,12 @@ export class SessionInputShell implements SessionInput {
 
   /** Teardown: abort any in-flight attempt and stop accepting async settlements. */
   dispose(): void {
+    const unsubscribe = this.queueUnsubscribe
+    this.queueUnsubscribe = undefined
+    unsubscribe?.()
     this.disposed = true
+    this.attachmentSendController?.abort(new Error('session input disposed'))
+    this.attachmentSendController = undefined
     this.run(this.core.dispatch({ type: 'release' }))
   }
 
@@ -516,12 +528,13 @@ export class SessionInputShell implements SessionInput {
     }
     const inputTriggers = this.deps.inputTriggers?.()
     const controller = new AbortController()
+    const serializationSignal = AbortSignal.any([attempt.signal, controller.signal])
     void Promise.all(occurrences.map(async (o) => {
       if (inputTriggers === undefined) throw new Error(`no serializer for reference source "${o.source}"`)
       return {
         offset: o.offset,
         length: o.length,
-        text: await inputTriggers.serializeReference(o.source, o.ref, controller.signal),
+        text: await inputTriggers.serializeReference(o.source, o.ref, serializationSignal),
       }
     })).then(
       (parts) => {
@@ -620,7 +633,9 @@ export class SessionInputShell implements SessionInput {
     const imageIds = claim.images === true ? [...this.imageIds] : []
     Promise.resolve()
       .then(async () => {
-        const images = imageIds.length > 0 ? await this.deps.commandImages.serialize(imageIds) : []
+        const images = imageIds.length > 0
+          ? await this.deps.commandImages.serialize(imageIds, attempt.signal)
+          : []
         // Serialization may outlive the attempt (large files, session
         // teardown); a dead attempt must not reach the Host executor.
         if (this.dead(attempt)) return undefined

@@ -10,6 +10,7 @@ import type {
 } from '@deepseek-ai/dsh-gateway-runtime'
 import {
   DEFAULT_GATEWAY_RESPONSE_MAX_BYTES,
+  GatewayResponseTooLargeError,
   readGatewayResponseJson,
 } from '@deepseek-ai/dsh-gateway-runtime'
 import {
@@ -24,7 +25,6 @@ import {
   type SessionPreparation,
 } from '@deepseek-ai/dsh-session'
 import SessionPersistence, {
-  DEFAULT_MAX_PENDING_BYTES_PER_SESSION,
   DEFAULT_PREPARED_SESSION_CACHE_SIZE,
   DEFAULT_MAX_PENDING_EVENTS_PER_SESSION,
   DEFAULT_WRITE_BATCH_MAX_DELAY_MS,
@@ -39,12 +39,21 @@ import SessionPersistence, {
   type SessionLocation,
   type SessionPersistenceSnapshot,
   type SessionPersistenceRevision as PersistenceRevision,
+  SessionPersistenceReadError,
+  SessionPersistenceReadCursor,
+  type SessionPersistencePage,
+  type SessionPersistencePageRequest,
   type StoredPrefix,
   type StoredSuffix,
 } from '@deepseek-ai/dsh-session-persistence'
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000
+const MAX_TIMER_DELAY_MS = 2_147_483_647
 const GATEWAY_SESSION_RESPONSE_MAX_BYTES = DEFAULT_GATEWAY_RESPONSE_MAX_BYTES
+/** Reserve one quarter of the 64 MiB Gateway request ceiling for JSON envelope overhead. */
+export const DEFAULT_GATEWAY_MAX_PENDING_BYTES = Math.floor(GATEWAY_SESSION_RESPONSE_MAX_BYTES * 0.75)
+/** One page has a 512 KiB event budget; retain bounded envelope headroom on the wire. */
+const GATEWAY_SESSION_PAGE_RESPONSE_MAX_BYTES = 1024 * 1024
 const EVENT_ENVELOPE_KEYS = new Set([
   'type',
   'seq',
@@ -115,6 +124,44 @@ function jsonSerializable(value: unknown): boolean {
   } catch {
     return false
   }
+}
+
+/** Preserve a stable persistence category across fetch and response decoding. */
+function classifyGatewayReadError(
+  error: unknown,
+  callerSignal?: AbortSignal,
+  effectiveSignal?: AbortSignal,
+): SessionPersistenceReadError {
+  if (error instanceof SessionPersistenceReadError) return error
+  if (callerSignal?.aborted) {
+    return new SessionPersistenceReadError('aborted', 'Gateway session persistence request was cancelled', { cause: error })
+  }
+  if (effectiveSignal?.aborted) {
+    return new SessionPersistenceReadError('timeout', 'Gateway session persistence request timed out', { cause: error })
+  }
+  if (error instanceof GatewayResponseTooLargeError) {
+    return new SessionPersistenceReadError('too-large', 'Gateway session persistence response exceeds its byte limit', { cause: error })
+  }
+  if (error instanceof SyntaxError) {
+    return new SessionPersistenceReadError('protocol', 'Gateway session persistence returned invalid JSON', { cause: error })
+  }
+  const code = typeof error === 'object' && error !== null
+    ? (error as { code?: unknown }).code
+    : undefined
+  if (code === 'ETIMEDOUT' || code === '57014' || (error instanceof Error && error.name === 'TimeoutError')) {
+    return new SessionPersistenceReadError('timeout', 'Gateway session persistence request timed out', { cause: error })
+  }
+  return new SessionPersistenceReadError('dependency', 'Gateway session persistence is temporarily unavailable', { cause: error })
+}
+
+/** Convert response-shape validation failures into the public protocol category. */
+function protocolReadError(error: unknown, fallback: string): SessionPersistenceReadError {
+  if (error instanceof SessionPersistenceReadError) return error
+  return new SessionPersistenceReadError(
+    'protocol',
+    error instanceof Error && error.message !== '' ? error.message : fallback,
+    { cause: error },
+  )
 }
 
 function headerFrom(value: unknown): SessionHeader {
@@ -211,8 +258,9 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     writeBatchMaxDelayMs: z.number().step(1).min(1).max(MAX_WRITE_BATCH_DELAY_MS)
       .default(DEFAULT_WRITE_BATCH_MAX_DELAY_MS),
     maxPendingEvents: z.number().step(1).min(1).default(DEFAULT_MAX_PENDING_EVENTS_PER_SESSION),
-    maxPendingBytes: z.number().step(1).min(1).default(DEFAULT_MAX_PENDING_BYTES_PER_SESSION),
-    requestTimeoutMs: z.number().step(1).min(1).default(DEFAULT_REQUEST_TIMEOUT_MS),
+    maxPendingBytes: z.number().step(1).min(1).max(DEFAULT_GATEWAY_MAX_PENDING_BYTES)
+      .default(DEFAULT_GATEWAY_MAX_PENDING_BYTES),
+    requestTimeoutMs: z.number().step(1).min(1).max(MAX_TIMER_DELAY_MS).default(DEFAULT_REQUEST_TIMEOUT_MS),
   })
 
   private readonly coordinator: PersistenceCoordinator<never>
@@ -222,13 +270,21 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
 
   constructor(ctx: Context, config: Config = {}) {
     super(ctx)
-    this.requestTimeoutMs = config.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS
+    const requestTimeoutMs = config.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS
+    if (!Number.isSafeInteger(requestTimeoutMs) || requestTimeoutMs < 1 || requestTimeoutMs > MAX_TIMER_DELAY_MS) {
+      throw new RangeError(`session-persistence-gateway requestTimeoutMs must be a positive safe integer no greater than ${String(MAX_TIMER_DELAY_MS)}`)
+    }
+    this.requestTimeoutMs = requestTimeoutMs
+    const maxPendingBytes = config.maxPendingBytes ?? DEFAULT_GATEWAY_MAX_PENDING_BYTES
+    if (!Number.isSafeInteger(maxPendingBytes) || maxPendingBytes < 1 || maxPendingBytes > DEFAULT_GATEWAY_MAX_PENDING_BYTES) {
+      throw new RangeError(`session-persistence-gateway maxPendingBytes must be within 1..${String(DEFAULT_GATEWAY_MAX_PENDING_BYTES)}`)
+    }
     ctx.on('session/created', (session) => { this.rememberCreation(session.header) })
     this.coordinator = new PersistenceCoordinator(this.ctx, this, {
       preparedSessionCacheSize: config.preparedSessionCacheSize ?? DEFAULT_PREPARED_SESSION_CACHE_SIZE,
       writeBatchMaxDelayMs: config.writeBatchMaxDelayMs ?? DEFAULT_WRITE_BATCH_MAX_DELAY_MS,
       maxPendingEvents: config.maxPendingEvents ?? DEFAULT_MAX_PENDING_EVENTS_PER_SESSION,
-      maxPendingBytes: config.maxPendingBytes ?? DEFAULT_MAX_PENDING_BYTES_PER_SESSION,
+      maxPendingBytes,
     })
     ctx.on('session/disposed', (session) => {
       void ctx.sessions.flush(session).then(
@@ -346,11 +402,130 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
   readFrom(id: SessionId, fromSeq: number, signal?: AbortSignal): Promise<{ meta: SessionHeader; events: SessionEvent[] }> {
     return this.coordinator.readFrom(id, fromSeq, signal)
   }
+
+  /** Read one session header through the indexed Gateway metadata endpoint. */
+  override async readHeader(id: SessionId, signal?: AbortSignal): Promise<SessionHeader | undefined> {
+    const value = record(await this.optional(
+      `/internal/runtime/session/meta?sessionId=${encodeURIComponent(id)}`,
+      signal,
+    ))
+    if (value === undefined) return undefined
+    if (typeof value.revision !== 'string' || value.revision === '') {
+      throw new SessionPersistenceReadError('protocol', 'Gateway returned an invalid session revision')
+    }
+    let header: SessionHeader
+    try {
+      header = headerFrom(value.header)
+    } catch (error: unknown) {
+      throw protocolReadError(error, 'Gateway returned an invalid session header')
+    }
+    if (header.id !== id) {
+      throw new SessionPersistenceReadError('protocol', 'Gateway returned metadata for another session')
+    }
+    return header
+  }
+
+  /** Read one revision without loading the session event log. */
+  override readRevision(id: SessionId, signal?: AbortSignal): Promise<PersistenceRevision | undefined> {
+    return this.readStoredRevision(id, signal)
+  }
+
+  /** Read a bounded page from the Gateway's indexed event range endpoint. */
+  override async readPage(
+    id: SessionId,
+    request: SessionPersistencePageRequest = {},
+    signal?: AbortSignal,
+  ): Promise<SessionPersistencePage> {
+    const query = new URLSearchParams({ sessionId: id })
+    if (request.cursor !== undefined) query.set('cursor', request.cursor)
+    if (request.beforeSeq !== undefined) query.set('beforeSeq', String(request.beforeSeq))
+    if (request.fromSeq !== undefined) query.set('fromSeq', String(request.fromSeq))
+    if (request.direction !== undefined) query.set('direction', request.direction)
+    if (request.maxBytes !== undefined) query.set('maxBytes', String(request.maxBytes))
+    if (request.maxEvents !== undefined) query.set('maxEvents', String(request.maxEvents))
+    if (request.maxGroups !== undefined) query.set('maxGroups', String(request.maxGroups))
+    const value = record(await this.request(
+      `/internal/runtime/session/page?${query.toString()}`,
+      {},
+      signal,
+      GATEWAY_SESSION_PAGE_RESPONSE_MAX_BYTES,
+    ))
+    if (value === undefined) throw new Error(`session "${id}" not found`)
+    if (typeof value.revision !== 'string' || value.revision === '') {
+      throw new SessionPersistenceReadError('protocol', 'Gateway returned an invalid session page revision')
+    }
+    let events: SessionEvent[]
+    try {
+      events = eventsFrom(value.events)
+    } catch (error: unknown) {
+      throw protocolReadError(error, 'Gateway returned an invalid session event list')
+    }
+    const startSeq = value.startSeq === null ? null : value.startSeq
+    const endSeq = value.endSeq === null ? null : value.endSeq
+    if ((startSeq !== null && !nonNegativeInteger(startSeq))
+      || (endSeq !== null && !nonNegativeInteger(endSeq))
+      || typeof value.hasMore !== 'boolean'
+      || !nonNegativeInteger(value.uncompressedBytes)) {
+      throw new SessionPersistenceReadError('protocol', 'Gateway returned invalid session page metadata')
+    }
+    const cursor = value.nextCursor
+    if (cursor !== undefined && (typeof cursor !== 'string' || cursor === '')) {
+      throw new SessionPersistenceReadError('protocol', 'Gateway returned an invalid session page cursor')
+    }
+    if ((value.hasMore && cursor === undefined) || (!value.hasMore && cursor !== undefined)) {
+      throw new SessionPersistenceReadError('protocol', 'Gateway returned an inconsistent session page continuation')
+    }
+    let header: SessionHeader
+    try {
+      header = headerFrom(value.header)
+    } catch (error: unknown) {
+      throw protocolReadError(error, 'Gateway returned an invalid session header')
+    }
+    if (header.id !== id) {
+      throw new SessionPersistenceReadError('protocol', 'Gateway returned a page for another session')
+    }
+    const first = events[0]
+    const last = events.at(-1)
+    if ((first === undefined && (startSeq !== null || endSeq !== null))
+      || (last === undefined && (startSeq !== null || endSeq !== null))
+      || (first !== undefined && (startSeq !== first.seq || endSeq !== last?.seq))) {
+      throw new SessionPersistenceReadError('protocol', 'Gateway returned inconsistent page sequence bounds')
+    }
+    let previous = -1
+    let encodedBytes = 0
+    for (const event of events) {
+      if (event.seq <= previous || (previous >= 0 && event.seq !== previous + 1)) {
+        throw new SessionPersistenceReadError('protocol', 'Gateway returned an unordered session page')
+      }
+      encodedBytes += Buffer.byteLength(JSON.stringify(event), 'utf8')
+      previous = event.seq
+    }
+    if (value.uncompressedBytes < encodedBytes) {
+      throw new SessionPersistenceReadError('protocol', 'Gateway under-reported session page bytes')
+    }
+    return {
+      meta: header,
+      revision: SessionPersistenceRevision(value.revision),
+      events,
+      startSeq,
+      endSeq,
+      hasMore: value.hasMore,
+      ...(cursor === undefined ? {} : { nextCursor: SessionPersistenceReadCursor(cursor) }),
+      uncompressedBytes: value.uncompressedBytes,
+    }
+  }
   /* jscpd:ignore-end */
 
-  private signal(signal?: AbortSignal): AbortSignal {
-    const timeout = AbortSignal.timeout(this.requestTimeoutMs)
-    return signal === undefined ? timeout : AbortSignal.any([signal, timeout])
+  private signal(signal?: AbortSignal): { signal: AbortSignal; dispose: () => void } {
+    const controller = new AbortController()
+    const timer = setTimeout(() => {
+      controller.abort(new Error('Gateway session persistence request timed out'))
+    }, this.requestTimeoutMs)
+    timer.unref()
+    return {
+      signal: signal === undefined ? controller.signal : AbortSignal.any([signal, controller.signal]),
+      dispose: () => { clearTimeout(timer) },
+    }
   }
 
   private rememberCreation(header: SessionHeader): PendingSessionCreation | undefined {
@@ -405,34 +580,84 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     return GatewaySessionCreationAuthorization(value.authorization)
   }
 
-  private async request(path: string, init: GatewayRuntimeRequestInit = {}, signal?: AbortSignal): Promise<unknown> {
+  private async request(
+    path: string,
+    init: GatewayRuntimeRequestInit = {},
+    signal?: AbortSignal,
+    responseLimit = GATEWAY_SESSION_RESPONSE_MAX_BYTES,
+  ): Promise<unknown> {
     signal?.throwIfAborted()
-    const response = await this.ctx.gatewayRuntime.request(path, { ...init, signal: this.signal(signal) })
-    let value: unknown
+    const deadline = this.signal(signal)
     try {
-      value = await readGatewayResponseJson(response, GATEWAY_SESSION_RESPONSE_MAX_BYTES)
-    } catch {
-      throw new Error(`Gateway session persistence returned HTTP ${String(response.status)}`)
+      let response: Response
+      try {
+        response = await this.ctx.gatewayRuntime.request(path, { ...init, signal: deadline.signal })
+      } catch (error: unknown) {
+        throw classifyGatewayReadError(error, signal, deadline.signal)
+      }
+      let value: unknown
+      try {
+        value = await readGatewayResponseJson(response, responseLimit, deadline.signal)
+      } catch (error: unknown) {
+        throw classifyGatewayReadError(error, signal, deadline.signal)
+      }
+      if (!response.ok) {
+        const recordValue = record(value)
+        const code = recordValue?.code
+        if (code === 'too-large' || code === 'aborted' || code === 'timeout'
+          || code === 'dependency' || code === 'protocol') {
+          const detail = recordValue?.message
+          throw new SessionPersistenceReadError(
+            code,
+            typeof detail === 'string' ? detail : `Gateway session persistence request failed (${code})`,
+          )
+        }
+        const detail = recordValue?.error
+        throw new Error(`Gateway session persistence failed: ${typeof detail === 'string' ? detail : `HTTP ${String(response.status)}`}`)
+      }
+      return value
+    } finally {
+      deadline.dispose()
     }
-    if (!response.ok) {
-      const detail = record(value)?.error
-      throw new Error(`Gateway session persistence failed: ${typeof detail === 'string' ? detail : `HTTP ${String(response.status)}`}`)
-    }
-    return value
   }
 
   private async optional(path: string, signal?: AbortSignal): Promise<unknown> {
     signal?.throwIfAborted()
-    const response = await this.ctx.gatewayRuntime.request(path, { signal: this.signal(signal) })
-    if (response.status === 404) return undefined
-    let value: unknown
+    const deadline = this.signal(signal)
     try {
-      value = await readGatewayResponseJson(response, GATEWAY_SESSION_RESPONSE_MAX_BYTES)
-    } catch {
-      throw new Error(`Gateway session persistence returned HTTP ${String(response.status)}`)
+      let response: Response
+      try {
+        response = await this.ctx.gatewayRuntime.request(path, { signal: deadline.signal })
+      } catch (error: unknown) {
+        throw classifyGatewayReadError(error, signal, deadline.signal)
+      }
+      if (response.status === 404) {
+        await response.body?.cancel().catch(() => {})
+        return undefined
+      }
+      let value: unknown
+      try {
+        value = await readGatewayResponseJson(response, GATEWAY_SESSION_RESPONSE_MAX_BYTES, deadline.signal)
+      } catch (error: unknown) {
+        throw classifyGatewayReadError(error, signal, deadline.signal)
+      }
+      if (!response.ok) {
+        const recordValue = record(value)
+        const code = recordValue?.code
+        if (code === 'too-large' || code === 'aborted' || code === 'timeout'
+          || code === 'dependency' || code === 'protocol') {
+          const detail = recordValue?.message
+          throw new SessionPersistenceReadError(
+            code,
+            typeof detail === 'string' ? detail : `Gateway session persistence request failed (${code})`,
+          )
+        }
+        throw new Error(`Gateway session persistence failed with HTTP ${String(response.status)}`)
+      }
+      return value
+    } finally {
+      deadline.dispose()
     }
-    if (!response.ok) throw new Error(`Gateway session persistence failed with HTTP ${String(response.status)}`)
-    return value
   }
 
   async loadStored(id: SessionId, signal?: AbortSignal): Promise<StoredPrefix<never> | undefined> {
@@ -442,11 +667,24 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     ))
     if (value === undefined) return undefined
     if (typeof value.revision !== 'string' || value.revision === '') {
-      throw new Error('Gateway returned an invalid session revision')
+      throw new SessionPersistenceReadError('protocol', 'Gateway returned an invalid session revision')
+    }
+    let header: SessionHeader
+    try {
+      header = headerFrom(value.header)
+    } catch (error: unknown) {
+      throw protocolReadError(error, 'Gateway returned an invalid session header')
+    }
+    if (header.id !== id) throw new SessionPersistenceReadError('protocol', 'Gateway returned a different session header')
+    let events: SessionEvent[]
+    try {
+      events = eventsFrom(value.events)
+    } catch (error: unknown) {
+      throw protocolReadError(error, 'Gateway returned an invalid session event list')
     }
     return {
-      meta: headerFrom(value.header),
-      events: eventsFrom(value.events),
+      meta: header,
+      events,
       revision: SessionPersistenceRevision(value.revision),
     }
   }
@@ -459,7 +697,7 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     ))
     if (value?.revision === null) return undefined
     if (typeof value?.revision !== 'string' || value.revision === '') {
-      throw new Error('Gateway returned an invalid session revision')
+      throw new SessionPersistenceReadError('protocol', 'Gateway returned an invalid session revision')
     }
     return SessionPersistenceRevision(value.revision)
   }
@@ -470,7 +708,20 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
       signal,
     ))
     if (value === undefined) return undefined
-    return { meta: headerFrom(value.header), events: eventsFrom(value.events) }
+    let header: SessionHeader
+    try {
+      header = headerFrom(value.header)
+    } catch (error: unknown) {
+      throw protocolReadError(error, 'Gateway returned an invalid session header')
+    }
+    if (header.id !== id) throw new SessionPersistenceReadError('protocol', 'Gateway returned a different session header')
+    let events: SessionEvent[]
+    try {
+      events = eventsFrom(value.events)
+    } catch (error: unknown) {
+      throw protocolReadError(error, 'Gateway returned an invalid session event list')
+    }
+    return { meta: header, events }
   }
 
   async appendBatch(meta: SessionHeader, events: readonly SessionEvent[], isMaterialized: boolean): Promise<void> {
@@ -522,11 +773,22 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     return value.items.map((candidate) => {
       const item = record(candidate)
       if (typeof item?.revision !== 'string' || item.revision === '') {
-        throw new Error('Gateway returned an invalid session list revision')
+        throw new SessionPersistenceReadError('protocol', 'Gateway returned an invalid session list revision')
       }
-      const content = contentMetadataFrom(item.content)
+      let header: SessionHeader
+      try {
+        header = headerFrom(item.header)
+      } catch (error: unknown) {
+        throw protocolReadError(error, 'Gateway returned an invalid session header')
+      }
+      let content: SessionContentMetadata | undefined
+      try {
+        content = contentMetadataFrom(item.content)
+      } catch (error: unknown) {
+        throw protocolReadError(error, 'Gateway returned invalid session content metadata')
+      }
       return {
-        header: headerFrom(item.header),
+        header,
         revision: SessionPersistenceRevision(item.revision),
         ...(content === undefined ? {} : { content }),
       }

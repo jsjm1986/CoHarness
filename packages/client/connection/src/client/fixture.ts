@@ -65,6 +65,31 @@ function toolResultMessage(callId: string, content: ContentBlock[], isError: boo
   return createToolResultMessage({ callId: CallId(callId), content, isError })
 }
 
+/** Delay a fixture response without retaining a timer after transport abort. */
+function delayWithSignal(milliseconds: number, signal?: AbortSignal): Promise<void> {
+  if (milliseconds <= 0) return Promise.resolve()
+  if (signal?.aborted) return Promise.reject(signal.reason instanceof Error ? signal.reason : new Error('fixture request aborted'))
+  return new Promise<void>((resolve, reject) => {
+    let settled = false
+    const cleanup = (): void => {
+      clearTimeout(timer)
+      signal?.removeEventListener('abort', onAbort)
+    }
+    const finish = (callback: () => void): void => {
+      if (settled) return
+      settled = true
+      cleanup()
+      callback()
+    }
+    const onAbort = (): void => {
+      finish(() => { reject(signal?.reason instanceof Error ? signal.reason : new Error('fixture request aborted')) })
+    }
+    const timer = setTimeout(() => { finish(resolve) }, milliseconds)
+    signal?.addEventListener('abort', onAbort, { once: true })
+    if (signal?.aborted) onAbort()
+  })
+}
+
 const MARKDOWN_FIXTURE = [
   '# Markdown fixture',
   '',
@@ -2445,7 +2470,8 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         }
         return ok(request, { sessionId: child.sessionId })
       },
-      history: async (request) => {
+      history: async (request, signal) => {
+        signal?.throwIfAborted()
         const log = logs.get(request.payload.sessionId) ?? []
         // Snapshot at request time, deliver after the transit delay (mirrors a real host under latency).
         const page = pageOf(log, request.payload.beforeSeq, request.payload.maxMessages ?? 50)
@@ -2458,7 +2484,8 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         const doomed = failNextHistory
         failNextHistory = false
         const delay = historyDelayMs
-        if (delay > 0) await new Promise(resolve => setTimeout(resolve, delay))
+        if (delay > 0) await delayWithSignal(delay, signal)
+        signal?.throwIfAborted()
         if (doomed) throw new Error('fixture: simulated history transport failure')
         return ok(request, { ...page, ...projections === undefined ? {} : { projections } })
       },
@@ -2606,7 +2633,8 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
     },
     subagents: {
       list: request => ok(request, { entries: [], parentAvailable: true }),
-      history: (request) => {
+      history: (request, signal) => {
+        signal?.throwIfAborted()
         const log = logs.get(request.payload.childSessionId) ?? []
         return Promise.resolve(ok(
           request,
@@ -3185,7 +3213,7 @@ export class FixtureApiClient extends AbstractApiClient {
       case 'session.list': return this.api.sessions.list(request)
       case 'session.search': return this.api.sessions.search(request, signal)
       case 'session.create': return this.api.sessions.create(request)
-      case 'session.history': return this.api.sessions.history(request)
+      case 'session.history': return this.api.sessions.history(request, signal)
       case 'session.models': return this.api.sessions.models(request)
       case 'session.selectModel': return this.api.sessions.selectModel(request)
       case 'session.rename': return this.api.sessions.rename(request)
@@ -3195,7 +3223,7 @@ export class FixtureApiClient extends AbstractApiClient {
       case 'session.updateQueue': return this.api.sessions.updateQueue(request)
       case 'session.cancel': return this.api.sessions.cancel(request)
       case 'subagent.list': return this.api.subagents.list(request)
-      case 'subagent.history': return this.api.subagents.history(request)
+      case 'subagent.history': return this.api.subagents.history(request, signal)
       case 'subagent.prompt': return this.api.subagents.prompt(request, signal)
       case 'subagent.interrupt': return this.api.subagents.interrupt(request)
       case 'host.describe': return this.api.host.describe(request)

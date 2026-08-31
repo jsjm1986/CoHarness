@@ -41,7 +41,10 @@ function verifyArtifacts(): void {
   for (const path of [
     'apps/cli/lib/bin.js',
     'apps/web/dist/index.html',
-    'gateway/src/index.ts',
+    'gateway/lib/index.js',
+    'gateway/lib/config.js',
+    'gateway/lib/server.js',
+    'gateway/lib/runtime-api.js',
     'gateway/public/admin/index.html',
     'gateway/deploy/postgres/migrations/003_project_collaboration.sql',
     'gateway/deploy/postgres/migrations/004_conversation_event_json.sql',
@@ -79,6 +82,7 @@ if (!process.argv.includes('--verify-only')) {
       cwd: resolve(root, 'plugins/dsh-model-governance'),
       args: ['run', 'build'],
     },
+    { label: 'Gateway artifact', cwd: resolve(root, 'gateway'), args: ['run', 'build'] },
     { label: 'Gateway typecheck', cwd: resolve(root, 'gateway'), args: ['run', 'typecheck'] },
     { label: 'Admin UI', cwd: resolve(root, 'gateway/admin-ui'), args: ['run', 'build'] },
   ]

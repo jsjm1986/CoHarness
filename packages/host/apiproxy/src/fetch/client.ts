@@ -304,6 +304,32 @@ class SseFrameBuffer {
 /** Whether a unary call uses the transport health deadline or only caller/connection cancellation. */
 type UnaryTimeoutPolicy = 'default' | 'caller-signal-only'
 
+interface RequestSignalLease {
+  readonly signal: AbortSignal | undefined
+  dispose(): void
+}
+
+/** Create one cancellable request deadline and release its timer after the body settles. */
+function requestSignalLease(
+  external: AbortSignal | undefined,
+  policy: UnaryTimeoutPolicy,
+  timeoutMs: number,
+): RequestSignalLease {
+  if (policy === 'caller-signal-only') return { signal: external, dispose: () => {} }
+  const controller = new AbortController()
+  const timer = setTimeout(() => {
+    const error = new Error('The operation was aborted due to timeout')
+    error.name = 'TimeoutError'
+    controller.abort(error)
+  }, timeoutMs)
+  timer.unref()
+  const signal = external === undefined ? controller.signal : AbortSignal.any([external, controller.signal])
+  return {
+    signal,
+    dispose: () => { clearTimeout(timer) },
+  }
+}
+
 /** URL base for in-process handler injection (fake authority, opencode precedent). */
 const INTERNAL_BASE = 'http://dsh.internal'
 
@@ -322,13 +348,49 @@ function validateResponseLimit(limit: number): void {
   }
 }
 
-async function readBoundedBytes(response: Response, limit: number): Promise<Uint8Array> {
+async function readResponseChunk(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  signal?: AbortSignal,
+): Promise<ReadableStreamReadResult<Uint8Array>> {
+  if (signal === undefined) return reader.read()
+  if (signal.aborted) {
+    await reader.cancel().catch(() => {})
+    throw abortError(signal)
+  }
+  return new Promise((resolve, reject) => {
+    let settled = false
+    const cleanup = (): void => { signal.removeEventListener('abort', onAbort) }
+    const finish = (): boolean => {
+      if (settled) return false
+      settled = true
+      cleanup()
+      return true
+    }
+    const onAbort = (): void => {
+      if (!finish()) return
+      void reader.cancel().catch(() => {})
+      reject(abortError(signal))
+    }
+    signal.addEventListener('abort', onAbort, { once: true })
+    // AbortSignal does not replay an event fired during listener
+    // registration. Recheck immediately so a response cannot remain blocked
+    // on a reader that the caller has already abandoned.
+    if (signal.aborted) onAbort()
+    void reader.read().then(
+      (value) => { if (finish()) resolve(value) },
+      (error: unknown) => { if (finish()) reject(error instanceof Error ? error : new Error(String(error), { cause: error })) },
+    )
+  })
+}
+
+async function readBoundedBytes(response: Response, limit: number, signal?: AbortSignal): Promise<Uint8Array> {
   const responseLike = response as unknown as {
     headers?: Pick<Headers, 'get'>
     body?: ReadableStream<Uint8Array> | null
     text?: () => Promise<string>
   }
   validateResponseLimit(limit)
+  signal?.throwIfAborted()
   const headers = responseLike.headers
   const body = responseLike.body
   const declared = headers?.get('content-length') ?? null
@@ -353,7 +415,7 @@ async function readBoundedBytes(response: Response, limit: number): Promise<Uint
   let total = 0
   try {
     for (;;) {
-      const next = await reader.read()
+      const next = await readResponseChunk(reader, signal)
       if (next.done) break
       total += next.value.byteLength
       if (!Number.isSafeInteger(total) || total > limit) {
@@ -374,26 +436,36 @@ async function readBoundedBytes(response: Response, limit: number): Promise<Uint
   return bytes
 }
 
-async function readBoundedText(response: Response, limit: number): Promise<string> {
+async function readBoundedText(response: Response, limit: number, signal?: AbortSignal): Promise<string> {
   const responseLike = response as unknown as ResponseLike
   validateResponseLimit(limit)
+  signal?.throwIfAborted()
   if (responseLike.body === null || responseLike.body === undefined) {
     if (responseLike.headers === undefined && responseLike.text !== undefined) {
       const text = await responseLike.text()
+      signal?.throwIfAborted()
       if (new TextEncoder().encode(text).byteLength > limit) throw new ApiResponseTooLargeError(limit)
       return text
     }
     return ''
   }
-  return new TextDecoder().decode(await readBoundedBytes(response, limit))
+  return new TextDecoder().decode(await readBoundedBytes(response, limit, signal))
 }
 
-async function readBoundedJson(response: Response, limit: number): Promise<unknown> {
+async function readBoundedJson(response: Response, limit: number, signal?: AbortSignal): Promise<unknown> {
   const responseLike = response as unknown as ResponseLike
+  signal?.throwIfAborted()
   if (responseLike.body == null && responseLike.headers === undefined && responseLike.json !== undefined) {
-    return await responseLike.json()
+    const value = await responseLike.json()
+    signal?.throwIfAborted()
+    const encoded = JSON.stringify(value)
+    if (new TextEncoder().encode(encoded).byteLength > limit) {
+      throw new ApiResponseTooLargeError(limit)
+    }
+    return value
   }
-  const text = await readBoundedText(response, limit)
+  const text = await readBoundedText(response, limit, signal)
+  signal?.throwIfAborted()
   if (text === '') return undefined
   return JSON.parse(text) as unknown
 }
@@ -403,26 +475,30 @@ async function readBoundedJson(response: Response, limit: number): Promise<unkno
  * Read one unary API response with the carrier's default or caller-supplied byte budget.
  * @param response - Fetch response returned by an API carrier.
  * @param limit - positive safe-integer response byte budget.
+ * @param signal - optional cancellation for response-body decoding.
  * @returns the decoded JSON value.
  */
 export function readApiResponseJson(
   response: Response,
   limit = DEFAULT_UNARY_RESPONSE_MAX_BYTES,
+  signal?: AbortSignal,
 ): Promise<unknown> {
-  return readBoundedJson(response, limit)
+  return readBoundedJson(response, limit, signal)
 }
 
 /**
  * Read one API response as text with the carrier's byte budget.
  * @param response - Fetch response returned by an API carrier.
  * @param limit - positive safe-integer response byte budget.
+ * @param signal - optional cancellation for response-body decoding.
  * @returns the decoded UTF-8 body; an empty body returns an empty string.
  */
 export function readApiResponseText(
   response: Response,
   limit = DEFAULT_UNARY_RESPONSE_MAX_BYTES,
+  signal?: AbortSignal,
 ): Promise<string> {
-  return readBoundedText(response, limit)
+  return readBoundedText(response, limit, signal)
 }
 
 /**
@@ -509,29 +585,35 @@ export abstract class AbstractApiClient implements IApiClient {
   /**
    * Shared POST leg of both C→S carriers (callUnary/respond): JSON body,
    * optional default timeout merged with the caller's external signal, non-2xx → transport throw.
+   * The deadline timer is released after response-body decoding.
    */
   private async postJson(
     path: string,
     body: ClientRequest | ClientResponse,
     signal: AbortSignal | undefined,
     timeoutPolicy: UnaryTimeoutPolicy = 'default',
-  ): Promise<Response> {
-    const requestSignal = timeoutPolicy === 'default'
-      ? signal === undefined
-        ? AbortSignal.timeout(this.timeoutMs)
-        : AbortSignal.any([AbortSignal.timeout(this.timeoutMs), signal])
-      : signal
-    const response = await this.doFetch(new URL(path, this.resolveBase()), {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-      ...requestSignal === undefined ? {} : { signal: requestSignal },
-    })
-    if (!response.ok) {
-      await response.body?.cancel().catch(() => {})
-      throw new Error(`transport failure for ${path}: HTTP ${response.status}`)
+  ): Promise<{ response: Response; signal: AbortSignal | undefined; dispose: () => void }> {
+    const lease = requestSignalLease(signal, timeoutPolicy, this.timeoutMs)
+    try {
+      lease.signal?.throwIfAborted()
+      const encodedBody = JSON.stringify(body)
+      lease.signal?.throwIfAborted()
+      const response = await this.doFetch(new URL(path, this.resolveBase()), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: encodedBody,
+        ...lease.signal === undefined ? {} : { signal: lease.signal },
+      })
+      if (!response.ok) {
+        await response.body?.cancel().catch(() => {})
+        lease.dispose()
+        throw new Error(`transport failure for ${path}: HTTP ${response.status}`)
+      }
+      return { response, signal: lease.signal, dispose: () => { lease.dispose() } }
+    } catch (error: unknown) {
+      lease.dispose()
+      throw error
     }
-    return response
   }
 
   /**
@@ -547,15 +629,23 @@ export abstract class AbstractApiClient implements IApiClient {
   ): Promise<RpcResponse<ResponseValue<K>>> {
     const message: ClientRequest = { type: 'client-request', rpcId: this.mintRpcId(), method, payload }
     this.onEnvelope(message)
-    const response = await this.postJson(`/api/${method}`, message, signal, timeoutPolicy)
-    const full = serverResponseSchema.parse(await readBoundedJson(response, this.maxResponseBytes))
-    this.onEnvelope(full)
-    if (full.rpcId !== message.rpcId) throw new Error(`rpcId mismatch for ${method}: sent ${message.rpcId}, got ${full.rpcId}`)
-    if (!full.result.ok) return { rpcId: full.rpcId, result: full.result }
-    // Second-level S→C parse: the ok value must match the method's Value schema (mirror of the
-    // handler's request-payload parse). The cast collapses the Wire<> widening, same as the handler side.
-    const value = UNARY_VALUE_SCHEMAS[method].parse(full.result.value) as ResponseValue<K>
-    return { rpcId: full.rpcId, result: { ok: true, value } }
+    const posted = await this.postJson(`/api/${method}`, message, signal, timeoutPolicy)
+    try {
+      const full = serverResponseSchema.parse(await readBoundedJson(
+        posted.response,
+        this.maxResponseBytes,
+        posted.signal,
+      ))
+      this.onEnvelope(full)
+      if (full.rpcId !== message.rpcId) throw new Error(`rpcId mismatch for ${method}: sent ${message.rpcId}, got ${full.rpcId}`)
+      if (!full.result.ok) return { rpcId: full.rpcId, result: full.result }
+      // Second-level S→C parse: the ok value must match the method's Value schema (mirror of the
+      // handler's request-payload parse). The cast collapses the Wire<> widening, same as the handler side.
+      const value = UNARY_VALUE_SCHEMAS[method].parse(full.result.value) as ResponseValue<K>
+      return { rpcId: full.rpcId, result: { ok: true, value } }
+    } finally {
+      posted.dispose()
+    }
   }
 
   /** Mux stream opener; virtual for the same override reason as callUnary. */
@@ -609,7 +699,7 @@ export abstract class AbstractApiClient implements IApiClient {
     }
     try {
       while (true) {
-        const { done, value } = await reader.read()
+        const { done, value } = await readResponseChunk(reader, signal)
         if (done) {
           for (const chunk of frameBuffer.append(decoder.decode())) {
             const request = parseFrame(chunk)
@@ -733,8 +823,12 @@ export abstract class AbstractApiClient implements IApiClient {
 
   async respond(message: ClientResponse, signal?: AbortSignal): Promise<RpcReceipt> {
     this.onEnvelope(message)
-    const response = await this.postJson('/api/respond', message, signal)
-    return rpcReceiptSchema.parse(await readBoundedJson(response, this.maxResponseBytes))
+    const posted = await this.postJson('/api/respond', message, signal)
+    try {
+      return rpcReceiptSchema.parse(await readBoundedJson(posted.response, this.maxResponseBytes, posted.signal))
+    } finally {
+      posted.dispose()
+    }
   }
 }
 
@@ -761,11 +855,45 @@ export class InProcessApiClient extends AbstractApiClient {
     if (signal === undefined) return this.handler.fetch(input, init)
     if (signal.aborted) return Promise.reject(abortError(signal))
     return new Promise((resolve, reject) => {
-      const onAbort = (): void => { reject(abortError(signal)) }
+      let settled = false
+      let response: Response | undefined
+      const cleanup = (): void => { signal.removeEventListener('abort', onAbort) }
+      const onAbort = (): void => {
+        if (settled) return
+        settled = true
+        cleanup()
+        void response?.body?.cancel().catch(() => {})
+        reject(abortError(signal))
+      }
       signal.addEventListener('abort', onAbort, { once: true })
-      this.handler.fetch(input, init)
-        .then(resolve, reject)
-        .finally(() => { signal.removeEventListener('abort', onAbort) })
+      let pending: Promise<Response>
+      try {
+        pending = this.handler.fetch(input, init)
+      } catch (error: unknown) {
+        settled = true
+        cleanup()
+        reject(error instanceof Error ? error : new Error(String(error), { cause: error }))
+        return
+      }
+      if (signal.aborted) onAbort()
+      void pending.then(
+        (value) => {
+          response = value
+          if (settled) {
+            void value.body?.cancel().catch(() => {})
+            return
+          }
+          settled = true
+          cleanup()
+          resolve(value)
+        },
+        (error: unknown) => {
+          if (settled) return
+          settled = true
+          cleanup()
+          reject(error instanceof Error ? error : new Error(String(error), { cause: error }))
+        },
+      )
     })
   }
 }

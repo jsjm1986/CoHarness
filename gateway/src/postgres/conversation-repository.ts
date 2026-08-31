@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import type { Pool, PoolClient } from 'pg'
+import type { Pool, PoolClient, QueryResultRow } from 'pg'
 import { transaction, type Queryable } from './database.ts'
 import { assertSafeAssistantEvent } from '../conversation-safety.ts'
 
@@ -28,6 +28,51 @@ export interface StoredConversation {
   header: ConversationHeader
   events: ConversationEvent[]
   revision: string
+}
+
+/** Direction for a bounded conversation event page. */
+export type ConversationPageDirection = 'older' | 'newer'
+
+/** Request for one bounded, revision-aware conversation page. */
+export interface ConversationPageRequest {
+  cursor?: string
+  beforeSeq?: number
+  fromSeq?: number
+  direction?: ConversationPageDirection
+  maxBytes?: number
+  maxEvents?: number
+  maxGroups?: number
+}
+
+/** One bounded page returned without materializing the complete conversation. */
+export interface ConversationPage {
+  header: ConversationHeader
+  events: ConversationEvent[]
+  revision: string
+  startSeq: number | null
+  endSeq: number | null
+  hasMore: boolean
+  nextCursor?: string
+  uncompressedBytes: number
+}
+
+/** Stable failure category for a bounded conversation observation. */
+export type ConversationReadErrorCode = 'too-large' | 'aborted' | 'timeout' | 'dependency' | 'protocol'
+
+/** Error raised by bounded conversation reads. */
+export class ConversationReadError extends Error {
+  constructor(readonly code: ConversationReadErrorCode, message: string, options: ErrorOptions = {}) {
+    super(message, options)
+    this.name = 'ConversationReadError'
+  }
+}
+
+/** Raised when one indivisible event exceeds a page's byte budget. */
+export class ConversationPageTooLargeError extends ConversationReadError {
+  constructor(readonly bytes: number, readonly limit: number) {
+    super('too-large', `conversation page event is ${String(bytes)} bytes, exceeding the ${String(limit)}-byte limit`)
+    this.name = 'ConversationPageTooLargeError'
+  }
 }
 
 /** Durable content facts used by cold session-list projections. */
@@ -96,11 +141,9 @@ function eventPromptTime(event: ConversationEvent): number | undefined {
 }
 
 function serialized(value: unknown): string {
-  return JSON.stringify(value)
-}
-
-function digest(value: string): Buffer {
-  return createHash('sha256').update(value).digest()
+  const encoded = JSON.stringify(value)
+  if (encoded === undefined) throw new TypeError('conversation value is not JSON serializable')
+  return encoded
 }
 
 function eventText(event: ConversationEvent): { role: 'user' | 'assistant' | 'tool'; content: string } | undefined {
@@ -215,6 +258,320 @@ const HEADER_COLUMNS = `id,organization_id,creator_user_id,project_id,parent_ses
   session_format_version,(extract(epoch FROM created_at)*1000)::bigint::text created_at_ms,cwd,
   seed_length::text,origin,delegation_depth,agent_preset,draft,title,version::text,next_seq::text,
   has_visible_content,visible_content_seq::text,(extract(epoch FROM last_prompt_at)*1000)::bigint::text last_prompt_at_ms`
+
+const DEFAULT_PAGE_MAX_BYTES = 512 * 1024
+const DEFAULT_PAGE_MAX_EVENTS = 2_000
+const DEFAULT_PAGE_MAX_GROUPS = 50
+const MAX_PAGE_QUERY_EVENTS = 10_000
+const MAX_PAGE_CURSOR_LENGTH = 16 * 1024
+/** Keep one multi-row INSERT comfortably below PostgreSQL's parameter limit. */
+const APPEND_INSERT_BATCH_SIZE = 500
+/** Keep SQL text and parameter buffers bounded when one event is unusually large. */
+const APPEND_INSERT_BATCH_BYTES = 4 * 1024 * 1024
+
+interface ConversationEventRow {
+  event: ConversationEvent
+  seq: string
+  payload_bytes: number
+}
+
+interface ConversationSearchInsertRow {
+  role: 'user' | 'assistant' | 'tool'
+  content: string
+  seq: number
+  time: number
+}
+
+async function insertConversationEvents(
+  client: PoolClient,
+  sessionId: string,
+  events: readonly { event: ConversationEvent; json: string; payloadBytes: number }[],
+): Promise<void> {
+  let offset = 0
+  while (offset < events.length) {
+    const batch: typeof events[number][] = []
+    let batchBytes = 0
+    while (offset + batch.length < events.length && batch.length < APPEND_INSERT_BATCH_SIZE) {
+      const candidate = events[offset + batch.length]!
+      const candidateBytes = Buffer.byteLength(candidate.json, 'utf8')
+      if (batch.length > 0 && batchBytes + candidateBytes > APPEND_INSERT_BATCH_BYTES) break
+      batch.push(candidate)
+      batchBytes += candidateBytes
+    }
+    const values: unknown[] = []
+    const rows = batch.map(({ event, json, payloadBytes }, index) => {
+      const base = index * 6
+      values.push(sessionId, event.seq, event.type, event.time, json, payloadBytes)
+      return `($${String(base + 1)},$${String(base + 2)},$${String(base + 3)},to_timestamp($${String(base + 4)}/1000.0),$${String(base + 5)}::json,$${String(base + 6)})`
+    }).join(',')
+    await client.query(`INSERT INTO harness.conversation_events(
+      session_id,seq,event_type,occurred_at,event,payload_bytes
+    ) VALUES${rows}`, values)
+    offset += batch.length
+  }
+}
+
+async function insertConversationSearch(
+  client: PoolClient,
+  sessionId: string,
+  rows: readonly ConversationSearchInsertRow[],
+): Promise<void> {
+  let offset = 0
+  while (offset < rows.length) {
+    const batch: ConversationSearchInsertRow[] = []
+    let batchBytes = 0
+    while (offset + batch.length < rows.length && batch.length < APPEND_INSERT_BATCH_SIZE) {
+      const candidate = rows[offset + batch.length]!
+      const candidateBytes = Buffer.byteLength(candidate.content, 'utf8')
+      if (batch.length > 0 && batchBytes + candidateBytes > APPEND_INSERT_BATCH_BYTES) break
+      batch.push(candidate)
+      batchBytes += candidateBytes
+    }
+    const values: unknown[] = []
+    const placeholders = batch.map(({ role, content, seq, time }, index) => {
+      const base = index * 5
+      values.push(sessionId, seq, role, content, time)
+      return `($${String(base + 1)},$${String(base + 2)},$${String(base + 3)},$${String(base + 4)},to_timestamp($${String(base + 5)}/1000.0))`
+    }).join(',')
+    await client.query(`INSERT INTO harness.conversation_search(session_id,event_seq,role,content,occurred_at)
+      VALUES${placeholders}`, values)
+    offset += batch.length
+  }
+}
+
+function validateReadRows(
+  rows: readonly { event: ConversationEvent; seq: string }[],
+  fromSeq: number,
+): void {
+  let previous = fromSeq - 1
+  let first = true
+  for (const row of rows) {
+    const seq = Number(row.seq)
+    if (!Number.isSafeInteger(seq) || seq < fromSeq || row.event.seq !== seq
+      || (first && seq !== fromSeq)
+      || (!first && seq !== previous + 1)) {
+      throw new ConversationReadError('protocol', 'conversation read returned an invalid sequence range')
+    }
+    previous = seq
+    first = false
+  }
+}
+
+/** Revision-bound payload encoded in a conversation page continuation cursor. */
+export interface ConversationCursorPayload {
+  version: 1
+  sessionId: string
+  revision: string
+  direction: ConversationPageDirection
+  anchor: number
+}
+
+function assertSignal(signal: AbortSignal | undefined): void {
+  signal?.throwIfAborted()
+}
+
+function errorCode(error: unknown): string | undefined {
+  if (typeof error !== 'object' || error === null) return undefined
+  const code = Reflect.get(error, 'code')
+  return typeof code === 'string' ? code : undefined
+}
+
+/** Normalize database cancellation and connectivity failures for read callers. */
+function normalizeReadError(error: unknown, signal?: AbortSignal): ConversationReadError | undefined {
+  if (error instanceof ConversationReadError) return error
+  if (signal?.aborted) return new ConversationReadError('aborted', 'conversation read was cancelled', { cause: error })
+  const code = errorCode(error)
+  if (code === '57014' || code === '55P03' || code === 'ETIMEDOUT') {
+    return new ConversationReadError('timeout', 'conversation read timed out', { cause: error })
+  }
+  if (code?.startsWith('08') === true || code === 'ECONNRESET' || code === 'ECONNREFUSED'
+    || code === 'EPIPE' || code === '53300' || code === 'DB_CHECKOUT_QUEUE_FULL'
+    || code === '57P01' || code === '57P02' || code === '57P03') {
+    return new ConversationReadError('dependency', 'conversation storage is temporarily unavailable', { cause: error })
+  }
+  return undefined
+}
+
+async function checkedQuery<R extends QueryResultRow>(
+  source: Queryable,
+  text: string,
+  values: readonly unknown[],
+  signal?: AbortSignal,
+): Promise<{ rows: R[]; rowCount: number | null }> {
+  assertSignal(signal)
+  const result = await source.query<R>(text, values)
+  assertSignal(signal)
+  return result
+}
+
+function pageDirection(request: ConversationPageRequest): ConversationPageDirection {
+  const cursorDirection = request.cursor === undefined
+    ? undefined
+    : decodePageCursor(request.cursor).direction
+  const direction = request.direction
+    ?? cursorDirection
+    ?? (request.beforeSeq !== undefined ? 'older' : request.fromSeq !== undefined ? 'newer' : 'older')
+  if (direction !== 'older' && direction !== 'newer') {
+    throw new ConversationReadError('protocol', 'conversation page direction is invalid')
+  }
+  if (cursorDirection !== undefined && cursorDirection !== direction) {
+    throw new ConversationReadError('protocol', 'conversation page direction does not match its cursor')
+  }
+  return direction
+}
+
+function positiveLimit(name: string, value: number | undefined, fallback: number): number {
+  const resolved = value ?? fallback
+  if (!Number.isSafeInteger(resolved) || resolved < 1 || resolved > fallback) {
+    throw new ConversationReadError(
+      'protocol',
+      `conversation page ${name} must be a positive safe integer no greater than ${String(fallback)}`,
+    )
+  }
+  return resolved
+}
+
+function optionalSeq(name: string, value: number | undefined): number | undefined {
+  if (value !== undefined && (!Number.isSafeInteger(value) || value < 0)) {
+    throw new ConversationReadError('protocol', `conversation page ${name} must be a non-negative safe integer`)
+  }
+  return value
+}
+
+/** Encode one canonical revision-bound conversation page cursor. */
+export function encodePageCursor(payload: ConversationCursorPayload): string {
+  if (payload.version !== 1 || payload.sessionId === '' || payload.revision === ''
+    || (payload.direction !== 'older' && payload.direction !== 'newer')
+    || !Number.isSafeInteger(payload.anchor) || payload.anchor < 0) {
+    throw new ConversationReadError('protocol', 'conversation page cursor fields are invalid')
+  }
+  return Buffer.from(JSON.stringify([
+    payload.version,
+    payload.sessionId,
+    payload.revision,
+    payload.direction,
+    payload.anchor,
+  ]), 'utf8').toString('base64url')
+}
+
+/** Decode and validate one canonical revision-bound conversation page cursor. */
+export function decodePageCursor(value: string): ConversationCursorPayload {
+  if (value === '' || value.length > MAX_PAGE_CURSOR_LENGTH || !/^[A-Za-z0-9_-]+$/.test(value)) {
+    throw new ConversationReadError('protocol', 'conversation page cursor is invalid')
+  }
+  try {
+    const decoded: unknown = JSON.parse(Buffer.from(value, 'base64url').toString('utf8'))
+    if (!Array.isArray(decoded) || decoded.length !== 5 || decoded[0] !== 1
+      || typeof decoded[1] !== 'string' || decoded[1] === ''
+      || typeof decoded[2] !== 'string' || decoded[2] === ''
+      || (decoded[3] !== 'older' && decoded[3] !== 'newer')
+      || typeof decoded[4] !== 'number' || !Number.isSafeInteger(decoded[4]) || decoded[4] < 0) {
+      throw new Error('invalid fields')
+    }
+    const canonical = Buffer.from(JSON.stringify(decoded), 'utf8').toString('base64url')
+    if (canonical !== value) throw new Error('non-canonical')
+    return {
+      version: 1,
+      sessionId: decoded[1],
+      revision: decoded[2],
+      direction: decoded[3],
+      anchor: decoded[4],
+    }
+  } catch (error: unknown) {
+    if (error instanceof ConversationReadError) throw error
+    throw new ConversationReadError('protocol', 'conversation page cursor is invalid', { cause: error })
+  }
+}
+
+function eventBytes(row: ConversationEventRow): number {
+  const encoded = JSON.stringify(row.event)
+  if (encoded === undefined) throw new ConversationReadError('protocol', 'conversation event is not JSON serializable')
+  const actual = Buffer.byteLength(encoded, 'utf8')
+  // `payload_bytes` is an acceleration hint maintained by the append path;
+  // never let a stale or under-reported column bypass the page budget.
+  return Number.isSafeInteger(row.payload_bytes) && row.payload_bytes >= 0
+    ? Math.max(row.payload_bytes, actual)
+    : actual
+}
+
+function eventGroupKey(event: ConversationEvent): string {
+  const sources = event.sourceEventSeqs
+  if (sources !== undefined && sources.length > 0) {
+    let start = event.seq
+    for (const seq of sources) if (seq < start) start = seq
+    return `source:${String(start)}`
+  }
+  if (event.type === 'user/message' || event.type === 'assistant/message' || event.type === 'tool/result') {
+    return `message:${String(event.seq)}`
+  }
+  return `event:${String(event.seq)}`
+}
+
+function selectPageRows(
+  rows: readonly ConversationEventRow[],
+  direction: ConversationPageDirection,
+  maxBytes: number,
+  maxEvents: number,
+  maxGroups: number,
+): { rows: ConversationEventRow[]; bytes: number; hasMore: boolean } {
+  const selected: ConversationEventRow[] = []
+  const groups = new Set<string>()
+  let bytes = 0
+  let index = direction === 'older' ? rows.length - 1 : 0
+  const step = direction === 'older' ? -1 : 1
+  while (index >= 0 && index < rows.length) {
+    const row = rows[index]!
+    const size = eventBytes(row)
+    if (selected.length === 0 && size > maxBytes) throw new ConversationPageTooLargeError(size, maxBytes)
+    const group = eventGroupKey(row.event)
+    if (selected.length >= maxEvents || bytes + size > maxBytes
+      || (!groups.has(group) && groups.size >= maxGroups)) break
+    selected.push(row)
+    groups.add(group)
+    bytes += size
+    index += step
+  }
+  selected.sort((left, right) => Number(left.seq) - Number(right.seq))
+  return { rows: selected, bytes, hasMore: selected.length < rows.length }
+}
+
+/** Validate the logical sequence carried by one bounded database result. */
+function validatePageRows(rows: readonly ConversationEventRow[]): void {
+  let previous = -1
+  for (const row of rows) {
+    const seq = Number(row.seq)
+    if (!Number.isSafeInteger(seq) || seq < 0 || row.event.seq !== seq
+      || (previous >= 0 && seq !== previous + 1)) {
+      throw new ConversationReadError('protocol', 'conversation page contains an invalid sequence range')
+    }
+    previous = seq
+  }
+}
+
+/** Reject a bounded query that starts after a missing logical sequence. */
+function validatePageAnchor(
+  rows: readonly ConversationEventRow[],
+  direction: ConversationPageDirection,
+  anchor: number,
+  nextSeq: number,
+): void {
+  if (rows.length === 0) {
+    if ((direction === 'newer' && anchor < nextSeq)
+      || (direction === 'older' && Math.min(anchor, nextSeq) > 0)) {
+      throw new ConversationReadError('protocol', 'conversation page query returned an unexpected sequence gap')
+    }
+    return
+  }
+  const first = Number(rows[0]!.seq)
+  const last = Number(rows.at(-1)!.seq)
+  const expected = direction === 'newer'
+    ? anchor
+    : Math.min(anchor, nextSeq) - 1
+  if ((direction === 'newer' && first !== expected)
+    || (direction === 'older' && last !== expected)) {
+    throw new ConversationReadError('protocol', 'conversation page query returned an unexpected sequence gap')
+  }
+}
 
 export class ConversationRepository {
   constructor(private readonly pool: Pool) {}
@@ -501,8 +858,19 @@ export class ConversationRepository {
       if (events[index]!.seq !== events[0]!.seq + index) throw new Error('conversation event batch must be contiguous')
     }
     for (const event of events) assertSafeAssistantEvent(event)
-    const batchJson = serialized(events)
-    const batchChecksum = digest(batchJson)
+    const encodedEvents = events.map(event => {
+      const json = serialized(event)
+      return { event, json, payloadBytes: Buffer.byteLength(json, 'utf8') }
+    })
+    // The event envelopes were serialized once for insertion. JSON arrays use
+    // the same comma-separated representation, so hash those bytes directly
+    // instead of joining a second full-size batch string in memory.
+    const checksum = createHash('sha256').update('[')
+    for (const [index, { json }] of encodedEvents.entries()) {
+      if (index > 0) checksum.update(',')
+      checksum.update(json)
+    }
+    const batchChecksum = checksum.update(']').digest()
     return transaction(this.pool, async (client) => {
       // Batch ids are globally idempotent. Serialize equal ids even when a bad
       // caller reuses one across sessions; hash collisions only reduce concurrency.
@@ -549,19 +917,12 @@ export class ConversationRepository {
       let visibleContentSeq = sessionRow.visible_content_seq === null ? null : Number(sessionRow.visible_content_seq)
       let lastPromptAt = sessionRow.last_prompt_at_ms === null ? null : Number(sessionRow.last_prompt_at_ms)
       const contributions = new Map<number, { count: number; first: number; last: number }>()
-      for (const event of events) {
-        const json = serialized(event)
-        const payloadBytes = Buffer.byteLength(json)
+      const searchRows: ConversationSearchInsertRow[] = []
+      for (const { event, json, payloadBytes } of encodedEvents) {
         bytes += payloadBytes
-        await client.query(`INSERT INTO harness.conversation_events(
-          session_id,seq,event_type,occurred_at,event,payload_bytes
-        ) VALUES($1,$2,$3,to_timestamp($4/1000.0),$5::json,$6)`,
-        [sessionId, event.seq, event.type, event.time, json, payloadBytes])
         const search = eventText(event)
         if (search !== undefined && search.content !== '') {
-          await client.query(`INSERT INTO harness.conversation_search(session_id,event_seq,role,content,occurred_at)
-            VALUES($1,$2,$3,$4,to_timestamp($5/1000.0))`,
-          [sessionId, event.seq, search.role, search.content, event.time])
+          searchRows.push({ role: search.role, content: search.content, seq: event.seq, time: event.time })
         }
         if (eventHasVisibleContent(event)) {
           hasVisibleContent = true
@@ -577,6 +938,8 @@ export class ConversationRepository {
             : { count: current.count + 1, first: Math.min(current.first, event.time), last: Math.max(current.last, event.time) })
         }
       }
+      await insertConversationEvents(client, sessionId, encodedEvents)
+      await insertConversationSearch(client, sessionId, searchRows)
       for (const [publicUserId, contribution] of contributions) {
         const contributor = sessionRow.project_id === null
           ? await client.query<{ id: string }>(`SELECT u.id FROM harness.users u
@@ -631,16 +994,131 @@ export class ConversationRepository {
     })
   }
 
-  private async readFromWith(source: Queryable, sessionId: string, fromSeq: number): Promise<ConversationEvent[]> {
-    const result = await source.query<{ event: ConversationEvent }>(
-      'SELECT event FROM harness.conversation_events WHERE session_id=$1 AND seq >= $2 ORDER BY seq',
-      [sessionId, fromSeq],
+  private async readFromWith(
+    source: Queryable,
+    sessionId: string,
+    fromSeq: number,
+    signal?: AbortSignal,
+  ): Promise<ConversationEvent[]> {
+    const result = await checkedQuery<{ event: ConversationEvent; seq: string }>(source,
+      'SELECT seq::text,event FROM harness.conversation_events WHERE session_id=$1 AND seq >= $2 ORDER BY seq',
+      [sessionId, fromSeq], signal,
     )
+    validateReadRows(result.rows, fromSeq)
     return result.rows.map(row => row.event)
   }
 
-  async readFrom(sessionId: string, fromSeq: number): Promise<ConversationEvent[]> {
-    return await this.readFromWith(this.pool, sessionId, fromSeq)
+  async readFrom(sessionId: string, fromSeq: number, signal?: AbortSignal): Promise<ConversationEvent[]> {
+    if (!Number.isSafeInteger(fromSeq) || fromSeq < 0) {
+      throw new ConversationReadError('protocol', 'conversation readFrom seq must be a non-negative safe integer')
+    }
+    try {
+      return await this.readFromWith(this.pool, sessionId, fromSeq, signal)
+    } catch (error: unknown) {
+      const normalized = normalizeReadError(error, signal)
+      if (normalized !== undefined) throw normalized
+      throw error
+    }
+  }
+
+  /** Read one conversation header and revision without touching its event rows. */
+  async readHeader(sessionId: string, signal?: AbortSignal): Promise<ConversationHeader | undefined> {
+    try {
+      const result = await checkedQuery<StoredHeaderRow>(this.pool, `SELECT ${HEADER_COLUMNS}
+        FROM harness.conversation_sessions WHERE id=$1 AND status<>'deleted'`, [sessionId], signal)
+      const row = result.rows[0]
+      return row === undefined ? undefined : headerFromRow(row)
+    } catch (error: unknown) {
+      const normalized = normalizeReadError(error, signal)
+      if (normalized !== undefined) throw normalized
+      throw error
+    }
+  }
+
+  /**
+   * Read a bounded conversation page using the `(session_id, seq)` index.
+   * Header and event rows are selected in one repeatable-read snapshot so a
+   * continuation cursor never mixes two revisions.
+   */
+  async readPage(
+    sessionId: string,
+    request: ConversationPageRequest = {},
+    signal?: AbortSignal,
+  ): Promise<ConversationPage | undefined> {
+    const direction = pageDirection(request)
+    const beforeSeq = optionalSeq('beforeSeq', request.beforeSeq)
+    const fromSeq = optionalSeq('fromSeq', request.fromSeq)
+    if (request.cursor !== undefined && (beforeSeq !== undefined || fromSeq !== undefined)) {
+      throw new ConversationReadError('protocol', 'conversation page cursor cannot be combined with a sequence anchor')
+    }
+    if (direction === 'older' && fromSeq !== undefined) {
+      throw new ConversationReadError('protocol', 'older conversation pages cannot use fromSeq')
+    }
+    if (direction === 'newer' && beforeSeq !== undefined) {
+      throw new ConversationReadError('protocol', 'newer conversation pages cannot use beforeSeq')
+    }
+    const maxBytes = positiveLimit('maxBytes', request.maxBytes, DEFAULT_PAGE_MAX_BYTES)
+    const maxEvents = positiveLimit('maxEvents', request.maxEvents, DEFAULT_PAGE_MAX_EVENTS)
+    const maxGroups = positiveLimit('maxGroups', request.maxGroups, DEFAULT_PAGE_MAX_GROUPS)
+    const queryLimit = Math.min(MAX_PAGE_QUERY_EVENTS, maxEvents + 1)
+    assertSignal(signal)
+    try {
+      return await transaction(this.pool, async (client) => {
+        await checkedQuery(client, 'SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY', [], signal)
+        const headerResult = await checkedQuery<StoredHeaderRow>(client, `SELECT ${HEADER_COLUMNS}
+          FROM harness.conversation_sessions WHERE id=$1 AND status<>'deleted'`, [sessionId], signal)
+        const headerRow = headerResult.rows[0]
+        if (headerRow === undefined) return undefined
+        const header = headerFromRow(headerRow)
+        const revision = `${headerRow.version}:${headerRow.next_seq}`
+        let anchor: number
+        if (request.cursor !== undefined) {
+          const cursor = decodePageCursor(request.cursor)
+          if (cursor.sessionId !== sessionId || cursor.revision !== revision || cursor.direction !== direction) {
+            throw new ConversationReadError('protocol', 'conversation page cursor is stale or belongs to another request')
+          }
+          anchor = cursor.anchor
+        } else if (direction === 'older') {
+          anchor = beforeSeq ?? Number(headerRow.next_seq)
+        } else {
+          anchor = fromSeq ?? 0
+        }
+        const query = direction === 'older'
+          ? `SELECT seq::text,event,payload_bytes FROM harness.conversation_events
+            WHERE session_id=$1 AND seq < $2 ORDER BY seq DESC LIMIT $3`
+          : `SELECT seq::text,event,payload_bytes FROM harness.conversation_events
+            WHERE session_id=$1 AND seq >= $2 ORDER BY seq ASC LIMIT $3`
+        const result = await checkedQuery<ConversationEventRow>(client, query, [sessionId, anchor, queryLimit], signal)
+        const rows = direction === 'older' ? [...result.rows].reverse() : result.rows
+        validatePageAnchor(rows, direction, anchor, Number(headerRow.next_seq))
+        const selected = selectPageRows(rows, direction, maxBytes, maxEvents, maxGroups)
+        validatePageRows(selected.rows)
+        const first = selected.rows[0]
+        const last = selected.rows.at(-1)
+        const hasMore = selected.hasMore
+          || (direction === 'older' ? (first !== undefined && Number(first.seq) > 0) : (last !== undefined && Number(last.seq) < Number(headerRow.next_seq) - 1))
+        const nextAnchor = direction === 'older'
+          ? (first === undefined ? anchor : Number(first.seq))
+          : (last === undefined ? anchor : Number(last.seq) + 1)
+        const nextCursor = hasMore
+          ? encodePageCursor({ version: 1, sessionId, revision, direction, anchor: nextAnchor })
+          : undefined
+        return {
+          header,
+          events: selected.rows.map(row => row.event),
+          revision,
+          startSeq: first === undefined ? null : Number(first.seq),
+          endSeq: last === undefined ? null : Number(last.seq),
+          hasMore,
+          ...(nextCursor === undefined ? {} : { nextCursor }),
+          uncompressedBytes: selected.bytes,
+        }
+      }, signal)
+    } catch (error: unknown) {
+      const normalized = normalizeReadError(error, signal)
+      if (normalized !== undefined) throw normalized
+      throw error
+    }
   }
 
   /** Read metadata, revision, and events from one PostgreSQL snapshot. */
@@ -659,11 +1137,17 @@ export class ConversationRepository {
     })
   }
 
-  async revision(sessionId: string): Promise<string | undefined> {
-    const result = await this.pool.query<{ version: string; next_seq: string }>(`SELECT version::text,next_seq::text
-      FROM harness.conversation_sessions WHERE id=$1 AND status<>'deleted'`, [sessionId])
-    const row = result.rows[0]
-    return row === undefined ? undefined : `${row.version}:${row.next_seq}`
+  async revision(sessionId: string, signal?: AbortSignal): Promise<string | undefined> {
+    try {
+      const result = await checkedQuery<{ version: string; next_seq: string }>(this.pool, `SELECT version::text,next_seq::text
+        FROM harness.conversation_sessions WHERE id=$1 AND status<>'deleted'`, [sessionId], signal)
+      const row = result.rows[0]
+      return row === undefined ? undefined : `${row.version}:${row.next_seq}`
+    } catch (error: unknown) {
+      const normalized = normalizeReadError(error, signal)
+      if (normalized !== undefined) throw normalized
+      throw error
+    }
   }
 
   async list(organizationId: string, projectId?: string): Promise<ConversationHeader[]> {

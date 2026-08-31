@@ -10,6 +10,36 @@ import { hasConversationContent, SessionPreparation } from '@deepseek-ai/dsh-ses
 import type { Session, SessionDraftId, SessionEvent, SessionId, SessionHeader } from '@deepseek-ai/dsh-session'
 import type { SessionPersistenceRevision } from './revision.ts'
 
+export {
+  SessionPersistencePageTooLargeError,
+  SessionPersistenceReadError,
+  SessionPersistenceReadCursor,
+  decodeSessionPersistenceCursor,
+  encodeSessionPersistenceCursor,
+  cursorSessionId,
+  normalizeSessionPersistencePageRequest,
+  selectSessionPersistencePage,
+} from './page.ts'
+export type {
+  SessionPersistenceCursorPayload,
+  SessionPersistencePage,
+  SessionPersistencePageDirection,
+  SessionPersistencePageRequest,
+  SessionPersistenceReadErrorCode,
+  SelectedSessionPersistencePage,
+} from './page.ts'
+import {
+  SessionPersistenceReadError,
+  decodeSessionPersistenceCursor,
+  encodeSessionPersistenceCursor,
+  normalizeSessionPersistencePageRequest,
+  selectSessionPersistencePage,
+} from './page.ts'
+import type {
+  SessionPersistencePage,
+  SessionPersistencePageRequest,
+} from './page.ts'
+
 // Re-export the metadata vocabulary so Consumers import it from the Service Definition.
 export type { SessionHeader } from '@deepseek-ai/dsh-session'
 export { SessionPersistenceRevision } from './revision.ts'
@@ -70,6 +100,13 @@ export interface SessionInspection {
   /** Validated contiguous logical event log. */
   readonly events: readonly SessionEvent[]
 }
+
+/** Default maximum uncompressed bytes returned by one persistence page. */
+export const DEFAULT_SESSION_PAGE_MAX_BYTES = 512 * 1024
+/** Default maximum logical events returned by one persistence page. */
+export const DEFAULT_SESSION_PAGE_MAX_EVENTS = 2_000
+/** Default message-group hint used by seek-capable persistence providers. */
+export const DEFAULT_SESSION_PAGE_MAX_GROUPS = 50
 
 /** A backend's own raw artifact text for one session, verbatim. */
 export interface SessionRawArtifact {
@@ -289,6 +326,19 @@ export abstract class SessionPersistence extends Service {
   Promise<{ meta: SessionHeader; events: SessionEvent[] }>
 
   /**
+   * Read one session header without loading its event log. First-party
+   * providers override this with an indexed lookup; the default filters the
+   * lightweight snapshot list for third-party compatibility.
+   * @param id - persisted session to observe.
+   * @param signal - optional cancellation for backend lookup work.
+   * @returns the immutable header, or undefined when the session is absent.
+   */
+  async readHeader(id: SessionId, signal?: AbortSignal): Promise<SessionHeader | undefined> {
+    signal?.throwIfAborted()
+    return (await this.listSnapshots(signal)).find(snapshot => snapshot.header.id === id)?.header
+  }
+
+  /**
    * Lightweight listing from metadata, without a full-log parse.
    * @param signal - optional cancellation for backend listing work.
    * @returns one header per materialized session.
@@ -305,6 +355,121 @@ export abstract class SessionPersistence extends Service {
    */
   async revision(id: SessionId, signal?: AbortSignal): Promise<SessionPersistenceRevision | undefined> {
     return (await this.listSnapshots(signal)).find(snapshot => snapshot.header.id === id)?.revision
+  }
+
+  /**
+   * Read one lightweight source revision. This named alias keeps callers from
+   * accidentally choosing a full-log operation when they only need freshness.
+   * @param id - persisted session to observe.
+   * @param signal - optional cancellation for backend lookup work.
+   * @returns the current revision, or undefined when the session is absent.
+   */
+  async readRevision(id: SessionId, signal?: AbortSignal): Promise<SessionPersistenceRevision | undefined> {
+    return this.revision(id, signal)
+  }
+
+  /**
+   * Read a bounded event-log page. Third-party providers inherit a safe
+   * compatibility fallback through {@link readFrom}; seek-capable providers
+   * override this method so source acquisition remains bounded.
+   * @param id - persisted session to read.
+   * @param request - revision-aware page request.
+   * @param signal - optional cancellation for backend read work.
+   * @returns one immutable page and a continuation cursor.
+   */
+  async readPage(
+    id: SessionId,
+    request: SessionPersistencePageRequest = {},
+    signal?: AbortSignal,
+  ): Promise<SessionPersistencePage> {
+    const normalized = normalizeSessionPersistencePageRequest(request, {
+      maxBytes: DEFAULT_SESSION_PAGE_MAX_BYTES,
+      maxEvents: DEFAULT_SESSION_PAGE_MAX_EVENTS,
+      maxGroups: DEFAULT_SESSION_PAGE_MAX_GROUPS,
+    })
+    signal?.throwIfAborted()
+    const revision = await this.readRevision(id, signal)
+    if (revision === undefined) throw new Error(`session "${id}" not found`)
+    let cursorAnchor: number | undefined
+    if (normalized.cursor !== undefined) {
+      const decoded = decodeSessionPersistenceCursor(normalized.cursor)
+      if (decoded.sessionId !== id || decoded.revision !== String(revision)
+        || decoded.direction !== normalized.direction) {
+        throw new SessionPersistenceReadError('protocol', 'session persistence page cursor is stale or belongs to another request')
+      }
+      cursorAnchor = decoded.anchor
+    }
+    const loaded = await this.readFrom(id, normalized.direction === 'newer'
+      ? cursorAnchor ?? normalized.fromSeq ?? 0
+      : 0, signal)
+    signal?.throwIfAborted()
+    if (loaded.meta.id !== id) {
+      throw new SessionPersistenceReadError('protocol', `session persistence returned metadata for "${id}"`)
+    }
+    let expectedSeq = normalized.direction === 'newer'
+      ? cursorAnchor ?? normalized.fromSeq ?? 0
+      : 0
+    for (const event of loaded.events) {
+      if (!Number.isSafeInteger(event.seq) || event.seq < 0 || event.seq !== expectedSeq) {
+        throw new SessionPersistenceReadError('protocol', 'session persistence returned a non-contiguous event range')
+      }
+      try {
+        const encoded: unknown = JSON.stringify(event)
+        if (typeof encoded !== 'string') {
+          throw new Error('event JSON is undefined')
+        }
+      } catch (error: unknown) {
+        throw new SessionPersistenceReadError(
+          'protocol',
+          'session persistence returned a non-serializable event',
+          { cause: error },
+        )
+      }
+      expectedSeq++
+    }
+    const currentRevision = await this.readRevision(id, signal)
+    if (currentRevision === undefined || String(currentRevision) !== String(revision)) {
+      throw new SessionPersistenceReadError('dependency', 'session persistence revision changed during page read')
+    }
+    const all = loaded.events
+    const anchor = cursorAnchor ?? (normalized.direction === 'older'
+      ? normalized.beforeSeq ?? ((all.at(-1)?.seq ?? -1) + 1)
+      : normalized.fromSeq ?? 0)
+    const window = normalized.direction === 'older'
+      ? all.filter(event => event.seq < anchor)
+      : all.filter(event => event.seq >= anchor)
+    const selected = selectSessionPersistencePage(
+      window,
+      normalized.direction,
+      normalized.maxBytes,
+      normalized.maxEvents,
+      normalized.maxGroups,
+    )
+    const first = selected.events[0]
+    const last = selected.events.at(-1)
+    const hasMore = selected.hasMore
+    const nextAnchor = normalized.direction === 'older'
+      ? (first?.seq ?? 0)
+      : (last?.seq ?? (anchor - 1)) + 1
+    const nextCursor = hasMore
+      ? encodeSessionPersistenceCursor({
+        version: 1,
+        sessionId: id,
+        revision: String(revision),
+        direction: normalized.direction,
+        anchor: nextAnchor,
+      })
+      : undefined
+    return {
+      meta: loaded.meta,
+      revision,
+      events: selected.events,
+      startSeq: first?.seq ?? null,
+      endSeq: last?.seq ?? null,
+      hasMore,
+      ...(nextCursor === undefined ? {} : { nextCursor }),
+      uncompressedBytes: selected.bytes,
+    }
   }
 
   /**

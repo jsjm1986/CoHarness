@@ -8,6 +8,8 @@ Provider-neutral LLM vocabulary and abstract service. This package defines the c
 
 An adapter registry plus a single streaming call API, interceptable via a waterfall event.
 
+The service accepts `streamCloseTimeoutMs` (default `1000`) to bound adapter iterator cleanup. Each outstanding adapter `next()` observes the request signal; cancellation wins the read and the runtime still awaits bounded `return()` cleanup.
+
 ### Retry policy
 
 Each provider adapter supplies its resolved route policy. Omitting provider configuration uses bounded normal mode with five retries after the first request. Layered configuration may retain `maxRetries` or `retryableCodes` after changing `mode` to `always`; resolution ignores those inactive normal-mode fields and captures a pure always policy. This service stores the effective policy but does not execute retries.

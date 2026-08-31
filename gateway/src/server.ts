@@ -1,6 +1,5 @@
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import { createServer } from 'node:http'
-import { once } from 'node:events'
 import type { Duplex } from 'node:stream'
 import type { UserRow } from './auth.ts'
 import {
@@ -39,6 +38,7 @@ import type {
 import type { ConversationArchiveService } from './postgres/conversation-archive-service.ts'
 import { isAdminPath, serveAdmin } from './static.ts'
 import { ResponseBodyTooLargeError } from './response-budget.ts'
+import { removeBootstrapAdminPassword } from './bootstrap-admin.ts'
 import type { ProjectConfigurationView } from './project-configuration.ts'
 import type { ProjectThemePolicy } from './projects.ts'
 import { applyModelGovernanceToProject, scheduleModelGovernanceRefresh } from './apply-model-governance.ts'
@@ -61,7 +61,7 @@ export interface GatewayDeps {
   archives?: ConversationArchiveService
   /** Optional persistent device registry and multi-provider push delivery service. */
   push?: GatewayPushService
-  readiness?: () => Awaitable<void>
+  readiness?: (signal?: AbortSignal) => Awaitable<void>
 }
 
 export const SESSION_COOKIE = 'hgw_session'
@@ -148,6 +148,33 @@ function requestAbort(req: IncomingMessage, res: ServerResponse): {
   }
 }
 
+/**
+ * Wait for writable capacity or a closed response without leaving the losing
+ * event listener behind.  A plain `Promise.race([once(...)])` retains one
+ * listener for every backpressured response until the other event eventually
+ * fires; long-lived downloads then trigger EventEmitter listener warnings.
+ */
+async function waitForResponseWritable(res: ServerResponse): Promise<'drain' | 'close'> {
+  if (res.destroyed || res.writableEnded) return 'close'
+  return new Promise<'drain' | 'close'>(resolve => {
+    let settled = false
+    const finish = (event: 'drain' | 'close'): void => {
+      if (settled) return
+      settled = true
+      res.removeListener('drain', onDrain)
+      res.removeListener('close', onClose)
+      resolve(event)
+    }
+    const onDrain = (): void => { finish('drain') }
+    const onClose = (): void => { finish('close') }
+    res.once('drain', onDrain)
+    res.once('close', onClose)
+    // The response can close between the state check above and listener
+    // installation. Re-check after registration so that waiters never wedge.
+    if (res.destroyed || res.writableEnded) finish('close')
+  })
+}
+
 async function sendGatewayResponse(res: ServerResponse, response: Response, limit: number): Promise<void> {
   const declared = response.headers.get('content-length')
   if (declared !== null) {
@@ -185,7 +212,7 @@ async function sendGatewayResponse(res: ServerResponse, response: Response, limi
         if (!res.destroyed) res.destroy(new ResponseBodyTooLargeError(limit))
         return
       }
-      if (!res.write(next.value)) await Promise.race([once(res, 'drain'), once(res, 'close')])
+      if (!res.write(next.value) && await waitForResponseWritable(res) === 'close') break
       if (res.destroyed) break
     }
     if (!res.writableEnded) res.end()
@@ -327,6 +354,13 @@ export interface GatewayHandlers {
   /** Gateway-owned administrator lifecycle operations for catalog rows. */
   documentAdmin?: GatewayDocumentAdminHandler
   admin?: (req: IncomingMessage, res: ServerResponse, user: UserRow, pathname: string, body: string) => Promise<boolean>
+  /**
+   * Authenticate a loopback runtime request before its body is read. The
+   * production composition supplies the runtime-token verifier; keeping this
+   * callback at the HTTP boundary prevents unauthenticated callers from
+   * forcing a 64 MiB allocation before the runtime handler can reject them.
+   */
+  runtimeAuthorize?: (req: IncomingMessage) => Awaitable<boolean>
   runtime?: (req: IncomingMessage, res: ServerResponse, pathname: string, body: string) => Promise<boolean>
   /** Override `serveAdmin` root (tests); default `gateway/public/admin`. */
   adminRoot?: string
@@ -334,6 +368,51 @@ export interface GatewayHandlers {
 
 export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers = {}): Server {
   const { cfg, auth, users, audit } = deps
+
+  const HEALTH_READINESS_TIMEOUT_MS = 5_000
+  const HEALTH_READINESS_CACHE_MS = 1_000
+  const HEALTH_READINESS_FAILURE_BACKOFF_MS = 1_000
+  let readinessInFlight: Promise<void> | undefined
+  let readinessCachedUntil = 0
+  let readinessFailureUntil = 0
+  let readinessFailure: Error | undefined
+
+  /** Share a short readiness probe across concurrent health checks. */
+  const checkReadiness = async (): Promise<void> => {
+    if (deps.readiness === undefined) return
+    const now = Date.now()
+    if (readinessCachedUntil > now) return
+    if (readinessFailure !== undefined && readinessFailureUntil > now) throw readinessFailure
+    if (readinessInFlight !== undefined) return readinessInFlight
+    const controller = new AbortController()
+    const readinessTimeoutMs = Math.min(cfg.readinessTimeoutMs, HEALTH_READINESS_TIMEOUT_MS)
+    const operation = Promise.resolve().then(() => deps.readiness?.(controller.signal))
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const timeout = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        controller.abort(new Error('Gateway readiness probe timed out'))
+        const error = new Error('Gateway readiness probe timed out')
+        error.name = 'TimeoutError'
+        reject(error)
+      }, readinessTimeoutMs)
+      timer.unref?.()
+    })
+    const probe = Promise.race([operation, timeout]).then(() => {
+      readinessFailure = undefined
+      readinessFailureUntil = 0
+      readinessCachedUntil = Date.now() + HEALTH_READINESS_CACHE_MS
+    }).catch((error: unknown) => {
+      const failure = error instanceof Error ? error : new Error(String(error))
+      readinessFailure = failure
+      readinessFailureUntil = Date.now() + HEALTH_READINESS_FAILURE_BACKOFF_MS
+      throw failure
+    }).finally(() => {
+      if (timer !== undefined) clearTimeout(timer)
+      if (readinessInFlight === probe) readinessInFlight = undefined
+    })
+    readinessInFlight = probe
+    return probe
+  }
 
   const currentUser = async (req: IncomingMessage): Promise<{ token: string; user: UserRow } | null> => {
     const token = parseCookies(req.headers.cookie).get(SESSION_COOKIE)
@@ -390,9 +469,14 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const pathname = new URL(req.url ?? '/', 'http://x').pathname
 
-    if (pathname === '/healthz') {
+    if (pathname === '/healthz/live') {
+      send(res, 200, JSON.stringify({ ok: true, release: cfg.releaseId }), 'application/json')
+      return
+    }
+
+    if (pathname === '/healthz' || pathname === '/healthz/ready') {
       try {
-        await deps.readiness?.()
+        await checkReadiness()
         send(res, 200, JSON.stringify({ ok: true, release: cfg.releaseId }), 'application/json')
       } catch {
         send(res, 503, JSON.stringify({ ok: false, release: cfg.releaseId }), 'application/json')
@@ -401,6 +485,28 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     }
 
     if (pathname.startsWith('/internal/runtime/')) {
+      if (handlers.runtimeAuthorize !== undefined) {
+        let authorized = false
+        try {
+          authorized = await handlers.runtimeAuthorize(req)
+        } catch {
+          authorized = false
+        }
+        if (!authorized) {
+          // Drain the request so keep-alive clients cannot strand the socket,
+          // but never buffer the attacker-controlled body first.
+          req.resume()
+          send(res, 401, '{"error":"invalid-runtime-token"}', 'application/json')
+          return
+        }
+      } else if (req.headers.authorization === undefined) {
+        // Test/legacy compositions may omit a verifier callback. They still
+        // receive the cheap header gate; production wires the callback above
+        // for cryptographic validation before body admission.
+        req.resume()
+        send(res, 401, '{"error":"invalid-runtime-token"}', 'application/json')
+        return
+      }
       let body = ''
       try {
         body = req.method === 'GET' || req.method === 'HEAD'
@@ -471,6 +577,11 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         const password = new URLSearchParams(await readBody(req)).get('password') ?? ''
         if (password.length < 8) { send(res, 400, passwordPage('密码至少 8 位')); return }
         await users.changeOwnPassword(user.id, password)
+        await removeBootstrapAdminPassword(cfg.bootstrapAdminPasswordFile).catch((error: unknown) => {
+          // Password change remains successful; operators can remove a stale
+          // one-time file after the warning if the filesystem rejected it.
+          console.error('[gateway] bootstrap password file cleanup failed:', error)
+        })
         await audit.write({ userId: user.id, action: 'password.changed', ip: clientIp(req) })
         redirect(res, '/')
         return

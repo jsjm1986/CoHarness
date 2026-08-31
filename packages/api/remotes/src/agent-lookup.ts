@@ -88,22 +88,29 @@ export function apiRemoteSubagentOwnershipError(sessionId: SessionId): ApiRemote
  * Inspect one cold served session without repairing, resuming, or publishing it.
  * @param ctx - Host Context carrying the optional persistence provider.
  * @param sessionId - durable identity to inspect.
+ * @param signal - optional cancellation for listing and inspection work.
  * @returns detached metadata and events for a servable session.
  * @throws {@link ApiRemoteSessionNotFound} when the identity has no project-backed session.
  */
 export async function inspectApiRemoteSession(
   ctx: Context,
   sessionId: SessionId,
+  signal?: AbortSignal,
 ): Promise<{ meta: SessionHeader; events: SessionEvent[] }> {
+  signal?.throwIfAborted()
   const persistence = ctx.get('sessionPersistence')
   if (persistence === undefined) {
     throw new Error('session persistence is not configured (load a dsh-session-persistence backend)')
   }
-  const meta = (await persistence.list()).find(candidate => candidate.id === sessionId)
+  const listed = signal === undefined ? await persistence.list() : await persistence.list(signal)
+  const meta = listed.find(candidate => candidate.id === sessionId)
   if (meta === undefined || meta.cwd === undefined) {
     throw new ApiRemoteSessionNotFound(`session "${sessionId}" not found`)
   }
-  const inspected = await persistence.inspect(sessionId)
+  const inspected = signal === undefined
+    ? await persistence.inspect(sessionId)
+    : await persistence.inspect(sessionId, signal)
+  signal?.throwIfAborted()
   if (inspected.meta.cwd === undefined) {
     throw new ApiRemoteSessionNotFound(`session "${sessionId}" not found`)
   }

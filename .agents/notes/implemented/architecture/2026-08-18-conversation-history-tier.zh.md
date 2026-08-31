@@ -10,7 +10,7 @@ Status: implemented
 
 ## 决策
 
-`session.history` 与 `subagent.history` 接受 `detail?: 'conversation' | 'full'`。缺失的 `detail` 与 `'full'` 返回已经分页页面上的全部事件。Web `Session` 在 `open()` / `loadOlder()` 时请求 `conversation`，除非该会话已经补全 detail。Host 仍分页出一段连续原始区间，再从 `events` 中省略符合条件的历史 chunk 游程，并以 `omittedSpans` 报告，使客户端保持无空洞的 seq 账本。Trajectory、Chat inspect 交接，以及持久化的 `view === 'trajectory'` 恢复，会对同一窗口请求 `full` 并按 seq 合并。Fetch 继续打包剩余 chunk。
+`session.history` 与 `subagent.history` 接受 `detail?: 'conversation' | 'full'`。缺失的 `detail` 与 `'full'` 返回已经分页页面上的全部事件。Web `Session` 在 `open()` / `loadOlder()` 时请求 `conversation`，除非该会话已经补全 detail。Host 在可用时通过带索引持久化提供方的 `readPage` 原语取得冷页，并让 detached 区间受页面和总实体化预算约束，然后从 `events` 中省略符合条件的历史 chunk 游程，并以 `omittedSpans` 报告，使客户端保持无空洞的 seq 账本。没有 seek 分页实现的提供方保留兼容的检查路径。Trajectory、Chat inspect 交接，以及持久化的 `view === 'trajectory'` 恢复，会对同一窗口请求 `full` 并按 seq 合并。Fetch 继续打包剩余 chunk。
 
 `omittedSpans` 是被省略历史 chunk 游程的闭区间 `{ startSeq, endSeq }`；没有省略时该字段缺席或为 `[]`。
 

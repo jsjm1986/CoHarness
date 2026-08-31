@@ -42,6 +42,39 @@ export class Notifier {
     this.schedule(typeof globalThis.requestAnimationFrame === 'function' ? 'frame' : 'microtask')
   }
 
+  /**
+   * Stream-change entry for a hot producer. Coalesces updates across a small
+   * number of animation frames so a large token burst cannot make rendering
+   * consume every frame while input and timers wait behind it.
+   * @param intervalFrames - minimum animation frames between publications.
+   */
+  markFrameDirtyThrottled(intervalFrames = 3): void {
+    if (!Number.isSafeInteger(intervalFrames) || intervalFrames < 1) {
+      throw new RangeError('intervalFrames must be a positive safe integer')
+    }
+    this.dirty = true
+    this.notifyPending = true
+    if (this.scheduled !== 'none') return
+    if (typeof globalThis.requestAnimationFrame !== 'function' || intervalFrames === 1) {
+      this.schedule(typeof globalThis.requestAnimationFrame === 'function' ? 'frame' : 'microtask')
+      return
+    }
+    const generation = ++this.scheduleGeneration
+    this.scheduled = 'frame'
+    let remaining = intervalFrames
+    const advance = (): void => {
+      if (generation !== this.scheduleGeneration) return
+      remaining -= 1
+      if (remaining > 0) {
+        globalThis.requestAnimationFrame(advance)
+        return
+      }
+      this.scheduled = 'none'
+      this.flush()
+    }
+    globalThis.requestAnimationFrame(advance)
+  }
+
   /** Synchronous flush for controlled-input writes. */
   notifyNow(): void {
     this.dirty = true

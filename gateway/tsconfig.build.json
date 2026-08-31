@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": false,
+    "sourceMap": false,
+    "outDir": "./lib",
+    "rootDir": "./src",
+    "rewriteRelativeImportExtensions": true,
+    "tsBuildInfoFile": "./lib/tsconfig.tsbuildinfo",
+    "paths": {
+      "@deepseek-ai/dsh-llm/discovery": ["../packages/llm/llm/lib/types/discovery.d.ts"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["tests", "scripts"]
+}

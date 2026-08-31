@@ -49,6 +49,8 @@ export interface GatewayConfig {
   runtimeCredentialDir: string
   /** Owner-only AES-GCM master-key file for organization model credentials. */
   organizationModelCredentialKeyFile: string
+  /** Owner-only one-time file for a newly generated bootstrap administrator password. */
+  bootstrapAdminPasswordFile: string
   dshCommand: string[]
   dshRepoRoot: string
   instancePortBase: number
@@ -259,6 +261,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   }
   const usersRoot = env.HGW_USERS_ROOT ?? join(homedir(), 'harness-users')
   const stateRoot = env.HGW_STATE_ROOT ?? join(homedir(), '.harness-gateway')
+  const bootstrapAdminPasswordFile = normalizedAbsolutePath(resolve(
+    env.HGW_BOOTSTRAP_ADMIN_PASSWORD_FILE ?? join(stateRoot, 'bootstrap-admin-password'),
+  ))
+  if (!posix.isAbsolute(bootstrapAdminPasswordFile) || bootstrapAdminPasswordFile === '/') {
+    throw new Error('HGW_BOOTSTRAP_ADMIN_PASSWORD_FILE must be an absolute path')
+  }
+  const principalKeyDir = resolve(env.HGW_PRINCIPAL_KEY_DIR ?? join(stateRoot, 'principal-keys'))
+  const runtimeCredentialDir = resolve(env.HGW_RUNTIME_CREDENTIAL_DIR ?? join(stateRoot, 'runtime-credentials'))
+  const organizationModelCredentialKeyFile = resolve(
+    env.HGW_ORGANIZATION_MODEL_CREDENTIAL_KEY_FILE ?? join(stateRoot, 'organization-model-credentials.key'),
+  )
   const launcher = env.HGW_LAUNCHER === 'systemd' ? 'systemd' : 'local'
   const configuredProjectPathRoots = projectPathRoots(env.HGW_PROJECT_PATH_ROOTS)
   if (launcher === 'systemd' && configuredProjectPathRoots.length === 0) {
@@ -292,6 +305,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
   if (pathsOverlap(projectsRoot, usersRoot) || pathsOverlap(projectsRoot, projectRuntimesRoot)
     || pathsOverlap(projectsRoot, gatewayDir) || pathsOverlap(projectsRoot, userProjectsRoot)) {
     throw new Error('HGW_PROJECTS_ROOT overlaps a reserved Gateway directory')
+  }
+  if (pathsOverlap(bootstrapAdminPasswordFile, usersRoot)
+    || pathsOverlap(bootstrapAdminPasswordFile, projectRuntimesRoot)
+    || pathsOverlap(bootstrapAdminPasswordFile, userProjectsRoot)
+    || pathsOverlap(bootstrapAdminPasswordFile, projectsRoot)
+    || pathsOverlap(bootstrapAdminPasswordFile, gatewayDir)
+    || pathsOverlap(bootstrapAdminPasswordFile, principalKeyDir)
+    || pathsOverlap(bootstrapAdminPasswordFile, runtimeCredentialDir)
+    || pathsOverlap(bootstrapAdminPasswordFile, organizationModelCredentialKeyFile)) {
+    throw new Error('HGW_BOOTSTRAP_ADMIN_PASSWORD_FILE overlaps a runtime, project, Gateway, or credential path')
   }
   // The default source-run entry is resolved to ABSOLUTE paths against
   // dshRepoRoot: instances spawn with cwd = user home (outside the repo), so
@@ -423,7 +446,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     userProjectsRoot,
     projectsRoot,
     projectRuntimeUser,
-    principalKeyDir: env.HGW_PRINCIPAL_KEY_DIR ?? join(stateRoot, 'principal-keys'),
+    principalKeyDir,
     principalAssertionTtlMs,
     upstreamTimeoutMs,
     upstreamResponseLimitBytes,
@@ -431,9 +454,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     archiveRetentionDays,
     databaseStartupRetryInitialMs,
     databaseStartupRetryMaxMs,
-    runtimeCredentialDir: env.HGW_RUNTIME_CREDENTIAL_DIR ?? join(stateRoot, 'runtime-credentials'),
-    organizationModelCredentialKeyFile: env.HGW_ORGANIZATION_MODEL_CREDENTIAL_KEY_FILE
-      ?? join(stateRoot, 'organization-model-credentials.key'),
+    runtimeCredentialDir,
+    organizationModelCredentialKeyFile,
+    bootstrapAdminPasswordFile,
     dshCommand,
     dshRepoRoot,
     instancePortBase,
