@@ -43,3 +43,9 @@
   - button "Queue":
     - text: Queue
     - img
+  - text: Conversation display Adjust transcript width and text size Content width
+  - slider "Content width": "748"
+  - status: 748px
+  - text: Text size
+  - slider "Text size": "14"
+  - status: 14px
