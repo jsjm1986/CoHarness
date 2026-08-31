@@ -401,6 +401,16 @@ describe('ConversationRoot resident composer', () => {
     expect(b.newSession).toHaveBeenCalledWith(wid('pending'))
   })
 
+  it('does not keep a deleted Workspace as a New conversation target', () => {
+    const b = mount(
+      conversationSnapshot({ composerPhase: 'blank', blank: true }),
+      [],
+      undefined,
+      { summaryBlank: true, summaryWorkspaceId: wid('deleted') },
+    )
+    expect(b.view.queryByRole('button', { name: '新建对话' })).toBeNull()
+  })
+
   it('keeps composer text in the machine, mirrors to the chat store, and submits through the sink', () => {
     const b = mount(conversationSnapshot())
     const box = b.view.getByRole('textbox')

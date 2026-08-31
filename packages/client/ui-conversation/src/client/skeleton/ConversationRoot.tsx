@@ -67,6 +67,10 @@ export function ConversationRoot({
     ? workspaces.items.find(workspace => workspace.workspaceId === summaryWorkspaceId)
     : undefined
   const activeWorkspace = sessionWorkspace ?? draftWorkspace
+  const hintedWorkspaceId = summaryBlank === true && summaryWorkspaceId !== undefined
+    && (activeWorkspace !== undefined || workspaces.phase !== 'ready')
+    ? summaryWorkspaceId
+    : undefined
   const pendingWorkspace = workspaces.items.find(
     workspace => workspace.workspaceId === pendingWorkspaceId,
   )
@@ -150,7 +154,7 @@ export function ConversationRoot({
 
   const newSessionWorkspaceId = pendingWorkspaceId
     ?? activeWorkspace?.workspaceId
-    ?? summaryWorkspaceId
+    ?? hintedWorkspaceId
     ?? workspaces.recentWorkspaceId
 
   const heroWorkspaceRow = (
@@ -176,7 +180,7 @@ export function ConversationRoot({
       {renderSlot('conversation.hero.workspace', {
         open: pickerOpen,
         anchorRef: pickerAnchor,
-        selectedId: pendingWorkspaceId ?? activeWorkspace?.workspaceId ?? summaryWorkspaceId,
+        selectedId: pendingWorkspaceId ?? activeWorkspace?.workspaceId ?? hintedWorkspaceId,
         onPick: chooseWorkspace,
         onClose: () => { setPickerOpen(false) },
       })}
