@@ -284,6 +284,7 @@ function SessionTree({
   const currentGroup = current === undefined
     ? undefined
     : (workspaces.find(w => w.sessionIds.includes(current))?.workspaceId as string | undefined)
+      ?? list.byId[current]?.workspaceId
       ?? UNGROUPED_KEY
   useEffect(() => {
     if (current === undefined || currentGroup === undefined || Object.hasOwn(groupExpansion, currentGroup)) return
@@ -295,7 +296,14 @@ function SessionTree({
   )
   const ungroupedSessionIds = useMemo(() => {
     const accounted = new Set(workspaces.flatMap(workspace => workspace.sessionIds))
-    return list.ids.filter(id => list.byId[id] !== undefined && !accounted.has(id))
+    const hintedWorkspaces = new Set(workspaces.map(workspace => workspace.workspaceId))
+    return list.ids.filter((id) => {
+      const summary = list.byId[id]
+      const hintedWorkspace = summary?.workspaceId
+      return summary !== undefined
+        && (hintedWorkspace === undefined || !hintedWorkspaces.has(hintedWorkspace))
+        && !accounted.has(id)
+    })
   }, [list, workspaces])
   useEffect(() => {
     if (list.phase !== 'ready') return
@@ -527,7 +535,7 @@ function SessionTree({
               // Session drag never leaves its group. Ungrouped writes only the
               // browser-local account; real Workspaces may also write Host order.
                 const sameGroupDrag = drag !== null && drag.accountKey === group.key
-                const dragProps = {
+                const dragProps = node.blank && node.workspaceId !== undefined ? undefined : {
                   start: () => {
                     sessionDropCommitted.current = false
                     setDrag({ accountKey: group.key, sessionId: node.id, over: null })
@@ -820,12 +828,16 @@ export function WorkspaceBrowser({
   const sessionUpdatedAtByAccount = useStore(s => s.sessionUpdatedAtByAccount)
   const currentBlankSessionId = useSessions((state) => {
     const current = state.current
-    return current !== undefined && state.byId[current]?.blank === true ? current : undefined
+    const summary = current === undefined ? undefined : state.byId[current]
+    return summary?.blank === true ? current : undefined
   })
+  const currentBlankWorkspaceId = useSessions(state => currentBlankSessionId === undefined
+    ? undefined
+    : state.byId[currentBlankSessionId]?.workspaceId)
   const currentBlankAccount = currentBlankSessionId === undefined
     ? undefined
     : (workspaces.find(workspace => workspace.sessionIds.includes(currentBlankSessionId))
-      ?.workspaceId as string | undefined) ?? UNGROUPED_KEY
+      ?.workspaceId as string | undefined) ?? currentBlankWorkspaceId ?? UNGROUPED_KEY
   const promotedBlank = useRef<{ sessionId: SessionId; accountKey: string } | undefined>(undefined)
   useEffect(() => {
     if (currentBlankSessionId === undefined || currentBlankAccount === undefined) {

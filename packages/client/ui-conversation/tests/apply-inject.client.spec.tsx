@@ -286,6 +286,18 @@ describe('conversation slot inject API', () => {
     await b.runtime.dispose()
   })
 
+  it('routes the explicit New conversation action to the selected Workspace', async () => {
+    const b = await bench()
+    const resident = b.residentApi(ROOT)
+    resident.newSession('workspace-new' as never)
+    await vi.waitFor(() => {
+      expect(b.runtime.workspaces.calls).toContainEqual({
+        method: 'startSession', args: ['workspace-new'],
+      })
+    })
+    await b.runtime.dispose()
+  })
+
   it('selectWorkspace edge arms: no-session resident, empty-draft move, open failure retryable', async () => {
     const b = await bench()
     // No-session resident (hero before any session): connect resolves and

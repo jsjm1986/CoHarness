@@ -317,6 +317,7 @@ describe('WorkspaceRuntime', () => {
     expect(api.callsOf('session.create')).toEqual([{
       workspaceId: 'alpha', sessionId: 's-blank', reuseWorkspaceBlank: true,
     }])
+    expect(sessions.list.getSnapshot().byId[sid('s-blank')]).toMatchObject({ workspaceId: wid('alpha') })
     // Resolution guarantee: the id is binding-resolvable synchronously.
     expect(sessions.binding(sid('s-blank'))).toBeDefined()
 
@@ -630,6 +631,34 @@ describe('WorkspaceRuntime', () => {
     const clear = vi.spyOn(emptySessions, 'clear')
     emptyWorkspaces.startSession()
     expect(clear).toHaveBeenCalledOnce()
+  })
+
+  it('uses a blank draft Workspace hint when Host membership is still pending', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const sessions = new SessionRuntime(ctx, api, fakeRemote())
+    const workspaces = new WorkspaceRuntime(ctx, api, sessions)
+    api.onWorkspaceList = () => Promise.resolve(ok({
+      items: [workspace('hinted', []), workspace('recent', [], '2026-02-01T00:00:00.000Z')] as never[],
+    }))
+    api.onList = () => Promise.resolve(ok({
+      items: [{
+        sessionId: sid('draft'), updatedAt: 1, running: false, blank: true,
+      }] as never[],
+    }))
+    await Promise.all([workspaces.refresh(), sessions.refresh()])
+    api.onCreate = () => Promise.resolve(ok({ sessionId: sid('draft') }))
+    await sessions.create({
+      workspaceId: wid('hinted'), sessionId: sid('draft'), draftId: 'draft-hinted' as never,
+    })
+    sessions.open(sid('draft'))
+    // The local hint is supplied by the draft reservation and does not imply
+    // Host membership in the Workspace view.
+    expect(sessions.list.getSnapshot().byId[sid('draft')]).toMatchObject({ workspaceId: wid('hinted') })
+    const connect = vi.spyOn(workspaces, 'connectWorkspace').mockReturnValue(new Promise(() => {}))
+    workspaces.startSession()
+    await Promise.resolve()
+    expect(connect).toHaveBeenCalledWith(wid('hinted'))
   })
 
   it('archives a session, projects the set from the response, list, and frame, and clears only the current one', async () => {

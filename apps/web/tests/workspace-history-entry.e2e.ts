@@ -63,7 +63,7 @@ describe('web e2e: Workspace history-first entry', () => {
     return { page, tripwire }
   }
 
-  it('desktop opens the existing history and keeps explicit New Session blank', async () => {
+  it('desktop opens the existing history and exposes an explicit blank-session action', async () => {
     const opened = await openPage({ width: 1280, height: 800 })
     const { page } = opened
     onTestFailed(() => saveFailureShot(page, 'web-e2e-workspace-history-entry-desktop'))
@@ -71,9 +71,19 @@ describe('web e2e: Workspace history-first entry', () => {
     const snapshot = await captureStableAria(page, '[data-conversation-scroll]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(DESKTOP_EXPECTED, snapshot, MODE)
 
-    await page.getByRole('button', { name: 'New session', exact: true }).first().click()
+    // The Workspace row keeps its creation affordance visible even while the
+    // historical Session is active; no hover-only discovery is required.
+    const workspaceNew = page.getByRole('button', { name: /New session in /i }).first()
+    await workspaceNew.waitFor({ timeout: 15_000 })
+    await workspaceNew.click()
     await page.getByText('Into the Unknown', { exact: true }).waitFor({ timeout: 15_000 })
     await page.locator('textarea[placeholder="Describe what you want to build"]').waitFor({ timeout: 15_000 })
+    expect((await scaffold.ctx.sessionPersistence.list()).filter(session =>
+      session.id === SessionId(BLANK_ID) || session.id === SessionId(HISTORY_ID)).length).toBe(2)
+    // Repeated explicit New conversation gestures reuse the same blank
+    // reservation instead of minting another empty Session.
+    await page.getByRole('button', { name: 'New conversation', exact: true }).click()
+    await page.waitForTimeout(50)
     expect((await scaffold.ctx.sessionPersistence.list()).filter(session =>
       session.id === SessionId(BLANK_ID) || session.id === SessionId(HISTORY_ID)).length).toBe(2)
     expect(opened.tripwire.pageErrors).toEqual([])

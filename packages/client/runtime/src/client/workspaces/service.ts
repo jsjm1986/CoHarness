@@ -293,10 +293,12 @@ export class WorkspaceRuntime implements IWorkspaces {
    */
   startSession(workspaceId?: WorkspaceId): void {
     const workspace = this.list.getSnapshot()
-    const current = this.sessions.list.getSnapshot().current
+    const sessions = this.sessions.list.getSnapshot()
+    const current = sessions.current
     const currentWorkspaceId = current === undefined
       ? undefined
       : workspace.items.find(item => item.sessionIds.includes(current))?.workspaceId
+        ?? sessions.byId[current]?.workspaceId
     const target = workspaceId ?? currentWorkspaceId ?? workspace.recentWorkspaceId
     if (target === undefined) {
       this.sessions.clear()

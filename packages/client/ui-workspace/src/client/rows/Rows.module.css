@@ -1,7 +1,7 @@
 /* Tree rows: project 34px, session 32px, radius 8, indent step 22px
-   (16px slot + 6px gap). Hover swaps
-   are pure CSS: project folder -> chevron + action buttons; session time ->
-   ellipsis button. */
+   (16px slot + 6px gap). Hover swaps are pure CSS: project folder -> chevron
+   and management actions; session time -> ellipsis button. The real-Workspace
+   add action stays visible. */
 
 .projectRow,
 .sessionRow {
@@ -339,6 +339,11 @@
 
 .iconButton:hover {
   color: var(--dsw-alias-label-primary);
+}
+
+.iconButton:focus-visible {
+  outline: 2px solid var(--dsw-alias-border-l3);
+  outline-offset: 1px;
 }
 
 /* Chevrons ride the caption grey (#ADB2B8); the folder glyph stays one step

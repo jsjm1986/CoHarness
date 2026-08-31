@@ -527,6 +527,8 @@ export interface ConversationInjected {
    * @param options - optional confirmed draft-discard instruction.
    */
   selectWorkspace: (workspaceId: WorkspaceId, options?: WorkspaceSelectionOptions) => Promise<void>
+  /** Start a new blank Session in the current or explicitly selected Workspace. */
+  newSession: (workspaceId?: WorkspaceId) => void
   /**
    * Framework-bound sources. `composerBlock` is this session's block when a
    * plugin raised one; the reason is the blocker's own localized copy, which

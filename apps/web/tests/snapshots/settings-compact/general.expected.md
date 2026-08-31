@@ -43,3 +43,9 @@
   - button "排队发送":
     - text: 排队发送
     - img
+  - text: 对话显示 调整对话内容宽度和文字大小 内容宽度
+  - slider "内容宽度": "748"
+  - status: 748px
+  - text: 文字大小
+  - slider "文字大小": "14"
+  - status: 14px

@@ -92,6 +92,22 @@ describe('deriveGroups', () => {
     expect(strayGroups.map(group => group.key)).toEqual(['first'])
   })
 
+  it('keeps a current draft in its hinted Workspace before Host attachment', () => {
+    const draft = {
+      ...summary('draft', 5),
+      blank: true,
+      workspaceId: wid('first'),
+    }
+    const groups = deriveGroups(
+      { ...list(draft), current: draft.id },
+      [workspace('first', [])],
+      noArchive,
+      view(['first']),
+    )
+    expect(groups[0]!.sessions.map(session => session.id)).toEqual([draft.id])
+    expect(groups).toHaveLength(1)
+  })
+
   it('projects the completion reminder into session and search rows (absent = false)', () => {
     const done = { ...summary('done', 3), completed: true }
     const plain = summary('plain', 2)

@@ -1,5 +1,7 @@
 - tree "Sessions":
-  - treeitem "workspace" [expanded]:
+  - treeitem "workspace New session in workspace" [expanded]:
     - img
     - text: workspace
+    - button "New session in workspace":
+      - img
   - treeitem "Ask a research subagent to now"

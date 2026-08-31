@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react'
 import clsx from 'clsx'
-import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconPlusOutline16, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConversationSlotProps, InputZone } from '../contract/slots.ts'
 import { HeroGlow, HeroShell, WorkspaceChip, workspaceLabel } from './EmptyHero.tsx'
@@ -21,7 +21,7 @@ export type ConversationRootProps = ConversationSlotProps
 
 export function ConversationRoot({
   sessionId, useSession, useSessions, useWorkspaces, useInput, useComposerBlock,
-  useDisplaySettings, setDisplayWidth, renderSlot, renderSlotChain, selectWorkspace, t, compact = false,
+  useDisplaySettings, setDisplayWidth, renderSlot, renderSlotChain, selectWorkspace, newSession, t, compact = false,
 }: ConversationRootProps) {
   const openState = useSession(s => s.openState)
   const composerPhase = useSession(s => s.composerPhase)
@@ -30,6 +30,7 @@ export function ConversationRoot({
   const inputState = useInput(s => s)
   const cwd = useSessions(s => sessionId === undefined ? undefined : s.byId[sessionId]?.cwd)
   const summaryBlank = useSessions(s => sessionId === undefined ? undefined : s.byId[sessionId]?.blank)
+  const summaryWorkspaceId = useSessions(s => sessionId === undefined ? undefined : s.byId[sessionId]?.workspaceId)
   const workspaces = useWorkspaces(s => s)
   // A plugin this package cannot import (ui-model-selection) says this session cannot
   // send; its reason is already localized by whoever raised it.
@@ -62,6 +63,10 @@ export function ConversationRoot({
   const sessionWorkspace = sessionId === undefined
     ? undefined
     : workspaces.items.find(workspace => workspace.sessionIds.includes(sessionId))
+  const draftWorkspace = summaryBlank === true && summaryWorkspaceId !== undefined
+    ? workspaces.items.find(workspace => workspace.workspaceId === summaryWorkspaceId)
+    : undefined
+  const activeWorkspace = sessionWorkspace ?? draftWorkspace
   const pendingWorkspace = workspaces.items.find(
     workspace => workspace.workspaceId === pendingWorkspaceId,
   )
@@ -84,7 +89,7 @@ export function ConversationRoot({
   const chooseWorkspace = (workspaceId: WorkspaceId): void => {
     setPickerOpen(false)
     if (pendingWorkspaceId !== undefined) return
-    if (sessionWorkspace?.workspaceId === workspaceId) return
+    if (activeWorkspace?.workspaceId === workspaceId) return
     if (sessionId !== undefined && hasUnsentDraft) {
       setDiscardWorkspaceId(workspaceId)
       return
@@ -102,14 +107,14 @@ export function ConversationRoot({
   // Clear the pending pick once the session lands in it, or when the picked
   // workspace disappears from a ready list (deleted from the sidebar).
   useEffect(() => {
-    if (pendingWorkspaceId !== undefined && (sessionWorkspace?.workspaceId === pendingWorkspaceId
+    if (pendingWorkspaceId !== undefined && (activeWorkspace?.workspaceId === pendingWorkspaceId
       || (workspaces.phase === 'ready' && pendingWorkspace === undefined))) {
       setPendingWorkspaceId(undefined)
     }
     if (discardWorkspaceId !== undefined && workspaces.phase === 'ready' && discardWorkspace === undefined) {
       setDiscardWorkspaceId(undefined)
     }
-  }, [discardWorkspace, discardWorkspaceId, pendingWorkspace, pendingWorkspaceId, sessionWorkspace?.workspaceId, workspaces.phase])
+  }, [activeWorkspace?.workspaceId, discardWorkspace, discardWorkspaceId, pendingWorkspace, pendingWorkspaceId, workspaces.phase])
 
   // While a session is still replaying (loading + blank) the hero/docked
   // choice is unknowable — render the composer hidden instead of flashing
@@ -130,7 +135,7 @@ export function ConversationRoot({
   // The chip is a selector; label resolution walks the flow top-down:
   //   1. a just-picked workspace (pending) → its title;
   //   2. cold start, no session yet → placeholder ("Choose workspace");
-  //   3. the blank session's workspace is in the list → its title;
+  //   3. the blank session's attached or client-hinted workspace is in the list → its title;
   //   4. list still loading → cwd folder name bridges so the title does not
   //      flash on refresh (empty cwd → placeholder);
   //   5. list ready but no owning workspace (deleted from the sidebar) →
@@ -138,10 +143,15 @@ export function ConversationRoot({
   const chipTitle = pendingWorkspace?.title
     ?? (sessionId === undefined
       ? undefined
-      : sessionWorkspace?.title
+      : activeWorkspace?.title
         ?? (workspaces.phase === 'ready' || cwd === undefined || cwd === ''
           ? undefined
           : workspaceLabel(cwd)))
+
+  const newSessionWorkspaceId = pendingWorkspaceId
+    ?? activeWorkspace?.workspaceId
+    ?? summaryWorkspaceId
+    ?? workspaces.recentWorkspaceId
 
   const heroWorkspaceRow = (
     <div className={css.heroWorkspaceRow}>
@@ -152,10 +162,21 @@ export function ConversationRoot({
         onClick={() => { setPickerOpen(open => !open) }}
         t={t}
       />
+      {newSessionWorkspaceId !== undefined && (
+        <button
+          type="button"
+          className={css.newSession}
+          aria-label={t('hero.newSession')}
+          onClick={() => { newSession(newSessionWorkspaceId) }}
+        >
+          <IconPlusOutline16 size={14} />
+          <span>{t('hero.newSession')}</span>
+        </button>
+      )}
       {renderSlot('conversation.hero.workspace', {
         open: pickerOpen,
         anchorRef: pickerAnchor,
-        selectedId: pendingWorkspaceId ?? sessionWorkspace?.workspaceId,
+        selectedId: pendingWorkspaceId ?? activeWorkspace?.workspaceId ?? summaryWorkspaceId,
         onPick: chooseWorkspace,
         onClose: () => { setPickerOpen(false) },
       })}

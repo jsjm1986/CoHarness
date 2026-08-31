@@ -155,6 +155,16 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, home,
       <span className={css.projectText}>
         <span className={css.title}>{label}</span>
       </span>
+      {row.workspaceId !== undefined && (
+        <button
+          type="button"
+          className={css.iconButton}
+          aria-label={t('actions.newSession.aria', { name: label })}
+          onClick={(e) => { e.stopPropagation(); onCreate() }}
+        >
+          <IconPlusOutline16 />
+        </button>
+      )}
       <span className={css.rowActions}>
         {actions !== undefined && (
           <Menu
@@ -184,14 +194,16 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, home,
             )}
           />
         )}
-        <button
-          type="button"
-          className={css.iconButton}
-          aria-label={t('actions.newSession.aria', { name: label })}
-          onClick={(e) => { e.stopPropagation(); onCreate() }}
-        >
-          <IconPlusOutline16 />
-        </button>
+        {row.workspaceId === undefined && (
+          <button
+            type="button"
+            className={css.iconButton}
+            aria-label={t('actions.newSession.aria', { name: label })}
+            onClick={(e) => { e.stopPropagation(); onCreate() }}
+          >
+            <IconPlusOutline16 />
+          </button>
+        )}
       </span>
     </div>
   )
