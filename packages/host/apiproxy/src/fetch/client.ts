@@ -322,7 +322,9 @@ function requestSignalLease(
     error.name = 'TimeoutError'
     controller.abort(error)
   }, timeoutMs)
-  timer.unref()
+  // Browser timers return numeric handles; Node timers expose `unref()`. The
+  // deadline must behave the same on both sides of this shared client module.
+  ;(timer as unknown as { unref?: () => void }).unref?.()
   const signal = external === undefined ? controller.signal : AbortSignal.any([external, controller.signal])
   return {
     signal,

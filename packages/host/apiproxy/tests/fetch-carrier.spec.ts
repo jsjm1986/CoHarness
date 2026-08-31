@@ -367,6 +367,16 @@ describe('unary round trip (handler ⇄ client, no network)', () => {
     expect(response.rpcId).toMatch(/[0-9a-f-]{36}/)
   })
 
+  it('keeps unary calls working with browser-style numeric timeout handles', async () => {
+    vi.stubGlobal('setTimeout', () => 1)
+    try {
+      const response = await client().sessions.list({})
+      expect(response.result).toEqual({ ok: true, value: { items: [] } })
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('rejects a declared unary response that exceeds the carrier budget', async () => {
     const oversized = new InProcessApiClient({
       fetch: async () => new Response('{}', { status: 200, headers: { 'content-length': '99' } }),

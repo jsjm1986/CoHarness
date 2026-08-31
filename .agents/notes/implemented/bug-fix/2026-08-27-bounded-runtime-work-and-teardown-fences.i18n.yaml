@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-27-bounded-runtime-work-and-teardown-fences.md
-2026-08-27-bounded-runtime-work-and-teardown-fences.md: c9da149161672b5ecba97a51c4174a0398f1fddb
-2026-08-27-bounded-runtime-work-and-teardown-fences.zh.md: 5310f437aabb657cfd058de7a52c7dab0117e746
+2026-08-27-bounded-runtime-work-and-teardown-fences.md: e79e0957295bc95e917fb9cc868f119e891f4e79
+2026-08-27-bounded-runtime-work-and-teardown-fences.zh.md: 4a0032db2059a7fdeba1217a077567a20c3d97ba

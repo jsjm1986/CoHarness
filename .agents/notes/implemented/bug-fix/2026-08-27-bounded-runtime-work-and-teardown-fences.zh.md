@@ -14,7 +14,7 @@ Gateway 与 SDK 传输、提供方流、持久化写入器和文档 broker 可�
 
 运行时工作从授权开始一直持有 operation reference，直到响应最后一个字节完成，因此 idle 回收不会在活动请求下停止进程。就绪检查使用绑定启动 token、nonce 和精确运行时身份的 HMAC challenge。Settings 注册、客户端会话 scope、动态 Host/Client runner 和子进程所有者会在拆卸前关闭接纳，并等待已启动的工作；迟到的 loader 条目和进程树会获得显式清理。带 revision 的模型 projection 会在使用前刷新并异步重试，因此数据库变更已经提交时，不会仅因文件 projection 暂时不可用就被报告为事务失败。
 
-运行时 lease 的接纳、活动 touch 和 idle 回收共享每个 runtime 的串行队列。若停止操作先赢得竞态，新 lease 会返回可重试拒绝；代理调用方启动新 generation，文档和归档 broker 则在不转发过期端口的情况下失败。idle 回收会通过按 runtime 建立索引的谓词重新检查每个候选项，不再为每个候选项重复扫描完整的 idle 目录；lease 接纳会在按 generation 保存的引用映射之外维护每个 runtime 的 O(1) 汇总。Gateway 关闭时通过固定 worker pool 停止本地 runtime，不会一次为每个进程启动拆卸任务。Gateway 与 SDK 中由计时器驱动的配置会拒绝超过 Node 最大延迟的值。
+运行时 lease 的接纳、活动 touch 和 idle 回收共享每个 runtime 的串行队列。若停止操作先赢得竞态，新 lease 会返回可重试拒绝；代理调用方启动新 generation，文档和归档 broker 则在不转发过期端口的情况下失败。idle 回收会通过按 runtime 建立索引的谓词重新检查每个候选项，不再为每个候选项重复扫描完整的 idle 目录；lease 接纳会在按 generation 保存的引用映射之外维护每个 runtime 的 O(1) 汇总。Gateway 关闭时通过固定 worker pool 停止本地 runtime，不会一次为每个进程启动拆卸任务。Gateway 与 SDK 中由计时器驱动的配置会拒绝超过 Node 最大延迟的值。共享 Host fetch 截止时间只在定时器句柄提供 `unref` 时调用它，因此浏览器数字句柄与 Node 超时对象使用相同的取消路径。
 
 JSONL 元数据读取会限制 header 字节数，并同时按重试次数与经过时间限制修订稳定性重试。Zstandard raw、load 与恢复读取会执行解压明文字节总预算；header 探测会按几何增长扩展输入缓冲区，而不是对每个分片重复拼接。
 
