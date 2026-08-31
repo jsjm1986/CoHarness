@@ -10,6 +10,8 @@
     "commit": "6464092040428805c5d76ed977fa4ab3fac66161"
   },
   "implementationCommit": "19cb32900974acddd926add6baecfaac803207d3",
+  "closeoutCommit": "b120f68a7cbd8c8698d399dc5ba49303a341ef13",
+  "closeoutBranch": "codex/alpha1-closeout-isolated",
   "candidateRelease": "coharness-19cb329009",
   "productionRelease": "coharness-19cb329009",
   "deployment": {
@@ -47,7 +49,9 @@
       "releaseVendor": "33303408793: success",
       "sandbox": "33303408766: success",
       "landlockRun": "covered by Sandbox 33303408766 (both ubuntu-24.04 architectures: success)",
-      "ciAggregate": "33303408921: pending with no jobs on push (workflow only schedules pull-request jobs)"
+      "ciAggregate": "33303408921: cancelled with no jobs on push (workflow only schedules pull-request jobs)",
+      "ci105": "32665761235 / run 105: cancelled after runner wait; node 24 snapshots job had zero steps, so no snapshot result exists",
+      "latestCi": "33307373841 / run 230: queued; Windows/Linux self-hosted serial jobs remain pending"
     },
     "macosSeatbeltPwsh": {
       "candidateRun": "33303408766",
@@ -298,8 +302,8 @@
     "unverified": "Implemented but an external platform, production, or cross-stack proof is still required."
   },
   "statusCounts": {
-    "implemented": 41,
-    "baseline-equivalent": 6,
+    "implemented": 42,
+    "baseline-equivalent": 5,
     "not-adopted": 4,
     "unverified": 1,
     "deferred": 0,
@@ -324,7 +328,7 @@
     { "id": "I02", "status": "baseline-equivalent" },
     { "id": "I03", "status": "implemented" },
     { "id": "I04", "status": "implemented" },
-    { "id": "I05", "status": "baseline-equivalent" },
+    { "id": "I05", "status": "implemented" },
     { "id": "I06", "status": "not-adopted" },
     { "id": "I07", "status": "implemented" },
     { "id": "I08", "status": "implemented" },
@@ -361,7 +365,10 @@
   ],
   "verification": {
     "auditDate": "2026-08-30",
+    "closeoutDate": "2026-08-31",
     "auditFocusedTests": "20 files, 388 tests; terminal-bash/subprocess focused suite 10 files, 161 passed, 3 skipped; WebFetch network policy included 58 tests; Locale modified client/index.ts and utility coverage at 100% in focused coverage runs",
+    "i05Closeout": "b120f68a7c: InputBar ordinary running drafts switch between Stop and Queue Send; focused component tests 76/76 and assembled Web replay 5/5 (one record test skipped); running-draft golden refreshed from replay",
+    "schemaFormAlias": "Removed the unused @deepseek-ai/dsh-client-schema-form alias and stale schema-form comment from gateway/admin-ui/vite.config.ts; Admin build transformed 1877 modules and Admin tests passed 48/48",
     "clientBundleBuild": "pnpm run build:lib:client passed; dsh-util-crypto is inlined through INLINE_SAFE",
     "sourceAudit": "256 upstream source paths are absent from the frozen baseline under the declared filter; 224 are still absent at the same path in the candidate because of intentional package/API relocation, equivalence, or deferral; all are grouped in UPGRADE-PLAN §8.2 with zero unclassified runtime paths",
     "focusedTests": "20 files, 388 tests; terminal-bash/subprocess suite 10 files, 161 passed, 3 skipped; WebFetch network policy 58 tests; token-meter/client source-plane suite 5 files, 113 tests; clean-artifact smoke 25 tests",
