@@ -193,7 +193,8 @@
           "type": "usage",
           "usage": {
             "inputTokens": 3,
-            "outputTokens": 3
+            "outputTokens": 3,
+            "totalTokens": 6
           }
         }
       }
@@ -239,7 +240,8 @@
         },
         "usage": {
           "inputTokens": 3,
-          "outputTokens": 3
+          "outputTokens": 3,
+          "totalTokens": 6
         }
       },
       "sourceEventSeqs": [
@@ -379,7 +381,8 @@
           "type": "usage",
           "usage": {
             "inputTokens": 3,
-            "outputTokens": 3
+            "outputTokens": 3,
+            "totalTokens": 6
           }
         }
       }
@@ -425,7 +428,8 @@
         },
         "usage": {
           "inputTokens": 3,
-          "outputTokens": 3
+          "outputTokens": 3,
+          "totalTokens": 6
         }
       },
       "sourceEventSeqs": [
@@ -603,7 +607,8 @@
           "type": "usage",
           "usage": {
             "inputTokens": 3,
-            "outputTokens": 3
+            "outputTokens": 3,
+            "totalTokens": 6
           }
         }
       }
@@ -649,7 +654,8 @@
         },
         "usage": {
           "inputTokens": 3,
-          "outputTokens": 3
+          "outputTokens": 3,
+          "totalTokens": 6
         }
       },
       "sourceEventSeqs": [
@@ -820,7 +826,8 @@
           "type": "usage",
           "usage": {
             "inputTokens": 3,
-            "outputTokens": 3
+            "outputTokens": 3,
+            "totalTokens": 6
           }
         }
       }
@@ -866,7 +873,8 @@
         },
         "usage": {
           "inputTokens": 3,
-          "outputTokens": 3
+          "outputTokens": 3,
+          "totalTokens": 6
         }
       },
       "sourceEventSeqs": [
@@ -1002,7 +1010,8 @@
           "type": "usage",
           "usage": {
             "inputTokens": 3,
-            "outputTokens": 3
+            "outputTokens": 3,
+            "totalTokens": 6
           }
         }
       }
@@ -1048,7 +1057,8 @@
         },
         "usage": {
           "inputTokens": 3,
-          "outputTokens": 3
+          "outputTokens": 3,
+          "totalTokens": 6
         }
       },
       "sourceEventSeqs": [
@@ -1224,7 +1234,8 @@
           "type": "usage",
           "usage": {
             "inputTokens": 3,
-            "outputTokens": 3
+            "outputTokens": 3,
+            "totalTokens": 6
           }
         }
       }
@@ -1270,7 +1281,8 @@
         },
         "usage": {
           "inputTokens": 3,
-          "outputTokens": 3
+          "outputTokens": 3,
+          "totalTokens": 6
         }
       },
       "sourceEventSeqs": [
@@ -1438,7 +1450,8 @@
           "type": "usage",
           "usage": {
             "inputTokens": 3,
-            "outputTokens": 3
+            "outputTokens": 3,
+            "totalTokens": 6
           }
         }
       }
@@ -1482,7 +1495,8 @@
         },
         "usage": {
           "inputTokens": 3,
-          "outputTokens": 3
+          "outputTokens": 3,
+          "totalTokens": 6
         }
       },
       "sourceEventSeqs": [
@@ -1784,7 +1798,8 @@
               "type": "usage",
               "usage": {
                 "inputTokens": 3,
-                "outputTokens": 3
+                "outputTokens": 3,
+                "totalTokens": 6
               }
             }
           }
@@ -1842,7 +1857,8 @@
             },
             "usage": {
               "inputTokens": 3,
-              "outputTokens": 3
+              "outputTokens": 3,
+              "totalTokens": 6
             }
           },
           "sourceEventSeqs": [
@@ -2030,7 +2046,8 @@
               "type": "usage",
               "usage": {
                 "inputTokens": 3,
-                "outputTokens": 3
+                "outputTokens": 3,
+                "totalTokens": 6
               }
             }
           }
@@ -2088,7 +2105,8 @@
             },
             "usage": {
               "inputTokens": 3,
-              "outputTokens": 3
+              "outputTokens": 3,
+              "totalTokens": 6
             }
           },
           "sourceEventSeqs": [
@@ -2320,7 +2338,8 @@
               "type": "usage",
               "usage": {
                 "inputTokens": 3,
-                "outputTokens": 3
+                "outputTokens": 3,
+                "totalTokens": 6
               }
             }
           }
@@ -2378,7 +2397,8 @@
             },
             "usage": {
               "inputTokens": 3,
-              "outputTokens": 3
+              "outputTokens": 3,
+              "totalTokens": 6
             }
           },
           "sourceEventSeqs": [
@@ -2609,7 +2629,8 @@
               "type": "usage",
               "usage": {
                 "inputTokens": 3,
-                "outputTokens": 3
+                "outputTokens": 3,
+                "totalTokens": 6
               }
             }
           }
@@ -2667,7 +2688,8 @@
             },
             "usage": {
               "inputTokens": 3,
-              "outputTokens": 3
+              "outputTokens": 3,
+              "totalTokens": 6
             }
           },
           "sourceEventSeqs": [
@@ -2897,11 +2919,10 @@
               "config": {
                 "provider": "deepseek-official",
                 "model": "smoke-model",
-                "maxTokens": 256000,
-                "reasoningEffort": "high"
+                "reasoningEffort": "high",
+                "maxTokens": 256000
               },
               "adapterDefaults": {
-                "reasoningEffort": true,
                 "maxTokens": true
               },
               "system": "{{system}}",
@@ -3021,7 +3042,8 @@
               "type": "usage",
               "usage": {
                 "inputTokens": 3,
-                "outputTokens": 3
+                "outputTokens": 3,
+                "totalTokens": 6
               }
             }
           }
@@ -3077,7 +3099,8 @@
             },
             "usage": {
               "inputTokens": 3,
-              "outputTokens": 3
+              "outputTokens": 3,
+              "totalTokens": 6
             }
           },
           "sourceEventSeqs": [
@@ -3299,7 +3322,8 @@
               "type": "usage",
               "usage": {
                 "inputTokens": 3,
-                "outputTokens": 3
+                "outputTokens": 3,
+                "totalTokens": 6
               }
             }
           }
@@ -3357,7 +3381,8 @@
             },
             "usage": {
               "inputTokens": 3,
-              "outputTokens": 3
+              "outputTokens": 3,
+              "totalTokens": 6
             }
           },
           "sourceEventSeqs": [
@@ -3601,11 +3626,10 @@
               "config": {
                 "provider": "deepseek-official",
                 "model": "smoke-model",
-                "maxTokens": 256000,
-                "reasoningEffort": "high"
+                "reasoningEffort": "high",
+                "maxTokens": 256000
               },
               "adapterDefaults": {
-                "reasoningEffort": true,
                 "maxTokens": true
               },
               "system": "{{system}}",
@@ -3743,7 +3767,8 @@
               "type": "usage",
               "usage": {
                 "inputTokens": 3,
-                "outputTokens": 3
+                "outputTokens": 3,
+                "totalTokens": 6
               }
             }
           }
@@ -3799,7 +3824,8 @@
             },
             "usage": {
               "inputTokens": 3,
-              "outputTokens": 3
+              "outputTokens": 3,
+              "totalTokens": 6
             }
           },
           "sourceEventSeqs": [
@@ -4052,7 +4078,8 @@
               "type": "usage",
               "usage": {
                 "inputTokens": 3,
-                "outputTokens": 3
+                "outputTokens": 3,
+                "totalTokens": 6
               }
             }
           }
@@ -4110,7 +4137,8 @@
             },
             "usage": {
               "inputTokens": 3,
-              "outputTokens": 3
+              "outputTokens": 3,
+              "totalTokens": 6
             }
           },
           "sourceEventSeqs": [
@@ -4332,7 +4360,8 @@
               "type": "usage",
               "usage": {
                 "inputTokens": 3,
-                "outputTokens": 3
+                "outputTokens": 3,
+                "totalTokens": 6
               }
             }
           }
@@ -4388,7 +4417,8 @@
             },
             "usage": {
               "inputTokens": 3,
-              "outputTokens": 3
+              "outputTokens": 3,
+              "totalTokens": 6
             }
           },
           "sourceEventSeqs": [
