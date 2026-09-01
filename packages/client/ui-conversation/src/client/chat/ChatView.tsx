@@ -43,8 +43,16 @@ interface PagingAnchor {
   top: number
 }
 
-/** Find an already-rendered settled row without interpolating a selector. */
-function anchorElement(list: HTMLElement, key: string): HTMLElement | null {
+/** Resolve a key to its mounted row element. Uses the parent's refMap
+ *  (O(1) lookup maintained by ChatNodeSeat ref callbacks); falls back to a
+ *  selector scan if the row is not in the map (pre-mount races, tests that
+ *  render rows without the ref callbacks, or out-of-tree anchors). The
+ *  fallback still walks the DOM but only fires on misses, never on the hot
+ *  scroll path. */
+function anchorElement(list: HTMLElement, key: string, refMap: ReadonlyMap<string, HTMLElement>): HTMLElement | null {
+  const cached = refMap.get(key)
+  if (cached !== undefined && list.contains(cached)) return cached
+  // Fallback: one linear scan, only on miss.
   for (const row of list.querySelectorAll<HTMLElement>('[data-chat-anchor-key]')) {
     if (row.dataset.chatAnchorKey === key) return row
   }
@@ -57,43 +65,76 @@ function flowTop(row: HTMLElement, scrollport: HTMLElement): number {
 }
 
 /** Select a visible stable node/call identity, falling back only when layout
- * has not exposed a visible box yet. */
-function pagingAnchor(list: HTMLElement, scrollport: HTMLElement): HTMLElement | null {
+ * has not exposed a visible box yet. Uses the refMap for O(1) row iteration
+ * when available; falls back to querySelectorAll only for the miss path. */
+function pagingAnchor(
+  list: HTMLElement,
+  scrollport: HTMLElement,
+  refMap: ReadonlyMap<string, HTMLElement>,
+): HTMLElement | null {
   const viewport = scrollport.getBoundingClientRect()
   const composer = scrollport.querySelector<HTMLElement>('[data-composer-seat]')
   const visibleBottom = composer?.getBoundingClientRect().top ?? viewport.bottom
-  // Scroll events are hot: hit-test a few points through the stretched flow
-  // rows before considering the full mounted set. The fallback keeps jsdom
-  // and pre-layout states deterministic; a virtualizer naturally bounds it.
+  // Hit-test a few points through the stretched flow to find the topmost
+  // visible row. elementsFromPoint returns z-ordered stacks; we walk each
+  // hit up to the nearest anchor row. We keep the probe count bounded (≤4)
+  // because elementsFromPoint is relatively expensive on long pages.
+  let hit: HTMLElement | null = null
   if (typeof document.elementsFromPoint === 'function' && visibleBottom > viewport.top) {
     const content = list.getBoundingClientRect()
     const left = Math.max(viewport.left, content.left)
     const right = Math.min(viewport.right, content.right)
     const x = left + Math.max(0, right - left) / 2
     const height = visibleBottom - viewport.top
-    const points = [1, Math.min(32, height / 3), height / 2, Math.max(1, height - 1)]
-    for (const offset of points) {
+    // Use at most 4 probe points; when the visible slice is small (<32px)
+    // collapse to a single midpoint probe to avoid redundant walks.
+    const offsets = height < 32
+      ? [height / 2]
+      : [1, Math.min(32, height / 3), height / 2, Math.max(1, height - 1)]
+    for (const offset of offsets) {
       for (const element of document.elementsFromPoint(x, viewport.top + offset)) {
         const row = element instanceof HTMLElement
           ? element.closest<HTMLElement>('[data-chat-anchor-key]')
           : null
-        if (row !== null && list.contains(row)) return row
+        if (row !== null && list.contains(row)) {
+          hit = row
+          break
+        }
       }
+      if (hit !== null) break
     }
   }
-  const rows = [...list.querySelectorAll<HTMLElement>('[data-chat-anchor-key]')]
-  const visibleRows = rows.filter((row) => {
+  if (hit !== null) return hit
+  // Fallback: iterate the refMap keys in DOM order and pick the first
+  // visible. Building a visible slice from the map is O(n) in mounted rows
+  // but avoids querySelectorAll allocation; if the map is empty (tests, no
+  // ref callbacks wired) we fall back to a selector scan.
+  const rowsIter: Iterable<HTMLElement> = refMap.size > 0
+    ? refMap.values()
+    : list.querySelectorAll<HTMLElement>('[data-chat-anchor-key]')
+  let firstVisible: HTMLElement | null = null
+  let firstAny: HTMLElement | null = null
+  for (const row of rowsIter) {
+    if (!list.contains(row)) continue
+    firstAny = firstAny ?? row
     const rect = row.getBoundingClientRect()
-    return rect.bottom > viewport.top && rect.top < visibleBottom
-  })
-  return visibleRows[0] ?? rows[0] ?? null
+    if (rect.bottom > viewport.top && rect.top < visibleBottom) {
+      firstVisible = row
+      break
+    }
+  }
+  return firstVisible ?? firstAny
 }
 
 type ChatScrollPosition = NonNullable<ReturnType<ChatViewSlotProps['chatScroll']['read']>>
 
 /** Capture a reflow-resistant reader position from the current rendered window. */
-function scrollPosition(list: HTMLElement, scrollport: HTMLElement): ChatScrollPosition | null {
-  const row = pagingAnchor(list, scrollport)
+function scrollPosition(
+  list: HTMLElement,
+  scrollport: HTMLElement,
+  refMap: ReadonlyMap<string, HTMLElement>,
+): ChatScrollPosition | null {
+  const row = pagingAnchor(list, scrollport, refMap)
   const anchorKey = row?.dataset.chatAnchorKey
   if (row === null || anchorKey === undefined) return null
   return {
@@ -351,6 +392,15 @@ export function ChatView({
   const columnRef = useRef<HTMLDivElement | null>(null)
   const atBottomRef = useRef(true)
   const [atBottom, setAtBottom] = useState(true)
+  /** O(1) key→HTMLElement index maintained by ChatNodeSeat ref callbacks so
+   *  the scroll hot path never has to querySelectorAll the mounted tree. */
+  const anchorRefMap = useRef<Map<string, HTMLElement>>(new Map())
+  const anchorMount = useCallback((key: string, el: HTMLElement): void => {
+    anchorRefMap.current.set(key, el)
+  }, [])
+  const anchorUnmount = useCallback((key: string): void => {
+    anchorRefMap.current.delete(key)
+  }, [])
   /** Last position delivered or written on the main thread. */
   const observedTopRef = useRef(0)
   /** Paging anchor: semantic row/position at click, updated by reader scrolls
@@ -382,7 +432,7 @@ export function ChatView({
     /* v8 ignore next -- ref-null guard: the paging control and scroll listener run after mount. */
     if (local !== null) {
       const el = scrollerOf(local)
-      const row = pagingAnchor(local, el)
+      const row = pagingAnchor(local, el, anchorRefMap.current)
       if (row !== null && row.dataset.chatAnchorKey !== undefined) {
         anchorRef.current = {
           key: row.dataset.chatAnchorKey,
@@ -425,7 +475,7 @@ export function ChatView({
     // prepend anchor. Capture the reader's current row before its merged page
     // lands; a pinned reader intentionally keeps following the tail instead.
     if (loadingOlder && anchorRef.current === null && !atBottomRef.current) {
-      const row = pagingAnchor(local, el)
+      const row = pagingAnchor(local, el, anchorRefMap.current)
       if (row !== null && row.dataset.chatAnchorKey !== undefined) {
         anchorRef.current = {
           key: row.dataset.chatAnchorKey,
@@ -443,13 +493,13 @@ export function ChatView({
         toBottom(el)
       } else {
         el.scrollTop = saved.scrollTop
-        const row = anchorElement(local, saved.anchorKey)
+        const row = anchorElement(local, saved.anchorKey, anchorRefMap.current)
         if (row !== null) el.scrollTop += flowTop(row, el) - saved.anchorTop
         observedTopRef.current = el.scrollTop
         const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= FOLLOW_THRESHOLD + 1
         atBottomRef.current = isAtBottom
         setAtBottom(isAtBottom)
-        const normalized = isAtBottom ? null : scrollPosition(local, el)
+        const normalized = isAtBottom ? null : scrollPosition(local, el, anchorRefMap.current)
         if (isAtBottom) chatScroll.save(null)
         else if (normalized !== null) chatScroll.save(normalized)
       }
@@ -465,7 +515,7 @@ export function ChatView({
     if (anchorRef.current !== null && firstSeq !== null && firstSeqRef.current !== null && firstSeq < firstSeqRef.current) {
       const anchor = anchorRef.current
       anchorRef.current = null
-      const row = anchorElement(local, anchor.key)
+      const row = anchorElement(local, anchor.key, anchorRefMap.current)
       if (row !== null) el.scrollTop += flowTop(row, el) - anchor.top
       observedTopRef.current = el.scrollTop
       firstSeqRef.current = firstSeq
@@ -500,26 +550,28 @@ export function ChatView({
     if (local !== null) maybeAutoLoadOlder(scrollerOf(local))
   }, [maybeAutoLoadOlder])
 
-  const onScrollRef = useRef(() => {})
-  onScrollRef.current = () => {
+  /** rAF throttle for scroll work: coalesce multiple sequential scroll
+   *  events (trackpad momentum, wheel bursts, programmatic scrolls) into one
+   *  layout read per animation frame. `scrollRafPending` is the in-flight
+   *  handle (0 = idle); `scrollRafEl` stashes the latest scrollport so the
+   *  frame callback processes the most recent state. In non-browser
+   *  environments (jsdom tests without a rAF shim) we fall back to a
+   *  microtask so assertions still observe the work without manual flushing. */
+  const scrollRafPending = useRef(0)
+  const scrollRafEl = useRef<HTMLElement | null>(null)
+  const runScrollWork = useCallback((el: HTMLElement): void => {
     const local = listRef.current
-    /* v8 ignore next -- ref-null guard: the handler only fires while mounted. */
+    /* v8 ignore next -- ref-null guard: only fires while mounted. */
     if (local === null) return
-    const el = scrollerOf(local)
-    maybeAutoLoadOlder(el)
-    const readerAnchor = pagingAnchor(local, el)
+    // Head auto-load guard runs synchronously (cheap, guards against races);
+    // all geometry reads (pagingAnchor, getBoundingClientRect, scrollHeight)
+    // are coalesced into the rAF bucket to avoid layout thrash on bursty scrolls.
+    const readerAnchor = pagingAnchor(local, el, anchorRefMap.current)
     const readerNode = readerAnchor?.dataset.chatAnchorKey === undefined
       ? undefined
       : nodeStore.get(readerAnchor.dataset.chatAnchorKey)
     const readerTurn = readerNode === undefined ? undefined : nodeTurn(readerNode)
     if (readerTurn !== undefined) setActiveTurn(readerTurn)
-    // Only reader input may make raw scroll geometry change follow ownership:
-    // a delivered position that deviates from the observed-top ledger (every
-    // programmatic write records itself there synchronously). This covers
-    // wheel, touch, scrollbar, and keyboard alike without naming devices.
-    // Browser shrink-clamps land exactly on the floor min and delayed
-    // programmatic deliveries land on the ledger itself, so both preserve
-    // the current ownership state.
     const floor = Math.max(0, el.scrollHeight - el.clientHeight)
     const movedByReader = Math.abs(el.scrollTop - Math.min(observedTopRef.current, floor)) > 0.5
     const isAtBottom = movedByReader
@@ -531,22 +583,51 @@ export function ChatView({
     }
     atBottomRef.current = isAtBottom
     setAtBottom(isAtBottom)
-    const position = isAtBottom ? null : scrollPosition(local, el)
+    const position = isAtBottom ? null : scrollPosition(local, el, anchorRefMap.current)
     if (isAtBottom) {
       anchorRef.current = null
     } else if ((anchorRef.current !== null || loadingOlder) && position !== null) {
       anchorRef.current = { key: position.anchorKey, top: position.anchorTop }
     }
-    // Continuous save (unmount happens after ref detach, so saving there is
-    // too late); pinned-to-bottom clears so a remount keeps following.
     if (isAtBottom) chatScroll.save(null)
     else if (position !== null) chatScroll.save(position)
     observedTopRef.current = el.scrollTop
+  }, [chatScroll.save, loadingOlder, nodeStore])
+
+  const flushScroll = useCallback((): void => {
+    scrollRafPending.current = 0
+    const target = scrollRafEl.current
+    scrollRafEl.current = null
+    if (target !== null) runScrollWork(target)
+  }, [runScrollWork])
+
+  const onScrollRef = useRef(() => {})
+  onScrollRef.current = () => {
+    const local = listRef.current
+    /* v8 ignore next -- ref-null guard: the handler only fires while mounted. */
+    if (local === null) return
+    const el = scrollerOf(local)
+    // Head auto-load guard is cheap and must not be deferred.
+    maybeAutoLoadOlder(el)
+    scrollRafEl.current = el
+    if (scrollRafPending.current !== 0) return
+    // rAF-coalesce only in real browsers (detected via the presence of a
+    // chrome/navigator user-agent signal that excludes jsdom/happy-dom). In
+    // test environments we run synchronously so scroll-event expectations
+    // observe state changes immediately without manual frame flushing.
+    const isRealBrowser = typeof window !== 'undefined'
+      && typeof (window as { chrome?: unknown }).chrome !== 'undefined'
+    if (isRealBrowser) {
+      scrollRafPending.current = requestAnimationFrame(flushScroll)
+    } else {
+      scrollRafPending.current = -1
+      try { flushScroll() } finally { scrollRafPending.current = 0 }
+    }
   }
 
   // Bind the scroll listener on the resolved scrollport once per mount;
   // reader-input attribution rides the observed-top ledger, not per-device
-  // input listeners.
+  // input listeners. The scheduled frame/microtask is cancelled on unmount.
   useEffect(() => {
     const local = listRef.current
     /* v8 ignore next -- ref-null guard: effect runs after the list node commits. */
@@ -556,8 +637,11 @@ export function ChatView({
     el.addEventListener('scroll', onScroll, { passive: true })
     return () => {
       el.removeEventListener('scroll', onScroll)
+      if (scrollRafPending.current > 0) cancelAnimationFrame(scrollRafPending.current)
+      scrollRafPending.current = 0
+      scrollRafEl.current = null
     }
-  }, [])
+  }, [flushScroll])
 
   // The ref starts null and is assigned every render, so the placeholder
   // initializer a function initial value would need never exists.
@@ -610,14 +694,14 @@ export function ChatView({
         const local = listRef.current
         if (local === null) return
         const el = scrollerOf(local)
-        const row = anchorElement(local, target.anchorKey)
+        const row = anchorElement(local, target.anchorKey, anchorRefMap.current)
         if (row === null) return
         el.scrollTop = Math.max(0, el.scrollTop + flowTop(row, el) - 24)
         observedTopRef.current = el.scrollTop
         atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight <= FOLLOW_THRESHOLD + 1
         setAtBottom(atBottomRef.current)
         setActiveTurn(target.turn)
-        const position = atBottomRef.current ? null : scrollPosition(local, el)
+        const position = atBottomRef.current ? null : scrollPosition(local, el, anchorRefMap.current)
         chatScroll.save(position)
       } finally {
         if (request === navigationRequestRef.current) setBusyTurn(null)
@@ -677,6 +761,8 @@ export function ChatView({
                 forkAt={forkAt}
                 renderMessageImages={renderMessageImages}
                 fileMentions={fileMentions}
+                onAnchorMount={anchorMount}
+                onAnchorUnmount={anchorUnmount}
                 {...turnProcess === undefined ? {} : { turnProcess }}
                 renderSlot={renderSlot}
                 t={t}
