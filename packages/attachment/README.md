@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-The durable binary attachment seam and its local filesystem implementation. Both are product packages.
+The durable binary attachment and named user-document capability families, with local implementations and a model-facing personal-document Consumer.
 
 | Package | Role | ctx key |
 |---|---|---|
@@ -10,5 +10,6 @@ The durable binary attachment seam and its local filesystem implementation. Both
 | `attachment-local/` | Content-addressed private storage below `DSH_HOME` | (registers on `ctx.attachments`) |
 | `userdoc/` | Named user-document references, limits, and storage service | `ctx.userDocs` |
 | `userdoc-local/` | Real-file storage below one user-visible document root | (registers on `ctx.userDocs`) |
+| `tool-userdoc/` | Model-facing personal document discovery and read tools | (consumes `ctx.userDocs`) |
 
 Unsent browser drafts are intentionally outside this capability. Bytes enter durable storage only when a user prompt is submitted or when a provider adapter commits structured model output.

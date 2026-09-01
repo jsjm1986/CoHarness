@@ -112,8 +112,8 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'User-uploaded document storage',
     mode: 'seam',
     implementations: ['userdoc-local'],
-    consumers: [],
-    note: 'Uploads land as real named files inside a directory the tool authorization policy already grants, so the agent reads them with its ordinary filesystem tools instead of through a retrieval channel of their own.',
+    consumers: ['tool-userdoc'],
+    note: 'Uploads land as real named files inside a directory the tool authorization policy already grants. The personal-document Consumer adds bounded discovery and text reads without exposing host paths; ordinary filesystem tools remain available for attached documents.',
   },
   {
     key: 'llm',

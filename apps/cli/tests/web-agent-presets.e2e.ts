@@ -17,6 +17,7 @@ import { CallId } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-compaction-basic'
 import type {} from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-tools'
+import type {} from '@deepseek-ai/dsh-userdoc'
 // Type-only: resolves `ctx.get('sessionProjections')` and `ctx.get('tokenMeter')`.
 import type {} from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-token-meter'
@@ -52,6 +53,7 @@ async function bootWeb(
   profileBundles?: readonly string[],
 ): Promise<Context> {
   const storageRoot = join(dirname(settingsFile), 'storages')
+  const documentRoot = join(dirname(settingsFile), 'documents')
   const overrides: PatchOptions[] = [
     // The settings row defaults to `$DSH_HOME/settings.yaml`. Left alone it
     // reads the developer's own document — and since the default preset is a
@@ -64,6 +66,10 @@ async function bootWeb(
     // back on the next run, so a stored document from any other build decides
     // this test's boot. Same reason the settings row above is pinned.
     { id: 'storage-json', config: { root: storageRoot } },
+    // Keep the model-facing personal-document Consumer inside this test's
+    // temporary root; a preset execution must never read the developer's
+    // actual document directory.
+    { id: 'userdoc-local', config: { uploadRoot: documentRoot, uploadMinFreeBytes: 0 } },
     // Host rows with side effects outside this process: a bound port, a served
     // asset tree, a telemetry exporter. `api-gateway` and `directory-picker`
     // stay ENABLED on purpose — the api-proxy is the host row that injects
@@ -163,6 +169,16 @@ function toolParameterNames(ctx: Context, agent: Agent, toolName: string): strin
   return Object.keys(properties).sort()
 }
 
+function textStream(value: string): ReadableStream<Uint8Array> {
+  const bytes = new TextEncoder().encode(value)
+  return new ReadableStream<Uint8Array>({
+    start(controller: ReadableStreamDefaultController<Uint8Array>) {
+      controller.enqueue(bytes)
+      controller.close()
+    },
+  })
+}
+
 function enablePresetTool(composition: string, id: string): string {
   const row = `    - id: ${id}\n`
   const start = composition.indexOf(row)
@@ -241,9 +257,41 @@ describe('the shipped Web composition', () => {
       expect(toolNames(ctx, handle.agent).filter(name => name !== 'glob' && name !== 'grep')).toEqual([
         'ask_user_question', 'bash', 'create_goal', 'edit', 'exit_plan_mode',
         'get_goal', 'interrupt_agent', 'job_kill', 'job_list', 'job_output', 'list_agents', 'ralph', 'read', 'read_image', 'send_message', 'skill',
-        'subagent', 'subagent_fork', 'todo_write', 'update_goal', 'web_search',
+        'subagent', 'subagent_fork', 'todo_write', 'update_goal', 'userdoc_list', 'userdoc_read', 'web_search',
         'workflow', 'write',
       ])
+    } finally {
+      await handle.dispose()
+    }
+  })
+
+  it('executes personal-document discovery and read through the standard preset', async () => {
+    const target = await ctx.userDocs.resolveTarget({ name: 'preset-personal.txt' })
+    await ctx.userDocs.save(target, textStream('Preset document content\n'))
+    const handle = await ctx.agents.create({
+      sessionId: SessionId(`preset-personal-documents-${randomUUID()}`),
+      setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'standard').then(() => undefined),
+    })
+    try {
+      const signal = new AbortController().signal
+      const listed = await ctx.tools.execute({
+        callId: CallId('preset-personal-list'),
+        name: 'userdoc_list',
+        arguments: { query: 'preset-personal' },
+        signal,
+        agent: handle.agent,
+      })
+      expect(listed.isError).toBe(false)
+      expect(JSON.stringify(listed.content)).toContain('preset-personal.txt')
+      const read = await ctx.tools.execute({
+        callId: CallId('preset-personal-read'),
+        name: 'userdoc_read',
+        arguments: { doc_id: 'preset-personal.txt' },
+        signal,
+        agent: handle.agent,
+      })
+      expect(read.isError).toBe(false)
+      expect(JSON.stringify(read.content)).toContain('Preset document content')
     } finally {
       await handle.dispose()
     }
@@ -338,6 +386,8 @@ describe('the shipped Web composition', () => {
       const sdk = assembly.sections.find(section => section.name === 'tools:sdk')?.text ?? ''
       expect(sdk).not.toContain('str_replace_editor')
       expect(sdk).toContain('web_search')
+      expect(sdk).toContain('userdoc_list')
+      expect(sdk).toContain('userdoc_read')
 
       // The presentation is this agent's alone: the deployment default is
       // native, and the session composed from `standard` still sees it.

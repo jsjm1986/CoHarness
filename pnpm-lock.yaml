@@ -21,6 +21,9 @@ importers:
       '@deepseek-ai/dsh-tool-session-query':
         specifier: workspace:^
         version: link:packages/session-query/tool-session-query
+      '@deepseek-ai/dsh-tool-userdoc':
+        specifier: workspace:^
+        version: link:packages/attachment/tool-userdoc
       '@stylistic/eslint-plugin':
         specifier: ^5.10.0
         version: 5.10.0(eslint@10.5.0(jiti@2.7.0))
@@ -322,6 +325,9 @@ importers:
       '@deepseek-ai/dsh-tool-todo':
         specifier: workspace:^
         version: link:../../packages/todo/tool-todo
+      '@deepseek-ai/dsh-tool-userdoc':
+        specifier: workspace:^
+        version: link:../../packages/attachment/tool-userdoc
       '@deepseek-ai/dsh-tool-web':
         specifier: workspace:^
         version: link:../../packages/web/tool-web
@@ -768,6 +774,9 @@ importers:
       '@deepseek-ai/dsh-tool-todo':
         specifier: workspace:*
         version: link:../packages/todo/tool-todo
+      '@deepseek-ai/dsh-tool-userdoc':
+        specifier: workspace:*
+        version: link:../packages/attachment/tool-userdoc
       '@deepseek-ai/dsh-tool-web':
         specifier: workspace:*
         version: link:../packages/web/tool-web
@@ -999,6 +1008,43 @@ importers:
       '@deepseek-ai/dsh-timeout':
         specifier: workspace:^
         version: link:../../util/timeout
+
+  packages/attachment/tool-userdoc:
+    dependencies:
+      '@deepseek-ai/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-agent':
+        specifier: workspace:^
+        version: link:../../core/agent
+      '@deepseek-ai/dsh-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@deepseek-ai/dsh-llm':
+        specifier: workspace:^
+        version: link:../../llm/llm
+      '@deepseek-ai/dsh-output-retention':
+        specifier: workspace:^
+        version: link:../../util/output-retention
+      '@deepseek-ai/dsh-session':
+        specifier: workspace:^
+        version: link:../../core/session
+      '@deepseek-ai/dsh-system-prompt':
+        specifier: workspace:^
+        version: link:../../core/system-prompt
+      '@deepseek-ai/dsh-timeout':
+        specifier: workspace:^
+        version: link:../../util/timeout
+      '@deepseek-ai/dsh-tools':
+        specifier: workspace:^
+        version: link:../../core/tools
+      '@deepseek-ai/dsh-userdoc':
+        specifier: workspace:^
+        version: link:../userdoc
 
   packages/attachment/userdoc:
     devDependencies:
@@ -1594,6 +1640,9 @@ importers:
       '@deepseek-ai/dsh-tool-subagent':
         specifier: workspace:^
         version: link:../../subagent/tool-subagent
+      '@deepseek-ai/dsh-tool-userdoc':
+        specifier: workspace:^
+        version: link:../../attachment/tool-userdoc
       '@deepseek-ai/dsh-userdoc-context':
         specifier: workspace:^
         version: link:../../context/userdoc-context
@@ -9753,6 +9802,9 @@ importers:
       '@deepseek-ai/dsh-tool-todo':
         specifier: workspace:^
         version: link:../../packages/todo/tool-todo
+      '@deepseek-ai/dsh-tool-userdoc':
+        specifier: workspace:^
+        version: link:../../packages/attachment/tool-userdoc
       '@deepseek-ai/dsh-tool-web':
         specifier: workspace:^
         version: link:../../packages/web/tool-web
@@ -9771,6 +9823,12 @@ importers:
       '@deepseek-ai/dsh-user-questions':
         specifier: workspace:^
         version: link:../../packages/interaction/user-questions
+      '@deepseek-ai/dsh-userdoc':
+        specifier: workspace:^
+        version: link:../../packages/attachment/userdoc
+      '@deepseek-ai/dsh-userdoc-local':
+        specifier: workspace:^
+        version: link:../../packages/attachment/userdoc-local
       '@deepseek-ai/dsh-util-crypto':
         specifier: workspace:^
         version: link:../../packages/util/crypto

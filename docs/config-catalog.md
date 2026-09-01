@@ -3118,6 +3118,30 @@ export interface Config {
 
 Source: [`packages/todo/tool-todo/src/index.ts:29`](../packages/todo/tool-todo/src/index.ts)
 
+<a id="deepseek-aidsh-tool-userdoc"></a>
+
+## `@deepseek-ai/dsh-tool-userdoc`
+
+Requires: `tools` · `systemPrompt` · `userDocs`
+
+```ts config-catalog
+/** Deployment limits for personal-document discovery and reads. */
+export interface Config {
+  /** Maximum inventory rows one call can return. */
+  maxListResults?: number
+  /** Maximum document bytes consumed by one read. */
+  maxReadBytes?: number
+  /** Maximum lines one read can return. */
+  maxReadLines?: number
+  /** Maximum complete rendered result bytes. */
+  maxOutputBytes?: number
+  /** Cooperative tool-call deadline in milliseconds. */
+  timeoutMs?: number
+}
+```
+
+Source: [`packages/attachment/tool-userdoc/src/index.ts:42`](../packages/attachment/tool-userdoc/src/index.ts)
+
 <a id="deepseek-aidsh-tool-web"></a>
 
 ## `@deepseek-ai/dsh-tool-web`

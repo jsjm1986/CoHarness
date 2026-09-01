@@ -68,6 +68,12 @@
   config:
     sampleOverCapGlobResults: false
 
+# Personal documents are a separate model-facing capability. The tool consumes
+# the host-provided userDocs store and lets this preset find/read files without
+# requiring a browser upload or a guessed filesystem path.
+- id: tool-userdoc
+  name: '@deepseek-ai/dsh-tool-userdoc'
+
 # ── background jobs ────────────────────────────────────────────────────────
 
 # Only the model-facing controls. The task REGISTRY stays on the host plane:
