@@ -8,6 +8,9 @@ import { PermissionSelect } from '../src/client/skeleton/PermissionSelect.tsx'
 const t: ComposerBarProps['t'] = (key, params) => {
   const values: Record<string, string> = {
     'input.accessMode': '访问模式，当前：{name}',
+    'access.preset.readOnly': 'Read Only',
+    'access.preset.workspaceWrite': 'Workspace Write',
+    'access.preset.fullAccess': 'Full access',
     'access.confirm.title': '确认启用 Full access？',
     'access.confirm.description': 'Full access 风险确认',
     'access.confirm.acknowledge': '我已了解风险，并愿意继续',

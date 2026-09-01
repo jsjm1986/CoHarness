@@ -11,7 +11,7 @@ import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
-  ClientSessionContext, InputTriggerServiceContract, InputTriggerSource,
+  ClientSessionContext, InputTriggerCrumb, InputTriggerServiceContract, InputTriggerSource,
 } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import { formatFileMention } from '@deepseek-ai/dsh-file-reference/grammar'
 import type { FileReferenceCandidate } from '@deepseek-ai/dsh-file-reference/types'
@@ -52,20 +52,24 @@ export function apply(ctx: ClientContext): void {
         ...sessionItems.map(candidate => sessionCandidate(candidate, t)),
       ]
     },
-    onPick({ candidate }) {
+    header(_session: ClientSessionContext, request) {
+      return crumbsFor(request.query, request.quoted === true, request.drilled === true, t)
+    },
+    onPick({ candidate, action }) {
       const value = parseCandidate(candidate.value)
       if (value?.kind === 'file') {
-        return value.fileKind === 'directory'
-          ? { text: value.mention, continue: true }
-          : {
-            insert: {
-              source: 'reference',
-              ref: value.mention,
-              label: value.label,
-              appearance: 'file',
-              clipboardText: value.mention,
-            },
-          }
+        if (value.fileKind === 'directory' && action === 'drill') {
+          return { text: value.mention, continue: true }
+        }
+        return {
+          insert: {
+            source: 'reference',
+            ref: value.mention,
+            label: value.fileKind === 'directory' ? `${value.label}/` : value.label,
+            appearance: value.fileKind === 'directory' ? 'folder' : 'file',
+            clipboardText: value.mention,
+          },
+        }
       }
       if (value?.kind === 'session') {
         return {
@@ -95,6 +99,39 @@ type ReferenceCandidateValue =
   | { kind: 'file'; fileKind: FileReferenceCandidate['kind']; label: string; mention: string }
   | { kind: 'session'; label: string; mention: string }
 
+/** Build the breadcrumb of a directory listing reached through a drill. */
+function crumbsFor(
+  query: string,
+  quoted: boolean,
+  drilled: boolean,
+  t: Translate,
+): readonly InputTriggerCrumb[] | undefined {
+  if (!drilled) return undefined
+  const slash = query.lastIndexOf('/')
+  if (slash < 0) return undefined
+  const segments = query.slice(0, slash).split('/').filter(segment => segment !== '')
+  const crumbs: InputTriggerCrumb[] = [{
+    label: t('crumb.root'),
+    value: directoryValue(t('crumb.root'), quoted ? '@"' : '@'),
+  }]
+  for (const [index, segment] of segments.entries()) {
+    const path = segments.slice(0, index + 1).join('/')
+    const mention = formatFileMention({ path, kind: 'directory' }, quoted)
+    if (mention === undefined) return undefined
+    crumbs.push({
+      label: segment,
+      value: directoryValue(segment, mention),
+      ...(index === segments.length - 1 ? { current: true } : {}),
+    })
+  }
+  return crumbs
+}
+
+/** Encode one directory destination through the source's ordinary drill path. */
+function directoryValue(label: string, mention: string): string {
+  return JSON.stringify({ kind: 'file', fileKind: 'directory', label, mention } satisfies ReferenceCandidateValue)
+}
+
 function fileCandidate(candidate: FileReferenceCandidate, preserveQuote: boolean, t: Translate) {
   const mention = formatFileMention(candidate, preserveQuote)
   if (mention === undefined) return []
@@ -109,8 +146,10 @@ function fileCandidate(candidate: FileReferenceCandidate, preserveQuote: boolean
   return [{
     name: `${t(directory ? 'candidate.folder' : 'candidate.file')} · ${name}${directory ? '/' : ''}`,
     description: candidate.path,
+    icon: directory ? 'folder' as const : 'file' as const,
     section: t('section.files'),
     value: JSON.stringify(value),
+    ...(directory ? { drill: true } : {}),
   }]
 }
 
@@ -125,6 +164,7 @@ function sessionCandidate(candidate: SessionReferenceMentionCandidate, t: Transl
   return {
     name: `${t('candidate.session')} · ${candidate.label}`,
     description,
+    icon: 'session' as const,
     section: t('section.sessions'),
     value: JSON.stringify(value),
   }

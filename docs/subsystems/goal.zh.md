@@ -69,6 +69,40 @@ interface GoalView extends GoalSnapshot {
 }
 ```
 
+```ts type-equiv
+/**
+ * The `goal` projection value: the current durable goal with its replay
+ * counters, exactly as the latest `goal/change` event carried them.
+ * Activation is process-local (never persisted) and deliberately absent —
+ * the projection reflects durable phase only.
+ */
+interface GoalProjection {
+  /** Current durable goal snapshot (the CAS ref for mutations rides on it). */
+  readonly goal: GoalSnapshot
+  /** Highest admitted round number for this goal. */
+  readonly roundsStarted: number
+  /** Epoch milliseconds of the create mutation. */
+  readonly createdAt: number
+  /** Epoch milliseconds of the latest mutation. */
+  readonly updatedAt: number
+}
+```
+
+Host checkpoint 状态会在 wire 值外包裹回放完整性事实。`current` 是提供给客户端的值，`seenGoalIds` 防止严格回放期间复用 goal id，`failure` 记录首个无效的自有事件，同时不会拆掉 projection 驱动。
+
+
+```ts type-equiv
+/** Strict checkpoint state used to derive the current goal client value. */
+interface GoalProjectionState {
+  /** Latest valid current goal, or null before creation and after clear. */
+  readonly current: GoalProjection | null
+  /** Goal identities already created in this Session, retained to reject reuse. */
+  readonly seenGoalIds: GoalId[]
+  /** First strict replay failure, or null while the durable stream is valid. */
+  readonly failure: string | null
+}
+```
+
 ## 持久变更
 
 每次变更都是持久的 `goal/change` 会话事件，其载荷要么是变更后的完整快照，要么是清除墓碑。严格折叠与持久投影只从这些事件派生生命周期状态；inbox 变更不会影响 goal 状态。
@@ -247,7 +281,7 @@ block(agent: Agent, ref: GoalRef, reason: GoalBlockReason): GoalView
 
 Types: [Agent](core.zh.md)
 
-Source: [`packages/goal/goal/src/index.ts:183`](../../packages/goal/goal/src/index.ts)
+Source: [`packages/goal/goal/src/index.ts:246`](../../packages/goal/goal/src/index.ts)
 
 <a id="goal-events"></a>
 

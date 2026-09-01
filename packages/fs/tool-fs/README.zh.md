@@ -169,7 +169,7 @@ Use the edit tool for targeted changes to existing UTF-8 text files. It replaces
 
 - **未交付面向模型的目录列表工具**：`ctx.fs.listDir` 服务于 skill（技能）发现等提供方代码，同级 [`dsh-tool-fs-search`](../tool-fs-search/) 包则提供基于 ripgrep 的 `glob` 与 `grep`，而不是扩展文件系统 seam。
 - **`read` 只处理 UTF-8 文本文件**：图像使用独立的、按扩展名路由的 `read_image` 工具；PDF、音频和视频仍延期处理。目录目标为 `FS_NOT_REGULAR_FILE`。
-- **媒体类型按扩展名声明**：扩展名选择声明类型，附件存储的魔数校验保持权威；扩展名错误但格式正确的图像会得到改名修复提示，而不是被嗅探接受。
+- **媒体类型按扩展名声明**：带扩展名的路径选择声明类型，附件存储的魔数校验保持权威；无扩展名路径先根据 PNG/JPEG/WebP/GIF 的起始签名分类，再由附件提供方完整解码。扩展名错误仍得到改名修复提示，不会被静默重新分类。
 - **工具结果卡片没有内嵌图像预览**：UI 表面以通用形式渲染图像结果（持久引用而非像素）；内嵌渲染延后到 UI 包处理。
 - **没有附件局部读取工具**：图片具有文件路径时，agent 可以用其他可用工具裁剪。粘贴或拖入但没有路径的图片无法按更高分辨率重新读取。
 - **没有超时接口**：`read`/`write`/`edit` 不接受超时参数，也不声明 `timeout-policy` 预算；取消只通过 `exec.signal` 传递（见[提供方理由](../README.zh.md#no-timeouts-on-file-io)）。

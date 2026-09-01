@@ -17,7 +17,7 @@
 // independent); an error row's collapsed summary is the failure's first line in
 // the error color.
 
-import { useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { useMemo, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import clsx from 'clsx'
 import {
   CodeBlock, DiffBlock, DisclosureRow, IconInspectOutline12, ReadBlock, SearchBlock, StateDot, TerminalBlock, WebBlock,
@@ -30,7 +30,7 @@ import type { AskQuestionCardModel } from '../models/ask-question-card-model.ts'
 import { CHAT_READ_MAX_LINES, type ReadCardModel } from '../models/read-card-model.ts'
 import { CHAT_SEARCH_MAX_LINES, type SearchCardModel } from '../models/search-card-model.ts'
 import { terminalBlockLabels, type TerminalCardModel } from '../models/terminal-card-model.ts'
-import type { ToolRowState, ToolRowVariant } from '../models/tool-call-model.ts'
+import { formatToolBody, type ToolRowState, type ToolRowVariant } from '../models/tool-call-model.ts'
 import css from './ToolRow.module.css'
 
 export interface ToolRowProps {
@@ -51,8 +51,8 @@ export interface ToolRowProps {
    * error row, whose collapsed summary is the failure line instead.
    */
   summarySuffix?: string | null | undefined
-  /** Expanded-body input text; null = no input section. */
-  body: string | null
+  /** Original argument payload; formatting is deferred until expansion. */
+  bodyRaw?: string | null | undefined
   /** Flattened result text for the expanded Output section; null/absent = no output section. */
   output?: string | null | undefined
   /** Ask-user transcript card; replaces generic input/output sections. */
@@ -137,7 +137,7 @@ export function ToolRow({
   title,
   summary,
   summarySuffix,
-  body,
+  bodyRaw,
   output,
   askQuestion,
   errorSummary,
@@ -163,8 +163,12 @@ export function ToolRow({
   // card props are mutually exclusive. Any of them, or a text body/output,
   // makes the row expandable.
   const card = askQuestionBody ?? terminalBody ?? diffBody ?? readBody ?? searchBody ?? webBody
-  const expandable = body !== null || outputText !== null || card !== null
+  const expandable = bodyRaw != null || outputText !== null || card !== null
   const open = expanded && expandable
+  const bodyText = useMemo(
+    () => open && card === null && bodyRaw != null ? formatToolBody(variant, bodyRaw) : null,
+    [bodyRaw, card, open, variant],
+  )
   // The run-state label AT needs: the StateDot and the running sweep are both
   // aria-hidden / colour-only, so a stopped or running row is otherwise silent.
   const status = stateStatus(state, t)
@@ -193,7 +197,7 @@ export function ToolRow({
   }
   // The code variant's program renders through CodeBlock (shiki), so only its
   // output joins the IN/OUT card; every other variant's input does too.
-  const cardBody = variant === 'code' ? null : body
+  const cardBody = variant === 'code' ? null : bodyText
   // The state substitution rides the idle icon slot, so an expandable error
   // row keeps DisclosureRow's icon→chevron hover preview (its default) instead
   // of losing it with the icon.
@@ -270,9 +274,9 @@ export function ToolRow({
                       ? <WebBlock {...webBody} className={css.webBody} />
                       : (
                         <>
-                          {variant === 'code' && body !== null && (
+                          {variant === 'code' && bodyText !== null && (
                             <div className={css.bodyScroll}>
-                              <CodeBlock code={body} lang="typescript" copyLabel={t('copy')} copiedLabel={t('copied')} className={css.codeBody} />
+                              <CodeBlock code={bodyText} lang="typescript" copyLabel={t('copy')} copiedLabel={t('copied')} className={css.codeBody} />
                             </div>
                           )}
                           {(cardBody !== null || outputText !== null) && (

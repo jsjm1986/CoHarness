@@ -421,7 +421,7 @@ async function resolveColdIdentity(
   }
   let identity: SubagentIdentityProjection | null | undefined
   try {
-    identity = projections.restore({}, inspected.events, 0).snapshot.values.subagent
+    identity = projections.restore({}, inspected.events, 0, inspected.meta).snapshot.values.subagent
   } catch {
     // The restore folds EVERY registered unit over this child's log, so any
     // unit's fold or schema can reject damaged payloads — deterministic data

@@ -294,6 +294,7 @@ export class Session implements SessionFace {
     const requestId = randomUUID() as RpcId
     this.pendingSubmissions = [...this.pendingSubmissions, {
       requestId,
+      placement: input.placement,
       time: Date.now(),
       text: input.text,
       images: input.images,
@@ -347,26 +348,16 @@ export class Session implements SessionFace {
           },
         }
       } else {
-        if (content.some(part => part.type === 'image')) {
-          result = {
-            ok: false,
-            error: {
-              code: 'attachment-error',
-              message: 'Image input is unavailable for subagent continuations.',
-              details: { reason: 'SUBAGENT_IMAGE_UNSUPPORTED' },
-            },
-          }
-        } else {
-          const routed = (await this.api.subagents.prompt({
-            ...this.address,
-            ...(requestId === undefined ? {} : { requestId }),
-            content: content.flatMap(part => part.type === 'text'
-              ? [{ type: 'text' as const, text: part.text }]
-              : []),
-            clientTimeZone: resolvedClientTimeZone(),
-          }, signal)).result
-          result = routed.ok ? { ok: true, value: { accepted: true } } : routed
-        }
+        // Continuable children accept the same upload-shaped text/image parts
+        // as ordinary sessions; the Host admits image bytes before inbox
+        // acceptance. Documents remain an ordinary-session capability.
+        const routed = (await this.api.subagents.prompt({
+          ...this.address,
+          ...(requestId === undefined ? {} : { requestId }),
+          content: content.filter((part): part is Extract<typeof part, { type: 'text' | 'image' }> => part.type === 'text' || part.type === 'image'),
+          clientTimeZone: resolvedClientTimeZone(),
+        }, signal)).result
+        result = routed.ok ? { ok: true, value: { accepted: true } } : routed
       }
     } catch (error) {
       result = transportError(error)

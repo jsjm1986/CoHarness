@@ -38,6 +38,14 @@ def test_repository_version_accepts_a_prerelease(tmp_path: Path) -> None:
     assert build_python_release.repository_version(tmp_path) == "1.2.3-rc.1"
 
 
+def test_repository_version_accepts_a_coharness_prerelease(tmp_path: Path) -> None:
+    (tmp_path / "package.json").write_text(
+        '{"version":"1.2.3-alpha.2.coharness.1"}\n'
+    )
+
+    assert build_python_release.repository_version(tmp_path) == "1.2.3-alpha.2.coharness.1"
+
+
 def test_repository_version_rejects_malformed_versions(tmp_path: Path) -> None:
     (tmp_path / "package.json").write_text('{"version":"v1.2"}\n')
 
@@ -52,9 +60,14 @@ def test_pep440_version_spells_a_prerelease_the_python_way() -> None:
     assert build_python_release.pep440_version("1.2.3-rc.1") == "1.2.3rc1"
     assert build_python_release.pep440_version("1.2.3-alpha.2") == "1.2.3a2"
     assert build_python_release.pep440_version("1.2.3-beta.10") == "1.2.3b10"
+    assert build_python_release.pep440_version("1.2.3-alpha.2.coharness.1") == "1.2.3a2.post1"
+    assert build_python_release.pep440_version("1.2.3-rc.4.coharness.10") == "1.2.3rc4.post10"
 
     with pytest.raises(ValueError, match="no PEP 440 spelling"):
         build_python_release.pep440_version("1.2.3-nightly")
+
+    with pytest.raises(ValueError, match="alpha.N.coharness.N"):
+        build_python_release.pep440_version("1.2.3-alpha.2.downstream.1")
 
 
 def test_macos_wheel_tag_does_not_claim_unsupported_node_platforms() -> None:

@@ -109,6 +109,7 @@ export class ConnectionController {
   private current: AbortController | null = null
   private backoff: AbortController | null = null
   private running = false
+  private immediateRetry = false
   private lastState: ConnectionState | null = null
   private readonly config: Required<ConnectionConfig>
 
@@ -131,11 +132,23 @@ export class ConnectionController {
   /** Stop the loop and abort the current generation's streams. */
   stop(): void {
     this.running = false
+    this.immediateRetry = false
+    this.lastState = null
     this.runToken += 1
     this.current?.abort()
     this.current = null
     this.backoff?.abort()
     this.backoff = null
+  }
+
+  /** Reset retry delay and replace the current generation without waiting for backoff. */
+  reconnect(): void {
+    if (!this.running) return
+    this.attempt = 0
+    this.immediateRetry = true
+    this.emitState('reconnecting')
+    this.current?.abort()
+    this.backoff?.abort()
   }
 
   private backoffDelay(attempt: number): number {
@@ -266,13 +279,18 @@ export class ConnectionController {
         }
       } catch {
         // Transport failure: treat as generation failure, fall through to the shared backoff.
-        if (!ac.signal.aborted) ac.abort()
+        ac.abort()
         generationLive = false
         buffered.length = 0
       }
 
       await failed
       if (!this.isRunning(token)) return
+      if (this.immediateRetry) {
+        this.immediateRetry = false
+        this.attempt = 0
+        continue
+      }
       this.emitState('reconnecting')
       this.attempt += 1
       console.warn(`[web-runtime] connection lost, retry #${this.attempt}`)

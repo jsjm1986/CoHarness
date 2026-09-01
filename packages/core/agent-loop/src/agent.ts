@@ -74,6 +74,14 @@ export class ReactLoopAgent implements Agent {
   /** Fused dispatcher, built once in the constructor so hot-path dispatches never allocate. */
   private readonly dispatch: AgentEventDispatch
 
+  /**
+   * Waking message ids awaiting claim. Cancellation, rejection, and driver
+   * failure clear this bookkeeping so retained inbox input parks; a normal
+   * driver exit reopens when one of these messages arrived after its last
+   * queue check. Injected context is never recorded here.
+   */
+  private readonly pendingWakes = new Set<UserMessage['id']>()
+
   /** Whether this loop instance has appended its initial/resume request anchor. */
   private requestHeaderLogged = false
   private readonly runtimeContext: RuntimeContextProjection
@@ -88,8 +96,14 @@ export class ReactLoopAgent implements Agent {
     this.dispatch = agentEvents(loopCtx, this)
     this.inbox = new Inbox(session, {
       inserted: (message) => { this.dispatch.emit('agent/inbox/inserted', { message }) },
-      discarded: (message) => { this.dispatch.emit('agent/inbox/discarded', { message }) },
-      claimed: (message, turn) => { this.dispatch.emit('agent/inbox/claimed', { message, turn }) },
+      discarded: (message) => {
+        this.pendingWakes.delete(message.id)
+        this.dispatch.emit('agent/inbox/discarded', { message })
+      },
+      claimed: (message, turn) => {
+        this.pendingWakes.delete(message.id)
+        this.dispatch.emit('agent/inbox/claimed', { message, turn })
+      },
     }, inboxLimits)
     const lastTurn = session.events.findLast(event => event.type === 'turn/start')?.data.turn ?? 0
     this.phase = { kind: 'idle', lastTurn }
@@ -117,7 +131,15 @@ export class ReactLoopAgent implements Agent {
     // Captured before the insertion so a reentrant cancel from a splice observer cannot reclassify it.
     const wakingAfterAbort = wakeup && this.phase.kind !== 'idle' && this.phase.abort.signal.aborted
     const resolvedTarget = wakingAfterAbort ? 'next-turn' : target
-    this.inbox.splice(resolvedTarget, Infinity, 0, [message])
+    // Register before splice: a synchronous discard/claim observer can then
+    // remove the identity, while a refused splice rolls it back below.
+    if (wakeup) this.pendingWakes.add(message.id)
+    try {
+      this.inbox.splice(resolvedTarget, Infinity, 0, [message])
+    } catch (error: unknown) {
+      this.pendingWakes.delete(message.id)
+      throw error
+    }
     if (wakeup) this.wakeDriver(wakingAfterAbort)
   }
 
@@ -138,6 +160,9 @@ export class ReactLoopAgent implements Agent {
       this.inbox.clear()
       if (this.phase.kind !== 'idle') this.phase.wakeRequested = false
     }
+    // Kept inbox work parks until the next waking send; a cancellation never
+    // turns an already accepted wake into an automatic replay.
+    this.pendingWakes.clear()
     if (this.phase.kind !== 'idle') this.phase.abort.abort(cause)
   }
 
@@ -214,12 +239,15 @@ export class ReactLoopAgent implements Agent {
       while (await this.turn()) {}
     } catch (_error) {
       // Reported failures and cancellation are contained at the driver boundary.
+      // A failed or aborted turn parks accepted-but-unclaimed input until a
+      // later waking send, matching the existing cancellation contract.
+      this.pendingWakes.clear()
     } finally {
       /* v8 ignore next -- kick owns a running phase until this driver boundary */
       if (this.phase.kind === 'running') {
         const { turn, wakeRequested } = this.phase
         this.setPhase({ kind: 'idle', lastTurn: turn })
-        if (wakeRequested && this.inbox.hasPending) this.wakeDriver()
+        if ((wakeRequested || this.pendingWakes.size > 0) && this.inbox.hasPending) this.wakeDriver()
       }
     }
   }
@@ -267,6 +295,9 @@ export class ReactLoopAgent implements Agent {
         const step = phase.step + 1
         const decision = await this.preStep(target, { turn, step })
         if (decision.kind === 'reject') {
+          // The rejecting listener owns resumption; accepted input stays
+          // parked instead of being offered to the same policy immediately.
+          this.pendingWakes.clear()
           turnEnds = { kind: 'blocked' }
           return false
         }

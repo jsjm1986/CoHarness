@@ -20,3 +20,27 @@ export function displayPresetName(name: string): string {
 export function displayPermissionPreset(value: string, name: string): string {
   return value === FULL_ACCESS_PRESET ? 'Full access' : displayPresetName(name)
 }
+
+/** Keys for the built-in permission labels shared by settings and composer surfaces. */
+export type PermissionPresetCopyKey =
+  | 'preset.readOnly'
+  | 'preset.workspaceWrite'
+  | 'preset.fullAccess'
+
+/**
+ * Resolve built-in permission labels through the owning surface's locale.
+ * @param value - preset machine value.
+ * @param name - host-supplied preset name.
+ * @param translate - locale lookup for built-in preset labels.
+ * @returns the localized built-in label or the title-cased custom name.
+ */
+export function localizedPermissionPreset(
+  value: string,
+  name: string,
+  translate: (key: PermissionPresetCopyKey) => string,
+): string {
+  if (value === 'read-only') return translate('preset.readOnly')
+  if (value === 'workspace-write') return translate('preset.workspaceWrite')
+  if (value === FULL_ACCESS_PRESET) return translate('preset.fullAccess')
+  return displayPresetName(name)
+}

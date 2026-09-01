@@ -8,6 +8,7 @@
 import { Context, FiberState, Service } from '@deepseek-ai/cordis'
 import { randomUUID } from 'node:crypto'
 import z from '@deepseek-ai/schemastery'
+import { z as zod } from 'zod'
 import { emitAgentEvent } from '@deepseek-ai/dsh-agent'
 import type {
   Agent,
@@ -19,6 +20,7 @@ import type {
   InboxLimits,
   ResumeAgentOptions,
   SessionStartSource,
+  TurnBoundaryProjection,
 } from '@deepseek-ai/dsh-agent'
 import { errorChain } from '@deepseek-ai/dsh-llm'
 import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
@@ -26,6 +28,8 @@ import { SessionId, SessionPreparation } from '@deepseek-ai/dsh-session'
 import type { Session, SessionHeader } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tools'
+import type {} from '@deepseek-ai/dsh-session-projection'
+import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import type { SessionPersistence } from '@deepseek-ai/dsh-session-persistence'
 import { ReactLoopAgent } from './agent.ts'
 import {
@@ -40,6 +44,43 @@ const INACTIVE_STATES: ReadonlySet<FiberState> = new Set([
   FiberState.DISPOSED,
   FiberState.FAILED,
 ])
+
+const turnBoundaryProjectionSchema: zod.ZodType<TurnBoundaryProjection> = zod.object({
+  openTurnStartSeq: zod.number().int().nonnegative().nullable(),
+  lastStepStartSeq: zod.number().int().nonnegative().nullable(),
+  lastStepBoundary: zod.object({
+    kind: zod.union([zod.literal('start'), zod.literal('end')]),
+    seq: zod.number().int().nonnegative(),
+  }).nullable(),
+  lastTurn: zod.number().int().nonnegative(),
+})
+
+/** Host projection of agent turn and step boundaries. */
+export const turnBoundaryProjectionDefinition = {
+  key: 'turnBoundary',
+  stateVersion: 2,
+  stateSchema: turnBoundaryProjectionSchema,
+  init: (): TurnBoundaryProjection => ({
+    openTurnStartSeq: null,
+    lastStepStartSeq: null,
+    lastStepBoundary: null,
+    lastTurn: 0,
+  }),
+  apply: (state, event): TurnBoundaryProjection => {
+    switch (event.type) {
+      case 'turn/start':
+        return { ...state, openTurnStartSeq: event.seq, lastTurn: event.data.turn }
+      case 'turn/end':
+        return { ...state, openTurnStartSeq: null }
+      case 'step/start':
+        return { ...state, lastStepStartSeq: event.seq, lastStepBoundary: { kind: 'start', seq: event.seq } }
+      case 'step/end':
+        return { ...state, lastStepBoundary: { kind: 'end', seq: event.seq } }
+      default:
+        return state
+    }
+  },
+} satisfies ProjectionDefinition<'turnBoundary', TurnBoundaryProjection>
 
 /** Factory-level ownership: live agent teardowns plus config startup work. */
 class FactoryOwnership {
@@ -386,6 +427,14 @@ export class AgentLoop extends Service implements AgentFactory {
       onChange: () => {},
     })
     validateConfiguredAgents(this.config.agents)
+    // Keep the boundary projection optional for compact/headless assemblies;
+    // full applications mount it with the registry and authority readers use
+    // its O(1) current state. Register on this service fiber so disposal owns
+    // the unit without adding a synthetic child plugin effect.
+    const projections = ctx.get('sessionProjections')
+    if (projections !== undefined) {
+      ctx.effect(() => projections.register(turnBoundaryProjectionDefinition), 'agentLoop.turnBoundaryProjection()')
+    }
     this.ownership = new FactoryOwnership(ctx.fiber)
     this.runtime = { ctx }
     ctx.effect(() => () => this.ownership.dispose(), 'agentLoop.transactions()')

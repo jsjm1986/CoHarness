@@ -23,6 +23,7 @@
 
 import { stat } from 'node:fs/promises'
 import { Context, Service } from '@deepseek-ai/cordis'
+import { evaluate } from '@deepseek-ai/cordis-plugin-loader'
 import z from '@deepseek-ai/schemastery'
 import { bindScopeParent, createScope, scopeOf, type Scope, type ScopeKey, type ScopeParentBinding } from '@deepseek-ai/dsh-scope'
 // Type-only: resolves the `agent/created` lifecycle event this service watches.
@@ -31,9 +32,13 @@ import { settingsNamespace, type SettingsScope, type default as SettingsService 
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 import { discoverPresets, USER_PRESET_DIR } from './discovery.ts'
 import { copyComposition, deleteComposition, readComposition } from './authoring.ts'
-import { mountPreset, serviceForAgent, standingMountFor } from './mount.ts'
+import { livePresetMounts, mountPreset, serviceForAgent, standingMountFor } from './mount.ts'
 import { PresetExistsError } from './authoring.ts'
 import { PresetMountError, UnknownPresetError, type AgentPreset, type Config, type PresetRoot } from './preset.ts'
+import {
+  fileComposition, mountedCompositionRows,
+  type AgentPresetComposition,
+} from './composition-inventory.ts'
 import type {} from './types.ts'
 
 /** Settings namespace carrying the user's chosen default preset. */
@@ -65,6 +70,10 @@ export {
 } from './authoring.ts'
 export { resolveSessionPreset, type PresetBearingSession } from './session.ts'
 export { PresetMountError, UnknownPresetError } from './preset.ts'
+export {
+  fileComposition, mountedCompositionRows,
+  type AgentPresetComposition, type AgentPresetCompositionRow, type CompositionRowEnablement,
+} from './composition-inventory.ts'
 export type { AgentPreset, Config, PresetRoot, PresetTrust } from './preset.ts'
 
 declare module '@deepseek-ai/cordis' {
@@ -211,6 +220,45 @@ export class AgentPresets extends Service {
    */
   async list(): Promise<AgentPreset[]> {
     return await discoverPresets(this.resolvedRoots, this.harnessBase)
+  }
+
+  /**
+   * Read every preset's flattened composition for a read-only inventory.
+   * Live standing mounts answer from their Loader tree; an unmounted preset is
+   * parsed from disk and never activated merely because it is listed.
+   * @returns preset identities and composition rows in roster order.
+   */
+  async compositionInventory(): Promise<AgentPresetComposition[]> {
+    const defaultId = this.defaultId
+    const evaluateExpression = (expression: string): unknown => {
+      // Loader expressions are deployment-owned config, not model input. A
+      // failed evaluation remains conditional rather than becoming enabled.
+      return evaluate(this.selfCtx.loader.ctx, expression)
+    }
+    const rootFiber = this.ctx.root.fiber
+    const result: AgentPresetComposition[] = []
+    for (const preset of await this.list()) {
+      const identity = {
+        id: preset.id,
+        trust: preset.trust,
+        ...preset.name === undefined ? {} : { name: preset.name },
+        isDefault: preset.id === defaultId,
+      }
+      const mounted = livePresetMounts(rootFiber).findLast(candidate => candidate.presetId === preset.id && candidate.tree !== undefined)
+      if (mounted?.tree !== undefined) {
+        result.push({ ...identity, rows: mountedCompositionRows(mounted.tree) })
+        continue
+      }
+      if (preset.broken !== undefined) {
+        result.push({ ...identity, broken: preset.broken, rows: [] })
+        continue
+      }
+      const read = await fileComposition(preset.path, evaluateExpression)
+      result.push('broken' in read
+        ? { ...identity, broken: read.broken, rows: [] }
+        : { ...identity, rows: read.rows })
+    }
+    return result
   }
 
   /**

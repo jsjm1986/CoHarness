@@ -318,6 +318,7 @@ export function PendingSubmissionBubble({ submission, renderMessageImages, t }: 
     <UserStyleBubble
       content={content}
       renderMessageImages={renderMessageImages}
+      pending={submission.placement === 'steering'}
       previewImages={previewImages}
       t={t}
       actions={text => (

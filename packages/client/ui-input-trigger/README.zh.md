@@ -6,6 +6,10 @@
 
 分层：`src/core/` 是纯内核——`detectTrigger`、`menuReduce`／`seedGroups`／`MENU_CLOSED`、`exactMatch`，零 React／DOM／cordis；`src/client/service.ts` 是壳层，把内核接到菜单快照 store、逐 hit 候选拉取（以 generation 把关、后继请求经 `AbortSignal` 取代旧请求、失败的 source 静默丢弃并留一条 console 记录）和三条 pick 路径上。`ReferenceInsert.appearance` 可以把显示类型标为 `session`、`file` 或 `folder`，且不会改变其序列化 `ref`；图标与颜色由消费它的输入框负责。`src/types.ts` 与两个 `contract.ts` 文件是冻结的跨包约定；变更需经主线程仲裁。
 
+候选刷新尚未完成时，菜单会阻止任何陈旧高亮被提交：在高亮分组落定前 Enter 会被消费；Tab 只对标记为 `drill` 的行执行下钻，否则保留浏览器原生焦点移动。
+
+Source 可以同步发布面包屑头部。目录候选既可以通过 Enter／点击作为原子文件夹引用落定，也可以通过 Tab、行尾箭头或面包屑显式下钻；下钻会替换 token 文本并在新目录重新追踪菜单，同时保留 source 自己的头部。
+
 MenuView 把菜单 store 渲染进 `conversation.input.overlay` slot（列表类，会话 scope），菜单关闭期间渲染 null。键入式 trigger 会 seed 为该 trigger 注册的所有 source；程序化 launcher 只 seed 所请求的 source，并在菜单关闭或重新开始键入式 tracking 前，通过 controller 的 `launcher` 快照 store 发布该 source 名称。分组按可选的 `InputTriggerSource.order` 排序（越小越靠前，默认 0，同值保持注册序），组标题行经 `inputTriggers.menu` locale 命名空间本地化（未知 source 显示其原名）。`showGroupTitle: false` 会在 pending 与 ready 状态全程隐藏该行，ready 且候选项声明了 section 的组则以这些 section 标题行取代 source 标题。列表高度受限于 composer 上方的可用空间，指针落在菜单与所在 composer 卡片之外即关闭菜单。compact 视口会使用共享 `--dsw-mobile-sheet-*` 几何把菜单变成固定手机 Sheet；焦点仍留在 textarea，mousedown 选择和关闭规则不变。该 slot 由 ui-conversation 的组合器条目拥有（锚点、children 声明、生命周期）；其 SlotMap 类型合并放在本包的 `src/client/slots.ts`，因为依赖方向（ui-conversation → ui-input-trigger）不允许反向的类型导入。combobox 模式：焦点始终留在 textarea，行在 mousedown 时完成 pick，高亮由 `aria-activedescendant` 承载。
 
 `/client` 导出接口是插件主体（`apply`／`inject`）、`InputTriggerService`、`MenuViewInjected` 与约定类型。MenuView 本身是内部实现——slot 注册以闭包持有它。
@@ -21,5 +25,5 @@ MenuView 把菜单 store 渲染进 `conversation.input.overlay` slot（列表类
 ## 已知限制与暂缓事项
 
 - **只有全局 source 层**：会话 scope 的 source 注册（逐会话遮蔽、类 ScopedLayers 机制）已有设计但未启用；台账记录着触发条件（出现真实的逐会话 source 需求）。
-- **`InputTriggerCandidate.icon` 以文本渲染**：MenuView 把该字符串原样放进图标位；与设计系统图标枚举（iconFile 五变体家族）的接入将在该枚举交付后完成。
+- **扩展图标保持文本兼容**：内置的 `file`、`folder`、`session` 值使用共享图标；扩展提供的图标字符串仍按文本保留。
 - **overlay 的 SlotMap 合并归属与 slot 所有权分离**：唯一的 `conversation.input.overlay` 合并放在本包，而 ui-conversation 负责其锚点、children 声明和生命周期，因为依赖方向是 ui-conversation → ui-input-trigger。

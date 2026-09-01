@@ -195,6 +195,56 @@ describe('agent loop', () => {
     expect(messages[1]!.content).toEqual([{ type: 'text', text: 'hello there' }])
   })
 
+  it('re-wakes a follow-up that arrives in the normal turn-closing microtask', async () => {
+    const adapter = new MockAdapter([textResponse('first reply'), textResponse('late reply')])
+    const ctx = await harness(adapter)
+    const agent = ctx.agentLoop.create(SessionId('closing-followup'), { provider: 'mock', model: 'mock' })
+    let sent = false
+    ctx.on('session/event', (_session, event) => {
+      if (event.type !== 'turn/end' || sent) return
+      sent = true
+      // This callback runs before the driver's await continuation. The first
+      // turn has already decided it is done, but its phase is still running.
+      queueMicrotask(() => {
+        agent.followup(createUserMessage({
+          content: [{ type: 'text', text: 'late follow-up' }],
+          source: { kind: 'user' },
+        }))
+      })
+    })
+
+    send(agent, 'first prompt')
+    await agent.whenIdle()
+
+    expect(userTexts(agent)).toEqual(['first prompt', 'late follow-up'])
+    expect(adapter.requests).toHaveLength(2)
+    expect(agent.inbox.hasPending).toBe(false)
+  })
+
+  it('re-wakes steering that arrives in the normal turn-closing microtask', async () => {
+    const adapter = new MockAdapter([textResponse('first reply'), textResponse('steer reply')])
+    const ctx = await harness(adapter)
+    const agent = ctx.agentLoop.create(SessionId('closing-steer'), { provider: 'mock', model: 'mock' })
+    let sent = false
+    ctx.on('session/event', (_session, event) => {
+      if (event.type !== 'turn/end' || sent) return
+      sent = true
+      queueMicrotask(() => {
+        agent.steer(createUserMessage({
+          content: [{ type: 'text', text: 'late steering' }],
+          source: { kind: 'user' },
+        }))
+      })
+    })
+
+    send(agent, 'first prompt')
+    await agent.whenIdle()
+
+    expect(userTexts(agent)).toEqual(['first prompt', 'late steering'])
+    expect(adapter.requests).toHaveLength(2)
+    expect(agent.inbox.hasPending).toBe(false)
+  })
+
   it('appends the complete entered-message batch before dispatching message-entered effects', async () => {
     const adapter = new MockAdapter([textResponse('done')])
     const ctx = await harness(adapter)

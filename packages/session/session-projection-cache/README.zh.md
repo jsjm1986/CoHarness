@@ -15,10 +15,11 @@
 
 ## 写策略
 
-两个必写点，其间节流：
+三个必写点，其间节流：
 
 | 触发 | 性质 |
 |---|---|
+| 会话创建 | 必写——在首个普通事件之前捕获由 seed 派生的投影状态。 |
 | `turn/end` | 必写——冷读要的正是轮次终值。 |
 | 会话释放（detach） | 必写——live 转 cold 的时刻；此后冷读阶梯接管该会话。 |
 | 累计 `writeEveryEvents` 个已提交事件 | 配置节流（条数）。 |
@@ -34,7 +35,7 @@
 
 读取阶梯，正常路径无需加载全量日志：缓存行 → `sessionProjections.restoreFloor`（锚定在最低可用水位之前一个事件的位置）→ 持久化 `readFrom(id, floor)` → `sessionProjections.restore` → 刷新行的 fail-soft 写回。这个锚使缩短的日志（崩溃修复截断）可被证明：越界的行恰好触发一次从 seq 0 的全量重读，而不是把幽灵值当现值服务。无已注册单元时直接服务 `{asOfSeq: -1, values: {}}`，不触碰持久化；无持久日志的会话以 seam 的 `not found` 拒绝。
 
-`write(session)` 是两个必写点共用的同步切面检查点；载体可以直接调用（非 fail-soft——由 fail-soft 包装层负责遏制）。
+`write(session)` 是所有必写点共用的同步切面检查点；载体可以直接调用（非 fail-soft——由 fail-soft 包装层负责遏制）。
 
 ## 组合
 

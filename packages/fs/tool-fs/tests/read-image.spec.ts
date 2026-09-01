@@ -28,6 +28,7 @@ import {
   formatImageReadOutput,
   imageMediaTypeForPath,
   imageRefFromValue,
+  sniffImageMediaType,
 } from '../src/read-image.ts'
 
 /** 1x1 red PNG (valid signature, IHDR, IDAT). */
@@ -165,6 +166,22 @@ describe('imageMediaTypeForPath', () => {
   })
 })
 
+describe('sniffImageMediaType', () => {
+  it('recognizes supported signatures and rejects incomplete or unrelated bytes', () => {
+    expect(sniffImageMediaType(PNG_1X1)).toBe('image/png')
+    expect(sniffImageMediaType(Uint8Array.from([0xff, 0xd8, 0xff, 0x00]))).toBe('image/jpeg')
+    expect(sniffImageMediaType(Uint8Array.from(Buffer.from('GIF87a')))).toBe('image/gif')
+    expect(sniffImageMediaType(Uint8Array.from(Buffer.from('GIF89a')))).toBe('image/gif')
+    const webp = new Uint8Array(12)
+    webp.set(Buffer.from('RIFF'), 0)
+    webp.set(Buffer.from('WEBP'), 8)
+    expect(sniffImageMediaType(webp)).toBe('image/webp')
+    expect(sniffImageMediaType(Uint8Array.from([0x89, 0x50]))).toBeUndefined()
+    expect(sniffImageMediaType(Uint8Array.from(Buffer.from('plain')))).toBeUndefined()
+    expect(sniffImageMediaType(Uint8Array.from(Buffer.from('RIFFxxxxWAVE')))).toBeUndefined()
+  })
+})
+
 describe('imageRefFromValue', () => {
   it('re-brands with and without the optional display name', () => {
     const base = { attachmentId: 'sha256:00', mediaType: 'image/png' as const, bytes: 1, width: 1, height: 1 }
@@ -213,6 +230,35 @@ describe('read_image happy path', () => {
     ctx.on('fs/observed', target => void observed.push(target.displayPath))
     await readImage(ctx, { file_path: 'red.png' }, agentOn('vision-model'))
     expect(observed).toEqual([join(dir, 'red.png')])
+  })
+
+  it('reads a supported extension-less image by its file signature', async () => {
+    await writeFile(join(dir, 'sha256-deadbeef'), PNG_1X1)
+    const ctx = await setup()
+    const result = await readImage(ctx, { file_path: 'sha256-deadbeef' }, agentOn('vision-model'))
+
+    expect(result.isError).toBe(false)
+    expect((result.content[1] as { attachment: ImageAttachmentRef }).attachment.mediaType).toBe('image/png')
+  })
+
+  it('sniffs dotfiles while refusing a trailing-dot pseudo-extension', async () => {
+    await writeFile(join(dir, '.hidden'), PNG_1X1)
+    const ctx = await setup()
+    const dotfile = await readImage(ctx, { file_path: '.hidden' }, agentOn('vision-model'))
+    expect(dotfile.isError).toBe(false)
+    expect((dotfile.content[1] as { attachment: ImageAttachmentRef }).attachment.name).toBe('.hidden')
+    const trailingDot = await readImage(ctx, { file_path: 'avatar.' }, agentOn('vision-model'))
+    expect(trailingDot.isError).toBe(true)
+    expect(text(trailingDot)).toContain('the . extension does not declare a supported image format')
+  })
+
+  it('rejects an extension-less file whose signature is not an image', async () => {
+    await writeFile(join(dir, 'sha256-not-image'), 'plain text')
+    const ctx = await setup()
+    const result = await readImage(ctx, { file_path: 'sha256-not-image' }, agentOn('vision-model'))
+
+    expect(result.isError).toBe(true)
+    expect(text(result)).toContain('file content is not a supported image format')
   })
 
   it('falls back to agent options when no request header exists yet', async () => {
@@ -309,7 +355,7 @@ describe('argument and service preconditions', () => {
 
     const nonImage = await readImage(ctx, { file_path: 'notes.txt' }, agentOn('vision-model'))
     expect(nonImage.isError).toBe(true)
-    expect(text(nonImage)).toContain('only accepts PNG/JPEG/WebP/GIF paths')
+    expect(text(nonImage)).toContain('does not declare a supported image format')
   })
 
   it('refuses when no attachment service is mounted', async () => {
@@ -459,6 +505,15 @@ describe('image admission failures', () => {
     const unrelated = await readImage(ctx, { file_path: 'red.png' }, agentOn('vision-model'))
     expect(unrelated.isError).toBe(true)
     expect(text(unrelated)).toContain('unrelated infrastructure failure')
+
+    await writeFile(join(dir, 'red'), PNG_1X1)
+    FailingStore.failure = new AttachmentError('Image bytes are truncated.', 'INVALID_IMAGE')
+    const invalidExtensionless = await readImage(ctx, { file_path: 'red' }, agentOn('vision-model'))
+    expect(text(invalidExtensionless)).toContain('the bytes do not decode as a supported PNG/JPEG/WebP/GIF image')
+
+    FailingStore.failure = new AttachmentError('Image type differs from its signature.', 'IMAGE_TYPE_MISMATCH')
+    const mismatchedExtensionless = await readImage(ctx, { file_path: 'red' }, agentOn('vision-model'))
+    expect(text(mismatchedExtensionless)).toContain('the file signature claims image/png, but the bytes decode as a different image format')
   })
 
   it('reports a missing image file and a directory target through the fs vocabulary', async () => {

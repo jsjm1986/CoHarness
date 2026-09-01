@@ -11,6 +11,9 @@ import { RpcId } from '@deepseek-ai/dsh-host-apiproxy/api'
 
 type Frame = MuxFrame | HostFrame
 
+/** Allow a busy event loop to miss two protocol heartbeats before closing. */
+const MAX_MISSED_HEARTBEATS = 2
+
 function serverRequest(frame: RpcRequest<Frame>): ServerRequest {
   return {
     type: 'server-request',
@@ -51,6 +54,7 @@ function failureFrame(error: unknown): RpcRequest<Frame> {
 export class WebSocketDownlinks {
   private readonly server = new WebSocketServer({ noServer: true })
   private readonly pumps = new Set<Promise<void>>()
+  private readonly missedHeartbeats = new WeakMap<WebSocket, number>()
   private heartbeatTimer: NodeJS.Timeout | undefined
 
   /**
@@ -110,7 +114,18 @@ export class WebSocketDownlinks {
     if (this.heartbeatTimer !== undefined) return
     this.heartbeatTimer = setInterval(() => {
       for (const socket of this.server.clients) {
-        if (socket.readyState === WebSocket.OPEN) socket.ping()
+        if (socket.readyState !== WebSocket.OPEN) continue
+        const missed = this.missedHeartbeats.get(socket) ?? 0
+        if (missed >= MAX_MISSED_HEARTBEATS) {
+          // Give a pong already queued by the event loop one turn to arrive
+          // before terminating the socket.
+          setImmediate(() => {
+            if ((this.missedHeartbeats.get(socket) ?? 0) >= MAX_MISSED_HEARTBEATS) socket.terminate()
+          })
+          continue
+        }
+        this.missedHeartbeats.set(socket, missed + 1)
+        socket.ping()
       }
     }, this.heartbeatIntervalMs)
     this.heartbeatTimer.unref()
@@ -124,6 +139,8 @@ export class WebSocketDownlinks {
   ): void {
     this.server.handleUpgrade(req, socket, head, (websocket) => {
       this.startHeartbeat()
+      this.missedHeartbeats.set(websocket, 0)
+      websocket.on('pong', () => { this.missedHeartbeats.set(websocket, 0) })
       const abort = new AbortController()
       websocket.once('close', () => { abort.abort() })
       websocket.once('error', () => { abort.abort() })

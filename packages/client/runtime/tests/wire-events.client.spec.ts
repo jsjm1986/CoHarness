@@ -65,9 +65,14 @@ async function mount(): Promise<Bench> {
       getSnapshot: () => undefined,
       subscribe: () => () => {},
     },
+    state: {
+      getSnapshot: () => undefined,
+      subscribe: () => () => {},
+    },
     rpc: {
       call: () => Promise.reject(new Error('unexpected generic RPC call')),
     },
+    reconnect: () => {},
     start: (sinks) => {
       bench.sinks = sinks
       return { stop: () => {} }

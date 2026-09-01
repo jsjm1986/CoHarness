@@ -15,6 +15,9 @@
       "path": "../../api/remotes/tsconfig.client.json"
     },
     {
+      "path": "../../preset/agent-presets/tsconfig.json"
+    },
+    {
       "path": "../locale"
     },
     {
@@ -22,6 +25,9 @@
     },
     {
       "path": "../ui-settings"
+    },
+    {
+      "path": "../ui-agent-preset"
     },
     {
       "path": "../ui-primitives"

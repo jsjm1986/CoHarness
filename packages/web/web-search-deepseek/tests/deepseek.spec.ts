@@ -1,3 +1,5 @@
+/* oxlint-disable typescript/no-unsafe-assignment -- Vitest asymmetric matchers
+ * are typed as any; these assertions inspect provider error fields. */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -327,25 +329,34 @@ describe('DeepSeekSearchProvider error handling', () => {
   it('maps an HTTP error to WEB_PROVIDER_ERROR with the provider message', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ error: { message: 'rate limited' } }, { status: 429 })))
     await expect(searchProvider(options).search({ query: 'q' }))
-      .rejects.toThrow(expect.objectContaining({ code: 'WEB_PROVIDER_ERROR', message: 'rate limited' }))
+      .rejects.toThrow(expect.objectContaining({
+        code: 'WEB_PROVIDER_ERROR',
+        message: expect.stringContaining('DeepSeek API error (HTTP 429): rate limited'),
+      }))
   })
 
   it('handles a string-form error body', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ error: 'bad request' }, { status: 400 })))
     await expect(searchProvider(options).search({ query: 'q' }))
-      .rejects.toThrow(expect.objectContaining({ message: 'bad request' }))
+      .rejects.toThrow(expect.objectContaining({ message: expect.stringContaining('DeepSeek API error (HTTP 400): bad request') }))
   })
 
   it('keeps a status-line message when the error body is not JSON', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('upstream error', { status: 503 })))
     await expect(searchProvider(options).search({ query: 'q' }))
-      .rejects.toThrow(expect.objectContaining({ message: 'DeepSeek API error (HTTP 503)' }))
+      .rejects.toThrow(expect.objectContaining({ message: expect.stringContaining('DeepSeek API error (HTTP 503)') }))
   })
 
   it('keeps the status-line message when the JSON error body carries no detail', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({}, { status: 500 })))
     await expect(searchProvider(options).search({ query: 'q' }))
-      .rejects.toThrow(expect.objectContaining({ message: 'DeepSeek API error (HTTP 500)' }))
+      .rejects.toThrow(expect.objectContaining({
+        message: expect.stringContaining('DeepSeek API error (HTTP 500)'),
+      }))
+    await expect(searchProvider(options).search({ query: 'q' }))
+      .rejects.toThrow(expect.objectContaining({
+        message: expect.stringContaining('Settings > Plugins > Plugin configuration > Web search'),
+      }))
   })
 
   it('bounds an oversized success response before JSON parsing', async () => {
@@ -362,7 +373,7 @@ describe('DeepSeekSearchProvider error handling', () => {
       status: 502, headers: { 'content-length': '128' },
     })))
     await expect(searchProvider({ ...options, maxResponseBytes: 32 }).search({ query: 'q' }))
-      .rejects.toThrow(expect.objectContaining({ message: 'DeepSeek API error (HTTP 502)' }))
+      .rejects.toThrow(expect.objectContaining({ message: expect.stringContaining('DeepSeek API error (HTTP 502)') }))
   })
 
   it('maps an abort to WEB_ABORTED', async () => {

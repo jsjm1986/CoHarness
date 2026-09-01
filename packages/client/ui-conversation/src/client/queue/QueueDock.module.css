@@ -138,6 +138,22 @@
   word-break: break-word;
 }
 
+.thumbs {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+
+.thumb {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 4px;
+  background: var(--dsw-alias-bg-base);
+  object-fit: cover;
+}
+
 .editor {
   box-sizing: border-box;
   height: 28px;

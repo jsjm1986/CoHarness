@@ -211,6 +211,7 @@ describe('ConversationController', () => {
       const sending = b.root.sendSession(b.session, '慢速图片', [attachment.id], [], 'queue')
       await vi.waitFor(() => { expect(programmable.inputs).toHaveLength(1) })
       expect(programmable.inputs[0]?.onRetire).toEqual(expect.any(Function))
+      expect(programmable.inputs[0]?.placement).toBe('transcript')
       expect(programmable.inputs[0]?.images).toEqual([{ previewUrl: 'blob:slow', name: 'slow.png' }])
       expect(programmable.inputs[0]?.text).toBe('慢速图片')
       expect(programmable.inputs[0]?.onRetire).toBeTruthy()

@@ -371,10 +371,15 @@ export interface PendingSubmissionImage {
   readonly height?: number
 }
 
+/** Client surface selected when a local submission begins. */
+export type PendingSubmissionPlacement = 'transcript' | 'queued' | 'steering'
+
 /** One local prompt-submission echo awaiting durable event or queue observation. */
 export interface PendingSubmission {
   /** Prompt identity carried through the host source metadata. */
   readonly requestId: RpcId
+  /** Expected surface until the Host reports the admitted occurrence. */
+  readonly placement: PendingSubmissionPlacement
   /** Client wall-clock ms when the submission began. */
   readonly time: number
   /** Prompt text exactly as sent, possibly empty for attachment-only input. */

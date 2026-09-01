@@ -36,8 +36,8 @@ describe('menuReduce hit', () => {
     s = menuReduce(s, { type: 'source-settled', generation: 1, source: 'command', items: [item('goal')] })
     s = menuReduce(s, { type: 'hit', hit: hit('g') })
     expect(s.generation).toBe(2)
-    expect(s.groups).toEqual([{ source: 'command', status: 'pending', items: [] }])
-    expect(s.highlight).toBeNull()
+    expect(s.groups).toEqual([{ source: 'command', status: 'pending', items: [{ name: 'goal' }] }])
+    expect(s.highlight).toEqual({ source: 'command', index: 0 })
   })
 
   it('preserves a hidden group title through re-hit and settlement', () => {

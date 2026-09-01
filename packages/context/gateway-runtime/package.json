@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-gateway-runtime",
   "description": "Authenticated Gateway request context and internal runtime transport for DeepSeek Harness",
-  "version": "0.1.1-rc.1",
+  "version": "0.1.2-alpha.3.coharness.1",
   "publishConfig": {
     "access": "public"
   },

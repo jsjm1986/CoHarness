@@ -95,8 +95,10 @@ export const menuReduce: MenuReduce = (state, ev) => {
         open: true,
         hit: ev.hit,
         generation: state.generation + 1,
-        groups: state.groups.map(g => ({ ...g, status: 'pending', items: [] })),
-        highlight: null,
+        // Keep the previous rows visible while a refinement is in flight;
+        // pending status fences picks until the new generation settles.
+        groups: state.groups.map(g => ({ ...g, status: 'pending' })),
+        highlight: state.highlight,
       }
     }
     case 'source-settled': {
@@ -130,6 +132,14 @@ export const menuReduce: MenuReduce = (state, ev) => {
       if (next === undefined) return state
       if (hl && next.source === hl.source && next.index === hl.index) return state
       return { ...state, highlight: next }
+    }
+    case 'hover': {
+      if (!state.open) return state
+      const target = validHighlight({ source: ev.source, index: ev.index }, state.groups)
+      if (target === null) return state
+      const hl = state.highlight
+      if (hl && hl.source === target.source && hl.index === target.index) return state
+      return { ...state, highlight: target }
     }
     case 'close':
       return closed(state)

@@ -18,6 +18,9 @@
       "path": "../../util/brand"
     },
     {
+      "path": "../../preset/agent-presets"
+    },
+    {
       "path": "../../typert/protocol"
     },
     {

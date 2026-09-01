@@ -15,9 +15,9 @@ import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
 import { TypertRemoteService, Remote } from '@deepseek-ai/dsh-typert-protocol'
 // Type-only: resolves ctx.sessionProjections for the optional unit child.
 import type {} from '@deepseek-ai/dsh-session-projection'
+import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import {
   applyGoalEvent,
-  decodeGoalChange,
   emptyGoalFoldState,
   goalChangeRef,
 } from './fold.ts'
@@ -35,6 +35,7 @@ import type {
   GoalBlockReason,
   GoalPhase,
   GoalProjection,
+  GoalProjectionState,
   GoalRef,
   GoalSnapshot,
   GoalView,
@@ -50,7 +51,7 @@ import type {
 // The pure payload outlet (./types.ts, ONE home of the `goal` projection-key
 // declaration) re-exported onto the package root keeps the module edge in
 // the emitted index.d.ts, so aggregate programs consuming the declarations
-// still receive the SessionProjectionMap merge.
+// still receive the SessionProjectionStateMap merge.
 export type * from './types.ts'
 export type * from './domain.ts'
 export { GOAL_CHANGE_VERSION, GoalError, GoalId } from './runtime.ts'
@@ -62,7 +63,7 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
-/** Wire payload schema of the `goal` projection (whole current goal or pre-create/cleared null). */
+/** Wire payload schema of the `goal` projection (current goal or pre-create/cleared null). */
 const goalProjectionSchema: ZodType<GoalProjection | null> = zod.union([
   zod.object({
     goal: zod.object({
@@ -80,37 +81,93 @@ const goalProjectionSchema: ZodType<GoalProjection | null> = zod.union([
   zod.null(),
 ]) as ZodType<GoalProjection | null>
 
+const goalProjectionStateSchema: ZodType<GoalProjectionState> = zod.object({
+  current: goalProjectionSchema,
+  seenGoalIds: zod.array(zod.string().min(1)).refine(
+    ids => new Set(ids).size === ids.length,
+    { message: 'seen goal ids must be unique' },
+  ),
+  failure: zod.string().min(1).nullable(),
+}).strict().superRefine((state, context) => {
+  if (state.current === null) return
+  if (!state.seenGoalIds.includes(state.current.goal.id)) {
+    context.addIssue({ code: 'custom', message: 'current goal id must be retained among seen goal ids' })
+  }
+  if (state.current.updatedAt < state.current.createdAt) {
+    context.addIssue({ code: 'custom', message: 'current goal update cannot precede its creation' })
+  }
+  if (state.current.roundsStarted > state.current.goal.maxGoalRounds) {
+    context.addIssue({ code: 'custom', message: 'current goal rounds cannot exceed its configured limit' })
+  }
+}) as unknown as ZodType<GoalProjectionState>
+
+/** Build strict fold state from one checkpoint-safe projection state. */
+function goalFoldState(state: GoalProjectionState): GoalFoldState {
+  return {
+    goal: state.current?.goal,
+    roundsStarted: state.current?.roundsStarted ?? 0,
+    createdAt: state.current?.createdAt,
+    updatedAt: state.current?.updatedAt,
+    lastRef: undefined,
+    seenGoalIds: new Set(state.seenGoalIds),
+  }
+}
+
+/** Convert strict fold state into checkpoint-safe projection state. */
+function goalProjectionState(state: GoalFoldState): GoalProjectionState {
+  let current: GoalProjection | null = null
+  if (state.goal !== undefined) {
+    const { createdAt, updatedAt } = state
+    if (createdAt === undefined || updatedAt === undefined) {
+      throw new Error('current goal fold lacks timestamps')
+    }
+    current = {
+      goal: state.goal,
+      roundsStarted: state.roundsStarted,
+      createdAt,
+      updatedAt,
+    }
+  }
+  return {
+    current,
+    seenGoalIds: [...state.seenGoalIds],
+    failure: null,
+  }
+}
+
 /**
- * Light last-wins fold of the `goal` projection unit. Unlike the strict
- * replay fold (fold.ts: transition validation, fail-loud on malformed
- * changes, Set-typed state), this transition is projection-grade: the state
- * is plain JSON (persisted-cache precondition), any non-goal or malformed
- * event returns the same reference (the registry's Object.is gate — the
- * title/todos posture), and correctness of the written change is the write
- * side's job (GoalService validated it before appending; the package
- * invariant rejects a violating stream fail-loud where it is installed).
+ * Fold durable goal events through the strict replay rules without throwing
+ * from the projection registry's event drive. The first invalid owned event
+ * is retained in `failure`; host goal access rejects that state while the
+ * client view remains at the last valid goal.
  * @param state - the projection covering all prior events.
  * @param event - the next committed session event.
- * @returns the next projection (same reference when the event is not a goal change).
+ * @returns the next projection (same reference when the event is unrelated).
  */
-export function applyGoalProjection(state: GoalProjection | null, event: SessionEvent): GoalProjection | null {
-  if (event.type !== 'goal/change') return state
-  let change: GoalChangeMeta | undefined
+export function applyGoalProjection(state: GoalProjectionState, event: SessionEvent): GoalProjectionState {
+  if (state.failure !== null) return state
+  if (event.type !== 'goal/change'
+    && (event.type !== 'user/message' || event.data.source.kind !== 'goal')) return state
+  const folded = goalFoldState(state)
   try {
-    change = decodeGoalChange(event.data)
-  } catch (_invalidPersistedGoalChange) {
-    return state
+    applyGoalEvent(folded, event)
+    return goalProjectionState(folded)
+  } catch (error: unknown) {
+    /* v8 ignore next -- the strict goal fold throws Error instances. */
+    const message = error instanceof Error ? error.message : String(error)
+    return { ...state, failure: `goal replay failed at session event ${event.seq}: ${message}` }
   }
-  if (change === undefined) return state
-  return change.operation === 'clear'
-    ? null
-    : {
-      goal: change.goal,
-      roundsStarted: change.roundsStarted,
-      createdAt: change.createdAt,
-      updatedAt: change.updatedAt,
-    }
 }
+
+/** Strict host projection definition with the existing cropped client value. */
+export const goalProjectionDefinition = {
+  key: 'goal',
+  stateSchema: goalProjectionStateSchema,
+  init: (): GoalProjectionState => ({ current: null, seenGoalIds: [], failure: null }),
+  apply: applyGoalProjection,
+  wire: { viewSchema: goalProjectionSchema, view: state => state.current },
+  stateVersion: 6,
+} satisfies ProjectionDefinition<'goal', GoalProjectionState>
 
 /** Deployment defaults for goal creation. */
 export interface Config {
@@ -129,6 +186,12 @@ interface GoalCache {
   readonly state: GoalFoldState
   activation: GoalActivation
   observedSeq: number
+  pendingActivation: { readonly seq: number; readonly activation: GoalActivation } | undefined
+}
+
+/** Process-local activation state kept separate from durable projection data. */
+interface GoalRuntimeState {
+  activation: GoalActivation
   pendingActivation: { readonly seq: number; readonly activation: GoalActivation } | undefined
 }
 
@@ -189,6 +252,7 @@ export class GoalService extends TypertRemoteService {
 
   private readonly resolved: ResolvedConfig
   private readonly caches = new WeakMap<Session, GoalCache>()
+  private readonly runtimeStates = new WeakMap<Session, GoalRuntimeState>()
 
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'goals')
@@ -196,20 +260,24 @@ export class GoalService extends TypertRemoteService {
       defaultMaxGoalRounds: resolveMaxGoalRounds(config.defaultMaxGoalRounds ?? 256),
     }
     ctx.on('agent/session-start', ({ agent }) => {
-      this.cache(agent.session).activation = 'disarmed'
+      const cache = this.caches.get(agent.session)
+      if (cache !== undefined) cache.activation = 'disarmed'
+      this.runtimeState(agent.session).activation = 'disarmed'
     })
-    // The `goal` projection unit: last-wins fold of goal/change whole values
-    // (see applyGoalProjection). The unit child activates only when a
-    // projection registry is composed (headless assemblies stay unaffected).
+    // The projection unit is optional so the compact/headless composition can
+    // keep using the local incremental fold. Assemblies with the registry use
+    // its eagerly maintained state and avoid rescanning the session log.
     ctx.inject(['sessionProjections'], (projectionCtx) => {
-      projectionCtx.sessionProjections.register<'goal', GoalProjection | null>({
-        key: 'goal',
-        stateSchema: goalProjectionSchema,
-        init: () => null,
-        apply: applyGoalProjection,
-        wire: { viewSchema: goalProjectionSchema, view: state => state },
-        stateVersion: 4,
-      })
+      projectionCtx.sessionProjections.register(goalProjectionDefinition)
+    })
+    ctx.on('session/event', (session, event) => {
+      if (event.type !== 'goal/change') return
+      const runtime = this.runtimeState(session)
+      runtime.activation = runtime.pendingActivation?.seq === event.seq
+        ? runtime.pendingActivation.activation
+        : 'disarmed'
+      const cache = this.caches.get(session)
+      if (cache !== undefined) cache.activation = runtime.activation
     })
   }
 
@@ -221,6 +289,10 @@ export class GoalService extends TypertRemoteService {
    */
   get(agent: Agent): GoalView | undefined {
     this.assertLive(agent)
+    const projected = this.projected(agent.session)
+    if (projected !== undefined) {
+      return this.viewProjection(projected.current, this.runtimeState(agent.session).activation)
+    }
     const cache = this.cache(agent.session)
     this.sync(agent.session, cache)
     return this.view(cache)
@@ -235,6 +307,14 @@ export class GoalService extends TypertRemoteService {
    */
   disarm(agent: Agent): GoalView | undefined {
     this.assertLive(agent)
+    const projected = this.projected(agent.session)
+    if (projected !== undefined) {
+      const runtime = this.runtimeState(agent.session)
+      runtime.activation = 'disarmed'
+      const cache = this.caches.get(agent.session)
+      if (cache !== undefined) cache.activation = 'disarmed'
+      return this.viewProjection(projected.current, runtime.activation)
+    }
     const cache = this.cache(agent.session)
     this.sync(agent.session, cache)
     cache.activation = 'disarmed'
@@ -421,8 +501,11 @@ export class GoalService extends TypertRemoteService {
   private cache(session: Session): GoalCache {
     let cache = this.caches.get(session)
     if (cache !== undefined) return cache
-    const state = emptyGoalFoldState()
-    for (const event of session.events) applyGoalEvent(state, event)
+    const projected = this.projected(session)
+    const state = projected === undefined ? emptyGoalFoldState() : goalFoldState(projected)
+    if (projected === undefined) {
+      for (const event of session.events) applyGoalEvent(state, event)
+    }
     cache = {
       state,
       activation: 'disarmed',
@@ -433,9 +516,32 @@ export class GoalService extends TypertRemoteService {
     return cache
   }
 
+  /** Read the optional eagerly maintained durable projection. */
+  private projected(session: Session): GoalProjectionState | undefined {
+    const projections = this.ctx.get('sessionProjections')
+    if (projections === undefined) return undefined
+    const state = projections.stateOf(session, 'goal')
+    if (state === undefined) throw new Error('goal projection is not registered')
+    if (state.failure !== null) throw new Error(state.failure)
+    return state
+  }
+
+  /** Return process-local activation state, initially disarmed. */
+  private runtimeState(session: Session): GoalRuntimeState {
+    let runtime = this.runtimeStates.get(session)
+    if (runtime !== undefined) return runtime
+    runtime = { activation: 'disarmed', pendingActivation: undefined }
+    this.runtimeStates.set(session, runtime)
+    return runtime
+  }
+
   /** Incrementally observe durable events and reconcile local activation intent. */
   private sync(session: Session, cache: GoalCache): void {
-    for (const event of session.events.slice(cache.observedSeq)) {
+    const events = session.events
+    while (cache.observedSeq < session.seq) {
+      const event = events[cache.observedSeq]
+      /* v8 ignore next -- Session exposes a contiguous immutable event log. */
+      if (event === undefined) throw new Error(`goal cache cannot advance across missing seq ${String(cache.observedSeq)}`)
       applyGoalEvent(cache.state, event)
       if (event.type === 'goal/change') {
         cache.activation = cache.pendingActivation?.seq === event.seq
@@ -542,11 +648,14 @@ export class GoalService extends TypertRemoteService {
   private commit(agent: Agent, cache: GoalCache, change: GoalChangeMeta, activation: GoalActivation): void {
     const ref = goalChangeRef(change)
     cache.pendingActivation = { seq: agent.session.seq, activation }
+    const runtime = this.runtimeState(agent.session)
+    runtime.pendingActivation = { seq: agent.session.seq, activation }
     try {
       agent.session.append('goal/change', change)
       this.sync(agent.session, cache)
     } finally {
       cache.pendingActivation = undefined
+      runtime.pendingActivation = undefined
     }
     const goal = this.view(cache)
     const notification: GoalChanged = {
@@ -573,6 +682,18 @@ export class GoalService extends TypertRemoteService {
       createdAt,
       updatedAt,
       activation: cache.activation,
+    }
+  }
+
+  /** Build a detached view from projected durable state and process-local activation. */
+  private viewProjection(state: GoalProjection | null, activation: GoalActivation): GoalView | undefined {
+    if (state === null) return undefined
+    return {
+      ...state.goal,
+      roundsStarted: state.roundsStarted,
+      createdAt: state.createdAt,
+      updatedAt: state.updatedAt,
+      activation,
     }
   }
 

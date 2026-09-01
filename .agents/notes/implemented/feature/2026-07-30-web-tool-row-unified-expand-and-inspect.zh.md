@@ -13,6 +13,7 @@ Status: implemented
 **所有可展开工具行共享同一交互——整行即开关（点击 / Enter / 空格），图标 hover 时渐变为 chevron 预览——以及同一展开体：带 IN/OUT 侧栏标签的卡片，各分区独立滚动上限；hover 显示的 Inspect 胶囊通过 store 的一次性交接跳到该调用的 trajectory 记录；聊天视图用内存态的按会话 Map 在视图切换间保留语义阅读位置。**
 
 - `toolRowModel` 在 args 之外同时派生结果材料：`output`（`resultText` 拍平逻辑从 DetailsPanel 移入 contract）和 `errorSummary`（失败首行，作为折叠摘要并以错误色显示）。有 body、output 或 terminal 材料的行即可展开；行本身是开关（`role="button"`、`aria-expanded`），文件路径摘要通过 `stopPropagation` 保持独立链接。
+- 通用行保留 `bodyRaw`，只在展开后调用 `formatToolBody`；折叠列表不会为大体积参数载荷分配 pretty-print 副本。
 - 展开卡片（figma 1249:35657）是 IN/OUT 分区列：每个分区是独立滚动区（max-height 150px），侧栏标签 sticky 固定，l2 分割线横贯整卡宽度。Think 的推理文本和 run_code 的 CodeBlock 保持非卡片体；上下文注入复用此行并以无标签的 `plainBody` 卡片展开。
 - `terminalFailed` 读取已结算 terminal 卡片的退出状态，让 BashRow 和 GenericToolCard 把失败命令显示为行的红色状态点——这是折叠行唯一的失败信号，因为调用本身结算为 `isError:false`。
 - TerminalBlock 的横幅并入同一阅读模型：与卡片共用同一表面（不再用 banner token），与正文之间是 l2 细线，命令列上限 150px 内部滚动，复制/状态控件 sticky 且顶对齐第一行提示符。

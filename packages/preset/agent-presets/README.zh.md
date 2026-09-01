@@ -26,6 +26,8 @@
 
 `AgentPreset` 携带 `id`（目录名）、`trust`（`system` 或 `user`，取自它所在的根目录）、`path`（组装文件的绝对路径），以及——仅当该 preset 无法组装会话时——`broken`（一条人类可读的原因，名单界面原样展示）。
 
+`compositionInventory()` 为 Host 插件清单提供同一 roster 的只读、压平插件行。有最新的常驻挂载时从该挂载读取，否则只解析组装文件而不挂载；无法在当前上下文求值的 `!!js` disabled 表达式保持为 `conditional`，不会被猜测。浏览器安全的 `./display` 子路径按当前 locale 解析内置 preset id，并保持用户自定义名称不变。
+
 ### 应在何处调用 `mount()`
 
 agent 工厂的 `setup(agentCtx)` 钩子是唯一受支持的调用点。只有在那里，认父是在 agent 尚未发布时完成的，因此组装被拒绝会让整次创建回滚，而不会留下一个组装到一半的会话。常驻子树归 roster 服务自己的 fiber 所有——刻意用其未追踪的上下文，因为从被追踪的 `this.ctx` 派生的子树会经调用方的 shadow fiber 解析一切服务、无视各 entry 自己的 inject store——所以它比任何 agent 都活得久，只随整棵树卸载。每个代际记录其组装文件的 stamp（mtime 与大小）：发现 stamp 过期的会话会开启下一个代际，而所有已加入的会话保持各自正在运行的那个——正在运行的会话所加入的组装在其文件被修改或删除后继续存活；文件是唯一的组装编辑器，stamp 正是把编辑送达后续会话的机制。

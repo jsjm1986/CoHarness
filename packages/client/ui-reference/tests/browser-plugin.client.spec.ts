@@ -36,6 +36,7 @@ function request(
     query,
     quoted: options.quoted ?? false,
     position: 'inline',
+    drilled: false,
     signal: options.signal ?? new AbortController().signal,
   }
 }
@@ -276,18 +277,28 @@ describe('candidates', () => {
 })
 
 describe('pick and codec', () => {
-  const pick = (source: InputTriggerSource, candidate: InputTriggerCandidate) => source.onPick({
+  const pick = (source: InputTriggerSource, candidate: InputTriggerCandidate, action: 'pick' | 'drill' = 'pick') => source.onPick({
     candidate,
     session,
     position: 'inline',
     via: 'menu',
+    action,
     span: { start: 0, end: 1, draftRev: 1 },
   })
 
-  it('inserts files as atomic icon labels while keeping directory completion open', async () => {
+  it('settles folders as atomic references and drills them explicitly', async () => {
     const { source } = await bench()
     const [directory, file] = await source.candidates(session, request(''))
-    expect(pick(source, directory!)).toEqual({ text: '@src/', continue: true })
+    expect(pick(source, directory!)).toEqual({
+      insert: {
+        source: 'reference',
+        ref: '@src/',
+        label: 'src/',
+        appearance: 'folder',
+        clipboardText: '@src/',
+      },
+    })
+    expect(pick(source, directory!, 'drill')).toEqual({ text: '@src/', continue: true })
     expect(pick(source, file!)).toEqual({
       insert: {
         source: 'reference',
@@ -298,7 +309,7 @@ describe('pick and codec', () => {
       },
     })
     const [quotedDirectory] = await source.candidates(session, request('', { quoted: true }))
-    expect(pick(source, quotedDirectory!)).toEqual({ text: '@"src/', continue: true })
+    expect(pick(source, quotedDirectory!, 'drill')).toEqual({ text: '@"src/', continue: true })
   })
 
   it('inserts sessions as atomic chips whose clipboard and model forms are canonical mentions', async () => {
@@ -322,5 +333,19 @@ describe('pick and codec', () => {
   it('ignores candidates that do not carry a source-owned value', async () => {
     const { source } = await bench()
     expect(pick(source, { name: 'foreign candidate' })).toBeUndefined()
+  })
+})
+
+describe('directory navigation', () => {
+  it('publishes a reversible breadcrumb trail only after a drill', async () => {
+    const { source } = await bench()
+    expect(source.header?.(session, { query: 'src/', quoted: false, drilled: false })).toBeUndefined()
+    const crumbs = source.header?.(session, { query: 'src/', quoted: false, drilled: true })
+    expect(crumbs?.map(crumb => ({ label: crumb.label, current: crumb.current }))).toEqual([
+      { label: 'Workspace', current: undefined },
+      { label: 'src', current: true },
+    ])
+    expect(typeof crumbs?.[0]?.value).toBe('string')
+    expect(typeof crumbs?.[1]?.value).toBe('string')
   })
 })

@@ -68,7 +68,7 @@ import type {
   ModelCatalogFailure, ModelProviderGroup,
   ModelReasoning, MuxFrame, PromptContentPart, QuestionResponsePayload, SessionHistoryIndex, SessionListMetadata,
   SessionProjectionsBlock, SessionSearchItem,
-  QueuedInboxItem, SessionSummary, SettingsNamespaceView, SubagentAddress, JobView, ToolEventView,
+  QueuedInboxItem, SessionSummary, SettingsNamespaceView, SubagentAddress, SubagentPromptContentPart, JobView, ToolEventView,
   WorkspaceId, WorkspaceView,
 } from './api/index.ts'
 import {
@@ -326,6 +326,19 @@ async function durablePromptContent(
     }),
     documents,
   }
+}
+
+/** Admit image uploads in a continuable subagent prompt before inbox delivery. */
+async function durableSubagentPromptContent(
+  ctx: Context,
+  content: readonly SubagentPromptContentPart[],
+): Promise<ContentBlock[]> {
+  const images = content.filter((part): part is Extract<SubagentPromptContentPart, { type: 'image' }> => part.type === 'image')
+  const refs = images.length === 0 ? [] : await admitEncodedImages(ctx.attachments, images)
+  let imageIndex = 0
+  return content.map((part): ContentBlock => part.type === 'text'
+    ? { type: 'text', text: part.text }
+    : { type: 'image', attachment: refs[imageIndex++] as ImageAttachmentRef })
 }
 
 /** Search durable content for an image reference, including nested tool results. */
@@ -1355,11 +1368,12 @@ function listProjectionsFor(ctx: Context, meta: SessionHeader, session: Session 
 /** Fold a complete compatibility inspection for a detached history baseline. */
 function detachedProjectionsFor(
   ctx: Context,
+  header: SessionHeader,
   events: readonly SessionEvent[],
 ): SessionProjectionsBlock | undefined {
   const registry = ctx.get('sessionProjections')
   if (registry === undefined) return undefined
-  return registry.restore({}, events, 0).snapshot
+  return registry.restore({}, events, 0, header).snapshot
 }
 
 /**
@@ -1394,8 +1408,21 @@ function subagentPromptError(
   if (signal.aborted) {
     return err(request, { code: 'cancelled', message: 'subagent prompt was cancelled', details: {} })
   }
+  if (error instanceof AttachmentError) {
+    return err(request, {
+      code: 'attachment-error',
+      message: error.message,
+      details: { reason: error.code },
+    })
+  }
   if (error instanceof SubagentError) {
     switch (error.code) {
+      case 'MODEL_DOES_NOT_SUPPORT_IMAGES':
+        return err(request, {
+          code: 'attachment-error',
+          message: error.message,
+          details: { reason: error.code },
+        })
       case 'NOT_RESUMABLE':
         return err(request, {
           code: 'subagent-not-resumable',
@@ -2672,7 +2699,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       const projections = includeProjections
         ? source.bounded
           ? listProjectionsFor(ctx, source.header, undefined)
-          : detachedProjectionsFor(ctx, source.events)
+          : detachedProjectionsFor(ctx, source.header, source.events)
         : undefined
       return { events: source.events, ...projections === undefined ? {} : { projections } }
     }
@@ -4344,7 +4371,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             ? projectionsFor(ctx, source.session)
             : source.bounded
               ? listProjectionsFor(ctx, source.header, undefined)
-              : detachedProjectionsFor(ctx, source.events))
+              : detachedProjectionsFor(ctx, source.header, source.events))
           : undefined
         if (header.parentSession !== parentSessionId) {
           return err(request, {
@@ -4404,7 +4431,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         if (verified.error !== undefined) return err(request, verified.error)
         const participant = projectParticipant(parentAccess.authority)
         try {
-          const messageId = await ctx.subagents.followup(parent, childSessionId, content, {
+          const admitted = await durableSubagentPromptContent(ctx, content)
+          const messageId = await ctx.subagents.followup(parent, childSessionId, admitted, {
             source: {
               kind: 'user',
               rpcId: requestId ?? request.rpcId,

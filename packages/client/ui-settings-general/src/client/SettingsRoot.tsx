@@ -12,16 +12,20 @@
  * sessions-derived empty-Hero fact is active. Visible dialog chrome belongs
  * to the step, so a mounted-but-deciding step paints nothing here.
  */
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import clsx from 'clsx'
 import {
-  handleDialogKeyDown, IconAgentPresetOutline16, IconCloseOutline16, IconDataOutline16,
+  ConnectionIndicator, handleDialogKeyDown, IconAgentPresetOutline16, IconCloseOutline16, IconDataOutline16,
   IconPersonalizationOutline16, IconSettingsOutline16, holdInert,
 } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { ConnectionIndicatorState } from '@deepseek-ai/dsh-client-ui-primitives'
 import { onSettingsNavigation } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SettingsRootComponentProps, SettingsSectionRow } from './shell-contract.ts'
 import css from './SettingsRoot.module.css'
+
+/** Duration of the transient successful-reconnect confirmation. */
+const RECOVERY_CONFIRMATION_MS = 2_000
 
 /** Nav glyph by section id; unknown ids fall back to the settings gear. */
 function navIcon(id: string) {
@@ -155,11 +159,16 @@ function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose, settings
  * @returns the settings shell element tree.
  */
 export function SettingsRoot(props: SettingsRootComponentProps) {
-  const { wide, useSections, useOnboardingSteps, useSessions, renderSlot } = props
+  const {
+    wide, reconnect, useConnectionState, useSections, useOnboardingSteps, useSessions, renderSlot, t,
+  } = props
   const [open, setOpen] = useState(false)
   const [activeId, setActiveId] = useState<string | undefined>(undefined)
   const [navigationScope, setNavigationScope] = useState<{ scope?: 'personal' | 'project'; projectId?: number }>({})
   const [completedOnboarding, setCompletedOnboarding] = useState<ReadonlySet<string>>(() => new Set())
+  const [showRecovery, setShowRecovery] = useState(false)
+  const triggerButton = useRef<HTMLButtonElement | null>(null)
+  const wasOpen = useRef(open)
   const close = useCallback(() => {
     setOpen(false)
     setActiveId(undefined)
@@ -191,6 +200,30 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
   const onboardingStep = onboardingActive
     ? onboardingSteps.find(step => !completedOnboarding.has(step.id))
     : undefined
+  const connectionState = useConnectionState(state => state)
+  const previousConnectionState = useRef(connectionState)
+
+  // Keep the success confirmation short-lived; an initial connection should
+  // not look like a recovery event.
+  useLayoutEffect(() => {
+    const previous = previousConnectionState.current
+    previousConnectionState.current = connectionState
+    if (connectionState !== 'connected') {
+      setShowRecovery(false)
+      return
+    }
+    if (previous !== 'reconnecting') return
+    setShowRecovery(true)
+    const timeout = window.setTimeout(() => { setShowRecovery(false) }, RECOVERY_CONFIRMATION_MS)
+    return () => { window.clearTimeout(timeout) }
+  }, [connectionState])
+
+  // Restore focus after the dialog close commit, when the portaled panel no
+  // longer owns the active element.
+  useEffect(() => {
+    if (wasOpen.current && !open) triggerButton.current?.focus({ preventScroll: true })
+    wasOpen.current = open
+  }, [open])
 
   useEffect(() => {
     if (onboardingActive) return
@@ -206,15 +239,35 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
 
   return (
     <>
-      <button
-        type="button"
-        className={clsx(css.trigger, !wide && css.rail)}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        onClick={() => { setNavigationScope({}); setOpen(true) }}
-      >
-        {renderSlot('settings.trigger', { wide })}
-      </button>
+      <div className={clsx(css.triggerRow, !wide && css.railRow)}>
+        <button
+          ref={triggerButton}
+          type="button"
+          className={clsx(css.trigger, !wide && css.rail)}
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          onClick={() => { setNavigationScope({}); setOpen(true) }}
+        >
+          {renderSlot('settings.trigger', { wide })}
+        </button>
+        {wide && (() => {
+          let indicatorState: ConnectionIndicatorState | undefined
+          if (connectionState === 'reconnecting') indicatorState = 'disconnected'
+          else if (showRecovery) indicatorState = 'recovered'
+          return (
+            <ConnectionIndicator
+              state={indicatorState}
+              disconnectedLabel={t('connection.error')}
+              reconnectLabel={t('connection.retry')}
+              connectingLabel={t('connection.connecting')}
+              recoveredLabel={t('connection.connected')}
+              reconnectActionLabel={t('connection.reconnect')}
+              restartActionLabel={t('connection.restart')}
+              onReconnect={reconnect}
+            />
+          )
+        })()}
+      </div>
       {open && (
         <SettingsPanel
           rows={rows}

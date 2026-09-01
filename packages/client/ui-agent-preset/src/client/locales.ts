@@ -151,52 +151,11 @@ export const zh: Record<AgentPresetSettingsKey, string> = {
   deleting: '正在删除…',
 }
 
-/** Preset roster fields needed to resolve Web display copy. */
-export interface PresetDisplaySource {
-  /** Stable preset id. */
-  readonly id: string
-  /** Whether the deployment ships the preset or the user owns it. */
-  readonly trust: 'system' | 'user'
-  /** Unlocalized name published by the preset. */
-  readonly name?: string
-  /** Unlocalized description published by the preset. */
-  readonly description?: string
-}
-
-/** Display copy resolved for the active Web locale. */
-export interface PresetDisplayText {
-  /** Localized built-in name or the preset's own fallback name. */
-  readonly name: string
-  /** Localized built-in description or the preset's own description. */
-  readonly description?: string
-}
-
-interface PresetLocaleKeys {
-  readonly name: AgentPresetSettingsKey
-  readonly description: AgentPresetSettingsKey
-}
-
-const BUILT_IN_PRESET_KEYS: Readonly<Partial<Record<string, PresetLocaleKeys>>> = {
-  standard: { name: 'presetStandardName', description: 'presetStandardDescription' },
-  code: { name: 'presetCodeName', description: 'presetCodeDescription' },
-  minimal: { name: 'presetMinimalName', description: 'presetMinimalDescription' },
-  cordis: { name: 'presetCordisName', description: 'presetCordisDescription' },
-}
-
-/**
- * Resolve preset display copy without making user-authored metadata translatable.
- * @param preset - roster row whose copy is being rendered.
- * @param t - active Web locale lookup.
- * @returns localized copy for a known shipped preset, otherwise file metadata.
- */
-export function presetDisplayText(
-  preset: PresetDisplaySource,
-  t: (key: AgentPresetSettingsKey) => string,
-): PresetDisplayText {
-  const keys = preset.trust === 'system' ? BUILT_IN_PRESET_KEYS[preset.id] : undefined
-  if (keys !== undefined) return { name: t(keys.name), description: t(keys.description) }
-  return {
-    name: preset.name ?? preset.id,
-    ...preset.description === undefined ? {} : { description: preset.description },
-  }
-}
+/** Shared browser-safe preset display resolution. */
+export {
+  presetDisplayText,
+} from '@deepseek-ai/dsh-agent-presets/display'
+export type {
+  PresetDisplaySource,
+  PresetDisplayText,
+} from '@deepseek-ai/dsh-agent-presets/display'

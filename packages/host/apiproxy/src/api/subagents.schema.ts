@@ -4,9 +4,21 @@ import { z } from 'zod'
 import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { RequestPayload, ResponseValue } from './rpc-map.ts'
 import type { Wire } from './rpc.schema.ts'
-import { contentBlockSchema, sessionIdSchema } from './sessions.schema.ts'
+import { sessionIdSchema } from './sessions.schema.ts'
 import { rpcIdSchema } from './rpc.schema.ts'
 import type { SubagentListEntry } from './subagents.ts'
+import type { SubagentPromptContentPart } from './subagents.ts'
+
+/** Upload-shaped content accepted by a continuable child prompt. */
+const subagentPromptContentPartSchema = z.union([
+  z.object({ type: z.literal('text'), text: z.string() }),
+  z.object({
+    type: z.literal('image'),
+    mediaType: z.enum(['image/png', 'image/jpeg', 'image/webp', 'image/gif']),
+    data: z.string(),
+    name: z.string().optional(),
+  }),
+]) as unknown as z.ZodType<SubagentPromptContentPart>
 
 /** Healthy and diagnostic durable catalog rows. */
 export const subagentListEntrySchema = z.union([
@@ -59,7 +71,7 @@ export const subagentPromptRequestSchema = z.object({
   parentSessionId: sessionIdSchema,
   childSessionId: sessionIdSchema,
   mode: z.literal('continuable'),
-  content: z.array(contentBlockSchema),
+  content: z.array(subagentPromptContentPartSchema),
   clientTimeZone: z.string().optional(),
   requestId: rpcIdSchema.optional(),
 }) as unknown as z.ZodType<RequestPayload<'subagent.prompt'>>

@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   normalizeSessionLog,
+  normalizeSessionSnapshot,
   normalizeStdout,
   scrubRequestHeaders,
   type NormalizeContext,
@@ -103,7 +104,7 @@ describe('assembled user-document prompt snapshots', () => {
     })
     expect(result.stderr).toBe('')
     const normalizedSession = normalizeUserDocFields(
-      scrubRequestHeaders(normalizeSessionLog(session, contextFor(session))),
+      normalizeSessionSnapshot(session, contextFor(session)),
     )
     const normalized = normalizeUserDocFields(normalizedStream(result.stdout, cwd))
     const expectedSession = await readFile(sessionFixture, 'utf8').catch(() => '')

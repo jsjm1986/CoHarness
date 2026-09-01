@@ -283,6 +283,12 @@
     - id: ui-reference
       name: '@deepseek-ai/dsh-client-ui-reference'
 
+    # Read-only active Schedule catalog. The Web graph resolves the package
+    # but keeps it disabled until the explicit Schedule overlay enables it.
+    - id: ui-schedule
+      name: '@deepseek-ai/dsh-client-ui-schedule'
+      disabled: true
+
     # Background jobs: the session-header list over the jobsBySession mirror.
     - id: ui-jobs
       name: '@deepseek-ai/dsh-client-ui-jobs'

@@ -5,6 +5,26 @@
    54px header and the 24px-padded options area. */
 
 /* Trigger row: the compact foot-row box shared with the footer actions. */
+.triggerRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.triggerRow > .trigger {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.railRow {
+  justify-content: center;
+}
+
+.railRow > .trigger {
+  flex: none;
+}
+
 .trigger {
   flex: none;
   display: flex;

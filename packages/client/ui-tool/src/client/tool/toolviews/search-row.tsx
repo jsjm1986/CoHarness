@@ -49,7 +49,7 @@ export function SearchRow({ toolName, block, inspect, t }: SearchRowProps) {
       // The result view's replacement title outranks the args-derived summary,
       // matching the terminal card's description precedence.
       summary={search?.title ?? model.summary}
-      body={null}
+      bodyRaw={null}
       // A settled call with no search card (errored search, nested run_code
       // sub-dispatch, legacy generic result) has its text nowhere else to go;
       // ToolRow's Output section carries it, and errorSummary its first line.

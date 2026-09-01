@@ -14,8 +14,8 @@ import {
   type Scenario,
   type SnapshotSuiteOptions,
 } from '@deepseek-ai/dsh-acp-snapshot'
+import { parseSessionLog } from '@deepseek-ai/dsh-llm-replay'
 import { resolvePwshPath } from '@deepseek-ai/dsh-pwsh-local'
-import { decodeStorageRecord } from '@deepseek-ai/dsh-session'
 
 /**
  * The acp-agent example's snapshot suite: the scenario table for
@@ -100,6 +100,23 @@ function normalizeProviderFileIds(value: unknown): unknown {
   return value
 }
 
+/** Replace the temporary workspace spelling in model-visible attachment paths. */
+function normalizeProviderPaths(value: unknown, cwd: string, aliases: readonly string[] = []): unknown {
+  if (typeof value === 'string') {
+    const spellings = [...new Set([cwd, ...aliases].filter(path => path.length > 0))]
+      .sort((left, right) => right.length - left.length)
+    return spellings.reduce((text, spelling) => text.replaceAll(spelling, '{{cwd}}'), value)
+  }
+  if (Array.isArray(value)) return value.map(item => normalizeProviderPaths(item, cwd, aliases))
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [
+      key,
+      normalizeProviderPaths(item, cwd, aliases),
+    ]))
+  }
+  return value
+}
+
 async function prepareEditingCordisSkillWorkspace(cwd: string): Promise<void> {
   const target = join(cwd, '.dsh', 'skills', 'editing-cordis-compositions', 'SKILL.md')
   await mkdir(dirname(target), { recursive: true })
@@ -145,8 +162,12 @@ async function prepareFsSearchWorkspace(cwd: string): Promise<void> {
 // TODO(acp-snapshot-ownership): Move backend/product scenarios to headless while
 // retaining ACP protocol contracts here.
 
-function fixtureRecords(name: string): unknown[] {
+function fixtureText(name: string): string {
   return readFileSync(join(SNAPSHOTS_DIR, name, 'session.jsonl'), 'utf8')
+}
+
+function fixtureRecords(name: string): unknown[] {
+  return fixtureText(name)
     .trimEnd()
     .split('\n')
     .map(line => JSON.parse(line) as unknown)
@@ -805,42 +826,37 @@ it('pins native DeepSeek image offload in the request sent by the assembled app'
     expect(requests).toHaveLength(2)
     const messages = requests[0]?.messages as { content?: unknown }[] | undefined
     const firstContent = messages?.find(message => Array.isArray(message.content))?.content
-    expect(normalizeProviderFileIds(firstContent)).toMatchInlineSnapshot(`
-      [
-        {
-          "text": "Compare the older image ",
-          "type": "text",
-        },
-        {
-          "text": "
-      Image sha256:b1ff9c8ea3a780bad09b346c423d2d0e46815926879b18e841d928376a946640; request image 1x1px.",
-          "type": "text",
-        },
-        {
-          "file_id": "{{fileId}}",
-          "type": "file",
-        },
-        {
-          "text": " with the newer image ",
-          "type": "text",
-        },
-        {
-          "text": "
-      Image sha256:b1ff9c8ea3a780bad09b346c423d2d0e46815926879b18e841d928376a946640; request image 1x1px.",
-          "type": "text",
-        },
-        {
-          "file_id": "{{fileId}}",
-          "type": "file",
-        },
-        {
-          "text": ", then use read_image on red.png and reply with DONE.",
-          "type": "text",
-        },
-      ]
-    `)
+    const attachmentDigest = 'b1ff9c8ea3a780bad09b346c423d2d0e46815926879b18e841d928376a946640'
+    const attachmentId = `sha256:${attachmentDigest}`
+    const normalizedAttachmentPath = join(
+      '{{cwd}}',
+      '.dsh',
+      'attachments',
+      'v1',
+      'objects',
+      attachmentDigest.slice(0, 2),
+      attachmentDigest,
+    )
+    const accessText = ` Normalized copy (read-only; may be resized or re-encoded): ${JSON.stringify(normalizedAttachmentPath)} (1x1px, image/png).`
+      + ' Source dimensions, format, and byte size may differ.'
+    const imageHandle = `Image ${attachmentId}; request preview 1x1px.${accessText}`
+    const namedImageHandle = `Image "red.png" (${attachmentId}); request preview 1x1px.${accessText}`
+    const normalizeProviderRequest = (value: unknown): unknown => normalizeProviderPaths(
+      normalizeProviderFileIds(value),
+      result.cwd,
+      result.cwdAliases,
+    )
+    expect(normalizeProviderRequest(firstContent)).toEqual([
+      { type: 'text', text: 'Compare the older image ' },
+      { type: 'text', text: `\n${imageHandle}` },
+      { type: 'file', file_id: '{{fileId}}' },
+      { type: 'text', text: ' with the newer image ' },
+      { type: 'text', text: `\n${imageHandle}` },
+      { type: 'file', file_id: '{{fileId}}' },
+      { type: 'text', text: ', then use read_image on red.png and reply with DONE.' },
+    ])
 
-    const followup = normalizeProviderFileIds(structuredClone((requests[1]?.messages as unknown[]).slice(1))) as Array<{
+    const followup = normalizeProviderRequest(structuredClone((requests[1]?.messages as unknown[]).slice(1))) as Array<{
       role?: unknown
       content?: unknown
     }>
@@ -848,21 +864,15 @@ it('pins native DeepSeek image offload in the request sent by the assembled app'
     if (toolMessage === undefined || typeof toolMessage.content !== 'string') {
       throw new Error('native read_image request has no tool content')
     }
-    const cwdSpellings = [...new Set([result.cwd, ...result.cwdAliases].flatMap(cwd => (
-      cwd.startsWith('/private/') ? [cwd, cwd.slice('/private'.length)] : [cwd, `/private${cwd}`]
-    )))]
-    let toolContent = toolMessage.content
-    for (const cwd of cwdSpellings) toolContent = toolContent.replaceAll(cwd, '{{cwd}}')
-    toolMessage.content = toolContent
     expect(followup).toEqual([
       {
         role: 'user',
         content: [
           { type: 'text', text: 'Compare the older image ' },
-          { type: 'text', text: '\nImage sha256:b1ff9c8ea3a780bad09b346c423d2d0e46815926879b18e841d928376a946640; request image 1x1px.' },
+          { type: 'text', text: `\n${imageHandle}` },
           { type: 'file', file_id: '{{fileId}}' },
           { type: 'text', text: ' with the newer image ' },
-          { type: 'text', text: '\nImage sha256:b1ff9c8ea3a780bad09b346c423d2d0e46815926879b18e841d928376a946640; request image 1x1px.' },
+          { type: 'text', text: `\n${imageHandle}` },
           { type: 'file', file_id: '{{fileId}}' },
           { type: 'text', text: ', then use read_image on red.png and reply with DONE.' },
         ],
@@ -885,7 +895,8 @@ it('pins native DeepSeek image offload in the request sent by the assembled app'
       {
         role: 'tool',
         tool_call_id: 'native-read-image',
-        content: '<path>{{cwd}}/red.png</path>\n<type>image</type>\n<content>\nimage/png image, 1x1 px, 69 bytes\n</content>\nImage sha256:b1ff9c8ea3a780bad09b346c423d2d0e46815926879b18e841d928376a946640; request image 1x1px.',
+        content: '<path>{{cwd}}/red.png</path>\n<type>image</type>\n<content>\nimage/png image, 1x1 px, 69 bytes\n</content>\n'
+          + namedImageHandle,
       },
       {
         role: 'user',
@@ -904,7 +915,8 @@ it('pins native DeepSeek image offload in the request sent by the assembled app'
 }, 45_000)
 
 it('packed ACP fixture retains every chunk row kind without changing the logical session', () => {
-  const source = fixtureRecords(PACKED_CHUNKS_SOURCE)
+  const source = fixtureText(PACKED_CHUNKS_SOURCE)
+  const packedText = fixtureText('packed-chunks')
   const packed = fixtureRecords('packed-chunks')
   const rowTypes = packed.flatMap((record) => {
     if (record === null || typeof record !== 'object') return []
@@ -936,9 +948,9 @@ it('packed ACP fixture retains every chunk row kind without changing the logical
     if (cloned.type === 'hook/result') delete cloned.data?.durationMs
     return cloned
   }
-  const logicalRecords = (records: readonly unknown[]): unknown[] => [
-    records[0],
-    ...records.slice(1).flatMap(record => decodeStorageRecord(record)).map(withoutMessageId),
+  const logicalRecords = (fixture: string): unknown[] => [
+    JSON.parse(fixture.split(/\r?\n/).find(line => line.trim().length > 0) as string) as unknown,
+    ...parseSessionLog(fixture).map(withoutMessageId),
   ]
-  expect(logicalRecords(packed)).toStrictEqual(logicalRecords(source))
+  expect(logicalRecords(packedText)).toStrictEqual(logicalRecords(source))
 })

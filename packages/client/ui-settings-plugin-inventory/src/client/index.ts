@@ -3,6 +3,10 @@
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+// Type-only: supplies the settings.agentPreset locale namespace used for
+// built-in preset display names.
+import type {} from '@deepseek-ai/dsh-client-ui-agent-preset/client'
+import { presetDisplayText } from '@deepseek-ai/dsh-agent-presets/display'
 import { PluginInventorySettingsTab, type PluginInventorySettingsTabInjected } from './PluginInventorySettingsTab.tsx'
 import { en, zh, type PluginInventoryLocaleKey } from './locales.ts'
 
@@ -34,7 +38,13 @@ export function apply(ctx: ClientContext): void {
     }
     return result.value
   }
-  const injected = (): PluginInventorySettingsTabInjected => ({ list })
+  // Built-in preset ids use the active Agent-preset dictionaries; custom
+  // metadata remains literal. Resolve on every render so locale switches are
+  // reflected without refetching the Host snapshot.
+  const agentPresetCopy = ctx.locale.bind('settings.agentPreset')
+  const presetName: PluginInventorySettingsTabInjected['presetName'] = preset =>
+    presetDisplayText(preset, agentPresetCopy).name
+  const injected = (): PluginInventorySettingsTabInjected => ({ list, presetName })
 
   ctx.slots.inject('settings.plugins.tab', () => ctx.slots.register({
     name: 'settings.plugins.tab',

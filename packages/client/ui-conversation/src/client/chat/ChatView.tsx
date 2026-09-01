@@ -14,7 +14,9 @@
 // lifecycle updates replace only their own row without remounting it.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { ConversationTimelineSnapshot, TurnNavigationItem } from '@deepseek-ai/dsh-client-runtime/client'
+import type {
+  ConversationTimelineSnapshot, PendingSubmission, TurnNavigationItem,
+} from '@deepseek-ai/dsh-client-runtime/client'
 import { Button, IconChevronDownOutline14, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatViewSlotProps, RenderMessageImages } from '../contract/slots.ts'
 import type { ChatNode, TurnProcessChatData } from '../contract/chat-nodes.ts'
@@ -27,6 +29,7 @@ import css from './ChatView.module.css'
 const FOLLOW_THRESHOLD = 24
 /** Start the next older-page request before the reader reaches the exact head. */
 const OLDER_AUTO_LOAD_THRESHOLD = 240
+const EMPTY_PENDING_SUBMISSIONS: readonly PendingSubmission[] = []
 
 /** Active column host when present; otherwise the view-local scroller. */
 function scrollerOf(from: HTMLElement): HTMLElement {
@@ -201,7 +204,7 @@ export function ChatView({
   const navigation = useSession(s => s.chat.navigation)
   const historyNavigation = useSession(s => s.historyNavigation)
   const inbox = useSession(s => s.queue)
-  const pendingSubmissions = useSession(s => s.pendingSubmissions ?? [])
+  const pendingSubmissions = useSession(s => s.pendingSubmissions ?? EMPTY_PENDING_SUBMISSIONS)
   // Workspace root off the session list row: path summaries display relative to it.
   const cwd = useSessions(s => s.byId[sessionId]?.cwd)
   const running = useSession(s => s.running)
@@ -214,6 +217,7 @@ export function ChatView({
   const [fileOpenError, setFileOpenError] = useState<{ path: string; message: string } | null>(null)
   const [fileOpenBusy, setFileOpenBusy] = useState(false)
   const [activeTurn, setActiveTurn] = useState<number | null>(null)
+  const [busyTurn, setBusyTurn] = useState<number | null>(null)
   const [processOpen, setProcessOpen] = useState<ReadonlyMap<number, boolean>>(new Map())
   // Close/retry must ignore a settlement that started before the latest
   // gesture; otherwise a cancelled in-flight refusal reopens the dialog.
@@ -259,6 +263,14 @@ export function ChatView({
     const observed = observedRpcIds(order, nodeStore, inbox)
     return pendingSubmissions.filter(item => !observed.has(item.requestId))
   }, [inbox, nodeStore, order, pendingSubmissions])
+  const transcriptSubmissions = useMemo(
+    () => visibleSubmissions.filter(item => item.placement !== 'queued' && item.placement !== 'steering'),
+    [visibleSubmissions],
+  )
+  const steeringSubmissions = useMemo(
+    () => visibleSubmissions.filter(item => item.placement === 'steering'),
+    [visibleSubmissions],
+  )
   const renderMessageImages = useCallback<RenderMessageImages>(
     owner => renderSlot('conversation.message.images', { ...owner, loadImage }),
     [loadImage, renderSlot],
@@ -583,28 +595,33 @@ export function ChatView({
   const navigateToTurn = useCallback((item: TurnNavigationItem): void => {
     const request = ++navigationRequestRef.current
     const jump = async (): Promise<void> => {
+      setBusyTurn(item.turn)
       let target = item
-      if ((target.loaded === false || target.anchorKey === '') && target.startSeq !== undefined) {
-        if (loadHistoryUntil === undefined || !await loadHistoryUntil(target.startSeq)) return
-        // Session publication is batched; wait one task for the corresponding
-        // keyed row to commit before measuring its flow position.
-        await new Promise<void>((resolve) => { setTimeout(resolve, 0) })
-        if (request !== navigationRequestRef.current) return
-        target = navigation.items().find(candidate => candidate.turn === item.turn && candidate.anchorKey !== '') ?? target
+      try {
+        if ((target.loaded === false || target.anchorKey === '') && target.startSeq !== undefined) {
+          if (loadHistoryUntil === undefined || !await loadHistoryUntil(target.startSeq)) return
+          // Session publication is batched; wait one task for the corresponding
+          // keyed row to commit before measuring its flow position.
+          await new Promise<void>((resolve) => { setTimeout(resolve, 0) })
+          if (request !== navigationRequestRef.current) return
+          target = navigation.items().find(candidate => candidate.turn === item.turn && candidate.anchorKey !== '') ?? target
+        }
+        if (request !== navigationRequestRef.current || target.anchorKey === '') return
+        const local = listRef.current
+        if (local === null) return
+        const el = scrollerOf(local)
+        const row = anchorElement(local, target.anchorKey)
+        if (row === null) return
+        el.scrollTop = Math.max(0, el.scrollTop + flowTop(row, el) - 24)
+        observedTopRef.current = el.scrollTop
+        atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight <= FOLLOW_THRESHOLD + 1
+        setAtBottom(atBottomRef.current)
+        setActiveTurn(target.turn)
+        const position = atBottomRef.current ? null : scrollPosition(local, el)
+        chatScroll.save(position)
+      } finally {
+        if (request === navigationRequestRef.current) setBusyTurn(null)
       }
-      if (request !== navigationRequestRef.current || target.anchorKey === '') return
-      const local = listRef.current
-      if (local === null) return
-      const el = scrollerOf(local)
-      const row = anchorElement(local, target.anchorKey)
-      if (row === null) return
-      el.scrollTop = Math.max(0, el.scrollTop + flowTop(row, el) - 24)
-      observedTopRef.current = el.scrollTop
-      atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight <= FOLLOW_THRESHOLD + 1
-      setAtBottom(atBottomRef.current)
-      setActiveTurn(target.turn)
-      const position = atBottomRef.current ? null : scrollPosition(local, el)
-      chatScroll.save(position)
     }
     void jump()
   }, [chatScroll.save, loadHistoryUntil, navigation])
@@ -612,7 +629,7 @@ export function ChatView({
   return (
     <div className={css.root}>
       <div ref={listRef} className={css.scroll}>
-        <TurnNavigator items={navigationItems} activeTurn={activeTurn} onNavigate={navigateToTurn} t={t} />
+        <TurnNavigator items={navigationItems} activeTurn={activeTurn} busyTurn={busyTurn} onNavigate={navigateToTurn} t={t} />
         <div ref={columnRef} className={css.column} data-chat-flow="">
           {openState === 'loading' && <div className={css.hint}>{t('chat.loadingHistory')}</div>}
           {openState === 'error' && openError !== null && (
@@ -680,7 +697,15 @@ export function ChatView({
               t={t}
             />
           ))}
-          {visibleSubmissions.map(submission => (
+          {steeringSubmissions.map(submission => (
+            <PendingSubmissionBubble
+              key={submission.requestId}
+              submission={submission}
+              renderMessageImages={renderMessageImages}
+              t={t}
+            />
+          ))}
+          {transcriptSubmissions.map(submission => (
             <PendingSubmissionBubble
               key={submission.requestId}
               submission={submission}

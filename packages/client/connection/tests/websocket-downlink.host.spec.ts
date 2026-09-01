@@ -95,6 +95,50 @@ describe('WebSocket downlinks', () => {
     await closed
   })
 
+  it('requires two missed heartbeats before terminating an unresponsive socket', async () => {
+    const downlinks = new WebSocketDownlinks(api(idle, idle), 20)
+    const host = await serve(downlinks)
+    running.push(host.close)
+    const socket = new WebSocket(`${host.origin}${MUX_EVENTS_PATH}`, { autoPong: false })
+    await once(socket, 'open')
+    const accepted = await acceptedSocket(downlinks)
+    const terminated = vi.spyOn(accepted, 'terminate')
+    const closed = once(socket, 'close')
+    await once(socket, 'ping')
+    await once(socket, 'ping')
+    expect(terminated).not.toHaveBeenCalled()
+    await vi.waitFor(() => { expect(terminated).toHaveBeenCalledOnce() })
+    await closed
+  })
+
+  it('keeps a socket when a delayed Pong arrives before the final heartbeat check', async () => {
+    const downlinks = new WebSocketDownlinks(api(idle, idle), 20)
+    const host = await serve(downlinks)
+    running.push(host.close)
+    const socket = new WebSocket(`${host.origin}${MUX_EVENTS_PATH}`, { autoPong: false })
+    await once(socket, 'open')
+    const accepted = await acceptedSocket(downlinks)
+    const terminated = vi.spyOn(accepted, 'terminate')
+    let finalCheck: (() => void) | undefined
+    const immediate = vi.spyOn(globalThis, 'setImmediate').mockImplementation((callback) => {
+      finalCheck = callback
+      return 0 as unknown as NodeJS.Immediate
+    })
+    try {
+      await once(socket, 'ping')
+      await once(socket, 'ping')
+      await vi.waitFor(() => { expect(finalCheck).toBeDefined() })
+      accepted.emit('pong', Buffer.alloc(0))
+      finalCheck?.()
+      expect(terminated).not.toHaveBeenCalled()
+    } finally {
+      immediate.mockRestore()
+      const closed = once(socket, 'close')
+      socket.close()
+      await closed
+    }
+  })
+
   it('carries mux and host over independent downstream sockets and cancels each source on close', async () => {
     let muxAborted = false
     let hostAborted = false

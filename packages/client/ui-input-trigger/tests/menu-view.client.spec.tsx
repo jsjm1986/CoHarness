@@ -13,7 +13,7 @@ import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import { zh } from '../src/client/locales.ts'
-import type { MenuState, TriggerHit } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
+import type { InputTriggerCrumb, MenuState, TriggerHit } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import { MenuView } from '../src/client/MenuView.tsx'
 
 const hit: TriggerHit = {
@@ -57,12 +57,25 @@ afterEach(() => {
 // unknown source comes back verbatim (its raw name).
 const t = makeTranslate(zh, commonZh)
 
-function mount(state: MenuState) {
+function mount(state: MenuState, trails: ReadonlyMap<string, readonly InputTriggerCrumb[]> = new Map()) {
   const menu = createSnapshotStore<MenuState>(state)
+  const headers = createSnapshotStore(trails)
   const onPick = vi.fn()
+  const onCrumb = vi.fn()
+  const onHover = vi.fn()
   const onDismiss = vi.fn()
-  const view = render(<MenuView menu={menu} onPick={onPick} onDismiss={onDismiss} t={t} />)
-  return { menu, onPick, onDismiss, view }
+  const view = render(
+    <MenuView
+      menu={menu}
+      headers={headers}
+      onPick={onPick}
+      onCrumb={onCrumb}
+      onHover={onHover}
+      onDismiss={onDismiss}
+      t={t}
+    />,
+  )
+  return { menu, headers, onPick, onCrumb, onHover, onDismiss, view }
 }
 
 /** The non-interactive group title rows (role=presentation), in document order. */
@@ -162,23 +175,23 @@ describe('MenuView', () => {
   it('caps the list height at the design maximum when the composer sits low enough', () => {
     vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({ bottom: 800 } as DOMRect)
     mount(openState())
-    expect(screen.getByRole('listbox').style.maxHeight).toBe('320px')
+    expect(document.querySelector<HTMLElement>('[data-trigger-menu]')?.style.maxHeight).toBe('320px')
   })
 
   it('clamps the list height to the space above the composer minus the safe margin', () => {
     vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({ bottom: 200 } as DOMRect)
     mount(openState())
-    expect(screen.getByRole('listbox').style.maxHeight).toBe('188px')
+    expect(document.querySelector<HTMLElement>('[data-trigger-menu]')?.style.maxHeight).toBe('188px')
   })
 
   it('re-fits the height when the window resizes', () => {
     const rect = vi.spyOn(Element.prototype, 'getBoundingClientRect')
     rect.mockReturnValue({ bottom: 800 } as DOMRect)
     mount(openState())
-    expect(screen.getByRole('listbox').style.maxHeight).toBe('320px')
+    expect(document.querySelector<HTMLElement>('[data-trigger-menu]')?.style.maxHeight).toBe('320px')
     rect.mockReturnValue({ bottom: 100 } as DOMRect)
     act(() => { window.dispatchEvent(new Event('resize')) })
-    expect(screen.getByRole('listbox').style.maxHeight).toBe('88px')
+    expect(document.querySelector<HTMLElement>('[data-trigger-menu]')?.style.maxHeight).toBe('88px')
   })
 
   it('pointerdown outside the menu (no composer card ancestor) dismisses', () => {
@@ -195,10 +208,19 @@ describe('MenuView', () => {
 
   it('pointerdown inside the surrounding composer card does not dismiss; outside it does', () => {
     const menu = createSnapshotStore<MenuState>(openState())
+    const headers = createSnapshotStore<ReadonlyMap<string, readonly InputTriggerCrumb[]>>(new Map())
     const onDismiss = vi.fn()
     render(
       <div data-composer-card="">
-        <MenuView menu={menu} onPick={vi.fn()} onDismiss={onDismiss} t={t} />
+        <MenuView
+          menu={menu}
+          headers={headers}
+          onPick={vi.fn()}
+          onCrumb={vi.fn()}
+          onHover={vi.fn()}
+          onDismiss={onDismiss}
+          t={t}
+        />
         <button type="button" data-testid="composer-button" />
       </div>,
     )
@@ -230,5 +252,30 @@ describe('MenuView', () => {
     // fireEvent returns false when preventDefault was called.
     expect(notPrevented).toBe(false)
     expect(onPick).toHaveBeenCalledWith('command', 1)
+  })
+
+  it('renders breadcrumb navigation and a drill chevron without changing row picks', () => {
+    const { onPick, onCrumb, onHover } = mount(
+      openState({
+        groups: [{
+          source: 'reference',
+          status: 'ready',
+          items: [{ name: 'src/', drill: true, icon: 'folder' }],
+        }],
+        highlight: null,
+      }),
+      new Map([['reference', [
+        { label: 'Workspace', value: 'root' },
+        { label: 'src', value: 'src', current: true },
+      ]]]),
+    )
+    expect(screen.getByRole('navigation', { name: '目录导航' })).toBeTruthy()
+    expect(screen.getByLabelText('进入目录')).toBeTruthy()
+    fireEvent.mouseMove(screen.getByRole('option'))
+    expect(onHover).toHaveBeenCalledWith('reference', 0)
+    fireEvent.mouseDown(screen.getByRole('button', { name: 'Workspace' }))
+    expect(onCrumb).toHaveBeenCalledWith('reference', 0)
+    fireEvent.mouseDown(screen.getByLabelText('进入目录'))
+    expect(onPick).toHaveBeenCalledWith('reference', 0, 'drill')
   })
 })

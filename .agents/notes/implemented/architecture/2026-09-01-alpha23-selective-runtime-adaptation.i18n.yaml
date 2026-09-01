@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-01-alpha23-selective-runtime-adaptation.md
+2026-09-01-alpha23-selective-runtime-adaptation.md: abdb9e16e7ab636c584c8371371f26813d9bfc3c
+2026-09-01-alpha23-selective-runtime-adaptation.zh.md: ee10ef27762ad334323864288e68d5da4900f1e5

@@ -3,6 +3,7 @@ import {
   type NormalizeContext,
   extractSnapshotSpillPaths,
   normalizeSessionLog,
+  normalizeSessionSnapshot,
   normalizeStdout,
   scrubRequestHeaders,
   scrubSystemPrompts,
@@ -384,6 +385,18 @@ describe('normalizeSessionLog', () => {
     expect(out).not.toContain('212')
   })
 
+  it('projects range-encoded source event references to logical arrays', () => {
+    const ev = JSON.stringify({
+      type: 'assistant/message',
+      seq: 2,
+      time: 5,
+      sourceEventSeqs: [[1, 3], 5],
+      data: { turn: 1, step: 1, message: { role: 'assistant', content: [] } },
+    })
+    const out = normalizeSessionLog(`${header({})}\n${ev}\n`, ctx)
+    expect(out).toContain('"sourceEventSeqs":[1,2,3,5]')
+  })
+
   it('zeroes time0 even when a malformed row carries no dt array', () => {
     const row = JSON.stringify({ type: 'text-chunks', seq0: 1, time0: 999, data: 'not-an-object' })
     const out = normalizeSessionLog(`${header({})}\n${row}\n`, ctx)
@@ -406,6 +419,29 @@ describe('normalizeSessionLog', () => {
     expect(out).toContain('"type":"note","seq":1')
     expect(out).toContain('"decision":"allow"')
     expect(out).not.toContain('durationMs')
+  })
+})
+
+describe('normalizeSessionSnapshot', () => {
+  const header = JSON.stringify({ type: 'session', version: 0, id: 's', createdAt: 123 })
+
+  it('projects envelopes and re-packs adjacent chunk rows', () => {
+    const raw = [
+      header,
+      JSON.stringify({ type: 'text-chunks', data: { turn: 1, step: 1, index: 0, dt: [9, 8], texts: ['a', 'b', 'c'] } }),
+      JSON.stringify({ type: 'text-chunks', data: { turn: 1, step: 1, index: 0, dt: [7, 6], texts: ['d', 'e', 'f'] } }),
+      '',
+    ].join('\n')
+    expect(normalizeSessionSnapshot(raw, ctx)).toBe([
+      JSON.stringify({ type: 'session', version: 0, id: 's', createdAt: 0 }),
+      JSON.stringify({ type: 'text-chunks', data: { turn: 1, step: 1, index: 0, dt: [0, 0, 0, 0, 0], texts: ['a', 'b', 'c', 'd', 'e', 'f'] } }),
+      '',
+    ].join('\n'))
+  })
+
+  it('rejects a headerless session snapshot', () => {
+    expect(() => normalizeSessionSnapshot('{"type":"turn/start"}\n', ctx))
+      .toThrow('session snapshot must start with a session header')
   })
 })
 

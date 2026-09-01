@@ -38,6 +38,18 @@ function readPre(root: HTMLElement) {
 }
 
 describe('StreamingHighlightSession', () => {
+  it('exposes only newly completed lines through updateFrame', () => {
+    const session = new StreamingHighlightSession()
+    const first = session.updateFrame('const a = 1\nlet', 'ts')
+    expect(first?.appended).toHaveLength(1)
+    expect(first?.tail).toHaveLength(1)
+    const second = session.updateFrame('const a = 1\nlet b = 2\n', 'ts')
+    expect(second?.generation).toBe(first?.generation)
+    expect(second?.appended).toHaveLength(1)
+    expect(second?.appended[0]?.map(span => span.text).join('')).toBe('let b = 2')
+    expect(session.updateFrame('const a = 1\nlet b = 2\n', 'ts')).toBe(second)
+  })
+
   it('reconstructs the code verbatim and colors tokens through --shiki-* properties', () => {
     const code = 'const a = 1\n// note\nconst b = "x"'
     const lines = new StreamingHighlightSession().update(code, 'ts')

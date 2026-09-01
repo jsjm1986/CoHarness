@@ -1,0 +1,6 @@
+- navigation "Folder navigation":
+  - button "Workspace"
+  - button "src" [disabled]
+- listbox "Trigger suggestions":
+  - text: Files & folders
+  - option "File · nested.txt src/nested.txt" [selected]

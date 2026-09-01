@@ -108,6 +108,27 @@ describe('parseSessionLog', () => {
       chunkEvent(3, 1, 1, { type: 'text-delta', index: 0, text: 'c' }),
     ])
   })
+
+  it('expands range-encoded source event references before replay consumers inspect them', () => {
+    const event = {
+      type: 'turn/start',
+      seq: 1,
+      time: 0,
+      data: { turn: 1 },
+      sourceEventSeqs: [[0, 2]],
+    } as never as SessionEvent
+    const [decoded] = parseSessionLog(sessionJsonl([event]))
+    expect((decoded as unknown as { sourceEventSeqs?: unknown }).sourceEventSeqs).toEqual([0, 1, 2])
+  })
+
+  it('reports malformed range provenance with its source line', () => {
+    const event = {
+      ...chunkEvent(4, 1, 1, TEXT_CHUNKS[0] as StreamChunk),
+      sourceEventSeqs: [[3, 1]],
+    } as never as SessionEvent
+    expect(() => parseSessionLog(sessionJsonl([event])))
+      .toThrow('session snapshot line 2: sourceEventSeqs ranges require start <= end')
+  })
 })
 
 describe('deriveReplayScript', () => {

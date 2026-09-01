@@ -790,6 +790,27 @@ describe('prompt and cancel errors', () => {
     })
   })
 
+  it('forwards upload-shaped image parts to a continuable child', async () => {
+    const api = new FakeApiClient()
+    const session = new Session(SID, api, fakeRemote(), {
+      address: { parentSessionId: PARENT, childSessionId: SID, mode: 'continuable' },
+      parentAvailable: true,
+    })
+    await session.open()
+    const content = [
+      { type: 'text' as const, text: '请看图' },
+      { type: 'image' as const, mediaType: 'image/png' as const, data: 'aGk=', name: 'shot.png' },
+    ]
+    await expect(session.prompt(content, 'queue')).resolves.toMatchObject({ ok: true })
+    expect(api.callsOf('subagent.prompt')).toEqual([{
+      parentSessionId: PARENT,
+      childSessionId: SID,
+      mode: 'continuable',
+      content,
+      clientTimeZone: new Intl.DateTimeFormat().resolvedOptions().timeZone,
+    }])
+  })
+
   it('lands an interrupt business failure in promptError with op=stop', async () => {
     const api = new FakeApiClient()
     api.onSubagentInterrupt = () => Promise.resolve(err({
@@ -930,12 +951,14 @@ describe('pending submission echoes', () => {
       name: 'submission.png',
     }
     const handle = session.beginSubmission({
+      placement: 'queued',
       text: '带图消息',
       images: [{ previewUrl: 'blob:submission', name: 'submission.png' }],
       onRetire: retired,
     })
     expect(session.getSnapshot().pendingSubmissions).toMatchObject([{
       requestId: handle.requestId,
+      placement: 'queued',
       text: '带图消息',
       images: [{ previewUrl: 'blob:submission', name: 'submission.png' }],
     }])
@@ -1013,7 +1036,7 @@ describe('pending submission echoes', () => {
       const { api, session } = makeSession()
       testCase.setup(api)
       const retired = vi.fn()
-      const handle = session.beginSubmission({ text: testCase.label, images: [], onRetire: retired })
+      const handle = session.beginSubmission({ placement: 'transcript', text: testCase.label, images: [], onRetire: retired })
       const controller = new AbortController()
       const result = await session.prompt(
         [{ type: 'text', text: testCase.label }],
@@ -1032,7 +1055,7 @@ describe('pending submission echoes', () => {
   it('disposes an unresolved echo once and leaves no pending submission', () => {
     const { session } = makeSession()
     const retired = vi.fn()
-    session.beginSubmission({ text: '待处理', images: [], onRetire: retired })
+    session.beginSubmission({ placement: 'transcript', text: '待处理', images: [], onRetire: retired })
     session.dispose()
     session.dispose()
     expect(session.getSnapshot().pendingSubmissions).toEqual([])

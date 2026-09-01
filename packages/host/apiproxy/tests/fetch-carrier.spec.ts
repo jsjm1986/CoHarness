@@ -625,6 +625,17 @@ describe('unary round trip (handler ⇄ client, no network)', () => {
     })).result).toEqual({ ok: true, value: { accepted: true } })
   })
 
+  it('round-trips upload-shaped image content for continuable prompts', async () => {
+    const c = client()
+    const response = await c.subagents.prompt({
+      parentSessionId: 'parent' as never,
+      childSessionId: 'child' as never,
+      mode: 'continuable',
+      content: [{ type: 'image', mediaType: 'image/png', data: 'AQ==', name: 'shot.png' }],
+    })
+    expect(response.result).toEqual({ ok: true, value: { messageId: 'message-1' } })
+  })
+
   it('restores the exact logical subagent history page from packed Fetch records', async () => {
     const handler = toFetchHandler(fakeApi())
     const response = await new InProcessApiClient(handler).subagents.history({

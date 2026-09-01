@@ -20,6 +20,7 @@ const SEAT_CONTENT: Record<string, string> = {
 
 function mount({
   wide = true,
+  connectionState,
   onboardingActive = true,
   rows = [
     { id: 'general', order: 0, label: 'General' },
@@ -30,11 +31,20 @@ function mount({
     { id: 'welcome', order: -100 },
     { id: 'credential', order: 0 },
   ],
-}: { wide?: boolean; onboardingActive?: boolean; rows?: Row[]; steps?: Step[] } = {}) {
+}: {
+  wide?: boolean
+  connectionState?: 'connected' | 'reconnecting'
+  onboardingActive?: boolean
+  rows?: Row[]
+  steps?: Step[]
+} = {}) {
   // Mutable row source standing in for the bound useSections hook; bump()
   // plays a ledger change through the same observable contract.
   let current = rows
   const listeners = new Set<() => void>()
+  let currentConnectionState = connectionState
+  const connectionListeners = new Set<() => void>()
+  const reconnect = vi.fn()
   const renderSlot = vi.fn(
     ((key: string, _owner: unknown, opts?: { only?: string }) => {
       if (key === 'settings.section') return <div data-testid={`section-${opts?.only ?? 'all'}`} />
@@ -52,6 +62,17 @@ function mount({
   const props: SettingsRootComponentProps = {
     useSessions,
     useWorkspaces: unusedHook,
+    reconnect,
+    t: ((key: string) => key),
+    useConnectionState: (select) => {
+      const [, force] = useState(0)
+      useEffect(() => {
+        const listener = () => { force(value => value + 1) }
+        connectionListeners.add(listener)
+        return () => { connectionListeners.delete(listener) }
+      }, [])
+      return select(currentConnectionState)
+    },
     wide,
     useOnboardingSteps: select => select(steps),
     useSections: (select) => {
@@ -72,7 +93,13 @@ function mount({
       for (const fn of [...listeners]) fn()
     })
   }
-  return { view, renderSlot, bump, listeners }
+  const setConnectionState = (next: typeof currentConnectionState) => {
+    act(() => {
+      currentConnectionState = next
+      for (const listener of [...connectionListeners]) listener()
+    })
+  }
+  return { view, renderSlot, bump, listeners, reconnect, setConnectionState }
 }
 
 function openPanel() {
@@ -94,6 +121,20 @@ describe('SettingsRoot trigger', () => {
   it('hands the rail state to the trigger seat', () => {
     const { renderSlot } = mount({ wide: false })
     expect(renderSlot).toHaveBeenCalledWith('settings.trigger', { wide: false })
+  })
+
+  it('shows a reconnect action and a short recovery confirmation', () => {
+    vi.useFakeTimers()
+    const mounted = mount()
+    mounted.setConnectionState('reconnecting')
+    const indicator = screen.getByRole('button', { name: 'connection.reconnect' })
+    fireEvent.click(indicator)
+    expect(mounted.reconnect).toHaveBeenCalledOnce()
+    mounted.setConnectionState('connected')
+    expect(screen.getByRole('status', { name: 'connection.connected' })).toBeTruthy()
+    act(() => { vi.advanceTimersByTime(2_000) })
+    expect(screen.queryByRole('status', { name: 'connection.connected' })).toBeNull()
+    vi.useRealTimers()
   })
 })
 

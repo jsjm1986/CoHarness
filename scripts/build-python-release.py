@@ -129,20 +129,31 @@ def pep440_version(version: str) -> str:
     A release candidate is `0.0.1-rc.1` in the repository and `0.0.1rc1` under
     PEP 440. Build backends normalize to the latter, so the wheel filename and
     metadata carry it: comparing them against the repository spelling would
-    reject every prerelease build.
+    reject every prerelease build. The CoHarness suffix
+    `alpha.N.coharness.M` becomes the public PEP 440 post-release spelling
+    `aN.postM`; a local `+coharness.M` version is not suitable for a public
+    Python index.
     """
     stable, separator, prerelease = version.partition("-")
     if not separator:
         return stable
-    match = re.fullmatch(r"(a|b|c|rc|alpha|beta|pre|preview)\.?(\d+)", prerelease)
+    match = re.fullmatch(
+        r"(?P<identifier>a|b|c|rc|alpha|beta|pre|preview)\.?"
+        r"(?P<number>\d+)"
+        r"(?:\.coharness\.(?P<fork_number>\d+))?",
+        prerelease,
+    )
     if match is None:
         raise ValueError(
-            f"prerelease segment {prerelease!r} has no PEP 440 spelling; use rc.N, alpha.N, or beta.N"
+            f"prerelease segment {prerelease!r} has no PEP 440 spelling;"
+            " use rc.N, alpha.N, beta.N, or alpha.N.coharness.N"
         )
     identifier = {"alpha": "a", "beta": "b", "c": "rc", "pre": "rc", "preview": "rc"}.get(
-        match.group(1), match.group(1)
+        match.group("identifier"), match.group("identifier")
     )
-    return f"{stable}{identifier}{match.group(2)}"
+    fork_number = match.group("fork_number")
+    post = "" if fork_number is None else f".post{fork_number}"
+    return f"{stable}{identifier}{match.group('number')}{post}"
 
 
 def validate_release_tag(tag: str | None, version: str) -> None:

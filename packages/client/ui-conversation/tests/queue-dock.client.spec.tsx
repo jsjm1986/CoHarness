@@ -33,12 +33,35 @@ function row(id: string, text: string | null, preview = text ?? '[image]'): Queu
   }
 }
 
+/** One queued row carrying a durable image reference. */
+function imageRow(id: string, attachmentId: string, text = ''): QueuedMessage {
+  return {
+    id: iid(id), messageId: `message-${id}` as never, placement: 'queued',
+    content: [
+      ...(text === '' ? [] : [{ type: 'text' as const, text }]),
+      {
+        type: 'image' as const,
+        attachment: {
+          attachmentId: attachmentId as never,
+          mediaType: 'image/png' as const,
+          bytes: 1,
+          width: 1,
+          height: 1,
+        },
+      },
+    ],
+    preview: text,
+    text: null,
+  }
+}
+
 function snapshotWith(queue: QueuedMessage[]): ConversationSnapshot {
   return {
     sessionId: SID, views: EMPTY_CONVERSATION_VIEWS, chat: EMPTY_CHAT_SNAPSHOT,
     nodes: [], turnTimings: new Map(), turnEnds: new Map(), partial: null, runningCalls: [],
     pending: [], queue, running: true, composerPhase: 'active', removed: false, openState: 'open', openError: null,
     hasMore: false, loadingOlder: false, historyWindowMode: 'tail', historyDetail: 'full', promptError: null, blank: false, subagent: null, lastAgentError: null,
+    pendingSubmissions: [],
   }
 }
 
@@ -82,6 +105,7 @@ function kitFor(snapshot: ConversationSnapshot, injected: Partial<QueueDockInjec
     input: INPUT_STATE,
     updateQueue: vi.fn(() => Promise.resolve()),
     notify: vi.fn(),
+    loadImage: vi.fn(() => Promise.resolve('blob:unused')),
     ...injected,
   }
 }
@@ -92,6 +116,33 @@ describe('QueueDock', () => {
     const source = liveSession(snap)
     const { container } = render(<QueueDock {...kitFor(snap)} useSession={source.useSession} />)
     expect(container.innerHTML).toBe('')
+  })
+
+  it('renders a queued local echo and hands it off by rpcId', () => {
+    const requestId = 'request-queued-image' as never
+    const pending = {
+      ...snapshotWith([]),
+      pendingSubmissions: [{
+        requestId,
+        placement: 'queued' as const,
+        time: 1,
+        text: '等待上传',
+        images: [{ previewUrl: 'blob:queue-preview', name: 'queue.png' }],
+      }],
+    }
+    const source = liveSession(pending)
+    const view = render(<QueueDock {...kitFor(pending)} useSession={source.useSession} />)
+    expect(view.getByText('等待上传').closest('[data-submission-echo]')).not.toBeNull()
+    expect(view.getByRole('img', { name: '排队消息图片' }).getAttribute('src')).toBe('blob:queue-preview')
+
+    act(() => {
+      source.push({
+        ...pending,
+        queue: [{ ...row('accepted', '等待上传'), rpcId: requestId }],
+      })
+    })
+    expect(view.getAllByText('等待上传')).toHaveLength(1)
+    expect(view.container.querySelector('[data-submission-echo]')).toBeNull()
   })
 
   it('leaves pending steering to the conversation flow', () => {
@@ -216,6 +267,52 @@ describe('QueueDock', () => {
     expect((container.querySelectorAll('[aria-label="编辑排队消息"]')[1] as HTMLButtonElement).disabled).toBe(true)
     expect(container.querySelectorAll('[aria-label="编辑排队消息"]')[1]?.getAttribute('title'))
       .toBe('包含非文本内容，暂不支持编辑')
+  })
+
+  it('renders queued image thumbnails from durable references beside the text preview', async () => {
+    const loadImage = vi.fn(() => Promise.resolve('blob:thumb-1'))
+    const snap = snapshotWith([imageRow('i-img', 'att-9', '带图消息')])
+    const source = liveSession(snap)
+    const { container } = render(
+      <QueueDock {...kitFor(snap, { loadImage })} useSession={source.useSession} />,
+    )
+
+    await waitFor(() => {
+      expect(container.querySelector('img')?.getAttribute('src')).toBe('blob:thumb-1')
+    })
+    expect(loadImage).toHaveBeenCalledWith(expect.objectContaining({ attachmentId: 'att-9' }))
+    expect(container.querySelector('img')?.getAttribute('alt')).toBe('排队消息图片')
+    expect(container.querySelector('li')?.textContent).toBe('带图消息')
+  })
+
+  it('keeps the image placeholder when a queued image read fails', async () => {
+    const loadImage = vi.fn(() => Promise.reject(new Error('read denied')))
+    const snap = snapshotWith([imageRow('i-broken', 'att-x')])
+    const source = liveSession(snap)
+    const { container } = render(
+      <QueueDock {...kitFor(snap, { loadImage })} useSession={source.useSession} />,
+    )
+
+    await act(async () => { await Promise.resolve() })
+    expect(loadImage).toHaveBeenCalled()
+    expect(container.querySelector('img')).toBeNull()
+  })
+
+  it('ignores a queued image resolution that lands after unmount', async () => {
+    let resolveUrl: ((url: string) => void) | undefined
+    const loadImage = vi.fn(() => new Promise<string>((resolve) => { resolveUrl = resolve }))
+    const snap = snapshotWith([imageRow('i-late', 'att-late')])
+    const source = liveSession(snap)
+    const { unmount } = render(
+      <QueueDock {...kitFor(snap, { loadImage })} useSession={source.useSession} />,
+    )
+
+    unmount()
+    await act(async () => {
+      resolveUrl?.('blob:late')
+      await Promise.resolve()
+    })
+    expect(loadImage).toHaveBeenCalledTimes(1)
   })
 
   it('edits text inline with save and cancel controls, then saves with the same item identity', async () => {

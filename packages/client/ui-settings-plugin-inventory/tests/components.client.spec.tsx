@@ -124,4 +124,35 @@ describe('PluginInventorySettingsTab', () => {
     pendingFailure.unmount()
     await act(async () => { deferredFailure.reject(new Error('late failure')) })
   })
+
+  it('groups preset and global rows, switches presets, and searches both planes', async () => {
+    const grouped = {
+      entries: [
+        { entryId: 'global-a', moduleName: '@deepseek-ai/dsh-global-a', enabled: false, fiberPhase: null },
+        { entryId: 'global-b', moduleName: '@deepseek-ai/dsh-global-b', enabled: true, fiberPhase: 'active' },
+      ],
+      agentPresets: [
+        {
+          id: 'default', trust: 'system', isDefault: true,
+          rows: [{ entryId: 'preset-a', moduleName: '@deepseek-ai/dsh-preset-a', enabled: true, fiberPhase: 'active' }],
+        },
+        {
+          id: 'other', trust: 'user', isDefault: false,
+          rows: [{ entryId: 'preset-b', moduleName: '@deepseek-ai/dsh-global-a', enabled: true, fiberPhase: 'active' }],
+        },
+      ],
+    } as unknown as Snapshot
+    render(<PluginInventorySettingsTab {...props(async () => grouped)} />)
+    await screen.findByRole('button', { name: en.switcherLabel })
+    expect(screen.getByText(en.presetTitle)).toBeTruthy()
+    expect(screen.getByText('preset-a')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'preset-a, Enabled' }))
+    expect(screen.getByText(en.moduleLabel)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: en.switcherLabel }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'other' }))
+    expect(screen.getByText('global-a')).toBeTruthy()
+    const search = screen.getByRole('searchbox', { name: en.search })
+    fireEvent.change(search, { target: { value: 'global-a' } })
+    expect(screen.getByText(en.presetEnabledTag)).toBeTruthy()
+  })
 })

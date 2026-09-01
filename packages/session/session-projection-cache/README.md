@@ -15,10 +15,11 @@ A stored row `(key → {ver, seq, val})` is a fold shortcut, never an authority:
 
 ## Write policy
 
-Two mandatory points, throttled in between:
+Three mandatory points, throttled in between:
 
 | Trigger | Nature |
 |---|---|
+| Session creation | Mandatory — captures seed-derived projection state before the first ordinary event. |
 | `turn/end` | Mandatory — the turn-final value is what cold reads want. |
 | Session disposal (detach) | Mandatory — the live-to-cold moment; after it the cold ladder serves this session. |
 | `writeEveryEvents` committed events | Config throttle (count). |
@@ -34,7 +35,7 @@ The zero-I/O rung: client values viewed straight from the identity-matching stor
 
 The read ladder, zero full-log load on the happy path: cached rows → `sessionProjections.restoreFloor` (anchored one event below the lowest usable watermark) → persistence `readFrom(id, floor)` → `sessionProjections.restore` → fail-soft write-back of the refreshed rows. The anchor makes a shrunk log (crash-repair truncation) provable: an overreaching row triggers exactly one full re-read from seq 0 instead of serving a ghost value. No registered units serve `{asOfSeq: -1, values: {}}` without touching persistence; a session with no persisted log rejects with the seam's `not found`.
 
-`write(session)` is the synchronous-cut checkpoint both mandatory points use; carriers may call it directly (not fail-soft — the fail-soft wrappers own containment).
+`write(session)` is the synchronous-cut checkpoint all mandatory points use; carriers may call it directly (not fail-soft — the fail-soft wrappers own containment).
 
 ## Composition
 

@@ -28,6 +28,7 @@ import {
   type NormalizeContext,
   extractSnapshotSpillPaths,
   normalizeSessionLog,
+  normalizeSessionSnapshot,
   normalizeStdout,
   scrubRequestHeaders,
   scrubSessionSnapshot,
@@ -1337,8 +1338,8 @@ export function defineAcpSnapshotSuite(options: SnapshotSuiteOptions): void {
           for (let i = 0; i < fixtureFiles.length; i++) {
             const harvested = scrub((result.sessionLogs[i] as HarvestedLog).content)
             const fixture = scrub(await readFile(join(dir, fixtureFiles[i] as string), 'utf8'))
-            expect(normalizeSessionLog(harvested, ctx), `${fixtureFiles[i]} mismatch`)
-              .toEqual(normalizeSessionLog(fixture, fixtureContext(fixture)))
+            expect(normalizeSessionSnapshot(harvested, ctx), `${fixtureFiles[i]} mismatch`)
+              .toEqual(normalizeSessionSnapshot(fixture, fixtureContext(fixture)))
           }
         }
 
