@@ -4017,12 +4017,20 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface GoalChanged {\n    readonly operation: GoalOperation;\n    readonly ref: GoalRef;\n    readonly goal?: GoalView;\n}',
   },
   {
+    name: 'GoalId',
+    declaration: 'export type GoalId = Branded<\'GoalId\'>;',
+  },
+  {
     name: 'GoalOperation',
     declaration: 'export type GoalOperation = \'create\' | \'edit\' | \'pause\' | \'resume\' | \'complete\' | \'block\' | \'clear\';',
   },
   {
     name: 'GoalPhase',
     declaration: 'export type GoalPhase = \'active\' | \'paused\' | \'blocked\' | \'complete\';',
+  },
+  {
+    name: 'GoalRef',
+    declaration: 'export interface GoalRef {\n    readonly id: GoalId;\n    readonly revision: number;\n}',
   },
   {
     name: 'GoalSnapshot',
