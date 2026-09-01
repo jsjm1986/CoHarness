@@ -48,3 +48,4 @@
 - **协作过滤**：组合 `ctx.collaboration` 时，候选发现与快照准备只保留 readable-session authority 放行的会话。未组合该服务的组合仍遵循可信调用方约定；此能力不是面向模型的搜索工具。
 - **只投影文本**：不会在会话间传播非文本 user 与 assistant 块。
 - **没有实时链接**：引用是快照，不是 fork、恢复、订阅或源会话变更。
+- **`zod` 是生成的 Typert 契约面的运行时依赖，不是 `src` 的依赖。** 发布的 `./typert` 与 `./remote` 出口解析到不经打包的 `lib/typert.*.js` 文件，其中包含裸 `zod` 导入。manifest 必须保留 `zod`；只有当两份生成 JavaScript 契约面都不存在时，`knip.config.ts` 才注入 workspace 级例外，已构建 checkout 则由 Knip 直接观察该导入。

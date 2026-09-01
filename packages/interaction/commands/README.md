@@ -38,3 +38,4 @@ Registry metadata, command input, and direct output never enter a model request 
 
 - **Only unstructured text input** — forms, completion schemas, and typed arguments remain command-owned parsing concerns.
 - **Cooperative side-effect cancellation** — dispatch stops awaiting on abort; handlers must honor the signal to stop work that has already escaped into external systems.
+- **`zod` is a runtime dependency of generated Typert faces, not of `src`.** The published `./typert` and `./remote` exports resolve to unbundled `lib/typert.*.js` files with bare `zod` imports. The manifest must retain `zod`; `knip.config.ts` adds a workspace-scoped exception only when neither generated JavaScript face exists, while a built checkout lets Knip observe the import directly.
