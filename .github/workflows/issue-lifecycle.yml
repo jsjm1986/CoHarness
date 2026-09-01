@@ -37,10 +37,14 @@ jobs:
   lifecycle:
     name: Issue lifecycle
     # The App and Project integration is repository-specific and remains
-    # disabled until an administrator explicitly enables it.
+    # disabled until an administrator explicitly enables it. Fork and
+    # Dependabot PR events cannot receive the App private key.
     if: >-
       github.repository == 'jsjm1986/CoHarness'
       && vars.DSH_ISSUE_AUTOMATION_ENABLED == 'true'
+      && (github.event_name == 'issues'
+      || !(github.event.pull_request.head.repo.fork
+      || github.event.pull_request.user.login == 'dependabot[bot]'))
       && (github.event_name != 'pull_request_review'
       || (github.event.action == 'submitted' && github.event.review.state == 'changes_requested'))
     runs-on: ubuntu-latest

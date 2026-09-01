@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-01-canonical-ci-automation-gates.md
-2026-09-01-canonical-ci-automation-gates.md: ec7634f0c0bdfcaf0952202b6049f77132e06524
-2026-09-01-canonical-ci-automation-gates.zh.md: 7956411c618766189bfb55e532334f451b59a146
+2026-09-01-canonical-ci-automation-gates.md: e59eb1a031a2170647b3e7c873551d6a5f4ed063
+2026-09-01-canonical-ci-automation-gates.zh.md: f70864c05bd3fb3da2ed59d9f06507510c5ecc77
