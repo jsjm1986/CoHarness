@@ -9,22 +9,18 @@
  * every client through the mux stream carrying the same whole value).
  */
 
-import type { Branded } from '@deepseek-ai/dsh-brand'
+import type { GoalRef } from '@deepseek-ai/dsh-goal/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { RpcRequest, RpcResponse } from './rpc.ts'
 
-/** Identifies one goal across its durable revisions. */
-export type GoalId = Branded<'GoalId'>
-
-/** Compare-and-set identity for one exact goal revision. */
-export interface GoalRef {
-  readonly id: GoalId
-  readonly revision: number
-}
+/** Reuse the goal domain's branded identity in the compatibility contract. */
+export type { GoalId, GoalRef } from '@deepseek-ai/dsh-goal/client'
 
 /**
- * Goal-domain unary methods. Every mutation resolves an ordinary session's
- * Agent and applies one CAS-guarded verb; session-backed subagents reject with
+ * Legacy goal RPC compatibility contract. New browser code should use
+ * `ctx.remote.goals`; these dotted methods remain for existing clients and
+ * preserve their acknowledgement envelopes. Every mutation still delegates
+ * to the same GoalService and rejects session-backed subagents with
  * `agent-busy`.
  */
 export interface GoalsApi {
