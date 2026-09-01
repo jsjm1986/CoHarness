@@ -12,6 +12,8 @@ CI 工作流默认选择组织范围的 larger-runner 标签和仅在 master 上
 
 必需的 Linux job 默认使用 `ubuntu-latest`，非阻塞的原生 Windows job 默认使用 `windows-2025`。只有当仓库变量 `DSH_CI_ENTERPRISE_RUNNERS_ENABLED` 精确设置为 `true` 时，才选择现有的具名企业 Runner 池。现有的 `DSH_CI_FAILOVER_LINUX=selfhosted` 和 `DSH_CI_FAILOVER_WINDOWS=selfhosted` 开关优先于该启用项，并继续禁止 Dependabot 拉取请求使用自托管容量。
 
+本决策取代[大型托管 Runner 证据](2026-07-22-evidence-based-larger-hosted-runners.zh.md)、[串行参考流程](2026-07-21-serial-cross-platform-ci-reference.zh.md)、[故障切换手册](2026-07-26-ci-failover-runbook.zh.md)和[原生 Windows 拓扑](2026-08-08-native-windows-pull-request-ci.zh.md)中隐含启用企业 Runner 与无条件运行热备演练的默认方式。这些 Note 继续保留测量结果、拓扑依据和操作步骤，但其中的企业与自托管路径只在相应仓库变量明确选择后适用。
+
 worker 与门禁并发度使用同一项容量判断。标准托管 Runner 使用有界的低并发值；企业池或显式选择的自托管池保留已经测量过的较高值。仅在 master 上运行的备用 job 还要求 `DSH_CI_SELF_HOSTED_STANDBY_ENABLED=true`，larger-runner 基准 job 则要求启用企业 Runner。仓库变量缺失时只会选择普遍可用的 GitHub 托管容量，绝不会让可选私有池进入必需路径。
 
 `scripts/ci-workflow.spec.ts` 固定可移植默认值、显式启用项、故障切换优先级和备用池门禁，防止后续工作流修改静默恢复以仓库专属 Runner 标签作为默认值。
