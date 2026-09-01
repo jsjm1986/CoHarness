@@ -41,6 +41,11 @@ function codepointCompare(left: string, right: string): number {
 }
 
 function matchOffsets(content: string, search: string): number[] {
+  // Guard against an empty needle: indexOf('') always returns `offset`, which
+  // would produce `offset = offset + 0` and spin forever (eventually throwing
+  // on array allocation). Callers currently enforce non-empty `old_str`, but
+  // harden the helper so a future caller or schema bypass cannot wedge the host.
+  if (search.length === 0) return []
   const offsets: number[] = []
   let offset = 0
   while (true) {

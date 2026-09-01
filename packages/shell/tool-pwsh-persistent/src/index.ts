@@ -177,19 +177,24 @@ function retainedScrollback(
   id: TerminalSessionId,
   latest = ctx.terminals.read(owner, id, { offset: 0, count: SCROLLBACK_PAGE_LINES }),
 ): RetainedOutput {
-  const pages: string[] = latest.text.length === 0 ? [] : [latest.text]
+  // Walk backwards so we can push() in read order (oldest→newest) instead of
+  // paying O(pages²) for unshift() on every page.
+  const pages: string[] = []
+  const newest = latest.text
+  if (newest.length > 0) pages.push(newest)
   let offset = latest.lineEnd
   let truncated = latest.truncated
+  const prefixPages: string[] = []
   while (true) {
     if (offset >= latest.totalLines) break
     const page = ctx.terminals.read(owner, id, { offset, count: SCROLLBACK_PAGE_LINES })
     truncated ||= page.truncated
-    if (page.text.length > 0) pages.unshift(page.text)
+    if (page.text.length > 0) prefixPages.push(page.text)
     const next = nextScrollbackOffset(page, offset)
     if (next === undefined || next >= page.totalLines) break
     offset = next
   }
-  return { text: pages.join('\n'), truncated }
+  return { text: prefixPages.reverse().concat(pages).join('\n'), truncated }
 }
 
 function renderCaptured(output: CapturedOutput, maxOutputChars: number): string {
