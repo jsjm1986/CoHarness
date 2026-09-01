@@ -690,16 +690,27 @@ export abstract class AbstractApiClient implements IApiClient {
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
     const frameBuffer = new SseFrameBuffer(MAX_SSE_FRAME_BYTES, path)
-    const parseFrame = (chunk: string): { message: ServerRequest; request: RpcRequest<F> } | undefined => {
+    let consecutiveMalformed = 0
+    const MALFORMED_STREAK_LIMIT = 16
+    // Returns one of:
+    //  - { ok, request }   — parsed cleanly, ready to yield
+    //  - 'comment'         — SSE comment / empty frame (":keepalive"), skip silently
+    //  - 'malformed'       — parse/schema failure; reported and counted toward the streak limit
+    type Parsed = { ok: true; message: ServerRequest; request: RpcRequest<F> } | 'comment' | 'malformed'
+    const parseFrame = (chunk: string): Parsed => {
       const data = chunk.split('\n').filter(line => line.startsWith('data: ')).map(line => line.slice(6)).join('')
-      if (data === '') return undefined
+      if (data === '') return 'comment'
       try {
         const full = serverRequestSchema.parse(JSON.parse(data))
         const frame = frameSchema.parse(full.payload)
-        return { message: full, request: { rpcId: full.rpcId, payload: frame } }
+        return { ok: true, message: full, request: { rpcId: full.rpcId, payload: frame } }
       } catch (error) {
+        // One corrupt frame is not fatal (gap detection covers the loss). But
+        // a sustained streak of unparseable frames indicates the wire is no
+        // longer aligned and we must not burn CPU parsing garbage indefinitely
+        // — a terminal throw forces the shared reconnect path.
         console.error(`[apiproxy] dropping malformed SSE frame on ${path}:`, error)
-        return undefined
+        return 'malformed'
       }
     }
     try {
@@ -707,20 +718,34 @@ export abstract class AbstractApiClient implements IApiClient {
         const { done, value } = await readResponseChunk(reader, signal)
         if (done) {
           for (const chunk of frameBuffer.append(decoder.decode())) {
-            const request = parseFrame(chunk)
-            if (request === undefined) continue
-            this.onEnvelope(request.message)
-            yield request.request
+            const parsed = parseFrame(chunk)
+            if (parsed === 'comment') continue
+            if (parsed === 'malformed') {
+              if (++consecutiveMalformed >= MALFORMED_STREAK_LIMIT) {
+                throw new Error(`SSE stream on ${path} delivered ${String(MALFORMED_STREAK_LIMIT)} consecutive malformed frames; giving up`)
+              }
+              continue
+            }
+            consecutiveMalformed = 0
+            this.onEnvelope(parsed.message)
+            yield parsed.request
           }
           if (frameBuffer.hasTail()) throw new Error(`truncated SSE frame on ${path}`)
           return
         }
         const decoded = decoder.decode(value, { stream: true })
         for (const chunk of frameBuffer.append(decoded)) {
-          const request = parseFrame(chunk)
-          if (request === undefined) continue
-          this.onEnvelope(request.message)
-          yield request.request
+          const parsed = parseFrame(chunk)
+          if (parsed === 'comment') continue
+          if (parsed === 'malformed') {
+            if (++consecutiveMalformed >= MALFORMED_STREAK_LIMIT) {
+              throw new Error(`SSE stream on ${path} delivered ${String(MALFORMED_STREAK_LIMIT)} consecutive malformed frames; giving up`)
+            }
+            continue
+          }
+          consecutiveMalformed = 0
+          this.onEnvelope(parsed.message)
+          yield parsed.request
         }
       }
     } finally {

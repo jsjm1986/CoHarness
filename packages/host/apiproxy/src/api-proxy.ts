@@ -625,7 +625,12 @@ function presetFailure(request: RpcRequest<unknown>, error: unknown): RpcRespons
 }
 
 /** Simple async queue: core callbacks push, the AsyncIterable pulls; abort/return cleans up. */
-class FrameQueue<F> {
+// Per-frame wire serialization is factored into wire-frame.ts so the SSE
+// write loop in fetch/handler.ts can reuse the string produced at FrameQueue
+// push() time instead of re-running JSON.stringify on large payloads.
+import { encodeWireFrame, forgetWireFrame } from './wire-frame.ts'
+
+class FrameQueue<F extends RpcRequest<{ type: string }>> {
   // A single session event may legitimately carry a tool result close to the
   // carrier's 8 MiB SSE frame budget. Keep enough room for that frame plus a
   // burst of control/event envelopes without allowing an unbounded backlog.
@@ -646,7 +651,7 @@ class FrameQueue<F> {
       this.buffer = this.buffer.slice(this.head)
       this.head = 0
     }
-    const bytes = frameBytes(item)
+    const { bytes } = encodeWireFrame(item)
     if (bytes > FrameQueue.MAX_BYTES
       || this.buffer.length - this.head >= FrameQueue.MAX_ITEMS
       || this.bufferedBytes + bytes > FrameQueue.MAX_BYTES) {
@@ -654,7 +659,7 @@ class FrameQueue<F> {
       this.head = 0
       this.bufferedBytes = 0
       const failure = this.overflow()
-      const failureBytes = frameBytes(failure)
+      const { bytes: failureBytes } = encodeWireFrame(failure)
       this.buffer.push({ item: failure, bytes: failureBytes })
       this.bufferedBytes = failureBytes
       this.done = true
@@ -669,7 +674,7 @@ class FrameQueue<F> {
   /** Publish one terminal frame even when normal buffering has overflowed. */
   fail(item: F): void {
     if (this.done) return
-    const bytes = frameBytes(item)
+    const { bytes } = encodeWireFrame(item)
     this.buffer = [{ item, bytes }]
     this.head = 0
     this.bufferedBytes = bytes
@@ -692,6 +697,7 @@ class FrameQueue<F> {
           this.head++
           this.bufferedBytes -= next.bytes
           yield next.item
+          forgetWireFrame(next.item)
         }
         this.buffer = []
         this.head = 0
@@ -703,17 +709,6 @@ class FrameQueue<F> {
       signal.removeEventListener('abort', onAbort)
       cleanup()
     }
-  }
-}
-
-function frameBytes(value: unknown): number {
-  try {
-    const serialized: unknown = JSON.stringify(value)
-    return typeof serialized === 'string'
-      ? Buffer.byteLength(serialized)
-      : FrameQueue.MAX_BYTES + 1
-  } catch {
-    return FrameQueue.MAX_BYTES + 1
   }
 }
 
@@ -747,7 +742,7 @@ function streamErrorFrame(error: RpcError): { type: 'stream/error'; error: RpcEr
   return { type: 'stream/error', error }
 }
 
-function createReadStreamFailure<F>(
+function createReadStreamFailure<F extends { type: string }>(
   queue: FrameQueue<RpcRequest<F>>,
   render: (error: RpcError) => F,
 ): (error: unknown) => void {
