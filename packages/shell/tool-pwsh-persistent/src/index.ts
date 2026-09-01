@@ -22,7 +22,10 @@ const TIMEOUT_CODE = 'PERSISTENT_PWSH_TIMEOUT'
 // One page is enough to find a just-emitted completion marker; the full
 // scrollback is assembled only when a command settles or needs partial output.
 const SCROLLBACK_PAGE_LINES = 1_000
-const POLL_INTERVAL_MS = 25
+// Keep TTFT sharp while bytes are flowing; back off when the PTY goes quiet
+// so a sleeping or `Read-Host`-blocked command doesn't wake 40 times/second.
+const ACTIVE_POLL_INTERVAL_MS = 25
+const IDLE_POLL_MAX_MS = 200
 
 const DEFAULT_DESCRIPTION = 'Run commands in a persistent PowerShell shell. State, including the current directory and exported environment variables, persists across calls for this agent.'
 
@@ -160,10 +163,6 @@ function partialOutput(
     text: stripPrompt(beforeEnd.replaceAll(SHELL_PROMPT, '').replaceAll(wrapper, '')),
     incomplete: fallbackTruncated || fallbackStart < 0,
   }
-}
-
-async function pause(): Promise<void> {
-  await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS))
 }
 
 function nextScrollbackOffset(page: TerminalReadResult, offset: number): number | undefined {
@@ -353,6 +352,10 @@ async function executeCommand(
   let first = true
   let fallback = ''
   let fallbackTruncated = false
+  // Adaptive backoff mirroring tool-bash-persistent: fast poll while output
+  // flows, exponential backoff capped at IDLE_POLL_MAX_MS when the PTY stalls.
+  let pollDelay = ACTIVE_POLL_INTERVAL_MS
+  let lastTextLength = 0
 
   while (true) {
     // The shell may flip to exited between iterations (a fast `exit` can
@@ -418,7 +421,13 @@ async function executeCommand(
         config.maxOutputChars,
       )
     }
-    await pause()
+    if (latest.text.length !== lastTextLength || incremental.delta.length > 0) {
+      pollDelay = ACTIVE_POLL_INTERVAL_MS
+      lastTextLength = latest.text.length
+    } else {
+      pollDelay = Math.min(IDLE_POLL_MAX_MS, pollDelay * 2)
+    }
+    await new Promise(resolve => setTimeout(resolve, pollDelay))
   }
 }
 

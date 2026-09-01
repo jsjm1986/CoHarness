@@ -19,7 +19,11 @@ const TIMEOUT_CODE = 'PERSISTENT_BASH_TIMEOUT'
 // One page is enough to find a just-emitted completion marker; the full
 // scrollback is assembled only when a command settles or needs partial output.
 const SCROLLBACK_PAGE_LINES = 1_000
-const POLL_INTERVAL_MS = 25
+// Active-output poll cadence (matches PTY backend flush rate) keeps TTFT sharp.
+// When output stalls (command waiting / sleeping) we back off to IDLE_POLL_MAX_MS
+// to avoid waking 40 times/second while doing nothing.
+const ACTIVE_POLL_INTERVAL_MS = 25
+const IDLE_POLL_MAX_MS = 200
 
 const DEFAULT_DESCRIPTION = 'Run commands in a persistent bash shell. State, including the current directory and exported environment variables, persists across calls for this agent.'
 
@@ -125,10 +129,6 @@ function partialOutput(
     text: trimTrailingNewline(beforeEnd),
     incomplete: fallbackTruncated || fallbackStart < 0,
   }
-}
-
-async function pause(): Promise<void> {
-  await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS))
 }
 
 function nextScrollbackOffset(page: TerminalReadResult, offset: number): number | undefined {
@@ -310,6 +310,11 @@ async function executeCommand(
   let first = true
   let fallback = ''
   let fallbackTruncated = false
+  // Adaptive backoff: stay responsive while output is flowing, but sleep
+  // longer when the PTY is silent (sleeping commands, `read`, idle wait).
+  // Resets to ACTIVE_POLL_INTERVAL_MS on every observed byte so TTFT stays sharp.
+  let pollDelay = ACTIVE_POLL_INTERVAL_MS
+  let lastTextLength = 0
 
   while (true) {
     // The shell may flip to exited between iterations (a fast `exit` can
@@ -378,7 +383,17 @@ async function executeCommand(
         config.maxOutputChars,
       )
     }
-    await pause()
+    // Adaptive backoff: new output → fast poll; silence → exponential backoff
+    // capped at IDLE_POLL_MAX_MS so idle/sleeping commands stop burning the
+    // event loop. We compare latest.text.length rather than parsing output so
+    // even an echoed prompt or stderr progress counts as activity.
+    if (latest.text.length !== lastTextLength || incremental.delta.length > 0) {
+      pollDelay = ACTIVE_POLL_INTERVAL_MS
+      lastTextLength = latest.text.length
+    } else {
+      pollDelay = Math.min(IDLE_POLL_MAX_MS, pollDelay * 2)
+    }
+    await new Promise(resolve => setTimeout(resolve, pollDelay))
   }
 }
 
