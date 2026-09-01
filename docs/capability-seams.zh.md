@@ -17,6 +17,7 @@ flowchart LR
   pkg_userdoc["userdoc"]
   svc_userDocs["ctx.userDocs<br/>User-uploaded document storage"]
   pkg_userdoc_local["userdoc-local"]
+  pkg_tool_userdoc["tool-userdoc"]
   pkg_llm["llm"]
   svc_llm["ctx.llm<br/>LLM adapter registry"]
   pkg_llm_deepseek["llm-deepseek"]
@@ -456,6 +457,7 @@ flowchart LR
   svc_tools --> pkg_tool_web
   svc_typert --> pkg_api_gateway
   svc_typert --> pkg_typert_loader
+  svc_userDocs --> pkg_tool_userdoc
   svc_userQuestions --> pkg_tool_ask_user
   svc_web --> pkg_tool_web
   svc_webServer --> pkg_connection
@@ -470,7 +472,7 @@ flowchart LR
 | ctx 键 | 角色 | 所属包 | 实现 | 直接消费方 | 配套插件 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- |
 | `ctx.attachments` | `seam` | [`attachment`](../packages/attachment/attachment) | [`attachment-local`](../packages/attachment/attachment-local) | `host-runtime`, [`llm-pi-ai`](../packages/llm/llm-pi-ai) | - | 宿主会在会话事件之前提交已接受的图片；提供方适配器将已授权的持久引用解析为提供方原生内容。 |
-| `ctx.userDocs` | `seam` | [`userdoc`](../packages/attachment/userdoc) | [`userdoc-local`](../packages/attachment/userdoc-local) | - | - | 上传落成真实的命名文件，且位于工具授权策略已经放行的目录内，因此 agent 用其常规文件工具读取它们，而无需专门的检索通道。 |
+| `ctx.userDocs` | `seam` | [`userdoc`](../packages/attachment/userdoc) | [`userdoc-local`](../packages/attachment/userdoc-local) | [`tool-userdoc`](../packages/attachment/tool-userdoc) | - | 上传落成真实的命名文件，且位于工具授权策略已经放行的目录内。个人文档 Consumer 增加有界发现和文本读取，不暴露主机路径；已附加文档仍可使用常规文件系统工具。 |
 | `ctx.llm` | `seam` | [`llm`](../packages/llm/llm) | [`llm-deepseek`](../packages/llm/llm-deepseek), [`llm-pi-ai`](../packages/llm/llm-pi-ai), [`llm-replay`](../packages/test-support/llm-replay) | [`agent-loop`](../packages/core/agent-loop), [`compaction-basic`](../packages/compaction/compaction-basic) | - | 适配器注册提供方实现；agent loop（智能体循环）与压缩功能调用提供方无关的流服务。 |
 | `ctx.deepseekLlmApiExtensions` | `seam` | [`deepseek-llm-api-extensions`](../packages/llm/deepseek-llm-api-extensions) | - | [`llm-deepseek`](../packages/llm/llm-deepseek), [`session-log-deepseek`](../packages/session/session-log-deepseek), [`plugin-package-inventory-deepseek`](../packages/llm/plugin-package-inventory-deepseek) | - | 注册表负责附加的、特定于提供方的请求字段及其接受后回调；官方适配器负责准备这些字段，而扩展插件负责字段语义。 |
 | `ctx.modelAccess` | `seam` | [`model-access`](../packages/llm/model-access) | - | `apiproxy` | - | 可选的部署侧策略决定精确的提供方／模型路由；网关实例提供实现，而 apiproxy 使用该决策检查目录和模型选择。 |

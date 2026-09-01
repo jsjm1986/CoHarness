@@ -34,7 +34,7 @@ npm scope 为 `@deepseek-ai/dsh-*`；Cordis `Service` 子类和函数插件通�
 | [`experimental/`](experimental/README.zh.md) | 私有原型与内部专用插件 | 不发布 |
 | [`workflow/`](workflow/README.zh.md) | 工作流 seam、worker 线程引擎和面向模型的 `workflow`/`ralph` 工具 | 产品：稳定 API |
 | [`web/`](web/README.zh.md) | Web 能力系列：seam、搜索／获取提供方实现和面向模型的 Web 工具 | 产品：稳定 API |
-| [`attachment/`](attachment/README.zh.md) | 持久附件标识、校验、本地内容寻址存储 | 产品：稳定 API |
+| [`attachment/`](attachment/README.zh.md) | 持久附件和命名用户文档的存储、校验与本地后端 | 产品：稳定 API |
 | [`spill/`](spill/README.zh.md) | spill 能力系列：存储 seam、本地实现、工具结果 spill 策略 | 产品：稳定 API |
 | [`todo/`](todo/README.zh.md) | 面向模型的 `todo_write` 工具 | 产品：稳定 API |
 | [`plan/`](plan/README.zh.md) | Plan 协作状态，提供直接进入命令与经评审的退出 | 产品：稳定 API |

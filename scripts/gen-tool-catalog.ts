@@ -26,6 +26,7 @@ import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
 import { AttachmentStore } from '@deepseek-ai/dsh-attachment'
 import type { ImageAttachmentLimits, ImageAttachmentRef, SaveImageAttachment, StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
+import type { UserDocStore } from '@deepseek-ai/dsh-userdoc'
 import UserQuestionService from '@deepseek-ai/dsh-user-questions'
 import PlanModeController from '@deepseek-ai/dsh-plan-mode'
 import WebRuntime from '@deepseek-ai/dsh-web'
@@ -48,6 +49,7 @@ import CordisHostRunner from '@deepseek-ai/dsh-cordis-host-runner'
 import * as ToolCordis from '@deepseek-ai/dsh-tool-cordis'
 import * as ToolFs from '@deepseek-ai/dsh-tool-fs'
 import * as ToolFsSearch from '@deepseek-ai/dsh-tool-fs-search'
+import * as ToolUserDoc from '@deepseek-ai/dsh-tool-userdoc'
 import * as ToolStrReplaceEditor from '@deepseek-ai/dsh-tool-str-replace-editor'
 import TerminalSessionService from '@deepseek-ai/dsh-terminal'
 import * as ToolPty from '@deepseek-ai/dsh-tool-terminal'
@@ -344,6 +346,30 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'glob and grep are unconditional discovery tools that spawn the packaged ripgrep binary (`@vscode/ripgrep`) through ctx.subprocess as ordinary foreground calls (never background jobs) — no host `rg` install and no shell layer. The catalog uses `sampleOverCapGlobResults: true`; deployments must choose that behavior explicitly. Capped results save the complete formatted list through the optional ctx.spillStore backend; returned locators are follow-up-readable/searchable when the backend exposes local paths in co-located deployments.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-tool-userdoc',
+    dir: 'tool-userdoc',
+    source: 'packages/attachment/tool-userdoc/src/index.ts',
+    requires: ['ctx.tools', 'ctx.userDocs', 'ctx.systemPrompt', 'an owning Agent session'],
+    writes: ['tool/call', 'tool/result'],
+    async mount(ctx) {
+      // Schema registration never invokes the store. A minimal seam marker is
+      // sufficient here and keeps catalog harvesting independent from a local
+      // document root or a real upload session.
+      ctx.provide('userDocs', {
+        limits: {
+          maxFileBytes: null,
+          maxFilesPerMessage: 1,
+          maxMessageBytes: 1,
+          maxInlineTextBytes: 1,
+          upload: { protocol: 'resumable-v1', chunkBytes: 65_536, sessionTtlMs: 60_000, resumable: true },
+        },
+      } as unknown as UserDocStore)
+      await ctx.plugin(ToolUserDoc)
+    },
+    note:
+      'userdoc_list and userdoc_read are read-only personal-scope tools. They consume the current runtime UserDocStore and refuse Gateway project runtimes; a future cross-scope personal reader belongs in a separate authenticated Provider.',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-terminal',

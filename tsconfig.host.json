@@ -143,6 +143,7 @@
     { "path": "./packages/attachment/attachment-local" },
     { "path": "./packages/attachment/userdoc" },
     { "path": "./packages/attachment/userdoc-local" },
+    { "path": "./packages/attachment/tool-userdoc" },
     { "path": "./packages/context/userdoc-context" },
     { "path": "./packages/context/gateway-runtime" },
     { "path": "./packages/context/archive-gateway" },

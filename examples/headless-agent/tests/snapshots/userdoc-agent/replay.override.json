@@ -1,0 +1,32 @@
+[
+  {
+    "kind": "chunks",
+    "chunks": [
+      { "type": "block-start", "index": 0, "blockType": "tool-call" },
+      { "type": "tool-call-delta", "index": 0, "id": "call_userdoc_list", "name": "userdoc_list", "argumentsDelta": "{\"query\":\"annual\"}" },
+      { "type": "block-end", "index": 0, "block": { "type": "tool-call", "id": "call_userdoc_list", "name": "userdoc_list", "arguments": "{\"query\":\"annual\"}" } },
+      { "type": "usage", "usage": { "inputTokens": 20, "outputTokens": 5 } },
+      { "type": "finish", "reason": { "kind": "tool-calls" } }
+    ]
+  },
+  {
+    "kind": "chunks",
+    "chunks": [
+      { "type": "block-start", "index": 0, "blockType": "tool-call" },
+      { "type": "tool-call-delta", "index": 0, "id": "call_userdoc_read", "name": "userdoc_read", "argumentsDelta": "{\"doc_id\":\"annual.txt\"}" },
+      { "type": "block-end", "index": 0, "block": { "type": "tool-call", "id": "call_userdoc_read", "name": "userdoc_read", "arguments": "{\"doc_id\":\"annual.txt\"}" } },
+      { "type": "usage", "usage": { "inputTokens": 30, "outputTokens": 5 } },
+      { "type": "finish", "reason": { "kind": "tool-calls" } }
+    ]
+  },
+  {
+    "kind": "chunks",
+    "chunks": [
+      { "type": "block-start", "index": 0, "blockType": "text" },
+      { "type": "text-delta", "index": 0, "text": "PERSONAL_DOCUMENT_OK" },
+      { "type": "block-end", "index": 0, "block": { "type": "text", "text": "PERSONAL_DOCUMENT_OK" } },
+      { "type": "usage", "usage": { "inputTokens": 40, "outputTokens": 2 } },
+      { "type": "finish", "reason": { "kind": "stop" } }
+    ]
+  }
+]
