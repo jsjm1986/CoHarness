@@ -627,6 +627,21 @@ describe('worktree-local Lefthook installer', { timeout: 30_000 }, () => {
     expect(existsSync(hooksPath(fixture, fixture.main))).toBe(false)
   })
 
+  it('ignores non-directory residue beside linked-worktree administration directories', async () => {
+    const fixture = createFixture()
+    const residue = join(commonDirectory(fixture), 'worktrees', '.DS_Store')
+    write(residue, 'finder metadata\n')
+
+    const result = await runInstaller(fixture, fixture.main)
+
+    expect(result.status, result.stderr).toBe(0)
+    expect(readFileSync(residue, 'utf8')).toBe('finder metadata\n')
+    expect(git(fixture, fixture.main, ['config', '--worktree', '--get', 'core.hooksPath'])).toBe(
+      hooksPath(fixture, fixture.main),
+    )
+    expect(existsSync(join(hooksPath(fixture, fixture.main), 'pre-commit'))).toBe(true)
+  })
+
   it.skipIf(process.platform === 'win32')('refuses an active symlinked worktree config before writing through it', async () => {
     const fixture = createFixture()
     const commonConfig = join(commonDirectory(fixture), 'config')
