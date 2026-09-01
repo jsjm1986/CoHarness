@@ -19,7 +19,7 @@ import type { RpcResponse } from './rpc.ts'
 /**
  * Method name → method signature. Signatures are the single source of truth; payload/value
  * types are always derived from here. A method may declare a trailing AbortSignal after the
- * request (command.execute): the carrier passes its request signal, never a wire field.
+ * request; the carrier passes its request signal, never a wire field.
  */
 export interface RpcMethodMap {
   'session.list': SessionsApi['list']
