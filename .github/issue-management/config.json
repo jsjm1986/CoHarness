@@ -1,6 +1,7 @@
 {
-  "organization": "deepseek-harness",
-  "repository": "deepseek-harness",
+  "organization": "jsjm1986",
+  "repository": "CoHarness",
+  "canonicalRepository": "jsjm1986/CoHarness",
   "projectNumber": 1,
   "projectTitle": "DSH Issue Management",
   "lifecycleActor": "dsh-issue-management",

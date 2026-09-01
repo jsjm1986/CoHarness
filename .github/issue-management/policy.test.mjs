@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  assertCanonicalRepository,
+  canonicalRepository,
   countVisibleUnits,
   nextResolvingIssueStatus,
   parseReferences,
@@ -61,6 +63,25 @@ const reviewedPull = (labels) => ({
   labels,
   references: { all: [2], resolving: [], related: [2] },
   issues: new Map([[2, { priority: null }]]),
+})
+
+test('requires policy runs to target the configured repository', () => {
+  assert.equal(canonicalRepository(), 'jsjm1986/CoHarness')
+  assert.doesNotThrow(() => assertCanonicalRepository({
+    runtimeRepository: 'JSJM1986/COHARNESS',
+    eventRepository: 'jsjm1986/CoHarness',
+  }))
+  assert.throws(
+    () => assertCanonicalRepository({ runtimeRepository: 'someone/fork' }),
+    /仅允许在 jsjm1986\/CoHarness 运行/,
+  )
+  assert.throws(
+    () => assertCanonicalRepository({
+      runtimeRepository: 'jsjm1986/CoHarness',
+      eventRepository: 'someone/fork',
+    }),
+    /运行仓库与事件仓库不一致/,
+  )
 })
 
 test('counts only text outside details', () => {

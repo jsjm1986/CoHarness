@@ -245,6 +245,14 @@ describe('DeepSeek e2e workflow', () => {
     if (!Array.isArray(e2e.steps)) throw new TypeError('DeepSeek e2e workflow must define steps')
 
     const steps = e2e.steps.filter(isRecord)
+    expect(e2e.if).toContain("github.repository == 'jsjm1986/CoHarness'")
+    expect(e2e.if).toContain("vars.DSH_REAL_API_E2E_ENABLED == 'true'")
+    expect(e2e.if).toContain('github.event.pull_request.head.repo.fork')
+    expect(e2e.if).toContain("github.event.pull_request.user.login == 'dependabot[bot]'")
+    expect(JSON.stringify(workflow)).not.toContain('pull_request_target')
+    expect(steps.find(step => step.name === 'Preflight (require DEEPSEEK_API_KEY)')).toMatchObject({
+      env: { DEEPSEEK_API_KEY: '${{ secrets.DEEPSEEK_API_KEY_EXTERNAL }}' },
+    })
     expect(steps.find(step => step.name === 'Prepare bubblewrap (unrestrict userns)')).toMatchObject({
       run: 'bash scripts/prepare-ci-bubblewrap.sh',
     })
@@ -411,10 +419,18 @@ describe('Issue lifecycle workflow', () => {
     expect(lifecyclePullRequest.types).not.toContain('ready_for_review')
     expect(lifecyclePullRequest.types).toContain('review_requested')
     expect(lifecycleReview.types).toEqual(['submitted'])
-    expect(lifecycleJob.if).toBe(
-      "${{ github.event_name != 'pull_request_review' || (github.event.action == 'submitted' && github.event.review.state == 'changes_requested') }}",
-    )
+    expect(lifecycleJob.if).toContain("github.repository == 'jsjm1986/CoHarness'")
+    expect(lifecycleJob.if).toContain("vars.DSH_ISSUE_AUTOMATION_ENABLED == 'true'")
+    expect(lifecycleJob.if).toContain("github.event.review.state == 'changes_requested'")
     expect(policyPullRequest.types).toContain('ready_for_review')
+
+    const policyJobDefinition = workflowJob(policy, 'policy')
+    expect(policyJobDefinition.if).toContain("github.repository == 'jsjm1986/CoHarness'")
+    expect(policyJobDefinition.if).toContain("vars.DSH_ISSUE_AUTOMATION_ENABLED == 'true'")
+    expect(policyJobDefinition.permissions).toBeUndefined()
+    expect(policy.permissions).toMatchObject({ contents: 'read', issues: 'read', 'pull-requests': 'read' })
+    expect(JSON.stringify(lifecycle)).toContain('"owner":"jsjm1986"')
+    expect(JSON.stringify(lifecycle)).toContain('"repositories":"CoHarness"')
   })
 })
 

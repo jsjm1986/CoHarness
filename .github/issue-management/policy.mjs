@@ -46,6 +46,34 @@ const IMPLEMENTATION_PULL_REQUEST_ACTIONS = new Set([
   'unlabeled',
 ])
 
+/**
+ * Return the configured canonical repository.
+ * @returns {string} GitHub owner/name.
+ */
+export function canonicalRepository() {
+  return config.canonicalRepository ?? `${config.organization}/${config.repository}`
+}
+
+/**
+ * Verify that a policy run targets the repository owning its Project.
+ * @param {{runtimeRepository?: string, eventRepository?: string, expectedRepository?: string}} input Repository identities.
+ * @returns {void}
+ */
+export function assertCanonicalRepository({
+  runtimeRepository = process.env.GITHUB_REPOSITORY,
+  eventRepository,
+  expectedRepository = canonicalRepository(),
+} = {}) {
+  const actual = runtimeRepository ?? eventRepository
+  if (!actual) throw new Error('GITHUB_REPOSITORY 未设置，无法确认 Issue policy 目标仓库')
+  if (eventRepository && eventRepository.toLowerCase() !== actual.toLowerCase()) {
+    throw new Error(`Issue policy 运行仓库与事件仓库不一致：${actual} != ${eventRepository}`)
+  }
+  if (actual.toLowerCase() !== expectedRepository.toLowerCase()) {
+    throw new Error(`Issue policy 仅允许在 ${expectedRepository} 运行，当前仓库为 ${actual}`)
+  }
+}
+
 for (const status of ['In progress', 'In review']) {
   if (!ACTIVE_STATUS_ORDER.includes(status)) throw new Error(`config.statuses 缺少 ${status}`)
 }
@@ -693,8 +721,10 @@ function readEvent() {
 
 async function main(argv) {
   const [command] = argv
-  if (command === 'pr') await runPullRequestCheck(readEvent())
-  else if (command === 'lifecycle') await runLifecycle(process.env.GITHUB_EVENT_NAME, readEvent())
+  const event = readEvent()
+  assertCanonicalRepository({ eventRepository: event.repository?.full_name })
+  if (command === 'pr') await runPullRequestCheck(event)
+  else if (command === 'lifecycle') await runLifecycle(process.env.GITHUB_EVENT_NAME, event)
   else throw new Error('用法：policy.mjs pr|lifecycle')
 }
 
