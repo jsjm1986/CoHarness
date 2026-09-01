@@ -43,36 +43,46 @@ env:
 jobs:
 
   # TODO(hosted-serial-ci): Re-enable the one remaining disabled hosted serial
-  # reference job (serial-macos) before release. The self-hosted standby lane
-  # below remains active on every master push. Re-enabling serial-macos does not
-  # restore a Linux hosted-cache producer: decide whether to add a master seeder
-  # or remove the restore-only steps if cold starts become a concern.
+  # reference job (serial-macos) before release. The self-hosted standby lanes
+  # below require DSH_CI_SELF_HOSTED_STANDBY_ENABLED=true. Re-enabling
+  # serial-macos does not restore a Linux hosted-cache producer: decide whether
+  # to add a master seeder or remove the restore-only steps if cold starts become
+  # a concern.
 
-  # Three enterprise jobs isolate coverage, static analysis, and the
-  # build-backed consumer tail. The consumer job owns the only Linux build so
-  # all three jobs enter runner allocation independently.
+  # Three jobs isolate coverage, static analysis, and the build-backed consumer
+  # tail. The portable default uses standard GitHub-hosted capacity. Deployments
+  # with the named enterprise pools may set DSH_CI_ENTERPRISE_RUNNERS_ENABLED to
+  # exactly `true`; the existing platform failover switches still take priority.
+  # The consumer job owns the only Linux build, so all three jobs enter runner
+  # allocation independently.
   #
-  # FAILOVER (Linux): each Linux enterprise job resolves its pool through the
-  # DSH_CI_FAILOVER_LINUX repository variable. Unset (normal), the expressions
-  # pick the hosted enterprise pools below. Setting the variable to
-  # 'selfhosted' (repo Settings → Actions → Variables; writer-manageable
-  # repository state — not PR-editable, no merge required) retargets all
-  # three onto the in-house
+  # FAILOVER (Linux): each Linux worker resolves its pool through the
+  # DSH_CI_FAILOVER_LINUX repository variable. Setting the variable to
+  # `selfhosted` (repo Settings → Actions → Variables; writer-manageable
+  # repository state — not PR-editable, no merge required) retargets all three
+  # onto the in-house
   # vm-backup pool and re-running the failed jobs is the entire switch —
   # see .agents/notes/implemented/process/2026-07-26-ci-failover-runbook.md. The
-  # in-house pool's readiness is re-proven on every master push by the
-  # serial-linux-selfhosted standby lane below. The Windows failover switch is
-  # the separate DSH_CI_FAILOVER_WINDOWS variable on the windows-native job below.
+  # in-house pool's readiness can be re-proven on master pushes by explicitly
+  # enabling the serial-linux-selfhosted standby lane below. The Windows
+  # failover switch is the separate DSH_CI_FAILOVER_WINDOWS variable on the
+  # windows-native job below.
   node-24:
     if: github.event_name == 'pull_request'
     runs-on: >-
       ${{ vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
           && github.event.pull_request.user.login != 'dependabot[bot]'
           && fromJSON('["self-hosted", "linux", "x64", "vm-backup"]')
-          || 'dsh-ubuntu-24-04-16core' }}
+          || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true'
+          && 'dsh-ubuntu-24-04-16core'
+          || 'ubuntu-latest' }}
     name: node 24 / static
     env:
-      DSH_GATE_CONCURRENCY: '8'
+      DSH_GATE_CONCURRENCY: >-
+        ${{ ((vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
+          && github.event.pull_request.user.login != 'dependabot[bot]')
+          || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
+          && '8' || '2' }}
     steps:
       # Fetch complete history so the archive gate can read the trusted PR base from a reused shallow checkout.
       - uses: actions/checkout@v7
@@ -121,14 +131,24 @@ jobs:
       ${{ vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
           && github.event.pull_request.user.login != 'dependabot[bot]'
           && fromJSON('["self-hosted", "linux", "x64", "vm-backup"]')
-          || 'dsh-ubuntu-24-04-16core' }}
+          || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true'
+          && 'dsh-ubuntu-24-04-16core'
+          || 'ubuntu-latest' }}
     name: node 24 / coverage
     env:
-      # Partitioning replaces the instrumented share; this budget gives the
-      # exempt-heavy gate two workers on both hosted and failover runners.
-      DSH_COVERAGE_MAX_WORKERS: '6'
+      # Partitioning replaces the instrumented share. Portable standard runners
+      # use two workers; configured external pools retain their measured bound.
+      DSH_COVERAGE_MAX_WORKERS: >-
+        ${{ ((vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
+          && github.event.pull_request.user.login != 'dependabot[bot]')
+          || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
+          && '6' || '2' }}
       DSH_COVERAGE_PARTITIONS: '4'
-      DSH_GATE_CONCURRENCY: '3'
+      DSH_GATE_CONCURRENCY: >-
+        ${{ ((vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
+          && github.event.pull_request.user.login != 'dependabot[bot]')
+          || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
+          && '3' || '2' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -183,16 +203,41 @@ jobs:
       ${{ vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
           && github.event.pull_request.user.login != 'dependabot[bot]'
           && fromJSON('["self-hosted", "linux", "x64", "vm-backup"]')
-          || 'dsh-ubuntu-24-04-16core' }}
+          || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true'
+          && 'dsh-ubuntu-24-04-16core'
+          || 'ubuntu-latest' }}
     name: node 24 / snapshots and artifacts
     env:
-      DSH_GATE_CONCURRENCY: '8'
+      DSH_GATE_CONCURRENCY: >-
+        ${{ ((vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
+          && github.event.pull_request.user.login != 'dependabot[bot]')
+          || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
+          && '8' || '2' }}
       DSH_NODE_COMPAT_SKIP_TYPECHECK: '1'
-      DSH_OXLINT_THREADS: '8'
-      DSH_PUBLINT_CONCURRENCY: '8'
-      DSH_WEB_SNAPSHOT_WORKERS: '6'
-      # Failover halves snapshot concurrency for the shared 64-core VM.
-      DSH_SNAPSHOT_MAX_CONCURRENCY: ${{ vars.DSH_CI_FAILOVER_LINUX == 'selfhosted' && github.event.pull_request.user.login != 'dependabot[bot]' && '12' || '32' }}
+      DSH_OXLINT_THREADS: >-
+        ${{ ((vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
+          && github.event.pull_request.user.login != 'dependabot[bot]')
+          || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
+          && '8' || '2' }}
+      DSH_PUBLINT_CONCURRENCY: >-
+        ${{ ((vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
+          && github.event.pull_request.user.login != 'dependabot[bot]')
+          || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
+          && '8' || '2' }}
+      DSH_WEB_SNAPSHOT_WORKERS: >-
+        ${{ ((vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
+          && github.event.pull_request.user.login != 'dependabot[bot]')
+          || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
+          && '6' || '2' }}
+      # Failover uses the shared-VM bound; enterprise and portable standard
+      # pools use their measured local bounds.
+      DSH_SNAPSHOT_MAX_CONCURRENCY: >-
+        ${{ vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
+          && github.event.pull_request.user.login != 'dependabot[bot]'
+          && '12'
+          || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true'
+          && '32'
+          || '4' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -455,11 +500,12 @@ jobs:
   # Every pull request also gets a real Windows-kernel signal. This job keeps
   # its own unmasked conclusion but is deliberately absent from
   # all-checks-passed.needs, so it never delays or changes that required
-  # verdict. Under normal operation it runs on the hosted larger runner; under
-  # Windows failover (DSH_CI_FAILOVER_WINDOWS=selfhosted) it retargets onto the
+  # verdict. The portable default is windows-2025. A deployment with the named
+  # larger pool may set DSH_CI_ENTERPRISE_RUNNERS_ENABLED=true; Windows failover
+  # (DSH_CI_FAILOVER_WINDOWS=selfhosted) takes priority and retargets onto the
   # in-house self-hosted Windows pool. Dependabot PRs are excluded from the
-  # self-hosted pool and stay queued for the hosted runner — see the failover
-  # runbook. This Windows switch is independent of the Linux
+  # self-hosted pool and stay on hosted capacity — see the failover runbook.
+  # This Windows switch is independent of the Linux
   # DSH_CI_FAILOVER_LINUX variable that retargets the three required Linux jobs
   # and the all-checks-passed verdict above.
   windows-native:
@@ -468,17 +514,31 @@ jobs:
       ${{ vars.DSH_CI_FAILOVER_WINDOWS == 'selfhosted'
           && github.event.pull_request.user.login != 'dependabot[bot]'
           && fromJSON('["self-hosted", "dsh-win-ci", "windows"]')
-          || 'dsh-windows-2025-16core' }}
+          || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true'
+          && 'dsh-windows-2025-16core'
+          || 'windows-2025' }}
     name: windows node 24 / native complete
     timeout-minutes: 120
     env:
-      DSH_COVERAGE_MAX_WORKERS: '6'
+      DSH_COVERAGE_MAX_WORKERS: >-
+        ${{ ((vars.DSH_CI_FAILOVER_WINDOWS == 'selfhosted'
+          && github.event.pull_request.user.login != 'dependabot[bot]')
+          || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
+          && '6' || '2' }}
       DSH_COVERAGE_PARTITIONS: '8'
       # Instrumented process and polling fixtures can exceed Vitest's defaults
       # under the complete lane's concurrent gate load.
       DSH_COVERAGE_TEST_TIMEOUT_MS: '30000'
-      DSH_GATE_CONCURRENCY: '4'
-      DSH_PUBLINT_CONCURRENCY: '8'
+      DSH_GATE_CONCURRENCY: >-
+        ${{ ((vars.DSH_CI_FAILOVER_WINDOWS == 'selfhosted'
+          && github.event.pull_request.user.login != 'dependabot[bot]')
+          || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
+          && '4' || '2' }}
+      DSH_PUBLINT_CONCURRENCY: >-
+        ${{ ((vars.DSH_CI_FAILOVER_WINDOWS == 'selfhosted'
+          && github.event.pull_request.user.login != 'dependabot[bot]')
+          || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
+          && '8' || '2' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -510,21 +570,19 @@ jobs:
         shell: pwsh
         run: pnpm run check:ci:windows-complete
 
-  # Hot-standby drill for the in-house self-hosted pool: every master move
-  # re-runs the complete unsharded aggregate on the persistent 64-core VM,
-  # continuously proving that environment can take over a required lane if
-  # the hosted pools degrade (the switch is then setting the writer-manageable
-  # DSH_CI_FAILOVER_LINUX variable — see the failover runbook, no merge required).
-  # Push-triggered, so this lane always executes the base branch's own
-  # workflow definition. (Under failover, pull_request jobs do reach these
-  # runners with the PR merge ref's workflow — the boundary there is
-  # repository membership: private, forking disabled, Dependabot excluded.)
-  # Non-blocking for
-  # pull requests; no cache steps because the VM's persistent pnpm store and
-  # tool caches make them redundant (and saving here would poison the hosted
-  # cache namespace with self-hosted paths).
+  # Optional hot-standby drill for the in-house self-hosted pool. When
+  # DSH_CI_SELF_HOSTED_STANDBY_ENABLED is exactly `true`, each master move
+  # re-runs the complete unsharded aggregate on the persistent 64-core VM and
+  # proves that environment can take over through DSH_CI_FAILOVER_LINUX. The
+  # push-triggered lane executes the base branch's workflow definition. Under
+  # failover, pull_request jobs instead reach the pool with the PR merge ref's
+  # workflow; Dependabot remains excluded. The drill is non-blocking for pull
+  # requests and uses the VM's persistent tool caches.
   serial-linux-selfhosted:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: >-
+      github.event_name == 'push'
+      && github.ref == 'refs/heads/master'
+      && vars.DSH_CI_SELF_HOSTED_STANDBY_ENABLED == 'true'
     name: serial / linux (self-hosted standby)
     runs-on: [self-hosted, linux, x64, vm-backup]
     steps:
@@ -598,19 +656,17 @@ jobs:
           DSH_SNAPSHOT_MAX_CONCURRENCY: '1'
         run: pnpm run check:ci
 
-  # Hot-standby drill for the in-house self-hosted Windows pool: every master
-  # move re-runs the complete unsharded Windows gate inventory on the persistent
-  # VM, continuously proving that environment can take over the required
-  # `windows` lane if the hosted pool degrades (the switch is setting the
-  # writer-manageable DSH_CI_FAILOVER_WINDOWS variable — see the failover
-  # runbook, no merge required). Push-triggered, so this lane always executes
-  # the base branch's own workflow definition. Non-blocking for pull requests;
-  # absent from all-checks-passed.needs by design — the required `windows` job
-  # owns the PR verdict. No cache steps because the VM's persistent pnpm store
-  # and tool caches make them redundant (and saving here would poison the
-  # hosted cache namespace with self-hosted paths).
+  # Optional hot-standby drill for the in-house self-hosted Windows pool. When
+  # DSH_CI_SELF_HOSTED_STANDBY_ENABLED is exactly `true`, each master move runs
+  # the complete unsharded Windows inventory and proves the
+  # DSH_CI_FAILOVER_WINDOWS target. It is non-blocking for pull requests and is
+  # absent from all-checks-passed.needs; the VM's persistent pnpm store and tool
+  # caches avoid transferring hosted cache archives.
   serial-windows:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: >-
+      github.event_name == 'push'
+      && github.ref == 'refs/heads/master'
+      && vars.DSH_CI_SELF_HOSTED_STANDBY_ENABLED == 'true'
     name: serial / windows (self-hosted standby)
     runs-on: [self-hosted, dsh-win-ci, windows]
     timeout-minutes: 120
@@ -652,7 +708,10 @@ jobs:
   # Manual, bounded comparison of the actual critical Linux and Windows lanes.
   # The named pools are restricted at the organization level to this repository.
   larger-runner-benchmark:
-    if: github.event_name == 'workflow_dispatch' && inputs.suite == 'larger-runner-benchmark'
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      && inputs.suite == 'larger-runner-benchmark'
+      && vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
     strategy:
@@ -743,7 +802,10 @@ jobs:
   # complete unsharded primary aggregate with bounded in-runner parallelism;
   # Windows runs both blocking build targets concurrently through run-gates.
   consolidated-runner-benchmark:
-    if: github.event_name == 'workflow_dispatch' && inputs.suite == 'consolidated-runner-benchmark'
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      && inputs.suite == 'consolidated-runner-benchmark'
+      && vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
     strategy:
