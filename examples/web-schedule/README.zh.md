@@ -8,7 +8,7 @@
 dsh web --patch examples/web-schedule/cordis.yml
 ```
 
-当前 overlay 支持使用正整数 `after_seconds`、绝对时间 `at` 目标，或至少 300 秒的固定速率 `every_seconds` 间隔创建提醒。模型通过 `schedule_create`、`schedule_list` 和 `schedule_delete` 管理它们；每个结果都会把交付标为 `session-local`。
+当前 overlay 支持使用正整数 `after_seconds`、绝对时间 `at` 目标，或至少 300 秒的固定速率 `every_seconds` 间隔创建提醒。模型通过 `schedule_create`、`schedule_list` 和 `schedule_delete` 管理它们；每个结果都会把交付标为 `session-local`。overlay 还会在会话头部添加只读的活动提醒目录；只有已打开且存在活动记录的 Session 才会显示。
 
 浏览器会为每条提示词附加其 IANA 时区。Time-context 会告诉模型，把未明确限定时区的日期和时间解释为该请求的浏览器时区。此假设仅用于自然语言解释：`schedule_create.at` 必须是带 `Z` 或数值偏移量且严格符合 RFC 3339 的日期时间，或是带显式 `UTC` 或 IANA Area/Location 时区的 `{ date, time, time_zone }`。Schedule 不保留或推断 Session 默认时区。夏令时缺口会被拒绝，重叠时段选择第一个时刻；成功创建的记录只保留所得的 UTC 目标。
 

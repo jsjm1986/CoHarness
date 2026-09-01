@@ -20,6 +20,8 @@ The durable inbox remains two `UserMessage[]` lists addressed by `MessageId`. `a
 
 The two event surfaces have separate consumers. Observers following one message use `agent/inbox/inserted`, `claimed`, and `discarded`. Whole-queue consumers, including the Web queue projection and reconnect baseline, use the durable `agent/inbox/spliced` stream; UI edits and removals route through `Inbox.splice()` or another Inbox mutation method so the same projection records every change.
 
+The Chat and Trajectory conversation Definitions keep their next-step state as a persistent splice chain plus the current claim set. They materialize pending ids only when a claim removes a batch, while next-turn queue rendering remains owned by the Host queue projection.
+
 Plugins that need current-step atomic rewriting return messages from `agent/pre-step`. Plugins that only need later context may mutate `agent.inbox` directly. Workspace context uses both paths: asynchronous filesystem projections stage one replaceable `next-step` item, while the next entering pre-step folds that item or a newly composed baseline into its final batch and removes the pending copy. Rejection keeps the item queued.
 
 The archived [addressable queue occurrence decision](../../archived/feature/2026-07-29-addressable-queue-operations.md) describes the superseded occurrence-wrapper design. `MessageId` now owns addressability, while the retained Host queue mirror derives its snapshots from the durable splice projection.

@@ -25,6 +25,8 @@ Every mutation appends a durable `goal/change` event carrying the complete post-
 
 Strict replay derives lifecycle mutations only from `goal/change` and rejects malformed shapes, discontinuous revisions, illegal lifecycle transitions, non-monotonic per-goal timestamps, and non-sequential admitted goal rounds. Positive rounds advance only on admitted goal-sourced `user/message` events. Mutation timestamps clamp against the preceding goal update when wall time moves backward. Incremental replay retains its cursor at the first corrupt event, and `goal/changed` fires after the durable event commits with listener failures contained.
 
+When `dsh-session-projection` is composed, the service reads the eagerly driven `goal` state for constant-time current-state access and checkpoint reuse. A composition without that optional registry keeps the local incremental cache, so headless assemblies retain their existing dependency set and behavior.
+
 Activation is never persisted. A fresh cache and every `agent/session-start` edge disarm it even when replay finds an active durable phase. A continuation driver also calls `disarm()` before unload or after durability uncertainty. Session resume, fork, and driver replacement therefore retain the objective, phase, revisions, and admitted-round count without initiating work; a later explicit resume mutation must arm continuation.
 
 The separately published `./invariant` companion maintains an independent fold of each attached session. It rejects malformed goal changes, discontinuous revisions, illegal lifecycle transitions, timestamp regressions, and non-sequential admitted rounds before the candidate event enters the durable log.

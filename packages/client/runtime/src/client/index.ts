@@ -101,7 +101,7 @@ export type {
   CommandNode, CompactionSummaryNode, ComposerPhase,
   ContextMessageNode, ConversationNode, ConversationSnapshot, HistoryDetailState, HistoryNavigationItem, HistoryNavigationSnapshot,
   HistoryNavigationState, HistoryWindowMode,
-  ModelRetryNode, PendingSubmission, PendingSubmissionImage, QueuedMessage,
+  ModelRetryNode, PendingSubmission, PendingSubmissionImage, PendingSubmissionPlacement, QueuedMessage,
   LegacyConversationSlice, PartialAssistant, RunningToolCall,
   SteeringMessageNode, TodoItem, ToolCallBlock, ToolResultNode, TurnErrorNode, TurnMaxTokensNode,
   UnknownSurfaceNode, UserMessageNode,

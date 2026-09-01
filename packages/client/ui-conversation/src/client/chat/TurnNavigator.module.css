@@ -1,3 +1,5 @@
+/* The rail floats over the transcript gutter and keeps a fixed mark pitch;
+   long histories scroll inside the rail instead of compressing marks. */
 .slot {
   position: sticky;
   top: 0;
@@ -6,7 +8,7 @@
   pointer-events: none;
 }
 
-.rail {
+.frame {
   --turn-rail-band: calc(var(--dsh-conversation-viewport-height, 100dvh) - var(--dsh-composer-height, 152px));
   --turn-preview-height: 100px;
   position: absolute;
@@ -20,11 +22,30 @@
   transition: height 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.marks { position: absolute; inset: var(--turn-rail-inset) 0; }
+.scroller {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.scroller::-webkit-scrollbar { display: none; }
+
+.fadeTop { mask-image: linear-gradient(to bottom, transparent 0, #000 24px, #000 100%); }
+.fadeBottom { mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 24px), transparent 100%); }
+.fadeTop.fadeBottom {
+  mask-image: linear-gradient(to bottom, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+}
+
+.marks {
+  position: relative;
+  height: var(--turn-natural-height);
+}
 
 .markPosition {
   position: absolute;
-  top: min(var(--turn-natural-position), var(--turn-position));
+  top: calc(var(--turn-natural-position) + var(--turn-rail-inset));
   right: 0;
   left: 0;
   height: 10px;
@@ -60,16 +81,14 @@
 
 .markPreview::before { width: 18px; background: var(--dsw-alias-label-tertiary); }
 .markActive::before { width: 20px; background: var(--dsw-alias-label-primary); }
-.markIndexed::before {
-  background: var(--dsw-alias-border-l3);
-  opacity: 0.72;
-}
+.markIndexed::before { width: 8px; background: var(--dsw-alias-border-l3); opacity: 0.72; }
+.markBusy::before { animation: dsh-turn-mark-busy 1s ease-in-out infinite; }
 .mark:focus-visible::before { width: 20px; background: var(--dsw-alias-state-business-primary); }
 .mark:focus-visible { outline: 1px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; }
 
 .preview {
   position: absolute;
-  top: clamp(0px, calc(min(var(--turn-natural-position), var(--turn-position)) + var(--turn-rail-inset) - var(--turn-preview-height) / 2), calc(100% - var(--turn-preview-height)));
+  top: clamp(0px, calc(var(--turn-natural-position) + var(--turn-rail-inset) - var(--turn-scroll-top, 0px) - var(--turn-preview-height) / 2), calc(100% - var(--turn-preview-height)));
   right: calc(100% + 10px);
   box-sizing: border-box;
   width: min(300px, calc(100cqw - 120px));
@@ -83,23 +102,24 @@
   box-shadow: var(--dsw-shadow-lv2);
   pointer-events: none;
   animation: dsh-turn-preview-enter 120ms ease-out;
+  transition: top 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .previewPrompt,
-.previewResponse {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-}
-
-.previewPrompt { font: var(--dsw-font-xs-strong-13); -webkit-line-clamp: 2; }
-.previewResponse { margin-top: 4px; color: var(--dsw-alias-label-caption); font: var(--dsw-font-xxs-12); -webkit-line-clamp: 2; }
+.previewResponse { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; }
+.previewPrompt { font: var(--dsw-font-xs-strong-13); -webkit-line-clamp: 1; }
+.previewResponse { margin-top: 4px; color: var(--dsw-alias-label-caption); font: var(--dsw-font-xxs-12); -webkit-line-clamp: 3; }
 
 @keyframes dsh-turn-mark-enter { from { opacity: 0; } to { opacity: 1; } }
 @keyframes dsh-turn-preview-enter { from { opacity: 0; transform: translateX(4px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes dsh-turn-mark-busy { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
 @container (max-width: 900px) { .slot { display: none; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .rail, .markPosition, .mark::before, .preview { transition: none; animation: none; }
+  .frame, .scroller, .markPosition, .mark::before, .markBusy::before, .preview {
+    transition: none;
+    animation: none;
+    scroll-behavior: auto;
+  }
 }

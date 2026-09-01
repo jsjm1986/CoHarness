@@ -9,6 +9,9 @@
   ],
   "references": [
     {
+      "path": "../../preset/agent-presets"
+    },
+    {
       "path": "../locale"
     },
     {

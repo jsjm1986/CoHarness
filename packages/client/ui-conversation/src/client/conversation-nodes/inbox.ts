@@ -16,54 +16,107 @@ interface InboxSplice {
   readonly outcome?: 'canceled'
 }
 
-/** Cumulative state after one durable inbox splice. */
-export interface InboxState {
-  readonly pending: readonly InboxIdentity[]
-  readonly claimed: ReadonlySet<string>
+interface PendingSnapshot {
+  readonly kind: 'snapshot'
+  readonly ids: readonly string[]
 }
 
+interface PendingSplice {
+  readonly kind: 'splice'
+  readonly previous: PendingState
+  readonly start: number
+  readonly removedCount: number
+  readonly inserted: readonly string[]
+}
+
+type PendingState = PendingSnapshot | PendingSplice
+
+/** Cumulative next-step state, retaining a lazy persistent splice chain. */
+export interface InboxState {
+  /** Pending next-step ids; only a claim materializes the chain. */
+  readonly pending: PendingState
+  /** Message ids in the current claim, shared until the next claim. */
+  readonly currentClaimed: ReadonlySet<string>
+}
+
+const EMPTY_PENDING: PendingState = { kind: 'snapshot', ids: [] }
+const EMPTY_CURRENT_CLAIMED: ReadonlySet<string> = new Set()
+
+function materializePending(state: PendingState): string[] {
+  const splices: PendingSplice[] = []
+  let current = state
+  while (current.kind === 'splice') {
+    splices.push(current)
+    current = current.previous
+  }
+  const pending = [...current.ids]
+  for (const splice of splices.reverse()) {
+    pending.splice(splice.start, splice.removedCount, ...splice.inserted)
+  }
+  return pending
+}
+
+function withoutInserted(claimed: ReadonlySet<string>, inserted: readonly string[]): ReadonlySet<string> {
+  let next: Set<string> | undefined
+  for (const id of inserted) {
+    if (!claimed.has(id)) continue
+    next ??= new Set(claimed)
+    next.delete(id)
+  }
+  return next ?? claimed
+}
+
+/** Apply one next-step splice while preserving the previous state by reference. */
 function applySplice(
   previous: ConversationPreviousContext<InboxState> | undefined,
   splice: InboxSplice,
 ): InboxState {
-  const pending = [...(previous?.state.pending ?? [])]
-  const claimed = new Set(previous?.state.claimed ?? [])
-  const removed = pending.splice(splice.start, splice.removedCount ?? 0, ...splice.inserted)
-  for (const identity of splice.inserted) claimed.delete(identity.id)
-  if (splice.target === 'next-step' && splice.outcome !== 'canceled') {
-    for (const identity of removed) claimed.add(identity.id)
+  const priorPending = previous?.state.pending ?? EMPTY_PENDING
+  const inserted = splice.inserted.map(identity => identity.id)
+  const removedCount = splice.removedCount ?? 0
+  if (removedCount > 0 && splice.outcome !== 'canceled') {
+    const pending = materializePending(priorPending)
+    const removed = pending.splice(splice.start, removedCount, ...inserted)
+    return {
+      pending: { kind: 'snapshot', ids: pending },
+      currentClaimed: new Set(removed),
+    }
   }
-  return { pending, claimed }
-}
-
-function inboxDefinition(target: InboxTarget): ConversationNodeDefinition<InboxState> {
-  const kind = `inbox-${target}`
+  const currentClaimed = withoutInserted(
+    previous?.state.currentClaimed ?? EMPTY_CURRENT_CLAIMED,
+    inserted,
+  )
   return {
-    kind,
-    match: event => event.type === 'agent/inbox/spliced'
-      && event.data.target === target
-      ? { id: String(event.seq), role: 'start' }
-      : null,
-    start: (_context, match, reader) => {
-      if (match.event.type !== 'agent/inbox/spliced') throw new Error(`${kind} start requires agent/inbox/spliced`)
-      return applySplice(reader.previous<InboxState>(kind), match.event.data)
+    pending: {
+      kind: 'splice',
+      previous: priorPending,
+      start: splice.start,
+      removedCount,
+      inserted,
     },
-    update: context => context.state,
-    publication: () => 'none',
+    currentClaimed,
   }
 }
-
-/** Cumulative next-turn inbox splice Definition. */
-export const nextTurnInboxDefinition = inboxDefinition('next-turn')
 
 /** Cumulative next-step inbox splice Definition used to classify steering. */
-export const nextStepInboxDefinition = inboxDefinition('next-step')
+export const nextStepInboxDefinition: ConversationNodeDefinition<InboxState> = {
+  kind: 'inbox-next-step',
+  match: event => event.type === 'agent/inbox/spliced'
+    && event.data.target === 'next-step'
+    ? { id: String(event.seq), role: 'start' }
+    : null,
+  start: (_context, match, reader) => {
+    if (match.event.type !== 'agent/inbox/spliced') throw new Error('inbox-next-step start requires agent/inbox/spliced')
+    return applySplice(reader.previous<InboxState>('inbox-next-step'), match.event.data)
+  },
+  update: context => context.state,
+  publication: () => 'none',
+}
 
 /**
- * Register the two durable Inbox-state contributions.
+ * Register the durable next-step inbox classification contribution.
  * @param ctx - owning UI Conversation context.
  */
 export function registerInboxConversationNodes(ctx: Context): void {
-  ctx.conversationEvents.register(nextTurnInboxDefinition)
   ctx.conversationEvents.register(nextStepInboxDefinition)
 }

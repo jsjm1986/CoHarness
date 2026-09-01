@@ -1,5 +1,5 @@
 /**
- * SessionProjectionCache behavior: mandatory-point writes (turn/end, detach),
+ * SessionProjectionCache behavior: mandatory-point writes (create, turn/end, detach),
  * count/interval throttling between them, fail-soft durability (a failed
  * write logs and stays stale, never throws into the event path), and the
  * cold-read ladder (cached row + readFrom tail + registry restore +
@@ -125,11 +125,13 @@ afterEach(async () => {
 })
 
 describe('SessionProjectionCache write policy', () => {
-  it('writes a durable checkpoint at turn/end (mandatory point)', async () => {
+  it('writes a durable checkpoint at session creation and advances it at turn/end', async () => {
     const { ctx, pool } = await harness()
     const session = ctx.sessions.create(SessionId('turn-end'))
+    await settle()
+    expect(storedRows(pool, session.id)?.['cache-test/marks']).toEqual({ ver: 1, seq: -1, val: null })
     mark(session, ['a'])
-    expect(storedRows(pool, session.id)).toBeUndefined() // throttled: no write yet
+    expect(storedRows(pool, session.id)?.['cache-test/marks']?.val).toBeNull() // mark is throttled
     const end = endTurn(session)
     await settle()
     const rows = storedRows(pool, session.id)
@@ -150,13 +152,26 @@ describe('SessionProjectionCache write policy', () => {
     expect(storedRows(pool, session.id)?.['cache-test/marks']?.val).toEqual({ marks: ['live'] })
   })
 
+  it('captures seed-derived state at creation before any ordinary event', async () => {
+    const { ctx, pool } = await harness()
+    const session = ctx.sessions.create(SessionId('seeded-create'), {
+      seed: [{ type: 'cache-test/mark', seq: 0, time: 1, data: { marks: ['seed'] } }] as SessionEvent[],
+    })
+    await settle()
+    expect(storedRows(pool, session.id)?.['cache-test/marks']).toEqual({
+      ver: 1,
+      seq: session.seq - 1,
+      val: { marks: ['seed'] },
+    })
+  })
+
   it('flushes when the in-turn event count reaches the configured threshold', async () => {
     const { ctx, pool } = await harness({ config: { writeEveryEvents: 3, writeIntervalMs: 60_000 } })
     const session = ctx.sessions.create(SessionId('count'))
     mark(session, ['1'])
     mark(session, ['2'])
     await settle()
-    expect(storedRows(pool, session.id)).toBeUndefined()
+    expect(storedRows(pool, session.id)?.['cache-test/marks']?.seq).toBe(-1)
     mark(session, ['3'])
     await settle()
     expect(storedRows(pool, session.id)?.['cache-test/marks']?.val).toEqual({ marks: ['3'] })
@@ -168,7 +183,7 @@ describe('SessionProjectionCache write policy', () => {
     const session = ctx.sessions.create(SessionId('interval'))
     mark(session, ['slow'])
     await vi.advanceTimersByTimeAsync(249)
-    expect(storedRows(pool, session.id)).toBeUndefined()
+    expect(storedRows(pool, session.id)?.['cache-test/marks']?.seq).toBe(-1)
     await vi.advanceTimersByTimeAsync(1)
     await vi.advanceTimersByTimeAsync(0)
     expect(storedRows(pool, session.id)?.['cache-test/marks']?.val).toEqual({ marks: ['slow'] })
@@ -203,18 +218,20 @@ describe('SessionProjectionCache write policy', () => {
     await fiber.dispose()
     // The armed timer died with the plugin: advancing time writes nothing.
     await vi.advanceTimersByTimeAsync(10_000)
-    expect(storedRows(pool, armed.id)).toBeUndefined()
+    expect(storedRows(pool, armed.id)?.['cache-test/marks']?.seq).toBe(-1)
   })
 
   it('contains a durable write failure: logs a warning, event path unharmed, next write self-heals', async () => {
     const { ctx, pool } = await harness()
     const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
     const session = ctx.sessions.create(SessionId('fail-soft'))
+    await settle()
+    expect(storedRows(pool, session.id)?.['cache-test/marks']?.val).toBeNull()
     mark(session, ['x'])
     pool.failNextWrites = 1
     endTurn(session)
     await settle()
-    expect(storedRows(pool, session.id)).toBeUndefined()
+    expect(storedRows(pool, session.id)?.['cache-test/marks']?.val).toBeNull()
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('turn/end write for "fail-soft" failed'))
     // Self-heal: the next mandatory point writes the current cut.
     mark(session, ['y'])

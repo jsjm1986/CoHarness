@@ -13,7 +13,7 @@ import type {
 } from '@deepseek-ai/dsh-api-remotes/client'
 import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
 import type { ConversationSnapshot } from '../sessions/conversation.ts'
-import type { PendingSubmissionImage } from '../sessions/conversation.ts'
+import type { PendingSubmissionImage, PendingSubmissionPlacement } from '../sessions/conversation.ts'
 import type { ObservableSnapshot } from './store.ts'
 
 /** Why a local submission echo retired from the session snapshot. */
@@ -23,6 +23,8 @@ export type PendingSubmissionRetirement =
 
 /** Input used to register one optimistic local submission echo. */
 export interface BeginSubmissionInput {
+  /** Expected surface selected from the submission mode and running state. */
+  readonly placement: PendingSubmissionPlacement
   /** Prompt text exactly as the upcoming request will send it. */
   readonly text: string
   /** Ordered browser previews matching the upcoming image parts. */

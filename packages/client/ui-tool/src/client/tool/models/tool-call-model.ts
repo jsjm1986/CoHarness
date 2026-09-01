@@ -89,8 +89,8 @@ export interface ToolRowModel {
    * relative values against the session cwd before opening.
    */
   filePath: string | undefined
-  /** Expanded-body input text (pretty args); null = no input section. */
-  body: string | null
+  /** Original argument payload retained for expansion-time formatting. */
+  bodyRaw: string | null
   /** Flattened result text ({@link resultText}); null while running or when the result carries no text. */
   output: string | null
   /** First line of the result text on an error row; null for every other state. */
@@ -193,7 +193,13 @@ function deriveFilePath(variant: ToolRowVariant, argsRaw: string): string | unde
   return picked === undefined ? undefined : firstLine(picked)
 }
 
-function deriveBody(variant: ToolRowVariant, argsRaw: string): string | null {
+/**
+ * Format one argument payload when its generic input body becomes visible.
+ * @param variant - row presentation selected for the tool name.
+ * @param argsRaw - original argument JSON or incomplete raw text.
+ * @returns display body, or null for empty input.
+ */
+export function formatToolBody(variant: ToolRowVariant, argsRaw: string): string | null {
   if (argsRaw === '') return null
   const parsed = parseArgs(argsRaw)
   if (parsed === undefined) return argsRaw
@@ -240,7 +246,7 @@ export function toolRowModel(toolName: string, block: ToolCallBlock, cwd?: strin
     title: toolTitle ?? VARIANT_TITLES[variant],
     summary,
     filePath: deriveFilePath(variant, argsRaw),
-    body: deriveBody(variant, argsRaw),
+    bodyRaw: argsRaw === '' ? null : argsRaw,
     output,
     errorSummary,
     state,

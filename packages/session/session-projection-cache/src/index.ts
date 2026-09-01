@@ -36,8 +36,8 @@ declare module '@deepseek-ai/cordis' {
 /**
  * Plugin config. Both throttle triggers are deployment choices with no
  * universally correct value, so the composition states them explicitly
- * (cordis.yml); the two mandatory write points (`turn/end` and session
- * disposal) are policy, not tunables, and always fire.
+ * (cordis.yml); the three mandatory write points (session creation,
+ * `turn/end`, and session disposal) are policy, not tunables, and always fire.
  */
 export interface Config {
   /** Committed events per session that force a durable checkpoint write between mandatory points. */
@@ -62,8 +62,8 @@ interface DirtyState {
 /**
  * The persisted projection cache service. Opens the `session_projcache`
  * domain at init, checkpoints live sessions on a throttled write-behind
- * (count/interval triggers from {@link Config}) plus two mandatory points —
- * `turn/end` and session disposal (the live-to-cold moment) — and serves the
+ * (count/interval triggers from {@link Config}) plus three mandatory points —
+ * session creation, `turn/end`, and session disposal (the live-to-cold moment) — and serves the
  * cold-read ladder: cached row, persistence `readFrom` tail, registry
  * `restore`, durable write-back. Every durable write is fail-soft: failures
  * log a warning and the cache self-heals on the next write or cold read.
@@ -130,7 +130,7 @@ export class SessionProjectionCache extends Service {
   }
 
   /**
-   * Durably checkpoint one live session NOW (both mandatory points call
+   * Durably checkpoint one live session NOW (all mandatory points call
    * this; tests and carriers may too). The registry cut is snapshotted at
    * this boundary (states are live references), then the whole record is
    * replaced. NOT fail-soft — callers on the fail-soft paths contain it.
@@ -183,13 +183,13 @@ export class SessionProjectionCache extends Service {
     const related = record === undefined || identityMatches(record.identity, identityOf(tail.meta))
     try {
       if (!related) throw new Error('unrelated log identity')
-      restored = this.ctx.sessionProjections.restore(cached, tail.events, floor)
+      restored = this.ctx.sessionProjections.restore(cached, tail.events, floor, tail.meta)
     } catch {
       // Recoverable failures are an unrelated record, a row outside the
       // supplied suffix or log end, and stateSchema rejection. The full read
       // removes every checkpoint seed and lets each unit refold from init.
       const whole = await persistence.readFrom(id, 0, signal)
-      restored = this.ctx.sessionProjections.restore({}, whole.events, 0)
+      restored = this.ctx.sessionProjections.restore({}, whole.events, 0, whole.meta)
     }
     await this.putSoft(id, identityOf(tail.meta), restored.checkpoint, 'cold-read write-back')
     return restored.snapshot
@@ -218,7 +218,15 @@ export class SessionProjectionCache extends Service {
       }, this.config.writeIntervalMs)
     })
 
-    // Detach (the live-to-cold moment): the second mandatory point. After
+    // Creation is the first mandatory point. A seeded Session (for example a
+    // fork carrying a title) can remain live without producing another event;
+    // checkpointing its initial fold keeps that value available to cold
+    // listing and recovery paths even if the process stops before detach.
+    this.ctx.on('session/created', (session: Session) => {
+      void this.flushSoft(session, 'create')
+    })
+
+    // Detach (the live-to-cold moment): the final mandatory point. After
     // this write the cold-read ladder serves the session from the cache.
     // flushSoft's synchronous prefix reads and resets the dirty state, so
     // dropping it (timer already cleared by markClean) right after is safe.
@@ -240,7 +248,7 @@ export class SessionProjectionCache extends Service {
   /**
    * One fail-soft durable checkpoint. Every caller has work by construction:
    * the throttle triggers only fire dirty (markClean clears the timer with
-   * the counter) and the two mandatory points write unconditionally.
+   * the counter) and the mandatory points write unconditionally.
    */
   private async flushSoft(session: Session, trigger: string): Promise<void> {
     try {

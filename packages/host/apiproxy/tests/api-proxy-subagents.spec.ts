@@ -1,3 +1,5 @@
+/* oxlint-disable typescript/no-unsafe-assignment -- Vitest asymmetric matchers
+ * are typed as any; the call assertion checks the runtime AbortSignal instance. */
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import type { SessionEvent, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
@@ -128,7 +130,7 @@ function bench(options: {
   const api = createApiProxy(ctx, {
     defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp',
   })
-  return { api, getAgent, listChildren, inspect, snapshot, restore, followup, interrupt, standingKeyFor, parent }
+  return { api, ctx, getAgent, listChildren, inspect, snapshot, restore, followup, interrupt, standingKeyFor, parent }
 }
 
 describe('subagent gateway', () => {
@@ -336,6 +338,36 @@ describe('subagent gateway', () => {
       CHILD,
       content,
       { source: { kind: 'user', rpcId: RpcId('subagent-rpc') }, signal },
+    )
+  })
+
+  it('admits continuable image uploads before forwarding durable references', async () => {
+    const { api, ctx, parent, followup } = bench()
+    ctx.provide('attachments', {
+      saveImages: vi.fn(async (inputs: readonly { mediaType: string; data: Uint8Array }[]) => inputs.map((input, index) => ({
+        attachmentId: `image-${String(index)}`,
+        mediaType: input.mediaType,
+        bytes: input.data.byteLength,
+        width: 1,
+        height: 1,
+      }))),
+    } as never)
+    const content = [
+      { type: 'text' as const, text: 'see this' },
+      { type: 'image' as const, mediaType: 'image/png' as const, data: 'AQ==', name: 'shot.png' },
+    ]
+    const response = await api.subagents.prompt(request({
+      parentSessionId: PARENT, childSessionId: CHILD, mode: 'continuable', content,
+    }), new AbortController().signal)
+    expect(response.result).toMatchObject({ ok: true })
+    expect(followup).toHaveBeenCalledWith(
+      parent,
+      CHILD,
+      [
+        { type: 'text', text: 'see this' },
+        { type: 'image', attachment: { attachmentId: 'image-0', mediaType: 'image/png', bytes: 1, width: 1, height: 1 } },
+      ],
+      { source: { kind: 'user', rpcId: RpcId('subagent-rpc') }, signal: expect.any(AbortSignal) },
     )
   })
 

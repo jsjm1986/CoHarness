@@ -1132,11 +1132,13 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     } catch (error) {
       // Only ENOENT means absent. A permission/I/O error must surface rather
       // than letting load or collision checks proceed under false absence.
-      // Windows reports ENOENT, not ENOTDIR, for `regular-file/child`; verify
-      // the immediate parent so a blocked session directory remains a storage fault.
       /* v8 ignore else -- Windows reports file-valued parents as ENOENT; POSIX covers direct ENOTDIR. */
       if (isENOENT(error)) {
-        await this.assertLogParentAllowsAbsence(path)
+        // Windows reports ENOENT, not ENOTDIR, for `regular-file/child`, so it
+        // alone verifies the immediate parent. POSIX open already reports
+        // ENOTDIR before this point and needs no extra stat on every probe.
+        /* v8 ignore next -- native Windows coverage exercises this platform dispatch. */
+        if (process.platform === 'win32') await this.assertLogParentAllowsAbsence(path)
         return false
       }
       /* v8 ignore next -- Windows repairs ENOTDIR from ENOENT above; POSIX covers direct ENOTDIR. */

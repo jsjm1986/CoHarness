@@ -30,6 +30,8 @@ Status: implemented
 
 从任何种子构建的缓存都以未激活状态开始，每次 `agent/session-start` 边沿也会再次解除激活。`GoalService.disarm(agent)` 还允许生命周期所有者移除进程内权限，而不写入会话事件、不改变修订号，也不发出 `goal/changed` 通知。因此，会话恢复、fork 和继续执行驱动器替换都会保留持久化目标与历史，但绝不会自行启动工作。后续人类提示词可由模型解释，其策略 API 可以显式调用恢复操作并激活目标。
 
+组合可选的 session-projection 注册表时，`GoalService` 读取严格的 `GoalProjectionState` 获取当前状态和回放失败；没有该注册表的组合继续使用本地增量缓存。
+
 ### 服务边界
 
 服务只接受在对应 id 下注册的同一个实时 `Agent` 对象。变更提交后，它会发出带作用域的 `goal/changed` 事件，并隔离监听器失败。策略消费方通过本服务、公共 `Agent` 接口和 `agent/*` 事件工作；目标领域既不导入也不修改 `dsh-agent-loop`。

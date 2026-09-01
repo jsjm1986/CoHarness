@@ -9,7 +9,7 @@
 // two cards collapse a long body at the same place. Colors resolve through
 // --shiki-*/--dsw-* tokens.
 
-import { useCallback, useMemo, useState, useSyncExternalStore } from 'react'
+import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import clsx from 'clsx'
 import { writeClipboard } from './clipboard.ts'
 import {
@@ -18,6 +18,7 @@ import {
   subscribeGrammarLoaded,
   type HighlightSpan,
 } from './markdown/highlight.ts'
+import { useViewportHighlighting } from './markdown/useViewportHighlighting.ts'
 import css from './ReadBlock.module.css'
 
 /**
@@ -106,6 +107,8 @@ export function ReadBlock({
   className,
   labels,
 }: ReadBlockProps) {
+  const rootRef = useRef<HTMLDivElement>(null)
+  const highlighting = useViewportHighlighting(rootRef, lang)
   const copy = useMemo<ReadBlockLabels>(
     () => (labels === undefined ? DEFAULT_LABELS : { ...DEFAULT_LABELS, ...labels }),
     [labels],
@@ -122,7 +125,10 @@ export function ReadBlock({
   // Per-line highlighted runs aligned 1:1 with `lines`; undefined for an
   // unknown/absent (or not-yet-loaded) language, when every line renders as
   // bare text.
-  const highlighted = useMemo(() => highlightLines(raw, lang), [raw, lang, loaded])
+  const highlighted = useMemo(
+    () => highlighting ? highlightLines(raw, lang) : undefined,
+    [highlighting, raw, lang, loaded],
+  )
   const [expanded, setExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
 
@@ -168,7 +174,7 @@ export function ReadBlock({
     [line, highlighted?.[index]])
 
   return (
-    <div className={clsx(css.block, className)} data-read="">
+    <div ref={rootRef} className={clsx(css.block, className)} data-read="">
       <div className={css.banner}>
         <div className={css.label}>{label ?? ''}</div>
         <div className={css.action}>

@@ -11,7 +11,7 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import * as SubagentSpawn from '@deepseek-ai/dsh-subagent-spawn-in-process'
 import * as SubagentFork from '@deepseek-ai/dsh-subagent-fork-in-process'
-import type { GenerateOptions, MessageId, StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { ContentBlock, GenerateOptions, MessageId, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { CallId, createUserMessage, LlmAdapter } from '@deepseek-ai/dsh-llm'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import InvariantRegistry from '@deepseek-ai/dsh-invariants'
@@ -130,7 +130,7 @@ function followup(
   ctx: Context,
   parent: Agent,
   childId: SessionId,
-  content: ReturnType<typeof message>,
+  content: ContentBlock[],
   signal: AbortSignal = testSignal,
 ) {
   return ctx.subagents.followup(parent, childId, content, {
@@ -533,6 +533,84 @@ describe('SubagentRuntime.startContinuable', () => {
     await waitNoActivation(ctx, started.childId)
     const resumed = await ctx.sessionPersistence.load(started.childId)
     expect(hasUserText(resumed.events, 'resume it')).toBe(true)
+  })
+})
+
+describe('continuable image follow-ups', () => {
+  const image = {
+    type: 'image' as const,
+    attachment: {
+      attachmentId: 'att-image' as never,
+      mediaType: 'image/png' as const,
+      bytes: 1,
+      width: 1,
+      height: 1,
+    },
+  }
+
+  it('rejects an image when the child model is text-only before appending a message', async () => {
+    const { ctx, parent } = await setup([textResponse('child')])
+    const started = await ctx.subagents.startContinuable(startSpec(parent))
+    await waitNoActivation(ctx, started.childId)
+    vi.spyOn(ctx.llm, 'resolveModelInfo').mockResolvedValue({ inputModalities: ['text'] } as never)
+    await expect(followup(ctx, parent, started.childId, [image])).rejects.toMatchObject({
+      code: 'MODEL_DOES_NOT_SUPPORT_IMAGES',
+    })
+    const loaded = await ctx.sessionPersistence.load(started.childId)
+    expect(loaded.events.some(event => event.type === 'user/message'
+      && event.data.content.some(block => block.type === 'image'))).toBe(false)
+  })
+
+  it('delivers an image when the child model advertises image input', async () => {
+    const { ctx, parent } = await setup([textResponse('child'), textResponse('image reply')])
+    const started = await ctx.subagents.startContinuable(startSpec(parent))
+    await waitNoActivation(ctx, started.childId)
+    vi.spyOn(ctx.llm, 'resolveModelInfo').mockResolvedValue({ inputModalities: ['text', 'image'] } as never)
+    await followup(ctx, parent, started.childId, [image])
+    await waitNoActivation(ctx, started.childId)
+    const loaded = await ctx.sessionPersistence.load(started.childId)
+    expect(loaded.events.some(event => event.type === 'user/message'
+      && event.data.content.some(block => block.type === 'image'))).toBe(true)
+  })
+
+  it('rechecks the live disposal cutoff after an image capability read', async () => {
+    const releaseFirst = Promise.withResolvers<undefined>()
+    const adapter = new GatedAdapter([{ chunks: textResponse('child work'), gate: releaseFirst.promise }])
+    const { ctx, parent } = await setupWith(adapter)
+    const started = await ctx.subagents.startContinuable(startSpec(parent))
+    await vi.waitFor(() => { expect(adapter.requests).toHaveLength(1) })
+    const capability = Promise.withResolvers<{ inputModalities: string[] }>()
+    const resolve = vi.spyOn(ctx.llm, 'resolveModelInfo').mockReturnValue(capability.promise as never)
+
+    const delivery = followup(ctx, parent, started.childId, [image])
+    delivery.catch(() => undefined)
+    await vi.waitFor(() => { expect(resolve).toHaveBeenCalled() })
+    releaseFirst.resolve(undefined)
+    const draining = drainManager(ctx)
+    capability.resolve({ inputModalities: ['text', 'image'] })
+
+    await expect(delivery).rejects.toMatchObject({ code: 'DRAINING' })
+    await draining
+  })
+
+  it('rejects a cold image follow-up when materialization starts disposing during capability lookup', async () => {
+    const { ctx, parent } = await setup([textResponse('child work')])
+    const started = await ctx.subagents.startContinuable(startSpec(parent))
+    await waitNoActivation(ctx, started.childId)
+    const capability = Promise.withResolvers<{ inputModalities: string[] }>()
+    const resolve = vi.spyOn(ctx.llm, 'resolveModelInfo').mockReturnValue(capability.promise as never)
+
+    const delivery = followup(ctx, parent, started.childId, [image])
+    delivery.catch(() => undefined)
+    await vi.waitFor(() => { expect(resolve).toHaveBeenCalled() })
+    const draining = drainManager(ctx)
+    capability.resolve({ inputModalities: ['text', 'image'] })
+
+    await expect(delivery).rejects.toMatchObject({ code: 'ACTIVATION_CLOSING' })
+    await draining
+    const loaded = await ctx.sessionPersistence.load(started.childId)
+    expect(loaded.events.some(event => event.type === 'user/message'
+      && event.data.content.some(block => block.type === 'image'))).toBe(false)
   })
 })
 

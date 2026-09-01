@@ -5,7 +5,7 @@ import { cleanup, fireEvent, render } from '@testing-library/react'
 import type { RunningToolCall, ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
-import { classifyTool, resultText, toolRowModel } from '../src/client/tool/models/tool-call-model.ts'
+import { classifyTool, formatToolBody, resultText, toolRowModel } from '../src/client/tool/models/tool-call-model.ts'
 import { ToolRow } from '../src/client/tool/components/ToolRow.tsx'
 import { GenericToolCard, type GenericToolCardProps } from '../src/client/tool/toolviews/GenericToolCard.tsx'
 import { zh } from '@deepseek-ai/dsh-client-ui-conversation/src/client/locales.ts'
@@ -162,15 +162,17 @@ describe('tool-call-model', () => {
       .toBe('/Users/u/a.ts')
   })
 
-  it('body pretty-prints JSON args, keeps raw non-JSON, null when empty', () => {
-    expect(toolRowModel('bash', running({ argsRaw: '{"a":1}' })).body).toBe('{\n  "a": 1\n}')
-    expect(toolRowModel('bash', running({ argsRaw: 'raw' })).body).toBe('raw')
-    expect(toolRowModel('bash', running({ argsRaw: '' })).body).toBeNull()
-    expect(toolRowModel('bash', result({ call: null })).body).toBeNull()
+  it('retains raw args and formats them only through the expansion formatter', () => {
+    expect(toolRowModel('bash', running({ argsRaw: '{"a":1}' })).bodyRaw).toBe('{"a":1}')
+    expect(toolRowModel('bash', running({ argsRaw: 'raw' })).bodyRaw).toBe('raw')
+    expect(toolRowModel('bash', running({ argsRaw: '' })).bodyRaw).toBeNull()
+    expect(toolRowModel('bash', result({ call: null })).bodyRaw).toBeNull()
+    expect(formatToolBody('bash', '{"a":1}')).toBe('{\n  "a": 1\n}')
+    expect(formatToolBody('bash', 'raw')).toBe('raw')
   })
 
   it('a code row with an empty program falls back to the args JSON envelope', () => {
-    expect(toolRowModel('run_code', running({ name: 'run_code', argsRaw: '{"code":""}' })).body)
+    expect(formatToolBody('code', '{"code":""}'))
       .toBe('{\n  "code": ""\n}')
   })
 
@@ -228,7 +230,7 @@ describe('ToolRow', () => {
   const rowProps = {
     t,
     variant: 'bash' as const, icon: <i data-testid="tool-icon" />, title: 'Bash',
-    summary: 'List files', body: '{\n  "a": 1\n}', state: 'ok' as const,
+    summary: 'List files', bodyRaw: '{"a":1}', state: 'ok' as const,
   }
 
   it('renders leading icon, title and summary while collapsed', () => {
@@ -264,7 +266,7 @@ describe('ToolRow', () => {
   })
 
   it('non-expandable rows render a passive leading slot and no row button', () => {
-    const view = render(<ToolRow {...rowProps} body={null} />)
+    const view = render(<ToolRow {...rowProps} bodyRaw={null} />)
     expect(view.queryByRole('button')).toBeNull()
     expect(view.container.querySelector('[aria-expanded]')).toBeNull()
     expect(view.queryByTestId('tool-icon')).not.toBeNull()
@@ -391,7 +393,7 @@ describe('ToolRow', () => {
     expect(inputOnly.getByText('IN')).toBeTruthy()
     expect(inputOnly.queryByText('OUT')).toBeNull()
     cleanup()
-    const outputOnly = render(<ToolRow {...rowProps} body={null} output="only out" />)
+    const outputOnly = render(<ToolRow {...rowProps} bodyRaw={null} output="only out" />)
     fireEvent.click(outputOnly.getByRole('button'))
     expect(outputOnly.queryByText('IN')).toBeNull()
     expect(outputOnly.getByText('OUT')).toBeTruthy()

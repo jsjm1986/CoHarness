@@ -35,7 +35,7 @@ export function ReadRow({ toolName, block, cwd, home, openFile, inspect, t }: Re
       icon={<IconBrowseOutline16 size={14} />}
       title={model.title}
       summary={model.summary}
-      body={null}
+      bodyRaw={null}
       output={model.output}
       errorSummary={model.errorSummary}
       read={read}

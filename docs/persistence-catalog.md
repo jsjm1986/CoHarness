@@ -115,7 +115,7 @@ Sources: [`packages/core/session/src/types.ts:355`](../packages/core/session/src
 }
 ```
 
-Source: [`packages/core/agent/src/types.ts:19`](../packages/core/agent/src/types.ts)
+Source: [`packages/core/agent/src/types.ts:37`](../packages/core/agent/src/types.ts)
 
 ### `agent-preset/*`
 

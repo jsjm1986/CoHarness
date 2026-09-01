@@ -1,0 +1,243 @@
+{
+  "schemaVersion": 1,
+  "reviewDate": "2026-09-01",
+  "upstream": {
+    "repository": "https://github.com/deepseek-ai/deepseek-harness",
+    "tags": [
+      {
+        "tag": "dsh-v0.1.2-alpha.2",
+        "commit": "0a53fb55bea101816fa226bb964ae2bed71c343b",
+        "comparison": "dsh-v0.1.2-alpha.1..dsh-v0.1.2-alpha.2",
+        "diff": { "files": 1609, "insertions": 28539, "deletions": 14727 },
+        "firstParentCommits": 30,
+        "nonMergeCommits": 157
+      },
+      {
+        "tag": "dsh-v0.1.2-alpha.3",
+        "commit": "dd6322d604e00eec1ba5e0c8541159906a21094a",
+        "comparison": "dsh-v0.1.2-alpha.2..dsh-v0.1.2-alpha.3",
+        "diff": { "files": 1043, "insertions": 11337, "deletions": 11350 },
+        "firstParentCommits": 21,
+        "nonMergeCommits": 79
+      }
+    ],
+    "releasePages": [
+      "https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.1.2-alpha.2",
+      "https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.1.2-alpha.3"
+    ],
+    "auditedCommitClusters": [
+      { "tag": "alpha.2", "commits": ["19b4d7f26c", "ccfbbb443a", "18480ff902"], "topic": "connection recovery" },
+      { "tag": "alpha.2", "commits": ["675efe73f2", "3e56eaaa0f", "a12e9de5f7"], "topic": "Node 24, Windows rename, POSIX JSONL probe" },
+      { "tag": "alpha.2", "commits": ["e5f36cc70f", "5eb7195f9d", "8349cc6c73"], "topic": "preset/plugin inventory" },
+      { "tag": "alpha.2", "commits": ["2a9b940ef5", "e841fb6049", "c3b694312f"], "topic": "Schedule projection and catalog" },
+      { "tag": "alpha.2", "commits": ["212df86cf8", "5ddbc6e71f", "d25ace0f22"], "topic": "projection migration" },
+      { "tag": "alpha.2", "commits": ["804b1ffbfc", "f9e8fc8f8a", "674a1e95a3"], "topic": "Remote failure vocabulary" },
+      { "tag": "alpha.3", "commits": ["6af1ee49b1", "b3064cca77", "218bb7f645"], "topic": "full-session turn rail" },
+      { "tag": "alpha.3", "commits": ["faa61ada74", "1dd3e60f50", "d8e2ac5052"], "topic": "viewport and incremental highlighting" },
+      { "tag": "alpha.3", "commits": ["7c38fd8102", "ba810b3539", "21d2d9395d"], "topic": "image admission and closing-turn delivery" },
+      { "tag": "alpha.3", "commits": ["7222e17dc0", "f3c69c2c3f", "6f08798981"], "topic": "extensionless read_image" },
+      { "tag": "alpha.3", "commits": ["49bf26a794"], "topic": "stalled-host heartbeat tolerance" },
+      { "tag": "alpha.3", "commits": ["4553c9d957"], "topic": "SQLite removal (not adopted)" }
+    ]
+  },
+  "baseline": {
+    "repository": "https://github.com/jsjm1986/CoHarness.git",
+    "commit": "af328465f4e73d03dc28fd4307a1781764afdd92",
+    "commonAncestorWithUpstream": false,
+    "packageVersionPolicy": "set the CoHarness dsh family to unique publication version 0.1.2-alpha.3.coharness.1 for the dsh-v0.1.2-alpha.3 code baseline; keep apps/android-shell at 0.1.0 and vendor/native families on their independent version lines"
+  },
+  "decisions": {
+    "implemented": [
+      "connection-recovery-indicator-and-manual-reconnect",
+      "node24-loader-shape-detection",
+      "windows-atomic-rename-retry",
+      "jsonl-posix-probe-stat-reduction",
+      "schedule-projection-and-opt-in-header-catalog",
+      "preset-composition-inventory-and-localized-display",
+      "plugin-inventory-preset-global-groups",
+      "full-history-turn-rail-and-load-jump",
+      "viewport-gated-code-and-read-highlighting",
+      "incremental-streaming-highlight-frame-groups",
+      "extensionless-read-image-signature-detection",
+      "tab-slash-command-completion",
+      "pending-refinement-enter-guard",
+      "goal-projection-read-path-and-turn-boundary",
+      "at-directory-drill-and-breadcrumb",
+      "lazy-tool-body-formatting",
+      "linear-inbox-projection",
+      "package-dependency-ownership-and-dual-npm-layout",
+      "closing-turn-pending-wake-replay",
+      "queued-image-thumbnail-and-echo-placement",
+      "continuable-subagent-image-followup-admission",
+      "continuation-image-disposal-cutoff",
+      "web-search-effective-endpoint-guidance",
+      "localized-permission-labels"
+    ],
+    "baselineEquivalent": [
+      "session-event-ignorable",
+      "turn-token-and-time-disclosure",
+      "menu-diff-polish",
+      "queue-image-echo",
+      "session-history-watermark-and-frame-queue-performance",
+      "home-logo-animation"
+    ],
+    "intentionallyNotAdopted": [
+      "unified-domain-prefixed-remote-error-and-remote-controller-closure",
+      "focused-ui-chat-package-replacement",
+      "shared-util-values-time-and-deque-package-relays",
+      "sqlite-session-persistence-removal"
+    ],
+    "platformUnverified": [
+      "windows-native-loader-and-pty-release-lanes",
+      "real-deepseek-api-e2e",
+      "assembled-browser-snapshot-and-production-gateway-timing",
+      "macos-packed-install-native-lifecycle"
+    ]
+  },
+  "evidence": {
+    "source": [
+      "vendor/loader/src/internal.ts",
+      "packages/util/atomic-write/src/index.ts",
+      "packages/session/session-persistence-jsonl/src/index.ts",
+      "packages/client/connection/src/client/connection.ts",
+      "packages/client/connection/src/websocket-downlink.ts"
+    ],
+    "projectionAndSchedule": [
+      "packages/session/session-projection/src/index.ts",
+      "packages/session/session-projection-cache/src/index.ts",
+      "packages/schedule/schedule/src/projection.ts",
+      "packages/client/ui-schedule/src/client/ScheduleCatalogAction.tsx"
+    ],
+    "browserAndSubagent": [
+      "packages/core/agent-loop/src/agent.ts",
+      "packages/client/ui-conversation/src/client/chat/TurnNavigator.tsx",
+      "packages/client/ui-conversation/src/client/queue/QueueDock.tsx",
+      "packages/client/runtime/src/client/sessions/queue-mirror.ts",
+      "packages/client/runtime/src/client/contract/session.ts",
+      "packages/client/ui-primitives/src/markdown/CodeBlock.tsx",
+      "packages/client/ui-primitives/src/markdown/useViewportHighlighting.ts",
+      "packages/fs/tool-fs/src/read-image.ts",
+      "packages/subagent/subagent/src/continuation.ts",
+      "packages/host/apiproxy/src/api-proxy.ts"
+    ],
+    "priorityAdaptations": [
+      "packages/goal/goal/src/index.ts",
+      "packages/core/agent-loop/src/index.ts",
+      "packages/goal/tool-goal/src/authority.ts",
+      "packages/client/ui-input-trigger/src/client/controller.ts",
+      "packages/client/ui-input-trigger/src/client/MenuView.tsx",
+      "packages/client/ui-reference/src/client/index.ts",
+      "packages/client/ui-tool/src/client/tool/models/tool-call-model.ts",
+      "packages/client/ui-tool/src/client/tool/components/ToolRow.tsx",
+      "packages/client/ui-conversation/src/client/conversation-nodes/inbox.ts",
+      "packages/client/ui-trajectory/src/client/trajectory-message-definitions.ts",
+      "apps/web/tests/reference-drill.e2e.ts",
+      "apps/web/tests/snapshots/reference-drill/ui.expected.md",
+      "scripts/verify-package-dependencies.ts",
+      "scripts/verify-npm-install-layout.ts"
+    ],
+    "inventoryAndLocales": [
+      "packages/preset/agent-presets/src/composition-inventory.ts",
+      "packages/preset/agent-presets/src/display.ts",
+      "packages/host/plugin-inventory/src/index.ts",
+      "packages/client/ui-settings-plugin-inventory/src/client/PluginInventorySettingsTab.tsx",
+      "packages/client/ui-permission-presets/src/client/locales.ts"
+    ]
+  },
+  "verification": {
+    "configuration": "CI=true pnpm run verify-cordis-config",
+    "apiCatalog": "CI=true pnpm run verify-cordis-api",
+    "clientPackages": "CI=true pnpm run verify-client-packages",
+    "runtimeClosure": "CI=true pnpm run verify-runtime-closure",
+    "packageDependencies": "CI=true pnpm run verify-package-dependencies",
+    "npmInstallLayout": {
+      "command": "CI=true pnpm run verify-npm-install-layout",
+      "result": "191 DSH package(s) per release, 510 internal edge(s), 1,244 source and 2,488 synthetic DSH peer edges statically verified"
+    },
+    "optionalImports": "CI=true pnpm run verify-optional-dependency-imports",
+    "domainGraph": "CI=true pnpm run verify-client-domain-graph",
+    "releaseVersion": {
+      "dshFamily": "0.1.2-alpha.3.coharness.1",
+      "upstreamCodeBaseline": "dsh-v0.1.2-alpha.3",
+      "releaseTag": "dsh-v0.1.2-alpha.3.coharness.1",
+      "pythonWheelVersion": "0.1.2a3.post1",
+      "publishedMembers": 248,
+      "privateExperimentalMembers": 2,
+      "independentAndroidShell": "0.1.0"
+    },
+    "releaseVerify": "CI=true pnpm run release:verify --family dsh",
+    "releasePack": {
+      "command": "CI=true pnpm run release:pack --family dsh",
+      "tarballs": 248,
+      "embeddedVersions": ["0.1.2-alpha.3.coharness.1"]
+    },
+    "packedInstall": {
+      "command": "npm_config_ignore_scripts=true CI=true pnpm run release:verify-packed-install --family dsh --from <dsh> --from <vendor> --from <landlock>",
+      "result": "@deepseek-ai/dsh --version reported 0.1.2-alpha.3.coharness.1",
+      "normalMacosInstall": "blocked by koffi native build because CMake is unavailable"
+    },
+    "pythonReleaseVersion": {
+      "tests": "uv run --project python/sdk --group test pytest python/sdk/tests/test_release_version.py",
+      "testsPassed": 13,
+      "sdkWheel": "deepseek_harness_sdk-0.1.2a3.post1-py3-none-any.whl"
+    },
+    "focusedTests": "CI=true pnpm exec vitest run <affected package suites> --no-file-parallelism --maxWorkers=1",
+    "focusedTestResult": { "files": 226, "tests": 3775 },
+    "latestPriorityFocusedTestResult": { "files": 19, "tests": 507, "agentLoopConfigSessionId": { "tests": 16 }, "dependencyAndGateSpecs": { "files": 5, "tests": 73 }, "goalAndAuthoritySpecs": { "files": 4, "tests": 114 }, "inputReferenceToolAndConversationSpecs": { "files": 7, "tests": 179 }, "snapshotAndReplaySupportSpecs": { "files": 3, "tests": 141, "normalize": { "tests": 47, "newTests": 2 }, "llmReplayRangeDecode": { "tests": 3 }, "fixtureLayout": { "tests": 8 } } },
+    "fullTestResult": {
+      "historicalPass": { "filesPassed": 973, "filesSkipped": 9, "testsPassed": 15933, "testsSkipped": 114 },
+      "latestAttempt": {
+        "filesPassed": 975,
+        "filesSkipped": 9,
+        "testsPassed": 15953,
+        "testsSkipped": 114,
+        "failedFile": "packages/hooks/hooks-claude-code/tests/coverage-stop.spec.ts",
+        "failureDisposition": "non-scope workspace-path assertion; focused rerun passed 9/9"
+      }
+    },
+    "guiResult": { "command": "pnpm run test:gui", "filesPassed": 342, "testsPassed": 4632, "testsSkipped": 1 },
+    "snapshotResult": {
+      "command": "NODE_DISABLE_COMPILE_CACHE=1 CI=true pnpm exec vitest run --config vitest.snapshot.config.ts",
+      "filesPassed": 15,
+      "testsPassed": 131,
+      "testsSkipped": 2,
+      "priorConcurrencyTransient": "headless profile model-failure smoke exceeded its 30s subprocess deadline once under concurrent load; serial headless file 17/17 passed and DSH_SNAPSHOT_MAX_CONCURRENCY=2 rerun passed"
+    },
+    "referenceDrillBrowserResult": {
+      "command": "DSH_SNAPSHOT=replay pnpm exec vitest run --config vitest.web.config.ts apps/web/tests/reference-drill.e2e.ts",
+      "testsPassed": 2,
+      "testsSkipped": 0
+    },
+    "assembledWebReplayResult": {
+      "command": "DSH_SNAPSHOT=replay pnpm run test:web",
+      "filesTotal": 91,
+      "filesPassed": 62,
+      "filesFailed": 28,
+      "testsPassed": 258,
+      "testsFailed": 47,
+      "testsSkipped": 20,
+      "errors": 1,
+      "disposition": "existing snapshot/fixture drift recorded; not claimed as a release-gate pass"
+    },
+    "coverageResult": {
+      "command": "CI=true pnpm run test:coverage",
+      "testsPassed": { "files": 973, "tests": 15933 },
+      "testsSkipped": { "files": 9, "tests": 114 },
+      "gate": "failed",
+      "reason": "repository-wide per-file 100% coverage reports uncovered baseline and newly expanded files; behavior tests still pass"
+    },
+    "diffCheck": "git diff --check"
+  },
+  "auditCorrections": {
+    "agentTeamJournal": {
+      "productionJournalStateCallSites": 16,
+      "invariantFoldPresent": true,
+      "disposition": "defer-projection-until-experimental-package-enters-an-official-profile",
+      "callSiteExpression": "journal.state(root)"
+    },
+    "llmRetryProjection": {
+      "disposition": "not-adopted-optimization-not-a-regression",
+      "currentRead": "findLast"
+    }
+  }
+}

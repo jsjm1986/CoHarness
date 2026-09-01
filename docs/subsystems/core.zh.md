@@ -88,7 +88,8 @@ interface Agent {
   /**
    * Resolve after the current whole-agent activity reaches quiescence. This
    * follows replacement work started before the observed driver retires,
-   * but does not identify the settlement of any particular message.
+   * including a follow-up or steer tracked during a normal turn-closing
+   * microtask, but does not identify the settlement of any particular message.
    * @returns fulfillment after no active driver or maintenance task remains.
    */
   whenIdle(): Promise<void>
@@ -107,10 +108,13 @@ interface Agent {
   /**
    * Route identified input to an inbox boundary and optionally wake the driver.
    * Waking input submitted after active cancellation is queued for the next
-   * turn and runs when the aborted activity converges to idle; a `disposed`
-   * cancel leaves it parked. A wake submitted while already idle always opens
-   * its turn boundary, even when its message is cleared before the driver
-   * claims ([cancel-convergence wake latch](../../../../.agents/notes/implemented/bug-fix/2026-08-07-cancel-convergence-wake-latch.md)).
+   * turn and runs when the aborted activity converges to idle; a follow-up or
+   * steer that arrives during normal turn closure is tracked until claim and
+   * reopens a fresh driver. A failed/rejected activity parks retained input,
+   * and a `disposed` cancel leaves it parked. A wake submitted while already
+   * idle always opens its turn boundary, even when its message is cleared
+   * before the driver claims; see the
+   * [cancel-convergence wake latch](../../../../.agents/notes/implemented/bug-fix/2026-08-07-cancel-convergence-wake-latch.md).
    * @param message - identified content and the source that supplied it.
    * @param target - the preferred next-turn or next-step inbox boundary.
    * @param wakeup - whether delivery may wake the driver.
@@ -179,6 +183,28 @@ inbox 即投递词汇——agent 以持久投影形式拥有的两条有序待�
 ```ts type-equiv
 /** One of the two ordered pending-message lists owned by an agent. */
 type InboxTarget = 'next-turn' | 'next-step'
+```
+
+可选的 agent-loop projection 会把相同的边界作为 host-only 状态提供给授权读取方。
+
+```ts type-equiv
+/**
+ * Turn and step boundaries folded from one agent session log.
+ *
+ * The key is registered by `dsh-agent-loop` and is absent when that driver
+ * is not composed. Readers treat absence as no open turn and use their
+ * existing indexed fallback where one is available.
+ */
+interface TurnBoundaryProjection {
+  /** Seq of the open turn's `turn/start`, or null between turns. */
+  readonly openTurnStartSeq: number | null
+  /** Seq of the latest `step/start` event, or null before the first step. */
+  readonly lastStepStartSeq: number | null
+  /** Latest step boundary and its seq, or null before the first boundary. */
+  readonly lastStepBoundary: { readonly kind: 'start' | 'end'; readonly seq: number } | null
+  /** Turn number of the latest `turn/start`; 0 before the first turn. */
+  readonly lastTurn: number
+}
 ```
 
 每个待处理入队项就是其 `UserMessage`；`MessageId` 是唯一标识。`Inbox.append`、`prepend`、`replace`、`remove`、`clear`、`splice` 与 `claim` 会记录规范化的持久 `agent/inbox/spliced` 变更，并拒绝重复的待处理 id。`replace(messageId, newMessage)` 与 `remove(messageId)` 通过 `MessageId` 跨两份列表定位待处理消息；替换可以改变标识，并先将旧消息作为 discarded 发布，再将新消息作为 inserted 发布。普通删除和 `clear()` 都表示取消。`claim(target)` 通过纯删除 splice 移除拟进入步骤的批次——全部 `next-step` 输入，外加轮次边界上的一条 `next-turn` 消息——且不发出 discarded 通知；循环另行逐条发出 claimed 通知。UI 投影等整体队列消费方通过持久 splice 重建 `nextTurn` 与 `nextStep`，而跟踪单条消息的消费方使用精确的 `agent/inbox/inserted`、`claimed` 与 `discarded` 通知。
@@ -389,7 +415,7 @@ async resume(ownerCtx: Context, options: ResumeAgentOptions): Promise<AgentHandl
 
 Types: [SessionHeader](persistence.zh.md)
 
-Source: [`packages/core/agent-loop/src/index.ts:317`](../../packages/core/agent-loop/src/index.ts)
+Source: [`packages/core/agent-loop/src/index.ts:358`](../../packages/core/agent-loop/src/index.ts)
 
 <a id="ctxagentpresets--agentpresets"></a>
 
@@ -405,6 +431,14 @@ Discovery is unmemoized: `list()` and `resolve()` re-read the roots on every cal
  * @returns the presets, first-root-wins per id.
  */
 async list(): Promise<AgentPreset[]>
+
+/**
+ * Read every preset's flattened composition for a read-only inventory.
+ * Live standing mounts answer from their Loader tree; an unmounted preset is
+ * parsed from disk and never activated merely because it is listed.
+ * @returns preset identities and composition rows in roster order.
+ */
+async compositionInventory(): Promise<AgentPresetComposition[]>
 
 /**
  * Resolve one preset by id.
@@ -560,7 +594,7 @@ async standingKeyFor(id?: string): Promise<ScopeKey>
 
 Types: [ScopeKey](scope.zh.md)
 
-Source: [`packages/preset/agent-presets/src/index.ts:83`](../../packages/preset/agent-presets/src/index.ts)
+Source: [`packages/preset/agent-presets/src/index.ts:92`](../../packages/preset/agent-presets/src/index.ts)
 
 <a id="ctxagents--agentregistry"></a>
 
@@ -732,7 +766,7 @@ list(): Agent[]
 roots(): Agent[]
 ```
 
-Source: [`packages/core/agent/src/index.ts:256`](../../packages/core/agent/src/index.ts)
+Source: [`packages/core/agent/src/index.ts:257`](../../packages/core/agent/src/index.ts)
 
 <a id="agent-events"></a>
 
@@ -760,7 +794,7 @@ A fully configured agent and live session were published. Setup is composition-o
 
 Types: [Scoped](scope.zh.md)
 
-Source: [`packages/core/agent/src/runtime-types.ts:162`](../../packages/core/agent/src/runtime-types.ts)
+Source: [`packages/core/agent/src/runtime-types.ts:166`](../../packages/core/agent/src/runtime-types.ts)
 
 <a id="agentdisposed--emit"></a>
 
@@ -782,7 +816,7 @@ An agent left the registry; AgentLoop emits this after driver quiescence and sco
 
 Types: [Scoped](scope.zh.md)
 
-Source: [`packages/core/agent/src/runtime-types.ts:171`](../../packages/core/agent/src/runtime-types.ts)
+Source: [`packages/core/agent/src/runtime-types.ts:175`](../../packages/core/agent/src/runtime-types.ts)
 
 <a id="agenterror--emit"></a>
 
@@ -806,7 +840,7 @@ A step or turn errored. The machine reports a failure here even when the error h
 
 Types: [Scoped](scope.zh.md)
 
-Source: [`packages/core/agent/src/runtime-types.ts:307`](../../packages/core/agent/src/runtime-types.ts)
+Source: [`packages/core/agent/src/runtime-types.ts:311`](../../packages/core/agent/src/runtime-types.ts)
 
 <a id="agentinboxclaimed--emit"></a>
 
@@ -830,7 +864,7 @@ One message left the inbox inside its open turn. If the proposed step is rejecte
 
 Types: [Scoped](scope.zh.md) · [UserMessage](session.zh.md)
 
-Source: [`packages/core/agent/src/runtime-types.ts:200`](../../packages/core/agent/src/runtime-types.ts)
+Source: [`packages/core/agent/src/runtime-types.ts:204`](../../packages/core/agent/src/runtime-types.ts)
 
 <a id="agentinboxdiscarded--emit"></a>
 
@@ -851,7 +885,7 @@ One message was discarded from the live inbox.
 
 Types: [Scoped](scope.zh.md) · [UserMessage](session.zh.md)
 
-Source: [`packages/core/agent/src/runtime-types.ts:208`](../../packages/core/agent/src/runtime-types.ts)
+Source: [`packages/core/agent/src/runtime-types.ts:212`](../../packages/core/agent/src/runtime-types.ts)
 
 <a id="agentinboxinserted--emit"></a>
 
@@ -872,7 +906,7 @@ One message entered the live inbox.
 
 Types: [Scoped](scope.zh.md) · [UserMessage](session.zh.md)
 
-Source: [`packages/core/agent/src/runtime-types.ts:189`](../../packages/core/agent/src/runtime-types.ts)
+Source: [`packages/core/agent/src/runtime-types.ts:193`](../../packages/core/agent/src/runtime-types.ts)
 
 <a id="agentmessage-entered--serial"></a>
 
@@ -899,7 +933,7 @@ A final user message has committed to the durable surface and the model request 
 
 Types: [Scoped](scope.zh.md) · [SessionEvent](session.zh.md)
 
-Source: [`packages/core/agent/src/runtime-types.ts:248`](../../packages/core/agent/src/runtime-types.ts)
+Source: [`packages/core/agent/src/runtime-types.ts:252`](../../packages/core/agent/src/runtime-types.ts)
 
 <a id="agentpre-step--waterfall"></a>
 
@@ -924,7 +958,7 @@ Reject a proposed step or replace the messages that enter it. Calling `next()` p
 
 Types: [Scoped](scope.zh.md) · [UserMessage](session.zh.md)
 
-Source: [`packages/core/agent/src/runtime-types.ts:234`](../../packages/core/agent/src/runtime-types.ts)
+Source: [`packages/core/agent/src/runtime-types.ts:238`](../../packages/core/agent/src/runtime-types.ts)
 
 <a id="agentrequest--waterfall"></a>
 
@@ -950,7 +984,7 @@ Replace the frozen call configuration. `await next()` yields the config the mach
 
 Types: [LlmCallConfig](llm-streaming.zh.md) · [Scoped](scope.zh.md)
 
-Source: [`packages/core/agent/src/runtime-types.ts:261`](../../packages/core/agent/src/runtime-types.ts)
+Source: [`packages/core/agent/src/runtime-types.ts:265`](../../packages/core/agent/src/runtime-types.ts)
 
 <a id="agentrequest-error--waterfall"></a>
 
@@ -979,7 +1013,7 @@ Handle one failed model-request attempt before the loop retries or closes its st
 
 Types: [LlmFailure](llm-streaming.zh.md) · [ResolvedRetryPolicy](llm-streaming.zh.md) · [Scoped](scope.zh.md)
 
-Source: [`packages/core/agent/src/runtime-types.ts:277`](../../packages/core/agent/src/runtime-types.ts)
+Source: [`packages/core/agent/src/runtime-types.ts:281`](../../packages/core/agent/src/runtime-types.ts)
 
 <a id="agentsession-start--emit"></a>
 
@@ -1003,7 +1037,7 @@ The session lifecycle began, once before the first turn. Use `agent.inject()` to
 
 Types: [Scoped](scope.zh.md)
 
-Source: [`packages/core/agent/src/runtime-types.ts:220`](../../packages/core/agent/src/runtime-types.ts)
+Source: [`packages/core/agent/src/runtime-types.ts:224`](../../packages/core/agent/src/runtime-types.ts)
 
 <a id="agentstatus--emit"></a>
 
@@ -1026,7 +1060,7 @@ Agent status changed (`idle` ⇄ `running`). A waking delivery enters `running` 
 
 Types: [Scoped](scope.zh.md)
 
-Source: [`packages/core/agent/src/runtime-types.ts:181`](../../packages/core/agent/src/runtime-types.ts)
+Source: [`packages/core/agent/src/runtime-types.ts:185`](../../packages/core/agent/src/runtime-types.ts)
 
 <a id="agentturn-stopping--serial"></a>
 
@@ -1057,7 +1091,7 @@ The turn is about to close: the model owes no response (no live tool calls, no f
 
 Types: [Scoped](scope.zh.md)
 
-Source: [`packages/core/agent/src/runtime-types.ts:295`](../../packages/core/agent/src/runtime-types.ts)
+Source: [`packages/core/agent/src/runtime-types.ts:299`](../../packages/core/agent/src/runtime-types.ts)
 
 <a id="agent-loop-events"></a>
 
@@ -1082,7 +1116,7 @@ A declarative agent entry failed before it could publish a live agent. Consumers
 'agent-loop/config-start-failed'(payload: { sessionId: SessionId; error: unknown }): void
 ```
 
-Source: [`packages/core/agent-loop/src/index.ts:192`](../../packages/core/agent-loop/src/index.ts)
+Source: [`packages/core/agent-loop/src/index.ts:233`](../../packages/core/agent-loop/src/index.ts)
 
 <a id="agent-preset-events"></a>
 

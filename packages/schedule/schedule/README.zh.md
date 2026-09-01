@@ -18,6 +18,8 @@ Time-context 不是 Schedule 的依赖。组合可以挂载 `@deepseek-ai/dsh-ti
 
 回放会拒绝未知版本、额外字段、重复使用的 id、形状不匹配的一次性或 Every dispatch，以及针对非活动记录的 delete 或 dispatch 转换。普通会话折叠完整日志。fork 只折叠 `session.events.slice(session.header.seedLength ?? 0)`，因此不会继承父会话的提醒。此包的 `./invariant` 配套模块会对现有日志和候选事件应用相同策略。
 
+存在可选的 session-projection registry 时，Schedule 会注册 `schedule` projection。其状态携带不可变的 fork seed 边界与活动记录，因此 Host 读取、projection frame 和可选 Web 目录共享同一个转换权威。浏览器目录由 [`dsh-client-ui-schedule`](../../client/ui-schedule/README.zh.md) 提供，且只有 Web Schedule overlay 才会启用。
+
 ## 绝对时间输入
 
 `at` selector 可以是严格的 `YYYY-MM-DDTHH:mm:ss[.S|.SS|.SSS](Z|±HH:MM)` 字符串，也可以是 `{ date: "YYYY-MM-DD", time: "HH:mm:ss[.S|.SS|.SSS]", time_zone: string }`。字符串通过 `Z` 或数值偏移量标识一个时刻。本地形式始终要求显式 `UTC` 或有效的 IANA Area/Location 时区。缺少 `time_zone`、不带偏移量的字符串、额外键、需要规范化的日历日期、无效偏移量和非未来目标都会被拒绝。

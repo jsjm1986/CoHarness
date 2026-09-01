@@ -45,7 +45,7 @@ export function WebRow({ toolName, block, inspect, t }: WebRowProps) {
       icon={icon}
       title={WEB_TITLES[toolName] ?? model.title}
       summary={model.summary}
-      body={null}
+      bodyRaw={null}
       output={model.output}
       errorSummary={model.errorSummary}
       web={web}

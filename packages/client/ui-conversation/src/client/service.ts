@@ -16,7 +16,7 @@ import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 // error, so scope resolution goes through the sessions service (scopeOf
 // method) instead of the standalone helper.
 import type {
-  ISessions, PendingSubmissionRetirement, SessionFace, SessionId,
+  ISessions, PendingSubmissionPlacement, PendingSubmissionRetirement, SessionFace, SessionId,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SubmitImageAttachment, SubmitOutcome } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type { ImageAttachmentRef, ImageMediaType } from '@deepseek-ai/dsh-attachment'
@@ -54,6 +54,20 @@ export interface IConversation {
    * @returns completion; converged strict-steer races resolve, while other failures reject.
    */
   updateQueue(itemId: QueueItemId, action: QueueAction): Promise<void>
+  /**
+   * Resolve one durable image through the caller Session's authorization scope.
+   * @param sessionId - Session owning the attachment.
+   * @param attachment - durable image reference.
+   * @returns a browser URL valid while the Session remains rendered.
+   */
+  resolveImage(sessionId: SessionId, attachment: ImageAttachmentRef): Promise<string>
+  /**
+   * Return a cached image URL without starting a read.
+   * @param sessionId - Session owning the attachment.
+   * @param attachment - durable image reference.
+   * @returns a cached URL, or undefined when it is not loaded.
+   */
+  peekImage(sessionId: SessionId, attachment: ImageAttachmentRef): string | undefined
   /**
    * Cancel the scoped session's in-flight turn while preserving its pending Queue.
    * @returns completion; failures reject as in send.
@@ -199,7 +213,8 @@ export class ConversationController extends Service implements IConversation {
     }
     // Session-backed subagents and legacy structural fakes do not expose the
     // local echo seam; preserve their existing serialize→prompt choreography.
-    if (session.getSnapshot().subagent !== null || session.beginSubmission === undefined) {
+    const initial = session.getSnapshot()
+    if (initial.subagent !== null || session.beginSubmission === undefined) {
       const uploaded = await this.serializeImages(attachments.map(attachment => attachment.file), signal)
       const content = [
         ...uploaded,
@@ -220,6 +235,9 @@ export class ConversationController extends Service implements IConversation {
         finishRetirement = resolve
       })
     const submission = session.beginSubmission({
+      placement: initial.running
+        ? mode === 'steer' ? 'steering' : 'queued'
+        : 'transcript' satisfies PendingSubmissionPlacement,
       text,
       images: attachments.map(attachment => ({
         previewUrl: attachment.previewUrl,

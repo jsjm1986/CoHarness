@@ -8,7 +8,7 @@ This overlay opts one `dsh web` process into Schedule reminders without changing
 dsh web --patch examples/web-schedule/cordis.yml
 ```
 
-The current overlay supports reminders created with a positive whole-number `after_seconds`, an absolute `at` target, or a fixed-rate `every_seconds` interval of at least 300 seconds. The model manages them through `schedule_create`, `schedule_list`, and `schedule_delete`; every result identifies delivery as `session-local`.
+The current overlay supports reminders created with a positive whole-number `after_seconds`, an absolute `at` target, or a fixed-rate `every_seconds` interval of at least 300 seconds. The model manages them through `schedule_create`, `schedule_list`, and `schedule_delete`; every result identifies delivery as `session-local`. The overlay also adds a read-only active-reminder catalog to the conversation header; it appears only for an opened Session with active records.
 
 The browser attaches its IANA zone to each prompt. Time-context tells the model to interpret otherwise-unqualified dates and times in that request's browser zone. This assumption belongs to natural-language interpretation only: `schedule_create.at` must be either a strict RFC 3339 date-time with `Z` or a numeric offset, or `{ date, time, time_zone }` with an explicit `UTC` or IANA Area/Location zone. Schedule does not retain or infer a Session default zone. Daylight-saving gaps are rejected, overlaps choose the first instant, and successful records keep only the resulting UTC target.
 

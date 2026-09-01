@@ -105,6 +105,24 @@ describe('connection lifecycle', () => {
     expect(api.openMuxCount).toBe(0)
   })
 
+  it('reconnect() aborts the active generation and retries immediately', async () => {
+    const api = new FakeApiClient()
+    let connected = 0
+    const controller = new ConnectionController(api, { onConnected: () => { connected++ } }, {
+      ...FAST,
+      backoffBaseMs: 200,
+      backoffMaxMs: 200,
+    })
+    controller.start()
+    try {
+      await vi.waitFor(() => { expect(connected).toBe(1) })
+      controller.reconnect()
+      await vi.waitFor(() => { expect(connected).toBe(2) }, { timeout: 100 })
+    } finally {
+      controller.stop()
+    }
+  })
+
   it('treats describe failure as generation failure and retries', async () => {
     const api = new FakeApiClient()
     const gate = deferred<Awaited<ReturnType<FakeApiClient['onDescribe']>>>()
@@ -358,5 +376,17 @@ describe('connection lifecycle', () => {
     } finally {
       controller.stop()
     }
+  })
+
+  it('publishes connected again when a stopped controller is started anew', async () => {
+    const api = new FakeApiClient()
+    const states: ConnectionState[] = []
+    const controller = new ConnectionController(api, { onStateChange: state => states.push(state) }, FAST)
+    controller.start()
+    await vi.waitFor(() => { expect(states).toEqual(['connected']) })
+    controller.stop()
+    controller.start()
+    await vi.waitFor(() => { expect(states).toEqual(['connected', 'connected']) })
+    controller.stop()
   })
 })

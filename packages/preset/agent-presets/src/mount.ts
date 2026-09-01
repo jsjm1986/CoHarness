@@ -57,6 +57,11 @@ const harnessBase = new WeakMap<object, string>()
 class PresetTree extends Include {
   constructor(ctx: Context, config: Include.Config) {
     super(ctx, config)
+    // A directly mounted Include records itself under the nearest Loader
+    // entry. Standing preset mounts are not Loader rows, so reclaim that slot
+    // before inventory readers walk the host tree.
+    const owner = this.ctx.fiber.entry
+    if (owner?.subtree === this) delete owner.subtree
     mounted.set(config, { tree: this, fiber: ctx.fiber })
   }
 
@@ -150,11 +155,16 @@ function pruneDisposedMounts(): void {
 /**
  * Every preset composition still installed, pruning fibers disposed since the
  * last read.
+ *
+ * The record set is module state and spans Cordis runtimes in one process. A
+ * reader for one root must not report a same-id mount owned by another root.
+ * @param within - optional runtime root used to restrict the result.
  * @returns the live mounts.
  */
-export function livePresetMounts(): PresetMount[] {
+export function livePresetMounts(within?: Fiber): PresetMount[] {
   pruneDisposedMounts()
-  return [...mounts]
+  const all = [...mounts]
+  return within === undefined ? all : all.filter(mount => withinFiber(mount.fiber, within))
 }
 
 /**

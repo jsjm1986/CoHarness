@@ -69,6 +69,39 @@ interface GoalView extends GoalSnapshot {
 }
 ```
 
+```ts type-equiv
+/**
+ * The `goal` projection value: the current durable goal with its replay
+ * counters, exactly as the latest `goal/change` event carried them.
+ * Activation is process-local (never persisted) and deliberately absent —
+ * the projection reflects durable phase only.
+ */
+interface GoalProjection {
+  /** Current durable goal snapshot (the CAS ref for mutations rides on it). */
+  readonly goal: GoalSnapshot
+  /** Highest admitted round number for this goal. */
+  readonly roundsStarted: number
+  /** Epoch milliseconds of the create mutation. */
+  readonly createdAt: number
+  /** Epoch milliseconds of the latest mutation. */
+  readonly updatedAt: number
+}
+```
+
+The host checkpoint state wraps the wire value with replay integrity facts. `current` is the value exposed to clients, `seenGoalIds` prevents goal-id reuse during strict replay, and `failure` records the first invalid owned event without tearing down the projection drive.
+
+```ts type-equiv
+/** Strict checkpoint state used to derive the current goal client value. */
+interface GoalProjectionState {
+  /** Latest valid current goal, or null before creation and after clear. */
+  readonly current: GoalProjection | null
+  /** Goal identities already created in this Session, retained to reject reuse. */
+  readonly seenGoalIds: GoalId[]
+  /** First strict replay failure, or null while the durable stream is valid. */
+  readonly failure: string | null
+}
+```
+
 ## Durable changes
 
 Every mutation is a durable `goal/change` session event whose payload is either a complete post-mutation snapshot or a clear tombstone. The strict fold and persisted projection derive lifecycle state only from these events; inbox mutations do not affect goal state.
@@ -247,7 +280,7 @@ block(agent: Agent, ref: GoalRef, reason: GoalBlockReason): GoalView
 
 Types: [Agent](core.md)
 
-Source: [`packages/goal/goal/src/index.ts:183`](../../packages/goal/goal/src/index.ts)
+Source: [`packages/goal/goal/src/index.ts:246`](../../packages/goal/goal/src/index.ts)
 
 <a id="goal-events"></a>
 

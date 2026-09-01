@@ -639,6 +639,7 @@ describe('ChatView', () => {
     const h = makeHarness({
       pendingSubmissions: [{
         requestId,
+        placement: 'transcript',
         time: 1_700_000_000_000,
         text: 'pending prompt',
         images: [],
@@ -651,6 +652,21 @@ describe('ChatView', () => {
       h.set({ nodes: [user(1, 'pending prompt', { kind: 'user', rpcId: requestId })] })
     })
     expect(view.getAllByText('pending prompt')).toHaveLength(1)
+  })
+
+  it('keeps queued submission echoes out of Chat while retaining transcript and steering placements', () => {
+    const h = makeHarness({
+      pendingSubmissions: [
+        { requestId: RpcId('queued-echo'), placement: 'queued', time: 1, text: 'queued echo', images: [] },
+        { requestId: RpcId('steering-echo'), placement: 'steering', time: 2, text: 'steering echo', images: [] },
+        { requestId: RpcId('transcript-echo'), placement: 'transcript', time: 3, text: 'transcript echo', images: [] },
+      ],
+    })
+    const view = render(<h.ChatView {...h.props} />)
+    expect(view.queryByText('queued echo')).toBeNull()
+    expect(view.getByText('steering echo')).toBeTruthy()
+    expect(view.getByText('transcript echo')).toBeTruthy()
+    expect(view.container.querySelectorAll('[data-pending-steering]')).toHaveLength(1)
   })
 
   it('animates only the latest unresolved model retry', () => {

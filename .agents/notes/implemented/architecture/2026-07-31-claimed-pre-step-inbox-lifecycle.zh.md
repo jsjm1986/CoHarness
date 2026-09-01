@@ -20,6 +20,8 @@ Status: implemented
 
 两类事件接口服务不同消费方。跟踪单条消息的观察方使用 `agent/inbox/inserted`、`claimed` 与 `discarded`。包括 Web 队列投影和重连基线在内的整体队列消费方使用持久 `agent/inbox/spliced` 流；UI 编辑与移除通过 `Inbox.splice()` 或其他 Inbox 变更方法处理，从而让同一投影记录所有变化。
 
+Chat 与 Trajectory 的 conversation Definition 将 next-step 状态保存为持久 splice 链和当前领取集合。只有在领取批次时才物化待处理 id；next-turn 队列的呈现仍由 Host queue projection 负责。
+
 必须对当前步骤进行原子改写的插件从 `agent/pre-step` 返回消息。只需要稍后上下文的插件可以直接修改 `agent.inbox`。Workspace context 同时使用两条路径：异步文件系统投影会暂存一条可替换的 `next-step` 消息，而下一次进入步骤的 pre-step 会把该消息或新组合的基线折入最终批次，并移除仍待处理的副本。reject 会让该条目继续排队。
 
 已归档的[可寻址队列项决策](../../archived/feature/2026-07-29-addressable-queue-operations.md)描述了已被取代的单次出现包装层设计。现在由 `MessageId` 负责寻址，而保留的 Host 队列镜像根据持久 splice 投影派生快照。

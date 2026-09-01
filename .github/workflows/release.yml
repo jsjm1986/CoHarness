@@ -74,6 +74,12 @@ jobs:
           RELEASE_PUBLISH: ${{ inputs.publish }}
         run: pnpm run release:verify --family dsh
 
+      - name: Verify package dependency ownership
+        run: pnpm run verify-package-dependencies
+
+      - name: Verify dual-version npm layout
+        run: pnpm run verify-npm-install-layout
+
       - name: Build
         run: pnpm run build:official
 

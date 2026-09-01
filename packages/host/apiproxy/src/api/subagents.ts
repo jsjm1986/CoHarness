@@ -5,7 +5,7 @@
  */
 
 import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
-import type { ContentBlock } from '@deepseek-ai/dsh-llm/types'
+import type { ImageMediaType } from '@deepseek-ai/dsh-attachment'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { RpcId, RpcRequest, RpcResponse } from './rpc.ts'
 import type { HistoryDetail, HistoryEntry, HistoryOmittedSpan, SessionProjectionsBlock } from './sessions.ts'
@@ -62,6 +62,11 @@ export interface SubagentCatalog {
   parentAvailable: boolean
 }
 
+/** Browser-upload content accepted by continuable subagent prompts. */
+export type SubagentPromptContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image'; mediaType: ImageMediaType; data: string; name?: string }
+
 /** Subagent-domain unary methods. */
 export interface SubagentsApi {
   /**
@@ -105,7 +110,8 @@ export interface SubagentsApi {
   prompt(
     request: RpcRequest<
       Extract<SubagentAddress, { mode: 'continuable' }> & {
-        content: ContentBlock[]
+        /** Upload-shaped parts; the Host admits images before followup delivery. */
+        content: SubagentPromptContentPart[]
         /** Optional browser zone sampled for this exact human prompt. */
         clientTimeZone?: string
         /** Optional browser-owned identity used to reconcile an optimistic submission echo. */

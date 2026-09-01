@@ -293,6 +293,41 @@ describe('track', () => {
     expect(controller.menu.getSnapshot().groups[0]!.items).toEqual([{ name: 'goal' }])
   })
 
+  it('publishes headers after a drill and routes a breadcrumb through the drill action', async () => {
+    const requests: Array<{ query: string; drilled?: boolean }> = []
+    const source: InputTriggerSource = {
+      trigger: '@',
+      name: 'reference',
+      candidates: (_session, request) => {
+        requests.push({ query: request.query, ...(request.drilled === undefined ? {} : { drilled: request.drilled }) })
+        return Promise.resolve([{ name: 'src/', drill: true, value: 'src' }])
+      },
+      header: (_session, request) => request.drilled === true && request.query.endsWith('/')
+        ? [{ label: 'Workspace', value: 'root' }, { label: 'src', value: 'src', current: true }]
+        : undefined,
+      onPick: ({ action, candidate }) => action === 'drill'
+        ? { text: `@${candidate.value}/`, continue: true }
+        : undefined,
+    }
+    const { controller, actx } = controllerBench([source])
+    actx.on('slash/input-insert-text', (request) => {
+      controller.track(request.text, request.text.length, { tier: 'plain' }, 2)
+      return true
+    })
+    controller.track('@s', 2, { tier: 'plain' }, 1)
+    await tick()
+    expect(requests[0]).toMatchObject({ query: 's', drilled: false })
+    controller.pick('reference', 0, 'drill')
+    await tick()
+    expect(requests.at(-1)).toMatchObject({ query: 'src/', drilled: true })
+    expect([...controller.headers.getSnapshot().get('reference') ?? []]).toEqual([
+      { label: 'Workspace', value: 'root' },
+      { label: 'src', value: 'src', current: true },
+    ])
+    controller.pickCrumb('reference', 0)
+    expect(requests.at(-1)?.drilled).toBe(true)
+  })
+
   it('same hit re-track refreshes the span stamp without refetching', () => {
     const cmd = deferredSource('/', 'command')
     const { controller } = controllerBench([cmd.source])
@@ -679,7 +714,7 @@ describe('lexicon', () => {
 
 describe('arbitrate', () => {
   async function menuBench() {
-    const cmd = readySource('/', 'command', [{ name: 'goal' }, { name: 'plan' }], () => undefined)
+    const cmd = readySource('/', 'command', [{ name: 'goal', drill: true }, { name: 'plan' }], () => undefined)
     const { controller } = controllerBench([cmd.source])
     controller.track('/g', 2, { tier: 'plain' }, 1)
     await tick()
@@ -701,6 +736,13 @@ describe('arbitrate', () => {
     expect(controller.menu.getSnapshot().open).toBe(false)
   })
 
+  it('tab drills the highlighted drillable completion while the menu is open', async () => {
+    const { controller, cmd } = await menuBench()
+    expect(controller.arbitrate('tab', false)).toBe('consumed')
+    expect(cmd.picks[0]!.candidate.name).toBe('goal')
+    expect(controller.menu.getSnapshot().open).toBe(false)
+  })
+
   it('escape closes and consumes', async () => {
     const { controller } = await menuBench()
     expect(controller.arbitrate('escape', false)).toBe('consumed')
@@ -709,19 +751,42 @@ describe('arbitrate', () => {
 
   it('IME composition passes every key untouched', async () => {
     const { controller } = await menuBench()
-    for (const key of ['up', 'down', 'enter', 'escape'] as const) {
+    for (const key of ['up', 'down', 'enter', 'escape', 'tab'] as const) {
       expect(controller.arbitrate(key, true)).toBe('pass')
     }
     expect(controller.menu.getSnapshot().open).toBe(true)
   })
 
-  it('closed menu passes; an open menu without a highlight passes enter', () => {
+  it('closed menu passes; an open menu without a highlight passes picking keys', () => {
     const cmd = deferredSource('/', 'command')
     const { controller } = controllerBench([cmd.source])
     expect(controller.arbitrate('enter', false)).toBe('pass')
+    expect(controller.arbitrate('tab', false)).toBe('pass')
     // Open with the only group still pending: nothing to pick yet.
     controller.track('/g', 2, { tier: 'plain' }, 1)
     expect(controller.arbitrate('enter', false)).toBe('pass')
+    expect(controller.arbitrate('tab', false)).toBe('pass')
+  })
+
+  it('enter with a stale pending highlight is consumed without picking or submit fallthrough', async () => {
+    const picks: string[] = []
+    const cmd = deferredSource('/', 'command', {
+      onPick: (pick) => { picks.push(pick.candidate.name); return undefined },
+    })
+    const { controller } = controllerBench([cmd.source])
+    controller.track('/g', 2, { tier: 'plain' }, 1)
+    await tick()
+    // A stale highlight can survive a source-level refresh even when its group
+    // is pending; Enter must remain an explicit no-op until it settles.
+    const state = controller.menu.getSnapshot()
+    controller.menu.set({
+      ...state,
+      groups: state.groups.map(group => ({ ...group, status: 'pending' as const, items: [] })),
+      highlight: { source: 'command', index: 0 },
+    })
+    expect(controller.arbitrate('enter', false)).toBe('consumed')
+    expect(picks).toHaveLength(0)
+    expect(controller.menu.getSnapshot().open).toBe(true)
   })
 })
 

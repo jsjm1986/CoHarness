@@ -10,6 +10,8 @@ While a staged session is running, the shared Session window expands older pages
 
 Trajectory assistant streams use the shared incremental block accumulator, joining reasoning and tool-argument parts only when a visible row is published. Long reasoning streams therefore avoid copying their complete prefix for every chunk.
 
+Trajectory's next-step message classifier folds a persistent inbox splice chain and a current claim set, so replay and live steering use the same message ownership without a second next-turn Definition.
+
 ## Model Experience
 
 None, as the trajectory views render session data in the browser; nothing here reaches a model request.

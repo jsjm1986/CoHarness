@@ -51,7 +51,7 @@ export type {
 export type { DirectoryEntry, DirectoryListing, HostApi } from './host.ts'
 export type {
   SubagentAddress, SubagentCatalog, SubagentInterruptReceipt, SubagentListEntry,
-  SubagentPromptReceipt, SubagentsApi,
+  SubagentPromptContentPart, SubagentPromptReceipt, SubagentsApi,
 } from './subagents.ts'
 export type { JobView } from './jobs.ts'
 export type { WorkspaceApi, WorkspaceId, WorkspaceView } from './workspace.ts'

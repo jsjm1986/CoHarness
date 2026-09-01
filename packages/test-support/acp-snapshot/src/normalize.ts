@@ -1,10 +1,17 @@
 /**
  * Pure ACP transcript and session-log normalizers. They scrub session ids, run cwd, RPC ids,
- * timestamps, and hook duration while preserving deterministic event sequence numbers.
+ * timestamps, and hook duration while preserving deterministic event payloads.
  * Request-header scrubbers stay composable so one scenario per header class can pin prompt and
  * tool-schema sidecars.
  * @module @deepseek-ai/dsh-acp-snapshot/normalize
  */
+
+import {
+  decodeSeqRanges,
+  decodeStorageRecord,
+  packChunkRuns,
+  type SessionEvent,
+} from '@deepseek-ai/dsh-session'
 
 const SESSION_ID = '{{sessionId}}'
 const CWD = '{{cwd}}'
@@ -295,9 +302,11 @@ export function normalizeStdout(
 /**
  * Normalize a session JSONL log into a stable expected output: the header line's
  * volatile fields (`createdAt`, `id`, `cwd`) and every event's `time` are
- * zeroed/scrubbed, all volatile strings scrubbed, and `seq` is LEFT INTACT
- * (deterministic by contract). A packed chunk row's timing (`time0`, the `dt`
- * gaps) zeroes just like an event `time`; its `seq0` stays, like `seq`.
+ * zeroed/scrubbed, goal lifecycle clocks are zeroed, all volatile strings
+ * scrubbed, and `seq` is LEFT INTACT (deterministic by contract). A packed
+ * chunk row's timing (`time0`, the `dt` gaps) zeroes just like an event `time`;
+ * its `seq0` stays, like `seq`. Storage range-encoded `sourceEventSeqs` values
+ * are expanded to logical arrays.
  * Output is JSONL in the same shape as the input — one compact record per
  * line.
  *
@@ -330,13 +339,56 @@ export function normalizeSessionLog(
       const data = record.data as Record<string, unknown>
       if ('durationMs' in data) data.durationMs = 0
     }
+    if (record.type === 'goal/change' && record.data !== null && typeof record.data === 'object') {
+      const data = record.data as Record<string, unknown>
+      if ('createdAt' in data) data.createdAt = 0
+      if ('updatedAt' in data) data.updatedAt = 0
+    }
+    if (Object.hasOwn(record, 'sourceEventSeqs')) {
+      record.sourceEventSeqs = decodeSeqRanges(record.sourceEventSeqs)
+    }
     return scrubValue(record, ctx, cwdPathMode) as Record<string, unknown>
   })
   return records.map(r => JSON.stringify(r)).join('\n') + '\n'
 }
 
 /**
+ * Repack normalized body records so persistence flush boundaries do not affect
+ * committed snapshots. Synthetic envelopes exist only while the storage codec
+ * reconstructs and packs the logical event stream; returned rows stay projected.
+ * @param rawLog - normalized projected session JSONL.
+ * @returns the same header and a canonical projected body.
+ */
+function repackSessionSnapshot(rawLog: string): string {
+  const lines = rawLog.split('\n').filter(line => line.trim().length > 0)
+  const header = lines.shift()
+  if (header === undefined) throw new Error('session snapshot must start with a session header')
+
+  let nextSeq = 0
+  const events = lines.flatMap((line) => {
+    const record = JSON.parse(line) as Record<string, unknown>
+    if (isPackedFixtureRow(record)) {
+      const decoded = decodeStorageRecord({ ...record, seq0: nextSeq, time0: 0 })
+      nextSeq += decoded.length
+      return decoded
+    }
+    const event = { ...record, seq: nextSeq, time: 0 } as SessionEvent
+    nextSeq += 1
+    return [event]
+  })
+  const body = packChunkRuns(events).map((stored) => {
+    const projected = { ...(stored as unknown as Record<string, unknown>) }
+    omitFixtureEnvelope(projected)
+    return JSON.stringify(projected)
+  })
+  return [header, ...body, ''].join('\n')
+}
+
+/**
  * Normalize and project persisted session JSONL for a committed fixture.
+ * The logical event stream is re-packed after normalization so separate
+ * persistence flushes produce one stable fixture layout; provenance ranges are
+ * emitted as ordinary logical sequence arrays.
  * @param rawLog - persisted or already-projected session JSONL.
  * @param ctx - the run's volatile values to scrub.
  * @param options - separator output controls.
@@ -347,7 +399,7 @@ export function normalizeSessionSnapshot(
   ctx: NormalizeContext,
   options: NormalizeOptions = {},
 ): string {
-  return scrubSessionSnapshot(normalizeSessionLog(rawLog, ctx, options))
+  return repackSessionSnapshot(scrubSessionSnapshot(normalizeSessionLog(rawLog, ctx, options)))
 }
 
 /**

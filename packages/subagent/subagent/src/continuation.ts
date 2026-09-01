@@ -30,7 +30,9 @@ import type {
   AgentSetupCommit,
   CreateAgentOptions,
 } from '@deepseek-ai/dsh-agent'
-import { boundContextSummary, createUserMessage, errorChain } from '@deepseek-ai/dsh-llm'
+import { boundContextSummary, contentHasImage, createUserMessage, errorChain } from '@deepseek-ai/dsh-llm'
+// Type-only: exposes the optional LLM registry on the continuation context.
+import type {} from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, MessageId, MessageSource } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
@@ -523,12 +525,24 @@ export class SubagentContinuationManager {
         if (activation === undefined) return this.coldResume(parent, childId, content, options)
         // A delivery that arrives after the disposal transaction began must not
         // reach a handle being torn down; wait for release, then cold-resume.
+        const disposal = activation.disposal
         /* v8 ignore next 3 -- the send-versus-dispose cutoff: reaching this arm needs a
          * delivery to observe the transaction inside the same critical section that opened it,
          * which no test can schedule deterministically. The behavior is covered end-to-end by
          * "cold-resumes a delivery that lost the race with final disposal". */
-        if (activation.disposal !== undefined) {
-          return activation.disposal.then(() => undefined, () => undefined)
+        if (disposal !== undefined) {
+          return disposal.then(() => undefined, () => undefined)
+        }
+        // Text-only delivery stays await-free, so the disposal cutoff check
+        // above and the submit share one critical window. Image capability
+        // lookup awaits; re-check the cutoff before admitting the message so
+        // a drain that begins during the lookup is retried through cold resume.
+        if (contentHasImage(content)) {
+          await this.assertImageCapable(activation.handle.agent, options.signal)
+          if (activation.disposal !== undefined) {
+            await Promise.allSettled([activation.disposal])
+            return undefined
+          }
         }
         return this.submitAdmitted(activation, content, options.source, parent, options.signal)
       })
@@ -1074,12 +1088,38 @@ export class SubagentContinuationManager {
     signal: AbortSignal,
   ): Promise<MessageId> {
     try {
+      if (contentHasImage(content)) {
+        // Capability lookup awaits with the Activation already published; a
+        // disposal cutoff that wins during the lookup must reject before the
+        // inbox receives the message.
+        await this.assertImageCapable(activation.handle.agent, signal)
+        if (activation.disposal !== undefined) {
+          throw new SubagentError(`subagent "${activation.childId}" is closing`, 'ACTIVATION_CLOSING')
+        }
+      }
       return this.submitAdmitted(activation, content, source, parent, signal)
     } catch (error: unknown) {
       /* v8 ignore next -- rollback disposal failures must not mask the
        * pre-acceptance signal, drain, or lifecycle failure. */
       await this.dispose(activation).catch(() => undefined)
       throw error
+    }
+  }
+
+  /** Refuse image content when the child's resolved model is text-only. */
+  private async assertImageCapable(agent: Agent, signal: AbortSignal): Promise<void> {
+    const { provider, model } = agent.options
+    if (provider === undefined || model === undefined) return
+    const llm = this.ctx.get('llm')
+    // A deployment without an LLM registry defers to its provider's own
+    // content projection rather than inventing a second capability source.
+    if (llm === undefined) return
+    const info = await llm.resolveModelInfo(provider, model, signal)
+    if (info.inputModalities !== undefined && !info.inputModalities.includes('image')) {
+      throw new SubagentError(
+        `Model "${model}" does not support image input.`,
+        'MODEL_DOES_NOT_SUPPORT_IMAGES',
+      )
     }
   }
 

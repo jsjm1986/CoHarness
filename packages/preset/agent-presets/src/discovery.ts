@@ -56,7 +56,7 @@ export const USER_PRESET_DIR = '.agent-presets'
  * @param at - row-path prefix for nested diagnostics, empty at the top level.
  * @returns one human-readable reason, or undefined when the shape holds.
  */
-function entryListProblem(rows: unknown, at = ''): string | undefined {
+export function entryListProblem(rows: unknown, at = ''): string | undefined {
   if (!Array.isArray(rows)) {
     return at === ''
       ? 'the composition must be a top-level list of plugin rows'

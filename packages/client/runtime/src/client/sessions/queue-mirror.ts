@@ -7,6 +7,7 @@ const QUEUE_PREVIEW_CHARS = 200
 
 function previewOf(content: readonly ContentBlock[]): string {
   const flat = content
+    .filter(block => block.type !== 'image')
     .map(block => (block.type === 'text' ? block.text : `[${block.type}]`))
     .join(' ').replace(/\s+/g, ' ').trim()
   const chars = Array.from(flat)

@@ -12,8 +12,8 @@ import { Context } from '@deepseek-ai/cordis'
 import { z } from 'zod'
 import SessionStore from '@deepseek-ai/dsh-session'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
-import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
-import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
+import SessionProjectionRegistry from '../src/index.ts'
+import type { ProjectionDefinition } from '../src/index.ts'
 
 declare module '@deepseek-ai/dsh-session-projection/types' {
   interface SessionProjectionStateMap {
@@ -56,6 +56,23 @@ const countUnit = (): ProjectionDefinition<'test/count', number> => ({
   stateVersion: 1,
 })
 
+/** State changes whose wire value intentionally keeps one object reference. */
+const stableViewUnit = (): Omit<ProjectionDefinition<'test/marks', MarksState>, 'wire'>
+  & { wire: NonNullable<ProjectionDefinition<'test/marks', MarksState>['wire']> } => {
+  const visible = { marks: ['stable'] }
+  return {
+    key: 'test/marks',
+    stateSchema: z.object({ marks: z.array(z.string()) }).nullable(),
+    init: () => null,
+    apply: (state, event) => event.type === 'test/mark' ? event.data : state,
+    wire: {
+      viewSchema: z.object({ marks: z.array(z.string()) }),
+      view: () => visible,
+    },
+    stateVersion: 2,
+  }
+}
+
 async function harness(): Promise<{ ctx: Context; session: Session }> {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
@@ -87,6 +104,17 @@ describe('SessionProjectionRegistry drive', () => {
     expect(ctx.sessionProjections.snapshot(session).values['test/marks']).toEqual({ marks: ['after'] })
   })
 
+  it('advances an already materialized cell across detached appends', async () => {
+    const { ctx } = await harness()
+    const session = ctx.sessions.prepare('detached-append' as never)
+    ctx.sessionProjections.register(marksUnit())
+    expect(ctx.sessionProjections.snapshot(session).values['test/marks']).toEqual({ marks: [] })
+    // Detached Sessions do not publish session/event; the next read must still
+    // notice their appended suffix rather than serving the stale cell.
+    mark(session, ['detached-append'])
+    expect(ctx.sessionProjections.snapshot(session).values['test/marks']).toEqual({ marks: ['detached-append'] })
+  })
+
   it('serves init-derived state and asOfSeq -1 for an empty log', async () => {
     const { ctx, session } = await harness()
     ctx.sessionProjections.register(marksUnit())
@@ -106,6 +134,17 @@ describe('SessionProjectionRegistry drive', () => {
     // Non-matching event: apply returns the same reference — no notification.
     session.append('turn/start', { turn: 1 })
     expect(seen).toEqual([{ key: 'test/marks', value: { marks: ['a'] }, seq: event.seq, sessionId: String(session.id) }])
+  })
+
+  it('suppresses a live notification when a changed state keeps the same raw view reference', async () => {
+    const { ctx, session } = await harness()
+    ctx.sessionProjections.register(stableViewUnit())
+    const seen: number[] = []
+    ctx.sessionProjections.onChanged((_session, _key, _value, seq) => { seen.push(seq) })
+    mark(session, ['first'])
+    mark(session, ['second'])
+    expect(seen).toEqual([0])
+    expect(ctx.sessionProjections.snapshot(session).values['test/marks']).toEqual({ marks: ['stable'] })
   })
 
   it('drives independently per session (cells are per-session watermarks)', async () => {

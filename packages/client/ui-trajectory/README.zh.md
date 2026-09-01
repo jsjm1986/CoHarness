@@ -10,6 +10,8 @@ compact 视口会保留记录的持久选择，同时把事件投影为使用较
 
 Trajectory 助手流使用共享的增量 block 累加器，只在发布可见行时拼接推理和工具参数片段。长推理流不会在每个 chunk 上复制完整前缀。
 
+Trajectory 的 next-step 消息分类器折叠持久的 inbox splice 链和当前领取集合，因此回放与实时 steering 使用同一消息所有权，不需要第二个 next-turn Definition。
+
 ## 模型体验
 
 无。轨迹视图在浏览器中渲染会话数据；这里没有任何内容进入模型请求。

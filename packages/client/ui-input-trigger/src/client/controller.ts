@@ -13,7 +13,8 @@ import { detectTrigger } from '../core/detect.ts'
 import { MENU_CLOSED, menuReduce, seedGroups } from '../core/menu.ts'
 import type { MenuEvent, MenuState, TriggerHit } from '../core/contract.ts'
 import type {
-  ArbitrateKey, ArbitrateOutcome, ClientSessionContext, PickOutcome, InputTriggerSource, SubmitEnvelope, TriggerChar, TriggerGuard,
+  ArbitrateKey, ArbitrateOutcome, ClientSessionContext, InputTriggerCandidate, InputTriggerCrumb,
+  PickAction, PickOutcome, InputTriggerSource, SubmitEnvelope, TriggerChar, TriggerGuard,
 } from '../types.ts'
 
 /** Roster access the controller borrows from the root service (registration order preserved). */
@@ -46,6 +47,9 @@ export class InputTriggerController {
    * for the launcher's expanded state without owning a second menu model.
    */
   readonly launcher: SnapshotStore<string | null> = createSnapshotStore<string | null>(null)
+  /** Breadcrumbs published per source for the currently open menu. */
+  readonly headers: SnapshotStore<ReadonlyMap<string, readonly InputTriggerCrumb[]>> =
+    createSnapshotStore<ReadonlyMap<string, readonly InputTriggerCrumb[]>>(new Map())
   /**
    * Aggregated hot reference lexicon, grouped by trigger (plain-text-reference decision;
    * see .agents/notes/implemented/architecture/2026-07-25-web-input-machine-and-slash-pipeline.md):
@@ -61,6 +65,8 @@ export class InputTriggerController {
 
   /** The authoritative hit: single truth for span CAS material (menu snapshot never carries it alone). */
   private hit: TriggerHit | null = null
+  /** Whether the current menu was reached by an in-place drill. */
+  private drilled = false
   private fetch: AbortController | null = null
   private disposed = false
   /** Per-source lexicon unsubscribers (sources without the hook never enter). */
@@ -115,6 +121,7 @@ export class InputTriggerController {
       this.menu.set(seedGroups(this.menu.getSnapshot(), roster))
     }
     this.reduce({ type: 'hit', hit })
+    this.refreshHeaders(hit, roster)
     this.fetchCandidates(hit, roster)
   }
 
@@ -142,6 +149,7 @@ export class InputTriggerController {
     this.launcher.set(source)
     this.menu.set(seedGroups(this.menu.getSnapshot(), [match]))
     this.reduce({ type: 'hit', hit })
+    this.refreshHeaders(hit, [match])
     this.fetchCandidates(hit, [match])
   }
 
@@ -150,8 +158,9 @@ export class InputTriggerController {
    * and execute claim/insert outcomes via the scoped input events.
    * @param source - source (group) name.
    * @param index - candidate index within the group.
+   * @param action - settling pick (default) or in-place drill.
    */
-  pick(source: string, index: number): void {
+  pick(source: string, index: number, action: PickAction = 'pick'): void {
     const state = this.menu.getSnapshot()
     const hit = this.hit
     if (this.disposed || !state.open || hit === null) return
@@ -160,23 +169,43 @@ export class InputTriggerController {
     if (candidate === undefined) return
     const src = this.deps.roster.sources(hit.trigger).find(s => s.name === source)
     if (src === undefined) return
-    const outcome = src.onPick({
-      candidate,
-      session: this.project(),
-      position: hit.position,
-      via: 'menu',
-      span: hit.span,
-    })
-    this.stopFetch()
-    this.reduce({ type: 'close' })
-    this.execute(outcome, hit.span)
+    this.settle(src, candidate, hit, action)
+  }
+
+  /**
+   * Pick a non-current breadcrumb through the source's drill path.
+   * @param source - source group owning the breadcrumb.
+   * @param index - breadcrumb index within that source's header.
+   */
+  pickCrumb(source: string, index: number): void {
+    const hit = this.hit
+    if (this.disposed || !this.menu.getSnapshot().open || hit === null) return
+    const crumb = this.headers.getSnapshot().get(source)?.[index]
+    if (crumb === undefined || crumb.current === true) return
+    const src = this.deps.roster.sources(hit.trigger).find(s => s.name === source)
+    if (src === undefined) return
+    this.settle(src, { name: crumb.label, value: crumb.value }, hit, 'drill')
+  }
+
+  /**
+   * Park the shared keyboard highlight on a pointer-hovered row.
+   * @param source - source group owning the row.
+   * @param index - candidate index within that group.
+   */
+  hover(source: string, index: number): void {
+    if (this.disposed) return
+    this.reduce({ type: 'hover', source, index })
   }
 
   /**
    * Keyboard arbitration while the menu is open.
    * @param key - intercepted key.
    * @param composing - inside IME composition: everything passes.
-   * @returns consumed / pick-highlighted / pass.
+   * @returns `pass` when the browser keeps the key (closed menu, no
+   * highlight, or a vanished candidate), `consumed` when the menu handled
+   * the key without a settling pick (move, close, or a pending refinement),
+   * or `pick-highlighted` when the highlighted candidate settled and the menu
+   * closed.
    */
   arbitrate(key: ArbitrateKey, composing: boolean): ArbitrateOutcome {
     if (composing || this.disposed) return 'pass'
@@ -198,8 +227,25 @@ export class InputTriggerController {
       }
       case 'enter': {
         if (state.highlight === null) return 'pass'
+        // Refinement keeps the previous rows and highlight visible while the
+        // next fetch is pending; Enter must neither pick the stale row nor
+        // fall through to submit until that group is ready.
+        const group = state.groups.find(g => g.source === state.highlight?.source)
+        if (group === undefined || group.status !== 'ready') return 'consumed'
         this.pick(state.highlight.source, state.highlight.index)
         return 'pick-highlighted'
+      }
+      case 'tab': {
+        // Tab is the keyboard twin of a row's drill chevron. A normal row
+        // deliberately passes through so native focus traversal remains intact.
+        if (state.highlight === null) return 'pass'
+        const group = state.groups.find(g => g.source === state.highlight?.source)
+        const item = group !== undefined && group.status === 'ready'
+          ? group.items[state.highlight.index]
+          : undefined
+        if (item?.drill !== true) return 'pass'
+        this.pick(state.highlight.source, state.highlight.index, 'drill')
+        return 'consumed'
       }
     }
   }
@@ -360,7 +406,15 @@ export class InputTriggerController {
   /** Wire one source's lexicon invalidation channel into refresh (hookless or roll-less sources never notify). */
   private watchLexicon(source: InputTriggerSource, projection: ClientSessionContext): void {
     if (source.lexicon === undefined || source.subscribeLexicon === undefined) return
-    this.lexiconOffs.set(source, source.subscribeLexicon(projection, () => { this.refreshLexicon() }))
+    this.lexiconOffs.set(source, source.subscribeLexicon(projection, () => {
+      this.refreshLexicon()
+      const hit = this.hit
+      if (hit === null || !this.menu.getSnapshot().open || hit.trigger !== source.trigger) return
+      void Promise.resolve().then(() => {
+        if (this.disposed || this.hit !== hit || !this.menu.getSnapshot().open) return
+        this.fetchCandidates(hit, this.deps.roster.sources(hit.trigger))
+      })
+    }))
   }
 
   /** Launch the candidate fetch for one hit generation, superseding the previous one. */
@@ -376,6 +430,7 @@ export class InputTriggerController {
           query: hit.query,
           quoted: hit.quoted,
           position: hit.position,
+          drilled: this.drilled,
           signal: controller.signal,
         })
         .then(
@@ -397,6 +452,55 @@ export class InputTriggerController {
     this.fetch = null
   }
 
+  /** Run one candidate through its source and apply the resulting input edit. */
+  private settle(
+    src: InputTriggerSource,
+    candidate: InputTriggerCandidate,
+    hit: TriggerHit,
+    action: PickAction,
+  ): void {
+    const outcome = src.onPick({
+      candidate,
+      session: this.project(),
+      position: hit.position,
+      via: 'menu',
+      action,
+      span: hit.span,
+    })
+    this.stopFetch()
+    this.reduce({ type: 'close' })
+    // Set the drill marker after closing: the synchronous input edit may
+    // re-enter track(), which must see the marker while it refreshes headers
+    // and candidates. A rejected CAS edit must not leave a stale marker.
+    this.drilled = action === 'drill'
+    if (!this.execute(outcome, hit.span)) this.drilled = false
+  }
+
+  /** Re-poll header-bearing sources for the current hit. */
+  private refreshHeaders(hit: TriggerHit, roster: readonly InputTriggerSource[]): void {
+    const projection = this.project()
+    const crumbs = new Map<string, readonly InputTriggerCrumb[]>()
+    for (const src of roster) {
+      if (src.header === undefined) continue
+      try {
+        const published = src.header(projection, {
+          query: hit.query,
+          quoted: hit.quoted,
+          drilled: this.drilled,
+        })
+        if (published !== undefined && published.length > 0) crumbs.set(src.name, published)
+      } catch (error) {
+        console.error(`[ui-input-trigger] source "${src.name}" header failed:`, error)
+      }
+    }
+    this.setHeaders(crumbs)
+  }
+
+  private setHeaders(next: ReadonlyMap<string, readonly InputTriggerCrumb[]>): void {
+    if (this.headers.getSnapshot().size === 0 && next.size === 0) return
+    this.headers.set(next)
+  }
+
   private clearLauncher(): void {
     if (this.launcher.getSnapshot() !== null) this.launcher.set(null)
   }
@@ -405,6 +509,9 @@ export class InputTriggerController {
     const cur = this.menu.getSnapshot()
     const next = menuReduce(cur, ev)
     if (next !== cur) this.menu.set(next)
-    if (!next.open) this.clearLauncher()
+    if (next.open) return
+    this.clearLauncher()
+    this.drilled = false
+    this.setHeaders(new Map())
   }
 }
