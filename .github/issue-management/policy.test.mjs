@@ -7,6 +7,7 @@ import {
   countVisibleUnits,
   nextResolvingIssueStatus,
   parseReferences,
+  projectOwnerSelection,
   retainIssueReferences,
   resolvingIssueStatusCommand,
   requiresPullRequestPolicy,
@@ -67,6 +68,9 @@ const reviewedPull = (labels) => ({
 
 test('requires policy runs to target the configured repository', () => {
   assert.equal(canonicalRepository(), 'jsjm1986/CoHarness')
+  assert.deepEqual(projectOwnerSelection(), { organization: false, user: true })
+  assert.deepEqual(projectOwnerSelection('organization'), { organization: true, user: false })
+  assert.throws(() => projectOwnerSelection('team'), /必须是 organization 或 user/)
   assert.doesNotThrow(() => assertCanonicalRepository({
     runtimeRepository: 'JSJM1986/COHARNESS',
     eventRepository: 'jsjm1986/CoHarness',

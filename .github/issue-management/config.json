@@ -1,7 +1,9 @@
 {
-  "organization": "jsjm1986",
+  "repositoryOwner": "jsjm1986",
   "repository": "CoHarness",
   "canonicalRepository": "jsjm1986/CoHarness",
+  "projectOwner": "jsjm1986",
+  "projectOwnerType": "user",
   "projectNumber": 1,
   "projectTitle": "DSH Issue Management",
   "lifecycleActor": "dsh-issue-management",

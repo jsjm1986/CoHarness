@@ -10,7 +10,7 @@ Real-API tests and Issue Project automation require repository-scoped credential
 
 ## Decision
 
-Credentialed E2E and Issue automation workflows run only when the workflow repository is `jsjm1986/CoHarness` and the corresponding repository variable explicitly enables the capability. Fork and non-canonical repositories continue to use keyless CI and do not receive real-API secrets or Issue Project access. The Issue policy executable independently verifies `GITHUB_REPOSITORY` and the event repository against the configured canonical repository before making any GitHub API request. The E2E workflow remains on `pull_request`; it must not use `pull_request_target` to expose secrets to untrusted code.
+Credentialed E2E and Issue automation workflows run only when the workflow repository is `jsjm1986/CoHarness` and the corresponding repository variable explicitly enables the capability. Fork and non-canonical repositories continue to use keyless CI and do not receive real-API secrets or Issue Project access. The Issue policy executable independently verifies `GITHUB_REPOSITORY` and the event repository against the configured canonical repository before making any GitHub API request. Repository ownership and Project ownership are configured separately: `repositoryOwner` identifies the REST and repository GraphQL target, while `projectOwner` plus `projectOwnerType` selects `user(login:)` or `organization(login:)` for the Project lookup. The E2E workflow remains on `pull_request`; it must not use `pull_request_target` to expose secrets to untrusted code.
 
 ## Alternatives considered
 
@@ -22,4 +22,4 @@ Credentialed E2E and Issue automation workflows run only when the workflow repos
 
 ## Consequences
 
-The canonical repository must configure `DSH_REAL_API_E2E_ENABLED`, `DSH_ISSUE_AUTOMATION_ENABLED`, `DEEPSEEK_API_KEY_EXTERNAL`, and the GitHub App credentials before enabling the corresponding workflows. Non-canonical repositories see those jobs skipped rather than failed. The repository identity is intentionally explicit in workflow guards and policy runtime validation, so changing the canonical repository requires updating the configuration, workflows, and regression tests together.
+The canonical repository must configure `DSH_REAL_API_E2E_ENABLED`, `DSH_ISSUE_AUTOMATION_ENABLED`, `DEEPSEEK_API_KEY_EXTERNAL`, and the GitHub App credentials before enabling the corresponding workflows. The configured Project owner is the `jsjm1986` user account, so the policy uses the user Project query rather than assuming an organization-owned Project. Non-canonical repositories see those jobs skipped rather than failed. Repository and Project identities are intentionally explicit in configuration, workflow guards, and policy runtime validation, so changing either owner requires updating the configuration and regression tests together.
