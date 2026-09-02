@@ -1151,8 +1151,9 @@ function viewFor(
     }
   } catch (error: unknown) {
     // A throwing presenter (or unparseable arguments) must not break delivery;
-    // the event still ships, just without a view.
-    console.error(`api-proxy: presenter failed for ${event.type}, falling back to generic: ${String(error)}`)
+    // the event still ships, just without a view. Route through ctx.logger
+    // so host log aggregation picks it up instead of going to raw stderr.
+    ctx.logger.warn(`api-proxy: presenter failed for ${event.type}, falling back to generic: ${String(error)}`)
   }
   return undefined
 }
