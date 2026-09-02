@@ -49,8 +49,13 @@ describe('CI workflow', () => {
     const node24Coverage = workflow.jobs['node-24-coverage']
     const node24Consumers = workflow.jobs['node-24-consumers']
     const aggregate = workflow.jobs['all-checks-passed']
-    if (!Array.isArray(windows.steps) || !Array.isArray(aggregate.needs)) {
-      throw new TypeError('Windows job must define steps and the aggregate must define needs')
+    if (!Array.isArray(windows.steps)
+      || !Array.isArray(aggregate.needs)
+      || !isRecord(windowsNative.env)
+      || !isRecord(node24Coverage.env)
+      || !isRecord(node24Consumers.env)
+      || !Array.isArray(node24Consumers.steps)) {
+      throw new TypeError('CI worker jobs must define environment maps and steps, and the aggregate must define needs')
     }
     const commandSteps = windows.steps.filter((step): step is Record<string, unknown> & { run: string } => (
       isRecord(step) && typeof step.run === 'string'
@@ -77,6 +82,9 @@ describe('CI workflow', () => {
     expect(windowsNative.env).toMatchObject({
       DSH_COVERAGE_TEST_TIMEOUT_MS: '30000',
     })
+    expectExternalCapacityExpression(windowsNative.env.DSH_COVERAGE_PARTITIONS, '8', '2')
+    expectExternalCapacityExpression(windowsNative.env.DSH_GATE_CONCURRENCY, '4', '1')
+    expectExternalCapacityExpression(windowsNative.env.DSH_PUBLINT_CONCURRENCY, '8', '1')
     const nativeCommandSteps = (windowsNative.steps as unknown[]).filter((step): step is Record<string, unknown> & { run: string } => (
       isRecord(step) && typeof step.run === 'string'
     ))
@@ -109,6 +117,23 @@ describe('CI workflow', () => {
       expect(job['runs-on']).toContain('dsh-ubuntu-24-04-16core')
       expect(job['runs-on']).toContain('ubuntu-latest')
     }
+    expect(node24Coverage.env.DSH_COVERAGE_TEST_TIMEOUT_MS).toBe('30000')
+    expectExternalCapacityExpression(node24Coverage.env.DSH_COVERAGE_PARTITIONS, '4', '2')
+    expectExternalCapacityExpression(node24Coverage.env.DSH_GATE_CONCURRENCY, '3', '1')
+    expectExternalCapacityExpression(node24Consumers.env.DSH_GATE_CONCURRENCY, '8', '1')
+    expectExternalCapacityExpression(node24Consumers.env.DSH_OXLINT_THREADS, '8', '1')
+    expectExternalCapacityExpression(node24Consumers.env.DSH_PUBLINT_CONCURRENCY, '8', '1')
+    expectExternalCapacityExpression(node24Consumers.env.DSH_WEB_SNAPSHOT_WORKERS, '6', '2')
+    expectExternalCapacityExpression(node24Consumers.env.DSH_SNAPSHOT_MAX_CONCURRENCY, '32', '1')
+    expect(String(node24Consumers.env.DSH_SNAPSHOT_MAX_CONCURRENCY)).toContain("&& '12'")
+    const consumerSteps = node24Consumers.steps.filter(isRecord)
+    const gatewayInstallIndex = consumerSteps.findIndex(step => step.name === 'Install Gateway runtime dependencies')
+    const consumerGateIndex = consumerSteps.findIndex(step => step.name === 'Run compatibility, snapshot, and artifact gates')
+    expect(gatewayInstallIndex).toBeGreaterThanOrEqual(0)
+    expect(consumerSteps[gatewayInstallIndex]).toMatchObject({
+      run: 'npm ci --prefix gateway --omit=dev',
+    })
+    expect(consumerGateIndex).toBeGreaterThan(gatewayInstallIndex)
     expect(aggregate['runs-on']).toContain('DSH_CI_FAILOVER_LINUX')
     expect(aggregate['runs-on']).not.toContain('DSH_CI_FAILOVER_WINDOWS')
     expect(aggregate['runs-on']).toContain('vm-backup')
@@ -508,6 +533,14 @@ function workflowJob(workflow: Record<string, unknown>, job: string): Record<str
     throw new TypeError(`workflow must define the ${job} job`)
   }
   return workflow.jobs[job]
+}
+
+function expectExternalCapacityExpression(value: unknown, external: string, portable: string): void {
+  expect(typeof value).toBe('string')
+  if (typeof value !== 'string') throw new TypeError('capacity expression must be a string')
+  expect(value).toContain('DSH_CI_ENTERPRISE_RUNNERS_ENABLED')
+  expect(value).toContain(`&& '${external}'`)
+  expect(value).toContain(`|| '${portable}'`)
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

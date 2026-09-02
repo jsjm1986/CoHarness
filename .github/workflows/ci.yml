@@ -138,18 +138,24 @@ jobs:
     name: node 24 / coverage
     env:
       # Partitioning replaces the instrumented share. Portable standard runners
-      # use two workers; configured external pools retain their measured bound.
+      # use two single-worker partitions and one outer gate worker; configured
+      # external pools retain their measured partition and gate bounds.
       DSH_COVERAGE_MAX_WORKERS: >-
         ${{ ((vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
           && github.event.pull_request.user.login != 'dependabot[bot]')
           || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
           && '6' || '2' }}
-      DSH_COVERAGE_PARTITIONS: '4'
+      DSH_COVERAGE_PARTITIONS: >-
+        ${{ ((vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
+          && github.event.pull_request.user.login != 'dependabot[bot]')
+          || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
+          && '4' || '2' }}
+      DSH_COVERAGE_TEST_TIMEOUT_MS: '30000'
       DSH_GATE_CONCURRENCY: >-
         ${{ ((vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
           && github.event.pull_request.user.login != 'dependabot[bot]')
           || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
-          && '3' || '2' }}
+          && '3' || '1' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -213,32 +219,32 @@ jobs:
         ${{ ((vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
           && github.event.pull_request.user.login != 'dependabot[bot]')
           || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
-          && '8' || '2' }}
+          && '8' || '1' }}
       DSH_NODE_COMPAT_SKIP_TYPECHECK: '1'
       DSH_OXLINT_THREADS: >-
         ${{ ((vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
           && github.event.pull_request.user.login != 'dependabot[bot]')
           || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
-          && '8' || '2' }}
+          && '8' || '1' }}
       DSH_PUBLINT_CONCURRENCY: >-
         ${{ ((vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
           && github.event.pull_request.user.login != 'dependabot[bot]')
           || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
-          && '8' || '2' }}
+          && '8' || '1' }}
       DSH_WEB_SNAPSHOT_WORKERS: >-
         ${{ ((vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
           && github.event.pull_request.user.login != 'dependabot[bot]')
           || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
           && '6' || '2' }}
-      # Failover uses the shared-VM bound; enterprise and portable standard
-      # pools use their measured local bounds.
+      # Failover uses the shared-VM bound; enterprise keeps the measured larger
+      # bound, while the portable standard pool serializes ordinary snapshots.
       DSH_SNAPSHOT_MAX_CONCURRENCY: >-
         ${{ vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
           && github.event.pull_request.user.login != 'dependabot[bot]'
           && '12'
           || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true'
           && '32'
-          || '4' }}
+          || '1' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -294,6 +300,12 @@ jobs:
           wait "$sandbox_pid" || sandbox_status=$?
           if (( install_status != 0 )); then exit "$install_status"; fi
           exit "$sandbox_status"
+
+      # Gateway is an independent npm project outside the root pnpm workspace.
+      # Root snapshot tests import its runtime modules, so install its locked
+      # production dependency graph before the consumer gate starts.
+      - name: Install Gateway runtime dependencies
+        run: npm ci --prefix gateway --omit=dev
 
       - name: Install Playwright Chromium and hosted dependencies
         if: vars.DSH_CI_FAILOVER_LINUX != 'selfhosted' || github.event.pull_request.user.login == 'dependabot[bot]'
@@ -526,20 +538,24 @@ jobs:
           && github.event.pull_request.user.login != 'dependabot[bot]')
           || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
           && '6' || '2' }}
-      DSH_COVERAGE_PARTITIONS: '8'
+      DSH_COVERAGE_PARTITIONS: >-
+        ${{ ((vars.DSH_CI_FAILOVER_WINDOWS == 'selfhosted'
+          && github.event.pull_request.user.login != 'dependabot[bot]')
+          || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
+          && '8' || '2' }}
       # Instrumented process and polling fixtures can exceed Vitest's defaults
-      # under the complete lane's concurrent gate load.
+      # under the complete lane's partition fan-out and build-backed workload.
       DSH_COVERAGE_TEST_TIMEOUT_MS: '30000'
       DSH_GATE_CONCURRENCY: >-
         ${{ ((vars.DSH_CI_FAILOVER_WINDOWS == 'selfhosted'
           && github.event.pull_request.user.login != 'dependabot[bot]')
           || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
-          && '4' || '2' }}
+          && '4' || '1' }}
       DSH_PUBLINT_CONCURRENCY: >-
         ${{ ((vars.DSH_CI_FAILOVER_WINDOWS == 'selfhosted'
           && github.event.pull_request.user.login != 'dependabot[bot]')
           || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
-          && '8' || '2' }}
+          && '8' || '1' }}
     steps:
       - uses: actions/checkout@v7
         with:

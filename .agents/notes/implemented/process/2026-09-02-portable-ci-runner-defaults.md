@@ -14,7 +14,15 @@ Required Linux jobs use `ubuntu-latest` by default, and the non-blocking native 
 
 This decision supersedes the implicit enterprise-runner defaults and unconditional standby cadence recorded in the [larger-runner evidence](2026-07-22-evidence-based-larger-hosted-runners.md), [serial reference](2026-07-21-serial-cross-platform-ci-reference.md), [failover runbook](2026-07-26-ci-failover-runbook.md), and [native Windows topology](2026-08-08-native-windows-pull-request-ci.md). Those notes retain their measurements, topology rationale, and operational procedures, but their enterprise and self-hosted paths now apply only when the corresponding repository variables select them.
 
-Worker and gate concurrency is resolved from the same capacity decision. Standard hosted runners use bounded low-concurrency values; enterprise or explicitly selected self-hosted pools retain the larger measured values. Master-only standby jobs require `DSH_CI_SELF_HOSTED_STANDBY_ENABLED=true`, and the larger-runner benchmark jobs require the enterprise-runner opt-in. An absent repository variable therefore selects only generally available GitHub-hosted capacity and never leaves an optional private pool in the required path.
+Worker and gate concurrency is resolved from the same capacity decision. Standard hosted Linux coverage runs two single-worker instrumented partitions, applies a 30-second test and polling timeout, and serializes the instrumented and exempt-heavy gates. The standard consumer lane runs one outer gate at a time, gives Oxlint and publint one worker each, and runs ordinary snapshots serially while retaining two browser replay workers. Standard native Windows uses two coverage partitions, one outer gate worker, one publint worker, and the same 30-second coverage timeout. Enterprise or explicitly selected self-hosted pools retain the larger measured values.
+
+The consumer lane also installs `gateway/package-lock.json` with `npm ci --prefix gateway --omit=dev` before running snapshots. `gateway/` is an independent npm project outside the root pnpm workspace, but its snapshot files are part of the root Vitest snapshot inventory and import Gateway runtime dependencies such as `pg`. A root `pnpm install` therefore cannot make that inventory self-contained by itself.
+
+The first complete standard-runner execution showed why both layers must be bounded together: four or eight concurrent coverage partitions plus two outer gate workers caused otherwise bounded repository scans, large-file upload checks, terminal-idle observation, and ACP snapshot polling to miss their deadlines. The consumer lane also overlapped build-backed snapshots, lint, package publication checks, and browser replay on the same small host. Raising individual test timeouts alone would preserve the resource contention and make failure latency longer; the portable topology therefore reduces process fan-out first and uses the larger timeout only for legitimately slow coverage instrumentation.
+
+Master-only standby jobs require `DSH_CI_SELF_HOSTED_STANDBY_ENABLED=true`, and the larger-runner benchmark jobs require the enterprise-runner opt-in. An absent repository variable therefore selects only generally available GitHub-hosted capacity and never leaves an optional private pool in the required path.
+
+Portable hosted execution also makes the clean checkout authoritative. Built-entry tests resolve third-party package roots from public entries instead of assuming `./package.json` exports, the consumer lane installs the independent Gateway runtime graph before root snapshots, and protocol assertions include the current ACP message and provider capability fields.
 
 `scripts/ci-workflow.spec.ts` pins the portable defaults, explicit opt-ins, failover precedence, and standby guards so a future workflow edit cannot silently restore repository-specific runner labels as defaults.
 
@@ -26,6 +34,8 @@ Worker and gate concurrency is resolved from the same capacity decision. Standar
 
 **Use enterprise concurrency on standard hosted runners.** Rejected because the existing worker counts were calibrated for larger machines and can increase contention, memory pressure, and test instability on the portable default pools.
 
+**Keep two outer gate workers and only raise test timeouts.** Rejected because the standard-runner failures occurred while multiple coverage processes and unrelated build-backed gates competed for the same cores and memory. Longer deadlines do not restore the intended scheduling boundary.
+
 **Add repository-specific runner labels for CoHarness.** Rejected because it would replace one private infrastructure dependency with another and leave the workflow non-portable.
 
 ## Consequences
@@ -34,4 +44,4 @@ A fresh repository can run the complete required CI surface on standard GitHub-h
 
 ## Testing
 
-The CI workflow test parses the YAML and asserts the standard hosted fallbacks, enterprise opt-in, self-hosted failover precedence, reduced portable concurrency, standby enablement, and benchmark guards. The repository pre-push typecheck and the resulting pull-request CI exercise the complete workflow configuration.
+The CI workflow test parses the YAML and asserts the standard hosted fallbacks, enterprise opt-in, self-hosted failover precedence, exact portable partition and gate bounds, coverage timeouts, the independent Gateway install ordering, standby enablement, and benchmark guards. Focused Gateway snapshot, built-bin, subagent composition, and ACP snapshot tests cover clean-install consumer behavior. The repository pre-push typecheck and the resulting pull-request CI exercise the complete workflow configuration.
