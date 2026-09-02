@@ -74,9 +74,11 @@ function text(result: { content: { type: string; text?: string }[] }): string {
 describe.skipIf(!hasPwsh)('persistent pwsh through a real cordis.yml Loader composition', () => {
   it('preserves cwd and environment across calls', async () => {
     root = await mkdtemp(join(tmpdir(), 'dsh-persistent-pwsh-loader-'))
-    // macOS exposes the same temporary directory as both /var and /private/var;
-    // PowerShell reports the canonical spelling from inside the PTY.
-    const expectedRoot = realpathSync(root)
+    // macOS exposes the same temporary directory as both /var and /private/var,
+    // and Windows may hand out an 8.3 short name (RUNNER~1); PowerShell reports
+    // the canonical long spelling from inside the PTY, which only the native
+    // realpath resolves.
+    const expectedRoot = realpathSync.native(root)
     const configPath = join(root, 'cordis.yml')
     await writeFile(configPath, [
       "- name: '@deepseek-ai/dsh-agent'",
