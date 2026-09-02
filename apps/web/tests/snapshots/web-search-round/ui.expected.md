@@ -1,4 +1,7 @@
 - banner:
+  - tablist:
+    - tab "Chat" [selected]
+    - tab "Trajectory"
   - navigation "Session hierarchy":
     - button "Use web_search once with queries" [disabled]
   - img
@@ -6,9 +9,10 @@
   - button "Session log":
     - text: Session log
     - img
-  - tablist:
-    - tab "Chat" [selected]
-    - tab "Trajectory"
+- separator "Adjust transcript content width"
+- button "1 tool call · 2 intermediate messages" [expanded]:
+  - text: 1 tool call · 2 intermediate messages
+  - img
 - text: Use web_search once with queries ["DeepSeek Harness snapshot search","DeepSeek Harness multi-query search"]. Then reply exactly SEARCH_DONE and stop. {{clock}}
 - button "Copy":
   - img
@@ -16,6 +20,10 @@
   - img
   - img
   - text: Context injection @deepseek-ai/dsh-system-prompt
+- button "System prompt":
+  - img
+  - img
+  - text: System prompt
 - button "Search DeepSeek Harness snapshot search, DeepSeek Harness multi-query search":
   - img
   - img
@@ -31,6 +39,10 @@
   - img
 - text: {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s
 - textbox "Message the agent"
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
 - button "Commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write

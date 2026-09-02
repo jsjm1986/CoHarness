@@ -26,6 +26,8 @@ consumer 通道还会在运行快照前通过 `npm ci --prefix gateway --omit=de
 
 可移植托管执行还会让干净检出成为权威环境。构建入口测试从公开入口解析第三方包根目录，不再假设包导出 `./package.json`；consumer 通道会在根快照前安装独立的 Gateway 运行时依赖图；协议断言包含当前 ACP 消息字段和 Provider capability 字段。
 
+浏览器 HMR owner 会同时快照和恢复动态 client bundle 以及 `apps/web/dist`。watcher 除了重建插件 bundle 还会重写 Vite dist，因此只恢复 `lib/client.js` 会让后续浏览器测试看到陈旧的 artifact digest，即使 HMR 断言本身已经通过。
+
 `scripts/ci-workflow.spec.ts` 固定可移植默认值、显式启用项、故障切换优先级和备用池门禁，防止后续工作流修改静默恢复以仓库专属 Runner 标签作为默认值。
 
 ## Alternatives considered
@@ -46,4 +48,4 @@ consumer 通道还会在运行快照前通过 `npm ci --prefix gateway --omit=de
 
 ## Testing
 
-CI 工作流测试会解析 YAML，并断言标准托管回退、企业池显式启用、自托管故障切换优先级、精确的可移植分区与门禁上限、coverage 超时、独立 Gateway 安装顺序、备用池启用条件和基准门禁。聚焦的 Gateway 快照、built-bin、subagent 组合和 ACP 快照测试覆盖干净安装下的消费方行为。仓库 pre-push 类型检查以及最终的拉取请求 CI 会覆盖完整工作流配置。
+CI 工作流测试会解析 YAML，并断言标准托管回退、企业池显式启用、自托管故障切换优先级、精确的可移植分区与门禁上限、coverage 超时、独立 Gateway 安装顺序、备用池启用条件和基准门禁。聚焦的 Gateway 快照、built-bin、subagent 组合和 ACP 快照测试覆盖干净安装下的消费方行为；HMR 浏览器 owner 还会验证源码编辑交付，并为后续消费方恢复完整的 client artifact tree。仓库 pre-push 类型检查以及最终的拉取请求 CI 会覆盖完整工作流配置。

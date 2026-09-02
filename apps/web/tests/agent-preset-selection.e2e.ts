@@ -20,6 +20,7 @@ import {
   SESSION_FORMAT_VERSION, SessionId as sessionId, type SessionEvent, type SessionId,
 } from '@deepseek-ai/dsh-session'
 import { snapshotSubagentDescriptor } from '@deepseek-ai/dsh-subagent'
+import { resolveSessionPreset } from '@deepseek-ai/dsh-agent-presets'
 import {
   captureStableAria, compareOrRefreshGolden, launchWebScaffold, seedSession, watchConsole,
   webSnapshotMode, type WebScaffold,
@@ -138,24 +139,18 @@ async function seedSubagent(scaffold: WebScaffold, parentId: SessionId): Promise
 
 /**
  * The preset the host reports for the blank session the workspace connect
- * produced. Addressed by id rather than by scanning the serialized list: the
- * seeded session records `minimal` too, so a substring match over the whole
- * list answers before the switch has landed.
- * @param baseUrl - the scaffold's origin.
+ * produced. Blank draft sessions are intentionally omitted from
+ * `session.list`, so inspect the in-process Host registry and select the
+ * root agent attached to the connected workspace.
+ * @param scaffold - the booted Web scaffold.
  * @returns the live session's preset, or undefined before it is listed.
  */
-async function livePreset(baseUrl: string): Promise<string | undefined> {
-  const response = await fetch(`${baseUrl}/api/session.list`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      type: 'client-request', rpcId: 'agent-preset-live', method: 'session.list', payload: {},
-    }),
-  })
-  const body = await response.json() as {
-    result: { value?: { items: { sessionId: string; agentPreset?: string }[] } }
-  }
-  return body.result.value?.items.find(item => item.sessionId !== SEED_ID)?.agentPreset
+function livePreset(scaffold: WebScaffold): string | undefined {
+  const workspacePath = join(scaffold.workspaceCwd, 'workspace')
+  const agent = scaffold.ctx.agents.list().find(candidate => candidate.session.id !== sessionId(SEED_ID)
+    && candidate.session.header.parentSession === undefined
+    && candidate.session.header.cwd === workspacePath)
+  return agent === undefined ? undefined : resolveSessionPreset(agent.session)
 }
 
 /** Every option label the trigger menu currently lists. */
@@ -228,7 +223,7 @@ describe('web e2e: agent-preset selection', () => {
 
     // The chip stages; the blank session the workspace connect produced is
     // what the stage lands on. The host's own answer is what comes back.
-    await expect.poll(() => livePreset(scaffold.baseUrl), { timeout: 15_000 }).toBe('minimal')
+    await expect.poll(() => livePreset(scaffold), { timeout: 15_000 }).toBe('minimal')
   })
 
   it('re-reads the slash catalog through the composition the switch installed', async () => {
@@ -258,7 +253,7 @@ describe('web e2e: agent-preset selection', () => {
     // instead of leaving the session reading the narrower composition.
     await page.getByRole('button', { name: 'Minimal mode' }).click()
     await page.getByRole('menuitem', { name: /^Standard mode/ }).first().click()
-    await expect.poll(() => livePreset(scaffold.baseUrl), { timeout: 15_000 }).toBe('standard')
+    await expect.poll(() => livePreset(scaffold), { timeout: 15_000 }).toBe('standard')
 
     await composer.fill('/')
     await expect.poll(() => menuOptions(page), { timeout: 15_000 })
@@ -282,8 +277,8 @@ describe('web e2e: agent-preset selection', () => {
     await compareOrRefreshGolden(HEADER_EXPECTED, snapshot, MODE)
     expect(snapshot).toContain('Minimal mode')
     expect(snapshot).toContain('button "1 subagent"')
-    expect(snapshot.indexOf('Minimal mode')).toBeLessThan(snapshot.indexOf('button "1 subagent"'))
-    expect(snapshot.indexOf('button "1 subagent"')).toBeLessThan(snapshot.indexOf('button "Session log"'))
+    expect(snapshot.indexOf('button "1 subagent"')).toBeLessThan(snapshot.indexOf('Minimal mode'))
+    expect(snapshot.indexOf('Minimal mode')).toBeLessThan(snapshot.indexOf('button "Session log"'))
     // Static chrome, not a control: the header can only report a composition
     // the host would refuse to change.
     expect(snapshot).not.toContain('button "Minimal mode"')

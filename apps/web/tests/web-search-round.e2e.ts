@@ -262,6 +262,8 @@ describe('web e2e: shipped default web search', () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-search-aria'))
     await expect.poll(() => page.getByText('SEARCH_DONE', { exact: true }).count(), { timeout: 15_000 })
       .toBeGreaterThanOrEqual(1)
+    const process = page.getByRole('button', { name: '1 tool call · 2 intermediate messages', exact: true })
+    await process.click()
     await page.locator('[data-tool="web_search"]').waitFor({ timeout: 10_000 })
     const snapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(UI_EXPECTED, snapshot, MODE)

@@ -26,6 +26,8 @@ Master-only standby jobs require `DSH_CI_SELF_HOSTED_STANDBY_ENABLED=true`, and 
 
 Portable hosted execution also makes the clean checkout authoritative. Built-entry tests resolve third-party package roots from public entries instead of assuming `./package.json` exports, the consumer lane installs the independent Gateway runtime graph before root snapshots, and protocol assertions include the current ACP message and provider capability fields.
 
+The browser HMR owner snapshots and restores both dynamic client bundles and `apps/web/dist`. The watcher rebuilds the Vite dist as well as plugin bundles, so restoring only `lib/client.js` leaves the next browser test on a stale artifact digest even when the HMR assertion itself passes.
+
 `scripts/ci-workflow.spec.ts` pins the portable defaults, explicit opt-ins, failover precedence, and standby guards so a future workflow edit cannot silently restore repository-specific runner labels as defaults.
 
 ## Alternatives considered
@@ -46,4 +48,4 @@ A fresh repository can run the complete required CI surface on standard GitHub-h
 
 ## Testing
 
-The CI workflow test parses the YAML and asserts the standard hosted fallbacks, enterprise opt-in, self-hosted failover precedence, exact portable partition and gate bounds, coverage timeouts, the independent Gateway install ordering, standby enablement, and benchmark guards. Focused Gateway snapshot, built-bin, subagent composition, and ACP snapshot tests cover clean-install consumer behavior. The repository pre-push typecheck and the resulting pull-request CI exercise the complete workflow configuration.
+The CI workflow test parses the YAML and asserts the standard hosted fallbacks, enterprise opt-in, self-hosted failover precedence, exact portable partition and gate bounds, coverage timeouts, the independent Gateway install ordering, standby enablement, and benchmark guards. Focused Gateway snapshot, built-bin, subagent composition, and ACP snapshot tests cover clean-install consumer behavior; the HMR browser owner verifies source-edit delivery and restores the complete client artifact tree for following consumers. The repository pre-push typecheck and the resulting pull-request CI exercise the complete workflow configuration.
