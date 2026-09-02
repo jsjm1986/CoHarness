@@ -123,7 +123,7 @@ describe('CI workflow', () => {
     expectExternalCapacityExpression(node24Consumers.env.DSH_GATE_CONCURRENCY, '8', '1')
     expectExternalCapacityExpression(node24Consumers.env.DSH_OXLINT_THREADS, '8', '1')
     expectExternalCapacityExpression(node24Consumers.env.DSH_PUBLINT_CONCURRENCY, '8', '1')
-    expectExternalCapacityExpression(node24Consumers.env.DSH_WEB_SNAPSHOT_WORKERS, '6', '2')
+    expectExternalCapacityExpression(node24Consumers.env.DSH_WEB_SNAPSHOT_WORKERS, '6', '1')
     expectExternalCapacityExpression(node24Consumers.env.DSH_SNAPSHOT_MAX_CONCURRENCY, '32', '1')
     expect(String(node24Consumers.env.DSH_SNAPSHOT_MAX_CONCURRENCY)).toContain("&& '12'")
     const consumerSteps = node24Consumers.steps.filter(isRecord)

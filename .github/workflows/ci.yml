@@ -235,9 +235,9 @@ jobs:
         ${{ ((vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
           && github.event.pull_request.user.login != 'dependabot[bot]')
           || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
-          && '6' || '2' }}
+          && '6' || '1' }}
       # Failover uses the shared-VM bound; enterprise keeps the measured larger
-      # bound, while the portable standard pool serializes ordinary snapshots.
+      # bound, while the portable standard pool serializes browser snapshots.
       DSH_SNAPSHOT_MAX_CONCURRENCY: >-
         ${{ vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
           && github.event.pull_request.user.login != 'dependabot[bot]'
