@@ -34,6 +34,7 @@ A standing-policy change appends an owner-rendered superseding runtime-context s
 
 - A headless xterm instance maintains control-sequence state only for terminal-protocol replies. Returned output remains line-oriented and normalized; full-screen alternate-buffer interaction is unsupported.
 - Exact stdin-wait detection depends on the mounted subprocess provider; providers that cannot prove it use prompt-marker and silence/timeout readiness. Windows is such a provider: the shell pid is the pseudo foreground group and there is no exact stdin-wait tier, so a marker-less child settles on the silence bound.
+- The persistent `pwsh` PTY integration is supported on Windows. Other POSIX hosts may expose `pwsh` for non-interactive calls, but this backend does not claim equivalent interactive handoff evidence there.
 - The pwsh bootstrap writes through `[Console]::` (the UTF-8 encoding pin and the prompt function), which the Windows ACL sandbox's read-only mode (ConstrainedLanguage) may deny. When that prevents marker readiness, startup rejects at `timeoutMs` instead of publishing a shell whose setup did not complete.
 - Cleanup guarantees are those of `SubprocessTerminalHandle`; provider-specific gaps belong to that implementation's contract rather than this PTY consumer.
 - Sessions do not survive harness process exit.

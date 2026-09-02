@@ -34,6 +34,7 @@
 
 - 无头 xterm 实例只为终端协议应答维护控制序列状态；返回输出仍按行规范化，不支持全屏备用缓冲区交互。
 - 精确 stdin 等待检测取决于已挂载的进程管理提供方；无法证明该状态的提供方使用提示符标记和静默／超时就绪机制。Windows 正是这样的提供方：shell pid 是伪前台进程组，没有精确的 stdin-wait 档，因此无标记的子进程按静默上限结算。
+- 持久 `pwsh` PTY 集成支持 Windows。其他 POSIX 主机可能提供 `pwsh` 供非交互调用使用，但本后端不承诺那里具备等价的交互式前台交接证据。
 - pwsh 引导（UTF-8 编码钉与 `prompt` 函数）通过 `[Console]::` 写入，Windows ACL 沙箱的只读模式（ConstrainedLanguage）可能拒绝它。若因此无法达到 marker 就绪，启动会在 `timeoutMs` 处拒绝，而不会发布设置未完成的 shell。
 - 清理保证以 `SubprocessTerminalHandle` 的保证为准；提供方特定的缺口属于该实现的约定，而非这个 PTY 消费方。
 - harness 进程退出后，会话无法继续存在。

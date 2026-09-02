@@ -139,6 +139,17 @@ describe('web e2e: Cordis tools use their owned cards', () => {
     await expect.poll(() => page.getByText('CORDIS_UI_DONE', { exact: true }).count(), { timeout: 15_000 })
       .toBeGreaterThanOrEqual(1)
 
+    // Settled turns collapse their intermediate work into disclosures. Open
+    // both tool-bearing turns before asserting the owned Cordis rows, then
+    // restore the compact state so the following conversation golden remains
+    // stable.
+    const toolGroup = page.getByRole('button', { name: '3 tool calls · 4 intermediate messages', exact: true }).first()
+    await toolGroup.waitFor({ timeout: 10_000 })
+    if (await toolGroup.getAttribute('aria-expanded') !== 'true') await toolGroup.click()
+    const runGroup = page.getByRole('button', { name: '1 tool call · 2 intermediate messages', exact: true }).first()
+    await runGroup.waitFor({ timeout: 10_000 })
+    if (await runGroup.getAttribute('aria-expanded') !== 'true') await runGroup.click()
+
     const inspectRow = page.locator('[data-tool="cordis_inspect_self"]').filter({ hasText: 'Inspect' }).first()
     await inspectRow.waitFor({ timeout: 10_000 })
 
@@ -164,6 +175,9 @@ describe('web e2e: Cordis tools use their owned cards', () => {
     await expect(stopRow.getAttribute('data-state')).resolves.toBe('ok')
     // Stopping withdraws the browser half from every page, probe included.
     await expect.poll(() => page.locator('[data-snapshot-probe]').count(), { timeout: 15_000 }).toBe(0)
+
+    if (await runGroup.getAttribute('aria-expanded') === 'true') await runGroup.click()
+    if (await toolGroup.getAttribute('aria-expanded') === 'true') await toolGroup.click()
   })
 
   it.skipIf(MODE === 'record')('matches the conversation aria golden', async () => {

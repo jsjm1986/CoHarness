@@ -16,6 +16,8 @@ CI 工作流默认选择组织范围的 larger-runner 标签和仅在 master 上
 
 worker 与门禁并发度使用同一项容量判断。标准托管 Linux coverage 使用两个单 worker 插桩分区，为测试与轮询设置 30 秒超时，并把插桩和 exempt-heavy 门禁串行执行。标准 consumer 通道一次只运行一个外层门禁，Oxlint 与 publint 各使用一个 worker，普通快照串行运行，同时保留两个浏览器回放 worker。标准原生 Windows 使用两个 coverage 分区、一个外层门禁 worker、一个 publint worker，以及相同的 30 秒 coverage 超时。企业池或显式选择的自托管池保留已经测量过的较高值。
 
+coverage 清单只在 Windows 上运行真实的持久 PowerShell PTY 检查。POSIX 主机可能提供 `pwsh` 供非交互执行，但 `terminal-bash` 的 PTY 前台交接证据只针对 Windows；在 Linux 上探测该检查会让必需 coverage 门禁在达到阈值前失败。原生 Windows 通道仍保留真实 shell 检查。
+
 consumer 通道还会在运行快照前通过 `npm ci --prefix gateway --omit=dev` 安装 `gateway/package-lock.json`。`gateway/` 是根 pnpm workspace 之外的独立 npm 工程，但它的快照文件属于根 Vitest 快照清单，并会导入 `pg` 等 Gateway 运行时依赖。因此，仅执行根目录 `pnpm install` 不能让这份清单自给自足。
 
 第一次完整的标准 Runner 执行说明了为什么必须同时限制内外两层：四个或八个并发 coverage 分区叠加两个外层门禁 worker，使原本有界的仓库扫描、大文件上传校验、终端空闲观察和 ACP 快照轮询错过截止时间。consumer 通道还在同一台小规格主机上重叠运行构建型快照、lint、包发布检查和浏览器回放。只提高单项测试超时会保留资源争用，并让失败等待更久；因此可移植拓扑先降低进程扇出，只把较大超时用于确实较慢的 coverage 插桩。

@@ -148,6 +148,19 @@ Additional instructions from: nested\AGENTS.md`,
     expect(out).not.toContain('"id"')
   })
 
+  it('tokenizes platform-dependent ACP usage counters while retaining capacity', () => {
+    const raw = JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'session/update',
+      params: { update: { sessionUpdate: 'usage_update', used: 1234, size: 1_000_000 } },
+    })
+    expect(JSON.parse(normalizeStdout(raw, ctx))).toEqual({
+      jsonrpc: '2.0',
+      method: 'session/update',
+      params: { update: { sessionUpdate: 'usage_update', used: '{{usedTokens}}', size: 1_000_000 } },
+    })
+  })
+
   it('stabilizes only the top-level event timestamp and spill byte count in event-read text', () => {
     const raw = JSON.stringify({
       jsonrpc: '2.0',

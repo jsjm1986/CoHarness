@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-02-portable-ci-runner-defaults.md
-2026-09-02-portable-ci-runner-defaults.md: aef0f74672c13a37889b4de4eb0b451ab57474e8
-2026-09-02-portable-ci-runner-defaults.zh.md: b846199fda2a2413fee59ca67a3ac90a483f6a17
+2026-09-02-portable-ci-runner-defaults.md: 3c13117f4276f86329fb256e65dc7aa8dcc4be3a
+2026-09-02-portable-ci-runner-defaults.zh.md: 1ffcc79d3a1d15c574d810f49a2506b067f2cb2f

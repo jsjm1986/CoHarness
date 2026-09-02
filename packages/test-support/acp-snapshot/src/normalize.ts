@@ -17,6 +17,7 @@ const SESSION_ID = '{{sessionId}}'
 const CWD = '{{cwd}}'
 const SYSTEM = '{{system}}'
 const TOOLS = '{{tools}}'
+const USED_TOKENS = '{{usedTokens}}'
 const EVENT_TIME = '{{eventTime}}'
 const EVENT_OMITTED_BYTES = '{{eventOmittedBytes}}'
 const PACKED_CHUNK_ROW_TYPES = new Set(['text-chunks', 'reasoning-chunks', 'tool-call-chunks'])
@@ -189,15 +190,22 @@ function scrubString(value: string, ctx: NormalizeContext, cwdPathMode: CwdPathM
 }
 
 /** Recursively scrub a parsed JSON value (strings replaced; structure kept). */
-function scrubValue(value: unknown, ctx: NormalizeContext, cwdPathMode: CwdPathMode, key?: string): unknown {
+function scrubValue(
+  value: unknown,
+  ctx: NormalizeContext,
+  cwdPathMode: CwdPathMode,
+  key?: string,
+  normalizeUsage = false,
+): unknown {
+  if (normalizeUsage && key === 'used' && typeof value === 'number') return USED_TOKENS
   if (typeof value === 'string') {
     const scrubbed = scrubString(value, ctx, cwdPathMode)
     return cwdPathMode === 'canonical' && key === 'path' ? scrubbed.replaceAll('\\', '/') : scrubbed
   }
-  if (Array.isArray(value)) return value.map(v => scrubValue(v, ctx, cwdPathMode))
+  if (Array.isArray(value)) return value.map(v => scrubValue(v, ctx, cwdPathMode, undefined, normalizeUsage))
   if (value !== null && typeof value === 'object') {
     const out: Record<string, unknown> = {}
-    for (const [k, v] of Object.entries(value)) out[k] = scrubValue(v, ctx, cwdPathMode, k)
+    for (const [k, v] of Object.entries(value)) out[k] = scrubValue(v, ctx, cwdPathMode, k, normalizeUsage)
     return out
   }
   return value
@@ -265,7 +273,8 @@ export function tokenizeSessionFixtureCwd(rawLog: string): string {
 /**
  * Normalize a raw stdout transcript (newline-delimited JSON-RPC frames) into a stable expected output
  * in the same shape as the wire: one compact JSON frame per line (NDJSON), with the JSON-RPC
- * `id` rewritten to a per-transcript sequence (1, 2, 3, …) and all volatile strings scrubbed.
+ * `id` rewritten to a per-transcript sequence (1, 2, 3, …), platform-dependent ACP usage
+ * counters replaced with a token, and all volatile strings scrubbed.
  * Invalid JSON throws, doubling as a protocol-stdout purity check.
  *
  * @param rawStdout The captured stdout bytes, decoded utf8.
@@ -294,7 +303,7 @@ export function normalizeStdout(
     if ('id' in frame && frame.id !== undefined && frame.id !== null) {
       frame.id = stableId(frame.id)
     }
-    return scrubValue(frame, ctx, cwdPathMode) as Record<string, unknown>
+    return scrubValue(frame, ctx, cwdPathMode, undefined, true) as Record<string, unknown>
   })
   return frames.map(f => JSON.stringify(f)).join('\n') + '\n'
 }
