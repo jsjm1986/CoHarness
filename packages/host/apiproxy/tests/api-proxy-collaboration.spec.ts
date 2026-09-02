@@ -1,3 +1,5 @@
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
@@ -14,6 +16,11 @@ import UserQuestionService from '@deepseek-ai/dsh-user-questions'
 import type { HostFrame, MuxFrame, RpcRequest, RpcResponse } from '@deepseek-ai/dsh-host-apiproxy/api'
 import { RpcId } from '@deepseek-ai/dsh-host-apiproxy/api/rpc'
 import { authorizeTypertRemote, createApiProxy } from '../src/api-proxy.ts'
+
+// The Host canonicalizes the project root through realpath, so it must exist
+// on every platform; a bare `/tmp` gains a drive letter on Windows and does not.
+const PROJECT_ROOT = tmpdir()
+const PROJECT_DIR = join(PROJECT_ROOT, 'project')
 
 function request<P>(payload: P): RpcRequest<P> {
   return { rpcId: RpcId('collaboration-test'), payload }
@@ -125,7 +132,7 @@ async function harness(
     ctx,
     api: createApiProxy(ctx, {
       defaultModelSelection: () => ({ provider: 'test', model: 'test-model' }),
-      cwd: options.cwd ?? '/tmp',
+      cwd: options.cwd ?? PROJECT_ROOT,
       canOpenPath: options.canOpenPath ?? (() => false),
       ...(options.openPath === undefined ? {} : { openPath: options.openPath }),
     }),
@@ -365,7 +372,7 @@ describe('project collaboration streams', () => {
     authority.readableSessionIds = readableSessionIds
     const visibleWorkspace = {
       id: 'workspace-visible',
-      path: '/tmp/project',
+      path: PROJECT_DIR,
       title: 'Project',
       sessionIds: [visibleId, privateId],
       createdAt: '2026-08-15T00:00:00.000Z',
@@ -722,7 +729,7 @@ describe('project collaboration read ACL', () => {
     }
     const workspace = {
       id: 'workspace-1',
-      path: '/tmp/project',
+      path: PROJECT_DIR,
       title: 'Project',
       sessionIds: [rootId, privateId],
       createdAt: 1,
@@ -732,9 +739,9 @@ describe('project collaboration read ACL', () => {
       list: () => [workspace],
       archivedSessionIds: [childId, privateId],
     })
-    const root = ctx.sessions.create(rootId, { meta: { cwd: '/tmp/project' } })
-    ctx.sessions.create(childId, { meta: { cwd: '/tmp/project', parentSession: rootId } })
-    ctx.sessions.create(privateId, { meta: { cwd: '/tmp/project' } })
+    const root = ctx.sessions.create(rootId, { meta: { cwd: PROJECT_DIR } })
+    ctx.sessions.create(childId, { meta: { cwd: PROJECT_DIR, parentSession: rootId } })
+    ctx.sessions.create(privateId, { meta: { cwd: PROJECT_DIR } })
     root.append('turn/start', { turn: 1 })
 
     ctx.provide('sessionQuery', {
@@ -848,7 +855,7 @@ describe('read-write project scope containment', () => {
     expect(createDirectory).not.toHaveBeenCalled()
     expect((await api.host.pickDirectory(request({}), signal)).result)
       .toMatchObject(collaborationForbidden('read'))
-    expect((await api.host.openPath(request({ path: '/tmp/project' }), signal)).result)
+    expect((await api.host.openPath(request({ path: PROJECT_DIR }), signal)).result)
       .toMatchObject(collaborationForbidden('write'))
     expect(openPath).not.toHaveBeenCalled()
   })
@@ -865,7 +872,7 @@ describe('read-write project scope containment', () => {
       agentPresets: presets,
       canOpenPath: () => true,
     })
-    const session = ctx.sessions.create(SessionId('preset-session'), { meta: { cwd: '/tmp' } })
+    const session = ctx.sessions.create(SessionId('preset-session'), { meta: { cwd: PROJECT_ROOT } })
     ctx.agents.register(stubAgent(ctx, session))
     const signal = new AbortController().signal
 
@@ -900,7 +907,7 @@ describe('read-write project scope containment', () => {
     ))
     const inside = {
       id: 'inside-workspace',
-      path: '/tmp/project',
+      path: PROJECT_DIR,
       title: 'Project',
       sessionIds: [visibleId, privateId],
       createdAt: 1,
@@ -942,11 +949,11 @@ describe('read-only project scope', () => {
     const signal = new AbortController().signal
     const calls: Array<[string, () => Promise<RpcResponse<unknown>>]> = [
       ['session.create', () => api.sessions.create(request({}))],
-      ['workspace.create', () => api.workspace.create(request({ path: '/tmp/project' }))],
+      ['workspace.create', () => api.workspace.create(request({ path: PROJECT_DIR }))],
       ['workspace.rename', () => api.workspace.rename(request({ workspaceId: 'workspace' as never, title: 'Renamed' }))],
       ['workspace.delete', () => api.workspace.delete(request({ workspaceId: 'workspace' as never }))],
       ['workspace.insertBefore', () => api.workspace.insertBefore(request({ workspaceId: 'workspace' as never }))],
-      ['host.createDirectory', () => api.host.createDirectory(request({ path: '/tmp', name: 'child' }))],
+      ['host.createDirectory', () => api.host.createDirectory(request({ path: PROJECT_ROOT, name: 'child' }))],
       ['settings.openDocument', () => api.settings.openDocument(request({}), signal)],
       ['settings.update', () => api.settings.update(request({ ns: 'ui-onboarding', patch: {} }))],
       ['settings.replace', () => api.settings.replace(request({ ns: 'ui-onboarding', section: {} }))],

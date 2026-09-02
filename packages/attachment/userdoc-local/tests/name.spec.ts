@@ -1,4 +1,4 @@
-import { join, sep } from 'node:path'
+import { join, resolve, sep } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   DOCUMENT_NAME_EXHAUSTED_CODE,
@@ -16,7 +16,9 @@ import {
   suffixName,
 } from '../src/name.ts'
 
-const ROOT = join(sep, 'home', 'alice', 'uploads')
+// Fully qualified on every platform: `resolve` adds the drive letter on
+// Windows, where a rooted `\home\...` path is not absolute.
+const ROOT = resolve(sep, 'home', 'alice', 'uploads')
 
 describe('sanitizeName', () => {
   it('keeps an ordinary name, including non-ASCII, unchanged', () => {
@@ -121,7 +123,7 @@ describe('assertInside', () => {
   })
 
   it('rejects an escaping path', () => {
-    expect(() => { assertInside(ROOT, join(sep, 'etc', 'passwd')) })
+    expect(() => { assertInside(ROOT, resolve(sep, 'etc', 'passwd')) })
       .toThrow(expect.objectContaining({ code: INVALID_DOCUMENT_REF_CODE }))
   })
 })

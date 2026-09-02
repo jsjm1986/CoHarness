@@ -1,3 +1,4 @@
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
 import { composeProfilePatches, composeRows, resolveShippedPresetPatch } from '../src/profile-boot.ts'
@@ -24,7 +25,7 @@ describe('launcher-derived shipped agent-preset root', () => {
       },
     })
     const shipped = (patch?.config as { roots: { path: string }[] }).roots[0]?.path
-    expect(shipped).toContain('config/agent-presets')
+    expect(shipped).toContain(join('config', 'agent-presets'))
   })
 
   it('returns no derived patch when the composition has no roster', () => {
