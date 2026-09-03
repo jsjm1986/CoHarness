@@ -37,8 +37,16 @@ import { SessionQueueMirror } from './queue-mirror.ts'
 /** Messages requested per history page. */
 export const PAGE_MESSAGES = 50
 
-/** Safety bound for one background history expansion. */
+/** Safety bound for one history walk driven by a reader jump or a detail fill. */
 const MAX_HISTORY_EXPANSION_PAGES = 64
+
+/**
+ * Older pages the automatic live expansion adds behind the tail page. A running
+ * staged session keeps at most tail + this many pages resident (4 × PAGE_MESSAGES
+ * messages), so every later stream publication rebuilds a bounded node set instead
+ * of the whole log; history past the bound stays behind the ordinary paging entry.
+ */
+const LIVE_HISTORY_RETAINED_PAGES = 3
 
 /** Delay between completed-turn index refreshes; keeps a streaming session off the RPC hot path. */
 const HISTORY_INDEX_REFRESH_DELAY_MS = 750
@@ -105,6 +113,8 @@ export class Session implements SessionFace {
   private stageActive = false
   /** Tail → background expansion → retained live history lifecycle. */
   private historyWindowMode: HistoryWindowMode = 'tail'
+  /** Older pages the live expansion has added to the current window; reset with the window. */
+  private liveHistoryPages = 0
   /** One serialized history mutation; detail fills and older-page reads share it. */
   private historyOperation: Promise<void> | null = null
   private historyExpansionPromise: Promise<void> | null = null
@@ -158,6 +168,10 @@ export class Session implements SessionFace {
   private liveBuffer: { event: SessionEvent; view: ToolEventView | undefined }[] = []
   /** Gap repair in flight; live events detour to the buffer until the tail page lands. */
   private stitching = false
+  /** The in-flight repair, shared with callers that request one while it runs. */
+  private repairPromise: Promise<void> | null = null
+  /** A tail merge was requested while one was in flight; the running repair reads the tail once more. */
+  private repairRequested = false
   /** subscribed.lastSeq baseline (gap detection; null when no subscribed frame arrived — degrade to the liveBuffer dedup path). */
   private subscribedLastSeq: number | null = null
   /** Local submission echoes retained until their durable event or queue occurrence is observed. */
@@ -277,8 +291,10 @@ export class Session implements SessionFace {
     this.loadingOlder = false
     this.historyDetail = 'conversation'
     this.historyWindowMode = 'tail'
+    this.liveHistoryPages = 0
     this.liveBuffer = []
     this.stitching = false
+    this.repairRequested = false
     this.conversation.replaceWindow([], false)
     this.notifier.markDirty()
   }
@@ -588,10 +604,14 @@ export class Session implements SessionFace {
     }
   }
 
-  /** Reconnect rebuild (manager calls this on onConnected for instances that were opened):
-   *  reset the window and rerun open; pending waits for the baseline replay. Invalidates any
-   *  in-flight open first — its history request rode the dead connection and must not settle
-   *  the fresh generation into 'error'. */
+  /** Reconnect catch-up (manager calls this on onConnected for instances that were opened).
+   *  An open window survives the connection generation: durable events never change, so the
+   *  resident rows (including retained live-history pages and the reader's position) stay and
+   *  only the events the dead stream missed are merged from one tail read; an in-flight page
+   *  request is still valid history, so the open generation is not bumped. A window still
+   *  loading or in error is reset and reopened: that history request rode the dead connection
+   *  and must not settle the fresh generation into 'error'. Pending waits always clear for the
+   *  baseline replay. */
   async resync(): Promise<void> {
     // The queue mirror is NOT cleared here: onConnected (which drives resync)
     // races the mux frames — the fresh generation's baseline may have landed
@@ -599,6 +619,16 @@ export class Session implements SessionFace {
     // session/subscribed frame instead (same stream as the queue snapshot
     // that follows it, so ordering is guaranteed).
     if (this.openState === 'cold') return // never opened: no window to rebuild (doOpen flips to 'loading' synchronously, so cold implies no in-flight open)
+    if (this.openState === 'open') {
+      // Superseded, not settled: the baseline replay re-sends still-pending requested frames verbatim
+      // (same rpcId), re-minting fresh waits; a stale reference's respond() still reaches the host.
+      this.pending.clear()
+      this.pendingRev++
+      this.subscribedLastSeq = null
+      this.notifier.markDirty()
+      await this.repairGap()
+      return
+    }
     this.openGeneration++
     this.historyAbortController?.abort()
     this.historyAbortController = null
@@ -670,6 +700,13 @@ export class Session implements SessionFace {
         // stale mirror clears here — race-free against onConnected/resync
         // timing (clearing there could wipe a baseline that already landed).
         if (this.queueMirror.reset()) this.notifier.markDirty()
+        // A baseline past the open window's tail means events landed while no
+        // stream was attached; an idle session would otherwise show them only
+        // after its next live event exposes the gap.
+        if (this.openState === 'open') {
+          const tailSeq = this.windowTailSeq()
+          if (tailSeq !== null && frame.lastSeq > tailSeq) void this.repairGap()
+        }
         return
       }
       case 'approval/requested': {
@@ -950,10 +987,11 @@ export class Session implements SessionFace {
   }
 
   /** Install a fresh history window + stitch the liveBuffer (seq is the sole dedup key).
-   *  This path is reserved for initial open and resync; gap repair uses the
-   *  merge path below. Stitching MUST NOT route through acceptLiveEvent: openState is still 'loading' here
-   *  (doOpen flips it after install), so recursing would push every buffered event straight
-   *  back into liveBuffer where nothing ever drains it — a silent drop loop.
+   *  This path is reserved for initial open, a reset resync, and a tail read that no longer
+   *  touches the window; ordinary gap repair uses the merge path below. Stitching MUST NOT
+   *  route through acceptLiveEvent: openState may still be 'loading' here (doOpen flips it
+   *  after install), so recursing would push every buffered event straight back into
+   *  liveBuffer where nothing ever drains it — a silent drop loop.
    *  A carried projections block seeds the value store (higher seq wins, so a stale
    *  baseline cannot overwrite a newer push frame); the window events themselves are
    *  never folded — the host is the only computation site. */
@@ -969,6 +1007,7 @@ export class Session implements SessionFace {
     this.baseSeq = logicalBaseSeq(this.events, this.omittedSpans) ?? 0
     this.hasMore = hasMore
     this.historyWindowMode = 'tail'
+    this.liveHistoryPages = 0
     const visible = this.events.findLast(hasConversationContent)
     if (visible !== undefined) this.markConversationContent(visible.seq)
     if (this.events.some(event => event.type === 'turn/start')) this.firstPromptPendingTurn = false
@@ -1077,9 +1116,10 @@ export class Session implements SessionFace {
     this.options.onEngaged?.(this, visibleContentSeq)
   }
 
-  /** Start one cancellable background expansion for the staged live session. */
+  /** Start one cancellable background expansion for the staged live session (no-op once the window holds its retained pages). */
   private beginLiveHistory(): void {
-    if (!this.stageActive || this.historyWindowMode === 'live' || this.historyWindowMode === 'expanding') return
+    if (!this.stageActive || this.historyWindowMode === 'live' || this.historyWindowMode === 'expanding'
+      || this.liveHistoryPages >= LIVE_HISTORY_RETAINED_PAGES) return
     this.historyWindowMode = 'expanding'
     this.notifier.markDirty()
     const operation = this.enqueueHistoryOperation(signal => this.expandHistory(signal), true)
@@ -1191,8 +1231,9 @@ export class Session implements SessionFace {
   }
 
   /**
-   * Fill every older page for the active stage without blocking the model.
-   * Partial progress is retained; an aborted or failed walk leaves the normal
+   * Add the retained older pages for the active stage without blocking the
+   * model. The walk stops at the retention bound or at the log head; partial
+   * progress is retained, and a bounded or failed walk leaves the normal
    * manual paging entry available after the current turn.
    */
   private async expandHistory(signal: AbortSignal): Promise<void> {
@@ -1211,6 +1252,8 @@ export class Session implements SessionFace {
       this.notifier.markDirty()
       return
     }
+    // beginLiveHistory only starts a walk with pages left; an exhausted budget skips the loop and lands in 'tail'.
+    const budget = LIVE_HISTORY_RETAINED_PAGES - this.liveHistoryPages
 
     const pages: HistoryPage[] = []
     let beforeSeq = this.baseSeq
@@ -1218,7 +1261,7 @@ export class Session implements SessionFace {
     let previousOldest = Number.POSITIVE_INFINITY
     let complete = false
     let failure: unknown
-    for (let guard = 0; guard < MAX_HISTORY_EXPANSION_PAGES; guard++) {
+    for (let guard = 0; guard < budget; guard++) {
       // oxlint-disable-next-line typescript/no-unnecessary-condition -- stage and generation can change during the awaited page.
       if (!this.stageActive || generation !== this.openGeneration || signal.aborted) return
       let page: HistoryPage | undefined
@@ -1255,8 +1298,10 @@ export class Session implements SessionFace {
 
     // oxlint-disable-next-line typescript/no-unnecessary-condition -- leaveStage/resync may run during the final page merge.
     if (!this.stageActive || generation !== this.openGeneration || signal.aborted) return
-    if (pages.length > 0) this.applyOlderPages(pages, hasMore)
-    else if (!hasMore) {
+    if (pages.length > 0) {
+      this.applyOlderPages(pages, hasMore)
+      this.liveHistoryPages += pages.length
+    } else if (!hasMore) {
       this.hasMore = false
       this.conversation.prepend([], false)
     }
@@ -1272,42 +1317,91 @@ export class Session implements SessionFace {
   /**
    * Resync-lite: repull the tail page and merge it into the existing window.
    * A recovery read must never turn an active conversation into a bounded tail;
-   * events arriving meanwhile stay in liveBuffer until the merge completes.
+   * events arriving meanwhile stay in liveBuffer until the merge completes. A
+   * request made while a repair is in flight (reconnect resync racing a live
+   * gap) makes the running repair read the tail once more instead of starting a
+   * competing one.
    */
-  private async repairGap(): Promise<void> {
-    /* v8 ignore next -- re-entry guard: acceptLiveEvent already detours to liveBuffer while stitching, so no second call reaches here. */
-    if (this.stitching) return
+  private repairGap(): Promise<void> {
+    if (this.repairPromise !== null) {
+      this.repairRequested = true
+      return this.repairPromise
+    }
     this.stitching = true
-    const generation = this.openGeneration
+    // runRepair awaits before it can settle, so the promise is registered before its finally runs.
+    const repair = this.runRepair()
+    this.repairPromise = repair
+    return repair
+  }
+
+  /** The repair loop body: one tail merge per request, failures logged and the buffer kept for the next repair. */
+  private async runRepair(): Promise<void> {
     try {
-      await this.enqueueHistoryOperation(async (signal) => {
-        if (generation !== this.openGeneration || this.openState !== 'open') return
-        const page = await this.fetchHistoryPage({ maxMessages: PAGE_MESSAGES }, signal)
-        // oxlint-disable-next-line typescript/no-unnecessary-condition -- the operation may be superseded while the page awaits.
-        if (page === undefined || generation !== this.openGeneration || this.openState !== 'open') return
-        const previousHasMore = this.hasMore
-        this.mergeHistoryEntries(page.entries)
-        this.omittedSpans = [...this.omittedSpans, ...page.omittedSpans]
-        this.dropCoveredSpans()
-        this.baseSeq = logicalBaseSeq(this.events, this.omittedSpans) ?? this.baseSeq
-        // A tail probe can prove that an existing bounded window still has an
-        // older prefix, but it cannot create one after the window was complete.
-        this.hasMore = previousHasMore && page.hasMore
-        if (page.projections !== undefined) this.projections.seed(page.projections)
-        this.conversation.replaceWindow(
-          this.events.map((event, index) => ({ event, view: this.views[index] })),
-          this.hasMore,
-        )
-        const buffered = this.liveBuffer
-        this.liveBuffer = []
-        for (const item of buffered) this.appendLive(item.event, item.view)
-        this.notifier.markDirty()
-      }, false)
+      do {
+        this.repairRequested = false
+        await this.enqueueHistoryOperation(signal => this.mergeTail(signal), false)
+        // oxlint-disable-next-line typescript/no-unnecessary-condition -- a resync or baseline can request another read mid-await.
+      } while (this.repairRequested)
     } catch (error) {
       console.error('[web-runtime] gap repair failed:', error)
     } finally {
+      this.repairRequested = false
       this.stitching = false
+      this.repairPromise = null
     }
+  }
+
+  /**
+   * One tail read merged into the open window. A tail whose logical base no
+   * longer touches the window (the stream was down for longer than one page
+   * covers) replaces the window instead: bridging it would replay every missed
+   * page, so this rare case pays a stage re-entry's cost rather than a walk.
+   */
+  private async mergeTail(signal: AbortSignal): Promise<void> {
+    const generation = this.openGeneration
+    if (this.openState !== 'open') return
+    const page = await this.fetchHistoryPage({ maxMessages: PAGE_MESSAGES }, signal)
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- the operation may be superseded while the page awaits.
+    if (page === undefined || generation !== this.openGeneration || this.openState !== 'open') return
+    const pageBase = logicalBaseSeq(page.entries.map(entry => entry.event), page.omittedSpans)
+    const tailSeq = this.windowTailSeq()
+    if (pageBase !== null && tailSeq !== null && pageBase > tailSeq + 1) {
+      this.installWindow(page.entries, page.hasMore, page.projections, page.omittedSpans)
+      if (this.stageActive && this.running) this.beginLiveHistory()
+      return
+    }
+    const existing = new Set(this.events.map(event => event.seq))
+    const fresh = page.entries
+      .filter(entry => !existing.has(entry.event.seq))
+      .sort((left, right) => left.event.seq - right.event.seq)
+    const appendOnly = tailSeq !== null
+      && fresh.every(entry => entry.event.seq > tailSeq)
+      && page.omittedSpans.every(span => span.startSeq > tailSeq)
+    // A tail probe can prove that an existing bounded window still has an
+    // older prefix, but it cannot create one after the window was complete.
+    const previousHasMore = this.hasMore
+    this.hasMore = previousHasMore && page.hasMore
+    if (page.projections !== undefined) this.projections.seed(page.projections)
+    if (appendOnly) {
+      // The ordinary reconnect case: everything missed lies past the tail, so
+      // the resident rows keep their node identity and only new rows assemble.
+      for (const entry of fresh) this.appendLive(entry.event, entry.view)
+      this.omittedSpans = [...this.omittedSpans, ...page.omittedSpans]
+      if (this.hasMore !== previousHasMore) this.conversation.prepend([], this.hasMore)
+    } else {
+      this.mergeHistoryEntries(page.entries)
+      this.omittedSpans = [...this.omittedSpans, ...page.omittedSpans]
+      this.dropCoveredSpans()
+      this.baseSeq = logicalBaseSeq(this.events, this.omittedSpans) ?? this.baseSeq
+      this.conversation.replaceWindow(
+        this.events.map((event, index) => ({ event, view: this.views[index] })),
+        this.hasMore,
+      )
+    }
+    const buffered = this.liveBuffer
+    this.liveBuffer = []
+    for (const item of buffered) this.appendLive(item.event, item.view)
+    this.notifier.markDirty()
   }
 
   private windowTailSeq(): number | null {

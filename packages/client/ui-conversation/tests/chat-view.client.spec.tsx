@@ -1374,6 +1374,39 @@ describe('ChatView', () => {
     expect(view.getByLabelText('回到底部')).toBeTruthy()
   })
 
+  it('samples reader geometry at most once per interval and never for a follow write', () => {
+    vi.useFakeTimers()
+    const hitTest = vi.fn(() => [] as Element[])
+    Object.defineProperty(document, 'elementsFromPoint', { configurable: true, value: hitTest })
+    try {
+      const h = makeHarness({ nodes: [user(1, 'q'), assistant(2, 'a')] })
+      const view = render(<h.ChatView {...h.props} />)
+      const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
+      installScrollMetrics(scroller, 1_000, 300)
+      vi.spyOn(scroller, 'getBoundingClientRect').mockReturnValue({ top: 0, bottom: 300, left: 0, right: 400 } as DOMRect)
+      scroller.scrollTop = 700
+      fireEvent.scroll(scroller) // settles the ledger at the floor
+      act(() => { vi.advanceTimersByTime(600) }) // the sampling interval elapses
+      hitTest.mockClear()
+      // Stream growth while pinned: the follow write delivers a scroll event, no hit-test.
+      act(() => { h.set({ partial: { turn: 1, step: 1, blocks: [{ kind: 'text', text: 'grow' }] } }) })
+      fireEvent.scroll(scroller)
+      expect(hitTest).not.toHaveBeenCalled()
+
+      readerScroll(scroller, 100) // reader input: one sample (four probe points)
+      expect(hitTest).toHaveBeenCalledTimes(4)
+      readerScroll(scroller, 120)
+      readerScroll(scroller, 140) // within the interval: deferred to one trailing sample
+      expect(hitTest).toHaveBeenCalledTimes(4)
+      act(() => { vi.advanceTimersByTime(500) })
+      expect(hitTest).toHaveBeenCalledTimes(8)
+      view.unmount()
+    } finally {
+      delete (document as { elementsFromPoint?: unknown }).elementsFromPoint
+      vi.useRealTimers()
+    }
+  })
+
   it('one ResizeObserver owns pinned dynamic-height follow and ignores growth while away', () => {
     let notify: (() => void) | undefined
     const observe = vi.fn()

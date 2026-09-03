@@ -225,9 +225,29 @@ interface AssistantProjection {
   readonly settled: AssistantMessageNode | undefined
 }
 
+/**
+ * One projection per (state, start Location) pair. Every chunk yields a new
+ * state object and every boundary change yields a new Location value, so the
+ * pair identifies the projection's inputs; the step-scope Location data and
+ * the view node of one flush then share it instead of materializing twice.
+ */
+const projectionMemo = new WeakMap<AssistantState, {
+  readonly location: ConversationLocation | undefined
+  readonly projection: AssistantProjection
+}>()
+
 function projectAssistant(context: ConversationNodeContext<AssistantState>): AssistantProjection | undefined {
   const state = context.state ?? fallbackState(context)
   if (state === undefined) return undefined
+  const location = context.start?.location
+  const memoized = context.state === undefined ? undefined : projectionMemo.get(state)
+  if (memoized !== undefined && memoized.location === location) return memoized.projection
+  const projection = buildProjection(state, context)
+  if (context.state !== undefined) projectionMemo.set(state, { location, projection })
+  return projection
+}
+
+function buildProjection(state: AssistantState, context: ConversationNodeContext<AssistantState>): AssistantProjection {
   const settled = finalNode(state, context)
   const blocks = settled?.blocks ?? materializeBlocks(state)
   const visible = hasVisibleContent(blocks)

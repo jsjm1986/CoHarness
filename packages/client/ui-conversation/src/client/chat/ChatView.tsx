@@ -29,6 +29,12 @@ import css from './ChatView.module.css'
 const FOLLOW_THRESHOLD = 24
 /** Start the next older-page request before the reader reaches the exact head. */
 const OLDER_AUTO_LOAD_THRESHOLD = 240
+/**
+ * Reader-geometry sampling cadence. Locating the visible row hit-tests the
+ * flow (forced layout), so a continuous reader scroll samples at most this
+ * often, with one trailing sample so the final position is always recorded.
+ */
+const SCROLL_SAMPLE_INTERVAL_MS = 500
 const EMPTY_PENDING_SUBMISSIONS: readonly PendingSubmission[] = []
 
 /** Active column host when present; otherwise the view-local scroller. */
@@ -500,6 +506,55 @@ export function ChatView({
     if (local !== null) maybeAutoLoadOlder(scrollerOf(local))
   }, [maybeAutoLoadOlder])
 
+  /** Locate the reader's row once: the active rail turn, the pending prepend anchor, and the saved position. */
+  const sampleReaderGeometryRef = useRef(() => {})
+  sampleReaderGeometryRef.current = () => {
+    const local = listRef.current
+    if (local === null) return
+    const el = scrollerOf(local)
+    const readerAnchor = pagingAnchor(local, el)
+    const anchorKey = readerAnchor?.dataset.chatAnchorKey
+    if (readerAnchor === null || anchorKey === undefined) return
+    const readerNode = nodeStore.get(anchorKey)
+    const readerTurn = readerNode === undefined ? undefined : nodeTurn(readerNode)
+    if (readerTurn !== undefined) setActiveTurn(readerTurn)
+    if (atBottomRef.current) return
+    const position: ChatScrollPosition = { anchorKey, anchorTop: flowTop(readerAnchor, el), scrollTop: el.scrollTop }
+    if (anchorRef.current !== null || loadingOlder) {
+      anchorRef.current = { key: position.anchorKey, top: position.anchorTop }
+    }
+    // Continuous save (unmount happens after ref detach, so saving there is
+    // too late); pinned-to-bottom clears so a remount keeps following.
+    chatScroll.save(position)
+  }
+  const geometrySampleRef = useRef<{ at: number; timer: ReturnType<typeof setTimeout> | null }>({ at: 0, timer: null })
+  /**
+   * Sample now when the interval has elapsed or a prepend is pending (the
+   * arriving page must preserve the reader's latest row, not a sampled one);
+   * otherwise schedule the trailing sample.
+   */
+  const requestGeometrySample = (immediate: boolean): void => {
+    const sample = geometrySampleRef.current
+    const now = Date.now()
+    const elapsed = now - sample.at
+    if (immediate || elapsed >= SCROLL_SAMPLE_INTERVAL_MS) {
+      sample.at = now
+      sampleReaderGeometryRef.current()
+      return
+    }
+    if (sample.timer !== null) return
+    sample.timer = setTimeout(() => {
+      sample.timer = null
+      sample.at = Date.now()
+      sampleReaderGeometryRef.current()
+    }, SCROLL_SAMPLE_INTERVAL_MS - elapsed)
+  }
+  useEffect(() => () => {
+    const sample = geometrySampleRef.current
+    if (sample.timer !== null) clearTimeout(sample.timer)
+    sample.timer = null
+  }, [])
+
   const onScrollRef = useRef(() => {})
   onScrollRef.current = () => {
     const local = listRef.current
@@ -507,12 +562,6 @@ export function ChatView({
     if (local === null) return
     const el = scrollerOf(local)
     maybeAutoLoadOlder(el)
-    const readerAnchor = pagingAnchor(local, el)
-    const readerNode = readerAnchor?.dataset.chatAnchorKey === undefined
-      ? undefined
-      : nodeStore.get(readerAnchor.dataset.chatAnchorKey)
-    const readerTurn = readerNode === undefined ? undefined : nodeTurn(readerNode)
-    if (readerTurn !== undefined) setActiveTurn(readerTurn)
     // Only reader input may make raw scroll geometry change follow ownership:
     // a delivered position that deviates from the observed-top ledger (every
     // programmatic write records itself there synchronously). This covers
@@ -526,22 +575,22 @@ export function ChatView({
       ? floor - el.scrollTop <= FOLLOW_THRESHOLD + 1
       : atBottomRef.current
     if (!movedByReader && isAtBottom) {
+      // A follow write delivered its own scroll event (every stream publication
+      // while pinned): the reader is at the tail, so the tail row names the
+      // active turn and no hit-test is needed.
+      const tailTurn = lastNode === undefined ? undefined : nodeTurn(lastNode)
+      if (tailTurn !== undefined) setActiveTurn(tailTurn)
       toBottom(el)
       return
     }
     atBottomRef.current = isAtBottom
     setAtBottom(isAtBottom)
-    const position = isAtBottom ? null : scrollPosition(local, el)
     if (isAtBottom) {
       anchorRef.current = null
-    } else if ((anchorRef.current !== null || loadingOlder) && position !== null) {
-      anchorRef.current = { key: position.anchorKey, top: position.anchorTop }
+      chatScroll.save(null)
     }
-    // Continuous save (unmount happens after ref detach, so saving there is
-    // too late); pinned-to-bottom clears so a remount keeps following.
-    if (isAtBottom) chatScroll.save(null)
-    else if (position !== null) chatScroll.save(position)
     observedTopRef.current = el.scrollTop
+    requestGeometrySample(anchorRef.current !== null || loadingOlder)
   }
 
   // Bind the scroll listener on the resolved scrollport once per mount;

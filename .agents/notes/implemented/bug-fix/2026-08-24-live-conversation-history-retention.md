@@ -10,7 +10,7 @@ The browser uses a bounded history tail to reduce the cost of re-entering a long
 
 ## Decision
 
-Session history has a staged retention mode. An idle stage opens a conversation-tier tail. Accepting a prompt, observing a running session, or entering a session that is already running changes the mode to `expanding`; older conversation pages are fetched sequentially in one cancellable background operation. The model request and live event stream do not wait for that operation. A completed expansion changes the mode to `live`; a failed, non-progressing, or safety-bounded expansion retains the current nodes and returns the normal older-page fallback.
+Session history has a staged retention mode. An idle stage opens a conversation-tier tail. Accepting a prompt, observing a running session, or entering a session that is already running changes the mode to `expanding`; older conversation pages are fetched sequentially in one cancellable background operation, up to the retention bound recorded in the [bounded live window note](2026-09-03-bounded-live-window-and-incremental-reconnect.md). The model request and live event stream do not wait for that operation. An expansion that reaches the log head changes the mode to `live`; a failed, non-progressing, or bounded expansion retains the current nodes and returns the normal older-page fallback.
 
 Leaving the staged session clears only the browser event window and invalidates its in-flight history work. Queue state, pending interactions, projections, running status, and the Session object remain resident. The next stage entry reads a fresh tail. Switching between Chat and Trajectory tabs does not leave the stage.
 

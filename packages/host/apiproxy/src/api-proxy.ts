@@ -137,7 +137,7 @@ import { approvalResponsePayloadSchema } from './api/approvals.schema.ts'
 import { imageLimitsProjectionSchema, sessionListMetadataProjectionSchema } from './api/sessions.schema.ts'
 import { questionResponsePayloadSchema } from './api/questions.schema.ts'
 import type { ClientResponse, RpcError, RpcReceipt, RpcRequest, RpcResponse } from './api/rpc.ts'
-import { RpcId } from './api/rpc.ts'
+import { RpcId, serverRequestJson } from './api/rpc.ts'
 import type {
   AskUserQuestionAnswer, AskUserQuestionItem, AskUserQuestionRequest,
 } from '@deepseek-ai/dsh-user-questions'
@@ -624,8 +624,10 @@ function presetFailure(request: RpcRequest<unknown>, error: unknown): RpcRespons
   return undefined
 }
 
-/** Simple async queue: core callbacks push, the AsyncIterable pulls; abort/return cleans up. */
-class FrameQueue<F> {
+/** Simple async queue: core callbacks push, the AsyncIterable pulls; abort/return cleans up.
+ *  Byte accounting serializes each frame once through `serverRequestJson`, whose memo the
+ *  carrier reuses when it writes the same frame object. */
+class FrameQueue<F extends RpcRequest<{ type: string }>> {
   // A single session event may legitimately carry a tool result close to the
   // carrier's 8 MiB SSE frame budget. Keep enough room for that frame plus a
   // burst of control/event envelopes without allowing an unbounded backlog.
@@ -706,12 +708,10 @@ class FrameQueue<F> {
   }
 }
 
-function frameBytes(value: unknown): number {
+/** Wire envelope bytes of one frame; an unserializable payload counts as over budget. */
+function frameBytes(frame: RpcRequest<{ type: string }>): number {
   try {
-    const serialized: unknown = JSON.stringify(value)
-    return typeof serialized === 'string'
-      ? Buffer.byteLength(serialized)
-      : FrameQueue.MAX_BYTES + 1
+    return Buffer.byteLength(serverRequestJson(frame))
   } catch {
     return FrameQueue.MAX_BYTES + 1
   }
@@ -747,7 +747,7 @@ function streamErrorFrame(error: RpcError): { type: 'stream/error'; error: RpcEr
   return { type: 'stream/error', error }
 }
 
-function createReadStreamFailure<F>(
+function createReadStreamFailure<F extends { type: string }>(
   queue: FrameQueue<RpcRequest<F>>,
   render: (error: RpcError) => F,
 ): (error: unknown) => void {

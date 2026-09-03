@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { RpcId, transportError } from '../src/api/rpc.ts'
+import { RpcId, serverRequestJson, transportError } from '../src/api/rpc.ts'
 import {
   clientRequestSchema, clientResponseSchema, rpcErrorSchema, rpcIdSchema, rpcMessageSchema,
   rpcReceiptSchema, rpcResultSchema, serverRequestSchema, serverResponseSchema,
@@ -55,6 +55,28 @@ describe('transportError', () => {
     expect(transportError('raw')).toMatchObject({ ok: false, error: { code: 'internal', message: 'raw' } })
   })
 })
+
+describe('serverRequestJson', () => {
+  it('serializes the wire envelope once per frame object and rethrows what JSON.stringify rejects', () => {
+    const frame = { rpcId: RpcId('push-1'), payload: { type: 'session/subscribed', sessionId: 's', lastSeq: 4 } }
+    const json = serverRequestJson(frame)
+    expect(JSON.parse(json)).toEqual({
+      type: 'server-request', rpcId: 'push-1', method: 'session/subscribed', payload: frame.payload,
+    })
+    expect(serverRequestJsonSchemaRoundTrip(json)).toBe(true)
+    // The queue's byte accounting and the carrier share the memo: same string identity.
+    expect(serverRequestJson(frame)).toBe(json)
+    // A structurally equal but distinct frame object serializes on its own (equal text, separate memo).
+    const copy = serverRequestJson({ ...frame })
+    expect(copy).toEqual(json)
+    const unserializable: { type: string } = { type: 'x', value: 1n } as { type: string; value: bigint }
+    expect(() => serverRequestJson({ rpcId: RpcId('big'), payload: unserializable })).toThrow(TypeError)
+  })
+})
+
+function serverRequestJsonSchemaRoundTrip(json: string): boolean {
+  return serverRequestSchema.safeParse(JSON.parse(json)).success
+}
 
 describe('rpcErrorSchema', () => {
   it('accepts every code branch with its required details', () => {

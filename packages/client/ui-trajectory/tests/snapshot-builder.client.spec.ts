@@ -234,4 +234,71 @@ describe('TrajectorySnapshotBuilder', () => {
     expect(builder.apply({ upserts: [middle] }).requests.map(request => request.startSeq))
       .toEqual([1, 3, 5])
   })
+
+  it('a streaming partial swaps only the partial field and keeps every ledger identity', () => {
+    const builder = new TrajectorySnapshotBuilder()
+    const settled = contribution('user', 1, {
+      kind: 'node',
+      node: { kind: 'user', seq: 1, time: 1, content: [] } as never,
+    })
+    const running = { ...assistantRequest(3, 1), completedAt: null, status: 'running' as const }
+    const streaming = (text: string) => contribution('assistant:1', 3, {
+      kind: 'assistant',
+      partial: { turn: 1, step: 1, blocks: [{ kind: 'text', text }] },
+      request: { ...running },
+    })
+    const before = builder.replace({ nodes: [settled, streaming('你')] })
+    const after = builder.apply({ upserts: [streaming('你好')] })
+
+    expect(after).not.toBe(before)
+    expect(after.partial?.blocks).toEqual([{ kind: 'text', text: '你好' }])
+    expect(after.eventNodes).toBe(before.eventNodes)
+    expect(after.eventLocations).toBe(before.eventLocations)
+    expect(after.requests).toBe(before.requests)
+    expect(after.callSchemas).toBe(before.callSchemas)
+    expect(after.runningCalls).toBe(before.runningCalls)
+
+    // An identical re-emit publishes nothing new.
+    expect(builder.apply({ upserts: [] })).toBe(after)
+  })
+
+  it('a structural rebuild republishes only the rows whose content changed', () => {
+    const builder = new TrajectorySnapshotBuilder()
+    const first = contribution('assistant:1', 1, {
+      kind: 'assistant', partial: null, request: assistantRequest(1, 1),
+    })
+    const node = { kind: 'user', seq: 4, time: 4, content: [] } as never
+    const before = builder.replace({ nodes: [first, contribution('user', 4, { kind: 'node', node })] })
+
+    const tool = contribution('tool', 6, {
+      kind: 'tool',
+      root: {
+        callId: 'call-read', name: 'read', argsRaw: '{}', turn: 1, step: 1, time: 6, callView: null, subCalls: [],
+      },
+    })
+    const later = contribution('user:8', 8, {
+      kind: 'node',
+      node: { kind: 'user', seq: 8, time: 8, content: [] } as never,
+    })
+    const after = builder.apply({ upserts: [tool, later] })
+    // The settled ledger grew, yet the existing user row is the same object and the
+    // content-equal request row is reused.
+    expect(after.eventNodes).not.toBe(before.eventNodes)
+    expect(after.eventNodes).toHaveLength(2)
+    expect(after.eventNodes[0]).toBe(before.eventNodes[0])
+    expect(after.requests).toBe(before.requests)
+    expect(after.runningCalls).toHaveLength(1)
+
+    // A request status edge replaces the request array but not the settled node ledger.
+    const failed = contribution('assistant:1', 1, {
+      kind: 'assistant',
+      partial: null,
+      request: { ...assistantRequest(1, 1), status: 'error', error: 'failed' },
+    })
+    const errored = builder.apply({ upserts: [failed] })
+    expect(errored.requests).not.toBe(after.requests)
+    expect(errored.requests[0]).toMatchObject({ status: 'error', error: 'failed' })
+    expect(errored.eventNodes).toBe(after.eventNodes)
+    expect(errored.runningCalls).toBe(after.runningCalls)
+  })
 })

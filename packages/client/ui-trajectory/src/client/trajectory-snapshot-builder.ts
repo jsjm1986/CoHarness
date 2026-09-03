@@ -134,7 +134,72 @@ function applyTurnErrors(
   }
 }
 
-/** Simple keyed adapter retaining the old Trajectory snapshot and stage layout. */
+function sameReferences<T>(left: readonly T[], right: readonly T[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index])
+}
+
+function shallowEqual(left: object, right: object): boolean {
+  if (left === right) return true
+  const before = left as Record<string, unknown>
+  const after = right as Record<string, unknown>
+  const keys = Object.keys(before)
+  return keys.length === Object.keys(after).length
+    && keys.every(key => Object.hasOwn(after, key) && before[key] === after[key])
+}
+
+function sameMapEntries<K, V>(left: ReadonlyMap<K, V>, right: ReadonlyMap<K, V>): boolean {
+  if (left.size !== right.size) return false
+  for (const [key, value] of left) {
+    if (!right.has(key) || right.get(key) !== value) return false
+  }
+  return true
+}
+
+/**
+ * Keep the previous element for every rebuilt row whose content did not change,
+ * then the previous array when no row changed. Rows are matched by a durable
+ * ordering key because a structural rebuild may insert rows anywhere.
+ */
+function reuseRows<T extends object>(
+  previous: readonly T[],
+  next: T[],
+  keyOf: (value: T) => number,
+): readonly T[] {
+  if (previous.length === 0) return next
+  const byKey = new Map<number, T>()
+  for (const value of previous) byKey.set(keyOf(value), value)
+  for (const [index, value] of next.entries()) {
+    const before = byKey.get(keyOf(value))
+    if (before !== undefined && shallowEqual(before, value)) next[index] = before
+  }
+  return sameReferences(previous, next) ? previous : next
+}
+
+/**
+ * Whether an upsert replaced only the streaming partial of an Assistant
+ * contribution: same settled node, same request facts, only `partial` moved.
+ * Every other change (a node settling, a request status or usage edge, a tool
+ * lifecycle step) needs the request/finalized ledger rebuilt.
+ */
+function partialOnlyChange(
+  previous: TrajectoryConversationViewNode,
+  next: TrajectoryConversationViewNode,
+): boolean {
+  const before = previous.data
+  const after = next.data
+  return before.kind === 'assistant' && after.kind === 'assistant'
+    && before.node === after.node
+    && (before.request === after.request
+      || (before.request !== undefined && after.request !== undefined && shallowEqual(before.request, after.request)))
+}
+
+/**
+ * Keyed adapter retaining the old Trajectory snapshot and stage layout. A
+ * publication that only moved an Assistant's streaming partial swaps that one
+ * field; every other publication rebuilds the ledger but publishes new
+ * identities only for the rows and fields whose content changed, so the view's
+ * layout memos stay valid across a stream.
+ */
 export class TrajectorySnapshotBuilder implements ConversationViewBuilder<
   TrajectoryConversationViewNode,
   TrajectorySnapshot
@@ -142,6 +207,7 @@ export class TrajectorySnapshotBuilder implements ConversationViewBuilder<
   private readonly nodes = new Map<string, TrajectoryConversationViewNode>()
   private readonly positions = new Map<string, number>()
   private contributions: TrajectoryConversationViewNode[] = []
+  private current: TrajectorySnapshot = EMPTY_TRAJECTORY_SNAPSHOT
   readonly empty = EMPTY_TRAJECTORY_SNAPSHOT
 
   replace(input: {
@@ -150,29 +216,53 @@ export class TrajectorySnapshotBuilder implements ConversationViewBuilder<
     this.nodes.clear()
     for (const node of input.nodes) this.nodes.set(node.key, node)
     this.rebuildContributions()
-    return this.snapshot()
+    this.current = this.rebuild()
+    return this.current
   }
 
   apply(input: {
     readonly upserts: readonly TrajectoryConversationViewNode[]
   }): TrajectorySnapshot {
     let structural = false
+    let partialOnly = true
     for (const node of input.upserts) {
       const previous = this.nodes.get(node.key)
+      if (previous === node) continue
       this.nodes.set(node.key, node)
       if (previous === undefined || previous.anchorSeq !== node.anchorSeq) {
         structural = true
+        partialOnly = false
         continue
       }
       const position = this.positions.get(node.key)
-      if (position === undefined) structural = true
-      else this.contributions[position] = node
+      if (position === undefined) {
+        structural = true
+        partialOnly = false
+      } else {
+        this.contributions[position] = node
+      }
+      if (partialOnly && !partialOnlyChange(previous, node)) partialOnly = false
     }
     if (structural) this.rebuildContributions()
-    return this.snapshot()
+    if (partialOnly) {
+      const partial = this.latestPartial()
+      if (partial !== this.current.partial) this.current = { ...this.current, partial }
+      return this.current
+    }
+    this.current = this.rebuild()
+    return this.current
   }
 
-  private snapshot(): TrajectorySnapshot {
+  /** The streaming partial of the latest contribution that carries one. */
+  private latestPartial(): TrajectorySnapshot['partial'] {
+    for (let index = this.contributions.length - 1; index >= 0; index--) {
+      const data = this.contributions[index]?.data
+      if (data?.kind === 'assistant' && data.partial !== null) return data.partial
+    }
+    return null
+  }
+
+  private rebuild(): TrajectorySnapshot {
     const headersByStep = new Map<string, TrajectoryRequestHeaderState>()
     for (const contribution of this.contributions) {
       if (contribution.data.kind !== 'request-header') continue
@@ -244,14 +334,14 @@ export class TrajectorySnapshotBuilder implements ConversationViewBuilder<
     interruptCompactions(requests, boundaries)
     applyTurnErrors(requests, turnEndings)
     finalized.sort((left, right) => left.seq - right.seq)
-    const eventNodes = finalized
+    const previous = this.current
     return {
-      eventNodes,
-      eventLocations,
-      requests,
-      callSchemas,
+      eventNodes: reuseRows(previous.eventNodes, finalized, node => node.seq),
+      eventLocations: sameMapEntries(previous.eventLocations, eventLocations) ? previous.eventLocations : eventLocations,
+      requests: reuseRows(previous.requests, requests, request => request.startSeq),
+      callSchemas: sameMapEntries(previous.callSchemas, callSchemas) ? previous.callSchemas : callSchemas,
       partial,
-      runningCalls,
+      runningCalls: sameReferences(previous.runningCalls, runningCalls) ? previous.runningCalls : runningCalls,
     }
   }
 

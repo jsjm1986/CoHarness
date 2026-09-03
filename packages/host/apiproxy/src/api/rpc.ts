@@ -176,6 +176,31 @@ export interface ServerRequest {
   payload: unknown
 }
 
+const serverRequestJsonCache = new WeakMap<RpcRequest<{ type: string }>, string>()
+
+/**
+ * Serialize one server-initiated frame as its wire `ServerRequest` envelope,
+ * memoized per frame object: the stream queue's byte accounting and the
+ * carrier that later writes the frame share one serialization instead of
+ * stringifying a large tool result twice. Throws like `JSON.stringify` for a
+ * payload it cannot serialize.
+ * @param frame - narrow request form whose payload carries the method as `type`.
+ * @returns the envelope JSON text.
+ */
+export function serverRequestJson(frame: RpcRequest<{ type: string }>): string {
+  const cached = serverRequestJsonCache.get(frame)
+  if (cached !== undefined) return cached
+  const envelope: ServerRequest = {
+    type: 'server-request',
+    rpcId: frame.rpcId,
+    method: frame.payload.type,
+    payload: frame.payload,
+  }
+  const json = JSON.stringify(envelope)
+  serverRequestJsonCache.set(frame, json)
+  return json
+}
+
 /** Response to a ServerRequest (wire carrier: POST /api/respond body); rpcId echoed, never minted anew. */
 export interface ClientResponse {
   type: 'client-response'

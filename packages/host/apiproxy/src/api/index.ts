@@ -82,8 +82,8 @@ export type {
   ServerResponse,
 } from './rpc.ts'
 
-// ---- Errors and ids ----
-export { RpcId, transportError } from './rpc.ts'
+// ---- Errors, ids, and the shared server-request serialization ----
+export { RpcId, serverRequestJson, transportError } from './rpc.ts'
 export type { RpcError, RpcErrorCode, RpcErrorDetailsMap, RpcResult } from './rpc.ts'
 export {
   clientRequestSchema,
