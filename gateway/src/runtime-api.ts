@@ -432,9 +432,13 @@ export function createRuntimeApiHandler(
     if (direction !== 'older' && direction !== 'newer') {
       throw new ConversationReadError('protocol', 'conversation page direction is invalid')
     }
-    if (cursor !== undefined && (cursor.sessionId !== sessionId
-      || cursor.revision !== value.revision || cursor.direction !== direction)) {
-      throw new ConversationReadError('protocol', 'conversation page cursor is stale or belongs to another request')
+    if (cursor !== undefined && (cursor.sessionId !== sessionId || cursor.direction !== direction)) {
+      throw new ConversationReadError('protocol', 'conversation page cursor belongs to another request')
+    }
+    // A moved log is the same transient condition as a revision change inside
+    // one page read; the Host retries `dependency`, never `protocol`.
+    if (cursor !== undefined && cursor.revision !== value.revision) {
+      throw new ConversationReadError('dependency', 'conversation revision changed since the page cursor was issued')
     }
     if (request.cursor !== undefined && (request.beforeSeq !== undefined || request.fromSeq !== undefined)) {
       throw new ConversationReadError('protocol', 'conversation page cursor cannot be combined with a sequence anchor')

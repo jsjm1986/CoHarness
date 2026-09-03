@@ -1355,8 +1355,13 @@ export class ConversationRepository {
         let anchor: number
         if (request.cursor !== undefined) {
           const cursor = decodePageCursor(request.cursor)
-          if (cursor.sessionId !== sessionId || cursor.revision !== revision || cursor.direction !== direction) {
-            throw new ConversationReadError('protocol', 'conversation page cursor is stale or belongs to another request')
+          if (cursor.sessionId !== sessionId || cursor.direction !== direction) {
+            throw new ConversationReadError('protocol', 'conversation page cursor belongs to another request')
+          }
+          // A moved log is the same transient condition as a revision change
+          // inside one page read; the Host retries `dependency`, never `protocol`.
+          if (cursor.revision !== revision) {
+            throw new ConversationReadError('dependency', 'conversation revision changed since the page cursor was issued')
           }
           anchor = cursor.anchor
         } else if (direction === 'older') {

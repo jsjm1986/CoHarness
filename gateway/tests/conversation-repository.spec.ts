@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   ConversationPageTooLargeError,
   ConversationRepository,
+  encodePageCursor,
 } from '../src/postgres/conversation-repository.ts'
 
 const headerRow = {
@@ -190,9 +191,13 @@ describe('ConversationRepository bounded pages', () => {
     const fixture = pagePool(header, rows)
     const repository = new ConversationRepository(fixture.pool)
     const page = await repository.readPage('session-1', { maxEvents: 1 })
+    // A foreign cursor is a caller fault; a moved log is the retryable category.
+    const foreign = encodePageCursor({ version: 1, sessionId: 'session-2', revision: '7:2', direction: 'older', anchor: 1 })
+    await expect(repository.readPage('session-1', { cursor: foreign })).rejects
+      .toMatchObject({ code: 'protocol' })
     header.version = '8'
     await expect(repository.readPage('session-1', { cursor: page?.nextCursor })).rejects
-      .toMatchObject({ code: 'protocol' })
+      .toMatchObject({ code: 'dependency' })
   })
 
   it('fails closed when a bounded keyset query exposes a sequence gap', async () => {

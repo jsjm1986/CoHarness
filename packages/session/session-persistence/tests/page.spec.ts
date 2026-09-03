@@ -184,8 +184,9 @@ describe('session persistence page protocol', () => {
       const cursor = page.nextCursor!
       await expect(persistence.readPage(id, { cursor, direction: 'older' }))
         .rejects.toMatchObject({ code: 'protocol' })
+      // A moved log is the retryable category, not a caller protocol fault.
       persistence.bump(id)
-      await expect(persistence.readPage(id, { cursor })).rejects.toMatchObject({ code: 'protocol' })
+      await expect(persistence.readPage(id, { cursor })).rejects.toMatchObject({ code: 'dependency' })
 
       const other = SessionId('other-page-session')
       await persistence.create({ id: other, version: 0, createdAt: 1 })

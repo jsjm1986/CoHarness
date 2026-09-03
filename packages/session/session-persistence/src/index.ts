@@ -424,9 +424,14 @@ export abstract class SessionPersistence extends Service {
     let cursorAnchor: number | undefined
     if (normalized.cursor !== undefined) {
       const decoded = decodeSessionPersistenceCursor(normalized.cursor)
-      if (decoded.sessionId !== id || decoded.revision !== String(revision)
-        || decoded.direction !== normalized.direction) {
-        throw new SessionPersistenceReadError('protocol', 'session persistence page cursor is stale or belongs to another request')
+      if (decoded.sessionId !== id || decoded.direction !== normalized.direction) {
+        throw new SessionPersistenceReadError('protocol', 'session persistence page cursor belongs to another request')
+      }
+      // Same walk, moved log: the writer that invalidated the cursor is the
+      // same transient condition as a revision change inside one page read,
+      // so callers see the retryable category for both.
+      if (decoded.revision !== String(revision)) {
+        throw new SessionPersistenceReadError('dependency', 'session persistence revision changed since the page cursor was issued')
       }
       cursorAnchor = decoded.anchor
     }

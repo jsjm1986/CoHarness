@@ -69,7 +69,7 @@ describe('serverRequestJson', () => {
     // A structurally equal but distinct frame object serializes on its own (equal text, separate memo).
     const copy = serverRequestJson({ ...frame })
     expect(copy).toEqual(json)
-    const unserializable: { type: string } = { type: 'x', value: 1n } as { type: string; value: bigint }
+    const unserializable = { type: 'x', value: 1n }
     expect(() => serverRequestJson({ rpcId: RpcId('big'), payload: unserializable })).toThrow(TypeError)
   })
 })

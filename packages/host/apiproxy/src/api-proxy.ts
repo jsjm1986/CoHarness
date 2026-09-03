@@ -2512,102 +2512,18 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       && typeof persistence.readPage === 'function'
       && persistence.readPage !== SessionPersistenceDefinition.prototype.readPage
     if (hasIndexedPage) {
-      signal?.throwIfAborted()
-      const maxGroups = Math.min(
-        DEFAULT_SESSION_PAGE_MAX_GROUPS,
-        Math.max(1, request.maxMessages ?? DEFAULT_MAX_MESSAGES),
-      )
-      const pageRequest: SessionPersistencePageRequest = {
-        direction: 'older',
-        maxBytes: DEFAULT_SESSION_PAGE_MAX_BYTES,
-        maxEvents: DEFAULT_SESSION_PAGE_MAX_EVENTS,
-        maxGroups,
-        ...(request.beforeSeq === undefined ? {} : { beforeSeq: request.beforeSeq }),
-      }
-      let page = await persistence.readPage(sessionId, pageRequest, signal)
-      signal?.throwIfAborted()
-      validateHistoryPersistencePage(sessionId, page)
-      if (page.uncompressedBytes > MAX_HISTORY_WINDOW_BYTES) {
-        throw new SessionPersistenceReadError('too-large', 'session history page exceeds the host response budget')
-      }
-      // A persistence page is bounded by bytes/events/groups, not by the
-      // public message quota. Follow its revision-bound cursor only until the
-      // requested message window is covered. The aggregate remains bounded by
-      // MAX_HISTORY_MATERIALIZED_BYTES and never falls back to a full inspect.
-      const events = [...page.events]
-      let bytes = page.uncompressedBytes
-      let cursor = page.nextCursor
-      let hasMore = page.hasMore
-      const maxMessages = request.maxMessages ?? DEFAULT_MAX_MESSAGES
-      let stoppedAtWindowBudget = false
-      for (let guard = 0; hasMore && cursor !== undefined
-        && (appendOriginMessageCount(events) < maxMessages || historyNeedsEarlierSources(events)); guard++) {
-        if (guard >= MAX_HISTORY_PAGE_FETCHES || bytes >= MAX_HISTORY_MATERIALIZED_BYTES) {
-          throw new SessionPersistenceReadError(
-            'too-large',
-            `session history materialization exceeded ${String(MAX_HISTORY_MATERIALIZED_BYTES)} bytes`,
-          )
-        }
-        if (bytes >= MAX_HISTORY_WINDOW_BYTES) {
-          stoppedAtWindowBudget = true
-          break
-        }
-        const next = await persistence.readPage(sessionId, {
-          cursor,
-          maxBytes: DEFAULT_SESSION_PAGE_MAX_BYTES,
-          maxEvents: DEFAULT_SESSION_PAGE_MAX_EVENTS,
-          maxGroups,
-        }, signal)
-        signal?.throwIfAborted()
-        validateHistoryPersistencePage(sessionId, next)
-        if (String(next.revision) !== String(page.revision)) {
-          throw new SessionPersistenceReadError('dependency', 'session persistence revision changed during history read')
-        }
-        if (next.events.length === 0 && next.hasMore) {
-          throw new SessionPersistenceReadError('protocol', 'session persistence page cursor returned no progress')
-        }
-        if (next.nextCursor !== undefined && next.nextCursor === cursor) {
-          throw new SessionPersistenceReadError('protocol', 'session persistence page cursor repeated')
-        }
-        const previousFirst = events[0]?.seq
-        const nextLast = next.events.at(-1)?.seq
-        if (previousFirst !== undefined && nextLast !== undefined && nextLast >= previousFirst) {
-          throw new SessionPersistenceReadError('protocol', 'session persistence page cursor returned overlapping events')
-        }
-        if (previousFirst !== undefined && nextLast !== undefined && nextLast + 1 !== previousFirst) {
-          throw new SessionPersistenceReadError('protocol', 'session persistence page cursor returned a sequence gap')
-        }
-        if (bytes + next.uncompressedBytes > MAX_HISTORY_WINDOW_BYTES) {
-          // The page is still valid, but retaining it would turn a normal
-          // bounded history request into a multi-megabyte response. The next
-          // public beforeSeq request can continue from the current first seq.
-          stoppedAtWindowBudget = true
-          break
-        }
-        events.unshift(...next.events)
-        bytes += next.uncompressedBytes
-        if (bytes > MAX_HISTORY_MATERIALIZED_BYTES) {
-          throw new SessionPersistenceReadError(
-            'too-large',
-            `session history materialization exceeded ${String(MAX_HISTORY_MATERIALIZED_BYTES)} bytes`,
-          )
-        }
-        page = next
-        hasMore = next.hasMore
-        cursor = next.nextCursor
-      }
-      if (!hasMore && historyNeedsEarlierSources(events)) {
-        throw new SessionPersistenceReadError('protocol', 'session history page ended before its cited source range')
-      }
-      const presenterEvents = await indexedPresenterEvents(persistence, sessionId, page.revision, signal)
-      return {
-        kind: 'detached',
-        header: page.meta,
-        events,
-        ...(presenterEvents === undefined ? {} : { presenterEvents }),
-        hasMore: hasMore || stoppedAtWindowBudget,
-        revision: page.revision,
-        bounded: true,
+      try {
+        return await boundedDetachedHistory(persistence, sessionId, request, signal)
+      } catch (error: unknown) {
+        if (!(error instanceof SessionPersistenceReadError) || error.code !== 'dependency') throw error
+        // The revision moved under the page walk. Opening a session in the
+        // browser attaches it concurrently with the first history read, and
+        // the resume appends lifecycle events, so the resident log is now the
+        // authoritative source; any other writer gets one restart on the new
+        // revision before the failure reaches the client.
+        const nowAttached = ctx.sessions.get(sessionId)
+        if (nowAttached !== undefined) return { kind: 'attached', session: nowAttached }
+        return await boundedDetachedHistory(persistence, sessionId, request, signal)
       }
     }
     const inspected = await inspectServable(sessionId, signal)
@@ -2620,6 +2536,122 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       // source signature still invalidates attached/cache races.
       revision: SessionPersistenceRevision(`inspection:${String(inspected.events.length)}:${String(inspected.events.at(-1)?.seq ?? -1)}`),
       bounded: false,
+    }
+  }
+
+  /**
+   * Walk the provider's revision-bound pages backwards from `beforeSeq` until
+   * the requested message window is covered or the host window budget stops
+   * the walk. Rejects with a `dependency` persistence error when the revision
+   * moves between pages; {@link historySourceFor} owns the recovery.
+   * @param persistence - provider with a real bounded page primitive.
+   * @param sessionId - the transcript being read.
+   * @param request - the public backwards-page request.
+   * @param signal - request cancellation propagated to persistence.
+   * @returns one bounded detached range.
+   */
+  async function boundedDetachedHistory(
+    persistence: SessionPersistence,
+    sessionId: SessionId,
+    request: { beforeSeq?: number; maxMessages?: number },
+    signal?: AbortSignal,
+  ): Promise<HistorySource> {
+    signal?.throwIfAborted()
+    const maxGroups = Math.min(
+      DEFAULT_SESSION_PAGE_MAX_GROUPS,
+      Math.max(1, request.maxMessages ?? DEFAULT_MAX_MESSAGES),
+    )
+    const pageRequest: SessionPersistencePageRequest = {
+      direction: 'older',
+      maxBytes: DEFAULT_SESSION_PAGE_MAX_BYTES,
+      maxEvents: DEFAULT_SESSION_PAGE_MAX_EVENTS,
+      maxGroups,
+      ...(request.beforeSeq === undefined ? {} : { beforeSeq: request.beforeSeq }),
+    }
+    let page = await persistence.readPage(sessionId, pageRequest, signal)
+    signal?.throwIfAborted()
+    validateHistoryPersistencePage(sessionId, page)
+    if (page.uncompressedBytes > MAX_HISTORY_WINDOW_BYTES) {
+      throw new SessionPersistenceReadError('too-large', 'session history page exceeds the host response budget')
+    }
+    // A persistence page is bounded by bytes/events/groups, not by the
+    // public message quota. Follow its revision-bound cursor only until the
+    // requested message window is covered. The aggregate remains bounded by
+    // MAX_HISTORY_MATERIALIZED_BYTES and never falls back to a full inspect.
+    const events = [...page.events]
+    let bytes = page.uncompressedBytes
+    let cursor = page.nextCursor
+    let hasMore = page.hasMore
+    const maxMessages = request.maxMessages ?? DEFAULT_MAX_MESSAGES
+    let stoppedAtWindowBudget = false
+    for (let guard = 0; hasMore && cursor !== undefined
+      && (appendOriginMessageCount(events) < maxMessages || historyNeedsEarlierSources(events)); guard++) {
+      if (guard >= MAX_HISTORY_PAGE_FETCHES || bytes >= MAX_HISTORY_MATERIALIZED_BYTES) {
+        throw new SessionPersistenceReadError(
+          'too-large',
+          `session history materialization exceeded ${String(MAX_HISTORY_MATERIALIZED_BYTES)} bytes`,
+        )
+      }
+      if (bytes >= MAX_HISTORY_WINDOW_BYTES) {
+        stoppedAtWindowBudget = true
+        break
+      }
+      const next = await persistence.readPage(sessionId, {
+        cursor,
+        maxBytes: DEFAULT_SESSION_PAGE_MAX_BYTES,
+        maxEvents: DEFAULT_SESSION_PAGE_MAX_EVENTS,
+        maxGroups,
+      }, signal)
+      signal?.throwIfAborted()
+      validateHistoryPersistencePage(sessionId, next)
+      if (String(next.revision) !== String(page.revision)) {
+        throw new SessionPersistenceReadError('dependency', 'session persistence revision changed during history read')
+      }
+      if (next.events.length === 0 && next.hasMore) {
+        throw new SessionPersistenceReadError('protocol', 'session persistence page cursor returned no progress')
+      }
+      if (next.nextCursor !== undefined && next.nextCursor === cursor) {
+        throw new SessionPersistenceReadError('protocol', 'session persistence page cursor repeated')
+      }
+      const previousFirst = events[0]?.seq
+      const nextLast = next.events.at(-1)?.seq
+      if (previousFirst !== undefined && nextLast !== undefined && nextLast >= previousFirst) {
+        throw new SessionPersistenceReadError('protocol', 'session persistence page cursor returned overlapping events')
+      }
+      if (previousFirst !== undefined && nextLast !== undefined && nextLast + 1 !== previousFirst) {
+        throw new SessionPersistenceReadError('protocol', 'session persistence page cursor returned a sequence gap')
+      }
+      if (bytes + next.uncompressedBytes > MAX_HISTORY_WINDOW_BYTES) {
+        // The page is still valid, but retaining it would turn a normal
+        // bounded history request into a multi-megabyte response. The next
+        // public beforeSeq request can continue from the current first seq.
+        stoppedAtWindowBudget = true
+        break
+      }
+      events.unshift(...next.events)
+      bytes += next.uncompressedBytes
+      if (bytes > MAX_HISTORY_MATERIALIZED_BYTES) {
+        throw new SessionPersistenceReadError(
+          'too-large',
+          `session history materialization exceeded ${String(MAX_HISTORY_MATERIALIZED_BYTES)} bytes`,
+        )
+      }
+      page = next
+      hasMore = next.hasMore
+      cursor = next.nextCursor
+    }
+    if (!hasMore && historyNeedsEarlierSources(events)) {
+      throw new SessionPersistenceReadError('protocol', 'session history page ended before its cited source range')
+    }
+    const presenterEvents = await indexedPresenterEvents(persistence, sessionId, page.revision, signal)
+    return {
+      kind: 'detached',
+      header: page.meta,
+      events,
+      ...(presenterEvents === undefined ? {} : { presenterEvents }),
+      hasMore: hasMore || stoppedAtWindowBudget,
+      revision: page.revision,
+      bounded: true,
     }
   }
 

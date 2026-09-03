@@ -473,6 +473,119 @@ describe('cold history recovery view', () => {
     expect(readPage).toHaveBeenCalledTimes(2)
   })
 
+  it('serves the resident log when a resume moves the revision under a detached page walk', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(UserQuestionService)
+    const sessionId = sid('session-attached-mid-walk')
+    const meta = header(sessionId, 1000)
+    const message = (seq: number, body: string): SessionEvent => ({
+      type: 'user/message',
+      seq,
+      time: 2000 + seq,
+      data: createUserMessage({ content: [{ type: 'text', text: body }], source: { kind: 'user' } }),
+      surfaceOp: 'append',
+    })
+    const readPage = vi.fn(async (_id: SessionId, pageRequest: { cursor?: string }): Promise<SessionPersistencePage> => {
+      if (pageRequest.cursor === undefined) {
+        return {
+          meta,
+          revision: SessionPersistenceRevision('walk:1'),
+          events: [message(1, 'tail')],
+          startSeq: 1,
+          endSeq: 1,
+          hasMore: true,
+          nextCursor: 'walk-next' as never,
+          uncompressedBytes: 512,
+        }
+      }
+      // The open that started this read also resumed the session; its
+      // lifecycle events moved the log between the two page reads.
+      ctx.sessions.create(sessionId, {
+        seed: [message(0, 'head'), message(1, 'tail'), { type: 'turn/start', seq: 2, time: 2002, data: { turn: 2 } }],
+        meta: { cwd: '/proj', createdAt: 1000 },
+      })
+      throw new SessionPersistenceReadError('dependency', 'session persistence revision changed since the page cursor was issued')
+    })
+    ctx.provide('sessionPersistence', {
+      list: () => Promise.resolve([meta]),
+      readPage,
+      revision: () => Promise.resolve(SessionPersistenceRevision('walk:1')),
+      locate: () => undefined,
+    } as never)
+    const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })
+
+    const response = await api.sessions.history(request({ sessionId, maxMessages: 2 }))
+    expect(response.result.ok).toBe(true)
+    if (!response.result.ok) throw new Error('history failed')
+    // The resume's own `session/end-seed` boundary (seq 3) proves the page came
+    // from the resident log rather than a third persistence read.
+    expect(response.result.value.events.map(entry => entry.event.seq)).toEqual([0, 1, 2, 3])
+    expect(response.result.value.events.at(-1)?.event.type).toBe('session/end-seed')
+    expect(response.result.value.hasMore).toBe(false)
+    expect(readPage).toHaveBeenCalledTimes(2)
+  })
+
+  it('restarts a detached page walk once when the revision moves without a resume', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(UserQuestionService)
+    const sessionId = sid('session-moved-mid-walk')
+    const meta = header(sessionId, 1000)
+    let revision = SessionPersistenceRevision('moved:1')
+    let pendingMoves = 1
+    const readPage = vi.fn(async (_id: SessionId, pageRequest: { cursor?: string }): Promise<SessionPersistencePage> => {
+      if (pageRequest.cursor !== undefined && pendingMoves > 0) {
+        pendingMoves -= 1
+        revision = SessionPersistenceRevision(`moved:${String(Number(String(revision).slice(6)) + 1)}`)
+        throw new SessionPersistenceReadError('dependency', 'session persistence revision changed since the page cursor was issued')
+      }
+      const seq = pageRequest.cursor === undefined ? 1 : 0
+      const event: SessionEvent = {
+        type: 'user/message',
+        seq,
+        time: 2000 + seq,
+        data: createUserMessage({ content: [{ type: 'text', text: `page-${String(seq)}` }], source: { kind: 'user' } }),
+        surfaceOp: 'append',
+      }
+      return {
+        meta,
+        revision,
+        events: [event],
+        startSeq: seq,
+        endSeq: seq,
+        hasMore: seq === 1,
+        ...(seq === 1 ? { nextCursor: `${String(revision)}-next` as never } : {}),
+        uncompressedBytes: 512,
+      }
+    })
+    ctx.provide('sessionPersistence', {
+      list: () => Promise.resolve([meta]),
+      readPage,
+      revision: () => Promise.resolve(revision),
+      locate: () => undefined,
+    } as never)
+    const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })
+
+    const response = await api.sessions.history(request({ sessionId, maxMessages: 2 }))
+    expect(response.result.ok).toBe(true)
+    if (!response.result.ok) throw new Error('history failed')
+    expect(response.result.value.events.map(entry => entry.event.seq)).toEqual([0, 1])
+    expect(readPage).toHaveBeenCalledTimes(4)
+
+    // A log that keeps moving is reported, not retried without bound.
+    pendingMoves = 2
+    const again = await api.sessions.history(request({ sessionId, maxMessages: 2, beforeSeq: 2 }))
+    expect(again.result).toEqual({
+      ok: false,
+      error: {
+        code: 'internal',
+        message: 'history storage is temporarily unavailable; retry later',
+        details: {},
+      },
+    })
+  })
+
   it('reuses a detached conversation tail through the persistence revision', async () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)

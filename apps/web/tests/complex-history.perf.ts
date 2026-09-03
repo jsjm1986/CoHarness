@@ -32,7 +32,7 @@ import {
   webSnapshotMode,
   type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage } from './support.ts'
+import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
 
 const SIDEBAR_SESSION_COUNT = 1_000
 const LONG_SESSION_ID = 'perf-long-history'
@@ -803,7 +803,22 @@ async function conversationTurns(page: Page): Promise<number> {
   // the window (context keys are `${kind.length}:${kind}${id}`). The stats
   // strip cannot serve as this probe: its counts ride the whole-log
   // sessionStats projection and stay fixed across paging by design.
-  return stableCount(page.locator('[data-chat-flow-key^="9:turn-tail"]'), count => count > 0)
+  try {
+    return await stableCount(page.locator('[data-chat-flow-key^="9:turn-tail"]'), count => count > 0)
+  } catch (error) {
+    const mounted = await page.evaluate(() => {
+      const kinds: Record<string, number> = {}
+      for (const row of document.querySelectorAll('[data-chat-flow-kind]')) {
+        const kind = row.getAttribute('data-chat-flow-kind') ?? 'unknown'
+        kinds[kind] = (kinds[kind] ?? 0) + 1
+      }
+      return kinds
+    }).catch(() => 'unavailable' as const)
+    throw new Error(
+      `loaded-window turn probe found no turn-tail rows; mounted flow kinds ${JSON.stringify(mounted)}`,
+      { cause: error },
+    )
+  }
 }
 
 /** Read the logical trajectory cardinality while the table may render a virtual subset. */
@@ -917,6 +932,33 @@ async function closePerformanceWorld(world: PerformanceWorld): Promise<void> {
   if (failures.length > 1) throw new AggregateError(failures, 'web performance teardown failed')
 }
 
+/**
+ * Close the world from a scenario's `finally` without letting a teardown
+ * failure replace the scenario's own error: replay's "fixture not fully
+ * consumed" is a consequence of an earlier failure, not its cause. The
+ * failure shot is taken here because `onTestFailed` runs after this close.
+ */
+async function closePerformanceWorldAfter(
+  world: PerformanceWorld,
+  failure: unknown,
+  shotName: string,
+): Promise<void> {
+  if (failure !== undefined) await saveFailureShot(world.page, shotName)
+  try {
+    await closePerformanceWorld(world)
+  } catch (cleanupError) {
+    if (failure === undefined) throw cleanupError
+    throw new AggregateError([failure, cleanupError], 'web performance scenario and teardown failed')
+  }
+}
+
+async function expandSessionSearch(page: Page): Promise<Locator> {
+  // Search collapsed into a header action; expand it before filling.
+  const searchButton = page.getByRole('button', { name: 'Search sessions' })
+  if (await searchButton.getAttribute('aria-expanded') !== 'true') await searchButton.click()
+  return page.getByRole('textbox', { name: /Search sessions\.\.\.|Search name, keywords\.\.\./ })
+}
+
 async function openPerformancePage(
   world: PerformanceWorld,
   expectedSessions: number,
@@ -935,8 +977,7 @@ async function openPerformancePage(
 }
 
 async function openLongHistory(page: Page): Promise<number> {
-  await page.getByRole('textbox', { name: /Search sessions\.\.\.|Search name, keywords\.\.\./ })
-    .fill('LONG_PERF_SENTINEL')
+  await (await expandSessionSearch(page)).fill('LONG_PERF_SENTINEL')
   const results = page.getByRole('tree', { name: 'Search results' }).getByRole('treeitem')
   await expect.poll(() => results.count(), { timeout: 60_000 }).toBe(1)
   await results.first().click()
@@ -1027,7 +1068,11 @@ async function continueConversation(
       .map(block => block.text)
       .join('')).toBe(spec.prompt)
     const resultingTurns = await conversationTurns(world.page)
-    expect(resultingTurns).toBe(options.startingTurns + index)
+    // The loaded window may also grow behind the tail while the session runs
+    // (the runtime retains older pages for a running stage), so its size is a
+    // reported measurement; the probe contract is that every continued turn
+    // mounts at least its own footer and the window never shrinks.
+    expect(resultingTurns).toBeGreaterThanOrEqual((turns.at(-1)?.resultingTurns ?? options.startingTurns) + 1)
     turns.push({
       ordinal: index,
       resultingTurns,
@@ -1208,6 +1253,7 @@ describe('manual web performance: complex workspace and history', () => {
       sidebarSessions: SIDEBAR_SESSION_COUNT,
       seedLongHistory: true,
     })
+    let testFailure: unknown
     try {
       const bootStarted = performance.now()
       const group = await openPerformancePage(world, SIDEBAR_SESSION_COUNT + 1)
@@ -1237,8 +1283,7 @@ describe('manual web performance: complex workspace and history', () => {
       await expect.poll(() => page.getByRole('treeitem').count()).toBe(1)
 
       const contentSearch = await measure(cdp, async () => {
-        await page.getByRole('textbox', { name: /Search sessions\.\.\.|Search name, keywords\.\.\./ })
-          .fill('LONG_PERF_SENTINEL')
+        await (await expandSessionSearch(page)).fill('LONG_PERF_SENTINEL')
         const results = page.getByRole('tree', { name: 'Search results' }).getByRole('treeitem')
         await expect.poll(() => results.count(), { timeout: 60_000 }).toBe(1)
         await results.first().waitFor({ timeout: 60_000 })
@@ -1348,8 +1393,11 @@ describe('manual web performance: complex workspace and history', () => {
       }, null, 2)}`)
       expect(world.tripwire.warnings).toEqual([])
       expect(world.tripwire.pageErrors).toEqual([])
+    } catch (error) {
+      testFailure = error
+      throw error
     } finally {
-      await closePerformanceWorld(world)
+      await closePerformanceWorldAfter(world, testFailure, 'web-perf-workspace-history-trajectory')
     }
   })
 
@@ -1359,6 +1407,7 @@ describe('manual web performance: complex workspace and history', () => {
       replay: performanceReplayOverride(COMPARISON_TURNS, comparisonTurn),
       seedLongHistory: true,
     })
+    let testFailure: unknown
     try {
       await openPerformancePage(world, 1)
       const cdp = await world.page.context().newCDPSession(world.page)
@@ -1381,8 +1430,11 @@ describe('manual web performance: complex workspace and history', () => {
       }, null, 2)}`)
       expect(world.tripwire.warnings).toEqual([])
       expect(world.tripwire.pageErrors).toEqual([])
+    } catch (error) {
+      testFailure = error
+      throw error
     } finally {
-      await closePerformanceWorld(world)
+      await closePerformanceWorldAfter(world, testFailure, 'web-perf-default-resume-24-plus-8')
     }
   })
 
@@ -1392,6 +1444,7 @@ describe('manual web performance: complex workspace and history', () => {
       replay: performanceReplayOverride(COMPARISON_TURNS, comparisonTurn),
       seedLongHistory: true,
     })
+    let testFailure: unknown
     try {
       await openPerformancePage(world, 1)
       const cdp = await world.page.context().newCDPSession(world.page)
@@ -1427,8 +1480,11 @@ describe('manual web performance: complex workspace and history', () => {
       }, null, 2)}`)
       expect(world.tripwire.warnings).toEqual([])
       expect(world.tripwire.pageErrors).toEqual([])
+    } catch (error) {
+      testFailure = error
+      throw error
     } finally {
-      await closePerformanceWorld(world)
+      await closePerformanceWorldAfter(world, testFailure, 'web-perf-expanded-history-500-plus-8')
     }
   })
 
@@ -1467,15 +1523,7 @@ describe('manual web performance: complex workspace and history', () => {
       testFailure = error
       throw error
     } finally {
-      try {
-        await closePerformanceWorld(world)
-      } catch (cleanupError) {
-        if (testFailure === undefined) throw cleanupError
-        throw new AggregateError(
-          [testFailure, cleanupError],
-          'continuous conversation performance test and teardown failed',
-        )
-      }
+      await closePerformanceWorldAfter(world, testFailure, 'web-perf-continuous-100-turn-soak')
     }
   })
 })
