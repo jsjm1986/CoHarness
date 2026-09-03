@@ -1,12 +1,20 @@
 - banner:
+  - tablist:
+    - tab "Chat" [selected]
+    - tab "Trajectory"
   - navigation "Session hierarchy":
     - button "{{workspace}}" [disabled]
   - button "Session log":
     - text: Session log
     - img
-  - tablist:
-    - tab "Chat" [selected]
-    - tab "Trajectory"
+- separator "Adjust transcript content width"
+- navigation "Turn navigation":
+  - button "Jump to turn 3"
+  - button "Jump to turn 4"
+  - button "Jump to turn 5"
+  - button "Jump to turn 6"
+  - button "Jump to turn 7"
+  - button "Jump to turn 8"
 - button "Load earlier"
 - text: WIRE_USER_03 {{date}} {{clock}}
 - button "Copy":
@@ -25,7 +33,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{date}} {{clock}} WIRE_USER_04 {{date}} {{clock}}
+- text: {{date}} {{clock}}
+- button "1 intermediate message" [expanded]:
+  - text: 1 intermediate message
+  - img
+- text: WIRE_USER_04 {{date}} {{clock}}
 - button "Copy":
   - img
 - button "Think WIRE_REASONING_04":
@@ -42,7 +54,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{date}} {{clock}} Ran for {{duration}} WIRE_USER_05 {{date}} {{clock}}
+- text: {{date}} {{clock}} Ran for {{duration}}
+- button "1 intermediate message" [expanded]:
+  - text: 1 intermediate message
+  - img
+- text: WIRE_USER_05 {{date}} {{clock}}
 - button "Copy":
   - img
 - button "Think WIRE_REASONING_05":
@@ -59,7 +75,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{date}} {{clock}} Ran for {{duration}} WIRE_USER_06 {{date}} {{clock}}
+- text: {{date}} {{clock}} Ran for {{duration}}
+- button "1 intermediate message" [expanded]:
+  - text: 1 intermediate message
+  - img
+- text: WIRE_USER_06 {{date}} {{clock}}
 - button "Copy":
   - img
 - button "Think WIRE_REASONING_06":
@@ -76,7 +96,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{date}} {{clock}} Ran for {{duration}} WIRE_USER_TOOL {{date}} {{clock}}
+- text: {{date}} {{clock}} Ran for {{duration}}
+- button "1 tool call · 2 intermediate messages" [expanded]:
+  - text: 1 tool call · 2 intermediate messages
+  - img
+- text: WIRE_USER_TOOL {{date}} {{clock}}
 - button "Copy":
   - img
 - button "Think WIRE_REASONING_TOOL_CALL":
@@ -104,7 +128,11 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{date}} {{clock}} Ran for {{duration}} WIRE_USER_INTERRUPTED {{date}} {{clock}}
+- text: {{date}} {{clock}} Ran for {{duration}}
+- button "Process details" [expanded]:
+  - text: Process details
+  - img
+- text: WIRE_USER_INTERRUPTED {{date}} {{clock}}
 - button "Copy":
   - img
 - button "Think WIRE_INTERRUPTED_REASONING":
@@ -118,8 +146,12 @@
 - button "Branch into a new conversation":
   - img
 - text: {{date}} {{clock}} Ran for {{duration}}
+- button "Back to bottom":
+  - img
 - textbox "Message the agent"
 - button "Add images or documents":
+  - img
+- button "Choose from Documents":
   - img
 - button "Commands":
   - img

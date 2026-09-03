@@ -163,13 +163,18 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
     await settings.getByText('自定义设置').click()
     await settings.getByRole('button', { name: /删除模型/ }).first().click()
     await settings.getByRole('button', { name: '添加模型' }).click()
-    const customModelId = settings.getByLabel('模型 ID 2')
+    // The new row is the last one; its ordinal follows however many shipped
+    // models survive the removal above rather than a fixed count.
+    const modelIds = settings.getByLabel(/^模型 ID \d+$/)
+    await expect.poll(() => modelIds.count(), { timeout: 10_000 }).toBeGreaterThanOrEqual(2)
+    const row = String(await modelIds.count())
+    const customModelId = settings.getByLabel(`模型 ID ${row}`)
     await customModelId.fill('private-preview')
-    await settings.getByLabel('显示名称 2').fill('Private Preview')
+    await settings.getByLabel(`显示名称 ${row}`).fill('Private Preview')
     // Capacities live behind the row's own disclosure, as in the pi-ai form.
-    await settings.getByRole('button', { name: '容量 2' }).click()
-    await settings.getByLabel('上下文窗口 2').fill('131072')
-    await settings.getByLabel('最大输出 token 数 2').fill('64K')
+    await settings.getByRole('button', { name: `容量 ${row}` }).click()
+    await settings.getByLabel(`上下文窗口（token） ${row}`).fill('131072')
+    await settings.getByLabel(`最大输出（token） ${row}`).fill('64K')
 
     const modelEditor = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(MODELS_EXPECTED, modelEditor, MODE)

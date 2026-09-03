@@ -23,7 +23,8 @@ import type { TokenMeter } from '@deepseek-ai/dsh-token-meter'
 import { join } from 'node:path'
 import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts,
-  launchWebScaffold, realizeSeedFixture, recordFixture, seedSession, watchConsole, webSnapshotMode, type WebScaffold,
+  launchWebScaffold, realizeSeedFixture, recordFixture, rewriteSeedEvents, seedSession, watchConsole, webSnapshotMode,
+  type WebScaffold,
 } from './scaffold.ts'
 import { newEnglishPage, saveFailureShot } from './support.ts'
 
@@ -54,126 +55,122 @@ const PROMPT = 'Use the read tool twice in one assistant message: read a.txt and
  * @returns the fixture with a manual compaction lifecycle appended.
  */
 function withCompaction(raw: string, meter: TokenMeter): string {
-  const lines = raw.trimEnd().split('\n')
-  const events = lines.slice(1).map(line => JSON.parse(line) as {
-    type: string
-    seq: number
-    time: number
-    surfaceOp?: unknown
-    data?: { turn?: unknown; message?: unknown; content?: unknown; callId?: unknown; isError?: unknown }
-  })
-  const surfaceSeqs = events
-    .filter(event => event.surfaceOp === 'append'
-      && (event.type === 'user/message'
+  return rewriteSeedEvents(raw, (events) => {
+    const surfaceSeqs = events
+      .filter(event => (event.type === 'user/message'
         || event.type === 'assistant/message'
-        || event.type === 'tool/result'))
-    .map(event => event.seq)
-  const first = surfaceSeqs[0]
-  const last = surfaceSeqs.at(-1)
-  const tail = events.at(-1)
-  if (first === undefined || last === undefined || tail === undefined) {
-    throw new Error('seeded-history compaction requires a non-empty closed surface')
-  }
-  const lastTurn = events.filter(event => event.type === 'turn/end').at(-1)?.data?.turn
-  if (typeof lastTurn !== 'number') {
-    throw new Error('seeded-history compaction requires a recording ending on a closed turn')
-  }
-  let seq = tail.seq + 1
-  let time = tail.time + 1
-  /**
-   * Append one event at the next seq/time.
-   * @param event - the event body, without seq/time.
-   * @returns the assigned seq, so later `sourceEventSeqs` cite the pushed event directly.
-   */
-  const at = (event: Record<string, unknown>): number => {
-    const taken = seq++
-    lines.push(JSON.stringify({ ...event, seq: taken, time: time++ }))
-    return taken
-  }
-  const commandId = 'cmd-seeded-manual-compact'
-  const compactionId = 'compact-seeded-manual-compact'
-  at({
-    type: 'command/run',
-    data: { commandId, name: 'compact', args: '', source: { kind: 'user' } },
-  })
-  const startSeq = at({
-    type: 'compaction/start',
-    data: { compactionId, sourceCommandId: commandId, turn: null },
-  })
-  // Load-bearing exactness: the projections subtract this count verbatim, so
-  // it must equal what the host's fold prices for these nodes. The estimator
-  // prices message CONTENT only, so a minimal wrapper for each stored event format is
-  // exact — pre-identity rows carry bare `content` (the persistence read path
-  // upgrades them), a current row carries the full `message` envelope.
-  const priceRow = (row: (typeof events)[number]): number => {
-    if (row.data?.message !== undefined) {
-      const message = deriveEventMessage(row as unknown as SessionEvent)
-      return message === null ? 0 : meter.estimateMessage(message)
+        || event.type === 'tool/result')
+        && event.surfaceOp === 'append')
+      .map(event => event.seq)
+    const first = surfaceSeqs[0]
+    const last = surfaceSeqs.at(-1)
+    const tail = events.at(-1)
+    if (first === undefined || last === undefined || tail === undefined) {
+      throw new Error('seeded-history compaction requires a non-empty closed surface')
     }
-    const content = row.data?.content as ContentBlock[]
-    if (row.type === 'tool/result') {
-      return meter.estimateMessage({
-        content: [{ type: 'tool-result', toolCallId: row.data?.callId, content, isError: row.data?.isError === true }],
-      } as unknown as Message)
+    const lastTurn = events
+      .findLast((event): event is Extract<SessionEvent, { type: 'turn/end' }> => event.type === 'turn/end')
+      ?.data.turn
+    if (typeof lastTurn !== 'number') {
+      throw new Error('seeded-history compaction requires a recording ending on a closed turn')
     }
-    // An empty-content assistant message derives no transcript entry.
-    if (row.type === 'assistant/message' && content.length === 0) return 0
-    return meter.estimateMessage({ content } as unknown as Message)
-  }
-  const shadowedTokenCount = surfaceSeqs.reduce((total, surfaceSeq) => {
-    const event = events.find(candidate => candidate.seq === surfaceSeq)
-    if (event === undefined) throw new Error(`seeded-history compaction: shadowed seq ${surfaceSeq} is not in the seed`)
-    return total + priceRow(event)
-  }, 0)
-  const summarySeq = at({
-    type: 'compaction/summary',
-    data: {
-      compactionId,
-      sourceCommandId: commandId,
-      summary: [{
-        type: 'text',
-        text: '## Cold resume compact summary\n\n- The exact summary remains available.',
-      }],
-      shadowedRange: { start: first, end: last },
-      shadowedSeqs: surfaceSeqs,
-      shadowedTokenCount,
-      provider: 'snapshot',
-      model: 'snapshot-compactor',
-    },
-  })
-  at({
-    type: 'user/message',
-    data: {
-      content: [{
-        type: 'text',
-        text: '<context_checkpoint>Model-only compact checkpoint.</context_checkpoint>',
-      }],
-      source: {
-        kind: 'plugin', plugin: 'compact', compactionId, sourceCommandId: commandId,
+    let seq = tail.seq + 1
+    /**
+     * Append one event at the next seq (times are materialized at seed time).
+     * @param event - the event body, without seq/time.
+     * @returns the assigned seq, so later `sourceEventSeqs` cite the pushed event directly.
+     */
+    const at = (event: Record<string, unknown>): number => {
+      const taken = seq++
+      events.push({ ...event, seq: taken, time: 0 } as unknown as SessionEvent)
+      return taken
+    }
+    const commandId = 'cmd-seeded-manual-compact'
+    const compactionId = 'compact-seeded-manual-compact'
+    at({
+      type: 'command/run',
+      data: { commandId, name: 'compact', args: '', source: { kind: 'user' } },
+    })
+    const startSeq = at({
+      type: 'compaction/start',
+      data: { compactionId, sourceCommandId: commandId, turn: null },
+    })
+    // Load-bearing exactness: the projections subtract this count verbatim, so
+    // it must equal what the host's fold prices for these nodes. The estimator
+    // prices message CONTENT only, so a minimal wrapper for each stored event format is
+    // exact — pre-identity rows carry bare `content` (the persistence read path
+    // upgrades them), a current row carries the full `message` envelope.
+    const priceRow = (row: SessionEvent): number => {
+      const data = row.data as { message?: unknown; content?: ContentBlock[]; callId?: unknown; isError?: unknown }
+      if (data.message !== undefined) {
+        const message = deriveEventMessage(row)
+        return message === null ? 0 : meter.estimateMessage(message)
+      }
+      const content = data.content as ContentBlock[]
+      if (row.type === 'tool/result') {
+        return meter.estimateMessage({
+          content: [{ type: 'tool-result', toolCallId: data.callId, content, isError: data.isError === true }],
+        } as unknown as Message)
+      }
+      // An empty-content assistant message derives no transcript entry.
+      if (row.type === 'assistant/message' && content.length === 0) return 0
+      return meter.estimateMessage({ content } as unknown as Message)
+    }
+    const shadowedTokenCount = surfaceSeqs.reduce((total, surfaceSeq) => {
+      const event = events.find(candidate => candidate.seq === surfaceSeq)
+      if (event === undefined) throw new Error(`seeded-history compaction: shadowed seq ${surfaceSeq} is not in the seed`)
+      return total + priceRow(event)
+    }, 0)
+    const summarySeq = at({
+      type: 'compaction/summary',
+      data: {
+        compactionId,
+        sourceCommandId: commandId,
+        summary: [{
+          type: 'text',
+          text: '## Cold resume compact summary\n\n- The exact summary remains available.',
+        }],
+        shadowedRange: { start: first, end: last },
+        shadowedSeqs: surfaceSeqs,
+        shadowedTokenCount,
+        provider: 'snapshot',
+        model: 'snapshot-compactor',
       },
-    },
-    surfaceOp: { op: 'replace', start: first, end: last },
-    sourceEventSeqs: [startSeq, summarySeq, ...surfaceSeqs],
+    })
+    at({
+      type: 'user/message',
+      data: {
+        content: [{
+          type: 'text',
+          text: '<context_checkpoint>Model-only compact checkpoint.</context_checkpoint>',
+        }],
+        source: {
+          kind: 'plugin', plugin: 'compact', compactionId, sourceCommandId: commandId,
+        },
+      },
+      surfaceOp: { op: 'replace', start: first, end: last },
+      sourceEventSeqs: [startSeq, summarySeq, ...surfaceSeqs],
+    })
+    at({
+      type: 'compaction/end',
+      data: { compactionId, sourceCommandId: commandId, turn: null },
+    })
+    at({
+      type: 'command/done',
+      data: {
+        commandId,
+        kind: 'success',
+        text: `Compacted ${surfaceSeqs.length} history items (~${shadowedTokenCount} tokens).`,
+        sourceEventSeq: summarySeq,
+      },
+    })
+    // The persistence seed helper requires a terminal turn/end. Keep the manual
+    // command standalone, then add a closed zero-step turn after it.
+    const closureTurn = lastTurn + 1
+    at({ type: 'turn/start', data: { turn: closureTurn } })
+    at({ type: 'turn/end', data: { turn: closureTurn, reason: { kind: 'completed' } } })
+    return events
   })
-  at({
-    type: 'compaction/end',
-    data: { compactionId, sourceCommandId: commandId, turn: null },
-  })
-  at({
-    type: 'command/done',
-    data: {
-      commandId,
-      kind: 'success',
-      text: `Compacted ${surfaceSeqs.length} history items (~${shadowedTokenCount} tokens).`,
-      sourceEventSeq: summarySeq,
-    },
-  })
-  // The persistence seed helper requires a terminal turn/end. Keep the manual
-  // command standalone, then add a closed zero-step turn after it.
-  const closureTurn = lastTurn + 1
-  at({ type: 'turn/start', data: { turn: closureTurn } })
-  at({ type: 'turn/end', data: { turn: closureTurn, reason: { kind: 'completed' } } })
-  return `${lines.join('\n')}\n`
 }
 
 describe('web e2e: seeded history renders through cold resume', () => {
@@ -224,46 +221,6 @@ describe('web e2e: seeded history renders through cold resume', () => {
     const sessionId = await settled
     await recordFixture(scaffold, sessionId, SEED)
   }, 200_000)
-
-  it.skipIf(MODE === 'record')('serves the projections baseline on the real composition tail page', async () => {
-    // Composition regression tripwire: the projection registry must be a row
-    // in the SHIPPED cordis.yml — with it absent every domain unit's optional
-    // injection stays silent and this block disappears (no titles/todos on
-    // the web), while fixture-level suites stay green. Assert through the
-    // real HTTP wire against the booted real host.
-    const response = await fetch(`${scaffold.baseUrl}/api/session.history`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        type: 'client-request', rpcId: 'seeded-projections', method: 'session.history',
-        payload: { sessionId: SEED_ID },
-      }),
-    })
-    expect(response.ok).toBe(true)
-    const body = await response.json() as {
-      result: { ok: boolean; value?: { projections?: { asOfSeq: number; values: Record<string, unknown> } } }
-    }
-    expect(body.result.ok).toBe(true)
-    const projections = body.result.value?.projections
-    expect(projections).toBeDefined()
-    expect(projections?.asOfSeq).toBeGreaterThanOrEqual(0)
-    // The seed carries a session/title event: the title unit is host-plane, so
-    // it folds the detached log and serves the value with nothing composed.
-    expect(typeof projections?.values.title).toBe('string')
-    // `todos` IS here, as its empty fold (null). Its unit is registered by
-    // `tool-todo` inside the default preset's STANDING mount, which the read
-    // itself ensures — deterministically, not because some unrelated session
-    // happens to be composed. A present-but-null key is what keeps the
-    // client's "omitted key = capability absent → clear the row" rule from
-    // wiping preset-owned projections on cold reads.
-    expect(projections?.values).toHaveProperty('todos', null)
-    // The session-stats unit is a shipped web-app bundle row: whole-log
-    // turn/step counts ride the same tail block (the stats strip's source).
-    const sessionStats = projections?.values.sessionStats as { turns: number; steps: number } | undefined
-    expect(sessionStats).toBeDefined()
-    expect(sessionStats?.turns).toBeGreaterThanOrEqual(1)
-    expect(sessionStats?.steps).toBeGreaterThanOrEqual(sessionStats?.turns ?? 0)
-  })
 
   it.skipIf(MODE === 'record')('lists the seeded session cold and renders its history from the log', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-seeded-history'))
@@ -328,6 +285,49 @@ describe('web e2e: seeded history renders through cold resume', () => {
     await page.getByRole('button', { name: 'Context injection AGENTS.md', exact: true })
       .waitFor({ timeout: 10_000 })
   }, 60_000)
+
+  it.skipIf(MODE === 'record')('serves the projections baseline on the attached session tail page', async () => {
+    // Composition regression tripwire: the projection registry must be a row
+    // in the SHIPPED cordis.yml — with it absent every domain unit's optional
+    // injection stays silent and this block disappears (no titles/todos on
+    // the web), while fixture-level suites stay green. Assert through the
+    // real HTTP wire against the booted real host. The read follows the
+    // sidebar open above on purpose: a bounded cold page serves only the
+    // persisted projection cache, which a never-opened seed has not written,
+    // so the baseline the client actually renders is the attached fold.
+    const response = await fetch(`${scaffold.baseUrl}/api/session.history`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        type: 'client-request', rpcId: 'seeded-projections', method: 'session.history',
+        payload: { sessionId: SEED_ID },
+      }),
+    })
+    expect(response.ok).toBe(true)
+    const body = await response.json() as {
+      result: { ok: boolean; value?: { projections?: { asOfSeq: number; values: Record<string, unknown> } } }
+    }
+    expect(body.result.ok).toBe(true)
+    const projections = body.result.value?.projections
+    expect(projections).toBeDefined()
+    expect(projections?.asOfSeq).toBeGreaterThanOrEqual(0)
+    // The seed carries a session/title event: the title unit is host-plane, so
+    // it folds the detached log and serves the value with nothing composed.
+    expect(typeof projections?.values.title).toBe('string')
+    // `todos` IS here, as its empty fold (null). Its unit is registered by
+    // `tool-todo` inside the default preset's STANDING mount, which the read
+    // itself ensures — deterministically, not because some unrelated session
+    // happens to be composed. A present-but-null key is what keeps the
+    // client's "omitted key = capability absent → clear the row" rule from
+    // wiping preset-owned projections on cold reads.
+    expect(projections?.values).toHaveProperty('todos', null)
+    // The session-stats unit is a shipped web-app bundle row: whole-log
+    // turn/step counts ride the same tail block (the stats strip's source).
+    const sessionStats = projections?.values.sessionStats as { turns: number; steps: number } | undefined
+    expect(sessionStats).toBeDefined()
+    expect(sessionStats?.turns).toBeGreaterThanOrEqual(1)
+    expect(sessionStats?.steps).toBeGreaterThanOrEqual(sessionStats?.turns ?? 0)
+  })
 
   it.skipIf(MODE === 'record')('matches the historical conversation aria golden', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-seeded-aria'))

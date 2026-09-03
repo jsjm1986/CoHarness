@@ -99,6 +99,9 @@ describe('web e2e: queue row actions', () => {
     const queueHeader = page.getByRole('button', { name: '2 queued messages' })
     await expect.poll(() => queueHeader.getAttribute('aria-expanded'), { timeout: 10_000 })
       .toBe('false')
+    // The dock lists a queued row from the session stream before the submit
+    // round-trip settles the composer; the golden captures the settled composer.
+    await expect.poll(() => input.inputValue(), { timeout: 10_000 }).toBe('')
     const collapsedSnapshot = await captureStableAria(
       page,
       '[class*="centerCol"]',
@@ -220,6 +223,7 @@ describe('web e2e: queue row actions', () => {
     const queueHeader = page.getByRole('button', { name: '2 queued messages' })
     await expect.poll(() => queueHeader.getAttribute('aria-expanded'), { timeout: 10_000 })
       .toBe('false')
+    await expect.poll(() => input.inputValue(), { timeout: 10_000 }).toBe('')
 
     const layoutSnapshot = await captureStableAria(
       page,

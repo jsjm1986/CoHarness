@@ -13,6 +13,7 @@ import type { ReplayEntry, ReplayOverrideDoc } from '@deepseek-ai/dsh-llm-replay
 import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
 import { createChatScrollFixture } from './chat-scroll-fixture.ts'
 import {
+  expandTurnProcesses,
   launchWebScaffold,
   seedSession,
   watchConsole,
@@ -152,6 +153,11 @@ describe('web e2e: long Chat interaction contract', () => {
       paceMs: 18,
     })
     await seedSession(scaffold, FIXTURE.log, SESSION_ID)
+    // Every host-written session carries a projection-cache row; a seeded log
+    // has none, so its list row would surface without a title and the branch
+    // below could not number its child. One cold read writes the row back,
+    // exactly as the fuller read ladder does for an opened session.
+    await scaffold.ctx.get('sessionProjectionCache')?.coldSnapshot(SessionId(SESSION_ID))
     browser = await chromium.launch()
     page = await newEnglishPage(browser, 900)
     tripwire = watchConsole(page)
@@ -193,6 +199,9 @@ describe('web e2e: long Chat interaction contract', () => {
     if (boundary === undefined) throw new Error(`turn ${String(BRANCH_TURN)} has no turn/end event`)
     const expectedUserText = textContent(branchUserEvent.data.content)
 
+    // The tool turn is settled, so its rows sit behind the turn-process
+    // disclosure until opened; the disclosure itself mounts with the tail.
+    await expandTurnProcesses(page)
     await wheelUntilMounted(page, `[data-chat-call-id="${TARGET_CALL_2}"]`, -1_100)
     const toolUserKey = messageKey(toolUserEvent)
     const toolAssistantKey = assistantKey(toolAssistantEvent)

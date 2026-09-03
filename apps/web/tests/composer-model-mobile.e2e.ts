@@ -164,11 +164,11 @@ describe('web e2e: mobile composer model label geometry', () => {
       await settings.getByRole('tab', { name: '思考等级' }).click()
       await settings.getByRole('menuitemradio', { name: 'High' }).click()
       await settings.getByRole('tab', { name: '权限' }).click()
-      const readOnly = settings.getByRole('menuitemradio', { name: 'Read Only' })
+      const readOnly = settings.getByRole('menuitemradio', { name: '仅可查看' })
       await readOnly.waitFor({ timeout: 10_000 })
       await readOnly.click()
       await page.waitForFunction(() => [...document.querySelectorAll('[data-session-settings-sheet] [role="menuitemradio"]')]
-        .some(item => item.textContent?.includes('Read Only') && item.getAttribute('aria-checked') === 'true'), undefined, { timeout: 10_000 })
+        .some(item => item.textContent?.includes('仅可查看') && item.getAttribute('aria-checked') === 'true'), undefined, { timeout: 10_000 })
       await settings.getByRole('button', { name: '关闭会话设置' }).click()
     }
     await page.locator(`button[title^="${MODEL_NAME}"][aria-haspopup="menu"]`).waitFor({ timeout: 15_000 })

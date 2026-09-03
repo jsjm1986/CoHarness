@@ -15,7 +15,9 @@ import type { ReplayOverrideDoc } from '@deepseek-ai/dsh-llm-replay'
 import {
   assertFixtureInventory,
   captureStableAria,
+  collapseTurnProcesses,
   compareOrRefreshGolden,
+  expandTurnProcesses,
   launchWebScaffold,
   watchConsole,
   webSnapshotMode,
@@ -119,6 +121,12 @@ describe.skipIf(MODE === 'record')('web e2e: user-explicit skill invocation thro
     await bubble.waitFor({ timeout: 15_000 })
     expect(await bubble.textContent()).toBe(`/${SKILL_NAME}`)
 
+    // The injection started a turn; the replay adapter answers it, and the
+    // settled turn folds its process rows behind one disclosure.
+    await page.getByText('USER_INVOKE_REPLY', { exact: false }).first().waitFor({ timeout: 20_000 })
+    await settled
+    await expandTurnProcesses(page)
+
     // The rendered body arrives as a context-injection row named after the
     // skill; expanding it reveals the canonical <skill_content> block, and
     // the user's text is NOT folded into it.
@@ -133,10 +141,8 @@ describe.skipIf(MODE === 'record')('web e2e: user-explicit skill invocation thro
     expect(injected).toContain('Reply with the fixture acknowledgement line.')
     expect(injected).not.toContain(ARGS_TEXT)
     await injectionRow.click()
-
-    // The injection started a turn; the replay adapter answers it.
-    await page.getByText('USER_INVOKE_REPLY', { exact: false }).first().waitFor({ timeout: 20_000 })
-    await settled
+    // The golden is the default settled view, with the turn's process folded.
+    await collapseTurnProcesses(page)
 
     const snapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(UI_EXPECTED, snapshot, MODE)
