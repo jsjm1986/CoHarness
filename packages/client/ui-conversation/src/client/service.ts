@@ -78,7 +78,12 @@ export interface IConversation {
    * @returns completion of the page pull.
    */
   loadOlder(): Promise<void>
-  /** Materialize older pages until an indexed turn marker is resident. */
+  /**
+   * Materialize older pages until an indexed turn marker is resident.
+   * @param targetSeq - seq of the indexed turn marker to make resident.
+   * @returns true when the marker is resident; false when the history ends
+   * or the session is unavailable before reaching it.
+   */
   loadHistoryUntil(targetSeq: number): Promise<boolean>
   /**
    * Attach one already-stored user document to a session's composer without

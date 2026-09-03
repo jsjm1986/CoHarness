@@ -11,7 +11,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { z } from 'zod'
 import Storage from '@deepseek-ai/dsh-storage'
 import { DomainFacility } from '@deepseek-ai/dsh-storage-domain'
-import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
+import SessionStore, { SessionId, SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
@@ -25,6 +25,7 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
   }
   interface SessionProjectionMap {
     'cache-test/marks': { marks: string[] }
+    'cache-test/marks3': { marks: string[] }
   }
 }
 
@@ -57,7 +58,8 @@ function fakePersistence(logs: Map<string, SessionEvent[]>) {
     const events = logs.get(String(id))
     if (events === undefined) throw new Error(`session "${id}" not found`)
     return {
-      meta: { version: 0, id, createdAt: 0 },
+      meta: { version: 0, id, createdAt: 0, isSeeded: false },
+      inheritedEventCount: SessionLogOffset(0),
       events: events.filter(event => event.seq >= fromSeq),
     }
   })
@@ -66,7 +68,7 @@ function fakePersistence(logs: Map<string, SessionEvent[]>) {
 
 /** Header shape for cachedSnapshot calls (fake logs stamp createdAt 0, no cwd). */
 const headerOf = (id: SessionId, createdAt = 0, cwd?: string) =>
-  ({ version: 0, id, createdAt, ...cwd === undefined ? {} : { cwd } })
+  ({ version: 0, id, createdAt, isSeeded: false, ...cwd === undefined ? {} : { cwd } })
 
 interface HarnessOptions {
   pool?: MemoryMediaPool
@@ -244,12 +246,12 @@ describe('SessionProjectionCache write policy', () => {
 describe('SessionProjectionCache cold read', () => {
   const storedLog = (marks: string[][]): SessionEvent[] => {
     const events: SessionEvent[] = [
-      { type: 'turn/start', seq: 0, time: 0, data: { turn: 1 } },
+      { type: 'turn/start', seq: SessionSeq(0), time: 0, data: { turn: 1 } },
     ]
     for (const m of marks) {
-      events.push({ type: 'cache-test/mark', seq: events.length, time: events.length, data: { marks: m } })
+      events.push({ type: 'cache-test/mark', seq: SessionSeq(events.length), time: events.length, data: { marks: m } })
     }
-    events.push({ type: 'turn/end', seq: events.length, time: events.length, data: { turn: 1, reason: { kind: 'completed' } } })
+    events.push({ type: 'turn/end', seq: SessionSeq(events.length), time: events.length, data: { turn: 1, reason: { kind: 'completed' } } })
     return events
   }
 
@@ -347,15 +349,16 @@ describe('SessionProjectionCache cold read', () => {
     const { cache, pool: samePool } = await harness({ pool, logs })
     const snapshot = await cache.coldSnapshot(SessionId('reborn'))
     expect(snapshot.values['cache-test/marks']).toEqual({ marks: ['real'] })
-    // The write-back rebinds the record to the actual log's identity.
-    expect(storedRecord(samePool, SessionId('reborn'))?.identity).toEqual({ createdAt: 0 })
+    // The write-back rebinds the record to the actual log's identity (lineage included).
+    expect(storedRecord(samePool, SessionId('reborn'))?.identity)
+      .toEqual({ createdAt: 0, isSeeded: false, inheritedEventCount: 0 })
   })
 
   it('cachedSnapshot returns undefined when every stored row is version-mismatched', async () => {
     const pool = new MemoryMediaPool()
     seedRow(pool, 'all-stale', { ver: 99, seq: 4, val: { marks: ['old'] } })
     const { cache } = await harness({ pool })
-    expect(cache.cachedSnapshot(headerOf(SessionId('all-stale')))).toBeUndefined()
+    expect(cache.cachedSnapshot(headerOf(SessionId('all-stale')), SessionLogOffset(0))).toBeUndefined()
   })
 
   it('binds identity on cwd too: a matching cwd serves, a moved session does not', async () => {
@@ -363,9 +366,9 @@ describe('SessionProjectionCache cold read', () => {
     seedRow(pool, 'homed', { ver: 1, seq: 2, val: { marks: ['w'] } }, { createdAt: 0, cwd: '/work' })
     const { cache } = await harness({ pool })
     const id = SessionId('homed')
-    expect(cache.cachedSnapshot(headerOf(id, 0, '/work'))?.values['cache-test/marks']).toEqual({ marks: ['w'] })
-    expect(cache.cachedSnapshot(headerOf(id, 0, '/elsewhere'))).toBeUndefined()
-    expect(cache.cachedSnapshot(headerOf(id, 0))).toBeUndefined()
+    expect(cache.cachedSnapshot(headerOf(id, 0, '/work'), SessionLogOffset(0))?.values['cache-test/marks']).toEqual({ marks: ['w'] })
+    expect(cache.cachedSnapshot(headerOf(id, 0, '/elsewhere'), SessionLogOffset(0))).toBeUndefined()
+    expect(cache.cachedSnapshot(headerOf(id, 0), SessionLogOffset(0))).toBeUndefined()
   })
 
   it('dates an empty stored log at -1 in the zero-units topology', async () => {
@@ -392,11 +395,11 @@ describe('SessionProjectionCache cold read', () => {
     const { cache } = await harness({ pool })
     const id = SessionId('listed')
     // Matching header: values plus the watermark the client seeds under.
-    expect(cache.cachedSnapshot(headerOf(id))).toEqual({ asOfSeq: 4, values: { 'cache-test/marks': { marks: ['t'] } } })
+    expect(cache.cachedSnapshot(headerOf(id), SessionLogOffset(0))).toEqual({ asOfSeq: 4, values: { 'cache-test/marks': { marks: ['t'] } } })
     // A recreated id (different createdAt): the record is unrelated — no block.
-    expect(cache.cachedSnapshot(headerOf(id, 777))).toBeUndefined()
+    expect(cache.cachedSnapshot(headerOf(id, 777), SessionLogOffset(0))).toBeUndefined()
     // Unknown id: no block.
-    expect(cache.cachedSnapshot(headerOf(SessionId('never-cached')))).toBeUndefined()
+    expect(cache.cachedSnapshot(headerOf(SessionId('never-cached')), SessionLogOffset(0))).toBeUndefined()
   })
 
   it('holds the not-found contract with zero registered units, and dates the empty cut for a present log', async () => {

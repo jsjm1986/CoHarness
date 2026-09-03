@@ -1,6 +1,7 @@
 import { Context } from '@deepseek-ai/cordis'
-import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
+import SessionStore, { SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
+import type { SessionEventSuffix, SessionInspection } from '@deepseek-ai/dsh-session-persistence'
 import { describe, expect, it } from 'vitest'
 import {
   SessionPersistence,
@@ -42,26 +43,28 @@ class PagePersistence extends SessionPersistence {
     entry.generation += 1
   }
 
-  async load(id: SessionId): Promise<{ meta: SessionHeader; events: SessionEvent[] }> {
+  async load(id: SessionId): Promise<SessionInspection> {
     const entry = this.entries.get(String(id))
     if (entry === undefined) throw new Error(`missing ${String(id)}`)
-    return { meta: structuredClone(entry.meta), events: structuredClone(entry.events) }
+    return { meta: structuredClone(entry.meta), inheritedEventCount: SessionLogOffset(0), events: structuredClone(entry.events) }
   }
 
-  async inspect(id: SessionId): Promise<{ meta: SessionHeader; events: SessionEvent[] }> {
+  async inspect(id: SessionId): Promise<SessionInspection> {
     return this.load(id)
   }
 
   async readFrom(
     id: SessionId,
-    fromSeq: number,
+    fromSeq: SessionLogOffset,
     signal?: AbortSignal,
-  ): Promise<{ meta: SessionHeader; events: SessionEvent[] }> {
+  ): Promise<SessionEventSuffix> {
     signal?.throwIfAborted()
     const entry = this.entries.get(String(id))
     if (entry === undefined) throw new Error(`missing ${String(id)}`)
     const result = {
       meta: structuredClone(entry.meta),
+      inheritedEventCount: SessionLogOffset(0),
+      fromSeq,
       events: structuredClone(entry.events.filter(event => event.seq >= fromSeq)),
     }
     this.afterReadFrom?.()
@@ -102,7 +105,7 @@ async function fixture(events = Array.from({ length: 5 }, (_, seq) => event(seq)
   await ctx.plugin(SessionStore)
   const persistence = new PagePersistence(ctx)
   const id = SessionId('page-session')
-  await persistence.create({ id, version: 0, createdAt: 1 })
+  await persistence.create({ id, version: 0, createdAt: 1, isSeeded: false })
   await persistence.append(id, events)
   return {
     persistence,
@@ -189,7 +192,7 @@ describe('session persistence page protocol', () => {
       await expect(persistence.readPage(id, { cursor })).rejects.toMatchObject({ code: 'dependency' })
 
       const other = SessionId('other-page-session')
-      await persistence.create({ id: other, version: 0, createdAt: 1 })
+      await persistence.create({ id: other, version: 0, createdAt: 1, isSeeded: false })
       await persistence.append(other, [event(0)])
       await expect(persistence.readPage(other, { cursor })).rejects.toMatchObject({ code: 'protocol' })
     } finally {

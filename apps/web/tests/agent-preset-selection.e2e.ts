@@ -16,9 +16,9 @@ import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
+import { MessageId } from '@deepseek-ai/dsh-llm'
 import {
-  SESSION_FORMAT_VERSION, SessionId as sessionId, type SessionEvent, type SessionId,
-} from '@deepseek-ai/dsh-session'
+  SESSION_FORMAT_VERSION, SessionId as sessionId, type SessionEvent, type SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
 import { snapshotSubagentDescriptor } from '@deepseek-ai/dsh-subagent'
 import { resolveSessionPreset } from '@deepseek-ai/dsh-agent-presets'
 import {
@@ -98,6 +98,7 @@ async function seedSubagent(scaffold: WebScaffold, parentId: SessionId): Promise
     createdAt,
     cwd: scaffold.workspaceCwd,
     parentSession: parentId,
+    isSeeded: false,
     origin: 'subagent',
     delegationDepth: 1,
     agentPreset: 'minimal',
@@ -105,15 +106,17 @@ async function seedSubagent(scaffold: WebScaffold, parentId: SessionId): Promise
   await scaffold.ctx.sessionPersistence.append(childId, [
     {
       type: 'turn/start',
-      seq: 0,
+      seq: SessionSeq(0),
       time: createdAt,
-      data: { turn: 1, trigger: { kind: 'message', source: { kind: 'user' } } },
+      data: { turn: 1 },
     },
     {
       type: 'user/message',
-      seq: 1,
+      seq: SessionSeq(1),
       time: createdAt + 1,
       data: {
+        id: MessageId(`legacy-message:${childId}:1`),
+        role: 'user',
         content: [{ type: 'text', text: 'Check the session-header action order.' }],
         source: { kind: 'user' },
       },
@@ -121,7 +124,7 @@ async function seedSubagent(scaffold: WebScaffold, parentId: SessionId): Promise
     },
     {
       type: 'subagent/descriptor',
-      seq: 2,
+      seq: SessionSeq(2),
       time: createdAt + 2,
       data: snapshotSubagentDescriptor({
         mode: 'one-shot', provider: 'spawn', label: 'header order probe',
@@ -129,7 +132,7 @@ async function seedSubagent(scaffold: WebScaffold, parentId: SessionId): Promise
     },
     {
       type: 'turn/end',
-      seq: 3,
+      seq: SessionSeq(3),
       time: createdAt + 3,
       data: { turn: 1, reason: { kind: 'completed' } },
     },

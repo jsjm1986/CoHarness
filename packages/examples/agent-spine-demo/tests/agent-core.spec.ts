@@ -250,11 +250,11 @@ describe('dsh-agent-spine-demo bundle', () => {
     await waitForIdle(ctx, handle.agent)
 
     expect(adapter.requests).toBe(2)
-    const retryEvents = handle.agent.session.events.filter(event => event.type === 'llm/retry')
+    const retryEvents = handle.agent.session.snapshotEvents().filter(event => event.type === 'llm/retry')
     expect(retryEvents).toHaveLength(1)
     expect(retryEvents[0]?.data.retry).toBe(1)
     expect(retryEvents[0]?.data).toMatchObject({ provider: 'mock', mode: 'normal', maxRetries: 1 })
-    expect(handle.agent.session.events.find(event => event.type === 'session/title')?.data.title).toBe('recover')
+    expect(handle.agent.session.snapshotEvents().find(event => event.type === 'session/title')?.data.title).toBe('recover')
     expect(messageText(handle.agent.session.deriveMessages().at(-1))).toBe('recovered by bundled policy')
     await handle.dispose()
     await ctx.fiber.dispose()
@@ -506,7 +506,7 @@ describe('dsh-agent-spine-demo bundle', () => {
       expect(loadedRequest).toContain('<skill_instructions>')
       expect(loadedRequest).toContain('Use the freshly loaded body.')
 
-      const transcript = handle.agent.session.events.flatMap<Record<string, unknown>>((event) => {
+      const transcript = handle.agent.session.snapshotEvents().flatMap<Record<string, unknown>>((event) => {
         if (event.type === 'user/message' && event.data.source.kind === 'skill-catalog') {
           return [{
             type: event.type,

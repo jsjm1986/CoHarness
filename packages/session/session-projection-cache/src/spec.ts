@@ -10,7 +10,8 @@
  */
 
 import { z } from 'zod'
-import { SessionId } from '@deepseek-ai/dsh-session'
+import { SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
+import type { SessionId, SessionSeqCursor } from '@deepseek-ai/dsh-session'
 import { defineDomain, domainTable } from '@deepseek-ai/dsh-storage-domain'
 
 /**
@@ -23,7 +24,8 @@ import { defineDomain, domainTable } from '@deepseek-ai/dsh-storage-domain'
  */
 export const checkpointRow = z.object({
   ver: z.number().int().nonnegative(),
-  seq: z.number().int().gte(-1),
+  seq: z.number().int().gte(-1).transform((value): SessionSeqCursor =>
+    value === -1 ? -1 : SessionSeq(value)),
   val: z.json(),
 })
 
@@ -35,10 +37,19 @@ export const checkpointRow = z.object({
  * old row pass every watermark check and seed state folded from an unrelated
  * log. Reads validate this against the live header (listing) or the stored
  * header (cold read) before accepting any row.
+ *
+ * The lineage fields are optional because rows written before they existed
+ * share this medium version (the version is not bumped for an additive,
+ * optional field). The reader (`identityMatches`) interprets their absence
+ * as the unseeded lineage — exact for an unseeded session, while a seeded
+ * expectation fails the match and the row is discarded to a cold rebuild.
+ * Current writes always store both fields.
  */
 export const checkpointIdentity = z.object({
   createdAt: z.number().int().nonnegative(),
   cwd: z.string().optional(),
+  isSeeded: z.boolean().optional(),
+  inheritedEventCount: z.number().int().nonnegative().transform(SessionLogOffset).optional(),
 })
 
 /** The identity fields a record is bound to, inferred from {@link checkpointIdentity}. */
@@ -61,7 +72,9 @@ export type CheckpointRecord = z.infer<typeof checkpointRecord>
 /**
  * The session-projcache domain spec. Version bumps discard the whole medium
  * (cache semantics: a stale or unreadable cache costs a longer tail replay,
- * never a wrong value).
+ * never a wrong value). The optional lineage fields on the identity were
+ * added without a bump: absent fields read as the unseeded lineage, so the
+ * existing rows of unseeded sessions keep serving and seeded ones refold.
  */
 export const projectionCacheDomainSpec = defineDomain({
   name: 'session_projcache',

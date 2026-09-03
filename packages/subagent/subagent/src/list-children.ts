@@ -4,10 +4,12 @@
  * query service. Candidates come from one live-preferred corpus; each child's
  * mode/label is the registered `subagent` projection unit's value, resolved
  * down a three-rung ladder: the registry's watermark cache for a live child,
- * a durable projection-cache row when it serves an own-suffix identity (the
- * seq gate), and one persistence inspection folded through the registry
- * otherwise, validated against the enumerated lifecycle. The projection fold
- * is the single classification authority — this module parses no descriptor
+ * an unseeded durable projection-cache row, and one persistence inspection
+ * folded through the registry otherwise, validated against the enumerated
+ * lifecycle. A seeded header deliberately lacks its exact inherited cut, so it
+ * takes the body-bearing inspection path before classifying an identity. The
+ * projection fold is the single classification authority — this module parses
+ * no descriptor
  * itself. Absent persistence, enumeration is live-only: a cold child is
  * unreachable for resume anyway, so its absence is capability absence, not an
  * error. The module owns no catalog state and does not consult Activation,
@@ -17,8 +19,9 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { Session, SessionEvent, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
-import type { SessionPersistence } from '@deepseek-ai/dsh-session-persistence'
+import { SessionLogOffset } from '@deepseek-ai/dsh-session'
+import type { Session, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
+import type { SessionInspection, SessionPersistence } from '@deepseek-ai/dsh-session-persistence'
 import type { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import type { SessionProjectionCache } from '@deepseek-ai/dsh-session-projection-cache'
 import { SubagentError } from './error.ts'
@@ -123,8 +126,8 @@ interface PositionedCandidate {
  * live-preferred merge of `ctx.sessions` and optional session persistence,
  * serving each identity from the `subagent` projection unit: the registry's
  * watermark snapshot for a live child; for a cold one, a durable
- * projection-cache row when it serves an own-suffix identity (the seq gate),
- * else one bounded-concurrency persistence inspection folded through the
+ * projection-cache read for an unseeded lifecycle, else one bounded-concurrency
+ * persistence inspection (carrying the exact inherited cut) folded through the
  * registry.
  * @see SubagentRuntime.listChildren for the public cancellation and failure contract.
  * @param ctx - context carrying the session store, the projection registry,
@@ -294,7 +297,8 @@ async function resolveCandidateRows(
     }
     // The unit's serializable no-value sentinel is `null`; `undefined` can
     // only mean the key was dropped at a JSON boundary. Both are no value.
-    if (identity === undefined || identity === null) return
+    if (identity === undefined || identity === null
+      || !candidate.live.isOwnSeq(identity.seq)) return
     rows[index] = childRow(childId, identity, 'running', subagentParents.has(childId))
   })
 
@@ -362,12 +366,12 @@ function compareCorpusRecords(a: CorpusRecord, b: CorpusRecord): number {
 }
 
 /**
- * Resolve one cold candidate down the remaining ladder: a durable
- * projection-cache row when it serves an own-suffix identity (the seq gate),
- * otherwise one persistence inspection folded through the projection
- * registry (the same detached recipe the API proxy uses for detached session
- * projections). A failed inspection is one transient `unavailable` row
- * retried on the next listing; an inspection naming another lifecycle, and a
+ * Resolve one cold candidate down the remaining ladder: an unseeded durable
+ * projection-cache row, otherwise one persistence inspection folded through
+ * the projection registry (the same detached recipe the API proxy uses for
+ * detached session projections). A failed inspection is one transient
+ * `unavailable` row retried on the next listing; an inspection naming another
+ * lifecycle, and a
  * settled log the fold cannot identify — or that makes any registered unit
  * throw — are final, so they report `corrupt`.
  */
@@ -380,30 +384,30 @@ async function resolveColdIdentity(
   signal: AbortSignal | undefined,
 ): Promise<SubagentListEntry> {
   const childId = header.id
-  if (cache !== undefined) {
+  // A header deliberately exposes only whether a fork cut exists, not its
+  // integer. An unseeded lifecycle has the exact cut 0 and may use the cache;
+  // a seeded lifecycle must read the body before an identity seq can be
+  // classified as inherited or owned.
+  if (cache !== undefined && !header.isSeeded) {
     let cached: SubagentIdentityProjection | null | undefined
     try {
-      cached = cache.cachedSnapshot(header)?.values.subagent
+      cached = cache.cachedSnapshot(header, SessionLogOffset(0))?.values.subagent
     } catch {
       // Unlike the preparation fold below, a throwing cache read renders no
       // verdict: the cache is derived data, so its damage (a poisoned stored
       // row of ANY unit) silently falls through to the authoritative re-fold.
       cached = undefined
     }
-    // A child's OWN descriptor is immutable once appended, so a cached
-    // identity is final only when the seq gate proves it was folded from the
-    // own suffix: a creation-window checkpoint may instead carry a fork
-    // seed's replayed ANCESTOR descriptor (seq below `seedLength`), which
-    // must not outrank the re-fold. Everything else also falls through to
-    // preparation: an absent key (a cut before any descriptor) and the
-    // `null` sentinel, whose verdict belongs to the authoritative re-fold,
-    // not to a derived row.
-    if (cached !== undefined && cached !== null && cached.seq >= (header.seedLength ?? 0)) {
+    // An unseeded child's descriptor is owned at every valid seq. Everything
+    // else falls through to preparation: an absent key and the `null`
+    // sentinel, whose verdict belongs to the authoritative re-fold, not to a
+    // derived row.
+    if (cached !== undefined && cached !== null) {
       return childRow(childId, cached, 'inactive', hasChildren)
     }
   }
   assertListingNotCancelled(signal)
-  let inspected: { meta: SessionHeader; events: readonly SessionEvent[] }
+  let inspected: SessionInspection
   try {
     inspected = await persistence.inspect(childId, signal)
   } catch {
@@ -421,14 +425,22 @@ async function resolveColdIdentity(
   }
   let identity: SubagentIdentityProjection | null | undefined
   try {
-    identity = projections.restore({}, inspected.events, 0, inspected.meta).snapshot.values.subagent
+    identity = projections.restore(
+      {},
+      inspected.events,
+      SessionLogOffset(0),
+      inspected.meta,
+      inspected.inheritedEventCount,
+    ).snapshot.values.subagent
   } catch {
     // The restore folds EVERY registered unit over this child's log, so any
     // unit's fold or schema can reject damaged payloads — deterministic data
     // damage in this one child, contained as its own corrupt diagnostic.
     return { kind: 'diagnostic', id: childId, reason: 'corrupt' }
   }
-  if (identity === undefined || identity === null) {
+  // An identity inside the inherited prefix is an ANCESTOR's descriptor
+  // replayed by a fork seed, never this child's own classification.
+  if (identity === undefined || identity === null || identity.seq < inspected.inheritedEventCount) {
     return { kind: 'diagnostic', id: childId, reason: 'corrupt' }
   }
   return childRow(childId, identity, 'inactive', hasChildren)
@@ -462,7 +474,8 @@ function childRow(
 
 /** Immutable header fields that distinguish one session lifecycle from another under the same id. */
 const LIFECYCLE_WITNESS_KEYS = [
-  'version', 'id', 'createdAt', 'cwd', 'parentSession', 'seedLength', 'delegationDepth',
+  'version', 'id', 'createdAt', 'cwd', 'parentSession', 'isSeeded', 'delegationDepth',
+  'origin', 'agentPreset',
 ] as const
 
 /** Whether an inspected log still belongs to the enumerated lifecycle. */

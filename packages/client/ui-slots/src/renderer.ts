@@ -34,6 +34,18 @@ export interface HostObservable<T> {
 }
 
 /**
+ * Convert one standard source name to its rendered Hook prop name.
+ * @param name - registered fixed or keyed source name.
+ * @returns the `use<Name>` prop exposed to Slot components.
+ */
+export function standardHookPropName(name: string): string {
+  return `use${name[0]?.toUpperCase() ?? ''}${name.slice(1)}`
+}
+
+/** Resolve one member of an open-key standard hook family. */
+export type KeyedStandardSource = (key: string) => HostObservable<unknown> | undefined
+
+/**
  * Type-erased store instance face at the render boundary (the typed twin is
  * {@link StoreInstance}): a bare snapshot source plus the draft-stripped
  * action callbacks. No React hook crosses this boundary — the render machinery

@@ -4,6 +4,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
+import { SessionSeq } from '@deepseek-ai/dsh-session'
 import { CallId, MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import { RpcId } from '../src/api/rpc.ts'
@@ -33,7 +34,7 @@ function userEntry(seq: number, time: number, text: string): HistoryEntry {
   return {
     event: {
       type: 'user/message',
-      seq,
+      seq: SessionSeq(seq),
       time,
       data: {
         id: messageId(seq),
@@ -56,7 +57,7 @@ function assistantEntry(
   return {
     event: {
       type: 'assistant/message',
-      seq,
+      seq: SessionSeq(seq),
       time,
       data: {
         turn: 1,
@@ -70,7 +71,7 @@ function assistantEntry(
         ...usage === undefined ? {} : { usage },
       },
       surfaceOp: 'append',
-      sourceEventSeqs,
+      sourceEventSeqs: sourceEventSeqs.map(SessionSeq),
     },
   }
 }
@@ -79,7 +80,7 @@ function retryEntry(seq: number, time: number): HistoryEntry {
   return {
     event: {
       type: 'llm/retry',
-      seq,
+      seq: SessionSeq(seq),
       time,
       data: {
         retryId: 'retry-1',
@@ -101,7 +102,7 @@ function summaryEntry(seq: number, time: number, text: string, shadowedSeqs: num
   return {
     event: {
       type: 'compaction/summary',
-      seq,
+      seq: SessionSeq(seq),
       time,
       data: {
         compactionId: 'compact-1',
@@ -125,7 +126,7 @@ function textDeltaEntries(seq0: number, time0: number, texts: readonly string[])
   return texts.map((text, k) => ({
     event: {
       type: 'assistant/chunk',
-      seq: seq0 + k,
+      seq: SessionSeq(seq0 + k),
       time: time0 + 10 * k,
       data: { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text } },
     } satisfies SessionEvent,
@@ -155,14 +156,14 @@ function conversation(): HistoryValue {
     values: { sessionListMetadata: { blank: false, visibleContentSeq: 6, lastPromptAt: 1000 } },
   }
   const events: HistoryEntry[] = [
-    { event: { type: 'turn/start', seq: 0, time: 1000, data: { turn: 1 } } },
+    { event: { type: 'turn/start', seq: SessionSeq(0), time: 1000, data: { turn: 1 } } },
     userEntry(1, 1010, 'first prompt'),
     ...textDeltaEntries(2, 1020, unicodeTexts),
     assistantEntry(6, 1060, '你好🙂世界', [2, 3, 4, 5], { inputTokens: 8, outputTokens: 4 }),
     {
       event: {
         type: 'tool/call',
-        seq: 7,
+        seq: SessionSeq(7),
         time: 1070,
         data: { turn: 1, step: 1, callId: CallId('c-term'), name: 'term', arguments: '{"cmd":"ls"}' },
       },
@@ -173,7 +174,7 @@ function conversation(): HistoryValue {
     {
       event: {
         type: 'user/message',
-        seq: 10,
+        seq: SessionSeq(10),
         time: 1100,
         data: {
           id: messageId(10),
@@ -181,8 +182,8 @@ function conversation(): HistoryValue {
           content: [{ type: 'text', text: '<context_checkpoint>summary</context_checkpoint>' }],
           source: { kind: 'plugin', plugin: 'compact' },
         },
-        surfaceOp: { op: 'replace', start: 1, end: 6 },
-        sourceEventSeqs: [1, 6, 9],
+        surfaceOp: { op: 'replace', start: SessionSeq(1), end: SessionSeq(6) },
+        sourceEventSeqs: [SessionSeq(1), SessionSeq(6), SessionSeq(9)],
       },
     },
     userEntry(11, 1110, 'second prompt'),
@@ -191,7 +192,7 @@ function conversation(): HistoryValue {
     {
       event: {
         type: 'turn/end',
-        seq: 14,
+        seq: SessionSeq(14),
         time: 1140,
         data: { turn: 1, reason: { kind: 'aborted', reason: { kind: 'user' } } },
       },
@@ -268,12 +269,12 @@ describe('history wire codec', () => {
   it('leaves an event-only page whole', () => {
     const value: HistoryValue = {
       events: [
-        { event: { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } } },
+        { event: { type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } } },
         retryEntry(1, 2),
         {
           event: {
             type: 'turn/end',
-            seq: 2,
+            seq: SessionSeq(2),
             time: 3,
             data: { turn: 1, reason: { kind: 'aborted', reason: { kind: 'user' } } },
           },
@@ -322,7 +323,7 @@ describe('history wire codec', () => {
   it('keeps a complete suffix when append group starts are non-monotonic', () => {
     const value: HistoryValue = {
       events: [
-        { event: { type: 'turn/start', seq: 0, time: 1000, data: { turn: 1 } } },
+        { event: { type: 'turn/start', seq: SessionSeq(0), time: 1000, data: { turn: 1 } } },
         summaryEntry(1, 1010, '你'.repeat(400), [1]),
         userEntry(2, 1020, 'first'),
         userEntry(5, 1050, 'second'),

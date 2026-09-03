@@ -14,8 +14,7 @@ import SessionStore, {
   SESSION_FORMAT_VERSION,
   SessionId,
   type SessionEvent,
-  type SessionHeader,
-} from '@deepseek-ai/dsh-session'
+  type SessionHeader, SessionSeq } from '@deepseek-ai/dsh-session'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import { describe, expect, it } from 'vitest'
 
@@ -32,7 +31,7 @@ async function seedSession(root: string, cwd: string, version: number, events: S
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   await ctx.plugin(JsonlSessionPersistence, { root, compression: 'none' })
-  const meta: SessionHeader = { version, id: sessionId, createdAt: 1, cwd }
+  const meta: SessionHeader = { version, id: sessionId, createdAt: 1, cwd, isSeeded: false }
   try {
     await ctx.sessionPersistence.create(meta)
     await ctx.sessionPersistence.append(sessionId, events)
@@ -46,8 +45,8 @@ async function seedSession(root: string, cwd: string, version: number, events: S
 
 function closedTurn(): SessionEvent[] {
   return [
-    { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } },
-    { type: 'turn/end', seq: 1, time: 2, data: { turn: 1, reason: { kind: 'completed' } } },
+    { type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } },
+    { type: 'turn/end', seq: SessionSeq(1), time: 2, data: { turn: 1, reason: { kind: 'completed' } } },
   ]
 }
 

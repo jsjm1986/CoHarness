@@ -8,6 +8,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { SessionSeq } from '@deepseek-ai/dsh-session/types'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-commands/types'
 import type { SessionId } from '@deepseek-ai/dsh-api-remotes/client'
@@ -72,8 +73,10 @@ function testLegacy(
 ): ChatSnapshot['legacy'] {
   const legacyNodes = nodes.flatMap((node): ConversationNode[] => {
     const event = (node.data as TestEventState).event
-    if (event.type === 'user/message') return [{ kind: 'user', seq: event.seq } as ConversationNode]
-    if (event.type === 'assistant/message') return [{ kind: 'assistant', seq: event.seq } as ConversationNode]
+    // Client conversation nodes carry plain numeric seqs (the brand stops at the wire).
+    const seq = Number(event.seq)
+    if (event.type === 'user/message') return [{ kind: 'user', seq } as ConversationNode]
+    if (event.type === 'assistant/message') return [{ kind: 'assistant', seq } as ConversationNode]
     return []
   })
   const turnTimings = new Map<number, { startTime: number; endTime?: number }>()
@@ -1012,7 +1015,7 @@ describe('pending submission echoes', () => {
       source: { kind: 'user', rpcId: handle.requestId } as never,
     })
     const durable = {
-      seq: 0,
+      seq: SessionSeq(0),
       time: 1_700_000_000_000,
       type: 'user/message',
       surfaceOp: 'append',

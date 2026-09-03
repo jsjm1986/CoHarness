@@ -11,7 +11,8 @@ import { z as zod } from 'zod'
 import type { ZodType } from 'zod'
 import { agentEvents } from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
+import { SessionSeq } from '@deepseek-ai/dsh-session'
+import type { Session, SessionEvent, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import { TypertRemoteService, Remote } from '@deepseek-ai/dsh-typert-protocol'
 // Type-only: resolves ctx.sessionProjections for the optional unit child.
 import type {} from '@deepseek-ai/dsh-session-projection'
@@ -192,7 +193,10 @@ interface GoalCache {
 /** Process-local activation state kept separate from durable projection data. */
 interface GoalRuntimeState {
   activation: GoalActivation
-  pendingActivation: { readonly seq: number; readonly activation: GoalActivation } | undefined
+  pendingActivation: {
+    readonly offset: SessionLogOffset
+    readonly activation: GoalActivation
+  } | undefined
 }
 
 /** Validated create input with every deployment default materialized. */
@@ -273,7 +277,8 @@ export class GoalService extends TypertRemoteService {
     ctx.on('session/event', (session, event) => {
       if (event.type !== 'goal/change') return
       const runtime = this.runtimeState(session)
-      runtime.activation = runtime.pendingActivation?.seq === event.seq
+      runtime.activation = runtime.pendingActivation !== undefined
+        && SessionSeq(runtime.pendingActivation.offset) === event.seq
         ? runtime.pendingActivation.activation
         : 'disarmed'
       const cache = this.caches.get(session)
@@ -504,7 +509,7 @@ export class GoalService extends TypertRemoteService {
     const projected = this.projected(session)
     const state = projected === undefined ? emptyGoalFoldState() : goalFoldState(projected)
     if (projected === undefined) {
-      for (const event of session.events) applyGoalEvent(state, event)
+      for (const event of session.snapshotEvents()) applyGoalEvent(state, event)
     }
     cache = {
       state,
@@ -537,9 +542,8 @@ export class GoalService extends TypertRemoteService {
 
   /** Incrementally observe durable events and reconcile local activation intent. */
   private sync(session: Session, cache: GoalCache): void {
-    const events = session.events
     while (cache.observedSeq < session.seq) {
-      const event = events[cache.observedSeq]
+      const event = session.eventAt(SessionSeq(cache.observedSeq))
       /* v8 ignore next -- Session exposes a contiguous immutable event log. */
       if (event === undefined) throw new Error(`goal cache cannot advance across missing seq ${String(cache.observedSeq)}`)
       applyGoalEvent(cache.state, event)
@@ -649,7 +653,7 @@ export class GoalService extends TypertRemoteService {
     const ref = goalChangeRef(change)
     cache.pendingActivation = { seq: agent.session.seq, activation }
     const runtime = this.runtimeState(agent.session)
-    runtime.pendingActivation = { seq: agent.session.seq, activation }
+    runtime.pendingActivation = { offset: agent.session.seq, activation }
     try {
       agent.session.append('goal/change', change)
       this.sync(agent.session, cache)

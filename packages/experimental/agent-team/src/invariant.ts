@@ -19,7 +19,7 @@ const install: InvariantInstaller = Object.assign((ctx: Context, fail: Invariant
     const [session, event] = args as [Session, SessionEvent]
     if (!isTeamEvent(event)) return
     try {
-      const state = foldTeam(session.id, session.events)
+      const state = foldTeam(session.id, session.snapshotEvents())
       applyTeamEvent(state, event)
     } catch (error: unknown) {
       /* v8 ignore next -- the strict Team fold throws Error instances. */

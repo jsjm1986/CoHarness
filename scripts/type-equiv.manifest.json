@@ -550,6 +550,26 @@
     },
     {
       "doc": "docs/subsystems/session.md",
+      "symbol": "SessionSeq",
+      "source": "packages/core/session/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/session.md",
+      "symbol": "SessionLogOffset",
+      "source": "packages/core/session/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/session.md",
+      "symbol": "SessionSeqCursor",
+      "source": "packages/core/session/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/session.md",
+      "symbol": "OptionalSessionSeq",
+      "source": "packages/core/session/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/session.md",
       "symbol": "TodoItem",
       "source": "packages/core/session/src/types.ts"
     },
@@ -637,7 +657,17 @@
     },
     {
       "doc": "docs/subsystems/persistence.md",
+      "symbol": "SessionStorageMetadata",
+      "source": "packages/session/session-persistence/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/persistence.md",
       "symbol": "SessionInspection",
+      "source": "packages/session/session-persistence/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/persistence.md",
+      "symbol": "SessionEventSuffix",
       "source": "packages/session/session-persistence/src/index.ts"
     },
     {
@@ -1377,17 +1407,7 @@
     },
     {
       "doc": "docs/subsystems/subagent.md",
-      "symbol": "CoordinatorMessageSource",
-      "source": "packages/subagent/subagent/src/continuation.ts"
-    },
-    {
-      "doc": "docs/subsystems/subagent.md",
-      "symbol": "SubagentReportMessageSource",
-      "source": "packages/subagent/subagent/src/continuation.ts"
-    },
-    {
-      "doc": "docs/subsystems/subagent.md",
-      "symbol": "SubagentReportDelivery",
+      "symbol": "AgentMessageSource",
       "source": "packages/subagent/subagent/src/continuation.ts"
     },
     {
@@ -1397,12 +1417,7 @@
     },
     {
       "doc": "docs/subsystems/subagent.md",
-      "symbol": "SubagentReportOptions",
-      "source": "packages/subagent/subagent/src/continuation.ts"
-    },
-    {
-      "doc": "docs/subsystems/subagent.md",
-      "symbol": "SubagentFollowupOptions",
+      "symbol": "SubagentSendMessageOptions",
       "source": "packages/subagent/subagent/src/continuation.ts"
     },
     {

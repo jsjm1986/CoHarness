@@ -24,7 +24,7 @@ import type {
 } from '@deepseek-ai/dsh-agent'
 import { errorChain } from '@deepseek-ai/dsh-llm'
 import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
-import { SessionId, SessionPreparation } from '@deepseek-ai/dsh-session'
+import { SessionId, SessionPreparation, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { Session, SessionHeader } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tools'
@@ -46,11 +46,11 @@ const INACTIVE_STATES: ReadonlySet<FiberState> = new Set([
 ])
 
 const turnBoundaryProjectionSchema: zod.ZodType<TurnBoundaryProjection> = zod.object({
-  openTurnStartSeq: zod.number().int().nonnegative().nullable(),
-  lastStepStartSeq: zod.number().int().nonnegative().nullable(),
+  openTurnStartSeq: zod.number().int().nonnegative().transform(SessionSeq).nullable(),
+  lastStepStartSeq: zod.number().int().nonnegative().transform(SessionSeq).nullable(),
   lastStepBoundary: zod.object({
     kind: zod.union([zod.literal('start'), zod.literal('end')]),
-    seq: zod.number().int().nonnegative(),
+    seq: zod.number().int().nonnegative().transform(SessionSeq),
   }).nullable(),
   lastTurn: zod.number().int().nonnegative(),
 })
@@ -698,6 +698,7 @@ export class AgentLoop extends Service implements AgentFactory {
     const preparation = SessionPreparation.create(this.runtime.ctx.sessions.prepare(options.sessionId, {
       ...options.seed === undefined ? {} : { seed: options.seed },
       ...options.meta === undefined ? {} : { meta: options.meta },
+      ...options.inheritedEventCount === undefined ? {} : { inheritedEventCount: options.inheritedEventCount },
     }))
     const published = this.setupAndPublish(
       ownerCtx,

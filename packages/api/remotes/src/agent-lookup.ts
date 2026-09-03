@@ -2,7 +2,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, AgentOptions, AgentSetup } from '@deepseek-ai/dsh-agent'
-import type { Session, SessionEvent, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
+import type { Session, SessionEvent, SessionHeader, SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-persistence'
 import { TypertLookupFailure } from '@deepseek-ai/dsh-typert-protocol'
 import type {} from '@deepseek-ai/dsh-typert-registry'
@@ -89,14 +89,14 @@ export function apiRemoteSubagentOwnershipError(sessionId: SessionId): ApiRemote
  * @param ctx - Host Context carrying the optional persistence provider.
  * @param sessionId - durable identity to inspect.
  * @param signal - optional cancellation for listing and inspection work.
- * @returns detached metadata and events for a servable session.
+ * @returns detached metadata, its exact inherited cut, and events for a servable session.
  * @throws {@link ApiRemoteSessionNotFound} when the identity has no project-backed session.
  */
 export async function inspectApiRemoteSession(
   ctx: Context,
   sessionId: SessionId,
   signal?: AbortSignal,
-): Promise<{ meta: SessionHeader; events: SessionEvent[] }> {
+): Promise<{ meta: SessionHeader; inheritedEventCount: SessionLogOffset; events: SessionEvent[] }> {
   signal?.throwIfAborted()
   const persistence = ctx.get('sessionPersistence')
   if (persistence === undefined) {
@@ -114,7 +114,7 @@ export async function inspectApiRemoteSession(
   if (inspected.meta.cwd === undefined) {
     throw new ApiRemoteSessionNotFound(`session "${sessionId}" not found`)
   }
-  return { meta: inspected.meta, events: [...inspected.events] }
+  return { meta: inspected.meta, inheritedEventCount: inspected.inheritedEventCount, events: [...inspected.events] }
 }
 
 /**

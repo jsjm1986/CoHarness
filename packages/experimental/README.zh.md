@@ -8,5 +8,6 @@
 |---|---|---|
 | `agent-team/` | 隐式 root Agent Teams roster、持久 peer mailbox、共享任务 DAG 与运行时协调 | `ctx.agentTeams` |
 | `tool-agent-team/` | 按 Agent 作用域提供的 Agent Teams 模型工具与协作指引 | — |
+| [`code-runtime-python/`](code-runtime-python/README.zh.md) | 代码执行 seam 的 CPython 子进程后端 | `ctx.codeRuntime` |
 
 [子树规则](AGENTS.md)规定依赖隔离、发布排除与 promotion。

@@ -39,7 +39,7 @@ function archivedEntry(id: SessionId, createdAt: number, rootSessionId = id): Ar
   return {
     sessionId: id,
     rootSessionId,
-    header: { id, version: 0, createdAt, ...(rootSessionId === id ? {} : { parentSession: rootSessionId }) },
+    header: { id, version: 0, createdAt, isSeeded: false, ...(rootSessionId === id ? {} : { parentSession: rootSessionId }) },
   }
 }
 
@@ -85,8 +85,8 @@ describe('archive-gateway runtime reader', () => {
     const root = SessionId('archive-root')
     const child = SessionId('archive-child')
     const headers: SessionHeader[] = [
-      { id: root, version: 0, createdAt: 1 },
-      { id: child, version: 0, createdAt: 2, parentSession: root },
+      { id: root, version: 0, createdAt: 1, isSeeded: false },
+      { id: child, version: 0, createdAt: 2, parentSession: root, isSeeded: false },
     ]
     const events = new Map<string, SessionEvent[]>([
       [root, [event('user/message', 0, 'hello')]],

@@ -333,20 +333,18 @@
         toolName: subagent
         backgroundMode: continuable
 
-    # Fork stays one-shot: a continuable child's `report` tool and prompt
-    # section precede the inherited history a fork exists to reuse; one-shot
-    # fork children install neither, keeping the parent's request prefix.
-    # See .agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.md.
+    # Fork omits model selection so provider/model stay equal to the parent and
+    # the inherited history remains eligible for KV Cache reuse. This base row
+    # stays one-shot; preset layers may select continuable mode without adding a
+    # child-only system-prompt section or tool schema ahead of that history.
+    # See .agents/notes/implemented/feature/2026-08-18-model-selected-subagent-routes.md
+    # and .agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.md.
     - id: tool-subagent-fork
       name: '@deepseek-ai/dsh-tool-subagent'
       config:
         provider: fork
         toolName: subagent_fork
         backgroundMode: one-shot
-
-    # Optional direct-child return channel; absent from roots and one-shot agents.
-    - id: tool-subagent-report
-      name: '@deepseek-ai/dsh-tool-subagent-report'
 
     - id: workflow-worker-thread
       name: '@deepseek-ai/dsh-workflow-worker-thread'
@@ -409,28 +407,35 @@
         thresholds: [3, 5, 8]
         argumentsPreviewChars: 500
 
-    # Every mode enables the stable model-facing web_search tool. DeepSeek search
-    # resolves the same DEEPSEEK_API_KEY credential the Models page manages for
-    # chat, at each search; its Messages endpoint is separate from the
-    # chat-completions endpoint, so it takes its own base-URL override. Fetch stays
-    # disabled and no fetch provider is mounted: that provider defers SSRF
-    # protection and the model would choose the request target. Search is a full
-    # auxiliary model request with server-side retrieval, so this shipped DeepSeek
-    # route gets 60s while the provider-neutral tool default remains 30s.
+    # The shared base enables the stable model-facing web_search and web_fetch
+    # tools. The Web app disables this host row and composes both tools per agent
+    # preset; products with a stricter network policy override tool-web. DeepSeek
+    # search resolves the same DEEPSEEK_API_KEY
+    # credential the Models page manages for chat, at each search; its Messages
+    # endpoint is separate from the chat-completions endpoint, so it takes its own
+    # base-URL override. Anonymous fetch accepts only public HTTP(S) destinations,
+    # resolves and validates every destination, and pins every actual connection.
+    # Search is a full auxiliary model request with server-side retrieval, so this
+    # shipped DeepSeek route gets 60s while the provider-neutral tool default
+    # remains 30s.
     - id: web
       name: '@deepseek-ai/dsh-web'
       config:
         searchProvider: deepseek-official
+        fetchProvider: http
 
     - id: web-search-deepseek
       name: '@deepseek-ai/dsh-web-search-deepseek'
       config:
         apiKeyEnv: DEEPSEEK_API_KEY
 
+    - id: web-fetch-http
+      name: '@deepseek-ai/dsh-web-fetch-http'
+
     - id: tool-web
       name: '@deepseek-ai/dsh-tool-web'
       config:
-        fetch: false
+        fetch: true
         searchTimeoutMs: 60000
 
     # ── rows every mode mounts, whose values each overlay may state ──────────────

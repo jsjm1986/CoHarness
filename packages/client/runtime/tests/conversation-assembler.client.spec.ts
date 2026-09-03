@@ -675,6 +675,52 @@ describe('ConversationNodeAssembler', () => {
       .toEqual({ step: 2, turn: 2 })
   })
 
+  it('does not republish an equivalent Location value', () => {
+    const apply = vi.fn()
+    const initialValue = { value: 1 }
+    const changedValue = { value: 2 }
+    const definition: ConversationNodeDefinition<{ readonly value: ScopeProbeStepData }> = {
+      kind: 'scope-probe',
+      match: (event) => {
+        if (event.type === 'step/start') return { id: '1:1', role: 'start' }
+        if ((event.type as string) === 'scope-probe/update') return { id: '1:1', role: 'update' }
+        return null
+      },
+      start: () => ({ value: initialValue }),
+      update: (_context, match) => ({
+        value: (match.event.data as unknown as { changed: boolean }).changed
+          ? changedValue
+          : initialValue,
+      }),
+      buildLocationData: (context, scope, previous) => {
+        if (scope !== 'step' || context.state === undefined) return null
+        if (previous?.kind === 'step'
+          && previous.turn === 1
+          && previous.step === 1
+          && previous.key === 'scope-probe'
+          && previous.value === context.state.value) return previous
+        return { kind: 'step', turn: 1, step: 1, key: 'scope-probe', value: context.state.value }
+      },
+    }
+    const assembler = new ConversationNodeAssembler(
+      new TestEventDefinitions([definition]),
+      new TestViewDefinitions([testView(apply)]),
+    )
+    assembler.replaceWindow([
+      input(at(1, 'turn/start', { turn: 1 })),
+      input(at(2, 'step/start', { turn: 1, step: 1 })),
+    ], false)
+    assembler.flush()
+
+    assembler.append(input(at(3, 'scope-probe/update', { turn: 1, step: 1, changed: false })))
+    expect(assembler.flush()).toBe(false)
+    expect(apply).not.toHaveBeenCalled()
+
+    assembler.append(input(at(4, 'scope-probe/update', { turn: 1, step: 1, changed: true })))
+    expect(assembler.flush()).toBe(true)
+    expect(apply).toHaveBeenCalledOnce()
+  })
+
   it('updates existing turn Locations when their Step membership changes', () => {
     const apply = vi.fn()
     const definition: ConversationNodeDefinition<null> = {

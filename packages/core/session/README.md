@@ -12,7 +12,7 @@ Creates and holds event-sourced `Session` instances. Persistence is intentionall
 
 ### Public API
 
-- `ctx.sessions.create(id?, { seed?, meta? }?)` validates and detaches durable seed/header data, fills the version and id, defaults `createdAt` to now, publishes the session, and binds it to the calling fiber. Persisted reconstruction supplies its original `createdAt`, `seedLength`, and `delegationDepth`.
+- `ctx.sessions.create(id?, { seed?, meta?, inheritedEventCount? }?)` validates and detaches durable seed/header data, fills the version and id, defaults `createdAt` to now, publishes the session, and binds it to the calling fiber. A seeded header (`meta.isSeeded: true`) must supply both `seed` and the exact `inheritedEventCount`, because the constructor seed can contain child-owned setup events after the inherited prefix; an unseeded header rejects a nonzero cut. Persisted reconstruction supplies its original `createdAt`, lineage, and `delegationDepth`.
 - `ctx.sessions.flush(session)` dispatches the awaited parallel durability checkpoint through the session's captured scope. Every listener starts and the call waits for all to settle before reporting failure; unpublished, detached, and stale objects reject.
 - `ctx.sessions.fork(source, boundary?, childSessionId?): Session` — Resolve a live session object or id, select a seed through the inclusive `boundary` event seq (default: current last event), require that prefix to end outside an open turn, and create a live child session with lineage metadata.
 - `ctx.sessions.get(id: SessionId): Session | undefined`
@@ -36,13 +36,16 @@ The store pairs announced creation with disposal, publishes post-commit append n
 
 Plain class (not a Cordis Service). Create live sessions through `ctx.sessions.create()` and detached replay or inspection sessions through `Session.create()`; the detached factory does not publish lifecycle events or bind the session to a fiber.
 
-- `session.append(type, data, opts?)` snapshots and freezes durable data and surface metadata, validates marker shape, cited source-event seqs, complete replacement coverage, and content-only single-result `tool/result` rewrites, commits synchronously, then notifies observers with independent failure containment. Reentrant attached-session appends reject, and runtime checks cover widened unions and loaded logs.
+- `session.append(type, data, opts?)` snapshots and freezes durable data and surface metadata, constructs the event's `SessionSeq`, validates marker shape, cited source-event sequences, complete replacement coverage, and content-only single-result `tool/result` rewrites, commits synchronously, then notifies observers with independent failure containment. Reentrant attached-session appends reject, and runtime checks cover widened unions and loaded logs.
 - `session.deriveMessages()` incrementally projects each new surface entry once and returns a fresh array over the complete identified, frozen messages stored by those entries. Assistant messages preserve the provider and model that produced them plus adapter-private replay state in their model source. A surface rewrite rebuilds the projection; there is no raw-log fallback.
 - `session.deriveEventMessage(event)` is the canonical per-event projection used by reconstruction and request checks.
 - `session.surface` exposes the readonly `SessionSurface` view owned by the session's single incremental surface manager; `replaceGeneration` changes on every committed rewrite.
-- `session.events` is a cached frozen snapshot invalidated by append; accepted events remain deeply frozen.
-- `session.seq`, `session.id` — current sequence and readonly typed identity.
-- `session.header: SessionHeader` — detached, deep-frozen creation metadata (`version`, `id`, `createdAt`, optional `cwd`/`parentSession`/`seedLength`/`delegationDepth`). Construction validates the durable record and requires its id to match `session.id`.
+- `session.seq` reads the current log length (a `SessionLogOffset`) without materializing an array, and `session.eventAt(seq)` reads one accepted, deeply frozen event by `SessionSeq`. `session.snapshotEvents(fromSeq?, toSeqExclusive?)` materializes a frozen, stable snapshot of a half-open range; a complete current snapshot is cached until the next append. Callers that only need a length or one event use `seq` or `eventAt()`.
+- `session.inheritedEventCount` retains the exact checked fork cut; `session.ownEvents()` returns events at and after that cut, and `session.isOwnSeq(seq)` accepts only an existing child-owned position. `session.header.isSeeded` reports whether fork history exists without exposing the positional integer.
+- `session.events` is a `@deprecated` compatibility getter over the cached complete snapshot, kept for out-of-tree plugins; in-tree code reads through `snapshotEvents()`, `eventAt()`, or `seq`.
+- Session log positions use two numeric brands. `SessionSeq` identifies an existing event or inclusive watermark; `SessionLogOffset` identifies a gap, prefix length, or read boundary and may equal the event count. `SessionSeqCursor` adds the `-1` “no event yet” value, while `OptionalSessionSeq` uses `null` when absence is data. The constructors validate non-negative safe integers, and the brands disappear at runtime, so durable JSON and wire values remain ordinary numbers.
+- `session.id` — readonly typed identity.
+- `session.header: SessionHeader` — detached, deep-frozen creation metadata (`version`, `id`, `createdAt`, optional `cwd`/`parentSession`/`isSeeded`/`origin`/`delegationDepth`/`agentPreset`/`draft`). Construction validates the durable record and requires its id to match `session.id`.
 
 ### Lossless JSON utilities
 
@@ -86,7 +89,7 @@ Every `SessionEvent` carries three optional top-level fields (structural metadat
 
 ### Metadata types (`types.ts`)
 
-- `SessionHeader` — session metadata written once when published as `Session.header`, where detachment and deep-freezing enforce immutability at runtime: `{ version, id, createdAt, cwd?, parentSession?, seedLength?, delegationDepth? }`. Persistence loaders may return mutable detached copies of the same data type. Owned here (beside `SessionId`) because `Session.header` is typed by it; persistence backends re-export it rather than own it (which would force a package cycle).
+- `SessionHeader` — session metadata written once when published as `Session.header`, where detachment and deep-freezing enforce immutability at runtime: `{ version, id, createdAt, isSeeded, cwd?, parentSession?, origin?, delegationDepth?, agentPreset?, draft? }`. `isSeeded` reports lineage without a positional integer; the exact `inheritedEventCount` travels beside the header as storage metadata and on the live `Session`. Persistence loaders may return mutable detached copies of the same data type. Owned here (beside `SessionId`) because `Session.header` is typed by it; persistence backends re-export it rather than own it (which would force a package cycle).
 
 ### Extension points
 

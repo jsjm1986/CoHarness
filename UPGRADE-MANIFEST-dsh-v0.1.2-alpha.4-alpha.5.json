@@ -1,0 +1,427 @@
+{
+  "schemaVersion": 1,
+  "reviewDate": "2026-09-03",
+  "upstream": {
+    "repository": "https://github.com/deepseek-ai/deepseek-harness",
+    "tags": [
+      {
+        "tag": "dsh-v0.1.2-alpha.4",
+        "commit": "4e84901e6471b79ec0338099867ebb4606d12bb5",
+        "comparison": "dsh-v0.1.2-alpha.3..dsh-v0.1.2-alpha.4",
+        "diff": {
+          "files": 2389,
+          "insertions": 31107,
+          "deletions": 23242
+        },
+        "firstParentCommits": 13,
+        "nonMergeCommits": 259
+      },
+      {
+        "tag": "dsh-v0.1.2-alpha.5",
+        "commit": "db6bdc3576c2d4e7c965e8e3ed0c2a731eed87f5",
+        "comparison": "dsh-v0.1.2-alpha.4..dsh-v0.1.2-alpha.5",
+        "diff": {
+          "files": 280,
+          "insertions": 1752,
+          "deletions": 305
+        },
+        "firstParentCommits": 2,
+        "nonMergeCommits": 5
+      }
+    ],
+    "releasePages": [
+      "https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.1.2-alpha.4",
+      "https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.1.2-alpha.5"
+    ],
+    "auditedCommitClusters": [
+      {
+        "tag": "alpha.4",
+        "pullRequest": 2907,
+        "commits": [
+          "5dd876025d"
+        ],
+        "topic": "session log read API: seq / eventAt() / snapshotEvents() with immutable snapshot reuse"
+      },
+      {
+        "tag": "alpha.4",
+        "pullRequest": 1148,
+        "commits": [
+          "9d15938073"
+        ],
+        "topic": "experimental CPython code-runtime backend moved to packages/experimental"
+      },
+      {
+        "tag": "alpha.4",
+        "pullRequest": 3367,
+        "commits": [
+          "714bec1316"
+        ],
+        "topic": "omit unneeded invariant companions"
+      },
+      {
+        "tag": "alpha.4",
+        "pullRequest": 3250,
+        "commits": [
+          "52af48f808"
+        ],
+        "topic": "steer service and bidirectional send_message replacing the report tool"
+      },
+      {
+        "tag": "alpha.4",
+        "pullRequest": 3403,
+        "commits": [
+          "68488c552a"
+        ],
+        "topic": "model discovery reuses profile headers; searchable model catalog"
+      },
+      {
+        "tag": "alpha.4",
+        "pullRequest": 3382,
+        "commits": [
+          "dead2b2324"
+        ],
+        "topic": "shared base bundle enables web_fetch by default"
+      },
+      {
+        "tag": "alpha.4",
+        "pullRequest": 3411,
+        "commits": [
+          "4bc0b000f5"
+        ],
+        "topic": "superellipse corner smoothing and elevation stroke shadows"
+      },
+      {
+        "tag": "alpha.4",
+        "pullRequest": 3346,
+        "commits": [
+          "876a3e0414"
+        ],
+        "topic": "SessionSeq / SessionLogOffset brands and inheritedEventCount storage metadata"
+      },
+      {
+        "tag": "alpha.4",
+        "pullRequest": 3415,
+        "commits": [
+          "3efd4b51e0"
+        ],
+        "topic": "turn rail preview layer above code banners"
+      },
+      {
+        "tag": "alpha.4",
+        "pullRequest": 3418,
+        "commits": [
+          "c3e5bd7dae"
+        ],
+        "topic": "agent note link fix"
+      },
+      {
+        "tag": "alpha.4",
+        "pullRequest": 3391,
+        "commits": [
+          "1f694c88ab"
+        ],
+        "topic": "long-session chat rendering cost"
+      },
+      {
+        "tag": "alpha.4",
+        "pullRequest": 3425,
+        "commits": [
+          "3c5b7097ae"
+        ],
+        "topic": "PTC preset omits the workflow tool"
+      },
+      {
+        "tag": "alpha.4",
+        "pullRequest": 3427,
+        "commits": [
+          "4e84901e64"
+        ],
+        "topic": "release 0.1.2-alpha.4"
+      },
+      {
+        "tag": "alpha.5",
+        "pullRequest": 3438,
+        "commits": [
+          "1915665e1e"
+        ],
+        "topic": "projection cache cross-version read compatibility (per-record layout)"
+      },
+      {
+        "tag": "alpha.5",
+        "commits": [
+          "db6bdc3576"
+        ],
+        "topic": "release 0.1.2-alpha.5"
+      }
+    ]
+  },
+  "baseline": {
+    "repository": "https://github.com/jsjm1986/CoHarness.git",
+    "commit": "4cb550ba86",
+    "branch": "feat/upstream-alpha45-sync",
+    "commonAncestorWithUpstream": false,
+    "integrationMethod": {
+      "kind": "file-level-three-way-merge",
+      "base": "dsh-v0.1.2-alpha.3",
+      "ours": "fork",
+      "theirs": "dsh-v0.1.2-alpha.5",
+      "fastForwarded": 78,
+      "mergedClean": 167,
+      "conflicted": 245,
+      "conflictHunks": 491,
+      "deleted": 7,
+      "added": 12,
+      "skipped": 1899
+    },
+    "packageVersionPolicy": "set the CoHarness dsh family to unique publication version 0.1.2-alpha.5.coharness.1 for the dsh-v0.1.2-alpha.5 code baseline; keep apps/android-shell at 0.1.0 and vendor/native families on their independent version lines"
+  },
+  "userDecisions": {
+    "card": "up45-scope",
+    "decidedAt": "2026-09-02T22:35+08:00",
+    "sessionEvents": "adopt seq/eventAt()/snapshotEvents() and keep a @deprecated events getter for tree-external plugins",
+    "seqBrands": "brand the whole session stack including fork-owned persistence and history-wire packages",
+    "invariantCleanup": "defer #3367 to a separate pull request",
+    "codeRuntimePython": "replace the whole package with the upstream experimental version",
+    "webFetchDefault": "follow upstream and enable web_fetch in bundle/base and the three fork presets"
+  },
+  "decisions": {
+    "implemented": [
+      "session-log-read-api-with-deprecated-events-getter",
+      "session-seq-and-log-offset-brands-through-fork-persistence-backends",
+      "inherited-event-count-storage-metadata-with-gateway-wire-seed-length-mapping",
+      "send-message-steer-service-replacing-report-tool",
+      "host-subagent-prompt-queue-through-subagent-internal-entry",
+      "model-discovery-profile-headers",
+      "searchable-model-catalog-picker",
+      "web-fetch-default-in-base-bundle-and-fork-presets",
+      "ptc-code-preset-omits-workflow-tool",
+      "superellipse-corner-shape-and-elevation-tokens",
+      "style-guards-applied-to-fork-owned-css",
+      "turn-navigator-preview-layer",
+      "location-data-identity-reuse-and-flush-published-flag",
+      "inject-keyed-hooks-compartment",
+      "css-produced-file-layout",
+      "experimental-code-runtime-python-whole-package-replacement",
+      "list-children-seq-gate-and-lifecycle-witness-keys-restored",
+      "persistence-load-live-snapshot-materialized-guard-restored",
+      "permission-presets-fold-knobs-approval",
+      "snapshot-child-sidecar-pins-reduced-to-divergent-scenarios",
+      "subagent-continuable-snapshot-reauthored-for-steer-semantics"
+    ],
+    "baselineEquivalent": [
+      "session-event-ignorable-and-format-version-zero",
+      "fork-history-window-and-trajectory-virtualization",
+      "fork-json-and-assert-helpers-instead-of-util-values",
+      "projection-cache-optional-lineage-identity-without-medium-version-bump"
+    ],
+    "intentionallyNotAdopted": [
+      "projection-cache-per-record-cross-version-read-compat-3438",
+      "invariant-companion-removal-3367-deferred",
+      "trajectory-resident-pagination-3391",
+      "composer-seat-ownership-migration-3391",
+      "chat-node-store-per-node-observable-source-3391",
+      "remote-subagent-control-plane-and-remote-error",
+      "runtime-brand-number-and-brand-string-factories",
+      "util-values-and-util-time-packages",
+      "upstream-tests-for-fork-removed-behaviors"
+    ],
+    "platformUnverified": [
+      "windows-native-loader-and-pty-release-lanes",
+      "real-deepseek-api-e2e",
+      "assembled-browser-snapshot-and-production-gateway-timing",
+      "gateway-admin-project-directory-snapshot-requires-pg",
+      "macos-packed-install-native-lifecycle"
+    ]
+  },
+  "evidence": {
+    "sessionProtocol": [
+      "packages/core/session/src/index.ts",
+      "packages/core/session/src/types.ts",
+      "packages/core/session/src/chunk-rows.ts",
+      "packages/util/brand/src/index.ts",
+      "packages/session/session-persistence/src/coordinator.ts",
+      "packages/session/session-persistence/src/index.ts",
+      "packages/session/session-persistence-jsonl/src/index.ts",
+      "packages/session/session-persistence-jsonl/src/format.ts",
+      "packages/session/session-persistence-sqlite/src/index.ts",
+      "packages/session/session-persistence-gateway/src/index.ts",
+      "packages/session/session-projection/src/index.ts",
+      "packages/session/session-projection-cache/src/index.ts",
+      "packages/session/session-projection-cache/src/spec.ts",
+      "scripts/session-sqlite-migration.ts"
+    ],
+    "subagentAndSteer": [
+      "packages/subagent/subagent/src/index.ts",
+      "packages/subagent/subagent/src/internal.ts",
+      "packages/subagent/subagent/src/continuation.ts",
+      "packages/subagent/subagent/src/list-children.ts",
+      "packages/subagent/tool-subagent-control/src/index.ts",
+      "packages/subagent/tool-subagent/src/index.ts",
+      "packages/host/apiproxy/src/api-proxy.ts",
+      "packages/experimental/agent-team/src/index.ts",
+      "packages/bundle/base/cordis.patch.yml",
+      "apps/cli/config/agent-presets/code/agent.cordis.yml",
+      "apps/cli/config/agent-presets/cordis/agent.cordis.yml",
+      "apps/cli/config/agent-presets/standard/agent.cordis.yml",
+      "tsconfig.base.json"
+    ],
+    "llmAndSettings": [
+      "packages/llm/llm/src/discovery.ts",
+      "packages/llm/llm-pi-ai/src/index.ts",
+      "packages/llm/llm-pi-ai/src/config.ts",
+      "packages/client/ui-settings-models/src/client/ModelListEditor.tsx"
+    ],
+    "clientRendering": [
+      "packages/client/ui-theme/src/styles/corner-shape.css",
+      "packages/client/ui-theme/src/styles/gradient-shadow-text.css",
+      "packages/client/ui-theme/tests/corner-shape-styles.client.spec.ts",
+      "packages/client/ui-theme/tests/elevation-styles.client.spec.ts",
+      "packages/client/ui-conversation/src/client/chat/TurnNavigator.module.css",
+      "packages/client/ui-conversation/src/client/skeleton/InputBar.tsx",
+      "packages/client/runtime/src/client/sessions/conversation-assembler.ts",
+      "packages/client/runtime/src/client/contract/conversation.ts",
+      "packages/client/ui-deliverables/src/client/turn-deliverables.ts",
+      "packages/client/ui-deliverables/src/client/ProducedFiles.tsx",
+      "packages/client/ui-slots/src/index.ts",
+      "packages/client/ui-renderer/src/client/scoped-slots.tsx",
+      "packages/client/ui-renderer/src/client/session-provider.tsx"
+    ],
+    "experimentalPython": [
+      "packages/experimental/code-runtime-python/src/index.ts",
+      "packages/experimental/code-runtime-python/src/protocol.ts",
+      "packages/experimental/code-runtime-python/src/invariant.ts",
+      "packages/experimental/code-runtime-python/py/bootstrap.py",
+      "packages/experimental/code-runtime-python/py/protocol.py",
+      "tsconfig.host.json",
+      "vitest.config.ts",
+      "knip.json",
+      "scripts/check-workspace-constraints.ts",
+      "scripts/verify-package-readme-model-experience.ts",
+      "scripts/gen-doc-graphs.ts"
+    ],
+    "agentNotesImported": [
+      ".agents/notes/implemented/architecture/2026-08-21-session-log-read-intent.md",
+      ".agents/notes/implemented/architecture/2026-08-27-adjacent-agent-steer-messaging.md",
+      ".agents/notes/implemented/architecture/2026-08-31-session-sequence-and-log-offset-brands.md",
+      ".agents/notes/implemented/bug-fix/2026-08-17-subagent-message-settlement-ordering.md",
+      ".agents/notes/implemented/feature/2026-09-01-shared-base-web-fetch-default.md",
+      ".agents/notes/implemented/feature/2026-09-01-web-elevation-stroke-shadows.md",
+      ".agents/notes/implemented/feature/2026-09-01-web-superellipse-corner-smoothing.md",
+      ".agents/notes/implemented/simplification/2026-09-01-css-produced-file-layout.md",
+      ".agents/notes/implemented/simplification/2026-09-01-ptc-omits-workflow-tool.md",
+      ".agents/notes/implemented/bug-fix/2026-07-31-code-runtime-python-settlement-fixes.md",
+      ".agents/notes/implemented/bug-fix/2026-08-29-code-runtime-python-call-backlog-and-binding-metadata-snapshot.md",
+      ".agents/notes/implemented/bug-fix/2026-08-29-code-runtime-python-load-and-dispatch-hardening.md",
+      ".agents/notes/implemented/bug-fix/2026-08-29-code-runtime-python-reply-backlog-and-surrogate-count.md"
+    ],
+    "agentNotesDeleted": [
+      ".agents/notes/implemented/feature/2026-07-30-continuable-subagent-report-tool.md",
+      ".agents/notes/implemented/feature/2026-08-06-continuable-child-report-obligation.md",
+      ".agents/notes/implemented/bug-fix/2026-08-17-subagent-report-settlement-ordering.md"
+    ],
+    "snapshots": [
+      "examples/acp-agent/tests/acp.snapshot.ts",
+      "examples/acp-agent/tests/snapshots/subagent-continuable/input.json",
+      "examples/acp-agent/tests/fixtures/subagent-durability-failure.ts",
+      "examples/acp-agent/tests/snapshots",
+      "examples/headless-agent/tests/snapshots"
+    ]
+  },
+  "verification": {
+    "typecheck": {
+      "command": "CI=true pnpm run typecheck",
+      "result": "tsc -b host, tsdown host, tsc -b client: 0 errors"
+    },
+    "lint": {
+      "command": "CI=true pnpm run lint",
+      "result": "0 problems after fixing 64 (52 deprecated session.events reads, 8 max-len, 2 unnecessary assertions, 1 unbound-method, 1 stale disable directive)"
+    },
+    "docSync": {
+      "command": "CI=true pnpm run doc-sync",
+      "leavesPassed": 28,
+      "leavesFailed": 0,
+      "firstRunFailures": [
+        "markdown links",
+        "package paths",
+        "type equivalence",
+        "translation pairing",
+        "documentation site checks",
+        "documentation build"
+      ],
+      "firstRunRootCause": "generated English catalogs regenerated while their reviewed .zh.md counterparts were not ported; four type-equiv blocks lagged the branded source types; 14 bilingual pairs unrecorded"
+    },
+    "clientBuild": {
+      "command": "CI=true pnpm run build:lib:client",
+      "bundles": 160
+    },
+    "hygiene": {
+      "command": "CI=true pnpm run hygiene",
+      "result": "passed",
+      "fix": "packages/skill/tool-skill declares @deepseek-ai/dsh-session as a peerDependency for its runtime SessionSeq import"
+    },
+    "releaseVerify": {
+      "command": "CI=true pnpm run release:verify --family dsh",
+      "members": 247,
+      "version": "0.1.2-alpha.5.coharness.1"
+    },
+    "releaseVersion": {
+      "dshFamily": "0.1.2-alpha.5.coharness.1",
+      "upstreamCodeBaseline": "dsh-v0.1.2-alpha.5",
+      "releaseTag": "dsh-v0.1.2-alpha.5.coharness.1",
+      "manifestsBumped": 251,
+      "bumpTool": "scripts/release/bump.ts --family dsh 0.1.2-alpha.5.coharness.1 (commit folded into the sync commit)",
+      "independentAndroidShell": "0.1.0"
+    },
+    "focusedTests": {
+      "command": "npx vitest run <115 package directories with src/tests changes>",
+      "files": 604,
+      "tests": 10186,
+      "result": "passed"
+    },
+    "lintFixRetest": {
+      "files": 22,
+      "tests": 612,
+      "result": "passed"
+    },
+    "experimentalPythonTests": {
+      "command": "npx vitest run packages/experimental/code-runtime-python",
+      "testsPassed": 283,
+      "testsSkipped": 2,
+      "pythonRequirement": "CPython >= 3.10 on PATH (macOS system 3.9.6 fails every test)"
+    },
+    "generators": {
+      "count": 11,
+      "result": "all exit 0"
+    },
+    "translationPairing": {
+      "command": "npx tsx scripts/verify-translation-pairing.ts",
+      "pairs": 1162,
+      "result": "all consistent"
+    },
+    "snapshotRefresh": {
+      "command": "DSH_SNAPSHOT=refresh vitest run --config vitest.snapshot.config.ts examples/acp-agent/tests/acp.snapshot.ts examples/headless-agent/tests/headless.snapshot.ts",
+      "result": "expected outputs rewritten for send_message schemas, child session logs, and the re-authored subagent-continuable scenario"
+    },
+    "snapshotReplay": {
+      "command": "vitest run --config vitest.snapshot.config.ts examples/acp-agent/tests/acp.snapshot.ts examples/headless-agent/tests/headless.snapshot.ts",
+      "acp": {
+        "tests": 93,
+        "passed": 93
+      },
+      "headless": {
+        "tests": 17,
+        "passed": 16,
+        "concurrencyTransient": "product headless profile model-failure smoke exceeded its 30s subprocess deadline under concurrency 5; serial rerun passed in 20s"
+      }
+    },
+    "diffCheck": "git diff --check && git diff --cached --check",
+    "notRunLocally": [
+      "pnpm run test (full)",
+      "pnpm run test:coverage",
+      "DSH_SNAPSHOT=replay pnpm run test:web",
+      "gateway/tests/admin-project-directory.snapshot.ts (needs pg)",
+      "windows lanes",
+      "real DeepSeek API e2e"
+    ]
+  }
+}

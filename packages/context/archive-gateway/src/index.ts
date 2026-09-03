@@ -4,6 +4,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import { readGatewayResponseJson } from '@deepseek-ai/dsh-gateway-runtime'
 import type {} from '@deepseek-ai/dsh-gateway-runtime'
+import { SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-persistence'
 import type { ArchivedSessionEntry, WorkspaceArchiveSnapshot, WorkspaceRegistry } from '@deepseek-ai/dsh-workspace'
@@ -265,7 +266,7 @@ async function loadArchiveProjection(
   ctx: Context,
   entry: ArchivedSessionEntry,
 ): Promise<CachedArchiveProjection> {
-  const stored = await ctx.sessionPersistence.readFrom(entry.sessionId, 0)
+  const stored = await ctx.sessionPersistence.readFrom(entry.sessionId, SessionLogOffset(0))
   const title = titleFromEvents(stored.events)
   const search = stored.events.flatMap((event) => {
     const row = searchRow(String(entry.sessionId), event)
@@ -611,7 +612,7 @@ async function readArchive(
   for (const header of entries) {
     const id = String(header.id)
     const cachedTitle = titleCache.get(id)
-    const stored = await ctx.sessionPersistence.readFrom(header.id, cachedTitle === undefined ? 0 : fromSeq)
+    const stored = await ctx.sessionPersistence.readFrom(header.id, SessionLogOffset(cachedTitle === undefined ? 0 : fromSeq))
     const title = cachedTitle === undefined
       ? titleFromEvents(stored.events)
       : explicitTitleFromEvents(stored.events) ?? cachedTitle

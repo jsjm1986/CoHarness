@@ -27,7 +27,7 @@
 }
 
 .historyRow {
-  border-bottom: 1px solid var(--dsw-alias-border-l1);
+  border-bottom: 0.5px solid var(--dsw-alias-border-l1);
 }
 
 .historyButton {
@@ -58,7 +58,7 @@
   position: relative;
   min-width: 0;
   min-height: var(--dsw-mobile-feed-row-height);
-  border-bottom: 1px solid var(--dsw-alias-border-l1);
+  border-bottom: 0.5px solid var(--dsw-alias-border-l1);
   transition: background-color 120ms var(--ds-ease-in-out), opacity 120ms var(--ds-ease-in-out);
 }
 

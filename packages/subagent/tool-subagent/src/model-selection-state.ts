@@ -23,7 +23,7 @@ declare module '@deepseek-ai/dsh-session/types' {
  * @returns a detached route list, or undefined for the fixed-route definition.
  */
 export function subagentModelSelectionPolicy(session: Session): AllowedModelRoute[] | undefined {
-  const event = session.events.find(candidate => candidate.type === 'subagent/model-selection-policy')
+  const event = session.snapshotEvents().find(candidate => candidate.type === 'subagent/model-selection-policy')
   if (event?.type !== 'subagent/model-selection-policy') return undefined
   const { allowedModels } = event.data
   assertAllowedModelRoutes(allowedModels)

@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-collaboration-context",
   "description": "Durable participant attribution for shared project conversations",
-  "version": "0.1.2-alpha.3.coharness.1",
+  "version": "0.1.2-alpha.5.coharness.1",
   "publishConfig": { "access": "public" },
   "repository": {
     "type": "git",

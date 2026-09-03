@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SessionId } from '@deepseek-ai/dsh-session'
+import { SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionEventMap, SessionEventType } from '@deepseek-ai/dsh-session'
 import {
   applyTeamEvent,
@@ -225,7 +225,7 @@ describe('Agent Teams fold', () => {
       ...delivered.data,
       targetId: SessionId('other'),
     }, 1)])).toThrow(/target changed/)
-    expect(() => foldTeam(ROOT, [queued, delivered, { ...delivered, seq: 2 }])).toThrow(/delivered twice/)
+    expect(() => foldTeam(ROOT, [queued, delivered, { ...delivered, seq: SessionSeq(2) }])).toThrow(/delivered twice/)
   })
 
   it('validates every current-version persisted payload before folding it', () => {

@@ -12,6 +12,7 @@ import type {} from '@deepseek-ai/dsh-collaboration'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import { createUserMessage, freezeMessage } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, UserMessage } from '@deepseek-ai/dsh-llm'
+import { SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 // Optional projection faces provide title labels without folding a full log
 // on every `@` keystroke; compositions without them retain the query fallback.
@@ -244,7 +245,10 @@ export class SessionReferenceResolver extends TypertRemoteService {
     if (attached !== undefined && projections !== undefined) {
       return titleOf(projections.snapshot(attached).values.title)
     }
-    const cached = this.ctx.get('sessionProjectionCache')?.cachedSnapshot(record.header)
+    // A seeded header lacks its exact inherited cut, so its cache identity
+    // cannot be formed from the listing alone; the title arrives once opened.
+    if (record.header.isSeeded) return undefined
+    const cached = this.ctx.get('sessionProjectionCache')?.cachedSnapshot(record.header, SessionLogOffset(0))
     return titleOf(cached?.values.title)
   }
 

@@ -72,7 +72,7 @@ export class Inbox {
   ) {
     this.maxMessages = resolveLimit(limits.maxMessages, 'inbox maxMessages')
     this.maxBytes = resolveLimit(limits.maxBytes, 'inbox maxBytes')
-    for (const event of session.events.slice(session.header.seedLength ?? 0)) {
+    for (const event of session.ownEvents()) {
       if (event.type !== 'agent/inbox/spliced') continue
       try {
         this.apply(event.data)

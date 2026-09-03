@@ -102,6 +102,7 @@
       "@deepseek-ai/dsh-tools/types": ["./packages/core/tools/src/types.ts"],
       "@deepseek-ai/dsh-tool-subagent-control/list-agents": ["./packages/subagent/tool-subagent-control/src/list-agents.ts"],
       "@deepseek-ai/dsh-tool-subagent/model-selection-settings": ["./packages/subagent/tool-subagent/src/model-selection-settings.ts"],
+      "@deepseek-ai/dsh-subagent/internal": ["./packages/subagent/subagent/src/internal.ts"],
       "@deepseek-ai/dsh-user-approval/types": ["./packages/interaction/user-approval/src/types.ts"],
       "@deepseek-ai/dsh-user-questions/types": ["./packages/interaction/user-questions/src/types.ts"],
       "@deepseek-ai/dsh-agent/types": ["./packages/core/agent/src/types.ts"],
@@ -110,6 +111,7 @@
       "@deepseek-ai/dsh-scope/invariant": ["./packages/core/scope/src/invariant.ts"],
       "@deepseek-ai/dsh-agent-loop/invariant": ["./packages/core/agent-loop/src/invariant.ts"],
       "@deepseek-ai/dsh-experimental-agent-team/invariant": ["./packages/experimental/agent-team/src/invariant.ts"],
+      "@deepseek-ai/dsh-experimental-code-runtime-python/invariant": ["./packages/experimental/code-runtime-python/src/invariant.ts"],
       "@deepseek-ai/dsh-experimental-tool-agent-team/invariant": ["./packages/experimental/tool-agent-team/src/invariant.ts"],
       "@deepseek-ai/dsh-*/invariant": [
         "./packages/core/*/src/invariant.ts",
@@ -250,6 +252,7 @@
       "@deepseek-ai/dsh-sdk-protocol": ["./packages/sdk/protocol/src"],
       "@deepseek-ai/dsh-sdk-jsonrpc-server": ["./packages/sdk/server/src"],
       "@deepseek-ai/dsh-experimental-agent-team": ["./packages/experimental/agent-team/src"],
+      "@deepseek-ai/dsh-experimental-code-runtime-python": ["./packages/experimental/code-runtime-python/src"],
       "@deepseek-ai/dsh-experimental-tool-agent-team": ["./packages/experimental/tool-agent-team/src"],
       "@deepseek-ai/dsh-*": [
         "./packages/core/*/src",

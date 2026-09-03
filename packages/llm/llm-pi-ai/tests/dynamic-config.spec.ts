@@ -167,6 +167,11 @@ describe('request-level dynamic profiles', () => {
     await expect(ctx.settings.update(NS, { providers: { 'not-a-real-provider': {} } }))
       .rejects.toThrow(/resolves no models/)
     expect(ctx.llm.listProviders().map(provider => provider.id)).toEqual(['openai'])
+
+    await expect(ctx.settings.update(NS, {
+      providers: { openai: { headers: { 'bad header name': 'value' } } },
+    })).rejects.toThrow(/provider "openai" header "bad header name" is not valid for Fetch/)
+    expect(ctx.llm.listProviders().map(provider => provider.id)).toEqual(['openai'])
   })
 
   it('keeps organization credential references out of personal settings', async () => {

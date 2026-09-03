@@ -28,7 +28,7 @@ export class TeamJournal {
    * @returns current replay state selected by the Lead Team id.
    */
   state(root: Agent): TeamFoldState {
-    return foldTeam(root.id, root.session.events)
+    return foldTeam(root.id, root.session.snapshotEvents())
   }
 
   /**

@@ -55,7 +55,7 @@ defineAcpSnapshotSuite({
 
 每个 pin 默认拥有其生成的 `system-prompt.expected.md` 或 `tool-schemas.expected.json`；当完整的对应序列相同时，`systemPromptSource` 和 `toolSchemasSource` 指定另一个 pin 作为来源，因此每个不同版本只提交一次。该 pin 的 `session.jsonl` 存储 `"system":"{{system}}","tools":"{{tools}}"`，同时保留配置、原因和任何模型可见前缀。具有合法运行中 header 变更的 pin 声明 `expectedHeaderChanges`；共享来源必须声明相同的 header 变更数量，录制/刷新会拒绝生成不同字节的共享引用方。
 
-自身作用域组合出不同请求的 child 会话按 fixture 索引单独声明：`pinsChildToolSchemas` 把该 child 的工具序列移入 `tool-schemas.<n>.expected.json`，`pinsChildSystemPrompts` 把其提示词移入 `system-prompt.<n>.expected.md`。两者都指名自己描述的 `session.<n>.jsonl` fixture，其余请求 header 字段仍归类别 pin 所有，并要求 sidecar 恰好在声明时存在。child 提示词 sidecar 还必须与其类别 pin 不同，因此冗余副本会直接失败，而不会悄悄漂移。携带作用域局部 `report` 工具及其指引 section 的可继续 child 是两者的随附用例。
+自身作用域组合出不同请求的 child 会话按 fixture 索引单独声明：`pinsChildToolSchemas` 把该 child 的工具序列移入 `tool-schemas.<n>.expected.json`，`pinsChildSystemPrompts` 把其提示词移入 `system-prompt.<n>.expected.md`。两者都指名自己描述的 `session.<n>.jsonl` fixture，其余请求 header 字段仍归类别 pin 所有，并要求 sidecar 恰好在声明时存在。child 提示词 sidecar 还必须与其类别 pin 不同，因此冗余副本会直接失败，而不会悄悄漂移。作用域组合出自有请求的可继续 child——委派范围声明，或与父级不同的工具行——是两者的随附用例；自 `send_message` 取代 child 作用域的 `report` 工具后，工具序列与父级一致的 child 应删除其 `pinsChildToolSchemas` 条目，而不是钉住一份冗余副本。
 
 每个场景都比较 `stdout.expected.jsonl`，其中以 cwd 为根的分隔符规范化为 `/`。在 Windows 上，`pinsNativeWindowsStdout` 还会在共享预期输出之后比较完整 `stdout.expected.windows.jsonl`，并且仅在启用时要求存在该伴随文件。需要非 Windows 主机的场景声明 `posixOnly`，在 Windows 上跳过运行测试，但 fixture 保护仍在所有平台覆盖其已提交文件；示例包括 POSIX 进程语义（例如取消正在运行的 bash 调用会终止一个已脱离的进程组）和 Windows 无法表示的生成路径。组合需要可用 `pwsh` 的场景声明 `pwshOnly`；调用方提供的 `hasPwsh` 探测（随附的 acp-agent 套件遵循执行器自身的解析，因此 Program Files 安装也计入）在解析不到可用 `pwsh` 时跳过运行测试，而 fixture 保护仍处处覆盖其已提交文件。
 

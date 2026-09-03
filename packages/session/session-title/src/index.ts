@@ -13,6 +13,7 @@ import type {
   Session,
   SessionEvent,
 } from '@deepseek-ai/dsh-session'
+import { SessionSeq } from '@deepseek-ai/dsh-session'
 // Type-only: resolves ctx.sessionProjections for the optional unit child.
 import type {} from '@deepseek-ai/dsh-session-projection'
 // The `title` projection-key declaration lives in src/types.ts (its one home);
@@ -62,7 +63,7 @@ export interface SessionTitleEventData {
   /** Normalized non-empty title text. */
   readonly title: string
   /** Exact human `user/message` seqs used to derive this title; empty for an explicit user rename. */
-  readonly messageSeqs: number[]
+  readonly messageSeqs: SessionSeq[]
   /** Whether the built-in fallback, a registered provider, or the user supplied the title. */
   readonly source: SessionTitleSource
 }
@@ -70,7 +71,7 @@ export interface SessionTitleEventData {
 /** Latest folded title plus the title event's durable envelope facts. */
 export interface SessionTitleSnapshot extends SessionTitleEventData {
   /** Seq of the latest `session/title` event. */
-  readonly eventSeq: number
+  readonly eventSeq: SessionSeq
   /** Timestamp of the latest `session/title` event. */
   readonly updatedAt: number
 }
@@ -114,7 +115,7 @@ export class SessionTitleInvalidError extends Error {
 /** One eligible human text message exposed to title providers. */
 export interface SessionTitleUserMessage {
   /** Source `user/message` event seq. */
-  readonly seq: number
+  readonly seq: SessionSeq
   /** Exact concatenated text-block content. */
   readonly text: string
 }
@@ -139,7 +140,7 @@ export interface SessionTitleProviderResult {
   /** Proposed title text. */
   readonly title: string
   /** Exact seqs from `request.messages` used by this result. */
-  readonly messageSeqs: readonly number[]
+  readonly messageSeqs: readonly SessionSeq[]
   /** Auxiliary LLM route, when generation used a model. */
   readonly model?: SessionTitleModelProvenance
 }
@@ -166,7 +167,7 @@ export interface SessionTitleProvider {
  */
 export function collectSessionTitleMessages(
   events: readonly SessionEvent[],
-  throughSeq?: number,
+  throughSeq?: SessionSeq,
 ): SessionTitleUserMessage[] {
   const messages: SessionTitleUserMessage[] = []
   for (const event of events) {
@@ -233,7 +234,7 @@ interface ProviderRegistration {
 interface PendingAutomaticWork {
   readonly registration: ProviderRegistration
   readonly revision: number
-  readonly throughSeq: number
+  readonly throughSeq: SessionSeq
 }
 
 /** Provider call currently allowed to commit for one session. */
@@ -347,7 +348,7 @@ export class SessionTitleService extends Service {
    * @returns latest title snapshot, or `undefined` before eligible input.
    */
   get(session: Session): SessionTitleSnapshot | undefined {
-    return foldSessionTitle(session.events)
+    return foldSessionTitle(session.snapshotEvents())
   }
 
   /**
@@ -397,7 +398,7 @@ export class SessionTitleService extends Service {
       throw new Error(`session "${session.id}" is not live in this store`)
     }
     const registration = this.registration
-    const messages = collectSessionTitleMessages(session.events)
+    const messages = collectSessionTitleMessages(session.snapshotEvents())
     const latest = messages.at(-1)
     if (registration === undefined || registration.closing || latest === undefined) {
       // Explicit refresh is the unpin even without a provider: a standing
@@ -467,7 +468,7 @@ export class SessionTitleService extends Service {
     if (this.get(session)?.source.kind === 'user') return
     const registration = this.registration
     if (registration !== undefined && !registration.closing) {
-      const messages = collectSessionTitleMessages(session.events, event.seq)
+      const messages = collectSessionTitleMessages(session.snapshotEvents(), event.seq)
       const shouldSchedule = registration.provider.automatic === 'all-prompts'
         || (session.header.parentSession === undefined && messages.length === 1 && this.get(session) === undefined)
       if (shouldSchedule) {
@@ -506,7 +507,7 @@ export class SessionTitleService extends Service {
     const state = session === undefined ? undefined : this.work.get(session)
     const pending = state?.pending
     if (session === undefined || state === undefined || pending === undefined) return
-    const boundary = session.events.findLast(event => event.type === 'step/start' || event.type === 'step/end')
+    const boundary = session.snapshotEvents().findLast(event => event.type === 'step/start' || event.type === 'step/end')
     const route = session.requestHeader()?.config
     if (boundary?.type !== 'step/start'
       || boundary.seq <= pending.throughSeq
@@ -558,7 +559,7 @@ export class SessionTitleService extends Service {
       this.assertCurrent(session, work)
       await this.ensureFallback(session)
       this.assertCurrent(session, work)
-      const messages = collectSessionTitleMessages(session.events, work.throughSeq)
+      const messages = collectSessionTitleMessages(session.snapshotEvents(), work.throughSeq)
       const result = await work.registration.provider.generate({
         session,
         messages,
@@ -598,18 +599,19 @@ export class SessionTitleService extends Service {
     if (!Array.isArray(candidate.messageSeqs) || candidate.messageSeqs.length === 0) {
       throw new Error('session-title provider must identify at least one source message seq')
     }
-    const messageSeqs: number[] = []
+    const messageSeqs: SessionSeq[] = []
     const order = new Map(messages.map((message, index) => [message.seq, index]))
     let previous = -1
     for (const seq of candidate.messageSeqs as unknown[]) {
-      if (typeof seq !== 'number') {
+      if (typeof seq !== 'number' || !Number.isSafeInteger(seq) || seq < 0) {
         throw new Error('session-title provider messageSeqs must be unique, ordered seqs from the request')
       }
-      const index = order.get(seq)
-      if (!Number.isSafeInteger(seq) || seq < 0 || index === undefined || index <= previous) {
+      const sessionSeq = SessionSeq(seq)
+      const index = order.get(sessionSeq)
+      if (index === undefined || index <= previous) {
         throw new Error('session-title provider messageSeqs must be unique, ordered seqs from the request')
       }
-      messageSeqs.push(seq)
+      messageSeqs.push(sessionSeq)
       previous = index
     }
     const modelCandidate = candidate.model
@@ -757,7 +759,7 @@ export class SessionTitleService extends Service {
     this.assertServiceActive()
     const current = this.get(session)
     if (current !== undefined) return current
-    const [first] = collectSessionTitleMessages(session.events)
+    const [first] = collectSessionTitleMessages(session.snapshotEvents())
     if (first === undefined) return undefined
     const title = fallbackSessionTitle(
       first.text,

@@ -4,7 +4,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { GoalView } from '@deepseek-ai/dsh-goal'
 import { HarnessError } from '@deepseek-ai/dsh-llm'
-import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import type { SessionEvent, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-session-projection'
 
@@ -12,7 +12,7 @@ import type {} from '@deepseek-ai/dsh-session-projection'
 export interface GoalToolExecution {
   readonly agent: Agent
   readonly events: readonly SessionEvent[]
-  readonly openTurnStartSeq: number
+  readonly openTurnStartSeq: SessionSeq
 }
 
 /** Hard authority granted to one state-changing call. */
@@ -27,7 +27,7 @@ function reject(message: string, code = 'GOAL_TOOL_AUTHORITY_REQUIRED'): never {
 
 /** Locate the open turn without copying the event suffix when projections are available. */
 function openTurnEvents(ctx: Context, agent: Agent): Pick<GoalToolExecution, 'events' | 'openTurnStartSeq'> {
-  const events = agent.session.events
+  const events = agent.session.snapshotEvents()
   const projections = ctx.get('sessionProjections')
   const projected = projections?.stateOf(agent.session, 'turnBoundary')
   if (projected !== undefined && projected.openTurnStartSeq !== null) {

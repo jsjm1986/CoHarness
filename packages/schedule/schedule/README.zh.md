@@ -16,9 +16,9 @@ Time-context 不是 Schedule 的依赖。组合可以挂载 `@deepseek-ai/dsh-ti
 
 此包拥有严格的版本 1 `schedule/change` create、delete 与 dispatch 联合。每条 create 记录都包含稳定的会话本地 `ScheduleId`、已 trim 的提示词，以及使用四位年份的 RFC 3339 UTC `scheduledAt`。`after` 记录还会存储 `afterSeconds`；`at` 记录不会保留所提交的偏移量、本地日历字段或解释该值时所用的时区；`every` 记录存储 `everySeconds`，并把 `scheduledAt` 视为尚未 dispatch 的最早一个创建锚点对齐发生时点。delete 与一次性 dispatch 只携带 id。Every dispatch 还会添加 `acceptedAt`；回放会据此直接推进到该决策时点之后的第一个锚点对齐目标。
 
-回放会拒绝未知版本、额外字段、重复使用的 id、形状不匹配的一次性或 Every dispatch，以及针对非活动记录的 delete 或 dispatch 转换。普通会话折叠完整日志。fork 只折叠 `session.events.slice(session.header.seedLength ?? 0)`，因此不会继承父会话的提醒。此包的 `./invariant` 配套模块会对现有日志和候选事件应用相同策略。
+回放会拒绝未知版本、额外字段、重复使用的 id、形状不匹配的一次性或 Every dispatch，以及针对非活动记录的 delete 或 dispatch 转换。普通会话折叠完整日志。fork 只折叠 `session.ownEvents()`，因此不会继承父会话的提醒。此包的 `./invariant` 配套模块会对现有日志和候选事件应用相同策略。
 
-存在可选的 session-projection registry 时，Schedule 会注册 `schedule` projection。其状态携带不可变的 fork seed 边界与活动记录，因此 Host 读取、projection frame 和可选 Web 目录共享同一个转换权威。浏览器目录由 [`dsh-client-ui-schedule`](../../client/ui-schedule/README.zh.md) 提供，且只有 Web Schedule overlay 才会启用。
+存在可选的 session-projection registry 时，Schedule 会注册 `schedule` projection。其 `init(header, inheritedEventCount)` 从 registry 收到会话的精确继承切点，checkpoint 携带 `{ inheritedEventCount, active, seenIds }`，因此 Host 读取、projection frame、冷恢复和可选 Web 目录共享同一个基于自有后缀的转换权威。浏览器目录由 [`dsh-client-ui-schedule`](../../client/ui-schedule/README.zh.md) 提供，且只有 Web Schedule overlay 才会启用。
 
 ## 绝对时间输入
 

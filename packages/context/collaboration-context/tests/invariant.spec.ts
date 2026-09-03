@@ -55,7 +55,7 @@ describe('collaboration-context invariant', () => {
   it('rejects tampered participant text', async () => {
     const ctx = await setup()
     const session = appendPair(ctx)
-    const notice = session.events.find(event => event.type === 'user/message'
+    const notice = session.snapshotEvents().find(event => event.type === 'user/message'
       && event.data.source.kind === 'plugin')
     if (notice?.type !== 'user/message') throw new Error('missing notice')
     const corrupt = ctx.sessions.create(SessionId('collaboration-corrupt'))

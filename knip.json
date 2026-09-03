@@ -58,7 +58,6 @@
         "acp-agent/tests/fixtures/subagent-durability-failure.ts",
         "acp-agent/tests/fixtures/subagent-current-model.ts",
         "acp-agent/tests/fixtures/subagent-result-diagnostic.ts",
-        "acp-agent/tests/fixtures/subagent-report-fence.ts",
         "acp-agent/tests/fixtures/subagent-settlement-marker.ts",
         "acp-agent/tests/fixtures/workspace-context-compaction.ts",
         "acp-agent/tests/fixtures/subagent/subagent-acp/mock-delegating-llm.ts",
@@ -472,7 +471,7 @@
         "tests/**/*.ts"
       ]
     },
-    "packages/code-runtime/code-runtime-python": {
+    "packages/experimental/code-runtime-python": {
       "entry": [
         "tests/**/*.spec.ts",
         "tests/**/*.e2e.ts"

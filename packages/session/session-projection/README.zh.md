@@ -18,7 +18,7 @@
 
 - `SessionProjectionMap`——协议块与客户端钩子共享的 merge-extensible client view 表。值是协议层 JSON 全量值；渲染归 slot 体系管，永远不归本层。
 - `SessionProjectionStateMap`——merge-extensible host 折叠状态表。每个 client-visible key 同时出现在两个表中；host-only key 只出现在这里。
-- `ProjectionDefinition<K, S>`——`{ key, stateSchema, init(), apply(state, event), wire?, stateVersion }`：同步的状态驱动计算单元。`wire` 提供 `viewSchema` 与 `view`；省略它即为 host-only 单元。
+- `ProjectionDefinition<K, S>`——`{ key, stateSchema, init(header, inheritedEventCount), apply(state, event), wire?, stateVersion }`：同步的状态驱动计算单元。`init` 收到不可变 header 与会话精确的 fork 继承切点（`SessionLogOffset`），不得从 `firstLiveSeq` 或 `session/end-seed` 推断该切点。`wire` 提供 `viewSchema` 与 `view`；省略它即为 host-only 单元。
 
 ## 约定
 
@@ -26,7 +26,7 @@
 - **同引用即无工作。** 对与单元无关的事件，`apply` 必须返回同一个状态引用；驱动以 `Object.is` 把守变更流，因此不匹配的事件只花一次调用，不产生任何下游工作。
 - **全量值事件规则（承重）。** 携带状态的日志事件必须携带变更后的完整状态，绝不携带裸增量——这让每次状态转移始终足够廉价，也让每个被供给的值自描述（对消费方即 last-wins）。
 - **单元的同步纪律。**`init`/`apply`/`wire.view` 必须是同步的；载体在切出页面切片的同一 tick 内读取 `snapshot()`，`asOfSeq` 之所以是一个一致切面正系于此。误写成异步的 view 会返回 Promise，并被 `wire.viewSchema.parse` 拒绝。
-- **状态是经校验的纯 JSON，`stateVersion` 是其失效锚点。** 持久投影缓存存储 `(sessionId, key, ver, seq, val)` 行，并在使用前以 `stateSchema` 校验 `val`；状态字段或折叠语义一旦变化就递增 `stateVersion`。每个单元的状态都会被检查点化——client-visible 与 host-only 一视同仁。
+- **状态是经校验的纯 JSON，`stateVersion` 是其失效锚点。** 持久投影缓存存储 `(sessionId, key, ver, seq, val)` 行，并在使用前以 `stateSchema` 校验 `val`；状态字段或折叠语义一旦变化就递增 `stateVersion`。每个单元的状态都会通过 `checkpoint(session)` 被检查点化——client-visible 与 host-only 一视同仁——同级的 [session-projection-cache](../session-projection-cache/README.zh.md) 持久化这些检查点，让冷读跳过全量日志加载。检查点水位使用 `SessionSeqCursor`（空日志为 `-1`），回放起点使用 `SessionLogOffset`；`restoreFloor(checkpoint)` 与 `restore(checkpoint, events, baseSeq, header, inheritedEventCount)` 实现这条读取配方，不把已存在的事件与日志间隙混为一谈，并把精确切点交给每个单元的 `init`。
 - **本层没有协议词汇。** 注册表只暴露变更流与快照读取面；载体（api-proxy）据此自铸各自的帧（`session/projection`）与块。
 - **可选能力。** 领域插件在 `ctx.inject(['sessionProjections'], …)` 下注册，因此不带注册表的 headless 组装完全不受影响；载体使用 `ctx.get('sessionProjections')`，注册表缺席时完全省略自己的块与帧。
 

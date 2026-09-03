@@ -32,9 +32,10 @@ interface ProjectionDefinition<
    * always supplies the header; the optional parameter keeps standalone fold
    * tests and pure domain consumers source-compatible.
    * @param header - immutable metadata for the Session being projected.
+   * @param inheritedEventCount - exact fork-inherited prefix length.
    * @returns the initial state.
    */
-  init(header?: SessionHeader): NoInfer<S>
+  init(header: SessionHeader, inheritedEventCount: SessionLogOffset): NoInfer<S>
   /**
    * Pure transition: previous state + one committed event → next state. A
    * unit uninterested in an event MUST return the same state reference — an
@@ -79,7 +80,7 @@ The whole-value event rule is load-bearing: a state-carrying log event carries t
  */
 interface ProjectionSnapshot {
   /** Seq of the last event the values reflect; -1 for an empty log. */
-  asOfSeq: number
+  asOfSeq: SessionSeqCursor
   /** Whole current client value per registered key. */
   values: Partial<SessionProjectionMap>
 }
@@ -95,7 +96,7 @@ type ProjectionChangeListener = (
   session: Session,
   key: Extract<keyof SessionProjectionMap, string>,
   value: unknown,
-  seq: number,
+  seq: SessionSeq,
 ) => void
 ```
 
@@ -129,10 +130,12 @@ The persisted projection cache service. Opens the `session_projcache` domain at 
  * paths (the history tail baseline, {@link coldSnapshot}) supersede these
  * values whenever a session is actually opened.
  * @param meta - the listed session's header (identity witness; no log read).
+ * @param inheritedEventCount - exact inherited prefix length that completes
+ * the checkpoint identity.
  * @returns the cut (`asOfSeq` = lowest served-row watermark), or
  *   `undefined` when no usable row exists for this lifecycle.
  */
-cachedSnapshot(meta: SessionHeader): ProjectionSnapshot | undefined
+cachedSnapshot(meta: SessionHeader, inheritedEventCount: SessionLogOffset): ProjectionSnapshot | undefined
 
 /**
  * Durably checkpoint one live session NOW (all mandatory points call
@@ -159,7 +162,7 @@ async write(session: Session): Promise<void>
 async coldSnapshot(id: SessionId, signal?: AbortSignal): Promise<ProjectionSnapshot>
 ```
 
-Types: [Session](session.md) · [SessionHeader](persistence.md) · [SessionId](core.md)
+Types: [Session](session.md) · [SessionHeader](persistence.md) · [SessionId](core.md) · [SessionLogOffset](session.md)
 
 Source: [`packages/session/session-projection-cache/src/index.ts:71`](../../packages/session/session-projection-cache/src/index.ts)
 
@@ -247,7 +250,7 @@ checkpoint(session: Session): ProjectionCheckpoint
  *   when no unit is registered (no read needed — {@link restore} would
  *   serve empty values regardless).
  */
-restoreFloor(checkpoint: ProjectionCheckpoint): number | undefined
+restoreFloor(checkpoint: ProjectionCheckpoint): SessionLogOffset | undefined
 
 /**
  * View a checkpoint's rows without any log read: for every registered
@@ -279,15 +282,16 @@ viewCheckpoint(checkpoint: ProjectionCheckpoint): Partial<SessionProjectionMap>
  * @param checkpoint - persisted rows for one session (possibly stale or empty).
  * @param events - the stored events with `seq >= baseSeq`, in seq order.
  * @param baseSeq - the seq `events` starts at (its first event's seq when non-empty).
- * @param header - immutable metadata for the persisted Session, when known.
+ * @param header - immutable metadata for the Session being restored.
+ * @param inheritedEventCount - exact fork-inherited prefix length supplied to unit initialization.
  * @returns the snapshot cut at the supplied log end (`asOfSeq` is the last
  *   supplied event's seq, `baseSeq - 1` for an empty tail) plus the
  *   refreshed checkpoint rows at that cut, ready for a durable write-back.
  */
-restore( checkpoint: ProjectionCheckpoint, events: readonly SessionEvent[], baseSeq: number, header?: SessionHeader, ): { snapshot: ProjectionSnapshot; checkpoint: ProjectionCheckpoint }
+restore( checkpoint: ProjectionCheckpoint, events: readonly SessionEvent[], baseSeq: SessionLogOffset, header: SessionHeader, inheritedEventCount: SessionLogOffset, ): { snapshot: ProjectionSnapshot; checkpoint: ProjectionCheckpoint }
 ```
 
-Types: [Session](session.md) · [SessionEvent](session.md) · [SessionHeader](persistence.md)
+Types: [Session](session.md) · [SessionEvent](session.md) · [SessionHeader](persistence.md) · [SessionLogOffset](session.md)
 
-Source: [`packages/session/session-projection/src/index.ts:187`](../../packages/session/session-projection/src/index.ts)
+Source: [`packages/session/session-projection/src/index.ts:199`](../../packages/session/session-projection/src/index.ts)
 <!-- END GENERATED cordis-surface -->

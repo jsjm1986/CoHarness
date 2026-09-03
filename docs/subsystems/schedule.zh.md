@@ -149,7 +149,7 @@ type ScheduleDispatchChange = OneShotScheduleDispatchChange | EveryScheduleDispa
 type ScheduleChange = ScheduleCreateChange | ScheduleDeleteChange | ScheduleDispatchChange
 ```
 
-严格 decoder 与 fold 会拒绝未知版本、额外字段、复用 id、不匹配的一次性提醒或 Every dispatch 形状，以及针对非活动记录的 delete 或 dispatch 转换。普通 Session 折叠完整事件流。fork 只折叠 `SessionHeader.seedLength` 位置及其后的事件，因此保留历史，但不会接管父 Session 的活动提醒。`schedule/change` 声明和源码位置也编入[持久化目录](../persistence-catalog.zh.md#schedulechange--log-only)。
+严格 decoder 与 fold 会拒绝未知版本、额外字段、复用 id、不匹配的一次性提醒或 Every dispatch 形状，以及针对非活动记录的 delete 或 dispatch 转换。普通 Session 折叠完整事件流。fork 只折叠其精确 `inheritedEventCount` 位置及其后的事件，因此保留历史，但不会接管父 Session 的活动提醒。projection 初始化在不可变 header 之外一并收到该切点，复用同一转换函数，并把切点、活动记录与已用 id 历史一起持久化，使缓存恢复仍保持严格回放。`schedule/change` 声明和源码位置也编入[持久化目录](../persistence-catalog.zh.md#schedulechange--log-only)。
 
 ## 活动视图与管理
 

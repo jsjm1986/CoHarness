@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { SessionSeq } from '@deepseek-ai/dsh-session'
 import { zstdCompressSync } from 'node:zlib'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { CallId, type StreamChunk } from '@deepseek-ai/dsh-llm'
@@ -20,7 +21,7 @@ import type { EventRow } from '../src/schema.ts'
 function chunk(seq: number, text = `token-${seq}`): SessionEvent {
   return {
     type: 'assistant/chunk',
-    seq,
+    seq: SessionSeq(seq),
     time: 1_000 + seq,
     data: {
       turn: 1,
@@ -31,7 +32,7 @@ function chunk(seq: number, text = `token-${seq}`): SessionEvent {
 }
 
 function event(seq: number, time: number, value: StreamChunk, turn = 1, step = 1): SessionEvent {
-  return { type: 'assistant/chunk', seq, time, data: { turn, step, chunk: value } }
+  return { type: 'assistant/chunk', seq: SessionSeq(seq), time, data: { turn, step, chunk: value } }
 }
 
 function row(record: StorageRecord): EventRow {
@@ -103,9 +104,9 @@ describe('SQLite compression', () => {
       type: 'assistant/chunk', seq, time: 10 + seq, data,
     } as SessionEvent)
     const values: SessionEvent[] = [
-      { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } },
+      { type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } },
       { ...chunk(1), extra: true } as unknown as SessionEvent,
-      { ...chunk(-1), seq: -1 },
+      { ...chunk(2), seq: -1 as unknown as SessionSeq },
       { ...chunk(3), time: 1.5 },
       malformed(4, 'data'),
       malformed(5, { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'x' }, extra: 1 }),
@@ -162,7 +163,7 @@ describe('SQLite compression', () => {
 
   it('decodes the schema-17 row vocabulary without another package codec', () => {
     const fixture: EventRow = {
-      seq: 7,
+      seq: SessionSeq(7),
       type: 'text-chunks',
       time: 90,
       data: JSON.stringify({ turn: 2, step: 3, index: 1, dt: [2, -1], texts: ['a', 'b', 'c'] }),
@@ -191,7 +192,7 @@ describe('SQLite compression', () => {
   })
 
   it('rejects the packed discriminator on a scalar event type', () => {
-    const scalar = row({ type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } })
+    const scalar = row({ type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } })
     expect(() => decodeRow({ ...scalar, ignorable: 0 }))
       .toThrow(/packed discriminator requires a chunk tag/)
   })
@@ -201,7 +202,7 @@ describe('SQLite compression', () => {
     (type) => {
       const logical = {
         type,
-        seq: 0,
+        seq: SessionSeq(0),
         time: 1,
         data: { future: true },
         ignorable: true,
@@ -228,7 +229,7 @@ describe('SQLite compression', () => {
     expect(bound.sourceEventSeqs?.byteLength).toBeLessThan(Buffer.byteLength(JSON.stringify(sources)))
     expect(decodeRow(row(event))).toEqual([event])
 
-    const small = bindRecord({ type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } })
+    const small = bindRecord({ type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } })
     expect(typeof small.data).toBe('string')
   })
 
@@ -295,7 +296,7 @@ describe('SQLite compression', () => {
   it.each([-1, 0.5])('rejects invalid provenance sequence %s before encoding', (sourceSeq) => {
     const event = {
       type: 'assistant/message',
-      seq: 1,
+      seq: SessionSeq(1),
       time: 1,
       data: {},
       sourceEventSeqs: [sourceSeq],
@@ -305,7 +306,7 @@ describe('SQLite compression', () => {
   })
 
   it('rejects malformed compressed and delta-encoded values', () => {
-    const scalar = row({ type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } })
+    const scalar = row({ type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } })
     expect(() => decodeRow({ ...scalar, data: Buffer.from('not zstd') })).toThrow()
     expect(() => decodeRow({ ...scalar, source_event_seqs: Buffer.from([0x80]) }))
       .toThrow(/truncated varint/)
@@ -325,7 +326,7 @@ describe('SQLite compression', () => {
 
   it('rejects an oversized packed data column before JSON decoding', () => {
     const oversized: EventRow = {
-      seq: 0,
+      seq: SessionSeq(0),
       type: 'text-chunks',
       time: 1,
       data: ' '.repeat(MAX_PACKED_DATA_BYTES + 1),
@@ -345,7 +346,7 @@ describe('SQLite compression', () => {
       texts: ['x'.repeat(MAX_PACKED_DATA_BYTES), 'b', 'c'],
     })
     const oversized: EventRow = {
-      seq: 0,
+      seq: SessionSeq(0),
       type: 'text-chunks',
       time: 1,
       data: zstdCompressSync(serialized),
@@ -357,15 +358,15 @@ describe('SQLite compression', () => {
   })
 
   it('distinguishes removable and committed physical corruption', () => {
-    const start = row({ type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } })
-    const skipped = row({ type: 'step/start', seq: 2, time: 2, data: { turn: 1, step: 1 } })
+    const start = row({ type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } })
+    const skipped = row({ type: 'step/start', seq: SessionSeq(2), time: 2, data: { turn: 1, step: 1 } })
     expect(scanRows([start, skipped])).toEqual({ preserved: [
-      { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } },
+      { type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } },
     ], tornFrom: 2 })
 
     const end = row({
       type: 'turn/end',
-      seq: 3,
+      seq: SessionSeq(3),
       time: 3,
       data: { turn: 1, reason: { kind: 'completed' } },
     })
@@ -377,7 +378,7 @@ describe('SQLite compression', () => {
     }
     const committedEnd = row({
       type: 'turn/end',
-      seq: 1,
+      seq: SessionSeq(1),
       time: 4,
       data: { turn: 1, reason: { kind: 'completed' } },
     })
@@ -387,7 +388,7 @@ describe('SQLite compression', () => {
 
   it('treats a malformed packed tail as one removable physical row', () => {
     const malformed: EventRow = {
-      seq: 0,
+      seq: SessionSeq(0),
       type: 'text-chunks',
       time: 1,
       data: JSON.stringify({ turn: 1, step: 1, index: 0, dt: [], texts: ['a', 'b'] }),

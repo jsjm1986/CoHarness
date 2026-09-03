@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, UserMessage } from '@deepseek-ai/dsh-llm/types'
+import { SessionSeq } from '@deepseek-ai/dsh-session/types'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import type { MessageId, MuxFrame, RpcId, SessionId } from '@deepseek-ai/dsh-api-remotes/client'
 import { Session } from '../src/client/sessions/session.ts'
@@ -183,7 +184,7 @@ describe('queue snapshot intake', () => {
       type: 'session/event',
       sessionId: SID,
       event: {
-        seq: 0,
+        seq: SessionSeq(0),
         time: 1_700_000_000_000,
         type: 'user/message',
         surfaceOp: 'append',

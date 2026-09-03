@@ -7,8 +7,8 @@
  * `tool-call-chunks` — and expands rows back to the exact original events.
  *
  * Storage rows are a durable-encoding vocabulary, NOT session events: they
- * never enter `Session.events`, have no `SessionEventMap` entry, and use bare
- * (slash-less) type tags so a reader cannot confuse them with the event
+ * never enter `Session.snapshotEvents()`, have no `SessionEventMap` entry, and
+ * use bare (slash-less) type tags so a reader cannot confuse them with the event
  * taxonomy (precedent: the JSONL header line's `session` tag). The encoder
  * whitelists exact shapes — anything it does not fully recognize is stored
  * verbatim, so unknown fields or future chunk variants lose compression, never
@@ -20,7 +20,8 @@
 
 import { CallId } from '@deepseek-ai/dsh-llm/brand'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm/types'
-import type { SessionEvent } from './types.ts'
+import { SessionSeq } from './types.ts'
+import type { SessionEvent, SessionSeq as SessionSeqType } from './types.ts'
 
 /** The chunk kinds that may pack; block boundaries, usage, and finish chunks always stay one event per line. */
 type DeltaKind = 'text-delta' | 'reasoning-delta' | 'tool-call-delta'
@@ -62,9 +63,9 @@ interface ToolCallRunData extends RunDataBase {
  * {@link TextRunData} payload, tool-call rows carry {@link ToolCallRunData}.
  */
 export type ChunkRow =
-  | { type: 'text-chunks'; seq0: number; time0: number; data: TextRunData }
-  | { type: 'reasoning-chunks'; seq0: number; time0: number; data: TextRunData }
-  | { type: 'tool-call-chunks'; seq0: number; time0: number; data: ToolCallRunData }
+  | { type: 'text-chunks'; seq0: SessionSeqType; time0: number; data: TextRunData }
+  | { type: 'reasoning-chunks'; seq0: SessionSeqType; time0: number; data: TextRunData }
+  | { type: 'tool-call-chunks'; seq0: SessionSeqType; time0: number; data: ToolCallRunData }
 
 /** One durable log line's JSON value: a session event verbatim, or a packed chunk row. */
 export type StorageRecord = SessionEvent | ChunkRow
@@ -118,7 +119,8 @@ function hasExactKeys(value: object, keys: readonly string[]): boolean {
 function classify(event: SessionEvent): DeltaKind | undefined {
   if (event.type !== 'assistant/chunk') return undefined
   if (!hasExactKeys(event, ['type', 'seq', 'time', 'data'])) return undefined
-  if (!Number.isSafeInteger(event.seq) || event.seq < 0 || !Number.isSafeInteger(event.time)) return undefined
+  if (!Number.isSafeInteger(event.seq) || event.seq < 0 || Object.is(event.seq, -0)
+    || !Number.isSafeInteger(event.time)) return undefined
   const data: unknown = event.data
   if (!isRecord(data) || !hasExactKeys(data, ['turn', 'step', 'chunk'])) return undefined
   if (typeof data.turn !== 'number' || typeof data.step !== 'number') return undefined
@@ -271,7 +273,7 @@ function validateRow(value: Record<string, unknown>, tag: ChunkRow['type']): Chu
   if (!hasExactKeys(value, ['type', 'seq0', 'time0', 'data'])) {
     malformed(tag, 'envelope must be exactly {type, seq0, time0, data}')
   }
-  if (!Number.isSafeInteger(value.seq0) || (value.seq0 as number) < 0) {
+  if (!Number.isSafeInteger(value.seq0) || (value.seq0 as number) < 0 || Object.is(value.seq0, -0)) {
     malformed(tag, 'seq0 must be a non-negative safe integer')
   }
   if (!Number.isSafeInteger(value.time0)) {
@@ -308,6 +310,7 @@ function validateRow(value: Record<string, unknown>, tag: ChunkRow['type']): Chu
     time += gap
     if (!Number.isSafeInteger(time)) malformed(tag, 'member times must stay safe integers')
   }
+  SessionSeq(value.seq0 as number)
   return value as unknown as ChunkRow
 }
 
@@ -341,7 +344,7 @@ function expandRow(row: ChunkRow): SessionEvent[] {
     }
     events.push({
       type: 'assistant/chunk',
-      seq: row.seq0 + k,
+      seq: SessionSeq(row.seq0 + k),
       time,
       data: { turn: row.data.turn, step: row.data.step, chunk },
     })
@@ -367,11 +370,16 @@ export function decodeChunkRow(value: unknown): SessionEvent[] {
  * Decode one parsed JSONL line value into the session event(s) it stores.
  * Chunk-row-tagged values validate and expand (a malformed row throws — it is
  * corrupt storage, and treating it as an event would silently drop a whole
- * run); every other value passes through as a single event, unvalidated.
+ * run); every other value passes through as a single event after admitting a
+ * numeric `seq` through the Session-sequence constructor.
  *
  * @param value - one line's `JSON.parse` result.
  * @returns the stored events, in log order.
  */
 export function decodeStorageRecord(value: unknown): SessionEvent[] {
-  return isChunkRow(value) ? decodeChunkRow(value) : [value as SessionEvent]
+  if (isChunkRow(value)) return decodeChunkRow(value)
+  // A plain event row keeps upstream's admission check: a `seq` that is not a
+  // non-negative safe integer fails loud here instead of poisoning the log.
+  if (isRecord(value) && typeof value.seq === 'number') SessionSeq(value.seq)
+  return [value as SessionEvent]
 }

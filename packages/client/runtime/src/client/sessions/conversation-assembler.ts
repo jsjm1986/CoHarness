@@ -304,6 +304,7 @@ export class ConversationNodeAssembler implements ConversationViewSnapshotStore 
     this.dirty.clear()
     const timelineDirty = this.timelineDirty
     this.timelineDirty = false
+    let published = false
     for (const view of this.views.values()) {
       const upserts = upsertsByTarget.get(view.target) ?? []
       if (upserts.length === 0 && !timelineDirty) continue
@@ -311,8 +312,9 @@ export class ConversationNodeAssembler implements ConversationViewSnapshotStore 
         upserts,
         timeline: this.locationIndex.snapshot(),
       })
+      published = true
     }
-    return true
+    return published
   }
 
   /**
@@ -720,9 +722,10 @@ export class ConversationNodeAssembler implements ConversationViewSnapshotStore 
   private buildLocationData(
     context: InternalContext,
     scope: ConversationLocationDataScope,
+    previous: ConversationLocationData | null,
   ): ConversationLocationData | null {
     if (context.definition.buildLocationData === undefined) return null
-    const data = context.definition.buildLocationData(contextSnapshot(context), scope)
+    const data = context.definition.buildLocationData(contextSnapshot(context), scope, previous)
     if (data === null) return null
     if (data.kind !== scope) {
       throw new Error(
@@ -747,7 +750,7 @@ export class ConversationNodeAssembler implements ConversationViewSnapshotStore 
     const entries: { owner: string; data: ConversationLocationData }[] = []
     for (const scope of LOCATION_DATA_SCOPES) {
       for (const context of this.contexts.values()) {
-        const data = this.buildLocationData(context, scope)
+        const data = this.buildLocationData(context, scope, context.locationData[scope])
         context.locationData[scope] = data
         if (data !== null) entries.push({ owner: context.key, data })
       }
@@ -763,9 +766,10 @@ export class ConversationNodeAssembler implements ConversationViewSnapshotStore 
       const changes: ConversationLocationDataChange[] = []
       for (const context of this.dirty) {
         const previous = context.locationData[scope]
-        const next = this.buildLocationData(context, scope)
+        const next = this.buildLocationData(context, scope, previous)
+        if (previous === next) continue
         context.locationData[scope] = next
-        if (previous !== next) changes.push({ owner: context.key, previous, next })
+        changes.push({ owner: context.key, previous, next })
       }
       changed = this.locationIndex.applyData(changes) || changed
     }

@@ -22,7 +22,7 @@
 | `toolName` | 面向模型的名称，默认 `subagent`；每个已加载实例必须不同。 |
 | `enableRunInBackground` | 公开后台模式，默认 `true`；禁用时也会拒绝强制后台调用。 |
 | `backgroundMode` | 后台生命周期策略，默认 `one-shot`。`one-shot` 默认前台调用；`continuable` 默认后台调用，要求提供方具备 `prepareContinuable` 能力，并返回持久化子 agent ID，且不要求加载后续消息工具。 |
-| `modelSelectionSettings` | 选择性读取 Host allowlist，以便子 agent 选择 provider／model／reasoning；默认 `false`，并要求 model-selection settings 插件。 |
+| `modelSelectionSettings` | 在组合全新的顶层会话时选择性读取 Host allowlist，以便子 agent 选择 provider／model／reasoning；没有记录策略的恢复会话保持禁用，子会话继承父会话记录的策略，之后的设置修改不会改变已记录的会话。默认 `false`，并要求 model-selection settings 插件。 |
 | `agentOptions` | 传给具体提供方的子 agent `provider`、`model`、可选 `reasoningEffort` 和正整数 `maxTokens`；提供方会用显式值覆盖继承的父级选项。 |
 | `persona` | 每个子 agent 独立的 persona；要求提供方具备 `persona` 能力。 |
 | `toolFilter` | 每个子 agent 独立的全局工具限制；要求提供方具备 `toolFilter` 能力。 |

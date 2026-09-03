@@ -12,7 +12,7 @@ Source: [`packages/llm/token-meter/src/types.ts`](../../packages/llm/token-meter
 /** Detached immutable request-pressure and surface snapshot at one consumed log revision. */
 interface TokenMeasurement {
   /** Number of durable events consumed; equal to the next unread event seq. */
-  readonly logRevision: number
+  readonly logRevision: SessionLogOffset
   /** Provider or heuristic anchor used for this measurement. */
   readonly baseline: TokenMeasurementBaseline
   /** Signed repricing of current surface content relative to the baseline anchor. */
@@ -34,7 +34,7 @@ interface TokenMeasurement {
 /** One token-priced node in the current ordered session surface. */
 interface TokenSurfaceNode {
   /** Durable sequence number of the surface event. */
-  readonly seq: number
+  readonly seq: SessionSeq
   /** Heuristic tokens for the exact message projected by this node. */
   readonly tokens: number
   /** Fixed heuristic price before a route-specific image repricing, when available. */
@@ -88,5 +88,5 @@ estimateMessage(message: Message): number
 
 Types: [EpochHeader](session.md) · [Message](llm-streaming.md) · [Session](session.md)
 
-Source: [`packages/llm/token-meter/src/index.ts:76`](../../packages/llm/token-meter/src/index.ts)
+Source: [`packages/llm/token-meter/src/index.ts:82`](../../packages/llm/token-meter/src/index.ts)
 <!-- END GENERATED cordis-surface -->

@@ -244,8 +244,8 @@ describe('session.history projections block', () => {
     expect('test/last-user' in (after.result.value.projections?.values ?? {})).toBe(false)
     expect(after.result.value.projections?.values.sessionListMetadata).toEqual({
       blank: false,
-      visibleContentSeq: session.events.find(event => event.type === 'user/message')?.seq,
-      lastPromptAt: session.events.at(-1)?.time,
+      visibleContentSeq: session.snapshotEvents().find(event => event.type === 'user/message')?.seq,
+      lastPromptAt: session.snapshotEvents().at(-1)?.time,
     })
   })
 
@@ -280,7 +280,7 @@ describe('session.list projections column', () => {
     expect(row?.projections?.values.sessionListMetadata).toEqual({
       blank: false,
       visibleContentSeq: 1,
-      lastPromptAt: session.events.at(-1)?.time,
+      lastPromptAt: session.snapshotEvents().at(-1)?.time,
     })
     expect(row?.projections?.asOfSeq).toBe(session.seq - 1)
   })

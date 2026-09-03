@@ -5,9 +5,9 @@ import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
+import { MessageId } from '@deepseek-ai/dsh-llm'
 import {
-  SESSION_FORMAT_VERSION, SessionId as sessionId, type SessionEvent, type SessionId,
-} from '@deepseek-ai/dsh-session'
+  SESSION_FORMAT_VERSION, SessionId as sessionId, type SessionEvent, type SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-agent'
 import { snapshotSubagentDescriptor } from '@deepseek-ai/dsh-subagent'
 import {
@@ -127,21 +127,24 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
       createdAt: oneShotAt,
       cwd: scaffold.workspaceCwd,
       parentSession: parent.id,
+      isSeeded: false,
       origin: 'subagent',
       delegationDepth: 1,
     })
     await scaffold.ctx.sessionPersistence.append(oneShotId, [
       {
         type: 'turn/start',
-        seq: 0,
+        seq: SessionSeq(0),
         time: oneShotAt,
-        data: { turn: 1, trigger: { kind: 'message', source: { kind: 'user' } } },
+        data: { turn: 1 },
       },
       {
         type: 'user/message',
-        seq: 1,
+        seq: SessionSeq(1),
         time: oneShotAt + 1,
         data: {
+          id: MessageId(`legacy-message:${oneShotId}:1`),
+          role: 'user',
           content: [{ type: 'text', text: 'Review the event sourcing explanation.' }],
           source: { kind: 'user' },
         },
@@ -149,7 +152,7 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
       },
       {
         type: 'subagent/descriptor',
-        seq: 2,
+        seq: SessionSeq(2),
         time: oneShotAt + 2,
         data: snapshotSubagentDescriptor({
           mode: 'one-shot', provider: 'spawn', label: ONE_SHOT_LABEL,
@@ -157,7 +160,7 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
       },
       {
         type: 'turn/end',
-        seq: 3,
+        seq: SessionSeq(3),
         time: oneShotAt + oneShotDurationMs,
         data: { turn: 1, reason: { kind: 'completed' } },
       },
@@ -171,21 +174,24 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
       createdAt: authoredAt,
       cwd: scaffold.workspaceCwd,
       parentSession: childId,
+      isSeeded: false,
       origin: 'subagent',
       delegationDepth: 2,
     })
     await scaffold.ctx.sessionPersistence.append(grandchildId, [
       {
         type: 'turn/start',
-        seq: 0,
+        seq: SessionSeq(0),
         time: authoredAt,
-        data: { turn: 1, trigger: { kind: 'message', source: { kind: 'user' } } },
+        data: { turn: 1 },
       },
       {
         type: 'user/message',
-        seq: 1,
+        seq: SessionSeq(1),
         time: authoredAt + 1,
         data: {
+          id: MessageId(`legacy-message:${grandchildId}:1`),
+          role: 'user',
           content: [{ type: 'text', text: NESTED_PROMPT }],
           source: { kind: 'user' },
         },
@@ -193,7 +199,7 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
       },
       {
         type: 'subagent/descriptor',
-        seq: 2,
+        seq: SessionSeq(2),
         time: authoredAt + 2,
         data: snapshotSubagentDescriptor({
           mode: 'continuable', provider: 'spawn', label: NESTED_LABEL,
@@ -201,7 +207,7 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
       },
       {
         type: 'turn/end',
-        seq: 3,
+        seq: SessionSeq(3),
         time: authoredAt + 3,
         data: { turn: 1, reason: { kind: 'completed' } },
       },
@@ -342,7 +348,7 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
     await openSubagentCatalog(page, '3 subagents')
     await page.getByRole('treeitem', { name: new RegExp(LABEL) }).click()
     await expect.poll(
-      () => page.getByText(INITIAL_PROMPT, { exact: true }).count(),
+      () => page.getByText(/^Explain event sourcing in one sentence\.Your parent agent id is /).count(),
       { timeout: 15_000 },
     ).toBe(1)
     if (scaffold.ctx.agents.get(childId) !== undefined) {

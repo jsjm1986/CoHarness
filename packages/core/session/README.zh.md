@@ -12,7 +12,7 @@
 
 ### 公共 API
 
-- `ctx.sessions.create(id?, { seed?, meta? }?)` 校验持久种子／头部数据并生成脱离副本，补齐版本和 id，在未提供 `createdAt` 时使用当前时间，发布会话并将其绑定到调用方 fiber。持久化重建会提供原始的 `createdAt`、`seedLength` 和 `delegationDepth`。
+- `ctx.sessions.create(id?, { seed?, meta?, inheritedEventCount? }?)` 校验持久种子／头部数据并生成脱离副本，补齐版本和 id，在未提供 `createdAt` 时使用当前时间，发布会话并将其绑定到调用方 fiber。带种子的 header（`meta.isSeeded: true`）必须同时提供 `seed` 与精确的 `inheritedEventCount`，因为构造种子可能在继承前缀之后还包含子级自有的初始化事件；无种子的 header 拒绝非零切点。持久化重建会提供原始的 `createdAt`、谱系与 `delegationDepth`。
 - `ctx.sessions.flush(session)` 通过会话捕获的作用域分发一个需等待完成的并行持久性检查点。每个监听器都会启动；调用会等待全部结算后才报告失败。未发布、已脱离和陈旧的对象会被拒绝。
 - `ctx.sessions.fork(source, boundary?, childSessionId?): Session`：解析实时会话对象或 id，选取截至 `boundary` 事件序号（含该事件）的种子（默认为当前最后一个事件），要求所选前缀结束时没有开放轮次，再创建带谱系元数据的实时子会话。
 - `ctx.sessions.get(id: SessionId): Session | undefined`
@@ -36,13 +36,16 @@
 
 普通类（不是 Cordis 服务）。活跃会话通过 `ctx.sessions.create()` 创建，脱离态的回放或检查会话通过 `Session.create()` 创建；脱离态工厂不会发布生命周期事件，也不会将会话绑定到 fiber。
 
-- `session.append(type, data, opts?)` 会为持久数据和 surface 元数据制作快照并冻结它们，校验标记形态、被引用的源事件 seq、替换覆盖完整性，以及仅修改内容的单个 `tool/result` 重写，随后同步提交，再在彼此独立的失败收容下通知观察者。对已挂接会话的重入追加会被拒绝，运行时检查也覆盖扩宽后的联合类型和已加载日志。
+- `session.append(type, data, opts?)` 会为持久数据和 surface 元数据制作快照并冻结它们，构造事件的 `SessionSeq`，校验标记形态、被引用的源事件序号、替换覆盖完整性，以及仅修改内容的单个 `tool/result` 重写，随后同步提交，再在彼此独立的失败收容下通知观察者。对已挂接会话的重入追加会被拒绝，运行时检查也覆盖扩宽后的联合类型和已加载日志。
 - `session.deriveMessages()` 对每个新的 surface 条目只做一次增量投影，并返回一个新数组，其中包含这些条目存储的完整、带标识且冻结的消息。assistant 消息的模型来源会保留生成该消息的提供方和模型，以及适配器私有回放状态。surface 重写会重建投影；不存在原始日志回退。
 - `session.deriveEventMessage(event)` 是重建和请求检查使用的规范逐事件投影。
 - `session.surface` 暴露只读 `SessionSurface` 视图，由会话唯一的增量 surface 管理器所有；每次提交重写，`replaceGeneration` 都会变化。
-- `session.events` 是按追加失效的缓存冻结快照；已接受事件保持深度冻结。
-- `session.seq`、`session.id`：当前序号和只读类型化身份。
-- `session.header: SessionHeader`：脱离、深冻结的创建元数据（`version`、`id`、`createdAt`，以及可选的 `cwd`／`parentSession`／`seedLength`／`delegationDepth`）。构造时会校验持久记录，并要求其中的 id 与 `session.id` 一致。
+- `session.seq` 读取当前日志长度（`SessionLogOffset`）而不物化数组；`session.eventAt(seq)` 按 `SessionSeq` 读取一条已接受、深冻结的事件。`session.snapshotEvents(fromSeq?, toSeqExclusive?)` 物化一段半开区间的冻结稳定快照；完整的当前快照会缓存到下一次追加。只需要长度或单条事件的调用方使用 `seq` 或 `eventAt()`。
+- `session.inheritedEventCount` 保留经校验的精确 fork 切点；`session.ownEvents()` 返回该切点及其后的事件，`session.isOwnSeq(seq)` 只接受已存在的子级自有位置。`session.header.isSeeded` 只报告是否存在 fork 历史，不暴露位置整数。
+- `session.events` 是覆盖在缓存完整快照之上的 `@deprecated` 兼容 getter，为树外插件保留；树内代码通过 `snapshotEvents()`、`eventAt()` 或 `seq` 读取。
+- 会话日志位置使用两种数字品牌类型。`SessionSeq` 标识一条已存在的事件或含端点的水位；`SessionLogOffset` 标识间隙、前缀长度或读取边界，可以等于事件总数。`SessionSeqCursor` 额外允许 `-1` 表示“尚无事件”，`OptionalSessionSeq` 则在缺失本身是数据时使用 `null`。构造函数校验非负安全整数，品牌在运行时消失，因此持久化 JSON 与线上值仍是普通数字。
+- `session.id`：只读类型化身份。
+- `session.header: SessionHeader`：脱离、深冻结的创建元数据（`version`、`id`、`createdAt`，以及可选的 `cwd`／`parentSession`／`isSeeded`／`origin`／`delegationDepth`／`agentPreset`／`draft`）。构造时会校验持久记录，并要求其中的 id 与 `session.id` 一致。
 
 ### 无损 JSON 工具
 
@@ -86,7 +89,7 @@
 
 ### 元数据类型（`types.ts`）
 
-- `SessionHeader`：会话元数据，在发布为 `Session.header` 时写入一次；脱离和深冻结保证运行时不可变：`{ version, id, createdAt, cwd?, parentSession?, seedLength?, delegationDepth? }`。持久化 loader 可返回相同数据类型的可变脱离副本。该类型与 `SessionId` 一同归此包所有，因为 `Session.header` 以它为类型；持久化后端只是重新导出而不拥有它，否则会形成包循环依赖。
+- `SessionHeader`：会话元数据，在发布为 `Session.header` 时写入一次；脱离和深冻结保证运行时不可变：`{ version, id, createdAt, isSeeded, cwd?, parentSession?, origin?, delegationDepth?, agentPreset?, draft? }`。`isSeeded` 只报告谱系而不带位置整数；精确的 `inheritedEventCount` 作为存储元数据伴随 header、并挂在在线 `Session` 上。持久化 loader 可返回相同数据类型的可变脱离副本。该类型与 `SessionId` 一同归此包所有，因为 `Session.header` 以它为类型；持久化后端只是重新导出而不拥有它，否则会形成包循环依赖。
 
 ### 扩展点
 

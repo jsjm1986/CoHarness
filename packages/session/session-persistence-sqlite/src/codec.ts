@@ -5,6 +5,7 @@
  */
 
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
+import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 
 /* jscpd:ignore-start -- schema 20 deliberately owns a frozen physical codec;
@@ -299,7 +300,7 @@ function expandRow(row: ChunkRow): SessionEvent[] {
     }
     events.push({
       type: 'assistant/chunk',
-      seq: row.seq0 + index,
+      seq: SessionSeq(row.seq0 + index),
       time,
       data: { turn: row.data.turn, step: row.data.step, chunk },
     })

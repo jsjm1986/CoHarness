@@ -186,6 +186,12 @@ export interface LlmEndpointModelDiscoveryRequest {
   api?: string
   /** One-shot credential; it is never stored by this helper. */
   apiKey?: string
+  /**
+   * Deployment-owned request headers configured on the route (validated
+   * against Fetch by the profile owner); `accept`, protocol authentication,
+   * and Harness attribution win reserved names.
+   */
+  headers?: Readonly<Record<string, string>>
   /** Caller cancellation signal. */
   signal?: AbortSignal
 }
@@ -414,13 +420,13 @@ async function fetchListingCandidate(
   const url = listingUrl(baseURL, api, variant)
   let response: Response
   try {
+    const headers = new Headers(request.headers === undefined ? undefined : Object.entries(request.headers))
+    headers.set('accept', 'application/json')
+    for (const [name, value] of Object.entries(listingHeaders(api, apiKey))) headers.set(name, value)
+    for (const [name, value] of Object.entries(attributionHeaders())) headers.set(name, value)
     response = await fetch(url, {
       method: 'GET',
-      headers: {
-        accept: 'application/json',
-        ...listingHeaders(api, apiKey),
-        ...attributionHeaders(),
-      },
+      headers,
       ...(request.signal === undefined ? {} : { signal: request.signal }),
     })
   } catch (error: unknown) {

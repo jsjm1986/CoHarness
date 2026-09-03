@@ -323,6 +323,9 @@ runCoordinatorContract('gateway-http', async (): Promise<CoordinatorFixture> => 
   const transport = new GatewayTransport()
   return {
     mount: ctx => mountBackend(ctx, transport),
+    // The wire decoder rejects a structurally invalid envelope before the
+    // coordinator's legacy-shape checks see it.
+    malformedSurfaceOpMessage: 'Gateway returned an invalid session event list',
     cleanup: async () => {},
   }
 })

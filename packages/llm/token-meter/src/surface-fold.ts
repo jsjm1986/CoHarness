@@ -12,7 +12,7 @@
  */
 
 import { deriveEventMessage } from '@deepseek-ai/dsh-session'
-import type { SurfaceEvent } from '@deepseek-ai/dsh-session'
+import type { SessionSeq, SurfaceEvent } from '@deepseek-ai/dsh-session'
 import type { ContentBlock, Message } from '@deepseek-ai/dsh-llm'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type { TokenSurfaceNode } from './types.ts'
@@ -48,7 +48,7 @@ function collectImageFacts(blocks: readonly ContentBlock[], images: ImageAttachm
   return structural
 }
 
-function makeNode(seq: number, message: Message | null, tokens: number): TokenSurfaceNode {
+function makeNode(seq: SessionSeq, message: Message | null, tokens: number): TokenSurfaceNode {
   const node: TokenSurfaceNode = { seq, tokens }
   if (message !== null) {
     const images: ImageAttachmentRef[] = []

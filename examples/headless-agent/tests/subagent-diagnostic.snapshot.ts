@@ -11,7 +11,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { normalizeSessionSnapshot, type NormalizeContext } from '@deepseek-ai/dsh-acp-snapshot'
 import { LOADER_SMOKE_TEST_TIMEOUT_MS, runLoaderSmoke } from '@deepseek-ai/dsh-loader-smoke'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import SessionStore, { SESSION_FORMAT_VERSION, SessionId, type SessionEvent, type SessionHeader } from '@deepseek-ai/dsh-session'
+import SessionStore, { SESSION_FORMAT_VERSION, SessionId, type SessionEvent, type SessionHeader, SessionSeq } from '@deepseek-ai/dsh-session'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import { describe, expect, it } from 'vitest'
 
@@ -38,27 +38,27 @@ async function seedDescriptorlessChild(root: string, cwd: string): Promise<void>
   const parentMeta: SessionHeader = {
     version: SESSION_FORMAT_VERSION,
     id: parentId,
-    createdAt: 1,
+    createdAt: 1, isSeeded: false,
     cwd,
     delegationDepth: 0,
   }
   const parentEvents: SessionEvent[] = [
-    { type: 'turn/start', seq: 0, time: 10, data: { turn: 1 } },
-    { type: 'user/message', seq: 1, time: 11, data: createUserMessage({ content: [{ type: 'text', text: 'Start a background job.' }], source: { kind: 'user' } }), surfaceOp: 'append' },
-    { type: 'turn/end', seq: 2, time: 12, data: { turn: 1, reason: { kind: 'completed' } } },
+    { type: 'turn/start', seq: SessionSeq(0), time: 10, data: { turn: 1 } },
+    { type: 'user/message', seq: SessionSeq(1), time: 11, data: createUserMessage({ content: [{ type: 'text', text: 'Start a background job.' }], source: { kind: 'user' } }), surfaceOp: 'append' },
+    { type: 'turn/end', seq: SessionSeq(2), time: 12, data: { turn: 1, reason: { kind: 'completed' } } },
   ]
   const childMeta: SessionHeader = {
     version: SESSION_FORMAT_VERSION,
     id: childId,
-    createdAt: 2,
+    createdAt: 2, isSeeded: false,
     cwd,
     parentSession: parentId,
     origin: 'subagent',
     delegationDepth: 1,
   }
   const childEvents: SessionEvent[] = [
-    { type: 'turn/start', seq: 0, time: 20, data: { turn: 1 } },
-    { type: 'turn/end', seq: 1, time: 21, data: { turn: 1, reason: { kind: 'interrupted' } } },
+    { type: 'turn/start', seq: SessionSeq(0), time: 20, data: { turn: 1 } },
+    { type: 'turn/end', seq: SessionSeq(1), time: 21, data: { turn: 1, reason: { kind: 'interrupted' } } },
   ]
   try {
     await ctx.sessionPersistence.create(parentMeta)

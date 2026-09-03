@@ -14,10 +14,11 @@
   max-width: var(--dsh-chat-content-width);
   min-height: 64px;
   padding: var(--dsw-space-3) var(--dsw-space-4);
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 0;
+  --dsw-elevation-stroke-color: var(--dsw-alias-border-l2);
   border-radius: var(--dsw-radius-lg);
   background: var(--dsw-specific-input-major);
-  box-shadow: var(--dsw-shadow-lv1);
+  box-shadow: var(--dsw-elevation-soft);
 }
 
 .icon {
@@ -27,6 +28,7 @@
   height: 32px;
   place-items: center;
   border-radius: 50%;
+  corner-shape: round;
   background: var(--dsw-alias-state-warn-tertiary);
   color: var(--dsw-alias-state-warn-primary);
 }

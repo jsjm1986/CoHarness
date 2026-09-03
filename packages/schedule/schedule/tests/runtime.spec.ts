@@ -174,7 +174,7 @@ describe('Schedule timer and admission runtime', () => {
     await settle()
     expect(test.followed).toHaveLength(1)
     expect(test.controls.releaseCount).toBe(1)
-    expect(test.agent.session.events.find(event =>
+    expect(test.agent.session.snapshotEvents().find(event =>
       event.type === 'schedule/change' && event.data.operation === 'dispatch')).toBeDefined()
     await runtime.dispose()
   })
@@ -224,7 +224,7 @@ describe('Schedule timer and admission runtime', () => {
 
     expect(test.followed).toEqual([])
     expect(test.controls.whenIdleCount).toBe(1)
-    expect(test.agent.session.events.at(-1)?.data).toMatchObject({ operation: 'create' })
+    expect(test.agent.session.snapshotEvents().at(-1)?.data).toMatchObject({ operation: 'create' })
 
     runtime.requestDrive()
     await settle()
@@ -296,13 +296,13 @@ describe('Schedule timer and admission runtime', () => {
       ].join('\n'),
     }])
     expect(test.followed[0]?.source).toEqual({ kind: 'plugin', plugin: 'schedule' })
-    const dispatches = test.agent.session.events.filter(event =>
+    const dispatches = test.agent.session.snapshotEvents().filter(event =>
       event.type === 'schedule/change' && event.data.operation === 'dispatch')
     expect(dispatches.map(event => event.data)).toEqual([
       { version: 1, operation: 'dispatch', id: 'schedule-fast', acceptedAt: '2026-08-05T12:00:00.000Z' },
       { version: 1, operation: 'dispatch', id: 'schedule-slow', acceptedAt: '2026-08-05T12:00:00.000Z' },
     ])
-    expect(foldScheduleEvents(test.agent.session.events).active).toEqual([
+    expect(foldScheduleEvents(test.agent.session.snapshotEvents()).active).toEqual([
       expect.objectContaining({ id: 'schedule-fast', scheduledAt: '2026-08-05T12:05:00.000Z' }),
       expect.objectContaining({ id: 'schedule-slow', scheduledAt: '2026-08-05T12:09:00.000Z' }),
     ])
@@ -371,7 +371,7 @@ describe('Schedule timer and admission runtime', () => {
 
     expect(test.controls.releaseCount).toBe(1)
     expect(test.followed).toEqual([])
-    expect(test.agent.session.events.at(-1)?.data).toMatchObject({ operation: 'delete' })
+    expect(test.agent.session.snapshotEvents().at(-1)?.data).toMatchObject({ operation: 'delete' })
     runtime.requestDrive()
     await settle()
     expect(test.followed).toEqual([])
@@ -407,9 +407,9 @@ describe('Schedule timer and admission runtime', () => {
     appendAfter(unreadable, 'schedule-1', 1, Date.now() - 1_000)
     unreadable.controls.onReserve = () => {
       unreadable.controls.onReserve = undefined
-      Object.defineProperty(unreadable.agent.session, 'events', {
+      Object.defineProperty(unreadable.agent.session, 'snapshotEvents', {
         configurable: true,
-        get() { throw new Error('became unreadable') },
+        value: () => { throw new Error('became unreadable') },
       })
     }
     const unreadableRuntime = runtimeFor(unreadable)
@@ -430,7 +430,7 @@ describe('Schedule runtime failure and teardown boundaries', () => {
     await settle()
 
     expect(test.controls.releaseCount).toBe(1)
-    expect(test.agent.session.events.filter(event =>
+    expect(test.agent.session.snapshotEvents().filter(event =>
       event.type === 'schedule/change' && event.data.operation === 'dispatch')).toEqual([])
     await runtime.dispose()
 
@@ -461,7 +461,7 @@ describe('Schedule runtime failure and teardown boundaries', () => {
 
     expect(test.followed).toHaveLength(1)
     expect(test.controls.releaseCount).toBe(1)
-    expect(test.agent.session.events.filter(event =>
+    expect(test.agent.session.snapshotEvents().filter(event =>
       event.type === 'schedule/change' && event.data.operation === 'dispatch')).toEqual([])
     runtime.requestDrive()
     await settle()
@@ -488,7 +488,7 @@ describe('Schedule runtime failure and teardown boundaries', () => {
 
     expect(test.followed).toHaveLength(1)
     expect(test.controls.releaseCount).toBe(1)
-    expect(test.agent.session.events.filter(event => (
+    expect(test.agent.session.snapshotEvents().filter(event => (
       event.type === 'schedule/change' && event.data.operation === 'dispatch'
     )).map(event => event.data)).toEqual([{
       version: 1,
@@ -496,7 +496,7 @@ describe('Schedule runtime failure and teardown boundaries', () => {
       id: 'schedule-first',
       acceptedAt: '2026-08-05T12:00:00.000Z',
     }])
-    expect(foldScheduleEvents(test.agent.session.events).active).toEqual([
+    expect(foldScheduleEvents(test.agent.session.snapshotEvents()).active).toEqual([
       expect.objectContaining({ id: 'schedule-first', scheduledAt: '2026-08-05T12:05:00.000Z' }),
       expect.objectContaining({ id: 'schedule-second', scheduledAt: '2026-08-05T11:55:00.000Z' }),
     ])
@@ -546,7 +546,7 @@ describe('Schedule runtime failure and teardown boundaries', () => {
     await settle()
     expect(test.controls.flushCount).toBe(1)
     expect(test.followed).toEqual([])
-    expect(test.agent.session.events.at(-1)?.data).toMatchObject({ operation: 'create' })
+    expect(test.agent.session.snapshotEvents().at(-1)?.data).toMatchObject({ operation: 'create' })
     await runtime.dispose()
 
     const departed = await harness()
@@ -608,15 +608,15 @@ describe('Schedule runtime failure and teardown boundaries', () => {
     }
     await settle()
     expect(test.followed).toEqual([])
-    expect(test.agent.session.events.filter(event =>
+    expect(test.agent.session.snapshotEvents().filter(event =>
       event.type === 'schedule/change' && event.data.operation === 'dispatch')).toEqual([])
   })
 
   it('faults on corrupt or unreadable durable state after preflight', async () => {
     const corrupt = await harness()
-    Object.defineProperty(corrupt.agent.session, 'events', {
+    Object.defineProperty(corrupt.agent.session, 'snapshotEvents', {
       configurable: true,
-      value: [{
+      value: () => [{
         type: 'schedule/change', seq: 0, time: Date.now(),
         data: { version: 9, operation: 'delete', id: 'schedule-1' },
       }],
@@ -627,9 +627,9 @@ describe('Schedule runtime failure and teardown boundaries', () => {
     expect(corrupt.followed).toEqual([])
 
     const unreadable = await harness()
-    Object.defineProperty(unreadable.agent.session, 'events', {
+    Object.defineProperty(unreadable.agent.session, 'snapshotEvents', {
       configurable: true,
-      get() { throw 'unreadable log' },
+      value: () => { throw 'unreadable log' },
     })
     const unreadableRuntime = runtimeFor(unreadable)
     unreadableRuntime.start()

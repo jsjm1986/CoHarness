@@ -46,7 +46,7 @@ interface AgentHandle {
 }
 ```
 
-`CreateAgentOptions` carries the shared identity and everything a fresh agent needs before publication: session metadata (`meta` — validated `cwd`, fork lineage, seed boundary, origin classification, delegation depth), an optional `seed` replay prefix for forks, per-agent `AgentOptions`, a creation-only cancellation `signal`, and `setup`. `ResumeAgentOptions` is the persisted-identity counterpart: `resumeSessionId`, `agentOptions`, `signal`, and `setup`. The `setup` callback (`AgentSetup`) composes the agent's scoped world while both ids are still unpublished — everything registered through `agentCtx` exists before `agent/created` and the first prompt assembly — and may return a synchronous commit invoked immediately before publication; a setup rejection, commit throw, or owner disposal rolls the transaction back without publishing either id.
+`CreateAgentOptions` carries the shared identity and everything a fresh agent needs before publication: session metadata (`meta` — validated `cwd`, fork lineage, the `isSeeded` marker, origin classification, delegation depth, and `agentPreset`), the exact fork cut in sibling field `inheritedEventCount`, an optional `seed` replay prefix, per-agent `AgentOptions`, a creation-only cancellation `signal`, and `setup`. `ResumeAgentOptions` is the persisted-identity counterpart: `resumeSessionId`, `agentOptions`, `signal`, and `setup`. The `setup` callback (`AgentSetup`) composes the agent's scoped world while both ids are still unpublished — everything registered through `agentCtx` exists before `agent/created` and the first prompt assembly — and may return a synchronous commit invoked immediately before publication; a setup rejection, commit throw, or owner disposal rolls the transaction back without publishing either id.
 
 `AgentFactory` is the creation interface behind the registry: the loop registers its factory via `ctx.agents.setFactory()`, so consumers use `ctx.agents` without depending on the concrete loop package. The exact `create`/`resume` signatures and rollback contracts are in the [generated section](#ctxagents--agentregistry) below.
 
@@ -193,11 +193,11 @@ The optional agent-loop projection exposes the same boundaries as host-only stat
  */
 interface TurnBoundaryProjection {
   /** Seq of the open turn's `turn/start`, or null between turns. */
-  readonly openTurnStartSeq: number | null
+  readonly openTurnStartSeq: OptionalSessionSeq
   /** Seq of the latest `step/start` event, or null before the first step. */
-  readonly lastStepStartSeq: number | null
+  readonly lastStepStartSeq: OptionalSessionSeq
   /** Latest step boundary and its seq, or null before the first boundary. */
-  readonly lastStepBoundary: { readonly kind: 'start' | 'end'; readonly seq: number } | null
+  readonly lastStepBoundary: { readonly kind: 'start' | 'end'; readonly seq: SessionSeq } | null
   /** Turn number of the latest `turn/start`; 0 before the first turn. */
   readonly lastTurn: number
 }
@@ -756,7 +756,7 @@ list(): Agent[]
 roots(): Agent[]
 ```
 
-Source: [`packages/core/agent/src/index.ts:257`](../../packages/core/agent/src/index.ts)
+Source: [`packages/core/agent/src/index.ts:259`](../../packages/core/agent/src/index.ts)
 
 <a id="agent-events"></a>
 
