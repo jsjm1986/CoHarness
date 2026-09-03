@@ -6,7 +6,7 @@ English | [中文](2026-09-02-windows-test-portability.zh.md)
 
 ## Problem
 
-The `windows node 24 / native complete` lane ran for the first time on a GitHub-hosted `windows-2025` runner once [portable runner defaults](../process/2026-09-02-portable-ci-runner-defaults.md) replaced the never-provisioned enterprise pool. Its `test:coverage` gate reported seven test files that pass on Linux and macOS and fail on Windows. None of them found a product defect: every failure was a POSIX assumption written into the test itself, plus one maintenance script calling an operation Windows rejects.
+The `windows node 24 / native complete` lane ran for the first time on a GitHub-hosted `windows-2025` runner once [portable runner defaults](../process/2026-09-02-portable-ci-runner-defaults.md) replaced the never-provisioned enterprise pool. Its `test:coverage` gate reported seven test files that pass on Linux and macOS and fail on Windows, and the first rerun on the fixed lane surfaced an eighth. None of them found a product defect: every failure was a POSIX or timing assumption written into the test itself, plus one maintenance script calling an operation Windows rejects.
 
 - `userdoc-local/tests/name.spec.ts` built its document root as `join(sep, 'home', 'alice', 'uploads')`. On Windows that is a rooted but drive-less `\home\alice\uploads`; the code under test resolves it to `D:\home\alice\uploads`, so every equality against the literal root failed, and a "taken names" set keyed on the drive-less spelling never matched what the resolver produced.
 - `userdoc-local/tests/store.spec.ts` asserted the saved file's mode is `0o600`. Windows has no POSIX permission bits and reports `0o666`.
@@ -15,6 +15,7 @@ The `windows node 24 / native complete` lane ran for the first time on a GitHub-
 - `tool-pwsh-persistent/tests/loader-composition.spec.ts` compared PowerShell's reported `cwd` with `realpathSync(root)`. The runner's temporary directory is handed out as an 8.3 short name (`RUNNER~1`) that only `realpathSync.native` expands to the long spelling PowerShell prints.
 - `apps/cli/tests/shipped-preset-root.spec.ts` asserted a forward-slash `config/agent-presets` substring inside a path the launcher builds with the platform separator.
 - `scripts/session-sqlite-migration.ts` opened the finished output read-only and `fsync`ed both it and its parent directory. Windows `FlushFileBuffers` needs a writable handle and rejects directory handles with `EPERM`.
+- `session-persistence-sqlite/tests/sqlite.spec.ts` paced a busy journal-mode transition against the wall clock: a 50 ms busy budget was expected to yield two to six attempts. The budget is open-relative, and on the Windows runner creating and initializing the database file alone consumed it, so the first attempt already sat past the cutoff and the test saw one attempt.
 
 ## Decision
 
@@ -26,10 +27,11 @@ Each test now asserts the platform-independent fact it always meant to assert, u
 - The pwsh loader test expects `realpathSync.native(root)`, which resolves both the macOS `/var` → `/private/var` alias and Windows short names.
 - The shipped-preset test expects `join('config', 'agent-presets')`.
 - `finalizeOutput` in the migration script opens the output with `r+` and skips the parent-directory `fsync` on `win32`, where the directory entry is durable without it. POSIX behavior is unchanged.
+- The pacing test drives `performance.now` with a controlled clock that advances 10 ms per busy attempt, the same technique its sibling cutoff test already used, so a 50 ms budget yields exactly five attempts on every runner and the file-creation cost no longer enters the measurement.
 
 ## Alternatives considered
 
-**Exclude the seven files from the Windows lane.** Rejected because six of the seven test real cross-platform behavior — document naming, project containment, PowerShell cwd persistence, preset roots — and Windows is a supported host for all of it. Only the two assertions that are literally POSIX facts are skipped, per assertion rather than per file.
+**Exclude the seven files from the Windows lane.** Rejected because six of the seven test real cross-platform behavior — document naming, project containment, PowerShell cwd persistence, preset roots — and Windows is a supported host for all of it. Only the two assertions that are literally POSIX facts are skipped, per assertion rather than per file; the pacing test keeps running everywhere because the fact it asserts is the retry cadence, not the runner's disk speed.
 
 **Normalize paths inside the code under test to satisfy the tests.** Rejected because the code was already correct: it resolves paths with `node:path` and the tests were comparing against spellings `node:path` never produces on Windows.
 

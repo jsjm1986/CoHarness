@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-09-02-windows-test-portability.md
-2026-09-02-windows-test-portability.md: 488b10bb20ec7f48460e06298f6aa9db703e9961
-2026-09-02-windows-test-portability.zh.md: f16933f9eb73eb7dc3f0a80c8bc28c66b8f0e0a8
+2026-09-02-windows-test-portability.md: 61a2abfa72d5683fa8ec4db7079b8e0eb12c27f1
+2026-09-02-windows-test-portability.zh.md: c06f54f808baf81a7db523e2eb8c243e0747a681

@@ -502,14 +502,18 @@ describe('SessionPersistenceSqlite schema ownership', () => {
       attempts += 1
       return Object.assign(new Error('database is locked'), { errcode: 5 })
     })
-    await expect(openDatabase(
-      BusyDatabase,
-      await freshDbPath('dsh-sqlite-journal-paced-'),
-      'wal',
-      50,
-    )).rejects.toThrow('database is locked')
-    expect(attempts).toBeGreaterThan(1)
-    expect(attempts).toBeLessThanOrEqual(6)
+    const path = await freshDbPath('dsh-sqlite-journal-paced-')
+    // The open reads the deadline base once; every busy attempt then reads the clock
+    // before yielding and again after. Advancing 10 ms per attempt paces a 50 ms budget
+    // into exactly five attempts however long the runner spends creating the file.
+    let reads = 0
+    const clock = vi.spyOn(performance, 'now').mockImplementation(() => Math.floor(reads++ / 2) * 10)
+    try {
+      await expect(openDatabase(BusyDatabase, path, 'wal', 50)).rejects.toThrow('database is locked')
+    } finally {
+      clock.mockRestore()
+    }
+    expect(attempts).toBe(5)
   })
 
   it('rejects unversioned, incompatible, and foreign-application databases', async () => {
