@@ -6,7 +6,7 @@ Status: implemented
 
 ## 问题
 
-[可移植 runner 默认值](../process/2026-09-02-portable-ci-runner-defaults.zh.md)用 GitHub 托管的 `windows-2025` 取代了从未配置过的企业 runner 池之后，`windows node 24 / native complete` lane 第一次真正执行。它的 `test:coverage` 门禁报告了七个在 Linux 与 macOS 上通过、在 Windows 上失败的测试文件。没有一个失败暴露出产品缺陷：每一处都是写进测试本身的 POSIX 假设，外加一个维护脚本调用了 Windows 拒绝的操作。
+[可移植 runner 默认值](../process/2026-09-02-portable-ci-runner-defaults.zh.md)用 GitHub 托管的 `windows-2025` 取代了从未配置过的企业 runner 池之后，`windows node 24 / native complete` lane 第一次真正执行。它的 `test:coverage` 门禁报告了七个在 Linux 与 macOS 上通过、在 Windows 上失败的测试文件，修复后的 lane 首次重跑又暴露出第八个。没有一个失败暴露出产品缺陷：每一处都是写进测试本身的 POSIX 假设或计时假设，外加一个维护脚本调用了 Windows 拒绝的操作。
 
 - `userdoc-local/tests/name.spec.ts` 用 `join(sep, 'home', 'alice', 'uploads')` 构造文档根目录。在 Windows 上这是一个带根却没有盘符的 `\home\alice\uploads`；被测代码会把它解析成 `D:\home\alice\uploads`，于是所有针对字面根目录的相等断言都失败，而以无盘符拼写为键的"已占用名字"集合也永远匹配不上解析器产出的路径。
 - `userdoc-local/tests/store.spec.ts` 断言保存文件的模式位为 `0o600`。Windows 没有 POSIX 权限位，统一报告 `0o666`。
@@ -15,6 +15,7 @@ Status: implemented
 - `tool-pwsh-persistent/tests/loader-composition.spec.ts` 用 `realpathSync(root)` 与 PowerShell 报告的 `cwd` 比较。runner 的临时目录以 8.3 短名（`RUNNER~1`）发放，只有 `realpathSync.native` 才能把它展开成 PowerShell 打印的长拼写。
 - `apps/cli/tests/shipped-preset-root.spec.ts` 在一个由启动器用平台分隔符拼出的路径里断言正斜杠子串 `config/agent-presets`。
 - `scripts/session-sqlite-migration.ts` 以只读方式打开完成的输出文件，并对它和父目录都执行 `fsync`。Windows 的 `FlushFileBuffers` 需要可写句柄，并以 `EPERM` 拒绝目录句柄。
+- `session-persistence-sqlite/tests/sqlite.spec.ts` 用墙钟给 busy 的 journal mode 切换计步：期望 50 ms 的 busy 预算产生两到六次尝试。这个预算从打开时刻起算，而在 Windows runner 上仅创建并初始化数据库文件就把它耗尽，第一次尝试已经落在截止点之后，测试只看到一次尝试。
 
 ## 决策
 
@@ -26,10 +27,11 @@ Status: implemented
 - pwsh loader 测试期望 `realpathSync.native(root)`，它既能解析 macOS 的 `/var` → `/private/var` 别名，也能展开 Windows 短名。
 - shipped-preset 测试期望 `join('config', 'agent-presets')`。
 - 迁移脚本的 `finalizeOutput` 以 `r+` 打开输出文件，并在 `win32` 上跳过父目录 `fsync`——那里的目录项无需它即可持久化。POSIX 行为保持不变。
+- 计步测试用受控时钟驱动 `performance.now`，每次 busy 尝试推进 10 ms——与同文件的截止点用例已用的手法一致——于是 50 ms 预算在任何 runner 上都恰好产生五次尝试，文件创建耗时不再进入测量。
 
 ## 考虑过的替代方案
 
-**把这七个文件从 Windows lane 排除。** 不采用，因为七个里有六个测试的是真实的跨平台行为——文档命名、项目包含、PowerShell cwd 持久化、预设根目录——而 Windows 是所有这些行为的受支持宿主。只有两条字面意义上就是 POSIX 事实的断言被跳过，且按断言而非按文件跳过。
+**把这七个文件从 Windows lane 排除。** 不采用，因为七个里有六个测试的是真实的跨平台行为——文档命名、项目包含、PowerShell cwd 持久化、预设根目录——而 Windows 是所有这些行为的受支持宿主。只有两条字面意义上就是 POSIX 事实的断言被跳过，且按断言而非按文件跳过；计步测试在所有平台继续运行，因为它断言的事实是重试节奏，而不是 runner 的磁盘速度。
 
 **在被测代码里归一化路径以迎合测试。** 不采用，因为代码本来就是正确的：它用 `node:path` 解析路径，而测试拿来比较的拼写是 `node:path` 在 Windows 上永远不会产出的。
 
