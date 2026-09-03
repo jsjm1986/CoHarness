@@ -1407,6 +1407,36 @@ describe('ChatView', () => {
     }
   })
 
+  it('unmounting inside the sampling interval flushes the deferred reader sample', () => {
+    vi.useFakeTimers()
+    const hitTest = vi.fn(() => [] as Element[])
+    Object.defineProperty(document, 'elementsFromPoint', { configurable: true, value: hitTest })
+    try {
+      const h = makeHarness({ nodes: [user(1, 'q'), assistant(2, 'a')] })
+      const view = render(<h.ChatView {...h.props} />)
+      const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
+      installScrollMetrics(scroller, 1_000, 300)
+      vi.spyOn(scroller, 'getBoundingClientRect').mockReturnValue({ top: 0, bottom: 300, left: 0, right: 400 } as DOMRect)
+      scroller.scrollTop = 700
+      fireEvent.scroll(scroller)
+      act(() => { vi.advanceTimersByTime(600) })
+      hitTest.mockClear()
+
+      readerScroll(scroller, 100) // immediate sample
+      readerScroll(scroller, 120) // deferred to the trailing sample
+      expect(hitTest).toHaveBeenCalledTimes(4)
+      // A tab or session switch inside the interval must not lose the newest
+      // position: the pending sample runs at unmount while the node is laid out.
+      view.unmount()
+      expect(hitTest).toHaveBeenCalledTimes(8)
+      act(() => { vi.advanceTimersByTime(1_000) })
+      expect(hitTest).toHaveBeenCalledTimes(8)
+    } finally {
+      delete (document as { elementsFromPoint?: unknown }).elementsFromPoint
+      vi.useRealTimers()
+    }
+  })
+
   it('one ResizeObserver owns pinned dynamic-height follow and ignores growth while away', () => {
     let notify: (() => void) | undefined
     const observe = vi.fn()

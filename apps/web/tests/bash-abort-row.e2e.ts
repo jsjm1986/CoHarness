@@ -67,9 +67,10 @@ describe.skipIf(MODE === 'record')('web e2e: cancelled Bash row disclosure', () 
     await expect.poll(() => call.getByText('Error: tool call aborted', { exact: true }).count()).toBe(2)
 
     const snapshot = (await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd))
-      // The borrowed fixture's UTC date is still the previous day in PDT;
-      // the disclosure golden must not depend on the runner timezone.
-      .replace(/\b\d{1,2}\/\d{1,2}(?= \{\{clock\}\})/g, '{{date}}')
+      // Message clocks carry a calendar-day prefix only when the seeded time
+      // falls on another day than the run; the golden must depend on neither
+      // the runner timezone nor the wall clock at seed time.
+      .replace(/(?:\b\d{1,2}\/\d{1,2} )?\{\{clock\}\}/g, '{{date}} {{clock}}')
       .split(SEED_ID).join('{{seededId}}')
     await compareOrRefreshGolden(UI_EXPECTED, snapshot, MODE)
     expect(tripwire.pageErrors).toEqual([])

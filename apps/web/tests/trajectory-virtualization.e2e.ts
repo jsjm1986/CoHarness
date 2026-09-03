@@ -332,6 +332,7 @@ describe('web e2e: Trajectory virtualization over tail-paged history', () => {
         }
         host.scrollTo = trackedScrollTo as typeof host.scrollTo
       })
+      const rowsBeforeTurn = await logicalRows(page)
       const settled = scaffold.whenTurnSettled()
       const input = page.locator('textarea').first()
       await input.fill('Stream one deterministic response while Trajectory remains visible.')
@@ -343,7 +344,13 @@ describe('web e2e: Trajectory virtualization over tail-paged history', () => {
         return (window as Window & { __trajectoryScrollCalls?: number })
           .__trajectoryScrollCalls ?? 0
       })
-      expect(streamingScrollCalls).toBeLessThanOrEqual(5)
+      // Bottom-follow re-anchors per committed row-structure change, never per
+      // chunk: one streamed turn appends dozens of rows (85 chunks plus the
+      // turn's lifecycle events) and the follow must stay well under one call
+      // per four of them.
+      const appendedRows = await logicalRows(page) - rowsBeforeTurn
+      expect(appendedRows).toBeGreaterThan(20)
+      expect(streamingScrollCalls).toBeLessThanOrEqual(Math.ceil(appendedRows / 4))
       expect(await mountedRows(page)).toBeLessThanOrEqual(MAX_MOUNTED_ROWS)
       expect({
         pageErrors: tripwire.pageErrors,

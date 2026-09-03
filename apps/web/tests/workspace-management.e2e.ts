@@ -256,6 +256,10 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     ).toBe(0)
     await expect.poll(() => page.getByText('Ungrouped', { exact: true }).count(), { timeout: 10_000 })
       .toBeGreaterThanOrEqual(1)
+    // The Ungrouped bucket collapses by default; disclose it so the retained
+    // session row is rendered before asserting it kept the selection.
+    const ungrouped = page.getByRole('treeitem', { name: /^Ungrouped/ })
+    if (await ungrouped.getAttribute('aria-expanded') !== 'true') await ungrouped.click()
     await expect.poll(
       () => page.locator('[role="treeitem"][aria-selected="true"]').count(),
       { timeout: 10_000 },
@@ -589,10 +593,11 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     // without a confirmation dialog (non-destructive: log + accounting stay).
     await clickHoverAction(sessionRow, `Session actions for ${rowTitle}`)
     await page.getByRole('menuitem', { name: 'Archive session' }).click()
-    // The row disappears on the archive-set echo. A provisional blank New
-    // Session may remain in the account, so the Ungrouped bucket can remain.
+    // The row disappears on the archive-set echo, and with it the Ungrouped
+    // bucket: blank sessions start inside their workspace group, so the stray
+    // was the bucket's only member.
     await expect.poll(() => page.getByText(rowTitle, { exact: true }).count(), { timeout: 10_000 }).toBe(0)
-    await expect.poll(() => page.getByText('Ungrouped', { exact: true }).count(), { timeout: 10_000 }).toBeGreaterThanOrEqual(1)
+    await expect.poll(() => page.getByText('Ungrouped', { exact: true }).count(), { timeout: 10_000 }).toBe(0)
     // Durable on the host: the registry-global set carries the id while the
     // session log itself stays in persistence untouched.
     expect([...scaffold.ctx.workspaceRegistry.archivedSessionIds]).toEqual([SessionId(SEED_ID)])

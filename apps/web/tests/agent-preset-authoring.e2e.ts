@@ -16,6 +16,7 @@ import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import type { Locator } from 'playwright'
+import { resolveSessionPreset } from '@deepseek-ai/dsh-agent-presets'
 import {
   captureStableAria, compareOrRefreshGolden, launchWebScaffold, watchConsole,
   webSnapshotMode, type WebScaffold,
@@ -255,22 +256,17 @@ describe('web e2e: agent-preset authoring is a host-side copy', () => {
 
     // Leaving settings is part of the gesture: the flow lands on the
     // new-session screen with the self-referential preset staged, and the
-    // blank session the flow produces composes from it on the host.
+    // blank session the flow produces composes from it on the host. Blank
+    // draft sessions are intentionally omitted from `session.list`, so read
+    // the in-process Host registry for the workspace's root agent instead.
     await dialog.waitFor({ state: 'detached', timeout: 10_000 })
     await page.getByRole('button', { name: '创造模式' }).waitFor({ timeout: 10_000 })
-    await expect.poll(async () => {
-      const response = await fetch(`${scaffold.baseUrl}/api/session.list`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          type: 'client-request', rpcId: 'creator-draft-stage', method: 'session.list', payload: {},
-        }),
-      })
-      const body = await response.json() as {
-        result: { value?: { sessions: unknown[] } }
-      }
-      return JSON.stringify(body.result.value?.sessions ?? body.result)
-    }, { timeout: 15_000 }).toContain('"agentPreset":"cordis"')
+    const workspacePath = join(scaffold.workspaceCwd, 'workspace')
+    await expect.poll(() => {
+      const agent = scaffold.ctx.agents.list().find(candidate => candidate.session.header.parentSession === undefined
+        && candidate.session.header.cwd === workspacePath)
+      return agent === undefined ? undefined : resolveSessionPreset(agent.session)
+    }, { timeout: 15_000 }).toBe('cordis')
   }, 60_000)
 
   it('drove every surface without a page error or a stream warning', () => {

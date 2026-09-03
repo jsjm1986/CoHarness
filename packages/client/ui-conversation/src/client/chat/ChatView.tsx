@@ -549,10 +549,16 @@ export function ChatView({
       sampleReaderGeometryRef.current()
     }, SCROLL_SAMPLE_INTERVAL_MS - elapsed)
   }
-  useEffect(() => () => {
+  // A deferred sample still pending at unmount is the reader's newest
+  // position (a tab or session switch inside the interval); flush it here.
+  // Layout cleanup runs before React detaches the child ref and removes the
+  // node, so the scrollport is still laid out — the passive cleanup is not.
+  useLayoutEffect(() => () => {
     const sample = geometrySampleRef.current
-    if (sample.timer !== null) clearTimeout(sample.timer)
+    if (sample.timer === null) return
+    clearTimeout(sample.timer)
     sample.timer = null
+    sampleReaderGeometryRef.current()
   }, [])
 
   const onScrollRef = useRef(() => {})
