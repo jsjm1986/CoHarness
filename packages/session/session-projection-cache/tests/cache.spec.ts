@@ -17,6 +17,7 @@ import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import { MemoryMediaPool, MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
 import SessionProjectionCache from '../src/index.ts'
+import { checkpointRow } from '../src/spec.ts'
 
 declare module '@deepseek-ai/dsh-session-projection/types' {
   interface SessionProjectionStateMap {
@@ -402,6 +403,12 @@ describe('SessionProjectionCache cold read', () => {
     expect(cache.cachedSnapshot(headerOf(SessionId('never-cached')), SessionLogOffset(0))).toBeUndefined()
   })
 
+  it('rejects an unseeded header with a non-zero inherited cut', async () => {
+    const { cache } = await harness()
+    expect(() => cache.cachedSnapshot(headerOf(SessionId('unseeded-cut')), SessionLogOffset(1)))
+      .toThrow('unseeded projection-cache identity inherited event count must be 0')
+  })
+
   it('holds the not-found contract with zero registered units, and dates the empty cut for a present log', async () => {
     // Same composition minus any registered unit: restoreFloor is undefined,
     // yet coldSnapshot must still reject for an absent log (probe read) and
@@ -422,5 +429,10 @@ describe('SessionProjectionCache cold read', () => {
     await expect(ctx.sessionProjectionCache.coldSnapshot(SessionId('absent'))).rejects.toThrow('not found')
     await expect(ctx.sessionProjectionCache.coldSnapshot(SessionId('bare')))
       .resolves.toEqual({ asOfSeq: 2, values: {} })
+  })
+
+  it('preserves the sentinel and brands non-empty checkpoint sequence values', () => {
+    expect(checkpointRow.parse({ ver: 1, seq: -1, val: null }).seq).toBe(-1)
+    expect(checkpointRow.parse({ ver: 1, seq: 0, val: null }).seq).toBe(SessionSeq(0))
   })
 })

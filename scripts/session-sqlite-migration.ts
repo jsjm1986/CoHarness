@@ -90,15 +90,7 @@ export function readV18(path: string): LogicalSession[] {
         FROM events WHERE session_id = ? ORDER BY seq`).all(row.id)
       const events = physical.flatMap(item => decodeV18Row(item, row.id))
       assertContiguous(events, row.id)
-      const storage = rowToStorage(row)
-      return {
-        header: storage.meta,
-        inheritedEventCount: storage.inheritedEventCount,
-        events,
-        storeId,
-        incarnation: row.incarnation,
-        revision: row.revision,
-      }
+      return toLogicalSession(row, events, storeId)
     })
   } finally {
     db.close()
@@ -134,15 +126,7 @@ export function readV20(path: string): LogicalSession[] {
         WHERE s.session_key = ? ORDER BY e.seq`).all(row.id)
       const events = physical.flatMap(item => decodeRow(decodeEventRow(item)))
       assertContiguous(events, row.id)
-      const storage = rowToStorage(row)
-      return {
-        header: storage.meta,
-        inheritedEventCount: storage.inheritedEventCount,
-        events,
-        storeId,
-        incarnation: row.incarnation,
-        revision: row.revision,
-      }
+      return toLogicalSession(row, events, storeId)
     })
   } finally {
     db.close()
@@ -323,6 +307,22 @@ function decodeLegacySource(value: unknown): number[] {
 function assertContiguous(events: readonly SessionEvent[], sessionId: string): void {
   for (let index = 0; index < events.length; index += 1) {
     if (events[index]?.seq !== index) throw new Error(`session ${sessionId} has a non-contiguous event sequence at ${String(events[index]?.seq)}`)
+  }
+}
+
+function toLogicalSession(
+  row: ReturnType<typeof decodeSessionRow>,
+  events: readonly SessionEvent[],
+  storeId: string,
+): LogicalSession {
+  const storage = rowToStorage(row)
+  return {
+    header: storage.meta,
+    inheritedEventCount: storage.inheritedEventCount,
+    events,
+    storeId,
+    incarnation: row.incarnation,
+    revision: row.revision,
   }
 }
 
