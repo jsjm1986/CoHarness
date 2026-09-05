@@ -169,6 +169,8 @@ describe('web e2e: live-turn interactions (cancel / error / retry)', () => {
     // frozen-partial swap is eventually consistent, so poll rather than count.
     await expect.poll(() => page.locator('textarea').first().isEnabled(), { timeout: 10_000 }).toBe(true)
     await expect.poll(() => page.locator('[data-streaming="true"]').count(), { timeout: 10_000 }).toBe(0)
+    await expect.poll(() => page.getByText('partial', { exact: true }).count(), { timeout: 10_000 })
+      .toBeGreaterThan(0)
     // Golden of the aborted end-state: the prompt bubble plus the frozen
     // partial ('partial' is the hang entry's replayed prefix) and no more.
     const snapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold!.workspaceCwd)
