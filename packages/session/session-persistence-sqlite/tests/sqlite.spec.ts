@@ -595,6 +595,7 @@ describe('SessionPersistenceSqlite schema ownership', () => {
     expect(() => decodeSessionRow({ ...base, created_at: -1 })).toThrow(/created_at/)
     expect(() => decodeSessionRow({ ...base, origin: 'external' })).toThrow(/origin/)
     expect(() => decodeSessionRow({ ...base, delegation_depth: -1 })).toThrow(/delegation_depth/)
+    expect(() => decodeSessionRow({ ...base, draft: 2 })).toThrow(/draft must be 0 or 1/)
   })
 
   it('rejects malformed SQLite row primitives generically', () => {
@@ -638,6 +639,8 @@ describe('SessionPersistenceSqlite schema ownership', () => {
       [{ ...eventRow, data: 1 }, /data.*string or blob/],
       [{ ...eventRow, source_event_seqs: 1 }, /source_event_seqs.*blob or null/],
       [{ ...eventRow, ignorable: 2 }, /ignorable.*1.*null/],
+      [{ ...eventRow, is_packed: 2 }, /is_packed must be 0 or 1/],
+      [{ ...eventRow, is_packed: 1, ignorable: 1 }, /packed event rows cannot be logically ignorable/],
     ] as const) {
       expect(() => decodeEventRow(value)).toThrow(message)
     }

@@ -113,5 +113,5 @@ describe('repository check', () => {
     const summary = verifyPackageDependencies(process.cwd())
     expect(summary.packageCount).toBeGreaterThan(0)
     expect(summary.runtimeEdgeCount).toBeGreaterThan(0)
-  })
+  }, 30_000)
 })

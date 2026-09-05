@@ -44,6 +44,8 @@ interface TextBlockState {
 
 /** Estimate one provider event's JSON footprint without retaining an unbounded queue. */
 function queuedEventBytes(event: NonTerminalAssistantMessageEvent): number {
+  /* v8 ignore start -- provider events are plain JSON objects. The escapes
+     only bound the queue if the SDK ever hands over something unserializable. */
   try {
     const serialized = JSON.stringify(event) as string | undefined
     if (serialized === undefined) return MAX_ORDERING_QUEUE_BYTES + 1
@@ -51,6 +53,7 @@ function queuedEventBytes(event: NonTerminalAssistantMessageEvent): number {
   } catch {
     return MAX_ORDERING_QUEUE_BYTES + 1
   }
+  /* v8 ignore stop */
 }
 
 function textStateOf(states: Map<number, TextBlockState>, nativeIndex: number): TextBlockState {
@@ -330,6 +333,7 @@ export async function* toStreamChunks(
 
   function queuedShift(): NonTerminalAssistantMessageEvent | undefined {
     const entry = queuedEvents[queuedHead]
+    /* v8 ignore next -- callers shift only after queuedCount() > 0 kept the head present. */
     if (entry === undefined) return undefined
     queuedBytes = Math.max(0, queuedBytes - entry.bytes)
     queuedHead += 1

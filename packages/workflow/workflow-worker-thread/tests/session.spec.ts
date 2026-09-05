@@ -250,6 +250,21 @@ describe('runWorkerSession over an in-process MessageChannel', () => {
     host.close()
   })
 
+  it('drains a long FIFO of slot waiters in order, compacting the retired head as it goes', async () => {
+    const host = fakeHost({ reply: (_request, index) => text(`answer-${index}`) })
+    const session = runWorkerSession(host.port, init(
+      "return await parallel(Array.from({ length: 70 }, (_, i) => () => agent('agent ' + i)))",
+      undefined,
+      { maxConcurrentAgents: 1 },
+    ))
+    const result = await host.result()
+    await session
+    expect(result.stopReason).toBe('completed')
+    expect(result.agentsStarted).toBe(70)
+    expect(result.value).toEqual(Array.from({ length: 70 }, (_, index) => `answer-${index}`))
+    host.close()
+  })
+
   it('cancellation between a queued waiter and its slot: the waiter rejects without a child-start', async () => {
     const host = fakeHost({ go: true })
     void runWorkerSession(host.port, init(

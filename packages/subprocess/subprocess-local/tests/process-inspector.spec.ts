@@ -188,6 +188,48 @@ describe('Linux process inspector', () => {
     expect(createProcessInspector('linux', 'x64', fake.internals).isStdinWaiting(77)).toBe(false)
   })
 
+  it('scopes stdin waits to the shell terminal when a shell pid is given', () => {
+    const fake = fakeInternals()
+    fake.dirs.set('/proc', ['100'])
+    fake.files.set('/proc/100/stat', stat(100, 77, 100, 77, '1'))
+    fake.dirs.set('/proc/100/task', ['100'])
+    fake.files.set('/proc/100/task/100/syscall', syscall(0, 0))
+    fake.files.set('/proc/50/stat', stat(50, 50, 50, 77, '0'))
+    // tty_nr 0: the shell has no controlling terminal to compare against.
+    fake.files.set('/proc/51/stat', stat(51, 51, 51, 77, '0').replace(' 99 ', ' 0 '))
+    const withoutLinks = createProcessInspector('linux', 'x64', fake.internals)
+    expect(withoutLinks.isStdinWaiting(77, 49)).toBe(false)
+    expect(withoutLinks.isStdinWaiting(77, 51)).toBe(false)
+    expect(withoutLinks.isStdinWaiting(77, 50)).toBe(false)
+
+    const links = new Map<string, string>([['/proc/50/fd/0', '/dev/tty'], ['/proc/100/task/100/fd/0', '/dev/pts/3']])
+    let taskDevice = 99
+    const internals: ProcessInspectorInternals = {
+      ...fake.internals,
+      readLink(path) {
+        const target = links.get(path)
+        if (target === undefined) throw new Error(`missing ${path}`)
+        return target
+      },
+      stat: () => ({ rdev: taskDevice, isCharacterDevice: () => true }),
+    }
+    const inspector = createProcessInspector('linux', 'x64', internals)
+    expect(inspector.isStdinWaiting(77, 50)).toBe(true)
+    taskDevice = 98
+    expect(inspector.isStdinWaiting(77, 50)).toBe(false)
+    links.delete('/proc/100/task/100/fd/0')
+    expect(inspector.isStdinWaiting(77, 50)).toBe(false)
+
+    // A thread's epoll fdinfo falls back to the process table before failing closed.
+    taskDevice = 99
+    links.set('/proc/100/task/100/fd/0', '/dev/pts/3')
+    fake.files.set('/proc/100/task/100/syscall', syscall(232, 5, 0, 1))
+    fake.files.set('/proc/100/fdinfo/5', 'pos: 0\ntfd: 0 events: 19\n')
+    expect(inspector.isStdinWaiting(77, 50)).toBe(true)
+    fake.files.delete('/proc/100/fdinfo/5')
+    expect(inspector.isStdinWaiting(77, 50)).toBe(false)
+  })
+
   it('contains unreadable syscall, memory, and fdinfo boundaries', () => {
     const fake = fakeInternals()
     fake.dirs.set('/proc', ['100'])

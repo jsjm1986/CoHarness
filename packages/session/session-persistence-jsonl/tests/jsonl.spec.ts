@@ -1187,6 +1187,21 @@ describe('JsonlSessionPersistence: default packed chunk rows', () => {
     expect(events[2]).toEqual({ type: 'assistant/chunk', seq: 2, time: 3, data: { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'b' } } })
   })
 
+  it.each([
+    ['a JSON array row', '[1, 2]'],
+    ['a range-form provenance row without a valid seq', JSON.stringify({
+      type: 'assistant/message', seq: -1, time: 2, sourceEventSeqs: '0-0',
+      data: { turn: 1, step: 1, message: { role: 'assistant', content: [] } }, surfaceOp: 'append',
+    })],
+  ])('scanLog: %s in the committed region rejects like corrupt JSON', (_label, row) => {
+    const logText = [
+      JSON.stringify({ type: 'session', version: 0, id: 'bad-shape', createdAt: 1, delegationDepth: 0 }),
+      row,
+      JSON.stringify({ type: 'turn/end', seq: 1, time: 3, data: { turn: 1, reason: { kind: 'completed' } } }),
+    ].join('\n') + '\n'
+    expect(() => scanLog(Buffer.from(logText))).toThrow(/unparsable committed event/)
+  })
+
   it('scanLog: a malformed packed row in the committed region rejects like corrupt JSON', () => {
     const logText = [
       JSON.stringify({ type: 'session', version: 0, id: 'bad-row', createdAt: 1, delegationDepth: 0 }),
