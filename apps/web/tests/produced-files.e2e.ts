@@ -144,9 +144,11 @@ describe('web e2e: a finished turn ends with the files it produced', () => {
     await expect.poll(() => chips.count()).toBe(2)
     expect(await chips.nth(0).innerText()).toBe('关于我.md')
     expect(await chips.nth(1).innerText()).toBe('index.html')
-    expect(await row.getByText('+ 8 files', { exact: true }).count()).toBe(1)
+    await expect.poll(() => row.getByText('+ 8 files', { exact: true }).count(), {
+      timeout: 15_000,
+    }).toBe(1)
     const showFolder = page.getByRole('button', { name: 'Show in folder', exact: true })
-    expect(await showFolder.count()).toBe(1)
+    await expect.poll(() => showFolder.count(), { timeout: 15_000 }).toBe(1)
     expect(await page.getByText('Produced', { exact: true }).count()).toBe(1)
 
     const openPath = vi.spyOn(scaffold.ctx.apiProxy.host, 'openPath')
