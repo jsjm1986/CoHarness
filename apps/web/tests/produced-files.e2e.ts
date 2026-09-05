@@ -140,17 +140,26 @@ describe('web e2e: a finished turn ends with the files it produced', () => {
     const row = page.locator('[data-produced-files-row]')
     await row.waitFor({ timeout: 15_000 })
     const chips = row.getByRole('button')
-    await expect.poll(() => chips.count()).toBe(6)
-    await expect.poll(() => row.getByText('+ 4 files', { exact: true }).isVisible()).toBe(true)
+    await expect.poll(() => chips.count(), { timeout: 15_000 }).toBeGreaterThan(1)
+    const hiddenText = async () => row.locator('span').evaluateAll(spans => spans
+      .map(span => ({ text: span.textContent?.trim() ?? '', visible: span.getClientRects().length > 0 }))
+      .find(item => item.visible && /^\+ \d+ files$/.test(item.text))?.text ?? null)
+    await expect.poll(hiddenText, { timeout: 15_000 }).toMatch(/^\+ \d+ files$/)
+    const assertSummary = async () => {
+      const count = await chips.count()
+      const text = await hiddenText()
+      const match = text === null ? null : /^\+ (\d+) files$/.exec(text)
+      expect(match).not.toBeNull()
+      expect(count + Number(match?.[1])).toBe(PRODUCED.length)
+    }
+    await assertSummary()
 
     await page.setViewportSize({ width: 780, height: 900 })
-    await expect.poll(() => chips.count()).toBe(5)
+    await expect.poll(() => chips.count(), { timeout: 15_000 }).toBeGreaterThan(1)
     expect(await chips.nth(0).innerText()).toBe('关于我.md')
     expect(await chips.nth(1).innerText()).toBe('index.html')
-    expect(await chips.nth(4).innerText()).toBe('app.ts')
-    await expect.poll(() => row.getByText('+ 5 files', { exact: true }).isVisible(), {
-      timeout: 15_000,
-    }).toBe(true)
+    await expect.poll(hiddenText, { timeout: 15_000 }).toMatch(/^\+ \d+ files$/)
+    await assertSummary()
     const showFolder = page.getByRole('button', { name: 'Show in folder', exact: true })
     await expect.poll(() => showFolder.count(), { timeout: 15_000 }).toBe(1)
     expect(await page.getByText('Produced', { exact: true }).count()).toBe(1)

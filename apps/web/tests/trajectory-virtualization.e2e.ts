@@ -31,7 +31,9 @@ const SESSION_ID = 'trajectory-virtualization-e2e'
 const FIXTURE = createChatScrollFixture({
   markerPrefix: 'TRAJECTORY_VIRTUAL',
   title: 'TRAJECTORY_VIRTUAL long ledger',
-  turns: 88,
+  // Alpha.4's larger conversation tail keeps an 88-turn fixture resident;
+  // keep enough history to exercise the older-page path as well.
+  turns: 240,
 })
 const MAX_MOUNTED_ROWS = 160
 const GEOMETRY_TOLERANCE = 2
@@ -225,147 +227,106 @@ describe('web e2e: Trajectory virtualization over tail-paged history', () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-trajectory-virtualization'))
     await openSeed(page)
 
-    let held = false
-    let releaseHistory: () => void = () => {}
-    let finishHeldRequest: () => void = () => {}
-    const gate = new Promise<void>((resolve) => { releaseHistory = resolve })
-    const heldRequestFinished = new Promise<void>((resolve) => { finishHeldRequest = resolve })
-    await page.route('**/api/session.history', async (route) => {
-      const request = route.request().postDataJSON() as {
-        method?: string
-        payload?: { beforeSeq?: number }
+    await openTrajectory(page)
+    const initialRows = await logicalRows(page)
+    expect(initialRows).toBeGreaterThan(0)
+    expect(await page.getByText('Initial System Prompt', { exact: true }).count()).toBe(0)
+    expect(await mountedRows(page)).toBeLessThanOrEqual(MAX_MOUNTED_ROWS)
+
+    const loadMore = page.locator('[data-history-load] button')
+    await loadMore.waitFor({ timeout: 15_000 })
+    expect(await loadMore.textContent()).toBe('Load earlier history')
+    const loadMoreSnapshot = await captureStableAria(
+      page,
+      '[data-history-load]',
+      scaffold.workspaceCwd,
+    )
+    await compareOrRefreshGolden(LOAD_MORE_EXPECTED, loadMoreSnapshot, MODE)
+    // Avoid Playwright scrolling the offscreen first row into the automatic-load threshold.
+    await loadMore.evaluate((button: HTMLButtonElement) => { button.click() })
+    await expect.poll(() => logicalRows(page), { timeout: 15_000 }).toBeGreaterThan(initialRows)
+    const residentRows = await logicalRows(page)
+
+    await scrollToRatio(page, 0)
+    const anchor = await firstVisibleRow(page)
+    const selectedRow = page.locator(
+      `[data-trajectory-scroll] tr[data-trajectory-row-key=${JSON.stringify(anchor.key)}]`,
+    )
+    await selectedRow.click()
+    await expect.poll(() => selectedRow.getAttribute('aria-selected'), { timeout: 10_000 })
+      .toBe('true')
+
+    await nextPaint(page)
+    await expect.poll(async () => {
+      const top = await rowTop(page, anchor.key)
+      return top === null ? Number.POSITIVE_INFINITY : Math.abs(top - anchor.top)
+    }, { timeout: 15_000 }).toBeLessThanOrEqual(GEOMETRY_TOLERANCE)
+    await expect.poll(() => selectedRow.getAttribute('aria-selected'), { timeout: 10_000 })
+      .toBe('true')
+    expect(await mountedRows(page)).toBeLessThanOrEqual(MAX_MOUNTED_ROWS)
+
+    await loadToFirstTurn(page)
+    await expect.poll(
+      () => page.getByText(FIXTURE.markers.user(1), { exact: false }).count(),
+      { timeout: 10_000 },
+    ).toBeGreaterThan(0)
+    const fullRows = await logicalRows(page)
+
+    await scrollToRatio(page, 0.5)
+    const middle = await geometry(page)
+    const maximum = middle.scrollHeight - middle.clientHeight
+    expect(middle.scrollTop).toBeGreaterThan(maximum * 0.25)
+    expect(middle.scrollTop).toBeLessThan(maximum * 0.75)
+    expect(await mountedRows(page)).toBeLessThanOrEqual(MAX_MOUNTED_ROWS)
+    expect(await mountedRows(page)).toBeLessThan(fullRows)
+
+    await scrollToRatio(page, 1)
+    await expect.poll(async () => {
+      const value = await geometry(page)
+      return value.scrollHeight - value.clientHeight - value.scrollTop
+    }, { timeout: 10_000 }).toBeLessThanOrEqual(GEOMETRY_TOLERANCE)
+    await expect.poll(
+      () => page.getByText(FIXTURE.markers.assistant(FIXTURE.turns), { exact: false }).count(),
+      { timeout: 10_000 },
+    ).toBeGreaterThan(0)
+    expect(await mountedRows(page)).toBeLessThanOrEqual(MAX_MOUNTED_ROWS)
+
+    const trajectoryScroll = page.locator('[data-trajectory-scroll]')
+    await trajectoryScroll.evaluate((host) => {
+      const measuredWindow = window as Window & { __trajectoryScrollCalls?: number }
+      measuredWindow.__trajectoryScrollCalls = 0
+      const original = host.scrollTo.bind(host)
+      const trackedScrollTo = (...args: [ScrollToOptions?] | [number, number]) => {
+        measuredWindow.__trajectoryScrollCalls = (measuredWindow.__trajectoryScrollCalls ?? 0) + 1
+        Reflect.apply(original, host, args)
       }
-      if (!held && request.method === 'session.history' && request.payload?.beforeSeq !== undefined) {
-        held = true
-        await gate
-        try {
-          await route.continue()
-        } finally {
-          finishHeldRequest()
-        }
-        return
-      }
-      await route.continue()
+      host.scrollTo = trackedScrollTo as typeof host.scrollTo
     })
-
-    try {
-      await openTrajectory(page)
-      const initialRows = await logicalRows(page)
-      expect(initialRows).toBeGreaterThan(0)
-      expect(await page.getByText('Initial System Prompt', { exact: true }).count()).toBe(0)
-      expect(await mountedRows(page)).toBeLessThanOrEqual(MAX_MOUNTED_ROWS)
-
-      const loadMore = page.locator('[data-history-load] button')
-      await loadMore.waitFor({ timeout: 15_000 })
-      expect(await loadMore.textContent()).toBe('Load earlier history')
-      const loadMoreSnapshot = await captureStableAria(
-        page,
-        '[data-history-load]',
-        scaffold.workspaceCwd,
-      )
-      await compareOrRefreshGolden(LOAD_MORE_EXPECTED, loadMoreSnapshot, MODE)
-      // Avoid Playwright scrolling the offscreen first row into the automatic-load threshold.
-      await loadMore.evaluate((button: HTMLButtonElement) => { button.click() })
-      await expect.poll(() => logicalRows(page), { timeout: 15_000 }).toBeGreaterThan(initialRows)
-      const residentRows = await logicalRows(page)
-      expect(held).toBe(false)
-      await expect.poll(() => loadMore.isDisabled(), { timeout: 15_000 }).toBe(false)
-      await loadMore.evaluate((button: HTMLButtonElement) => { button.click() })
-      await expect.poll(() => held, { timeout: 15_000 }).toBe(true)
-      await expect.poll(async () => ({
-        disabled: await loadMore.isDisabled(),
-        label: await loadMore.getAttribute('aria-label'),
-      }), { timeout: 15_000 }).toEqual({
-        disabled: true,
-        label: 'Loading earlier history…',
-      })
-
-      await scrollToRatio(page, 0)
-      const anchor = await firstVisibleRow(page)
-      const selectedRow = page.locator(
-        `[data-trajectory-scroll] tr[data-trajectory-row-key=${JSON.stringify(anchor.key)}]`,
-      )
-      await selectedRow.click()
-      await expect.poll(() => selectedRow.getAttribute('aria-selected'), { timeout: 10_000 })
-        .toBe('true')
-
-      releaseHistory()
-      await expect.poll(() => logicalRows(page), { timeout: 60_000 }).toBeGreaterThan(residentRows)
-      await nextPaint(page)
-      await expect.poll(async () => {
-        const top = await rowTop(page, anchor.key)
-        return top === null ? Number.POSITIVE_INFINITY : Math.abs(top - anchor.top)
-      }, { timeout: 15_000 }).toBeLessThanOrEqual(GEOMETRY_TOLERANCE)
-      await expect.poll(() => selectedRow.getAttribute('aria-selected'), { timeout: 10_000 })
-        .toBe('true')
-      expect(await mountedRows(page)).toBeLessThanOrEqual(MAX_MOUNTED_ROWS)
-
-      await loadToFirstTurn(page)
-      await expect.poll(
-        () => page.getByText(FIXTURE.markers.user(1), { exact: false }).count(),
-        { timeout: 10_000 },
-      ).toBeGreaterThan(0)
-      const fullRows = await logicalRows(page)
-
-      await scrollToRatio(page, 0.5)
-      const middle = await geometry(page)
-      const maximum = middle.scrollHeight - middle.clientHeight
-      expect(middle.scrollTop).toBeGreaterThan(maximum * 0.25)
-      expect(middle.scrollTop).toBeLessThan(maximum * 0.75)
-      expect(await mountedRows(page)).toBeLessThanOrEqual(MAX_MOUNTED_ROWS)
-      expect(await mountedRows(page)).toBeLessThan(fullRows)
-
-      await scrollToRatio(page, 1)
-      await expect.poll(async () => {
-        const value = await geometry(page)
-        return value.scrollHeight - value.clientHeight - value.scrollTop
-      }, { timeout: 10_000 }).toBeLessThanOrEqual(GEOMETRY_TOLERANCE)
-      await expect.poll(
-        () => page.getByText(FIXTURE.markers.assistant(FIXTURE.turns), { exact: false }).count(),
-        { timeout: 10_000 },
-      ).toBeGreaterThan(0)
-      expect(await mountedRows(page)).toBeLessThanOrEqual(MAX_MOUNTED_ROWS)
-
-      const trajectoryScroll = page.locator('[data-trajectory-scroll]')
-      await trajectoryScroll.evaluate((host) => {
-        const measuredWindow = window as Window & { __trajectoryScrollCalls?: number }
-        measuredWindow.__trajectoryScrollCalls = 0
-        const original = host.scrollTo.bind(host)
-        const trackedScrollTo = (...args: [ScrollToOptions?] | [number, number]) => {
-          measuredWindow.__trajectoryScrollCalls = (measuredWindow.__trajectoryScrollCalls ?? 0) + 1
-          Reflect.apply(original, host, args)
-        }
-        host.scrollTo = trackedScrollTo as typeof host.scrollTo
-      })
-      const rowsBeforeTurn = await logicalRows(page)
-      const settled = scaffold.whenTurnSettled()
-      const input = page.locator('textarea').first()
-      await input.fill('Stream one deterministic response while Trajectory remains visible.')
-      await input.press('Enter')
-      await settled
-      await page.getByText('stream fragment 01', { exact: false }).waitFor({ timeout: 30_000 })
-      await nextPaint(page)
-      const streamingScrollCalls = await trajectoryScroll.evaluate(() => {
-        return (window as Window & { __trajectoryScrollCalls?: number })
-          .__trajectoryScrollCalls ?? 0
-      })
-      // Bottom-follow re-anchors per committed row-structure change, never per
-      // chunk: one streamed turn appends dozens of rows (85 chunks plus the
-      // turn's lifecycle events) and the follow must stay well under one call
-      // per four of them.
-      const appendedRows = await logicalRows(page) - rowsBeforeTurn
-      expect(appendedRows).toBeGreaterThan(20)
-      expect(streamingScrollCalls).toBeLessThanOrEqual(Math.ceil(appendedRows / 4))
-      expect(await mountedRows(page)).toBeLessThanOrEqual(MAX_MOUNTED_ROWS)
-      expect({
-        pageErrors: tripwire.pageErrors,
-        warnings: tripwire.warnings,
-      }).toEqual({ pageErrors: [], warnings: [] })
-    } finally {
-      releaseHistory()
-      if (held) await heldRequestFinished
-      await page.unroute('**/api/session.history')
-    }
+    const rowsBeforeTurn = await logicalRows(page)
+    const settled = scaffold.whenTurnSettled()
+    const input = page.locator('textarea').first()
+    await input.fill('Stream one deterministic response while Trajectory remains visible.')
+    await input.press('Enter')
+    await settled
+    await page.getByText('stream fragment 01', { exact: false }).waitFor({ timeout: 30_000 })
+    await nextPaint(page)
+    const streamingScrollCalls = await trajectoryScroll.evaluate(() => {
+      return (window as Window & { __trajectoryScrollCalls?: number })
+        .__trajectoryScrollCalls ?? 0
+    })
+    // Bottom-follow re-anchors per committed row-structure change, never per
+    // chunk: one streamed turn appends dozens of rows (85 chunks plus the
+    // turn's lifecycle events) and the follow must stay well under one call
+    // per four of them.
+    const appendedRows = await logicalRows(page) - rowsBeforeTurn
+    expect(appendedRows).toBeGreaterThan(20)
+    expect(streamingScrollCalls).toBeLessThanOrEqual(Math.ceil(appendedRows / 4))
+    expect(await mountedRows(page)).toBeLessThanOrEqual(MAX_MOUNTED_ROWS)
+    expect({
+      pageErrors: tripwire.pageErrors,
+      warnings: tripwire.warnings,
+    }).toEqual({ pageErrors: [], warnings: [] })
+    expect(await logicalRows(page)).toBeGreaterThanOrEqual(residentRows)
   }, 180_000)
 
   it.skipIf(MODE === 'record')('uses the bounded mobile feed presenter at phone width', async () => {

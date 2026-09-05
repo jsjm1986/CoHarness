@@ -56,6 +56,7 @@ const EXPECTED_TOOLS = [
   'update_goal',
   'userdoc_list',
   'userdoc_read',
+  'web_fetch',
   'web_search',
   'workflow',
   'write',
@@ -197,7 +198,7 @@ it('ships PTC with run_code but without the general workflow SDK binding', async
   const ctx = scaffold.ctx
   const handle = await ctx.agents.create({
     sessionId: SessionId('shipped-ptc-composition'),
-    setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'ptc').then(() => undefined),
+    setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'code').then(() => undefined),
   })
   try {
     const assembly = await ctx.systemPrompt.assemble({ scope: handle.agent })
