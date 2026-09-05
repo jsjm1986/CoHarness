@@ -303,7 +303,10 @@ export function normalizeStdout(
     if ('id' in frame && frame.id !== undefined && frame.id !== null) {
       frame.id = stableId(frame.id)
     }
-    return scrubValue(frame, ctx, cwdPathMode, undefined, true) as Record<string, unknown>
+    const params = frame.params as { update?: { sessionUpdate?: unknown } } | undefined
+    const normalizeUsage = frame.method === 'session/update'
+      && params?.update?.sessionUpdate === 'usage_update'
+    return scrubValue(frame, ctx, cwdPathMode, undefined, normalizeUsage) as Record<string, unknown>
   })
   return frames.map(f => JSON.stringify(f)).join('\n') + '\n'
 }

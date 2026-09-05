@@ -10,7 +10,7 @@ Status: implemented
 
 ## 决策
 
-三个必需的 Linux 工作作业、独立的原生 Windows 作业与 `all checks passed` 判定作业都通过仓库变量解析运行器池，且开关按平台拆分，使一个平台的故障不会重定向另一个平台。三个 Linux 工作作业与 `all checks passed` 通过 `DSH_CI_FAILOVER_LINUX` 解析；原生 Windows 作业通过 `DSH_CI_FAILOVER_WINDOWS` 解析。未设置外部容量变量时，工作作业使用可移植的标准标签。`DSH_CI_ENTERPRISE_RUNNERS_ENABLED=true` 选择具名企业标签，而对于可信且非 Dependabot 的拉取请求，任一平台的 `selfhosted` 故障切换值具有更高优先级。Linux 故障切换时，Linux 作业与判定作业切到 `vm-backup` 池，快照并发降到共享虚拟机上限，并跳过托管路径的 pnpm 缓存恢复；Windows 故障切换时，原生 Windows 作业切到 `dsh-win-ci` 池。每个开关都是写者可管理的仓库状态而非一次合并，因此在所有检查都是红色时仍然有效。`serial / linux (self-hosted standby)` 与 `serial / windows (self-hosted standby)` 就绪演练只在 `DSH_CI_SELF_HOSTED_STANDBY_ENABLED=true` 时随 master 推送运行；计划依赖故障切换的部署负责启用并监控这些演练。
+三个必需的 Linux 工作作业、独立的原生 Windows 作业与 `all checks passed` 判定作业都通过仓库变量解析运行器池，且开关按平台拆分，使一个平台的故障不会重定向另一个平台。三个 Linux 工作作业与 `all checks passed` 通过 `DSH_CI_FAILOVER_LINUX` 解析；原生 Windows 作业通过 `DSH_CI_FAILOVER_WINDOWS` 解析。未设置外部容量变量时，工作作业使用可移植的标准标签。`DSH_CI_ENTERPRISE_RUNNERS_ENABLED=true` 选择具名企业标签，而任一平台的 `selfhosted` 故障切换值只对同仓库且非 Dependabot 的拉取请求生效；Fork 拉取请求始终留在托管 Runner 上。Linux 故障切换时，Linux 作业与判定作业切到 `vm-backup` 池，快照并发降到共享虚拟机上限，并跳过托管路径的 pnpm 缓存恢复；Windows 故障切换时，原生 Windows 作业切到 `dsh-win-ci` 池。每个开关都是写者可管理的仓库状态而非一次合并，因此在所有检查都是红色时仍然有效。`serial / linux (self-hosted standby)` 与 `serial / windows (self-hosted standby)` 就绪演练只在 `DSH_CI_SELF_HOSTED_STANDBY_ENABLED=true` 时随 master 推送运行；计划依赖故障切换的部署负责启用并监控这些演练。
 
 `ci.yml` 只豁免一个事件不做取消（`${{ github.event_name != 'push' }}`），因此一次 master 推送不会取消上一次推送留下的、已启用且仍在运行的热备演练。每次已启用的演练以单门禁工作进程执行完整的未分片聚合流程，耗时可能长于 master 合并的间隔；在无条件取消下，演练会在得出结论前被后续运行取代，该通道无法产出供响应者查看的就绪证据。
 
@@ -34,9 +34,9 @@ Status: implemented
 2. 重新触发必需作业，使其重新解析运行器池。已经为托管标签**排队**的作业不会重定向，也无法原地 re-run，因此对于本手册所述的无限排队故障，应取消卡住的运行并 re-run all jobs，或推送一个新提交；“Re-run failed jobs”只有在作业真正失败（而非仍在排队）时才有用。
 3. 切换到此完成。Linux 故障切换状态下，工作流还会把 `DSH_SNAPSHOT_MAX_CONCURRENCY` 降为 12，以限制共享虚拟机上的争抢，并跳过托管路径的 pnpm 缓存恢复，因为虚拟机的持久 store 会直接提供热安装。覆盖率在两个 Linux 池上都使用 4 个单 worker 插桩分区与 2 个豁免 worker。Windows 开关没有并发或缓存分支；它只重定向原生 Windows 作业的运行器池。
 
-#**Dependabot 例外。**两个开关的选择器都刻意排除了 `dependabot[bot]`：故障切换期间，Dependabot 拉取请求继续在托管池排队，而不是把依赖项提供的代码放到持久化虚拟机上执行。故障期间 Dependabot PR 持续排队是预期行为而非切换失败；托管池恢复后它会自行完成。
+#**不受信任拉取请求例外。**两个开关的选择器都要求 head 仓库不是 Fork，并刻意排除了 `dependabot[bot]`：故障切换期间，Fork 与 Dependabot 拉取请求继续使用托管容量，而不是把不受信任代码放到持久化虚拟机上执行。故障期间 PR 留在托管容量上是预期行为而非切换失败；托管池恢复后它会自行完成。
 
-**谁能扳动这个变量。**GitHub 的 API 允许任何具有写权限的协作者管理仓库变量，因此每个开关实际是写者级而非严格的管理员级。在本仓库的信任模型下这并不构成升权：runner group 接纳本私有、禁 fork 仓库的全部工作流（这是让 PR 引用的故障切换得以成立的刻意取舍），因此任何写者本就可以通过推送分支工作流触达这台虚拟机。抵御不可信代码的边界是仓库成员资格；变量只是为成员路由工作。
+**谁能扳动这个变量。**GitHub 的 API 允许任何具有写权限的协作者管理仓库变量，因此每个开关实际是写者级而非严格的管理员级。本仓库是公开仓库且允许 Fork，工作流会在选择持久运行器前明确拒绝 Fork head；只有同仓库拉取请求可以使用这条故障切换路径。runner group 仍接纳本仓库的全部工作流，因此同仓库写者依旧被视为可以在虚拟机上执行代码；工作流中的 Fork 门禁负责阻挡公开的不可信贡献。
 
 ## 切换期间的容量
 
@@ -49,7 +49,7 @@ Status: implemented
 
 ### 信任边界
 
-这些变量是写者可管理的仓库状态；`pull_request` 事件本身既不能设置它们，也不能让不同的值生效，选择器表达式存在于工作流定义中。需要注意：故障切换期间，`pull_request` 运行执行的是 PR merge 引用自带的工作流定义——抵御不可信代码的边界是仓库成员资格（私有、禁 fork、选择器排除 Dependabot），而非该变量。关于 runner group 策略的说明：把 runner group 绑定到 master 引用的工作流与本故障切换机制**不兼容**——五个故障切换作业是从 PR merge 引用求值的 `pull_request` 运行，master 绑定的组会让它们持续排队（2026-07-27 实际故障中亲历；当时将组放宽为本仓库全部工作流才疏通了切换）。更严格的运行器侧策略以牺牲 PR 故障切换为代价；当前采用的形态是仓库范围、全工作流的组访问。
+这些变量是写者可管理的仓库状态；`pull_request` 事件本身既不能设置它们，也不能让不同的值生效，选择器表达式存在于工作流定义中。需要注意：故障切换期间，`pull_request` 运行执行的是 PR merge 引用自带的工作流定义，因此所有持久运行器选择器都要求 `github.event.pull_request.head.repo.full_name == github.repository`，并排除 Dependabot。缺失 head 仓库元数据时该字符串比较不成立，作业会回退到托管容量；而 `head.repo.fork == false` 会放行这种情况，因为表达式会把 `null` 与 `false` 强转为同一个数字。关于 runner group 策略的说明：把 runner group 绑定到 master 引用的工作流与本故障切换机制**不兼容**——五个故障切换作业是从 PR merge 引用求值的 `pull_request` 运行，master 绑定的组会让它们持续排队（2026-07-27 实际故障中亲历；当时将组放宽为本仓库全部工作流才疏通了切换）。更严格的运行器侧策略会牺牲同仓库 PR 故障切换；当前采用的形态是仓库范围、全工作流的组访问，并由工作流级 Fork 门禁阻挡不可信代码。
 
 ## 曾考虑的替代方案
 

@@ -10,7 +10,7 @@ The CI workflow selected organization-scoped larger-runner labels and master-onl
 
 ## Decision
 
-Required Linux jobs use `ubuntu-latest` by default, and the non-blocking native Windows job uses `windows-2025`. Setting the repository variable `DSH_CI_ENTERPRISE_RUNNERS_ENABLED` to exactly `true` selects the existing named enterprise pools instead. The existing `DSH_CI_FAILOVER_LINUX=selfhosted` and `DSH_CI_FAILOVER_WINDOWS=selfhosted` switches take precedence over that opt-in and continue to exclude Dependabot pull requests from self-hosted capacity.
+Required Linux jobs use `ubuntu-latest` by default, and the non-blocking native Windows job uses `windows-2025`. Setting the repository variable `DSH_CI_ENTERPRISE_RUNNERS_ENABLED` to exactly `true` selects the existing named enterprise pools instead. The existing `DSH_CI_FAILOVER_LINUX=selfhosted` and `DSH_CI_FAILOVER_WINDOWS=selfhosted` switches take precedence over that opt-in, but select self-hosted capacity only for same-repository, non-Dependabot pull requests; fork pull requests stay on hosted capacity.
 
 This decision supersedes the implicit enterprise-runner defaults and unconditional standby cadence recorded in the [larger-runner evidence](2026-07-22-evidence-based-larger-hosted-runners.md), [serial reference](2026-07-21-serial-cross-platform-ci-reference.md), [failover runbook](2026-07-26-ci-failover-runbook.md), and [native Windows topology](2026-08-08-native-windows-pull-request-ci.md). Those notes retain their measurements, topology rationale, and operational procedures, but their enterprise and self-hosted paths now apply only when the corresponding repository variables select them.
 
@@ -22,13 +22,13 @@ The consumer lane also installs `gateway/package-lock.json` with `npm ci --prefi
 
 The first complete standard-runner execution showed why both layers must be bounded together: four or eight concurrent coverage partitions plus two outer gate workers caused otherwise bounded repository scans, large-file upload checks, terminal-idle observation, and ACP snapshot polling to miss their deadlines. The consumer lane also overlapped build-backed snapshots, lint, package publication checks, and browser replay on the same small host. Raising individual test timeouts alone would preserve the resource contention and make failure latency longer; the portable topology therefore reduces process fan-out first and uses the larger timeout only for legitimately slow coverage instrumentation.
 
-Master-only standby jobs require `DSH_CI_SELF_HOSTED_STANDBY_ENABLED=true`, and the larger-runner benchmark jobs require the enterprise-runner opt-in. An absent repository variable therefore selects only generally available GitHub-hosted capacity and never leaves an optional private pool in the required path.
+Master-only standby jobs require `DSH_CI_SELF_HOSTED_STANDBY_ENABLED=true`, and the larger-runner benchmark jobs require the enterprise-runner opt-in. An absent repository variable therefore selects only generally available GitHub-hosted capacity and never leaves an optional private pool in the required path. The failover selectors compare `github.event.pull_request.head.repo.full_name` with `github.repository`, so a fork head or a missing head repository falls back to hosted capacity; a boolean `head.repo.fork == false` test would accept a deleted fork because GitHub Actions expressions coerce `null` and `false` to the same number.
 
 Portable hosted execution also makes the clean checkout authoritative. Built-entry tests resolve third-party package roots from public entries instead of assuming `./package.json` exports, the consumer lane installs the independent Gateway runtime graph before root snapshots, and protocol assertions include the current ACP message and provider capability fields.
 
 The browser HMR owner snapshots and restores both dynamic client bundles and `apps/web/dist`. The watcher rebuilds the Vite dist as well as plugin bundles, so restoring only `lib/client.js` leaves the next browser test on a stale artifact digest even when the HMR assertion itself passes.
 
-`scripts/ci-workflow.spec.ts` pins the portable defaults, explicit opt-ins, failover precedence, and standby guards so a future workflow edit cannot silently restore repository-specific runner labels as defaults.
+`scripts/ci-workflow.spec.ts` pins the portable defaults, explicit opt-ins, failover precedence, fork exclusion, and standby guards so a future workflow edit cannot silently restore repository-specific runner labels as defaults or route fork code to persistent runners.
 
 ## Alternatives considered
 

@@ -10,7 +10,7 @@ CI 工作流默认选择组织范围的 larger-runner 标签和仅在 master 上
 
 ## Decision
 
-必需的 Linux job 默认使用 `ubuntu-latest`，非阻塞的原生 Windows job 默认使用 `windows-2025`。只有当仓库变量 `DSH_CI_ENTERPRISE_RUNNERS_ENABLED` 精确设置为 `true` 时，才选择现有的具名企业 Runner 池。现有的 `DSH_CI_FAILOVER_LINUX=selfhosted` 和 `DSH_CI_FAILOVER_WINDOWS=selfhosted` 开关优先于该启用项，并继续禁止 Dependabot 拉取请求使用自托管容量。
+必需的 Linux job 默认使用 `ubuntu-latest`，非阻塞的原生 Windows job 默认使用 `windows-2025`。只有当仓库变量 `DSH_CI_ENTERPRISE_RUNNERS_ENABLED` 精确设置为 `true` 时，才选择现有的具名企业 Runner 池。现有的 `DSH_CI_FAILOVER_LINUX=selfhosted` 和 `DSH_CI_FAILOVER_WINDOWS=selfhosted` 开关优先于该启用项，但只允许同仓库且非 Dependabot 的拉取请求使用自托管容量；Fork 拉取请求始终留在托管 Runner 上。
 
 本决策取代[大型托管 Runner 证据](2026-07-22-evidence-based-larger-hosted-runners.zh.md)、[串行参考流程](2026-07-21-serial-cross-platform-ci-reference.zh.md)、[故障切换手册](2026-07-26-ci-failover-runbook.zh.md)和[原生 Windows 拓扑](2026-08-08-native-windows-pull-request-ci.zh.md)中隐含启用企业 Runner 与无条件运行热备演练的默认方式。这些 Note 继续保留测量结果、拓扑依据和操作步骤，但其中的企业与自托管路径只在相应仓库变量明确选择后适用。
 
@@ -22,13 +22,13 @@ consumer 通道还会在运行快照前通过 `npm ci --prefix gateway --omit=de
 
 第一次完整的标准 Runner 执行说明了为什么必须同时限制内外两层：四个或八个并发 coverage 分区叠加两个外层门禁 worker，使原本有界的仓库扫描、大文件上传校验、终端空闲观察和 ACP 快照轮询错过截止时间。consumer 通道还在同一台小规格主机上重叠运行构建型快照、lint、包发布检查和浏览器回放。只提高单项测试超时会保留资源争用，并让失败等待更久；因此可移植拓扑先降低进程扇出，只把较大超时用于确实较慢的 coverage 插桩。
 
-仅在 master 上运行的备用 job 还要求 `DSH_CI_SELF_HOSTED_STANDBY_ENABLED=true`，larger-runner 基准 job 则要求启用企业 Runner。仓库变量缺失时只会选择普遍可用的 GitHub 托管容量，绝不会让可选私有池进入必需路径。
+仅在 master 上运行的备用 job 还要求 `DSH_CI_SELF_HOSTED_STANDBY_ENABLED=true`，larger-runner 基准 job 则要求启用企业 Runner。仓库变量缺失时只会选择普遍可用的 GitHub 托管容量，绝不会让可选私有池进入必需路径。故障切换选择器把 `github.event.pull_request.head.repo.full_name` 与 `github.repository` 比较，因此 Fork head 或缺失的 head 仓库都会回退到托管容量；若改用布尔判断 `head.repo.fork == false`，已删除的 Fork 会被放行，因为 GitHub Actions 表达式会把 `null` 与 `false` 强转为同一个数字。
 
 可移植托管执行还会让干净检出成为权威环境。构建入口测试从公开入口解析第三方包根目录，不再假设包导出 `./package.json`；consumer 通道会在根快照前安装独立的 Gateway 运行时依赖图；协议断言包含当前 ACP 消息字段和 Provider capability 字段。
 
 浏览器 HMR owner 会同时快照和恢复动态 client bundle 以及 `apps/web/dist`。watcher 除了重建插件 bundle 还会重写 Vite dist，因此只恢复 `lib/client.js` 会让后续浏览器测试看到陈旧的 artifact digest，即使 HMR 断言本身已经通过。
 
-`scripts/ci-workflow.spec.ts` 固定可移植默认值、显式启用项、故障切换优先级和备用池门禁，防止后续工作流修改静默恢复以仓库专属 Runner 标签作为默认值。
+`scripts/ci-workflow.spec.ts` 固定可移植默认值、显式启用项、故障切换优先级、Fork 排除和备用池门禁，防止后续工作流修改静默恢复以仓库专属 Runner 标签作为默认值，或把 Fork 代码路由到持久运行器。
 
 ## Alternatives considered
 

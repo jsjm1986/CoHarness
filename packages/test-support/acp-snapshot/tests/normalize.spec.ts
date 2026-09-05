@@ -161,6 +161,21 @@ Additional instructions from: nested\AGENTS.md`,
     })
   })
 
+  it('preserves unrelated numeric used fields', () => {
+    const raw = JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'session/update',
+      params: { update: { sessionUpdate: 'tool_call_update', used: 1234 } },
+      metadata: { used: 5678 },
+    })
+    expect(JSON.parse(normalizeStdout(raw, ctx))).toEqual({
+      jsonrpc: '2.0',
+      method: 'session/update',
+      params: { update: { sessionUpdate: 'tool_call_update', used: 1234 } },
+      metadata: { used: 5678 },
+    })
+  })
+
   it('stabilizes only the top-level event timestamp and spill byte count in event-read text', () => {
     const raw = JSON.stringify({
       jsonrpc: '2.0',

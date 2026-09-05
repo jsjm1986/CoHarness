@@ -107,9 +107,11 @@ describe('web e2e: settings modal and General preferences', () => {
     await pluginRow.waitFor({ timeout: 10_000 })
     const globalScope = dialog.locator('[data-plugin-scope="global"]')
     const countNode = globalScope.locator('[data-plugin-count]')
-    const expectedPluginCount = Number(await countNode.getAttribute('data-plugin-count'))
-    expect(Number.isSafeInteger(expectedPluginCount)).toBe(true)
+    const expectedPluginCount = [...scaffold.ctx.loader.entries()]
+      .filter(entry => !entry.options.group)
+      .length
     expect(await dialog.getByRole('searchbox', { name: '搜索插件' }).count()).toBe(1)
+    expect(await countNode.getAttribute('data-plugin-count')).toBe(String(expectedPluginCount))
     expect(await globalScope.locator('[data-plugin-entry]').count()).toBe(expectedPluginCount)
     expect(await dialog.getByRole('button', { name: '插件', exact: true }).getAttribute('aria-current')).toBe('true')
     expect(await dialog.getByRole('tab', { name: '插件列表', exact: true }).getAttribute('aria-selected')).toBe('true')
