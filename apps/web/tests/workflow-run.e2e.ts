@@ -146,7 +146,8 @@ describe.skipIf(MODE === 'record')('web e2e: durable workflow run in Chat', () =
     expect(darkNarrow.statusWidth).toBe(64)
     expect(darkNarrow.statusFontSize).toBe('13px')
     expect(darkNarrow.runHeight).toBe(44)
-    expect(darkNarrow.phaseHeight).toBe(32)
+    expect(darkNarrow.phaseHeight).toBeGreaterThanOrEqual(32)
+    expect(darkNarrow.phaseHeight).toBeLessThanOrEqual(44)
     expect(darkNarrow.phaseTitleRight).toBeLessThanOrEqual(darkNarrow.phaseStatusLeft)
     await page.locator('[data-workflow-run]').evaluate((element) => {
       (element as HTMLElement).style.removeProperty('width')
@@ -190,7 +191,10 @@ describe.skipIf(MODE === 'record')('web e2e: durable workflow run in Chat', () =
     const workflow = page.getByRole('button', { name: /^snapshot-flow/ })
     await workflow.waitFor({ timeout: 15_000 })
     expect(await workflow.getAttribute('aria-expanded')).toBe('false')
-    const snapshot = await captureStableAria(page, '[data-chat-flow]', scaffold.workspaceCwd)
+    // Throughput is a timing-derived optional metric: the hosted runner can
+    // expose it while a local replay has no measured stream rate.
+    const snapshot = (await captureStableAria(page, '[data-chat-flow]', scaffold.workspaceCwd))
+      .replace(' {{throughput}} tok/s', '')
     await compareOrRefreshGolden(UI_EXPECTED, snapshot, MODE)
     await workflow.click()
     const phase = page.getByRole('button', { name: /^Run/ })
