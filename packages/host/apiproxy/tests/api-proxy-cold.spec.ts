@@ -482,7 +482,7 @@ describe('cold history recovery view', () => {
     const meta = header(sessionId, 1000)
     const message = (seq: number, body: string): SessionEvent => ({
       type: 'user/message',
-      seq,
+      seq: SessionSeq(seq),
       time: 2000 + seq,
       data: createUserMessage({ content: [{ type: 'text', text: body }], source: { kind: 'user' } }),
       surfaceOp: 'append',
@@ -503,7 +503,7 @@ describe('cold history recovery view', () => {
       // The open that started this read also resumed the session; its
       // lifecycle events moved the log between the two page reads.
       ctx.sessions.create(sessionId, {
-        seed: [message(0, 'head'), message(1, 'tail'), { type: 'turn/start', seq: 2, time: 2002, data: { turn: 2 } }],
+        seed: [message(0, 'head'), message(1, 'tail'), { type: 'turn/start', seq: SessionSeq(2), time: 2002, data: { turn: 2 } }],
         meta: { cwd: '/proj', createdAt: 1000 },
       })
       throw new SessionPersistenceReadError('dependency', 'session persistence revision changed since the page cursor was issued')
@@ -544,7 +544,7 @@ describe('cold history recovery view', () => {
       const seq = pageRequest.cursor === undefined ? 1 : 0
       const event: SessionEvent = {
         type: 'user/message',
-        seq,
+        seq: SessionSeq(seq),
         time: 2000 + seq,
         data: createUserMessage({ content: [{ type: 'text', text: `page-${String(seq)}` }], source: { kind: 'user' } }),
         surfaceOp: 'append',
