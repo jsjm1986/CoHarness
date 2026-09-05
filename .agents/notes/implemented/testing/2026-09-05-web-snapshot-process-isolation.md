@@ -16,6 +16,10 @@ The long Web snapshot lane intermittently failed stateful suites after unrelated
 
 Each isolated suite pays one process startup, but its module state, environment restoration, browser lifetime, and replay cursor cannot leak into another suite. Add a suite to the isolated list only when standalone success and full-lane interference show that process ownership is the missing guarantee.
 
+## Alternatives considered
+
+**Raise browser timeouts or retry failed assertions.** Rejected because the failures changed files between runs and the same suites passed alone; retries would hide process-state leakage. **Run the entire Web lane in one process.** Rejected because it preserves the shared module and environment state that caused the non-deterministic failures.
+
 ## Testing
 
 The affected suites pass when run together from a clean checkout. CI must re-run the full Web snapshot gate to validate the process split on the hosted runner.
