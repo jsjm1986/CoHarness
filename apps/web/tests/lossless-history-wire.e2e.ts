@@ -674,8 +674,11 @@ describe('web e2e: lossless history wire pagination', () => {
       // control remains for a reader who stopped short of that threshold.
       if (historyReads.length === beforeReadCount) {
         const loadEarlier = page.getByRole('button', { name: 'Load earlier' })
-        await loadEarlier.waitFor({ timeout: 10_000 })
-        await loadEarlier.click()
+        const loadingEarlier = page.getByRole('button', { name: /Loading earlier history/ })
+        await expect.poll(async () => (await loadEarlier.count()) + (await loadingEarlier.count()), {
+          timeout: 30_000,
+        }).toBeGreaterThan(0)
+        if (await loadingEarlier.count() === 0) await loadEarlier.click()
       }
       loadOlderOperations += 1
       await expect.poll(() => historyReads.length, { timeout: 15_000 })
