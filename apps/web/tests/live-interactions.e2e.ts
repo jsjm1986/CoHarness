@@ -140,6 +140,10 @@ describe('web e2e: live-turn interactions (cancel / error / retry)', () => {
     // hang (prefix chunks delivered to the loop) before the stop click.
     await expect.poll(() => existsSync(marker), { timeout: 15_000 }).toBe(true)
     await expect.poll(
+      () => page.locator('[class*="centerCol"]').getByText('partial', { exact: true }).count(),
+      { timeout: 10_000 },
+    ).toBeGreaterThan(0)
+    await expect.poll(
       () => page.getByRole('status').filter({ hasText: 'Deep diving...' }).isVisible(),
       { timeout: 10_000 },
     ).toBe(true)
@@ -169,7 +173,7 @@ describe('web e2e: live-turn interactions (cancel / error / retry)', () => {
     // frozen-partial swap is eventually consistent, so poll rather than count.
     await expect.poll(() => page.locator('textarea').first().isEnabled(), { timeout: 10_000 }).toBe(true)
     await expect.poll(() => page.locator('[data-streaming="true"]').count(), { timeout: 10_000 }).toBe(0)
-    await expect.poll(() => page.getByText('partial', { exact: true }).count(), { timeout: 10_000 })
+    await expect.poll(() => page.locator('[class*="centerCol"]').getByText('partial', { exact: true }).count(), { timeout: 10_000 })
       .toBeGreaterThan(0)
     // Golden of the aborted end-state: the prompt bubble plus the frozen
     // partial ('partial' is the hang entry's replayed prefix) and no more.
