@@ -6,7 +6,7 @@
  * (HMR safety) against the real SlotRegistry.
  */
 import { Context } from '@deepseek-ai/cordis'
-import { act, cleanup, fireEvent, render, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   ConversationEventRegistry, ConversationNodeAssembler, SlotRegistry,
@@ -19,9 +19,7 @@ import type {
 import { apply as applyLocale, inject as localeInject } from '@deepseek-ai/dsh-client-locale/client'
 import type { ChatFileMentions, TurnTailOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { makeTranslate, stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
-import {
-  fitProducedFiles, ProducedFiles, type ProducedFilesProps,
-} from '../src/client/ProducedFiles.tsx'
+import { ProducedFiles, type ProducedFilesProps } from '../src/client/ProducedFiles.tsx'
 import {
   basename, deliverablesDefinition, producedFileMentions, producedForClosing, selectProducedFiles,
   type DeliverablesTurnData,
@@ -30,17 +28,10 @@ import { apply, inject } from '../src/client/index.ts'
 import { apply as applyInvariant } from '../src/invariant.ts'
 import { en, zh } from '../src/client/locales.ts'
 
-const originalClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth')
-
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
-  if (originalClientWidth === undefined) {
-    delete (HTMLElement.prototype as { clientWidth?: number }).clientWidth
-  } else {
-    Object.defineProperty(HTMLElement.prototype, 'clientWidth', originalClientWidth)
-  }
 })
 
 class TestTurnDataStore implements ConversationLocationDataStore<ConversationTurnDataMap> {
@@ -250,6 +241,33 @@ describe('produced-file Turn data', () => {
     expect(deliverablesDefinition.update(context, unrelated)).toBe(state)
   })
 
+  it('keeps Turn data identity while produced paths are unchanged', () => {
+    const startMatch = matched(at(1, 'turn/start', { turn: 1 }), 'start')
+    const build = deliverablesDefinition.buildLocationData?.bind(deliverablesDefinition)
+    if (build === undefined) throw new Error('deliverables publishes Turn data')
+    const produced = [{ seq: 2, path: 'a.ts' }]
+    const context: Parameters<typeof build>[0] = {
+      key: 'deliverables:1',
+      kind: 'deliverables',
+      id: '1',
+      matches: [startMatch],
+      start: startMatch,
+      state: { turn: 1, calls: new Map(), produced },
+      current: new Map(),
+    }
+    const first = build(context, 'turn', null)
+    expect(first).toEqual({ kind: 'turn', turn: 1, key: 'deliverables', value: { produced } })
+
+    expect(build(context, 'turn', first)).toBe(first)
+    expect(build({ ...context, state: undefined }, 'turn', first)).toBeNull()
+    expect(build(context, 'step', first)).toBeNull()
+
+    const grownPaths = [...produced, { seq: 3, path: 'b.ts' }]
+    const second = build({ ...context, state: { turn: 1, calls: new Map(), produced: grownPaths } }, 'turn', first)
+    expect(second).not.toBe(first)
+    expect(second).toEqual({ kind: 'turn', turn: 1, key: 'deliverables', value: { produced: grownPaths } })
+  })
+
   it('replays a tail page once prepend supplies its missing Turn start', () => {
     const value = assembler([
       call(10, 'late', diff('history.txt')),
@@ -293,48 +311,9 @@ describe('ProducedFiles row', () => {
     }
   }
 
-  it('selects the largest prefix using the exact remainder width', () => {
-    expect(fitProducedFiles(230, 8, [70, 60, 60], [55, 55, 55, 55])).toBe(2)
-    expect(fitProducedFiles(145, 8, [70, 60, 60], [55, 55, 55, 55])).toBe(1)
-    expect(fitProducedFiles(300, 8, [70, 60, 60], [55, 55, 55, 55])).toBe(3)
-    // A zero-width lane is a pre-layout test/hidden state, not evidence that
-    // every chip overflowed; keep the bounded initial prefix until measured.
-    expect(fitProducedFiles(0, 8, [70, 60], [60, 50, undefined])).toBe(2)
-    expect(fitProducedFiles(128, 8, [60, 60], [70, 50, undefined])).toBe(2)
-    // Candidate-specific suffix widths matter at the 10 -> 9 digit boundary.
-    expect(fitProducedFiles(126, 8, [60], [70, 50])).toBe(1)
-    expect(fitProducedFiles(20, 8, [60], [70, 50])).toBe(0)
-  })
-
-  it('keeps one measured line, updates on resize, and opens a file or the workspace folder', () => {
-    const paths = ['deep/a.html', 'b.css', 'c.ts', 'd.ts', 'e.ts', 'f.ts', 'g.ts']
+  it('renders the bounded CSS candidates and opens a file or the workspace folder', () => {
+    const paths = ['deep/a.html', 'b.css', 'c.ts', 'd.ts', 'e.ts', 'f.ts', 'g.ts', 'h.ts']
     const openFile = vi.fn<(path: string) => void>()
-    let available = 226
-    let resize: ResizeObserverCallback | undefined
-    const disconnect = vi.fn()
-    const observeNode = vi.fn<(target: Element) => void>()
-    vi.stubGlobal('ResizeObserver', class {
-      constructor(callback: ResizeObserverCallback) { resize = callback }
-      observe(target: Element): void {
-        expect(target).toBeInstanceOf(Element)
-        observeNode(target)
-      }
-      disconnect(): void { disconnect() }
-    })
-    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
-      configurable: true,
-      get(this: HTMLElement) { return this.hasAttribute('data-produced-files-row') ? available : 0 },
-    })
-    const rect = (width: number): DOMRect => ({
-      x: 0, y: 0, width, height: 22, top: 0, right: width, bottom: 22, left: 0,
-      toJSON: () => ({}),
-    })
-    const bounds = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
-      .mockImplementation(function getProbeRect(this: HTMLElement) {
-        if (this.closest('[aria-hidden="true"]') === null) return rect(0)
-        if (this.tagName !== 'BUTTON') return rect(60)
-        return rect(this.textContent === 'a.html' || this.textContent === 'b.css' ? 50 : 100)
-      })
 
     const view = render(
       <ProducedFiles matched={paths} openFile={openFile} {...capability(true)} t={t} />,
@@ -342,9 +321,8 @@ describe('ProducedFiles row', () => {
     expect(view.getByText('产物')).toBeTruthy()
     const row = view.container.querySelector('[data-produced-files-row]')
     if (!(row instanceof HTMLElement)) throw new Error('produced row missing')
-    // The third probe is 100px: two chips plus the remainder fit, three do not.
-    expect(within(row).getAllByRole('button')).toHaveLength(2)
-    expect(within(row).getByText('+ 5 个文件')).toBeTruthy()
+    expect(within(row).getAllByRole('button')).toHaveLength(6)
+    expect(within(row).getByText('+ 2 个文件')).toBeTruthy()
     const chip = view.getByRole('button', { name: '打开 deep/a.html' })
     expect(chip.textContent).toBe('a.html')
     expect(chip.getAttribute('title')).toBe('deep/a.html')
@@ -355,30 +333,6 @@ describe('ProducedFiles row', () => {
     const showFolder = view.getByRole('button', { name: '在文件夹中显示' })
     fireEvent.click(showFolder)
     expect(openFile).toHaveBeenLastCalledWith('.')
-
-    available = 150
-    act(() => { resize?.([], {} as ResizeObserver) })
-    expect(within(row).getAllByRole('button')).toHaveLength(1)
-    expect(within(row).getByText('+ 6 个文件')).toBeTruthy()
-
-    // A missing/unsupported computed gap falls back to zero rather than NaN.
-    vi.stubGlobal('getComputedStyle', () => ({ columnGap: '', gap: '' } as CSSStyleDeclaration))
-    available = 165
-    act(() => { resize?.([], {} as ResizeObserver) })
-    expect(within(row).getAllByRole('button')).toHaveLength(2)
-
-    // Ref callbacks leave nulls in the probe arrays when the candidate set
-    // shrinks; the replacement observer must skip those stale slots.
-    observeNode.mockClear()
-    view.rerender(
-      <ProducedFiles matched={paths.slice(0, 1)} openFile={openFile} {...capability(true)} t={t} />,
-    )
-    expect(within(row).getAllByRole('button')).toHaveLength(1)
-    expect(observeNode).toHaveBeenCalledTimes(3)
-
-    view.unmount()
-    expect(disconnect).toHaveBeenCalledTimes(2)
-    bounds.mockRestore()
   })
 
   it('keeps the folder action absent without overflow or a local native opener', () => {

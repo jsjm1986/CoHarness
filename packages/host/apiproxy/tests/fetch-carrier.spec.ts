@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { ApiProxy, HostFrame, MuxFrame } from '../src/api/index.ts'
 import type { ResponseValue } from '../src/api/rpc-map.ts'
 import type { ClientResponse, RpcMessage, RpcReceipt, RpcRequest } from '../src/api/rpc.ts'
@@ -11,7 +12,7 @@ const SCRIPTED_HISTORY_PAGE = {
     {
       event: {
         type: 'assistant/chunk',
-        seq: 1,
+        seq: SessionSeq(1),
         time: 1000,
         data: { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'packed ' } },
       },
@@ -19,7 +20,7 @@ const SCRIPTED_HISTORY_PAGE = {
     {
       event: {
         type: 'assistant/chunk',
-        seq: 2,
+        seq: SessionSeq(2),
         time: 1010,
         data: { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'history ' } },
       },
@@ -27,7 +28,7 @@ const SCRIPTED_HISTORY_PAGE = {
     {
       event: {
         type: 'assistant/chunk',
-        seq: 3,
+        seq: SessionSeq(3),
         time: 1020,
         data: { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'page' } },
       },
@@ -35,7 +36,7 @@ const SCRIPTED_HISTORY_PAGE = {
     {
       event: {
         type: 'tool/call',
-        seq: 4,
+        seq: SessionSeq(4),
         time: 1030,
         data: { turn: 1, step: 1, callId: 'call-1' as never, name: 'bash', arguments: '{"command":"pwd"}' },
       },

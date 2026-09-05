@@ -43,7 +43,7 @@
   min-height: var(--dsw-mobile-header-height);
   padding: var(--dsw-safe-top) var(--dsw-space-2) 0
     calc(var(--dsw-space-2) + var(--dsw-safe-left));
-  border-bottom: 1px solid var(--dsw-alias-border-l1);
+  border-bottom: 0.5px solid var(--dsw-alias-border-l1);
   background: var(--dsw-alias-bg-base);
 }
 
@@ -159,8 +159,9 @@
   visibility: hidden;
   overflow: hidden;
   background: var(--dsw-specific-sidebar-fill);
-  border-right: 1px solid var(--dsw-alias-border-l1);
-  box-shadow: var(--dsw-shadow-lv3);
+  border-right: 0;
+  --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
+  box-shadow: var(--dsw-elevation-prominent);
   transition:
     transform var(--ds-transition-duration-slow) var(--ds-ease-in-out),
     visibility var(--ds-transition-duration-slow) step-end;
@@ -188,7 +189,7 @@
   visibility: hidden;
   overflow: hidden;
   background: var(--dsw-alias-bg-base);
-  border-left: 1px solid var(--dsw-alias-border-l2);
+  border-left: 0.5px solid var(--dsw-alias-border-l2);
   transition:
     transform var(--ds-transition-duration-slow) var(--ds-ease-in-out),
     visibility var(--ds-transition-duration-slow) step-end;
@@ -236,7 +237,7 @@
   min-width: 0;
   overflow: hidden;
   background: var(--dsw-specific-sidebar-fill);
-  border-right: 1px solid var(--dsw-alias-border-l1);
+  border-right: 0.5px solid var(--dsw-alias-border-l3);
 }
 
 .centerCol {
@@ -254,7 +255,7 @@
 .detailsCol {
   min-width: 0;
   overflow: hidden;
-  border-left: 1px solid var(--dsw-alias-border-l2);
+  border-left: 0.5px solid var(--dsw-alias-border-l3);
 }
 
 /* The details subtree stays mounted at zero width, so its border must not paint
@@ -301,7 +302,7 @@
   border-radius: 10px;
   box-sizing: border-box;
   background: var(--dsw-alias-button-floating-fill);
-  border: 1px solid var(--dsw-alias-border-l2-darkmode-thin);
+  border: 0.5px solid var(--dsw-alias-border-l2-darkmode-thin);
   /* Hover affordance: the details pill hides until the pointer is over its
      column, the strip itself, or a drag. */
   opacity: 0;

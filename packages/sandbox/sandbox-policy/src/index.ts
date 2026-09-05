@@ -147,7 +147,7 @@ export class SandboxPolicyService extends Service {
    * @returns the last logged mode, or `undefined` without one.
    */
   overrideOf(session: Session): SandboxMode | undefined {
-    return effectiveSandboxMode(session.events)
+    return effectiveSandboxMode(session.snapshotEvents())
   }
 }
 

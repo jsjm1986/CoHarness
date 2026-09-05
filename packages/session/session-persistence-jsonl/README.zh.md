@@ -14,7 +14,7 @@ JSONL 持久会话存储后端：`SessionPersistence` 的一个具体实现（`d
       session.jsonl              # only with compression: 'none'
 ```
 
-- 第一个逻辑行是不可变的 `SessionHeader`，标记为 `{ type: 'session', version, id, cwd?, createdAt, parentSession?, seedLength?, origin?, delegationDepth, agentPreset? }`。`delegationDepth` 在磁盘上必需，顶层会话为 `0`；缺失或无效值会拒绝日志。`agentPreset` 必须持久化，因为它决定了被恢复会话的工具与提示词——恢复成另一套组装，就会回放模型已无法据以行动的历史。后续每个逻辑行是一条存储记录；`assistant/chunk` 事件绝不丢弃，且 `seq` 在解码日志中保持连续（`events[i].seq === i`）。
+- 第一个逻辑行是私有的 v0 物理 header，标记为 `{ type: 'session', version, id, cwd?, createdAt, parentSession?, seedLength?, origin?, delegationDepth, agentPreset?, draft? }`。其可选的数字 `seedLength` 保持字节兼容：缺失解码为 `SessionHeader.isSeeded: false`，零或正值解码为 `isSeeded: true` 加精确的 `inheritedEventCount`，因此逻辑 header 从不携带位置整数。`delegationDepth` 在磁盘上必需，顶层会话为 `0`；缺失或无效值会拒绝日志。`agentPreset` 必须持久化，因为它决定了被恢复会话的工具与提示词——恢复成另一套组装，就会回放模型已无法据以行动的历史。后续每个逻辑行是一条存储记录；`assistant/chunk` 事件绝不丢弃，且 `seq` 在解码日志中保持连续（`events[i].seq === i`）。
 - 存储记录可以是原样的 `SessionEvent` JSON，也可以在启用 `packChunks` 且连续段符合条件时写为**分片打包行**（`text-chunks`／`reasoning-chunks`／`tool-call-chunks`；使用无斜线标签避免与事件类型混淆）：一行保存至少 3 个连续同块 `assistant/chunk` delta 事件，`seq0`／`time0` 与各成员的 `dt` 间隔可精确重建每个成员。无损 codec 位于 `@deepseek-ai/dsh-session`（`packChunkRuns`／`decodeStorageRecord`），未识别形态原样存储；读取与布局无关，打包、非打包和混合文件加载结果一致。
 - surface 的 `sourceEventSeqs` 数组在连续段有收益时使用无损闭区间范围；读取方同时接受范围形式和旧的数字数组形式。
 - 项目目录保留规范化 cwd 的可读形式，便于导航，并限制在文件系统组件上限内。分隔符替换和截断刻意有损，因此规范化相同的 cwd 字符串共享项目目录；会话 id 仍选择不同会话目录。在不区分大小写的文件系统上，只有文件系统规范化将两种写法解析到同一 transcript（文本记录）时，身份验证才接受备选路径写法。配置根仍由部署控制：可以是项目本地、共享、临时或集中式。[项目会话目录决策](../../../.agents/notes/implemented/architecture/2026-07-24-project-session-directories.zh.md) 记录这项取舍。
@@ -51,7 +51,7 @@ JSONL 持久会话存储后端：`SessionPersistence` 的一个具体实现（`d
 - **延迟实体化。**`create(meta)` 不写入；浏览器草稿会把边界和策略事件保留在内存中，直到出现实体化事件，后端才把完整缓冲前缀和第一批写入临时文件并执行 `fsync`。出现可见消息后 header 会退出草稿状态；仅命令工件仍对普通列表隐藏。POSIX 通过硬链接无覆盖发布，并对父目录 `fsync`。Windows 通过 `MoveFileExW(..., MOVEFILE_WRITE_THROUGH)` 无覆盖发布，并通过同一 write-through pattern 创建缺失目录。已创建但从未 append 的会话不留下磁盘内容，不在 `list` 中。
 - **仅追加。** 已 flush 事件绝不重写。后续原始批次 append 行；压缩批次 append 一个 frame。两条路径都执行 `fsync`，并在捕获到写入或同步失败时回滚到之前字节长度。
 - **崩溃恢复：保留有效尾部工作。**`load` 验证每个完整压缩 frame，并扫描解压 JSONL。最后 frame 结构不完整时，读取器保留其完整解码记录，从 frame 开头截断，并使用共享[持久化约定](../../../.agents/notes/implemented/architecture/2026-06-14-session-persistence.zh.md) 需要的合成工具、步骤和轮次 closer 重新编码这些记录。原始 mode 从第一个不完整行截断。已经存在却没有完整 header frame 的压缩工件、完整 frame 中的 checksum/解压失败，或位于最后已提交的 `turn/end` 处或之前的缺陷都属于损坏，会被拒绝。
-- **非修改式检查。**`inspect()` 返回不可变、平衡的逻辑视图，并可在内存中合成恢复 closer，但不会截断不完整尾部或更改轻量修订。
+- **非修改式检查。**`inspect()` 返回带精确继承切点的不可变、平衡逻辑视图，并可在内存中合成恢复 closer，但不会截断不完整尾部或更改轻量修订。`readFrom(id, fromOffset)` 接受 `SessionLogOffset`，解析整个工件后向前跳过，把后缀与同一切点一起返回；仅读 header 的列表暴露 `isSeeded`，无需读取事件体。
 - **连续 seq。**`append` 拒绝第一个 `seq` 不继续已存储日志的批次，并拒绝无法 JSON 序列化的 `event.data`，同时命名违规事件类型。
 - **轻量修订。**`revision(id, signal?)` 只解析指定产物，并使用 device、inode、size 和纳秒时间戳标识它，不解析日志；`listSnapshots(signal?)` 对每个已发现产物使用同一身份。该标识会在 append、修复、替换或存储变更后改变。完整前缀读取要求读取字节前后的身份一致，`readStoredRevision()` 也使用同一身份校验保留的 preparation。快照列表通过产物发现原样转发该信号，并在每个 `stat` 前后检查取消；由于文件系统 `stat` 不可中断，取消会等待活动调用完成，然后在不启动另一次调用的情况下拒绝。
 

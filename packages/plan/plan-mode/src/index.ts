@@ -246,7 +246,7 @@ export class PlanModeController extends Service {
       text: (context) => {
         if (context.agent === undefined) return ''
         const pending = this.pendingIntents.get(context.agent.session)
-        return (pending?.active ?? foldPlanMode(context.agent.session.events)) ? this.section : ''
+        return (pending?.active ?? foldPlanMode(context.agent.session.snapshotEvents())) ? this.section : ''
       },
     })
 
@@ -314,7 +314,7 @@ export class PlanModeController extends Service {
                 // Repeat the queued wording while an exit still awaits the
                 // next accepted pre-step; only a truly inactive session reads
                 // idempotent.
-                return foldPlanMode(agent.session.events)
+                return foldPlanMode(agent.session.snapshotEvents())
                   ? { kind: 'success', text: 'Leaving plan mode (applies from the next step).' }
                   : { kind: 'success', text: 'Plan mode is already inactive.' }
             }
@@ -358,7 +358,7 @@ export class PlanModeController extends Service {
       execute: async (args, exec) => {
         const agent = exec.agent
         if (agent === undefined) throw new Error(`${EXIT_PLAN_MODE} requires a calling agent (no session to switch)`)
-        if (!foldPlanMode(agent.session.events)) {
+        if (!foldPlanMode(agent.session.snapshotEvents())) {
           throw new Error(`${EXIT_PLAN_MODE} is only available in plan mode`)
         }
         if (!/^#\s+\S/.test(args.plan.trim())) {
@@ -438,7 +438,7 @@ export class PlanModeController extends Service {
    * @returns Current logged state plus a pending selection, when present.
    */
   get(agent: Agent): { active: boolean; pending?: boolean } {
-    const active = foldPlanMode(agent.session.events)
+    const active = foldPlanMode(agent.session.snapshotEvents())
     const pending = this.pendingIntents.get(agent.session)
     return pending === undefined ? { active } : { active, pending: pending.active }
   }
@@ -462,15 +462,15 @@ export class PlanModeController extends Service {
   set(agent: Agent, active: boolean): 'committed' | 'queued' | 'cancelled' | 'noop' {
     const session = agent.session
     const pending = this.pendingIntents.get(session)
-    const target = pending?.active ?? foldPlanMode(session.events)
+    const target = pending?.active ?? foldPlanMode(session.snapshotEvents())
     if (active === target) return 'noop'
-    if (hasOpenTurn(session.events)) {
+    if (hasOpenTurn(session.snapshotEvents())) {
       this.pendingIntents.set(session, { active, narrate: true })
-      return foldPlanMode(session.events) === active ? 'cancelled' : 'queued'
+      return foldPlanMode(session.snapshotEvents()) === active ? 'cancelled' : 'queued'
     }
     // No open turn: commit now. Delete only after append succeeds so a
     // failed durable write leaves the selection retryable, not dropped.
-    if (active === foldPlanMode(session.events)) {
+    if (active === foldPlanMode(session.snapshotEvents())) {
       this.pendingIntents.delete(session)
       return 'cancelled'
     }
@@ -486,7 +486,7 @@ export class PlanModeController extends Service {
     const pending = this.pendingIntents.get(session)
     if (pending === undefined) return
     const target = pending.active
-    if (target === foldPlanMode(session.events)) {
+    if (target === foldPlanMode(session.snapshotEvents())) {
       this.pendingIntents.delete(session)
       return
     }
@@ -498,7 +498,7 @@ export class PlanModeController extends Service {
 
   /** Build a user-switch notice when the last logged header described the other mode. */
   private narration(session: Session, target: boolean): UserMessage | undefined {
-    const told = planModeAtLastHeader(session.events)
+    const told = planModeAtLastHeader(session.snapshotEvents())
     if (told === undefined || told === target) return
     const text = target
       ? 'The user switched this session to plan mode.'

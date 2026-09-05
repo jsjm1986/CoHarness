@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { SessionId } from '@deepseek-ai/dsh-session'
+import { SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
 import { resolveSessionPreset } from '../src/session.ts'
 
@@ -18,13 +18,14 @@ function header(agentPreset?: string): SessionHeader {
     version: 0,
     id: SessionId('s'),
     createdAt: 1,
+    isSeeded: false,
     delegationDepth: 0,
     ...agentPreset === undefined ? {} : { agentPreset },
   }
 }
 
 /** One logged selection, as `agentPreset.select` appends it. */
-function selected(agentPreset: string, seq: number): SessionEvent {
+function selected(agentPreset: string, seq: SessionSeq): SessionEvent {
   return { type: 'agent-preset/selected', seq, time: seq, data: { agentPreset } }
 }
 
@@ -36,21 +37,21 @@ describe('resolving which preset a session ran', () => {
   it('prefers a logged switch over the header', () => {
     // The switch's effect outlives the blank window it was made in: the turns
     // that follow run under the newer composition.
-    expect(resolveSessionPreset({ header: header('standard'), events: [selected('minimal', 0)] }))
+    expect(resolveSessionPreset({ header: header('standard'), events: [selected('minimal', SessionSeq(0))] }))
       .toBe('minimal')
   })
 
   it('takes the last switch when a session was moved twice', () => {
     expect(resolveSessionPreset({
       header: header('standard'),
-      events: [selected('minimal', 0), selected('cordis', 1)],
+      events: [selected('minimal', SessionSeq(0)), selected('cordis', SessionSeq(1))],
     })).toBe('cordis')
   })
 
   it('finds a switch behind later events', () => {
     const later = { type: 'turn/end', seq: 2, time: 2, data: { turn: 1 } } as SessionEvent
 
-    expect(resolveSessionPreset({ header: header(), events: [selected('minimal', 0), later] }))
+    expect(resolveSessionPreset({ header: header(), events: [selected('minimal', SessionSeq(0)), later] }))
       .toBe('minimal')
   })
 

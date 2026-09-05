@@ -28,7 +28,7 @@ function durable(agent: Agent): {
   tasks: TeamTaskSnapshot[]
   pendingMessages: TeamMessageSnapshot[]
 } {
-  const state = foldTeam(agent.id, agent.session.events)
+  const state = foldTeam(agent.id, agent.session.snapshotEvents())
   return {
     members: [...state.members.values()],
     tasks: [...state.tasks.values()],
@@ -131,9 +131,11 @@ function persistedChild(
     agentProvider: 'mock',
     agentModel: 'mock',
   }))
+  // The seed is the child's own bootstrap turn (an unseeded lifecycle whose
+  // descriptor is owned), not an inherited fork prefix.
   const child = ctx.sessions.create(childId, {
     seed,
-    meta: { parentSession: rootId, seedLength: 0, origin: 'subagent' },
+    meta: { parentSession: rootId, isSeeded: false, origin: 'subagent' },
   })
   child.append('agent/inbox/spliced', {
     target: 'next-turn',

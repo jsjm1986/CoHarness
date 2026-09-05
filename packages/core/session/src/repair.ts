@@ -7,7 +7,8 @@
 
 import { MessageId, freezeMessage, type CallId } from '@deepseek-ai/dsh-llm'
 import type { ToolResultMessage } from '@deepseek-ai/dsh-llm'
-import type { SessionEvent } from './types.ts'
+import { SessionSeq } from './types.ts'
+import type { SessionEvent, SessionSeq as SessionSeqType } from './types.ts'
 
 /** Recovery code for an assistant tool request that never reached a recorded call start. */
 export const TOOL_NOT_STARTED = 'TOOL_NOT_STARTED'
@@ -29,7 +30,7 @@ export function interruptedTurnClosers(events: readonly SessionEvent[]): Session
   let openStep: number | null = null
   // Reset at each turn boundary so earlier calls cannot leak into tail repair.
   // Assistant blocks register calls; later `tool/call` events add their seqs to `sourceEventSeqs`.
-  const pendingCalls = new Map<CallId, { step: number; callSeq?: number }>()
+  const pendingCalls = new Map<CallId, { step: number; callSeq?: SessionSeqType }>()
   for (const event of events) {
     switch (event.type) {
       case 'turn/start':
@@ -108,7 +109,7 @@ export function interruptedTurnClosers(events: readonly SessionEvent[]): Session
     })
     closers.push({
       type: 'tool/result',
-      seq: seq++,
+      seq: SessionSeq(seq++),
       time,
       data: {
         turn: openTurn,
@@ -126,8 +127,8 @@ export function interruptedTurnClosers(events: readonly SessionEvent[]): Session
   // Close an open step next — a turn/end while a step is open is an invariant
   // violation, so the step's boundary must be synthesized before the turn's.
   if (openStep !== null) {
-    closers.push({ type: 'step/end', seq: seq++, time, data: { turn: openTurn, step: openStep } })
+    closers.push({ type: 'step/end', seq: SessionSeq(seq++), time, data: { turn: openTurn, step: openStep } })
   }
-  closers.push({ type: 'turn/end', seq: seq++, time, data: { turn: openTurn, reason: { kind: 'interrupted' } } })
+  closers.push({ type: 'turn/end', seq: SessionSeq(seq++), time, data: { turn: openTurn, reason: { kind: 'interrupted' } } })
   return closers
 }

@@ -24,7 +24,7 @@ Capacity deliberately stays out of `EpochHeader`. That type is the reconstructio
 
 Both units ride the standard projection lifecycle: history tail baselines, `session/projection` live frames, higher-seq-wins client storage, JSON checkpoints, cache recovery, and unit unload. There is no token-specific history field, mux frame, projector, revision counter, or client fence.
 
-The Web `StatsLine` reads both through the standard `useProjection` seat. Window nodes still supply turn and step counts plus LLM and tool wall times — those answer "what is on screen" and are correctly window-scoped. Durable token and context groups remain when compaction leaves no visible assistant step. Cache writes count in billed input and in the cache-hit denominator. A deployment without token-meter drops the token groups; occupancy stays hidden until both pressure and capacity are known.
+The Web `StatsLine` reads both through the standard `useProjection` seat. Window nodes still supply turn and step counts plus LLM and tool wall times — those answer "what is on screen" and are correctly window-scoped. Durable token and context groups remain when compaction leaves no visible assistant step. Cache writes count in billed input and in the cache-hit denominator. A deployment without token-meter drops the token groups; occupancy stays hidden until both pressure and capacity are known. The exact-overflow tooltip mounts its measuring child only for a non-empty line and retains one `ResizeObserver` while values change; text changes perform one direct measurement without replacing the observer.
 
 ## Context occupancy is approximate, and that is the decision
 

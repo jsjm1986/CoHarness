@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { CallId, type StreamChunk } from '@deepseek-ai/dsh-llm'
-import SessionStore, { type SessionEvent } from '@deepseek-ai/dsh-session'
+import SessionStore, { type SessionEvent, SessionSeq, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type { SessionPersistence } from '@deepseek-ai/dsh-session-persistence'
 import SessionPersistenceJsonl from '@deepseek-ai/dsh-session-persistence-jsonl'
 import SessionPersistenceSqlite from '@deepseek-ai/dsh-session-persistence-sqlite'
@@ -53,19 +53,19 @@ function closedChunkLog(
 ): SessionEvent[] {
   const chunks = entries.map(({ chunk, time, ignorable }, index): SessionEvent => ({
     type: 'assistant/chunk',
-    seq: index + 2,
+    seq: SessionSeq(index + 2),
     time,
     data: { turn: 1, step: 1, chunk },
     ...ignorable === true ? { ignorable } : {},
   }))
   return [
-    { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } },
-    { type: 'step/start', seq: 1, time: 2, data: { turn: 1, step: 1 } },
+    { type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } },
+    { type: 'step/start', seq: SessionSeq(1), time: 2, data: { turn: 1, step: 1 } },
     ...chunks,
-    { type: 'step/end', seq: chunks.length + 2, time: 3, data: { turn: 1, step: 1 } },
+    { type: 'step/end', seq: SessionSeq(chunks.length + 2), time: 3, data: { turn: 1, step: 1 } },
     {
       type: 'turn/end',
-      seq: chunks.length + 3,
+      seq: SessionSeq(chunks.length + 3),
       time: 4,
       data: { turn: 1, reason: { kind: 'completed' } },
     },
@@ -112,15 +112,15 @@ function packingMatrixLog(): SessionEvent[] {
 
 function storageTagCollisionLog(): SessionEvent[] {
   return [
-    { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } },
+    { type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } },
     ...['text-chunks', 'reasoning-chunks', 'tool-call-chunks'].map((type, index) => ({
       type,
-      seq: index + 1,
+      seq: SessionSeq(index + 1),
       time: index + 2,
       data: { future: true },
       ignorable: true as const,
     }) as unknown as SessionEvent),
-    { type: 'turn/end', seq: 4, time: 5, data: { turn: 1, reason: { kind: 'completed' } } },
+    { type: 'turn/end', seq: SessionSeq(4), time: 5, data: { turn: 1, reason: { kind: 'completed' } } },
   ]
 }
 
@@ -150,11 +150,12 @@ async function verifyBackend(
     for (const batch of batches(events, sizes)) {
       await mounted.persistence.append(header.id, batch)
     }
-    expect(await mounted.persistence.inspect(header.id), name).toEqual({ meta: header, events })
+    expect(await mounted.persistence.inspect(header.id), name)
+      .toEqual({ meta: header, inheritedEventCount: SessionLogOffset(0), events })
     expect(await mounted.persistence.list(), name).toEqual([header])
     const revision = (await mounted.persistence.listSnapshots())[0]?.revision
     for (let fromSeq = 0; fromSeq <= events.length + 1; fromSeq += 1) {
-      expect((await mounted.persistence.readFrom(header.id, fromSeq)).events, `${name} seq ${fromSeq}`)
+      expect((await mounted.persistence.readFrom(header.id, SessionLogOffset(fromSeq))).events, `${name} seq ${fromSeq}`)
         .toEqual(events.slice(fromSeq))
     }
     expect((await mounted.persistence.listSnapshots())[0]?.revision, name).toBe(revision)
@@ -164,7 +165,8 @@ async function verifyBackend(
 
   mounted = await mount(name, root)
   try {
-    expect(await mounted.persistence.inspect(header.id), `${name} reopen`).toEqual({ meta: header, events })
+    expect(await mounted.persistence.inspect(header.id), `${name} reopen`)
+      .toEqual({ meta: header, inheritedEventCount: SessionLogOffset(0), events })
   } finally {
     await mounted.dispose()
   }

@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
+import { SessionSeq } from '@deepseek-ai/dsh-session'
 import { Context } from '@deepseek-ai/cordis'
 import { stat } from 'node:fs/promises'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
@@ -37,7 +38,7 @@ function header(id: string, cwd: string | null = '/project'): SessionHeader {
   return {
     version: 0,
     id: sid(id),
-    createdAt: 100,
+    createdAt: 100, isSeeded: false,
     ...(cwd === null ? {} : { cwd }),
   }
 }
@@ -50,7 +51,7 @@ function hit(id: string, index = 0): SessionSearchHit {
     persisted: false,
     bestMatch: {
       sessionId: session.id,
-      seq: index,
+      seq: SessionSeq(index),
       type: 'user/message',
       time: 200 + index,
       surface: 'current',

@@ -4,6 +4,8 @@ Status: implemented
 
 [English](2026-07-31-web-default-search.md) | 中文
 
+[共享 base 的 Web 抓取默认值](2026-09-01-shared-base-web-fetch-default.zh.md)取代本文关于抓取按需启用的决策。本文继续负责默认搜索提供方、凭据解析、端点、超时，以及提供方可用性与模型工具注册之间的区分。
+
 ## 问题
 
 该 harness 已具备完整的 Web 能力体系：提供方注册表、DeepSeek、Exa 和 Perplexity 搜索提供方、本地抓取、稳定的面向模型工具，以及结构化结果呈现，但已交付的 `dsh web` 组合没有挂载其中任何一项。除非部署提供自定义覆盖层，否则模型无法发现最新信息。仅挂载现有 DeepSeek 提供方仍无法打通 WebUI 链路：Models 页面通过 `ctx.credentials` 存储 `DEEPSEEK_API_KEY`，而搜索提供方只会在插件加载时固定读取进程环境，因此在运行中的 UI 输入或轮换的密钥无法用于搜索。

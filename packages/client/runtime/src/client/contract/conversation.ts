@@ -213,11 +213,14 @@ export interface ConversationNodeDefinition<State = unknown> {
    * the same Location key.
    * @param context - latest complete Context.
    * @param scope - Location hierarchy level currently being materialized.
-   * @returns current Location value, or null while unavailable.
+   * @param previous - value from the preceding materialization; return it when unchanged.
+   * @returns current Location value, preserving value identity while unchanged,
+   * or null while unavailable.
    */
   buildLocationData?(
     context: ConversationNodeContext<State>,
     scope: ConversationLocationDataScope,
+    previous: ConversationLocationData | null,
   ): ConversationLocationData | null
   /**
    * Materialize one final Node for this Definition's declared view target.

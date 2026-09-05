@@ -86,16 +86,16 @@ function validateAttached(history: readonly SessionEvent[], event: SessionEvent<
 
 function validateSession(session: Session, fail: InvariantFailure): void {
   const attachedByMessage = new Set<string>()
-  for (const [index, event] of session.events.entries()) {
+  for (const [index, event] of session.snapshotEvents().entries()) {
     if (event.type === 'userdoc/attached') {
-      validateAttached(session.events.slice(0, index), event, fail)
+      validateAttached(session.snapshotEvents().slice(0, index), event, fail)
       const data = event.data
       const key = `${data.messageId}:${String(data.index)}`
       if (attachedByMessage.has(key)) fail('one document index must have at most one userdoc/attached event')
       attachedByMessage.add(key)
     }
   }
-  for (const event of session.events) {
+  for (const event of session.snapshotEvents()) {
     if (event.type !== 'user/message' || event.data.source.kind !== SOURCE_KIND
       || !('documents' in event.data.source) || !Array.isArray(event.data.source.documents)) continue
     event.data.source.documents.forEach((_attachment, index) => {
@@ -118,7 +118,7 @@ function installAttachedEventCheck(ctx: Context, fail: InvariantFailure): void {
   ctx.on('internal/dispatch', (_mode, eventName, args) => {
     if (eventName !== 'session/event') return
     const [session, event] = args as [Session, SessionEvent]
-    if (event.type === 'userdoc/attached') validateAttached(session.events, event, fail)
+    if (event.type === 'userdoc/attached') validateAttached(session.snapshotEvents(), event, fail)
   }, { global: true })
 }
 

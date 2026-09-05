@@ -88,7 +88,7 @@
 
 .organizationCard {
   overflow: hidden;
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: var(--dsw-radius-lg);
 }
 
@@ -135,7 +135,7 @@
   min-height: 42px;
   gap: 12px;
   padding: 0 14px;
-  border-top: 1px solid var(--dsw-alias-border-l2);
+  border-top: 0.5px solid var(--dsw-alias-border-l2);
 }
 
 .organizationModels code {
@@ -146,7 +146,7 @@
 .organizationFailure {
   margin: 0;
   padding: 11px 14px;
-  border-top: 1px solid var(--dsw-alias-border-l2);
+  border-top: 0.5px solid var(--dsw-alias-border-l2);
   color: var(--dsw-alias-label-tertiary);
   font-size: 12px;
   line-height: 18px;
@@ -169,8 +169,8 @@
 /* A configured provider: outlined on the panel fill, so the filled editor
    card it expands into reads as the nested object. */
 .rowCard {
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: var(--dsw-radius-lg);
+  border: 0.5px solid var(--dsw-alias-border-l4);
+  border-radius: var(--dsw-radius-xl);
   padding: var(--dsw-space-3) 14px;
   display: flex;
   flex-direction: column;
@@ -204,7 +204,7 @@
 .rowTag {
   flex: none;
   padding: 1px 6px;
-  border: 1px solid var(--dsw-alias-border-l3);
+  border: 0.5px solid var(--dsw-alias-border-l3);
   border-radius: var(--dsw-radius-xs);
   font-size: 11px;
   line-height: 16px;
@@ -218,6 +218,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
+  corner-shape: round;
 }
 
 .credentialDotConfigured {
@@ -267,7 +268,7 @@
 
 .secondaryButton,
 .addButton {
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 0.5px solid var(--dsw-alias-border-l3);
   background: transparent;
   color: var(--dsw-alias-label-primary);
 }
@@ -443,7 +444,7 @@
   gap: 6px;
   height: 44px;
   border: 1px dashed var(--dsw-alias-border-l3);
-  border-radius: var(--dsw-radius-lg);
+  border-radius: var(--dsw-radius-xl);
 }
 
 .addButtonFull {
@@ -469,7 +470,7 @@
 }
 
 .customized {
-  border-top: 1px solid var(--dsw-alias-border-l2);
+  border-top: 0.5px solid var(--dsw-alias-border-l2);
   padding-top: 10px;
 }
 
@@ -530,7 +531,7 @@
   flex-direction: column;
   gap: 10px;
   padding-top: var(--dsw-space-3);
-  border-top: 1px solid var(--dsw-alias-border-l2);
+  border-top: 0.5px solid var(--dsw-alias-border-l2);
 }
 
 .modelCatalogHeading {
@@ -574,8 +575,8 @@
 }
 
 .modelEntry {
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: var(--dsw-radius-md);
+  border: 0.5px solid var(--dsw-alias-border-l4);
+  border-radius: 10px;
   padding: 6px;
 }
 
@@ -668,7 +669,7 @@
   gap: var(--dsw-space-2);
   margin: 0;
   padding: var(--dsw-space-2);
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: var(--dsw-radius-md);
 }
 
@@ -701,7 +702,7 @@
   gap: var(--dsw-space-1);
   height: 28px;
   padding: 0 10px;
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 0.5px solid var(--dsw-alias-border-l3);
   border-radius: 14px;
   background: transparent;
   color: var(--dsw-alias-label-primary);
@@ -720,7 +721,7 @@
   width: 100%;
   height: 32px;
   padding: 0 10px;
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 0.5px solid var(--dsw-alias-border-l4);
   border-radius: var(--dsw-radius-md);
   font: inherit;
   font-size: 14px;
@@ -812,10 +813,16 @@ select.input {
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 }
 
-.candidateActions {
+.candidateToolbar {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 6px;
+}
+
+.candidateSearch {
+  min-width: 0;
+  flex: 1 1 240px;
 }
 
 .candidateList {
@@ -846,6 +853,14 @@ select.input {
   font-family: var(--ds-font-family-code);
   font-size: 13px;
   overflow-wrap: anywhere;
+}
+
+.candidateEmpty {
+  margin: 24px 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  line-height: 20px;
+  text-align: center;
 }
 
 /* Compact viewports (below the 768 medium boundary, docs/web-styling.md):

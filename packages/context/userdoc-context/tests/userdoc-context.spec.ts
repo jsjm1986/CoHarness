@@ -136,7 +136,7 @@ describe('user-document prompt context', () => {
       signal: new AbortController().signal,
     })
 
-    expect(session.events.map(event => event.type)).toEqual(['user/message'])
+    expect(session.snapshotEvents().map(event => event.type)).toEqual(['user/message'])
   })
 
   it('records an attached event after the exact user message and replays the frozen model text', async () => {
@@ -161,17 +161,17 @@ describe('user-document prompt context', () => {
       signal: new AbortController().signal,
     })
 
-    expect(session.events.map(event => event.type)).toEqual([
+    expect(session.snapshotEvents().map(event => event.type)).toEqual([
       'turn/start', 'step/start', 'user/message', 'userdoc/attached',
     ])
-    const attached = session.events.at(-1)
+    const attached = session.snapshotEvents().at(-1)
     expect(attached?.type).toBe('userdoc/attached')
     expect(session.deriveMessages()[0]?.content).toEqual([
       { type: 'text', text: 'Uploaded document "report.txt" at "/uploads/report"; contents inlined verbatim:\nfrozen contents' },
     ])
 
-    const replayed = Session.create(SessionId('userdoc-replay'), session.events)
+    const replayed = Session.create(SessionId('userdoc-replay'), session.snapshotEvents())
     expect(replayed.deriveMessages()).toEqual(session.deriveMessages())
-    expect(replayed.events.find(event => event.type === 'userdoc/attached')?.data).toEqual(attached?.data)
+    expect(replayed.snapshotEvents().find(event => event.type === 'userdoc/attached')?.data).toEqual(attached?.data)
   })
 })

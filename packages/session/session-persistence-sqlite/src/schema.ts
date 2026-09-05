@@ -10,8 +10,10 @@ import type { DatabaseSync } from 'node:sqlite'
 import { setTimeout as delay } from 'node:timers/promises'
 import {
   SessionId,
+  SessionLogOffset,
   type SessionHeader,
 } from '@deepseek-ai/dsh-session'
+import type { SessionStorageMetadata } from '@deepseek-ai/dsh-session-persistence'
 import { sql } from './sql.ts'
 
 /** Current physical-record schema with packed rows and CoHarness extensions. */
@@ -365,12 +367,24 @@ export function rowToMeta(row: SessionRow): SessionHeader {
     createdAt: row.created_at,
     ...row.cwd === null ? {} : { cwd: row.cwd },
     ...row.parent_session === null ? {} : { parentSession: SessionId(row.parent_session) },
-    ...row.seed_length === null ? {} : { seedLength: row.seed_length },
+    // The stored `seed_length` column is the exact inherited cut; the header
+    // exposes only its presence and the storage metadata carries the integer.
+    isSeeded: row.seed_length !== null,
     ...row.origin === null ? {} : { origin: row.origin },
     ...row.delegation_depth === null ? {} : { delegationDepth: row.delegation_depth },
     ...row.agent_preset === null ? {} : { agentPreset: row.agent_preset },
     ...(row.draft === 1 ? { draft: true } : {}),
   }
+}
+
+/**
+ * Reconstruct the storage metadata (header plus exact inherited cut) from a
+ * validated metadata row.
+ * @param row - validated stored metadata row.
+ * @returns the storage metadata the persistence coordinator consumes.
+ */
+export function rowToStorage(row: SessionRow): SessionStorageMetadata {
+  return { meta: rowToMeta(row), inheritedEventCount: SessionLogOffset(row.seed_length ?? 0) }
 }
 
 function record(value: unknown, label: string): Record<string, unknown> {

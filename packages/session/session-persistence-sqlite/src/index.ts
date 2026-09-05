@@ -10,6 +10,7 @@ import type {
   SessionEvent,
   SessionHeader,
   SessionId,
+  SessionLogOffset,
   SessionPreparation,
 } from '@deepseek-ai/dsh-session'
 import {
@@ -20,6 +21,7 @@ import {
   MAX_WRITE_BATCH_DELAY_MS,
   PersistenceCoordinator,
   SessionPersistence,
+  type SessionEventSuffix,
   type SessionInspection,
   type SessionLocation,
   type SessionPersistenceRevision as PersistenceRevision,
@@ -108,8 +110,8 @@ export class SqliteSessionPersistence extends SessionPersistence {
   }
 
   /* jscpd:ignore-start -- each persistence provider repeats the narrow Service Definition adapter. */
-  create(meta: SessionHeader): Promise<void> {
-    return this.coordinator.create(meta)
+  create(meta: SessionHeader, inheritedEventCount?: SessionLogOffset): Promise<void> {
+    return this.coordinator.create(meta, inheritedEventCount)
   }
 
   /** Persist an empty session as a metadata row without an event row. */
@@ -133,11 +135,7 @@ export class SqliteSessionPersistence extends SessionPersistence {
     return this.coordinator.inspect(id, signal)
   }
 
-  readFrom(
-    id: SessionId,
-    fromSeq: number,
-    signal?: AbortSignal,
-  ): Promise<{ meta: SessionHeader; events: SessionEvent[] }> {
+  readFrom(id: SessionId, fromSeq: SessionLogOffset, signal?: AbortSignal): Promise<SessionEventSuffix> {
     return this.coordinator.readFrom(id, fromSeq, signal)
   }
   /* jscpd:ignore-end */

@@ -9,7 +9,7 @@
   padding: 0 var(--dsw-space-2) 0 var(--dsw-space-5);
   gap: var(--dsw-space-6);
   border-radius: var(--dsw-radius-md);
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 0.5px solid var(--dsw-alias-border-l4);
   background: var(--dsw-alias-bg-layer-3);
   min-width: 0;
 }

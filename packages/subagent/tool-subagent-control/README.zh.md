@@ -2,9 +2,9 @@
 
 [English](README.md) | 中文
 
-可选的全局具名 `send_message`、`interrupt_agent` 与 `list_agents` 工具是 `ctx.subagents` 之上的轻量适配器。绑定提供方的 `@deepseek-ai/dsh-tool-subagent` 实例会为每种传输注册不同的委派工具；这个单独加载的包只注册一次共享控制工具，因此多个委派工具绝不会重复注册全局控制工具。根插件注册 `send_message` 与 `interrupt_agent`，且只要求 `subagents`；可单独加载的 `./list-agents` 插件注册 `list_agents`，并将 `subagents` 与 `agents` 声明为加载时依赖。其目录读取在调用时还要求会话存储与投影注册表，但不要求任何查询服务。部署可保留根插件工具并省略列表工具。是否加载这些工具不会决定委派工具是否启动可继续工作。这些工具只负责父到子的方向；单独安装的 [`@deepseek-ai/dsh-tool-subagent-report`](../tool-subagent-report/README.zh.md) 负责子到父的方向。
+可选的全局具名 `send_message`、`interrupt_agent` 与 `list_agents` 工具是 `ctx.subagents` 之上的轻量适配器。绑定提供方的 `@deepseek-ai/dsh-tool-subagent` 实例会为每种传输注册不同的委派工具；这个单独加载的包只注册一次共享控制工具，因此多个委派工具绝不会重复注册全局控制工具。根插件注册 `send_message` 与 `interrupt_agent`，且只要求 `subagents`；可单独加载的 `./list-agents` 插件注册 `list_agents`，并将 `subagents` 与 `agents` 声明为加载时依赖。其目录读取在调用时还要求会话存储与投影注册表，但不要求任何查询服务。部署可保留根插件工具并省略列表工具。是否加载这些工具不会决定委派工具是否启动可继续工作。父级与可继续子级继承同一份 `send_message` 定义与顺序，因此模型间通信不会增加任何仅子级可见的工具 schema：`send_message` 在直接父级与子级之间沿受支持的任一方向 steer 消息。
 
-本工具不执行生命周期路由：驻留与冷恢复归 subagent 服务所有。它将 `exec.agent` 作为授权投递的确切在线父级传入，并把每条消息的来源记录为 `{ kind: 'coordinator', senderSessionId: parent.id }`；服务会保留该来源，但绝不将其视为权限。每条消息都会通过 `Agent.followup()` 成为 subagent 的下一个 FIFO 轮次：如果子 agent（智能体）仍在工作，该消息会等待其当前轮次结束，因此无法重定向已经在进行的工作。本工具会转发其执行信号，该信号只在 inbox 接受之前掌管准入；一旦子 agent 接受消息，已接受的轮次便无法再通过本工具取消。本次调用不会返回子 agent 的回复；通过该 id 查看其 transcript（文本记录），才是了解它完成了哪些工作的真源。拥有 `report` 的子 agent 会自行把内容作为一条单独的父级消息发回。投递失败会变为出错的工具结果，并明确说明消息未送达。
+本工具不执行生命周期路由：驻留、冷恢复与授权都归 subagent 服务所有。它把 `exec.agent` 同时作为发送方与权限传给 `ctx.subagents.sendMessage()`：任何确切在线的 Agent 都可以把直接可继续子级作为目标，驻留的可继续子级还可以把直接父级作为目标。正在工作的目标会经 Steer 在最近的 step 边界收到消息；空闲目标开启新轮次，冷的直接子级则经继续执行生命周期恢复。每条消息都以 `Agent <sender-id> sent a message:` 开头，并记录为 `{ kind: 'agent-message', form: 'relay', senderSessionId: sender.id }`；该归属由服务推导，绝不视为权限。本工具会转发其执行信号，该信号只在 inbox 接受之前掌管准入；目标一旦接受消息，便无法再通过本工具取消。本次调用不会返回回复：通过目标 id 查看其 transcript（文本记录）才是了解它做了什么的真源，回复是另一条显式指定目标的 `send_message`。失败——不受支持的目标、父级不可用、未知子级、无描述符而无法恢复的子级或准入被拒——会变为出错的工具结果，并明确说明消息未送达。
 
 `interrupt_agent(agent_id)` 将 `exec.agent` 作为 `ctx.subagents.interrupt()` 的确切在线 ancestor 授权传入：目标可以是直接 child 或更深的后代，由服务——而不是本工具——依据目标 Activation 记录的 lineage 校验调用方。只有目标的当前轮次会停止（`keepInbox`）：已排队的消息保持暂停直到之后的 `send_message`，已发布的后代继续运行，child 也仍可接受后续消息。调用在停止请求被接受后立即返回，不等待目标完全停稳；目标不存在或已结算是被接受的 no-op，而 self、sibling、陈旧与非 ancestor 调用方会成为出错结果。
 
@@ -16,7 +16,7 @@
 
 #### 模型看到的内容
 
-已生成的 [schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-subagent-control)：`send_message` 包含 `subagent_id` 和 `message`，说明消息会成为 subagent 的下一个轮次、本次调用不会返回 subagent 的回答，以及失败即表示消息未送达；`interrupt_agent` 包含 `agent_id`，说明只有当前轮次会停止、已排队消息保持暂停、后代继续运行，以及接受先于实际停止；`list_agents` 包含可选的 `scope` 枚举。
+已生成的 [schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-subagent-control)：`send_message` 包含 `agent_id` 和 `message`，说明正在工作的目标会在最近的 step 被 steer、空闲目标则开启新轮次，本次调用不会返回 agent 的回答，以及失败即表示消息未送达；`interrupt_agent` 包含 `agent_id`，说明只有当前轮次会停止、已排队消息保持暂停、后代继续运行，以及接受先于实际停止；`list_agents` 包含可选的 `scope` 枚举。
 
 #### Token 影响
 
@@ -44,11 +44,11 @@
 
 #### 模型看到的内容
 
-接受时返回 `message queued as the next turn for subagent <subagent_id>`；规范输出携带被接受的 `messageId`。失败，包括未授权或未知的子 agent、缺少描述符而无法恢复的子 agent，或准入被拒绝，都会成为出错的结果，其消息说明该消息未送达。
+接受时返回 `message delivered to agent <agent_id>`；规范输出携带被接受的 `messageId`。失败——不相邻的目标、父级不可用、未知子级、缺少描述符而无法恢复的子级，或准入被拒绝——都会成为出错的结果，其消息说明该消息未送达。
 
 #### Token 影响
 
-每次调用产生一条简短确认消息；子 agent 的响应绝不会通过本次调用返回。单独授予的 `report` 可以把选定内容追加到父级历史中。
+每次调用产生一条简短确认消息；目标的响应绝不会通过本次调用返回。子级用同一个工具、以其初始任务中的父级 id 为目标，把选定内容追加到父级历史中。
 
 #### KV Cache 影响
 
@@ -70,7 +70,7 @@
 
 ## 已知限制与暂缓事项
 
-- **已排队的消息没有独立结果**：接受时只返回其 inbox `messageId`；subagent 的工作会落入持久化子 agent 会话，绝不会通过本工具收集。获得 `report` 的子 agent 可以单独发回选定内容，但该消息不是本次调用的结果。
-- **不对当前轮次进行 steering（中途引导）**：每条消息都会开启后续 FIFO 轮次，因此在子 agent 工作时发送的消息只会在其当前轮次结束后运行，无法将其重定向。
+- **已投递的消息没有独立结果**：接受时只返回其 inbox `messageId`；目标之后的工作会落入该目标的持久化会话，绝不会通过本工具收集。回复是另一条显式指定目标的 `send_message`，不是本次调用的结果。
+- **只有受支持的相邻 Agent 之间才能通信**：任何发送方都可以把直接可继续子级作为目标，只有拥有驻留可继续 Activation 的发送方才能把直接父级作为目标，且该父级必须保持在线；兄弟节点和更深的后代不是消息目标，只有向直接子级的投递支持冷激活。
 - **列表是快照，而非投递承诺**：它可能与发布、dispose（资源释放）或后续消息发生竞态，另一个进程也可能激活当前进程报告为 `ready` 的 child；跨进程准确性需要共享租约。`interrupt_agent` 自己执行权威的在线 lineage 检查，因此过期的发现结果不会授予权限。
 - **没有分页或删除**：系统返回完整且稳定排序的集合；只要 child 会话仍在持久化存储中，它就会继续出现在列表中，服务级上限或删除操作留待后续产品决策。

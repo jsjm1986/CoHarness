@@ -179,7 +179,7 @@ function renderReading(location: TmuxLocation, turn: number): string {
  * cache state.
  */
 function latestInjectedState(agent: Agent): { state: string; time: number } | undefined {
-  for (const event of [...agent.session.events].reverse()) {
+  for (const event of [...agent.session.snapshotEvents()].reverse()) {
     if (event.type === 'user/message'
       && event.data.source.kind === 'plugin'
       && event.data.source.plugin === name) {

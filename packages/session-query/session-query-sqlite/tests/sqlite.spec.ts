@@ -5,10 +5,15 @@ import { DatabaseSync } from 'node:sqlite'
 import { chmod, mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import SessionStore, { SESSION_FORMAT_VERSION, SessionId } from '@deepseek-ai/dsh-session'
+import SessionStore, {
+  SESSION_FORMAT_VERSION,
+  SessionId,
+  SessionLogOffset,
+  SessionSeq,
+} from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionHeader, SessionId as SessionIdType } from '@deepseek-ai/dsh-session'
 import SessionPersistence, { SessionPersistenceRevision } from '@deepseek-ai/dsh-session-persistence'
-import type { SessionPersistenceSnapshot } from '@deepseek-ai/dsh-session-persistence'
+import type { SessionEventSuffix, SessionInspection, SessionPersistenceSnapshot } from '@deepseek-ai/dsh-session-persistence'
 import SqliteSessionPersistence from '@deepseek-ai/dsh-session-persistence-sqlite'
 import SqliteSessionQueryEngine, {
   SESSION_QUERY_SQLITE_SCHEMA_VERSION,
@@ -37,13 +42,13 @@ async function temporaryPath(name = 'search.db'): Promise<string> {
 }
 
 function header(id: string, createdAt = 1, extra: Partial<SessionHeader> = {}): SessionHeader {
-  return { version: SESSION_FORMAT_VERSION, id: SessionId(id), createdAt, ...extra }
+  return { version: SESSION_FORMAT_VERSION, id: SessionId(id), createdAt, isSeeded: false, ...extra }
 }
 
-function messageEvents(text: string, time = 1): SessionEvent[] {
+function messageEvents(text: string, time = 1): SessionEvent<'user/message'>[] {
   return [{
     type: 'user/message',
-    seq: 0,
+    seq: SessionSeq(0),
     time,
     data: createUserMessage({
       content: [{ type: 'text', text }], source: { kind: 'user' },
@@ -69,7 +74,11 @@ function replaceCursorOffset(
 class TestPersistence extends SessionPersistence {
   override readonly supportsRawArtifacts = false
 
-  static entries = new Map<SessionIdType, { meta: SessionHeader; events: SessionEvent[] }>()
+  static entries = new Map<SessionIdType, {
+    meta: SessionHeader
+    inheritedEventCount?: SessionLogOffset
+    events: SessionEvent[]
+  }>()
   static revisions = new Map<SessionIdType, number>()
   static nextRevision = 0
   static loads = new Map<SessionIdType, number>()
@@ -91,7 +100,11 @@ class TestPersistence extends SessionPersistence {
     return undefined
   }
 
-  static reset(entries: readonly { meta: SessionHeader; events: SessionEvent[] }[] = []): void {
+  static reset(entries: readonly {
+    meta: SessionHeader
+    inheritedEventCount?: SessionLogOffset
+    events: SessionEvent[]
+  }[] = []): void {
     this.entries = new Map()
     this.revisions = new Map()
     this.loads = new Map()
@@ -108,13 +121,21 @@ class TestPersistence extends SessionPersistence {
     this.failure = undefined
   }
 
-  static set(entry: { meta: SessionHeader; events: SessionEvent[] }): void {
+  static set(entry: {
+    meta: SessionHeader
+    inheritedEventCount?: SessionLogOffset
+    events: SessionEvent[]
+  }): void {
     this.entries.set(entry.meta.id, structuredClone(entry))
     this.revisions.set(entry.meta.id, ++this.nextRevision)
   }
 
-  create(meta: SessionHeader): Promise<void> {
-    TestPersistence.set({ meta, events: [] })
+  create(meta: SessionHeader, inheritedEventCount?: SessionLogOffset): Promise<void> {
+    TestPersistence.set({
+      meta,
+      ...inheritedEventCount === undefined ? {} : { inheritedEventCount },
+      events: [],
+    })
     return Promise.resolve()
   }
 
@@ -126,7 +147,7 @@ class TestPersistence extends SessionPersistence {
     return Promise.resolve()
   }
 
-  async load(id: SessionIdType): Promise<{ meta: SessionHeader; events: SessionEvent[] }> {
+  async load(id: SessionIdType): Promise<SessionInspection> {
     TestPersistence.loads.set(id, (TestPersistence.loads.get(id) ?? 0) + 1)
     if (TestPersistence.failure !== undefined) throw TestPersistence.failure
     const entry = TestPersistence.entries.get(id)
@@ -137,10 +158,13 @@ class TestPersistence extends SessionPersistence {
       effect(entry)
       TestPersistence.revisions.set(id, ++TestPersistence.nextRevision)
     }
-    return structuredClone(entry)
+    return {
+      ...structuredClone(entry),
+      inheritedEventCount: entry.inheritedEventCount ?? SessionLogOffset(0),
+    }
   }
 
-  async inspect(id: SessionIdType, signal?: AbortSignal): Promise<{ meta: SessionHeader; events: SessionEvent[] }> {
+  async inspect(id: SessionIdType, signal?: AbortSignal): Promise<SessionInspection> {
     TestPersistence.inspections.set(id, (TestPersistence.inspections.get(id) ?? 0) + 1)
     TestPersistence.inspectSignals.push(signal)
     if (TestPersistence.failure !== undefined) throw TestPersistence.failure
@@ -148,12 +172,19 @@ class TestPersistence extends SessionPersistence {
     if (entry === undefined) throw new Error('missing test session')
     await TestPersistence.inspectEffect?.(entry, signal)
     TestPersistence.inspectEffect = undefined
-    return structuredClone(entry)
+    return {
+      ...structuredClone(entry),
+      inheritedEventCount: entry.inheritedEventCount ?? SessionLogOffset(0),
+    }
   }
 
-  async readFrom(id: SessionIdType, fromSeq: number, signal?: AbortSignal): Promise<{ meta: SessionHeader; events: SessionEvent[] }> {
+  async readFrom(
+    id: SessionIdType,
+    fromSeq: SessionLogOffset,
+    signal?: AbortSignal,
+  ): Promise<SessionEventSuffix> {
     const whole = await this.inspect(id, signal)
-    return { meta: whole.meta, events: whole.events.filter(event => event.seq >= fromSeq) }
+    return { ...whole, fromSeq, events: whole.events.filter(event => event.seq >= fromSeq) }
   }
 
   async list(): Promise<SessionHeader[]> {
@@ -312,10 +343,12 @@ describe('SQLite session search', () => {
   it('searches two-character Unicode61 tokens in live-only sessions', async () => {
     const ctx = await liveContext({ path: ':memory:', snippetChars: 20 })
     const session = ctx.sessions.create(SessionId('live'), {
+      seed: messageEvents('inherited context'),
+      inheritedEventCount: SessionLogOffset(1),
       // agentPreset rides along: the index rebuilds the header a caller reads,
       // and a session listed under the wrong composition is a lie about what it
       // ran. The full-header comparison below is what pins every column.
-      meta: { cwd: '/work', createdAt: 10, seedLength: 1, delegationDepth: 2, agentPreset: 'minimal' },
+      meta: { cwd: '/work', createdAt: 10, isSeeded: true, delegationDepth: 2, agentPreset: 'minimal' },
     })
     session.append(
       'user/message',
@@ -327,11 +360,44 @@ describe('SQLite session search', () => {
 
     await expect(ctx.sessionQuery.searchEvents({ sessionId: session.id, query: 'AI' }))
       .resolves.toMatchObject({
-        session: { ...session.header, seedLength: 1 },
-        items: [{ sessionId: session.id, seq: 0, snippet: 'An AI helper' }],
+        session: session.header,
+        items: [{ sessionId: session.id, seq: 2, snippet: 'An AI helper' }],
       })
     await expect(ctx.sessionQuery.searchSessions({ query: 'AI' }))
-      .resolves.toMatchObject({ items: [{ header: { ...session.header, seedLength: 1 }, live: true, persisted: false }] })
+      .resolves.toMatchObject({ items: [{ header: session.header, live: true, persisted: false }] })
+    const db = (ctx.sessionQuery as unknown as { _db: DatabaseSync })._db
+    expect(db.prepare('SELECT seed_length FROM temp.live_sessions WHERE id = ?').get(session.id))
+      .toEqual({ seed_length: 1 })
+  })
+
+  it('retains a persisted inherited cut and reindexes when that source identity changes', async () => {
+    const meta = header('persisted-seed-cut', 10, { isSeeded: true })
+    const events: SessionEvent[] = [
+      ...messageEvents('persisted cut needle'),
+      { ...messageEvents('second inherited event')[0]!, seq: SessionSeq(1) },
+    ]
+    TestPersistence.reset([{
+      meta,
+      inheritedEventCount: SessionLogOffset(1),
+      events,
+    }])
+    const ctx = await liveContext()
+    await ctx.plugin(TestPersistence)
+    const db = (ctx.sessionQuery as unknown as { _db: DatabaseSync })._db
+
+    await expect(ctx.sessionQuery.searchSessions({ query: 'needle' }))
+      .resolves.toMatchObject({ items: [{ header: { ...meta, isSeeded: true } }] })
+    expect(db.prepare('SELECT seed_length FROM persisted_sessions WHERE id = ?').get(meta.id))
+      .toEqual({ seed_length: 1 })
+
+    TestPersistence.set({
+      meta,
+      inheritedEventCount: SessionLogOffset(2),
+      events,
+    })
+    await ctx.sessionQuery.searchSessions({ query: 'needle' })
+    expect(db.prepare('SELECT seed_length FROM persisted_sessions WHERE id = ?').get(meta.id))
+      .toEqual({ seed_length: 2 })
   })
 
   it('excludes assistant reasoning while indexing visible answer text', async () => {
@@ -368,14 +434,14 @@ describe('SQLite session search', () => {
     const ctx = await liveContext({ path: ':memory:', defaultLimit: 10, maxLimit: 20 })
     const parent = SessionId('parent')
     const events: SessionEvent[] = [
-      { type: 'user/message', seq: 0, time: 10, data: createUserMessage({
+      { type: 'user/message', seq: SessionSeq(0), time: 10, data: createUserMessage({
         content: [{ type: 'text', text: 'needle original' }], source: { kind: 'user' },
       }), surfaceOp: 'append' },
-      { type: 'assistant/chunk', seq: 1, time: 11, data: { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'needle raw' } } },
-      { type: 'user/message', seq: 2, time: 12, data: createUserMessage({
+      { type: 'assistant/chunk', seq: SessionSeq(1), time: 11, data: { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'needle raw' } } },
+      { type: 'user/message', seq: SessionSeq(2), time: 12, data: createUserMessage({
         content: [{ type: 'text', text: 'needle summary' }], source: { kind: 'plugin', plugin: 'test' },
-      }), surfaceOp: { op: 'replace', start: 0, end: 0 }, sourceEventSeqs: [0] },
-      { type: 'turn/end', seq: 3, time: 13, data: { turn: 1, reason: { kind: 'error', error: { message: 'needle failure', code: 'UNKNOWN' } } } },
+      }), surfaceOp: { op: 'replace', start: SessionSeq(0), end: SessionSeq(0) }, sourceEventSeqs: [SessionSeq(0)] },
+      { type: 'turn/end', seq: SessionSeq(3), time: 13, data: { turn: 1, reason: { kind: 'error', error: { message: 'needle failure', code: 'UNKNOWN' } } } },
     ]
     ctx.sessions.create(SessionId('a'), { seed: events, meta: { cwd: '/a', parentSession: parent, createdAt: 20 } })
     ctx.sessions.create(SessionId('b'), { seed: messageEvents('needle peer', 12), meta: { createdAt: 20 } })
@@ -532,8 +598,8 @@ describe('SQLite session search', () => {
     const target = ctx.sessions.create(SessionId('target'), {
       seed: [
         ...messageEvents('needle one', 10),
-        { ...messageEvents('needle two', 11)[0]!, seq: 1 },
-        { ...messageEvents('needle three', 12)[0]!, seq: 2 },
+        { ...messageEvents('needle two', 11)[0]!, seq: SessionSeq(1) },
+        { ...messageEvents('needle three', 12)[0]!, seq: SessionSeq(2) },
       ],
     })
     ctx.sessions.create(SessionId('other'), { seed: messageEvents('needle other', 10) })
@@ -875,7 +941,7 @@ describe('SQLite reconciliation and source lifecycle', () => {
     const durable = header('post-reconcile-unmount')
     TestPersistence.reset([{ meta: durable, events: [
       ...messageEvents('durable needle', 1),
-      { ...messageEvents('durable needle again', 2)[0]!, seq: 1 },
+      { ...messageEvents('durable needle again', 2)[0]!, seq: SessionSeq(1) },
     ] }])
     const ctx = await liveContext({ path: ':memory:', defaultLimit: 1, maxLimit: 2 })
     const persistence = await ctx.plugin(TestPersistence)

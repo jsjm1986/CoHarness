@@ -39,7 +39,7 @@
 .panel::after {
   position: absolute;
   inset: 0;
-  border: 1px solid var(--dsw-alias-border-l1);
+  border: 0.5px solid var(--dsw-alias-border-l1);
   /* The input card's own top border closes the shape below. */
   border-bottom: none;
   border-radius: inherit;
@@ -148,7 +148,7 @@
   width: 24px;
   height: 24px;
   flex: none;
-  border: 1px solid var(--dsw-alias-border-l1);
+  border: 0.5px solid var(--dsw-alias-border-l1);
   border-radius: 4px;
   background: var(--dsw-alias-bg-base);
   object-fit: cover;
@@ -158,7 +158,7 @@
   box-sizing: border-box;
   height: 28px;
   padding: 0 var(--dsw-space-2);
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 0.5px solid var(--dsw-alias-border-l4);
   border-radius: var(--dsw-radius-sm);
   outline: none;
   background: var(--dsw-alias-bg-base);
@@ -185,6 +185,7 @@
   padding: 0;
   border: none;
   border-radius: 999px;
+  corner-shape: round;
   background: transparent;
   color: var(--dsw-alias-label-tertiary);
   cursor: pointer;

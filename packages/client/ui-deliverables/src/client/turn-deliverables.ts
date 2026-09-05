@@ -128,14 +128,19 @@ export const deliverablesDefinition: ConversationNodeDefinition<DeliverablesStat
       ? context.state
       : { ...context.state, produced: [...context.state.produced, ...additions] }
   },
-  buildLocationData: (context, scope) => scope !== 'turn' || context.state === undefined
-    ? null
-    : {
+  buildLocationData: (context, scope, previous) => {
+    if (scope !== 'turn' || context.state === undefined) return null
+    if (previous?.kind === 'turn'
+      && previous.turn === context.state.turn
+      && previous.key === 'deliverables'
+      && previous.value.produced === context.state.produced) return previous
+    return {
       kind: 'turn',
       turn: context.state.turn,
       key: 'deliverables',
       value: { produced: context.state.produced },
-    },
+    }
+  },
 }
 
 /**

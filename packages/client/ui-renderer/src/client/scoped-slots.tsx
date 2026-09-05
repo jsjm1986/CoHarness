@@ -4,13 +4,13 @@
  */
 import { Component, useMemo, useState, useSyncExternalStore, type FC, type ReactNode } from 'react'
 import {
-  SlotOwnershipError, StaleAuthorizationError,
-  type ChainRenderOpts, type HostObservable, type LocaleFace, type RenderOpts,
+  SlotOwnershipError, StaleAuthorizationError, standardHookPropName,
+  type ChainRenderOpts, type HostObservable, type KeyedStandardSource, type LocaleFace, type RenderOpts,
   type SessionMaybeProvideInfo, type SessionProvideInfo, type SlotRenderer, type SlotRendererHost,
   type SlotScope, type StoredEntry, type Translate,
 } from '@deepseek-ai/dsh-client-ui-slots'
 import {
-  HostContext, SessionMaybeProvider, SessionProvider, SlotAssemblyError, maybeObservableHook,
+  HostContext, SessionMaybeProvider, SessionProvider, SlotAssemblyError, keyedObservableHook, maybeObservableHook,
   observableHook, projectionHook, useHost, useSessionMaybeProvideInfo,
 } from './session-provider.tsx'
 
@@ -107,21 +107,27 @@ function runInject(entry: StoredEntry, info: SessionMaybeProvideInfo | undefined
   const args: unknown[] = []
   if (info !== undefined) args.push(info.sessionId)
   if (actions !== undefined) args.push(actions)
-  return bindInjectHooks((inject as (...args: unknown[]) => InjectedProps)(...args))
+  return bindInjectSources((inject as (...args: unknown[]) => InjectedProps)(...args))
 }
 
-/**
- * Normalize one entry-owned inject face on its existing cache axis. Its hooks
- * compartment remains the original Observable-only contract.
- */
-function bindInjectHooks(face: InjectedProps): InjectedProps {
+/** Bind one entry-owned inject face on its existing cache axis. */
+function bindInjectSources(face: InjectedProps): InjectedProps {
   const sources = face['hooks']
-  if (sources === undefined) return face
-  const { hooks: _hooks, ...rest } = face
+  const keyedSources = face['keyedHooks']
+  if (sources === undefined && keyedSources === undefined) return face
+  const { hooks: _hooks, keyedHooks: _keyedHooks, ...rest } = face
   const bound: InjectedProps = rest
-  for (const [name, source] of Object.entries(sources as Record<string, HostObservable<unknown>>)) {
-    const hookName = `use${name[0]?.toUpperCase() ?? ''}${name.slice(1)}`
+  for (const [name, source] of Object.entries(
+    (sources ?? {}) as Record<string, HostObservable<unknown>>,
+  )) {
+    const hookName = standardHookPropName(name)
     bound[hookName] = observableHook(source)
+  }
+  for (const [name, source] of Object.entries(
+    (keyedSources ?? {}) as Record<string, KeyedStandardSource>,
+  )) {
+    const hookName = standardHookPropName(name)
+    bound[hookName] = keyedObservableHook(source)
   }
   return bound
 }

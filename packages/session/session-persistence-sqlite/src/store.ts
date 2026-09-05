@@ -13,6 +13,7 @@ import {
   SessionId,
   type SessionEvent,
   type SessionHeader,
+  type SessionLogOffset,
 } from '@deepseek-ai/dsh-session'
 import {
   SessionPersistenceRevision,
@@ -20,6 +21,7 @@ import {
   type PersistenceBackend,
   type SessionPersistenceRevision as PersistenceRevision,
   type SessionPersistenceSnapshot,
+  type SessionStorageMetadata,
   type StoredPrefix,
   type StoredSuffix,
 } from '@deepseek-ai/dsh-session-persistence'
@@ -42,6 +44,7 @@ import {
   openDatabase,
   validateSchemaForMutation,
   rowToMeta,
+  rowToStorage,
   type SessionRow,
 } from './schema.ts'
 import { sql } from './sql.ts'
@@ -144,7 +147,7 @@ export class SqliteStore implements PersistenceBackend<number> {
     if (snapshot === undefined) return undefined
     const scanned = scanRows(snapshot.eventRows)
     return {
-      meta: rowToMeta(snapshot.row),
+      ...rowToStorage(snapshot.row),
       events: scanned.preserved,
       revision: sqliteRevision(this.storeIdentity, snapshot.row),
       ...scanned.tornFrom === undefined ? {} : { tornMarker: scanned.tornFrom },
@@ -158,7 +161,7 @@ export class SqliteStore implements PersistenceBackend<number> {
     return row === undefined ? undefined : sqliteRevision(this.storeIdentity, row)
   }
 
-  async loadStoredFrom(id: SessionId, fromSeq: number, signal?: AbortSignal): Promise<StoredSuffix | undefined> {
+  async loadStoredFrom(id: SessionId, fromSeq: SessionLogOffset, signal?: AbortSignal): Promise<StoredSuffix | undefined> {
     await this.observe(signal)
     const snapshot = this.readTransaction(() => {
       const row = this.rowFor(id)
@@ -168,14 +171,15 @@ export class SqliteStore implements PersistenceBackend<number> {
     signal?.throwIfAborted()
     if (snapshot === undefined) return undefined
     const { preserved } = scanRows(snapshot.eventRows, snapshot.base)
-    return { meta: rowToMeta(snapshot.row), events: preserved.filter(event => event.seq >= fromSeq) }
+    return { ...rowToStorage(snapshot.row), events: preserved.filter(event => event.seq >= fromSeq) }
   }
 
   async appendBatch(
-    meta: SessionHeader,
+    storage: SessionStorageMetadata,
     events: readonly SessionEvent[],
     isMaterialized: boolean,
   ): Promise<void> {
+    const meta = storage.meta
     await this.open()
     if (events.length === 0) return
     this.db.exec(sql('begin-immediate'))
@@ -188,7 +192,7 @@ export class SqliteStore implements PersistenceBackend<number> {
       if (first.seq !== expected) {
         throw new Error(`session ${meta.id} append starts at seq ${first.seq}, stored next seq is ${expected}`)
       }
-      if (!isMaterialized) this.writeRow(meta)
+      if (!isMaterialized) this.writeRow(storage)
 
       const insert = this.insertStatement()
       for (const record of packChunkRuns(events)) this.insertRecord(insert, meta.id, bindRecord(record))
@@ -200,7 +204,8 @@ export class SqliteStore implements PersistenceBackend<number> {
   }
 
   /** Durably insert one header-only session row. */
-  async materializeHeader(meta: SessionHeader): Promise<void> {
+  async materializeHeader(storage: SessionStorageMetadata): Promise<void> {
+    const meta = storage.meta
     await this.open()
     this.db.exec(sql('begin-immediate'))
     try {
@@ -208,7 +213,7 @@ export class SqliteStore implements PersistenceBackend<number> {
       if (this.rowFor(meta.id) !== undefined) {
         throw new Error(`session ${meta.id} metadata row already exists`)
       }
-      this.writeRow(meta)
+      this.writeRow(storage)
       this.db.exec(sql('commit'))
     } catch (error: unknown) {
       this.rollback(error, 'materialize')
@@ -216,10 +221,11 @@ export class SqliteStore implements PersistenceBackend<number> {
   }
 
   async commitRepair(
-    meta: SessionHeader,
+    storage: SessionStorageMetadata,
     tornMarker: number | undefined,
     closers: readonly SessionEvent[],
   ): Promise<void> {
+    const meta = storage.meta
     await this.open()
     if (tornMarker === undefined && closers.length === 0) return
     this.db.exec(sql('begin-immediate'))
@@ -403,14 +409,15 @@ export class SqliteStore implements PersistenceBackend<number> {
     }
   }
 
-  private writeRow(meta: SessionHeader): void {
+  private writeRow(storage: SessionStorageMetadata): void {
+    const meta = storage.meta
     const result = this.db.prepare(sql('upsert-session')).get(
       meta.id,
       meta.version,
       meta.createdAt,
       meta.cwd ?? null,
       meta.parentSession ?? null,
-      meta.seedLength ?? null,
+      meta.isSeeded ? storage.inheritedEventCount : null,
       meta.origin ?? null,
       meta.delegationDepth ?? null,
       meta.agentPreset ?? null,

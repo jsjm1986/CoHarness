@@ -15,8 +15,7 @@ import SessionStore, {
   SESSION_FORMAT_VERSION,
   SessionId,
   type SessionEvent,
-  type SessionHeader,
-} from '@deepseek-ai/dsh-session'
+  type SessionHeader, SessionSeq } from '@deepseek-ai/dsh-session'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import { renderWorkspaceContext } from '@deepseek-ai/dsh-agent-instructions'
 import { resolveConfig, workspaceBaselineIdentity } from '@deepseek-ai/dsh-agent-instructions/src/config.ts'
@@ -51,7 +50,7 @@ async function seedVisibleBaseline(
   const meta: SessionHeader = {
     version: SESSION_FORMAT_VERSION,
     id: sessionId,
-    createdAt: 1,
+    createdAt: 1, isSeeded: false,
     cwd,
     delegationDepth: 0,
   }
@@ -69,17 +68,17 @@ async function seedVisibleBaseline(
       : { instructionFileCandidates: options.instructionFileCandidates },
   })
   const events: SessionEvent[] = [
-    { type: 'turn/start', seq: 0, time: 10, data: { turn: 1 } },
+    { type: 'turn/start', seq: SessionSeq(0), time: 10, data: { turn: 1 } },
     {
       type: 'user/message',
-      seq: 1,
+      seq: SessionSeq(1),
       time: 11,
       data: createUserMessage({ content: [{ type: 'text', text: 'Remember the workspace instruction.' }], source: { kind: 'user' } }),
       surfaceOp: 'append',
     },
     {
       type: 'user/message',
-      seq: 2,
+      seq: SessionSeq(2),
       time: 12,
       data: createUserMessage({
         content: [{ type: 'text', text: baseline.text }],
@@ -98,7 +97,7 @@ async function seedVisibleBaseline(
       }),
       surfaceOp: 'append',
     },
-    { type: 'turn/end', seq: 3, time: 13, data: { turn: 1, reason: { kind: 'completed' } } },
+    { type: 'turn/end', seq: SessionSeq(3), time: 13, data: { turn: 1, reason: { kind: 'completed' } } },
   ]
   try {
     await ctx.sessionPersistence.create(meta)

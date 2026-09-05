@@ -31,7 +31,7 @@ describe('SidebarRoot.module.css', () => {
     expect(root?.get('--dsh-sidebar-footer-row-height')).toBe('36px')
     expect(root?.get('--dsh-sidebar-footer-row-radius')).toBe('var(--dsw-radius-md)')
     expect(declarations('.footerActions')?.get('gap')).toBe('var(--dsh-sidebar-footer-row-gap)')
-    expect(declarations('.settingsArea')?.get('border-top')).toBe('1px solid var(--dsw-alias-border-l2)')
+    expect(declarations('.settingsArea')?.get('border-top')).toBe('0.5px solid var(--dsw-alias-border-l2)')
     expect(declarations('.settingsArea:empty')?.get('display')).toBe('none')
   })
 

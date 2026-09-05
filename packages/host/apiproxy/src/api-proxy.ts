@@ -25,9 +25,18 @@ import { errorChain } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, MessageSource } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-model-access'
 import type {} from '@deepseek-ai/dsh-model-provider-config'
-import { isAppendSurfaceEvent, isJsonValue, materializesSession, SessionId as brandSessionId } from '@deepseek-ai/dsh-session'
+import { isAppendSurfaceEvent, isJsonValue, materializesSession, SessionId as brandSessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import { hasConversationContent as hasSessionConversationContent } from '@deepseek-ai/dsh-session/surface'
-import type { JsonValue, Session, SessionEvent, SessionEventMap, SessionHeader, SessionId, UserMessage } from '@deepseek-ai/dsh-session'
+import type {
+  JsonValue,
+  Session,
+  SessionEvent,
+  SessionEventMap,
+  SessionHeader,
+  SessionId,
+  SessionLogOffset as SessionLogOffsetType,
+  UserMessage,
+} from '@deepseek-ai/dsh-session'
 import {
   DEFAULT_SESSION_PAGE_MAX_BYTES,
   DEFAULT_SESSION_PAGE_MAX_EVENTS,
@@ -47,6 +56,7 @@ import type {
 import type {} from '@deepseek-ai/dsh-permission-presets'
 import { SessionQueryError, type SessionSearchCursor } from '@deepseek-ai/dsh-session-query'
 import { SubagentError } from '@deepseek-ai/dsh-subagent'
+import { queueHostSubagentPrompt } from '@deepseek-ai/dsh-subagent/internal'
 import type { SubagentListEntry as CatalogSubagentListEntry } from '@deepseek-ai/dsh-subagent'
 import { isUserInvocable } from '@deepseek-ai/dsh-skill'
 import type { Workspace, WorkspaceRecord } from '@deepseek-ai/dsh-workspace'
@@ -446,7 +456,7 @@ function paginate(
     if (!MESSAGE_TYPES.has(event.type) || !isAppendSurfaceEvent(event)) continue
     count++
     const sources = (event as { sourceEventSeqs?: number[] }).sourceEventSeqs
-    let groupStart = event.seq
+    let groupStart: number = event.seq
     if (sources !== undefined) {
       for (const source of sources) {
         if (source < groupStart) groupStart = source
@@ -870,7 +880,7 @@ function isConversationContentEvent(event: SessionEvent): boolean {
  * @returns true while no visible conversation event has been recorded.
  */
 function sessionBlank(session: Session): boolean {
-  return !session.events.some(isConversationContentEvent)
+  return !session.snapshotEvents().some(isConversationContentEvent)
 }
 
 /** Advance the Session-list hint projection by one committed event. */
@@ -920,14 +930,14 @@ function sessionListFields(header: SessionHeader, events: readonly SessionEvent[
 
 /** SessionSummary projection for attached (in-memory) sessions. */
 function summarize(session: Session, running: boolean): SessionSummary {
-  const metadata = sessionListMetadata(session.events)
+  const metadata = sessionListMetadata(session.snapshotEvents())
   return {
     sessionId: session.id,
     updatedAt: sessionListUpdatedAt(session.header, metadata),
     running,
     blank: metadata.blank,
     ...(metadata.visibleContentSeq === null ? {} : { visibleContentSeq: metadata.visibleContentSeq }),
-    ...sessionListFields(session.header, session.events),
+    ...sessionListFields(session.header, session.snapshotEvents()),
   }
 }
 
@@ -959,7 +969,7 @@ async function probeColdSessionMetadata(
   }
   if (size > maxBytes) return undefined
   try {
-    const { events } = await persistence.readFrom(meta.id, 0, signal)
+    const { events } = await persistence.readFrom(meta.id, SessionLogOffset(0), signal)
     signal?.throwIfAborted()
     return sessionListMetadata(events)
   } catch (error) {
@@ -1257,6 +1267,8 @@ type HistorySource =
   | {
     readonly kind: 'detached'
     readonly header: SessionHeader
+    /** Exact fork-inherited prefix length; known only for a complete inspection. */
+    readonly inheritedEventCount?: SessionLogOffsetType
     /** The bounded raw range returned by the indexed persistence provider. */
     readonly events: SessionEvent[]
     /** Small indexed prefix facts needed to restore the recorded presenter scope. */
@@ -1322,7 +1334,7 @@ const HISTORY_TAIL_CACHE_MAX_ENTRIES = 16
 const HISTORY_TAIL_CACHE_MAX_BYTES = 2 * 1024 * 1024
 
 function historySourceEvents(source: HistorySource): readonly SessionEvent[] {
-  return source.kind === 'attached' ? source.session.events : source.events
+  return source.kind === 'attached' ? source.session.snapshotEvents() : source.events
 }
 
 /** Stable append-log identity; a new event or replacement invalidates the tail entry. */
@@ -1355,9 +1367,13 @@ function projectionsFor(ctx: Context, session: Session): SessionProjectionsBlock
  */
 function listProjectionsFor(ctx: Context, meta: SessionHeader, session: Session | undefined): SessionProjectionsBlock | undefined {
   try {
+    // A seeded header lacks its exact inherited cut, so its cache identity
+    // cannot be formed from the listing alone; opening the session refreshes it.
     const block = session !== undefined
       ? ctx.get('sessionProjections')?.snapshot(session)
-      : ctx.get('sessionProjectionCache')?.cachedSnapshot(meta)
+      : meta.isSeeded
+        ? undefined
+        : ctx.get('sessionProjectionCache')?.cachedSnapshot(meta, SessionLogOffset(0))
     return block !== undefined && Object.keys(block.values).length > 0 ? block : undefined
   } catch (error) {
     ctx.logger.warn(`session.list: projection column for "${meta.id}" failed (serving the row without it): ${String(error)}`)
@@ -1369,11 +1385,14 @@ function listProjectionsFor(ctx: Context, meta: SessionHeader, session: Session 
 function detachedProjectionsFor(
   ctx: Context,
   header: SessionHeader,
+  inheritedEventCount: SessionLogOffsetType | undefined,
   events: readonly SessionEvent[],
 ): SessionProjectionsBlock | undefined {
   const registry = ctx.get('sessionProjections')
-  if (registry === undefined) return undefined
-  return registry.restore({}, events, 0, header).snapshot
+  // Unit initialization needs the exact inherited cut; a source without it
+  // (a bounded page) cannot fold a whole-log projection.
+  if (registry === undefined || inheritedEventCount === undefined) return undefined
+  return registry.restore({}, events, SessionLogOffset(0), header, inheritedEventCount).snapshot
 }
 
 /**
@@ -2126,7 +2145,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   const inspectServable = (
     sessionId: SessionId,
     signal?: AbortSignal,
-  ): Promise<{ meta: SessionHeader; events: SessionEvent[] }> =>
+  ): Promise<{ meta: SessionHeader; inheritedEventCount: SessionLogOffsetType; events: SessionEvent[] }> =>
     signal === undefined
       ? inspectApiRemoteSession(ctx, sessionId)
       : inspectApiRemoteSession(ctx, sessionId, signal)
@@ -2326,7 +2345,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       // request's event is therefore the newest asked event that is still
       // undecided, unclaimed by another pending entry, and — when the ask
       // names a call — carries the same callId.
-      const events = req.agent.session.events
+      const events = req.agent.session.snapshotEvents()
       const claimed = new Set<ApprovalRequestId>()
       for (const entry of pendingApprovals.values()) claimed.add(entry.approvalId)
       const decided = new Set<ApprovalRequestId>()
@@ -2399,7 +2418,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       return {
         id: attached.id,
         header: attached.header,
-        events: [...attached.events],
+        events: [...attached.snapshotEvents()],
       }
     }
     const inspected = await inspectServable(sessionId)
@@ -2530,6 +2549,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     return {
       kind: 'detached',
       header: inspected.meta,
+      inheritedEventCount: inspected.inheritedEventCount,
       events: inspected.events,
       hasMore: false,
       // Compatibility inspections have no independent page token. The
@@ -2667,7 +2687,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   ): Promise<SessionHistoryIndex | undefined> {
     const attached = ctx.sessions.get(sessionId)
     if (attached !== undefined) {
-      const index = historyIndexFromEvents(attached.events, `attached:${String(attached.events.at(-1)?.seq ?? -1)}`, maxItems)
+      const events = attached.snapshotEvents()
+      const index = historyIndexFromEvents(events, `attached:${String(events.at(-1)?.seq ?? -1)}`, maxItems)
       return {
         asOfSeq: index.asOfSeq,
         totalTurns: index.totalTurns,
@@ -2705,7 +2726,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     if (source.kind === 'detached') {
       return { header: source.header, events: source.presenterEvents ?? source.events }
     }
-    return { header: source.session.header, events: source.session.events }
+    return { header: source.session.header, events: source.session.snapshotEvents() }
   }
 
   /**
@@ -2731,11 +2752,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       const projections = includeProjections
         ? source.bounded
           ? listProjectionsFor(ctx, source.header, undefined)
-          : detachedProjectionsFor(ctx, source.header, source.events)
+          : detachedProjectionsFor(ctx, source.header, source.inheritedEventCount, source.events)
         : undefined
       return { events: source.events, ...projections === undefined ? {} : { projections } }
     }
-    const events = [...source.session.events]
+    const events = [...source.session.snapshotEvents()]
     const projections = includeProjections ? projectionsFor(ctx, source.session) : undefined
     return { events, ...projections === undefined ? {} : { projections } }
   }
@@ -4070,11 +4091,12 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             meta: {
               ...source.header.cwd === undefined ? {} : { cwd: source.header.cwd },
               parentSession: source.id,
-              seedLength: cut,
+              isSeeded: true,
               ...forkComposition.agentPreset === undefined
                 ? {}
                 : { agentPreset: forkComposition.agentPreset },
             },
+            inheritedEventCount: SessionLogOffset(cut),
             agentOptions: agentOptions(),
             setup: forkComposition.setup,
           })
@@ -4403,7 +4425,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             ? projectionsFor(ctx, source.session)
             : source.bounded
               ? listProjectionsFor(ctx, source.header, undefined)
-              : detachedProjectionsFor(ctx, source.header, source.events))
+              : detachedProjectionsFor(ctx, source.header, source.inheritedEventCount, source.events))
           : undefined
         if (header.parentSession !== parentSessionId) {
           return err(request, {
@@ -4464,15 +4486,14 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         const participant = projectParticipant(parentAccess.authority)
         try {
           const admitted = await durableSubagentPromptContent(ctx, content)
-          const messageId = await ctx.subagents.followup(parent, childSessionId, admitted, {
-            source: {
-              kind: 'user',
-              rpcId: requestId ?? request.rpcId,
-              ...(canonicalTimeZone === undefined ? {} : { clientTimeZone: canonicalTimeZone }),
-              ...(participant === undefined ? {} : { participant }),
-            },
-            signal,
-          })
+          // Host-protocol delivery keeps its own provenance through the
+          // symbol-keyed queue adapter instead of impersonating an Agent sender.
+          const messageId = await queueHostSubagentPrompt(ctx.subagents, parent, childSessionId, admitted, {
+            kind: 'user',
+            rpcId: requestId ?? request.rpcId,
+            ...(canonicalTimeZone === undefined ? {} : { clientTimeZone: canonicalTimeZone }),
+            ...(participant === undefined ? {} : { participant }),
+          }, signal)
           return ok(request, { messageId })
         } catch (error: unknown) {
           return subagentPromptError(request, error, signal)
@@ -5433,7 +5454,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             }
             const view = viewFor(
               ctx, event,
-              callId => openCalls.get(session.id)?.get(callId) ?? backscanArgs(session.events, callId),
+              callId => openCalls.get(session.id)?.get(callId) ?? backscanArgs(session.snapshotEvents(), callId),
               ctx.agents.get(session.id),
             )
             queue.push(frame({ type: 'session/event', sessionId: session.id, event, ...view === undefined ? {} : { view } }))
@@ -5577,7 +5598,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               type: 'host/session-added',
               sessionId: session.id,
               blank: sessionBlank(session),
-              ...sessionListFields(session.header, session.events),
+              ...sessionListFields(session.header, session.snapshotEvents()),
             }))
           }
 

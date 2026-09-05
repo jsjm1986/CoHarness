@@ -74,11 +74,11 @@ function validatePair(
 
 /** Validate every complete package-owned notice relation in one durable session. */
 function validateSession(session: Session, fail: InvariantFailure): void {
-  for (const [index, candidate] of session.events.entries()) {
+  for (const [index, candidate] of session.snapshotEvents().entries()) {
     if (noticeSource(candidate) === undefined) continue
     const notice = candidate as SessionEvent<'user/message'>
     validateNotice(notice, fail)
-    const following = session.events.slice(index + 1).find(event =>
+    const following = session.snapshotEvents().slice(index + 1).find(event =>
       event.type === 'user/message' || event.type === 'step/end' || event.type === 'turn/end')
     if (following?.type !== 'user/message') {
       fail('collaboration notice must be followed by its participant message before the step ends')
@@ -100,7 +100,7 @@ const install: InvariantInstaller = Object.assign((ctx: Context, fail: Invariant
       return
     }
     if (event.type !== 'user/message' || projectParticipantFromSource(event.data.source) === undefined) return
-    const previous = [...session.events].reverse().find(candidate => candidate.type === 'user/message')
+    const previous = [...session.snapshotEvents()].reverse().find(candidate => candidate.type === 'user/message')
     if (previous?.type === 'user/message' && noticeSource(previous) !== undefined) {
       validatePair(previous, event, fail)
     }

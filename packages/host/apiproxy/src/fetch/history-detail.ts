@@ -25,7 +25,7 @@ export interface HistoryDetailPage {
  */
 export function appendOriginGroupStart(event: SessionEvent): number {
   const sources = (event as SessionEvent & { sourceEventSeqs?: number[] }).sourceEventSeqs
-  let start = event.seq
+  let start: number = event.seq
   if (sources === undefined) return start
   for (const seq of sources) {
     if (seq < start) start = seq

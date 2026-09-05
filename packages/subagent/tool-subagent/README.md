@@ -22,7 +22,7 @@ A foreground call passes the execution signal through startup and execution, awa
 | `toolName` | Model-facing name, default `subagent`; distinct for every loaded instance. |
 | `enableRunInBackground` | Exposes background mode, default `true`; disabling also rejects forced background calls. |
 | `backgroundMode` | Background lifecycle policy, default `one-shot`. `one-shot` defaults calls to foreground; `continuable` defaults them to background, requires the provider's `prepareContinuable` capability, and returns a durable child id without requiring the follow-up tool. |
-| `modelSelectionSettings` | Opt-in sampling of the host allowlist for child provider/model/reasoning selection; defaults to `false` and requires the model-selection settings plugin. |
+| `modelSelectionSettings` | Opt-in sampling of the host allowlist for child provider/model/reasoning selection when a fresh top-level Session is composed; a restored Session without a recorded policy stays disabled, a child inherits its parent's recorded policy, and later settings edits never change a recorded Session. Defaults to `false` and requires the model-selection settings plugin. |
 | `agentOptions` | Provider-specific child `provider`, `model`, optional `reasoningEffort`, and positive `maxTokens`; the provider treats explicit values as overrides of inherited parent options. |
 | `persona` | Per-child persona; requires provider `persona` capability. |
 | `toolFilter` | Per-child global-tool restriction; requires `toolFilter` capability. |

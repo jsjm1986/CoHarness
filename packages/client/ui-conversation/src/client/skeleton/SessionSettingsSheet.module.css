@@ -8,10 +8,10 @@
   max-height: min(64vh, calc(var(--dsw-viewport-height, 100vh) - 112px));
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 0;
   border-radius: var(--dsw-mobile-sheet-radius);
   background: var(--dsw-alias-bg-layer-2);
-  box-shadow: var(--dsw-shadow-lv3);
+  box-shadow: var(--dsw-elevation-prominent);
   color: var(--dsw-alias-label-primary);
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
@@ -36,7 +36,7 @@
   justify-content: space-between;
   min-height: 48px;
   padding: 0 var(--dsw-space-3);
-  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  border-bottom: 0.5px solid var(--dsw-alias-border-l2);
 }
 
 .title {

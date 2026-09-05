@@ -7,7 +7,8 @@
 | 包 | 职责 | ctx key |
 |---|---|---|
 | [`code-runtime/`](code-runtime/README.zh.md) | Service Definition 与共享词汇 | `ctx.codeRuntime` |
-| [`code-runtime-worker/`](code-runtime-worker-thread/README.zh.md) | Worker 线程后端 | 注册 `ctx.codeRuntime` |
+| [`code-runtime-worker-thread/`](code-runtime-worker-thread/README.zh.md) | Worker 线程后端 | 注册 `ctx.codeRuntime` |
+| [`experimental/code-runtime-python/`](../experimental/code-runtime-python/README.zh.md) | 实验性 Python 后端：拥有 Node 宿主与 CPython 子进程之间的 fd-3 线协议以及 CPython 运行时实现 | 注册 `ctx.codeRuntime`（显式组合选用） |
 
 提供方在不改变Consumer的情况下注册该服务。子 README 负责语言、隔离和执行预算细节。
 

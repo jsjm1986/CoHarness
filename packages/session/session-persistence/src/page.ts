@@ -263,7 +263,7 @@ function eventGroupKey(event: SessionEvent): string {
   const candidate = event as SessionEvent & { sourceEventSeqs?: readonly number[] }
   const sources = candidate.sourceEventSeqs
   if (sources !== undefined && sources.length > 0) {
-    let start = event.seq
+    let start: number = event.seq
     for (const seq of sources) if (seq < start) start = seq
     return `source:${String(start)}`
   }

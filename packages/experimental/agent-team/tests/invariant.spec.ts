@@ -40,7 +40,7 @@ describe('Agent Teams stream invariant', () => {
       code: 'INVARIANT',
       packageName: '@deepseek-ai/dsh-experimental-agent-team',
     }))
-    expect(invalid.events).toEqual([])
+    expect(invalid.snapshotEvents()).toEqual([])
   })
 
   it('rejects an invalid task dependency before publication', async () => {
@@ -65,6 +65,6 @@ describe('Agent Teams stream invariant', () => {
       code: 'INVARIANT',
       packageName: '@deepseek-ai/dsh-experimental-agent-team',
     }))
-    expect(session.events).toEqual([])
+    expect(session.snapshotEvents()).toEqual([])
   })
 })

@@ -4,6 +4,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
+import { SessionSeq } from '@deepseek-ai/dsh-session'
 import { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import type { HistoryEntry } from '../src/api/sessions.ts'
@@ -17,7 +18,7 @@ function user(seq: number): HistoryEntry {
   return {
     event: {
       type: 'user/message',
-      seq,
+      seq: SessionSeq(seq),
       time: 1000 + seq,
       data: {
         id: messageId(seq),
@@ -34,7 +35,7 @@ function assistant(seq: number, sourceEventSeqs: number[]): HistoryEntry {
   return {
     event: {
       type: 'assistant/message',
-      seq,
+      seq: SessionSeq(seq),
       time: 1000 + seq,
       data: {
         turn: 1,
@@ -47,7 +48,7 @@ function assistant(seq: number, sourceEventSeqs: number[]): HistoryEntry {
         },
       },
       surfaceOp: 'append',
-      sourceEventSeqs,
+      sourceEventSeqs: sourceEventSeqs.map(SessionSeq),
     },
   }
 }
@@ -56,7 +57,7 @@ function chunk(seq: number, text = 'x'): HistoryEntry {
   return {
     event: {
       type: 'assistant/chunk',
-      seq,
+      seq: SessionSeq(seq),
       time: 1000 + seq,
       data: { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text } },
     } satisfies SessionEvent,
@@ -67,7 +68,7 @@ function tool(seq: number): HistoryEntry {
   return {
     event: {
       type: 'tool/call',
-      seq,
+      seq: SessionSeq(seq),
       time: 1000 + seq,
       data: { turn: 1, step: 1, callId: 'c1', name: 'bash', arguments: '{}' },
     } as SessionEvent,

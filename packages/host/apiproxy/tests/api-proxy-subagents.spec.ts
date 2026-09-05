@@ -1,9 +1,9 @@
-/* oxlint-disable typescript/no-unsafe-assignment -- Vitest asymmetric matchers
- * are typed as any; the call assertion checks the runtime AbortSignal instance. */
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
+import { SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
 import { SubagentError } from '@deepseek-ai/dsh-subagent'
+import { queueSubagentPrompt } from '@deepseek-ai/dsh-subagent/internal'
 import { RpcId } from '../src/api/rpc.ts'
 import type { RpcRequest } from '../src/api/rpc.ts'
 import { createApiProxy } from '../src/api-proxy.ts'
@@ -20,7 +20,7 @@ function bench(options: {
   parentLive?: boolean
   childStatus?: 'idle' | 'running'
   entries?: object[]
-  followupError?: Error
+  queuePromptError?: Error
   interruptError?: Error
   listError?: Error
   /** Persistence forgets the child entirely (the vanished-mid-read race). */
@@ -51,17 +51,17 @@ function bench(options: {
       },
     ])
     : Promise.reject(options.listError))
-  const followup = vi.fn((
+  // The host-protocol prompt path enters the runtime through the symbol-keyed
+  // queue adapter (`queueHostSubagentPrompt`), never through an Agent sender.
+  const queuePrompt = vi.fn((
     _parent: unknown,
     _childId: SessionId,
     _content: unknown,
-    _delivery: {
-      source: { kind: string; rpcId: RpcId; clientTimeZone?: string }
-      signal: AbortSignal
-    },
-  ) => options.followupError === undefined
+    _source: { kind: string; rpcId: RpcId; clientTimeZone?: string },
+    _signal: AbortSignal,
+  ) => options.queuePromptError === undefined
     ? Promise.resolve('message-1')
-    : Promise.reject(options.followupError))
+    : Promise.reject(options.queuePromptError))
   const interrupt = vi.fn((
     _targetSessionId: SessionId,
     _authority: { kind: 'user'; parentSessionId: SessionId },
@@ -69,7 +69,7 @@ function bench(options: {
     if (options.interruptError !== undefined) throw options.interruptError
   })
   const childHeader = {
-    version: 0, id: CHILD, createdAt: 1, cwd: '/proj', parentSession: options.historyParent ?? PARENT,
+    version: 0, id: CHILD, createdAt: 1, cwd: '/proj', isSeeded: false, parentSession: options.historyParent ?? PARENT,
     ...options.agentPreset === undefined ? {} : { agentPreset: options.agentPreset },
   } satisfies SessionHeader
   const childEvents = (options.presenterHistory === true
@@ -80,7 +80,9 @@ function bench(options: {
     : [
       { type: 'user/message', seq: 0, time: 1, data: { content: [{ type: 'text', text: 'work' }], source: { kind: 'user' } } },
     ]) as unknown as SessionEvent[]
-  const inspect = vi.fn(() => Promise.resolve({ meta: childHeader, events: childEvents }))
+  const inspect = vi.fn(() => Promise.resolve({
+    meta: childHeader, inheritedEventCount: SessionLogOffset(0), events: childEvents,
+  }))
   const liveBlock = { values: {}, asOfSeq: 3 }
   const coldBlock = { values: {}, asOfSeq: 0 }
   const standingScope = { agentPreset: options.agentPreset ?? 'default' }
@@ -98,11 +100,11 @@ function bench(options: {
   })
   const ctx = new Context()
   ctx.provide('agents', { get: getAgent })
-  ctx.provide('subagents', { listChildren, followup, interrupt })
+  ctx.provide('subagents', { listChildren, [queueSubagentPrompt]: queuePrompt, interrupt })
   ctx.provide('sessions', {
     list: () => [],
     get: (id: SessionId) => options.liveChild === true && id === CHILD
-      ? { id: CHILD, header: childHeader, events: childEvents }
+      ? { id: CHILD, header: childHeader, snapshotEvents: () => childEvents }
       : undefined,
   })
   ctx.provide('sessionPersistence', {
@@ -130,7 +132,7 @@ function bench(options: {
   const api = createApiProxy(ctx, {
     defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp',
   })
-  return { api, ctx, getAgent, listChildren, inspect, snapshot, restore, followup, interrupt, standingKeyFor, parent }
+  return { api, ctx, getAgent, listChildren, inspect, snapshot, restore, queuePrompt, interrupt, standingKeyFor, parent }
 }
 
 describe('subagent gateway', () => {
@@ -320,11 +322,11 @@ describe('subagent gateway', () => {
     expect((await prompt.api.subagents.prompt(request({
       parentSessionId: PARENT, childSessionId: CHILD, mode: 'continuable', content: [],
     }), new AbortController().signal)).result).toMatchObject({ ok: false, error: expected })
-    expect(prompt.followup).not.toHaveBeenCalled()
+    expect(prompt.queuePrompt).not.toHaveBeenCalled()
   })
 
   it('routes human content through the exact live parent with rpc attribution', async () => {
-    const { api, parent, followup } = bench()
+    const { api, parent, queuePrompt } = bench()
     const content = [{ type: 'text' as const, text: '继续' }]
     const signal = new AbortController().signal
     const response = await api.subagents.prompt(request({
@@ -333,16 +335,17 @@ describe('subagent gateway', () => {
     expect(response.result).toMatchObject({
       ok: true, value: { messageId: 'message-1' },
     })
-    expect(followup).toHaveBeenCalledWith(
+    expect(queuePrompt).toHaveBeenCalledWith(
       parent,
       CHILD,
       content,
-      { source: { kind: 'user', rpcId: RpcId('subagent-rpc') }, signal },
+      { kind: 'user', rpcId: RpcId('subagent-rpc') },
+      signal,
     )
   })
 
   it('admits continuable image uploads before forwarding durable references', async () => {
-    const { api, ctx, parent, followup } = bench()
+    const { api, ctx, parent, queuePrompt } = bench()
     ctx.provide('attachments', {
       saveImages: vi.fn(async (inputs: readonly { mediaType: string; data: Uint8Array }[]) => inputs.map((input, index) => ({
         attachmentId: `image-${String(index)}`,
@@ -360,19 +363,20 @@ describe('subagent gateway', () => {
       parentSessionId: PARENT, childSessionId: CHILD, mode: 'continuable', content,
     }), new AbortController().signal)
     expect(response.result).toMatchObject({ ok: true })
-    expect(followup).toHaveBeenCalledWith(
+    expect(queuePrompt).toHaveBeenCalledWith(
       parent,
       CHILD,
       [
         { type: 'text', text: 'see this' },
         { type: 'image', attachment: { attachmentId: 'image-0', mediaType: 'image/png', bytes: 1, width: 1, height: 1 } },
       ],
-      { source: { kind: 'user', rpcId: RpcId('subagent-rpc') }, signal: expect.any(AbortSignal) },
+      { kind: 'user', rpcId: RpcId('subagent-rpc') },
+      expect.any(AbortSignal),
     )
   })
 
   it('canonicalizes browser-zone provenance before delivering a child prompt', async () => {
-    const { api, parent, followup } = bench()
+    const { api, parent, queuePrompt } = bench()
     const alias = 'US/Pacific'
     const canonical = new Intl.DateTimeFormat('en-US', { timeZone: alias })
       .resolvedOptions().timeZone
@@ -385,10 +389,13 @@ describe('subagent gateway', () => {
       content,
       clientTimeZone: alias,
     }), signal)).resolves.toMatchObject({ result: { ok: true } })
-    expect(followup).toHaveBeenCalledWith(parent, CHILD, content, {
-      source: { kind: 'user', rpcId: RpcId('subagent-rpc'), clientTimeZone: canonical },
+    expect(queuePrompt).toHaveBeenCalledWith(
+      parent,
+      CHILD,
+      content,
+      { kind: 'user', rpcId: RpcId('subagent-rpc'), clientTimeZone: canonical },
       signal,
-    })
+    )
 
     const invalid = await api.subagents.prompt(request({
       parentSessionId: PARENT,
@@ -405,7 +412,7 @@ describe('subagent gateway', () => {
         details: { value: 'Not/A_Real_Zone' },
       },
     })
-    expect(followup).toHaveBeenCalledOnce()
+    expect(queuePrompt).toHaveBeenCalledOnce()
   })
 
   it('fails before delivery when the parent is absent and maps continuation failures', async () => {
@@ -417,7 +424,7 @@ describe('subagent gateway', () => {
     })
     expect(absent.listChildren).not.toHaveBeenCalled()
 
-    const failed = bench({ followupError: new SubagentError('draining', 'DRAINING') })
+    const failed = bench({ queuePromptError: new SubagentError('draining', 'DRAINING') })
     expect((await failed.api.subagents.prompt(request({
       parentSessionId: PARENT, childSessionId: CHILD, mode: 'continuable', content: [],
     }), new AbortController().signal)).result).toMatchObject({
@@ -446,7 +453,7 @@ describe('subagent gateway', () => {
       error: { code: 'internal', message: 'subagent catalog read failed' },
     })
 
-    const prompt = bench({ followupError: new Error('secret provider') })
+    const prompt = bench({ queuePromptError: new Error('secret provider') })
     expect((await prompt.api.subagents.prompt(request({
       parentSessionId: PARENT, childSessionId: CHILD, mode: 'continuable', content: [],
     }), new AbortController().signal)).result).toMatchObject({

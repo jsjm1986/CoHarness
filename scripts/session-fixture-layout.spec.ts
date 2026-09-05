@@ -1,5 +1,6 @@
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { parseSessionLog } from '@deepseek-ai/dsh-llm-replay'
 import { canonicalSessionFixture, inspectSessionFixtureLayouts, isPhysicalSessionFixture } from './session-fixture-layout.ts'
@@ -9,7 +10,7 @@ const HEADER = '  {"type":"session","version":0,"id":"fixture","createdAt":1,"de
 function chunkRun(): SessionEvent[] {
   return Array.from({ length: 4 }, (_, index) => ({
     type: 'assistant/chunk',
-    seq: index,
+    seq: SessionSeq(index),
     time: 10 + index,
     data: {
       turn: 1,

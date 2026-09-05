@@ -5,7 +5,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { normalizeSessionSnapshot, type NormalizeContext } from '@deepseek-ai/dsh-acp-snapshot'
 import { LOADER_SMOKE_TEST_TIMEOUT_MS, runLoaderSmoke } from '@deepseek-ai/dsh-loader-smoke'
 import { createUserMessage, CallId , createMessage } from '@deepseek-ai/dsh-llm'
-import SessionStore, { SESSION_FORMAT_VERSION, SessionId, type SessionEvent, type SessionHeader } from '@deepseek-ai/dsh-session'
+import SessionStore, { SESSION_FORMAT_VERSION, SessionId, type SessionEvent, type SessionHeader, SessionSeq } from '@deepseek-ai/dsh-session'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import { describe, expect, it } from 'vitest'
 
@@ -27,19 +27,19 @@ async function seedInterruptedSession(root: string, cwd: string): Promise<string
   const meta: SessionHeader = {
     version: SESSION_FORMAT_VERSION,
     id: sessionId,
-    createdAt: 1,
+    createdAt: 1, isSeeded: false,
     cwd,
     delegationDepth: 0,
   }
   const events: SessionEvent[] = [
-    { type: 'turn/start', seq: 0, time: 10, data: { turn: 1 } },
-    { type: 'user/message', seq: 1, time: 11, data: createUserMessage({
+    { type: 'turn/start', seq: SessionSeq(0), time: 10, data: { turn: 1 } },
+    { type: 'user/message', seq: SessionSeq(1), time: 11, data: createUserMessage({
       content: [{ type: 'text', text: 'Perform one side-effecting remote mutation.' }], source: { kind: 'user' },
     }), surfaceOp: 'append' },
-    { type: 'step/start', seq: 2, time: 12, data: { turn: 1, step: 1 } },
+    { type: 'step/start', seq: SessionSeq(2), time: 12, data: { turn: 1, step: 1 } },
     {
       type: 'assistant/message',
-      seq: 3,
+      seq: SessionSeq(3),
       time: 13,
       data: {
         turn: 1,
@@ -57,7 +57,7 @@ async function seedInterruptedSession(root: string, cwd: string): Promise<string
     },
     {
       type: 'tool/call',
-      seq: 4,
+      seq: SessionSeq(4),
       time: 14,
       data: {
         turn: 1,

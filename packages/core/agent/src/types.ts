@@ -5,6 +5,7 @@
  */
 
 import type { UserMessage } from '@deepseek-ai/dsh-llm/types'
+import type { OptionalSessionSeq, SessionSeq } from '@deepseek-ai/dsh-session/types'
 
 /** One of the two ordered pending-message lists owned by an agent. */
 export type InboxTarget = 'next-turn' | 'next-step'
@@ -18,11 +19,11 @@ export type InboxTarget = 'next-turn' | 'next-step'
  */
 export interface TurnBoundaryProjection {
   /** Seq of the open turn's `turn/start`, or null between turns. */
-  readonly openTurnStartSeq: number | null
+  readonly openTurnStartSeq: OptionalSessionSeq
   /** Seq of the latest `step/start` event, or null before the first step. */
-  readonly lastStepStartSeq: number | null
+  readonly lastStepStartSeq: OptionalSessionSeq
   /** Latest step boundary and its seq, or null before the first boundary. */
-  readonly lastStepBoundary: { readonly kind: 'start' | 'end'; readonly seq: number } | null
+  readonly lastStepBoundary: { readonly kind: 'start' | 'end'; readonly seq: SessionSeq } | null
   /** Turn number of the latest `turn/start`; 0 before the first turn. */
   readonly lastTurn: number
 }

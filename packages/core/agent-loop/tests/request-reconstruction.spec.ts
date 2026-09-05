@@ -92,7 +92,7 @@ describe('request stability across the loop', () => {
       expect(Object.isFrozen(request.messages)).toBe(true)
     }
     // One anchoring header snapshot; no further header events (nothing changed).
-    const headerEvents = agent.session.events.filter(e => e.type === 'request/header')
+    const headerEvents = agent.session.snapshotEvents().filter(e => e.type === 'request/header')
     expect(headerEvents).toHaveLength(1)
     expect(headerEvents[0]?.type === 'request/header' && headerEvents[0].data.reason).toBe('initial')
   })
@@ -136,7 +136,7 @@ describe('request stability across the loop', () => {
       ReasoningEffortId('high'),
       ReasoningEffortId('max'),
     ])
-    const headers = agent.session.events.filter(event => event.type === 'request/header')
+    const headers = agent.session.snapshotEvents().filter(event => event.type === 'request/header')
     expect(headers.map(event => event.data.header.config.reasoningEffort)).toEqual([
       ReasoningEffortId('high'),
       ReasoningEffortId('max'),
@@ -155,7 +155,7 @@ describe('request stability across the loop', () => {
       const resumedCtx = await harness(resumedAdapter)
       const resumedHandle = await resumedCtx.agents.create({
         sessionId: SessionId(`effort-${model}`),
-        seed: structuredClone(agent.session.events),
+        seed: structuredClone(agent.session.snapshotEvents()),
         agentOptions: { provider: 'mock', model },
       })
       send(resumedHandle.agent, 'resumed')
@@ -163,7 +163,7 @@ describe('request stability across the loop', () => {
 
       expect(resumedAdapter.requests[0]?.model).toBe(model)
       expect(resumedAdapter.requests[0]?.reasoningEffort).toBe(effort)
-      const resumedHeaders = resumedHandle.agent.session.events.filter(event => event.type === 'request/header')
+      const resumedHeaders = resumedHandle.agent.session.snapshotEvents().filter(event => event.type === 'request/header')
       expect(resumedHeaders.at(-1)?.data.header.config.reasoningEffort).toBe(effort)
       expect(resumedHeaders.at(-1)?.data.reason).toBe('resume')
     }
@@ -181,7 +181,7 @@ describe('request stability across the loop', () => {
     await waitForIdle(ctx, agent)
 
     expect(adapter.requests[0]?.maxTokens).toBe(256_000)
-    const header = agent.session.events.find(event => event.type === 'request/header')
+    const header = agent.session.snapshotEvents().find(event => event.type === 'request/header')
     expect(header?.type === 'request/header' && header.data.header.config.maxTokens).toBe(256_000)
     expect(header?.type === 'request/header' && header.data.header.adapterDefaults)
       .toEqual({ maxTokens: true })
@@ -212,7 +212,7 @@ describe('request stability across the loop', () => {
 
     expect(deepseek.requests[0]?.maxTokens).toBe(256_000)
     expect(other.requests[0]?.maxTokens).toBe(8_192)
-    const headers = agent.session.events.filter(event => event.type === 'request/header')
+    const headers = agent.session.snapshotEvents().filter(event => event.type === 'request/header')
     expect(headers.map(event => event.data.header.config.maxTokens)).toEqual([256_000, 8_192])
     expect(headers.map(event => event.data.header.adapterDefaults)).toEqual([
       { maxTokens: true },
@@ -246,7 +246,7 @@ describe('request stability across the loop', () => {
 
     expect(deepseek.requests[0]?.maxTokens).toBe(4_096)
     expect(other.requests[0]?.maxTokens).toBe(4_096)
-    const headers = agent.session.events.filter(event => event.type === 'request/header')
+    const headers = agent.session.snapshotEvents().filter(event => event.type === 'request/header')
     expect(headers.map(event => event.data.header.config.maxTokens)).toEqual([4_096, 4_096])
     expect(headers.map(event => event.data.header.adapterDefaults)).toEqual([undefined, undefined])
   })
@@ -297,7 +297,7 @@ describe('request stability across the loop', () => {
       ReasoningEffortId('high'),
     ])
     expect(second.requests).toHaveLength(0)
-    const headers = agent.session.events.filter(event => event.type === 'request/header')
+    const headers = agent.session.snapshotEvents().filter(event => event.type === 'request/header')
     expect(headers.at(-1)?.data.header.config.reasoningEffort).toBe(ReasoningEffortId('high'))
   })
 
@@ -335,7 +335,7 @@ describe('request stability across the loop', () => {
     expect(signal.aborted).toBe(true)
     expect(handle.agent.status).toBe('idle')
     expect(adapter.requests).toHaveLength(0)
-    expect(handle.agent.session.events.some(event => event.type === 'request/header')).toBe(false)
+    expect(handle.agent.session.snapshotEvents().some(event => event.type === 'request/header')).toBe(false)
   })
 
   it.each(['plain error', 'LLM error'] as const)(
@@ -358,7 +358,7 @@ describe('request stability across the loop', () => {
       send(agent, 'go')
       await waitForIdle(ctx, agent)
 
-      expect(agent.session.events.findLast(event => event.type === 'turn/end')).toMatchObject({
+      expect(agent.session.snapshotEvents().findLast(event => event.type === 'turn/end')).toMatchObject({
         data: {
           reason: failure instanceof LlmError
             ? { kind: 'error', error: failure.failure }
@@ -427,7 +427,7 @@ describe('request stability across the loop', () => {
     // The rewritten history: summary replaces turn 1's user+assistant pair.
     expect(second.messages[0]!.content.some(b => b.type === 'text' && b.text.includes('[summary of turn 1]'))).toBe(true)
     // No header event beyond the anchor: the replace is itself in the log.
-    expect(agent.session.events.filter(e => e.type === 'request/header')).toHaveLength(1)
+    expect(agent.session.snapshotEvents().filter(e => e.type === 'request/header')).toHaveLength(1)
   })
 
   it('a real system-prompt change is a full changed-header snapshot; a stable prompt logs nothing', async () => {
@@ -440,13 +440,13 @@ describe('request stability across the loop', () => {
     send(agent, 'second')
     await waitForIdle(ctx, agent)
     // Identical assembly re-rendered per step is NOT a change.
-    expect(agent.session.events.filter(e => e.type === 'request/header')).toHaveLength(1)
+    expect(agent.session.snapshotEvents().filter(e => e.type === 'request/header')).toHaveLength(1)
 
     ctx.systemPrompt.section({ name: 'extra', order: 2, text: 'new guidance' })
     send(agent, 'third')
     await waitForIdle(ctx, agent)
 
-    const snapshots = agent.session.events.filter(e => e.type === 'request/header')
+    const snapshots = agent.session.snapshotEvents().filter(e => e.type === 'request/header')
     expect(snapshots).toHaveLength(2)
     expect(snapshots[1]?.data.reason).toBe('change')
     expect(adapter.requests[2]!.system).toContain('new guidance')
@@ -473,7 +473,7 @@ describe('request stability across the loop', () => {
     const first = adapter.requests[0]!
     // The inject landed in the log after the boundary: not in THIS request…
     expect(first.messages.some(m => m.content.some(b => b.type === 'text' && b.text.includes('[late context]')))).toBe(false)
-    expect(agent.session.events.some(e => e.type === 'user/message' && e.data.source.kind === 'plugin')).toBe(true)
+    expect(agent.session.snapshotEvents().some(e => e.type === 'user/message' && e.data.source.kind === 'plugin')).toBe(true)
 
     send(agent, 'second')
     await waitForIdle(ctx, agent)
@@ -500,7 +500,7 @@ describe('request stability across the loop', () => {
     send(agent, 'go')
     await waitForIdle(ctx, agent)
 
-    const turnEnd = agent.session.events.findLast(event => event.type === 'turn/end')
+    const turnEnd = agent.session.snapshotEvents().findLast(event => event.type === 'turn/end')
     expect(turnEnd).toMatchObject({ data: { reason: { kind: 'error' } } })
     if (turnEnd?.type !== 'turn/end' || turnEnd.data.reason.kind !== 'error') throw new Error()
     expect(turnEnd.data.reason.error.message).toMatch(/not extensible|frozen|read only|readonly/i)
@@ -519,14 +519,14 @@ describe('request stability across the loop', () => {
     const ctx2 = await harness(adapter2)
     const handle = await ctx2.agents.create({
       sessionId: SessionId('gen2-session'),
-      seed: [...agent.session.events],
+      seed: agent.session.snapshotEvents(),
       agentOptions: { provider: 'mock', model: 'mock' },
     })
     const agent2 = handle.agent
     send(agent2, 'second')
     await waitForIdle(ctx2, agent2)
 
-    const snapshots = agent2.session.events.filter(e => e.type === 'request/header')
+    const snapshots = agent2.session.snapshotEvents().filter(e => e.type === 'request/header')
     expect(snapshots).toHaveLength(2)
     expect(snapshots[1]?.data.reason).toBe('resume')
     // Identical header across the restart: byte-identical continuation.
@@ -558,7 +558,7 @@ describe('request stability across the loop', () => {
 
     // No changed snapshot was logged (nothing really changed), and the session's own
     // fold is immutable state.
-    expect(agent.session.events.filter(e => e.type === 'request/header')).toHaveLength(1)
+    expect(agent.session.snapshotEvents().filter(e => e.type === 'request/header')).toHaveLength(1)
     expect(Object.isFrozen(agent.session.requestHeader())).toBe(true)
     expect(adapter.requests[1]!.temperature).toBeUndefined()
   })
@@ -583,7 +583,7 @@ describe('request stability across the loop', () => {
     await waitForIdle(ctx, agent)
 
     expect(adapter.requests).toHaveLength(3)
-    const events = agent.session.events
+    const events = agent.session.snapshotEvents()
     const stepStarts = events.filter(e => e.type === 'step/start')
     expect(stepStarts).toHaveLength(3)
 
@@ -639,7 +639,7 @@ describe('request/context capacity records', () => {
     send(agent, 'second')
     await waitForIdle(ctx, agent)
 
-    const records = agent.session.events.filter(event => event.type === 'request/context')
+    const records = agent.session.snapshotEvents().filter(event => event.type === 'request/context')
     expect(records).toHaveLength(1)
     expect(records[0]?.data).toEqual({ provider: 'mock', model: 'mock', contextWindow: 128_000 })
     // Log-only: not a SurfaceEventType, so it can never reach a model request
@@ -664,7 +664,7 @@ describe('request/context capacity records', () => {
     send(agent, 'second')
     await waitForIdle(ctx, agent)
 
-    expect(agent.session.events
+    expect(agent.session.snapshotEvents()
       .filter(event => event.type === 'request/context')
       .map(event => event.data.contextWindow)).toEqual([64_000, 256_000])
   })
@@ -676,7 +676,7 @@ describe('request/context capacity records', () => {
     await waitForIdle(ctx, agent)
     send(agent, 'second')
     await waitForIdle(ctx, agent)
-    expect(agent.session.events
+    expect(agent.session.snapshotEvents()
       .filter(event => event.type === 'request/context')
       .map(event => event.data)).toEqual([{ provider: 'mock', model: 'mock' }])
   })
@@ -696,7 +696,7 @@ describe('request/context capacity records', () => {
     send(agent, 'second')
     await waitForIdle(ctx, agent)
 
-    expect(agent.session.events
+    expect(agent.session.snapshotEvents()
       .filter(event => event.type === 'request/context')
       .map(event => event.data)).toEqual([
       { provider: 'mock', model: 'known', contextWindow: 64_000 },

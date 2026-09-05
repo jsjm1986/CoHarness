@@ -132,9 +132,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'id', description: 'a registered locale id; unknown ids throw.' }],
       },
       {
-        signature: 'register<N extends keyof LocaleNamespaceMap & string>(ns: N, dicts: Record<LocaleId, LocaleDictOf<N>>): () => void',
+        signature: 'register<N extends keyof LocaleNamespaceMap & string>(ns: N, dicts: Record<BuiltInLocaleId, LocaleDictOf<N>>): () => void',
         description: 'Register a declared namespace\'s dictionaries, all locales in one call — the typed form: each dictionary is checked against the namespace\'s LocaleNamespaceMap key union (a missing or extra key is a compile error), and every shipped locale is required (bilingual balance enforced at registration). Duplicate (ns, locale) throws (single occupant; a namespace\'s texts have one owner). Registration bumps the revision so mounted outlets pick up late-arriving dictionaries.',
-        parameters: [{ name: 'ns', description: 'a namespace merged into LocaleNamespaceMap.' }, { name: 'dicts', description: 'complete dictionaries keyed by locale id.' }],
+        parameters: [{ name: 'ns', description: 'a namespace merged into LocaleNamespaceMap.' }, { name: 'dicts', description: 'complete dictionaries keyed by built-in locale id.' }],
         returns: 'disposer removing every locale registered by this call (idempotent).',
       },
       {
@@ -142,6 +142,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Single-locale untyped form for namespaces outside the merge table (dynamic composition, tests).',
         parameters: [{ name: 'ns', description: 'namespace.' }, { name: 'locale', description: 'locale tag.' }, { name: 'dict', description: 'dictionary.' }],
         returns: 'disposer (idempotent).',
+        throws: ['when the locale id is not a BCP 47-style tag.'],
       },
       {
         signature: 'bind<N extends keyof LocaleNamespaceMap & string>(ns: N): TranslateNS<N>',
@@ -444,8 +445,16 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type BakedActions<T, A extends ActionsDecl<T>> = {\n    [K in keyof A]: A[K] extends (draft: T, ...params: infer P) => void ? (...params: P) => void : never;\n};',
   },
   {
+    name: 'BeginSubmissionInput',
+    declaration: 'export interface BeginSubmissionInput {\n    readonly placement: PendingSubmissionPlacement;\n    readonly text: string;\n    readonly images: readonly PendingSubmissionImage[];\n    readonly onRetire?: (retirement: PendingSubmissionRetirement) => void;\n}',
+  },
+  {
     name: 'BoundActions',
     declaration: 'export type BoundActions<H> = H extends StoreHandle<infer T, infer A> ? BakedActions<T, A> : never;',
+  },
+  {
+    name: 'BuiltInLocaleId',
+    declaration: 'export type BuiltInLocaleId = typeof LOCALE_IDS[number];',
   },
   {
     name: 'ChainKeysOf',
@@ -469,7 +478,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ChatSnapshot',
-    declaration: 'export interface ChatSnapshot {\n    readonly order: readonly string[];\n    readonly nodes: ChatNodeStore;\n    readonly locations: ChatLocationNodeIndex;\n    readonly timeline: ConversationTimelineSnapshot;\n    readonly legacy: LegacyConversationSlice;\n}',
+    declaration: 'export interface ChatSnapshot {\n    readonly order: readonly string[];\n    readonly nodes: ChatNodeStore;\n    readonly locations: ChatLocationNodeIndex;\n    readonly navigation: ChatTurnNavigationIndex;\n    readonly timeline: ConversationTimelineSnapshot;\n    readonly legacy: LegacyConversationSlice;\n}',
+  },
+  {
+    name: 'ChatTurnNavigationIndex',
+    declaration: 'export interface ChatTurnNavigationIndex {\n    items(): readonly TurnNavigationItem[];\n}',
   },
   {
     name: 'ChildrenDecl',
@@ -521,7 +534,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ConversationSnapshot',
-    declaration: 'export interface ConversationSnapshot {\n    sessionId: SessionId;\n    views: ConversationViewSnapshotStore;\n    chat: ChatSnapshot;\n    nodes: readonly ConversationNode[];\n    turnTimings: ReadonlyMap<number, {\n        readonly startTime: number;\n        readonly endTime?: number;\n    }>;\n    turnEnds: ReadonlyMap<number, number>;\n    partial: PartialAssistant | null;\n    runningCalls: readonly RunningToolCall[];\n    pending: readonly PendingInteraction[];\n    queue: readonly QueuedMessage[];\n    running: boolean;\n    subagent: {\n        address: SubagentAddress;\n        parentAvailable: boolean;\n    } | null;\n    composerPhase: ComposerPhase;\n    removed: boolean;\n    openState: OpenState;\n    openError: RpcError | null;\n    hasMore: boolean;\n    loadingOlder: boolean;\n    historyWindowMode: HistoryWindowMode;\n    historyDetail: HistoryDetailState;\n    promptError: PromptError | null;\n    blank: boolean;\n    lastAgentError: string | null;\n}',
+    declaration: 'export interface ConversationSnapshot {\n    sessionId: SessionId;\n    views: ConversationViewSnapshotStore;\n    chat: ChatSnapshot;\n    nodes: readonly ConversationNode[];\n    turnTimings: ReadonlyMap<number, {\n        readonly startTime: number;\n        readonly endTime?: number;\n    }>;\n    turnEnds: ReadonlyMap<number, number>;\n    partial: PartialAssistant | null;\n    runningCalls: readonly RunningToolCall[];\n    pending: readonly PendingInteraction[];\n    pendingSubmissions?: readonly PendingSubmission[];\n    queue: readonly QueuedMessage[];\n    running: boolean;\n    subagent: {\n        address: SubagentAddress;\n        parentAvailable: boolean;\n    } | null;\n    composerPhase: ComposerPhase;\n    removed: boolean;\n    openState: OpenState;\n    openError: RpcError | null;\n    hasMore: boolean;\n    loadingOlder: boolean;\n    historyWindowMode: HistoryWindowMode;\n    historyDetail: HistoryDetailState;\n    historyNavigation?: HistoryNavigationSnapshot;\n    promptError: PromptError | null;\n    blank: boolean;\n    lastAgentError: string | null;\n}',
   },
   {
     name: 'ConversationStepDataMap',
@@ -564,6 +577,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type HistoryDetailState = \'conversation\' | \'filling\' | \'full\';',
   },
   {
+    name: 'HistoryNavigationItem',
+    declaration: 'export interface HistoryNavigationItem {\n    readonly turn: number;\n    readonly startSeq: number;\n    readonly endSeq: number;\n    readonly prompt?: string;\n    readonly response?: string;\n}',
+  },
+  {
+    name: 'HistoryNavigationSnapshot',
+    declaration: 'export interface HistoryNavigationSnapshot {\n    readonly state: HistoryNavigationState;\n    readonly asOfSeq: number;\n    readonly totalTurns: number;\n    readonly items: readonly HistoryNavigationItem[];\n    readonly truncated: boolean;\n    readonly error: RpcError | null;\n}',
+  },
+  {
+    name: 'HistoryNavigationState',
+    declaration: 'export type HistoryNavigationState = \'idle\' | \'loading\' | \'ready\' | \'error\';',
+  },
+  {
     name: 'HistoryWindowMode',
     declaration: 'export type HistoryWindowMode = \'tail\' | \'expanding\' | \'live\';',
   },
@@ -577,7 +602,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'InjectFace',
-    declaration: 'export type InjectFace<I extends object> = I extends {\n    hooks: infer HS extends HooksSources;\n} ? Omit<I, \'hooks\'> & PropsHooks<HS> : I;',
+    declaration: 'export type InjectFace<I extends object> = I extends {\n    hooks: infer HS extends HooksSources;\n} ? I extends {\n    keyedHooks: infer KS extends KeyedHooksSources;\n} ? Omit<I, \'hooks\' | \'keyedHooks\'> & PropsHooks<HS> & PropsKeyedHooks<KS> : Omit<I, \'hooks\'> & PropsHooks<HS> : I extends {\n    keyedHooks: infer KS extends KeyedHooksSources;\n} ? Omit<I, \'keyedHooks\'> & PropsKeyedHooks<KS> : I;',
   },
   {
     name: 'InjectParams',
@@ -585,7 +610,19 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ISession',
-    declaration: 'export interface ISession {\n    readonly sessionId: SessionId;\n    readonly projections: ProjectionsFace;\n    prompt(content: PromptContentPart[], mode: \'queue\' | \'steer\', signal?: AbortSignal): Promise<RpcResult<{\n        accepted: true;\n    }>>;\n    readAttachment(attachmentId: AttachmentIdType): Promise<RpcResult<{\n        attachment: ImageAttachmentRef;\n        data: Uint8Array;\n    }>>;\n    updateQueue(itemId: MessageId, action: QueueAction): Promise<RpcResult<{\n        accepted: true;\n    }>>;\n    cancel(): Promise<RpcResult<{\n        accepted: true;\n    }>>;\n    rename(title: string): Promise<RpcResult<{\n        title: string;\n        seq: number;\n    }>>;\n    loadOlder(): Promise<void>;\n    ensureHistoryDetail(): Promise<void>;\n    command(line: string): Promise<RemoteResult<{\n        matched: boolean;\n    }>>;\n}',
+    declaration: 'export interface ISession {\n    readonly sessionId: SessionId;\n    readonly projections: ProjectionsFace;\n    readonly beginSubmission?: (input: BeginSubmissionInput) => SubmissionHandle;\n    prompt(content: PromptContentPart[], mode: \'queue\' | \'steer\', signal?: AbortSignal, requestId?: RpcId): Promise<RpcResult<{\n        accepted: true;\n    }>>;\n    readAttachment(attachmentId: AttachmentIdType): Promise<RpcResult<{\n        attachment: ImageAttachmentRef;\n        data: Uint8Array;\n    }>>;\n    updateQueue(itemId: MessageId, action: QueueAction): Promise<RpcResult<{\n        accepted: true;\n    }>>;\n    cancel(): Promise<RpcResult<{\n        accepted: true;\n    }>>;\n    rename(title: string): Promise<RpcResult<{\n        title: string;\n        seq: number;\n    }>>;\n    loadOlder(): Promise<void>;\n    loadHistoryUntil?(targetSeq: number): Promise<boolean>;\n    ensureHistoryDetail(): Promise<void>;\n    command(line: string): Promise<RemoteResult<{\n        matched: boolean;\n    }>>;\n}',
+  },
+  {
+    name: 'KeyedHooksSources',
+    declaration: 'export type KeyedHooksSources = Record<string, KeyedStandardSource>;',
+  },
+  {
+    name: 'KeyedSnapshotSelectorHook',
+    declaration: 'export type KeyedSnapshotSelectorHook<Snapshot> = {\n    (key: string): Snapshot | undefined;\n    <Selected>(key: string, selector: (value: Snapshot | undefined) => Selected, equal?: (left: Selected, right: Selected) => boolean): Selected;\n};',
+  },
+  {
+    name: 'KeyedStandardSource',
+    declaration: 'export type KeyedStandardSource = (key: string) => HostObservable<unknown> | undefined;',
   },
   {
     name: 'KeyPropsOf',
@@ -601,7 +638,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'LocaleDefinition',
-    declaration: 'export interface LocaleDefinition {\n    id: LocaleId;\n    label: string;\n}',
+    declaration: 'export interface LocaleDefinition {\n    readonly id: LocaleId;\n    readonly label: string;\n    readonly fallback?: LocaleId;\n}',
   },
   {
     name: 'LocaleDict',
@@ -613,7 +650,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'LocaleId',
-    declaration: 'export type LocaleId = typeof LOCALE_IDS[number];',
+    declaration: 'export type LocaleId = string;',
   },
   {
     name: 'LocaleKeysOf',
@@ -664,6 +701,22 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface PendingPayloads {\n    approval: Omit<Extract<MuxFrame, {\n        type: \'approval/requested\';\n    }>, \'type\' | \'sessionId\'>;\n    question: Omit<Extract<MuxFrame, {\n        type: \'question/requested\';\n    }>, \'type\' | \'sessionId\'>;\n}',
   },
   {
+    name: 'PendingSubmission',
+    declaration: 'export interface PendingSubmission {\n    readonly requestId: RpcId;\n    readonly placement: PendingSubmissionPlacement;\n    readonly time: number;\n    readonly text: string;\n    readonly images: readonly PendingSubmissionImage[];\n}',
+  },
+  {
+    name: 'PendingSubmissionImage',
+    declaration: 'export interface PendingSubmissionImage {\n    readonly previewUrl: string;\n    readonly name?: string;\n    readonly width?: number;\n    readonly height?: number;\n}',
+  },
+  {
+    name: 'PendingSubmissionPlacement',
+    declaration: 'export type PendingSubmissionPlacement = \'transcript\' | \'queued\' | \'steering\';',
+  },
+  {
+    name: 'PendingSubmissionRetirement',
+    declaration: 'export type PendingSubmissionRetirement = {\n    readonly reason: \'observed\';\n    readonly attachments: readonly ImageAttachmentRef[];\n} | {\n    readonly reason: \'failed\';\n};',
+  },
+  {
     name: 'PendingWait',
     declaration: 'export class PendingWait<K extends PendingKind = PendingKind> {\n    readonly kind: K;\n    readonly key: string;\n    readonly sessionId: SessionId;\n    readonly payload: PendingPayloads[K];\n    constructor(kind: K, rpcId: RpcId, sessionId: SessionId, payload: PendingPayloads[K], respond: (message: ClientResponse) => Promise<RpcReceipt>);\n    respond(result: ClientResponse[\'result\']): Promise<RpcReceipt>;\n    markSettled(): void;\n}',
   },
@@ -678,6 +731,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'PropsHooks',
     declaration: 'export type PropsHooks<HS extends HooksSources> = {\n    [N in keyof HS & string as `use${Capitalize<N>}`]: SnapshotSelectorHook<HS[N] extends HostObservable<infer T> ? T : never>;\n};',
+  },
+  {
+    name: 'PropsKeyedHooks',
+    declaration: 'export type PropsKeyedHooks<HS extends KeyedHooksSources> = {\n    [N in keyof HS & string as `use${Capitalize<N>}`]: KeyedSnapshotSelectorHook<HS[N] extends (key: string) => HostObservable<infer T> | undefined ? T : never>;\n};',
   },
   {
     name: 'PropsLocale',
@@ -820,6 +877,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface StoreSpec<T, A extends ActionsDecl<T>> {\n    init: () => T;\n    persist?: string;\n    actions: A;\n}',
   },
   {
+    name: 'SubmissionHandle',
+    declaration: 'export interface SubmissionHandle {\n    readonly requestId: RpcId;\n    abandon(): void;\n}',
+  },
+  {
     name: 'ThemeDefinition',
     declaration: 'export interface ThemeDefinition {\n    id: string;\n    colorScheme: \'light\' | \'dark\';\n    tokens: ThemeTokens;\n}',
   },
@@ -829,7 +890,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ThemeSnapshot',
-    declaration: 'export interface ThemeSnapshot {\n    preference: ThemePreference;\n    active: ThemeDefinition;\n    themes: readonly ThemeDefinition[];\n    revision: number;\n}',
+    declaration: 'export interface ThemeSnapshot {\n    preference: ThemePreference;\n    active: ThemeDefinition;\n    themes: readonly ThemeDefinition[];\n    revision: number;\n    projectOverride?: \'light\' | \'dark\';\n}',
   },
   {
     name: 'ThemeTokenModes',
@@ -870,6 +931,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'TurnMaxTokensNode',
     declaration: 'export interface TurnMaxTokensNode {\n    kind: \'turn-max-tokens\';\n    seq: number;\n    time: number;\n    turn: number;\n    step: number;\n}',
+  },
+  {
+    name: 'TurnNavigationItem',
+    declaration: 'export interface TurnNavigationItem {\n    readonly turn: number;\n    readonly anchorKey: string;\n    readonly startSeq?: number;\n    readonly endSeq?: number;\n    readonly loaded?: boolean;\n    readonly prompt: string;\n    readonly response: string;\n}',
   },
   {
     name: 'UnknownSurfaceNode',

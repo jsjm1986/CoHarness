@@ -75,7 +75,7 @@
   margin: var(--dsw-space-1) 0 var(--dsw-space-1) var(--dsw-space-1);
   padding: var(--dsw-space-3) var(--dsw-space-4);
   overflow: auto;
-  border: 1px solid var(--dsw-alias-border-l1);
+  border: 0.5px solid var(--dsw-alias-border-l1);
   border-radius: var(--dsw-radius-lg);
   background: var(--dsw-alias-markdown-code-block);
   color: var(--dsw-alias-label-primary);

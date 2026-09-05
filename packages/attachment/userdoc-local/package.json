@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-userdoc-local",
   "description": "Real-file user document storage below a per-user upload root",
-  "version": "0.1.2-alpha.3.coharness.1",
+  "version": "0.1.2-alpha.5.coharness.1",
   "publishConfig": {
     "access": "public"
   },

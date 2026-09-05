@@ -8,6 +8,7 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
+import { SessionSeq } from '@deepseek-ai/dsh-session'
 import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
@@ -261,7 +262,7 @@ describe('mux live view computation', () => {
       content: [{ type: 'text', text: '<context_checkpoint>summary</context_checkpoint>' }],
       source: { kind: 'plugin', plugin: 'compact' },
     }), {
-      surfaceOp: { op: 'replace', start: shadowed[0] as number, end: shadowed.at(-1) as number },
+      surfaceOp: { op: 'replace', start: SessionSeq(shadowed[0] as number), end: SessionSeq(shadowed.at(-1) as number) },
       sourceEventSeqs: [...shadowed, summary.seq],
     })
 

@@ -22,7 +22,7 @@ import type {
   StreamChunk,
   TokenUsage,
 } from '@deepseek-ai/dsh-llm'
-import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
+import SessionStore, { Session, SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import { agentEvents, type Agent, type RequestErrorAction } from '@deepseek-ai/dsh-agent'
 import ToolResultPruner from '@deepseek-ai/dsh-compaction-tool-result-pruner'
@@ -602,7 +602,7 @@ describe('pressure measurement and retention', () => {
 
     await expect(compactIfNeeded(compact, session, 'context-overflow')).resolves.toBeNull()
     expect(session.surface.replaceGeneration).toBe(generation)
-    expect(session.events.some(event => event.type === 'compaction/start')).toBe(false)
+    expect(session.snapshotEvents().some(event => event.type === 'compaction/start')).toBe(false)
   })
 
   it('does nothing below threshold and compacts a priced head above threshold', async () => {
@@ -830,10 +830,10 @@ describe('optional model-free tool-result pruning', () => {
 
     expect(await compactIfNeeded(compact, session)).not.toBeNull()
     expect(compact.calls).toHaveLength(1)
-    const original = session.events.find(event => event.type === 'tool/result')
+    const original = session.snapshotEvents().find(event => event.type === 'tool/result')
     expect(original?.type === 'tool/result' && original.data.message.content[0].content[0])
       .toEqual({ type: 'text', text: 'X'.repeat(3_000) })
-    expect(session.events.filter(event =>
+    expect(session.snapshotEvents().filter(event =>
       event.type === 'tool/result' && event.surfaceOp !== 'append')).toHaveLength(0)
   })
 })
@@ -859,7 +859,7 @@ describe('compaction region transaction', () => {
     expect(result.shadowedTokenCount).toBeGreaterThan(0)
     expect(compact.calls[0]).toMatchObject({ signal: SIGNAL })
     expect(summarizedText(compact.calls[0]!.input)).toContain('fixture user 1')
-    const summary = session.events.findLast(event => event.type === 'compaction/summary')
+    const summary = session.snapshotEvents().findLast(event => event.type === 'compaction/summary')
     expect(summary?.data).toMatchObject({
       shadowedSeqs: result.shadowedSeqs,
       shadowedTokenCount: result.shadowedTokenCount,
@@ -875,7 +875,7 @@ describe('compaction region transaction', () => {
     expect(head.content[0]?.type === 'text' ? head.content[0].text : '').toContain('<compacted-summary>')
     expect(head.content.at(-1)).toEqual({ type: 'text', text: '</compacted-summary>' })
 
-    const replay = Session.create(SessionId('replay'), [...session.events])
+    const replay = Session.create(SessionId('replay'), session.snapshotEvents())
     expect(replay.deriveMessages()).toEqual(session.deriveMessages())
   })
 
@@ -904,8 +904,8 @@ describe('compaction region transaction', () => {
     const session = conversation(2)
     const nodes = session.surface.nodes
     await expect(compact.compactRegion(
-      startOverride ?? nodes[0]!,
-      endOverride ?? nodes[1]!,
+      startOverride === undefined ? nodes[0]! : SessionSeq(startOverride),
+      endOverride === undefined ? nodes[1]! : SessionSeq(endOverride),
       agent(session, MODEL),
     )).rejects.toThrow(pattern)
   })
@@ -1005,7 +1005,7 @@ describe('compaction region transaction', () => {
       agent(session, MODEL),
     )).rejects.toThrow('summary unavailable')
     expect(session.surface.nodes).toEqual(before)
-    expect(session.events.findLast(event => event.type === 'compaction/end')?.data)
+    expect(session.snapshotEvents().findLast(event => event.type === 'compaction/end')?.data)
       .toMatchObject({ error: 'summary unavailable' })
   })
 
@@ -1019,7 +1019,7 @@ describe('compaction region transaction', () => {
       nodes[2]!,
       agent(session, MODEL),
     )).rejects.toBe('plain failure')
-    expect(session.events.findLast(event => event.type === 'compaction/end')?.data)
+    expect(session.snapshotEvents().findLast(event => event.type === 'compaction/end')?.data)
       .toMatchObject({ error: 'plain failure' })
   })
 
@@ -1039,7 +1039,7 @@ describe('compaction region transaction', () => {
       nodes[2]!,
       agent(session, MODEL),
     )).resolves.toMatchObject({ shadowedSeqs: nodes.slice(0, 3) })
-    expect(session.events.some(event => event.type === 'compaction/summary')).toBe(true)
+    expect(session.snapshotEvents().some(event => event.type === 'compaction/summary')).toBe(true)
   })
 
   it('rejects concurrent surface appends before committing the replacement', async () => {
@@ -1058,7 +1058,7 @@ describe('compaction region transaction', () => {
       nodes[2]!,
       agent(session, MODEL),
     )).rejects.toThrow(/session surface changed/)
-    expect(session.events.some(event => event.type === 'compaction/summary')).toBe(false)
+    expect(session.snapshotEvents().some(event => event.type === 'compaction/summary')).toBe(false)
   })
 
   it('rejects a non-shrinking framed summary under the conversation meter', async () => {
@@ -1075,7 +1075,7 @@ describe('compaction region transaction', () => {
       nodes[2]!,
       agent(session, MODEL),
     )).rejects.toThrow(/summary is not smaller/)
-    expect(session.events.some(event => event.type === 'compaction/summary')).toBe(false)
+    expect(session.snapshotEvents().some(event => event.type === 'compaction/summary')).toBe(false)
   })
 
   it('lets a model-independent custom summarizer compact without a conversation model', async () => {
@@ -1325,7 +1325,7 @@ describe('default one-shot summarizer', () => {
     const session = conversation(3, 'large history '.repeat(500))
     const nodes = session.surface.nodes
     await compact.compactRegion(nodes[0]!, nodes[3]!, agent(session, MODEL), SIGNAL)
-    expect(session.events.findLast(event => event.type === 'compaction/summary')?.data).toMatchObject({
+    expect(session.snapshotEvents().findLast(event => event.type === 'compaction/summary')?.data).toMatchObject({
       summary: [{ type: 'text', text: 'routed summary' }],
       llmStreamCall: true,
       provider: 'routed-summary-provider',
@@ -1450,7 +1450,7 @@ describe('automatic listener and loader composition', () => {
     next: () => Promise<RequestErrorAction> = () => Promise.resolve(undefined),
   ): Promise<boolean> {
     const failure: LlmFailure = { message: error.message, code: error.code ?? 'UNKNOWN' }
-    const turn = owner.session.events.findLast(event => event.type === 'turn/start')?.data.turn ?? 1
+    const turn = owner.session.snapshotEvents().findLast(event => event.type === 'turn/start')?.data.turn ?? 1
     return agentEvents(ctx, owner).waterfall(
       'agent/request-error',
       { turn, step: 1, provider: 'test', failure, retryPolicy: undefined, signal },
@@ -1470,11 +1470,11 @@ describe('automatic listener and loader composition', () => {
     })
     const pressured = conversation(4)
     await preStep(ctx, agent(pressured, 'unconfigured-agent-fallback'))
-    expect(pressured.events.some(event => event.type === 'compaction/summary')).toBe(true)
+    expect(pressured.snapshotEvents().some(event => event.type === 'compaction/summary')).toBe(true)
 
     const small = conversation(1)
     await preStep(ctx, agent(small, MODEL))
-    expect(small.events.some(event => event.type === 'compaction/start')).toBe(false)
+    expect(small.snapshotEvents().some(event => event.type === 'compaction/start')).toBe(false)
     expect(compact.calls).toHaveLength(1)
   })
 
@@ -1491,7 +1491,7 @@ describe('automatic listener and loader composition', () => {
       .resolves.toEqual({ kind: 'enter', messages: [] })
 
     expect(compactIfNeeded).not.toHaveBeenCalled()
-    expect(pressured.events.some(event => event.type === 'compaction/start')).toBe(false)
+    expect(pressured.snapshotEvents().some(event => event.type === 'compaction/start')).toBe(false)
   })
 
   it('warns and continues after operational failures, including non-Errors', async () => {
@@ -1507,7 +1507,7 @@ describe('automatic listener and loader composition', () => {
 
     await expect(preStep(ctx, agent(session, MODEL))).resolves.toEqual({ kind: 'enter', messages: [] })
     expect(warnings).toContainEqual(expect.stringContaining('temporary failure'))
-    expect(session.events.some(event => event.type === 'compaction/summary')).toBe(false)
+    expect(session.snapshotEvents().some(event => event.type === 'compaction/summary')).toBe(false)
   })
 
   it('warns once per routed target when proactive pressure has no context metadata', async () => {
@@ -1566,7 +1566,7 @@ describe('automatic listener and loader composition', () => {
 
     expect(decision).toBe(true)
     expect(session.surface.replaceGeneration).toBe(beforeGeneration + 1)
-    expect(session.events.some(event => event.type === 'compaction/summary')).toBe(true)
+    expect(session.snapshotEvents().some(event => event.type === 'compaction/summary')).toBe(true)
     expect(session.surface.nodes).toContain(retainedSeq)
   })
 
@@ -1585,7 +1585,7 @@ describe('automatic listener and loader composition', () => {
 
     expect(await recover(ctx, agent(session, MODEL), overflow())).toBe(true)
     expect(session.surface.replaceGeneration).toBe(1)
-    expect(session.events.some(event => event.type === 'compaction/summary')).toBe(false)
+    expect(session.snapshotEvents().some(event => event.type === 'compaction/summary')).toBe(false)
     expect(compact.calls).toHaveLength(0)
   })
 
@@ -1603,7 +1603,7 @@ describe('automatic listener and loader composition', () => {
     const session = toolConversation()
 
     expect(await recover(ctx, agent(session, MODEL), overflow())).toBe(true)
-    expect(session.events.some(event => event.type === 'compaction/summary')).toBe(true)
+    expect(session.snapshotEvents().some(event => event.type === 'compaction/summary')).toBe(true)
     expect(compact.calls).toHaveLength(1)
     expect(summarizedText(compact.calls[0]!.input)).toContain('tool result middle pruned')
   })
@@ -1626,8 +1626,8 @@ describe('automatic listener and loader composition', () => {
 
     expect(await recover(ctx, agent(session, MODEL), overflow())).toBe(true)
     expect(session.surface.replaceGeneration).toBe(1)
-    expect(session.events.filter(event => event.type === 'tool/result')).toHaveLength(2)
-    expect(session.events.findLast(event => event.type === 'compaction/end')?.data)
+    expect(session.snapshotEvents().filter(event => event.type === 'tool/result')).toHaveLength(2)
+    expect(session.snapshotEvents().findLast(event => event.type === 'compaction/end')?.data)
       .toMatchObject({ error: 'summary unavailable after prune' })
     expect(warnings).toContainEqual(expect.stringContaining('retrying from the replacement surface'))
   })
@@ -1677,12 +1677,12 @@ describe('automatic listener and loader composition', () => {
     const session = conversation(2)
     const fakeResult: CompactionResult = {
       compactionId: CompactionId('fake-compaction'),
-      startSeq: 1,
-      summarySeq: 2,
-      endSeq: 3,
+      startSeq: SessionSeq(1),
+      summarySeq: SessionSeq(2),
+      endSeq: SessionSeq(3),
       summary: [{ type: 'text', text: 'fake' }],
-      shadowedRange: { start: 1, end: 2 },
-      shadowedSeqs: [1, 2],
+      shadowedRange: { start: SessionSeq(1), end: SessionSeq(2) },
+      shadowedSeqs: [SessionSeq(1), SessionSeq(2)],
       shadowedTokenCount: 10,
     }
     vi.spyOn(compact, 'compactIfNeeded').mockResolvedValue(fakeResult)
@@ -1829,10 +1829,10 @@ describe('automatic listener and loader composition', () => {
     })
     const session = conversation(4)
     await preStep(ctx, agent(session, MODEL))
-    const summaries = session.events.filter(event => event.type === 'compaction/summary').length
+    const summaries = session.snapshotEvents().filter(event => event.type === 'compaction/summary').length
     expect(summaries).toBe(1)
     expect(await recover(ctx, agent(session, MODEL), overflow())).toBe(false)
-    expect(session.events.filter(event => event.type === 'compaction/summary')).toHaveLength(summaries)
+    expect(session.snapshotEvents().filter(event => event.type === 'compaction/summary')).toHaveLength(summaries)
   })
 
   it('auto:false installs neither automatic listener', async () => {
@@ -1844,7 +1844,7 @@ describe('automatic listener and loader composition', () => {
     })
     const session = conversation(4)
     await preStep(ctx, agent(session, MODEL))
-    expect(session.events.some(event => event.type === 'compaction/start')).toBe(false)
+    expect(session.snapshotEvents().some(event => event.type === 'compaction/start')).toBe(false)
     expect(await recover(ctx, agent(session, MODEL), overflow())).toBe(false)
   })
 
@@ -1874,7 +1874,7 @@ describe('automatic listener and loader composition', () => {
 
     const session = conversation(4)
     await preStep(ctx, agent(session, MODEL))
-    expect(session.events.some(event => event.type === 'compaction/start')).toBe(false)
+    expect(session.snapshotEvents().some(event => event.type === 'compaction/start')).toBe(false)
     expect(await recover(ctx, agent(session, MODEL), overflow())).toBe(false)
   })
 })

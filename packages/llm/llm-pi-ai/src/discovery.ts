@@ -25,14 +25,22 @@ import { discoverModelsAtEndpoint, LlmError, supportsModelListing } from '@deeps
 import type { LlmDiscoveredModel, LlmEndpointResolutionCache, LlmModelDiscoveryRequest } from '@deepseek-ai/dsh-llm'
 import { catalogModels } from './catalog.ts'
 
+/** Host-owned profile inputs that a configuration draft deliberately omits. */
+export interface StoredModelDiscoveryProfile {
+  /** Deployment headers configured on the named route. */
+  readonly headers: Readonly<Record<string, string>> | undefined
+  /** Resolve the named route's credential only when the draft carries none. */
+  readonly resolveApiKey: () => Promise<string | undefined>
+}
+
 /**
  * Interrogate one draft provider endpoint for the models it advertises.
  * @param request - the endpoint, protocol, and one-shot credential to use.
- * @param storedApiKey - the credential the named route already stored, asked
- *   for only when the draft carries none and only on the path that reaches the
- *   network. A configuration surface never holds a stored secret — it edits a
- *   redacted descriptor — so without this an already-configured route would be
- *   interrogated unauthenticated and answer 401.
+ * @param storedProfile - Host-owned headers and lazy credential resolution for
+ *   the named route. It is read only on the path that reaches the network; the
+ *   credential is resolved only when the draft carries none. A configuration
+ *   surface edits a redacted descriptor and holds neither, so without this an
+ *   already-configured route would be interrogated unauthenticated.
  * @param cache - optional process-local endpoint resolution cache shared with
  *   model requests; a successful candidate is retained until the profile
  *   snapshot changes.
@@ -42,7 +50,7 @@ import { catalogModels } from './catalog.ts'
  */
 export async function discoverModels(
   request: LlmModelDiscoveryRequest,
-  storedApiKey?: () => Promise<string | undefined>,
+  storedProfile?: () => StoredModelDiscoveryProfile | undefined,
   cache?: LlmEndpointResolutionCache,
 ): Promise<readonly LlmDiscoveredModel[]> {
   // A catalog route already has its answer, and a better one: the installed
@@ -76,18 +84,20 @@ export async function discoverModels(
       'DISCOVERY_UNSUPPORTED',
     )
   }
-  // A key typed into the form wins: it is the one the user is testing, and it
-  // may be the replacement for exactly the stored key that is failing. The
-  // stored one is only asked for here, past the catalog short-circuit and the
-  // protocol check, so a route answered from the registry costs no credential
-  // lookup — and no diagnostic about a credential it never needed.
-  // A probe carrying no key stays unauthenticated, which is how a route that
-  // relies on the provider's own ambient discovery is meant to be asked.
-  const supplied = request.apiKey ?? await storedApiKey?.()
+  // A key typed into the form wins: it may replace the stored key that is
+  // failing. The stored profile is asked only here, past the catalog
+  // short-circuit and the protocol check, and its credential resolver stays
+  // lazy so a typed key cannot fail over a stored credential it supersedes. A
+  // probe carrying no key stays unauthenticated — how a route relying on the
+  // provider's own ambient discovery is meant to be asked — unless a
+  // deployment-owned Authorization header on the profile authenticates it.
+  const stored = storedProfile?.()
+  const supplied = request.apiKey ?? await stored?.resolveApiKey()
   return discoverModelsAtEndpoint({
     baseURL: request.baseURL,
     api,
     ...(supplied === undefined ? {} : { apiKey: supplied }),
+    ...(stored?.headers === undefined ? {} : { headers: stored.headers }),
     ...(request.signal === undefined ? {} : { signal: request.signal }),
   }, cache)
 }

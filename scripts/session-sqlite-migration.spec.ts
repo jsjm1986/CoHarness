@@ -3,7 +3,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { mkdtemp, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
+import { SessionId, type SessionEvent, SessionSeq, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import { DEFAULT_BUSY_TIMEOUT_MS } from '../packages/session/session-persistence-sqlite/src/index.ts'
 import { SqliteStore } from '../packages/session/session-persistence-sqlite/src/store.ts'
 import {
@@ -27,7 +27,7 @@ async function fixture(): Promise<{ root: string; path: string }> {
 
 function events(): SessionEvent[] {
   return [
-    { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } },
+    { type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } },
     {
       type: 'assistant/message',
       seq: 1,
@@ -37,7 +37,7 @@ function events(): SessionEvent[] {
       surfaceOp: 'append',
       ignorable: true,
     } as unknown as SessionEvent,
-    { type: 'turn/end', seq: 2, time: 3, data: { turn: 1, reason: { kind: 'completed' } } },
+    { type: 'turn/end', seq: SessionSeq(2), time: 3, data: { turn: 1, reason: { kind: 'completed' } } },
   ]
 }
 
@@ -45,8 +45,8 @@ describe('offline Session SQLite migrations', () => {
   it('round-trips a draft, provenance, ignorable event, and store identity both ways', async () => {
     const { root, path } = await fixture()
     const store = new SqliteStore({ path, journalMode: 'delete', busyTimeoutMs: DEFAULT_BUSY_TIMEOUT_MS })
-    const header = { id: SessionId('migration-session'), version: 0, createdAt: 1, cwd: '/work', draft: true }
-    await store.appendBatch(header, events(), false)
+    const header = { id: SessionId('migration-session'), version: 0, createdAt: 1, cwd: '/work', isSeeded: false, draft: true }
+    await store.appendBatch({ meta: header, inheritedEventCount: SessionLogOffset(0) }, events(), false)
     await store.close()
 
     const v18 = join(root, 'v18.db')

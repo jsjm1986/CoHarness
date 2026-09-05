@@ -1,7 +1,7 @@
 /** Internal React bindings for the renderer host and active session provide bundle. */
 import { createContext, useContext, type ReactNode } from 'react'
 import type {
-  HostObservable, MaybeSnapshotSelectorHook, SessionMaybeProvideInfo, SessionProvideInfo,
+  HostObservable, KeyedStandardSource, MaybeSnapshotSelectorHook, SessionMaybeProvideInfo, SessionProvideInfo,
   SlotRendererHost, SnapshotSelectorHook,
 } from '@deepseek-ai/dsh-client-ui-slots'
 import { bindSnapshotSelector } from './bind.ts'
@@ -69,6 +69,34 @@ const absentSource: HostObservable<undefined> = {
   getSnapshot: () => undefined,
   subscribe: () => () => {},
 }
+
+/** Erased open-key selector Hook synthesized from one keyed source family. */
+export type KeyedSnapshotHook = (
+  key: string,
+  selector?: (value: unknown) => unknown,
+  equal?: (left: unknown, right: unknown) => boolean,
+) => unknown
+
+/**
+ * Bind an open-key source family declared in an entry inject `keyedHooks`
+ * compartment. Absent members resolve the shared absent source so the
+ * caller's selector still runs over `undefined` and the uSES call count
+ * stays constant.
+ * @param source - keyed resolver.
+ * @returns cached keyed selector Hook.
+ */
+export function keyedObservableHook(source: KeyedStandardSource): KeyedSnapshotHook {
+  let hook = keyedHookCache.get(source)
+  if (hook === undefined) {
+    hook = (key, selector, equal) => {
+      const useValue = observableHook(source(key) ?? absentSource)
+      return useValue(selector ?? (value => value), equal)
+    }
+    keyedHookCache.set(source, hook)
+  }
+  return hook
+}
+const keyedHookCache = new WeakMap<KeyedStandardSource, KeyedSnapshotHook>()
 
 /** Bind a source that disappears with the current session to an optional selector hook. */
 export function maybeObservableHook<T>(source: HostObservable<T> | undefined): MaybeSnapshotSelectorHook<T> {

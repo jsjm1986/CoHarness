@@ -6,6 +6,7 @@
  */
 
 import { randomBytes } from 'node:crypto'
+import { SessionLogOffset } from '@deepseek-ai/dsh-session'
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { unzipSync, strFromU8 } from 'fflate'
@@ -22,7 +23,7 @@ function header(id: string, parentSession?: SessionId): SessionHeader {
   return {
     version: 0,
     id: sid(id),
-    createdAt: 1000,
+    createdAt: 1000, isSeeded: false,
     cwd: '/proj',
     ...parentSession === undefined ? {} : { parentSession },
     delegationDepth: parentSession === undefined ? 0 : 1,
@@ -32,6 +33,7 @@ function header(id: string, parentSession?: SessionId): SessionHeader {
 function artifact(id: string, parentSession?: SessionId, content?: string): SessionRawArtifact {
   return {
     meta: header(id, parentSession),
+    inheritedEventCount: SessionLogOffset(0),
     filename: 'session.jsonl',
     content: content ?? `{"type":"session","version":0,"id":"${id}","createdAt":1000}\n{"type":"turn/start","seq":0,"time":2000,"data":{"turn":1}}\n`,
   }

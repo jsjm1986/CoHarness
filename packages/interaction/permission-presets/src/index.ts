@@ -20,7 +20,7 @@ import { SANDBOX_MODES, effectiveSandboxMode, setSandboxMode } from '@deepseek-a
 // `sandboxMode` this service reads), without a value dependency on the seam.
 import type {} from '@deepseek-ai/dsh-shell'
 import type { ApprovalPolicy } from '@deepseek-ai/dsh-user-approval'
-import { APPROVAL_POLICIES, effectiveApprovalPolicy, setApprovalPolicy } from '@deepseek-ai/dsh-user-approval'
+import { APPROVAL_POLICIES, setApprovalPolicy } from '@deepseek-ai/dsh-user-approval'
 import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
 // Type-only: resolves ctx.sessionProjections / ctx.commands for the optional children.
 import type {} from '@deepseek-ai/dsh-session-projection'
@@ -307,7 +307,7 @@ export class PermissionPresetService extends Service {
         handler: ({ agent, rawInput }) => {
           const name = rawInput.trim()
           if (name === '') {
-            return { kind: 'success', text: `current preset ${this.current(agent.session.events)} (available: ${this.names.join(', ')})` }
+            return { kind: 'success', text: `current preset ${this.current(agent.session.snapshotEvents())} (available: ${this.names.join(', ')})` }
           }
           if (!this.names.includes(name)) {
             return { kind: 'error', text: `unknown preset "${name}" (available: ${this.names.join(', ')})` }
@@ -359,7 +359,7 @@ export class PermissionPresetService extends Service {
    * @param session - the live session selected for Workspace blank reuse.
    */
   refreshDefaultForReuse(session: Session): void {
-    const events = session.events
+    const events = session.snapshotEvents()
     if (events.some(event => event.type === 'turn/start')) return
     const selected = latestPermissionSelection(events)
     if (selected?.data.origin !== 'default') return
@@ -451,14 +451,14 @@ export class PermissionPresetService extends Service {
   ): void {
     const spec = this.resolve(name)
     this.assertAuthorized(name)
-    if (this.current(session.events) !== name) {
+    if (this.current(session.snapshotEvents()) !== name) {
       session.append('permission/preset', { preset: name, origin })
     }
-    const events = session.events
+    const events = session.snapshotEvents()
     if (spec.sandbox !== (effectiveSandboxMode(events) ?? this.ctx.shell.sandboxMode)) {
       setSandboxMode(session, spec.sandbox)
     }
-    if (spec.approval !== (effectiveApprovalPolicy(events) ?? this.ctx.approval.config.policy ?? 'ask')) {
+    if (spec.approval !== (foldKnobs(events).approval ?? this.ctx.approval.config.policy ?? 'ask')) {
       setApproval(spec.approval)
     }
   }
@@ -470,10 +470,10 @@ export class PermissionPresetService extends Service {
    * the missing durable facts.
    */
   private pinInitialPermission(session: Session): void {
-    const events = session.events
+    const events = session.snapshotEvents()
     const selected = effectivePermissionPreset(events)
     const sandbox = effectiveSandboxMode(events)
-    const approval = effectiveApprovalPolicy(events)
+    const approval = foldKnobs(events).approval ?? undefined
     const seeded = events.some(event => event.type === 'session/end-seed')
     if (selected === undefined && sandbox === undefined && approval === undefined && !seeded) {
       const name = this.defaultPreset

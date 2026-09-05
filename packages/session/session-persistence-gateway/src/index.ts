@@ -20,8 +20,11 @@ import {
 import {
   isSurfaceEligibleType,
   SessionId,
+  SessionLogOffset,
+  type Session,
   type SessionEvent,
   type SessionHeader,
+  type SessionLogOffset as SessionLogOffsetType,
   type SessionPreparation,
 } from '@deepseek-ai/dsh-session'
 import SessionPersistence, {
@@ -36,8 +39,10 @@ import SessionPersistence, {
   type SessionDraftReservationRequest,
   type SessionContentMetadata,
   type PersistenceBackend,
+  type SessionEventSuffix,
   type SessionInspection,
   type SessionLocation,
+  type SessionStorageMetadata,
   type SessionPersistenceSnapshot,
   type SessionHistoryIndex,
   type SessionHistoryIndexItem,
@@ -69,7 +74,7 @@ const EVENT_ENVELOPE_KEYS = new Set([
 
 interface PendingSessionCreation {
   visibility: 'project' | 'private'
-  header: SessionHeader
+  header: GatewayWireHeader
   authorization: Promise<SessionCreationAuthorization>
   unregister: () => void
 }
@@ -189,7 +194,37 @@ function protocolReadError(error: unknown, fallback: string): SessionPersistence
   )
 }
 
+/**
+ * The session header as the Gateway stores and returns it. The wire keeps the
+ * exact inherited cut as `seedLength` (the Gateway schema is the authority);
+ * the Host header exposes only `isSeeded` and carries the integer beside it
+ * as storage metadata.
+ */
+interface GatewayWireHeader extends Omit<SessionHeader, 'isSeeded'> {
+  readonly seedLength?: number
+}
+
+/** Project Host storage metadata onto the Gateway wire header. */
+function wireHeader(storage: SessionStorageMetadata): GatewayWireHeader {
+  const { isSeeded, ...header } = storage.meta
+  return { ...header, ...(isSeeded ? { seedLength: storage.inheritedEventCount } : {}) }
+}
+
+/** Storage metadata for a live Session's creation: header plus its exact inherited cut. */
+function storageOf(session: Session): SessionStorageMetadata {
+  return { meta: session.header, inheritedEventCount: session.inheritedEventCount }
+}
+
+/** Storage metadata for a Service Definition `create`: seeded only when the caller supplies the cut. */
+function storageForCreate(meta: SessionHeader, inheritedEventCount: SessionLogOffsetType | undefined): SessionStorageMetadata {
+  return { meta, inheritedEventCount: SessionLogOffset(inheritedEventCount ?? 0) }
+}
+
 function headerFrom(value: unknown): SessionHeader {
+  return storageFrom(value).meta
+}
+
+function storageFrom(value: unknown): SessionStorageMetadata {
   const header = record(value)
   if (typeof header?.id !== 'string' || header.id === '' || !safeInteger(header.version)
     || !nonNegativeInteger(header.createdAt) || !optionalString(header.cwd)
@@ -202,16 +237,19 @@ function headerFrom(value: unknown): SessionHeader {
     throw new Error('Gateway returned an invalid session header')
   }
   return {
-    id: SessionId(header.id),
-    version: header.version,
-    createdAt: header.createdAt,
-    ...(header.cwd === undefined ? {} : { cwd: header.cwd }),
-    ...(header.parentSession === undefined ? {} : { parentSession: SessionId(header.parentSession) }),
-    ...(header.seedLength === undefined ? {} : { seedLength: header.seedLength }),
-    ...(header.origin === undefined ? {} : { origin: header.origin }),
-    ...(header.delegationDepth === undefined ? {} : { delegationDepth: header.delegationDepth }),
-    ...(header.agentPreset === undefined ? {} : { agentPreset: header.agentPreset }),
-    ...(header.draft === undefined ? {} : { draft: header.draft }),
+    meta: {
+      id: SessionId(header.id),
+      version: header.version,
+      createdAt: header.createdAt,
+      ...(header.cwd === undefined ? {} : { cwd: header.cwd }),
+      ...(header.parentSession === undefined ? {} : { parentSession: SessionId(header.parentSession) }),
+      isSeeded: header.seedLength !== undefined,
+      ...(header.origin === undefined ? {} : { origin: header.origin }),
+      ...(header.delegationDepth === undefined ? {} : { delegationDepth: header.delegationDepth }),
+      ...(header.agentPreset === undefined ? {} : { agentPreset: header.agentPreset }),
+      ...(header.draft === undefined ? {} : { draft: header.draft }),
+    },
+    inheritedEventCount: SessionLogOffset(header.seedLength ?? 0),
   }
 }
 
@@ -344,7 +382,7 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     if (!Number.isSafeInteger(maxPendingBytes) || maxPendingBytes < 1 || maxPendingBytes > DEFAULT_GATEWAY_MAX_PENDING_BYTES) {
       throw new RangeError(`session-persistence-gateway maxPendingBytes must be within 1..${String(DEFAULT_GATEWAY_MAX_PENDING_BYTES)}`)
     }
-    ctx.on('session/created', (session) => { this.rememberCreation(session.header) })
+    ctx.on('session/created', (session) => { this.rememberCreation(storageOf(session)) })
     this.coordinator = new PersistenceCoordinator(this.ctx, this, {
       preparedSessionCacheSize: config.preparedSessionCacheSize ?? DEFAULT_PREPARED_SESSION_CACHE_SIZE,
       writeBatchMaxDelayMs: config.writeBatchMaxDelayMs ?? DEFAULT_WRITE_BATCH_MAX_DELAY_MS,
@@ -376,9 +414,9 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     return undefined
   }
 
-  create(meta: SessionHeader): Promise<void> {
-    const creation = this.rememberCreation(meta)
-    return this.coordinator.create(meta).catch((error: unknown) => {
+  create(meta: SessionHeader, inheritedEventCount?: SessionLogOffsetType): Promise<void> {
+    const creation = this.rememberCreation(storageForCreate(meta, inheritedEventCount))
+    return this.coordinator.create(meta, inheritedEventCount).catch((error: unknown) => {
       if (creation !== undefined) this.forgetCreation(meta.id, creation)
       throw error
     })
@@ -464,7 +502,7 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     return this.coordinator.inspect(id, signal)
   }
 
-  readFrom(id: SessionId, fromSeq: number, signal?: AbortSignal): Promise<{ meta: SessionHeader; events: SessionEvent[] }> {
+  readFrom(id: SessionId, fromSeq: SessionLogOffsetType, signal?: AbortSignal): Promise<SessionEventSuffix> {
     return this.coordinator.readFrom(id, fromSeq, signal)
   }
 
@@ -610,7 +648,8 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     }
   }
 
-  private rememberCreation(header: SessionHeader): PendingSessionCreation | undefined {
+  private rememberCreation(storage: SessionStorageMetadata): PendingSessionCreation | undefined {
+    const header = wireHeader(storage)
     const creation = this.ctx.get('collaboration')?.currentCreation()
     if (creation === undefined) return this.creations.get(header.id)
     const principal = this.ctx.gatewayRuntime.current()
@@ -646,7 +685,7 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
   }
 
   private async prepareCreation(
-    header: SessionHeader,
+    header: GatewayWireHeader,
     visibility: 'project' | 'private',
     principal: GatewayRequestPrincipal,
   ): Promise<SessionCreationAuthorization> {
@@ -736,13 +775,13 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     if (typeof value.revision !== 'string' || value.revision === '') {
       throw new SessionPersistenceReadError('protocol', 'Gateway returned an invalid session revision')
     }
-    let header: SessionHeader
+    let storage: SessionStorageMetadata
     try {
-      header = headerFrom(value.header)
+      storage = storageFrom(value.header)
     } catch (error: unknown) {
       throw protocolReadError(error, 'Gateway returned an invalid session header')
     }
-    if (header.id !== id) throw new SessionPersistenceReadError('protocol', 'Gateway returned a different session header')
+    if (storage.meta.id !== id) throw new SessionPersistenceReadError('protocol', 'Gateway returned a different session header')
     let events: SessionEvent[]
     try {
       events = eventsFrom(value.events)
@@ -750,7 +789,7 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
       throw protocolReadError(error, 'Gateway returned an invalid session event list')
     }
     return {
-      meta: header,
+      ...storage,
       events,
       revision: SessionPersistenceRevision(value.revision),
     }
@@ -769,29 +808,30 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     return SessionPersistenceRevision(value.revision)
   }
 
-  async loadStoredFrom(id: SessionId, fromSeq: number, signal?: AbortSignal): Promise<StoredSuffix | undefined> {
+  async loadStoredFrom(id: SessionId, fromSeq: SessionLogOffsetType, signal?: AbortSignal): Promise<StoredSuffix | undefined> {
     const value = record(await this.optional(
       `/internal/runtime/session/read-from?sessionId=${encodeURIComponent(id)}&fromSeq=${String(fromSeq)}`,
       signal,
     ))
     if (value === undefined) return undefined
-    let header: SessionHeader
+    let storage: SessionStorageMetadata
     try {
-      header = headerFrom(value.header)
+      storage = storageFrom(value.header)
     } catch (error: unknown) {
       throw protocolReadError(error, 'Gateway returned an invalid session header')
     }
-    if (header.id !== id) throw new SessionPersistenceReadError('protocol', 'Gateway returned a different session header')
+    if (storage.meta.id !== id) throw new SessionPersistenceReadError('protocol', 'Gateway returned a different session header')
     let events: SessionEvent[]
     try {
       events = eventsFrom(value.events)
     } catch (error: unknown) {
       throw protocolReadError(error, 'Gateway returned an invalid session event list')
     }
-    return { meta: header, events }
+    return { ...storage, events }
   }
 
-  async appendBatch(meta: SessionHeader, events: readonly SessionEvent[], isMaterialized: boolean): Promise<void> {
+  async appendBatch(storage: SessionStorageMetadata, events: readonly SessionEvent[], isMaterialized: boolean): Promise<void> {
+    const meta = storage.meta
     const creation = isMaterialized ? undefined : this.creations.get(meta.id)
     const authorization = creation === undefined ? undefined : await creation.authorization
     await this.request('/internal/runtime/session/append', {
@@ -802,7 +842,7 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
         batchId: deterministicBatchId('append', meta.id, events),
         events,
         ...isMaterialized ? {} : {
-          ...(authorization === undefined ? { header: meta } : { creationAuthorization: authorization }),
+          ...(authorization === undefined ? { header: wireHeader(storage) } : { creationAuthorization: authorization }),
         },
       }),
     })
@@ -813,7 +853,8 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     }
   }
 
-  async commitRepair(meta: SessionHeader, _tornMarker: undefined, closers: readonly SessionEvent[]): Promise<void> {
+  async commitRepair(storage: SessionStorageMetadata, _tornMarker: undefined, closers: readonly SessionEvent[]): Promise<void> {
+    const meta = storage.meta
     if (closers.length === 0) return
     await this.request('/internal/runtime/session/repair', {
       method: 'POST',

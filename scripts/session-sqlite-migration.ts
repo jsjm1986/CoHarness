@@ -14,12 +14,14 @@ import {
   SESSION_PERSISTENCE_SQLITE_APPLICATION_ID,
   decodeEventRow,
   decodeSessionRow,
-  rowToMeta,
+  rowToStorage,
 } from '../packages/session/session-persistence-sqlite/src/schema.ts'
 
 /** One logical session extracted from either physical schema. */
 export interface LogicalSession {
-  readonly header: ReturnType<typeof rowToMeta>
+  readonly header: ReturnType<typeof rowToStorage>['meta']
+  /** Exact inherited cut stored beside the header (`seed_length`). */
+  readonly inheritedEventCount: ReturnType<typeof rowToStorage>['inheritedEventCount']
   readonly events: readonly SessionEvent[]
   readonly storeId: string
   readonly incarnation: string
@@ -88,7 +90,7 @@ export function readV18(path: string): LogicalSession[] {
         FROM events WHERE session_id = ? ORDER BY seq`).all(row.id)
       const events = physical.flatMap(item => decodeV18Row(item, row.id))
       assertContiguous(events, row.id)
-      return { header: rowToMeta(row), events, storeId, incarnation: row.incarnation, revision: row.revision }
+      return toLogicalSession(row, events, storeId)
     })
   } finally {
     db.close()
@@ -124,7 +126,7 @@ export function readV20(path: string): LogicalSession[] {
         WHERE s.session_key = ? ORDER BY e.seq`).all(row.id)
       const events = physical.flatMap(item => decodeRow(decodeEventRow(item)))
       assertContiguous(events, row.id)
-      return { header: rowToMeta(row), events, storeId, incarnation: row.incarnation, revision: row.revision }
+      return toLogicalSession(row, events, storeId)
     })
   } finally {
     db.close()
@@ -308,6 +310,22 @@ function assertContiguous(events: readonly SessionEvent[], sessionId: string): v
   }
 }
 
+function toLogicalSession(
+  row: ReturnType<typeof decodeSessionRow>,
+  events: readonly SessionEvent[],
+  storeId: string,
+): LogicalSession {
+  const storage = rowToStorage(row)
+  return {
+    header: storage.meta,
+    inheritedEventCount: storage.inheritedEventCount,
+    events,
+    storeId,
+    incarnation: row.incarnation,
+    revision: row.revision,
+  }
+}
+
 function writeV20(path: string, sessions: readonly LogicalSession[], storeId: string): void {
   const db = createDatabase(path, 20, sql('schema'))
   try {
@@ -329,7 +347,7 @@ function writeV20(path: string, sessions: readonly LogicalSession[], storeId: st
     for (const session of sessions) {
       const header = session.header
       insertSession.run(header.id, header.version, header.createdAt, header.cwd ?? null,
-        header.parentSession ?? null, header.seedLength ?? null, header.origin ?? null,
+        header.parentSession ?? null, header.isSeeded ? session.inheritedEventCount : null, header.origin ?? null,
         header.delegationDepth ?? null, header.agentPreset ?? null,
         session.incarnation, session.revision)
       insertDraft.run(header.draft === true ? 1 : 0, header.id)
@@ -364,7 +382,7 @@ function writeV18(path: string, sessions: readonly LogicalSession[], storeId: st
     for (const session of sessions) {
       const header = session.header
       insertSession.run(header.id, header.version, header.createdAt, header.cwd ?? null,
-        header.parentSession ?? null, header.seedLength ?? null, header.origin ?? null,
+        header.parentSession ?? null, header.isSeeded ? session.inheritedEventCount : null, header.origin ?? null,
         header.delegationDepth ?? null, header.agentPreset ?? null, header.draft === true ? 1 : 0,
         session.incarnation, session.revision)
       for (const event of session.events) {

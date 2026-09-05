@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { createUserMessage, CallId, HarnessError, type ContentBlock  } from '@deepseek-ai/dsh-llm'
+import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import ApprovalService, { type ApprovalOutcome, type ApprovalRequest } from '@deepseek-ai/dsh-user-approval'
@@ -720,13 +721,13 @@ describe('ToolRuntime', () => {
   describe('ask routing through ctx.approval', () => {
     /**
      * A minimal Agent stand-in — the approval seam reaches
-     * `agent.session.append` and folds `.events`; the seeded open turn
-     * satisfies request()'s enclosure precondition.
+     * `agent.session.append` and scans the log for the enclosing turn; the
+     * seeded open turn satisfies request()'s enclosure precondition.
      */
     function fakeAgent(): Agent {
-      return {
-        session: { events: [{ type: 'turn/start' }], append: () => ({}) },
-      } as unknown as Agent
+      const session = Session.create(SessionId('approval-fake-agent'))
+      session.append('turn/start', { turn: 1 })
+      return { session } as unknown as Agent
     }
 
     async function approvalSetup() {

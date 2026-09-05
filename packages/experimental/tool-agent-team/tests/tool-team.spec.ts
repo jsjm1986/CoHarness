@@ -355,11 +355,11 @@ describe('dsh-tool-team', () => {
     const { ctx, lead, fiber } = await setup([], true)
     const teamSchema = (await assembly(ctx, lead)).tools.find(schema => schema.name === 'send_message')
     expect(JSON.stringify(teamSchema)).toContain('target')
-    expect(JSON.stringify(teamSchema)).not.toContain('subagent_id')
+    expect(JSON.stringify(teamSchema)).not.toContain('agent_id')
 
     await fiber.dispose()
     const legacySchema = (await assembly(ctx, lead)).tools.find(schema => schema.name === 'send_message')
-    expect(JSON.stringify(legacySchema)).toContain('subagent_id')
+    expect(JSON.stringify(legacySchema)).toContain('agent_id')
   })
 
   it('rolls back partial scoped installation after a same-scope collision', async () => {

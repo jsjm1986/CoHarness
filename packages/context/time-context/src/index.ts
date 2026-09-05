@@ -10,6 +10,7 @@ import z from '@deepseek-ai/schemastery'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
+import { SessionSeq } from '@deepseek-ai/dsh-session'
 import {
   deriveBrowserTimeZoneContext,
   renderBrowserTimeZoneContext,
@@ -56,7 +57,7 @@ function formatDuration(elapsedMs: number): string {
 
 /** Find the latest model-visible event, excluding this plugin's pending append. */
 function precedingMessageTime(agent: Agent): number | undefined {
-  for (const event of [...agent.session.events].reverse()) {
+  for (const event of [...agent.session.snapshotEvents()].reverse()) {
     switch (event.type) {
       case 'user/message':
       case 'assistant/message':
@@ -72,7 +73,7 @@ function precedingMessageTime(agent: Agent): number | undefined {
 
 /** Find the preceding time-context event within the open turn. */
 function precedingStepContextTime(agent: Agent, turn: number): number | undefined {
-  for (const event of [...agent.session.events].reverse()) {
+  for (const event of [...agent.session.snapshotEvents()].reverse()) {
     if (event.type === 'turn/start' && event.data.turn === turn) return undefined
     if (event.type === 'user/message'
       && event.data.source.kind === 'plugin'
@@ -85,7 +86,7 @@ function precedingStepContextTime(agent: Agent, turn: number): number | undefine
 
 /** Find this plugin's latest durable injection, including a shadowed surface event. */
 function latestInjectionTime(agent: Agent): number | undefined {
-  for (const event of [...agent.session.events].reverse()) {
+  for (const event of [...agent.session.snapshotEvents()].reverse()) {
     if (event.type === 'user/message'
       && event.data.source.kind === 'plugin'
       && event.data.source.plugin === name) {
@@ -97,14 +98,15 @@ function latestInjectionTime(agent: Agent): number | undefined {
 
 /** Collect already-entered and proposed user messages belonging to one open turn. */
 function requestMessages(agent: Agent, turn: number, proposed: readonly UserMessage[]): UserMessage[] {
-  const start = agent.session.events.findLastIndex(
-    event => event.type === 'turn/start' && event.data.turn === turn,
-  )
-  const entered = start < 0
-    ? []
-    : agent.session.events.slice(start + 1)
-      .flatMap(event => event.type === 'user/message' ? [event.data] : [])
-  return [...entered, ...proposed]
+  const entered: UserMessage[] = []
+  for (let seq = agent.session.seq - 1; seq >= 0; seq -= 1) {
+    const event = agent.session.eventAt(SessionSeq(seq))
+    if (event?.type === 'turn/start' && event.data.turn === turn) {
+      return [...entered.reverse(), ...proposed]
+    }
+    if (event?.type === 'user/message') entered.push(event.data)
+  }
+  return [...proposed]
 }
 
 function renderText(

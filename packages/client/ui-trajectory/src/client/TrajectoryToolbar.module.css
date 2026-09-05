@@ -5,7 +5,7 @@
   box-sizing: border-box;
   width: 100%;
   height: var(--dsh-trajectory-toolbar-height);
-  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  border-bottom: 0.5px solid var(--dsw-alias-border-l2);
   background: var(--dsw-alias-bg-layer-1);
   /* Compact action/search overflow belongs to this toolbar surface. The
      search capsule is an elevated layer-2 child, so keep any horizontal bar
@@ -127,6 +127,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
+  corner-shape: round;
   background: var(--dsw-alias-bg-layer-1);
   transition: transform 120ms var(--ds-ease-in-out);
 }
@@ -178,7 +179,7 @@
   margin-left: auto;
   padding: 0 6px;
   gap: var(--dsw-space-1);
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 0.5px solid var(--dsw-alias-border-l4);
   border-radius: var(--dsw-radius-xs);
   color: var(--dsw-alias-label-caption);
   background: var(--dsw-alias-bg-layer-2);
@@ -329,7 +330,7 @@
     align-items: center;
     gap: var(--dsw-space-1);
     padding: 0 var(--dsw-space-1) 0 var(--dsw-space-2);
-    border: 1px solid var(--dsw-alias-border-l2);
+    border: 0.5px solid var(--dsw-alias-border-l2);
     border-radius: var(--dsw-radius-md);
     color: var(--dsw-alias-label-caption);
     background: var(--dsw-alias-bg-layer-2);

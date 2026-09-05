@@ -126,6 +126,7 @@ async function seedSubagents(scaffold: WebScaffold, parentId: SessionId, count: 
       version: SESSION_FORMAT_VERSION,
       id: childId,
       createdAt,
+      isSeeded: false,
       cwd: scaffold.workspaceCwd,
       parentSession: parentId,
       origin: 'subagent',

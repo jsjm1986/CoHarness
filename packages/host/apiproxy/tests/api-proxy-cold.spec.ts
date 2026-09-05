@@ -5,6 +5,7 @@
  */
 
 import { mkdtempSync, writeFileSync } from 'node:fs'
+import { SessionSeq, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
@@ -38,7 +39,7 @@ function request<P>(payload: P): RpcRequest<P> {
 }
 
 function header(id: string, createdAt: number, extra: Partial<SessionHeader> = {}): SessionHeader {
-  return { version: 0, id: sid(id), createdAt, cwd: '/proj', ...extra }
+  return { version: 0, id: sid(id), createdAt, cwd: '/proj', isSeeded: false, ...extra }
 }
 
 describe('sessions.list cold merge', () => {
@@ -192,9 +193,9 @@ describe('sessions.list cold merge', () => {
     await started.promise
     const session = ctx.sessions.create(meta.id, {
       seed: [
-        { type: 'turn/start', seq: 0, time: 200, data: { turn: 1 } },
+        { type: 'turn/start', seq: SessionSeq(0), time: 200, data: { turn: 1 } },
         {
-          type: 'user/message', seq: 1, time: 300,
+          type: 'user/message', seq: SessionSeq(1), time: 300,
           data: createUserMessage({ content: [{ type: 'text', text: 'live' }], source: { kind: 'user' } }),
           surfaceOp: 'append',
         },
@@ -232,18 +233,18 @@ describe('attached updatedAt tracks human prompts', () => {
     const worked = 1_000_000
     const resumed = ctx.sessions.create(sid('resumed-untouched'), {
       seed: [
-        { type: 'turn/start', seq: 0, time: worked, data: { turn: 1 } },
+        { type: 'turn/start', seq: SessionSeq(0), time: worked, data: { turn: 1 } },
         {
-          type: 'user/message', seq: 1, time: worked,
+          type: 'user/message', seq: SessionSeq(1), time: worked,
           data: createUserMessage({ content: [{ type: 'text', text: 'worked' }], source: { kind: 'user' } }),
           surfaceOp: 'append',
         },
-        { type: 'turn/end', seq: 2, time: worked + 1, data: { turn: 1, reason: { kind: 'completed' } } },
+        { type: 'turn/end', seq: SessionSeq(2), time: worked + 1, data: { turn: 1, reason: { kind: 'completed' } } },
       ],
       meta: { cwd: '/proj', createdAt: 500 },
     })
     ctx.agents.register({ id: resumed.id, session: resumed, status: 'idle', ctx } as Agent)
-    const boundary = resumed.events.at(-1)
+    const boundary = resumed.snapshotEvents().at(-1)
     expect(boundary?.type).toBe('session/end-seed')
     expect(boundary?.time).toBeGreaterThan(worked)
 
@@ -333,7 +334,7 @@ describe('cold history recovery view', () => {
         maxEvents: 2_000,
         maxGroups: 1,
       })
-      const seq = pageRequest.beforeSeq === undefined ? 137_381 : pageRequest.beforeSeq - 1
+      const seq = SessionSeq(pageRequest.beforeSeq === undefined ? 137_381 : pageRequest.beforeSeq - 1)
       const event: SessionEvent = {
         type: 'user/message',
         seq,
@@ -383,7 +384,7 @@ describe('cold history recovery view', () => {
       pageRequest: { cursor?: string },
     ): Promise<SessionPersistencePage> => {
       const first = pageRequest.cursor === undefined
-      const seq = first ? 100 : 99
+      const seq = SessionSeq(first ? 100 : 99)
       const event: SessionEvent = {
         type: 'user/message',
         seq,
@@ -428,13 +429,13 @@ describe('cold history recovery view', () => {
     const revision = SessionPersistenceRevision('postgres:test:source-range')
     const chunk: SessionEvent = {
       type: 'assistant/chunk',
-      seq: 99,
+      seq: SessionSeq(99),
       time: 2000,
       data: { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'tail' } },
     }
     const message: SessionEvent = {
       type: 'assistant/message',
-      seq: 100,
+      seq: SessionSeq(100),
       time: 2001,
       data: {
         turn: 1,
@@ -442,11 +443,11 @@ describe('cold history recovery view', () => {
         message: createAssistantMessage({ content: [{ type: 'text', text: 'tail' }], source: { provider: 'p', model: 'm' } }),
       },
       surfaceOp: 'append',
-      sourceEventSeqs: [98, 99],
+      sourceEventSeqs: [SessionSeq(98), SessionSeq(99)],
     }
     const readPage = vi.fn(async (_id: SessionId, pageRequest: { cursor?: string }): Promise<SessionPersistencePage> => {
       const first = pageRequest.cursor === undefined
-      const events = first ? [chunk, message] : [{ ...chunk, seq: 98 }]
+      const events = first ? [chunk, message] : [{ ...chunk, seq: SessionSeq(98) }]
       return {
         meta,
         revision,
@@ -481,7 +482,7 @@ describe('cold history recovery view', () => {
     const meta = header(sessionId, 1000)
     const message = (seq: number, body: string): SessionEvent => ({
       type: 'user/message',
-      seq,
+      seq: SessionSeq(seq),
       time: 2000 + seq,
       data: createUserMessage({ content: [{ type: 'text', text: body }], source: { kind: 'user' } }),
       surfaceOp: 'append',
@@ -502,7 +503,7 @@ describe('cold history recovery view', () => {
       // The open that started this read also resumed the session; its
       // lifecycle events moved the log between the two page reads.
       ctx.sessions.create(sessionId, {
-        seed: [message(0, 'head'), message(1, 'tail'), { type: 'turn/start', seq: 2, time: 2002, data: { turn: 2 } }],
+        seed: [message(0, 'head'), message(1, 'tail'), { type: 'turn/start', seq: SessionSeq(2), time: 2002, data: { turn: 2 } }],
         meta: { cwd: '/proj', createdAt: 1000 },
       })
       throw new SessionPersistenceReadError('dependency', 'session persistence revision changed since the page cursor was issued')
@@ -543,7 +544,7 @@ describe('cold history recovery view', () => {
       const seq = pageRequest.cursor === undefined ? 1 : 0
       const event: SessionEvent = {
         type: 'user/message',
-        seq,
+        seq: SessionSeq(seq),
         time: 2000 + seq,
         data: createUserMessage({ content: [{ type: 'text', text: `page-${String(seq)}` }], source: { kind: 'user' } }),
         surfaceOp: 'append',
@@ -595,7 +596,7 @@ describe('cold history recovery view', () => {
     let revision = SessionPersistenceRevision('tail:1')
     let events: SessionEvent[] = [{
       type: 'user/message',
-      seq: 0,
+      seq: SessionSeq(0),
       time: 1100,
       data: createUserMessage({ content: [{ type: 'text', text: 'first' }], source: { kind: 'user' } }),
       surfaceOp: 'append',
@@ -622,7 +623,7 @@ describe('cold history recovery view', () => {
     revision = SessionPersistenceRevision('tail:2')
     events = [...events, {
       type: 'user/message',
-      seq: 1,
+      seq: SessionSeq(1),
       time: 1200,
       data: createUserMessage({ content: [{ type: 'text', text: 'second' }], source: { kind: 'user' } }),
       surfaceOp: 'append',
@@ -642,7 +643,8 @@ describe('cold history recovery view', () => {
     const meta = header(sessionId, 1000)
     const stored: StoredPrefix<never> = {
       meta,
-      events: [{ type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } }],
+      inheritedEventCount: SessionLogOffset(0),
+      events: [{ type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } }],
       revision: SessionPersistenceRevision('history-recovery-test:1'),
     }
     const backend: PersistenceBackend<never> = {
@@ -796,7 +798,7 @@ describe('subagent ownership fence', () => {
     const sessionId = sid('session-child')
     const meta = header('session-child', 1000, {
       parentSession: sid('session-parent'),
-      seedLength: 0,
+      isSeeded: true,
       origin: 'subagent',
     })
     const events = [
@@ -864,7 +866,7 @@ describe('subagent ownership fence', () => {
     const sessionId = sid('session-legacy-child')
     const meta = header('session-legacy-child', 1000, {
       parentSession: sid('session-parent'),
-      seedLength: 0,
+      isSeeded: true,
     })
     const events = [
       {
@@ -963,11 +965,12 @@ describe('subagent ownership fence', () => {
     const session = ctx.sessions.create(sid('session-ordinary-fork'), {
       seed: [{
         type: 'subagent/descriptor',
-        seq: 0,
+        seq: SessionSeq(0),
         time: 1,
         data: { version: 2, mode: 'continuable', provider: 'spawn', label: 'ancestor' },
       }],
-      meta: { cwd: '/proj', parentSession: sid('session-source'), seedLength: 1 },
+      meta: { cwd: '/proj', parentSession: sid('session-source'), isSeeded: true },
+      inheritedEventCount: SessionLogOffset(1),
     })
     const followup = vi.fn()
     const agent = { id: session.id, session, status: 'idle', ctx, followup } as unknown as Agent
