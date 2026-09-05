@@ -115,29 +115,28 @@ describe('web e2e: queue row actions', () => {
     ).toBe(2)
 
     await page.setViewportSize({ width: 640, height: 1000 })
-    const composerCard = page.locator('[data-composer-card]:visible')
-    const queueDock = page.locator('[data-queue-dock]:visible')
-    await expect.poll(async () => composerCard.evaluate((element) => {
-      const queue = [...element.ownerDocument.querySelectorAll<HTMLElement>('[data-queue-dock]')]
-        .find(candidate => candidate.getClientRects().length > 0)
-      if (queue === undefined) return Number.POSITIVE_INFINITY
-      const card = element.getBoundingClientRect()
-      const dock = queue.getBoundingClientRect()
-      const inset = 8
-      return Math.max(Math.abs(dock.x - card.x - inset), Math.abs(card.right - dock.right - inset))
-    }), { timeout: 10_000 }).toBeLessThanOrEqual(1)
-    const queueBox = await queueDock.boundingBox()
-    const composerBox = await composerCard.boundingBox()
-    expect(queueBox).not.toBeNull()
-    expect(composerBox).not.toBeNull()
-    expect(queueBox!.x).toBeGreaterThanOrEqual(composerBox!.x)
-    expect(queueBox!.x + queueBox!.width)
-      .toBeLessThanOrEqual(composerBox!.x + composerBox!.width)
-    const queueLeftInset = queueBox!.x - composerBox!.x
-    const queueRightInset = composerBox!.x + composerBox!.width - queueBox!.x - queueBox!.width
-    const composerMetrics = { dockInset: 8 }
-    expect(queueLeftInset).toBeCloseTo(composerMetrics.dockInset, 1)
-    expect(queueRightInset).toBeCloseTo(composerMetrics.dockInset, 1)
+    const readQueueLayout = () => page.evaluate(() => {
+      const visible = <T extends HTMLElement>(selector: string): T | undefined => [...document.querySelectorAll<T>(selector)]
+        .find(element => element.getClientRects().length > 0)
+      const card = visible<HTMLElement>('[data-composer-card]')
+      const queue = visible<HTMLElement>('[data-queue-dock]')
+      if (card === undefined || queue === undefined) return undefined
+      const cardBox = card.getBoundingClientRect()
+      const queueBox = queue.getBoundingClientRect()
+      return {
+        left: queueBox.x - cardBox.x,
+        right: cardBox.right - queueBox.right,
+        within: queueBox.x >= cardBox.x && queueBox.right <= cardBox.right,
+      }
+    })
+    await expect.poll(async () => {
+      const layout = await readQueueLayout()
+      return layout === undefined ? Number.POSITIVE_INFINITY : Math.max(Math.abs(layout.left - 8), Math.abs(layout.right - 8))
+    }, { timeout: 10_000 }).toBeLessThanOrEqual(1)
+    const queueLayout = await readQueueLayout()
+    expect(queueLayout).toMatchObject({ within: true })
+    expect(queueLayout?.left).toBeCloseTo(8, 1)
+    expect(queueLayout?.right).toBeCloseTo(8, 1)
     await page.setViewportSize({ width: 1680, height: 1000 })
 
     const editRow = page.getByText(EDIT, { exact: true }).locator('..')
