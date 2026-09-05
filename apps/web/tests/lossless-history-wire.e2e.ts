@@ -462,7 +462,8 @@ async function markerCount(page: Page): Promise<number> {
  * the settled offset is not asserted here; callers observe the page itself.
  */
 async function scrollToHistoryStart(page: Page): Promise<void> {
-  const scroller = page.locator('[data-conversation-scroll]').first()
+  const scroller = page.locator('[data-conversation-scroll]:visible').first()
+  await scroller.waitFor({ state: 'visible', timeout: 15_000 })
   await scroller.evaluate(async (element) => {
     element.scrollTop = 0
     element.dispatchEvent(new Event('scroll'))
