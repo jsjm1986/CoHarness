@@ -18,7 +18,7 @@
     - img
     - text: 关闭
   - heading "模型" [level=2]
-  - paragraph: 填入各提供方的 API 密钥即可使用其模型。
+  - paragraph: 使用组织分配的模型，或通过自己的 API 密钥添加个人提供方。
   - list:
     - listitem:
       - text: DeepSeek
@@ -46,22 +46,35 @@
             - img
           - textbox "模型 ID 2":
             - /placeholder: 模型 ID
-            - text: private-preview
+            - text: deepseek-v4-flash-vision-exp
           - textbox "显示名称 2":
             - /placeholder: 显示名称
-            - text: Private Preview
-          - button "容量 2" [expanded]:
+            - text: DeepSeek-V4-Flash-Vision-Exp
+          - button "容量 2":
             - img
           - button "删除模型 2":
             - img
-          - text: 上下文窗口
-          - textbox "上下文窗口 2":
+          - textbox "模型 ID 3":
+            - /placeholder: 模型 ID
+            - text: private-preview
+          - textbox "显示名称 3":
+            - /placeholder: 显示名称
+            - text: Private Preview
+          - button "容量 3" [expanded]:
+            - img
+          - button "删除模型 3":
+            - img
+          - paragraph: 单位是 token。可填 393216、256K 或 1M；K=1,000，M=1,000,000。留空继承提供方默认值。上下文窗口是请求总容量，最大输出是生成上限。
+          - text: 上下文窗口（token）
+          - textbox "上下文窗口（token） 3":
             - /placeholder: 1M
             - text: "131072"
-          - text: 最大输出 token 数
-          - textbox "最大输出 token 数 2":
+          - text: 最大输出（token）
+          - textbox "最大输出（token） 3":
             - /placeholder: 256K
             - text: 64K
+          - checkbox "接受图片输入 3"
+          - text: 接受图片输入
           - button "添加模型":
             - img
             - text: 添加模型

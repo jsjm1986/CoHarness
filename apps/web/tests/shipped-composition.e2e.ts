@@ -54,6 +54,8 @@ const EXPECTED_TOOLS = [
   'subagent_fork',
   'todo_write',
   'update_goal',
+  'userdoc_list',
+  'userdoc_read',
   'web_search',
   'workflow',
   'write',

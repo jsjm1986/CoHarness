@@ -11,7 +11,16 @@ type Parser<F> = { parse(value: unknown): F }
 /** Bound one browser downlink's retained burst before reconnecting it. */
 const SOCKET_QUEUE_MAX_ITEMS = 1024
 const SOCKET_QUEUE_MAX_BYTES = 8 * 1024 * 1024
-const socketEncoder = new TextEncoder()
+
+/**
+ * Budget size of one text frame: its UTF-16 length, a lower bound of the UTF-8
+ * bytes the Host accounted. Re-encoding the frame only to count bytes copied
+ * every multi-megabyte tool result once more on the main thread; the bound
+ * never rejects a frame the Host's own 8 MiB budget admitted.
+ */
+function frameBudgetBytes(data: string): number {
+  return data.length
+}
 
 interface QueuedSocketItem<F> {
   item: RpcRequest<F>
@@ -123,7 +132,7 @@ export class WebApiClient extends AbstractApiClient {
         console.error(`[client-connection] dropping malformed WebSocket frame on ${path}: binary frames are unsupported`)
         return
       }
-      const bytes = socketEncoder.encode(event.data).byteLength
+      const bytes = frameBudgetBytes(event.data)
       if (bytes > SOCKET_QUEUE_MAX_BYTES) {
         console.error(`[client-connection] WebSocket downlink frame exceeded its ${String(SOCKET_QUEUE_MAX_BYTES)}-byte budget on ${path}`)
         closeForOverflow()

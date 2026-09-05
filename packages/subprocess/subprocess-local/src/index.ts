@@ -44,6 +44,7 @@ function registerHostExit(handler: () => void): () => void {
     hostExitListenerInstalled = true
   }
   return () => {
+    /* v8 ignore next -- Cordis runs an effect disposer once; the guard only keeps a repeated call harmless. */
     if (!hostExitHandlers.delete(handler)) return
     if (hostExitHandlers.size === 0 && hostExitListenerInstalled) {
       process.off('exit', dispatchHostExit)

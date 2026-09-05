@@ -111,14 +111,17 @@ function renderGeometry(rows: readonly { width: number; metrics: ComposerMetrics
   const lines = [
     '# Mobile composer model seat',
     '',
-    '| viewport | tool controls before model | model before Send | trailing layout | row inside card | effort display | label overflow | label white-space | label text overflow | label width |',
+    '| viewport | tool controls before model | model before Send | trailing layout | row inside card | effort display | label overflow | label white-space | label text overflow | label width class |',
     '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
   ]
   for (const { width, metrics } of rows) {
     const toolsBeforeModel = metrics.modelPresentation === 'summary' || metrics.toolControlRight <= metrics.model.left + 1 || metrics.trailingWrapped
     const modelBeforeSend = metrics.modelPresentation === 'summary' || metrics.model.right <= metrics.send.left + 1
     const layout = metrics.modelPresentation === 'summary' ? 'summary' : metrics.trailingWrapped ? 'wrapped' : 'same-line'
-    lines.push(`| ${String(width)}px | ${String(toolsBeforeModel)} | ${String(modelBeforeSend)} | ${layout} | ${String(metrics.row.left >= metrics.card.left - 1 && metrics.row.right <= metrics.card.right + 1)} | ${metrics.modelEffortDisplay} | ${metrics.modelLabelOverflow} | ${metrics.modelLabelWhiteSpace} | ${metrics.modelLabelTextOverflow} | ${String(Math.round(metrics.modelLabelWidth))}px |`)
+    // Exact pixels vary with browser font metrics and the platform scrollbar,
+    // while the product contract is the available seat class.
+    const labelWidthClass = metrics.modelLabelWidth >= 100 ? 'wide' : 'compact'
+    lines.push(`| ${String(width)}px | ${String(toolsBeforeModel)} | ${String(modelBeforeSend)} | ${layout} | ${String(metrics.row.left >= metrics.card.left - 1 && metrics.row.right <= metrics.card.right + 1)} | ${metrics.modelEffortDisplay} | ${metrics.modelLabelOverflow} | ${metrics.modelLabelWhiteSpace} | ${metrics.modelLabelTextOverflow} | ${labelWidthClass} |`)
   }
   return lines.join('\n')
 }
@@ -164,11 +167,11 @@ describe('web e2e: mobile composer model label geometry', () => {
       await settings.getByRole('tab', { name: '思考等级' }).click()
       await settings.getByRole('menuitemradio', { name: 'High' }).click()
       await settings.getByRole('tab', { name: '权限' }).click()
-      const readOnly = settings.getByRole('menuitemradio', { name: 'Read Only' })
+      const readOnly = settings.getByRole('menuitemradio', { name: '仅可查看' })
       await readOnly.waitFor({ timeout: 10_000 })
       await readOnly.click()
       await page.waitForFunction(() => [...document.querySelectorAll('[data-session-settings-sheet] [role="menuitemradio"]')]
-        .some(item => item.textContent?.includes('Read Only') && item.getAttribute('aria-checked') === 'true'), undefined, { timeout: 10_000 })
+        .some(item => item.textContent?.includes('仅可查看') && item.getAttribute('aria-checked') === 'true'), undefined, { timeout: 10_000 })
       await settings.getByRole('button', { name: '关闭会话设置' }).click()
     }
     await page.locator(`button[title^="${MODEL_NAME}"][aria-haspopup="menu"]`).waitFor({ timeout: 15_000 })

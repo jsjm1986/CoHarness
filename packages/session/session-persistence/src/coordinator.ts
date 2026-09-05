@@ -683,6 +683,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     await this.flush(session)
     await this.serialize(session.id, async () => {
       const state = this.states.get(session.id)
+      /* v8 ignore next 3 -- the flush above registers this lifecycle; only a stale Session object for the same id could reach here. */
       if (state === undefined || state.owner !== session) {
         throw new Error(`session "${session.id}" is not registered for persistence`)
       }

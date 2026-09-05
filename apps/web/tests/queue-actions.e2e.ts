@@ -99,6 +99,9 @@ describe('web e2e: queue row actions', () => {
     const queueHeader = page.getByRole('button', { name: '2 queued messages' })
     await expect.poll(() => queueHeader.getAttribute('aria-expanded'), { timeout: 10_000 })
       .toBe('false')
+    // The dock lists a queued row from the session stream before the submit
+    // round-trip settles the composer; the golden captures the settled composer.
+    await expect.poll(() => input.inputValue(), { timeout: 10_000 }).toBe('')
     const collapsedSnapshot = await captureStableAria(
       page,
       '[class*="centerCol"]',
@@ -112,23 +115,29 @@ describe('web e2e: queue row actions', () => {
     ).toBe(2)
 
     await page.setViewportSize({ width: 640, height: 1000 })
-    const queueBox = await page.locator('[data-queue-dock]').boundingBox()
-    const composerBox = await page.locator('[data-composer-card]').boundingBox()
-    expect(queueBox).not.toBeNull()
-    expect(composerBox).not.toBeNull()
-    expect(queueBox!.x).toBeGreaterThanOrEqual(composerBox!.x)
-    expect(queueBox!.x + queueBox!.width)
-      .toBeLessThanOrEqual(composerBox!.x + composerBox!.width)
-    const queueLeftInset = queueBox!.x - composerBox!.x
-    const queueRightInset = composerBox!.x + composerBox!.width - queueBox!.x - queueBox!.width
-    const composerMetrics = await page.locator('[data-composer-card]').evaluate((element) => {
-      const style = getComputedStyle(element)
+    const readQueueLayout = () => page.evaluate(() => {
+      const visible = (selector: string): HTMLElement | undefined => [...document.querySelectorAll(selector)]
+        .map(element => element as HTMLElement)
+        .find(element => element.getClientRects().length > 0)
+      const card = visible('[data-composer-card]')
+      const queue = visible('[data-queue-dock]')
+      if (card === undefined || queue === undefined) return undefined
+      const cardBox = card.getBoundingClientRect()
+      const queueBox = queue.getBoundingClientRect()
       return {
-        dockInset: Number.parseFloat(style.getPropertyValue('--dsh-composer-dock-inset')),
+        left: queueBox.x - cardBox.x,
+        right: cardBox.right - queueBox.right,
+        within: queueBox.x >= cardBox.x && queueBox.right <= cardBox.right,
       }
     })
-    expect(queueLeftInset).toBeCloseTo(composerMetrics.dockInset, 1)
-    expect(queueRightInset).toBeCloseTo(composerMetrics.dockInset, 1)
+    await expect.poll(async () => {
+      const layout = await readQueueLayout()
+      return layout === undefined ? Number.POSITIVE_INFINITY : Math.max(Math.abs(layout.left - 8), Math.abs(layout.right - 8))
+    }, { timeout: 10_000 }).toBeLessThanOrEqual(1)
+    const queueLayout = await readQueueLayout()
+    expect(queueLayout).toMatchObject({ within: true })
+    expect(queueLayout?.left).toBeCloseTo(8, 1)
+    expect(queueLayout?.right).toBeCloseTo(8, 1)
     await page.setViewportSize({ width: 1680, height: 1000 })
 
     const editRow = page.getByText(EDIT, { exact: true }).locator('..')
@@ -220,6 +229,7 @@ describe('web e2e: queue row actions', () => {
     const queueHeader = page.getByRole('button', { name: '2 queued messages' })
     await expect.poll(() => queueHeader.getAttribute('aria-expanded'), { timeout: 10_000 })
       .toBe('false')
+    await expect.poll(() => input.inputValue(), { timeout: 10_000 }).toBe('')
 
     const layoutSnapshot = await captureStableAria(
       page,
@@ -229,18 +239,17 @@ describe('web e2e: queue row actions', () => {
     await compareOrRefreshGolden(LAYOUT_EXPECTED, layoutSnapshot, MODE)
 
     const expectAlignedContextPanels = async () => {
-      const queuePanelBox = await page.locator('[data-queue-dock] > div').boundingBox()
-      const todoBox = await page.locator('[data-testid="todo-panel"]').boundingBox()
-      const goalBox = await page.locator('[data-goal-bar] > div').boundingBox()
-      expect(queuePanelBox).not.toBeNull()
-      expect(todoBox).not.toBeNull()
-      expect(goalBox).not.toBeNull()
-      expect(todoBox!.y).toBeLessThan(goalBox!.y)
-      expect(goalBox!.y).toBeLessThan(queuePanelBox!.y)
-      expect(todoBox!.x).toBeCloseTo(goalBox!.x, 1)
-      expect(todoBox!.x).toBeCloseTo(queuePanelBox!.x, 1)
-      expect(todoBox!.width).toBeCloseTo(goalBox!.width, 1)
-      expect(todoBox!.width).toBeCloseTo(queuePanelBox!.width, 1)
+      await expect.poll(async () => {
+        const queuePanelBox = await page.locator('[data-queue-dock]:visible > div').boundingBox()
+        const todoBox = await page.locator('[data-testid="todo-panel"]:visible').boundingBox()
+        const goalBox = await page.locator('[data-goal-bar]:visible > div').boundingBox()
+        if (queuePanelBox === null || todoBox === null || goalBox === null) return false
+        return todoBox.y < goalBox.y && goalBox.y < queuePanelBox.y
+          && Math.abs(todoBox.x - goalBox.x) <= 1
+          && Math.abs(todoBox.x - queuePanelBox.x) <= 1
+          && Math.abs(todoBox.width - goalBox.width) <= 1
+          && Math.abs(todoBox.width - queuePanelBox.width) <= 1
+      }, { timeout: 10_000 }).toBe(true)
     }
     await expectAlignedContextPanels()
     await page.setViewportSize({ width: 640, height: 1000 })

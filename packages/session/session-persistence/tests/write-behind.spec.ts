@@ -17,6 +17,18 @@ afterEach(() => {
 })
 
 describe('SessionWriteBehind', () => {
+  it.each([
+    ['maxPendingEvents', { maxPendingEvents: 0 }],
+    ['maxPendingBytes', { maxPendingBytes: -1 }],
+  ])('rejects a non-positive %s admission bound', (_name, override) => {
+    expect(() => new SessionWriteBehind({
+      maxDelayMs: 200,
+      write: async () => {},
+      reportBackgroundFailure: vi.fn(),
+      ...override,
+    })).toThrow(/must be a positive safe integer/)
+  })
+
   it('uses one fixed window from the first queued event and owns its copy', async () => {
     vi.useFakeTimers()
     const batches: SessionEvent[][] = []

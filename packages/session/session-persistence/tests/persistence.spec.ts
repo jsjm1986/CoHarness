@@ -569,6 +569,42 @@ describe('PersistenceCoordinator session preparations', () => {
     })).toThrow(/writeBatchMaxDelayMs must be an integer between/)
   })
 
+  it.each([
+    ['maxPendingEvents', { maxPendingEvents: 0 }],
+    ['maxPendingBytes', { maxPendingBytes: 1.5 }],
+  ])('rejects a non-positive %s admission bound', (_name, override) => {
+    const ctx = new Context()
+    const backend = new ControlledBackend()
+
+    expect(() => new PersistenceCoordinator(ctx, backend, {
+      preparedSessionCacheSize: DEFAULT_PREPARED_SESSION_CACHE_SIZE,
+      writeBatchMaxDelayMs: DEFAULT_WRITE_BATCH_MAX_DELAY_MS,
+      ...override,
+    })).toThrow(/must be a positive safe integer/)
+  })
+
+  it('refuses to materialize a header-only session on a backend without materializeHeader', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const backend = new ControlledBackend()
+    let coordinator: PersistenceCoordinator | undefined
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      coordinator = new PersistenceCoordinator(inner, backend)
+    }, { inject: ['sessions'] }))
+    try {
+      if (coordinator === undefined) throw new Error('coordinator did not initialize')
+      const draft = ctx.sessions.create(SessionId('header-only'), { meta: { draft: true } })
+      await expect(coordinator.ensureMaterialized(draft)).rejects.toThrow(/cannot materialize an empty session/)
+      // A session whose content already reached the backend needs no header-only artifact.
+      const materialized = ctx.sessions.create(SessionId('already-materialized'), { seed: oneTurnLog() })
+      await ctx.sessions.flush(materialized)
+      await expect(coordinator.ensureMaterialized(materialized)).resolves.toBeUndefined()
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('retries invalidated prepare and load reservations', async () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)

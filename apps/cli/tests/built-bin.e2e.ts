@@ -466,6 +466,11 @@ describe.skipIf(!existsSync(dshBin))('dsh BUILT bin (node lib/bin.js, no tsx)', 
     try {
       const result = await runBuiltBin(['--profile', 'web', '--patch', invalidProvider], {
         DSH_HOME: home,
+        // The Web composition prewarms the local document store. Keep its
+        // operating-system home inside this fixture so the failure probe
+        // cannot wait on or migrate a real user's document lock.
+        HOME: home,
+        USERPROFILE: home,
         DEEPSEEK_API_KEY: 'keyless-invalid-config',
         DSH_TELEMETRY_DISABLED: '1',
       })

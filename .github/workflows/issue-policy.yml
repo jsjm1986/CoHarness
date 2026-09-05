@@ -14,6 +14,14 @@ permissions:
 jobs:
   policy:
     name: Issue policy
+    # The App and Project integration is repository-specific and remains
+    # disabled until an administrator explicitly enables it. Fork and
+    # Dependabot PR events cannot receive the App private key.
+    if: >-
+      github.repository == 'jsjm1986/CoHarness'
+      && vars.DSH_ISSUE_AUTOMATION_ENABLED == 'true'
+      && !(github.event.pull_request.head.repo.fork
+      || github.event.pull_request.user.login == 'dependabot[bot]')
     runs-on: ubuntu-latest
     steps:
       - name: Check out trusted policy
@@ -21,7 +29,15 @@ jobs:
         with:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
+      - name: Create project token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
+        with:
+          client-id: ${{ vars.DSH_ISSUE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.DSH_ISSUE_APP_PRIVATE_KEY }}
+          owner: jsjm1986
+          repositories: CoHarness
       - name: Validate pull request
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: node .github/issue-management/policy.mjs pr

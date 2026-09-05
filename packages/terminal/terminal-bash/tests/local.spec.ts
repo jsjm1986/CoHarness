@@ -279,7 +279,11 @@ const hasPwsh = spawnSync(
   { encoding: 'utf8' },
 ).status === 0
 
-describe.skipIf(!hasPwsh)('terminal-bash pwsh real shell', () => {
+// The persistent pwsh PTY contract is the Windows counterpart of the POSIX
+// bash integration. Unix hosts may have a `pwsh` executable for the
+// non-interactive executor, but do not provide the Windows PTY handoff that
+// this real-shell suite proves.
+describe.skipIf(process.platform !== 'win32' || !hasPwsh)('terminal-bash pwsh real shell', () => {
   it('bootstraps a persistent pwsh, persists state, and scrubs secrets', async () => {
     const previous = process.env.DSH_TEST_SECRET
     process.env.DSH_TEST_SECRET = 'must-not-leak'

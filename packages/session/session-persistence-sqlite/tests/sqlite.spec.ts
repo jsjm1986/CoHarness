@@ -502,14 +502,18 @@ describe('SessionPersistenceSqlite schema ownership', () => {
       attempts += 1
       return Object.assign(new Error('database is locked'), { errcode: 5 })
     })
-    await expect(openDatabase(
-      BusyDatabase,
-      await freshDbPath('dsh-sqlite-journal-paced-'),
-      'wal',
-      50,
-    )).rejects.toThrow('database is locked')
-    expect(attempts).toBeGreaterThan(1)
-    expect(attempts).toBeLessThanOrEqual(6)
+    const path = await freshDbPath('dsh-sqlite-journal-paced-')
+    // The open reads the deadline base once; every busy attempt then reads the clock
+    // before yielding and again after. Advancing 10 ms per attempt paces a 50 ms budget
+    // into exactly five attempts however long the runner spends creating the file.
+    let reads = 0
+    const clock = vi.spyOn(performance, 'now').mockImplementation(() => Math.floor(reads++ / 2) * 10)
+    try {
+      await expect(openDatabase(BusyDatabase, path, 'wal', 50)).rejects.toThrow('database is locked')
+    } finally {
+      clock.mockRestore()
+    }
+    expect(attempts).toBe(5)
   })
 
   it('rejects unversioned, incompatible, and foreign-application databases', async () => {
@@ -595,6 +599,7 @@ describe('SessionPersistenceSqlite schema ownership', () => {
     expect(() => decodeSessionRow({ ...base, created_at: -1 })).toThrow(/created_at/)
     expect(() => decodeSessionRow({ ...base, origin: 'external' })).toThrow(/origin/)
     expect(() => decodeSessionRow({ ...base, delegation_depth: -1 })).toThrow(/delegation_depth/)
+    expect(() => decodeSessionRow({ ...base, draft: 2 })).toThrow(/draft must be 0 or 1/)
   })
 
   it('rejects malformed SQLite row primitives generically', () => {
@@ -638,6 +643,8 @@ describe('SessionPersistenceSqlite schema ownership', () => {
       [{ ...eventRow, data: 1 }, /data.*string or blob/],
       [{ ...eventRow, source_event_seqs: 1 }, /source_event_seqs.*blob or null/],
       [{ ...eventRow, ignorable: 2 }, /ignorable.*1.*null/],
+      [{ ...eventRow, is_packed: 2 }, /is_packed must be 0 or 1/],
+      [{ ...eventRow, is_packed: 1, ignorable: 1 }, /packed event rows cannot be logically ignorable/],
     ] as const) {
       expect(() => decodeEventRow(value)).toThrow(message)
     }

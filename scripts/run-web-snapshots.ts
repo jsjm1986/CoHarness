@@ -5,11 +5,20 @@ import { pnpmInvocation } from './pnpm-invocation.ts'
 const serialFiles = [
   'apps/web/tests/hmr-live.e2e.ts',
   'apps/web/tests/cordis-tool-round.e2e.ts',
+  // These suites own long-lived browser/session state. Run each in a fresh
+  // Vitest process so a previous suite cannot leave timing or environment
+  // state that changes the next suite's replayed surface.
+  'apps/web/tests/agent-preset-selection.e2e.ts',
+  'apps/web/tests/composer-model-mobile.e2e.ts',
+  'apps/web/tests/live-interactions.e2e.ts',
+  'apps/web/tests/lossless-history-wire.e2e.ts',
+  'apps/web/tests/queue-actions.e2e.ts',
+  'apps/web/tests/workflow-run.e2e.ts',
 ]
 const workerRaw = process.env.DSH_WEB_SNAPSHOT_WORKERS
 const workers = Number.parseInt(workerRaw ?? '', 10)
-if (!Number.isSafeInteger(workers) || workers < 2 || String(workers) !== workerRaw) {
-  throw new Error(`DSH_WEB_SNAPSHOT_WORKERS must be an integer greater than 1, got ${JSON.stringify(workerRaw)}.`)
+if (!Number.isSafeInteger(workers) || workers < 1 || String(workers) !== workerRaw) {
+  throw new Error(`DSH_WEB_SNAPSHOT_WORKERS must be a positive integer, got ${JSON.stringify(workerRaw)}.`)
 }
 const invocation = pnpmInvocation(['exec', 'vitest', 'run', '--config', 'vitest.web.config.ts'])
 let serialStatus = 0

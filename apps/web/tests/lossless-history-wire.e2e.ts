@@ -10,7 +10,7 @@ import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { DEFAULT_HISTORY_PAGE_TARGET_BYTES, RpcId } from '@deepseek-ai/dsh-host-apiproxy'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import {
-  assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
+  assertFixtureInventory, captureStableAria, compareOrRefreshGolden, expandTurnProcesses,
   launchWebScaffold, seedSession, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
 import { newEnglishPage, saveFailureShot } from './support.ts'
@@ -456,22 +456,30 @@ async function markerCount(page: Page): Promise<number> {
   return counts.reduce((total, count) => total + count, 0)
 }
 
+/**
+ * Put the reader at the head of the loaded window. Reaching it may request
+ * the next older page, whose anchored prepend moves the offset back down, so
+ * the settled offset is not asserted here; callers observe the page itself.
+ */
 async function scrollToHistoryStart(page: Page): Promise<void> {
-  const scroller = page.locator('[data-conversation-scroll]').first()
-  await scroller.evaluate((element) => {
+  const scroller = page.locator('[data-conversation-scroll]:visible').first()
+  await scroller.waitFor({ state: 'visible', timeout: 15_000 })
+  await scroller.evaluate(async (element) => {
     element.scrollTop = 0
     element.dispatchEvent(new Event('scroll'))
+    await new Promise<void>(resolve => requestAnimationFrame(() => {
+      requestAnimationFrame(() => { resolve() })
+    }))
   })
-  await expect.poll(() => scroller.evaluate(element => element.scrollTop), {
-    timeout: 5_000,
-    message: 'conversation scrollport did not reach the history boundary',
-  }).toBeLessThanOrEqual(1)
 }
 
-/** Center-column aria with calendar-day prefixes collapsed so goldens do not depend on the runner timezone. */
+/**
+ * Center-column aria with the optional calendar-day prefix collapsed so
+ * goldens depend on neither the runner timezone nor the seed wall clock.
+ */
 async function captureHistoryAria(page: Page, scaffold: WebScaffold): Promise<string> {
   return (await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd))
-    .replace(/\b\d{1,2}\/\d{1,2}(?= \{\{clock\}\})/g, '{{date}}')
+    .replace(/(?:\b\d{1,2}\/\d{1,2} )?\{\{clock\}\}/g, '{{date}} {{clock}}')
     .split(SEED_ID).join('{{seededId}}')
 }
 
@@ -514,6 +522,10 @@ describe('web e2e: lossless history wire pagination', () => {
     if (MODE === 'record') throw new Error('lossless-history-wire is a keyless assembled snapshot')
     scaffold = await launchWebScaffold({})
     await seedSession(scaffold, seed.jsonl, SEED_ID)
+    // Every host-written session carries a projection-cache row; a seeded log
+    // has none, so its cold tail page would serve no projections block. One
+    // cold read writes the row back, as the fuller read ladder does.
+    await scaffold.ctx.get('sessionProjectionCache')?.coldSnapshot(SessionId(SEED_ID))
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
@@ -625,6 +637,8 @@ describe('web e2e: lossless history wire pagination', () => {
     expect(firstBrowserPage?.bytes).toBeLessThanOrEqual(DEFAULT_HISTORY_PAGE_TARGET_BYTES)
     expect(firstBrowserPage?.hasMore).toBe(true)
 
+    // The settled turn folds its tool row behind the turn-process disclosure.
+    await expandTurnProcesses(page)
     const toolButton = page.getByRole('button', { name: `Bash ${TOOL_DESCRIPTION}` })
     await toolButton.waitFor({ timeout: 10_000 })
     await toolButton.click()
@@ -654,12 +668,21 @@ describe('web e2e: lossless history wire pagination', () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-lossless-history-expanded'))
     while (await page.getByText(USER_MARKERS[0] as string, { exact: true }).count() === 0) {
       expect(loadOlderOperations).toBeLessThan(10)
-      await scrollToHistoryStart(page)
       const beforeReadCount = historyReads.length
       const beforeMarkerCount = await markerCount(page)
-      const loadEarlier = page.getByRole('button', { name: 'Load earlier' })
-      await loadEarlier.waitFor({ timeout: 10_000 })
-      await loadEarlier.click()
+      // Reaching the head requests the older page by itself; the explicit
+      // control remains for a reader who stopped short of that threshold.
+      if (historyReads.length === beforeReadCount) {
+        const loadEarlier = page.getByRole('button', { name: 'Load earlier' })
+        const loadingEarlier = page.getByRole('button', { name: /Loading earlier history/ })
+        if (await loadEarlier.count() === 0 && await loadingEarlier.count() === 0) {
+          await scrollToHistoryStart(page)
+        }
+        await expect.poll(async () => (await loadEarlier.count()) + (await loadingEarlier.count()), {
+          timeout: 30_000,
+        }).toBeGreaterThan(0)
+        if (await loadingEarlier.count() === 0) await loadEarlier.click()
+      }
       loadOlderOperations += 1
       await expect.poll(() => historyReads.length, { timeout: 15_000 })
         .toBeGreaterThan(beforeReadCount)
@@ -691,6 +714,8 @@ describe('web e2e: lossless history wire pagination', () => {
       timeout: 15_000,
     }).toBe(1)
     await scrollToHistoryStart(page)
+    // Every loaded turn is settled and folds its intermediate rows.
+    await expandTurnProcesses(page)
     for (const marker of MESSAGE_MARKERS) {
       expect(await page.getByText(marker, { exact: true }).count(), marker).toBe(1)
     }

@@ -281,6 +281,38 @@ describe('open', () => {
     expect(chatSeqs(session.getSnapshot())).toEqual([...Array(12).keys()])
   })
 
+  it('bounds the live expansion to the retained pages and does not resume it on the next turn', async () => {
+    const { api, session } = makeSession()
+    // Six turns of six events each (0..35); every history read serves one turn as a page.
+    api.onHistory = (payload) => {
+      const start = (payload.beforeSeq ?? 36) - 6
+      return histResponse(plainTurn(start, start / 6, `问${String(start)}`, `答${String(start)}`), start > 0)
+    }
+
+    session.enterStage()
+    await vi.waitFor(() => { expect(session.getSnapshot().openState).toBe('open') })
+    session.handleRunning(true)
+    await vi.waitFor(() => { expect(session.getSnapshot().historyWindowMode).toBe('expanding') })
+    await vi.waitFor(() => { expect(session.getSnapshot().historyWindowMode).toBe('tail') })
+
+    // Tail page + three retained pages; the two oldest turns stay behind the manual paging entry.
+    expect(api.callsOf('session.history')).toHaveLength(4)
+    expect(chatSeqs(session.getSnapshot())).toEqual([...Array(24).keys()].map(seq => seq + 12))
+    expect(session.getSnapshot().hasMore).toBe(true)
+
+    session.handleRunning(false)
+    session.handleRunning(true)
+    await expect(session.prompt([{ type: 'text', text: '再来' }], 'queue')).resolves.toMatchObject({ ok: true })
+    await Promise.resolve()
+    expect(api.callsOf('session.history')).toHaveLength(4)
+    expect(session.getSnapshot().historyWindowMode).toBe('tail')
+
+    // The reader can still page manually once the turn is over.
+    session.handleRunning(false)
+    await session.loadOlder()
+    expect(chatSeqs(session.getSnapshot())).toEqual([...Array(30).keys()].map(seq => seq + 6))
+  })
+
   it('resets only the browser window when the staged session is left and re-entered', async () => {
     const { api, session } = makeSession()
     const tail = plainTurn(6, 1, '尾部问题', '尾部回答')
@@ -1141,16 +1173,16 @@ describe('remaining branches', () => {
     const calls = api.calls.length
     await session.loadOlder()
     expect(api.calls.length).toBe(calls)
-    // throw path: fail-soft with console.error
+    // throw path: fail-soft with console.error (a fresh window that still has an older prefix)
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     try {
-      await session.resync()
-      api.onHistory = () => histResponse(plainTurn(6, 1, 'x', 'y'), true)
-      await session.resync()
-      api.onHistory = () => Promise.reject(new Error('page wire down'))
-      await session.loadOlder()
+      const paged = makeSession()
+      paged.api.onHistory = () => histResponse(plainTurn(6, 1, 'x', 'y'), true)
+      await paged.session.open()
+      paged.api.onHistory = () => Promise.reject(new Error('page wire down'))
+      await paged.session.loadOlder()
       expect(errorSpy).toHaveBeenCalled()
-      expect(session.getSnapshot().loadingOlder).toBe(false)
+      expect(paged.session.getSnapshot().loadingOlder).toBe(false)
     } finally {
       errorSpy.mockRestore()
     }
@@ -1310,7 +1342,7 @@ describe('remaining branches', () => {
     expect(session.getSnapshot().openState).toBe('open')
   })
 
-  it('drops a gap repair superseded by a full resync while its pull was in flight', async () => {
+  it('a resync during an in-flight gap repair coalesces into one more tail read and keeps the window', async () => {
     const { api, session } = makeSession()
     api.onHistory = () => histResponse(plainTurn(0, 0, 'a', 'b'))
     await session.open()
@@ -1318,14 +1350,61 @@ describe('remaining branches', () => {
     api.onHistory = () => repairPull.promise
     session.handleMuxEnvelope('r' as never, { type: 'session/event', sessionId: SID, event: ev.user(9, '洞') }) // starts repairGap
     api.onHistory = () => histResponse(plainTurn(6, 1, 'c', 'd'))
-    const resynced = session.resync() // bumps the generation
+    const resynced = session.resync() // open window: no second competing read, the running repair loops once more
     repairPull.resolve(ok({
       events: entries(plainTurn(0, 0, '旧', '页')) as never[],
       hasMore: false,
       modelSelection: { provider: 'deepseek-official', model: 'stale' },
-    })) // repair result: stale, dropped
+    })) // first read predates the reconnect: nothing new lands
     await resynced
-    expect(session.getSnapshot().nodes.map(n => n.seq)).toEqual([7, 9])
+    expect(api.callsOf('session.history')).toHaveLength(3) // open + repair + coalesced catch-up
+    expect(session.getSnapshot().nodes.map(n => n.seq)).toEqual([1, 3, 7, 9]) // resident rows kept, missed turn appended
+  })
+
+  it('a gap repair whose tail no longer touches the window replaces it instead of bridging', async () => {
+    const { api, session } = makeSession()
+    api.onHistory = () => histResponse(plainTurn(0, 0, 'a', 'b'))
+    await session.open()
+    // The stream was down for longer than one page: the tail read starts at seq 60, past tail 5.
+    api.onHistory = () => histResponse(plainTurn(60, 9, '很久以后的问题', '很久以后的回答'), true)
+    session.handleMuxEnvelope('late' as never, { type: 'session/event', sessionId: SID, event: ev.user(66, '再之后') })
+    await vi.waitFor(() => { expect(api.callsOf('session.history')).toHaveLength(2) })
+    await vi.waitFor(() => { expect(session.getSnapshot().nodes.map(n => n.seq)).toEqual([61, 63, 66]) })
+    expect(session.getSnapshot().hasMore).toBe(true)
+  })
+
+  it('a tail read that also covers an older prefix merges the whole page and keeps node identity for the rest', async () => {
+    const { api, session } = makeSession()
+    api.onHistory = () => histResponse(plainTurn(6, 1, '中', '间'), true)
+    await session.open()
+    // The window is shorter than a page: the repaired tail reaches below its base and past its tail.
+    api.onHistory = () => histResponse([...plainTurn(0, 0, '更', '早'), ...plainTurn(6, 1, '中', '间'), ...plainTurn(12, 2, '缺', '口')], false)
+    session.handleMuxEnvelope('gap' as never, { type: 'session/event', sessionId: SID, event: ev.user(19, '再之后') })
+    await vi.waitFor(() => { expect(session.getSnapshot().nodes.map(n => n.seq)).toEqual([1, 3, 7, 9, 13, 15, 19]) })
+    expect(session.getSnapshot().hasMore).toBe(false)
+  })
+
+  it('an append-only tail read that reaches the log head clears hasMore', async () => {
+    const { api, session } = makeSession()
+    api.onHistory = () => histResponse(plainTurn(0, 0, 'a', 'b'), true) // the Host claimed an older prefix
+    await session.open()
+    api.onHistory = () => histResponse([...plainTurn(0, 0, 'a', 'b'), ...plainTurn(6, 1, 'c', 'd')], false)
+    session.handleMuxEnvelope('gap' as never, { type: 'session/event', sessionId: SID, event: ev.user(13, '后') })
+    await vi.waitFor(() => { expect(session.getSnapshot().nodes.map(n => n.seq)).toEqual([1, 3, 7, 9, 13]) })
+    expect(session.getSnapshot().hasMore).toBe(false)
+  })
+
+  it('a subscribed baseline past an idle open window repulls the tail once', async () => {
+    const { api, session } = makeSession()
+    api.onHistory = () => histResponse(plainTurn(0, 0, 'a', 'b'))
+    await session.open()
+    api.onHistory = () => histResponse([...plainTurn(0, 0, 'a', 'b'), ...plainTurn(6, 1, 'c', 'd')])
+    session.handleMuxEnvelope('rs' as never, { type: 'session/subscribed', sessionId: SID, lastSeq: 11 })
+    await vi.waitFor(() => { expect(session.getSnapshot().nodes.map(n => n.seq)).toEqual([1, 3, 7, 9]) })
+    // A baseline at the tail is not a gap.
+    session.handleMuxEnvelope('rs2' as never, { type: 'session/subscribed', sessionId: SID, lastSeq: 11 })
+    await Promise.resolve()
+    expect(api.callsOf('session.history')).toHaveLength(2)
   })
 
   it('successful cancel leaves no promptError', async () => {

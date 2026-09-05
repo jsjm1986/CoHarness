@@ -41,8 +41,10 @@ describe('web e2e: goal bar clear convergence', () => {
 
   it('renders one active goal and clears it without exposing a stale error', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-goal-bar-clear'))
-    // Startup reuses the fixture workspace's blank session, keeping this
-    // command independent of alpha's running replay and pending question.
+    // Startup opens the fixture workspace's most recent history — alpha's
+    // running replay with its pending question — so ask for a blank session
+    // explicitly, keeping this command independent of that replay.
+    await page.getByRole('button', { name: 'New session', exact: true }).first().click()
     const input = page.getByPlaceholder('Describe what you want to build')
     await input.waitFor({ timeout: 10_000 })
     await input.fill('/goal guard rapid clear clicks')

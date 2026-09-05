@@ -453,11 +453,15 @@ function verifyEquivalent(expected: readonly LogicalSession[], actual: readonly 
 }
 
 async function finalizeOutput(path: string): Promise<void> {
-  const handle = openSync(path, 'r')
+  // Windows FlushFileBuffers needs a writable handle and rejects directory
+  // handles with EPERM; the directory entry is durable there without it.
+  const handle = openSync(path, 'r+')
   try { fsyncSync(handle) } finally { closeSync(handle) }
   chmodSync(path, 0o600)
-  const parent = openSync(dirname(path), 'r')
-  try { fsyncSync(parent) } finally { closeSync(parent) }
+  if (process.platform !== 'win32') {
+    const parent = openSync(dirname(path), 'r')
+    try { fsyncSync(parent) } finally { closeSync(parent) }
+  }
   const info = await stat(path)
   if (info.size === 0) throw new Error(`migration output is empty: ${path}`)
 }

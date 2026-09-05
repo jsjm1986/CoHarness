@@ -238,6 +238,7 @@ export class TokenMeter extends Service {
         || stepStart.step !== event.data.step) {
         throw new Error(`token meter: assistant/message at seq ${event.seq} has no matching step/start event`)
       }
+      /* v8 ignore next 3 -- Session rejects a surface-eligible append or seed without its surfaceOp marker before it reaches the log. */
       if (surfaceEvent === undefined || surface === undefined) {
         throw new Error(`token meter: assistant/message at seq ${event.seq} is missing its surfaceOp marker`)
       }

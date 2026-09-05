@@ -378,7 +378,9 @@ describe('BrowseDirectoryPicker grant file fallbacks', () => {
     }
   })
 
-  it('treats a filesystem-root grant as containing every descendant', async () => {
+  // A `/` grant and the `/etc` descendant are POSIX filesystem facts; Windows
+  // roots are drive-qualified and `/etc` is not a fully qualified path there.
+  it.skipIf(process.platform === 'win32')('treats a filesystem-root grant as containing every descendant', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'dsh-browse-slash-grant-'))
     const file = join(dir, 'directory-grants.json')
     await writeFile(file, JSON.stringify([{ path: '/', mode: 'rw', label: 'System' }]))

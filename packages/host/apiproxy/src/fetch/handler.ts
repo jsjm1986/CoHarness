@@ -11,8 +11,8 @@ import type { z } from 'zod'
 import type { ApiProxy, MuxFrame, HostFrame } from '../api/index.ts'
 import { sessionLogQuerySchema } from '../api/downloads.schema.ts'
 import type { RequestPayload, ResponseValue, RpcMethodMap } from '../api/rpc-map.ts'
-import type { ClientRequest, RpcError, RpcRequest, RpcResponse, ServerRequest, ServerResponse } from '../api/rpc.ts'
-import { RpcId } from '../api/rpc.ts'
+import type { ClientRequest, RpcError, RpcRequest, RpcResponse, ServerResponse } from '../api/rpc.ts'
+import { RpcId, serverRequestJson } from '../api/rpc.ts'
 import type { Wire } from '../api/rpc.schema.ts'
 import { clientRequestSchema, clientResponseSchema } from '../api/rpc.schema.ts'
 import {
@@ -226,11 +226,6 @@ async function handleUnary<K extends keyof RpcMethodMap>(
   }
 }
 
-/** SSE frame: complete the narrow RpcRequest<frame> into a ServerRequest full form (method = frame type). */
-function fullFrame(narrow: RpcRequest<MuxFrame | HostFrame>): ServerRequest {
-  return { type: 'server-request', rpcId: narrow.rpcId, method: narrow.payload.type, payload: narrow.payload }
-}
-
 /**
  * Wrap a frame stream as an SSE Response; stops when req.signal aborts. An
  * impl throw mid-stream emits one stream/error frame and then closes.
@@ -248,7 +243,7 @@ function sseResponse(
         // a comment line is not a frame, so client frame parsing skips it naturally).
         controller.enqueue(encoder.encode(': connected\n\n'))
         for await (const narrow of frames) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(fullFrame(narrow))}\n\n`))
+          controller.enqueue(encoder.encode(`data: ${serverRequestJson(narrow)}\n\n`))
         }
       } catch (error: unknown) {
         // Mid-stream impl failure → one stream/error frame, then close: the client must see
@@ -256,7 +251,7 @@ function sseResponse(
         // rpcId is minted — this is a server-initiated push like any other frame.
         const failure: MuxFrame | HostFrame = { type: 'stream/error', error: { code: 'internal', message: String(error), details: {} } }
         try {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(fullFrame({ rpcId: RpcId(randomUUID()), payload: failure }))}\n\n`))
+          controller.enqueue(encoder.encode(`data: ${serverRequestJson({ rpcId: RpcId(randomUUID()), payload: failure })}\n\n`))
         } catch {
           // Consumer already cancelled the stream: enqueue-after-cancel is the
           // only reachable error, and there is no one left to tell.

@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-24-live-conversation-history-retention.md
-2026-08-24-live-conversation-history-retention.md: 6c9579b4ce4a6a934e139bcc75d731193b2cb257
-2026-08-24-live-conversation-history-retention.zh.md: 2415d1c0a606b2b103c3d951d2733826bba6edc9
+2026-08-24-live-conversation-history-retention.md: 495af2b76850507a4b39b03509f75990ff028076
+2026-08-24-live-conversation-history-retention.zh.md: e76cc3921bfeafb88e0a8083bc00bc0571730a94

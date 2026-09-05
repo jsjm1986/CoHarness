@@ -709,7 +709,11 @@ export function fixtureUserPrompts(fixtureText: string): string[] {
  * plugin — the semantic-checkpoint precedent), never raw file writes: no
  * knowledge of bucket hashing, filename encoding, or compression, and
  * malformed session events fail loud at seed time. The fixture's tokenized identity
- * ({{sessionId}}/{{cwd}}) is realized for this world before parsing.
+ * ({{sessionId}}/{{cwd}}) is realized for this world before parsing. Event
+ * times are materialized from event order against the fixture header's
+ * creation time, or the seeded creation time when normalization replaced the
+ * header value with zero: projected fixtures carry no `time` fields, and a
+ * zero-time history renders epoch dates and hides every derived duration.
  * @param scaffold - the target scaffold.
  * @param fixtureText - raw recorded session.jsonl contents.
  * @param id - the seeded session id (stable for deterministic goldens).
@@ -744,7 +748,8 @@ export async function seedSession(
   id: string,
   agentPreset?: string,
 ): Promise<SessionId> {
-  const events = parseSessionLog(realizeSeedFixture(scaffold, fixtureText, id))
+  const realized = realizeSeedFixture(scaffold, fixtureText, id)
+  const events = parseSessionLog(realized)
   if (events.length === 0) throw new Error('seed fixture has no events')
   const last = events[events.length - 1]!
   // An open final turn would be mutated by resume's crash repair on first
@@ -758,7 +763,11 @@ export async function seedSession(
     delegationDepth: 0,
     ...agentPreset === undefined ? {} : { agentPreset },
   }
-  await persistSeedSession(scaffold, meta, events)
+  const header = JSON.parse(realized.split('\n', 1)[0]!) as { createdAt?: unknown }
+  if (typeof header.createdAt !== 'number') throw new Error('seed fixture requires a numeric createdAt header')
+  const timeAnchor = header.createdAt === 0 ? meta.createdAt : header.createdAt
+  const materializedEvents = events.map((event, index) => ({ ...event, time: timeAnchor + index }))
+  await persistSeedSession(scaffold, meta, materializedEvents)
   return meta.id
 }
 
@@ -848,6 +857,9 @@ function normalizeAria(snapshot: string, workspaceCwd: string): string {
       /~\d+(?:y(?: \d+mo)?|mo(?: \d+d)?)|\b(?:\d+d(?: \d+h(?: \d+m \d+s)?)?|\d+h \d+m \d+s|\d+m ?\d+s|\d+(?:\.\d+)?s|\d+(?:\.\d+)?ms)\b/g,
       duration => duration.startsWith('~') ? duration : '{{duration}}',
     )
+    // Trajectory timing tooltips spell milliseconds with a space and digit
+    // grouping (`Total 1,542 ms`); the figure is replay wall time.
+    .replace(/\b\d[\d,]*(?:\.\d+)? ms\b/g, '{{duration}}')
     .replace(
       /约\d+(?:年(?:\d+个月)?|个月(?:\d+天)?)|\d+(?:天(?:\d+小时(?:\d+分\d+秒)?)?|小时\d+分\d+秒|分\d+秒|(?:\.\d+)?秒)/g,
       duration => duration.startsWith('约') ? duration : '{{duration}}',
@@ -884,6 +896,76 @@ export async function captureStableAria(page: Page, selector: string, workspaceC
     return stable
   }, { timeout: 5_000, message: 'aria snapshot did not stabilize' }).toBe(true)
   return previous
+}
+
+/**
+ * Rewrite a seed fixture through its decoded event list. Projected fixtures
+ * omit `seq`/`time` and pack chunk runs into single rows, so a scenario that
+ * trims or extends a recording must edit the decoded events rather than raw
+ * lines; the result is re-serialized one event per row, which
+ * {@link parseSessionLog} reads back unchanged. Appended events take the next
+ * positional seq; `time` may be left at zero because {@link seedSession}
+ * materializes times from event order.
+ * @param fixtureText - raw or realized session.jsonl contents.
+ * @param edit - returns the full event list to serialize (kept + appended).
+ * @returns the rewritten fixture text.
+ */
+export function rewriteSeedEvents(
+  fixtureText: string,
+  edit: (events: SessionEvent[]) => SessionEvent[],
+): string {
+  const header = fixtureText.split(/\r?\n/, 1)[0]!
+  const events = edit(parseSessionLog(fixtureText))
+  events.forEach((event, index) => {
+    if (event.seq !== index) {
+      throw new Error(`rewritten seed events must stay contiguous from 0: seq ${String(event.seq)} at index ${String(index)}`)
+    }
+  })
+  return `${[header, ...events.map(event => JSON.stringify(event))].join('\n')}\n`
+}
+
+/**
+ * Open every collapsed turn-process disclosure in the transcript. Settled
+ * turns fold their tool calls and intermediate messages behind one
+ * `[data-turn-process]` button, so a scenario that asserts on a historical
+ * tool row must disclose the turn first; the streaming turn is already open.
+ * @param page - the page under test.
+ * @param timeout - how long to wait for at least one disclosure to mount.
+ */
+export async function expandTurnProcesses(page: Page, timeout = 15_000): Promise<void> {
+  await toggleTurnProcesses(page, 'false', timeout)
+}
+
+/**
+ * Fold every open turn-process disclosure back, restoring the default view a
+ * golden captures after a scenario disclosed rows to assert on them. A
+ * transcript with nothing open is already in that state.
+ * @param page - the page under test.
+ */
+export async function collapseTurnProcesses(page: Page): Promise<void> {
+  await toggleTurnProcesses(page, 'true', 0)
+}
+
+async function toggleTurnProcesses(page: Page, expanded: 'true' | 'false', timeout: number): Promise<void> {
+  const selector = `[data-turn-process][aria-expanded="${expanded}"]`
+  if (timeout > 0) await page.locator(selector).first().waitFor({ timeout })
+  // Toggling one disclosure re-lays the transcript and a virtualized window
+  // may mount further turns, so re-query per click and work tail-first (the
+  // newest turns are what scenarios assert on); the bound keeps a long
+  // history from turning this into a full-transcript walk. Plain Playwright
+  // waits: this also runs from beforeAll, outside expect.
+  for (let guard = 0; guard < 32; guard += 1) {
+    const pending = page.locator(selector)
+    if (await pending.count() === 0) return
+    const target = pending.last()
+    const turn = await target.getAttribute('data-turn-process')
+    await target.click()
+    await page.waitForFunction(
+      ([turnId, before]) => document.querySelector(`[data-turn-process="${turnId}"]`)?.getAttribute('aria-expanded') !== before,
+      [turn, expanded] as const,
+      { timeout: 5_000 },
+    )
+  }
 }
 
 /**

@@ -13,12 +13,11 @@
 - button "Add workspace":
   - img
 - tree "Sessions":
-  - treeitem "workspace":
+  - treeitem "workspace New session in workspace" [expanded]:
     - img
     - text: workspace
-  - treeitem "Ungrouped" [expanded]:
-    - img
-    - text: Ungrouped
+    - button "New session in workspace":
+      - img
   - treeitem "New Session" [selected]
 - button "Documents":
   - img
@@ -32,6 +31,9 @@
   - img
   - text: workspace
   - img
+- button "New conversation":
+  - img
+  - text: New conversation
 - button "Standard mode":
   - img
   - text: Standard mode

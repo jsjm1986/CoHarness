@@ -9,9 +9,10 @@ import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { SessionId } from '@deepseek-ai/dsh-session'
+import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts,
-  launchWebScaffold, seedSession, watchConsole, webSnapshotMode, type WebScaffold,
+  launchWebScaffold, rewriteSeedEvents, seedSession, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
 import { newEnglishPage, saveFailureShot } from './support.ts'
 
@@ -36,36 +37,42 @@ const SECOND_PROMPT = 'Now give the final answer.'
  * @returns A contiguous, closed two-turn fixture.
  */
 function completedTailFixture(raw: string): string {
-  const kept: string[] = []
-  for (const line of raw.trimEnd().split('\n')) {
-    const row = JSON.parse(line) as {
-      type: string
-      seq?: number
-      seq0?: number
-      data?: { content?: unknown[] }
+  return rewriteSeedEvents(raw, (events) => {
+    const isTurnOneAssistant = (event: SessionEvent): event is Extract<SessionEvent, { type: 'assistant/message' }> =>
+      event.type === 'assistant/message' && event.data.turn === 1
+    const assistantMessages = events.filter(isTurnOneAssistant)
+    const stepOne = assistantMessages.find(event => event.data.step === 1)
+    const stepTwo = assistantMessages.find(event => event.data.step === 2)
+    if (stepOne === undefined || stepTwo === undefined) {
+      throw new Error('borrowed recording must carry two assistant messages in turn 1')
     }
-    const firstSeq = row.seq ?? row.seq0
-    if (firstSeq !== undefined && firstSeq >= 101) break
-    if (row.type === 'assistant/message' && row.seq === 64) {
-      const content = row.data?.content
-      if (!Array.isArray(content)) throw new Error('borrowed step-one assistant message has no content')
-      content.splice(1, 0, { type: 'text', text: MID_TURN_TEXT })
-      kept.push(JSON.stringify(row))
-    } else {
-      kept.push(line)
+    // Projected fixture rows carry the assistant content directly on `data`
+    // (the in-memory event nests it under `message`); edit the row as stored.
+    const projected = stepOne.data as unknown as { content: Array<{ type: string; text: string }> }
+    if (projected.content.length === 0) throw new Error('borrowed step-one assistant message has no content')
+    projected.content.splice(1, 0, { type: 'text', text: MID_TURN_TEXT })
+    // Keep the step-two Think chunks but cut before its answer text starts,
+    // dropping the message and the recorded closure: the turn is interrupted
+    // instead, then a second turn completes.
+    const textStart = events.findIndex(event => event.type === 'assistant/chunk'
+      && event.data.turn === 1 && event.data.step === 2
+      && event.data.chunk.type === 'block-start' && event.data.chunk.blockType === 'text')
+    if (textStart === -1 || textStart > events.indexOf(stepTwo)) {
+      throw new Error('borrowed step-two stream must open a text block before its message')
     }
-  }
-  const tail = [
-    { type: 'step/end', seq: 101, time: 1784974102749, data: { turn: 1, step: 2 } },
-    { type: 'turn/end', seq: 102, time: 1784974102750, data: { turn: 1, reason: { kind: 'aborted' } } },
-    { type: 'turn/start', seq: 103, time: 1784974103000, data: { turn: 2, trigger: { kind: 'message', source: { kind: 'user', rpcId: '{{rpcId}}' } } } },
-    { type: 'user/message', seq: 104, time: 1784974103001, data: { content: [{ type: 'text', text: SECOND_PROMPT }], source: { kind: 'user', rpcId: '{{rpcId}}' } }, surfaceOp: 'append' },
-    { type: 'step/start', seq: 105, time: 1784974103002, data: { turn: 2, step: 1 } },
-    { type: 'assistant/message', seq: 106, time: 1784974103003, data: { turn: 2, step: 1, content: [{ type: 'text', text: 'DONE' }], provenance: { provider: 'deepseek-official', model: 'deepseek-v4-flash' } }, sourceEventSeqs: [], surfaceOp: 'append' },
-    { type: 'step/end', seq: 107, time: 1784974103004, data: { turn: 2, step: 1 } },
-    { type: 'turn/end', seq: 108, time: 1784974103005, data: { turn: 2, reason: { kind: 'completed' } } },
-  ]
-  return `${[...kept, ...tail.map(row => JSON.stringify(row))].join('\n')}\n`
+    const kept = events.slice(0, textStart)
+    const tail: Record<string, unknown>[] = [
+      { type: 'step/end', data: { turn: 1, step: 2 } },
+      { type: 'turn/end', data: { turn: 1, reason: { kind: 'aborted' } } },
+      { type: 'turn/start', data: { turn: 2, trigger: { kind: 'message', source: { kind: 'user', rpcId: '{{rpcId}}' } } } },
+      { type: 'user/message', data: { content: [{ type: 'text', text: SECOND_PROMPT }], source: { kind: 'user', rpcId: '{{rpcId}}' } }, surfaceOp: 'append' },
+      { type: 'step/start', data: { turn: 2, step: 1 } },
+      { type: 'assistant/message', data: { turn: 2, step: 1, content: [{ type: 'text', text: 'DONE' }], provenance: { provider: 'deepseek-official', model: 'deepseek-v4-flash' } }, sourceEventSeqs: [], surfaceOp: 'append' },
+      { type: 'step/end', data: { turn: 2, step: 1 } },
+      { type: 'turn/end', data: { turn: 2, reason: { kind: 'completed' } } },
+    ]
+    return [...kept, ...tail.map((event, index) => ({ ...event, seq: kept.length + index, time: 0 } as unknown as SessionEvent))]
+  })
 }
 
 describe('web e2e: message IconActions and clocks on settled history', () => {

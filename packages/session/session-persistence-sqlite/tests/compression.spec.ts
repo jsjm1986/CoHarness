@@ -249,6 +249,49 @@ describe('SQLite compression', () => {
     }
   })
 
+  it('run-encodes ascending provenance with gaps and round-trips every run', () => {
+    const sources = [
+      ...Array.from({ length: 400 }, (_, index) => index + 10),
+      ...Array.from({ length: 300 }, (_, index) => index + 600),
+    ]
+    const event = {
+      type: 'assistant/message',
+      seq: 1_000,
+      time: 1,
+      data: {},
+      sourceEventSeqs: sources,
+      surfaceOp: 'append',
+    } as unknown as SessionEvent
+    const bound = bindRecord(event)
+    // Two runs: five varints, far below one delta per source.
+    expect(bound.sourceEventSeqs?.byteLength).toBeLessThan(16)
+    expect(decodeRow(row(event))).toEqual([event])
+  })
+
+  it.each([
+    ['a zero-length run', [1, 5, 0], /invalid ascending range/],
+    ['a run starting inside the previous one', [1, 0, 3, 1, 2], /invalid ascending range/],
+    ['a run longer than the event sequence allows', [1, 0, 100], /run exceeds its event sequence/],
+  ])('rejects %s in a stored provenance run stream', (_label, bytes, pattern) => {
+    const base = row({
+      type: 'assistant/message', seq: 10, time: 1, data: {}, sourceEventSeqs: [0], surfaceOp: 'append',
+    } as unknown as SessionEvent)
+    expect(() => decodeRow({ ...base, source_event_seqs: Uint8Array.from(bytes) })).toThrow(pattern)
+  })
+
+  it('reads a chunk-tagged legacy row as scalar when its JSON data names neither texts nor args', () => {
+    const legacy: EventRow = {
+      seq: 3,
+      type: 'text-chunks',
+      time: 5,
+      data: JSON.stringify({ turn: 1, step: 1 }),
+      source_event_seqs: null,
+      surface_op: null,
+      ignorable: null,
+    }
+    expect(decodeRow(legacy)).toEqual([{ type: 'text-chunks', seq: 3, time: 5, data: { turn: 1, step: 1 } }])
+  })
+
   it.each([-1, 0.5])('rejects invalid provenance sequence %s before encoding', (sourceSeq) => {
     const event = {
       type: 'assistant/message',

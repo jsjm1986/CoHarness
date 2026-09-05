@@ -117,7 +117,9 @@ describe('saveDocFile', () => {
     expect(ref.bytes).toBe(5)
   })
 
-  it('writes the file owner-only', async () => {
+  // Windows has no POSIX permission bits; stat reports 0o666 regardless of the
+  // requested mode, so the owner-only contract is a POSIX assertion.
+  it.skipIf(process.platform === 'win32')('writes the file owner-only', async () => {
     const uploadRoot = await root()
     const ref = await save(uploadRoot, 'secret.txt', 'hello')
 

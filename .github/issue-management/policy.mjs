@@ -12,6 +12,7 @@ const AUDIT_MARKER = '<!-- dsh-issue-policy -->'
 const OWNER_LINE = /^Owner: @([A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?)$/
 const TYPES = new Set(['Idea', 'Feature', 'Bug', 'Research', 'Task'])
 const PRIORITIES = ['p0', 'p1', 'p2', 'p3']
+const PROJECT_OWNER_TYPES = new Set(['organization', 'user'])
 const PR_KINDS = new Set([
   'kind/feature',
   'kind/bug-fix',
@@ -45,6 +46,51 @@ const IMPLEMENTATION_PULL_REQUEST_ACTIONS = new Set([
   'labeled',
   'unlabeled',
 ])
+
+/**
+ * Return the configured canonical repository.
+ * @returns {string} GitHub owner/name.
+ */
+export function canonicalRepository() {
+  return config.canonicalRepository ?? `${config.repositoryOwner}/${config.repository}`
+}
+
+/**
+ * Resolve which GitHub account field owns the configured Project.
+ * @param {string} ownerType Configured Project owner type.
+ * @returns {{organization: boolean, user: boolean}} GraphQL include flags.
+ */
+export function projectOwnerSelection(ownerType = config.projectOwnerType) {
+  if (!PROJECT_OWNER_TYPES.has(ownerType)) {
+    throw new Error(`config.projectOwnerType 必须是 organization 或 user，当前为 ${String(ownerType)}`)
+  }
+  return {
+    organization: ownerType === 'organization',
+    user: ownerType === 'user',
+  }
+}
+
+/**
+ * Verify that a policy run targets the repository owning its Project.
+ * @param {{runtimeRepository?: string, eventRepository?: string, expectedRepository?: string}} input Repository identities.
+ * @returns {void}
+ */
+export function assertCanonicalRepository({
+  runtimeRepository = process.env.GITHUB_REPOSITORY,
+  eventRepository,
+  expectedRepository = canonicalRepository(),
+} = {}) {
+  const actual = runtimeRepository ?? eventRepository
+  if (!actual) throw new Error('GITHUB_REPOSITORY 未设置，无法确认 Issue policy 目标仓库')
+  if (eventRepository && eventRepository.toLowerCase() !== actual.toLowerCase()) {
+    throw new Error(`Issue policy 运行仓库与事件仓库不一致：${actual} != ${eventRepository}`)
+  }
+  if (actual.toLowerCase() !== expectedRepository.toLowerCase()) {
+    throw new Error(`Issue policy 仅允许在 ${expectedRepository} 运行，当前仓库为 ${actual}`)
+  }
+}
+
+const PROJECT_OWNER_SELECTION = projectOwnerSelection()
 
 for (const status of ['In progress', 'In review']) {
   if (!ACTIVE_STATUS_ORDER.includes(status)) throw new Error(`config.statuses 缺少 ${status}`)
@@ -416,10 +462,10 @@ async function graphql(query, variables) {
 }
 
 async function issueSnapshot(number, status = undefined) {
-  const issue = await api(`/repos/${config.organization}/${config.repository}/issues/${number}`)
+  const issue = await api(`/repos/${config.repositoryOwner}/${config.repository}/issues/${number}`)
   if (issue.pull_request) return null
   const values = await api(
-    `/repos/${config.organization}/${config.repository}/issues/${number}/issue-field-values?per_page=100`,
+    `/repos/${config.repositoryOwner}/${config.repository}/issues/${number}/issue-field-values?per_page=100`,
   )
   const field = (name) => values.find((value) => value.issue_field_name === name)
   return {
@@ -440,24 +486,26 @@ async function issueSnapshot(number, status = undefined) {
 async function projectContext(number, includeStatusActor = false) {
   const data = await graphql(
     `query(
-      $organization: String!
+      $projectOwner: String!
+      $projectOwnerIsOrganization: Boolean!
+      $projectOwnerIsUser: Boolean!
+      $repositoryOwner: String!
       $repository: String!
       $number: Int!
       $project: Int!
       $includeStatusActor: Boolean!
     ) {
-      organization(login: $organization) {
+      organization(login: $projectOwner) @include(if: $projectOwnerIsOrganization) {
         projectV2(number: $project) {
-          id
-          title
-          fields(first: 50) {
-            nodes {
-              ... on ProjectV2SingleSelectField { id name options { id name } }
-            }
-          }
+          ...ManagedProject
         }
       }
-      repository(owner: $organization, name: $repository) {
+      user(login: $projectOwner) @include(if: $projectOwnerIsUser) {
+        projectV2(number: $project) {
+          ...ManagedProject
+        }
+      }
+      repository(owner: $repositoryOwner, name: $repository) {
         issue(number: $number) {
           id
           timelineItems(last: 100, itemTypes: [PROJECT_V2_ITEM_STATUS_CHANGED_EVENT])
@@ -481,16 +529,28 @@ async function projectContext(number, includeStatusActor = false) {
           }
         }
       }
+    }
+    fragment ManagedProject on ProjectV2 {
+      id
+      title
+      fields(first: 50) {
+        nodes {
+          ... on ProjectV2SingleSelectField { id name options { id name } }
+        }
+      }
     }`,
     {
-      organization: config.organization,
+      projectOwner: config.projectOwner,
+      projectOwnerIsOrganization: PROJECT_OWNER_SELECTION.organization,
+      projectOwnerIsUser: PROJECT_OWNER_SELECTION.user,
+      repositoryOwner: config.repositoryOwner,
       repository: config.repository,
       number,
       project: config.projectNumber,
       includeStatusActor,
     },
   )
-  const project = data.organization?.projectV2
+  const project = data.organization?.projectV2 ?? data.user?.projectV2
   const issue = data.repository?.issue
   if (!project || project.title !== config.projectTitle) throw new Error('目标 Project 不存在或标题不匹配')
   if (!issue) throw new Error(`#${number} 不存在`)
@@ -557,14 +617,14 @@ async function setStatus(number, status) {
 
 async function upsertAudit(number, errors) {
   const comments = await api(
-    `/repos/${config.organization}/${config.repository}/issues/${number}/comments?per_page=100`,
+    `/repos/${config.repositoryOwner}/${config.repository}/issues/${number}/comments?per_page=100`,
   )
   const existing = comments.find(
     (comment) => comment.user?.type === 'Bot' && comment.body?.includes(AUDIT_MARKER),
   )
   if (errors.length === 0) {
     if (existing) {
-      await api(`/repos/${config.organization}/${config.repository}/issues/comments/${existing.id}`, {
+      await api(`/repos/${config.repositoryOwner}/${config.repository}/issues/comments/${existing.id}`, {
         method: 'DELETE',
       })
     }
@@ -573,13 +633,13 @@ async function upsertAudit(number, errors) {
   const body = `${AUDIT_MARKER}\n⚠️ Issue policy 未通过：\n\n${errors.map((error) => `- ${error}`).join('\n')}`
   if (existing) {
     if (existing.body === body) return
-    await api(`/repos/${config.organization}/${config.repository}/issues/comments/${existing.id}`, {
+    await api(`/repos/${config.repositoryOwner}/${config.repository}/issues/comments/${existing.id}`, {
       method: 'PATCH',
       body: JSON.stringify({ body }),
       headers: { 'Content-Type': 'application/json' },
     })
   } else {
-    await api(`/repos/${config.organization}/${config.repository}/issues/${number}/comments`, {
+    await api(`/repos/${config.repositoryOwner}/${config.repository}/issues/${number}/comments`, {
       method: 'POST',
       body: JSON.stringify({ body }),
       headers: { 'Content-Type': 'application/json' },
@@ -598,7 +658,7 @@ async function auditIssue(number, extraErrors = [], status = undefined) {
 async function resolvingReferencesSnapshot(number, pull) {
   const references = parseReferences({
     body: pull.body ?? '',
-    repository: `${config.organization}/${config.repository}`,
+    repository: `${config.repositoryOwner}/${config.repository}`,
   })
   const issues = new Map()
   for (const issueNumber of references.all) {
@@ -614,9 +674,9 @@ async function resolvingReferencesSnapshot(number, pull) {
 
 async function pullRequestSnapshot(number) {
   const [pull, reviewRequests, reviews] = await Promise.all([
-    api(`/repos/${config.organization}/${config.repository}/pulls/${number}`),
-    api(`/repos/${config.organization}/${config.repository}/pulls/${number}/requested_reviewers`),
-    api(`/repos/${config.organization}/${config.repository}/pulls/${number}/reviews?per_page=100`),
+    api(`/repos/${config.repositoryOwner}/${config.repository}/pulls/${number}`),
+    api(`/repos/${config.repositoryOwner}/${config.repository}/pulls/${number}/requested_reviewers`),
+    api(`/repos/${config.repositoryOwner}/${config.repository}/pulls/${number}/reviews?per_page=100`),
   ])
   const resolving = await resolvingReferencesSnapshot(number, pull)
   return {
@@ -630,7 +690,7 @@ async function pullRequestSnapshot(number) {
 }
 
 async function lifecyclePullRequestSnapshot(number) {
-  const pull = await api(`/repos/${config.organization}/${config.repository}/pulls/${number}`)
+  const pull = await api(`/repos/${config.repositoryOwner}/${config.repository}/pulls/${number}`)
   return resolvingReferencesSnapshot(number, pull)
 }
 
@@ -693,8 +753,10 @@ function readEvent() {
 
 async function main(argv) {
   const [command] = argv
-  if (command === 'pr') await runPullRequestCheck(readEvent())
-  else if (command === 'lifecycle') await runLifecycle(process.env.GITHUB_EVENT_NAME, readEvent())
+  const event = readEvent()
+  assertCanonicalRepository({ eventRepository: event.repository?.full_name })
+  if (command === 'pr') await runPullRequestCheck(event)
+  else if (command === 'lifecycle') await runLifecycle(process.env.GITHUB_EVENT_NAME, event)
   else throw new Error('用法：policy.mjs pr|lifecycle')
 }
 

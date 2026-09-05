@@ -112,7 +112,15 @@ describe('web e2e: whole-session stats survive history paging', () => {
 
     // 加载更早: prepending the older page must not move ANY strip figure —
     // counts, wall times, or token groups.
-    await page.getByRole('button', { name: 'Load earlier' }).click()
+    const loadEarlier = page.getByRole('button', { name: 'Load earlier' })
+    const loadingEarlier = page.getByRole('button', { name: /Loading earlier history/ })
+    await expect.poll(async () => {
+      if (await page.getByText('m1', { exact: true }).count() > 0) return true
+      if (await loadingEarlier.count() > 0) return false
+      if (await loadEarlier.count() === 0) return false
+      try { await loadEarlier.click({ timeout: 1_000 }) } catch { /* retry after the DOM settles */ }
+      return await page.getByText('m1', { exact: true }).count() > 0
+    }, { timeout: 30_000 }).toBe(true)
     await expect.poll(() => page.getByText('m1', { exact: true }).count(), { timeout: 10_000 }).toBe(1)
     expect(await strip.textContent()).toBe(stripBeforePaging)
     // With the whole log loaded, the window mounts one turn-tail footer per

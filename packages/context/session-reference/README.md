@@ -48,3 +48,4 @@ The request and snapshot are consecutive append-only target messages and preserv
 - **Collaboration filtering** — when `ctx.collaboration` is composed, candidate discovery and snapshot preparation retain only sessions admitted by its readable-session authority. Compositions without that service retain the trusted-caller contract; this is not a model-facing search tool.
 - **Text projection only** — non-text user and assistant blocks are not propagated across sessions.
 - **No live link** — references are snapshots, not forks, resumes, subscriptions, or source-session mutations.
+- **`zod` is a runtime dependency of generated Typert faces, not of `src`.** The published `./typert` and `./remote` exports resolve to unbundled `lib/typert.*.js` files with bare `zod` imports. The manifest must retain `zod`; `knip.config.ts` adds a workspace-scoped exception only when neither generated JavaScript face exists, while a built checkout lets Knip observe the import directly.

@@ -4,10 +4,11 @@ import type { Pool } from 'pg'
 import { describe, expect, it, vi } from 'vitest'
 import type { UserRow } from '../src/auth.ts'
 import { CollaborationDeniedError } from '../src/collaboration.ts'
-import type {
-  ConversationEvent,
-  ConversationHeader,
-  StoredConversation,
+import {
+  type ConversationEvent,
+  type ConversationHeader,
+  encodePageCursor,
+  type StoredConversation,
 } from '../src/postgres/conversation-repository.ts'
 import { GatewayPrincipalSigner, PRINCIPAL_HEADER } from '../src/principal.ts'
 import type { DocumentTransferResponse } from '../src/document-transfer.ts'
@@ -556,6 +557,32 @@ describe('runtime bounded session history', () => {
       status: 400,
       body: { error: 'conversation-protocol', code: 'protocol' },
     })
+  })
+
+  it('reports a moved revision under a compatibility page cursor as a retryable dependency failure', async () => {
+    const runtime = fixture()
+    const header: ConversationHeader = {
+      id: 'fallback-session',
+      organizationId: ORGANIZATION_ID,
+      creatorUserId: CREATOR_INTERNAL_ID,
+      projectId: PROJECT_INTERNAL_ID,
+      rootSessionId: 'fallback-session',
+      visibility: 'project',
+      sessionFormatVersion: 0,
+      createdAt: CREATED_AT,
+      cwd: '/tmp/shared',
+    }
+    runtime.deps.conversations.load.mockResolvedValue({ header, events: [event], revision: '7:2' })
+    const page = (cursor: string) => request(
+      runtime.handler,
+      `/internal/runtime/session/page?sessionId=fallback-session&cursor=${encodeURIComponent(cursor)}`,
+      { method: 'GET', body: {} },
+    )
+
+    const moved = await page(encodePageCursor({ version: 1, sessionId: 'fallback-session', revision: '7:1', direction: 'older', anchor: 1 }))
+    expect(moved).toMatchObject({ status: 503, body: { error: 'conversation-dependency', code: 'dependency' } })
+    const foreign = await page(encodePageCursor({ version: 1, sessionId: 'other-session', revision: '7:2', direction: 'older', anchor: 1 }))
+    expect(foreign).toMatchObject({ status: 400, body: { error: 'conversation-protocol', code: 'protocol' } })
   })
 
   it('serves the lightweight history index from the repository without invoking load()', async () => {

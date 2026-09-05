@@ -147,7 +147,12 @@ describe.skipIf(MODE === 'record')('web e2e: file and session references through
     expect(snapshot).toContain('Session conversations')
     expect(snapshot).not.toContain('text: reference Files & folders')
     expect(snapshot).toContain('File \u00b7 reference.txt')
-    expect(snapshot).toContain('Session \u00b7 Research notes')
+    // A seed reaches disk as a log alone, and the Host labels a session from
+    // its projections: no checkpoint until the session is opened once, so the
+    // row is its id. The fixture's own title (`Research notes`) is unreachable
+    // here by construction; the recall test below exercises the titled path.
+    expect(snapshot).toContain(`Session \u00b7 ${SOURCE_SESSION_ID}`)
+    expect(snapshot).not.toContain('Research notes')
     expect(snapshot).not.toContain('text: Subagents')
 
     await input.fill('@reference')
@@ -157,12 +162,12 @@ describe.skipIf(MODE === 'record')('web e2e: file and session references through
     await expect.poll(() => fileReference.locator('svg').count()).toBe(1)
     await expect.poll(() => input.inputValue()).toBe('@reference.txt ')
 
-    await input.fill('@Research')
-    await menu.getByRole('option', { name: /Session \u00b7 Research notes/ }).click()
+    await input.fill('@reference-source')
+    await menu.getByRole('option', { name: new RegExp(`Session \\u00b7 ${SOURCE_SESSION_ID}`) }).click()
     const sessionReference = page.locator('[data-reference-appearance="session"]')
-    await expect.poll(() => sessionReference.textContent()).toBe('@Research notes')
+    await expect.poll(() => sessionReference.textContent()).toBe(`@${SOURCE_SESSION_ID}`)
     await expect.poll(() => sessionReference.locator('svg').count()).toBe(1)
-    await expect.poll(() => input.inputValue()).toBe('@Research notes ')
+    await expect.poll(() => input.inputValue()).toBe(`@${SOURCE_SESSION_ID} `)
 
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])

@@ -57,6 +57,22 @@ async function link(target: string, name: string, nm: string): Promise<void> {
   await symlink(target, dest)
 }
 
+async function packageRoot(specifier: string, parent: string): Promise<string> {
+  let current = dirname(fileURLToPath(import.meta.resolve(specifier, parent)))
+  while (true) {
+    const manifestPath = join(current, 'package.json')
+    try {
+      const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as { name?: unknown }
+      if (manifest.name === specifier) return current
+    } catch (error) {
+      if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error
+    }
+    const parentDirectory = dirname(current)
+    if (parentDirectory === current) throw new Error(`Cannot locate package root for ${specifier}`)
+    current = parentDirectory
+  }
+}
+
 /** Build a temp consumer dir + a minimal acp `cordis.yml`. Returns the dir. */
 async function makeConsumer(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'acp-built-bin-'))
@@ -70,11 +86,12 @@ async function makeConsumer(): Promise<string> {
     await link(abs, await pkgName(abs), nm)
   }
   for (const dep of npmDeps) {
-    // Resolve from ACP's package.json URL (the package that declares the
-    // dep), not this test file's location — `acp-agent` does not depend on these.
+    // Resolve from ACP's package.json URL (the package that declares the dep),
+    // not this test file's location — `acp-agent` does not depend on these.
+    // Resolve the public entry and walk to its owning manifest because third-
+    // party packages are not required to export `./package.json`.
     const fromAcp = pathToFileURL(join(acpPkgDir, 'package.json')).href
-    const resolved = fileURLToPath(import.meta.resolve(`${dep}/package.json`, fromAcp))
-    await link(dirname(resolved), dep, nm)
+    await link(await packageRoot(dep, fromAcp), dep, nm)
   }
   await writeFile(join(dir, 'mock-llm.mjs'), [
     "import { LlmAdapter } from '@deepseek-ai/dsh-llm'",
@@ -167,15 +184,21 @@ describe.skipIf(!existsSync(acpBin))('dsh-acp-demo BUILT bin (node lib/bin.js, n
     const init = await client.request(methods.agent.initialize, { protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })
     expect(init.agentCapabilities).toEqual({
       promptCapabilities: { image: false, audio: false, embeddedContext: false },
+      mcpCapabilities: { http: true },
+      sessionCapabilities: { list: {}, resume: {}, close: {} },
     })
     const sessionCwd = consumer
     const { sessionId } = await client.request(methods.agent.session.new, { cwd: sessionCwd, mcpServers: [] })
     const result = await client.request(methods.agent.session.prompt, { sessionId, prompt: [{ type: 'text', text: 'reply' }] })
     expect(result.stopReason).toBe('end_turn')
-    await expect.poll(() => updates).toEqual([{
+    await expect.poll(() => updates).toHaveLength(1)
+    const update = updates[0]
+    expect(update).toMatchObject({
       sessionUpdate: 'agent_message_chunk',
       content: { type: 'text', text: 'ACP BUILT OK' },
-    }])
+    })
+    if (update?.sessionUpdate !== 'agent_message_chunk') throw new Error('expected one agent message chunk')
+    expect(update.messageId).toBeTypeOf('string')
     const sessionsRoot = join(sessionCwd, '.sessions')
     let log: string | undefined
     await expect.poll(async () => {

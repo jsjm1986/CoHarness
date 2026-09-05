@@ -17,6 +17,7 @@ import { createChatScrollFixture, type ChatScrollFixture } from './chat-scroll-f
 import {
   captureStableAria,
   compareOrRefreshGolden,
+  expandTurnProcesses,
   launchWebScaffold,
   seedSession,
   watchConsole,
@@ -427,16 +428,33 @@ async function expectMarkerAboveComposer(page: Page, marker: string): Promise<vo
   expect(geometry.rowBottom).toBeLessThanOrEqual(geometry.composerTop + GEOMETRY_TOLERANCE)
 }
 
-async function loadEarlierWithAnchor(page: Page): Promise<void> {
-  await wheelToHistoryStart(page)
-  const older = page.getByRole('button', { name: 'Load earlier', exact: true })
-  await older.waitFor({ timeout: 10_000 })
-  const anchor = await visibleFlowAnchor(page)
+/**
+ * Bring one older history page in from the head of the loaded window and
+ * hold the reader anchor through the prepend. A reader nearing the head
+ * requests the next page by itself, so the wheel advances in short steps and
+ * stops at the first arrival; the explicit control covers a reader who
+ * reached the head without one.
+ * @returns whether an older page arrived (`false` once the whole log is loaded).
+ */
+async function loadEarlierWithAnchor(page: Page): Promise<boolean> {
   const before = await loadedFlowRows(page)
-  await older.click()
+  let anchor = await visibleFlowAnchor(page)
+  for (let attempt = 0; attempt < 64; attempt += 1) {
+    if (await loadedFlowRows(page) > before) break
+    if ((await scrollGeometry(page)).scrollTop <= 1) {
+      const older = page.getByRole('button', { name: 'Load earlier', exact: true })
+      if (await older.count() === 0) return false
+      anchor = await visibleFlowAnchor(page)
+      await older.click()
+      break
+    }
+    await wheelTranscript(page, -600)
+    anchor = await visibleFlowAnchor(page)
+  }
   await expect.poll(() => loadedFlowRows(page), { timeout: 30_000 }).toBeGreaterThan(before)
   await nextPaint(page)
   await expectSameFlowTop(page, anchor)
+  return true
 }
 
 async function fileExists(path: string): Promise<boolean> {
@@ -617,6 +635,13 @@ describe('web e2e: long Chat scroll contract', () => {
       await expectBottom(world.page)
       await expectMarkerAboveComposer(world.page, LIVE_TOOL_DONE)
 
+      // The settled live turn folds its tool row behind the turn-process
+      // disclosure; open that one turn (opening every loaded turn would
+      // re-lay the whole transcript away from the tail) before asserting on
+      // the row's own state.
+      const liveProcess = world.page.locator(`[data-turn-process="${String(TOOL_FIXTURE.turns + 1)}"]`)
+      await liveProcess.waitFor({ timeout: 10_000 })
+      if (await liveProcess.getAttribute('aria-expanded') !== 'true') await liveProcess.click()
       const liveRowSelector = `[data-chat-call-id="${LIVE_TOOL_CALL_ID}"] [data-sample="bash"]`
       const liveRow = world.page.locator(liveRowSelector)
       await wheelUntilVisible(world.page, liveRowSelector, -300)
@@ -778,6 +803,7 @@ describe('web e2e: long Chat scroll contract', () => {
       const lastToolRow = world.page.locator(
         `[data-chat-call-id="chat-scroll-${String(INPUTS_FIXTURE.turns).padStart(3, '0')}-1"] [data-sample="bash"]`,
       )
+      await expandTurnProcesses(world.page)
       await lastToolRow.focus()
       await world.page.keyboard.press('End')
       await expectBottom(world.page)

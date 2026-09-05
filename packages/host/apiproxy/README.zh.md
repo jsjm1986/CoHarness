@@ -28,7 +28,7 @@ Settings 分节中的 `reasoningEffort` 在 agent-default-model 插件配置中�
 
 首个回答认领待处理请求之前，系统会对照该请求校验问题响应。多选题的回答项可以同时携带 `selected` 中的请求选项标签与非空 `custom` 文本；单选题的回答项必须二选一。标签重复、标签未知、id 不匹配、批次不完整以及自定义文本为空都会以 `bad-response` 拒绝。
 
-`session.history` 会读取已附加 Session 的内存状态，或通过持久化的有界分页读取 detached 历史，而不会恢复或发布 agent，然后按追加来源的消息边界分页：`maxMessages` 统计以追加方式进入 surface 的 `user/message` 和 `assistant/message` 事件，因此仅供模型使用的替换副本不占用配额。每一页仍是一段连续的原始事件区间，从而让压缩（compaction）的仅日志 `compaction/summary` 记录与引用它的替换留在同一页。带索引的冷读取使用 512 KiB 持久化页，并把一次 Host 操作限制在 4 MiB 窗口内；长流尚未达到消息配额时，调用方可用 `beforeSeq` 继续读取。Web 的 `detail: 'conversation'` 尾页会在每个 Runtime 内按已附加／分离的来源类型、追加日志身份（分离来源还使用持久化 revision）、请求页大小和投影注册集 revision 放入有界缓存。分离来源校验使用按 id 查询的 `SessionPersistence.readRevision()`，不扫描会话目录；会话事件、工具注册表或投影 key 变化会使条目失效，其他历史请求仍走未缓存路径。没有 seek 分页实现的提供方保留兼容的完整检查路径。
+`session.history` 会读取已附加 Session 的内存状态，或通过持久化的有界分页读取 detached 历史，而不会恢复或发布 agent，然后按追加来源的消息边界分页：`maxMessages` 统计以追加方式进入 surface 的 `user/message` 和 `assistant/message` 事件，因此仅供模型使用的替换副本不占用配额。每一页仍是一段连续的原始事件区间，从而让压缩（compaction）的仅日志 `compaction/summary` 记录与引用它的替换留在同一页。带索引的冷读取使用 512 KiB 持久化页，并把一次 Host 操作限制在 4 MiB 窗口内；长流尚未达到消息配额时，调用方可用 `beforeSeq` 继续读取。Web 的 `detail: 'conversation'` 尾页会在每个 Runtime 内按已附加／分离的来源类型、追加日志身份（分离来源还使用持久化 revision）、请求页大小和投影注册集 revision 放入有界缓存。分离来源校验使用按 id 查询的 `SessionPersistence.readRevision()`，不扫描会话目录；会话事件、工具注册表或投影 key 变化会使条目失效，其他历史请求仍走未缓存路径。冷读分页游走中出现 `dependency` 失败（打开动作自带的 resume 已附加该会话并追加了生命周期事件，或其他写入者改变了 revision）时，Host 改由此时已附加的日志提供数据，或按新 revision 重走一次分页，再失败才把错误交给客户端。没有 seek 分页实现的提供方保留兼容的完整检查路径。
 
 `session.historyIndex` 是导航条使用的独立提示性读取。它最多返回 2,000 个轮次范围及 160 个 Unicode code point 的问答预览；冷会话使用带索引的 persistence 提供方，结果绝不包含事件或流式 chunk 正文。浏览器在刷新期间保留上一次成功的索引；选择尚未加载的标记时，只读取到该标记所需的更早页面。
 

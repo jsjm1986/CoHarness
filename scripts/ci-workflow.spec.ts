@@ -27,7 +27,7 @@ describe('CI workflow', () => {
     }
   })
 
-  it('keeps a required Wine Windows job, a non-blocking native Windows job with failover, and a master-only standby', () => {
+  it('keeps portable required pools, explicit external-runner opt-ins, and non-blocking native Windows coverage', () => {
     const workflow = loadWorkflow('.github/workflows/ci.yml')
     if (!isRecord(workflow.jobs)
       || !isRecord(workflow.jobs.windows)
@@ -49,8 +49,13 @@ describe('CI workflow', () => {
     const node24Coverage = workflow.jobs['node-24-coverage']
     const node24Consumers = workflow.jobs['node-24-consumers']
     const aggregate = workflow.jobs['all-checks-passed']
-    if (!Array.isArray(windows.steps) || !Array.isArray(aggregate.needs)) {
-      throw new TypeError('Windows job must define steps and the aggregate must define needs')
+    if (!Array.isArray(windows.steps)
+      || !Array.isArray(aggregate.needs)
+      || !isRecord(windowsNative.env)
+      || !isRecord(node24Coverage.env)
+      || !isRecord(node24Consumers.env)
+      || !Array.isArray(node24Consumers.steps)) {
+      throw new TypeError('CI worker jobs must define environment maps and steps, and the aggregate must define needs')
     }
     const commandSteps = windows.steps.filter((step): step is Record<string, unknown> & { run: string } => (
       isRecord(step) && typeof step.run === 'string'
@@ -62,19 +67,25 @@ describe('CI workflow', () => {
     expect(windows.if).toBe("github.event_name == 'pull_request'")
     expect(commandSteps.some(step => step.run.includes('wine-windows-gates.sh'))).toBe(true)
 
-    // windows-native: non-blocking native job with failover, runs windows-complete.
-    // Its pool is resolved by the Windows-specific switch.
+    // windows-native: portable standard Windows by default, optional enterprise
+    // capacity, and the Windows-specific self-hosted failover switch.
     expect(typeof windowsNative['runs-on']).toBe('string')
     expect(windowsNative['runs-on']).toContain('DSH_CI_FAILOVER_WINDOWS')
     expect(windowsNative['runs-on']).not.toContain('DSH_CI_FAILOVER_LINUX')
+    expect(windowsNative['runs-on']).toContain('DSH_CI_ENTERPRISE_RUNNERS_ENABLED')
+    expect(windowsNative['runs-on']).toContain('github.event.pull_request.head.repo.full_name == github.repository')
     expect(windowsNative['runs-on']).toContain('self-hosted')
     expect(windowsNative['runs-on']).toContain('dsh-win-ci')
     expect(windowsNative['runs-on']).toContain('dsh-windows-2025-16core')
+    expect(windowsNative['runs-on']).toContain('windows-2025')
     expect(windowsNative.name).toBe('windows node 24 / native complete')
     expect(windowsNative.if).toBe("github.event_name == 'pull_request'")
     expect(windowsNative.env).toMatchObject({
       DSH_COVERAGE_TEST_TIMEOUT_MS: '30000',
     })
+    expectExternalCapacityExpression(windowsNative.env.DSH_COVERAGE_PARTITIONS, '8', '2')
+    expectExternalCapacityExpression(windowsNative.env.DSH_GATE_CONCURRENCY, '4', '1')
+    expectExternalCapacityExpression(windowsNative.env.DSH_PUBLINT_CONCURRENCY, '8', '1')
     const nativeCommandSteps = (windowsNative.steps as unknown[]).filter((step): step is Record<string, unknown> & { run: string } => (
       isRecord(step) && typeof step.run === 'string'
     ))
@@ -84,8 +95,10 @@ describe('CI workflow', () => {
     expect(wineAptCache.if).toBe("github.event_name == 'push' && github.ref == 'refs/heads/master'")
     expect(wineAptCache['runs-on']).toBe('ubuntu-latest')
 
-    // serial-windows: master-only standby, self-hosted, non-blocking.
-    expect(serialWindows.if).toBe("github.event_name == 'push' && github.ref == 'refs/heads/master'")
+    // serial-windows: explicitly enabled master-only standby, self-hosted, non-blocking.
+    expect(serialWindows.if).toContain("github.event_name == 'push'")
+    expect(serialWindows.if).toContain("github.ref == 'refs/heads/master'")
+    expect(serialWindows.if).toContain("vars.DSH_CI_SELF_HOSTED_STANDBY_ENABLED == 'true'")
     expect(serialWindows['runs-on']).toEqual(['self-hosted', 'dsh-win-ci', 'windows'])
     expect(serialWindows.name).toBe('serial / windows (self-hosted standby)')
 
@@ -94,16 +107,37 @@ describe('CI workflow', () => {
     expect(aggregate.needs).not.toContain('windows-native')
     expect(aggregate.needs).not.toContain('serial-windows')
 
-    // Linux failover is a separate switch: the three required Linux workers
-    // and the verdict job resolve their pool through DSH_CI_FAILOVER_LINUX,
-    // never the Windows switch.
+    // Linux uses standard hosted capacity by default, with explicit enterprise
+    // opt-in and the separate Linux self-hosted failover switch.
     for (const [jobName, job] of [['node-24', node24], ['node-24-coverage', node24Coverage], ['node-24-consumers', node24Consumers]] as const) {
       expect(typeof job['runs-on']).toBe('string')
       expect(job['runs-on'], `${jobName} runs-on must use the Linux failover switch`).toContain('DSH_CI_FAILOVER_LINUX')
       expect(job['runs-on'], `${jobName} runs-on must not use the Windows failover switch`).not.toContain('DSH_CI_FAILOVER_WINDOWS')
+      expect(job['runs-on']).toContain('DSH_CI_ENTERPRISE_RUNNERS_ENABLED')
+      expect(job['runs-on']).toContain('github.event.pull_request.head.repo.full_name == github.repository')
       expect(job['runs-on']).toContain('vm-backup')
+      expect(job['runs-on']).toContain('dsh-ubuntu-24-04-16core')
+      expect(job['runs-on']).toContain('ubuntu-latest')
     }
+    expect(node24Coverage.env.DSH_COVERAGE_TEST_TIMEOUT_MS).toBe('30000')
+    expectExternalCapacityExpression(node24Coverage.env.DSH_COVERAGE_PARTITIONS, '4', '2')
+    expectExternalCapacityExpression(node24Coverage.env.DSH_GATE_CONCURRENCY, '3', '1')
+    expectExternalCapacityExpression(node24Consumers.env.DSH_GATE_CONCURRENCY, '8', '1')
+    expectExternalCapacityExpression(node24Consumers.env.DSH_OXLINT_THREADS, '8', '1')
+    expectExternalCapacityExpression(node24Consumers.env.DSH_PUBLINT_CONCURRENCY, '8', '1')
+    expectExternalCapacityExpression(node24Consumers.env.DSH_WEB_SNAPSHOT_WORKERS, '6', '1')
+    expectExternalCapacityExpression(node24Consumers.env.DSH_SNAPSHOT_MAX_CONCURRENCY, '32', '1')
+    expect(String(node24Consumers.env.DSH_SNAPSHOT_MAX_CONCURRENCY)).toContain("&& '12'")
+    const consumerSteps = node24Consumers.steps.filter(isRecord)
+    const gatewayInstallIndex = consumerSteps.findIndex(step => step.name === 'Install Gateway runtime dependencies')
+    const consumerGateIndex = consumerSteps.findIndex(step => step.name === 'Run compatibility, snapshot, and artifact gates')
+    expect(gatewayInstallIndex).toBeGreaterThanOrEqual(0)
+    expect(consumerSteps[gatewayInstallIndex]).toMatchObject({
+      run: 'npm ci --prefix gateway --omit=dev',
+    })
+    expect(consumerGateIndex).toBeGreaterThan(gatewayInstallIndex)
     expect(aggregate['runs-on']).toContain('DSH_CI_FAILOVER_LINUX')
+    expect(aggregate['runs-on']).toContain('github.event.pull_request.head.repo.full_name == github.repository')
     expect(aggregate['runs-on']).not.toContain('DSH_CI_FAILOVER_WINDOWS')
     expect(aggregate['runs-on']).toContain('vm-backup')
   })
@@ -131,8 +165,10 @@ describe('CI workflow', () => {
       const job = workflow.jobs[name]
       if (!isRecord(job)) throw new TypeError(`${name} must be defined`)
       expect(job.concurrency).toBeUndefined()
-      // Both stay master-push-only; that is what makes the push carve-out safe.
-      expect(job.if).toBe("github.event_name == 'push' && github.ref == 'refs/heads/master'")
+      // Both stay master-push-only and require explicit standby enablement.
+      expect(job.if).toContain("github.event_name == 'push'")
+      expect(job.if).toContain("github.ref == 'refs/heads/master'")
+      expect(job.if).toContain("vars.DSH_CI_SELF_HOSTED_STANDBY_ENABLED == 'true'")
     }
 
     // What bounds the cost of exempting push: a master push may only carry the
@@ -146,8 +182,8 @@ describe('CI workflow', () => {
     const NOT_PUSH_REACHABLE = new Set([
       "github.event_name == 'pull_request'",
       "always() && github.event_name == 'pull_request'",
-      "github.event_name == 'workflow_dispatch' && inputs.suite == 'larger-runner-benchmark'",
-      "github.event_name == 'workflow_dispatch' && inputs.suite == 'consolidated-runner-benchmark'",
+      "github.event_name == 'workflow_dispatch' && inputs.suite == 'larger-runner-benchmark' && vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true'",
+      "github.event_name == 'workflow_dispatch' && inputs.suite == 'consolidated-runner-benchmark' && vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true'",
     ])
     const pushReachable = Object.entries(workflow.jobs)
       .filter(([, job]) => {
@@ -170,6 +206,7 @@ describe('CI workflow', () => {
       if (!isRecord(job) || !isRecord(job.strategy)) {
         throw new TypeError(`${name} must define a matrix strategy`)
       }
+      expect(job.if).toContain("vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true'")
       expect(job.strategy['max-parallel']).toBe(12)
       expect(job['timeout-minutes']).toBe(15)
     }
@@ -245,6 +282,14 @@ describe('DeepSeek e2e workflow', () => {
     if (!Array.isArray(e2e.steps)) throw new TypeError('DeepSeek e2e workflow must define steps')
 
     const steps = e2e.steps.filter(isRecord)
+    expect(e2e.if).toContain("github.repository == 'jsjm1986/CoHarness'")
+    expect(e2e.if).toContain("vars.DSH_REAL_API_E2E_ENABLED == 'true'")
+    expect(e2e.if).toContain('github.event.pull_request.head.repo.fork')
+    expect(e2e.if).toContain("github.event.pull_request.user.login == 'dependabot[bot]'")
+    expect(JSON.stringify(workflow)).not.toContain('pull_request_target')
+    expect(steps.find(step => step.name === 'Preflight (require DEEPSEEK_API_KEY)')).toMatchObject({
+      env: { DEEPSEEK_API_KEY: '${{ secrets.DEEPSEEK_API_KEY_EXTERNAL }}' },
+    })
     expect(steps.find(step => step.name === 'Prepare bubblewrap (unrestrict userns)')).toMatchObject({
       run: 'bash scripts/prepare-ci-bubblewrap.sh',
     })
@@ -411,10 +456,26 @@ describe('Issue lifecycle workflow', () => {
     expect(lifecyclePullRequest.types).not.toContain('ready_for_review')
     expect(lifecyclePullRequest.types).toContain('review_requested')
     expect(lifecycleReview.types).toEqual(['submitted'])
-    expect(lifecycleJob.if).toBe(
-      "${{ github.event_name != 'pull_request_review' || (github.event.action == 'submitted' && github.event.review.state == 'changes_requested') }}",
-    )
+    expect(lifecycleJob.if).toContain("github.repository == 'jsjm1986/CoHarness'")
+    expect(lifecycleJob.if).toContain("vars.DSH_ISSUE_AUTOMATION_ENABLED == 'true'")
+    expect(lifecycleJob.if).toContain('github.event.pull_request.head.repo.fork')
+    expect(lifecycleJob.if).toContain("github.event.pull_request.user.login == 'dependabot[bot]'")
+    expect(lifecycleJob.if).toContain("github.event.review.state == 'changes_requested'")
     expect(policyPullRequest.types).toContain('ready_for_review')
+
+    const policyJobDefinition = workflowJob(policy, 'policy')
+    expect(policyJobDefinition.if).toContain("github.repository == 'jsjm1986/CoHarness'")
+    expect(policyJobDefinition.if).toContain("vars.DSH_ISSUE_AUTOMATION_ENABLED == 'true'")
+    expect(policyJobDefinition.if).toContain('github.event.pull_request.head.repo.fork')
+    expect(policyJobDefinition.if).toContain("github.event.pull_request.user.login == 'dependabot[bot]'")
+    expect(policyJobDefinition.permissions).toBeUndefined()
+    expect(policy.permissions).toMatchObject({ contents: 'read', issues: 'read', 'pull-requests': 'read' })
+    expect(JSON.stringify(lifecycle)).toContain('"owner":"jsjm1986"')
+    expect(JSON.stringify(lifecycle)).toContain('"repositories":"CoHarness"')
+    expect(JSON.stringify(policy)).toContain('"owner":"jsjm1986"')
+    expect(JSON.stringify(policy)).toContain('"repositories":"CoHarness"')
+    expect(JSON.stringify(policy)).toContain('"GH_TOKEN":"${{ steps.app-token.outputs.token }}"')
+    expect(JSON.stringify(policy)).not.toContain('"GITHUB_TOKEN":"${{ github.token }}"')
   })
 })
 
@@ -475,6 +536,14 @@ function workflowJob(workflow: Record<string, unknown>, job: string): Record<str
     throw new TypeError(`workflow must define the ${job} job`)
   }
   return workflow.jobs[job]
+}
+
+function expectExternalCapacityExpression(value: unknown, external: string, portable: string): void {
+  expect(typeof value).toBe('string')
+  if (typeof value !== 'string') throw new TypeError('capacity expression must be a string')
+  expect(value).toContain('DSH_CI_ENTERPRISE_RUNNERS_ENABLED')
+  expect(value).toContain(`&& '${external}'`)
+  expect(value).toContain(`|| '${portable}'`)
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

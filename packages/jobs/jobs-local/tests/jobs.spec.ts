@@ -265,6 +265,18 @@ describe('LocalJobRegistry.start', () => {
     expect(() => ctx.jobs.get(firstId)).toThrow(`unknown job ${firstId}`)
   })
 
+  it('expires settled records past the retention interval from the cleanup timer', async () => {
+    const ctx = await harness({ terminalRetentionMs: 20 })
+    const job = producer()
+    const id = ctx.jobs.start(job.spec)
+    job.settle({ status: 'completed', output: 'done' })
+    await tick()
+    // Settlement prunes immediately, but a record this young stays.
+    expect(ctx.jobs.get(id).status).toBe('completed')
+    await new Promise<void>(resolve => setTimeout(resolve, 80))
+    expect(() => ctx.jobs.get(id)).toThrow(`unknown job ${id}`)
+  })
+
   it('evicts terminal output when the global output budget is exceeded', async () => {
     const ctx = await harness({ maxTerminalOutputBytes: 4 })
     const first = producer()

@@ -1,12 +1,16 @@
 - banner:
+  - tablist:
+    - tab "Chat" [selected]
+    - tab "Trajectory"
   - navigation "Session hierarchy":
     - button "Load the editing-cordis-compositions ski" [disabled]
   - button "Session log":
     - text: Session log
     - img
-  - tablist:
-    - tab "Chat" [selected]
-    - tab "Trajectory"
+- separator "Adjust transcript content width"
+- button "1 tool call · 2 intermediate messages" [expanded]:
+  - text: 1 tool call · 2 intermediate messages
+  - img
 - text: Load the editing-cordis-compositions skill with the skill tool, then reply DONE. {{date}} {{clock}}
 - button "Copy":
   - img
@@ -18,6 +22,10 @@
   - img
   - img
   - text: Context injection skill-catalog
+- button "System prompt":
+  - img
+  - img
+  - text: System prompt
 - button "Think Load the requested skill.":
   - img
   - img
@@ -40,8 +48,12 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{date}} {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s
+- text: {{date}} {{clock}} Ran for {{duration}}
 - textbox "Message the agent"
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
 - button "Commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write

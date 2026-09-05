@@ -118,6 +118,7 @@ export class E2BOutputReader implements SubprocessOutputReader {
 
   /** Reclaim retired chunk slots without moving the active tail per push. */
   private compactChunks(): void {
+    /* v8 ignore next 3 -- a positive tail cap always keeps the newest chunk, so the retired prefix never reaches the end. */
     if (this.head === this.chunks.length) {
       this.chunks = []
       this.head = 0
