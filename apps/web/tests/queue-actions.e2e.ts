@@ -115,6 +115,14 @@ describe('web e2e: queue row actions', () => {
     ).toBe(2)
 
     await page.setViewportSize({ width: 640, height: 1000 })
+    await expect.poll(async () => page.locator('[data-composer-card]').evaluate((element) => {
+      const queue = element.ownerDocument.querySelector<HTMLElement>('[data-queue-dock]')
+      if (queue === null) return Number.POSITIVE_INFINITY
+      const card = element.getBoundingClientRect()
+      const dock = queue.getBoundingClientRect()
+      const inset = Number.parseFloat(getComputedStyle(element).getPropertyValue('--dsh-composer-dock-inset'))
+      return Math.max(Math.abs(dock.x - card.x - inset), Math.abs(card.right - dock.right - inset))
+    }), { timeout: 10_000 }).toBeLessThanOrEqual(1)
     const queueBox = await page.locator('[data-queue-dock]').boundingBox()
     const composerBox = await page.locator('[data-composer-card]').boundingBox()
     expect(queueBox).not.toBeNull()
