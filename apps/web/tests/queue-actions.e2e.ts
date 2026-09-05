@@ -116,10 +116,11 @@ describe('web e2e: queue row actions', () => {
 
     await page.setViewportSize({ width: 640, height: 1000 })
     const readQueueLayout = () => page.evaluate(() => {
-      const visible = <T extends HTMLElement>(selector: string): T | undefined => [...document.querySelectorAll<T>(selector)]
+      const visible = (selector: string): HTMLElement | undefined => [...document.querySelectorAll(selector)]
+        .map(element => element as HTMLElement)
         .find(element => element.getClientRects().length > 0)
-      const card = visible<HTMLElement>('[data-composer-card]')
-      const queue = visible<HTMLElement>('[data-queue-dock]')
+      const card = visible('[data-composer-card]')
+      const queue = visible('[data-queue-dock]')
       if (card === undefined || queue === undefined) return undefined
       const cardBox = card.getBoundingClientRect()
       const queueBox = queue.getBoundingClientRect()
