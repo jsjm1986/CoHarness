@@ -111,14 +111,17 @@ function renderGeometry(rows: readonly { width: number; metrics: ComposerMetrics
   const lines = [
     '# Mobile composer model seat',
     '',
-    '| viewport | tool controls before model | model before Send | trailing layout | row inside card | effort display | label overflow | label white-space | label text overflow | label width |',
+    '| viewport | tool controls before model | model before Send | trailing layout | row inside card | effort display | label overflow | label white-space | label text overflow | label width class |',
     '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
   ]
   for (const { width, metrics } of rows) {
     const toolsBeforeModel = metrics.modelPresentation === 'summary' || metrics.toolControlRight <= metrics.model.left + 1 || metrics.trailingWrapped
     const modelBeforeSend = metrics.modelPresentation === 'summary' || metrics.model.right <= metrics.send.left + 1
     const layout = metrics.modelPresentation === 'summary' ? 'summary' : metrics.trailingWrapped ? 'wrapped' : 'same-line'
-    lines.push(`| ${String(width)}px | ${String(toolsBeforeModel)} | ${String(modelBeforeSend)} | ${layout} | ${String(metrics.row.left >= metrics.card.left - 1 && metrics.row.right <= metrics.card.right + 1)} | ${metrics.modelEffortDisplay} | ${metrics.modelLabelOverflow} | ${metrics.modelLabelWhiteSpace} | ${metrics.modelLabelTextOverflow} | ${String(Math.round(metrics.modelLabelWidth))}px |`)
+    // Exact pixels vary with browser font metrics and the platform scrollbar,
+    // while the product contract is the available seat class.
+    const labelWidthClass = metrics.modelLabelWidth >= 100 ? 'wide' : 'compact'
+    lines.push(`| ${String(width)}px | ${String(toolsBeforeModel)} | ${String(modelBeforeSend)} | ${layout} | ${String(metrics.row.left >= metrics.card.left - 1 && metrics.row.right <= metrics.card.right + 1)} | ${metrics.modelEffortDisplay} | ${metrics.modelLabelOverflow} | ${metrics.modelLabelWhiteSpace} | ${metrics.modelLabelTextOverflow} | ${labelWidthClass} |`)
   }
   return lines.join('\n')
 }
