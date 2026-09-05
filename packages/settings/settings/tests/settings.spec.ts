@@ -106,6 +106,26 @@ describe('registration', () => {
     })).toThrow(/project write paths must contain non-empty safe paths/)
   })
 
+  it('rejects a field allowlist without manager writes, an empty one, and a duplicated path', async () => {
+    const { ctx } = await boot()
+    expect(() => ctx.settings.register(settingsNamespace('never-writable'), ThemeSchema, {
+      owner: 'project', projectWritePaths: [['fontSize']],
+    })).toThrow(/only with project manager writes/)
+    expect(() => ctx.settings.register(settingsNamespace('no-paths'), ThemeSchema, {
+      owner: 'project', projectWrite: 'manager', projectWritePaths: [],
+    })).toThrow(/must be a non-empty array/)
+    expect(() => ctx.settings.register(settingsNamespace('dup-paths'), ThemeSchema, {
+      owner: 'project', projectWrite: 'manager', projectWritePaths: [['fontSize'], ['fontSize']],
+    })).toThrow(/must not contain duplicates/)
+  })
+
+  it('rejects a registration once the service is disposed', async () => {
+    const { provider, fiber } = await boot()
+    await fiber.dispose()
+    expect(() => provider.register(settingsNamespace('late'), ThemeSchema))
+      .toThrow(/settings service is disposed/)
+  })
+
   it('resolves schema defaults, then composition base, then the user layer', async () => {
     const { ctx } = await boot({ doc: { 'ui-theme': { theme: 'light' } } })
     const scope = ctx.settings.register(settingsNamespace('ui-theme'), ThemeSchema, {
@@ -566,6 +586,36 @@ describe('second review regressions', () => {
     await fiber.dispose()
     await first
     await expect(second).rejects.toThrow(/registration was disposed before the queued/)
+  })
+
+  it('holds the namespace closed while a started watcher keeps the disposal fence open', async () => {
+    const { ctx, provider } = await boot({ persistDelayMs: 20 })
+    let scope: SettingsScope<ThemeConfig> | undefined
+    const fiber = ctx.plugin({
+      inject: ['settings'],
+      apply: (child: Context) => {
+        scope = child.settings.register(settingsNamespace('ui-theme'), ThemeSchema)
+      },
+    })
+    await fiber
+    let release!: () => void
+    const draining = new Promise<void>((resolve) => { release = resolve })
+    scope!.watch(() => draining)
+    await scope!.update({ theme: 'light' })
+    const inflight = scope!.update({ fontSize: 20 })
+    await new Promise(resolve => setTimeout(resolve, 2))
+    const disposing = fiber.dispose()
+    await new Promise(resolve => setTimeout(resolve, 2))
+    // Inactive but still the namespace owner: the started watcher holds the
+    // fence, so admission closes here rather than at the map.
+    expect(() => scope!.watch(() => {})).toThrow(/registration is disposed/)
+    await expect(scope!.update({ fontSize: 22 }))
+      .rejects.toThrow(/registration was disposed before the queued update/)
+    await inflight
+    expect(provider.persisted.at(-1)?.section).toEqual({ theme: 'light', fontSize: 20 })
+    expect(scope!.get()).toEqual({ theme: 'light', fontSize: 14 })
+    release()
+    await disposing
   })
 
   it('snapshots the patch at call time so caller mutation cannot leak in', async () => {

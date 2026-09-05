@@ -918,6 +918,51 @@ describe('toStreamChunks', () => {
       .toEqual([[0, 'text'], [1, 'text'], [2, 'tool-call']])
   })
 
+  it('compacts the ordering queue after draining a long run of held later-index deltas', async () => {
+    // 80 tool deltas arrive while text block 0 is still an unclosed tag: each
+    // is held, then drained in order once the tag closes, walking the queue
+    // head past the compaction threshold.
+    const tool = { type: 'toolCall' as const, id: 'call-1', name: 'f', arguments: {} }
+    const done = assistant({
+      content: [{ type: 'text', text: '<thinking>plan</thinking>answer' }, tool],
+      stopReason: 'toolUse',
+    })
+    const heldDeltas = Array.from({ length: 80 }, () => ({
+      type: 'toolcall_delta' as const, contentIndex: 1, delta: '', partial: assistant({ content: [tool] }),
+    }))
+    const chunks = await collect(toStreamChunks(feed(
+      { type: 'text_start', contentIndex: 0, partial: assistant() },
+      { type: 'text_delta', contentIndex: 0, delta: '<thinking>plan', partial: assistant() },
+      { type: 'toolcall_start', contentIndex: 1, partial: assistant({ content: [tool] }) },
+      ...heldDeltas,
+      { type: 'text_delta', contentIndex: 0, delta: '</thinking>answer', partial: assistant() },
+      { type: 'text_end', contentIndex: 0, content: '<thinking>plan</thinking>answer', partial: assistant() },
+      { type: 'toolcall_end', contentIndex: 1, toolCall: tool, partial: done },
+      { type: 'done', reason: 'toolUse', message: done },
+    ), undefined, true))
+    expect(chunks
+      .filter((chunk): chunk is Extract<StreamChunk, { type: 'block-start' }> => chunk.type === 'block-start')
+      .map(chunk => [chunk.index, chunk.blockType]))
+      .toEqual([[0, 'reasoning'], [1, 'text'], [2, 'tool-call']])
+    expect(chunks.filter(chunk => chunk.type === 'tool-call-delta')).toHaveLength(80)
+  })
+
+  it('takes the caller signal as the canonical third argument and reports its abort at finish', async () => {
+    const controller = new AbortController()
+    controller.abort()
+    const done = assistant({ content: [{ type: 'text', text: 'hi' }], stopReason: 'stop' })
+    const chunks = await collect(toStreamChunks(feed(
+      { type: 'text_start', contentIndex: 0, partial: assistant() },
+      { type: 'text_delta', contentIndex: 0, delta: 'hi', partial: assistant() },
+      { type: 'text_end', contentIndex: 0, content: 'hi', partial: assistant() },
+      { type: 'done', reason: 'stop', message: done },
+    ), undefined, controller.signal))
+    expect(chunks.at(-1)).toMatchObject({
+      type: 'finish',
+      reason: { kind: 'aborted', failure: { message: 'pi-ai stream aborted', code: 'ABORTED' } },
+    })
+  })
+
   it('keeps a tool call after tagged text even when its events arrive before the closing tag', async () => {
     const tool = { type: 'toolCall' as const, id: 'call-1', name: 'f', arguments: {} }
     const done = assistant({
@@ -1149,6 +1194,11 @@ describe('mapStopReason / mapUsage', () => {
     ['length', { kind: 'max-tokens' }],
     ['toolUse', { kind: 'tool-calls' }],
     ['aborted', { kind: 'aborted', failure: { message: 'pi-ai stream aborted', code: 'ABORTED' } }],
+    ['pending', { kind: 'error', failure: { message: 'pi-ai stream for model "deepseek-v4-flash" ended pending', code: 'PI_AI_ERROR' } }],
+    ['deferred', {
+      kind: 'error',
+      failure: { message: 'pi-ai deferred response for model "deepseek-v4-flash" is not supported', code: 'PI_AI_ERROR' },
+    }],
   ] as const)('maps %s', (stopReason, expected) => {
     expect(mapStopReason(assistant({ stopReason, content: [{ type: 'text', text: 'ok' }] }))).toEqual(expected)
   })

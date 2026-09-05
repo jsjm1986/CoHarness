@@ -161,6 +161,7 @@ export class LocalJobRegistry extends JobRegistry {
     this.maxTerminalJobs = resolved.maxTerminalJobs
     this.maxTerminalOutputBytes = resolved.maxTerminalOutputBytes
     this.terminalRetentionMs = resolved.terminalRetentionMs
+    /* v8 ignore next 4 -- the Config schema already pins the same step/min/max bounds before construction. */
     if (!Number.isSafeInteger(this.terminalRetentionMs) || this.terminalRetentionMs < 1
       || this.terminalRetentionMs > MAX_TIMER_DELAY_MS) {
       throw new RangeError(`terminalRetentionMs must be a positive safe integer no greater than ${MAX_TIMER_DELAY_MS}`)
@@ -493,9 +494,11 @@ export class LocalJobRegistry extends JobRegistry {
 
   /** Evict only settled records that exceed age/count/output budgets. */
   private pruneTerminalRecords(now = Date.now()): void {
+    /* v8 ignore next -- every terminal record is stamped with finishedAt at settlement; the fallback only satisfies the optional type. */
+    const finishedOrder = (job: TrackedTask): number => job.finishedAt ?? 0
     const terminal = [...this.store.values()]
       .filter(job => isTerminal(job.status))
-      .sort((a, b) => (a.finishedAt ?? 0) - (b.finishedAt ?? 0) || a.id.localeCompare(b.id))
+      .sort((a, b) => finishedOrder(a) - finishedOrder(b) || a.id.localeCompare(b.id))
     const expired = terminal.filter((job) => {
       const finishedAt = job.finishedAt
       return job.waiters === 0
@@ -517,6 +520,7 @@ export class LocalJobRegistry extends JobRegistry {
     if (remove.size === 0) return
     const changedOwners = new Set<Agent | undefined>()
     for (const job of remove) {
+      /* v8 ignore next -- every candidate was read from the store a moment ago on this same tick. */
       if (this.store.delete(job.id)) changedOwners.add(job.owner)
     }
     for (const owner of changedOwners) this.notifyChanged(owner)

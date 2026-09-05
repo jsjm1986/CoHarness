@@ -558,6 +558,8 @@ export abstract class SettingsProvider extends Service {
         // chains settle. A concurrent write observes the inactive flag and
         // cannot enqueue another callback while this fence is open.
         await Promise.allSettled(tails)
+        /* v8 ignore next -- register() rejects the namespace while this
+           registration occupies the map, so nothing replaces it before the fence closes. */
         if (this.registrations.get(ns) === registration) this.registrations.delete(ns)
       }
     }, `settings.register(${JSON.stringify(String(ns))})`)

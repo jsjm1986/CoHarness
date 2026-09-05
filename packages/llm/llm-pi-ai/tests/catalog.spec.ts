@@ -12,6 +12,7 @@ import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
 import { getBuiltinModels } from '@earendil-works/pi-ai/providers/all'
 import { createModels, getSupportedThinkingLevels } from '@earendil-works/pi-ai'
 import type { Api, Model, OpenAICompletionsCompat, Provider } from '@earendil-works/pi-ai'
+import { catalogProviderTakesApiKey } from '../src/catalog.ts'
 import { resolveProfiles } from '../src/config.ts'
 import { buildProvider, supportedProtocols } from '../src/provider.ts'
 import { memoryAuth } from './auth-double.ts'
@@ -74,6 +75,13 @@ async function harness(config: LlmPiAi.Config): Promise<Context> {
   await ctx.plugin(LlmPiAi, config)
   return ctx
 }
+
+describe('catalog provider authentication posture', () => {
+  it('answers whether a catalog route takes an api key, and false for a route pi-ai never shipped', () => {
+    expect(catalogProviderTakesApiKey('anthropic')).toBe(true)
+    expect(catalogProviderTakesApiKey('route-pi-ai-never-shipped')).toBe(false)
+  })
+})
 
 describe('hand-declared providers', () => {
   it('serves a route pi-ai has never heard of from its own declaration', async () => {

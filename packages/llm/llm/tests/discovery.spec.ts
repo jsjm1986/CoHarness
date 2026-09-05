@@ -361,6 +361,39 @@ describe('discoverModelsAtEndpoint', () => {
     })
   })
 
+  it.each([
+    ['an empty body', '', undefined, []],
+    ['an HTML error page', '<html><body>Forbidden</body></html>', undefined, []],
+    ['a plain-text body', 'upstream relay refused the key', undefined, ['upstream relay refused the key']],
+    ['a JSON array', '[1, 2]', undefined, []],
+    ['a JSON object with no diagnostic fields', '{"status":"nope"}', undefined, []],
+    ['a nested error object', '{"error":{"code":"E_AUTH","type":"auth","message":"bad key"}}', 'relay-key', ['E_AUTH: auth: bad key']],
+    ['a nested error string', '{"error":"quota reached"}', 'relay-key', ['quota reached']],
+    ['an overlong diagnostic', JSON.stringify({ message: 'm'.repeat(300) }), 'relay-key', [`${'m'.repeat(239)}…`]],
+  ] as const)('summarizes %s from a provider error body', async (_label, body, apiKey, expectedFragments) => {
+    vi.stubGlobal('fetch', async () => new Response(body, { status: 401, headers: { 'content-type': 'text/plain' } }))
+    const error = await discoverModelsAtEndpoint({
+      baseURL: 'https://gateway.example', api: 'openai-completions', ...(apiKey === undefined ? {} : { apiKey }),
+    }).then(() => undefined, (reason: unknown) => reason as Error)
+    if (error === undefined) throw new Error('discovery must fail on 401')
+    expect(error).toMatchObject({ code: 'DISCOVERY_FAILED', failure: { status: 401 } })
+    for (const fragment of expectedFragments) expect(error.message).toContain(fragment)
+    if (expectedFragments.length === 0 && body !== '') expect(error.message).not.toContain(body)
+  })
+
+  it('drops the diagnostic when a provider error body exceeds the response bound', async () => {
+    vi.stubGlobal('fetch', async () => new Response('x'.repeat(16), {
+      status: 429, headers: { 'content-type': 'text/plain', 'content-length': String(8 * 1024 * 1024) },
+    }))
+    await expect(discoverModelsAtEndpoint({
+      baseURL: 'https://gateway.example', api: 'openai-completions', apiKey: 'k',
+    })).rejects.toMatchObject({
+      code: 'DISCOVERY_FAILED',
+      message: expect.not.stringContaining('xxxx') as unknown,
+      failure: { status: 429 },
+    })
+  })
+
   it('does not duplicate an existing Anthropic v1 path and permits unauthenticated probes', async () => {
     const requests = stubResponse(jsonResponse({ data: [] }))
 

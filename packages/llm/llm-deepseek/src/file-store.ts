@@ -82,6 +82,7 @@ function waitForUpload(operation: SharedUpload, signal: AbortSignal | undefined)
       reject(reason)
     }
     signal.addEventListener('abort', abort, { once: true })
+    /* v8 ignore next -- throwIfAborted above rejects an already-aborted signal and nothing yields before this subscription */
     if (signal.aborted) abort()
     void operation.promise.then((value) => {
       signal.removeEventListener('abort', abort)

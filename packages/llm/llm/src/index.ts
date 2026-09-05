@@ -1053,6 +1053,7 @@ async function nextWithSignal<T>(
     signal.addEventListener('abort', onAbort, { once: true })
     // A signal can fire between the initial check and listener installation;
     // AbortSignal does not replay that event for late listeners.
+    /* v8 ignore next -- nothing yields between the initial aborted check and this subscription. */
     if (signal.aborted) onAbort()
     void next.then(
       (value) => {

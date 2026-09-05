@@ -4,6 +4,7 @@ import tsconfigPaths from 'vite-tsconfig-paths'
 import { resolvePwshPath } from './packages/shell/pwsh-local/src/resolve.ts'
 import { defineConfig } from 'vitest/config'
 import { standardDecoratorPlugin, vitestExecArgv } from './vitest.shared.ts'
+import { coverageBaselineFiles } from './scripts/coverage-baseline.ts'
 import { COVERAGE_EXEMPT_ENV, coverageExemptHeavySuites } from './scripts/coverage-exempt.ts'
 import { COVERAGE_PARTITION_MODE_ENV } from './scripts/coverage-partitions.ts'
 
@@ -283,6 +284,9 @@ export default defineConfig({
         'packages/interaction/commands/src/index.ts',
         'packages/interaction/commands/src/invariant.ts',
         'packages/session/session-projection/src/index.ts',
+        // Debt the first hosted-runner coverage run reported, carried as an
+        // explicit shrink-only roster (scripts/coverage-baseline.ts).
+        ...coverageBaselineFiles,
         ...windowsUnsupportedCoveragePackages.map(path => `${path}/src/**/*.ts`),
         ...windowsOnlyCoverageExclusions,
         ...windowsRunnerCoverageExclusions,

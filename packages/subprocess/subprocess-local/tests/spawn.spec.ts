@@ -502,6 +502,14 @@ describe('OutputCollector', () => {
     expect(out.truncated).toBe(true)
   })
 
+  it('compacts retired head chunks without disturbing a highly fragmented tail', () => {
+    const collector = new OutputCollector(8, undefined, 'fragmented-tail', spillDir)
+    for (let index = 0; index < 5_000; index += 1) collector.push(Buffer.from(String(index % 10)))
+    const out = collector.finalize()
+    expect(out.text).toBe('23456789')
+    expect(out.truncated).toBe(true)
+  })
+
   it('readFrom returns increments and flags lossy reads', () => {
     const collector = new OutputCollector(10, 100, 'test', spillDir)
     collector.push(Buffer.from('aaaaa'))
