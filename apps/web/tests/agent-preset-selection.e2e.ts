@@ -274,6 +274,10 @@ describe('web e2e: agent-preset selection', () => {
     await page.getByRole('treeitem', { name: /^Ungrouped/ }).click()
     await page.locator('[role="treeitem"]').last().click()
     await page.getByText('Seeded turn.').waitFor({ timeout: 15_000 })
+    await expect.poll(
+      () => page.getByRole('button', { name: 'Seeded turn', exact: true }).count(),
+      { timeout: 15_000 },
+    ).toBe(1)
 
     const snapshot = await captureStableAria(page, '[class*="titleRow"]', scaffold.workspaceCwd)
 
