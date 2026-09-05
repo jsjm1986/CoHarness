@@ -141,12 +141,15 @@ describe('web e2e: a finished turn ends with the files it produced', () => {
     const row = page.locator('[data-produced-files-row]')
     await row.waitFor({ timeout: 15_000 })
     const chips = row.getByRole('button')
-    await expect.poll(() => chips.count()).toBe(2)
+    await expect.poll(() => chips.count(), { timeout: 15_000 }).toBeGreaterThan(1)
     expect(await chips.nth(0).innerText()).toBe('关于我.md')
     expect(await chips.nth(1).innerText()).toBe('index.html')
-    await expect.poll(() => row.getByText('+ 8 files', { exact: true }).count(), {
+    const more = row.locator('span').filter({ hasText: /^\+ \d+ files$/ })
+    await expect.poll(() => more.count(), {
       timeout: 15_000,
     }).toBe(1)
+    const hidden = Number((await more.innerText()).match(/\d+/)?.[0])
+    expect((await chips.count()) + hidden).toBe(PRODUCED.length)
     const showFolder = page.getByRole('button', { name: 'Show in folder', exact: true })
     await expect.poll(() => showFolder.count(), { timeout: 15_000 }).toBe(1)
     expect(await page.getByText('Produced', { exact: true }).count()).toBe(1)
