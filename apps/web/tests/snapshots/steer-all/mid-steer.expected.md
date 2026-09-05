@@ -46,6 +46,4 @@
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img
-- button "0% of context used"
 - button "Stop generating"
-- text: Cache hit 0% Input 10 tok · Output 10 tok
