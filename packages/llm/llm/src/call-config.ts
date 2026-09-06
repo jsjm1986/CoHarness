@@ -77,9 +77,14 @@ export function isAgentLoopRequest(request: GenerateOptions): boolean {
   return AGENT_LOOP_REQUESTS.has(request)
 }
 
-/* jscpd:ignore-start */
 // LLM request objects are client-facing; this local freezer avoids loading the
 // host-only value utility into the client bundle.
+/**
+ * Deep-freeze a request graph while leaving live AbortSignal objects mutable.
+ * @param value - request value to freeze in place.
+ * @returns the same value after every reachable object is frozen.
+ */
+/* jscpd:ignore-start */
 export function deepFreeze<T>(value: T): T {
   const seen = new WeakSet<object>()
   const pending: (
