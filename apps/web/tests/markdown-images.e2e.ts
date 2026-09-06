@@ -202,6 +202,7 @@ describe('web e2e: remote Markdown image rendering', () => {
 
     const snapshot = (await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd))
       .split(SEED_ID).join('{{seededId}}')
+      .replace(/ \d{1,2}\/\d{1,2} (?=\{\{clock\}\})/g, ' ')
     await compareOrRefreshGolden(UI_EXPECTED, snapshot, MODE)
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
