@@ -4887,11 +4887,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SessionMigrationRecord',
-    declaration: 'export interface SessionMigrationRecord {\n    readonly id: SessionId;\n    readonly fromVersion: number;\n    readonly toVersion: number;\n    readonly status: \'succeeded\' | \'failed\';\n    readonly durationMs: number;\n    readonly error?: string;\n}',
+    declaration: 'export interface SessionMigrationRecord {\n    readonly id: SessionId;\n    readonly fromVersion: number;\n    readonly toVersion: number;\n    readonly status: \'succeeded\' | \'skipped\' | \'failed\';\n    readonly durationMs: number;\n    readonly error?: string;\n}',
   },
   {
     name: 'SessionMigrationStats',
-    declaration: 'export interface SessionMigrationStats {\n    readonly attempts: number;\n    readonly succeeded: number;\n    readonly failed: number;\n    readonly totalDurationMs: number;\n    readonly generations: readonly {\n        readonly fromVersion: number;\n        readonly toVersion: number;\n        readonly attempts: number;\n        readonly succeeded: number;\n        readonly failed: number;\n    }[];\n    readonly lastFailure?: SessionMigrationRecord;\n}',
+    declaration: 'export interface SessionMigrationStats {\n    readonly attempts: number;\n    readonly succeeded: number;\n    readonly skipped: number;\n    readonly failed: number;\n    readonly totalDurationMs: number;\n    readonly generations: readonly {\n        readonly fromVersion: number;\n        readonly toVersion: number;\n        readonly attempts: number;\n        readonly succeeded: number;\n        readonly skipped: number;\n        readonly failed: number;\n    }[];\n    readonly lastFailure?: SessionMigrationRecord;\n}',
   },
   {
     name: 'SessionPersistencePage',
