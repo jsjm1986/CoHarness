@@ -272,7 +272,7 @@ async replace(ns: SettingsNamespace, section: object, expectedRevision?: number)
 async mutate(ns: SettingsNamespace, ops: readonly SettingsPathOp[], expectedRevision?: number): Promise<void>
 ```
 
-Source: [`packages/settings/settings/src/index.ts:440`](../../packages/settings/settings/src/index.ts)
+Source: [`packages/settings/settings/src/index.ts:418`](../../packages/settings/settings/src/index.ts)
 
 <a id="settings-events"></a>
 
