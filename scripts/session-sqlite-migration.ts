@@ -346,6 +346,9 @@ function writeV20(path: string, sessions: readonly LogicalSession[], storeId: st
     db.exec('BEGIN IMMEDIATE')
     for (const session of sessions) {
       const header = session.header
+      /* jscpd:ignore-start */
+      // The v20 and v18 writers intentionally mirror transaction scaffolding;
+      // their schema-specific bindings remain separate for migration safety.
       insertSession.run(header.id, header.version, header.createdAt, header.cwd ?? null,
         header.parentSession ?? null, header.isSeeded ? session.inheritedEventCount : null, header.origin ?? null,
         header.delegationDepth ?? null, header.agentPreset ?? null,
@@ -357,6 +360,7 @@ function writeV20(path: string, sessions: readonly LogicalSession[], storeId: st
           bound.surfaceOp, bound.isPacked, header.id)
         if (bound.ignorable === 1) insertIgnorable.run(bound.seq, header.id)
       }
+      /* jscpd:ignore-end */
     }
     db.exec('COMMIT')
     db.close()
