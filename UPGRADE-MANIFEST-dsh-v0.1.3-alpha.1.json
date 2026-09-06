@@ -56,8 +56,8 @@
     "sourcePreserved": true,
     "immutableSuccessor": false,
     "physicalSuccessorStatus": "pending-provider-stage",
-    "physicalSuccessorProviders": ["jsonl"],
-    "pendingSuccessorProviders": ["gateway", "sqlite"],
+    "physicalSuccessorProviders": ["jsonl", "sqlite"],
+    "pendingSuccessorProviders": ["gateway"],
     "automaticDowngrade": false,
     "productionPrerequisites": ["backup", "copy-dry-run", "canary", "migration-metrics"]
   },

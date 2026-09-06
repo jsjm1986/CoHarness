@@ -12,7 +12,7 @@ Session provider 需要在读取事件体前对存储 header 分类，也需要�
 
 `@deepseek-ai/dsh-session-format` 编译完整的相邻链，并提供只读 header 分类以及脱离原对象的完整 artifact 迁移。默认静态 catalog 声明 v0→v1 和 v1→v2。新代次在读取事件体前拒绝；旧代次必须经过每条声明的边。输入会被快照并冻结，catalog 不会写入存储。
 
-当前 CoHarness 步骤保留现有事件词汇并推进代次标记。JSONL 已提供第一个 provider adapter：读取 v0/v1 body 时原子发布 `session.v2.*`，保留源 bytes，并在后续读取中优先最高代次。Gateway 和 SQLite 的物理发布、超出共享协调器的旧 payload 归一化以及 provider 备份仍由 adapter 负责，本纯包不会隐藏这些行为。
+当前 CoHarness 步骤保留现有事件词汇并推进代次标记。JSONL 会原子发布 `session.v2.*`，SQLite 只在写事务中更新元数据行；两者都保留逻辑事件行／源 bytes。Gateway 的物理发布、超出共享协调器的旧 payload 归一化以及 provider 备份仍由 adapter 负责，本纯包不会隐藏这些行为。
 
 ## 考虑过的替代方案
 
@@ -24,7 +24,7 @@ Session provider 需要在读取事件体前对存储 header 分类，也需要�
 
 ## 结果
 
-Provider 实现拥有统一的迁移规划器和稳定诊断类别。catalog 本身不写入存储；JSONL 负责自己的原子 successor（后继产物）发布，Gateway 和 SQLite 仍需要各自的发布与回滚实现。
+Provider 实现拥有统一的迁移规划器和稳定诊断类别。catalog 本身不写入存储；JSONL 和 SQLite 负责各自的 provider 发布，Gateway 仍需要服务端迁移 endpoint（端点）和回滚约定。
 
 ## 验证
 
