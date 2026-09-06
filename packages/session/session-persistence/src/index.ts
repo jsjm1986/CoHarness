@@ -211,7 +211,7 @@ class PersistenceSessionHandle implements SessionHandle {
   async read(offset = 0): Promise<readonly SessionEvent[]> {
     this.assertOpen()
     if (!Number.isSafeInteger(offset) || offset < 0) throw new TypeError('session handle offset must be non-negative')
-    return (await this.owner.readFrom(this.id, offset)).events
+    return (await this.owner.readFrom(this.id, SessionLogOffset(offset))).events
   }
 
   async append(events: readonly SessionEvent[]): Promise<void> {
