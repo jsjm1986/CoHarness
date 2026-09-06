@@ -319,7 +319,7 @@ describe('JsonlSessionPersistence: durability and crash semantics', () => {
   })
   afterEach(async () => { await ctx.fiber.dispose() })
 
-  it('rejects a second process writer until the first handle closes', async () => {
+  it('rejects a second process writer until the first handle closes and recovers a dead owner', async () => {
     const secondCtx = new Context()
     await secondCtx.plugin(SessionStore)
     const secondFiber = await secondCtx.plugin(JsonlSessionPersistence, { root, compression: 'none' })
@@ -329,6 +329,10 @@ describe('JsonlSessionPersistence: durability and crash semantics', () => {
     await first.close()
     const second = await secondCtx.sessionPersistence.openHandleAsync(id, 'write')
     await second.close()
+    await mkdir(join(root, '.locks'), { recursive: true })
+    await writeFile(join(root, '.locks', 'stale.lock'), JSON.stringify({ pid: 999_999_999, createdAt: 1 }))
+    const stale = await secondCtx.sessionPersistence.openHandleAsync(SessionId('stale'), 'write')
+    await stale.close()
     await secondFiber.dispose()
     await secondCtx.fiber.dispose()
   })

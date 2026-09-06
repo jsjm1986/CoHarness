@@ -10,7 +10,7 @@ import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { constants as bufferConstants } from 'node:buffer'
 import { readdirSync } from 'node:fs'
-import { open, mkdir, readdir, realpath, link, rm, stat, truncate, unlink } from 'node:fs/promises'
+import { open, mkdir, readdir, realpath, link, rm, stat, truncate, unlink, readFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { scheduler } from 'node:timers/promises'
@@ -196,6 +196,21 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
       await lock.writeFile(JSON.stringify({ pid: process.pid, createdAt: Date.now() }))
     } catch (error: unknown) {
       if ((error as NodeJS.ErrnoException | null)?.code === 'EEXIST') {
+        try {
+          const record = JSON.parse(await readFile(path, 'utf8')) as { pid?: unknown }
+          if (typeof record.pid === 'number' && Number.isSafeInteger(record.pid) && record.pid > 0) {
+            try {
+              process.kill(record.pid, 0)
+            } catch (probeError: unknown) {
+              if ((probeError as NodeJS.ErrnoException | null)?.code === 'ESRCH') {
+                await unlink(path)
+                return this.acquireWriteLock(id)
+              }
+            }
+          }
+        } catch {
+          // An unreadable lock is treated as live; deleting it could race its owner.
+        }
         throw new Error(`session "${id}" is already locked by another process`)
       }
       throw error
