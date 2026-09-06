@@ -44,6 +44,13 @@
       "bulk-vendor-or-generated-test-copy"
     ]
   },
+  "implementedFoundation": [
+    "session-handle-process-local-ownership",
+    "agent-factory-persistent-handle-lifecycle",
+    "session-format-v0-v1-v2-adjacent-catalog",
+    "projection-cache-format-version-binding",
+    "outbound-http-proxy-policy"
+  ],
   "migration": {
     "trigger": "first-body-read",
     "sourcePreserved": true,

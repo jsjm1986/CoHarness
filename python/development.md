@@ -13,7 +13,7 @@ pnpm install
 pnpm exec tsx scripts/build-exe-for-python-sdk.ts
 ```
 
-Use `--skip-build` when the required `lib/` artifacts already exist, or `--targets=node24-linux-x64,node24-linux-arm64,node24-macos-arm64` to select platforms. Products land in `dist-exe/` and the script syncs the selected carriers into `python/sdk-runtime/`. macOS builds also sync the matching spawn helper required by `node-pty`.
+Use `--skip-build` when the required `lib/` artifacts already exist, or `--targets=node24-linux-x64,node24-linux-arm64,node24-macos-arm64,node24-macos-x64` to select platforms. Products land in `dist-exe/` and the script syncs the selected carriers into `python/sdk-runtime/`. macOS builds also sync the matching spawn helper required by `node-pty`.
 
 ## Validate the SDK
 
@@ -75,7 +75,7 @@ pip install \
   "dist-python/deepseek_harness_runtime_bin-$version-py3-none-macosx_14_0_arm64.whl"
 ```
 
-The runtime distribution is wheel-only. The release pipeline publishes three platform wheels with the pure SDK wheel: Linux x64, Linux arm64, and macOS 14 or newer on arm64. A `python-v<repository-version>` tag is accepted only when it matches the repository version; prerelease repository versions such as `0.0.1-rc.1` use their normalized PEP 440 spelling, such as `0.0.1rc1`, inside wheel filenames and metadata. The CoHarness version `0.1.2-alpha.3.coharness.1` uses the public spelling `0.1.2a3.post1` in Python wheel filenames and metadata, because a PEP 440 local version is not suitable for a public index.
+The runtime distribution is wheel-only. The release pipeline publishes four platform wheels with the pure SDK wheel: Linux x64, Linux arm64, and macOS 14 or newer on arm64 and x64. A `python-v<repository-version>` tag is accepted only when it matches the repository version; prerelease repository versions such as `0.0.1-rc.1` use their normalized PEP 440 spelling, such as `0.0.1rc1`, inside wheel filenames and metadata. The CoHarness version `0.1.2-alpha.3.coharness.1` uses the public spelling `0.1.2a3.post1` in Python wheel filenames and metadata, because a PEP 440 local version is not suitable for a public index.
 
 ## Validate a release candidate
 

@@ -30,7 +30,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'python-release-dry-run'
     uses: ./.github/workflows/build-exe-for-python-sdk.yml
     with:
-      targets: node24-linux-x64,node24-linux-arm64,node24-macos-arm64
+      targets: node24-linux-x64,node24-linux-arm64,node24-macos-arm64,node24-macos-x64
       release: true
 
   python-compat:
@@ -152,6 +152,7 @@ jobs:
           actual="$(mktemp)"
           printf '%s\n' \
             "deepseek_harness_runtime_bin-$VERSION-py3-none-macosx_14_0_arm64.whl" \
+            "deepseek_harness_runtime_bin-$VERSION-py3-none-macosx_14_0_x86_64.whl" \
             "deepseek_harness_runtime_bin-$VERSION-py3-none-manylinux_2_28_aarch64.whl" \
             "deepseek_harness_runtime_bin-$VERSION-py3-none-manylinux_2_28_x86_64.whl" \
             "deepseek_harness_sdk-$VERSION-py3-none-any.whl" > "$expected"

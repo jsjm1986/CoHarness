@@ -64,6 +64,12 @@ def test_runtime_requires_spawn_helper_only_on_macos(
     assert runtime.bundled_runtime_path() == linux
 
 
+def test_current_platform_supports_macos_x64(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(runtime.sys, "platform", "darwin")
+    monkeypatch.setattr(runtime.platform, "machine", lambda: "x86_64")
+    assert runtime._current_platform_tag() == "macos-x64"
+
+
 def test_legacy_runtime_name_remains_a_lookup_alias(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
