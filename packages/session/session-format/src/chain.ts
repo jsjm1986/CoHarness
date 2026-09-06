@@ -2,7 +2,10 @@ import { SessionFormatError, SessionFormatUnsupportedMigrationError } from './er
 import { inspectSessionFormatVersion, snapshotSessionFormatArtifact, snapshotSessionFormatHeader } from './json.ts'
 import type { SessionFormatArtifact, SessionFormatChain, SessionFormatChainOptions, SessionFormatHeader, SessionFormatMigration } from './types.ts'
 
-/** Validate one exact adjacent migration declaration. */
+/** Validate one exact adjacent migration declaration.
+ * @param migration - migration declaration to validate.
+ * @returns the frozen migration declaration.
+ */
 export function defineSessionFormatMigration(migration: SessionFormatMigration): SessionFormatMigration {
   if (migration.name.length === 0) throw new SessionFormatError('Session migration name must be non-empty')
   if (!Number.isSafeInteger(migration.fromVersion) || migration.fromVersion < 0) throw new SessionFormatError('migration fromVersion must be non-negative')
@@ -10,7 +13,10 @@ export function defineSessionFormatMigration(migration: SessionFormatMigration):
   return Object.freeze({ ...migration })
 }
 
-/** Compile a unique, complete adjacent migration chain. */
+/** Compile a unique, complete adjacent migration chain.
+ * @param options - chain configuration.
+ * @returns the compiled migration chain.
+ */
 export function createSessionFormatChain(options: SessionFormatChainOptions): SessionFormatChain {
   return new CompiledSessionFormatChain(options)
 }

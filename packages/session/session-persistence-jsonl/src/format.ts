@@ -245,7 +245,14 @@ export function logPath(
   return join(sessionDir(root, cwd, id), `session${logSuffix(compression)}`)
 }
 
-/** Return the canonical path for an immutable migrated generation. */
+/** Return the canonical path for an immutable migrated generation.
+ * @param root - persistence root.
+ * @param cwd - session working directory.
+ * @param id - session identity.
+ * @param compression - physical encoding.
+ * @param version - generation format version.
+ * @returns the generation path.
+ */
 export function generationLogPath(
   root: string,
   cwd: string | undefined,

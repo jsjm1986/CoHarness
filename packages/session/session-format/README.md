@@ -23,3 +23,11 @@ The catalog is a pure value operation. JSONL, Gateway, and SQLite adapters remai
 ## Known limitations
 
 The v0/v1 steps currently preserve the existing CoHarness event vocabulary. Physical codec and provider adoption are separate changes because their durable layouts differ.
+
+## Model Experience
+
+None, as this package only validates and migrates durable Session data; provider and prompt consumers own every model-visible effect.
+
+#### KV Cache effect
+
+No direct invalidation: the package does not contribute request tokens or mutate a model request prefix.

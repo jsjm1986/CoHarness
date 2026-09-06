@@ -287,6 +287,35 @@ Durable append-only session storage. Implementations preserve contiguous, lossle
 
 ```ts cordis-catalog
 /**
+ * Create a new explicit write handle while retaining the legacy create API.
+ * @param meta - immutable Session header to register.
+ * @returns an owned write handle.
+ */
+async createHandle(meta: SessionHeader): Promise<SessionHandle>
+
+/**
+ * Open a handle and acquire any provider-specific cross-process lock.
+ * @param id - persisted Session identity.
+ * @param mode - read or write access.
+ * @returns a handle whose close releases local and provider ownership.
+ */
+async openHandleAsync(id: SessionId, mode: SessionHandleMode): Promise<SessionHandle>
+
+/**
+ * Open a read or write handle for an existing Session.
+ * @param id - persisted Session identity.
+ * @param mode - read allows inspection; write reserves the local writer.
+ * @returns an explicit SessionHandle.
+ */
+openHandle(id: SessionId, mode: SessionHandleMode): SessionHandle
+
+/** Release a process-local writer reservation held by one handle.
+ * @param id - session identity whose reservation is released.
+ * @param handle - handle that owns the reservation.
+ */
+releaseHandle(id: SessionId, handle: SessionHandle): void
+
+/**
  * Resolve this backend's independent local artifact for a session without
  * reading, creating, flushing, or otherwise materializing it. Backends such
  * as SQLite that do not own one artifact per session return `undefined`.
@@ -513,5 +542,5 @@ releaseDraft(_request: SessionDraftReservationRequest): Promise<void>
 
 Types: [Session](session.zh.md) · [SessionEvent](session.zh.md) · [SessionId](core.zh.md) · [SessionLogOffset](session.zh.md)
 
-Source: [`packages/session/session-persistence/src/index.ts:207`](../../packages/session/session-persistence/src/index.ts)
+Source: [`packages/session/session-persistence/src/index.ts:290`](../../packages/session/session-persistence/src/index.ts)
 <!-- END GENERATED cordis-surface -->

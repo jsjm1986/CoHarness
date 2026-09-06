@@ -3,7 +3,11 @@ import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import { SessionFormatError } from './error.ts'
 import type { SessionFormatArtifact, SessionFormatHeader, SessionFormatJsonObject } from './types.ts'
 
-/** Require a non-negative safe integer. */
+/** Require a non-negative safe integer.
+ * @param value - candidate value.
+ * @param label - diagnostic label.
+ * @returns the validated integer.
+ */
 export function sessionFormatCount(value: unknown, label: string): number {
   if (!Number.isSafeInteger(value) || (value as number) < 0 || Object.is(value, -0)) {
     throw new SessionFormatError(`${label} must be a non-negative safe integer`)
@@ -11,7 +15,10 @@ export function sessionFormatCount(value: unknown, label: string): number {
   return value as number
 }
 
-/** Read and validate a version without inspecting body rows. */
+/** Read and validate a version without inspecting body rows.
+ * @param value - candidate header.
+ * @returns the stored format version.
+ */
 export function inspectSessionFormatVersion(value: unknown): number {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new SessionFormatError('Session header must be a JSON object')
@@ -19,14 +26,22 @@ export function inspectSessionFormatVersion(value: unknown): number {
   return sessionFormatCount((value as { version?: unknown }).version, 'Session format version')
 }
 
-/** Snapshot an arbitrary value at the durable JSON boundary. */
+/** Snapshot an arbitrary value at the durable JSON boundary.
+ * @param value - value to snapshot.
+ * @param label - diagnostic label.
+ * @returns the lossless JSON snapshot.
+ */
 export function snapshotSessionFormatJson(value: unknown, label = 'Session value'): JsonValue {
   const snapshot = snapshotJsonValue(value)
   if (snapshot === undefined) throw new SessionFormatError(`${label} is not lossless JSON`)
   return deepFreeze(snapshot) as JsonValue
 }
 
-/** Snapshot and validate one logical header. */
+/** Snapshot and validate one logical header.
+ * @param value - header to snapshot.
+ * @param label - diagnostic label.
+ * @returns the validated header.
+ */
 export function snapshotSessionFormatHeader(value: SessionFormatHeader, label = 'Session header'): SessionFormatHeader {
   const snapshot = snapshotSessionFormatJson(value, label)
   if (typeof snapshot !== 'object' || snapshot === null || Array.isArray(snapshot)) {
@@ -39,7 +54,11 @@ export function snapshotSessionFormatHeader(value: SessionFormatHeader, label = 
   return record as SessionFormatHeader
 }
 
-/** Snapshot and validate one complete artifact's coordinates. */
+/** Snapshot and validate one complete artifact's coordinates.
+ * @param value - artifact to snapshot.
+ * @param label - diagnostic label.
+ * @returns the validated artifact.
+ */
 export function snapshotSessionFormatArtifact(value: SessionFormatArtifact, label = 'Session artifact'): SessionFormatArtifact {
   const snapshot = snapshotSessionFormatJson(value, label)
   if (typeof snapshot !== 'object' || snapshot === null || Array.isArray(snapshot)) throw new SessionFormatError(`${label} must be an object`)

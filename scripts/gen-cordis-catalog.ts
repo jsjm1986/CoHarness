@@ -623,6 +623,9 @@ export const FOUNDATION_TYPE_NAMES: ReadonlySet<string> = new Set([
 
 /** Project types deliberately documented outside the subsystems catalog. */
 export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
+  SessionHandle: 'persistence handle contract is owned by packages/session/session-persistence/README.md',
+  SessionHandleMode: 'persistence handle mode is owned by packages/session/session-persistence/README.md',
+  PersistenceSessionHandle: 'private persistence handle implementation is owned by packages/session/session-persistence/src/index.ts',
   z: 'schemastery schema constructor is owned by vendor/schemastery (vendored upstream)',
   BeginCommandRequest: 'event-local request contract is owned by packages/client/ui-input-trigger/src/types.ts',
   InsertReferenceRequest: 'event-local request contract is owned by packages/client/ui-input-trigger/src/types.ts',
