@@ -1,4 +1,4 @@
-{"type":"session","version":0,"id":"736c4bd8-41bd-43fb-9030-b4df3b2a4f83","createdAt":1783352084735,"cwd":"{{cwd}}","delegationDepth":0}
+{"type":"session","version":2,"id":"736c4bd8-41bd-43fb-9030-b4df3b2a4f83","createdAt":1783352084735,"cwd":"{{cwd}}","delegationDepth":0}
 {"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"inserted":[{"content":[{"type":"text","text":"First use the read tool to read config.txt in the current directory. Then use the edit tool (NOT bash) to replace the literal text DEBUG with RELEASE in that file. Then reply with exactly the single word DONE."}],"source":{"kind":"user"},"role":"user","id":"b900992d-cb68-45e3-bdf1-366e2529f6c0"}]}}
 {"type":"turn/start","data":{"turn":1}}
 {"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"removedCount":1,"inserted":[]}}

@@ -1,4 +1,4 @@
-{"type":"session","version":0,"id":"{{sessionId}}","createdAt":0,"cwd":"{{cwd}}","delegationDepth":0}
+{"type":"session","version":2,"id":"{{sessionId}}","createdAt":0,"cwd":"{{cwd}}","delegationDepth":0}
 {"type":"turn/start","data":{"turn":1}}
 {"type":"user/message","data":{"content":[{"type":"text","text":"Tighten this session to read-only."}],"source":{"kind":"user"},"role":"user","id":"{{sessionId}}"},"surfaceOp":"append"}
 {"type":"sandbox/mode","data":{"mode":"read-only"}}

@@ -10,9 +10,9 @@ The persistence service had durable operations but no explicit owner for a Sessi
 
 ## Decision
 
-`SessionPersistence` exposes read and write `SessionHandle`s. One persistence instance admits one write handle per Session id; read handles remain independent, and a read handle rejects append. `AgentFactory.createAgent` acquires a write handle before publication for fresh persistent sessions, while `resume` opens one after preparation. The handle is closed by the same memoized Agent teardown that drains the loop and unregisters the Session. Configuration-driven restore-or-create uses the same path; the synchronous in-memory `agentLoop.create` remains unchanged.
+`SessionPersistence` exposes read and write `SessionHandle`s. One persistence instance admits one write handle per Session id; read handles remain independent, and a read handle rejects append. `AgentFactory.createAgent` acquires a write handle before publication for fresh persistent sessions, while `resume` opens one before reading or repairing the stored session. The handle is closed before registry detachment by the same memoized Agent teardown that drains the loop, releases durable ownership, and unregisters the Session. Configuration-driven restore-or-create uses the same path; the synchronous in-memory `agentLoop.create` remains unchanged.
 
-The current reservation is process-local and additive to the coordinator's existing per-id serialization. Cross-process file locking and the v2 on-disk migration use this ownership seam in later steps; they are not hidden inside a provider-specific compatibility shim.
+The current reservation is process-local and additive to the coordinator's existing per-id serialization. The JSONL provider also holds an atomic root lock for the lifetime of a write handle, while SQLite and Gateway providers retain their own provider-specific ownership rules. Format migration uses the same lifecycle seam and never runs without write ownership.
 
 ## Alternatives considered
 
@@ -24,8 +24,8 @@ The current reservation is process-local and additive to the coordinator's exist
 
 ## Consequences
 
-Persistent Agent creation now fails before publication when another writer is already held, and successful teardown releases the id for reuse. Detached read consumers can use the same service without acquiring mutation rights. The handle currently delegates durability to the existing coordinator; it does not yet provide cross-process locking or automatic v2 conversion.
+Persistent Agent creation and resume now fail before publication when another writer is already held, and successful teardown releases the id for reuse. Closing the handle before registry detachment prevents a replacement configuration from racing the previous lifecycle's final durable drain. Detached read consumers can use the same service without acquiring mutation rights. JSONL resume and provider migration preserve the source generation while publishing the current format.
 
 ## Verification
 
-Agent-loop lifecycle tests cover acquisition, rejection of a second writer, and release after `AgentHandle.dispose()`. Session-persistence handle tests cover read-only rejection, idempotent close, and local ownership.
+Agent-loop lifecycle tests cover acquisition before resume reads, rejection of a second writer, close-before-detach teardown ordering, abandoned opens, and release after `AgentHandle.dispose()`. Session-persistence handle tests cover read-only rejection, idempotent close, and local ownership; JSONL tests cover the cross-process lock and legacy-generation publication.

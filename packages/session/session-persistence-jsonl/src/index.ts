@@ -204,7 +204,7 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
             } catch (probeError: unknown) {
               if ((probeError as NodeJS.ErrnoException | null)?.code === 'ESRCH') {
                 await unlink(path)
-                return this.acquireWriteLock(id)
+                return await this.acquireWriteLock(id)
               }
             }
           }

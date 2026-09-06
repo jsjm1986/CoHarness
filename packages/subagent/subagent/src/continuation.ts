@@ -463,53 +463,78 @@ export class SubagentContinuationManager {
     // parent's future, not to this child.
     const delegatedPolicies = captureDelegatedPolicyOverrides(parent)
 
-    const prepared = await this.host.prepareContinuable(spec.provider, {
-      sessionId: childId,
-      parent,
-      signal: spec.signal,
-    })
-    spec.signal.throwIfAborted()
-    this.assertAdmitting(parent)
-
-    const inheritedEventCount = SessionLogOffset(prepared.seed?.length ?? 0)
-    const seed = seedDescriptorTurn(childId, prepared.seed, descriptor)
-    const messageId = await this.locks.run(childId, async () => {
+    const releaseHold = this.holdOwnership(parent, childId)
+    try {
+      const prepared = await this.host.prepareContinuable(spec.provider, {
+        sessionId: childId,
+        parent,
+        signal: spec.signal,
+      })
       spec.signal.throwIfAborted()
       this.assertAdmitting(parent)
-      this.assertChildIdAvailable(childId)
-      if (spec.childId !== undefined) {
-        const persisted = await persistence.listSnapshots(spec.signal)
+
+      const inheritedEventCount = SessionLogOffset(prepared.seed?.length ?? 0)
+      const seed = seedDescriptorTurn(childId, prepared.seed, descriptor)
+      const messageId = await this.locks.run(childId, async () => {
         spec.signal.throwIfAborted()
         this.assertAdmitting(parent)
         this.assertChildIdAvailable(childId)
-        if (persisted.some(snapshot => snapshot.header.id === childId)) {
-          throw new SubagentError(`subagent "${childId}" already exists`, 'DUPLICATE_CHILD')
+        if (spec.childId !== undefined) {
+          const persisted = await persistence.listSnapshots(spec.signal)
+          spec.signal.throwIfAborted()
+          this.assertAdmitting(parent)
+          this.assertChildIdAvailable(childId)
+          if (persisted.some(snapshot => snapshot.header.id === childId)) {
+            throw new SubagentError(`subagent "${childId}" already exists`, 'DUPLICATE_CHILD')
+          }
         }
-      }
-      const activation = await this.materialize({
-        childId,
-        provider: spec.provider,
-        parent,
-        create: {
-          seed,
-          meta: childSessionMeta(parent, childDepth, prepared.seed !== undefined),
-          inheritedEventCount,
-          delegatedPolicies,
-        },
-        agentOptions,
-        composition: { persona: request.persona, toolFilter: request.toolFilter },
-        signal: spec.signal,
+        const activation = await this.materialize({
+          childId,
+          provider: spec.provider,
+          parent,
+          create: {
+            seed,
+            meta: childSessionMeta(parent, childDepth, prepared.seed !== undefined),
+            inheritedEventCount,
+            delegatedPolicies,
+          },
+          agentOptions,
+          composition: { persona: request.persona, toolFilter: request.toolFilter },
+          signal: spec.signal,
+        })
+        return this.submitMaterialized(
+          activation,
+          isAdjacentAgentSendMessageTool(this.ctx.get('tools')?.get('send_message', activation.handle.agent))
+            ? continuableInitialPrompt(parent.id, request.prompt)
+            : request.prompt,
+          { source: { kind: 'user' }, signal: spec.signal, delivery: 'queue' },
+          parent,
+        )
       })
-      return this.submitMaterialized(
-        activation,
-        isAdjacentAgentSendMessageTool(this.ctx.get('tools')?.get('send_message', activation.handle.agent))
-          ? continuableInitialPrompt(parent.id, request.prompt)
-          : request.prompt,
-        { source: { kind: 'user' }, signal: spec.signal, delivery: 'queue' },
-        parent,
+      return { childId, messageId }
+    } catch (error: unknown) {
+      releaseHold()
+      throw error
+    }
+  }
+
+  /** Hold an idle continuation parent open while a child is being established. */
+  private holdOwnership(parent: Agent, childId: SessionId): () => void {
+    const parentActivation = this.activations.get(parent.id)
+    if (parentActivation === undefined || parentActivation.handle.agent !== parent) return () => {}
+    if (parentActivation.disposal !== undefined) {
+      throw new SubagentError(
+        `subagent parent "${parent.id}" is being disposed; the child was not established`,
+        'ACTIVATION_CLOSING',
       )
-    })
-    return { childId, messageId }
+    }
+    if (parentActivation.ownedChildren.has(childId)) return () => {}
+    parentActivation.ownedChildren.add(childId)
+    return () => {
+      const live = this.activations.get(childId)
+      if (live !== undefined && live.disposal === undefined) return
+      if (parentActivation.ownedChildren.delete(childId)) this.wake(parentActivation)
+    }
   }
 
   /** Reject one child identity already owned by a live Agent or Session. */
@@ -591,6 +616,22 @@ export class SubagentContinuationManager {
     options: ChildDeliveryOptions,
   ): Promise<MessageId> {
     this.assertAdmitting(parent)
+    const releaseHold = this.holdOwnership(parent, childId)
+    try {
+      return await this.deliverFollowup(parent, childId, content, options)
+    } catch (error: unknown) {
+      releaseHold()
+      throw error
+    }
+  }
+
+  /** Delivery loop executed while the direct parent remains owned. */
+  private async deliverFollowup(
+    parent: Agent,
+    childId: SessionId,
+    content: ContentBlock[],
+    options: ChildDeliveryOptions,
+  ): Promise<MessageId> {
     while (true) {
       const live = await this.locks.run(childId, async () => {
         const activation = this.activations.get(childId)

@@ -1347,9 +1347,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     description: 'Durable append-only session storage. Implementations preserve contiguous, losslessly JSON-serializable events; append resolves only after durability, and load balances a complete interrupted tail without rewriting committed events.',
     methods: [
       {
-        signature: 'async createHandle(meta: SessionHeader): Promise<SessionHandle>',
+        signature: 'async createHandle(meta: SessionHeader, inheritedEventCount?: SessionLogOffset): Promise<SessionHandle>',
         description: 'Create a new explicit write handle while retaining the legacy create API.',
-        parameters: [{ name: 'meta', description: 'immutable Session header to register.' }],
+        parameters: [{ name: 'meta', description: 'immutable Session header to register.' }, { name: 'inheritedEventCount', description: 'exact inherited prefix length for a seeded Session.' }],
         returns: 'an owned write handle.',
       },
       {
@@ -2849,6 +2849,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     summary: 'A declarative agent entry failed before it could publish a live agent.',
     description: 'A declarative agent entry failed before it could publish a live agent. Consumers that buffer work for the configured identity use this transient signal to reject that work instead of waiting forever. Normal factory teardown suppresses failures from the cancelled startup attempt.',
     parameters: [{ name: 'payload', description: '.error - persistence, setup, or publication failure.' }],
+  },
+  {
+    name: 'agent-preset/recomposed',
+    mode: 'emit',
+    signature: '\'agent-preset/recomposed\'(): void',
+    summary: 'A live Agent was re-linked to a different standing preset composition.',
+    description: 'A live Agent was re-linked to a different standing preset composition. Consumers refresh Agent-scoped registrations derived from the scope chain.',
+    parameters: [],
   },
   {
     name: 'agent-preset/selected',

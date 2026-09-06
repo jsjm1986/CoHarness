@@ -18,7 +18,9 @@ Status: implemented
 
 这是认父而非挂载，两处差别都要紧。子 agent 拿到的是父方那个确切的代际，因此父方启动后被编辑过的组装文件不可能把与父方历史所产出时不同的另一个代际交给它，此后被删除的 preset 也不可能让一个父方仍在运行的子 agent 失败。它还是同步的，这正是子 agent 创建窗口能够使用它的前提——两个进程内驱动都在同步的 `setup` 中完成组装。
 
-`applyChildComposition(childCtx, parent, composition)` 接收父方，并在应用子 agent 自身注册之前完成加入。这个参数正是要点所在：它让"组装子 agent 却不做该加入"在各调用点无法表达，而不是把第二个步骤留给每个新驱动去记住。`childSessionMeta()` 通过 `AgentPresets.composedPreset()` 记录所加入的 id，该值从父方**活着的** scope 链读取而不是从其 header 读取，因为在空白期切换过 preset 的父方运行在更新的那份组装上，而它的 header 仍写着旧的那个。
+`applyChildComposition(childCtx, parent, composition)` 接收父方，并在应用子 agent 自身注册之前完成加入。这个参数正是要点所在：它让“组装子 agent 却不做该加入”在各调用点无法表达，而不是把第二个步骤留给每个新驱动去记住。`childSessionMeta()` 通过 `AgentPresets.composedPreset()` 记录所加入的 id，该值从父方**活着的** scope 链读取而不是从其 header 读取，因为在空白期切换过 preset 的父方运行在更新的那份组装上，而它的 header 仍写着旧的那个。
+
+重新组合会在移动 parent 链接后发出带作用域的 `agent-preset/recomposed` 事件。需要根据 scope 变化重新协调注册项的 Agent 级 Consumer 会利用这个事件移除旧 preset 留下的注册，再让 child 加入新的 standing composition。这样，blank parent 切换 preset 后，parent 的 live 视图与 child 继承的视图保持一致。
 
 `dsh-subagent` 以类型级导入加可选 peer 依赖的方式，通过 `ctx.get('agentPresets')` 触达 roster——这正是它对 `sandboxPolicy` 与 `approval` 已在使用的、有明确文档的机会性消费模式。
 

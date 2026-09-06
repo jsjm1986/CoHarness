@@ -1,4 +1,4 @@
-{"type":"session","version":0,"id":"{{sessionId}}","createdAt":0,"cwd":"{{cwd}}","delegationDepth":0}
+{"type":"session","version":2,"id":"{{sessionId}}","createdAt":0,"cwd":"{{cwd}}","delegationDepth":0}
 {"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"inserted":[{"content":[{"type":"text","text":"Write the todo list 'watch the kettle boil' five times in a row without changing it, then reply DONE."}],"source":{"kind":"user"},"role":"user","id":"f92afb51-ac61-47d2-b0fb-ee55cc744838"}]}}
 {"type":"turn/start","data":{"turn":1}}
 {"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"removedCount":1,"inserted":[]}}

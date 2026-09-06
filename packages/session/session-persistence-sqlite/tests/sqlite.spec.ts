@@ -686,7 +686,7 @@ describe('SessionPersistenceSqlite edge behavior', () => {
     await first.fiber.dispose()
 
     const raw = new DatabaseSync(path)
-    raw.prepare('UPDATE sessions SET version = 0 WHERE session_key = ?').run(id)
+    raw.prepare(testSql('migrate-update-session-version')).run(id)
     raw.close()
 
     const second = new Context()
@@ -695,7 +695,7 @@ describe('SessionPersistenceSqlite edge behavior', () => {
     const loaded = await second.sessionPersistence.load(id)
     expect(loaded.meta.version).toBe(2)
     const migrated = new DatabaseSync(path)
-    expect(migrated.prepare('SELECT version FROM sessions WHERE session_key = ?').get(id)).toEqual({ version: 2 })
+    expect(migrated.prepare(testSql('select-session-version')).get(id)).toEqual({ version: 2 })
     migrated.close()
     await second.fiber.dispose()
   })

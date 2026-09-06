@@ -1,4 +1,4 @@
-{"type":"session","version":0,"id":"5f49e80c-16fc-42c7-a617-0b6bd0680aa3","createdAt":1783352129662,"cwd":"{{cwd}}","parentSession":"14dda109-5728-45ba-a002-7db9543fe50e","origin":"subagent","delegationDepth":1}
+{"type":"session","version":2,"id":"5f49e80c-16fc-42c7-a617-0b6bd0680aa3","createdAt":1783352129662,"cwd":"{{cwd}}","parentSession":"14dda109-5728-45ba-a002-7db9543fe50e","origin":"subagent","delegationDepth":1}
 {"type":"approval/policy","data":{"policy":"never","source":"delegation"}}
 {"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"inserted":[{"content":[{"type":"text","text":"Reply with exactly the word BETA and nothing else."}],"source":{"kind":"user"},"role":"user","id":"53f6419d-8ddc-4eee-8803-5b68411336f9"}]}}
 {"type":"turn/start","data":{"turn":1}}

@@ -5,7 +5,8 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import LlmRuntime from '@deepseek-ai/dsh-llm'
-import SessionStore, { SessionId, SessionPreparation } from '@deepseek-ai/dsh-session'
+import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
+import type { SessionHandle } from '@deepseek-ai/dsh-session-persistence'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
@@ -288,15 +289,15 @@ describe('config-driven session id', () => {
   })
 
   it.each(['resolve', 'reject'] as const)(
-    'abandons an exact-id preparation that later %s when AgentLoop disposal starts',
+    'abandons an exact-id open that later %ss when AgentLoop disposal starts',
     async (outcome) => {
       const root = await mkdtemp(join(tmpdir(), 'dsh-cfg-exact-dispose-'))
       dirs.push(root)
       const ctx = await makeCoreContext()
       await ctx.plugin(JsonlSessionPersistence, { root })
-      const preparing = Promise.withResolvers<SessionPreparation>()
-      vi.spyOn(ctx.sessionPersistence, 'prepare').mockReturnValue(preparing.promise)
-      const released = vi.fn()
+      const opening = Promise.withResolvers<SessionHandle>()
+      vi.spyOn(ctx.sessionPersistence, 'openHandleAsync').mockReturnValue(opening.promise)
+      const closed = vi.fn(async () => {})
       const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => undefined)
       const failures: unknown[] = []
       ctx.on('agent-loop/config-start-failed', ({ error }) => { failures.push(error) })
@@ -306,15 +307,12 @@ describe('config-driven session id', () => {
       })
       await loop.dispose()
       if (outcome === 'resolve') {
-        preparing.resolve(SessionPreparation.create(
-          ctx.sessions.prepare(SessionId('config-exact-dispose')),
-          { release: released },
-        ))
+        opening.resolve({ close: closed } as unknown as SessionHandle)
       } else {
-        preparing.reject(new Error('startup cancelled by teardown'))
+        opening.reject(new Error('startup cancelled by teardown'))
       }
       await Promise.resolve()
-      if (outcome === 'resolve') await expect.poll(() => released).toHaveBeenCalledOnce()
+      if (outcome === 'resolve') await expect.poll(() => closed).toHaveBeenCalledOnce()
       expect(ctx.agents.get(SessionId('config-exact-dispose'))).toBeUndefined()
       expect(failures).toEqual([])
       expect(warn).not.toHaveBeenCalled()
@@ -355,8 +353,8 @@ describe('config-driven session id', () => {
     await ctx1.plugin(SystemPrompt)
     await ctx1.plugin(ToolRuntime)
     await ctx1.plugin(AgentRegistry)
-    await ctx1.plugin(AgentLoop, { agents: [{ id: SessionId('cfg'), provider: 'mock', model: 'mock' }] })
     await ctx1.plugin(JsonlSessionPersistence, { root })
+    await ctx1.plugin(AgentLoop, { agents: [{ id: SessionId('cfg'), provider: 'mock', model: 'mock' }] })
     ctx1.llm.registerAdapter(['mock'], new MockAdapter([textResponse('cfg')]))
     const a1 = ctx1.agents.list()[0] as Agent
     expect(a1.id).toBe(a1.session.id)
@@ -374,8 +372,8 @@ describe('config-driven session id', () => {
     await ctx2.plugin(SystemPrompt)
     await ctx2.plugin(ToolRuntime)
     await ctx2.plugin(AgentRegistry)
-    await ctx2.plugin(AgentLoop, { agents: [{ id: SessionId('cfg'), provider: 'mock', model: 'mock' }] })
     await ctx2.plugin(JsonlSessionPersistence, { root })
+    await ctx2.plugin(AgentLoop, { agents: [{ id: SessionId('cfg'), provider: 'mock', model: 'mock' }] })
     ctx2.llm.registerAdapter(['mock'], new MockAdapter([textResponse('cfg2')]))
     const a2 = ctx2.agents.list()[0] as Agent
     expect(a2.id).toBe(a2.session.id)
@@ -398,8 +396,8 @@ describe('config-driven session id', () => {
     await ctx1.plugin(SystemPrompt)
     await ctx1.plugin(ToolRuntime)
     await ctx1.plugin(AgentRegistry)
-    await ctx1.plugin(AgentLoop, { agents: [] })
     await ctx1.plugin(JsonlSessionPersistence, { root })
+    await ctx1.plugin(AgentLoop, { agents: [] })
     ctx1.llm.registerAdapter(['mock'], new MockAdapter([textResponse('first')]))
     const a1 = (await ctx1.agents.create({ sessionId: SessionId('sticky-1') })).agent
     a1.followup(createUserMessage({ content: [{ type: 'text', text: 'remember me' }], source: { kind: 'user' } }))
@@ -414,8 +412,8 @@ describe('config-driven session id', () => {
     await ctx2.plugin(SystemPrompt)
     await ctx2.plugin(ToolRuntime)
     await ctx2.plugin(AgentRegistry)
-    await ctx2.plugin(AgentLoop, { agents: [{ id: SessionId('main'), provider: 'mock', model: 'mock', resumeSessionId: SessionId('sticky-1') }] })
     await ctx2.plugin(JsonlSessionPersistence, { root })
+    await ctx2.plugin(AgentLoop, { agents: [{ id: SessionId('main'), provider: 'mock', model: 'mock', resumeSessionId: SessionId('sticky-1') }] })
     ctx2.llm.registerAdapter(['mock'], new MockAdapter([textResponse('second')]))
 
     // The deferred resume runs after the backend is available.
@@ -439,10 +437,10 @@ describe('config-driven session id', () => {
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
     await ctx.plugin(AgentRegistry)
+    await ctx.plugin(JsonlSessionPersistence, { root })
     await ctx.plugin(AgentLoop, { agents: [{ id: SessionId('main'), provider: 'mock', model: 'mock', resumeSessionId: SessionId('does-not-exist') }] })
     const warn = vi.spyOn((ctx.agentLoop as unknown as { ctx: { logger: { warn: (...a: unknown[]) => void } } }).ctx.logger, 'warn')
       .mockImplementation(() => undefined)
-    await ctx.plugin(JsonlSessionPersistence, { root })
     ctx.llm.registerAdapter(['mock'], new MockAdapter([textResponse('x')]))
 
     // The deferred resume fails (no such session on disk). It must be contained:

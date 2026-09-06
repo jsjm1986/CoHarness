@@ -1,4 +1,4 @@
-{"type":"session","version":0,"id":"539aa64c-7f37-40ff-abd8-ed45b717be1b","createdAt":1783600629539,"cwd":"{{cwd}}","delegationDepth":0}
+{"type":"session","version":2,"id":"539aa64c-7f37-40ff-abd8-ed45b717be1b","createdAt":1783600629539,"cwd":"{{cwd}}","delegationDepth":0}
 {"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"inserted":[{"content":[{"type":"text","text":"Reply with exactly the word: PONG. Do not use any tools."}],"source":{"kind":"user"},"role":"user","id":"a56c3c26-071d-407c-8900-d84de1222c0c"}]}}
 {"type":"turn/start","data":{"turn":1}}
 {"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"removedCount":1,"inserted":[]}}

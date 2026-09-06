@@ -22,6 +22,8 @@ child 的初始任务会告诉它如何使用共享的 `send_message` 工具向�
 
 child 会在继承的 fork 种子之后，从初始任务获得直接 parent id 与返回指引。它可以调用零次或多次 `send_message`，包括发送会改变 parent 下一步动作的发现，以及自包含的最终交接。由管理器负责的结算仍然无条件执行，不检查 Agent 消息是否已经到达。这两条消息可能重复最终内容，但作者和用途不同：`send_message` 携带 child 自己选择的内容，结算则记录本次运行如何结束，并在 child 无法配合时保留终止输出。两者都使用 Agent inbox 与固定 Steer 调度；已接受的 child 消息先于后续结算通知。
 
+continuation manager 会在 child 建立、冷恢复或后续投递等待 provider、持久化或能力查询期间，保持由 continuation 管理的 parent Activation 存活。操作失败时释放这项暂存持有；成功物化后由 child Activation 接管所有权关系。提交前会再次核实 parent 仍是当前精确的 live Agent，因此 await 期间发生处置或替换不会让陈旧投递获得授权。只要旧日志仍被保留，持久化 SessionId 就不能复用。
+
 无密钥 headless `subagent-settlement` 场景省略 `run_in_background`，收到立即返回的 child id；尽管 fixture（测试前置数据）有意不发送 child 编写的消息，它仍通过管理器生成的结算通知到达 parent 最终答案。包测试另行固定了显式 `false` 的前台语义、parent 调度文本以及 child 的 parent-id 返回指引。
 
 ## 考虑过的替代方案
@@ -41,5 +43,6 @@ child 会在继承的 fork 种子之后，从初始任务获得直接 parent id 
 - 普通可继续调用无需写出 `run_in_background: true` 即为非阻塞；串行委派需要显式选择 `false`。
 - 同一条 assistant 消息中的独立 subagent 调用会在工具循环的并发安全分发下重叠执行；有依赖的前台调用仍可逐个发出。
 - parent 指引、工具 schema、运行时解析和结算投递陈述同一个默认值。
+- idle 的 continuation parent 会在 child 建立和投递等待期间保持存活；陈旧 parent 身份和仍有日志保留的持久化 SessionId 会在接纳点被拒绝。
 - child 可以发送一份自包含的最终结果，也可以更早发送重要发现。每次 Activation 还会产生无条件结算通知，因此已完成的运行可能两次投递相互重叠的最终内容。
 - 一次性后台 Task 与禁用后台的工具实例保留现有行为。

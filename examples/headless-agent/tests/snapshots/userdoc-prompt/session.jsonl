@@ -1,4 +1,4 @@
-{"type":"session","version":0,"id":"{{sessionId}}","createdAt":0,"cwd":"{{cwd}}","delegationDepth":0}
+{"type":"session","version":2,"id":"{{sessionId}}","createdAt":0,"cwd":"{{cwd}}","delegationDepth":0}
 {"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"inserted":[{"content":[{"type":"text","text":"Summarize the uploaded brief and prove its durable representation."},{"type":"text","text":"Uploaded document \"brief.txt\" at \"{{cwd}}/uploads/brief.txt\"; contents inlined verbatim:\nfrozen document text\n"}],"source":{"kind":"user","documents":[{"ref":{"docId":"brief.txt","path":"{{cwd}}/uploads/brief.txt","name":"brief.txt","bytes":21,"mediaType":"text/plain","modifiedAt":0},"representation":{"kind":"inline","text":"frozen document text\n"}}]},"role":"user","id":"{{sessionId}}"}]}}
 {"type":"turn/start","data":{"turn":1}}
 {"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"removedCount":1,"inserted":[]}}

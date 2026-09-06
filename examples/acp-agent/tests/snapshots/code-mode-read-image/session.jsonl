@@ -1,4 +1,4 @@
-{"type":"session","version":0,"id":"44444444-4444-4444-8444-444444444444","createdAt":1783952000000,"cwd":"{{cwd}}","delegationDepth":0}
+{"type":"session","version":2,"id":"44444444-4444-4444-8444-444444444444","createdAt":1783952000000,"cwd":"{{cwd}}","delegationDepth":0}
 {"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"inserted":[{"content":[{"type":"text","text":"Using ONE run_code program, create a one-pixel PNG with Node.js, call read_image on it, then reply with exactly the single word DONE."}],"source":{"kind":"user"},"role":"user","id":"08e67dbb-9432-4fe4-b7da-4483998c0a31"}]}}
 {"type":"turn/start","data":{"turn":1}}
 {"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"removedCount":1,"inserted":[]}}

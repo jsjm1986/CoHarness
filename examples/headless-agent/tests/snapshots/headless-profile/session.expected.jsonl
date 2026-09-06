@@ -1,4 +1,4 @@
-{"type":"session","version":0,"id":"{{sessionId}}","createdAt":0,"cwd":"{{cwd}}","delegationDepth":0}
+{"type":"session","version":2,"id":"{{sessionId}}","createdAt":0,"cwd":"{{cwd}}","delegationDepth":0}
 {"type":"permission/preset","data":{"preset":"danger-full-access","origin":"default"}}
 {"type":"sandbox/mode","data":{"mode":"danger-full-access"}}
 {"type":"approval/policy","data":{"policy":"never"}}

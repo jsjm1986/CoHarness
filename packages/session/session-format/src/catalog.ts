@@ -19,7 +19,7 @@ export function createSessionFormatCatalog(options: SessionFormatCatalogOptions)
         const header = chain.migrateHeader(snapshotSessionFormatHeader(value as SessionFormatHeader))
         return { status: storedVersion === chain.currentVersion ? 'current' : 'migration-required', storedVersion, targetVersion: chain.currentVersion, header }
       } catch (error: unknown) {
-        if (error instanceof SessionFormatError) return { status: 'malformed', ...(Number.isSafeInteger((value as { version?: unknown })?.version) ? { storedVersion: (value as { version: number }).version } : {}), targetVersion: chain.currentVersion, reason: error.message }
+        if (error instanceof SessionFormatError) return { status: 'malformed', ...(Number.isSafeInteger((value as { version?: unknown }).version) ? { storedVersion: (value as { version: number }).version } : {}), targetVersion: chain.currentVersion, reason: error.message }
         return { status: 'malformed', targetVersion: chain.currentVersion, reason: String(error) }
       }
     },

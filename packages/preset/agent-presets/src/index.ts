@@ -529,6 +529,10 @@ export class AgentPresets extends Service {
     } else {
       binding.rebind(standing.key)
     }
+    // Scope re-linking changes inherited registries without changing a tool
+    // registration itself. Notify consumers that reconcile Agent-owned rows
+    // after the new chain is live.
+    agentCtx.emit('agent-preset/recomposed')
     return preset
   }
 

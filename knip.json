@@ -370,6 +370,11 @@
         "src/**/*.ts"
       ]
     },
+    "packages/util/values": {
+      "project": [
+        "src/**/*.ts"
+      ]
+    },
     "packages/attachment/attachment": {
       "project": [
         "src/**/*.ts"
