@@ -335,7 +335,7 @@ function historyIndexFrom(value: unknown, maxItems: number): SessionHistoryIndex
   }
 }
 
-function deterministicBatchId(kind: 'append' | 'repair', sessionId: SessionId, value: unknown): string {
+function deterministicBatchId(kind: 'append' | 'repair' | 'migrate', sessionId: SessionId, value: unknown): string {
   const bytes = createHash('sha256')
     .update(kind)
     .update('\0')
@@ -734,13 +734,13 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     }
   }
 
-  private async optional(path: string, signal?: AbortSignal): Promise<unknown> {
+  private async optional(path: string, signal?: AbortSignal, init: GatewayRuntimeRequestInit = {}): Promise<unknown> {
     signal?.throwIfAborted()
     const deadline = this.signal(signal)
     try {
       let response: Response
       try {
-        response = await this.ctx.gatewayRuntime.request(path, { signal: deadline.signal })
+        response = await this.ctx.gatewayRuntime.request(path, { ...init, signal: deadline.signal })
       } catch (error: unknown) {
         throw classifyGatewayReadError(error, signal, deadline.signal)
       }
@@ -793,6 +793,37 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
       events,
       revision: SessionPersistenceRevision(value.revision),
     }
+  }
+
+  /**
+   * Ask the remote store to publish a v2 metadata successor when supported.
+   * A missing route is a compatibility no-op; the coordinator still exposes
+   * the normalized in-memory view for older Gateway deployments.
+   * @param sourceMeta - legacy stored header.
+   * @param currentMeta - normalized current header.
+   * @param _events - validated logical events, not sent over the wire.
+   * @param sourceRevision - revision that the remote transaction must match.
+   * @returns after the optional remote migration request settles.
+   */
+  async migrateStored(
+    sourceMeta: SessionHeader,
+    currentMeta: SessionHeader,
+    _events: readonly SessionEvent[],
+    sourceRevision: PersistenceRevision,
+  ): Promise<void> {
+    await this.optional('/internal/runtime/session/migrate', undefined, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: sourceMeta.id,
+        sourceRevision: String(sourceRevision),
+        targetHeader: currentMeta,
+        migrationId: deterministicBatchId('migrate', sourceMeta.id, {
+          sourceRevision: String(sourceRevision),
+          targetHeader: currentMeta,
+        }),
+      }),
+    })
   }
 
   async readStoredRevision(id: SessionId, signal?: AbortSignal): Promise<PersistenceRevision | undefined> {
