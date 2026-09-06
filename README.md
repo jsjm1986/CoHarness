@@ -93,7 +93,7 @@ The repository keeps these upstream conventions deliberately:
 
 Use the [architecture guide](docs/architecture.md) for the plugin model and the [user guide](docs/user/guide/index.md) for the current Web workflow. The [Gateway reference](gateway/README.md) and [deployment runbook](gateway/deploy/README.md) own the hosted multi-user control plane.
 
-The latest upstream comparison is recorded in [`UPGRADE-PLAN-dsh-v0.1.2-alpha.2-alpha.3.md`](UPGRADE-PLAN-dsh-v0.1.2-alpha.2-alpha.3.md), with its machine-readable decision inventory in [`UPGRADE-MANIFEST-dsh-v0.1.2-alpha.2-alpha.3.json`](UPGRADE-MANIFEST-dsh-v0.1.2-alpha.2-alpha.3.json).
+The latest upstream comparison is recorded in [`UPGRADE-PLAN-dsh-v0.1.3-alpha.1.md`](UPGRADE-PLAN-dsh-v0.1.3-alpha.1.md), with its machine-readable decision inventory in [`UPGRADE-MANIFEST-dsh-v0.1.3-alpha.1.json`](UPGRADE-MANIFEST-dsh-v0.1.3-alpha.1.json).
 
 <a id="run"></a>
 
