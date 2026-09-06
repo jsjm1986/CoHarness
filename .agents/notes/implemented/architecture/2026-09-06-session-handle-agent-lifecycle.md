@@ -24,8 +24,8 @@ The abstract reservation is process-local and additive to the coordinator's exis
 
 ## Consequences
 
-Persistent Agent creation now fails before publication when another writer is already held, and successful teardown releases the id for reuse. JSONL rejects a second process through its atomic lock file; stale-lock recovery and automatic v2 conversion remain provider-specific follow-up work. Detached read consumers can use the same service without acquiring mutation rights, and the handle delegates durability to the existing coordinator.
+Persistent Agent creation now fails before publication when another writer is already held, and successful teardown releases the id for reuse. JSONL rejects a second process through its atomic lock file and removes a lock whose recorded PID is no longer alive; unreadable or live locks remain blocking. Automatic v2 conversion remains provider-specific follow-up work. Detached read consumers can use the same service without acquiring mutation rights, and the handle delegates durability to the existing coordinator.
 
 ## Verification
 
-Agent-loop lifecycle tests cover acquisition, rejection of a second writer, and release after `AgentHandle.dispose()`. Session-persistence and JSONL tests cover read-only rejection, idempotent close, local ownership, cross-process locking, and release.
+Agent-loop lifecycle tests cover acquisition, rejection of a second writer, and release after `AgentHandle.dispose()`. Session-persistence and JSONL tests cover read-only rejection, idempotent close, local ownership, live/dead cross-process locks, and release.
