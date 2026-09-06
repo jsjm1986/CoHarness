@@ -806,8 +806,8 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
    * @returns after the optional remote migration request settles.
    */
   async migrateStored(
-    sourceMeta: SessionHeader,
-    currentMeta: SessionHeader,
+    sourceStorage: SessionStorageMetadata,
+    currentStorage: SessionStorageMetadata,
     _events: readonly SessionEvent[],
     sourceRevision: PersistenceRevision,
   ): Promise<void> {
@@ -815,12 +815,12 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        sessionId: sourceMeta.id,
+        sessionId: sourceStorage.meta.id,
         sourceRevision: String(sourceRevision),
-        targetHeader: currentMeta,
-        migrationId: deterministicBatchId('migrate', sourceMeta.id, {
+        targetHeader: currentStorage.meta,
+        migrationId: deterministicBatchId('migrate', sourceStorage.meta.id, {
           sourceRevision: String(sourceRevision),
-          targetHeader: currentMeta,
+          targetHeader: currentStorage.meta,
         }),
       }),
     })

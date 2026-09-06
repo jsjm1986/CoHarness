@@ -207,8 +207,8 @@ export interface PersistenceBackend<TornMarker = unknown> {
    * @param sourceRevision - revision observed before conversion.
    */
   migrateStored?(
-    sourceMeta: SessionHeader,
-    currentMeta: SessionHeader,
+    sourceStorage: SessionStorageMetadata,
+    currentStorage: SessionStorageMetadata,
     events: readonly SessionEvent[],
     sourceRevision: SessionPersistenceRevision,
   ): Promise<void>
@@ -1063,7 +1063,12 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     const currentMeta = this.assertVersion(stored.meta)
     const events = snapshotStoredEvents(stored.events, id)
     if (stored.meta.version !== currentMeta.version && this.backend.migrateStored !== undefined) {
-      await this.backend.migrateStored(stored.meta, currentMeta, events, stored.revision)
+      await this.backend.migrateStored(
+        stored,
+        { meta: currentMeta, inheritedEventCount: stored.inheritedEventCount },
+        events,
+        stored.revision,
+      )
     }
     this.assertEventsSupported(currentMeta, events)
     return {
@@ -1083,7 +1088,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       const currentMeta = this.assertVersion(meta)
       const storedEvents = adoptStoredEvents(events, id)
       if (meta.version !== currentMeta.version && this.backend.migrateStored !== undefined) {
-        await this.backend.migrateStored(meta, currentMeta, storedEvents, revision)
+        await this.backend.migrateStored({ meta, inheritedEventCount }, { meta: currentMeta, inheritedEventCount }, storedEvents, revision)
       }
       this.assertEventsSupported(currentMeta, storedEvents)
       if (inheritedEventCount > storedEvents.length) {
