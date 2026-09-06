@@ -60,6 +60,7 @@ class GatewayTransport {
   readonly organization = 'acme'
   readonly appends: RecordedAppend[] = []
   readonly migrations: RecordedAppend[] = []
+  migrationAvailable = true
   readonly creations: RecordedCreation[] = []
   principal: GatewayRequestPrincipal | undefined
 
@@ -119,6 +120,7 @@ class GatewayTransport {
     }
 
     if (url.pathname === '/internal/runtime/session/migrate') {
+      if (!this.migrationAvailable) return json(404, { error: 'not-found' })
       const body = bodyRecord(init)
       this.migrations.push({ body: structuredClone(body), principal: init.principal })
       const stored = this.sessions.get(sessionId || String(body.sessionId))
@@ -377,6 +379,20 @@ describe('GatewaySessionPersistence collaboration creation', () => {
       sourceRevision: 'revision-1',
       targetHeader: { id, version: 2 },
     })
+    await fiber.dispose()
+  })
+
+  it('keeps the in-memory migration fallback when the remote endpoint is not deployed', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const transport = new GatewayTransport()
+    transport.migrationAvailable = false
+    const id = SessionId('gateway-legacy-fallback')
+    transport.seed(String(id), oneTurnLog())
+    const fiber = await mountBackend(ctx, transport)
+
+    await expect(ctx.sessionPersistence.load(id)).resolves.toMatchObject({ meta: { id, version: 2 } })
+    expect(transport.migrations).toHaveLength(0)
     await fiber.dispose()
   })
 
