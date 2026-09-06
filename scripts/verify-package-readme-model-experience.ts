@@ -33,6 +33,7 @@ const NO_MODEL_EXPERIENCE_SECTION: Readonly<Record<string, string>> = {
   'packages/core/scope': 'The package is a model-agnostic registration and lifecycle primitive; model-facing consumers own any context selection.',
   'packages/util/brand': 'The package is a type-only primitive erased at compile time.',
   'packages/util/home-paths': 'The package only resolves harness-owned host paths; model-facing consumers own any rendered use.',
+  'packages/util/http-proxy': 'Transport policy only: it changes how bytes reach the network and registers no prompt, schema, or result text.',
   'packages/util/launch-environment': 'The package only resolves host environment values; model-facing consumers own any rendered use.',
 }
 
@@ -42,6 +43,8 @@ const NO_MODEL_EXPERIENCE_SECTION: Readonly<Record<string, string>> = {
  * blocks. A package moves on or off this list with its context behavior.
  */
 const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
+  'packages/session/session-format': { kind: 'none', reason: 'The package validates and migrates durable Session data; provider and prompt consumers own every model-visible effect.' },
+  'packages/util/values': { kind: 'none', reason: 'JSON-safe value operations register no prompt, schema, or result text.' },
   'packages/credentials/authorization': { kind: 'none', reason: 'Authorization is a configuration-time human conversation; its flow, notice, and prompt never enter a model request.' },
   'packages/attachment/attachment': { kind: 'indirect', reason: 'The storage seam delegates model request rendering to provider adapters.' },
   'packages/attachment/attachment-local': { kind: 'indirect', reason: 'The local backend delegates model request rendering to provider adapters.' },

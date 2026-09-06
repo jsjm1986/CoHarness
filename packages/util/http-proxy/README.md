@@ -85,19 +85,10 @@ An entry names a host and matches it together with every subdomain under it: `NO
 <a id="further-exploration"></a>
 ## Further Exploration
 
-- [Network proxy guide](../../../docs/user/guide/network-proxy.md) — what to export, and why a browser is proxied when a terminal is not.
+- [Proxy policy and upstream audit](../../../UPGRADE-PLAN-dsh-v0.1.3-alpha.1.md) — the policy decisions and integration scope.
 - [`dsh-web-fetch-http`](../../web/web-fetch-http/README.md) — the one consumer whose safety rules change under a proxy.
 
 -----
-
-<a id="model-experience"></a>
-## Model Experience
-
-None, as transport policy only: it changes how bytes reach the network and registers no prompt, schema, or result text.
-
-#### KV Cache effect
-
-No direct invalidation: the package contributes no request tokens and never mutates a request prefix, so provider cache reuse is unaffected.
 
 ## Known Limitations and Deferred Work
 
