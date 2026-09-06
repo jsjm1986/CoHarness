@@ -1,5 +1,8 @@
 {
   "name": "@deepseek-ai/dsh-session",
+  "dependencies": {
+    "@deepseek-ai/dsh-session-format": "workspace:*"
+  },
   "description": "Event-sourced session store for the DeepSeek Harness",
   "version": "0.1.2-alpha.5.coharness.1",
   "publishConfig": {

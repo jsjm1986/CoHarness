@@ -1,14 +1,12 @@
 {
-  "name": "@deepseek-ai/dsh-util-values",
-  "description": "Duplicate-install-safe value primitives for the DeepSeek Harness",
+  "name": "@deepseek-ai/dsh-session-format",
+  "description": "Pure adjacent Session format migration chain and catalog primitives",
   "version": "0.1.2-alpha.5.coharness.1",
-  "publishConfig": {
-    "access": "public"
-  },
+  "publishConfig": { "access": "public" },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
-    "directory": "packages/util/values"
+    "directory": "packages/session/session-format"
   },
   "type": "module",
   "main": "lib/index.js",
@@ -18,14 +16,18 @@
       "types": "./lib/types/index.d.ts",
       "default": "./lib/index.js"
     },
+    "./catalog": {
+      "types": "./lib/types/catalog.d.ts",
+      "default": "./lib/catalog.js"
+    },
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
-  "files": [
-    "lib/index.js",
-    "lib/types/**/*.d.ts"
-  ],
+  "files": ["lib/index.js", "lib/catalog.js", "lib/types/**/*.d.ts"],
   "license": "MIT",
+  "dependencies": {
+    "@deepseek-ai/dsh-util-values": "workspace:^"
+  },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:^"
   },

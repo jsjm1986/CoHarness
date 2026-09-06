@@ -21,6 +21,9 @@
       "path": "../../llm/llm"
     },
     {
+      "path": "../../session/session-format"
+    },
+    {
       "path": "../../core/scope"
     },
     {
