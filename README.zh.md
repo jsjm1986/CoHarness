@@ -93,7 +93,7 @@ Gateway 把协同哲学落实为经过认证的项目边界。每个账户拥有
 
 请先阅读[架构文档](docs/architecture.zh.md)了解插件模型，再阅读[用户指南](docs/user/guide/index.zh.md)了解当前 Web 流程。[Gateway 参考](gateway/README.zh.md)和[部署手册](gateway/deploy/README.zh.md)负责自托管多用户控制面。
 
-最新的上游对比记录在 [`UPGRADE-PLAN-dsh-v0.1.2-alpha.2-alpha.3.md`](UPGRADE-PLAN-dsh-v0.1.2-alpha.2-alpha.3.md)，机器可读的决策清单在 [`UPGRADE-MANIFEST-dsh-v0.1.2-alpha.2-alpha.3.json`](UPGRADE-MANIFEST-dsh-v0.1.2-alpha.2-alpha.3.json)。
+最新的上游对比记录在 [`UPGRADE-PLAN-dsh-v0.1.3-alpha.1.md`](UPGRADE-PLAN-dsh-v0.1.3-alpha.1.md)，机器可读的决策清单在 [`UPGRADE-MANIFEST-dsh-v0.1.3-alpha.1.json`](UPGRADE-MANIFEST-dsh-v0.1.3-alpha.1.json)。
 
 <a id="run"></a>
 

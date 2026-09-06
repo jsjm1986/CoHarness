@@ -72,6 +72,8 @@ def test_pep440_version_spells_a_prerelease_the_python_way() -> None:
 
 def test_macos_wheel_tag_does_not_claim_unsupported_node_platforms() -> None:
     assert build_python_release.PLATFORMS["macos-arm64"][0] == "macosx_14_0_arm64"
+    assert build_python_release.PLATFORMS["macos-x64"][0] == "macosx_14_0_x86_64"
+    assert build_python_release.PLATFORMS["macos-x64"][1] == "deepseek-harness-sdk-runtime-macos-x64"
 
 
 def test_platform_manifest_rejects_incomplete_entries(tmp_path: Path) -> None:
@@ -97,7 +99,7 @@ def test_stage_sdk_keeps_distribution_module_and_runtime_pin_distinct(tmp_path: 
     assert (destination / "src" / "deepseek_harness" / "__init__.py").is_file()
 
 
-@pytest.mark.parametrize(("target", "with_helper"), [("linux-x64", False), ("macos-arm64", True)])
+@pytest.mark.parametrize(("target", "with_helper"), [("linux-x64", False), ("macos-arm64", True), ("macos-x64", True)])
 def test_stage_runtime_copies_platform_payload(
     tmp_path: Path, target: str, with_helper: bool
 ) -> None:

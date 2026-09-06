@@ -34,6 +34,10 @@
       "types": "./lib/types/message.d.ts",
       "default": "./lib/types/message.js"
     },
+    "./assistant-stream": {
+      "types": "./lib/types/assistant-stream.d.ts",
+      "default": "./lib/types/assistant-stream.js"
+    },
     "./discovery": {
       "types": "./lib/types/discovery.d.ts",
       "default": "./lib/types/discovery.js"
@@ -57,6 +61,7 @@
   },
   "dependencies": {
     "@deepseek-ai/dsh-util-crypto": "workspace:^",
+    "@deepseek-ai/dsh-util-values": "workspace:^",
     "@deepseek-ai/schemastery": "workspace:^"
   },
   "devDependencies": {
