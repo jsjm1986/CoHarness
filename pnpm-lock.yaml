@@ -7074,6 +7074,10 @@ importers:
         version: link:../../core/session
 
   packages/session/session-persistence:
+    dependencies:
+      '@deepseek-ai/dsh-session-format':
+        specifier: workspace:^
+        version: link:../session-format
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: workspace:^

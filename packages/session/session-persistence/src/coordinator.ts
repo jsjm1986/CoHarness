@@ -28,6 +28,7 @@ import type {
   SessionSeq as SessionSeqType,
 } from '@deepseek-ai/dsh-session'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
+import { sessionFormatCatalog, type SessionFormatHeader } from '@deepseek-ai/dsh-session-format'
 import type {
   SessionEventSuffix,
   SessionInspection,
@@ -1006,7 +1007,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       signal?.throwIfAborted()
       if (suffix === undefined) throw new Error(`session "${id}" not found`)
       this.assertStoredId(id, suffix.meta)
-      this.assertVersion(suffix.meta)
+      const currentMeta = this.assertVersion(suffix.meta)
       if (suffix.events.some(needsLegacyPrefix)) {
         const whole = await this.readStoredPrefix(id, signal)
         return {
@@ -1017,9 +1018,9 @@ export class PersistenceCoordinator<TornMarker = unknown> {
         }
       }
       const events = snapshotStoredEvents(suffix.events, id)
-      this.assertEventsSupported(suffix.meta, events)
+      this.assertEventsSupported(currentMeta, events)
       return {
-        meta: structuredClone(suffix.meta),
+        meta: structuredClone(currentMeta),
         inheritedEventCount: SessionLogOffset(suffix.inheritedEventCount),
         fromSeq,
         events,
@@ -1045,11 +1046,11 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     signal?.throwIfAborted()
     if (stored === undefined) throw new Error(`session "${id}" not found`)
     this.assertStoredId(id, stored.meta)
-    this.assertVersion(stored.meta)
+    const currentMeta = this.assertVersion(stored.meta)
     const events = snapshotStoredEvents(stored.events, id)
-    this.assertEventsSupported(stored.meta, events)
+    this.assertEventsSupported(currentMeta, events)
     return {
-      meta: structuredClone(stored.meta),
+      meta: structuredClone(currentMeta),
       inheritedEventCount: SessionLogOffset(stored.inheritedEventCount),
       events,
     }
@@ -1062,9 +1063,9 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     try {
       const { meta, inheritedEventCount, events, revision, tornMarker } = stored
       this.assertStoredId(id, meta)
-      this.assertVersion(meta)
+      const currentMeta = this.assertVersion(meta)
       const storedEvents = adoptStoredEvents(events, id)
-      this.assertEventsSupported(meta, storedEvents)
+      this.assertEventsSupported(currentMeta, storedEvents)
       if (inheritedEventCount > storedEvents.length) {
         throw new Error(`session "${id}" inherited event count exceeds its stored event count`)
       }
@@ -1074,7 +1075,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       const balanced = [...storedEvents, ...closers]
       const session = this.ctx.sessions.prepare(id, {
         seed: balanced,
-        meta,
+        meta: currentMeta,
         inheritedEventCount,
         seedSource: 'persistence',
       })
@@ -1225,8 +1226,11 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     }
   }
 
-  private assertVersion(meta: SessionHeader): void {
-    if (meta.version === SESSION_FORMAT_VERSION) return
+  private assertVersion(meta: SessionHeader): SessionHeader {
+    if (meta.version === SESSION_FORMAT_VERSION) return meta
+    if (meta.version === 0 || meta.version === 1) {
+      return sessionFormatCatalog.migrateHeader(meta as unknown as SessionFormatHeader) as unknown as SessionHeader
+    }
     throw this.unsupported(meta, sessionFormatVersionRefusal(meta.id, meta.version))
   }
 
