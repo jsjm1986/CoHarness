@@ -193,6 +193,7 @@ class PersistenceSessionHandle implements SessionHandle {
     private readonly owner: SessionPersistence,
     readonly id: SessionId,
     readonly mode: SessionHandleMode,
+    private readonly releaseExternal: () => Promise<void>,
   ) {}
 
   async read(offset = 0): Promise<readonly SessionEvent[]> {
@@ -217,7 +218,11 @@ class PersistenceSessionHandle implements SessionHandle {
   async close(): Promise<void> {
     if (this.closed) return
     this.closed = true
-    this.owner.releaseHandle(this.id, this)
+    try {
+      await this.releaseExternal()
+    } finally {
+      this.owner.releaseHandle(this.id, this)
+    }
   }
 
   private assertOpen(): void {
@@ -281,8 +286,34 @@ export abstract class SessionPersistence extends Service {
    * @returns an owned write handle.
    */
   async createHandle(meta: SessionHeader): Promise<SessionHandle> {
-    await this.create(meta)
-    return this.openHandle(meta.id, 'write')
+    const handle = await this.openHandleAsync(meta.id, 'write')
+    try {
+      await this.create(meta)
+      return handle
+    } catch (error: unknown) {
+      await handle.close()
+      throw error
+    }
+  }
+
+  /**
+   * Open a handle and acquire any provider-specific cross-process lock.
+   * @param id - persisted Session identity.
+   * @param mode - read or write access.
+   * @returns a handle whose close releases local and provider ownership.
+   */
+  async openHandleAsync(id: SessionId, mode: SessionHandleMode): Promise<SessionHandle> {
+    if (mode === 'read') return this.openHandle(id, mode)
+    if (this.writeHandles.has(id)) throw new SessionAlreadyOwnedError(id)
+    const releaseExternal = await this.acquireWriteLock(id)
+    try {
+      const handle = new PersistenceSessionHandle(this, id, mode, releaseExternal)
+      this.writeHandles.set(id, handle)
+      return handle
+    } catch (error: unknown) {
+      await releaseExternal()
+      throw error
+    }
   }
 
   /**
@@ -294,11 +325,16 @@ export abstract class SessionPersistence extends Service {
   openHandle(id: SessionId, mode: SessionHandleMode): SessionHandle {
     if (mode === 'write') {
       if (this.writeHandles.has(id)) throw new SessionAlreadyOwnedError(id)
-      const handle = new PersistenceSessionHandle(this, id, mode)
+      const handle = new PersistenceSessionHandle(this, id, mode, async () => {})
       this.writeHandles.set(id, handle)
       return handle
     }
-    return new PersistenceSessionHandle(this, id, mode)
+    return new PersistenceSessionHandle(this, id, mode, async () => {})
+  }
+
+  /** Acquire a provider-specific cross-process writer lock, when available. */
+  protected async acquireWriteLock(_id: SessionId): Promise<() => Promise<void>> {
+    return async () => {}
   }
 
   /** Release a process-local writer reservation held by one handle. */

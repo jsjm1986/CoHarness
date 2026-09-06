@@ -10,7 +10,7 @@ import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { constants as bufferConstants } from 'node:buffer'
 import { readdirSync } from 'node:fs'
-import { open, mkdir, readdir, realpath, link, rm, stat, truncate } from 'node:fs/promises'
+import { open, mkdir, readdir, realpath, link, rm, stat, truncate, unlink } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { scheduler } from 'node:timers/promises'
@@ -184,6 +184,31 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
    * constructor.
    */
   override readonly name = 'session-persistence-jsonl'
+
+  /** Acquire one root-scoped atomic lock so separate processes cannot write one Session id. */
+  protected override async acquireWriteLock(id: SessionId): Promise<() => Promise<void>> {
+    await mkdir(join(this.root, '.locks'), { recursive: true })
+    const path = join(this.root, '.locks', `${encodeSegment(id)}.lock`)
+    let lock: Awaited<ReturnType<typeof open>>
+    try {
+      lock = await open(path, 'wx')
+      await lock.writeFile(JSON.stringify({ pid: process.pid, createdAt: Date.now() }))
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException | null)?.code === 'EEXIST') {
+        throw new Error(`session "${id}" is already locked by another process`)
+      }
+      throw error
+    }
+    return async () => {
+      try {
+        await lock.close()
+      } finally {
+        await unlink(path).catch((error: unknown) => {
+          if ((error as NodeJS.ErrnoException | null)?.code !== 'ENOENT') throw error
+        })
+      }
+    }
+  }
 
   private root: string
   private packChunks: boolean

@@ -833,7 +833,7 @@ export class AgentLoop extends Service implements AgentFactory {
         ownerCtx.fiber.assertActive()
         if (!this.ownership.isActive()) throw new Error('agent loop is not active')
         handle = await raceAbortCall(
-          () => persistence.openHandle(id, 'write'),
+          () => persistence.openHandleAsync(id, 'write'),
           fused,
           id,
           (abandoned) => { void abandoned.close() },
