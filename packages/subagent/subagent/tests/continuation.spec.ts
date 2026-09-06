@@ -1446,7 +1446,7 @@ describe('continuable durability and teardown', () => {
 })
 
 describe('continuable review regressions', () => {
-  it('rechecks exact parent liveness after cold-resume materialization', async () => {
+  it('rechecks exact parent liveness after parent disposal during cold resume', async () => {
     const { ctx } = await setup([textResponse('first')])
     const parentId = SessionId('replaceable-parent')
     const originalParent = await ctx.agents.create({
@@ -1478,10 +1478,13 @@ describe('continuable review regressions', () => {
     )
     await resumed.promise
     await originalParent.dispose()
-    const replacement = await ctx.agents.create({
+    // A persisted SessionId is durable identity and cannot be recreated over
+    // its retained log. The stale parent must therefore be rejected after its
+    // lifecycle has detached, without manufacturing a replacement Agent.
+    await expect(ctx.agents.create({
       sessionId: parentId,
       agentOptions: { provider: 'mock', model: 'mock' },
-    })
+    })).rejects.toThrow(/already has a persisted log/)
     releaseResume.resolve(undefined)
 
     await expect(delivery).rejects.toMatchObject({ code: 'UNAUTHORIZED' })
@@ -1489,7 +1492,6 @@ describe('continuable review regressions', () => {
     await waitNoActivation(ctx, started.childId)
     const loaded = await ctx.sessionPersistence.load(started.childId)
     expect(hasUserText(loaded.events, 'must not cross parent replacement')).toBe(false)
-    await replacement.dispose()
   })
 
   it('clears the accepted reservation when Agent.followup throws', async () => {

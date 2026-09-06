@@ -62,7 +62,7 @@ The JSON validator uses an explicit work stack and tracks only the active ancest
 | File | Role |
 |---|---|
 | [`src/index.ts`](src/index.ts) | JSON value type, validation and snapshot traversal, structural equality, deep freezing, and exhaustive-union failure |
-| — | No runtime invariant companion is published because these value operations have no shared runtime state; unit tests cover their algebra. |
+| [`src/invariant.ts`](src/invariant.ts) | Empty package companion; no runtime invariant exists because these value operations have no shared event stream or mutable state. |
 
 </details>
 -----

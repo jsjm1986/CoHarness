@@ -1,12 +1,13 @@
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import LlmRuntime from '@deepseek-ai/dsh-llm'
 import SessionStore, { SESSION_FORMAT_VERSION, Session, SessionId, SessionLogOffset, SessionPreparation, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionHeader, SessionLogOffset as SessionLogOffsetType } from '@deepseek-ai/dsh-session'
+import type { SessionHandle } from '@deepseek-ai/dsh-session-persistence'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
@@ -31,10 +32,19 @@ async function mountPersistentHarness(root: string, adapter: MockAdapter): Promi
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(AgentRegistry)
-  await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(JsonlSessionPersistence, { root })
+  await ctx.plugin(AgentLoop, { agents: [] })
   ctx.llm.registerAdapter(['mock'], adapter)
   return ctx
+}
+
+/** Remove every JSONL lock so a crashed POSIX writer can be replaced safely. */
+async function removeSessionLocks(dir: string): Promise<void> {
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name)
+    if (entry.isDirectory()) await removeSessionLocks(path)
+    else if (entry.name.endsWith('.lock')) await rm(path, { force: true })
+  }
 }
 
 async function persistSession(sessionId: SessionId): Promise<string> {
@@ -67,6 +77,12 @@ function preparationFromSnapshot(
     inheritedEventCount: snapshot.inheritedEventCount,
     seedSource: 'persistence',
   }))
+}
+
+/** Handle stand-in for an abandoned open that settles after owner disposal. */
+function abandonedHandleStub(): { handle: SessionHandle; close: ReturnType<typeof vi.fn> } {
+  const close = vi.fn(async () => {})
+  return { handle: { close } as unknown as SessionHandle, close }
 }
 
 function waitForIdle(ctx: Context, agent: Agent): Promise<void> {
@@ -214,7 +230,7 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
     await ctx.sessions.flush(first.session)
 
     await expect(ctx.agents.resume({ resumeSessionId: sessionId }))
-      .rejects.toThrow(/while it is live/)
+      .rejects.toThrow(/already owned/)
 
     first.session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
     await ctx.sessions.flush(first.session)
@@ -253,8 +269,8 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
     await ctx2.plugin(SystemPrompt)
     await ctx2.plugin(ToolRuntime)
     await ctx2.plugin(AgentRegistry)
-    await ctx2.plugin(AgentLoop, { agents: [] })
     await ctx2.plugin(JsonlSessionPersistence, { root })
+    await ctx2.plugin(AgentLoop, { agents: [] })
     ctx2.llm.registerAdapter(['mock'], adapter2)
     const a2 = (await ctx2.agents.resume({ resumeSessionId: SessionId('nocwd-sess') })).agent
     expect(a2.session.header.cwd).toBeUndefined()
@@ -281,8 +297,8 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
     await ctx2.plugin(SystemPrompt)
     await ctx2.plugin(ToolRuntime)
     await ctx2.plugin(AgentRegistry)
-    await ctx2.plugin(AgentLoop, { agents: [] })
     await ctx2.plugin(JsonlSessionPersistence, { root })
+    await ctx2.plugin(AgentLoop, { agents: [] })
     ctx2.llm.registerAdapter(['mock'], adapter2)
     const sources2: string[] = []
     ctx2.on('agent/session-start', ({ source }) => void sources2.push(source))
@@ -464,24 +480,22 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
     await ctx.fiber.dispose()
   })
 
-  it('owner unload aborts a never-settling persistence preparation, releases the identity, and blocks late publication', async () => {
+  it('owner unloads a never-settling persistence open, releases the identity, and blocks late publication', async () => {
     const sessionId = SessionId('resume-load-owner-unload')
     const root = await persistSession(sessionId)
     const ctx = await mountPersistentHarness(root, new MockAdapter([textResponse('next')]))
-    const snapshot = await ctx.sessionPersistence.load(sessionId)
-    const abandoned = preparationFromSnapshot(ctx, snapshot)
-    const latePreparation = Promise.withResolvers<SessionPreparation>()
-    const preparationStarted = Promise.withResolvers<undefined>()
-    const originalPrepare = ctx.sessionPersistence.prepare.bind(ctx.sessionPersistence)
-    let preparations = 0
-    ctx.sessionPersistence.prepare = (id, signal) => {
+    const lateOpen = Promise.withResolvers<SessionHandle>()
+    const openStarted = Promise.withResolvers<undefined>()
+    const originalOpen = ctx.sessionPersistence.openHandleAsync.bind(ctx.sessionPersistence)
+    let opens = 0
+    ctx.sessionPersistence.openHandleAsync = async (id, mode) => {
       expect(id).toBe(sessionId)
-      preparations += 1
-      if (preparations === 1) {
-        preparationStarted.resolve(undefined)
-        return latePreparation.promise
+      opens += 1
+      if (opens === 1) {
+        openStarted.resolve(undefined)
+        return lateOpen.promise
       }
-      return originalPrepare(id, signal)
+      return originalOpen(id, mode)
     }
 
     const published: string[] = []
@@ -493,7 +507,7 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
     const owner = await ctx.plugin(Object.assign((inner: Context) => {
       resuming = inner.agents.resume({ resumeSessionId: sessionId, agentOptions: { provider: 'mock', model: 'mock' } })
     }, { inject: ['agents'] }))
-    await preparationStarted.promise
+    await openStarted.promise
 
     const rejection = expect(promptly(resuming)).rejects.toThrow(/owner disposed during setup/)
     await promptly(owner.dispose())
@@ -505,24 +519,24 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
     // can be reused before awaiting the public rejection.
     const retry = await promptly(ctx.agents.resume({ resumeSessionId: sessionId, agentOptions: { provider: 'mock', model: 'mock' } }))
     await rejection
-    expect(preparations).toBe(2)
+    expect(opens).toBe(2)
     expect(published).toEqual(['session/created', 'agent/created', 'agent/session-start'])
 
-    // Settlement of the abandoned backend promise cannot resume the old
-    // transaction or emit a second publication after the retry owns the ids.
-    latePreparation.resolve(abandoned)
-    await Promise.resolve()
-    await Promise.resolve()
+    // Settlement of the abandoned backend open cannot resume the old
+    // transaction: the late handle is closed, and no second publication lands
+    // after the retry owns the ids.
+    const abandoned = abandonedHandleStub()
+    lateOpen.resolve(abandoned.handle)
+    await expect.poll(() => abandoned.close.mock.calls.length).toBe(1)
     expect(ctx.agents.get(sessionId)).toBe(retry.agent)
     expect(ctx.sessions.get(sessionId)).toBe(retry.agent.session)
     expect(published).toEqual(['session/created', 'agent/created', 'agent/session-start'])
 
-    abandoned[Symbol.dispose]()
     await retry.dispose()
     await ctx.fiber.dispose()
   })
 
-  it('AgentLoop unload aborts persistence preparation and awaits wrapper settlement', async () => {
+  it('AgentLoop unload aborts persistence open and awaits wrapper settlement', async () => {
     const sessionId = SessionId('resume-load-factory-unload')
     const root = await persistSession(sessionId)
     const ctx = new Context()
@@ -535,21 +549,19 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
     await ctx.plugin(JsonlSessionPersistence, { root })
     ctx.llm.registerAdapter(['mock'], new MockAdapter([textResponse('next')]))
 
-    const snapshot = await ctx.sessionPersistence.load(sessionId)
-    const abandoned = preparationFromSnapshot(ctx, snapshot)
-    const latePreparation = Promise.withResolvers<SessionPreparation>()
-    const preparationStarted = Promise.withResolvers<undefined>()
-    ctx.sessionPersistence.prepare = (id) => {
+    const lateOpen = Promise.withResolvers<SessionHandle>()
+    const openStarted = Promise.withResolvers<undefined>()
+    ctx.sessionPersistence.openHandleAsync = async (id, _mode) => {
       expect(id).toBe(sessionId)
-      preparationStarted.resolve(undefined)
-      return latePreparation.promise
+      openStarted.resolve(undefined)
+      return lateOpen.promise
     }
     const published: string[] = []
     ctx.on('session/created', () => void published.push('session/created'))
     ctx.on('agent/created', () => void published.push('agent/created'))
 
     const resuming = ctx.agents.resume({ resumeSessionId: sessionId, agentOptions: { provider: 'mock', model: 'mock' } })
-    await preparationStarted.promise
+    await openStarted.promise
     const rejection = expect(promptly(resuming)).rejects.toThrow(/agent loop is not active/)
     await promptly(loopFiber.dispose())
     await rejection
@@ -557,11 +569,10 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
     expect(published).toEqual([])
     expect(ctx.agents.get(sessionId)).toBeUndefined()
     expect(ctx.sessions.get(sessionId)).toBeUndefined()
-    latePreparation.resolve(abandoned)
-    await Promise.resolve()
-    await Promise.resolve()
+    const abandoned = abandonedHandleStub()
+    lateOpen.resolve(abandoned.handle)
+    await expect.poll(() => abandoned.close.mock.calls.length).toBe(1)
     expect(published).toEqual([])
-    abandoned[Symbol.dispose]()
     await ctx.fiber.dispose()
   })
 
@@ -593,8 +604,8 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
     await ctx2.plugin(SystemPrompt)
     await ctx2.plugin(ToolRuntime)
     await ctx2.plugin(AgentRegistry)
-    await ctx2.plugin(AgentLoop, { agents: [] })
     await ctx2.plugin(JsonlSessionPersistence, { root })
+    await ctx2.plugin(AgentLoop, { agents: [] })
     ctx2.llm.registerAdapter(['mock'], adapter2)
     const a2 = (await ctx2.agents.resume({ resumeSessionId: SessionId('forked-sess') })).agent
     expect(a2.session.header.parentSession).toBe('parent-sess')
@@ -607,7 +618,7 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
     await ctx2.fiber.dispose()
   })
 
-  it('a pending idle inject() survives persist + resume without a synthetic turn', async () => {
+  it.skipIf(process.platform === 'win32')('a pending idle inject() survives persist + resume without a synthetic turn', async () => {
     const adapter1 = new MockAdapter([textResponse('answer')])
     const { ctx: ctx1, root } = await persistentHarness(adapter1)
     const a1 = (await ctx1.agents.create({ sessionId: SessionId('inject-sess'), meta: { cwd: '/w' } })).agent
@@ -616,6 +627,10 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
     a1.inject(createUserMessage({ content: [{ type: 'text', text: 'background job 42 finished' }], source: { kind: 'plugin', plugin: 'tool-bash' } }))
     await a1.whenIdle()
     await ctx1.sessions.flush(a1.session)
+    // Simulate a wedged first lifecycle. Removing the lock file orphans its
+    // held inode so the resumer locks a fresh one; a graceful disposal would
+    // durably discard this pending injected context.
+    await removeSessionLocks(root)
 
     // Lifecycle 2: resume; the injected context is still pending and becomes
     // model-visible when the next turn admits it.
@@ -626,12 +641,12 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
     await ctx2.plugin(SystemPrompt)
     await ctx2.plugin(ToolRuntime)
     await ctx2.plugin(AgentRegistry)
-    await ctx2.plugin(AgentLoop, { agents: [] })
     await ctx2.plugin(JsonlSessionPersistence, { root })
+    await ctx2.plugin(AgentLoop, { agents: [] })
     ctx2.llm.registerAdapter(['mock'], adapter2)
-    const loaded = await ctx2.sessionPersistence.load(SessionId('inject-sess'))
-    expect(loaded.events.some(event => event.type === 'agent/inbox/spliced')).toBe(true)
-    expect(JSON.stringify(loaded.events)).toContain('background job 42 finished')
+    const stored = await ctx2.sessionPersistence.readFrom(SessionId('inject-sess'), SessionLogOffset(0))
+    expect(stored.events.some(event => event.type === 'agent/inbox/spliced')).toBe(true)
+    expect(JSON.stringify(stored.events)).toContain('background job 42 finished')
     const a2 = (await ctx2.agents.resume({ resumeSessionId: SessionId('inject-sess') })).agent
     expect(JSON.stringify(a2.inbox.nextStep)).toContain('background job 42 finished')
     a2.followup(createUserMessage({ content: [{ type: 'text', text: 'continue' }], source: { kind: 'user' } }))
@@ -662,8 +677,8 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
     await ctx2.plugin(SystemPrompt)
     await ctx2.plugin(ToolRuntime)
     await ctx2.plugin(AgentRegistry)
-    await ctx2.plugin(AgentLoop, { agents: [] })
     await ctx2.plugin(JsonlSessionPersistence, { root })
+    await ctx2.plugin(AgentLoop, { agents: [] })
     ctx2.llm.registerAdapter(['mock'], adapter2)
 
     const a2 = (await ctx2.agents.resume({ resumeSessionId: SessionId('sess-resume') })).agent

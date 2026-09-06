@@ -47,7 +47,7 @@ export function snapshotSessionFormatHeader(value: SessionFormatHeader, label = 
   if (typeof snapshot !== 'object' || snapshot === null || Array.isArray(snapshot)) {
     throw new SessionFormatError(`${label} must be a JSON object`)
   }
-  const record = snapshot as SessionFormatJsonObject
+  const record = snapshot
   inspectSessionFormatVersion(record)
   if (typeof record.id !== 'string' || record.id.length === 0) throw new SessionFormatError(`${label} id must be a non-empty string`)
   sessionFormatCount(record.createdAt, `${label} createdAt`)
@@ -62,19 +62,20 @@ export function snapshotSessionFormatHeader(value: SessionFormatHeader, label = 
 export function snapshotSessionFormatArtifact(value: SessionFormatArtifact, label = 'Session artifact'): SessionFormatArtifact {
   const snapshot = snapshotSessionFormatJson(value, label)
   if (typeof snapshot !== 'object' || snapshot === null || Array.isArray(snapshot)) throw new SessionFormatError(`${label} must be an object`)
-  const record = snapshot as SessionFormatJsonObject
+  const record = snapshot
   const header = record.header
   if (typeof header !== 'object' || header === null || Array.isArray(header)) throw new SessionFormatError(`${label} header must be an object`)
   snapshotSessionFormatHeader(header as SessionFormatHeader, `${label} header`)
   sessionFormatCount(record.inheritedEventCount, `${label} inheritedEventCount`)
   if (!Array.isArray(record.events)) throw new SessionFormatError(`${label} events must be an array`)
-  const events = record.events as readonly SessionFormatJsonObject[]
+  const events = record.events as readonly unknown[]
   for (const [index, event] of events.entries()) {
     if (typeof event !== 'object' || event === null || Array.isArray(event)) throw new SessionFormatError(`${label} event ${index} must be an object`)
-    if (event.seq !== index) throw new SessionFormatError(`${label} event ${index} has non-dense seq`)
-    if (typeof event.type !== 'string' || event.type.length === 0) throw new SessionFormatError(`${label} event ${index} type must be non-empty`)
-    sessionFormatCount(event.time, `${label} event ${index} time`)
-    if (!Object.hasOwn(event, 'data')) throw new SessionFormatError(`${label} event ${index} lacks data`)
+    const eventRecord = event as SessionFormatJsonObject
+    if (eventRecord.seq !== index) throw new SessionFormatError(`${label} event ${index} has non-dense seq`)
+    if (typeof eventRecord.type !== 'string' || eventRecord.type.length === 0) throw new SessionFormatError(`${label} event ${index} type must be non-empty`)
+    sessionFormatCount(eventRecord.time, `${label} event ${index} time`)
+    if (!Object.hasOwn(eventRecord, 'data')) throw new SessionFormatError(`${label} event ${index} lacks data`)
   }
   if ((record.inheritedEventCount as number) > events.length) throw new SessionFormatError(`${label} inheritedEventCount exceeds events`)
   return record as unknown as SessionFormatArtifact

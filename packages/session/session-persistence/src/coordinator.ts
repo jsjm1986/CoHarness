@@ -742,7 +742,10 @@ export class PersistenceCoordinator<TornMarker = unknown> {
         ? error
         : new TypeError('invalid session storage metadata', { cause: error }))
     }
-    return this.serialize(snapshot.id, () => this.createCore(storage))
+    // A disposed live Session may still be draining its final write batch. Wait
+    // for that retirement before reserving the id so immediate replacement
+    // creation cannot race the old lifecycle's cleanup.
+    return this.waitForRetirement(snapshot.id).then(() => this.serialize(snapshot.id, () => this.createCore(storage)))
   }
 
   /**

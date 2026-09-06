@@ -113,4 +113,4 @@ Reaching Node's built-in `fetch` from a userland undici relies on both writing t
 
 </details>
 
-**Runtime invariant:** No companion is published. The one piece of mutable state here — the active policy — is asserted against the dispatcher it installs by unit tests that dispose the registration and observe a real loopback proxy.
+**Runtime invariant:** The package companion registers no runtime check. This startup library exposes no Cordis event stream or owner-scoped mutable data; egress tests assert the active policy against the dispatcher it installs.

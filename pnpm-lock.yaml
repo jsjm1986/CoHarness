@@ -7053,6 +7053,9 @@ importers:
       '@deepseek-ai/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
 
   packages/session/session-log-deepseek:
     dependencies:
@@ -9114,6 +9117,9 @@ importers:
       '@deepseek-ai/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
 
   packages/web/tool-web:
     dependencies:
@@ -9670,6 +9676,9 @@ importers:
       '@deepseek-ai/dsh-session-checkpoint-policy':
         specifier: workspace:^
         version: link:../../packages/session/session-checkpoint-policy
+      '@deepseek-ai/dsh-session-format':
+        specifier: workspace:^
+        version: link:../../packages/session/session-format
       '@deepseek-ai/dsh-session-persistence':
         specifier: workspace:^
         version: link:../../packages/session/session-persistence

@@ -51,8 +51,8 @@ interface SessionLocation {
 interface SessionHeader {
   /**
    * On-disk format version, stamped from {@link SESSION_FORMAT_VERSION} when the
-   * session is created. A persistence backend rejects any other version on load
-   * (no migration — see the constant).
+   * session is created. Persistence providers migrate supported historical
+   * generations before exposing a current Session and reject newer versions.
    */
   readonly version: number
   /** The session's id (mirrors the {@link Session}'s id). */
@@ -93,7 +93,7 @@ interface SessionHeader {
 
 ## 格式拒绝：本构建无法可靠读取的日志
 
-后端用 `SessionFormatUnsupportedError` 拒绝无法可靠解读的日志，它与 `SessionPersistenceCorruptionError` 区分，因为数据没有损坏。header 的 `version` 比 `SESSION_FORMAT_VERSION` 新时，消息说明方向（"由更新的 harness 写入，请升级 harness 后打开"）；比它旧时说明本构建没有升级路径。经过 legacy 形状归一化后，本构建生成词汇表（`KNOWN_SESSION_EVENT_TYPES`，由 `gen-persistence-catalog` 生成）之外的事件类型同样被拒绝，除非该事件的信封带 `ignorable: true`：静默跳过一个不认识的必需事件可能改变日志其余部分的解读方式。后端为每个会话保留独立文件时，消息附上原始日志路径，被拒绝的文本仍然可读。JSONL 后端直接从原始 header 行拒绝外来版本，先于当前 header 形状校验和任何事件行解码，因此结构完全不同的未来格式仍会报告升级方向，绝不会报"损坏"；SQLite 则先由自己的 `SCHEMA_VERSION` pragma 把关整个文件的结构。设计理由与推迟建设的升级器链见 [session-log 版本机制 Agent Note](../../.agents/notes/implemented/architecture/2026-08-10-session-log-version-mechanism.zh.md)。
+后端用 `SessionFormatUnsupportedError` 拒绝无法可靠解读的日志，它与 `SessionPersistenceCorruptionError` 区分，因为数据没有损坏。header 的 `version` 比 `SESSION_FORMAT_VERSION` 新时，消息说明方向（"由更新的 harness 写入，请升级 harness 后打开"）。受支持的 v0/v1 header 和事件会先通过相邻 migration catalog，再构造当前 v2 Session；缺少迁移边或目标记录格式错误时会明确拒绝。迁移后，本构建生成词汇表（`KNOWN_SESSION_EVENT_TYPES`，由 `gen-persistence-catalog` 生成）之外的事件类型同样被拒绝，除非该事件的信封带 `ignorable: true`。JSONL provider 会在保留源文件的同时发布迁移后的 v2 generation；SQLite 继续使用单调递增的 `SCHEMA_VERSION` 检查整个文件结构。
 
 ## `CreateSessionOptions`：seed 与元数据
 
@@ -289,9 +289,10 @@ Durable append-only session storage. Implementations preserve contiguous, lossle
 /**
  * Create a new explicit write handle while retaining the legacy create API.
  * @param meta - immutable Session header to register.
+ * @param inheritedEventCount - exact inherited prefix length for a seeded Session.
  * @returns an owned write handle.
  */
-async createHandle(meta: SessionHeader): Promise<SessionHandle>
+async createHandle(meta: SessionHeader, inheritedEventCount?: SessionLogOffset): Promise<SessionHandle>
 
 /**
  * Open a handle and acquire any provider-specific cross-process lock.
@@ -542,5 +543,5 @@ releaseDraft(_request: SessionDraftReservationRequest): Promise<void>
 
 Types: [Session](session.zh.md) · [SessionEvent](session.zh.md) · [SessionId](core.zh.md) · [SessionLogOffset](session.zh.md)
 
-Source: [`packages/session/session-persistence/src/index.ts:290`](../../packages/session/session-persistence/src/index.ts)
+Source: [`packages/session/session-persistence/src/index.ts:291`](../../packages/session/session-persistence/src/index.ts)
 <!-- END GENERATED cordis-surface -->

@@ -82,8 +82,8 @@ export type OptionalSessionSeq = SessionSeq | null
  * The on-disk session format version, stamped into every newly-written {@link SessionHeader}
  * and enforced by every persistence backend on load. The single source of truth for the
  * version — write sites and the load-time check all read it.
- * While the harness is unreleased it is pinned at `0`: no compatibility is
- * implied, incompatible logs are rejected, and no migration is provided.
+ * The current build stamps `2`; supported historical generations are migrated
+ * by the persistence format catalog before a provider exposes a Session.
  *
  * The version is a single monotonic integer with no major/minor split. Whether
  * a bump is needed is decided by what the WRITER emits, never by what a newer
@@ -109,8 +109,8 @@ export const SESSION_FORMAT_VERSION = 2
 export interface SessionHeader {
   /**
    * On-disk format version, stamped from {@link SESSION_FORMAT_VERSION} when the
-   * session is created. A persistence backend rejects any other version on load
-   * (no migration — see the constant).
+   * session is created. Persistence providers migrate supported historical
+   * generations before exposing a current Session and reject newer versions.
    */
   readonly version: number
   /** The session's id (mirrors the {@link Session}'s id). */

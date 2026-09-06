@@ -1,4 +1,4 @@
-{"type":"session","version":0,"id":"{{sessionId}}","createdAt":1785974400000,"cwd":"{{cwd}}","agentPreset":"minimal"}
+{"type":"session","version":2,"id":"{{sessionId}}","createdAt":1785974400000,"cwd":"{{cwd}}","agentPreset":"minimal"}
 {"type":"user/message","data":{"content":[{"type":"text","text":"Reply exactly MINIMAL_PRESET_REQUEST_OK and stop."}],"source":{"kind":"user","rpcId":"{{rpcId}}"}},"surfaceOp":"append"}
 {"type":"assistant/chunk","data":{"turn":1,"step":1,"chunk":{"type":"block-start","index":0,"blockType":"text"}}}
 {"type":"assistant/chunk","data":{"turn":1,"step":1,"chunk":{"type":"text-delta","index":0,"text":"MINIMAL_PRESET_REQUEST_OK"}}}

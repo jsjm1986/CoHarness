@@ -1,4 +1,4 @@
-{"type":"session","version":0,"id":"44444444-4444-4444-8444-444444444444","createdAt":1785218500000,"cwd":"{{cwd}}","delegationDepth":0}
+{"type":"session","version":2,"id":"44444444-4444-4444-8444-444444444444","createdAt":1785218500000,"cwd":"{{cwd}}","delegationDepth":0}
 {"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"inserted":[{"content":[{"type":"text","text":"Use the bash tool to run exactly: false. Then reply with exactly CHILD_EXIT_PRESERVED and stop."}],"source":{"kind":"user"},"role":"user","id":"8a81cb32-8acc-4929-bb63-ec02adea20df"}]}}
 {"type":"turn/start","data":{"turn":1}}
 {"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"removedCount":1,"inserted":[]}}
