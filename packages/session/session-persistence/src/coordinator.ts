@@ -202,7 +202,7 @@ export interface PersistenceBackend<TornMarker = unknown> {
     currentMeta: SessionHeader,
     events: readonly SessionEvent[],
     sourceRevision: SessionPersistenceRevision,
-  ): Promise<void>
+  ): Promise<boolean>
 
   /** Durably create an empty header-only session artifact. */
   materializeHeader?(meta: SessionHeader): Promise<void>
@@ -1039,7 +1039,15 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     if (sourceMeta.version === currentMeta.version || this.backend.migrateStored === undefined) return
     const started = performance.now()
     try {
-      await this.backend.migrateStored(sourceMeta, currentMeta, events, sourceRevision)
+      const migrated = await this.backend.migrateStored(sourceMeta, currentMeta, events, sourceRevision)
+      this.onMigration?.({
+        id: sourceMeta.id,
+        fromVersion: sourceMeta.version,
+        toVersion: currentMeta.version,
+        status: migrated ? 'succeeded' : 'skipped',
+        durationMs: Math.max(0, performance.now() - started),
+      })
+      return
     } catch (error: unknown) {
       this.onMigration?.({
         id: sourceMeta.id,
@@ -1051,13 +1059,6 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       })
       throw error
     }
-    this.onMigration?.({
-      id: sourceMeta.id,
-      fromVersion: sourceMeta.version,
-      toVersion: currentMeta.version,
-      status: 'succeeded',
-      durationMs: Math.max(0, performance.now() - started),
-    })
   }
 
   /** Commit one prepared repair and establish its ownerless durable cursor. */

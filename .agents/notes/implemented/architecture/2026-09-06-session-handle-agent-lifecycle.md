@@ -26,7 +26,7 @@ The abstract reservation is process-local and additive to the coordinator's exis
 
 Persistent Agent creation now fails before publication when another writer is already held, and successful teardown releases the id for reuse. JSONL rejects a second process through its atomic lock file and removes a lock whose recorded PID is no longer alive; unreadable or live locks remain blocking. Automatic v2 conversion remains provider-specific follow-up work. Detached read consumers can use the same service without acquiring mutation rights, and the handle delegates durability to the existing coordinator.
 
-Persistence providers expose aggregate migration metrics from the same coordinator callback: attempts, successes, failures, elapsed milliseconds, per-generation counts, and the last failure. The counters are process-local observation and do not become part of Session history.
+Persistence providers expose aggregate migration metrics from the same coordinator callback: attempts, successes, skips, failures, elapsed milliseconds, per-generation counts, and the last failure. A missing optional Gateway endpoint is a skip rather than a success. The counters are process-local observation and do not become part of Session history.
 
 ## Verification
 

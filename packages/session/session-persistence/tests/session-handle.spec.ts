@@ -75,9 +75,10 @@ describe('SessionPersistence explicit handles', () => {
     expect(persistence.migrationStats()).toEqual({
       attempts: 2,
       succeeded: 1,
+      skipped: 0,
       failed: 1,
       totalDurationMs: 8,
-      generations: [{ fromVersion: 0, toVersion: 2, attempts: 2, succeeded: 1, failed: 1 }],
+      generations: [{ fromVersion: 0, toVersion: 2, attempts: 2, succeeded: 1, skipped: 0, failed: 1 }],
       lastFailure: { id: header.id, fromVersion: 0, toVersion: 2, status: 'failed', durationMs: 5, error: 'conflict' },
     })
   })

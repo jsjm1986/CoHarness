@@ -26,7 +26,7 @@
 
 持久化 Agent 创建现在会在发布前发现已有写入者并失败，成功销毁后 id 可以再次使用。JSONL 通过原子 lock 文件拒绝第二个进程，并在记录的 PID 已不再存活时移除锁；无法读取或仍存活的锁会继续阻塞。自动 v2 转换仍是 provider 后续工作。脱离 Agent 的读消费者可以使用同一服务而无需取得修改权限，句柄继续委托现有协调器保证耐久性。
 
-持久化 provider 通过同一个 coordinator callback 暴露聚合迁移 metrics：尝试、成功、失败、耗时、按代次统计以及最近一次失败。计数只用于进程内观测，不会写入 Session 历史。
+持久化 provider 通过同一个 coordinator callback 暴露聚合迁移 metrics：尝试、成功、跳过、失败、耗时、按代次统计以及最近一次失败。缺失可选 Gateway endpoint（端点）计为跳过而非成功。计数只用于进程内观测，不会写入 Session 历史。
 
 ## 验证
 

@@ -155,7 +155,7 @@ export class SqliteSessionPersistence extends SessionPersistence {
     currentMeta: SessionHeader,
     events: readonly SessionEvent[],
     sourceRevision: PersistenceRevision,
-  ): Promise<void> {
+  ): Promise<boolean> {
     return this.store.migrateStored(sourceMeta, currentMeta, events, sourceRevision)
   }
   /* jscpd:ignore-end */

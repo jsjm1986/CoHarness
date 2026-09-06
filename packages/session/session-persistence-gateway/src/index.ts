@@ -772,8 +772,8 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     currentMeta: SessionHeader,
     _events: readonly SessionEvent[],
     sourceRevision: PersistenceRevision,
-  ): Promise<void> {
-    await this.optional('/internal/runtime/session/migrate', undefined, {
+  ): Promise<boolean> {
+    const response = await this.optional('/internal/runtime/session/migrate', undefined, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -786,6 +786,7 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
         }),
       }),
     })
+    return response !== undefined
   }
 
   async readStoredRevision(id: SessionId, signal?: AbortSignal): Promise<PersistenceRevision | undefined> {

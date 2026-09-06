@@ -616,12 +616,12 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     currentMeta: SessionHeader,
     events: readonly SessionEvent[],
     sourceRevision: PersistenceRevision,
-  ): Promise<void> {
+  ): Promise<boolean> {
     await this.ensureRootEncoding()
     const project = projectDir(this.root, currentMeta.cwd)
     const dir = sessionDir(this.root, currentMeta.cwd, currentMeta.id)
     const finalPath = generationLogPath(this.root, currentMeta.cwd, currentMeta.id, this.compression, currentMeta.version)
-    if (await this.exists(finalPath)) return
+    if (await this.exists(finalPath)) return true
     const current = await this.readStoredRevision(sourceMeta.id)
     if (current !== undefined && String(current) !== String(sourceRevision)) {
       throw new Error(`session "${sourceMeta.id}" changed while its format migration was preparing`)
@@ -635,9 +635,10 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
         await this.materializePosix(project, dir, finalPath, currentMeta.id, content)
       }
     } catch (error: unknown) {
-      if (await this.exists(finalPath)) return
+      if (await this.exists(finalPath)) return true
       throw error
     }
+    return true
   }
 
   /** Durably publish a header-only artifact without inventing an event row. */

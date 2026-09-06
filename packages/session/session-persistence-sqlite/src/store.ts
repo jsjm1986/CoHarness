@@ -177,7 +177,7 @@ export class SqliteStore implements PersistenceBackend<number> {
     currentMeta: SessionHeader,
     _events: readonly SessionEvent[],
     sourceRevision: PersistenceRevision,
-  ): Promise<void> {
+  ): Promise<boolean> {
     await this.open()
     this.db.exec(sql('begin-immediate'))
     try {
@@ -189,11 +189,12 @@ export class SqliteStore implements PersistenceBackend<number> {
       }
       if (row.version === currentMeta.version) {
         this.db.exec(sql('commit'))
-        return
+        return false
       }
       const updated = this.db.prepare(sql('update-session-version')).run(currentMeta.version, sourceMeta.id)
       if (Number(updated.changes) !== 1) throw new Error(`session ${sourceMeta.id} metadata row is missing`)
       this.db.exec(sql('commit'))
+      return true
     } catch (error: unknown) {
       this.rollback(error, 'format migration')
     }

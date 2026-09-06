@@ -154,7 +154,7 @@ export interface SessionMigrationRecord {
   readonly id: SessionId
   readonly fromVersion: number
   readonly toVersion: number
-  readonly status: 'succeeded' | 'failed'
+  readonly status: 'succeeded' | 'skipped' | 'failed'
   readonly durationMs: number
   readonly error?: string
 }
@@ -163,6 +163,7 @@ export interface SessionMigrationRecord {
 export interface SessionMigrationStats {
   readonly attempts: number
   readonly succeeded: number
+  readonly skipped: number
   readonly failed: number
   readonly totalDurationMs: number
   readonly generations: readonly {
@@ -170,6 +171,7 @@ export interface SessionMigrationStats {
     readonly toVersion: number
     readonly attempts: number
     readonly succeeded: number
+    readonly skipped: number
     readonly failed: number
   }[]
   readonly lastFailure?: SessionMigrationRecord
@@ -305,6 +307,7 @@ export abstract class SessionPersistence extends Service {
   private readonly writeHandles = new Map<SessionId, PersistenceSessionHandle>()
   private migrationAttempts = 0
   private migrationSucceeded = 0
+  private migrationSkipped = 0
   private migrationFailed = 0
   private migrationDurationMs = 0
   private readonly migrationGenerations = new Map<string, {
@@ -312,6 +315,7 @@ export abstract class SessionPersistence extends Service {
     toVersion: number
     attempts: number
     succeeded: number
+    skipped: number
     failed: number
   }>()
   private lastMigrationFailure: SessionMigrationRecord | undefined
@@ -328,6 +332,7 @@ export abstract class SessionPersistence extends Service {
     return {
       attempts: this.migrationAttempts,
       succeeded: this.migrationSucceeded,
+      skipped: this.migrationSkipped,
       failed: this.migrationFailed,
       totalDurationMs: this.migrationDurationMs,
       generations: [...this.migrationGenerations.values()].map(value => ({ ...value })),
@@ -340,6 +345,7 @@ export abstract class SessionPersistence extends Service {
     this.migrationAttempts += 1
     this.migrationDurationMs += record.durationMs
     if (record.status === 'succeeded') this.migrationSucceeded += 1
+    else if (record.status === 'skipped') this.migrationSkipped += 1
     else {
       this.migrationFailed += 1
       this.lastMigrationFailure = { ...record }
@@ -350,10 +356,12 @@ export abstract class SessionPersistence extends Service {
       toVersion: record.toVersion,
       attempts: 0,
       succeeded: 0,
+      skipped: 0,
       failed: 0,
     }
     generation.attempts += 1
     if (record.status === 'succeeded') generation.succeeded += 1
+    else if (record.status === 'skipped') generation.skipped += 1
     else generation.failed += 1
     this.migrationGenerations.set(key, generation)
   }
