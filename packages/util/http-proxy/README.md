@@ -16,7 +16,6 @@ Node's built-in `fetch` ignores `HTTP_PROXY` and `HTTPS_PROXY`, so a harness beh
 - [Use this package](#use-this-package)
 - [Understand the implementation](#understand-the-implementation)
 - [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
