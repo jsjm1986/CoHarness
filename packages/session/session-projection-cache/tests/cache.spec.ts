@@ -106,7 +106,7 @@ const endTurn = (session: Session): SessionEvent =>
 function storedRecord(pool: MemoryMediaPool, id: Session['id']) {
   return pool.media.get('session_projcache')?.tables.get('sessions')?.get(String(id)) as
     {
-      identity: { createdAt: number; cwd?: string }
+      identity: { formatVersion: number; createdAt: number; cwd?: string }
       rows: Record<string, { ver: number; seq: number; val: unknown }>
     } | undefined
 }
@@ -258,9 +258,9 @@ describe('SessionProjectionCache cold read', () => {
     pool: MemoryMediaPool,
     id: string,
     row: { ver: number; seq: number; val: unknown },
-    identity: { createdAt: number; cwd?: string } = { createdAt: 0 },
+    identity: { formatVersion: number; createdAt: number; cwd?: string } = { formatVersion: 0, createdAt: 0 },
   ): void {
-    pool.versions.set('session_projcache', 3)
+    pool.versions.set('session_projcache', 4)
     pool.media.set('session_projcache', {
       tables: new Map([['sessions', new Map([[id, { identity, rows: { 'cache-test/marks': row } }]])]]),
       global: null,
@@ -343,12 +343,12 @@ describe('SessionProjectionCache cold read', () => {
     const logs = new Map([['reborn', storedLog([['real']])]]) // stored header stamps createdAt 0
     // A checkpoint from a PRIOR lifecycle of the same id (different createdAt):
     // its rows pass every watermark check, but the identity does not match.
-    seedRow(pool, 'reborn', { ver: 1, seq: 2, val: { marks: ['phantom'] } }, { createdAt: 999 })
+    seedRow(pool, 'reborn', { ver: 1, seq: 2, val: { marks: ['phantom'] } }, { formatVersion: 0, createdAt: 999 })
     const { cache, pool: samePool } = await harness({ pool, logs })
     const snapshot = await cache.coldSnapshot(SessionId('reborn'))
     expect(snapshot.values['cache-test/marks']).toEqual({ marks: ['real'] })
     // The write-back rebinds the record to the actual log's identity.
-    expect(storedRecord(samePool, SessionId('reborn'))?.identity).toEqual({ createdAt: 0 })
+    expect(storedRecord(samePool, SessionId('reborn'))?.identity).toEqual({ formatVersion: 0, createdAt: 0 })
   })
 
   it('cachedSnapshot returns undefined when every stored row is version-mismatched', async () => {
@@ -360,7 +360,7 @@ describe('SessionProjectionCache cold read', () => {
 
   it('binds identity on cwd too: a matching cwd serves, a moved session does not', async () => {
     const pool = new MemoryMediaPool()
-    seedRow(pool, 'homed', { ver: 1, seq: 2, val: { marks: ['w'] } }, { createdAt: 0, cwd: '/work' })
+    seedRow(pool, 'homed', { ver: 1, seq: 2, val: { marks: ['w'] } }, { formatVersion: 0, createdAt: 0, cwd: '/work' })
     const { cache } = await harness({ pool })
     const id = SessionId('homed')
     expect(cache.cachedSnapshot(headerOf(id, 0, '/work'))?.values['cache-test/marks']).toEqual({ marks: ['w'] })

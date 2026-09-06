@@ -296,12 +296,18 @@ export class SessionProjectionCache extends Service {
 
 /** Project a header onto the identity fields a record is bound to. */
 function identityOf(header: SessionHeader): CheckpointIdentity {
-  return { createdAt: header.createdAt, ...header.cwd === undefined ? {} : { cwd: header.cwd } }
+  return {
+    formatVersion: header.version,
+    createdAt: header.createdAt,
+    ...header.cwd === undefined ? {} : { cwd: header.cwd },
+  }
 }
 
 /** Whether a stored record's bound identity names the caller's lifecycle. */
 function identityMatches(stored: CheckpointIdentity, expected: CheckpointIdentity): boolean {
-  return stored.createdAt === expected.createdAt && stored.cwd === expected.cwd
+  return stored.formatVersion === expected.formatVersion
+    && stored.createdAt === expected.createdAt
+    && stored.cwd === expected.cwd
 }
 
 export default SessionProjectionCache
