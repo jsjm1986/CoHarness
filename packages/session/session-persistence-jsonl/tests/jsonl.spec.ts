@@ -319,6 +319,20 @@ describe('JsonlSessionPersistence: durability and crash semantics', () => {
   })
   afterEach(async () => { await ctx.fiber.dispose() })
 
+  it('rejects a second process writer until the first handle closes', async () => {
+    const secondCtx = new Context()
+    await secondCtx.plugin(SessionStore)
+    const secondFiber = await secondCtx.plugin(JsonlSessionPersistence, { root, compression: 'none' })
+    const id = SessionId('cross-process-lock')
+    const first = await ctx.sessionPersistence.createHandle({ version: 0, id, createdAt: 1 })
+    await expect(secondCtx.sessionPersistence.openHandleAsync(id, 'write')).rejects.toThrow(/already locked by another process/)
+    await first.close()
+    const second = await secondCtx.sessionPersistence.openHandleAsync(id, 'write')
+    await second.close()
+    await secondFiber.dispose()
+    await secondCtx.fiber.dispose()
+  })
+
   it('lazy materialization: create() writes no file until the first append', async () => {
     const m = meta('lazy', '/work')
     const location = ctx.sessionPersistence.locate(m)
