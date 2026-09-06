@@ -16,6 +16,16 @@ The CI workflow adds a small `pr-scope` classifier. It marks a pull request as l
 
 The classifier runs from the trusted pull-request base SHA after a full checkout. It is a small TypeScript module with unit coverage so workflow edits can test the action-only, documentation-only, and full-change classifications without needing GitHub Actions.
 
+## Alternatives considered
+
+**Run the complete gate set for every pull request.** This preserves maximum uniformity, but spends the longest runners on changes that cannot affect product behavior. The classifier keeps the full set for source, dependency, lockfile, and workflow-logic changes.
+
+**Use only changed-file filters in workflow triggers.** That would prevent entire workflows from starting, but would make required checks disappear and would not give one stable aggregate verdict. The scope job keeps the workflow and aggregate check present for every pull request.
+
+**Trust a pull-request-provided base or scope value.** Rejected because a branch can modify its own classifier inputs. The selector computes the diff from the event's trusted base SHA after a full checkout and fails closed for unrecognized changes.
+
+**Skip all checks for documentation or action-pin changes.** Rejected because static, compatibility, and keyless SDK checks are cheap guardrails for workflow and packaging regressions. Those checks remain mandatory on the light path.
+
 ## Consequences
 
 Action-pin and documentation pull requests no longer allocate the long-running coverage, browser, packaging, Wine, and native Windows runners. Product, dependency, lockfile, and workflow-logic changes keep the existing release-sized validation. The workflow still exposes one stable aggregate check, and the aggregate log records whether the expensive lanes were selected and why.
