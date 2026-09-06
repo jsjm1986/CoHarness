@@ -28,7 +28,7 @@ import {
 } from '@deepseek-ai/dsh-session-persistence'
 import type { SessionEvent, SessionId, SessionHeader, SessionLogOffset, SessionPreparation } from '@deepseek-ai/dsh-session'
 import {
-  encodeSegment, eventLines, logPath, logSuffix, parseHeader, parseHeaderMeta, projectDir, scanLog, sessionDir,
+  encodeSegment, eventLines, generationLogPath, logPath, logSuffix, parseHeader, parseHeaderMeta, projectDir, scanLog, sessionDir,
   SessionLogScanner, toHeaderLine,
   type JsonlCompression,
 } from './format.ts'
@@ -334,6 +334,31 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
       signal?.throwIfAborted()
       if (isENOENT(error)) return undefined
       throw error
+    }
+  }
+
+  /** Publish an immutable v2 successor while retaining the legacy source file. */
+  async migrateStored(
+    sourceStorage: SessionStorageMetadata,
+    currentStorage: SessionStorageMetadata,
+    events: readonly SessionEvent[],
+    sourceRevision: PersistenceRevision,
+  ): Promise<void> {
+    await this.ensureRootEncoding()
+    const { meta } = currentStorage
+    const finalPath = generationLogPath(this.root, meta.cwd, meta.id, this.compression, meta.version)
+    if (await this.exists(finalPath)) return
+    const currentRevision = await this.readStoredRevision(sourceStorage.meta.id)
+    if (currentRevision !== undefined && String(currentRevision) !== String(sourceRevision)) {
+      throw new Error(`session "${meta.id}" changed while its format migration was preparing`)
+    }
+    const content = await this.encodeMaterialization(currentStorage, events)
+    const project = projectDir(this.root, meta.cwd)
+    const dir = sessionDir(this.root, meta.cwd, meta.id)
+    if (process.platform === 'win32') {
+      await this.materializeWin32(project, dir, finalPath, meta.id, content)
+    } else {
+      await this.materializePosix(project, dir, finalPath, meta.id, content)
     }
   }
 
@@ -833,7 +858,7 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
    */
   private async appendLines(meta: SessionHeader, events: readonly SessionEvent[]): Promise<void> {
     const content = await this.encodeEventBatch(events)
-    const path = logPath(this.root, meta.cwd, meta.id, this.compression)
+    const path = await this.writableLogPath(meta)
     const handle = await open(path, 'a')
     let closed = false
     const closeAppendHandle = async (): Promise<void> => {
@@ -873,7 +898,7 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
 
   /** Truncate the log file to `offset` bytes and fsync (discard the crash tail). */
   private async repair(meta: SessionHeader, offset: number): Promise<void> {
-    const path = logPath(this.root, meta.cwd, meta.id, this.compression)
+    const path = await this.writableLogPath(meta)
     await truncate(path, offset)
     const handle = await open(path, 'r+')
     try {
@@ -881,6 +906,14 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     } finally {
       await handle.close()
     }
+  }
+
+  /** Prefer an already-published canonical generation for subsequent writes. */
+  private async writableLogPath(meta: SessionHeader): Promise<string> {
+    const generation = generationLogPath(this.root, meta.cwd, meta.id, this.compression, meta.version)
+    return generation !== logPath(this.root, meta.cwd, meta.id, this.compression) && await this.exists(generation)
+      ? generation
+      : logPath(this.root, meta.cwd, meta.id, this.compression)
   }
 
   // --- discovery helpers ---
@@ -984,8 +1017,14 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
       await this.rejectLegacyFlatArtifact(project, id, signal)
       signal?.throwIfAborted()
       const dir = join(project, encodeSegment(id))
-      const path = join(dir, `session${logSuffix(this.compression)}`)
-      const opposite = join(dir, `session${logSuffix(this.oppositeCompression())}`)
+      const generation = join(dir, `session.v2${logSuffix(this.compression)}`)
+      const path = await this.exists(generation)
+        ? generation
+        : join(dir, `session${logSuffix(this.compression)}`)
+      const oppositeGeneration = join(dir, `session.v2${logSuffix(this.oppositeCompression())}`)
+      const opposite = await this.exists(oppositeGeneration)
+        ? oppositeGeneration
+        : join(dir, `session${logSuffix(this.oppositeCompression())}`)
       const oppositeExists = await this.exists(opposite)
       signal?.throwIfAborted()
       if (oppositeExists) throw this.encodingMismatch(opposite)
@@ -1022,12 +1061,16 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
       throw new Error(`corrupt session log "${path}": requested id "${expectedId}" does not match header id "${meta.id}"`)
     }
     let expectedPath: string
+    let generationPath: string
     try {
       expectedPath = logPath(this.root, meta.cwd, meta.id, this.compression)
+      generationPath = generationLogPath(this.root, meta.cwd, meta.id, this.compression, meta.version)
     } catch (error) {
       throw new Error(`corrupt session log "${path}": header id cannot name a storage path`, { cause: error })
     }
-    if (path !== expectedPath && !await this.sameFile(path, expectedPath, signal)) {
+    if (path !== expectedPath && path !== generationPath
+      && !await this.sameFile(path, expectedPath, signal)
+      && !await this.sameFile(path, generationPath, signal)) {
       throw new Error(`corrupt session log "${path}": header id "${meta.id}" and cwd identify "${expectedPath}"`)
     }
     signal?.throwIfAborted()

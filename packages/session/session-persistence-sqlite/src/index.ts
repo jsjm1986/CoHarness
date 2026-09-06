@@ -26,6 +26,7 @@ import {
   type SessionLocation,
   type SessionPersistenceRevision as PersistenceRevision,
   type SessionPersistenceSnapshot,
+  type SessionStorageMetadata,
 } from '@deepseek-ai/dsh-session-persistence'
 import type { JournalMode } from './schema.ts'
 import { SqliteStore } from './store.ts'
@@ -141,12 +142,12 @@ export class SqliteSessionPersistence extends SessionPersistence {
 
   /** Publish a current-format metadata generation while preserving event rows. */
   migrateStored(
-    sourceMeta: SessionHeader,
-    currentMeta: SessionHeader,
+    sourceStorage: SessionStorageMetadata,
+    currentStorage: SessionStorageMetadata,
     events: readonly SessionEvent[],
     sourceRevision: PersistenceRevision,
   ): Promise<void> {
-    return this.store.migrateStored(sourceMeta, currentMeta, events, sourceRevision)
+    return this.store.migrateStored(sourceStorage, currentStorage, events, sourceRevision)
   }
   /* jscpd:ignore-end */
 
