@@ -245,6 +245,18 @@ export function logPath(
   return join(sessionDir(root, cwd, id), `session${logSuffix(compression)}`)
 }
 
+/** Return the canonical path for an immutable migrated generation. */
+export function generationLogPath(
+  root: string,
+  cwd: string | undefined,
+  id: SessionId,
+  compression: JsonlCompression,
+  version: number,
+): string {
+  if (version === 0) return logPath(root, cwd, id, compression)
+  return join(sessionDir(root, cwd, id), `session.v${String(version)}${logSuffix(compression)}`)
+}
+
 /**
  * Serialize an event batch as JSONL lines (no trailing newline). With
  * `packChunks` on, delta-chunk runs pack into `text-chunks` /

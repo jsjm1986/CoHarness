@@ -199,6 +199,20 @@ export interface PersistenceBackend<TornMarker = unknown> {
    */
   loadStoredFrom?(id: SessionId, fromSeq: SessionLogOffsetType, signal?: AbortSignal): Promise<StoredSuffix | undefined>
 
+  /**
+   * Publish a current-format successor for one legacy body read.
+   * @param sourceMeta - header read from the preserved source generation.
+   * @param currentMeta - normalized current-format header.
+   * @param events - validated source event prefix to encode in the successor.
+   * @param sourceRevision - revision observed before conversion.
+   */
+  migrateStored?(
+    sourceMeta: SessionHeader,
+    currentMeta: SessionHeader,
+    events: readonly SessionEvent[],
+    sourceRevision: SessionPersistenceRevision,
+  ): Promise<void>
+
   /** Durably create an empty header-only session artifact. */
   materializeHeader?(storage: SessionStorageMetadata): Promise<void>
 
@@ -1048,6 +1062,9 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     this.assertStoredId(id, stored.meta)
     const currentMeta = this.assertVersion(stored.meta)
     const events = snapshotStoredEvents(stored.events, id)
+    if (stored.meta.version !== currentMeta.version && this.backend.migrateStored !== undefined) {
+      await this.backend.migrateStored(stored.meta, currentMeta, events, stored.revision)
+    }
     this.assertEventsSupported(currentMeta, events)
     return {
       meta: structuredClone(currentMeta),
@@ -1065,6 +1082,9 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       this.assertStoredId(id, meta)
       const currentMeta = this.assertVersion(meta)
       const storedEvents = adoptStoredEvents(events, id)
+      if (meta.version !== currentMeta.version && this.backend.migrateStored !== undefined) {
+        await this.backend.migrateStored(meta, currentMeta, storedEvents, revision)
+      }
       this.assertEventsSupported(currentMeta, storedEvents)
       if (inheritedEventCount > storedEvents.length) {
         throw new Error(`session "${id}" inherited event count exceeds its stored event count`)

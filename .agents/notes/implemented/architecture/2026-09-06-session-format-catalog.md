@@ -12,7 +12,7 @@ Session providers need to classify a stored header before reading its body and n
 
 `@deepseek-ai/dsh-session-format` compiles a complete adjacent chain and exposes header-only classification plus detached whole-artifact migration. The default static catalog declares v0→v1 and v1→v2. Newer generations refuse before body decoding; older generations must traverse every declared edge. Inputs are snapshotted and frozen, and the catalog never writes storage.
 
-The current CoHarness steps preserve the existing event vocabulary and only advance the generation marker. Physical codecs, legacy payload normalization, generation publication, and provider backups remain provider-adapter work; they are intentionally not hidden in this pure package.
+The current CoHarness steps preserve the existing event vocabulary and advance the generation marker. JSONL now supplies the first provider adapter: a v0/v1 body read atomically publishes `session.v2.*`, preserves the source bytes, and prefers the highest generation on later reads. Gateway and SQLite physical publication, legacy payload normalization beyond the shared coordinator, and provider backups remain adapter work; they are intentionally not hidden in this pure package.
 
 ## Alternatives considered
 
@@ -24,7 +24,7 @@ The current CoHarness steps preserve the existing event vocabulary and only adva
 
 ## Consequences
 
-Provider implementations have one reusable migration planner and a stable diagnostic category. The catalog does not yet change `SESSION_FORMAT_VERSION` or rewrite existing files; those actions require an adapter-specific atomic publication and rollback design.
+Provider implementations have one reusable migration planner and a stable diagnostic category. The catalog itself does not write storage; JSONL owns its atomic successor publication, while Gateway and SQLite still need adapter-specific publication and rollback work.
 
 ## Verification
 
