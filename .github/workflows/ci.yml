@@ -50,6 +50,37 @@ jobs:
   # to add a master seeder or remove the restore-only steps if cold starts become
   # a concern.
 
+  # Pull-request changes that only update workflow action pins or documentation
+  # do not need the release-sized coverage, browser, runtime, and native lanes.
+  # Source and dependency changes keep the complete existing PR gate set.
+  pr-scope:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    name: PR scope / lane selection
+    outputs:
+      run_expensive: ${{ steps.scope.outputs.run_expensive }}
+      reason: ${{ steps.scope.outputs.reason }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6.0.10
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+
+      - name: Install scope classifier runtime
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Classify pull-request scope
+        id: scope
+        run: pnpm exec tsx scripts/ci-pr-scope.ts "${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+
   # Three jobs isolate coverage, static analysis, and the build-backed consumer
   # tail. The portable default uses standard GitHub-hosted capacity. Deployments
   # with the named enterprise pools may set DSH_CI_ENTERPRISE_RUNNERS_ENABLED to
@@ -132,7 +163,8 @@ jobs:
         run: pnpm run check:ci:static
 
   node-24-coverage:
-    if: github.event_name == 'pull_request'
+    needs: pr-scope
+    if: github.event_name == 'pull_request' && needs.pr-scope.outputs.run_expensive == 'true'
     runs-on: >-
       ${{ vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
           && github.event.pull_request.head.repo.full_name == github.repository
@@ -217,7 +249,8 @@ jobs:
         run: pnpm run check:ci:coverage
 
   node-24-consumers:
-    if: github.event_name == 'pull_request'
+    needs: pr-scope
+    if: github.event_name == 'pull_request' && needs.pr-scope.outputs.run_expensive == 'true'
     runs-on: >-
       ${{ vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
           && github.event.pull_request.head.repo.full_name == github.repository
@@ -414,7 +447,8 @@ jobs:
   # The reusable builder owns the executable, snapshot, wheel, clean-install,
   # GLIBC, and manylinux checks; release validation retains all native targets.
   python-runtime:
-    if: github.event_name == 'pull_request'
+    needs: pr-scope
+    if: github.event_name == 'pull_request' && needs.pr-scope.outputs.run_expensive == 'true'
     name: python runtime / release-shaped Linux x64
     uses: ./.github/workflows/build-exe-for-python-sdk.yml
     with:
@@ -432,7 +466,8 @@ jobs:
   # Current topology and fidelity limits live in
   # .agents/notes/implemented/process/2026-08-08-native-windows-pull-request-ci.md
   windows:
-    if: github.event_name == 'pull_request'
+    needs: pr-scope
+    if: github.event_name == 'pull_request' && needs.pr-scope.outputs.run_expensive == 'true'
     runs-on: ubuntu-latest
     name: windows node 24 / wine blocking
     timeout-minutes: 15
@@ -553,7 +588,8 @@ jobs:
   # DSH_CI_FAILOVER_LINUX variable that retargets the three required Linux jobs
   # and the all-checks-passed verdict above.
   windows-native:
-    if: github.event_name == 'pull_request'
+    needs: pr-scope
+    if: github.event_name == 'pull_request' && needs.pr-scope.outputs.run_expensive == 'true'
     runs-on: >-
       ${{ vars.DSH_CI_FAILOVER_WINDOWS == 'selfhosted'
           && github.event.pull_request.head.repo.full_name == github.repository
@@ -972,15 +1008,16 @@ jobs:
 
   # Single stable required check for branch protection: require "all checks
   # passed" instead of enumerating matrix legs whose names change as lanes and
-  # node versions evolve. Every blocking job in THIS workflow must be listed in
-  # `needs`. The required Wine job is listed as `windows`; `windows-native` is
-  # deliberately absent so its independent result never delays or changes this
-  # verdict. (`needs` cannot reach across workflow files; e2e.yml stays its own
-  # check.)
-  # `if: always()` is load-bearing: without it a failed dependency
-  # would SKIP this job, and GitHub counts a skipped required check as passing
-  # — so this job always runs and fails on any non-success result, including
-  # 'cancelled' and 'skipped'.
+  # node versions evolve. Every pull-request job is listed in `needs`, including
+  # expensive jobs that `pr-scope` may intentionally skip. The verdict requires
+  # those jobs only when the scope selector enables the full lane set;
+  # `windows-native` remains independent so its result never changes this
+  # required verdict. (`needs` cannot reach across workflow files; e2e.yml stays
+  # its own check.)
+  # `if: always()` is load-bearing: without it a failed dependency would SKIP
+  # this job, and GitHub counts a skipped required check as passing. The first
+  # step rejects failed or cancelled always-run jobs and any failed full-lane
+  # job; scope-selected expensive skips are accepted explicitly there.
   all-checks-passed:
     name: all checks passed
     # This bookkeeping-only verdict must not depend on custom-pool
@@ -995,13 +1032,22 @@ jobs:
           && github.event.pull_request.user.login != 'dependabot[bot]'
           && fromJSON('["self-hosted", "linux", "x64", "vm-backup"]')
           || 'ubuntu-latest' }}
-    needs: [node-24, node-24-coverage, node-24-consumers, node-compat, python-sdk, python-runtime, windows]
+    needs: [pr-scope, node-24, node-24-coverage, node-24-consumers, node-compat, python-sdk, python-runtime, windows]
     if: always() && github.event_name == 'pull_request'
     steps:
       - name: Fail if any needed job did not succeed
-        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')
+        if: >-
+          needs.pr-scope.result != 'success'
+          || needs.node-24.result != 'success'
+          || needs.node-compat.result != 'success'
+          || needs.python-sdk.result != 'success'
+          || (needs.pr-scope.outputs.run_expensive == 'true'
+            && (needs.node-24-coverage.result != 'success'
+              || needs.node-24-consumers.result != 'success'
+              || needs.python-runtime.result != 'success'
+              || needs.windows.result != 'success'))
         run: |
-          echo "::error::Needed job results: ${{ join(needs.*.result, ', ') }}"
+          echo "::error::Needed job results: scope=${{ needs.pr-scope.result }}, static=${{ needs.node-24.result }}, compat=${{ needs.node-compat.result }}, python=${{ needs.python-sdk.result }}, expensive=${{ needs.pr-scope.outputs.run_expensive }}, coverage=${{ needs.node-24-coverage.result }}, consumers=${{ needs.node-24-consumers.result }}, runtime=${{ needs.python-runtime.result }}, wine=${{ needs.windows.result }}"
           exit 1
       - name: All checks passed
-        run: echo "All needed jobs succeeded (${{ join(needs.*.result, ', ') }})"
+        run: echo "Required checks passed; expensive lanes=${{ needs.pr-scope.outputs.run_expensive }} (${{ needs.pr-scope.outputs.reason }})"

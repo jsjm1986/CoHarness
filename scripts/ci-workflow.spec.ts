@@ -37,8 +37,9 @@ describe('CI workflow', () => {
       || !isRecord(workflow.jobs['node-24'])
       || !isRecord(workflow.jobs['node-24-coverage'])
       || !isRecord(workflow.jobs['node-24-consumers'])
+      || !isRecord(workflow.jobs['pr-scope'])
       || !isRecord(workflow.jobs['all-checks-passed'])) {
-      throw new TypeError('CI workflow must define windows, windows-native, wine-apt-cache, serial-windows, node-24, node-24-coverage, node-24-consumers, and all-checks-passed jobs')
+      throw new TypeError('CI workflow must define pr-scope, windows, windows-native, wine-apt-cache, serial-windows, node-24, node-24-coverage, node-24-consumers, and all-checks-passed jobs')
     }
 
     const windows = workflow.jobs.windows
@@ -48,6 +49,7 @@ describe('CI workflow', () => {
     const node24 = workflow.jobs['node-24']
     const node24Coverage = workflow.jobs['node-24-coverage']
     const node24Consumers = workflow.jobs['node-24-consumers']
+    const prScope = workflow.jobs['pr-scope']
     const aggregate = workflow.jobs['all-checks-passed']
     if (!Array.isArray(windows.steps)
       || !Array.isArray(aggregate.needs)
@@ -64,7 +66,8 @@ describe('CI workflow', () => {
     // Required PR job: Wine on ubuntu-latest, runs wine-windows-gates.sh.
     expect(windows['runs-on']).toBe('ubuntu-latest')
     expect(windows.name).toBe('windows node 24 / wine blocking')
-    expect(windows.if).toBe("github.event_name == 'pull_request'")
+    expect(windows.if).toContain("github.event_name == 'pull_request'")
+    expect(windows.if).toContain('needs.pr-scope.outputs.run_expensive')
     expect(commandSteps.some(step => step.run.includes('wine-windows-gates.sh'))).toBe(true)
 
     // windows-native: portable standard Windows by default, optional enterprise
@@ -79,7 +82,8 @@ describe('CI workflow', () => {
     expect(windowsNative['runs-on']).toContain('dsh-windows-2025-16core')
     expect(windowsNative['runs-on']).toContain('windows-2025')
     expect(windowsNative.name).toBe('windows node 24 / native complete')
-    expect(windowsNative.if).toBe("github.event_name == 'pull_request'")
+    expect(windowsNative.if).toContain("github.event_name == 'pull_request'")
+    expect(windowsNative.if).toContain('needs.pr-scope.outputs.run_expensive')
     expect(windowsNative.env).toMatchObject({
       DSH_COVERAGE_TEST_TIMEOUT_MS: '30000',
     })
@@ -103,6 +107,7 @@ describe('CI workflow', () => {
     expect(serialWindows.name).toBe('serial / windows (self-hosted standby)')
 
     // Aggregate: Wine `windows` required, native `windows-native` excluded.
+    expect(aggregate.needs).toContain('pr-scope')
     expect(aggregate.needs).toContain('windows')
     expect(aggregate.needs).not.toContain('windows-native')
     expect(aggregate.needs).not.toContain('serial-windows')
@@ -140,6 +145,11 @@ describe('CI workflow', () => {
     expect(aggregate['runs-on']).toContain('github.event.pull_request.head.repo.full_name == github.repository')
     expect(aggregate['runs-on']).not.toContain('DSH_CI_FAILOVER_WINDOWS')
     expect(aggregate['runs-on']).toContain('vm-backup')
+    expect(prScope.if).toBe("github.event_name == 'pull_request'")
+    expect(prScope.outputs).toMatchObject({
+      run_expensive: '${{ steps.scope.outputs.run_expensive }}',
+      reason: '${{ steps.scope.outputs.reason }}',
+    })
   })
 
   it('exempts push from cancellation, so one master merge does not cancel the running drill', () => {
@@ -181,6 +191,7 @@ describe('CI workflow', () => {
     // would silently misclassify it as gated.
     const NOT_PUSH_REACHABLE = new Set([
       "github.event_name == 'pull_request'",
+      "github.event_name == 'pull_request' && needs.pr-scope.outputs.run_expensive == 'true'",
       "always() && github.event_name == 'pull_request'",
       "github.event_name == 'workflow_dispatch' && inputs.suite == 'larger-runner-benchmark' && vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true'",
       "github.event_name == 'workflow_dispatch' && inputs.suite == 'consolidated-runner-benchmark' && vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true'",
@@ -229,7 +240,6 @@ describe('CI workflow', () => {
     }
 
     expect(pythonRuntime).toMatchObject({
-      if: "github.event_name == 'pull_request'",
       name: 'python runtime / release-shaped Linux x64',
       uses: './.github/workflows/build-exe-for-python-sdk.yml',
       with: {
@@ -237,6 +247,8 @@ describe('CI workflow', () => {
         ci: true,
       },
     })
+    expect(pythonRuntime.if).toContain("github.event_name == 'pull_request'")
+    expect(pythonRuntime.if).toContain('needs.pr-scope.outputs.run_expensive')
     expect(aggregate.needs).toContain('python-runtime')
   })
 
