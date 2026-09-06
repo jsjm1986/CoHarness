@@ -43,7 +43,7 @@
   "license": "MIT",
   "dependencies": {
     "immer": "^11.1.16",
-    "zustand": "~4.4.7"
+    "zustand": "~5.0.14"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:^",
