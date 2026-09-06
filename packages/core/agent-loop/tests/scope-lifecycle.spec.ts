@@ -11,7 +11,25 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import { scopeOf } from '@deepseek-ai/dsh-scope'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
+import type { SessionInspection, SessionLocation, SessionPersistenceSnapshot } from '@deepseek-ai/dsh-session-persistence'
+import SessionPersistence from '@deepseek-ai/dsh-session-persistence'
 import { MockAdapter, textResponse } from './mock-adapter.ts'
+
+class HandlePersistence extends SessionPersistence {
+  override readonly supportsRawArtifacts = false
+  readonly created: SessionId[] = []
+
+  locate(_meta: import('@deepseek-ai/dsh-session').SessionHeader): SessionLocation | undefined { return undefined }
+  async create(meta: import('@deepseek-ai/dsh-session').SessionHeader): Promise<void> { this.created.push(meta.id) }
+  async append(_id: SessionId, _events: readonly SessionEvent[]): Promise<void> {}
+  async load(_id: SessionId): Promise<SessionInspection> { throw new Error('not used') }
+  async inspect(_id: SessionId): Promise<SessionInspection> { throw new Error('not used') }
+  async readFrom(_id: SessionId, _fromSeq: number): Promise<{ meta: import('@deepseek-ai/dsh-session').SessionHeader; events: SessionEvent[] }> {
+    throw new Error('not used')
+  }
+  async list(): Promise<import('@deepseek-ai/dsh-session').SessionHeader[]> { return [] }
+  async listSnapshots(): Promise<SessionPersistenceSnapshot[]> { return [] }
+}
 
 async function harnessWithLoop(adapter: MockAdapter = new MockAdapter([textResponse('ok')])): Promise<{ ctx: Context; loopFiber: Fiber }> {
   const ctx = new Context()
@@ -27,6 +45,12 @@ async function harnessWithLoop(adapter: MockAdapter = new MockAdapter([textRespo
 
 async function harness(adapter: MockAdapter = new MockAdapter([textResponse('ok')])): Promise<Context> {
   return (await harnessWithLoop(adapter)).ctx
+}
+
+async function persistentHarness(): Promise<{ ctx: Context; persistence: HandlePersistence }> {
+  const ctx = await harness()
+  await ctx.plugin(HandlePersistence)
+  return { ctx, persistence: ctx.get('sessionPersistence') as HandlePersistence }
 }
 
 function waitForIdle(ctx: Context, agent: Agent): Promise<void> {
@@ -59,6 +83,23 @@ function disposeCurrentLifecycle(ownerCtx: Context): void {
 }
 
 describe('agent scope lifecycle', () => {
+  it('holds one persistence write handle for the owned agent lifecycle', async () => {
+    const { ctx, persistence } = await persistentHarness()
+    const id = SessionId('owned-persistence-handle')
+    const owned = await ctx.agents.create({
+      sessionId: id,
+      agentOptions: { provider: 'mock', model: 'mock' },
+    })
+
+    expect(persistence.created).toEqual([id])
+    expect(() => persistence.openHandle(id, 'write')).toThrow(/already owned/)
+
+    await owned.dispose()
+    const released = persistence.openHandle(id, 'write')
+    await released.close()
+    await ctx.fiber.dispose()
+  })
+
   it('rejects an already-aborted creation signal before publishing either object', async () => {
     const ctx = await harness()
     const reason = new Error('cancelled before creation')

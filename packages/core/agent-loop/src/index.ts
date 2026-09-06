@@ -30,7 +30,7 @@ import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-session-projection'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
-import type { SessionPersistence } from '@deepseek-ai/dsh-session-persistence'
+import type { SessionHandle, SessionPersistence } from '@deepseek-ai/dsh-session-persistence'
 import { ReactLoopAgent } from './agent.ts'
 import {
   DEFAULT_MAX_INBOX_BYTES,
@@ -515,7 +515,25 @@ export class AgentLoop extends Service implements AgentFactory {
       const exists = (await persistence.list()).some(header => header.id === sessionId)
       if (exists) throw error
     }
-    this.create(sessionId, agentOptions, meta)
+    const preparation = SessionPreparation.create(this.runtime.ctx.sessions.prepare(sessionId, { meta }))
+    let handle: SessionHandle | undefined
+    try {
+      handle = await persistence.createHandle(preparation.session.header)
+      await this.setupAndPublish(
+        ownerCtx,
+        sessionId,
+        preparation,
+        agentOptions,
+        undefined,
+        undefined,
+        'startup',
+        handle,
+      )
+      handle = undefined
+    } finally {
+      preparation[Symbol.dispose]()
+      if (handle !== undefined) await handle.close()
+    }
   }
 
   /** Wait for a draining same-id lifecycle to finish registry teardown. */
@@ -547,7 +565,14 @@ export class AgentLoop extends Service implements AgentFactory {
    * BEFORE publication, so a mid-setup unload rolls everything back; `signal`
    * fuses caller cancellation with lifecycle teardown for setup awaits.
    */
-  private prepare(ownerCtx: Context, id: SessionId, options: AgentOptions, session: Session, callerSignal?: AbortSignal): PreparedAgent {
+  private prepare(
+    ownerCtx: Context,
+    id: SessionId,
+    options: AgentOptions,
+    session: Session,
+    callerSignal?: AbortSignal,
+    handle?: SessionHandle,
+  ): PreparedAgent {
     assertAgentOptions(options)
     ownerCtx.fiber.assertActive()
     // Every caller reaches prepare() synchronously from a service method
@@ -604,8 +629,12 @@ export class AgentLoop extends Service implements AgentFactory {
           detachAgent?.()
           detachSession?.()
         } finally {
-          untrack()
-          if (!ownerTriggered) await unfollowOwner()
+          try {
+            await handle?.close()
+          } finally {
+            untrack()
+            if (!ownerTriggered) await unfollowOwner()
+          }
         }
       }
     })())
@@ -699,17 +728,35 @@ export class AgentLoop extends Service implements AgentFactory {
       ...options.seed === undefined ? {} : { seed: options.seed },
       ...options.meta === undefined ? {} : { meta: options.meta },
     }))
-    const published = this.setupAndPublish(
-      ownerCtx,
-      options.sessionId,
-      preparation,
-      options.agentOptions ?? {},
-      options.setup,
-      options.signal,
-      'startup',
-    )
-    this.ownership.trackWrapper(published)
-    return published
+    const persistence = this.runtime.ctx.get('sessionPersistence')
+    let handle: SessionHandle | undefined
+    try {
+      if (persistence !== undefined) {
+        handle = await raceAbortCall(
+          () => persistence.createHandle(preparation.session.header),
+          options.signal ?? this.ownership.signal,
+          options.sessionId,
+          (abandoned) => { void abandoned.close() },
+        )
+      }
+      const published = this.setupAndPublish(
+        ownerCtx,
+        options.sessionId,
+        preparation,
+        options.agentOptions ?? {},
+        options.setup,
+        options.signal,
+        'startup',
+        handle,
+      )
+      this.ownership.trackWrapper(published)
+      const result = await published
+      handle = undefined
+      return result
+    } finally {
+      preparation[Symbol.dispose]()
+      if (handle !== undefined) await handle.close()
+    }
   }
 
   /** Prepare one Agent around an acquired Session, run setup, and publish it. */
@@ -721,10 +768,11 @@ export class AgentLoop extends Service implements AgentFactory {
     setup: AgentSetup | undefined,
     signal: AbortSignal | undefined,
     source: SessionStartSource,
+    handle?: SessionHandle,
   ): Promise<AgentHandle> {
     using ownedPreparation = preparation
     const session = ownedPreparation.session
-    const prepared = this.prepare(ownerCtx, id, agentOptions, session, signal)
+    const prepared = this.prepare(ownerCtx, id, agentOptions, session, signal, handle)
     try {
       const setupCommit = await raceAbort(setup?.(prepared.agent.ctx), prepared.signal, id)
       setupCommit?.commit()
@@ -770,6 +818,7 @@ export class AgentLoop extends Service implements AgentFactory {
         this.ownership.signal,
       ])
       let preparation: SessionPreparation | undefined
+      let handle: SessionHandle | undefined
       try {
         try {
           preparation = await raceAbortCall(
@@ -783,7 +832,13 @@ export class AgentLoop extends Service implements AgentFactory {
         }
         ownerCtx.fiber.assertActive()
         if (!this.ownership.isActive()) throw new Error('agent loop is not active')
-        return await this.setupAndPublish(
+        handle = await raceAbortCall(
+          () => persistence.openHandle(id, 'write'),
+          fused,
+          id,
+          (abandoned) => { void abandoned.close() },
+        )
+        const result = await this.setupAndPublish(
           ownerCtx,
           id,
           preparation,
@@ -791,8 +846,12 @@ export class AgentLoop extends Service implements AgentFactory {
           options.setup,
           options.signal,
           'resume',
+          handle,
         )
+        handle = undefined
+        return result
       } finally {
+        if (handle !== undefined) await handle.close()
         preparation?.[Symbol.dispose]()
       }
     })()
