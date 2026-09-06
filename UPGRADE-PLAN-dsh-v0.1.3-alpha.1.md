@@ -11,14 +11,14 @@
 
 CoHarness 已经拥有上游 alpha.1 的部分能力：模型发现、任意 MIME 文档上传、断点续传、文件观测、`read_image`、Workspace 根目录处理和 Agent Team 控制工具。此次同步不重复实现这些能力，而是校验差异并补齐缺失的行为。
 
-必须优先处理的是 Session format v2、SessionHandle 和单 Session 写锁。它们会改变 persistence 生命周期和生产数据读取方式，必须在通用上传及其他能力之前落地。
+必须优先处理的是 Session format v2、SessionHandle 和单 Session 写锁。它们会改变 persistence 生命周期和生产数据读取方式，必须在通用上传及其他能力之前落地。本分支已经完成 SessionHandle 的进程内基础接缝、AgentFactory 生命周期接入、projection cache 的格式代次绑定，以及纯函数迁移 catalog；物理代次发布和跨进程锁仍需后续 provider 阶段完成。
 
 ## 能力处置
 
 | 上游能力 | CoHarness 当前状态 | 本轮处置 |
 | --- | --- | --- |
-| SessionHandle、异步 `agentLoop.create()`、Session lock | 当前是 coordinator/SessionPersistence API，`SESSION_FORMAT_VERSION` 仍为 0 | 采用，拆为基础 API、迁移链、JSONL/Gateway provider 三个阶段 |
-| v0/v1 → v2 Session migration | 已有旧事件读取转换，但没有不可变 generation migration | 采用；首次 body read 自动生成 v2，保留旧文件和 inode |
+| SessionHandle、异步 `agentLoop.create()`、Session lock | `AgentFactory.createAgent`/`resume` 已在发布前取得写句柄，并在 Agent teardown 后释放；同步便利入口仍保留 | 采用基础 API；跨进程锁与 provider 原子锁文件另拆阶段 |
+| v0/v1 → v2 Session migration | 已有旧事件读取转换；新增纯函数相邻 catalog，物理 provider 尚未接入 v2 generation | 采用 catalog；首次 body read 自动生成 v2、保留旧文件和 inode 仍是后续 provider 阶段 |
 | 任意文件上传、进度、取消、续传 | `userdoc` 已支持任意 mediaType、resumable upload、localStorage/IndexedDB resume | 保留现有实现，补齐会话引用、UI 预览和真实组合验收，不引入上游平行 `file-upload` 存储 |
 | `read_image` | 已有附件、image modality 和 tool-card | 基线等效，仅核对 extensionless/attachment 路径行为 |
 | `FS_NOT_OBSERVED` | 已有 observation policy 和版本保护 | 基线等效，不移植重复实现 |
@@ -32,8 +32,8 @@ CoHarness 已经拥有上游 alpha.1 的部分能力：模型发现、任意 MIM
 ## 实施顺序
 
 1. 记录审计和目标版本，建立本次同步的 manifest。
-2. 引入 SessionHandle、异步 agentLoop 创建、单 Session 写锁。
-3. 实现 v0/v1 → v2 迁移链、JSONL immutable generation 和 Gateway 逻辑适配。
+2. 引入 SessionHandle、异步 agentLoop 创建、单 Session 写锁（本分支已完成进程内基础接入）。
+3. 实现 v0/v1 → v2 迁移链、JSONL immutable generation 和 Gateway 逻辑适配（catalog 已完成，provider 接入待继续）。
 4. 复用现有 userdoc/attachment，补通用文件上传的会话引用、UI 和 scope 验收。
 5. 适配 HTTP proxy、模型 discovery 回归、Agent Team steer、Windows/macOS 和搜索边界修复。
 6. 更新版本、文档、release verify、迁移 runbook 和生产 canary 证据。

@@ -32,6 +32,7 @@ def test_otool_parser_requires_a_deployment_target() -> None:
 
 def test_wheel_tag_rejects_a_newer_executable_target() -> None:
     checker.ensure_compatible(Path("runtime"), (13, 5), "macosx_14_0_arm64")
+    checker.ensure_compatible(Path("runtime-x64"), (13, 5), "macosx_14_0_x86_64")
 
     with pytest.raises(RuntimeError, match="requires macOS 14.1"):
         checker.ensure_compatible(Path("spawn-helper"), (14, 1), "macosx_14_0_arm64")
