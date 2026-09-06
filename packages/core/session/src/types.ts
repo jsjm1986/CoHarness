@@ -101,7 +101,7 @@ export type OptionalSessionSeq = SessionSeq | null
  * recorded in the session-log-version-mechanism Agent Note
  * (`.agents/notes/implemented/architecture/2026-08-10-session-log-version-mechanism.md`).
  */
-export const SESSION_FORMAT_VERSION = 0
+export const SESSION_FORMAT_VERSION = 2
 
 /**
  * Immutable validated storage metadata, kept outside the conversation event log.

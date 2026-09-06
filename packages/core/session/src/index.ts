@@ -13,6 +13,7 @@ import { scopeOf, scopeTarget } from '@deepseek-ai/dsh-scope'
 import type { Scoped } from '@deepseek-ai/dsh-scope'
 import type { Message } from '@deepseek-ai/dsh-llm'
 import { SESSION_FORMAT_VERSION, SessionId, SessionLogOffset, SessionSeq } from './types.ts'
+import { sessionFormatCatalog } from '@deepseek-ai/dsh-session-format'
 import type { TypertLookup } from '@deepseek-ai/dsh-typert-protocol'
 import type { CreateSessionOptions, EpochHeader, PrepareSessionOptions, RequestContext, SessionEvent, SessionEventMap, SessionEventType, SessionHeader, SurfaceIntent, SurfaceEventType } from './types.ts'
 import { snapshotJsonValue } from './json.ts'
@@ -112,7 +113,7 @@ function validateSessionHeader(id: SessionId, input: unknown): SessionHeader {
   if (Object.hasOwn(record, 'seedLength')) {
     throw new Error('session header has invalid field "seedLength"')
   }
-  if (record.version !== SESSION_FORMAT_VERSION) {
+  if (record.version !== SESSION_FORMAT_VERSION && record.version !== 0 && record.version !== 1) {
     throw new Error(`session header version must be ${SESSION_FORMAT_VERSION}, got ${String(record.version)}`)
   }
   if (record.id !== id) {
@@ -148,7 +149,10 @@ function validateSessionHeader(id: SessionId, input: unknown): SessionHeader {
   if (record.draft !== undefined && typeof record.draft !== 'boolean') {
     throw new Error('session header draft must be a boolean')
   }
-  return deepFreeze(record as unknown as SessionHeader)
+  const migrated = record.version === SESSION_FORMAT_VERSION
+    ? record
+    : sessionFormatCatalog.migrateHeader(record as never)
+  return deepFreeze(migrated as unknown as SessionHeader)
 }
 
 /** Validate and freeze one exclusively owned persistence header in place. */
