@@ -24,7 +24,7 @@ The current CoHarness steps preserve the existing event vocabulary and advance t
 
 ## Consequences
 
-Provider implementations have one reusable migration planner and a stable diagnostic category. The catalog itself does not write storage; JSONL and SQLite own their provider-specific publication, while Gateway still needs its server-side migration endpoint and rollback contract.
+Provider implementations have one reusable migration planner and a stable diagnostic category. The catalog itself does not write storage; JSONL and SQLite own their provider-specific publication. Gateway clients now issue an optional idempotent migration request carrying the source revision and target header; the server must add the transactional endpoint and rollback contract, while a 404 keeps older deployments on the in-memory fallback.
 
 ## Verification
 

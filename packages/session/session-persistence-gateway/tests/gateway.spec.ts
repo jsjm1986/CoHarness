@@ -59,6 +59,7 @@ class GatewayTransport {
   readonly identity = { kind: 'project' as const, id: 41, generation: 7 }
   readonly organization = 'acme'
   readonly appends: RecordedAppend[] = []
+  readonly migrations: RecordedAppend[] = []
   readonly creations: RecordedCreation[] = []
   principal: GatewayRequestPrincipal | undefined
 
@@ -115,6 +116,19 @@ class GatewayTransport {
     if (url.pathname === '/internal/runtime/session/revision') {
       const stored = this.sessions.get(sessionId)
       return json(200, { revision: stored === undefined ? null : `revision-${String(stored.revision)}` })
+    }
+
+    if (url.pathname === '/internal/runtime/session/migrate') {
+      const body = bodyRecord(init)
+      this.migrations.push({ body: structuredClone(body), principal: init.principal })
+      const stored = this.sessions.get(sessionId || String(body.sessionId))
+      if (stored === undefined) return json(404, { error: 'conversation-not-found' })
+      if (String(body.sourceRevision) !== `revision-${String(stored.revision)}`) {
+        return json(409, { error: 'revision-conflict' })
+      }
+      stored.header = structuredClone(body.targetHeader)
+      stored.revision += 1
+      return json(200, { migrated: true, revision: `revision-${String(stored.revision)}` })
     }
 
     if (url.pathname === '/internal/runtime/session/meta') {
@@ -344,6 +358,25 @@ const PRINCIPAL: GatewayRequestPrincipal = {
 }
 
 describe('GatewaySessionPersistence collaboration creation', () => {
+  it('requests optional v2 migration and keeps the in-memory fallback compatible', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const transport = new GatewayTransport()
+    const id = SessionId('gateway-legacy-v0')
+    transport.seed(String(id), oneTurnLog())
+    const fiber = await mountBackend(ctx, transport)
+
+    const loaded = await ctx.sessionPersistence.load(id)
+    expect(loaded.meta.version).toBe(2)
+    expect(transport.migrations).toHaveLength(1)
+    expect(transport.migrations[0]?.body).toMatchObject({
+      sessionId: id,
+      sourceRevision: 'revision-1',
+      targetHeader: { id, version: 2 },
+    })
+    await fiber.dispose()
+  })
+
   it('uses a persistent creation authorization after the request principal expires', async () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)

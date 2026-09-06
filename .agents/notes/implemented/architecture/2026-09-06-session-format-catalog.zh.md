@@ -24,7 +24,7 @@ Session provider 需要在读取事件体前对存储 header 分类，也需要�
 
 ## 结果
 
-Provider 实现拥有统一的迁移规划器和稳定诊断类别。catalog 本身不写入存储；JSONL 和 SQLite 负责各自的 provider 发布，Gateway 仍需要服务端迁移 endpoint（端点）和回滚约定。
+Provider 实现拥有统一的迁移规划器和稳定诊断类别。catalog 本身不写入存储；JSONL 和 SQLite 负责各自的 provider 发布。Gateway 客户端现在会发送携带源 revision 和目标 header 的可选幂等迁移请求；服务端仍需增加事务 endpoint（端点）和回滚约定，返回 404 时客户端继续使用内存回退。
 
 ## 验证
 
