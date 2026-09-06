@@ -4,21 +4,24 @@
 
 会话持久化是一项能力 seam。抽象的 `SessionPersistence` 服务（`ctx.sessionPersistence`）是其 Service Definition。它要求持久化后端持久存储、重新加载和列出会话，但不规定具体存储实现。该 seam 采用与 `dsh-shell` 相同的角色划分（见[能力 seam](../../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.zh.md)）：本包负责 Service Definition，同级包负责 Service Provider，Consumer 注入该服务。
 
-持久化单元就是现有 `SessionEvent`（事件溯源模型：日志是唯一真源），因此不存在另一套并行的「持久消息」类型。不属于可回放对话状态的元数据（格式版本、cwd、血缘、origin、委托深度和临时浏览器草稿标记）作为 `SessionHeader` 单独传输，该类型归 `dsh-session` 所有，并在此重新导出。`SessionHeader.isSeeded` 让轻量列表也能看到血缘，而精确的 `inheritedEventCount` 作为 `SessionStorageMetadata` 伴随每一次带事件体的存储读取（`SessionInspection`、`SessionEventSuffix`）和已准备好的 Session。
+持久化单元就是现有 `SessionEvent`（事件溯源模型：日志是唯一真源），因此不存在另一套并行的「持久消息」类型。不属于可回放对话状态的元数据（格式版本、cwd、血缘、种子边界、origin、委托深度和临时浏览器草稿标记）作为 `SessionHeader` 单独传输，该类型归 `dsh-session` 所有，并在此重新导出。
 
 ## 服务 API（`ctx.sessionPersistence`）
+
+`createHandle` 与 `openHandle` 是 v2 迁移使用的增量所有权 seam。写 handle 会在当前进程内预留一个 Session id，读 handle 不能 append，`close` 幂等地释放预留。现有服务方法会在 Provider 和 Consumer 迁移期间继续保留。
 
 | 方法 | 约定 |
 |---|---|
 | `locate(meta): SessionLocation \| undefined` | 在不执行 I/O 或实体化的情况下解析每个会话的绝对产物目标。没有独立本地产物的后端返回 `undefined`。 |
 | `supportsRawArtifacts: boolean` | 明确说明该后端是否为每个会话暴露一份逐字工件。Consumer 在调用 `readRaw` 前检查此能力；`false` 并不表示会话缺失。 |
 | `readRaw(id, signal?): Promise<SessionRawArtifact \| undefined>` | 读取受支持后端自身的逐字工件文本；只解码物理编码，绝不从事件重建。`undefined` 仅表示所请求工件缺失；不支持的后端会拒绝。 |
-| `create(meta, inheritedEventCount?): Promise<void>` | 注册新会话元数据。`meta.isSeeded: true` 时必须同时给出精确切点；无种子元数据可以省略它，且拒绝非零值。可以将物理写入延迟到第一次 `append`（延迟实体化）；带种子会话的首个实体化批次必须覆盖完整的继承前缀，因此存储永远不会暴露切点超过日志长度的元数据。 |
+| `create(meta): Promise<void>` | 注册新会话元数据。可以将物理写入延迟到第一次 `append`（延迟实体化）。 |
+| `createHandle(meta): Promise<SessionHandle>` / `openHandle(id, mode): SessionHandle` | 为一个 Session 获取显式读/写所有权。第二个写 handle 以 `SESSION_ALREADY_OWNED` 拒绝；读 handle 的 append 以 `SESSION_READ_ONLY` 拒绝。 |
 | `append(id, events): Promise<void>` | 持久保存一个批次。仅追加；任何修复后，第一个事件 `seq` == 已存储 next-seq；非 JSON 可序列化数据会被拒绝，并命名违规类型。 |
 | `prepare(id, signal?): Promise<SessionPreparation>` | 预留恢复所使用的那个未发布 Session。协调器会尽可能复用之前的检查结果、提交待处理恢复，并在 dispose（资源释放）时将未发布 reservation 释放回有界缓存。 |
-| `load(id): Promise<SessionInspection>` | 转换同一格式版本中受支持的旧记录后，返回不可变、平衡的逻辑日志，并提交冷恢复。实时 load 先 flush 其快照，并在轮次开放时拒绝；冷 load 保留中断的最终轮次，并用合成 `tool/result`/`step/end?`/`turn/end {interrupted}` 事件持久关闭它。只丢弃撕裂尾部碎片；已提交损坏和格式错误的记录以 `SessionPersistenceCorruptionError` 拒绝，不支持的格式 `version` 或本构建不认识且信封未带 `ignorable` 标记的事件类型以 `SessionFormatUnsupportedError` 拒绝，消息说明拒绝方向，并在后端为每个会话保留独立文件时给出原始日志路径。 |
-| `inspect(id, signal?): Promise<SessionInspection>` | 返回已经升级、验证和深度冻结的逻辑视图，但不提交恢复或发布 Session。冷视图会获得仅存在于内存的合成恢复 closer，物理撕裂尾部保持不变；实时状态下的视图则是当前不可变快照，可能包含开放的轮次。基于协调器的实现会在有界 LRU 中保留该冷状态下未发布的 Session 本身，供后续 `prepare` 使用，但已存储修订值变化后会丢弃并重新读取。同 id 检查共享进行中的读取。 |
-| `readFrom(id, fromSeq: SessionLogOffset, signal?): Promise<SessionEventSuffix>` | 返回一个脱离的 `SessionEventSuffix`——header、未变的继承切点、该 `fromSeq`，以及 `seq >= fromSeq` 的有效已存储事件——不进入 preparation 缓存、不截断、不合成 closer，也不发布协调器状态。`fromSeq` 达到或超过已存储末尾时返回空事件列表；负数或非安全整数的偏移会被 `SessionLogOffset` 构造函数拒绝。可寻址后端（SQLite）只读后缀，除非转换受支持的旧记录需要读取更早的记录；顺序后端（JSONL）解析整个产物并向前跳过。未知类型拒绝遵循同一读取方式：寻址读取只检查返回的后缀，顺序回退路径还会拒绝窗口以下的未知必需事件。供 checkpoint 消费方只应用已存序号之后的事件。 |
+| `load(id): Promise<{ meta; events }>` | 转换同一格式版本中受支持的旧记录后，返回不可变、平衡的逻辑日志，并提交冷恢复。实时 load 先 flush 其快照，并在轮次开放时拒绝；冷 load 保留中断的最终轮次，并用合成 `tool/result`/`step/end?`/`turn/end {interrupted}` 事件持久关闭它。只丢弃撕裂尾部碎片；已提交损坏和格式错误的记录以 `SessionPersistenceCorruptionError` 拒绝，不支持的格式 `version` 或本构建不认识且信封未带 `ignorable` 标记的事件类型以 `SessionFormatUnsupportedError` 拒绝，消息说明拒绝方向，并在后端为每个会话保留独立文件时给出原始日志路径。 |
+| `inspect(id, signal?): Promise<{ meta; events }>` | 返回已经升级、验证和深度冻结的逻辑视图，但不提交恢复或发布 Session。冷视图会获得仅存在于内存的合成恢复 closer，物理撕裂尾部保持不变；实时状态下的视图则是当前不可变快照，可能包含开放的轮次。基于协调器的实现会在有界 LRU 中保留该冷状态下未发布的 Session 本身，供后续 `prepare` 使用，但已存储修订值变化后会丢弃并重新读取。同 id 检查共享进行中的读取。 |
+| `readFrom(id, fromSeq, signal?): Promise<{ meta; events }>` | 返回 `seq >= fromSeq` 的有效已存储事件，不进入 preparation 缓存、不截断、不合成 closer，也不发布协调器状态。`fromSeq` 达到或超过已存储末尾时返回空事件列表；负数或非安全整数 `fromSeq` 会被拒绝。可寻址后端（SQLite）只读后缀，除非转换受支持的旧记录需要读取更早的记录；顺序后端（JSONL）解析整个产物并向前跳过。未知类型拒绝遵循同一读取方式：寻址读取只检查返回的后缀，顺序回退路径还会拒绝窗口以下的未知必需事件。供 checkpoint 消费方只应用已存序号之后的事件。 |
 | `readHeader(id, signal?): Promise<SessionHeader \| undefined>` | 只读取会话 header，不实体化事件行。第一方带索引的提供方按会话 id 查询；默认实现过滤 `listSnapshots()`，兼容第三方提供方。 |
 | `readRevision(id, signal?): Promise<SessionPersistenceRevision \| undefined>` | 供只需要新鲜度的调用方使用的具名轻量 revision 查询。第一方提供方使用按 id 的索引；默认实现委托给 `revision()`。 |
 | `readPage(id, request, signal?): Promise<SessionPersistencePage>` | 读取一个有界的升序事件区间，限制为 `maxBytes`（512 KiB）、`maxEvents`（2,000）和 `maxGroups`（50）。组数统计会把同一 turn/step 的 assistant 流式 chunk 归为一组，并让每个工具调用生命周期保持独立，因此 token chunk 不会各自消耗一组。绑定 revision 的 cursor 可沿相同方向续取，并在追加或修复后失效——与单页读取中 revision 变化一样报为 `dependency`；指向其他会话或方向的 cursor 才是 `protocol` 错误。提供方区分 `too-large`、`aborted`、`timeout`、`dependency` 和 `protocol` 失败；没有 seek 实现的提供方保留完整读取兼容回退。 |
@@ -58,8 +61,8 @@
 | `loadStored(id, signal?)` | 在全部存储范围中按 id 读取已存储前缀。用于恢复／加载、非修改式 inspect、活动会话接管和 create 冲突探测。可选信号属于仅观察读取。返回元数据标识 `id`；`revision` 精确标识返回的 header 和事件；当且仅当必须截断撕裂尾部时才存在不透明 `tornMarker`。 |
 | `readStoredRevision(id, signal?)` | 在不加载事件日志的情况下读取一个 id 当前的来源限定修订值。它使用与 `loadStored` 相同的修订值表示；id 不存在时返回 `undefined`。 |
 | `loadStoredFrom?(id, fromSeq, signal?)` | 服务 `readFrom` 背后的可选可寻址后缀读取：返回 header 和 `seq >= fromSeq` 的已存储事件，非修改式、无撕裂标记。SQLite 实现它（`WHERE seq >= ?`）；不实现的后端使用协调器回退——`loadStored` 加向前跳过。 |
-| `appendBatch(storage, events, isMaterialized)` | 持久追加连续批次；尚未实体化时以原子方式延迟实体化。 |
-| `commitRepair(storage, tornMarker, closers)` | 使崩溃修复持久：截断撕裂尾部（当且仅当 `tornMarker !== undefined`；标记可为 falsy，例如 seq/offset `0`），并追加 `closers`。不要求原子性。由 load（截断 + closer）和活动会话接管（仅截断）使用。 |
+| `appendBatch(meta, events, isMaterialized)` | 持久追加连续批次；尚未实体化时以原子方式延迟实体化。 |
+| `commitRepair(meta, tornMarker, closers)` | 使崩溃修复持久：截断撕裂尾部（当且仅当 `tornMarker !== undefined`；标记可为 falsy，例如 seq/offset `0`），并追加 `closers`。不要求原子性。由 load（截断 + closer）和活动会话接管（仅截断）使用。 |
 | `list(signal?)` | 列出全部已存储元数据，并遵循可选的取消信号。 |
 | `close?()` | 可选生命周期拆卸（例如关闭 db 句柄），在 dispose drain 后等待其完成。 |
 
@@ -67,7 +70,7 @@
 
 ## 元数据与位置类型
 
-从 `dsh-session` 重新导出：`SessionHeader`（不可变会话元数据：`version`、`id`、`createdAt`、`isSeeded`、`cwd?`、`parentSession?`、`origin?`、`delegationDepth?`、`agentPreset?`、`draft?`）。本包拥有：`SessionStorageMetadata`（`{ meta, inheritedEventCount }`）、`SessionInspection`（元数据加完整已验证日志）和 `SessionEventSuffix`（元数据加 `fromSeq` 及其后的已存储事件）。后端提供 `SessionPersistenceSnapshot.content` 时，它携带供冷列表投影使用的 `blank`、`visibleContentSeq` 和 `lastPromptAt`。`SessionLocation` 是 `{ readonly kind: string; readonly path: string }`；其 path 是绝对后端目标，不证明产物已存在或包含未 flush 轮次。
+从 `dsh-session` 重新导出：`SessionHeader`（不可变会话元数据：`version`、`id`、`createdAt`、`cwd?`、`parentSession?`、`seedLength?`、`origin?`、`delegationDepth?`、`draft?`）。后端提供 `SessionPersistenceSnapshot.content` 时，它携带供冷列表投影使用的 `blank`、`visibleContentSeq` 和 `lastPromptAt`。`SessionLocation` 是 `{ readonly kind: string; readonly path: string }`；其 path 是绝对后端目标，不证明产物已存在或包含未 flush 轮次。
 
 ## 模型体验
 

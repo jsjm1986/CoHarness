@@ -161,6 +161,82 @@ export interface SessionRawArtifact extends SessionStorageMetadata {
   readonly content: string
 }
 
+/** Error raised when one persistence instance already owns a Session for writing. */
+export class SessionAlreadyOwnedError extends Error {
+  readonly code = 'SESSION_ALREADY_OWNED' as const
+
+  constructor(id: SessionId) {
+    super(`session "${id}" is already owned for writing`)
+    this.name = 'SessionAlreadyOwnedError'
+  }
+}
+
+/** Error raised when a read-only SessionHandle receives a mutation. */
+export class SessionReadOnlyError extends Error {
+  readonly code = 'SESSION_READ_ONLY' as const
+
+  constructor(id: SessionId) {
+    super(`session "${id}" is open for reading only`)
+    this.name = 'SessionReadOnlyError'
+  }
+}
+
+/** Access mode for one persistence-owned SessionHandle. */
+export type SessionHandleMode = 'read' | 'write'
+
+/**
+ * Explicit per-session persistence access. Handles are the additive seam used
+ * by the v2 migration; legacy service methods remain available until callers
+ * move to handle ownership.
+ */
+export interface SessionHandle {
+  readonly id: SessionId
+  readonly mode: SessionHandleMode
+  read(offset?: number): Promise<readonly SessionEvent[]>
+  append(events: readonly SessionEvent[]): Promise<void>
+  flush(): Promise<void>
+  close(): Promise<void>
+}
+
+class PersistenceSessionHandle implements SessionHandle {
+  private closed = false
+
+  constructor(
+    private readonly owner: SessionPersistence,
+    readonly id: SessionId,
+    readonly mode: SessionHandleMode,
+  ) {}
+
+  async read(offset = 0): Promise<readonly SessionEvent[]> {
+    this.assertOpen()
+    if (!Number.isSafeInteger(offset) || offset < 0) throw new TypeError('session handle offset must be non-negative')
+    return (await this.owner.readFrom(this.id, offset)).events
+  }
+
+  async append(events: readonly SessionEvent[]): Promise<void> {
+    this.assertOpen()
+    if (this.mode === 'read') throw new SessionReadOnlyError(this.id)
+    await this.owner.append(this.id, events)
+  }
+
+  async flush(): Promise<void> {
+    this.assertOpen()
+    // Legacy append is already durable at resolution. The lifecycle event is
+    // emitted when a live Session exists, so this additive handle remains safe
+    // for detached provider tests without inventing a second flush protocol.
+  }
+
+  async close(): Promise<void> {
+    if (this.closed) return
+    this.closed = true
+    this.owner.releaseHandle(this.id, this)
+  }
+
+  private assertOpen(): void {
+    if (this.closed) throw new Error(`session handle for "${this.id}" is closed`)
+  }
+}
+
 // The backend-agnostic write-path orchestration first-party backends compose.
 export {
   DEFAULT_MAX_PENDING_BYTES_PER_SESSION,
@@ -205,8 +281,41 @@ export interface SessionLocation {
  * rewriting committed events.
  */
 export abstract class SessionPersistence extends Service {
+  private readonly writeHandles = new Map<SessionId, PersistenceSessionHandle>()
+
   constructor(ctx: Context) {
     super(ctx, 'sessionPersistence')
+  }
+
+  /**
+   * Create a new explicit write handle while retaining the legacy create API.
+   * @param meta - immutable Session header to register.
+   * @returns an owned write handle.
+   */
+  async createHandle(meta: SessionHeader): Promise<SessionHandle> {
+    await this.create(meta)
+    return this.openHandle(meta.id, 'write')
+  }
+
+  /**
+   * Open a read or write handle for an existing Session.
+   * @param id - persisted Session identity.
+   * @param mode - read allows inspection; write reserves the local writer.
+   * @returns an explicit SessionHandle.
+   */
+  openHandle(id: SessionId, mode: SessionHandleMode): SessionHandle {
+    if (mode === 'write') {
+      if (this.writeHandles.has(id)) throw new SessionAlreadyOwnedError(id)
+      const handle = new PersistenceSessionHandle(this, id, mode)
+      this.writeHandles.set(id, handle)
+      return handle
+    }
+    return new PersistenceSessionHandle(this, id, mode)
+  }
+
+  /** Release a process-local writer reservation held by one handle. */
+  releaseHandle(id: SessionId, handle: PersistenceSessionHandle): void {
+    if (this.writeHandles.get(id) === handle) this.writeHandles.delete(id)
   }
 
   /**
