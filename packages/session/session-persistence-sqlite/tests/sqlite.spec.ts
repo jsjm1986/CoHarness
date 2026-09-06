@@ -681,7 +681,7 @@ describe('SessionPersistenceSqlite edge behavior', () => {
     const first = new Context()
     await first.plugin(SessionStore)
     await first.plugin(SessionPersistenceSqlite, { path })
-    await first.sessionPersistence.create({ id, version: 2, createdAt: 1, cwd: '/work' })
+    await first.sessionPersistence.create({ id, version: 2, createdAt: 1, cwd: '/work', isSeeded: false })
     await first.sessionPersistence.append(id, chunkLog(1))
     await first.fiber.dispose()
 
