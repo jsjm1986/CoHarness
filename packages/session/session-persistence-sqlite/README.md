@@ -30,6 +30,8 @@ pnpm run migrate:session-sqlite-v18-to-v20 -- --input old.db --verify-only
 
 The input is read-only, the output must be a distinct new file, and each tool verifies logical event hashes before it returns. `--replace --keep-backup` is an explicit atomic replacement mode; keep the backup until a cold load and replay pass. Every runtime statement and fixed pragma lives in a packaged `.sql` resource; values use SQLite parameters and runtime code never assembles query text.
 
+Session headers from format v0/v1 are a separate logical migration: the first body read updates only the metadata row to v2 in a write transaction and leaves all event rows untouched. Database schema upgrades remain offline and explicit.
+
 ## Configuration (schemastery)
 
 ```ts

@@ -670,6 +670,31 @@ describe('SessionPersistenceSqlite schema ownership', () => {
 })
 
 describe('SessionPersistenceSqlite edge behavior', () => {
+  it('publishes a v2 metadata generation after reading a legacy header', async () => {
+    const path = await freshDbPath('dsh-sqlite-format-migration-')
+    const id = SessionId('sqlite-legacy-format')
+    const first = new Context()
+    await first.plugin(SessionStore)
+    await first.plugin(SessionPersistenceSqlite, { path })
+    await first.sessionPersistence.create({ id, version: 2, createdAt: 1, cwd: '/work' })
+    await first.sessionPersistence.append(id, chunkLog(1))
+    await first.fiber.dispose()
+
+    const raw = new DatabaseSync(path)
+    raw.prepare('UPDATE sessions SET version = 0 WHERE session_key = ?').run(id)
+    raw.close()
+
+    const second = new Context()
+    await second.plugin(SessionStore)
+    await second.plugin(SessionPersistenceSqlite, { path })
+    const loaded = await second.sessionPersistence.load(id)
+    expect(loaded.meta.version).toBe(2)
+    const migrated = new DatabaseSync(path)
+    expect(migrated.prepare('SELECT version FROM sessions WHERE session_key = ?').get(id)).toEqual({ version: 2 })
+    migrated.close()
+    await second.fiber.dispose()
+  })
+
   it('keeps a fresh database unopened until the first persistence operation', async () => {
     const path = await freshDbPath('dsh-sqlite-lazy-')
     const ctx = new Context()

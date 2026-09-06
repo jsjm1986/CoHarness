@@ -30,6 +30,8 @@ pnpm run migrate:session-sqlite-v18-to-v20 -- --input old.db --verify-only
 
 输入只读，输出必须是不同的新文件；工具返回前会校验逻辑事件 hash。`--replace --keep-backup` 是显式原子替换模式；完成冷加载和回放前保留备份。每条运行时语句和固定 pragma 都位于随包发布的 `.sql` 资源中；值使用 SQLite 参数，运行时代码不会拼装查询文本。
 
+格式 v0/v1 的 Session header 属于独立的逻辑迁移：首次读取 body 时，在写事务中只将元数据行更新为 v2，事件行保持不变。数据库 schema 升级仍必须离线、显式执行。
+
 ## 配置（schemastery）
 
 ```ts

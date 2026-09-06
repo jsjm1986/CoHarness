@@ -140,6 +140,16 @@ export class SqliteSessionPersistence extends SessionPersistence {
   ): Promise<{ meta: SessionHeader; events: SessionEvent[] }> {
     return this.coordinator.readFrom(id, fromSeq, signal)
   }
+
+  /** Publish a current-format metadata generation while preserving event rows. */
+  migrateStored(
+    sourceMeta: SessionHeader,
+    currentMeta: SessionHeader,
+    events: readonly SessionEvent[],
+    sourceRevision: PersistenceRevision,
+  ): Promise<void> {
+    return this.store.migrateStored(sourceMeta, currentMeta, events, sourceRevision)
+  }
   /* jscpd:ignore-end */
 
   list(signal?: AbortSignal): Promise<SessionHeader[]> {

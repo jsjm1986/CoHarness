@@ -171,6 +171,34 @@ export class SqliteStore implements PersistenceBackend<number> {
     return { meta: rowToMeta(snapshot.row), events: preserved.filter(event => event.seq >= fromSeq) }
   }
 
+  /** Publish a current-format header generation without rewriting event rows. */
+  async migrateStored(
+    sourceMeta: SessionHeader,
+    currentMeta: SessionHeader,
+    _events: readonly SessionEvent[],
+    sourceRevision: PersistenceRevision,
+  ): Promise<void> {
+    await this.open()
+    this.db.exec(sql('begin-immediate'))
+    try {
+      validateSchemaForMutation(this.databaseConstructor, this.db, this.databasePath)
+      const row = this.rowFor(sourceMeta.id)
+      if (row === undefined) throw new Error(`session ${sourceMeta.id} metadata row is missing`)
+      if (String(sqliteRevision(this.storeIdentity, row)) !== String(sourceRevision)) {
+        throw new Error(`session ${sourceMeta.id} changed while its format migration was preparing`)
+      }
+      if (row.version === currentMeta.version) {
+        this.db.exec(sql('commit'))
+        return
+      }
+      const updated = this.db.prepare(sql('update-session-version')).run(currentMeta.version, sourceMeta.id)
+      if (Number(updated.changes) !== 1) throw new Error(`session ${sourceMeta.id} metadata row is missing`)
+      this.db.exec(sql('commit'))
+    } catch (error: unknown) {
+      this.rollback(error, 'format migration')
+    }
+  }
+
   async appendBatch(
     meta: SessionHeader,
     events: readonly SessionEvent[],
