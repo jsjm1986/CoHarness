@@ -11,7 +11,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import { scopeOf } from '@deepseek-ai/dsh-scope'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
-import type { SessionInspection, SessionLocation, SessionPersistenceSnapshot } from '@deepseek-ai/dsh-session-persistence'
+import type { SessionEventSuffix, SessionInspection, SessionLocation, SessionPersistenceSnapshot } from '@deepseek-ai/dsh-session-persistence'
 import SessionPersistence from '@deepseek-ai/dsh-session-persistence'
 import { MockAdapter, textResponse } from './mock-adapter.ts'
 
@@ -24,7 +24,7 @@ class HandlePersistence extends SessionPersistence {
   async append(_id: SessionId, _events: readonly SessionEvent[]): Promise<void> {}
   async load(_id: SessionId): Promise<SessionInspection> { throw new Error('not used') }
   async inspect(_id: SessionId): Promise<SessionInspection> { throw new Error('not used') }
-  async readFrom(_id: SessionId, _fromSeq: number): Promise<{ meta: import('@deepseek-ai/dsh-session').SessionHeader; events: SessionEvent[] }> {
+  async readFrom(_id: SessionId, _fromSeq: import('@deepseek-ai/dsh-session').SessionLogOffset): Promise<SessionEventSuffix> {
     throw new Error('not used')
   }
   async list(): Promise<import('@deepseek-ai/dsh-session').SessionHeader[]> { return [] }

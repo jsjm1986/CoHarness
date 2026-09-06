@@ -324,7 +324,7 @@ describe('JsonlSessionPersistence: durability and crash semantics', () => {
     await secondCtx.plugin(SessionStore)
     const secondFiber = await secondCtx.plugin(JsonlSessionPersistence, { root, compression: 'none' })
     const id = SessionId('cross-process-lock')
-    const first = await ctx.sessionPersistence.createHandle({ version: 0, id, createdAt: 1 })
+    const first = await ctx.sessionPersistence.createHandle({ version: 0, id, createdAt: 1, isSeeded: false })
     await expect(secondCtx.sessionPersistence.openHandleAsync(id, 'write')).rejects.toThrow(/already locked by another process/)
     await first.close()
     const second = await secondCtx.sessionPersistence.openHandleAsync(id, 'write')

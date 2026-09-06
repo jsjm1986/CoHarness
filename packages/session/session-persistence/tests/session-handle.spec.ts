@@ -1,11 +1,11 @@
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it } from 'vitest'
-import { SessionId, type SessionEvent, type SessionHeader } from '@deepseek-ai/dsh-session'
+import { SessionId, SessionLogOffset, type SessionEvent, type SessionHeader } from '@deepseek-ai/dsh-session'
 import SessionPersistence, {
   SessionAlreadyOwnedError,
   SessionPersistenceRevision,
   SessionReadOnlyError,
-  type SessionInspection,
+  type SessionEventSuffix, type SessionInspection,
   type SessionLocation,
   type SessionPersistenceSnapshot,
 } from '../src/index.ts'
@@ -17,10 +17,12 @@ class MemoryPersistence extends SessionPersistence {
   locate(_meta: SessionHeader): SessionLocation | undefined { return undefined }
   async create(_meta: SessionHeader): Promise<void> {}
   async append(_id: SessionId, events: readonly SessionEvent[]): Promise<void> { this.appended.push([...events]) }
-  async load(_id: SessionId): Promise<SessionInspection> { return { meta: header, events: [] } }
-  async inspect(_id: SessionId): Promise<SessionInspection> { return { meta: header, events: [] } }
-  async readFrom(_id: SessionId, _fromSeq: number): Promise<{ meta: SessionHeader; events: SessionEvent[] }> {
-    return { meta: header, events: [] }
+  async load(_id: SessionId): Promise<SessionInspection> { return { meta: header, inheritedEventCount: SessionLogOffset(0), events: [] } }
+  async inspect(_id: SessionId): Promise<SessionInspection> {
+    return { meta: header, inheritedEventCount: SessionLogOffset(0), events: [] }
+  }
+  async readFrom(_id: SessionId, fromSeq: SessionLogOffset): Promise<SessionEventSuffix> {
+    return { meta: header, inheritedEventCount: SessionLogOffset(0), fromSeq, events: [] }
   }
   async list(): Promise<SessionHeader[]> { return [header] }
   async listSnapshots(): Promise<SessionPersistenceSnapshot[]> {
@@ -32,6 +34,7 @@ const header: SessionHeader = {
   version: 0,
   id: SessionId('handle-test'),
   createdAt: 1,
+  isSeeded: false,
 }
 
 describe('SessionPersistence explicit handles', () => {
