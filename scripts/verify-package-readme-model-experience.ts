@@ -42,6 +42,9 @@ const NO_MODEL_EXPERIENCE_SECTION: Readonly<Record<string, string>> = {
  * blocks. A package moves on or off this list with its context behavior.
  */
 const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
+  'packages/session/session-format': { kind: 'none', reason: 'Format migration is a persistence operation; provider adapters own any model-visible history projection.' },
+  'packages/util/http-proxy': { kind: 'none', reason: 'Transport policy only changes how bytes reach the network and registers no prompt, schema, or result text.' },
+  'packages/util/values': { kind: 'none', reason: 'Stateless value helpers validate persistence data and register no prompt, schema, or result text.' },
   'packages/credentials/authorization': { kind: 'none', reason: 'Authorization is a configuration-time human conversation; its flow, notice, and prompt never enter a model request.' },
   'packages/attachment/attachment': { kind: 'indirect', reason: 'The storage seam delegates model request rendering to provider adapters.' },
   'packages/attachment/attachment-local': { kind: 'indirect', reason: 'The local backend delegates model request rendering to provider adapters.' },

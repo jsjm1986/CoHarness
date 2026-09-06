@@ -12,7 +12,7 @@ import { deepFreeze } from '@deepseek-ai/dsh-llm'
 import { scopeOf, scopeTarget } from '@deepseek-ai/dsh-scope'
 import type { Scoped } from '@deepseek-ai/dsh-scope'
 import type { Message } from '@deepseek-ai/dsh-llm'
-import { SESSION_FORMAT_VERSION, SessionId } from './types.ts'
+import { MIGRATABLE_SESSION_FORMAT_VERSIONS, SESSION_FORMAT_VERSION, SessionId } from './types.ts'
 import type { TypertLookup } from '@deepseek-ai/dsh-typert-protocol'
 import type { CreateSessionOptions, EpochHeader, PrepareSessionOptions, RequestContext, SessionEvent, SessionEventMap, SessionEventType, SessionHeader, SurfaceIntent, SurfaceEventType } from './types.ts'
 import { snapshotJsonValue } from './json.ts'
@@ -109,7 +109,8 @@ function validateSessionHeader(id: SessionId, input: unknown): SessionHeader {
     throw new Error('session header is not a plain JSON record')
   }
   const record = input as Record<string, unknown>
-  if (record.version !== SESSION_FORMAT_VERSION) {
+  if (record.version !== SESSION_FORMAT_VERSION
+    && !MIGRATABLE_SESSION_FORMAT_VERSIONS.includes(record.version as 0 | 1)) {
     throw new Error(`session header version must be ${SESSION_FORMAT_VERSION}, got ${String(record.version)}`)
   }
   if (record.id !== id) {
@@ -146,7 +147,16 @@ function validateSessionHeader(id: SessionId, input: unknown): SessionHeader {
   if (record.draft !== undefined && typeof record.draft !== 'boolean') {
     throw new Error('session header draft must be a boolean')
   }
-  return deepFreeze(record as unknown as SessionHeader)
+  return deepFreeze({ ...record, version: SESSION_FORMAT_VERSION } as unknown as SessionHeader)
+}
+
+/**
+ * Normalize a supported historical header without reading its event body.
+ * @param header - detached v0, v1, or current Session header.
+ * @returns a frozen header stamped with the current format version.
+ */
+export function migrateSessionHeader(header: SessionHeader): SessionHeader {
+  return validateSessionHeader(header.id, header)
 }
 
 /** Validate and freeze one exclusively owned persistence header in place. */

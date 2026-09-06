@@ -3,7 +3,11 @@ import { SessionFormatError } from './error.ts'
 import { inspectSessionFormatVersion, snapshotSessionFormatHeader } from './json.ts'
 import type { SessionFormatCatalog, SessionFormatCatalogOptions, SessionFormatHeader, SessionFormatHeaderReadResult } from './types.ts'
 
-/** Compile a build-static header classifier and adjacent migration chain. */
+/**
+ * Compile a build-static header classifier and adjacent migration chain.
+ * @param options - chain options for the provider build.
+ * @returns a header classifier and detached migration catalog.
+ */
 export function createSessionFormatCatalog(options: SessionFormatCatalogOptions): SessionFormatCatalog {
   const chain = createSessionFormatChain(options)
   return Object.freeze({

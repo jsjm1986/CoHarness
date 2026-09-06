@@ -74,6 +74,14 @@ JSON 校验器使用显式工作栈，并只跟踪当前祖先链，因此深层
 
 -----
 
+## Model Experience
+
+None, as stateless value helpers validate persistence data and register no prompt, schema, or result text.
+
+#### KV Cache effect
+
+No direct invalidation: the package never contributes request tokens or mutates a model request prefix.
+
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>

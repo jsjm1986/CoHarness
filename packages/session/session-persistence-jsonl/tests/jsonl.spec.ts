@@ -249,14 +249,31 @@ describe('JsonlSessionPersistence: format helpers', () => {
     await ctx.plugin(SessionStore)
     const fiber = await ctx.plugin(JsonlSessionPersistence, { root: absoluteRoot, compression: 'none' })
     const m = { ...meta('newer-format', '/work'), version: 7 }
-    await ctx.sessionPersistence.create(m)
-    await ctx.sessionPersistence.append(m.id, [
+    const path = rawLogPath(resolve(absoluteRoot), '/work', m.id)
+    await mkdir(dirname(path), { recursive: true })
+    await writeFile(path, `${JSON.stringify(toHeaderLine(m))}\n${[
       { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } },
       { type: 'turn/end', seq: 1, time: 2, data: { turn: 1, reason: { kind: 'completed' } } },
-    ])
+    ].map(event => JSON.stringify(event)).join('\n')}\n`)
     const failure = await ctx.sessionPersistence.load(m.id).then(() => undefined, (error: unknown) => error as Error)
     expect(failure?.name).toBe('SessionFormatUnsupportedError')
     expect(failure?.message).toContain(`(raw log: ${rawLogPath(resolve(absoluteRoot), '/work', m.id)})`)
+    await fiber.dispose()
+  })
+
+  it('reads v0 headers through the migration catalog without rewriting the source', async () => {
+    const absoluteRoot = await freshRoot()
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const fiber = await ctx.plugin(JsonlSessionPersistence, { root: absoluteRoot, compression: 'none' })
+    const id = SessionId('legacy-v0')
+    const path = rawLogPath(resolve(absoluteRoot), '/work', id)
+    await mkdir(dirname(path), { recursive: true })
+    const legacy = { version: 0, id, createdAt: 1, cwd: '/work', delegationDepth: 0 }
+    await writeFile(path, `${JSON.stringify({ type: 'session', ...legacy })}\n${oneTurnLog().map(event => JSON.stringify(event)).join('\n')}\n`)
+    const loaded = await ctx.sessionPersistence.load(id)
+    expect(loaded.meta.version).toBe(2)
+    expect((await readFile(path, 'utf8')).startsWith('{"type":"session","version":0')).toBe(true)
     await fiber.dispose()
   })
 })

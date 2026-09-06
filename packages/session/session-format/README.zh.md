@@ -20,6 +20,14 @@ kind: "package-library"
 
 catalog 是纯值操作。JSONL、Gateway 和 SQLite adapter 仍分别负责原始 bytes、损坏尾部恢复、备份和原子发布。
 
-## 已知限制
+## Model Experience
 
-当前 v0/v1 步骤保留 CoHarness 现有事件词汇。物理 codec 和 provider 接入会拆成独立变更，因为各 durable layout 并不相同。
+None, as format migration is a persistence operation and registers no prompt, schema, or result text.
+
+#### KV Cache effect
+
+No direct invalidation: the package never contributes request tokens or mutates a model request prefix.
+
+## 已知限制与延期工作
+
+- **Provider 接入保持独立**——当前 v0/v1 步骤保留 CoHarness 现有事件词汇；物理 codec 和 provider 发布会拆成独立变更，因为各 durable layout 并不相同。

@@ -1042,7 +1042,7 @@ describe('Session', () => {
     const cases: Array<{ header: unknown; error: RegExp }> = [
       { header: 1, error: /not a plain JSON record/ },
       { header: null, error: /not a plain JSON record/ },
-      { header: { ...base, version: 1 }, error: /header version/ },
+      { header: { ...base, version: 3 }, error: /header version/ },
       { header: { ...base, createdAt: '123' }, error: /createdAt must be a non-negative safe integer/ },
       { header: { ...base, cwd: 1 }, error: /header cwd must be a string/ },
       { header: { ...base, cwd: 'relative' }, error: /header cwd must be an absolute path/ },
@@ -1055,6 +1055,17 @@ describe('Session', () => {
 
     for (const { header, error } of cases) {
       expect(() => Session.create(SessionId('header-shape'), undefined, header as SessionHeader)).toThrow(error)
+    }
+  })
+
+  it('normalizes released v0 and v1 headers to the current format generation', () => {
+    for (const version of [0, 1] as const) {
+      const session = Session.create(SessionId(`legacy-header-${version}`), [], {
+        version,
+        id: SessionId(`legacy-header-${version}`),
+        createdAt: 123,
+      })
+      expect(session.header.version).toBe(SESSION_FORMAT_VERSION)
     }
   })
 

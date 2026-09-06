@@ -74,6 +74,14 @@ The JSON validator uses an explicit work stack and tracks only the active ancest
 
 -----
 
+## Model Experience
+
+None, as stateless value helpers validate persistence data and register no prompt, schema, or result text.
+
+#### KV Cache effect
+
+No direct invalidation: the package never contributes request tokens or mutates a model request prefix.
+
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>

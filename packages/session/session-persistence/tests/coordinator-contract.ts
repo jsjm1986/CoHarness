@@ -1325,14 +1325,12 @@ export function runCoordinatorContract(name: string, makeFixture: () => Promise<
       }
     })
 
-    it('rejects a newer format version on load, naming the upgrade direction', async () => {
+    it('rejects a newer format version before creation, naming the upgrade direction', async () => {
       const fix = await makeFixture()
       const { ctx, fiber } = await freshCtx(fix)
       try {
         const m = { version: 99, id: SessionId('v99'), createdAt: 1, cwd: WORK }
-        await ctx.sessionPersistence.create(m)
-        await ctx.sessionPersistence.append(m.id, oneTurnLog())
-        const failure = await ctx.sessionPersistence.load(m.id).then(() => undefined, (error: unknown) => error as Error)
+        const failure = await ctx.sessionPersistence.create(m).then(() => undefined, (error: unknown) => error as Error)
         expect(failure?.name).toBe('SessionFormatUnsupportedError')
         expect(failure?.message).toMatch(/written by a newer harness.*upgrade the harness/)
       } finally {
@@ -1341,16 +1339,14 @@ export function runCoordinatorContract(name: string, makeFixture: () => Promise<
       }
     })
 
-    it('rejects an older format version on load without claiming an upgrade path', async () => {
+    it('rejects a format version below the migration catalog', async () => {
       const fix = await makeFixture()
       const { ctx, fiber } = await freshCtx(fix)
       try {
         const m = { version: -1, id: SessionId('v-older'), createdAt: 1, cwd: WORK }
-        await ctx.sessionPersistence.create(m)
-        await ctx.sessionPersistence.append(m.id, oneTurnLog())
-        const failure = await ctx.sessionPersistence.load(m.id).then(() => undefined, (error: unknown) => error as Error)
+        const failure = await ctx.sessionPersistence.create(m).then(() => undefined, (error: unknown) => error as Error)
         expect(failure?.name).toBe('SessionFormatUnsupportedError')
-        expect(failure?.message).toMatch(/older than the supported v0.*no upgrade path/)
+        expect(failure?.message).toMatch(/older than the supported v2.*no upgrade path/)
       } finally {
         await fiber.dispose()
         await fix.cleanup()

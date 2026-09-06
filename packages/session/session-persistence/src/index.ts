@@ -151,6 +151,7 @@ export interface SessionRawArtifact {
 
 /** Error raised when one persistence instance already owns a Session for writing. */
 export class SessionAlreadyOwnedError extends Error {
+  /** Stable machine-readable ownership failure code. */
   readonly code = 'SESSION_ALREADY_OWNED' as const
 
   constructor(id: SessionId) {
@@ -161,6 +162,7 @@ export class SessionAlreadyOwnedError extends Error {
 
 /** Error raised when a read-only SessionHandle receives a mutation. */
 export class SessionReadOnlyError extends Error {
+  /** Stable machine-readable access-mode failure code. */
   readonly code = 'SESSION_READ_ONLY' as const
 
   constructor(id: SessionId) {
@@ -196,7 +198,7 @@ class PersistenceSessionHandle implements SessionHandle {
     private readonly releaseExternal: () => Promise<void>,
   ) {}
 
-  async read(offset = 0): Promise<readonly SessionEvent[]> {
+  async read(offset: number = 0): Promise<readonly SessionEvent[]> {
     this.assertOpen()
     if (!Number.isSafeInteger(offset) || offset < 0) throw new TypeError('session handle offset must be non-negative')
     return (await this.owner.readFrom(this.id, offset)).events
@@ -337,8 +339,12 @@ export abstract class SessionPersistence extends Service {
     return async () => {}
   }
 
-  /** Release a process-local writer reservation held by one handle. */
-  releaseHandle(id: SessionId, handle: PersistenceSessionHandle): void {
+  /**
+   * Release a process-local writer reservation held by one handle.
+   * @param id - Session identity whose reservation may be released.
+   * @param handle - exact handle that owns the reservation.
+   */
+  releaseHandle(id: SessionId, handle: SessionHandle): void {
     if (this.writeHandles.get(id) === handle) this.writeHandles.delete(id)
   }
 

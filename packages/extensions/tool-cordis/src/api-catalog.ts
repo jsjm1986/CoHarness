@@ -1347,6 +1347,29 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     description: 'Durable append-only session storage. Implementations preserve contiguous, losslessly JSON-serializable events; append resolves only after durability, and load balances a complete interrupted tail without rewriting committed events.',
     methods: [
       {
+        signature: 'async createHandle(meta: SessionHeader): Promise<SessionHandle>',
+        description: 'Create a new explicit write handle while retaining the legacy create API.',
+        parameters: [{ name: 'meta', description: 'immutable Session header to register.' }],
+        returns: 'an owned write handle.',
+      },
+      {
+        signature: 'async openHandleAsync(id: SessionId, mode: SessionHandleMode): Promise<SessionHandle>',
+        description: 'Open a handle and acquire any provider-specific cross-process lock.',
+        parameters: [{ name: 'id', description: 'persisted Session identity.' }, { name: 'mode', description: 'read or write access.' }],
+        returns: 'a handle whose close releases local and provider ownership.',
+      },
+      {
+        signature: 'openHandle(id: SessionId, mode: SessionHandleMode): SessionHandle',
+        description: 'Open a read or write handle for an existing Session.',
+        parameters: [{ name: 'id', description: 'persisted Session identity.' }, { name: 'mode', description: 'read allows inspection; write reserves the local writer.' }],
+        returns: 'an explicit SessionHandle.',
+      },
+      {
+        signature: 'releaseHandle(id: SessionId, handle: SessionHandle): void',
+        description: 'Release a process-local writer reservation held by one handle.',
+        parameters: [{ name: 'id', description: 'Session identity whose reservation may be released.' }, { name: 'handle', description: 'exact handle that owns the reservation.' }],
+      },
+      {
         signature: 'abstract locate(meta: SessionHeader): SessionLocation | undefined',
         description: 'Resolve this backend\'s independent local artifact for a session without reading, creating, flushing, or otherwise materializing it. Backends such as SQLite that do not own one artifact per session return `undefined`.',
         parameters: [{ name: 'meta', description: 'the immutable session header whose artifact is requested.' }],
@@ -4173,10 +4196,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type JsonSchemaType = \'object\' | \'array\' | \'string\' | \'number\' | \'integer\' | \'boolean\' | \'null\';',
   },
   {
-    name: 'JsonValue',
-    declaration: 'export type JsonValue = null | boolean | number | string | JsonValue[] | {\n    [key: string]: JsonValue;\n};',
-  },
-  {
     name: 'KnobState',
     declaration: 'export interface KnobState {\n    preset: string | null;\n    sandbox: SandboxMode | null;\n    approval: ApprovalPolicy | null;\n}',
   },
@@ -4823,6 +4842,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SessionForkSource',
     declaration: 'export type SessionForkSource = Session | SessionId;',
+  },
+  {
+    name: 'SessionHandle',
+    declaration: 'export interface SessionHandle {\n    readonly id: SessionId;\n    readonly mode: SessionHandleMode;\n    read(offset?: number): Promise<readonly SessionEvent[]>;\n    append(events: readonly SessionEvent[]): Promise<void>;\n    flush(): Promise<void>;\n    close(): Promise<void>;\n}',
+  },
+  {
+    name: 'SessionHandleMode',
+    declaration: 'export type SessionHandleMode = \'read\' | \'write\';',
   },
   {
     name: 'SessionHeader',

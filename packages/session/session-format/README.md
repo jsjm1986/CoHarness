@@ -20,6 +20,14 @@ The default catalog in `src/catalog-default.ts` contains the static v0 → v1 �
 
 The catalog is a pure value operation. JSONL, Gateway, and SQLite adapters remain responsible for their own raw bytes, crash-tail recovery, backups, and atomic publication.
 
-## Known limitations
+## Model Experience
 
-The v0/v1 steps currently preserve the existing CoHarness event vocabulary. Physical codec and provider adoption are separate changes because their durable layouts differ.
+None, as format migration is a persistence operation and registers no prompt, schema, or result text.
+
+#### KV Cache effect
+
+No direct invalidation: the package never contributes request tokens or mutates a model request prefix.
+
+## Known Limitations and Deferred Work
+
+- **Provider adoption remains separate** — the v0/v1 steps preserve the existing CoHarness event vocabulary; physical codecs and provider publication are separate changes because their durable layouts differ.

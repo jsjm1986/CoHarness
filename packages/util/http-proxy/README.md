@@ -85,7 +85,6 @@ An entry names a host and matches it together with every subdomain under it: `NO
 <a id="further-exploration"></a>
 ## Further Exploration
 
-- [Network proxy guide](../../../docs/user/guide/network-proxy.md) — what to export, and why a browser is proxied when a terminal is not.
 - [`dsh-web-fetch-http`](../../web/web-fetch-http/README.md) — the one consumer whose safety rules change under a proxy.
 
 -----

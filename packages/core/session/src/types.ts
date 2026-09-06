@@ -46,8 +46,10 @@ export function SessionId(id: string): SessionId {
  * The on-disk session format version, stamped into every newly-written {@link SessionHeader}
  * and enforced by every persistence backend on load. The single source of truth for the
  * version — write sites and the load-time check all read it.
- * While the harness is unreleased it is pinned at `0`: no compatibility is
- * implied, incompatible logs are rejected, and no migration is provided.
+ * The released v0 and v1 headers are accepted and normalized to v2 on first
+ * body read; newer versions are refused. v2 keeps the single monotonic
+ * integer and is the first format generation with an explicit migration
+ * catalog.
  *
  * The version is a single monotonic integer with no major/minor split. Whether
  * a bump is needed is decided by what the WRITER emits, never by what a newer
@@ -65,7 +67,10 @@ export function SessionId(id: string): SessionId {
  * recorded in the session-log-version-mechanism Agent Note
  * (`.agents/notes/implemented/architecture/2026-08-10-session-log-version-mechanism.md`).
  */
-export const SESSION_FORMAT_VERSION = 0
+export const SESSION_FORMAT_VERSION = 2
+
+/** Header generations that this build can migrate into the current format. */
+export const MIGRATABLE_SESSION_FORMAT_VERSIONS = Object.freeze([0, 1] as const)
 
 /**
  * Immutable validated storage metadata, kept outside the conversation event log.
@@ -73,8 +78,8 @@ export const SESSION_FORMAT_VERSION = 0
 export interface SessionHeader {
   /**
    * On-disk format version, stamped from {@link SESSION_FORMAT_VERSION} when the
-   * session is created. A persistence backend rejects any other version on load
-   * (no migration — see the constant).
+   * session is created. Persistence providers migrate v0/v1 artifacts through
+   * the adjacent catalog and refuse newer versions.
    */
   readonly version: number
   /** The session's id (mirrors the {@link Session}'s id). */

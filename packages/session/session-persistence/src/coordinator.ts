@@ -11,6 +11,7 @@ import {
   hasConversationContent,
   interruptedTurnClosers,
   KNOWN_SESSION_EVENT_TYPES,
+  migrateSessionHeader,
   materializesSession,
   SESSION_FORMAT_VERSION,
   SessionPreparation,
@@ -698,18 +699,19 @@ export class PersistenceCoordinator<TornMarker = unknown> {
   }
 
   private async createCore(meta: SessionHeader): Promise<void> {
+    const currentMeta = this.assertVersion(meta)
     // Do NOT clobber an existing session: the SessionId IS the identity.
-    if (this.states.has(meta.id) || this.preparations.has(meta.id)) {
-      throw new Error(`session "${meta.id}" already exists in this backend`)
+    if (this.states.has(currentMeta.id) || this.preparations.has(currentMeta.id)) {
+      throw new Error(`session "${currentMeta.id}" already exists in this backend`)
     }
     // A persisted artifact under this id (in ANY scope) blocks creation: load/
     // resume identify a session by id alone, so a second artifact would make
     // resume nondeterministic.
-    if (await this.backend.loadStored(meta.id) !== undefined) {
-      throw new Error(`session "${meta.id}" already has a persisted log on disk; load/resume it instead of creating`)
+    if (await this.backend.loadStored(currentMeta.id) !== undefined) {
+      throw new Error(`session "${currentMeta.id}" already has a persisted log on disk; load/resume it instead of creating`)
     }
     // Pure lazy: record intent only. No artifact until the first append.
-    this.states.set(meta.id, { meta, cursor: 0, materialized: false, pendingEvents: [] })
+    this.states.set(currentMeta.id, { meta: currentMeta, cursor: 0, materialized: false, pendingEvents: [] })
   }
 
   // `async` so synchronous materialization failures below reject (not throw) per
@@ -931,14 +933,14 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       signal?.throwIfAborted()
       if (suffix === undefined) throw new Error(`session "${id}" not found`)
       this.assertStoredId(id, suffix.meta)
-      this.assertVersion(suffix.meta)
+      const meta = this.assertVersion(suffix.meta)
       if (suffix.events.some(needsLegacyPrefix)) {
         const whole = await this.readStoredPrefix(id, signal)
         return { meta: whole.meta, events: whole.events.filter(event => event.seq >= fromSeq) }
       }
       const events = snapshotStoredEvents(suffix.events, id)
-      this.assertEventsSupported(suffix.meta, events)
-      return { meta: structuredClone(suffix.meta), events }
+      this.assertEventsSupported(meta, events)
+      return { meta: structuredClone(meta), events }
     }
     const whole = await this.readStoredPrefix(id, signal)
     // Sequential fallback: contiguous seqs from 0 make the suffix an index slice.
@@ -955,11 +957,11 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     signal?.throwIfAborted()
     if (stored === undefined) throw new Error(`session "${id}" not found`)
     this.assertStoredId(id, stored.meta)
-    this.assertVersion(stored.meta)
+    const meta = this.assertVersion(stored.meta)
     const events = snapshotStoredEvents(stored.events, id)
-    this.assertEventsSupported(stored.meta, events)
+    this.assertEventsSupported(meta, events)
     return {
-      meta: structuredClone(stored.meta),
+      meta: structuredClone(meta),
       events,
     }
   }
@@ -971,16 +973,16 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     try {
       const { meta, events, revision, tornMarker } = stored
       this.assertStoredId(id, meta)
-      this.assertVersion(meta)
+      const currentMeta = this.assertVersion(meta)
       const storedEvents = adoptStoredEvents(events, id)
-      this.assertEventsSupported(meta, storedEvents)
+      this.assertEventsSupported(currentMeta, storedEvents)
 
       // Preserve complete interrupted events and synthesize only missing closers.
       const closers = interruptedTurnClosers(storedEvents).map(adoptSessionEvent)
       const balanced = [...storedEvents, ...closers]
       const session = this.ctx.sessions.prepare(id, {
         seed: balanced,
-        meta,
+        meta: currentMeta,
         seedSource: 'persistence',
       })
       const inspection: SessionInspection = Object.freeze({
@@ -1121,8 +1123,9 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     }
   }
 
-  private assertVersion(meta: SessionHeader): void {
-    if (meta.version === SESSION_FORMAT_VERSION) return
+  private assertVersion(meta: SessionHeader): SessionHeader {
+    if (meta.version === SESSION_FORMAT_VERSION) return meta
+    if (meta.version === 0 || meta.version === 1) return migrateSessionHeader(meta)
     throw this.unsupported(meta, sessionFormatVersionRefusal(meta.id, meta.version))
   }
 
@@ -1386,16 +1389,16 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     if (meta.cwd !== session.header.cwd) {
       throw new Error(`session "${session.header.id}" is already persisted at a different cwd (persisted: ${String(meta.cwd)}, live: ${String(session.header.cwd)}) (id collision)`)
     }
-    this.assertVersion(meta)
+    const currentMeta = this.assertVersion(meta)
     const storedEvents = snapshotStoredEvents(events, session.header.id)
-    this.assertEventsSupported(meta, storedEvents)
+    this.assertEventsSupported(currentMeta, storedEvents)
     if (!seedCoversPrefix(seed, storedEvents)) {
       throw new Error(`session "${session.header.id}" already has a persisted log on disk that does not match this live session (id collision)`)
     }
     // Truncate-only repair (no closers): the open turn is NOT closed here.
-    if (tornMarker !== undefined) await this.backend.commitRepair(meta, tornMarker, [])
+    if (tornMarker !== undefined) await this.backend.commitRepair(currentMeta, tornMarker, [])
     this.states.set(session.header.id, {
-      meta: { ...meta },
+      meta: { ...currentMeta },
       cursor: storedEvents.length,
       materialized: true,
       pendingEvents: [],
