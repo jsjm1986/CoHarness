@@ -12,7 +12,6 @@ JSONL 持久会话存储后端：`SessionPersistence` 的一个具体实现（`d
     <encoded-id>/                # session-owned directory
       session.jsonl.zstd         # default: checksummed header frame + append frames
       session.jsonl              # only with compression: 'none'
-      session.v2.jsonl.zstd      # generated successor after legacy v0/v1 migration
 ```
 
 - 第一个逻辑行是私有的 v0 物理 header，标记为 `{ type: 'session', version, id, cwd?, createdAt, parentSession?, seedLength?, origin?, delegationDepth, agentPreset?, draft? }`。其可选的数字 `seedLength` 保持字节兼容：缺失解码为 `SessionHeader.isSeeded: false`，零或正值解码为 `isSeeded: true` 加精确的 `inheritedEventCount`，因此逻辑 header 从不携带位置整数。`delegationDepth` 在磁盘上必需，顶层会话为 `0`；缺失或无效值会拒绝日志。`agentPreset` 必须持久化，因为它决定了被恢复会话的工具与提示词——恢复成另一套组装，就会回放模型已无法据以行动的历史。后续每个逻辑行是一条存储记录；`assistant/chunk` 事件绝不丢弃，且 `seq` 在解码日志中保持连续（`events[i].seq === i`）。
@@ -44,7 +43,7 @@ JSONL 持久会话存储后端：`SessionPersistence` 的一个具体实现（`d
 
 默认产物是独立 [Zstandard frame](../../../.agents/notes/implemented/architecture/2026-07-19-zstandard-jsonl-session-logs.zh.md) 的标准拼接：一个仅包含 header 行的带 checksum frame，后跟每个持久 append 批次一个带 checksum frame。后端使用 Node 内置 Zstandard API 和默认压缩级别，不提供级别开关。列表只读取并验证 header frame。`compression: 'none'` 在原始表示中保留相同逻辑行。
 
-一个根只属于一种编码。启动发现和定向查找会拒绝相反 suffix，错误会命名不兼容产物，并指示调用方选择匹配 mode 或独立根。平铺 `<project>/<id>.jsonl*` 产物也会被拒绝，而不是忽略。读取 v0/v1 body 时会在保留源文件的同时，于同目录原子发布 `session.v2.*`；发现逻辑优先最高 canonical generation，绝不删除源文件。
+一个根只属于一种编码。启动发现和定向查找会拒绝相反 suffix，错误会命名不兼容产物，并指示调用方选择匹配 mode 或独立根。平铺 `<project>/<id>.jsonl*` 产物也会被拒绝，而不是忽略。不提供迁移、混合根回退或双写。
 
 ## 持久性与崩溃语义
 
@@ -78,7 +77,7 @@ JSONL 存储不修改实时请求前缀。只有重建历史、当前 envelope �
 
 ## 已知限制与暂缓事项
 
-- **只加载已配置编码**：更改压缩需要独立/全新根，或选择匹配 mode；v0/v1 header 会迁移到 v2 successor（后继产物），更新的代次则拒绝。
+- **只加载已配置编码和当前 `SESSION_FORMAT_VERSION`（v0）**：更改压缩需要独立/全新根，或选择遗留原始 mode；预发布格式没有迁移。
 - **平铺文件存储布局不加载**：加载前使用独立根，或将预发布产物移入项目/会话目录布局。
 - **压缩文件不能直接按行读取**：使用后端加载；或在写入新根前选择 `compression: 'none'`，以便外部行 reader 使用。
 - **不删除会话文件**：日志在 `root` 下累积，直到外部移除（seam 无删除接口）。
