@@ -12,6 +12,7 @@ The JSONL durable session-persistence backend — a concrete `SessionPersistence
     <encoded-id>/                # session-owned directory
       session.jsonl.zstd         # default: checksummed header frame + append frames
       session.jsonl              # only with compression: 'none'
+      session.v2.jsonl.zstd      # generated successor after legacy v0/v1 migration
 ```
 
 - The first logical line is the immutable `SessionHeader` tagged `{ type: 'session', version, id, cwd?, createdAt, parentSession?, seedLength?, origin?, delegationDepth, agentPreset? }`. `delegationDepth` is required on disk and is `0` for a top-level session; a missing or invalid value rejects the log. `agentPreset` is durable because it decides the resumed session's tools and prompt — restoring a different composition would replay history the model can no longer act on. Every subsequent logical line is one storage record; `assistant/chunk` events are never dropped, and `seq` stays contiguous across the decoded log (`events[i].seq === i`).
@@ -43,7 +44,7 @@ The JSONL durable session-persistence backend — a concrete `SessionPersistence
 
 The default artifact is a standard concatenation of independent [Zstandard frames](../../../.agents/notes/implemented/architecture/2026-07-19-zstandard-jsonl-session-logs.md): one checksummed frame containing only the header line, followed by one checksummed frame per durable append batch. The backend uses Node's built-in Zstandard API with its default compression level and exposes no level knob. Listing reads and validates only the header frame. `compression: 'none'` keeps the same logical lines in the original raw representation.
 
-A root belongs to one encoding. Startup discovery and targeted lookup reject the opposite suffix with an error naming the incompatible artifact and instructing the caller to select the matching mode or a separate root. Flat `<project>/<id>.jsonl*` artifacts are also rejected instead of ignored. There is no migration, mixed-root fallback, or dual write.
+A root belongs to one encoding. Startup discovery and targeted lookup reject the opposite suffix with an error naming the incompatible artifact and instructing the caller to select the matching mode or a separate root. Flat `<project>/<id>.jsonl*` artifacts are also rejected instead of ignored. A v0/v1 body read publishes `session.v2.*` atomically beside the preserved source; discovery prefers the highest canonical generation and never deletes the source.
 
 ## Durability and crash semantics
 
@@ -77,7 +78,7 @@ JSONL storage does not mutate live request prefixes. A resumed loop can reuse pr
 
 ## Known Limitations and Deferred Work
 
-- **Only the configured encoding and current `SESSION_FORMAT_VERSION` (v0) load** — changing compression requires a separate/fresh root or selecting the legacy raw mode; the pre-release format has no migration.
+- **Only the configured encoding loads** — changing compression requires a separate/fresh root or selecting the matching mode; v0/v1 headers migrate to the v2 successor, while newer generations refuse.
 - **The flat-file storage layout does not load** — use a separate root or move pre-release artifacts into the project/session directory layout before loading.
 - **Compressed files are not directly line-readable** — use the backend to load them, or select `compression: 'none'` before writing a fresh root when external line readers are required.
 - **Nothing deletes session files** — logs accumulate under `root` until removed externally (the seam has no deletion API).

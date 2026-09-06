@@ -8,7 +8,7 @@ import SessionStore, { encodeSeqRanges, SessionId } from '@deepseek-ai/dsh-sessi
 import type { Session, SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import {
-  encodeSegment, eventLines, logPath, projectDir, projectKey, scanLog, sessionDir, SessionLogScanner, toHeaderLine,
+  encodeSegment, eventLines, generationLogPath, logPath, projectDir, projectKey, scanLog, sessionDir, SessionLogScanner, toHeaderLine,
 } from '../src/format.ts'
 import { runPersistenceContract, meta, oneTurnLog, appendLog } from '../../session-persistence/tests/contract.ts'
 import { runCoordinatorContract, type CoordinatorFixture } from '../../session-persistence/tests/coordinator-contract.ts'
@@ -274,6 +274,7 @@ describe('JsonlSessionPersistence: format helpers', () => {
     const loaded = await ctx.sessionPersistence.load(id)
     expect(loaded.meta.version).toBe(2)
     expect((await readFile(path, 'utf8')).startsWith('{"type":"session","version":0')).toBe(true)
+    expect((await stat(generationLogPath(resolve(absoluteRoot), '/work', id, 'none', 2))).isFile()).toBe(true)
     await fiber.dispose()
   })
 })
@@ -1204,10 +1205,10 @@ describe('JsonlSessionPersistence: default packed chunk rows', () => {
     const loaded = await ctx.sessionPersistence.load(m.id)
     expect(loaded.events).toEqual([...log, ...secondTurn])
     // The packed append really packed: the file's tail carries a text-chunks row.
-    const tags = (await readFile(rawLogPath(root, '/work', m.id), 'utf8')).split('\n').filter(Boolean)
+    const tags = (await readFile(generationLogPath(root, '/work', m.id, 'none', 2), 'utf8')).split('\n').filter(Boolean)
       .map(line => (JSON.parse(line) as { type: string }).type)
-    expect(tags.filter(t => t === 'text-chunks')).toHaveLength(1)
-    expect(tags.filter(t => t === 'assistant/chunk')).toHaveLength(5)
+    expect(tags.filter(t => t === 'text-chunks')).toHaveLength(2)
+    expect(tags.filter(t => t === 'assistant/chunk')).toHaveLength(0)
   })
 
   it('scanLog: a packed row advances the seq cursor by its whole run', () => {

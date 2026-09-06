@@ -187,6 +187,20 @@ export interface PersistenceBackend<TornMarker = unknown> {
    */
   loadStoredFrom?(id: SessionId, fromSeq: number, signal?: AbortSignal): Promise<StoredSuffix | undefined>
 
+  /**
+   * Publish a current-format successor for one legacy body read.
+   * @param sourceMeta - header read from the preserved source generation.
+   * @param currentMeta - normalized current-format header.
+   * @param events - validated source event prefix to encode in the successor.
+   * @param sourceRevision - revision observed before conversion.
+   */
+  migrateStored?(
+    sourceMeta: SessionHeader,
+    currentMeta: SessionHeader,
+    events: readonly SessionEvent[],
+    sourceRevision: SessionPersistenceRevision,
+  ): Promise<void>
+
   /** Durably create an empty header-only session artifact. */
   materializeHeader?(meta: SessionHeader): Promise<void>
 
@@ -959,6 +973,9 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     this.assertStoredId(id, stored.meta)
     const meta = this.assertVersion(stored.meta)
     const events = snapshotStoredEvents(stored.events, id)
+    if (stored.meta.version !== meta.version && this.backend.migrateStored !== undefined) {
+      await this.backend.migrateStored(stored.meta, meta, events, stored.revision)
+    }
     this.assertEventsSupported(meta, events)
     return {
       meta: structuredClone(meta),
@@ -975,6 +992,9 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       this.assertStoredId(id, meta)
       const currentMeta = this.assertVersion(meta)
       const storedEvents = adoptStoredEvents(events, id)
+      if (meta.version !== currentMeta.version && this.backend.migrateStored !== undefined) {
+        await this.backend.migrateStored(meta, currentMeta, storedEvents, revision)
+      }
       this.assertEventsSupported(currentMeta, storedEvents)
 
       // Preserve complete interrupted events and synthesize only missing closers.
