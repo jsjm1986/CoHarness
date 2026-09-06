@@ -256,6 +256,12 @@ Durable append-only session storage. Implementations preserve contiguous, lossle
 
 ```ts cordis-catalog
 /**
+ * Return immutable aggregate counters for format migration attempts.
+ * @returns migration totals and per-generation counters.
+ */
+migrationStats(): SessionMigrationStats
+
+/**
  * Create a new explicit write handle while retaining the legacy create API.
  * @param meta - immutable Session header to register.
  * @returns an owned write handle.
@@ -508,5 +514,5 @@ releaseDraft(_request: SessionDraftReservationRequest): Promise<void>
 
 Types: [Session](session.zh.md) · [SessionEvent](session.zh.md) · [SessionId](core.zh.md)
 
-Source: [`packages/session/session-persistence/src/index.ts:278`](../../packages/session/session-persistence/src/index.ts)
+Source: [`packages/session/session-persistence/src/index.ts:304`](../../packages/session/session-persistence/src/index.ts)
 <!-- END GENERATED cordis-surface -->

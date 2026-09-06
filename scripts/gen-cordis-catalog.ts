@@ -695,6 +695,8 @@ export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   SessionForkSource: 'service-local fork input is owned by packages/core/session/src/index.ts',
   SessionHandle: 'persistence ownership handle is owned by packages/session/session-persistence/README.md',
   SessionHandleMode: 'persistence ownership mode is owned by packages/session/session-persistence/README.md',
+  SessionMigrationStats: 'persistence migration metrics are owned by packages/session/session-persistence/README.md',
+  SessionMigrationRecord: 'persistence migration record is owned by packages/session/session-persistence/README.md',
   PersistenceSessionHandle: 'private persistence handle implementation is owned by packages/session/session-persistence/src/index.ts',
   SubagentRunEndInfo: 'event payload contract is owned by packages/subagent/subagent/src/types.ts',
   SubagentRunInfo: 'event payload contract is owned by packages/subagent/subagent/src/types.ts',

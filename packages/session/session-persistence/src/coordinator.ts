@@ -6,6 +6,7 @@
  */
 
 import { Context } from '@deepseek-ai/cordis'
+import { performance } from 'node:perf_hooks'
 import {
   adoptSessionEvent,
   hasConversationContent,
@@ -20,7 +21,7 @@ import {
 } from '@deepseek-ai/dsh-session'
 import type { Session, SessionEvent, SessionId, SessionHeader } from '@deepseek-ai/dsh-session'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
-import type { SessionInspection, SessionLocation } from './index.ts'
+import type { SessionInspection, SessionLocation, SessionMigrationRecord } from './index.ts'
 import type { SessionPersistenceRevision } from './revision.ts'
 import { observeQueuedAbort, SessionPreparations } from './preparations.ts'
 import type { SessionPreparationReservation } from './preparations.ts'
@@ -98,6 +99,8 @@ export interface PersistenceCoordinatorOptions {
   readonly maxPendingEvents?: number
   /** Maximum UTF-8 JSON bytes retained in one live session's pending write queue. */
   readonly maxPendingBytes?: number
+  /** Observe one legacy-format conversion attempt for provider metrics. */
+  readonly onMigration?: (record: SessionMigrationRecord) => void
 }
 
 /**
@@ -636,6 +639,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
   private readonly maxPendingEvents: number
   /** Resolved per-session pending write byte bound. */
   private readonly maxPendingBytes: number
+  private readonly onMigration: ((record: SessionMigrationRecord) => void) | undefined
 
   constructor(
     private ctx: Context,
@@ -667,6 +671,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       throw new TypeError('maxPendingBytes must be a positive safe integer')
     }
     this.maxPendingBytes = maxPendingBytes
+    this.onMigration = options.onMigration
     this.preparations = new SessionPreparations(options.preparedSessionCacheSize)
     this.installWritePath()
   }
@@ -973,9 +978,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     this.assertStoredId(id, stored.meta)
     const meta = this.assertVersion(stored.meta)
     const events = snapshotStoredEvents(stored.events, id)
-    if (stored.meta.version !== meta.version && this.backend.migrateStored !== undefined) {
-      await this.backend.migrateStored(stored.meta, meta, events, stored.revision)
-    }
+    await this.migrateStoredIfNeeded(stored.meta, meta, events, stored.revision)
     this.assertEventsSupported(meta, events)
     return {
       meta: structuredClone(meta),
@@ -992,9 +995,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       this.assertStoredId(id, meta)
       const currentMeta = this.assertVersion(meta)
       const storedEvents = adoptStoredEvents(events, id)
-      if (meta.version !== currentMeta.version && this.backend.migrateStored !== undefined) {
-        await this.backend.migrateStored(meta, currentMeta, storedEvents, revision)
-      }
+      await this.migrateStoredIfNeeded(meta, currentMeta, storedEvents, revision)
       this.assertEventsSupported(currentMeta, storedEvents)
 
       // Preserve complete interrupted events and synthesize only missing closers.
@@ -1026,6 +1027,37 @@ export class PersistenceCoordinator<TornMarker = unknown> {
         { cause: error },
       )
     }
+  }
+
+  /** Run and measure one provider-owned legacy format conversion. */
+  private async migrateStoredIfNeeded(
+    sourceMeta: SessionHeader,
+    currentMeta: SessionHeader,
+    events: readonly SessionEvent[],
+    sourceRevision: SessionPersistenceRevision,
+  ): Promise<void> {
+    if (sourceMeta.version === currentMeta.version || this.backend.migrateStored === undefined) return
+    const started = performance.now()
+    try {
+      await this.backend.migrateStored(sourceMeta, currentMeta, events, sourceRevision)
+    } catch (error: unknown) {
+      this.onMigration?.({
+        id: sourceMeta.id,
+        fromVersion: sourceMeta.version,
+        toVersion: currentMeta.version,
+        status: 'failed',
+        durationMs: Math.max(0, performance.now() - started),
+        error: error instanceof Error ? error.message : String(error),
+      })
+      throw error
+    }
+    this.onMigration?.({
+      id: sourceMeta.id,
+      fromVersion: sourceMeta.version,
+      toVersion: currentMeta.version,
+      status: 'succeeded',
+      durationMs: Math.max(0, performance.now() - started),
+    })
   }
 
   /** Commit one prepared repair and establish its ownerless durable cursor. */

@@ -1347,6 +1347,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     description: 'Durable append-only session storage. Implementations preserve contiguous, losslessly JSON-serializable events; append resolves only after durability, and load balances a complete interrupted tail without rewriting committed events.',
     methods: [
       {
+        signature: 'migrationStats(): SessionMigrationStats',
+        description: 'Return immutable aggregate counters for format migration attempts.',
+        parameters: [],
+        returns: 'migration totals and per-generation counters.',
+      },
+      {
         signature: 'async createHandle(meta: SessionHeader): Promise<SessionHandle>',
         description: 'Create a new explicit write handle while retaining the legacy create API.',
         parameters: [{ name: 'meta', description: 'immutable Session header to register.' }],
@@ -4878,6 +4884,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SessionLogSnapshot',
     declaration: 'export interface SessionLogSnapshot {\n    session: SessionHeader;\n    events: SessionEvent[];\n}',
+  },
+  {
+    name: 'SessionMigrationRecord',
+    declaration: 'export interface SessionMigrationRecord {\n    readonly id: SessionId;\n    readonly fromVersion: number;\n    readonly toVersion: number;\n    readonly status: \'succeeded\' | \'failed\';\n    readonly durationMs: number;\n    readonly error?: string;\n}',
+  },
+  {
+    name: 'SessionMigrationStats',
+    declaration: 'export interface SessionMigrationStats {\n    readonly attempts: number;\n    readonly succeeded: number;\n    readonly failed: number;\n    readonly totalDurationMs: number;\n    readonly generations: readonly {\n        readonly fromVersion: number;\n        readonly toVersion: number;\n        readonly attempts: number;\n        readonly succeeded: number;\n        readonly failed: number;\n    }[];\n    readonly lastFailure?: SessionMigrationRecord;\n}',
   },
   {
     name: 'SessionPersistencePage',

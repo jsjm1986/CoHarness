@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-06-session-handle-agent-lifecycle.md
-2026-09-06-session-handle-agent-lifecycle.md: 5af54e6004c5db7c1b48e229b3853eedaf9b8972
-2026-09-06-session-handle-agent-lifecycle.zh.md: 7ed77671f0584f69320ec62249ede4e3a869a370
+2026-09-06-session-handle-agent-lifecycle.md: 64a7e838af0a3281074f20f09eaedc3abd8d7b86
+2026-09-06-session-handle-agent-lifecycle.zh.md: 0bf562f5f4bfb1834658d26163d16666c9d1a906

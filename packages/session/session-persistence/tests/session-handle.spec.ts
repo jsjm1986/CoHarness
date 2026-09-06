@@ -5,6 +5,7 @@ import SessionPersistence, {
   SessionAlreadyOwnedError,
   SessionPersistenceRevision,
   SessionReadOnlyError,
+  type SessionMigrationRecord,
   type SessionInspection,
   type SessionLocation,
   type SessionPersistenceSnapshot,
@@ -25,6 +26,10 @@ class MemoryPersistence extends SessionPersistence {
   async list(): Promise<SessionHeader[]> { return [header] }
   async listSnapshots(): Promise<SessionPersistenceSnapshot[]> {
     return [{ header, revision: SessionPersistenceRevision('memory') }]
+  }
+
+  reportMigration(record: SessionMigrationRecord): void {
+    this.recordMigration(record)
   }
 }
 
@@ -61,5 +66,19 @@ describe('SessionPersistence explicit handles', () => {
     await handle.close()
     await handle.close()
     await expect(handle.read()).rejects.toThrow(/closed/)
+  })
+
+  it('aggregates migration outcomes by generation', () => {
+    const persistence = new MemoryPersistence(new Context())
+    persistence.reportMigration({ id: header.id, fromVersion: 0, toVersion: 2, status: 'succeeded', durationMs: 3 })
+    persistence.reportMigration({ id: header.id, fromVersion: 0, toVersion: 2, status: 'failed', durationMs: 5, error: 'conflict' })
+    expect(persistence.migrationStats()).toEqual({
+      attempts: 2,
+      succeeded: 1,
+      failed: 1,
+      totalDurationMs: 8,
+      generations: [{ fromVersion: 0, toVersion: 2, attempts: 2, succeeded: 1, failed: 1 }],
+      lastFailure: { id: header.id, fromVersion: 0, toVersion: 2, status: 'failed', durationMs: 5, error: 'conflict' },
+    })
   })
 })

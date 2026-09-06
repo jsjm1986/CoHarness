@@ -350,6 +350,7 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
       writeBatchMaxDelayMs: config.writeBatchMaxDelayMs ?? DEFAULT_WRITE_BATCH_MAX_DELAY_MS,
       maxPendingEvents: config.maxPendingEvents ?? DEFAULT_MAX_PENDING_EVENTS_PER_SESSION,
       maxPendingBytes,
+      onMigration: record => this.recordMigration(record),
     })
     ctx.on('session/disposed', (session) => {
       void ctx.sessions.flush(session).then(

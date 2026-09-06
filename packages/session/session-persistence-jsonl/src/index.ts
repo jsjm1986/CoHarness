@@ -283,6 +283,7 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
       writeBatchMaxDelayMs,
       maxPendingEvents,
       maxPendingBytes,
+      onMigration: record => this.recordMigration(record),
     })
   }
 

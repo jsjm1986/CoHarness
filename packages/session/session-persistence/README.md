@@ -10,6 +10,8 @@ The persisted unit IS the existing `SessionEvent` (event-sourced model — the l
 
 `createHandle` and `openHandleAsync` are the additive ownership seam for the v2 migration. A write handle reserves one Session id in this process and lets a provider add a cross-process lock; JSONL uses an atomic root lock file. A read handle cannot append, and `close` releases every reservation idempotently. The synchronous `openHandle` remains for local in-memory providers and tests. Legacy service methods below remain available while existing providers and Consumers migrate.
 
+Each provider also exposes aggregate migration metrics so a deployment can measure attempts, success/failure counts, elapsed time, and the source/target generation without reading session bodies.
+
 | Method | Contract |
 |---|---|
 | `locate(meta): SessionLocation \| undefined` | Resolve an absolute per-session artifact target without I/O or materialization. Backends without an independent local artifact return `undefined`. |
@@ -17,6 +19,7 @@ The persisted unit IS the existing `SessionEvent` (event-sourced model — the l
 | `readRaw(id, signal?): Promise<SessionRawArtifact \| undefined>` | Read a supported backend's own artifact text verbatim, decoded from its physical encoding but never reconstructed from events. `undefined` means only that the requested artifact is absent; an unsupported backend rejects. |
 | `create(meta): Promise<void>` | Register a new session's metadata. MAY defer the physical write until the first `append` (lazy materialization). |
 | `createHandle(meta): Promise<SessionHandle>` / `openHandleAsync(id, mode): Promise<SessionHandle>` | Acquire explicit read/write ownership for one Session. A second local or provider-locked writer rejects with `SESSION_ALREADY_OWNED` or a provider lock error; a read handle rejects append with `SESSION_READ_ONLY`. |
+| `migrationStats(): SessionMigrationStats` | Return immutable counters for legacy-format migration attempts, grouped by source/target generation, including the last failure. |
 | `append(id, events): Promise<void>` | Durably persist a batch. Append-only; first event `seq` == stored next-seq after any repair; rejects non-JSON-serializable data naming the offending type. |
 | `prepare(id, signal?): Promise<SessionPreparation>` | Reserve the exact unpublished Session used by resume. A coordinator reuses an earlier inspection when available, commits pending recovery, and releases an unpublished reservation back to its bounded cache on disposal. |
 | `load(id): Promise<{ meta; events }>` | Return an immutable balanced logical log after converting supported older records from the same format version and committing cold recovery. A live load first flushes its snapshot and rejects while its turn is open; a cold load preserves an interrupted final turn and durably closes it with synthetic `tool/result`/`step/end?`/`turn/end {interrupted}` events. Only a torn tail fragment is dropped; committed corruption and malformed records reject as `SessionPersistenceCorruptionError`, while an unsupported format `version` or an event type unknown to this build (without the envelope's `ignorable` marker) refuses as `SessionFormatUnsupportedError`, naming the refusal direction and the raw log path when the backend keeps one artifact per session. |

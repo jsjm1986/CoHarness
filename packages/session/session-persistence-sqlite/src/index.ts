@@ -94,6 +94,7 @@ export class SqliteSessionPersistence extends SessionPersistence {
       writeBatchMaxDelayMs,
       maxPendingEvents,
       maxPendingBytes,
+      onMigration: record => this.recordMigration(record),
     })
   }
 

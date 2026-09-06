@@ -149,6 +149,32 @@ export interface SessionRawArtifact {
   readonly content: string
 }
 
+/** One completed or failed legacy-to-current format migration attempt. */
+export interface SessionMigrationRecord {
+  readonly id: SessionId
+  readonly fromVersion: number
+  readonly toVersion: number
+  readonly status: 'succeeded' | 'failed'
+  readonly durationMs: number
+  readonly error?: string
+}
+
+/** Aggregated migration counters owned by one persistence provider instance. */
+export interface SessionMigrationStats {
+  readonly attempts: number
+  readonly succeeded: number
+  readonly failed: number
+  readonly totalDurationMs: number
+  readonly generations: readonly {
+    readonly fromVersion: number
+    readonly toVersion: number
+    readonly attempts: number
+    readonly succeeded: number
+    readonly failed: number
+  }[]
+  readonly lastFailure?: SessionMigrationRecord
+}
+
 /** Error raised when one persistence instance already owns a Session for writing. */
 export class SessionAlreadyOwnedError extends Error {
   /** Stable machine-readable ownership failure code. */
@@ -277,9 +303,59 @@ export interface SessionLocation {
  */
 export abstract class SessionPersistence extends Service {
   private readonly writeHandles = new Map<SessionId, PersistenceSessionHandle>()
+  private migrationAttempts = 0
+  private migrationSucceeded = 0
+  private migrationFailed = 0
+  private migrationDurationMs = 0
+  private readonly migrationGenerations = new Map<string, {
+    fromVersion: number
+    toVersion: number
+    attempts: number
+    succeeded: number
+    failed: number
+  }>()
+  private lastMigrationFailure: SessionMigrationRecord | undefined
 
   constructor(ctx: Context) {
     super(ctx, 'sessionPersistence')
+  }
+
+  /**
+   * Return immutable aggregate counters for format migration attempts.
+   * @returns migration totals and per-generation counters.
+   */
+  migrationStats(): SessionMigrationStats {
+    return {
+      attempts: this.migrationAttempts,
+      succeeded: this.migrationSucceeded,
+      failed: this.migrationFailed,
+      totalDurationMs: this.migrationDurationMs,
+      generations: [...this.migrationGenerations.values()].map(value => ({ ...value })),
+      ...(this.lastMigrationFailure === undefined ? {} : { lastFailure: { ...this.lastMigrationFailure } }),
+    }
+  }
+
+  /** Record one coordinator migration attempt without exposing mutable state. */
+  protected recordMigration(record: SessionMigrationRecord): void {
+    this.migrationAttempts += 1
+    this.migrationDurationMs += record.durationMs
+    if (record.status === 'succeeded') this.migrationSucceeded += 1
+    else {
+      this.migrationFailed += 1
+      this.lastMigrationFailure = { ...record }
+    }
+    const key = `${record.fromVersion}->${record.toVersion}`
+    const generation = this.migrationGenerations.get(key) ?? {
+      fromVersion: record.fromVersion,
+      toVersion: record.toVersion,
+      attempts: 0,
+      succeeded: 0,
+      failed: 0,
+    }
+    generation.attempts += 1
+    if (record.status === 'succeeded') generation.succeeded += 1
+    else generation.failed += 1
+    this.migrationGenerations.set(key, generation)
   }
 
   /**
