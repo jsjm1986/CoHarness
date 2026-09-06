@@ -16,7 +16,6 @@ Node 内置的 `fetch` 会忽略 `HTTP_PROXY` 与 `HTTPS_PROXY`，因此在代�
 - [使用本包](#use-this-package)
 - [理解实现](#understand-the-implementation)
 - [进一步探索](#further-exploration)
-- [模型体验](#model-experience)
 - [已知限制与延期工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
@@ -89,15 +88,6 @@ loopback 始终被绕过——`localhost`、整个 `127.0.0.0/8` 段、`::1`、`
 - [`dsh-web-fetch-http`](../../web/web-fetch-http/README.zh.md)——唯一一个安全规则会因代理而改变的消费方。
 
 -----
-
-<a id="model-experience"></a>
-## 模型体验
-
-无。本包只承担传输策略：它改变字节如何抵达网络，不注册任何提示词、schema 或结果文本。
-
-#### KV Cache 影响
-
-不会直接失效：本包不贡献任何请求 token，也从不改变请求前缀，因此提供方缓存复用不受影响。
 
 ## 已知限制与延期工作
 

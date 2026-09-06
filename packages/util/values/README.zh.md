@@ -76,6 +76,14 @@ JSON 校验器使用显式工作栈，并只跟踪当前祖先链，因此深层
 
 -----
 
+## 模型体验
+
+无。本包提供 JSON 安全值操作，不注册提示词、schema 或结果文本。
+
+#### KV Cache effect
+
+不会直接失效：值工具不会进入模型请求前缀。
+
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
