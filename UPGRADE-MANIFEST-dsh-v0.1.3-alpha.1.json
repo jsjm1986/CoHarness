@@ -54,7 +54,8 @@
   "migration": {
     "trigger": "first-body-read",
     "sourcePreserved": true,
-    "immutableSuccessor": true,
+    "immutableSuccessor": false,
+    "physicalSuccessorStatus": "pending-provider-stage",
     "automaticDowngrade": false,
     "productionPrerequisites": ["backup", "copy-dry-run", "canary", "migration-metrics"]
   },
