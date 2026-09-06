@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "reviewDate": "2026-09-06",
+  "upstream": {
+    "repository": "https://github.com/deepseek-ai/deepseek-harness",
+    "tag": "dsh-v0.1.3-alpha.1",
+    "commit": "d347e703908d0406b7a7ef80e3a0e594d86b2215",
+    "previousTag": "dsh-v0.1.2-alpha.5",
+    "diff": { "files": 2201, "insertions": 63846, "deletions": 30632 },
+    "firstParentCommits": 37,
+    "nonMergeCommits": 182,
+    "releasePage": "https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.1.3-alpha.1"
+  },
+  "baseline": {
+    "repository": "https://github.com/jsjm1986/CoHarness.git",
+    "commit": "73e1eb5d0cb7bfbe0dfb54792350fcead07815eb",
+    "synchronization": "semantic-selective"
+  },
+  "targetVersion": "0.1.3-alpha.1.coharness.1",
+  "decisions": {
+    "equivalent": [
+      "read-image-attachment-gating",
+      "fs-not-observed-policy",
+      "userdoc-arbitrary-mime-resumable-upload",
+      "protocol-specific-model-discovery",
+      "workspace-root-and-windows-path-policy"
+    ],
+    "adapt": [
+      "session-v2-and-immutable-generation-migration",
+      "session-handle-and-single-writer-lock",
+      "userdoc-upload-session-reference-and-ui-integration",
+      "agent-team-send-message-steer-ordering",
+      "search-result-workspace-reveal",
+      "windows-child-console-and-macos-x64-runtime"
+    ],
+    "adopt": [
+      "outbound-http-proxy-and-no-proxy-policy",
+      "session-history-performance-baseline-and-release-block"
+    ],
+    "notAdopted": [
+      "upstream-ui-chat-package-replacement",
+      "upstream-gateway-and-remote-error-contract",
+      "sqlite-session-persistence-removal",
+      "bulk-vendor-or-generated-test-copy"
+    ]
+  },
+  "migration": {
+    "trigger": "first-body-read",
+    "sourcePreserved": true,
+    "immutableSuccessor": true,
+    "automaticDowngrade": false,
+    "productionPrerequisites": ["backup", "copy-dry-run", "canary", "migration-metrics"]
+  },
+  "verification": {
+    "required": ["typecheck", "test", "build", "hygiene", "doc-sync", "release-verify"],
+    "externalEvidence": ["assembled-web", "windows-native", "real-api", "production-canary"],
+    "performanceGate": "history-load benchmark must not regress from the CoHarness baseline"
+  }
+}
