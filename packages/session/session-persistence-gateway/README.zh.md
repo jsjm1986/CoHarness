@@ -14,6 +14,7 @@
 - 浏览器创建根会话前会预留按 scope 限定的草稿 id。PostgreSQL 为重试返回同一个 canonical Session id，未使用的 reservation 在一小时后过期，且不保存 prompt 文本或凭据。首个实体化 append 或草稿成功 dispose 后会释放 reservation。
 - `revision(id, signal?)` 使用认证的逐会话 revision 端点，不列出运行时目录。`listSnapshots()` 携带 PostgreSQL 维护的 `blank`、`visibleContentSeq` 和 `lastPromptAt` 事实。仅草稿行不会进入普通会话列表；仅命令行仍可恢复并供维护视图处理。
 - `readHeader(id, signal?)` 和 `readRevision(id, signal?)` 使用带索引的元数据 endpoint。`readPage(id, request, signal?)` 使用 PostgreSQL 的 `(session_id, seq)` keyset 查询，每页最多返回 512 KiB／2,000 个事件／50 个组，并把续传 cursor 绑定到源 revision。`readHistoryIndex(id, maxItems?, signal?)` 只读取轮次边界和有界搜索预览，不选择事件正文。提供方保留有类型的分页失败，Gateway page 路径不会传输完整 detached 历史。
+- 读取旧 v0/v1 body 时，会可选地 POST `/internal/runtime/session/migrate`，携带 `sessionId`、`sourceRevision`、`targetHeader` 和幂等 `migrationId`。已部署的服务端必须校验源 revision 并在事务中更新元数据；旧 Gateway 返回 404 时，客户端保留内存归一化回退。
 
 ## 配置
 

@@ -12,7 +12,7 @@ Session providers need to classify a stored header before reading its body and n
 
 `@deepseek-ai/dsh-session-format` compiles a complete adjacent chain and exposes header-only classification plus detached whole-artifact migration. The default static catalog declares v0→v1 and v1→v2. Newer generations refuse before body decoding; older generations must traverse every declared edge. Inputs are snapshotted and frozen, and the catalog never writes storage.
 
-The current CoHarness steps preserve the existing event vocabulary and advance the generation marker. JSONL now supplies the first provider adapter: a v0/v1 body read atomically publishes `session.v2.*`, preserves the source bytes, and prefers the highest generation on later reads. Gateway and SQLite physical publication, legacy payload normalization beyond the shared coordinator, and provider backups remain adapter work; they are intentionally not hidden in this pure package.
+The current CoHarness steps preserve the existing event vocabulary and advance the generation marker. JSONL atomically publishes `session.v2.*` while SQLite updates only the metadata row in a write transaction; both preserve logical event rows/source bytes. Gateway physical publication, legacy payload normalization beyond the shared coordinator, and provider backups remain adapter work; they are intentionally not hidden in this pure package.
 
 ## Alternatives considered
 
@@ -24,7 +24,7 @@ The current CoHarness steps preserve the existing event vocabulary and advance t
 
 ## Consequences
 
-Provider implementations have one reusable migration planner and a stable diagnostic category. The catalog itself does not write storage; JSONL owns its atomic successor publication, while Gateway and SQLite still need adapter-specific publication and rollback work.
+Provider implementations have one reusable migration planner and a stable diagnostic category. The catalog itself does not write storage; JSONL and SQLite own their provider-specific publication. Gateway clients now issue an optional idempotent migration request carrying the source revision and target header; the server must add the transactional endpoint and rollback contract, while a 404 keeps older deployments on the in-memory fallback.
 
 ## Verification
 
