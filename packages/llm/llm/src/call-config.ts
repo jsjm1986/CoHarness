@@ -6,7 +6,6 @@
  * @module dsh-llm/call-config
  */
 
-export { deepFreeze } from '@deepseek-ai/dsh-util-values'
 import type { GenerateOptions } from './types.ts'
 import type { ReasoningEffortId } from './brand.ts'
 
@@ -77,3 +76,38 @@ export function markAgentLoopRequest<T extends GenerateOptions>(request: T): T {
 export function isAgentLoopRequest(request: GenerateOptions): boolean {
   return AGENT_LOOP_REQUESTS.has(request)
 }
+
+/* jscpd:ignore-start */
+// LLM request objects are client-facing; this local freezer avoids loading the
+// host-only value utility into the client bundle.
+export function deepFreeze<T>(value: T): T {
+  const seen = new WeakSet<object>()
+  const pending: (
+    | { kind: 'visit'; node: unknown }
+    | { kind: 'property'; source: Record<string, unknown>; key: string }
+  )[] = [{ kind: 'visit', node: value }]
+  while (pending.length > 0) {
+    const task = pending.pop()
+    /* v8 ignore next -- the loop condition guarantees one pending task. */
+    if (task === undefined) continue
+    if (task.kind === 'property') {
+      pending.push({ kind: 'visit', node: task.source[task.key] })
+      continue
+    }
+    const node = task.node
+    if (node === null || typeof node !== 'object') continue
+    if (node instanceof AbortSignal) continue
+    if (seen.has(node)) continue
+    seen.add(node)
+    Object.freeze(node)
+    const keys = Object.keys(node)
+    for (let index = keys.length - 1; index >= 0; index -= 1) {
+      const key = keys[index]
+      /* v8 ignore next -- the loop is bounded by the captured key count. */
+      if (key === undefined) continue
+      pending.push({ kind: 'property', source: node as Record<string, unknown>, key })
+    }
+  }
+  return value
+}
+/* jscpd:ignore-end */
