@@ -72,6 +72,49 @@ describe('DocumentsModal.module.css', () => {
       /@media \(min-width: 768px\) and \(max-width: 1023px\)[\s\S]*\.actions \.actionIcon\s*\{[\s\S]*display:\s*inline-flex/,
     )
   })
+
+  it('keeps the workbench hierarchy and skips off-screen row rendering', () => {
+    expect(modal).toMatch(/\.panel\s*\{[\s\S]*border-radius:\s*14px[\s\S]*box-shadow:\s*var\(--dsw-elevation-panel\)/)
+    expect(modal).toMatch(/\.scopeItemActive\s*\{[\s\S]*box-shadow:\s*inset 3px 0 var\(--dsw-alias-brand-primary\)/)
+    expect(modal).toMatch(new RegExp([
+      '\\.row,[\\s\\S]*\\.overviewRow,[\\s\\S]*\\.trashRow\\s*\\{',
+      '[\\s\\S]*content-visibility:\\s*auto[\\s\\S]*contain-intrinsic-block-size:\\s*auto 50px',
+    ].join('')))
+  })
+
+  it('keeps overview source metadata and transfer actions in one desktop row surface', () => {
+    expect(modal).toMatch(/@media \(min-width: 768px\)[\s\S]*\.overviewList\s*\{[\s\S]*gap:\s*8px/)
+    expect(modal).toMatch(new RegExp([
+      '@media \\(min-width: 768px\\)[\\s\\S]*\\.overviewRow\\s*\\{',
+      '[\\s\\S]*border-radius:\\s*10px[\\s\\S]*background:\\s*var\\(--dsw-alias-bg-layer-2\\)',
+    ].join('')))
+    expect(modal).toMatch(/\.overviewRowActions > :last-child\s*\{[\s\S]*min-width:\s*76px/)
+  })
+
+  it('does not leak the current-folder empty state into overview or trash views', () => {
+    expect(modal).toMatch(/\.overviewPanel[\s\S]*\.overviewPanel \.emptyState[\s\S]*\.overviewPanel \.mobileSelectionBar/)
+    expect(modal).toMatch(/\.trashPanel[\s\S]*\.trashPanel \.emptyState[\s\S]*\.trashPanel \.mobileSelectionBar/)
+  })
+
+  it('keeps the desktop scope header compact while retaining permission metadata', () => {
+    expect(modal).toMatch(/@media \(min-width: 768px\)[\s\S]*\.scopeNotice\s*\{[\s\S]*min-height:\s*30px[\s\S]*padding:\s*3px 8px/)
+    expect(modal).toMatch(/@media \(min-width: 768px\)[\s\S]*\.scopeNoticeCopy\s*\{[\s\S]*flex-direction:\s*row[\s\S]*gap:\s*8px/)
+  })
+
+  it('reserves a separate track for scrollbars beside navigation options and lists', () => {
+    expect(modal).toMatch(/\.scopePickerOptions\s*\{[\s\S]*padding-inline-end:\s*8px[\s\S]*scrollbar-gutter:\s*stable both-edges/)
+    expect(modal).toMatch(/\.scopePickerOption\s*\{[\s\S]*box-sizing:\s*border-box/)
+    expect(modal).toMatch(new RegExp([
+      '\\.list,[\\s\\S]*\\.overviewList,[\\s\\S]*\\.trashList\\s*\\{',
+      '[\\s\\S]*padding-inline-end:\\s*6px[\\s\\S]*scrollbar-gutter:\\s*stable both-edges',
+    ].join('')))
+  })
+
+  it('uses a compact desktop density across navigation, chrome, and rows', () => {
+    expect(modal).toMatch(/@media \(min-width: 768px\)[\s\S]*\.scopeItem\s*\{[\s\S]*min-height:\s*46px/)
+    expect(modal).toMatch(/@media \(min-width: 768px\)[\s\S]*\.panel\s*\{[\s\S]*padding:\s*10px 12px 12px/)
+    expect(modal).toMatch(/@media \(min-width: 768px\)[\s\S]*\.row\s*\{[\s\S]*min-height:\s*50px/)
+  })
 })
 
 describe('DocumentsMobileSheet.module.css', () => {

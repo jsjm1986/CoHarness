@@ -243,11 +243,16 @@
   flex: none;
 }
 
+.overviewPanel .directoryChrome,
+.overviewPanel .breadcrumbBar,
 .overviewPanel .breadcrumbs,
 .overviewPanel .toolbar,
 .overviewPanel .caption,
 .overviewPanel .selectionBar,
 .overviewPanel .progress,
+.overviewPanel .loadingState,
+.overviewPanel .emptyState,
+.overviewPanel .mobileSelectionBar,
 .overviewPanel > .status,
 .overviewPanel > .empty,
 .overviewPanel .list,
@@ -311,12 +316,17 @@
   gap: var(--dsw-space-1);
 }
 
+.trashPanel .directoryChrome,
+.trashPanel .breadcrumbBar,
 .trashPanel .breadcrumbs,
 .trashPanel .scopeNotice,
 .trashPanel .toolbar,
 .trashPanel .caption,
 .trashPanel .selectionBar,
 .trashPanel .progress,
+.trashPanel .loadingState,
+.trashPanel .emptyState,
+.trashPanel .mobileSelectionBar,
 .trashPanel > .status,
 .trashPanel > .empty,
 .trashPanel .list,
@@ -381,6 +391,38 @@
   overflow-x: auto;
   color: var(--dsw-alias-label-secondary);
   scrollbar-width: none;
+}
+
+.breadcrumbBar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.parentBack {
+  flex: none;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-mobile-font-caption);
+  cursor: pointer;
+}
+
+.parentBack:hover:not(:disabled),
+.parentBack:focus-visible {
+  border-color: var(--dsw-alias-border-l3);
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.parentBack:disabled {
+  cursor: wait;
+  opacity: 0.6;
 }
 
 .breadcrumbs::-webkit-scrollbar {
@@ -927,8 +969,10 @@
   max-height: 280px;
   flex-direction: column;
   gap: var(--dsw-space-1);
+  box-sizing: border-box;
+  padding-inline-end: 8px;
   overflow-y: auto;
-  scrollbar-gutter: stable;
+  scrollbar-gutter: stable both-edges;
 }
 
 .scopePickerOption {
@@ -936,6 +980,7 @@
   align-items: center;
   gap: var(--dsw-space-2);
   width: 100%;
+  box-sizing: border-box;
   min-height: 52px;
   padding: var(--dsw-space-2) var(--dsw-space-3);
   border: 1px solid transparent;
@@ -1747,5 +1792,572 @@
   .loadingRow {
     transition: none;
     animation: none;
+  }
+}
+
+/* -------------------------------------------------------------------------
+   Unified workbench visual system
+
+   Keep the existing DOM and operation order, but give the manager one clear
+   surface hierarchy: the rail navigates, the content panel carries the
+   current task, and rows stay quiet until they are relevant. The containment
+   rules also let the browser skip layout and paint work for off-screen rows
+   when a scope contains many documents.
+ */
+
+.dialog {
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-border-l2) 82%, transparent);
+  border-radius: 18px;
+  background: var(--dsw-alias-bg-layer-2);
+  box-shadow: var(--dsw-elevation-prominent);
+}
+
+.shell {
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.limits {
+  margin: 12px 20px 0;
+  border-color: color-mix(in srgb, var(--dsw-alias-border-l2) 76%, transparent);
+  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1) 72%, transparent);
+}
+
+.scopeRail {
+  flex-basis: 248px;
+  gap: 6px;
+  padding: 18px 14px 20px;
+  background: color-mix(in srgb, var(--dsw-alias-bg-layer-2) 88%, var(--dsw-alias-bg-layer-1));
+}
+
+.scopeRailHeading {
+  padding: 2px 10px 10px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.scopeItem {
+  min-height: 54px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  transition: background-color 140ms ease, box-shadow 140ms ease, color 140ms ease;
+}
+
+.scopeItemActive {
+  border-color: color-mix(in srgb, var(--dsw-alias-brand-primary) 28%, var(--dsw-alias-border-l2));
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 10%, var(--dsw-alias-bg-layer-1));
+  box-shadow: inset 3px 0 var(--dsw-alias-brand-primary);
+}
+
+.scopeItemActive .scopeItemIcon {
+  color: var(--dsw-alias-brand-primary);
+}
+
+.workbenchContent {
+  padding: 20px 24px 24px;
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.panel {
+  gap: 12px;
+  padding: 18px 20px 20px;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-border-l2) 86%, transparent);
+  border-radius: 14px;
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: var(--dsw-elevation-panel);
+}
+
+.overview,
+.trash {
+  gap: 14px;
+}
+
+.overviewHeader,
+.trashHeader {
+  padding-bottom: 12px;
+  border-bottom-color: color-mix(in srgb, var(--dsw-alias-border-l2) 84%, transparent);
+}
+
+.overviewHeader h2,
+.trashHeader h2 {
+  font-size: 18px;
+  line-height: 26px;
+  letter-spacing: -0.01em;
+}
+
+.toolbar {
+  gap: 10px;
+}
+
+.filterGroup,
+.actionGroup {
+  gap: 8px;
+}
+
+.filterGroup {
+  flex-basis: 460px;
+}
+
+.search {
+  min-height: 40px;
+}
+
+.select {
+  height: 40px;
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.actionGroup > button {
+  min-height: 36px;
+  border-radius: 10px;
+}
+
+.caption {
+  min-height: 30px;
+  padding: 8px 4px;
+  border-top: 1px solid color-mix(in srgb, var(--dsw-alias-border-l2) 66%, transparent);
+  border-bottom-color: color-mix(in srgb, var(--dsw-alias-border-l2) 84%, transparent);
+}
+
+.scopeNotice,
+.selectionModeNotice {
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.scopeNoticeTarget {
+  border-color: color-mix(in srgb, var(--dsw-alias-brand-primary) 36%, var(--dsw-alias-border-l2));
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 7%, var(--dsw-alias-bg-layer-2));
+}
+
+.list,
+.overviewList,
+.trashList {
+  gap: 0;
+}
+
+.list,
+.overviewList,
+.trashList {
+  padding-inline-end: 6px;
+  scrollbar-gutter: stable both-edges;
+}
+
+.listHeader {
+  min-height: 36px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.row,
+.overviewRow,
+.trashRow {
+  content-visibility: auto;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  contain-intrinsic-block-size: auto 50px;
+}
+
+.row {
+  min-height: 60px;
+  padding: 10px 12px;
+  border-top: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--dsw-alias-border-l2) 74%, transparent);
+  border-radius: 8px;
+}
+
+.row:hover {
+  background: color-mix(in srgb, var(--dsw-alias-interactive-bg-hover) 70%, transparent);
+}
+
+.groupDate {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 12px 12px 6px;
+  background: var(--dsw-alias-bg-layer-1);
+  font-weight: 600;
+}
+
+.overviewRow,
+.trashRow {
+  min-height: 60px;
+  padding: 10px 12px;
+  border-bottom-color: color-mix(in srgb, var(--dsw-alias-border-l2) 74%, transparent);
+}
+
+.overviewRow:hover,
+.trashRow:hover {
+  background: color-mix(in srgb, var(--dsw-alias-interactive-bg-hover) 70%, transparent);
+}
+
+.emptyState {
+  min-height: 260px;
+  padding: 24px;
+  border: 1px dashed color-mix(in srgb, var(--dsw-alias-border-l2) 86%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--dsw-alias-bg-layer-2) 48%, transparent);
+}
+
+@media (max-width: 767px) {
+  .dialog {
+    border: 0;
+    border-radius: var(--dsw-mobile-sheet-radius) var(--dsw-mobile-sheet-radius) 0 0;
+    box-shadow: none;
+  }
+
+  .limits {
+    margin: 8px 12px 0;
+  }
+
+  .workbenchContent {
+    padding: 12px;
+  }
+
+  .panel {
+    padding: 12px;
+    border-radius: 12px;
+    box-shadow: none;
+  }
+
+  .emptyState {
+    min-height: 200px;
+    padding: 16px;
+  }
+}
+
+@media (min-width: 768px) {
+  .shell > :first-child {
+    min-height: 40px;
+    padding: 8px 14px 6px;
+  }
+
+  .limits {
+    margin: 8px 14px 0;
+    padding: 5px 10px;
+  }
+
+  .scopeRail {
+    gap: 3px;
+    padding: 12px 10px 14px;
+  }
+
+  .scopeRailHeading {
+    padding: 0 8px 6px;
+  }
+
+  .scopeItem {
+    min-height: 46px;
+    padding: 7px 10px;
+  }
+
+  .workbenchContent {
+    gap: 8px;
+    padding: 10px 14px 14px;
+  }
+
+  .panel {
+    gap: 7px;
+    padding: 10px 12px 12px;
+  }
+
+  .scopeNotice {
+    min-height: 30px;
+    padding: 3px 8px;
+    border-radius: 8px;
+  }
+
+  .scopeNoticeCopy {
+    align-items: baseline;
+    flex-direction: row;
+    gap: 8px;
+  }
+
+  .scopeNoticeCopy strong {
+    font-size: 13px;
+    line-height: 18px;
+  }
+
+  .scopeNoticeCopy small {
+    font-size: 11px;
+    line-height: 16px;
+  }
+
+  .toolbar {
+    gap: 6px;
+  }
+
+  .filterGroup,
+  .actionGroup {
+    gap: 6px;
+  }
+
+  .search {
+    min-height: 36px;
+  }
+
+  .select {
+    height: 36px;
+  }
+
+  .actionGroup > button {
+    min-height: 32px;
+  }
+
+  .caption {
+    min-height: 24px;
+    padding: 4px;
+  }
+
+  /* Overview rows are catalog records, so keep their source metadata and
+     transfer actions inside one quiet card instead of a full-width rule. */
+  .overviewList {
+    gap: 2px;
+    padding: 2px 6px 2px 0;
+  }
+
+  .overviewRow {
+    min-height: 52px;
+    padding: 6px 10px;
+    border: 1px solid color-mix(in srgb, var(--dsw-alias-border-l2) 82%, transparent);
+    border-radius: 10px;
+    background: var(--dsw-alias-bg-layer-2);
+  }
+
+  .overviewRow .fileIcon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--dsw-alias-brand-primary) 10%, var(--dsw-alias-bg-layer-1));
+    color: var(--dsw-alias-brand-primary);
+  }
+
+  .overviewRow .meta {
+    gap: 3px;
+  }
+
+  .overviewRow .size {
+    color: var(--dsw-alias-label-secondary);
+  }
+
+  .overviewRowActions {
+    gap: 6px;
+    padding-left: 12px;
+  }
+
+  .overviewRowActions > * {
+    min-height: 30px;
+    border-radius: 8px;
+    white-space: nowrap;
+  }
+
+  .overviewRowActions > :last-child {
+    min-width: 76px;
+  }
+
+  .row {
+    min-height: 50px;
+    padding: 6px 10px;
+  }
+
+  .trashRow {
+    min-height: 50px;
+    padding: 6px 10px;
+  }
+
+  .groupDate {
+    padding: 8px 10px 4px;
+  }
+}
+
+/* Document controls own their total height, including border and padding. */
+.directoryChrome {
+  display: flex;
+  flex: none;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.breadcrumbs {
+  flex: 1 1 auto;
+}
+
+@media (min-width: 768px) and (pointer: fine) {
+  .dialog.dialog {
+    padding-bottom: 0;
+    gap: 0;
+  }
+
+  .shell > :first-child,
+  .scopeItem,
+  .scopeNotice,
+  .caption,
+  .search,
+  .select {
+    box-sizing: border-box;
+  }
+
+  .scopeRail {
+    flex-basis: 208px;
+    scrollbar-gutter: stable;
+  }
+
+  .scopeItem {
+    flex-shrink: 0;
+    min-height: 42px;
+    padding: 4px 8px;
+    border-radius: 6px;
+  }
+
+  .workbenchContent {
+    padding: 8px 12px 12px;
+  }
+
+  .panel {
+    padding: 10px 12px;
+    border-radius: 8px;
+    box-shadow: none;
+  }
+
+  .scopeNotice {
+    border: 0;
+    background: transparent;
+    padding: 0;
+    min-height: 24px;
+  }
+
+  .scopeNoticeCopy {
+    flex-wrap: wrap;
+    gap: 0 8px;
+  }
+
+  .scopeNoticeCopy small {
+    font-size: 12px;
+  }
+
+  .search,
+  .select,
+  .actionGroup > button,
+  .overviewActions > button {
+    height: 32px;
+    min-height: 32px;
+    border-radius: 6px;
+  }
+
+  .actionGroup > button {
+    padding-inline: 10px;
+    font-size: 13px;
+  }
+
+  .actionGroup {
+    flex-wrap: wrap;
+  }
+
+  .row,
+  .overviewRow,
+  .trashRow {
+    min-height: 46px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    contain-intrinsic-block-size: auto 46px;
+  }
+
+  .overviewRow {
+    border: 0;
+    border-bottom: 1px solid var(--dsw-alias-border-l2);
+    background: transparent;
+  }
+
+  .overview,
+  .trash {
+    gap: 8px;
+  }
+
+  .overviewHeader,
+  .trashHeader {
+    padding-bottom: 6px;
+  }
+
+  .group {
+    gap: 0;
+  }
+
+  .groupDate {
+    padding: 6px 8px 2px;
+  }
+
+  .listHeader {
+    min-height: 28px;
+  }
+
+  .emptyState {
+    min-height: 120px;
+    border: 0;
+    background: transparent;
+  }
+}
+
+@media (min-width: 1024px) and (pointer: fine) {
+  .directoryChrome {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 12px;
+    align-items: center;
+  }
+
+  .breadcrumbBar {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .scopeNotice {
+    grid-column: 2;
+    grid-row: 1;
+    max-width: 320px;
+  }
+
+  .toolbar {
+    display: contents;
+  }
+
+  .filterGroup {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .actionGroup {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    margin: 0;
+    justify-content: flex-end;
+  }
+
+  .caption {
+    grid-column: 1 / -1;
+    border-top: 0;
+    min-height: 20px;
+    padding: 0 0 4px;
+  }
+}
+
+@media (max-width: 767px), (pointer: coarse) {
+  .parentBack {
+    min-height: var(--dsw-touch-target);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scopeItem,
+  .refreshingStatus::before {
+    animation: none;
+    transition: none;
   }
 }

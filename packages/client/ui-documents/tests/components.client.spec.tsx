@@ -242,6 +242,23 @@ describe('DocumentsModal', () => {
     expect(screen.getByRole('button', { name: t('action.previewNamed', { name: 'report.pdf' }) })).toBeTruthy()
   })
 
+  it('returns to the parent directory through an explicit navigation action', async () => {
+    const client = makeClient()
+    client.browse.mockImplementation(async (directoryId: UserDocDirectoryIdType = '' as UserDocDirectoryIdType) => ({
+      directoryId,
+      directories: directoryId === '' ? [directory('dsh-plugin')] : [],
+      documents: [],
+      limits,
+    }))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    await screen.findByRole('dialog', { name: t('modal.title') })
+    fireEvent.click(screen.getByRole('button', { name: t('folder.openNamed', { name: 'dsh-plugin' }) }))
+    expect(await screen.findByRole('button', { name: t('breadcrumb.parent') })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: t('breadcrumb.parent') }))
+    await waitFor(() => { expect(client.browse).toHaveBeenLastCalledWith('', expect.any(AbortSignal), expect.anything()) })
+  })
+
   it('keeps the current list visible and cancels a superseded scope request', async () => {
     type ScopeResponse = {
       directoryId: UserDocDirectoryIdType
