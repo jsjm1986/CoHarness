@@ -348,6 +348,12 @@ function breadcrumbs(directoryId: UserDocDirectoryIdType, rootName: string): Bre
   return result
 }
 
+function parentDirectory(directoryId: UserDocDirectoryIdType): UserDocDirectoryIdType {
+  const segments = String(directoryId).split('/').filter(Boolean)
+  segments.pop()
+  return segments.join('/') as UserDocDirectoryIdType
+}
+
 function normalizeDirectoryRef(value: {
   readonly directoryId: string
   readonly name: string
@@ -3571,189 +3577,204 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
                 </section>
               )}
 
-              <nav className={css.breadcrumbs} aria-label={t('breadcrumb.label')}>
-                {directoryTrail.map((crumb, index) => (
-                  <span key={crumb.directoryId || 'root'} className={css.crumbSeat}>
-                    {index > 0 && <IconChevronRightOutline14 size={12} className={css.crumbChevron} />}
+              <div className={css.directoryChrome}>
+                <div className={css.breadcrumbBar}>
+                  {currentDirectoryId !== ROOT_DIRECTORY_ID && (
                     <button
                       type="button"
-                      className={css.crumb}
-                      aria-current={index === directoryTrail.length - 1 ? 'page' : undefined}
-                      disabled={(loading && !listingReadyRef.current) || index === directoryTrail.length - 1}
-                      onClick={() => { navigate(crumb.directoryId) }}
+                      className={css.parentBack}
+                      disabled={loading && !listingReadyRef.current}
+                      onClick={() => { navigate(parentDirectory(currentDirectoryId)) }}
                     >
-                      {crumb.name}
+                      {t('breadcrumb.parent')}
                     </button>
-                  </span>
-                ))}
-              </nav>
-
-              {scopeView !== null && (
-                <div className={`${css.scopeNotice} ${scopeView.canUpload ? css.scopeNoticeTarget : css.scopeNoticeReadOnly}`} role="status">
-                  <span className={css.scopeNoticeIcon} aria-hidden="true"><IconFolderClose16 size={16} /></span>
-                  <span className={css.scopeNoticeCopy}>
-                    <strong>{scopeView.canUpload
-                      ? t('scope.upload.target', { name: scopeView.label })
-                      : scopeView.label}</strong>
-                    <small>{scopeView.canUpload ? t('scope.manage.editable') : t('scope.upload.readOnly', { name: scopeView.label })}</small>
-                  </span>
-                </div>
-              )}
-              {alternateSource !== null && (
-                <div className={`${css.scopeNotice} ${alternateSource.mode === 'rw' ? css.scopeNoticeTarget : css.scopeNoticeReadOnly}`} role="status">
-                  <span className={css.scopeNoticeIcon} aria-hidden="true"><IconBrowseOutline16 size={16} /></span>
-                  <span className={css.scopeNoticeCopy}>
-                    <strong>{alternateSource.label}</strong>
-                    <small>{alternateSource.mode === 'rw' ? t('scope.manage.editable') : t('scope.source.readOnly')}</small>
-                  </span>
-                </div>
-              )}
-
-              <div className={css.toolbar}>
-                <div className={css.filterGroup} role="group" aria-label={t('modal.filters')}>
-                  <Input
-                    className={css.search as string}
-                    icon={<IconSearchOutline16 size={16} />}
-                    placeholder={t('modal.search')}
-                    value={query}
-                    onChange={(event) => { setQuery(event.target.value) }}
-                  />
-                  {!phone && (
-                    <>
-                      <select
-                        className={css.select}
-                        aria-label={t('modal.type')}
-                        value={typeFilter}
-                        onChange={(event) => { setTypeFilter(event.currentTarget.value as DocumentTypeFilter) }}
-                      >
-                        {TYPE_OPTIONS.map(option => (
-                          <option key={option.value} value={option.value}>{t(option.label)}</option>
-                        ))}
-                      </select>
-                      <select
-                        className={css.select}
-                        aria-label={t('modal.sort')}
-                        value={sortValue}
-                        onChange={(event) => { setSortValue(event.currentTarget.value) }}
-                      >
-                        {SORT_OPTIONS.map(option => (
-                          <option key={option.value} value={option.value}>{t(option.label)}</option>
-                        ))}
-                      </select>
-                    </>
                   )}
+                  <nav className={css.breadcrumbs} aria-label={t('breadcrumb.label')}>
+                    {directoryTrail.map((crumb, index) => (
+                      <span key={crumb.directoryId || 'root'} className={css.crumbSeat}>
+                        {index > 0 && <IconChevronRightOutline14 size={12} className={css.crumbChevron} />}
+                        <button
+                          type="button"
+                          className={css.crumb}
+                          aria-current={index === directoryTrail.length - 1 ? 'page' : undefined}
+                          disabled={(loading && !listingReadyRef.current) || index === directoryTrail.length - 1}
+                          onClick={() => { navigate(crumb.directoryId) }}
+                        >
+                          {crumb.name}
+                        </button>
+                      </span>
+                    ))}
+                  </nav>
                 </div>
-                <div className={`${css.actionGroup}${phone ? ` ${css.mobileActionGroup}` : ''}`} role="group" aria-label={t('modal.actions')}>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    hidden
-                    onChange={(event) => {
-                      const files = event.currentTarget.files
-                      /* v8 ignore next -- the file input always exposes a FileList */
-                      if (files !== null) void uploadFiles(files)
-                    }}
-                  />
-                  {phone ? (
-                    <>
-                      {trashMode ? (
+
+                {scopeView !== null && (
+                  <div className={`${css.scopeNotice} ${scopeView.canUpload ? css.scopeNoticeTarget : css.scopeNoticeReadOnly}`} role="status">
+                    <span className={css.scopeNoticeIcon} aria-hidden="true"><IconFolderClose16 size={16} /></span>
+                    <span className={css.scopeNoticeCopy}>
+                      <strong>{scopeView.canUpload
+                        ? t('scope.upload.target', { name: scopeView.label })
+                        : scopeView.label}</strong>
+                      <small>{scopeView.canUpload ? t('scope.manage.editable') : t('scope.upload.readOnly', { name: scopeView.label })}</small>
+                    </span>
+                  </div>
+                )}
+                {alternateSource !== null && (
+                  <div className={`${css.scopeNotice} ${alternateSource.mode === 'rw' ? css.scopeNoticeTarget : css.scopeNoticeReadOnly}`} role="status">
+                    <span className={css.scopeNoticeIcon} aria-hidden="true"><IconBrowseOutline16 size={16} /></span>
+                    <span className={css.scopeNoticeCopy}>
+                      <strong>{alternateSource.label}</strong>
+                      <small>{alternateSource.mode === 'rw' ? t('scope.manage.editable') : t('scope.source.readOnly')}</small>
+                    </span>
+                  </div>
+                )}
+
+                <div className={css.toolbar}>
+                  <div className={css.filterGroup} role="group" aria-label={t('modal.filters')}>
+                    <Input
+                      className={css.search as string}
+                      icon={<IconSearchOutline16 size={16} />}
+                      placeholder={t('modal.search')}
+                      value={query}
+                      onChange={(event) => { setQuery(event.target.value) }}
+                    />
+                    {!phone && (
+                      <>
+                        <select
+                          className={css.select}
+                          aria-label={t('modal.type')}
+                          value={typeFilter}
+                          onChange={(event) => { setTypeFilter(event.currentTarget.value as DocumentTypeFilter) }}
+                        >
+                          {TYPE_OPTIONS.map(option => (
+                            <option key={option.value} value={option.value}>{t(option.label)}</option>
+                          ))}
+                        </select>
+                        <select
+                          className={css.select}
+                          aria-label={t('modal.sort')}
+                          value={sortValue}
+                          onChange={(event) => { setSortValue(event.currentTarget.value) }}
+                        >
+                          {SORT_OPTIONS.map(option => (
+                            <option key={option.value} value={option.value}>{t(option.label)}</option>
+                          ))}
+                        </select>
+                      </>
+                    )}
+                  </div>
+                  <div className={`${css.actionGroup}${phone ? ` ${css.mobileActionGroup}` : ''}`} role="group" aria-label={t('modal.actions')}>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      hidden
+                      onChange={(event) => {
+                        const files = event.currentTarget.files
+                        /* v8 ignore next -- the file input always exposes a FileList */
+                        if (files !== null) void uploadFiles(files)
+                      }}
+                    />
+                    {phone ? (
+                      <>
+                        {trashMode ? (
+                          <Button
+                            className={css.trashToggle}
+                            type="button"
+                            variant="outline"
+                            disabled={busy || trashLoading}
+                            onClick={() => { void load(ROOT_DIRECTORY_ID) }}
+                          >
+                            {t('trash.back')}
+                          </Button>
+                        ) : alternateSource === null && !overviewMode && uploadButton}
+                        <Button
+                          className={css.mobileMore}
+                          data-documents-toolbar-more=""
+                          type="button"
+                          variant="outline"
+                          aria-label={t('action.more')}
+                          aria-haspopup="dialog"
+                          aria-expanded={mobileSheet?.kind === 'more'}
+                          disabled={busy}
+                          icon={<IconEllipsisOutline16 size={18} />}
+                          onClick={() => { setMobileSheet({ kind: 'more' }) }}
+                        >
+                          {t('action.more.compact')}
+                        </Button>
+                      </>
+                    ) : (
+                      <>
                         <Button
                           className={css.trashToggle}
                           type="button"
                           variant="outline"
                           disabled={busy || trashLoading}
-                          onClick={() => { void load(ROOT_DIRECTORY_ID) }}
+                          onClick={() => { void (trashMode ? load(ROOT_DIRECTORY_ID) : openTrash()) }}
                         >
-                          {t('trash.back')}
+                          {trashMode ? t('trash.back') : t('trash.button')}
                         </Button>
-                      ) : alternateSource === null && !overviewMode && uploadButton}
-                      <Button
-                        className={css.mobileMore}
-                        data-documents-toolbar-more=""
-                        type="button"
-                        variant="outline"
-                        aria-label={t('action.more')}
-                        aria-haspopup="dialog"
-                        aria-expanded={mobileSheet?.kind === 'more'}
-                        disabled={busy}
-                        icon={<IconEllipsisOutline16 size={18} />}
-                        onClick={() => { setMobileSheet({ kind: 'more' }) }}
-                      >
-                        {t('action.more.compact')}
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Button
-                        className={css.trashToggle}
-                        type="button"
-                        variant="outline"
-                        disabled={busy || trashLoading}
-                        onClick={() => { void (trashMode ? load(ROOT_DIRECTORY_ID) : openTrash()) }}
-                      >
-                        {trashMode ? t('trash.back') : t('trash.button')}
-                      </Button>
-                      {!trashMode && scopeView === null && alternateSource === null && sourceOptions.length > 0 && (
-                        <Button
-                          className={css.sourceAction}
+                        {!trashMode && scopeView === null && alternateSource === null && sourceOptions.length > 0 && (
+                          <Button
+                            className={css.sourceAction}
+                            type="button"
+                            variant="outline"
+                            disabled={busy}
+                            icon={<IconBrowseOutline16 size={16} />}
+                            onClick={openSourcePicker}
+                          >
+                            {t('copy.source')}
+                          </Button>
+                        )}
+                        {!trashMode && (scopeView !== null || alternateSource !== null) && (
+                          <Button
+                            className={css.sourceAction}
+                            type="button"
+                            variant="outline"
+                            disabled={busy}
+                            onClick={() => { void load(ROOT_DIRECTORY_ID) }}
+                          >
+                            {t('copy.source.current')}
+                          </Button>
+                        )}
+                        {!trashMode && <Button
+                          className={css.newFolder}
                           type="button"
                           variant="outline"
-                          disabled={busy}
-                          icon={<IconBrowseOutline16 size={16} />}
-                          onClick={openSourcePicker}
+                          disabled={busy || writeLocked}
+                          icon={<IconFolderClose16 size={16} />}
+                          onClick={openCreateDirectory}
                         >
-                          {t('copy.source')}
-                        </Button>
-                      )}
-                      {!trashMode && (scopeView !== null || alternateSource !== null) && (
-                        <Button
-                          className={css.sourceAction}
+                          {t('folder.create')}
+                        </Button>}
+                        {!trashMode && alternateSource === null && !overviewMode && uploadButton}
+                        {!trashMode && <Button
+                          className={css.refresh}
                           type="button"
-                          variant="outline"
+                          variant="ghost"
+                          aria-label={t('modal.refresh')}
                           disabled={busy}
-                          onClick={() => { void load(ROOT_DIRECTORY_ID) }}
+                          icon={<IconRefreshOutline16 size={16} />}
+                          onClick={() => { void refreshDisplayed() }}
+                        />}
+                        {!trashMode && <Button
+                          type="button"
+                          variant="ghost"
+                          disabled={busy || historyLoading || overviewMode}
+                          onClick={() => { void openHistory() }}
                         >
-                          {t('copy.source.current')}
-                        </Button>
-                      )}
-                      {!trashMode && <Button
-                        className={css.newFolder}
-                        type="button"
-                        variant="outline"
-                        disabled={busy || writeLocked}
-                        icon={<IconFolderClose16 size={16} />}
-                        onClick={openCreateDirectory}
-                      >
-                        {t('folder.create')}
-                      </Button>}
-                      {!trashMode && alternateSource === null && !overviewMode && uploadButton}
-                      {!trashMode && <Button
-                        className={css.refresh}
-                        type="button"
-                        variant="ghost"
-                        aria-label={t('modal.refresh')}
-                        disabled={busy}
-                        icon={<IconRefreshOutline16 size={16} />}
-                        onClick={() => { void refreshDisplayed() }}
-                      />}
-                      {!trashMode && <Button
-                        type="button"
-                        variant="ghost"
-                        disabled={busy || historyLoading || overviewMode}
-                        onClick={() => { void openHistory() }}
-                      >
-                        {t('history.button')}
-                      </Button>}
-                    </>
-                  )}
+                          {t('history.button')}
+                        </Button>}
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              <div className={css.caption}>
-                <span>{visibleScope}</span>
-                {refreshing && <span className={css.refreshingStatus} role="status" aria-live="polite">{pendingScopeLabel === '' ? t('modal.refreshing') : t('scope.switch.loading', { name: pendingScopeLabel })}</span>}
-                {!loading && <span>{t('modal.count', { count: String(totalDocuments ?? filtered.length) })}</span>}
+                <div className={css.caption}>
+                  <span>{visibleScope}</span>
+                  {refreshing && <span className={css.refreshingStatus} role="status" aria-live="polite">{pendingScopeLabel === '' ? t('modal.refreshing') : t('scope.switch.loading', { name: pendingScopeLabel })}</span>}
+                  {!loading && <span>{t('modal.count', { count: String(totalDocuments ?? filtered.length) })}</span>}
+                </div>
+
               </div>
 
               {selected.size > 0 && (
