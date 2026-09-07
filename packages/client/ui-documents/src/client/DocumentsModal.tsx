@@ -88,6 +88,7 @@ function documentErrorMessage(error: unknown, t: (key: DocumentsKey) => string):
     if (error.code === 'DOCUMENT_LIST_QUERY') return t('error.listQuery')
     if (error.code === 'DOCUMENT_TRASH_NOT_FOUND') return t('error.trashUnavailable')
     if (error.code === 'DOCUMENT_RESTORE_CONFLICT') return t('trash.restore.error')
+    if (error.status >= 500 && /<(!doctype|html)\b/iu.test(error.message)) return t('error.runtimeUnavailable')
   }
   return error instanceof Error ? error.message : String(error)
 }

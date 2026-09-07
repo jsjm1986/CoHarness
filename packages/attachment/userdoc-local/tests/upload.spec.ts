@@ -179,6 +179,18 @@ describe('resumable local document uploads', () => {
     expect((results.find(result => result.status === 'rejected') as PromiseRejectedResult).reason).toMatchObject({ code: 'DOCUMENT_UPLOAD_BUSY' })
   })
 
+  it('reclaims an admission lock left by a stopped runtime', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-userdoc-upload-orphan-lock-'))
+    roots.push(root)
+    await store(root)
+    const lockPath = join(root, '.upload-sessions', 'v1', '.admission')
+    await writeFile(lockPath, '9007199254740991\n', { mode: 0o600 })
+
+    const restarted = await store(root)
+    await expect(restarted.list()).resolves.toEqual([])
+    await expect(readFile(lockPath)).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
   it('rejects and removes an oversized on-disk manifest before parsing it', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-userdoc-upload-manifest-limit-'))
     roots.push(root)

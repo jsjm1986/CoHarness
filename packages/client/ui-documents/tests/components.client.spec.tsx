@@ -815,6 +815,18 @@ describe('DocumentsModal', () => {
     expect(alert.textContent).not.toContain('Document scope request timed out.')
   })
 
+  it('does not render an HTML proxy error body in the document panel', async () => {
+    const client = makeClient()
+    client.browse.mockRejectedValue(new UserDocHttpError(
+      502, '<!DOCTYPE html><html><body>Bad Gateway</body></html>', undefined, undefined,
+    ))
+    createUserDocClient.mockReturnValue(client)
+    renderModal()
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain(t('error.runtimeUnavailable'))
+    expect(alert.textContent).not.toContain('<!DOCTYPE html>')
+  })
+
   it('uploads a selected file, reports progress, and refreshes the list', async () => {
     const client = makeClient()
     let release: () => void = () => {}

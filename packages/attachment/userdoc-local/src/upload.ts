@@ -5,7 +5,9 @@ import { createReadStream } from 'node:fs'
 import {
   mkdir,
   open,
+  readFile,
   readdir,
+  rename,
   rm,
   stat,
   statfs,
@@ -134,6 +136,17 @@ const SHA256_PATTERN = /^[0-9a-f]{64}$/u
 const MAX_FINGERPRINT_LENGTH = 512
 const ADMISSION_LOCK_NAME = '.admission'
 const LOCK_WAIT_MS = 30_000
+
+/** Whether a PID still names a live process that may own an admission lock. */
+function processIsLive(pid: number): boolean {
+  if (!Number.isSafeInteger(pid) || pid <= 0) return false
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM'
+  }
+}
 
 function manifestPath(root: string, uploadId: string): string {
   if (!ID_PATTERN.test(uploadId)) {
@@ -315,6 +328,30 @@ function admissionLockPath(root: string): string {
   return join(sessionRoot(root), ADMISSION_LOCK_NAME)
 }
 
+/** Reclaim an admission lock left by a process that no longer exists. */
+async function recoverOrphanedAdmissionLock(root: string): Promise<void> {
+  const lockPath = admissionLockPath(root)
+  let owner: number
+  try {
+    const content = (await readFile(lockPath, 'utf8')).trim()
+    if (!/^\d+$/u.test(content)) return
+    owner = Number(content)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
+    throw error
+  }
+  if (processIsLive(owner)) return
+  const quarantine = `${lockPath}.${process.pid}.${randomUUID()}.stale`
+  try {
+    await rename(lockPath, quarantine)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
+    throw error
+  }
+  await rm(quarantine, { force: true })
+  console.warn(`[userdoc-local] recovered orphaned document admission lock ownerPid=${String(owner)}`)
+}
+
 function hashBytes(bytes: Uint8Array): string {
   return createHash('sha256').update(bytes).digest('hex')
 }
@@ -427,6 +464,7 @@ export class LocalUploadManager {
    */
   async cleanupExpired(now = Date.now()): Promise<void> {
     await mkdir(sessionRoot(this.root), { recursive: true, mode: 0o700 })
+    await recoverOrphanedAdmissionLock(this.root)
     await withFileLock(admissionLockPath(this.root), () => this.sweepExpired(now), { waitMs: LOCK_WAIT_MS })
   }
 
