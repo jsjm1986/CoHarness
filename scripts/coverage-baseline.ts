@@ -73,7 +73,6 @@ export const coverageBaselineFiles: readonly string[] = [
   'packages/llm/llm-pi-ai/src/auth.ts',
   'packages/llm/llm-pi-ai/src/index.ts',
   'packages/llm/llm-pi-ai/src/login.ts',
-  'packages/llm/llm/src/assistant-stream.ts',
   'packages/llm/llm/src/attribution.ts',
   'packages/llm/llm/src/content.ts',
   'packages/llm/llm/src/text-thinking-guard.ts',
@@ -100,14 +99,6 @@ export const coverageBaselineFiles: readonly string[] = [
   'packages/session/session-persistence/src/index.ts',
   'packages/session/session-persistence/src/page.ts',
   'packages/session/session-persistence-sqlite/src/compression.ts',
-  // Alpha1 value and Session-format seams are source-plane modules with
-  // historical branches still awaiting dedicated exhaustive coverage.
-  'packages/session/session-format/src/catalog.ts',
-  'packages/session/session-format/src/chain.ts',
-  'packages/session/session-format/src/error.ts',
-  'packages/session/session-format/src/json.ts',
-  'packages/session/session-persistence/src/coordinator.ts',
-  'packages/util/values/src/index.ts',
   // SDK, ACP, and Remote lookup transports.
   'packages/acp/acp/src/index.ts',
   'packages/api/remotes/src/agent-lookup.ts',

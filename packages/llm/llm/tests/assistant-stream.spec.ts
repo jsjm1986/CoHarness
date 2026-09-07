@@ -7,6 +7,14 @@ import {
 import type { TimedStreamChunk } from '@deepseek-ai/dsh-llm'
 
 describe('AssistantStreamAccumulator', () => {
+  it('preserves block starts as raw records across expansion', () => {
+    const timed: TimedStreamChunk = { time: 1, chunk: { type: 'block-start', index: 0, blockType: 'text' } }
+    const accumulator = new AssistantStreamAccumulator()
+    accumulator.push(timed)
+    expect(accumulator.snapshot()).toEqual([{ type: 'chunk', time: 1, chunk: timed.chunk }])
+    expect(expandAssistantStream(accumulator.snapshot())).toEqual([timed])
+  })
+
   it('keeps delta boundaries and timestamps while compacting one attempt', () => {
     const chunks: readonly TimedStreamChunk[] = [
       { time: 1_000, chunk: { type: 'text-delta', index: 0, text: 'hel' } },
