@@ -6,11 +6,24 @@ import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { CallId } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
+import type { SessionHandle } from '@deepseek-ai/dsh-session-persistence'
 import * as toolSchedule from '../src/index.ts'
 
 class PersistenceProbe extends Service {
   constructor(ctx: Context) {
     super(ctx, 'sessionPersistence')
+  }
+
+  /** Minimal handle surface for AgentLoop lifecycle tests without a backend. */
+  async createHandle(id: SessionId): Promise<SessionHandle> {
+    return {
+      id,
+      mode: 'write',
+      read: async () => [],
+      append: async () => {},
+      flush: async () => {},
+      close: async () => {},
+    }
   }
 }
 

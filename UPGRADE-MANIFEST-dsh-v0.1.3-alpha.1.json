@@ -1,20 +1,49 @@
 {
   "schemaVersion": 1,
-  "reviewDate": "2026-09-06",
+  "reviewDate": "2026-09-07",
   "upstream": {
     "repository": "https://github.com/deepseek-ai/deepseek-harness",
     "tag": "dsh-v0.1.3-alpha.1",
     "commit": "d347e703908d0406b7a7ef80e3a0e594d86b2215",
     "previousTag": "dsh-v0.1.2-alpha.5",
-    "diff": { "files": 2201, "insertions": 63846, "deletions": 30632 },
+    "diff": {
+      "files": 2201,
+      "insertions": 63846,
+      "deletions": 30632
+    },
     "firstParentCommits": 37,
     "nonMergeCommits": 182,
     "releasePage": "https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.1.3-alpha.1"
   },
   "baseline": {
     "repository": "https://github.com/jsjm1986/CoHarness.git",
-    "commit": "73e1eb5d0cb7bfbe0dfb54792350fcead07815eb",
+    "commit": "aefc098da89f3bd90b836b2ee9ade1a2e5f44097",
     "synchronization": "semantic-selective"
+  },
+  "audit": {
+    "branch": "codex/upstream-alignment-audit",
+    "comparison": {
+      "mergeBase": null,
+      "localTreeFiles": 9191,
+      "upstreamTreeFiles": 9080,
+      "changedPaths": 9562,
+      "commonPackages": 227,
+      "localOnlyPackages": 24,
+      "upstreamOnlyPackages": 28
+    },
+    "policy": "shared-core-behavior-and-protocol-parity-with-upstream; preserve-CoHarness-product-owners",
+    "status": "local-audit-complete-external-evidence-pending",
+    "knownFindings": [
+      "agent-loop-resume-open-before-read-and-dispose-before-registry-detach",
+      "sqlite-test-sql-resource-boundary",
+      "session-v2-documentation-and-generator-drift",
+      "subagent-parent-activation-hold-during-establishment-and-delivery",
+      "durable-session-id-reuse-test-aligned-with-identity-contract",
+      "keyless-snapshot-output-version-v2-refresh",
+      "preset-recomposition-event-reconciles-agent-owned-registrations",
+      "web-preset-e2e-session-root-isolation",
+      "acp-capability-e2e-expectations-aligned"
+    ]
   },
   "targetVersion": "0.1.3-alpha.1.coharness.1",
   "decisions": {
@@ -48,6 +77,8 @@
     "session-handle-process-local-ownership",
     "agent-factory-persistent-handle-lifecycle",
     "session-format-v0-v1-v2-adjacent-catalog",
+    "jsonl-and-sqlite-provider-generation-migration",
+    "jsonl-cross-process-session-write-lock",
     "projection-cache-format-version-binding",
     "outbound-http-proxy-policy"
   ],
@@ -56,11 +87,61 @@
     "sourcePreserved": true,
     "immutableSuccessor": true,
     "automaticDowngrade": false,
-    "productionPrerequisites": ["backup", "copy-dry-run", "canary", "migration-metrics"]
+    "productionPrerequisites": [
+      "backup",
+      "copy-dry-run",
+      "canary",
+      "migration-metrics"
+    ]
   },
   "verification": {
-    "required": ["typecheck", "test", "build", "hygiene", "doc-sync", "release-verify"],
-    "externalEvidence": ["assembled-web", "windows-native", "real-api", "production-canary"],
+    "required": [
+      "typecheck",
+      "test",
+      "build",
+      "hygiene",
+      "doc-sync",
+      "release-verify"
+    ],
+    "completedInAudit": [
+      "pnpm run typecheck",
+      "pnpm run lint",
+      "pnpm run build",
+      "pnpm run hygiene",
+      "pnpm run doc-sync",
+      "pnpm run verify-persistence-catalog",
+      "pnpm exec tsx scripts/release/verify.ts --family dsh",
+      "pnpm exec tsx scripts/release/verify.ts --family vendor",
+      "pnpm exec vitest run packages/core/session packages/session/session-format packages/session/session-persistence packages/session/session-persistence-jsonl packages/session/session-persistence-sqlite packages/core/agent-loop",
+      "pnpm exec vitest run packages/subagent",
+      "pnpm exec vitest run packages/llm",
+      "pnpm exec vitest run packages/web",
+      "pnpm exec vitest run packages/attachment packages/api",
+      "pnpm exec vitest run packages/client/connection packages/client/ui-conversation packages/client/ui-attachment packages/client/ui-documents packages/client/ui-goal packages/client/ui-model-selection packages/client/ui-subagent",
+      "env -u all_proxy -u http_proxy -u https_proxy pnpm exec vitest run --config vitest.snapshot.config.ts examples/headless-agent/tests/headless.snapshot.ts apps/cli/tests/web-browser-open.snapshot.ts",
+      "env -u all_proxy -u http_proxy -u https_proxy pnpm exec vitest run --config vitest.snapshot.config.ts gateway/tests/admin-project-directory.snapshot.ts",
+      "env -u all_proxy -u http_proxy -u https_proxy pnpm run test:e2e -- --retry 0",
+      "pnpm exec vitest run packages/session/session-persistence-gateway packages/session/session-format",
+      "pnpm exec vitest run packages/session-query",
+      "pnpm exec vitest run packages/schedule/schedule/tests/plugin.spec.ts packages/session/session-log-deepseek/tests/upload.spec.ts",
+      "pnpm exec vitest run apps/cli/tests/web-agent-presets.e2e.ts",
+      "shim=$(mktemp -d /tmp/dsh-python3-bin.XXXXXX); ln -s /opt/homebrew/bin/python3.12 \"$shim/python3\"; PATH=\"$shim:$PATH\" pnpm run test",
+      "npm test -- --no-file-parallelism (gateway)"
+    ],
+    "environmentNotes": [
+      {
+        "command": "pnpm run test",
+        "result": "the default PATH resolves /usr/bin/python3 CPython 3.9.6, while packages/experimental/code-runtime-python requires Python >=3.10; the supported CPython 3.12.13 run above passes the full suite"
+      }
+    ],
+    "externalEvidence": [
+      "assembled-web",
+      "windows-native",
+      "macos-x64-runtime",
+      "real-api",
+      "production-canary",
+      "history-performance-benchmark"
+    ],
     "performanceGate": "history-load benchmark must not regress from the CoHarness baseline"
   }
 }

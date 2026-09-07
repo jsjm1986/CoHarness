@@ -648,6 +648,94 @@ describe('PersistenceCoordinator stored identity', () => {
 })
 
 describe('PersistenceCoordinator session preparations', () => {
+  it('refuses preparation of an already published Session before reading storage', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const backend = new ControlledBackend()
+    let coordinator!: PersistenceCoordinator<never>
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      coordinator = new PersistenceCoordinator(inner, backend)
+    }, { inject: ['sessions'] }))
+    try {
+      const live = ctx.sessions.create(SessionId('already-published'))
+      await ctx.sessions.flush(live)
+      const reads = backend.loadAttempts
+      await expect(coordinator.prepare(live.id)).rejects.toThrow(/while it is live/)
+      expect(backend.loadAttempts).toBe(reads)
+      expect(ctx.sessions.get(live.id)).toBe(live)
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('upgrades an aborted turn ending that has no legacy cause', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const backend = new ControlledBackend()
+    const id = SessionId('legacy-aborted-turn')
+    backend.store.set(id, {
+      meta: meta(id),
+      events: [
+        { type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } },
+        { type: 'turn/end', seq: SessionSeq(1), time: 2, data: { turn: 1, reason: { kind: 'aborted' } } } as unknown as SessionEvent,
+        { type: 'turn/start', seq: SessionSeq(2), time: 3, data: { turn: 2 } },
+        { type: 'turn/end', seq: SessionSeq(3), time: 4, data: { turn: 2, reason: { kind: 'aborted', reason: { kind: 'user' } } } } as unknown as SessionEvent,
+      ],
+    })
+    let coordinator!: PersistenceCoordinator<never>
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      coordinator = new PersistenceCoordinator(inner, backend)
+    }, { inject: ['sessions'] }))
+    try {
+      const loaded = await coordinator.load(id)
+      expect(loaded.events.at(1)?.data).toEqual({ turn: 1, reason: { kind: 'aborted', reason: { kind: 'legacy' } } })
+      expect(loaded.events.at(-1)?.data).toEqual({ turn: 2, reason: { kind: 'aborted', reason: { kind: 'user' } } })
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it.each([true, false])('reads an old whole prefix with migration hook enabled=%s', async (withMigration) => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const medium = new ControlledBackend()
+    const id = SessionId('legacy-prefix-read')
+    const stored = { meta: { ...meta(id), version: 0 } as unknown as SessionHeader, events: oneTurnLog() }
+    medium.store.set(id, stored)
+    const migrateStored = vi.fn(async (
+      _source: StoredPrefix<never>, target: SessionStorageMetadata, _events: readonly SessionEvent[],
+      _revision: SessionPersistenceRevision,
+    ): Promise<void> => { medium.store.set(id, { ...stored, meta: target.meta }) })
+    const backend: PersistenceBackend<never> = {
+      name: medium.name,
+      loadStored: medium.loadStored.bind(medium),
+      readStoredRevision: medium.readStoredRevision.bind(medium),
+      appendBatch: medium.appendBatch.bind(medium),
+      commitRepair: medium.commitRepair.bind(medium),
+      list: medium.list.bind(medium),
+      close: medium.close.bind(medium),
+      ...withMigration ? { migrateStored } : {},
+    }
+    let coordinator!: PersistenceCoordinator<never>
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      coordinator = new PersistenceCoordinator(inner, backend)
+    }, { inject: ['sessions'] }))
+    try {
+      const suffix = await coordinator.readFrom(id, SessionLogOffset(1))
+      expect(suffix.meta.version).toBe(2)
+      expect(suffix.events).toEqual(stored.events.slice(1))
+      expect(stored.meta.version).toBe(0)
+      expect(medium.store.get(id)?.meta.version).toBe(withMigration ? 2 : 0)
+      expect(migrateStored).toHaveBeenCalledTimes(withMigration ? 1 : 0)
+      if (withMigration) expect(migrateStored.mock.calls[0]?.[3]).toBe(memoryRevision(stored))
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
   it.each([0, 1.5])('rejects invalid preparation cache capacity %s', (capacity) => {
     const ctx = new Context()
     const backend = new ControlledBackend()

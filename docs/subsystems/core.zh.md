@@ -1122,6 +1122,23 @@ Source: [`packages/core/agent-loop/src/index.ts:233`](../../packages/core/agent-
 
 ### `agent-preset/*` events
 
+<a id="agent-presetrecomposed--emit"></a>
+
+#### `agent-preset/recomposed` — emit
+
+A live Agent was re-linked to a different standing preset composition. Consumers refresh Agent-scoped registrations derived from the scope chain.
+
+```ts cordis-catalog
+/**
+ * A live Agent was re-linked to a different standing preset composition.
+ * Consumers refresh Agent-scoped registrations derived from the scope chain.
+ * @mode emit
+ */
+'agent-preset/recomposed'(): void
+```
+
+Source: [`packages/preset/agent-presets/src/types.ts:19`](../../packages/preset/agent-presets/src/types.ts)
+
 <a id="agent-presetselected--emit"></a>
 
 #### `agent-preset/selected` — emit

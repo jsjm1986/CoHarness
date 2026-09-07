@@ -122,7 +122,9 @@ describe('dsh-acp-demo real-load-path smoke (bin + Loader, keyless)', () => {
       clientCapabilities: {},
     })
     expect(init.agentCapabilities).toEqual({
+      mcpCapabilities: { http: true },
       promptCapabilities: { image: false, audio: false, embeddedContext: false },
+      sessionCapabilities: { close: {}, list: {}, resume: {} },
     })
 
     // session/new reaches the agent FACTORY (create) without the model.

@@ -1,4 +1,4 @@
-{"type":"session","version":0,"id":"{{sessionId}}","createdAt":1786406400000,"cwd":"{{cwd}}"}
+{"type":"session","version":2,"id":"{{sessionId}}","createdAt":1786406400000,"cwd":"{{cwd}}"}
 {"type":"turn/start","data":{"turn":1}}
 {"type":"user/message","data":{"role":"user","content":[{"type":"text","text":"Give one useful answer."}],"source":{"kind":"user"},"id":"22222222-2222-4222-8222-222222222222"},"surfaceOp":"append"}
 {"type":"step/start","data":{"turn":1,"step":1}}

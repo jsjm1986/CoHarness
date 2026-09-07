@@ -1,4 +1,4 @@
-{"type":"session","version":0,"id":"44444444-4444-4444-8444-444444444444","createdAt":1783952000000,"cwd":"{{cwd}}","delegationDepth":0}
+{"type":"session","version":2,"id":"44444444-4444-4444-8444-444444444444","createdAt":1783952000000,"cwd":"{{cwd}}","delegationDepth":0}
 {"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"inserted":[{"content":[{"type":"text","text":"Inspect this image, then reply with exactly "},{"type":"image","attachment":{"attachmentId":"sha256:b1ff9c8ea3a780bad09b346c423d2d0e46815926879b18e841d928376a946640","mediaType":"image/png","width":1,"height":1,"bytes":69}},{"type":"text","text":"the single word DONE."}],"source":{"kind":"user"},"role":"user","id":"0c0c0c0c-0000-4000-8000-000000000001"}]}}
 {"type":"turn/start","data":{"turn":1}}
 {"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"removedCount":1,"inserted":[]}}

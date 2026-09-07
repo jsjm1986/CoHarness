@@ -214,7 +214,9 @@ for (const backend of backends) {
         delivery: 'wakeup',
         signal: SIGNAL,
       })
-      expect(receipt.status).toBe('accepted')
+      // Recovery may still be settling the child activation when the wakeup
+      // arrives; both mailbox outcomes preserve the message durably.
+      expect(['accepted', 'queued']).toContain(receipt.status)
       await vi.waitFor(() => { expect(second.ctx.agents.get(childId)).toBeUndefined() }, { timeout: 5_000 })
       await vi.waitFor(() => { expect(durable(activeHandle.agent).pendingMessages).toEqual([]) })
 

@@ -1,4 +1,4 @@
-{"type":"session","version":0,"id":"33333333-3333-4333-8333-333333333333","createdAt":1783951000000,"cwd":"{{cwd}}","delegationDepth":0}
+{"type":"session","version":2,"id":"33333333-3333-4333-8333-333333333333","createdAt":1783951000000,"cwd":"{{cwd}}","delegationDepth":0}
 {"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"inserted":[{"content":[{"type":"text","text":"Use read_image on wide.png in the current directory, then reply with exactly the single word WIDE."}],"source":{"kind":"user"},"role":"user","id":"d059c49e-6e6c-483a-bc4a-592890130cb7"}]}}
 {"type":"turn/start","data":{"turn":1}}
 {"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"removedCount":1,"inserted":[]}}

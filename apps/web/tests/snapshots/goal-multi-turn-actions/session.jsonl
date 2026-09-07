@@ -1,4 +1,4 @@
-{"type":"session","version":0,"id":"{{sessionId}}","createdAt":1786073817152,"cwd":"{{cwd}}/workspace"}
+{"type":"session","version":2,"id":"{{sessionId}}","createdAt":1786073817152,"cwd":"{{cwd}}/workspace"}
 {"type":"permission/preset","data":{"preset":"workspace-write"}}
 {"type":"sandbox/mode","data":{"mode":"workspace-write"}}
 {"type":"approval/policy","data":{"policy":"ask"}}

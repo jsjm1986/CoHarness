@@ -11,6 +11,12 @@ declare module '@deepseek-ai/cordis' {
      * @param agentPreset - the preset recorded by the committed selection.
      */
     'agent-preset/selected'(sessionId: SessionId, agentPreset: string): void
+    /**
+     * A live Agent was re-linked to a different standing preset composition.
+     * Consumers refresh Agent-scoped registrations derived from the scope chain.
+     * @mode emit
+     */
+    'agent-preset/recomposed'(): void
   }
 }
 

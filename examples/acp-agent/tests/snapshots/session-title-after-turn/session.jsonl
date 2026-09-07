@@ -1,4 +1,4 @@
-{"type":"session","version":0,"id":"session-title-after-turn","createdAt":0,"cwd":"{{cwd}}","delegationDepth":0}
+{"type":"session","version":2,"id":"session-title-after-turn","createdAt":0,"cwd":"{{cwd}}","delegationDepth":0}
 {"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"inserted":[{"content":[{"type":"text","text":"Reply with exactly TITLE_DONE. Do not use tools."}],"source":{"kind":"user"},"role":"user","id":"07495f06-71ba-4146-b27c-de2cf46a60fb"}]}}
 {"type":"turn/start","data":{"turn":1}}
 {"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"removedCount":1,"inserted":[]}}

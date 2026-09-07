@@ -699,4 +699,7 @@ export function apply(ctx: Context, config: Config): void {
   // set and emits `tools/change`; reconcile the Agent-owned override with the
   // new ancestry. Other registry changes are idempotent no-ops here.
   ctx.on('tools/change', reconcileComposedAgents)
+  // Presets are optional for this Consumer; keep the event name available at
+  // runtime without making the package depend on the preset roster's types.
+  ctx.on('agent-preset/recomposed' as never, reconcileComposedAgents as never)
 }

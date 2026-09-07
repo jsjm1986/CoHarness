@@ -111,6 +111,12 @@ async function realInstanceFixture(
     HTTPS_PROXY: '',
     ALL_PROXY: '',
     NO_PROXY: '127.0.0.1,localhost',
+    ...process.platform === 'win32' && process.env.SystemRoot !== undefined
+      ? { SystemRoot: process.env.SystemRoot }
+      : {},
+    ...process.platform === 'win32' && process.env.ComSpec !== undefined
+      ? { ComSpec: process.env.ComSpec }
+      : {},
   }
   return { fixture, env, workspace }
 }

@@ -66,6 +66,11 @@ async function bootWeb(
     // back on the next run, so a stored document from any other build decides
     // this test's boot. Same reason the settings row above is pinned.
     { id: 'storage-json', config: { root: storageRoot } },
+    // The base profile derives session-persistence-jsonl from the process
+    // DSH_HOME. Keep this boot's durable sessions beside its temporary
+    // settings file so fixed test ids cannot collide with another run or the
+    // developer's own session history.
+    { id: 'session-persistence-jsonl', config: { root: join(dirname(settingsFile), 'sessions') } },
     // Keep the model-facing personal-document Consumer inside this test's
     // temporary root; a preset execution must never read the developer's
     // actual document directory.
@@ -257,7 +262,7 @@ describe('the shipped Web composition', () => {
       expect(toolNames(ctx, handle.agent).filter(name => name !== 'glob' && name !== 'grep')).toEqual([
         'ask_user_question', 'bash', 'create_goal', 'edit', 'exit_plan_mode',
         'get_goal', 'interrupt_agent', 'job_kill', 'job_list', 'job_output', 'list_agents', 'ralph', 'read', 'read_image', 'send_message', 'skill',
-        'subagent', 'subagent_fork', 'todo_write', 'update_goal', 'userdoc_list', 'userdoc_read', 'web_search',
+        'subagent', 'subagent_fork', 'todo_write', 'update_goal', 'userdoc_list', 'userdoc_read', 'web_fetch', 'web_search',
         'workflow', 'write',
       ])
     } finally {

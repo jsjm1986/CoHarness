@@ -1,0 +1,330 @@
+{
+  "schemaVersion": 1,
+  "auditDate": "2026-09-07",
+  "local": {
+    "repository": "https://github.com/jsjm1986/CoHarness.git",
+    "sourceBaseline": "aefc098da89f3bd90b836b2ee9ade1a2e5f44097",
+    "workingBranch": "codex/upstream-alignment-audit",
+    "version": "0.1.3-alpha.1.coharness.1",
+    "treeFiles": 9191,
+    "packageCount": 251
+  },
+  "upstream": {
+    "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
+    "tag": "dsh-v0.1.3-alpha.1",
+    "commit": "d347e703908d0406b7a7ef80e3a0e594d86b2215",
+    "treeFiles": 9080,
+    "packageCount": 255
+  },
+  "comparison": {
+    "mergeBase": null,
+    "changedPaths": 9562,
+    "commonPackages": 227,
+    "localOnlyPackages": 24,
+    "upstreamOnlyPackages": 28,
+    "comparisonRule": "tree-and-behavior comparison; commit ancestry is unavailable"
+  },
+  "policy": {
+    "sharedCore": "match upstream behavior, API, wire fields, and lifecycle semantics",
+    "productLayer": "preserve CoHarness Gateway, collaboration, documents, Android, deployment, and authorization owners",
+    "mergeStrategy": "semantic adaptation; no wholesale merge or blind cherry-pick"
+  },
+  "domains": [
+    {
+      "id": "session-format-v2",
+      "area": "core/session, session-format, persistence providers",
+      "status": "adapted-verified-locally",
+      "priority": "P0",
+      "evidence": [
+        "SESSION_FORMAT_VERSION=2",
+        "adjacent v0/v1->v2 catalog",
+        "JSONL/SQLite/Gateway migrateStored paths"
+      ],
+      "verification": "focused Session/format/JSONL/SQLite tests pass; build, persistence catalog, and keyless snapshots pass",
+      "next": [
+        "verify immutable generation and source preservation for every provider",
+        "run migration dry-run, rollback, and canary"
+      ]
+    },
+    {
+      "id": "session-handle-single-writer",
+      "area": "session-persistence, agent-loop",
+      "status": "implemented-verified-locally",
+      "priority": "P0",
+      "evidence": [
+        "resume acquires write handle before read/repair",
+        "Agent teardown closes handle before registry detach",
+        "JSONL root lock"
+      ],
+      "verification": "AgentLoop resume/config tests, JSONL lock tests, typecheck, build, and hygiene pass",
+      "next": [
+        "run two-process lock and process-restart evidence on supported platforms"
+      ]
+    },
+    {
+      "id": "agent-loop-lifecycle",
+      "area": "core/agent-loop",
+      "status": "adapted-verified-locally",
+      "priority": "P0",
+      "evidence": [
+        "async create/resume",
+        "owner cancellation",
+        "setup rollback",
+        "close-before-detach ordering"
+      ],
+      "verification": "core focused suite, Subagent lifecycle suite, typecheck, build, and keyless snapshots pass",
+      "next": [
+        "compare upstream request/turn/step and cancellation paths",
+        "run external platform evidence"
+      ]
+    },
+    {
+      "id": "llm-stream-and-discovery",
+      "area": "llm, DeepSeek adapter, model settings",
+      "status": "verified-locally",
+      "priority": "P0",
+      "evidence": [
+        "local and upstream LLM runtime implementations differ materially"
+      ],
+      "next": [
+        "run real API provider matrix with configured credentials"
+      ],
+      "verification": "52 LLM test files and 1176 tests pass; assembled keyless snapshots pass"
+    },
+    {
+      "id": "subagent-steer",
+      "area": "subagent, experimental agent-team, tool-subagent-control",
+      "status": "adapted-verified-locally",
+      "priority": "P1",
+      "evidence": [
+        "send_message and continuable subagent exist in CoHarness",
+        "parent Activation hold covers establishment and delivery awaits",
+        "durable inherited event count is passed into child creation"
+      ],
+      "next": [
+        "run process-restart and external provider evidence"
+      ],
+      "verification": "28 Subagent files/657 tests plus continuation and tool-control regressions pass; keyless snapshots pass"
+    },
+    {
+      "id": "attachments-files-and-fs-policy",
+      "area": "attachment, userdoc, file-reference, fs observation, web tools",
+      "status": "adapted-verified-locally",
+      "priority": "P1",
+      "evidence": [
+        "userdoc supports arbitrary MIME and resumable upload",
+        "read_image and FS_NOT_OBSERVED paths exist"
+      ],
+      "next": [
+        "run browser visual/e2e and upload cancel/resume matrix"
+      ],
+      "verification": "Attachment/API/Web/client selected suites pass; keyless headless and ACP snapshots pass"
+    },
+    {
+      "id": "outbound-proxy",
+      "area": "util/http-proxy, SDK, adapters, subprocess paths",
+      "status": "implemented-verified-locally",
+      "priority": "P1",
+      "evidence": [
+        "CoHarness http-proxy package and policy are present"
+      ],
+      "next": [
+        "enumerate production outbound routes and test HTTP_PROXY/HTTPS_PROXY/ALL_PROXY/NO_PROXY corpus"
+      ],
+      "verification": "Web and LLM suites pass; browser/headless snapshots pass with proxy variables unset"
+    },
+    {
+      "id": "api-sdk-acp-wire",
+      "area": "api, gateway, remotes, sdk, acp",
+      "status": "verified-locally",
+      "priority": "P1",
+      "evidence": [
+        "upstream adds session/workspace/settings controllers and stream protocol",
+        "CoHarness retains ApiProxy and Gateway owners"
+      ],
+      "next": [
+        "prove auth, identity, visibility, and error semantics against deployed gateway"
+      ],
+      "verification": "27 API/Attachment files/335 tests, ACP demo/e2e capability checks, and keyless ACP/JSONRPC snapshots pass"
+    },
+    {
+      "id": "web-ui-architecture",
+      "area": "client runtime, ui-conversation, ui-chat, session/workspace controllers",
+      "status": "protected-replacement-verified-locally",
+      "priority": "P1",
+      "evidence": [
+        "local ui-conversation/client-runtime and upstream ui-chat/controller packages are different owners"
+      ],
+      "next": [
+        "run browser visual/e2e and mobile flows"
+      ],
+      "verification": "72 selected client files/915 tests, 31 Web preset e2e tests, and keyless browser/headless snapshots pass"
+    },
+    {
+      "id": "coharness-business-layer",
+      "area": "gateway, collaboration, model governance, userdoc, Android, native, deployment",
+      "status": "protected-verified-locally",
+      "priority": "P1",
+      "evidence": [
+        "local-only packages and gateway are product-owned"
+      ],
+      "next": [
+        "run deployed ACL/quota/audit and document-scope regression matrix"
+      ],
+      "verification": "Gateway unit suite 37 files/307 tests plus selected API/client/subagent suites pass; Gateway snapshot passes after Node ABI rebuild"
+    },
+    {
+      "id": "redundancy-and-compatibility",
+      "area": "deprecated APIs, dual backends, wrappers, old formats, duplicate UI/transport",
+      "status": "audited-retain-or-defer",
+      "priority": "P2",
+      "evidence": [
+        "24 local-only packages are product, gateway, persistence, document, client-runtime, or test/demo owners",
+        "upstream-only ui-chat/session/file-upload and controller packages have retained CoHarness owners",
+        "production source has no legacy persistence write calls; Session.events compatibility remains exposed for package-facing projections"
+      ],
+      "next": [
+        "remove only surfaces proven unreferenced after product owner review",
+        "complete migration and deployment canary before retiring dual providers"
+      ],
+      "verification": "knip, runtime closure, package dependency graph, rg call-site audit, and Web preset environment isolation pass"
+    },
+    {
+      "id": "docs-and-generated-contracts",
+      "area": "AGENTS, READMEs, persistence catalog, upgrade records",
+      "status": "verified-locally",
+      "priority": "P1",
+      "evidence": [
+        "v0/v2 contradictions corrected in this branch",
+        "generator and English catalog regenerated"
+      ],
+      "next": [
+        "review generated docs in release PR"
+      ],
+      "verification": "doc-sync 28/28 gates, translation pairing, type equivalence, persistence and Cordis catalogs pass"
+    },
+    {
+      "id": "platform-and-release",
+      "area": "Windows native, macOS x64 Python runtime, artifacts, performance",
+      "status": "partially-verified-local-platform",
+      "priority": "P1",
+      "evidence": [
+        "Node 25 arm64 build/typecheck/hygiene/doc-sync pass",
+        "Gateway better-sqlite3 rebuilt for current ABI",
+        "keyless snapshots pass with proxy variables unset",
+        "full keyless e2e lane passes with proxy variables unset"
+      ],
+      "next": [
+        "run Windows/native and macOS x64 lanes",
+        "run real API and production canary evidence",
+        "run long-history benchmark"
+      ]
+    }
+  ],
+  "verification": {
+    "passed": [
+      "pnpm run typecheck",
+      "pnpm run lint",
+      "pnpm run build",
+      "pnpm run hygiene",
+      "pnpm run doc-sync",
+      "pnpm run verify-persistence-catalog",
+      "pnpm exec tsx scripts/release/verify.ts --family dsh",
+      "pnpm exec tsx scripts/release/verify.ts --family vendor",
+      "pnpm exec vitest run packages/core/session packages/session/session-format packages/session/session-persistence packages/session/session-persistence-jsonl packages/session/session-persistence-sqlite packages/core/agent-loop",
+      "pnpm exec vitest run packages/subagent",
+      "pnpm exec vitest run packages/llm",
+      "pnpm exec vitest run packages/web",
+      "pnpm exec vitest run packages/attachment packages/api",
+      "pnpm exec vitest run packages/client/connection packages/client/ui-conversation packages/client/ui-attachment packages/client/ui-documents packages/client/ui-goal packages/client/ui-model-selection packages/client/ui-subagent",
+      "env -u all_proxy -u http_proxy -u https_proxy pnpm exec vitest run --config vitest.snapshot.config.ts examples/headless-agent/tests/headless.snapshot.ts apps/cli/tests/web-browser-open.snapshot.ts",
+      "env -u all_proxy -u http_proxy -u https_proxy pnpm exec vitest run --config vitest.snapshot.config.ts gateway/tests/admin-project-directory.snapshot.ts",
+      "DSH_SNAPSHOT=record pnpm exec vitest run --config vitest.snapshot.config.ts scripts/translation-prompt.snapshot.ts",
+      "env -u all_proxy -u http_proxy -u https_proxy pnpm run test:e2e -- --retry 0",
+      "pnpm exec vitest run packages/session/session-persistence-gateway packages/session/session-format",
+      "pnpm exec vitest run packages/session-query",
+      "pnpm exec vitest run packages/schedule/schedule/tests/plugin.spec.ts packages/session/session-log-deepseek/tests/upload.spec.ts",
+      "pnpm exec vitest run apps/cli/tests/web-agent-presets.e2e.ts",
+      "shim=$(mktemp -d /tmp/dsh-python3-bin.XXXXXX); ln -s /opt/homebrew/bin/python3.12 \"$shim/python3\"; PATH=\"$shim:$PATH\" pnpm run test",
+      "npm test -- --no-file-parallelism (gateway)"
+    ],
+    "environmentNotes": [
+      {
+        "command": "pnpm run test",
+        "result": "the default PATH resolves /usr/bin/python3 CPython 3.9.6, while packages/experimental/code-runtime-python requires Python >=3.10; the supported CPython 3.12.13 run above passes the full suite"
+      }
+    ],
+    "pending": [
+      "Windows/native",
+      "macOS x64 runtime",
+      "real API",
+      "production canary",
+      "history performance benchmark",
+      "full snapshot run is flaky under concurrent process load; focused keyless snapshots pass"
+    ]
+  },
+  "scopeInventory": {
+    "localOnlyPackages": [
+      "@deepseek-ai/dsh-acp-demo",
+      "@deepseek-ai/dsh-acp-snapshot",
+      "@deepseek-ai/dsh-agent-spine-demo",
+      "@deepseek-ai/dsh-archive-gateway",
+      "@deepseek-ai/dsh-client-runtime",
+      "@deepseek-ai/dsh-client-ui-collaboration",
+      "@deepseek-ai/dsh-client-ui-documents",
+      "@deepseek-ai/dsh-client-ui-usage-alert",
+      "@deepseek-ai/dsh-client-userdoc-upload",
+      "@deepseek-ai/dsh-collaboration",
+      "@deepseek-ai/dsh-collaboration-context",
+      "@deepseek-ai/dsh-collaboration-gateway",
+      "@deepseek-ai/dsh-gateway-runtime",
+      "@deepseek-ai/dsh-host-apiproxy",
+      "@deepseek-ai/dsh-host-userdoc-http",
+      "@deepseek-ai/dsh-model-access",
+      "@deepseek-ai/dsh-model-provider-config",
+      "@deepseek-ai/dsh-sdk-jsonrpc-demo",
+      "@deepseek-ai/dsh-session-persistence-gateway",
+      "@deepseek-ai/dsh-session-persistence-sqlite",
+      "@deepseek-ai/dsh-tool-userdoc",
+      "@deepseek-ai/dsh-userdoc",
+      "@deepseek-ai/dsh-userdoc-context",
+      "@deepseek-ai/dsh-userdoc-local"
+    ],
+    "upstreamOnlyPackages": [
+      "@deepseek-ai/dsh-acp-app",
+      "@deepseek-ai/dsh-api-session-controller",
+      "@deepseek-ai/dsh-api-settings-controller",
+      "@deepseek-ai/dsh-api-workspace-controller",
+      "@deepseek-ai/dsh-client-file-upload",
+      "@deepseek-ai/dsh-client-store",
+      "@deepseek-ai/dsh-client-ui-approval",
+      "@deepseek-ai/dsh-client-ui-chat",
+      "@deepseek-ai/dsh-client-ui-session",
+      "@deepseek-ai/dsh-deque",
+      "@deepseek-ai/dsh-experimental-agent-team-profile",
+      "@deepseek-ai/dsh-experimental-agent-team-web-profile",
+      "@deepseek-ai/dsh-experimental-client-ui-agent-team",
+      "@deepseek-ai/dsh-experimental-inspector",
+      "@deepseek-ai/dsh-experimental-webworker-packer",
+      "@deepseek-ai/dsh-experimental-webworker-runtime",
+      "@deepseek-ai/dsh-sdk-app",
+      "@deepseek-ai/dsh-sdk-minimal",
+      "@deepseek-ai/dsh-session-format-catalog",
+      "@deepseek-ai/dsh-session-format-v0-to-v1",
+      "@deepseek-ai/dsh-session-format-v1-to-v2",
+      "@deepseek-ai/dsh-session-snapshot",
+      "@deepseek-ai/dsh-session-turn-outline",
+      "@deepseek-ai/dsh-util-time",
+      "@deepseek-ai/dsh-util-workspace-path",
+      "@deepseek-ai/dsh-webhook",
+      "@deepseek-ai/dsh-webhook-github",
+      "@deepseek-ai/dsh-win32-process"
+    ],
+    "productionCallSiteAudit": {
+      "deprecatedSessionEventsGetter": "no direct Session.events consumer outside compatibility-facing host/preset projections; snapshotEvents/inspection.events used elsewhere",
+      "legacyPersistenceWrites": "no production source call to legacy create/openHandle/append/load; AgentLoop owns createHandle and resume handle, query consumers use inspect/listSnapshots",
+      "dualPersistence": "SQLite, JSONL, and Gateway are independently consumed by configured profiles; retain until deployment matrix and migration canary complete",
+      "uiReplacement": "upstream ui-chat/session/file-upload map to retained CoHarness ui-conversation/userdoc-upload/client-runtime owners; no blind replacement"
+    }
+  }
+}

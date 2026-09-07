@@ -22,6 +22,8 @@ The model-facing text divides responsibility by location:
 
 The child receives its direct parent id and return guidance in the initial task after any inherited fork seed. It may call `send_message` zero or more times, including for findings that change the parent's next action and for a self-contained final handoff. Manager-owned settlement remains unconditional and does not inspect whether an Agent message arrived. The two messages may repeat final content, but they retain distinct authors and purposes: `send_message` carries content the child chose, while settlement records how the run ended and preserves terminal output when the child cannot cooperate. Both use the Agent inbox and fixed Steer scheduling; the accepted child message precedes the later settlement notice.
 
+The continuation manager holds a continuation-managed parent Activation open while child establishment, cold resume, or follow-up delivery is awaiting provider, persistence, or capability work. The hold is released on a failed operation; a successful materialization transfers the ownership edge to the child Activation. Submission rechecks the exact live parent, so disposal or replacement during an await cannot authorize a stale delivery. Durable SessionId reuse remains rejected when its prior log is retained.
+
 The keyless headless `subagent-settlement` scenario omits `run_in_background`, receives the immediate child id, and reaches the final parent answer through the manager-authored settlement notice even though its fixture deliberately sends no child-authored message. Package tests separately pin explicit `false` as foreground, the parent scheduling text, and the child's parent-id return guidance.
 
 ## Alternatives considered
@@ -41,5 +43,6 @@ The keyless headless `subagent-settlement` scenario omits `run_in_background`, r
 - An ordinary continuable call is non-blocking without spelling `run_in_background: true`; serialized delegation is an explicit `false` choice.
 - Independent subagent calls in one assistant message overlap under the tool loop's concurrency-safe dispatch, while dependent foreground calls can still be issued one at a time.
 - Parent guidance, tool schema, runtime resolution, and settlement delivery state the same default.
+- An idle continuation parent remains live through child establishment and delivery awaits, while stale parent identities and retained durable SessionIds are rejected at the admission point.
 - A child may send one self-contained final result and important findings earlier. Every Activation also produces an unconditional settlement notice, so a completed run may deliver overlapping final content twice.
 - One-shot background Jobs and disabled-background tool instances retain their existing behavior.

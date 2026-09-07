@@ -51,8 +51,8 @@ Source: [`packages/core/session/src/types.ts`](../../packages/core/session/src/t
 interface SessionHeader {
   /**
    * On-disk format version, stamped from {@link SESSION_FORMAT_VERSION} when the
-   * session is created. A persistence backend rejects any other version on load
-   * (no migration — see the constant).
+   * session is created. Persistence providers migrate supported historical
+   * generations before exposing a current Session and reject newer versions.
    */
   readonly version: number
   /** The session's id (mirrors the {@link Session}'s id). */
@@ -93,7 +93,7 @@ interface SessionHeader {
 
 ## Format refusal — logs a build cannot faithfully read
 
-A backend refuses a log it cannot faithfully interpret with `SessionFormatUnsupportedError`, distinct from `SessionPersistenceCorruptionError` because nothing is damaged. A header `version` ahead of `SESSION_FORMAT_VERSION` names the direction ("written by a newer harness — upgrade the harness to open it"); one behind it states that this build ships no upgrade path. After legacy-shape normalization, an event type outside this build's generated vocabulary (`KNOWN_SESSION_EVENT_TYPES`, emitted by `gen-persistence-catalog`) refuses the same way unless the event's envelope carries `ignorable: true` — silently skipping an unrecognized required event could change how the rest of the log must be read. The message appends the raw log path when the backend keeps one artifact per session, so the refused text stays reachable. The JSONL backend refuses a foreign version straight from the raw header line, before validating today's header shape or decoding any event row — a structurally different future format still reports the upgrade direction, never "corrupt"; SQLite gates whole-file structure through its own `SCHEMA_VERSION` pragma first. Design rationale and the deferred upgrader chain live in the [session-log-version-mechanism note](../../.agents/notes/implemented/architecture/2026-08-10-session-log-version-mechanism.md).
+A backend refuses a log it cannot faithfully interpret with `SessionFormatUnsupportedError`, distinct from `SessionPersistenceCorruptionError` because nothing is damaged. A header `version` ahead of `SESSION_FORMAT_VERSION` names the direction ("written by a newer harness — upgrade the harness to open it"). Supported v0/v1 headers and events pass through the adjacent migration catalog before the current v2 Session is constructed; a missing edge or malformed target refuses explicitly. After migration, an event type outside this build's generated vocabulary (`KNOWN_SESSION_EVENT_TYPES`, emitted by `gen-persistence-catalog`) refuses the same way unless the event's envelope carries `ignorable: true`. The JSONL provider publishes the migrated v2 generation beside the preserved source; SQLite keeps its monotonic `SCHEMA_VERSION` gate for whole-file structure.
 
 ## `CreateSessionOptions` — seeding and metadata
 
@@ -289,9 +289,10 @@ Durable append-only session storage. Implementations preserve contiguous, lossle
 /**
  * Create a new explicit write handle while retaining the legacy create API.
  * @param meta - immutable Session header to register.
+ * @param inheritedEventCount - exact inherited prefix length for a seeded Session.
  * @returns an owned write handle.
  */
-async createHandle(meta: SessionHeader): Promise<SessionHandle>
+async createHandle(meta: SessionHeader, inheritedEventCount?: SessionLogOffset): Promise<SessionHandle>
 
 /**
  * Open a handle and acquire any provider-specific cross-process lock.
@@ -542,5 +543,5 @@ releaseDraft(_request: SessionDraftReservationRequest): Promise<void>
 
 Types: [Session](session.md) · [SessionEvent](session.md) · [SessionId](core.md) · [SessionLogOffset](session.md)
 
-Source: [`packages/session/session-persistence/src/index.ts:290`](../../packages/session/session-persistence/src/index.ts)
+Source: [`packages/session/session-persistence/src/index.ts:291`](../../packages/session/session-persistence/src/index.ts)
 <!-- END GENERATED cordis-surface -->

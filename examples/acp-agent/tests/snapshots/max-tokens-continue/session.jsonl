@@ -1,4 +1,4 @@
-{"type":"session","version":0,"id":"7f1c9a04-5b52-4a7e-9a63-1d2ab7c90d11","createdAt":1786348800000,"cwd":"{{cwd}}","delegationDepth":0}
+{"type":"session","version":2,"id":"7f1c9a04-5b52-4a7e-9a63-1d2ab7c90d11","createdAt":1786348800000,"cwd":"{{cwd}}","delegationDepth":0}
 {"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"inserted":[{"content":[{"type":"text","text":"This turn is cut off at the output limit while calling a tool."}],"source":{"kind":"user"},"role":"user","id":"3a6a5c9e-0f9c-4c8f-9f57-6f2f7f3d5a01"}]}}
 {"type":"turn/start","data":{"turn":1}}
 {"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"removedCount":1,"inserted":[]}}

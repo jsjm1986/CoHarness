@@ -77,14 +77,14 @@ export function isAgentLoopRequest(request: GenerateOptions): boolean {
   return AGENT_LOOP_REQUESTS.has(request)
 }
 
+// LLM request objects are client-facing; this local freezer avoids loading the
+// host-only value utility into the client bundle.
 /**
- * Deep-freeze a value in place with an iterative traversal, guarding cycles,
- * so later mutation throws without imposing a JavaScript call-stack depth cap.
- * {@link AbortSignal} objects are deliberately skipped because they are the
- * request's live cancellation channel and freezing them breaks abort.
- * @param value - the value to freeze in place.
- * @returns the same value, frozen.
+ * Deep-freeze a request graph while leaving live AbortSignal objects mutable.
+ * @param value - request value to freeze in place.
+ * @returns the same value after every reachable object is frozen.
  */
+/* jscpd:ignore-start */
 export function deepFreeze<T>(value: T): T {
   const seen = new WeakSet<object>()
   const pending: (
@@ -106,7 +106,7 @@ export function deepFreeze<T>(value: T): T {
     seen.add(node)
     Object.freeze(node)
     const keys = Object.keys(node)
-    for (let index = keys.length - 1; index >= 0; index--) {
+    for (let index = keys.length - 1; index >= 0; index -= 1) {
       const key = keys[index]
       /* v8 ignore next -- the loop is bounded by the captured key count. */
       if (key === undefined) continue
@@ -115,3 +115,4 @@ export function deepFreeze<T>(value: T): T {
   }
   return value
 }
+/* jscpd:ignore-end */

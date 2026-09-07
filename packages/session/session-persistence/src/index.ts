@@ -222,11 +222,12 @@ class PersistenceSessionHandle implements SessionHandle {
     await this.owner.append(this.id, events)
   }
 
-  async flush(): Promise<void> {
+  flush(): Promise<void> {
     this.assertOpen()
     // Legacy append is already durable at resolution. The lifecycle event is
     // emitted when a live Session exists, so this additive handle remains safe
     // for detached provider tests without inventing a second flush protocol.
+    return Promise.resolve()
   }
 
   async close(): Promise<void> {
@@ -297,12 +298,13 @@ export abstract class SessionPersistence extends Service {
   /**
    * Create a new explicit write handle while retaining the legacy create API.
    * @param meta - immutable Session header to register.
+   * @param inheritedEventCount - exact inherited prefix length for a seeded Session.
    * @returns an owned write handle.
    */
-  async createHandle(meta: SessionHeader): Promise<SessionHandle> {
+  async createHandle(meta: SessionHeader, inheritedEventCount?: SessionLogOffset): Promise<SessionHandle> {
     const handle = await this.openHandleAsync(meta.id, 'write')
     try {
-      await this.create(meta)
+      await this.create(meta, inheritedEventCount)
       return handle
     } catch (error: unknown) {
       await handle.close()
@@ -347,8 +349,8 @@ export abstract class SessionPersistence extends Service {
   }
 
   /** Acquire a provider-specific cross-process writer lock, when available. */
-  protected async acquireWriteLock(_id: SessionId): Promise<() => Promise<void>> {
-    return async () => {}
+  protected acquireWriteLock(_id: SessionId): Promise<() => Promise<void>> {
+    return Promise.resolve(async () => {})
   }
 
   /** Release a process-local writer reservation held by one handle.

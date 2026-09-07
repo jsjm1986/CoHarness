@@ -518,7 +518,7 @@ export class AgentLoop extends Service implements AgentFactory {
     const preparation = SessionPreparation.create(this.runtime.ctx.sessions.prepare(sessionId, { meta }))
     let handle: SessionHandle | undefined
     try {
-      handle = await persistence.createHandle(preparation.session.header)
+      handle = await persistence.createHandle(preparation.session.header, preparation.session.inheritedEventCount)
       await this.setupAndPublish(
         ownerCtx,
         sessionId,
@@ -608,12 +608,16 @@ export class AgentLoop extends Service implements AgentFactory {
     let disposing: Promise<void> | undefined
     const machineReady = Promise.withResolvers<void>()
     // Reverse teardown, memoized so every racing owner awaits one quiescence:
-    // stop the machine, leave the registries, unwind the scope, release
-    // bookkeeping.
+    // stop the machine, drain and close the session's write path, leave the
+    // registries, unwind the scope, release bookkeeping.
     const dispose = (ownerTriggered = false): Promise<void> => (disposing ??= (async () => {
       abort.abort(new Error(`agent "${id}" lifecycle disposed`))
       callerSignal?.removeEventListener('abort', onCallerAbort)
       this.ownership.signal.removeEventListener('abort', onFactoryTeardown)
+      // Teardown failures are collected, never swallowed: registry, scope,
+      // and ownership cleanup always run to quiescence, then the memoized
+      // disposal rejects with what failed so every racing owner observes it.
+      const failures: unknown[] = []
       try {
         // Disposal IS a disposed-cause cancel followed by quiescence. New work
         // sent after this point is the sender's bug — the registries are about
@@ -624,18 +628,28 @@ export class AgentLoop extends Service implements AgentFactory {
           await machine.whenIdle()
           await machine.scope.dispose()
         }
+      } catch (error: unknown) {
+        failures.push(error)
+      }
+      // The loop above committed its closing events synchronously into the
+      // session; handle close drains them durably before releasing the write
+      // path. The close drain can be the first operation that surfaces a
+      // durability failure, so its error is retained, not logged away.
+      try {
+        await handle?.close()
+      } catch (error: unknown) {
+        failures.push(error)
+      }
+      try {
+        detachAgent?.()
+        detachSession?.()
       } finally {
-        try {
-          detachAgent?.()
-          detachSession?.()
-        } finally {
-          try {
-            await handle?.close()
-          } finally {
-            untrack()
-            if (!ownerTriggered) await unfollowOwner()
-          }
-        }
+        untrack()
+        if (!ownerTriggered) await unfollowOwner()
+      }
+      if (failures.length === 1) throw failures[0]
+      if (failures.length > 1) {
+        throw new AggregateError(failures, `agent "${id}" disposal failed`)
       }
     })())
     const untrack = this.ownership.track(dispose)
@@ -734,7 +748,7 @@ export class AgentLoop extends Service implements AgentFactory {
     try {
       if (persistence !== undefined) {
         handle = await raceAbortCall(
-          () => persistence.createHandle(preparation.session.header),
+          () => persistence.createHandle(preparation.session.header, preparation.session.inheritedEventCount),
           options.signal ?? this.ownership.signal,
           options.sessionId,
           (abandoned) => { void abandoned.close() },
@@ -822,6 +836,15 @@ export class AgentLoop extends Service implements AgentFactory {
       let handle: SessionHandle | undefined
       try {
         try {
+          // Acquire write ownership before reading or repairing the stored
+          // session. This serializes resume with another writer and keeps the
+          // ownership effect live until every persistence await has settled.
+          handle = await raceAbortCall(
+            () => persistence.openHandleAsync(id, 'write'),
+            fused,
+            id,
+            (abandoned) => { void abandoned.close() },
+          )
           preparation = await raceAbortCall(
             () => persistence.prepare(id, fused),
             fused,
@@ -833,12 +856,6 @@ export class AgentLoop extends Service implements AgentFactory {
         }
         ownerCtx.fiber.assertActive()
         if (!this.ownership.isActive()) throw new Error('agent loop is not active')
-        handle = await raceAbortCall(
-          () => persistence.openHandle(id, 'write'),
-          fused,
-          id,
-          (abandoned) => { void abandoned.close() },
-        )
         const result = await this.setupAndPublish(
           ownerCtx,
           id,

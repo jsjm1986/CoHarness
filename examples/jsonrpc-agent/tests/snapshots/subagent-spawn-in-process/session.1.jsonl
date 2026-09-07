@@ -1,4 +1,4 @@
-{"type":"session","version":0,"id":"0b7fd85c-9f6f-4d46-b954-363984ce66fb","createdAt":1785097410282,"cwd":"{{cwd}}","parentSession":"sdk-snapshot-subagent","origin":"subagent","delegationDepth":1}
+{"type":"session","version":2,"id":"0b7fd85c-9f6f-4d46-b954-363984ce66fb","createdAt":1785097410282,"cwd":"{{cwd}}","parentSession":"sdk-snapshot-subagent","origin":"subagent","delegationDepth":1}
 {"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"inserted":[{"content":[{"type":"text","text":"Reply with exactly: child answer 42."}],"source":{"kind":"user"},"role":"user","id":"7ae1698c-db1d-4fca-8404-3a9dece9c1d0"}]}}
 {"type":"turn/start","data":{"turn":1}}
 {"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"removedCount":1,"inserted":[]}}
