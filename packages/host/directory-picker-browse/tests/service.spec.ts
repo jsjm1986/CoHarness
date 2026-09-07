@@ -3,7 +3,7 @@
 import { realpathSync } from 'node:fs'
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
-import { basename, join } from 'node:path'
+import { basename, join, parse } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { DirectoryPickerError } from '@deepseek-ai/dsh-host-directory-picker'
@@ -289,10 +289,10 @@ describe('BrowseDirectoryPicker grant roots', () => {
   })
 
   it('rejects listing and createDirectory outside the grant roots', async () => {
-    const listed = await grantCapability.list('/etc').catch((error: unknown) => error)
+    const listed = await grantCapability.list(grantsRoot).catch((error: unknown) => error)
     expect(listed).toBeInstanceOf(DirectoryPickerError)
     expect((listed as DirectoryPickerError).code).toBe('directory-unreadable')
-    const created = await grantCapability.createDirectory('/etc', 'nope').catch((error: unknown) => error)
+    const created = await grantCapability.createDirectory(grantsRoot, 'nope').catch((error: unknown) => error)
     expect(created).toBeInstanceOf(DirectoryPickerError)
     expect((created as DirectoryPickerError).code).toBe('directory-create-failed')
   })
@@ -378,12 +378,12 @@ describe('BrowseDirectoryPicker grant file fallbacks', () => {
     }
   })
 
-  // A `/` grant and the `/etc` descendant are POSIX filesystem facts; Windows
-  // roots are drive-qualified and `/etc` is not a fully qualified path there.
-  it.skipIf(process.platform === 'win32')('treats a filesystem-root grant as containing every descendant', async () => {
+  it('treats a filesystem-root grant as containing every descendant', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'dsh-browse-slash-grant-'))
     const file = join(dir, 'directory-grants.json')
-    await writeFile(file, JSON.stringify([{ path: '/', mode: 'rw', label: 'System' }]))
+    const target = realpathSync(dir)
+    const filesystemRoot = parse(target).root
+    await writeFile(file, JSON.stringify([{ path: filesystemRoot, mode: 'rw', label: 'System' }]))
     const previous = process.env.DSH_DIRECTORY_GRANTS
     process.env.DSH_DIRECTORY_GRANTS = file
     try {
@@ -393,9 +393,9 @@ describe('BrowseDirectoryPicker grant file fallbacks', () => {
       const picked = ctx.get('directoryPicker')!.capability()
       if (picked.kind !== 'browse') throw new Error('browse backend must advertise the browse capability')
       try {
-        const listing = await picked.list('/etc')
-        expect(listing.path).toBe('/etc')
-        expect(listing.crumbs[0]).toMatchObject({ path: '/' })
+        const listing = await picked.list(target)
+        expect(listing.path).toBe(target)
+        expect(listing.crumbs[0]).toMatchObject({ path: filesystemRoot })
       } finally {
         await fiber.dispose()
       }
