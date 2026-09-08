@@ -92,7 +92,7 @@ class CompiledSessionFormatChain implements SessionFormatChain {
       header: snapshotSessionFormatHeader(this.options.restoreCurrentHeader(header), 'current Session header'),
       emitEvent,
       finish: () => {
-        for (let index = stages.length - 1; index >= 0; index -= 1) {
+        for (let index = 0; index < stages.length; index += 1) {
           stages[index]?.finish(contexts[index] as SessionFormatMigrationContext)
         }
       },
