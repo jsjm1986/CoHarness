@@ -306,7 +306,12 @@ export class SessionRuntimePool implements ISessions {
   handleDisconnected(): void { this.base.handleDisconnected() }
 
   runtimeTargetFor(id: SessionId): SessionRuntimeTarget | undefined {
-    return this.sessionOwners.get(id)?.target
+    const owner = this.sessionOwners.get(id)
+    // The base runtime's sessions ride the base connection; a target here
+    // would reroute every session-addressed Remote call (commands/list,
+    // goals/*, …) to a fresh transport instead of the one that serves them.
+    if (owner === undefined || owner.runtime === this.base) return undefined
+    return owner.target
   }
 
   setBaseRuntimeTarget(target: SessionRuntimeTarget): void {

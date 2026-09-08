@@ -65,4 +65,18 @@ describe('SessionRuntimePool', () => {
     pool.clear()
     expect(pool.runtimeTargetFor('project-session' as SessionId)).toBeUndefined()
   })
+
+  it('keeps base-runtime sessions on the base connection with no rerouted target', async () => {
+    const ctx = new Context()
+    const baseApi = new FakeApiClient()
+    baseApi.onList = () => Promise.resolve(ok({ items: [{
+      sessionId: 'base-session' as SessionId,
+      updatedAt: 1, running: false, blank: false, cwd: '/home/test',
+    }] }))
+    const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
+    await base.refresh()
+    const baseConnection = connection(baseApi)
+    const pool = new SessionRuntimePool(ctx, base, baseConnection, fakeRemote())
+    expect(pool.runtimeTargetFor('base-session' as SessionId)).toBeUndefined()
+  })
 })
