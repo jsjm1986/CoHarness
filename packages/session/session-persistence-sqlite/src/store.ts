@@ -180,8 +180,11 @@ export class SqliteStore implements PersistenceBackend<number> {
     currentStorage: SessionStorageMetadata,
     _events: readonly SessionEvent[],
     sourceRevision: PersistenceRevision,
+    signal?: AbortSignal,
   ): Promise<void> {
+    signal?.throwIfAborted()
     await this.open()
+    signal?.throwIfAborted()
     this.db.exec(sql('begin-immediate'))
     try {
       validateSchemaForMutation(this.databaseConstructor, this.db, this.databasePath)

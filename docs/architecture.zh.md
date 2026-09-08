@@ -111,6 +111,11 @@ seam 正是替换一个提供方就能改变整个产品的原因。文件系统
 
 [实验性 Agent Teams](subsystems/agent-team.zh.md) 是 `ctx.agentTeams` 上的私有显式启用协作 seam，在可继续 subagent 之上提供持久 roster、任务板和 mailbox。
 
+## 浏览器呈现
+
+[客户端运行时](../packages/client/runtime/README.zh.md)保留当前 Session 和显式 staged 集合，共用一条连接及有界历史窗口。[对话插件](../packages/client/ui-conversation/README.zh.md)拥有 Session 渲染权并提供根作用域 viewport 能力；可选的 [Workspace 工作台](../packages/client/ui-workbench/README.zh.md)通过其 slots 组合最多四个面板。账户目录遵循 ACL 过滤，并通过 SessionRuntimePool 按需启动目标运行时，因此每个面板拥有独立 principal、事件流和 scope 资源。面板选择只改变浏览器视图状态，Session 日志、模型请求、sandbox 策略和 Collaboration 授权仍由原有模块负责。
+
+
 ## 新行为的归属位置
 
 新行为附加到已有文档记录的扩展点。改动循环本身时，本映射随之更新。

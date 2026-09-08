@@ -402,6 +402,7 @@ export async function startClaudeCodeRun(
   }
 
   let child: SubprocessHandle | undefined
+  const spawnState = { failed: false }
   let query: Query | undefined
   let managedProcess: ManagedClaudeCodeProcess | undefined
   let diagnostic: string | undefined
@@ -419,6 +420,7 @@ export async function startClaudeCodeRun(
     process: ManagedClaudeCodeProcess,
   ): void => {
     child = captured
+    void captured.done.catch(() => { spawnState.failed = true })
     managedProcess = process
   }
   try {
@@ -431,7 +433,8 @@ export async function startClaudeCodeRun(
         capturePermissionDiagnostic,
       ),
     })
-    if (child === undefined || child.pid <= 0) {
+    await Promise.resolve()
+    if (child === undefined || spawnState.failed) {
       throw new Error(
         'subagent-claude-code: official SDK did not publish a controllable Claude Code process',
       )
@@ -455,7 +458,7 @@ export async function startClaudeCodeRun(
       thrown(cause),
     )
     requestCancel()
-    if (child !== undefined && child.pid <= 0) {
+    if (child !== undefined && spawnState.failed) {
       let closeError: Error | undefined
       try {
         query?.close()

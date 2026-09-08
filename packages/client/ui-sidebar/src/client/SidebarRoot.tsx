@@ -45,10 +45,13 @@ export function SidebarRoot({
   collapsed,
   width,
   startSession,
+  useViewport = selector => selector({ mode: 'single', paneIds: [], paneRatios: [] }),
+  exitWorkbench,
   toggleSidebar,
   t,
   renderSlot,
 }: SidebarRootComponentProps) {
+  const workbenchMode = useViewport(state => state.mode === 'workbench')
   // Wide content stays mounted while the collapse animates (fading via
   // .collapsed .wide), unmounts at settle, and remounts right away on expand.
   const [settled, setSettled] = useState(collapsed)
@@ -135,7 +138,7 @@ export function SidebarRoot({
             type="button"
             className={clsx(css.brand, css.wide)}
             aria-label={t('session.new.label')}
-            onClick={() => { startSession() }}
+            onClick={() => { if (workbenchMode) exitWorkbench?.(); else startSession() }}
           >
             <span className={css.brandIdentity} aria-hidden="true">
               <span className={css.brandMark}>
@@ -177,7 +180,7 @@ export function SidebarRoot({
       </div>
 
       {/* Expanded, the button carries its own label — tooltip only on the rail. */}
-      <Tooltip label={t('session.new.label')} delayMs={500} disabled={wide}>
+      {!workbenchMode && <Tooltip label={t('session.new.label')} delayMs={500} disabled={wide}>
         <button
           type="button"
           className={css.newSession}
@@ -187,7 +190,7 @@ export function SidebarRoot({
           <IconNewChatOutline16 size={wide ? 14 : 18} />
           {wide && <span className={clsx(css.newSessionLabel, css.wide)}>{t('session.new')}</span>}
         </button>
-      </Tooltip>
+      </Tooltip>}
 
       {/* The browsing region fills the column between the controls and the
           foot in both states; its rail icon column rides the same slot. */}
@@ -201,9 +204,9 @@ export function SidebarRoot({
       {/* Footer actions share one row rhythm; Settings is separated as the
           account group so a destructive action cannot dominate the shell. */}
       <div className={css.footArea}>
-        <div className={css.footerActions}>
+        {!workbenchMode && <div className={css.footerActions}>
           {renderSlot('sidebar.footer.action', { wide })}
-        </div>
+        </div>}
         <div className={css.settingsArea}>
           <div className={css.settingsRow}>
             <div className={css.settingsTrigger}>

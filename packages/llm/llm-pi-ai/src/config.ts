@@ -245,6 +245,8 @@ const compatProfile: z<PiAiCompatProfile> = z.object({
   chatTemplateKwargs: z.dict(chatTemplateKwarg),
   chatTemplateArgs: z.dict(chatTemplateKwarg),
   thinkingTokenBudgetField: z.union(['thinking_token_budget', 'thinking_budget', 'thinking_budget_tokens'] as const),
+  vllmPriority: z.number(),
+  supportsMaxOutputTokens: z.boolean(),
   supportsThinkingTokenBudget: z.boolean(),
   supportsStrictMode: z.boolean(),
   cacheControlFormat: z.union(CACHE_CONTROL_FORMATS),

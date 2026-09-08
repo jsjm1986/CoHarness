@@ -138,6 +138,13 @@
   word-break: break-word;
 }
 
+.status {
+  flex: none;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xs-13);
+  white-space: nowrap;
+}
+
 .thumbs {
   display: flex;
   flex: none;

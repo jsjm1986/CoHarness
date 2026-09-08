@@ -14,7 +14,7 @@ export type { SessionDraftId } from '@deepseek-ai/dsh-session/types'
 // cordis Context merge (via dsh-agent) must not enter client aggregates.
 import type { SessionProjectionMap } from '@deepseek-ai/dsh-session-projection/types'
 import type { RpcId, RpcRequest, RpcResponse } from './rpc.ts'
-import type { ToolEventView } from './events.ts'
+import type { QueuedInboxItem, ToolEventView } from './events.ts'
 import type { WorkspaceId } from './workspace.ts'
 import type { UserDocIdType, UserDocPromptAttachment } from '@deepseek-ai/dsh-userdoc'
 
@@ -33,9 +33,15 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
   interface SessionProjectionStateMap {
     sessionListMetadata: SessionListMetadata
     imageLimits: null
+    inbox: {
+      inheritedEventCount: number
+      items: QueuedInboxItem[]
+    }
   }
 
   interface SessionProjectionMap {
+    /** Durable pending input, reconstructed without activating the Session Agent. */
+    inbox: QueuedInboxItem[]
     /**
      * Session-list hints persisted by the projection cache. `blank: false`
      * is monotonic and may suppress a cold-log probe; `blank: true` is only a

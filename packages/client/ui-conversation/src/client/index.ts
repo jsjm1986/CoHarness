@@ -19,6 +19,9 @@ export type {} from './conversation-nodes/turn-process.ts'
 export { apply, inject } from './apply.ts'
 export { ConversationController } from './service.ts'
 export type { IConversation } from './service.ts'
+export type {
+  AddPaneResult, ConversationViewport, ConversationViewportMode, ConversationViewportSnapshot,
+} from './viewport.ts'
 export type { DraftAttachmentId } from './input/contract.ts'
 
 export type {
@@ -35,7 +38,9 @@ export type {
   ChatStore, ChatViewInjected, ChatViewSlotProps, CommandRowOwnerProps, CommandRowProps, ComposerBarInjected,
   ComposerAttachment, ComposerAttachmentsOwnerProps, ComposerAttachmentsProps, ComposerChainProps, ConversationInjected,
   ConversationSessionHeaderInjected, ConversationSessionInjected, ConversationSlotProps, ConvViewOwnerProps,
-  ConvViewProps, DetailsInjected, DetailsSlotProps, DetailsToolOwnerProps, EmptyWorkspaceOwnerProps, HeroBrandMarkOwnerProps,
+  ConvViewProps, ConversationPaneOwnerProps, ConversationPaneSlotProps, ConversationWorkbenchEmptyOwnerProps,
+  ConversationWorkbenchPaneHeaderOwnerProps, ConversationWorkbenchToolbarOwnerProps,
+  DetailsInjected, DetailsSlotProps, DetailsToolOwnerProps, EmptyWorkspaceOwnerProps, HeroBrandMarkOwnerProps,
   MessageImageLoader, MessageImageSource, MessageImagesOwnerProps, MessageImagesProps,
   RenderMessageImages, TurnTailOwnerProps, UseChatNodeTurnData,
 } from './contract/slots.ts'

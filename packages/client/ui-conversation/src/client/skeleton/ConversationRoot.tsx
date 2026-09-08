@@ -1,12 +1,13 @@
-// Resident conversation skeleton. Hero chrome, composer positioning, the
-// chain, AND the composer bar (session-maybe slot) stay mounted across
-// no-session/session transitions — the bar renders inert via owner props.
+// Root conversation viewport and its resident Session pane. The pane keeps
+// Hero/composer identity while the root owns explicit per-pane bindings.
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react'
 import clsx from 'clsx'
 import { Button, IconPlusOutline16, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ConversationSlotProps, InputZone } from '../contract/slots.ts'
+import type { SessionId, WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
+import type {
+  ConversationPaneSlotProps, ConversationSlotProps, InputZone,
+} from '../contract/slots.ts'
 import { HeroGlow, HeroShell, WorkspaceChip, workspaceLabel } from './EmptyHero.tsx'
 import { CHAT_CONTENT_WIDTH_RANGE } from '../../submission-settings.ts'
 import css from './ConversationRoot.module.css'
@@ -18,17 +19,21 @@ function invokePointerCapture(target: HTMLElement, method: 'setPointerCapture' |
 
 /** Full props composed from the slot contract. */
 export type ConversationRootProps = ConversationSlotProps
+export type ConversationPaneProps = ConversationPaneSlotProps
 
-export function ConversationRoot({
+/** Render one Session's complete conversation surface. */
+export function ConversationPane({
   sessionId, useSession, useSessions, useWorkspaces, useInput, useComposerBlock,
-  useDisplaySettings, setDisplayWidth, renderSlot, renderSlotChain, selectWorkspace, newSession, t, compact = false,
-}: ConversationRootProps) {
+  useDisplaySettings, setDisplayWidth, renderSlot, renderSlotChain, selectWorkspace, newSession,
+  t, compact = false, active = true, workbench = false, headerLeading,
+}: ConversationPaneProps) {
   const openState = useSession(s => s.openState)
   const composerPhase = useSession(s => s.composerPhase)
   const pending = useSession(s => s.pending) ?? []
   const session = useSession(s => s)
   const inputState = useInput(s => s)
   const cwd = useSessions(s => sessionId === undefined ? undefined : s.byId[sessionId]?.cwd)
+  const workspaceName = useSessions(s => sessionId === undefined ? undefined : s.byId[sessionId]?.workspaceName)
   const summaryBlank = useSessions(s => sessionId === undefined ? undefined : s.byId[sessionId]?.blank)
   const summaryWorkspaceId = useSessions(s => sessionId === undefined ? undefined : s.byId[sessionId]?.workspaceId)
   const workspaces = useWorkspaces(s => s)
@@ -148,6 +153,7 @@ export function ConversationRoot({
     ?? (sessionId === undefined
       ? undefined
       : activeWorkspace?.title
+        ?? workspaceName
         ?? (workspaces.phase === 'ready' || cwd === undefined || cwd === ''
           ? undefined
           : workspaceLabel(cwd)))
@@ -159,6 +165,7 @@ export function ConversationRoot({
 
   const heroWorkspaceRow = (
     <div className={css.heroWorkspaceRow}>
+      {headerLeading}
       <WorkspaceChip
         buttonRef={pickerAnchor}
         label={chipTitle}
@@ -200,6 +207,8 @@ export function ConversationRoot({
   const blocked = !inert && composerBlock !== undefined
   const inputBar = renderSlot('conversation.composer.bar', {
     variant: hero ? 'hero' : 'composer',
+    active,
+    compact,
     ...(inert
       ? {
         disabled: true,
@@ -234,7 +243,7 @@ export function ConversationRoot({
   const phase = settling ? 'settling' : hero ? 'hero' : 'active'
   const composer = renderSlotChain(
     'conversation.composer',
-    { interactions: pending, session },
+    { interactions: pending, session, active },
     { fallback: composerBar, overlay: true },
   )
 
@@ -290,8 +299,8 @@ export function ConversationRoot({
   }
 
   return (
-    <div ref={rootRef} className={css.root} data-phase={phase} style={widthStyle}>
-      {renderSlot('conversation.session.header', { compact })}
+    <div ref={rootRef} className={clsx(css.root, workbench && css.workbenchPane)} data-phase={phase} style={widthStyle}>
+      {renderSlot('conversation.session.header', { compact, leading: hero ? undefined : headerLeading })}
       <div className={css.scrollBody} data-conversation-scroll="">
         <div
           className={css.widthHandle}
@@ -331,6 +340,150 @@ export function ConversationRoot({
           </>
         )}
       />
+    </div>
+  )
+}
+
+/** Render the current conversation or bounded explicit Session panes. */
+export function ConversationRoot(props: ConversationRootProps) {
+  const viewport = props.useStore(snapshot => snapshot)
+  const available = props.useViewportAvailable(value => value)
+  useEffect(() => {
+    props.onViewportEnabled(available)
+    return () => { props.onViewportEnabled(false) }
+  }, [available, props.onViewportEnabled])
+  const [maximizedId, setMaximizedId] = useState<SessionId | undefined>()
+  const [width, setWidth] = useState<number | undefined>()
+  const root = useRef<HTMLDivElement | null>(null)
+  const workbench = available && viewport.mode === 'workbench'
+  useEffect(() => {
+    const node = root.current
+    if (node === null) return
+    let frame: number | undefined
+    const observer = new ResizeObserver(() => {
+      if (frame !== undefined) return
+      frame = requestAnimationFrame(() => {
+        frame = undefined
+        const next = node.getBoundingClientRect().width
+        if (next > 0) setWidth(next)
+      })
+    })
+    observer.observe(node)
+    return () => { observer.disconnect(); if (frame !== undefined) cancelAnimationFrame(frame) }
+  }, [workbench])
+  const drag = useRef<{ pointerId: number; index: number; x: number; width: number; total: number; ratios: number[] } | null>(null)
+  const compact = props.compact ?? false
+  const tabbed = compact || (width !== undefined && width < 728)
+  const activePane = viewport.activePaneId ?? viewport.paneIds[0]
+  const maximized = maximizedId !== undefined && viewport.paneIds.includes(maximizedId) ? maximizedId : undefined
+  // A selected tab always wins over a desktop-only maximization preference.
+  const focusedPane = tabbed ? activePane : maximized ?? activePane
+  const paneIds = (tabbed || maximized !== undefined) && focusedPane !== undefined ? [focusedPane] : viewport.paneIds
+  const columns = tabbed || maximized !== undefined ? 1
+    : width === undefined || width >= viewport.paneIds.length * 364 ? Math.max(1, paneIds.length) : 2
+  const rows = Array.from({ length: Math.ceil(paneIds.length / columns) }, (_, row) => paneIds.slice(row * columns, (row + 1) * columns))
+  const resize = (index: number, ratios: readonly number[], delta: number, rowWidth: number, rowTotal: number): void => {
+    const next = [...ratios]
+    const left = next[index] ?? 0
+    const right = next[index + 1] ?? 0
+    const total = left + right
+    const minimum = Math.min(360 / Math.max(1, rowWidth) * rowTotal, total / 2)
+    next[index] = Math.max(minimum, Math.min(total - minimum, left + delta))
+    next[index + 1] = total - next[index]
+    props.onViewportRatios(next)
+  }
+  if (!workbench) return available ? (
+    <div className={css.workbenchRoot}>
+      {props.renderSlot('conversation.pane', { compact, workbench: false, headerLeading: props.renderSlot('conversation.workbench.toolbar', { viewport, tabbed: false, inline: true }) })}
+    </div>
+  ) : props.renderSlot('conversation.pane', { compact })
+  return (
+    <div ref={root} className={css.workbenchRoot} data-workbench="" data-tabbed={tabbed || undefined} data-maximized={maximized !== undefined || undefined}>
+      {props.renderSlot('conversation.workbench.toolbar', { viewport, tabbed })}
+      {paneIds.length === 0 ? props.renderSlot('conversation.workbench.empty', {}) : (
+        <div className={css.workbenchGrid} data-workbench-grid="">
+          {rows.map((row, rowIndex) => {
+            const ratioStart = rowIndex * columns
+            const ratios = row.map((_, index) => viewport.paneRatios[ratioStart + index] ?? 1)
+            const total = ratios.reduce((sum, ratio) => sum + ratio, 0)
+            return (
+              <div key={rowIndex} className={css.workbenchRow} data-workbench-row="" style={{ gridTemplateColumns: ratios.map(ratio => `minmax(${row.length > 1 ? 360 : 0}px, ${ratio}fr)`).join(' ') }}>
+                {row.map((id, column) => {
+                  const index = ratioStart + column
+                  return (
+                    <section
+                      key={id}
+                      className={css.workbenchPane}
+                      data-session-pane={id}
+                      data-active={id === activePane || undefined}
+                      onPointerDown={() => { props.onViewportFocus(id) }}
+                      onFocusCapture={() => { props.onViewportFocus(id) }}
+                    >
+                      <props.SessionProvider sessionId={id}>
+                        {() => (
+                          <>
+                            {props.renderSlot('conversation.workbench.pane.header', {
+                              active: id === activePane,
+                              onFocus: () => { props.onViewportFocus(id) },
+                              onClose: () => { if (maximized === id) setMaximizedId(undefined); props.onViewportRemove(id) },
+                              maximized: maximized === id,
+                              onMaximize: () => {
+                                props.onViewportFocus(id)
+                                const next = maximized !== id
+                                props.onViewportMaximize(id, next)
+                                setMaximizedId(current => current === id ? undefined : id)
+                              },
+                            })}
+                            {props.renderSlot('conversation.pane', { compact: compact || viewport.paneIds.length > 1, active: id === activePane, workbench: true })}
+                          </>
+                        )}
+                      </props.SessionProvider>
+                      {column < row.length - 1 && (
+                        <div
+                          className={css.paneSeparator}
+                          role="separator"
+                          aria-orientation="vertical"
+                          aria-label={props.t('viewport.resize')}
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-valuenow={Math.round((ratios[column] ?? 1) / total * 100)}
+                          tabIndex={0}
+                          onPointerDown={(event) => {
+                            event.preventDefault()
+                            event.stopPropagation()
+                            invokePointerCapture(event.currentTarget, 'setPointerCapture', event.pointerId)
+                            drag.current = {
+                              pointerId: event.pointerId, index, x: event.clientX,
+                              width: event.currentTarget.parentElement?.parentElement?.clientWidth ?? 1,
+                              total, ratios: [...viewport.paneRatios],
+                            }
+                          }}
+                          onPointerMove={(event) => {
+                            const current = drag.current
+                            if (current === null || current.pointerId !== event.pointerId) return
+                            resize(current.index, current.ratios,
+                              (event.clientX - current.x) / current.width * current.total, current.width, current.total)
+                          }}
+                          onPointerUp={(event) => {
+                            drag.current = null
+                            invokePointerCapture(event.currentTarget, 'releasePointerCapture', event.pointerId)
+                          }}
+                          onPointerCancel={() => { drag.current = null }}
+                          onKeyDown={(event) => {
+                            if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+                            event.preventDefault()
+                            resize(index, viewport.paneRatios, (event.key === 'ArrowLeft' ? -0.025 : 0.025) * total, event.currentTarget.parentElement?.parentElement?.clientWidth ?? 1, total)
+                          }}
+                        />
+                      )}
+                    </section>
+                  )
+                })}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

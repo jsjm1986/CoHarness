@@ -2047,6 +2047,8 @@ export interface Config {
   maxDecompressedBytes?: number
   /** Maximum physical bytes read from one session artifact. */
   maxArtifactBytes?: number
+  /** Target expanded JSON bytes per migration output batch; a single event remains indivisible. */
+  migrationBatchMaxBytes?: number
 }
 
 /** Physical encoding selected for JSONL session artifacts. */

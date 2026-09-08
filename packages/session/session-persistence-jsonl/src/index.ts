@@ -28,7 +28,7 @@ import {
 } from '@deepseek-ai/dsh-session-persistence'
 import type { SessionEvent, SessionId, SessionHeader, SessionLogOffset, SessionPreparation } from '@deepseek-ai/dsh-session'
 import {
-  encodeSegment, eventLines, generationLogPath, logPath, logSuffix, parseHeader, parseHeaderMeta, projectDir, scanLog, sessionDir,
+  encodeSegment, eventLines, generationLogPath, logPath, logSuffix, parseHeader, parseHeaderMeta, projectDir, sessionDir,
   SessionLogScanner, toHeaderLine,
   type JsonlCompression,
 } from './format.ts'
@@ -47,6 +47,7 @@ const DEFAULT_READ_STABLE_MAX_ATTEMPTS = 8
 const DEFAULT_READ_STABLE_MAX_DURATION_MS = 2_000
 const DEFAULT_MAX_DECOMPRESSED_BYTES = 256 * 1024 * 1024
 const DEFAULT_MAX_ARTIFACT_BYTES = 256 * 1024 * 1024
+const DEFAULT_MIGRATION_BATCH_MAX_BYTES = 2 * 1024 * 1024
 /**
  * Internal scheduling constant, not deployment configuration: balance
  * frame-boundary event-loop yields against `setImmediate` overhead. One frame
@@ -120,6 +121,8 @@ export interface Config {
   maxDecompressedBytes?: number
   /** Maximum physical bytes read from one session artifact. */
   maxArtifactBytes?: number
+  /** Target expanded JSON bytes per migration output batch; a single event remains indivisible. */
+  migrationBatchMaxBytes?: number
 }
 
 /** Opaque coordinator token for replacing bytes recovered from a torn frame. */
@@ -177,6 +180,7 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     readStableMaxDurationMs: z.number().step(1).min(1).max(MAX_TIMER_DELAY_MS).default(DEFAULT_READ_STABLE_MAX_DURATION_MS),
     maxDecompressedBytes: z.number().step(1).min(1).max(bufferConstants.MAX_LENGTH).default(DEFAULT_MAX_DECOMPRESSED_BYTES),
     maxArtifactBytes: z.number().step(1).min(1).max(bufferConstants.MAX_LENGTH).default(DEFAULT_MAX_ARTIFACT_BYTES),
+    migrationBatchMaxBytes: z.number().step(1).min(1).max(bufferConstants.MAX_LENGTH).default(DEFAULT_MIGRATION_BATCH_MAX_BYTES),
   })
 
   /**
@@ -234,6 +238,7 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
   private readonly readStableMaxDurationMs: number
   private readonly maxDecompressedBytes: number
   private readonly maxArtifactBytes: number
+  private readonly migrationBatchMaxBytes: number
   private coordinator: PersistenceCoordinator<JsonlTornMarker>
   private rootEncodingCheck: Promise<void> | undefined
 
@@ -277,6 +282,9 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     this.readStableMaxDurationMs = readStableMaxDurationMs
     this.maxDecompressedBytes = maxDecompressedBytes
     this.maxArtifactBytes = maxArtifactBytes
+    this.migrationBatchMaxBytes = config.migrationBatchMaxBytes ?? DEFAULT_MIGRATION_BATCH_MAX_BYTES
+    assertPositiveSafeInteger('migrationBatchMaxBytes', this.migrationBatchMaxBytes)
+    if (this.migrationBatchMaxBytes > bufferConstants.MAX_LENGTH) throw new TypeError('migrationBatchMaxBytes exceeds Buffer maximum length')
     this.assertUsableRoot()
     this.coordinator = new PersistenceCoordinator<JsonlTornMarker>(this.ctx, this, {
       preparedSessionCacheSize,
@@ -383,22 +391,27 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     currentStorage: SessionStorageMetadata,
     events: readonly SessionEvent[],
     sourceRevision: PersistenceRevision,
+    signal?: AbortSignal,
   ): Promise<void> {
     await this.ensureRootEncoding()
     const { meta } = currentStorage
     const finalPath = generationLogPath(this.root, meta.cwd, meta.id, this.compression, meta.version)
     if (await this.exists(finalPath)) return
-    const currentRevision = await this.readStoredRevision(sourceStorage.meta.id)
-    if (currentRevision !== undefined && String(currentRevision) !== String(sourceRevision)) {
-      throw new Error(`session "${meta.id}" changed while its format migration was preparing`)
+    const verifySource = async (): Promise<void> => {
+      signal?.throwIfAborted()
+      const currentRevision = await this.readStoredRevision(sourceStorage.meta.id, signal)
+      if (currentRevision === undefined || String(currentRevision) !== String(sourceRevision)) {
+        throw new Error(`session "${meta.id}" changed while its format migration was preparing`)
+      }
     }
-    const content = await this.encodeMaterialization(currentStorage, events)
+    await verifySource()
+    const content = this.encodeMigration(currentStorage, events, signal)
     const project = projectDir(this.root, meta.cwd)
     const dir = sessionDir(this.root, meta.cwd, meta.id)
     if (process.platform === 'win32') {
-      await this.materializeWin32(project, dir, finalPath, meta.id, content)
+      await this.materializeWin32(project, dir, finalPath, meta.id, content, verifySource)
     } else {
-      await this.materializePosix(project, dir, finalPath, meta.id, content)
+      await this.materializePosix(project, dir, finalPath, meta.id, content, verifySource)
     }
   }
 
@@ -462,14 +475,23 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     path: string,
     signal?: AbortSignal,
   ): Promise<{ buffer: Buffer; revision: PersistenceRevision }> {
+    const { value, revision } = await this.readStable(path, () => this.readBoundedArtifactFile(path, signal), signal)
+    return { buffer: value, revision }
+  }
+
+  private async readStable<T>(
+    path: string,
+    read: () => Promise<T>,
+    signal?: AbortSignal,
+  ): Promise<{ value: T; revision: PersistenceRevision }> {
     const startedAt = performance.now()
     for (let attempt = 1; attempt <= this.readStableMaxAttempts; attempt++) {
       signal?.throwIfAborted()
       const before = fileRevision(await stat(path, { bigint: true }))
-      const buffer = await this.readBoundedArtifactFile(path, signal)
+      const value = await read()
       signal?.throwIfAborted()
       const after = fileRevision(await stat(path, { bigint: true }))
-      if (before === after) return { buffer, revision: after }
+      if (before === after) return { value, revision: after }
       if (attempt === this.readStableMaxAttempts || performance.now() - startedAt >= this.readStableMaxDurationMs) {
         throw new Error(
           `session file did not remain revision-stable after ${attempt} attempt${attempt === 1 ? '' : 's'}`
@@ -512,26 +534,15 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     expectedId?: SessionId,
     signal?: AbortSignal,
   ): Promise<StoredPrefix<JsonlTornMarker>> {
-    const { buffer, revision } = await this.readStableFile(path, signal)
+    let revision: PersistenceRevision
     let prefix: Omit<StoredPrefix<JsonlTornMarker>, 'revision'>
     try {
-      if (this.compression === 'zstd') {
-        prefix = await this.readZstdPrefix(buffer, signal)
-      } else {
-        signal?.throwIfAborted()
-        const headerEnd = buffer.indexOf(0x0A)
-        if (headerEnd !== -1) assertHeaderBytes(headerEnd + 1, this.maxHeaderBytes)
-        const { meta, inheritedEventCount, events, committedBytes } = scanLog(buffer)
-        signal?.throwIfAborted()
-        prefix = {
-          meta,
-          inheritedEventCount,
-          events,
-          ...committedBytes < buffer.byteLength
-            ? { tornMarker: { truncateTo: committedBytes, recoveredEvents: [] } }
-            : {},
-        }
-      }
+      const stable = await this.readStable(path, async () => {
+        if (this.compression === 'none') return this.readPlainPrefix(path, signal)
+        return this.readZstdPrefix(await this.readBoundedArtifactFile(path, signal), signal)
+      }, signal)
+      prefix = stable.value
+      revision = stable.revision
     } catch (error: unknown) {
       // A parse-time format refusal predates any SessionHeader, so the
       // coordinator's locate-based enrichment cannot run; attach the artifact
@@ -545,6 +556,50 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     await this.assertStoredIdentity(path, prefix.meta, expectedId, signal)
     signal?.throwIfAborted()
     return { ...prefix, revision }
+  }
+
+  /** Scan plaintext records without retaining a second copy of the complete artifact. */
+  private async readPlainPrefix(path: string, signal?: AbortSignal): Promise<Omit<StoredPrefix<JsonlTornMarker>, 'revision'>> {
+    const handle = await open(path, 'r')
+    const chunk = Buffer.allocUnsafe(64 * 1024)
+    const header: Buffer[] = []
+    let headerBytes = 0
+    let total = 0
+    let scanner: SessionLogScanner | undefined
+    try {
+      signal?.throwIfAborted()
+      if ((await handle.stat()).size > this.maxArtifactBytes) throw new Error(`session artifact exceeds ${this.maxArtifactBytes} bytes`)
+      for (;;) {
+        signal?.throwIfAborted()
+        const { bytesRead } = await handle.read(chunk, 0, chunk.length, null)
+        signal?.throwIfAborted()
+        if (bytesRead === 0) break
+        total += bytesRead
+        if (total > this.maxArtifactBytes) throw new Error(`session artifact exceeds ${this.maxArtifactBytes} bytes`)
+        const bytes = chunk.subarray(0, bytesRead)
+        if (scanner !== undefined) {
+          scanner.write(bytes)
+          continue
+        }
+        const newline = bytes.indexOf(0x0A)
+        const end = newline === -1 ? bytes.length : newline + 1
+        headerBytes += end
+        assertHeaderBytes(headerBytes, this.maxHeaderBytes)
+        header.push(Buffer.from(bytes.subarray(0, end)))
+        if (newline === -1) continue
+        scanner = new SessionLogScanner(Buffer.concat(header, headerBytes))
+        header.length = 0
+        scanner.write(bytes.subarray(end))
+      }
+      if (scanner === undefined) throw new Error('empty or header-less session log')
+      const { committedBytes, ...prefix } = scanner.finish()
+      return {
+        ...prefix,
+        ...committedBytes < total ? { tornMarker: { truncateTo: committedBytes, recoveredEvents: [] } } : {},
+      }
+    } finally {
+      await handle.close()
+    }
   }
 
   /** Decode complete frames and retain complete JSONL records from a torn final frame. */
@@ -773,7 +828,8 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     dir: string,
     finalPath: string,
     id: SessionId,
-    content: Buffer | string,
+    content: Buffer | string | AsyncIterable<Buffer | string>,
+    beforePublish?: () => Promise<void>,
   ): Promise<void> {
     await mkdir(this.root, { recursive: true, mode: 0o700 })
     await this.syncDirPosix(dirname(this.root))
@@ -788,6 +844,7 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     // concurrently cannot clobber each other. rename() would silently overwrite.
     let linked = false
     try {
+      await beforePublish?.()
       await link(tmp, finalPath)
       linked = true
     } finally {
@@ -817,7 +874,8 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     dir: string,
     finalPath: string,
     id: SessionId,
-    content: Buffer | string,
+    content: Buffer | string | AsyncIterable<Buffer | string>,
+    beforePublish?: () => Promise<void>,
   ): Promise<void> {
     await ensureDurableDirectoryWin32(this.root)
     await ensureDurableDirectoryWin32(project)
@@ -825,6 +883,7 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     await this.rejectExistingLog(finalPath, id)
     const tmp = await this.writeSyncedTempFile(finalPath, content)
     try {
+      await beforePublish?.()
       await publishNewFileWin32(tmp, finalPath)
     } catch (error) {
       await rm(tmp, { force: true })
@@ -845,16 +904,47 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     }
   }
 
-  private async writeSyncedTempFile(finalPath: string, content: Buffer | string): Promise<string> {
+  private async writeSyncedTempFile(finalPath: string, content: Buffer | string | AsyncIterable<Buffer | string>): Promise<string> {
     const tmp = `${finalPath}.${randomBytes(6).toString('hex')}.tmp`
     const handle = await open(tmp, 'wx', 0o600)
     try {
-      await handle.writeFile(content)
-      await handle.sync()
-    } finally {
-      await handle.close()
+      try {
+        if (typeof content === 'string' || Buffer.isBuffer(content)) await handle.writeFile(content)
+        else for await (const chunk of content) await handle.writeFile(chunk)
+        await handle.sync()
+      } finally {
+        await handle.close()
+      }
+    } catch (error: unknown) {
+      await rm(tmp, { force: true })
+      throw error
     }
     return tmp
+  }
+
+  /** Encode successor batches while keeping the complete encoded body out of memory. */
+  private async *encodeMigration(
+    storage: SessionStorageMetadata,
+    events: readonly SessionEvent[],
+    signal?: AbortSignal,
+  ): AsyncGenerator<Buffer | string> {
+    signal?.throwIfAborted()
+    yield await this.encodeMaterialization(storage, [])
+    let batch: SessionEvent[] = []
+    let bytes = 0
+    for (const event of events) {
+      signal?.throwIfAborted()
+      const size = Buffer.byteLength(JSON.stringify(event)) + 1
+      if (batch.length > 0 && bytes + size > this.migrationBatchMaxBytes) {
+        yield await this.encodeEventBatch(batch)
+        batch = []
+        bytes = 0
+      }
+      batch.push(event)
+      bytes += size
+    }
+    signal?.throwIfAborted()
+    if (batch.length > 0) yield await this.encodeEventBatch(batch)
   }
 
   /** Encode the header and first batch without combining their frame boundaries. */

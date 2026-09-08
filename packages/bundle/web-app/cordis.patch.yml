@@ -15,8 +15,9 @@
 
 - id: system-prompt
   config:
-    persona: >-
-      You are a coding agent powered by the {{model}} model. Your working directory is {{cwd}}.
+    personaPrefix: >-
+      You are a coding agent powered by the {{model}} model.
+    personaSuffix: Your working directory is {{cwd}}.
 
 # TODO: Re-enable shared HMR for Web after its reload lifecycle is tested.
 - id: hmr
@@ -107,6 +108,7 @@
     # shares. The base layer's agent-default-model service owns the default model.
     - id: api-gateway
       name: '@deepseek-ai/dsh-host-apiproxy'
+
 
     # User-uploaded documents are ordinary files below the user's home. The
     # HTTP consumer registers its streaming subtree through Connection, so the
@@ -229,6 +231,7 @@
     - id: ui-conversation
       name: '@deepseek-ai/dsh-client-ui-conversation'
 
+
     # Gateway project scope, shared-conversation visibility, read-only role UI,
     # and the authenticated user logout form.
     - id: ui-collaboration
@@ -265,6 +268,9 @@
 
     - id: ui-workspace
       name: '@deepseek-ai/dsh-client-ui-workspace'
+
+    - id: ui-workbench
+      name: '@deepseek-ai/dsh-client-ui-workbench'
 
     # Input triggers: the '/' | '@' pipeline (ui-input-trigger), the command surface over
     # it (ui-commands), and the reference sources (ui-skill / ui-reference).

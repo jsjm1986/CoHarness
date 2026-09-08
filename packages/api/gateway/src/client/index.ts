@@ -6,7 +6,7 @@
 
 import { Service } from '@deepseek-ai/cordis'
 import type { Context, Events } from '@deepseek-ai/cordis'
-import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
+import type { ConnectionHandle, SessionId } from '@deepseek-ai/dsh-client-connection/client'
 import type {
   InvocationDescriptor,
   TypertClientRemote,
@@ -441,12 +441,17 @@ class ClientRemoteService extends Service implements TypertClientRemote {
     })
     const connection = this.ownerCtx.get('connection') as ConnectionHandle | undefined
     if (connection === undefined) throw new Error(`client api: ${endpoint} has no active Connection`)
+    const scope = projection ?? descriptor.scope
+    const sessionId = scope?.context === 'agent' ? args[scope.wire] : undefined
+    const targetConnection = typeof sessionId === 'string'
+      ? connection.forSession?.(sessionId as SessionId) ?? connection
+      : connection
     const callerSignal = hasCallerSignal ? values[expected] as AbortSignal | undefined : undefined
     const signal = callerSignal === undefined
       ? token.abort.signal
       : AbortSignal.any([token.abort.signal, callerSignal])
     try {
-      const result = await connection.rpc.call('/api', endpoint, { args }, signal)
+      const result = await targetConnection.rpc.call('/api', endpoint, { args }, signal)
       if (!mountActive(token)) return withdrawn(endpoint)
       if (!result.ok) return { ok: false, error: result.error }
       return { ok: true, value: parse(descriptor.result, result.value, endpoint, 'result') }

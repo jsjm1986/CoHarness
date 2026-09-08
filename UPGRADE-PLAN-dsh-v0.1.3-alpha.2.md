@@ -101,6 +101,6 @@ CoHarness 已经拥有上游 alpha.1 的部分能力：模型发现、任意 MIM
 
 上游 alpha.2 之后的 master 新增 Workspace 文件资源链、Sidebar 文件树和资源注册表，但 CoHarness 已有独立 User Documents 业务、多个 runtime 的 Workbench、Gateway ACL 和 Host-only openPath。该链路不作为普通同步项；未适配的上游拷贝不得进入 release。
 
-Session migration 当前仍使用整体 `events[]` 迁移，不能宣称已完成上游 streaming migration；Inbox projection 仅作为冷队列一致性候选；Assistant compact record reader 需要先与 CoHarness 的独立 `assistant/chunk` 和 history-wire packing 做 profiling。
+Session migration 已增加增量阶段、明文分块读取、后继 generation 分批编码和发布前 revision 复核；压缩读取与逻辑 preparation 仍保留完整数组，因此不标为完全流式迁移。Inbox projection 已在 ApiProxy 内实现，使用现有冷投影缓存，读取不激活 Agent，修改仍保持 live-only。Assistant 输出尾部扫描已有测量收益；compact record accessor 与 WeakSet 复用不进入默认实现。
 
 Cordis 适配必须保持 Service Definition / Provider / Consumer 三角色、`ctx.inject` 依赖就绪、`ctx.effect` 可逆注册、`ctx.on`/waterfall 事件语义、Host/Client 编译面和真实 Loader disposal 测试。

@@ -191,7 +191,7 @@ export class TestSessions implements ISessions {
 
   /** Calls observed on the service-level face, newest last. */
   readonly calls: {
-    method: 'open' | 'openSubagent' | 'setSubagentCatalogOpen' | 'refreshSubagents'
+    method: 'open' | 'openSubagent' | 'setSubagentCatalogOpen' | 'refreshSubagents' | 'setAdditionalStaged'
       | 'clear' | 'search' | 'fork'
     args: unknown[]
   }[] = []
@@ -338,11 +338,20 @@ export class TestSessions implements ISessions {
    * @param id - session id.
    * @returns the identity-stable bundle, or undefined for unknown sessions.
    */
-  provideInfo(id: string): SessionProvideInfo | undefined {
-    const record = this.records.get(id as SessionId)
+  provideInfoFor(id: SessionId): SessionProvideInfo | undefined {
+    const record = this.records.get(id)
     if (record === undefined) return undefined
-    record.provideInfo ??= this.channel.materializeInfo(this.bindingOf(id as SessionId, record))
+    record.provideInfo ??= this.channel.materializeInfo(this.bindingOf(id, record))
     return record.provideInfo
+  }
+
+  /** Legacy test helper retained for direct fixture assertions. */
+  /** Resolve a listed fixture Session's standard bundle.
+   * @param id - fixture Session identity.
+   * @returns the bundle, or undefined for an unknown fixture.
+   */
+  provideInfo(id: string): SessionProvideInfo | undefined {
+    return this.provideInfoFor(id as SessionId)
   }
 
   /**
@@ -352,7 +361,7 @@ export class TestSessions implements ISessions {
    * @returns a definite or no-session provide bundle.
    */
   maybeProvideInfo(id: string | undefined): SessionMaybeProvideInfo {
-    return (id === undefined ? undefined : this.provideInfo(id)) ?? this.channel.maybeInfo
+    return (id === undefined ? undefined : this.provideInfoFor(id as SessionId)) ?? this.channel.maybeInfo
   }
 
   /**
@@ -439,6 +448,11 @@ export class TestSessions implements ISessions {
   /** Record catalog consumption; fixture callers drive snapshots explicitly. */
   setSubagentCatalogOpen(parentSessionId: SessionId, open: boolean): void {
     this.calls.push({ method: 'setSubagentCatalogOpen', args: [parentSessionId, open] })
+  }
+
+  /** Record the multi-pane staged-session request. */
+  setAdditionalStaged(ids: readonly SessionId[]): void {
+    this.calls.push({ method: 'setAdditionalStaged', args: [[...ids]] })
   }
 
   /** Record a catalog refresh; fixture callers drive snapshots explicitly. */

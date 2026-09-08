@@ -7,7 +7,7 @@
  * derives its PropsStore share from the return type, and the service face
  * receives the bound actions through the registration's inject hook.
  */
-import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-runtime/client'
+import { defineStore, type EngineStoreHandle, type SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import {
   clampWidth, DETAILS_DEFAULT, DETAILS_MAX, DETAILS_MIN,
   SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN,
@@ -22,7 +22,7 @@ import {
  * expanded over the squeezed center, the compact mode as the overlay drawer
  * (AppFrame owns that rendering split).
  */
-type LayoutState = { sidebar: number; details: number; narrow: boolean; narrowExpanded: boolean }
+type LayoutState = { sidebar: number; details: number; narrow: boolean; narrowExpanded: boolean; detailsSessionId?: SessionId }
 
 /**
  * Annotation twin of the actions literal below (the export needs a declared
@@ -34,8 +34,8 @@ type LayoutActions = {
   toggleSidebar: (draft: LayoutState) => void
   setNarrow: (draft: LayoutState, narrow: boolean) => void
   collapseNarrow: (draft: LayoutState) => void
-  openDetails: (draft: LayoutState) => void
-  closeDetails: (draft: LayoutState) => void
+  openDetails: (draft: LayoutState, sessionId?: SessionId) => void
+  closeDetails: (draft: LayoutState, sessionId?: SessionId) => void
 }
 
 /**
@@ -70,8 +70,16 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
       // Explicit narrow dismissal (scrim tap, compact session navigation):
       // drops only the override, never the wide width preference.
       collapseNarrow: (d) => { d.narrowExpanded = false },
-      openDetails: (d) => { if (d.details === 0) d.details = DETAILS_DEFAULT },
-      closeDetails: (d) => { d.details = 0 },
+      openDetails: (d, sessionId?: SessionId) => {
+        if (d.details === 0) d.details = DETAILS_DEFAULT
+        if (sessionId === undefined) delete d.detailsSessionId
+        else d.detailsSessionId = sessionId
+      },
+      closeDetails: (d, sessionId?: SessionId) => {
+        if (sessionId !== undefined && d.detailsSessionId !== sessionId) return
+        d.details = 0
+        delete d.detailsSessionId
+      },
     },
   })
   return handle

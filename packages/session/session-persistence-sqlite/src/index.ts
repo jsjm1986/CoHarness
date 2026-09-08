@@ -145,6 +145,7 @@ export class SqliteSessionPersistence extends SessionPersistence {
    * @param currentStorage - normalized storage metadata.
    * @param events - validated events.
    * @param sourceRevision - revision used for compare-and-swap.
+   * @param signal - optional cancellation before the synchronous transaction.
    * @returns a promise settled after the transaction commits.
    */
   migrateStored(
@@ -152,8 +153,9 @@ export class SqliteSessionPersistence extends SessionPersistence {
     currentStorage: SessionStorageMetadata,
     events: readonly SessionEvent[],
     sourceRevision: PersistenceRevision,
+    signal?: AbortSignal,
   ): Promise<void> {
-    return this.store.migrateStored(sourceStorage, currentStorage, events, sourceRevision)
+    return this.store.migrateStored(sourceStorage, currentStorage, events, sourceRevision, signal)
   }
   /* jscpd:ignore-end */
 

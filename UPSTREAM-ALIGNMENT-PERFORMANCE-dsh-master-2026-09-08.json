@@ -1,0 +1,54 @@
+{
+  "date": "2026-09-08",
+  "platform": "macOS arm64, Node 25.8.1",
+  "method": "separate Node processes with --expose-gc; peak RSS from process.resourceUsage; synthetic 4096-byte text user messages; one local run per case; not production throughput guarantees",
+  "plain10MiB": {
+    "events": 2460,
+    "whole": {
+      "elapsedMs": 12,
+      "maxRssKiB": 115984
+    },
+    "windowed": {
+      "elapsedMs": 14,
+      "maxRssKiB": 104640
+    }
+  },
+  "plain100MiB": {
+    "events": 24582,
+    "whole": {
+      "elapsedMs": 92,
+      "maxRssKiB": 371456
+    },
+    "windowed": {
+      "elapsedMs": 109,
+      "maxRssKiB": 273360
+    }
+  },
+  "migration100MiB": {
+    "before": {
+      "elapsedMs": 477,
+      "maxRssKiB": 743408
+    },
+    "batchedAndAdopted": {
+      "elapsedMs": 682,
+      "maxRssKiB": 421968
+    }
+  },
+  "oneGiBDefaultLimit": {
+    "result": "refused before plaintext body scan: maxArtifactBytes=268435456",
+    "elapsedMs": 2,
+    "maxRssKiB": 94896
+  },
+  "assistantOutput": {
+    "events": 100200,
+    "iterations": 100,
+    "forwardMs": 129.293958,
+    "tailMs": 0.0375
+  },
+  "deepFreeze": {
+    "messages": 400,
+    "iterations": 1000,
+    "perRequestMs": 0.161298458,
+    "decision": "retain existing algorithm; no cross-request WeakSet cache"
+  }
+}

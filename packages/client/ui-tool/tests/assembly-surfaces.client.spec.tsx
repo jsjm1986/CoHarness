@@ -62,7 +62,7 @@ function AppRoot({ renderSlot }: AppRootProps) {
 }
 
 const LAYOUT_CHILDREN = {
-  'conversation': { kind: 'single', scope: 'session-maybe' },
+  'conversation': { kind: 'single', scope: 'root' },
   'details': { kind: 'single', scope: 'session' },
 } as const
 

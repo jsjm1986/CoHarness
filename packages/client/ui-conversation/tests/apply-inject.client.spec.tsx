@@ -66,7 +66,7 @@ async function bench() {
   // The AppFrame role: the conversation-package slots must be declared by a
   // live entry before apply can contribute into them.
   await runtime.root.declare({
-    'conversation': { kind: 'single', scope: 'session-maybe' },
+    'conversation': { kind: 'single', scope: 'root' },
     'details': { kind: 'single', scope: 'session' },
   }, (_p: { renderSlot?: unknown }) => null)
 
@@ -75,7 +75,7 @@ async function bench() {
   // The host face (store resolution) exists only inside the installed
   // renderer, so materialize it the way the shell does.
   runtime.renderRoot()
-  const entryOf = (key: 'conversation' | 'conversation.session' | 'conversation.session.header' | 'conversation.composer.bar' | 'conversation.view' | 'details') =>
+  const entryOf = (key: 'conversation' | 'conversation.pane' | 'conversation.session' | 'conversation.session.header' | 'conversation.composer.bar' | 'conversation.view' | 'details') =>
     runtime.slots.entries(key)[0]!
   /** Resolve store instance + call the inject the way the outlet would. */
   const conversationApi = (id: SessionId) => {
@@ -93,7 +93,7 @@ async function bench() {
     return { instance, injected }
   }
   const residentApi = (id: SessionId | undefined) => {
-    const entry = entryOf('conversation')
+    const entry = entryOf('conversation.pane')
     return (entry.inject as unknown as (sessionId: SessionId | undefined) => ConversationInjected)(id)
   }
   const composerApi = (id: SessionId | undefined) => {

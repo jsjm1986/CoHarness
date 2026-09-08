@@ -8,11 +8,11 @@
  * actions in `sidebar.footer.action` and compact actions beside Settings in
  * `sidebar.settings.action`.
  */
-import type { PropsLocale, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { HostObservable, PropsHooks, PropsLocale, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: pulls ui-layout's SlotMap merge (the 'sidebar' entry) into every
 // program that sees this contract, so PropsRuntime<'sidebar'> resolves.
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
-import type { WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ConversationViewportSnapshot, WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
@@ -104,6 +104,8 @@ export interface SidebarFooterActionOwnerProps {
  * the New Session button and toggling the column.
  */
 export type SidebarRootInjected = {
+  hooks: { viewport: HostObservable<ConversationViewportSnapshot> }
+  exitWorkbench?: () => void
   /**
    * Start a New Session: with a workspace, reuse-or-create its blank session
    * and open it; without one, inherit the current Session Workspace, then the
@@ -129,4 +131,4 @@ export type SidebarRootComponentProps =
     | 'sidebar.settings.action'
     | 'sidebar.footer.action'
   >
-  & SidebarRootInjected & PropsLocale<'sidebar'>
+  & Omit<SidebarRootInjected, 'hooks'> & PropsHooks<SidebarRootInjected['hooks']> & PropsLocale<'sidebar'>

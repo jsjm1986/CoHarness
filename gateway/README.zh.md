@@ -87,6 +87,7 @@ Gateway 按认证用户保存 Android Token，只在持久化 completed turn 后
 ## 项目协作对话
 
 账户运行在个人 scope 或一个可访问项目 scope 中。个人 scope 保留每用户运行时及其持久化；每个项目使用一个覆盖项目路径的共享运行时。scope 选择端点会先启动并等待目标运行时就绪，再写入新的 scope Cookie；启动失败会保留当前 scope，成功后的页面重载会直接连接已就绪进程。代理重试响应禁止缓存并声明两秒后重试，HTML 等待页把自动刷新元数据放在文档 head 中。Gateway 为所选运行时签发短期请求 principal，并在每次代理的 HTTP/WebSocket 操作中转发。长时间 HTTP/WebSocket 工作会持有串行 runtime lease；idle 回收会重新检查 lease 准入，若停止操作赢得竞态则使用新 generation 重试，而不会转发过期端口。运行时会在 Host 代码观察请求前验证组织、用户、scope、运行时 id 和 generation。私有运行时凭据与协作端点只允许 loopback 访问。完整决策见[项目协作对话](../.agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.zh.md)。
+账户工作台额外提供 `/account/api/workbench/catalog`，只返回个人空间和成员可访问项目的对话元数据，不包含 transcript 内容。浏览器 API 与 WebSocket 请求可以携带 `dshTarget` 选择器；Gateway 会在解析目标运行时和签发 principal 前，根据当前认证成员关系重新校验该选择器。这样并行面板可以保持独立运行时连接，同时继续使用同一套 ACL、sandbox 和 approval 检查。
 
 项目成员分为 `ro` 和 `rw`。组织管理员无需项目成员记录，就对每个活动项目及其全部对话（包括私密根对话）拥有隐式 `rw` 权限。管理员专用的 `danger-full-access` 预设在个人或项目 scope 中都会在验证请求身份后提供；普通用户不能通过 `/permission` 或新会话默认设置选择它。在共享项目会话中，权限事件属于整个会话，因此管理员切换预设后，所有参与者看到的应用内预设都会改变，直到下一次获得授权的选择；systemd 项目单元仍把宿主访问限制在项目路径内。对普通成员而言，根对话选择项目公开或仅创建者可见，后代继承根 ACL。Host 操作会授权读取、写入、管理、fork、stream、审批和问题；PostgreSQL 只接受每项共享审批/问题的一份响应。项目运行时通过 Gateway PostgreSQL 提供方保存 Session header 和完整事件；其写入和读取解码器会在数据进入活动 Session 前要求精确的事件 envelope 字段与 surface 元数据。持久参与者元数据使模型与 transcript 能区分贡献者。Web 插件展示 scope、可见性、创建者、参与者和贡献次数，并为 `ro` 成员替换完整 composer；浏览器不是授权边界。
 

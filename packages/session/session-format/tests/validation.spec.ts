@@ -141,8 +141,68 @@ describe('streaming migration stages', () => {
     expect(stream.header.version).toBe(1)
   })
 
+  it('validates every intermediate artifact when incremental stages are available', () => {
+    const chain = createSessionFormatChain(options({ migrations: [migration({
+      createStage: () => ({ transformEvent: (event, context) => { context.emitEvent(event) }, finish: () => {} }),
+      validateTarget: () => { throw new Error('invalid migrated payload') },
+    })] }))
+    expect(() => chain.migrate(artifact())).toThrow('invalid migrated payload')
+  })
+
+  it('rejects a header restorer that returns an old generation', () => {
+    const chain = createSessionFormatChain(options({ restoreCurrentHeader: () => header(0) }))
+    expect(() => chain.migrateHeader(header(1))).toThrow('restorer returned an invalid version')
+    expect(() => chain.createStream(header(1), 0, { emitEvent: () => {} })).toThrow('restorer returned an invalid version')
+  })
+
+  it('passes upstream flush output through a downstream buffering stage before finishing it', () => {
+    const output: SessionFormatEvent[] = []
+    const chain = createSessionFormatChain(options({
+      currentVersion: 2,
+      migrations: [
+        migration({ createStage: () => ({
+          transformEvent: () => {},
+          finish: (context) => { context.emitEvent(artifact().events[0] as SessionFormatEvent) },
+        }) }),
+        migration({
+          name: 'v1-to-v2', fromVersion: 1, toVersion: 2,
+          migrateHeader: value => ({ ...value, version: 2 }),
+          createStage: () => {
+            const pending: SessionFormatEvent[] = []
+            return { transformEvent: (event) => { pending.push(event) }, finish: (context) => { pending.forEach(context.emitEvent) } }
+          },
+        }),
+      ],
+    }))
+    const stream = chain.createStream(header(), 0, { emitEvent: (event) => { output.push(event) } })
+    stream.finish()
+    expect(output).toEqual(artifact().events)
+  })
+
   it('fails when an adjacent migration has no streaming stage', () => {
     const noStage = migration()
     expect(() => createSessionFormatChain(options({ migrations: [noStage] })).createStream(header(), 0, { emitEvent: () => {} })).toThrow('does not provide a streaming stage')
+  })
+})
+
+describe('stream compatibility validation', () => {
+  it('refuses an invalid intermediate stream header and forwards a current-generation event unchanged', () => {
+    const chain = createSessionFormatChain(options({ migrations: [migration({ migrateHeader: value => value })] }))
+    expect(() => chain.createStream(header(), 0, { emitEvent: () => {} })).toThrow('invalid header version')
+    const output: SessionFormatEvent[] = []
+    const stream = chain.createStream(header(1), 0, { emitEvent: (event) => { output.push(event) } })
+    const event = artifact().events[0] as SessionFormatEvent
+    stream.emitEvent(event)
+    stream.finish()
+    expect(output).toEqual([event])
+  })
+
+  it('preserves a legacy whole-artifact migration that adjusts the inherited cut', () => {
+    const source = { ...artifact(), inheritedEventCount: 1 }
+    const chain = createSessionFormatChain(options({ migrations: [migration({
+      migrate: () => ({ header: header(1), events: [], inheritedEventCount: 0 }),
+      createStage: () => ({ transformEvent: () => {}, finish: () => {} }),
+    })] }))
+    expect(chain.migrate(source)).toEqual({ header: header(1), events: [], inheritedEventCount: 0 })
   })
 })

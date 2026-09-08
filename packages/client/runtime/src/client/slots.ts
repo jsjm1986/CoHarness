@@ -16,6 +16,7 @@
  * redundancy. */
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
+import type { SessionId } from '@deepseek-ai/dsh-api-remotes/client'
 import { SlotCore } from '@deepseek-ai/dsh-client-ui-slots'
 import type {
   LiveSlotNode, LocaleFace, OwnerOf, SlotEntryDef, SlotMap, SlotRenderer, SlotRendererHost,
@@ -124,6 +125,19 @@ export class SlotRegistry extends Service {
    * own root ctx and silently break per-plugin disposal.
    */
   declare readonly register: SlotCore['register']
+
+  /**
+   * Resolve the framework-owned instance of a registered store for service
+   * consumers. The renderer uses this same instance; unloading the last
+   * registration releases it. Components use their standard store props.
+   * @param handle - handle already passed to a live slot registration.
+   * @param sessionId - required for a session-scoped store; omitted for root.
+   * @returns the shared observable and its declared actions.
+   * @throws when the handle is unregistered or its session scope is absent.
+   */
+  bindStore<H extends EngineStoreHandle>(handle: H, sessionId?: SessionId): ReturnType<H['create']> {
+    return this.resolveStore(handle, sessionId) as ReturnType<H['create']>
+  }
 
   /**
    * Install an effect for each declaration lifetime of a slot. The callback
@@ -412,6 +426,7 @@ export class SlotRegistry extends Service {
       sessions: {
         list: sessions.list,
         provideInfo: sessions.currentProvideInfo,
+        provideInfoFor: id => sessions.provideInfoFor(id as SessionId),
       },
       workspaces: { list: workspaces.list },
       get locale() { return service._locale },

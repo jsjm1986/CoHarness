@@ -34,7 +34,7 @@ export interface Config {
    * variables. Empty text drops the section at render, matching the registry.
    */
   prefix?: string
-  /** @deprecated Use prefix; retained for existing preset patches. */
+  /** Legacy preset alias for prefix. */
   text?: string
   /**
    * Persona suffix template rendered after first-party guidance. Omitted or empty

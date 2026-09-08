@@ -7,7 +7,7 @@ import {
   AccountPreferencesInputError,
   normalizeAccountPreferenceMutation,
 } from './account-preferences.ts'
-import { CollaborationDeniedError } from './collaboration.ts'
+import { CollaborationDeniedError, type AccountConversationView } from './collaboration.ts'
 import type { GatewayConfig } from './config.ts'
 import type { ProjectRuntime } from './instances.ts'
 import type { PrincipalScope } from './principal.ts'
@@ -43,6 +43,7 @@ import type { ProjectConfigurationView } from './project-configuration.ts'
 import type { ProjectThemePolicy } from './projects.ts'
 import { applyModelGovernanceToProject, scheduleModelGovernanceRefresh } from './apply-model-governance.ts'
 import { ProjectModelSettingsConflictError, type ModelSettingsPathOp } from './model-governance.ts'
+import type { GatewayWorkbenchCatalogHandler } from './workbench.ts'
 
 export interface GatewayDeps {
   cfg: GatewayConfig
@@ -96,6 +97,14 @@ function wantsHtml(req: IncomingMessage): boolean {
 }
 
 class BodyTooLargeError extends Error {}
+
+/** Invalid browser-selected runtime target at the account Gateway boundary. */
+class InvalidRuntimeTargetError extends Error {
+  constructor() {
+    super('invalid-runtime-target')
+    this.name = 'InvalidRuntimeTargetError'
+  }
+}
 
 async function readBody(req: IncomingMessage, limit = 1024 * 1024): Promise<string> {
   const declared = req.headers['content-length']
@@ -345,6 +354,8 @@ export type UpgradeHandler = (req: IncomingMessage, socket: Duplex, head: Buffer
 export interface GatewayHandlers {
   proxy?: ProxyHandler
   upgrade?: UpgradeHandler
+  /** Account catalog including personal runtime metadata and ACL-filtered projects. */
+  workbenchCatalog?: GatewayWorkbenchCatalogHandler
   /** Gateway-owned alternate-scope document listing; never expose runtime URLs. */
   documentTransferList?: GatewayDocumentTransferListHandler
   /** Gateway-owned target-scope resumable upload proxy. */
@@ -425,6 +436,31 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     context: GatewayRequestContext
     resetScope: boolean
   }> => {
+    const requestedTarget = new URL(req.url ?? '/', 'http://x').searchParams.get('dshTarget')
+    if (requestedTarget !== null) {
+      if (requestedTarget === 'personal') {
+        return { context: { user, scope: { kind: 'personal' }, runtime: user }, resetScope: false }
+      }
+      const match = requestedTarget.match(/^project:([1-9][0-9]*)$/)
+      if (match === null) throw new InvalidRuntimeTargetError()
+      const projectId = Number(match[1])
+      if (!Number.isSafeInteger(projectId)) throw new InvalidRuntimeTargetError()
+      const project = await deps.collaboration?.projectForUser(projectId, user.id)
+      if (project === undefined || project === null) throw new CollaborationDeniedError('not-member')
+      const detail = await deps.projects.getById(projectId)
+      const canManage = user.role === 'admin' || project.administrator || detail?.owner?.id === user.id
+      return {
+        context: {
+          user,
+          scope: {
+            kind: 'project', projectId, projectName: project.name, mode: project.mode, canManage,
+            ...(detail?.uiThemePolicy === undefined ? {} : { uiThemePolicy: detail.uiThemePolicy }),
+          },
+          runtime: { kind: 'project', id: projectId, name: project.name, path: project.path },
+        },
+        resetScope: false,
+      }
+    }
     const raw = parseCookies(req.headers.cookie).get(SCOPE_COOKIE)
     const match = raw?.match(/^project:([1-9][0-9]*)$/)
     if (match === null || match === undefined || deps.collaboration === undefined) {
@@ -458,6 +494,11 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       if (!res.writableEnded) {
         if (error instanceof BodyTooLargeError) {
           send(res, 413, JSON.stringify({ error: 'request-too-large' }), 'application/json')
+        } else if (error instanceof InvalidRuntimeTargetError) {
+          send(res, 400, JSON.stringify({ error: error.message }), 'application/json')
+        } else if (error instanceof CollaborationDeniedError) {
+          send(res, error.code === 'conversation-not-found' ? 404 : 403,
+            JSON.stringify({ error: error.code }), 'application/json')
         } else if ((req.url ?? '').startsWith('/internal/runtime/')) {
           // Runtime consumers require JSON even when an unexpected exception
           // escapes a route. Keep stack details in the server log only; paths,
@@ -910,6 +951,34 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         // The shared project runtime remains confined to its project path;
         // this flag only advertises the administrator-only preset choice.
         fullAccess: user.role === 'admin',
+      }), 'application/json')
+      return
+    }
+
+    if (pathname === '/account/api/workbench/catalog' && req.method === 'GET') {
+      if (deps.collaboration?.listAccountConversations === undefined) {
+        send(res, 501, JSON.stringify({ error: 'workbench-catalog-unsupported' }), 'application/json')
+        return
+      }
+      res.setHeader('cache-control', 'no-store')
+      const scopes = await deps.collaboration.projectsForUser(user.id)
+      const abort = requestAbort(req, res)
+      let items: AccountConversationView[]
+      try {
+        items = handlers.workbenchCatalog === undefined
+          ? await deps.collaboration.listAccountConversations(user.id)
+          : await handlers.workbenchCatalog(user, abort.signal)
+      } finally {
+        abort.dispose()
+      }
+      const activeRuntime = resolved.context.scope.kind === 'personal'
+        ? { kind: 'personal' as const }
+        : { kind: 'project' as const, projectId: resolved.context.scope.projectId }
+      send(res, 200, JSON.stringify({
+        personal: { id: user.id, name: user.displayName || user.username },
+        activeRuntime,
+        projects: scopes,
+        items,
       }), 'application/json')
       return
     }

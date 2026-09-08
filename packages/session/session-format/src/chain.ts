@@ -54,7 +54,9 @@ class CompiledSessionFormatChain implements SessionFormatChain {
       if (current.version !== migration.toVersion) throw new SessionFormatError(`${migration.name} returned an invalid header version`)
       migration.validateTargetHeader(current)
     }
-    return snapshotSessionFormatHeader(this.options.restoreCurrentHeader(current), 'current Session header')
+    const restored = snapshotSessionFormatHeader(this.options.restoreCurrentHeader(current), 'current Session header')
+    if (restored.version !== this.currentVersion) throw new SessionFormatError('current Session restorer returned an invalid version')
+    return restored
   }
 
   createStream(
@@ -88,8 +90,10 @@ class CompiledSessionFormatChain implements SessionFormatChain {
       if (first === undefined) output.emitEvent(event)
       else first.transformEvent(event, contexts[0] as SessionFormatMigrationContext)
     }
+    const restoredHeader = snapshotSessionFormatHeader(this.options.restoreCurrentHeader(header), 'current Session header')
+    if (restoredHeader.version !== this.currentVersion) throw new SessionFormatError('current Session restorer returned an invalid version')
     return {
-      header: snapshotSessionFormatHeader(this.options.restoreCurrentHeader(header), 'current Session header'),
+      header: restoredHeader,
       emitEvent,
       finish: () => {
         for (let index = 0; index < stages.length; index += 1) {
@@ -102,22 +106,6 @@ class CompiledSessionFormatChain implements SessionFormatChain {
   migrate(source: SessionFormatArtifact): SessionFormatArtifact {
     let current = snapshotSessionFormatArtifact(source, 'stored Session artifact')
     const plan = this.plan(inspectSessionFormatVersion(current.header))
-    if (plan.length > 0 && plan.every(migration => migration.createStage !== undefined)) {
-      const events: SessionFormatEvent[] = []
-      const stream = this.createStream(current.header, current.inheritedEventCount, {
-        emitEvent: (event) => { events.push(event) },
-      })
-      for (const event of current.events) stream.emitEvent(event)
-      stream.finish()
-      current = snapshotSessionFormatArtifact({
-        header: stream.header,
-        inheritedEventCount: current.inheritedEventCount,
-        events,
-      }, 'streamed Session migration output')
-      const restored = snapshotSessionFormatArtifact(this.options.restoreCurrent(current), 'current Session artifact')
-      if (restored.header.version !== this.currentVersion) throw new SessionFormatError('current Session restorer returned an invalid version')
-      return restored
-    }
     for (const migration of plan) {
       current = snapshotSessionFormatArtifact(migration.migrate(current), `${migration.name} output`)
       if (current.header.version !== migration.toVersion) throw new SessionFormatError(`${migration.name} returned an invalid artifact version`)

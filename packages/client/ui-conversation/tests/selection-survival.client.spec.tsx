@@ -19,7 +19,7 @@ async function bench() {
   // body, and details registrations; the session-maybe 'conversation' shell
   // carries no store by design. The slots must first exist in the ledger.
   await runtime.root.declare({
-    'conversation': { kind: 'single', scope: 'session-maybe' },
+    'conversation': { kind: 'single', scope: 'root' },
     'conversation.session': { kind: 'single', scope: 'session' },
     'conversation.session.header': { kind: 'single', scope: 'session' },
     'details': { kind: 'single', scope: 'session' },

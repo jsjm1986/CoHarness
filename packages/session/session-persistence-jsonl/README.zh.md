@@ -36,6 +36,7 @@ JSONL 持久会话存储后端：`SessionPersistence` 的一个具体实现（`d
 | `readStableMaxDurationMs` | 正整数（默认 `2,000`） | 修订稳定读取允许消耗的最大毫秒数；不能超过 Node 计时器上限 `2_147_483_647` ms。 |
 | `maxDecompressedBytes` | 正整数（默认 `256 MiB`） | 单个 zstd 工件在 raw、load 或恢复读取中允许解码的最大明文字节总数。 |
 | `maxArtifactBytes` | 正整数（默认 `256 MiB`） | 单个会话工件允许读取的最大物理字节数；有界读取会在将更大文件保留到内存前拒绝它。 |
+| `migrationBatchMaxBytes` | 正整数（默认 `2 MiB`） | 后继 generation 编码批次的展开 JSON 字节目标；单个事件不可拆分，因此可超过目标。 |
 
 `locate(meta)` 返回已解析项目/会话目录内固定 transcript 的 `{ kind: 'jsonl', path }`。它不执行文件系统 I/O：可以在目录或文件存在前返回目标，现有文件也只包含最近一次 flush 完成的前缀。
 
@@ -58,6 +59,8 @@ JSONL 持久会话存储后端：`SessionPersistence` 的一个具体实现（`d
 ## 写入路径
 
 插件将冻结的会话事件复制到每个活动会话各自的 controller。第一个待处理事件会开启配置的固定批处理窗口，后续事件会加入但不会重置截止时间。窗口到期后会启动一次持久化追加；该次写入期间接纳的事件会形成另一个独立有界的后续批次。`session/flush` 会取消等待并排空当前与待处理批次。每会话游标防止恢复后的会话重新 append 已存储事件，插件加载时会为活动会话设置初始状态。所属后端实例串行化单会话操作；dispose（资源释放）会在拆卸前排空每个保留的 controller。每个逻辑事件都会保留：批处理只让单个压缩帧或一次原始 JSONL fsync 承载更多记录。
+
+明文正文按有界字节窗口扫描，保留解码后的事件，不构建完整原始文件缓冲区。读取之间检查取消，revision 变化时重试。后继 generation 写完临时文件后重新校验源 revision；源发生变化或消失时拒绝发布。后继 generation 按有界批次编码，在事件和写入之间检查取消。压缩读取和逻辑 preparation 仍保留完整输入或事件数组。
 
 ## 模型体验
 

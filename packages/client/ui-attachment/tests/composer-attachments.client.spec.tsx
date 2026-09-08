@@ -158,3 +158,12 @@ describe('ComposerAttachments', () => {
     expect(view.getByAltText('原图')).toBeTruthy()
   })
 })
+
+it('leaves document-wide drops to the active pane when this composer is inactive', () => {
+  const onAddImages = vi.fn()
+  render(<ComposerAttachments {...props({ onAddImages })} active={false} />)
+  const dataTransfer = { types: ['Files'], files: [attachment('inactive').file], dropEffect: 'none' }
+  expect(fireEvent.dragEnter(document.body, { dataTransfer })).toBe(true)
+  expect(fireEvent.drop(document.body, { dataTransfer })).toBe(true)
+  expect(onAddImages).not.toHaveBeenCalled()
+})

@@ -165,8 +165,6 @@ export interface SubprocessCollectedOutputs {
  * the handle unnoticed.
  */
 export interface SubprocessHandle {
-  /** Process id (tree root); -1 when the spawn itself failed. */
-  readonly pid: number
   /** The child's stdin, present iff spawned with `stdin: 'pipe'`. */
   readonly stdin: Writable | undefined
   /** The child's raw stdout, present iff spawned with `stdout: 'pipe'`. */

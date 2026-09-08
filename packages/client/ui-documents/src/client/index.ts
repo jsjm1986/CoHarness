@@ -34,8 +34,8 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-documents: dictionaries')
 
   const injected = (): DocumentsButtonInjected => ({
-    attachDocument: (document) => {
-      const sessionId = ctx.sessions.list.getSnapshot().current
+    attachDocument: (document, targetSessionId) => {
+      const sessionId = targetSessionId ?? ctx.sessions.list.getSnapshot().current
       if (sessionId === undefined) return false
       return ctx.get('conversation')?.attachDocument(sessionId, document) ?? false
     },

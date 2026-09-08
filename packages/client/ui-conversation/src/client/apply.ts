@@ -13,7 +13,8 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { ViewTab } from './contract/views.ts'
 import type {
   ApprovalWait, ChatNodeTurnDataInjected, ChatScrollPosition, ChatViewInjected, ComposerBarInjected,
-  ComposerChainProps, ConversationInjected, ConversationSessionHeaderInjected, ConversationSessionInjected, MessageImageLoader,
+  ComposerChainProps, ConversationInjected,
+  ConversationViewportInjected, ConversationSessionHeaderInjected, ConversationSessionInjected, MessageImageLoader,
   DetailsInjected, WorkspaceSelectionOptions,
 } from './contract/slots.ts'
 import type { InputNotice } from './input/contract.ts'
@@ -34,7 +35,8 @@ import { StatsLine } from './chat/StatsLine.tsx'
 import { ApprovalPanel } from './skeleton/ApprovalPanel.tsx'
 import { todoDockEntry } from './skeleton/TodoPanel.tsx'
 import { queueDockEntry } from './queue/QueueDock.tsx'
-import { ConversationRoot } from './skeleton/ConversationRoot.tsx'
+import { ConversationPane, ConversationRoot } from './skeleton/ConversationRoot.tsx'
+import { ConversationViewportController, createConversationViewportStore } from './viewport.ts'
 import { ConversationSession, ConversationSessionHeader } from './skeleton/ConversationSession.tsx'
 import { DetailsPanel } from './skeleton/DetailsPanel.tsx'
 import { en, NS, zh, type ConversationKey } from './locales.ts'
@@ -125,6 +127,13 @@ export function apply(ctx: Context): void {
   const workspaces = ctx.workspaces
   const layout = ctx.layout
   const slots = ctx.slots
+
+  const viewportStore = createConversationViewportStore()
+  const viewportAvailable = {
+    getSnapshot: () => slots.entries('conversation.workbench.toolbar').length > 0,
+    subscribe: (listener: () => void) => slots.subscribe('conversation.workbench.toolbar', listener),
+  }
+
 
   registerConversationNodes(ctx)
   registerChatNodeRenderers(ctx)
@@ -222,6 +231,35 @@ export function apply(ctx: Context): void {
   slots.register({
     name: 'conversation',
     locale: NS,
+    store: viewportStore,
+    children: {
+      'conversation.pane': { kind: 'single', scope: 'session-maybe' },
+      'conversation.workbench.toolbar': { kind: 'single', scope: 'root' },
+      'conversation.workbench.empty': { kind: 'single', scope: 'root' },
+      'conversation.workbench.pane.header': { kind: 'list', scope: 'session' },
+    },
+    inject: (): ConversationViewportInjected => ({
+      hooks: { viewportAvailable },
+      onViewportFocus: (id) => { viewport.focus(id) },
+      onViewportRemove: (id) => { viewport.remove(id); layout.closeDetails(id) },
+      onViewportRatios: (ratios) => { viewport.setPaneRatios(ratios) },
+      onViewportMaximize: (_id, maximized) => { if (maximized) layout.closeDetails() },
+      onViewportEnabled: (enabled) => { viewport.setEnabled(enabled) },
+    }),
+  }, ConversationRoot)
+
+  const viewport = new ConversationViewportController(sessions, slots.bindStore(viewportStore), workspaces)
+  ctx.effect(() => {
+    const dispose = ctx.reflect.provide('conversationViewport', viewport)
+    return () => {
+      viewport.dispose()
+      void dispose()
+    }
+  }, 'ui-conversation: conversation viewport capability')
+
+  slots.register({
+    name: 'conversation.pane',
+    locale: NS,
     children: {
       'conversation.session': { kind: 'single', scope: 'session' },
       'conversation.session.header': { kind: 'single', scope: 'session' },
@@ -244,8 +282,6 @@ export function apply(ctx: Context): void {
       setDisplayWidth: (value) => { displaySettings.setWidth(value) },
       selectWorkspace: async (workspaceId, options: WorkspaceSelectionOptions = {}) => {
         const nextId = await workspaces.openWorkspace(workspaceId)
-        // Validate/open first: a race can invalidate a history id between the
-        // snapshot scan and selection, and that failure must retain the draft.
         sessions.open(nextId)
         if (options.discardDraft === true && sessionId !== undefined && nextId !== sessionId) {
           inputHub.discardDraft(sessionId)
@@ -253,7 +289,7 @@ export function apply(ctx: Context): void {
       },
       newSession: (workspaceId) => { workspaces.startSession(workspaceId) },
     }),
-  }, ConversationRoot)
+  }, ConversationPane)
 
   // The strict session body fills the resident scrollport without owning it;
   // the Hero/composer path therefore stays fixed while the first blank
@@ -444,7 +480,7 @@ export function apply(ctx: Context): void {
       return {
         openDetails: (target) => {
           actions.select(target)
-          layout.openDetails()
+          layout.openDetails(viewportAvailable.getSnapshot() && viewport.snapshot.getSnapshot().mode === 'workbench' ? sessionId : undefined)
         },
         fileMentions: owner => ctx.get('chatFileMentions')?.forClosing(owner),
         openFile: (path) => {

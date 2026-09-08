@@ -177,3 +177,15 @@ describe('the persona row', () => {
     ])
   })
 })
+
+it('accepts the legacy text alias and refuses a missing persona prefix', async () => {
+  const ctx = await harness('Deployment')
+  try {
+    const key = { agent: 'legacy-persona' }
+    const scope = createScope(ctx, key)
+    const legacy = await scope.ctx.plugin(Persona, { text: 'Legacy persona' })
+    expect(await personaText(ctx, key)).toBe('Legacy persona')
+    await legacy.dispose()
+    await expect(scope.ctx.plugin(Persona, {})).rejects.toThrow('persona requires prefix')
+  } finally { await ctx.fiber.dispose() }
+})

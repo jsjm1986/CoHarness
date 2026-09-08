@@ -237,7 +237,7 @@ export interface Config {
    * `deployment:persona-prefix` shadows it; `{{variable}}` references are strict.
    */
   personaPrefix?: string
-  /** @deprecated Use personaPrefix; retained for existing profile patches. */
+  /** Legacy profile alias for personaPrefix. */
   persona?: string
   /**
    * Persona suffix template after first-party guidance. A scoped `deployment:persona-suffix`

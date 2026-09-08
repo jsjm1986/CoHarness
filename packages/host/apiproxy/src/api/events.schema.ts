@@ -6,7 +6,7 @@
 
 import { z } from 'zod'
 import type { AskUserQuestionItem } from '@deepseek-ai/dsh-user-questions/types'
-import type { HostFrame, MuxFrame } from './events.ts'
+import type { QueuedInboxItem, HostFrame, MuxFrame } from './events.ts'
 import type { Wire } from './rpc.schema.ts'
 import { rpcErrorSchema, rpcIdSchema } from './rpc.schema.ts'
 import { approvalRequestIdSchema } from './approvals.schema.ts'
@@ -39,6 +39,14 @@ const messageSchema = z.object({
   source: z.looseObject({ kind: z.string() }),
 })
 
+/** Validated complete inbox rows shared by queue frames and cold projections. */
+export const queuedInboxItemsSchema = z.array(z.object({
+  id: messageIdSchema,
+  rpcId: rpcIdSchema.optional(),
+  placement: z.union([z.literal('queued'), z.literal('steering'), z.literal('context')]),
+  message: messageSchema,
+})) as unknown as z.ZodType<QueuedInboxItem[]>
+
 /** MuxFrame union (payload slot of a mux-stream ServerRequest). */
 export const muxFrameSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('session/event'), sessionId: sessionIdSchema, event: sessionEventSchema, view: toolEventViewSchema.optional() }),
@@ -53,12 +61,7 @@ export const muxFrameSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('session/queue'),
     sessionId: sessionIdSchema,
-    items: z.array(z.object({
-      id: messageIdSchema,
-      rpcId: rpcIdSchema.optional(),
-      placement: z.union([z.literal('queued'), z.literal('steering'), z.literal('context')]),
-      message: messageSchema,
-    })),
+    items: queuedInboxItemsSchema,
   }),
   z.object({ type: z.literal('session/jobs'), sessionId: sessionIdSchema, jobs: z.array(taskViewSchema) }),
   // value stays wide: it already passed its unit's own schema on the host,

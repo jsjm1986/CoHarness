@@ -102,6 +102,10 @@ export interface Config {
   includeRuntimeContext?: SystemPromptConfig['includeRuntimeContext']
   /** The deployment persona (see dsh-system-prompt's `Config`). */
   persona?: SystemPromptConfig['persona']
+  /** Persona prefix forwarded to the system-prompt plugin. */
+  personaPrefix?: SystemPromptConfig['personaPrefix']
+  /** Persona suffix forwarded to the system-prompt plugin. */
+  personaSuffix?: SystemPromptConfig['personaSuffix']
   /** The explicit model-facing tool order (see dsh-system-prompt's `Config`). */
   toolOrder?: SystemPromptConfig['toolOrder']
   /** The tool registry's config — its presentation `mode` (see dsh-tools' `Config`). */
@@ -188,6 +192,8 @@ export function pickSpineConfig(config: Omit<Config, 'agents'>): Omit<Config, 'a
     ...config.includeHarnessIdentity !== undefined ? { includeHarnessIdentity: config.includeHarnessIdentity } : {},
     ...config.includeRuntimeContext !== undefined ? { includeRuntimeContext: config.includeRuntimeContext } : {},
     ...config.persona !== undefined ? { persona: config.persona } : {},
+    ...config.personaPrefix !== undefined ? { personaPrefix: config.personaPrefix } : {},
+    ...config.personaSuffix !== undefined ? { personaSuffix: config.personaSuffix } : {},
     ...config.toolOrder !== undefined ? { toolOrder: config.toolOrder } : {},
     ...config.tools !== undefined ? { tools: config.tools } : {},
     ...config.dshHome !== undefined ? { dshHome: config.dshHome } : {},
@@ -228,7 +234,9 @@ export function apply(ctx: Context, config: Config): void {
   ctx.plugin(SystemPrompt, {
     includeHarnessIdentity: config.includeHarnessIdentity ?? true,
     includeRuntimeContext: config.includeRuntimeContext ?? true,
-    persona: config.persona ?? '',
+    ...config.persona === undefined ? {} : { persona: config.persona },
+    ...config.personaPrefix === undefined ? {} : { personaPrefix: config.personaPrefix },
+    ...config.personaSuffix === undefined ? {} : { personaSuffix: config.personaSuffix },
     ...config.toolOrder !== undefined ? { toolOrder: config.toolOrder } : {},
   })
   ctx.plugin(ToolRuntime, config.tools ?? {})

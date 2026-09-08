@@ -26,7 +26,6 @@ import type {
   OpenAICompletionsCompat,
   OpenAIResponsesCompat,
   Provider,
-  ThinkingTokenBudgetField,
   ThinkingLevelMap,
 } from '@earendil-works/pi-ai'
 
@@ -124,6 +123,16 @@ const MAX_TOKENS_FIELD_GATE: Record<PiAiMaxTokensField, true> = {
 
 /** The output-cap field spellings a profile may name. */
 export const MAX_TOKENS_FIELDS = Object.keys(MAX_TOKENS_FIELD_GATE) as readonly PiAiMaxTokensField[]
+
+/** Reasoning-budget field spellings accepted by pi-ai. */
+export type PiAiThinkingTokenBudgetField = NonNullable<OpenAICompletionsCompat['thinkingTokenBudgetField']>
+const THINKING_TOKEN_BUDGET_FIELD_GATE: Record<PiAiThinkingTokenBudgetField, true> = {
+  thinking_token_budget: true,
+  thinking_budget: true,
+  thinking_budget_tokens: true,
+}
+/** Provider fields that carry an explicit thinking token budget. */
+export const THINKING_TOKEN_BUDGET_FIELDS = Object.keys(THINKING_TOKEN_BUDGET_FIELD_GATE) as readonly PiAiThinkingTokenBudgetField[]
 
 /** The prompt-cache marker conventions pi-ai accepts. */
 export type PiAiCacheControlFormat = NonNullable<OpenAICompletionsCompat['cacheControlFormat']>
@@ -251,6 +260,7 @@ const COMPLETIONS_COMPAT_GATE = {
   chatTemplateArgs: 'offer',
   thinkingTokenBudgetField: 'offer',
   supportsThinkingTokenBudget: 'offer',
+  vllmPriority: 'offer',
   supportsStrictMode: 'offer',
   cacheControlFormat: 'offer',
   supportsLongCacheRetention: 'offer',
@@ -266,6 +276,7 @@ const COMPLETIONS_COMPAT_GATE = {
 /** Disposition of every `OpenAIResponsesCompat` field; a drift gate like the one above. */
 const RESPONSES_COMPAT_GATE = {
   supportsDeveloperRole: 'offer',
+  supportsMaxOutputTokens: 'offer',
   supportsStrictMode: 'offer',
   supportsLongCacheRetention: 'offer',
   sessionAffinityFormat: 'withhold',
@@ -287,6 +298,7 @@ const ANTHROPIC_COMPAT_GATE = {
   allowedFallbackModels: 'withhold',
   sendSessionAffinityHeaders: 'withhold',
   supportsToolReferences: 'withhold',
+  supportsMidConvoEffort: 'withhold',
 } as const satisfies Record<keyof AnthropicMessagesCompat, CompatDisposition>
 
 /** Disposition of every `BedrockCompat` field; a drift gate like the one above. */
@@ -398,7 +410,11 @@ export interface PiAiCompatProfile {
   /** Arguments sent as `chat_template_args` for the baseten format. */
   chatTemplateArgs?: NonNullable<OpenAICompletionsCompat['chatTemplateArgs']>
   /** Top-level field used for provider-specific thinking token budgets. */
-  thinkingTokenBudgetField?: ThinkingTokenBudgetField
+  thinkingTokenBudgetField?: PiAiThinkingTokenBudgetField
+  /** vLLM scheduler priority; lower values run earlier. */
+  vllmPriority?: number
+  /** Whether an OpenAI Responses endpoint accepts max_output_tokens. */
+  supportsMaxOutputTokens?: boolean
   /** Whether the endpoint accepts a vLLM thinking token budget. */
   supportsThinkingTokenBudget?: boolean
   /**

@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-08-session-format-streaming-stage.md
-2026-09-08-session-format-streaming-stage.md: 8419beb31296604a01dad48cb5b19e0a8ac183a9
-2026-09-08-session-format-streaming-stage.zh.md: 7385bfeee60bd3815fadb2f1743c58221da8aa3f
+2026-09-08-session-format-streaming-stage.md: 7ff39301960f85dd71886932e8ed57248a8cee6f
+2026-09-08-session-format-streaming-stage.zh.md: 6334b6094029f94736ef879606c62c9b41970e25

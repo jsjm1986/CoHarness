@@ -36,7 +36,7 @@ function mountShell({ collapsed = false, width = 300 }: { collapsed?: boolean; w
   const root = () => (
     <SidebarRoot
       collapsed={current.collapsed} width={current.width}
-      useSessions={neverHook} useWorkspaces={neverHook}
+      useSessions={neverHook} useWorkspaces={neverHook} useViewport={selector => selector({ mode: 'single', paneIds: [], paneRatios: [] })}
       startSession={startSession} toggleSidebar={toggleSidebar} t={t}
       renderSlot={((
         key: string,
@@ -107,7 +107,7 @@ describe('SidebarRoot shell', () => {
     vi.stubEnv('DSH_CLIENT_COMMIT_HASH', '0123456')
     const { container } = render(<SidebarRoot
       collapsed={false} width={300}
-      useSessions={neverHook} useWorkspaces={neverHook}
+      useSessions={neverHook} useWorkspaces={neverHook} useViewport={selector => selector({ mode: 'single', paneIds: [], paneRatios: [] })}
       startSession={vi.fn()} toggleSidebar={vi.fn()} t={t}
       renderSlot={((_key: string, _owner: unknown, options?: { fallback?: ReactNode }) =>
         options?.fallback ?? null) as SidebarRootComponentProps['renderSlot']}

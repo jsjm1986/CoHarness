@@ -10,7 +10,7 @@ System prompt assembly registry. Plugins contribute ordered sections, tool schem
 |---|---|---|
 | `includeHarnessIdentity` | `true` | Include the fixed `You are an AI agent powered by DeepSeek Harness.` order-−100 opener. Set false only when a compatibility deployment owns the complete system prompt. |
 | `includeRuntimeContext` | `true` | Include ordered dynamic contexts in assembly. When false, context providers are not evaluated and contexts added by `system-prompt/assemble` listeners are discarded after the waterfall; other services and their enforcement remain active. |
-| `persona` | `''` | The global deployment-persona default: the ONE config-authored prompt fragment, rendered as the order-0 `deployment:persona` section unless an agent-scoped contribution shadows it. A template — complete `{{…}}` groups are interpreted strictly against the registered variables (the shipped loop registers `{{model}}`/`{{cwd}}`), with no escape syntax for literal braces yet. Empty ⇒ the section is dropped at render. |
+| `persona` | `''` | The global deployment-persona default: the ONE config-authored prompt fragment, rendered as the order-0 `deployment:persona-prefix` section unless an agent-scoped contribution shadows it. A template — complete `{{…}}` groups are interpreted strictly against the registered variables (the shipped loop registers `{{model}}`/`{{cwd}}`), with no escape syntax for literal braces yet. Empty ⇒ the section is dropped at render. |
 | `toolOrder` | — | Explicit model-facing tool order, as a list of `ToolSchema.name`s with one `'<unlisted-tools>'` rest entry (`TOOL_ORDER_REST`): listed tools take their listed position, unlisted tools land at the rest entry in lexicographic name order. Absent ⇒ plain lexicographic name order. Applied to the collected tools BEFORE the `system-prompt/assemble` waterfall — like the sections' `order` sort, it canonicalizes what the registry contributed (registration order is a plugin-load artifact), and a waterfall listener that mutates the list owns the determinism of what it emits. Misconfiguration fails loud: a list without exactly one rest entry, or with duplicates, throws at load; a listed name with no registered tool rejects every `assemble()`; a tool provider returning the reserved rest-entry name also rejects. Under the shipped loop the turn fails before any model request. Why a central list and not per-plugin weights: [Explicit model-facing tool order](../../../.agents/notes/implemented/feature/2026-07-06-explicit-tool-order.md). |
 
 ## Service: `SystemPrompt` (ctx key: `systemPrompt`)
@@ -39,7 +39,7 @@ Merge-extensible: plugins can declare extra fields on `PromptAssembly` and `Asse
 
 ### Extension points
 
-- Section providers: tool packages own their cross-call guidance (`tool:bash`, `tool:read`, …); this plugin owns `harness:identity` and `deployment:persona`.
+- Section providers: tool packages own their cross-call guidance (`tool:bash`, `tool:read`, …); this plugin owns `harness:identity` and `deployment:persona-prefix`.
 - Variable providers: the agent loop registers `model` and `cwd`; any plugin can register the facts it owns (a future `date`, git state, …).
 - Tool schema providers: `ToolRuntime` registers itself as a tool provider automatically.
 - The [`system-prompt/assemble` waterfall](#live-events): cooperatively mutate or replace the assembly per caller before any complete-section constraint is enforced.

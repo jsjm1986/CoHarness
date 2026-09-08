@@ -8,13 +8,13 @@ The agent persona as a composable row. It can either shadow the deployment perso
 
 ## Scope-only
 
-Mounting this row outside an agent scope collides with the registry's own `deployment:persona` registration and fails loud. That is not a limitation to work around: the deployment persona already has an owner, and the whole point of this row is to shadow it for one agent. Mount it inside a preset composition, where the preset mount supplies the agent scope.
+Mounting this row outside an agent scope collides with the registry's own `deployment:persona-prefix` registration and fails loud. That is not a limitation to work around: the deployment persona already has an owner, and the whole point of this row is to shadow it for one agent. Mount it inside a preset composition, where the preset mount supplies the agent scope.
 
 ## Config
 
 | Field | Default | Meaning |
 |---|---|---|
-| `text` | required | Persona prose rendered as the `deployment:persona` section |
+| `text` | required | Persona prose rendered as the `deployment:persona-prefix` section |
 | `complete` | `false` | Restore this persona after assembly as the only system-prompt section |
 | `includeRuntimeContext` | `true` | Include dynamic runtime-context snapshots for this agent scope; false suppresses every context contribution without disabling its owning services |
 
@@ -26,7 +26,7 @@ Mounting this row outside an agent scope collides with the registry's own `deplo
 
 #### What the model sees
 
-The `deployment:persona` section at order 0, immediately after the harness identity opener, carrying exactly this row's configured `text` with prompt variables resolved. For an agent whose preset mounts this row, it replaces whatever persona the deployment configured. In complete mode, the model sees only this rendered section as its system prompt. Runtime context remains enabled by default. When disabled, a fresh agent receives no runtime-context snapshot from sandbox policy, approval policy, delegation, or another system-prompt context provider.
+The `deployment:persona-prefix` section at order 0, immediately after the harness identity opener, carrying exactly this row's configured `text` with prompt variables resolved. For an agent whose preset mounts this row, it replaces whatever persona the deployment configured. In complete mode, the model sees only this rendered section as its system prompt. Runtime context remains enabled by default. When disabled, a fresh agent receives no runtime-context snapshot from sandbox policy, approval policy, delegation, or another system-prompt context provider.
 
 #### Token effect
 

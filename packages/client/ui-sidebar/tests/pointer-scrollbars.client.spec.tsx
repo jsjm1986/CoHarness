@@ -32,7 +32,7 @@ function mountColumn(): { column: HTMLElement; quiet: () => boolean } {
   const view = render(
     <SidebarRoot
       collapsed={false} width={300}
-      useSessions={neverHook} useWorkspaces={neverHook}
+      useSessions={neverHook} useWorkspaces={neverHook} useViewport={selector => selector({ mode: 'single', paneIds: [], paneRatios: [] })}
       startSession={vi.fn()} toggleSidebar={vi.fn()} t={t}
       renderSlot={((_key: string, owner: SidebarSectionOwnerProps) =>
         <div data-testid="region" data-wide={owner.wide} />) as SidebarRootComponentProps['renderSlot']}

@@ -6,7 +6,7 @@
 
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
-  'group.ungrouped': '未分组',
+  'group.ungrouped': '独立会话',
   'session.new': '新会话',
   'session.private': '私密',
   'section.workspaces': '工作区',
@@ -43,7 +43,7 @@ export const zh = {
   'field.workspaceName': '工作区名称',
   'field.sessionName': '会话名称',
   'delete.workspace': '删除工作区',
-  'delete.desc': '将把“{name}”从工作区列表中移除。文件夹与会话记录会保留，其会话将显示在“未分组”下。',
+  'delete.desc': '将把“{name}”从工作区列表中移除。文件夹与会话记录会保留，其会话将显示在“独立会话”下。',
   'delete.pending': '正在删除工作区…',
   'menu.fork': '分叉会话',
   'menu.archiveSession': '归档会话',
@@ -77,7 +77,7 @@ export type WorkspaceKey = keyof typeof zh
 
 /** English dictionary, checked complete against the zh key set. */
 export const en = {
-  'group.ungrouped': 'Ungrouped',
+  'group.ungrouped': 'Independent sessions',
   'session.new': 'New Session',
   'session.private': 'Private',
   'section.workspaces': 'Workspaces',
@@ -114,7 +114,7 @@ export const en = {
   'field.workspaceName': 'Workspace name',
   'field.sessionName': 'Session name',
   'delete.workspace': 'Delete workspace',
-  'delete.desc': 'This removes “{name}” from the workspace list. The folder and session logs will be kept. Its sessions will appear under Ungrouped.',
+  'delete.desc': 'This removes “{name}” from the workspace list. The folder and session logs will be kept. Its sessions will appear under Independent sessions.',
   'delete.pending': 'Deleting workspace…',
   'menu.fork': 'Fork session',
   'menu.archiveSession': 'Archive session',

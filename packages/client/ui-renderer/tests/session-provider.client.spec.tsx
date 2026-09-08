@@ -55,6 +55,7 @@ function makeHost(bodies: { root: (rp: (key: string, owner: object) => React.Rea
     sessions: {
       list: observable<unknown>({ ids: [] }),
       provideInfo: provide,
+      provideInfoFor: (id: string) => infos.get(id),
     },
     workspaces: { list: observable<unknown>({ items: [] }) },
   }
@@ -112,6 +113,20 @@ describe('SessionProvider', () => {
     })
     const view = render(<>{createSlotRenderer().renderRoot(h.host, {})}</>)
     expect(view.container.textContent).toBe('')
+  })
+
+  it('binds an explicit Session without changing the current selection', () => {
+    const h = makeHost({
+      root: () => (
+        <SessionProvider sessionId="s2">
+          {id => <b>{id}</b>}
+        </SessionProvider>
+      ),
+    })
+    h.addSession('s1')
+    h.addSession('s2')
+    const view = render(<>{createSlotRenderer().renderRoot(h.host, {})}</>)
+    expect(view.container.textContent).toBe('s2')
   })
 
   it('remounts the body on session switch (key semantics) but not on unrelated re-renders', () => {

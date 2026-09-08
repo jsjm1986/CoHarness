@@ -24,7 +24,7 @@ import type { SessionFace } from '../contract/session.ts'
 import type { SubagentAddress } from '@deepseek-ai/dsh-api-remotes/client'
 import type { SessionSearchResultItem } from './manager.ts'
 import type { RpcResult } from '@deepseek-ai/dsh-api-remotes/client'
-import { createSnapshotStore, type SnapshotStore } from '../contract/store.ts'
+import { createSnapshotStore, type ObservableSnapshot, type SnapshotStore } from '../contract/store.ts'
 
 interface RuntimeEntry {
   key: string
@@ -33,6 +33,7 @@ interface RuntimeEntry {
   readonly connection?: ConnectionHandle
   readonly fiber?: Fiber
   stop?: () => void
+  stopSubscriptions?: () => void
   ready?: Promise<void>
   rejectReady?: (error: unknown) => void
 }
@@ -51,10 +52,12 @@ function targetKey(target: ConnectionRuntimeTarget): string {
 export class SessionRuntimePool implements ISessions {
   readonly searchResultLimit: number
   readonly list: SnapshotStore<SessionListState>
+  readonly currentScopeList: ObservableSnapshot<SessionListState>
   readonly currentProvideInfo: HostObservable<SessionMaybeProvideInfo>
   private readonly entries = new Map<string, RuntimeEntry>()
+  private readonly archivedByTarget = new Map<string, ReadonlySet<SessionId>>()
   private readonly sessionOwners = new Map<SessionId, RuntimeEntry>()
-  private readonly providers: SessionProvideDescriptor[] = []
+  private readonly providers = new Map<SessionProvideDescriptor, Map<RuntimeEntry, () => void>>()
   private activeSession: SessionId | undefined
   private readonly provideListeners = new Set<() => void>()
   private currentProvideSnapshot: SessionMaybeProvideInfo
@@ -83,35 +86,44 @@ export class SessionRuntimePool implements ISessions {
       ids: [], byId: {}, current: undefined, phase: 'pending',
       subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
     })
+    this.currentScopeList = base.list
     this.subscribeEntry(baseEntry)
     this.rebuild()
     rootCtx.reflect.provide('sessions', this, undefined)
+    const stopTargets = baseConnection.registerSessionTargetResolver?.(id => this.runtimeTargetFor(id))
     rootCtx.effect(() => () => {
-      for (const entry of this.entries.values()) entry.stop?.()
+      stopTargets?.()
+      for (const entry of this.entries.values()) {
+        entry.stop?.()
+        entry.stopSubscriptions?.()
+      }
     }, 'runtime: session runtime pool')
   }
 
   private subscribeEntry(entry: RuntimeEntry): void {
-    entry.runtime.list.subscribe(() => {
+    const stopList = entry.runtime.list.subscribe(() => {
+      if (this.entries.get(entry.key) !== entry) return
       this.indexEntry(entry)
       this.rebuild()
     })
-    entry.runtime.currentProvideInfo.subscribe(() => {
+    const stopProvide = entry.runtime.currentProvideInfo.subscribe(() => {
+      if (this.entries.get(entry.key) !== entry) return
       if (this.activeOwner()?.key !== entry.key) return
       this.currentProvideSnapshot = entry.runtime.currentProvideInfo.getSnapshot()
       this.notifyProvide()
     })
+    entry.stopSubscriptions = () => { stopList(); stopProvide() }
     this.indexEntry(entry)
   }
 
   private indexEntry(entry: RuntimeEntry): void {
     for (const [id, owner] of this.sessionOwners) if (owner.key === entry.key) this.sessionOwners.delete(id)
-    for (const id of entry.runtime.list.getSnapshot().ids) this.sessionOwners.set(id, entry)
+    for (const id of Object.keys(entry.runtime.list.getSnapshot().byId) as SessionId[]) this.sessionOwners.set(id, entry)
   }
 
   private activeOwner(): RuntimeEntry | undefined {
-    if (this.activeSession !== undefined) return this.sessionOwners.get(this.activeSession)
-    return this.entries.get('personal')
+    return (this.activeSession === undefined ? undefined : this.sessionOwners.get(this.activeSession))
+      ?? [...this.entries.values()].find(entry => entry.runtime === this.base)
   }
 
   private notifyProvide(): void {
@@ -127,10 +139,11 @@ export class SessionRuntimePool implements ISessions {
     const jobsBySession: SessionListState['jobsBySession'] = {}
     for (const entry of this.entries.values()) {
       const state = entry.runtime.list.getSnapshot()
-      for (const id of state.ids) {
+      const archived = this.archivedByTarget.get(entry.key) ?? new Set<SessionId>()
+      for (const id of state.ids) if (!archived.has(id) && !ids.includes(id)) ids.push(id)
+      for (const id of Object.keys(state.byId) as SessionId[]) {
         const summary = state.byId[id]
-        if (summary === undefined || byId[id] !== undefined) continue
-        ids.push(id)
+        if (summary === undefined || archived.has(id) || byId[id] !== undefined) continue
         byId[id] = entry.target.kind === 'project'
           ? {
             ...summary,
@@ -175,7 +188,18 @@ export class SessionRuntimePool implements ISessions {
       })
       entry = { key, target, runtime, connection, fiber }
       this.entries.set(key, entry)
-      for (const descriptor of this.providers) runtime.provide(descriptor)
+      try {
+        for (const [descriptor, disposers] of this.providers) disposers.set(entry, runtime.provide(descriptor))
+      } catch (error) {
+        this.entries.delete(key)
+        for (const disposers of this.providers.values()) {
+          disposers.get(entry)?.()
+          disposers.delete(entry)
+        }
+        await fiber.dispose()
+        throw error
+      }
+      const establishedEntry = entry
       this.subscribeEntry(entry)
       let resolveReady: () => void = () => {}
       let rejectReady: (error: unknown) => void = () => {}
@@ -192,13 +216,33 @@ export class SessionRuntimePool implements ISessions {
         },
         onConnected: () => {
           runtime.handleConnected()
-          void runtime.refresh().then(resolveReady, rejectReady)
+          void runtime.refresh().then(() => {
+            if (runtime.list.getSnapshot().phase === 'ready') resolveReady()
+            else rejectReady(new Error('target runtime session list unavailable'))
+            return connection.api.workspace.list({})
+          }).then(({ result }) => {
+            if (result.ok) {
+              this.archivedByTarget.set(establishedEntry.key, new Set(result.value.archivedSessionIds))
+              this.rebuild()
+            }
+          }, rejectReady)
         },
-        onStateChange: (state: 'connected' | 'reconnecting') => { if (state === 'reconnecting') runtime.handleDisconnected() },
+        onStateChange: (state: 'connected' | 'reconnecting') => {
+          if (state !== 'reconnecting') return
+          runtime.handleDisconnected()
+          rejectReady(new Error('target runtime connection unavailable'))
+        },
       })
       entry.stop = () => { loop.stop() }
     }
-    if (entry.ready !== undefined) await entry.ready
+    try {
+      if (entry.ready !== undefined) await entry.ready
+    } catch (error) {
+      this.releaseEntry(entry)
+      this.rebuild()
+      throw error
+    }
+    if (this.entries.get(key) !== entry) return undefined
     this.indexEntry(entry)
     this.rebuild()
     return entry
@@ -207,7 +251,10 @@ export class SessionRuntimePool implements ISessions {
   /** Check whether a Session exists in the target runtime. */
   async ensureSession(target: SessionRuntimeTarget, id: SessionId): Promise<boolean> {
     const entry = await this.runtimeForTarget(target)
-    return entry?.runtime.list.getSnapshot().ids.includes(id) === true
+    if (entry?.runtime.list.getSnapshot().ids.includes(id) !== true || entry.connection === undefined) return false
+    const { result } = await entry.connection.api.workspace.list({})
+    if (!result.ok) throw new Error(result.error.message)
+    return !result.value.archivedSessionIds.includes(id)
   }
 
   /** Create a Session in the target runtime and index its owner. */
@@ -215,12 +262,13 @@ export class SessionRuntimePool implements ISessions {
     const entry = await this.runtimeForTarget(target)
     if (entry === undefined) throw new Error('target runtime transport unavailable')
     const id = await entry.runtime.create()
+    if (this.entries.get(entry.key) !== entry) throw new Error('target runtime was released during session creation')
     this.indexEntry(entry)
     this.rebuild()
     return id
   }
 
-  /** Create or reuse a blank Session in the active runtime.
+  /** Create or reuse a blank Session in the bootstrap Workspace runtime.
    * @param opts - draft/session creation options.
    * @param reusableSessionIds - blank Session identities eligible for reuse.
    * @returns the selected Session identity.
@@ -229,9 +277,7 @@ export class SessionRuntimePool implements ISessions {
     opts: Parameters<Runtime['createOrReuse']>[0],
     reusableSessionIds: readonly SessionId[],
   ): Promise<SessionId> {
-    const owner = this.activeOwner()
-    if (owner === undefined) return Promise.reject(new Error('No runtime selected'))
-    return owner.runtime.createOrReuse(opts, reusableSessionIds)
+    return this.base.createOrReuse(opts, reusableSessionIds)
   }
 
   /** Route a mux frame to the base runtime.
@@ -247,7 +293,15 @@ export class SessionRuntimePool implements ISessions {
     this.base.handleHostEnvelope(envelope)
   }
   /** Mark the base runtime connection as ready. */
-  handleConnected(): void { this.base.handleConnected() }
+  handleConnected(): void {
+    this.base.handleConnected()
+    void this.baseConnection.api.workspace.list({}).then(({ result }) => {
+      if (result.ok) {
+        this.archivedByTarget.set('personal', new Set(result.value.archivedSessionIds))
+        this.rebuild()
+      }
+    })
+  }
   /** Mark the base runtime connection as unavailable. */
   handleDisconnected(): void { this.base.handleDisconnected() }
 
@@ -256,7 +310,7 @@ export class SessionRuntimePool implements ISessions {
   }
 
   setBaseRuntimeTarget(target: SessionRuntimeTarget): void {
-    const baseEntry = this.entries.get('personal') ?? [...this.entries.values()].find(entry => entry.runtime === this.base)
+    const baseEntry = [...this.entries.values()].find(entry => entry.runtime === this.base)
     if (baseEntry === undefined || targetKey(baseEntry.target) === targetKey(target)) return
     this.entries.delete(baseEntry.key)
     baseEntry.target = target
@@ -300,28 +354,49 @@ export class SessionRuntimePool implements ISessions {
 
   private releaseUnused(ids: readonly SessionId[]): void {
     const retained = new Set(ids)
-    if (ids.length === 0 && this.activeSession !== undefined) retained.add(this.activeSession)
+    // An active pane is retained only while it is explicitly staged. When
+    // the workbench closes or the page changes scope, releasing every
+    // non-base target prevents its sessions from leaking into the ordinary
+    // current-space navigation list.
     for (const entry of [...this.entries.values()]) {
       if (entry.runtime === this.base || [...retained].some(id => this.sessionOwners.get(id) === entry)) continue
-      entry.stop?.()
-      entry.rejectReady?.(new Error('target runtime was released before it became ready'))
-      this.entries.delete(entry.key)
-      for (const [id, owner] of this.sessionOwners) if (owner === entry) this.sessionOwners.delete(id)
-      void entry.fiber?.dispose()
+      this.releaseEntry(entry)
     }
     this.rebuild()
   }
 
+  private releaseEntry(entry: RuntimeEntry): void {
+    if (entry.runtime === this.base || this.entries.get(entry.key) !== entry) return
+    this.entries.delete(entry.key)
+    this.archivedByTarget.delete(entry.key)
+    entry.stop?.()
+    entry.stopSubscriptions?.()
+    entry.rejectReady?.(new Error('target runtime was released before it became ready'))
+    for (const disposers of this.providers.values()) {
+      disposers.get(entry)?.()
+      disposers.delete(entry)
+    }
+    for (const [id, owner] of this.sessionOwners) if (owner === entry) this.sessionOwners.delete(id)
+    void entry.fiber?.dispose().catch((error: unknown) => {
+      console.error('[web-runtime] target runtime disposal failed:', error)
+    })
+  }
+
   provide(descriptor: SessionProvideDescriptor): () => void {
-    this.providers.push(descriptor)
-    const disposers = [...this.entries.values()].map(entry => entry.runtime.provide(descriptor))
+    const disposers = new Map<RuntimeEntry, () => void>()
+    try {
+      for (const entry of this.entries.values()) disposers.set(entry, entry.runtime.provide(descriptor))
+    } catch (error) {
+      for (const disposer of disposers.values()) disposer()
+      throw error
+    }
+    this.providers.set(descriptor, disposers)
     let disposed = false
     const dispose = (): void => {
       if (disposed) return
       disposed = true
-      for (const disposer of disposers) disposer()
-      const index = this.providers.indexOf(descriptor)
-      if (index >= 0) this.providers.splice(index, 1)
+      for (const disposer of disposers.values()) disposer()
+      this.providers.delete(descriptor)
     }
     return dispose
   }
@@ -342,7 +417,7 @@ export class SessionRuntimePool implements ISessions {
   provideInfoFor(id: SessionId): SessionProvideInfo | undefined { return this.sessionOwners.get(id)?.runtime.provideInfoFor(id) }
   subagentAddress(id: SessionId): SubagentAddress | undefined { return this.sessionOwners.get(id)?.runtime.subagentAddress(id) }
   openSubagent(address: SubagentAddress): void {
-    const owner = this.sessionOwners.get(address.childSessionId)
+    const owner = this.sessionOwners.get(address.childSessionId) ?? this.sessionOwners.get(address.parentSessionId)
     if (owner === undefined) throw new Error(`sessions.selectSubagent: unknown session ${address.childSessionId}`)
     owner.runtime.openSubagent(address)
     this.activeSession = address.childSessionId
@@ -368,24 +443,11 @@ export class SessionRuntimePool implements ISessions {
    */
   noteAgentPreset(id: SessionId, preset: string): void { this.sessionOwners.get(id)?.runtime.noteAgentPreset(id, preset) }
   search(query: string, signal: AbortSignal): Promise<RpcResult<{ items: SessionSearchResultItem[]; hasMore: boolean }>> {
-    const owner = this.activeOwner()
-    if (owner === undefined) return Promise.reject(new Error('No runtime selected'))
-    return owner.runtime.search(query, signal)
+    return this.base.search(query, signal)
   }
   fork(opts: { sessionId: SessionId; atSeq?: number; increaseTitle?: boolean }): Promise<SessionId> {
     const owner = this.sessionOwners.get(opts.sessionId)
     if (owner === undefined) return Promise.reject(new Error(`unknown session ${opts.sessionId}`))
     return owner.runtime.fork(opts)
-  }
-  /** Whether this runtime face is backed by multiple target runtimes. */
-  get isPooled(): true { return true }
-
-  /** Subscribe to changes in the currently selected runtime's provide state.
-   * @param listener - callback invoked after a change.
-   * @returns disposer for the listener.
-   */
-  subscribeCurrentProvide(listener: () => void): () => void {
-    this.provideListeners.add(listener)
-    return () => { this.provideListeners.delete(listener) }
   }
 }

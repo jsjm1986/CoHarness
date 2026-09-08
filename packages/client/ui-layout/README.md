@@ -8,6 +8,8 @@ The compact topbar displays the current non-blank Session title and frames below
 
 The `/client` exports are the plugin body (`apply`/`inject`), `LayoutController`, and the owner-share interfaces, including `MobileHeaderActionOwnerProps`. AppFrame, the panel store, and the concession solver remain package-internal.
 
+The `conversation` slot is root-scoped so changing the current Session does not remount a multi-pane viewport. `layout.openDetails(sessionId?)` optionally pins the sole details panel to the triggering Session; omission retains current-session navigation behavior. Closing a matching workbench pane releases its pinned details.
+
 ## Model Experience
 
 None, as the layout shell manages browser viewing state; nothing here reaches a model request.

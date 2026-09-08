@@ -405,7 +405,7 @@
   flex: none;
   min-height: 28px;
   padding: 0 8px;
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: 8px;
   background: var(--dsw-alias-bg-layer-2);
   color: var(--dsw-alias-label-secondary);
@@ -1806,7 +1806,7 @@
  */
 
 .dialog {
-  border: 1px solid color-mix(in srgb, var(--dsw-alias-border-l2) 82%, transparent);
+  border: none;
   border-radius: 18px;
   background: var(--dsw-alias-bg-layer-2);
   box-shadow: var(--dsw-elevation-prominent);
@@ -1862,7 +1862,7 @@
 .panel {
   gap: 12px;
   padding: 18px 20px 20px;
-  border: 1px solid color-mix(in srgb, var(--dsw-alias-border-l2) 86%, transparent);
+  border: none;
   border-radius: 14px;
   background: var(--dsw-alias-bg-layer-1);
   box-shadow: var(--dsw-elevation-panel);
@@ -1917,7 +1917,7 @@
 .caption {
   min-height: 30px;
   padding: 8px 4px;
-  border-top: 1px solid color-mix(in srgb, var(--dsw-alias-border-l2) 66%, transparent);
+  border-top: 0.5px solid color-mix(in srgb, var(--dsw-alias-border-l2) 66%, transparent);
   border-bottom-color: color-mix(in srgb, var(--dsw-alias-border-l2) 84%, transparent);
 }
 
@@ -1966,7 +1966,7 @@
   min-height: 60px;
   padding: 10px 12px;
   border-top: 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--dsw-alias-border-l2) 74%, transparent);
+  border-bottom: 0.5px solid color-mix(in srgb, var(--dsw-alias-border-l2) 74%, transparent);
   border-radius: 8px;
 }
 
@@ -2123,7 +2123,7 @@
   .overviewRow {
     min-height: 52px;
     padding: 6px 10px;
-    border: 1px solid color-mix(in srgb, var(--dsw-alias-border-l2) 82%, transparent);
+    border: 0.5px solid color-mix(in srgb, var(--dsw-alias-border-l2) 82%, transparent);
     border-radius: 10px;
     background: var(--dsw-alias-bg-layer-2);
   }
@@ -2272,7 +2272,7 @@
 
   .overviewRow {
     border: 0;
-    border-bottom: 1px solid var(--dsw-alias-border-l2);
+    border-bottom: 0.5px solid var(--dsw-alias-border-l2);
     background: transparent;
   }
 

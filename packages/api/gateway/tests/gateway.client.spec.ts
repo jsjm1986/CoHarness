@@ -190,6 +190,30 @@ async function benchFiber(
 }
 
 describe('Client Typert API', () => {
+  it('routes agent-addressed Remote calls through the session target transport', async () => {
+    const call = vi.fn<ConnectionHandle['rpc']['call']>()
+      .mockResolvedValue({ ok: true, value: { ref: 'target-goal' } })
+    const fallback = vi.fn<ConnectionHandle['rpc']['call']>()
+    const forSession = vi.fn(() => ({ rpc: { call } } as unknown as ConnectionHandle))
+    const ctx = new Context()
+    await ctx.plugin(TypertRegistry)
+    ctx.provide('connection', { rpc: { call: fallback }, forSession } as unknown as ConnectionHandle)
+    await ctx.plugin({ inject, apply })
+    const base = directDescriptor()
+    const descriptor: InvocationDescriptor = {
+      ...base,
+      scope: { context: 'agent', wire: 'agentId' },
+      parameters: base.parameters.map(parameter => parameter.source === 'lookup'
+        ? { ...parameter, lookup: 'agent' }
+        : parameter),
+    }
+    await ctx.remote.$mount({ package: '@fixture/probe', descriptors: [descriptor] })
+    await expect(ctx.remote.probe.create('project-session', { objective: 'ship' }))
+      .resolves.toEqual({ ok: true, value: { ref: 'target-goal' } })
+    expect(forSession).toHaveBeenCalledWith('project-session')
+    expect(fallback).not.toHaveBeenCalled()
+  })
+
   it('mounts concrete direct methods, validates both boundaries, and withdraws retained handles', async () => {
     const call = vi.fn<ConnectionHandle['rpc']['call']>()
       .mockResolvedValue({ ok: true, value: { ref: 'goal-1' } })

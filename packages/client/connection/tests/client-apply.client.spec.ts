@@ -194,6 +194,34 @@ describe('connection client apply', () => {
     expect(seen.some(u => u.includes('/api/respond'))).toBe(true)
   })
 
+  it('creates a target transport that carries the selected project on HTTP and WebSocket requests', async () => {
+    ;(globalThis as Win).location = {
+      hostname: 'harness.example', search: '', origin: 'https://harness.example',
+    }
+    ;(globalThis as WebSocketGlobal).WebSocket = FakeWebSocket as unknown as typeof WebSocket
+    const handle = await mount()
+    const target = handle.forTarget?.({ kind: 'project', projectId: 42 })
+    expect(target).toBeDefined()
+    const seen: string[] = []
+    const original = globalThis.fetch
+    globalThis.fetch = (input: URL | RequestInfo) => {
+      seen.push(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url)
+      return Promise.resolve(new Response('{}', { status: 200 }))
+    }
+    try {
+      await target!.api.host.describe({}).catch(() => undefined)
+      const abort = new AbortController()
+      const iterator = target!.api.events.mux({}, abort.signal)[Symbol.asyncIterator]()
+      const pending = iterator.next()
+      await vi.waitFor(() => { expect(sockets.at(-1)?.url).toContain('dshTarget=project%3A42') })
+      abort.abort()
+      await pending
+    } finally {
+      globalThis.fetch = original
+    }
+    expect(seen[0]).toContain('dshTarget=project%3A42')
+  })
+
   it('opens one WebSocket per downlink, parses frames, and aborts both without using fetch', async () => {
     ;(globalThis as Win).location = {
       hostname: 'localhost', search: '', origin: 'http://localhost:3080',

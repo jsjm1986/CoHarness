@@ -53,7 +53,7 @@ describe('ui-layout client apply', () => {
     expect(slots.entries('root')).toHaveLength(1)
     // …and declared the shell children in the ledger.
     expect(slots.spec('sidebar')).toEqual({ kind: 'single', scope: 'root' })
-    expect(slots.spec('conversation')).toEqual({ kind: 'single', scope: 'session-maybe' })
+    expect(slots.spec('conversation')).toEqual({ kind: 'single', scope: 'root' })
     expect(slots.spec('details')).toEqual({ kind: 'single', scope: 'session' })
     expect(slots.spec('shell.mobile.header.actions')).toEqual({ kind: 'list', scope: 'session' })
   })

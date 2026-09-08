@@ -337,8 +337,8 @@ describe('SystemPrompt', () => {
 
     const passed: AssembleContext = {}
     const assembly = await ctx.systemPrompt.assemble(passed)
-    expect(seen).toEqual([['harness:identity', 'deployment:persona-prefix', 'base', 'deployment:persona-suffix', 'from-a']])
-    expect(assembly.sections.map(s => s.name)).toEqual(['harness:identity', 'deployment:persona-prefix', 'base', 'deployment:persona-suffix', 'from-a'])
+    expect(seen).toEqual([['harness:identity', 'base', 'deployment:persona-prefix', 'deployment:persona-suffix', 'from-a']])
+    expect(assembly.sections.map(s => s.name)).toEqual(['harness:identity', 'base', 'deployment:persona-prefix', 'deployment:persona-suffix', 'from-a'])
     expect(contexts[0]).toBe(passed) // the caller's context reaches listeners
   })
 
@@ -398,7 +398,7 @@ describe('SystemPrompt', () => {
     firstParameters.properties['leak'] = { type: 'string' }
 
     const second = await ctx.systemPrompt.assemble()
-    expect(second.sections.map(section => section.name)).toEqual(['harness:identity', 'deployment:persona-prefix', 'base', 'deployment:persona-suffix'])
+    expect(second.sections.map(section => section.name)).toEqual(['harness:identity', 'base', 'deployment:persona-prefix', 'deployment:persona-suffix'])
     expect(second.sections[0]!.text).toBe(IDENTITY)
     expect(second.contexts).toEqual([])
     expect(second.tools).toEqual([{ name: 't', description: 'tool', parameters: { type: 'object', properties: {} } }])

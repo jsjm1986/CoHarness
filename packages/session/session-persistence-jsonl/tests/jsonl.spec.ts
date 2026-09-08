@@ -446,6 +446,84 @@ describe('JsonlSessionPersistence: durability and crash semantics', () => {
     await expect(ctx.sessionPersistence.readRaw(m.id)).rejects.toThrow(/corrupt session log/)
   })
 
+  it('loads multibyte records across byte windows and retries a changed revision', async () => {
+    const m = meta('windowed-prefix', '/work')
+    const events = oneTurnLog().map(event => event.type === 'user/message'
+      ? { ...event, data: createUserMessage({ content: [{ type: 'text', text: '文件🙂'.repeat(30_000) }], source: { kind: 'user' } }) }
+      : event)
+    await ctx.sessionPersistence.create(m)
+    await ctx.sessionPersistence.append(m.id, events)
+    statRace.path = rawLogPath(root, '/work', m.id)
+    const stored = await (ctx.sessionPersistence as JsonlSessionPersistence).loadStored(m.id)
+    expect(stored?.events).toEqual(events)
+    expect(statRace.reads).toBeGreaterThanOrEqual(4)
+  })
+
+  it.each(['none', 'zstd'] as const)('writes bounded successor batches in %s and preserves the source bytes', async (compression) => {
+    const localRoot = await freshRoot()
+    const localCtx = new Context()
+    await localCtx.plugin(SessionStore)
+    await localCtx.plugin(JsonlSessionPersistence, { root: localRoot, compression, migrationBatchMaxBytes: 1 })
+    try {
+      const persistence = localCtx.sessionPersistence as JsonlSessionPersistence
+      const m = meta(`batched-${compression}`, '/work')
+      await persistence.create(m)
+      await persistence.append(m.id, oneTurnLog())
+      const sourcePath = logPath(localRoot, '/work', m.id, compression)
+      const sourceBytes = await readFile(sourcePath)
+      const stored = await persistence.loadStored(m.id)
+      if (stored === undefined) throw new Error('missing source')
+      await persistence.migrateStored(stored, { ...stored, meta: { ...stored.meta, version: 2 } }, stored.events, stored.revision)
+      expect(await readFile(sourcePath)).toEqual(sourceBytes)
+      const successor = await persistence.loadStored(m.id)
+      expect(successor?.meta.version).toBe(2)
+      expect(successor?.events).toEqual(oneTurnLog())
+    } finally {
+      await localCtx.fiber.dispose()
+    }
+  })
+
+  it('removes an unpublished migration temporary file when cancellation reaches its writer', async () => {
+    const m = meta('migration-cancel', '/work')
+    await ctx.sessionPersistence.create(m)
+    await ctx.sessionPersistence.append(m.id, oneTurnLog())
+    const persistence = ctx.sessionPersistence as JsonlSessionPersistence
+    const stored = await persistence.loadStored(m.id)
+    if (stored === undefined) throw new Error('missing source')
+    const abort = new AbortController()
+    const revision = persistence.readStoredRevision.bind(persistence)
+    vi.spyOn(persistence, 'readStoredRevision').mockImplementation(async (id) => {
+      const value = await revision(id)
+      abort.abort(new Error('cancel migration'))
+      return value
+    })
+    await expect(persistence.migrateStored(
+      stored, { ...stored, meta: { ...stored.meta, version: 2 } }, stored.events, stored.revision, abort.signal,
+    ))
+      .rejects.toThrow('cancel migration')
+    expect(await readdir(sessionDir(root, '/work', m.id))).toEqual(['session.jsonl'])
+    expect((await persistence.loadStored(m.id))?.events).toEqual(oneTurnLog())
+  })
+
+  it('refuses a successor when its source changes before publication and removes the temporary file', async () => {
+    const m = meta('migration-publication-race', '/work')
+    await ctx.sessionPersistence.create(m)
+    await ctx.sessionPersistence.append(m.id, oneTurnLog())
+    const persistence = ctx.sessionPersistence as JsonlSessionPersistence
+    const stored = await persistence.loadStored(m.id)
+    if (stored === undefined) throw new Error('missing source')
+    const revision = persistence.readStoredRevision.bind(persistence)
+    let reads = 0
+    vi.spyOn(persistence, 'readStoredRevision').mockImplementation(async (id) => {
+      if (++reads === 2) await appendFile(rawLogPath(root, '/work', m.id), 'incomplete')
+      return revision(id)
+    })
+    await expect(persistence.migrateStored(stored, { ...stored, meta: { ...stored.meta, version: 2 } }, stored.events, stored.revision))
+      .rejects.toThrow('changed while its format migration was preparing')
+    expect(await readdir(sessionDir(root, '/work', m.id))).toEqual(['session.jsonl'])
+    expect((await readFile(rawLogPath(root, '/work', m.id), 'utf8')).endsWith('incomplete')).toBe(true)
+  })
+
   it('readRaw retries when the file revision changes during the read', async () => {
     const m = meta('raw-revision-race', '/work')
     await ctx.sessionPersistence.create(m)

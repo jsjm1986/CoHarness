@@ -4,7 +4,7 @@
   "local": {
     "repository": "https://github.com/jsjm1986/CoHarness.git",
     "sourceBaseline": "d5274caced + 380c4d597b",
-    "workingBranch": "codex/upstream-alignment-audit",
+    "workingBranch": "codex/ui-workbench",
     "version": "0.1.3-alpha.2.coharness.1",
     "treeFiles": 9191,
     "packageCount": 251
@@ -33,23 +33,28 @@
     {
       "id": "session-format-v2",
       "area": "core/session, session-format, persistence providers",
-      "status": "adaptation-required",
       "priority": "P0",
       "evidence": [
         "SESSION_FORMAT_VERSION=2",
         "adjacent v0/v1->v2 catalog",
-        "JSONL/SQLite/Gateway migrateStored paths"
+        "JSONL/SQLite/Gateway migrateStored paths",
+        "incremental stages preserve intermediate artifact validation and forward flush order",
+        "plaintext body scanning uses bounded byte windows",
+        "exclusive backend events are adopted without a redundant copy",
+        "migrationBatchMaxBytes defaults to 2 MiB; successors stream encoded batches",
+        "source revision is rechecked before no-overwrite publication; cancellation removes unpublished temporary files"
       ],
-      "verification": "focused Session/format/JSONL/SQLite tests pass; build, persistence catalog, and keyless snapshots pass",
+      "verification": "175 JSONL tests pass; 645 persistence/JSONL tests pass before final added cases; measured 100 MiB migration peak RSS reduces from 743408 KiB to 421968 KiB",
       "next": [
-        "implement bounded/internal streaming migration without changing SessionEvent wire",
-        "verify immutable successor, source preservation, rollback, and RSS"
-      ]
+        "compressed reads and logical preparation still materialize arrays under configured size limits; full provider row streaming remains incomplete",
+        "production migration/rollback and Windows publication need deployment evidence"
+      ],
+      "historicalAuditStatus": "adaptation-required",
+      "status": "adapt"
     },
     {
       "id": "session-handle-single-writer",
       "area": "session-persistence, agent-loop",
-      "status": "implemented-verified-locally",
       "priority": "P0",
       "evidence": [
         "resume acquires write handle before read/repair",
@@ -59,12 +64,13 @@
       "verification": "AgentLoop resume/config tests, JSONL lock tests, typecheck, build, and hygiene pass",
       "next": [
         "run two-process lock and process-restart evidence on supported platforms"
-      ]
+      ],
+      "historicalAuditStatus": "implemented-verified-locally",
+      "status": "retain"
     },
     {
       "id": "agent-loop-lifecycle",
       "area": "core/agent-loop",
-      "status": "adapted-verified-locally",
       "priority": "P0",
       "evidence": [
         "async create/resume",
@@ -76,12 +82,13 @@
       "next": [
         "compare upstream request/turn/step and cancellation paths",
         "run external platform evidence"
-      ]
+      ],
+      "historicalAuditStatus": "adapted-verified-locally",
+      "status": "adapt"
     },
     {
       "id": "llm-stream-and-discovery",
       "area": "llm, DeepSeek adapter, model settings",
-      "status": "verified-locally",
       "priority": "P0",
       "evidence": [
         "local and upstream LLM runtime implementations differ materially"
@@ -89,12 +96,13 @@
       "next": [
         "run real API provider matrix with configured credentials"
       ],
-      "verification": "52 LLM test files and 1176 tests pass; assembled keyless snapshots pass"
+      "verification": "52 LLM test files and 1176 tests pass; assembled keyless snapshots pass",
+      "historicalAuditStatus": "verified-locally",
+      "status": "equivalent"
     },
     {
       "id": "subagent-steer",
       "area": "subagent, experimental agent-team, tool-subagent-control",
-      "status": "adapted-verified-locally",
       "priority": "P1",
       "evidence": [
         "send_message and continuable subagent exist in CoHarness",
@@ -104,12 +112,13 @@
       "next": [
         "run process-restart and external provider evidence"
       ],
-      "verification": "28 Subagent files/657 tests plus continuation and tool-control regressions pass; keyless snapshots pass"
+      "verification": "28 Subagent files/657 tests plus continuation and tool-control regressions pass; keyless snapshots pass",
+      "historicalAuditStatus": "adapted-verified-locally",
+      "status": "adapt"
     },
     {
       "id": "attachments-files-and-fs-policy",
       "area": "attachment, userdoc, file-reference, fs observation, web tools",
-      "status": "adapted-verified-locally",
       "priority": "P1",
       "evidence": [
         "userdoc supports arbitrary MIME and resumable upload",
@@ -118,12 +127,13 @@
       "next": [
         "run browser visual/e2e and upload cancel/resume matrix"
       ],
-      "verification": "Attachment/API/Web/client selected suites pass; keyless headless and ACP snapshots pass"
+      "verification": "Attachment/API/Web/client selected suites pass; keyless headless and ACP snapshots pass",
+      "historicalAuditStatus": "adapted-verified-locally",
+      "status": "retain"
     },
     {
       "id": "outbound-proxy",
       "area": "util/http-proxy, SDK, adapters, subprocess paths",
-      "status": "implemented-verified-locally",
       "priority": "P1",
       "evidence": [
         "CoHarness http-proxy package and policy are present"
@@ -131,12 +141,13 @@
       "next": [
         "enumerate production outbound routes and test HTTP_PROXY/HTTPS_PROXY/ALL_PROXY/NO_PROXY corpus"
       ],
-      "verification": "Web and LLM suites pass; browser/headless snapshots pass with proxy variables unset"
+      "verification": "Web and LLM suites pass; browser/headless snapshots pass with proxy variables unset",
+      "historicalAuditStatus": "implemented-verified-locally",
+      "status": "retain"
     },
     {
       "id": "api-sdk-acp-wire",
       "area": "api, gateway, remotes, sdk, acp",
-      "status": "equivalent-with-local-owner",
       "priority": "P1",
       "evidence": [
         "upstream adds session/workspace/settings controllers and stream protocol",
@@ -145,12 +156,13 @@
       "next": [
         "verify existing ApiProxy/Gateway ACL and runtime generation; do not import controller split"
       ],
-      "verification": "27 API/Attachment files/335 tests, ACP demo/e2e capability checks, and keyless ACP/JSONRPC snapshots pass"
+      "verification": "27 API/Attachment files/335 tests, ACP demo/e2e capability checks, and keyless ACP/JSONRPC snapshots pass",
+      "historicalAuditStatus": "equivalent-with-local-owner",
+      "status": "equivalent"
     },
     {
       "id": "web-ui-architecture",
       "area": "client runtime, ui-conversation, ui-chat, session/workspace controllers",
-      "status": "protected-replacement-verified-locally",
       "priority": "P1",
       "evidence": [
         "local ui-conversation/client-runtime and upstream ui-chat/controller packages are different owners"
@@ -158,12 +170,13 @@
       "next": [
         "run browser visual/e2e and mobile flows"
       ],
-      "verification": "72 selected client files/915 tests, 31 Web preset e2e tests, and keyless browser/headless snapshots pass"
+      "verification": "72 selected client files/915 tests, 31 Web preset e2e tests, and keyless browser/headless snapshots pass",
+      "historicalAuditStatus": "protected-replacement-verified-locally",
+      "status": "retain"
     },
     {
       "id": "coharness-business-layer",
       "area": "gateway, collaboration, model governance, userdoc, Android, native, deployment",
-      "status": "protected-verified-locally",
       "priority": "P1",
       "evidence": [
         "local-only packages and gateway are product-owned"
@@ -171,12 +184,13 @@
       "next": [
         "run deployed ACL/quota/audit and document-scope regression matrix"
       ],
-      "verification": "Gateway unit suite 37 files/307 tests plus selected API/client/subagent suites pass; Gateway snapshot passes after Node ABI rebuild"
+      "verification": "Gateway unit suite 37 files/307 tests plus selected API/client/subagent suites pass; Gateway snapshot passes after Node ABI rebuild",
+      "historicalAuditStatus": "protected-verified-locally",
+      "status": "retain"
     },
     {
       "id": "redundancy-and-compatibility",
       "area": "deprecated APIs, dual backends, wrappers, old formats, duplicate UI/transport",
-      "status": "audited-retain-or-defer",
       "priority": "P2",
       "evidence": [
         "24 local-only packages are product, gateway, persistence, document, client-runtime, or test/demo owners",
@@ -187,12 +201,13 @@
         "remove only surfaces proven unreferenced after product owner review",
         "complete migration and deployment canary before retiring dual providers"
       ],
-      "verification": "knip, runtime closure, package dependency graph, rg call-site audit, and Web preset environment isolation pass"
+      "verification": "knip, runtime closure, package dependency graph, rg call-site audit, and Web preset environment isolation pass",
+      "historicalAuditStatus": "audited-retain-or-defer",
+      "status": "defer"
     },
     {
       "id": "docs-and-generated-contracts",
       "area": "AGENTS, READMEs, persistence catalog, upgrade records",
-      "status": "verified-locally",
       "priority": "P1",
       "evidence": [
         "v0/v2 contradictions corrected in this branch",
@@ -201,12 +216,13 @@
       "next": [
         "review generated docs in release PR"
       ],
-      "verification": "doc-sync 28/28 gates, translation pairing, type equivalence, persistence and Cordis catalogs pass"
+      "verification": "doc-sync 28/28 gates, translation pairing, type equivalence, persistence and Cordis catalogs pass",
+      "historicalAuditStatus": "verified-locally",
+      "status": "adapt"
     },
     {
       "id": "platform-and-release",
       "area": "Windows native, macOS x64 Python runtime, artifacts, performance",
-      "status": "partially-verified-local-platform",
       "priority": "P1",
       "evidence": [
         "Node 25 arm64 build/typecheck/hygiene/doc-sync pass",
@@ -218,12 +234,13 @@
         "run Windows/native and macOS x64 lanes",
         "run real API and production canary evidence",
         "run long-history benchmark"
-      ]
+      ],
+      "historicalAuditStatus": "partially-verified-local-platform",
+      "status": "adapt"
     },
     {
       "id": "workspace-files-remote-preview",
       "area": "workspace-files/resources/readByteRange/sidebar file preview",
-      "status": "deferred-new-product-capability",
       "priority": "P1",
       "evidence": [
         "Documents plugin already owns uploaded-document preview and cross-scope transfer",
@@ -233,51 +250,63 @@
       "verification": "not mounted; prototype removed from release graph",
       "next": [
         "only reopen under a separate product decision with runtimeTarget+Session binding, opaque wire paths, ACL and bounded queues"
-      ]
+      ],
+      "historicalAuditStatus": "deferred-new-product-capability",
+      "status": "defer"
     },
     {
       "id": "cordis-plugin-consistency",
       "area": "all adapted packages and bundle composition",
-      "status": "required-gate",
       "priority": "P0",
       "evidence": [
         "Service Definition/Provider/Consumer role separation",
         "ctx.inject/ctx.effect/ctx.on lifecycle ownership",
-        "real Loader composition and disposer tests"
+        "real Loader composition and disposer tests",
+        "upstream alpha.2-to-c389f96 vendor tree has no changes",
+        "140 Loader config files pass source-resolution checks",
+        "254 invariant companions and 52 client packages pass hygiene checks"
       ],
       "verification": "run plugin surface, dependency, invariant, client package and doc gates",
       "next": [
         "reject hidden globals, missing disposers, wrong default-export form, stale dsh.client.inject and cross-face imports"
-      ]
+      ],
+      "historicalAuditStatus": "required-gate",
+      "status": "required"
     },
     {
       "id": "assistant-stream-performance",
       "area": "llm/session-stats/token-meter/subagent output",
-      "status": "profile-before-adapt",
       "priority": "P1",
       "evidence": [
         "CoHarness logical assistant/chunk differs from upstream compact assistant/message",
-        "existing history wire packs chunk rows"
+        "existing history wire packs chunk rows",
+        "100200-event final-output benchmark: forward fold 129.29 ms versus tail lookup 0.0375 ms across 100 runs",
+        "400-message deepFreeze baseline averages 0.161 ms per request; WeakSet reuse is not enabled"
       ],
       "verification": "benchmark current expansion and RSS first",
       "next": [
-        "add record-level accessor only if profiling proves material cost"
-      ]
+        "retain logical assistant/chunk and existing packing; no upstream compact-record accessor without an end-to-end profile proving need"
+      ],
+      "historicalAuditStatus": "profile-before-adapt",
+      "status": "adapt"
     },
     {
       "id": "inbox-cold-queue",
       "area": "core/agent, agent-loop, host/apiproxy, client/runtime",
-      "status": "adaptation-candidate",
       "priority": "P1",
       "evidence": [
-        "live Agent inbox replay exists",
-        "no independent inbox projection in current tree",
-        "queue baseline is live-agent based"
+        "ApiProxy-owned Cordis inbox projection ignores inherited input and preserves live Agent.inbox mutation ownership",
+        "cold tails use existing projection cache coldSnapshot; complete unseeded prefixes fold directly",
+        "Session list omits inbox bodies",
+        "Client Session owns projection subscription and disposer"
       ],
-      "verification": "restart/cold history/pending queue and claim/reconnect race tests",
+      "verification": "1316 Agent/AgentLoop/ApiProxy/Client runtime regressions pass; Loader+HTTP cold inbox snapshot passes for short history; long-history variant under verification",
       "next": [
-        "projection only for read baseline; preserve maxMessages/maxBytes and live-only mutation"
-      ]
+        "verify long cold-tail cache reconstruction and browser replay",
+        "measure duplicate live queue/projection delivery before removing either compatible carrier"
+      ],
+      "historicalAuditStatus": "adaptation-candidate",
+      "status": "adapt"
     }
   ],
   "verification": {
@@ -320,7 +349,17 @@
       "production canary",
       "history performance benchmark",
       "full snapshot run is flaky under concurrent process load; focused keyless snapshots pass"
-    ]
+    ],
+    "latestExecution": {
+      "date": "2026-09-08",
+      "gatewayPostgres": "327 tests in 39 files pass against isolated PostgreSQL 17.6 container; container removed",
+      "docSync": "28/28 pass",
+      "hygiene": "pass after adding Workbench source mapping",
+      "build": "pass",
+      "typecheck": "pass after registering Web snapshot in Host compiler face",
+      "fullCoverage": "not passed; complete run in progress and earlier runs exposed native HMR timing and fixture-format failures",
+      "versionBumped": false
+    }
   },
   "scopeInventory": {
     "localOnlyPackages": [

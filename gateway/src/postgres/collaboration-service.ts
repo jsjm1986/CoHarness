@@ -254,6 +254,69 @@ export class PostgresCollaborationService {
     }))
   }
 
+  /** Return every root conversation this account may read across personal and project runtimes. */
+  async listAccountConversations(userId: number): Promise<import('../collaboration.ts').AccountConversationView[]> {
+    const result = await this.context.pool.query<{
+      session_id: string
+      project_public_id: string | null
+      project_name: string | null
+      title: string | null
+      cwd: string | null
+      visibility: 'personal' | 'project' | 'private'
+      creator_public_id: string
+      creator_display_name: string
+      updated_at_ms: string
+      has_visible_content: boolean
+      visible_content_seq: string | null
+      last_prompt_at_ms: string | null
+      can_write: boolean
+    }>(`SELECT r.id session_id,p.public_id::text project_public_id,p.name::text project_name,
+      COALESCE(r.title, (SELECT left(search.content, 80) FROM harness.conversation_search search
+        WHERE search.session_id=r.id AND search.role='user' ORDER BY search.occurred_at DESC LIMIT 1)) title,
+      r.cwd,r.visibility,creator.public_id::text creator_public_id,
+      creator.display_name creator_display_name,
+      (extract(epoch FROM r.updated_at)*1000)::bigint::text updated_at_ms,
+      r.has_visible_content,r.visible_content_seq::text,
+      (extract(epoch FROM r.last_prompt_at)*1000)::bigint::text last_prompt_at_ms,
+      CASE WHEN p.id IS NULL THEN true
+        WHEN membership.role='admin' THEN true
+        ELSE member.access_mode='rw' END can_write
+      FROM harness.conversation_sessions r
+      JOIN harness.users creator ON creator.id=r.creator_user_id AND creator.organization_id=r.organization_id
+      JOIN harness.users actor ON actor.organization_id=r.organization_id
+        AND actor.public_id=$2 AND actor.status='active'
+      LEFT JOIN harness.memberships membership ON membership.organization_id=actor.organization_id
+        AND membership.user_id=actor.id AND membership.status='active'
+      LEFT JOIN harness.projects p ON p.id=r.project_id AND p.organization_id=r.organization_id
+        AND p.status='active'
+      LEFT JOIN harness.project_members member ON member.organization_id=r.organization_id
+        AND member.project_id=r.project_id AND member.user_id=actor.id
+      WHERE r.organization_id=$1 AND r.id=r.root_session_id AND r.status<>'deleted'
+        AND NOT EXISTS (SELECT 1 FROM harness.conversation_archive_records archive
+          WHERE archive.organization_id=r.organization_id AND archive.root_session_id=r.id
+            AND (archive.state IN ('trash','purged') OR archive.restored_at IS NULL))
+        AND ((r.project_id IS NULL AND r.creator_user_id=actor.id)
+          OR (p.id IS NOT NULL AND (membership.role='admin' OR member.user_id IS NOT NULL)
+            AND (membership.role='admin' OR r.visibility='project' OR r.creator_user_id=actor.id)))
+      ORDER BY r.updated_at DESC,r.id`, [this.context.organizationId, userId])
+    return result.rows.map(row => ({
+      sessionId: row.session_id,
+      runtime: row.project_public_id === null
+        ? { kind: 'personal' as const }
+        : { kind: 'project' as const, projectId: publicNumber(row.project_public_id, 'project'), projectName: row.project_name ?? 'Project' },
+      ...(row.title === null ? {} : { title: row.title }),
+      ...(row.cwd === null ? {} : { cwd: row.cwd }),
+      visibility: row.visibility,
+      creatorUserId: publicNumber(row.creator_public_id, 'user'),
+      creatorDisplayName: row.creator_display_name,
+      updatedAt: Number(row.updated_at_ms),
+      blank: !row.has_visible_content,
+      ...(row.visible_content_seq === null ? {} : { visibleContentSeq: Number(row.visible_content_seq) }),
+      ...(row.last_prompt_at_ms === null ? {} : { lastPromptAt: Number(row.last_prompt_at_ms) }),
+      canWrite: row.can_write,
+    }))
+  }
+
   async readableSessionIds(userId: number, projectId: number, sessionIds: readonly string[]): Promise<string[]> {
     if (sessionIds.length === 0) return []
     const result = await this.context.pool.query<{ session_id: string }>(`SELECT c.id session_id

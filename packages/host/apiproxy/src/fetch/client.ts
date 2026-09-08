@@ -527,6 +527,8 @@ export abstract class AbstractApiClient implements IApiClient {
   constructor(
     protected readonly timeoutMs: number = DEFAULT_TIMEOUT_MS,
     protected readonly maxResponseBytes: number = DEFAULT_UNARY_RESPONSE_MAX_BYTES,
+    /** Optional Gateway runtime target used by multi-workspace clients. */
+    protected readonly target?: { readonly kind: 'personal' } | { readonly kind: 'project'; readonly projectId: number },
   ) {
     if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > MAX_TIMER_DELAY_MS) {
       throw new RangeError(`timeoutMs must be a positive safe integer no greater than ${String(MAX_TIMER_DELAY_MS)}`)
@@ -583,6 +585,17 @@ export abstract class AbstractApiClient implements IApiClient {
     return loc?.origin !== undefined && loc.origin !== 'null' ? loc.origin : INTERNAL_BASE
   }
 
+  /** Resolve one API URL and carry an explicitly selected runtime target. */
+  protected resolveUrl(path: string): URL {
+    const url = new URL(path, this.resolveBase())
+    if (this.target !== undefined) {
+      url.searchParams.set('dshTarget', this.target.kind === 'personal'
+        ? 'personal'
+        : `project:${String(this.target.projectId)}`)
+    }
+    return url
+  }
+
   protected mintRpcId(): RpcId {
     return RpcId(randomUUID())
   }
@@ -603,7 +616,7 @@ export abstract class AbstractApiClient implements IApiClient {
       lease.signal?.throwIfAborted()
       const encodedBody = JSON.stringify(body)
       lease.signal?.throwIfAborted()
-      const response = await this.doFetch(new URL(path, this.resolveBase()), {
+      const response = await this.doFetch(this.resolveUrl(path), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: encodedBody,
@@ -676,7 +689,7 @@ export abstract class AbstractApiClient implements IApiClient {
     frameSchema: z.ZodType<F>,
     onOpen?: () => void,
   ): AsyncGenerator<RpcRequest<F>> {
-    const response = await this.doFetch(new URL(path, this.resolveBase()), { signal })
+    const response = await this.doFetch(this.resolveUrl(path), { signal })
     if (!response.ok || response.body === null) {
       await response.body?.cancel().catch(() => {})
       throw new Error(`transport failure for ${path}: HTTP ${response.status}`)

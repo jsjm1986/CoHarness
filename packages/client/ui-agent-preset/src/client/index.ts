@@ -11,7 +11,7 @@
  * before-the-fact, while the header only reports what a session already runs.
  */
 
-import type { ConnectionHandle } from '@deepseek-ai/dsh-api-remotes/client'
+import type { ConnectionHandle, IApiClient, SessionId } from '@deepseek-ai/dsh-api-remotes/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: pulls the ctx.remote merge and the forwarded-event key face
@@ -102,7 +102,18 @@ export function apply(ctx: ClientContext): void {
   // The new-session chip and the header label: one controller, because the
   // staged choice belongs to the flow rather than to any one session.
   ctx.inject(['slots', 'conversation', 'sessions', 'workspaces'], (scope: ClientContext) => {
-    const api = (scope.get('connection') as ConnectionHandle).api
+    const connection = scope.get('connection') as ConnectionHandle
+    const apiForSession = (id: SessionId | undefined): IApiClient => {
+      const target = id === undefined ? undefined : scope.sessions.runtimeTargetFor?.(id)
+      return target === undefined || connection.forTarget === undefined ? connection.api : connection.forTarget(target).api
+    }
+    const api: Pick<IApiClient, 'agentPresets'> = {
+      agentPresets: {
+        ...connection.api.agentPresets,
+        list: (payload, signal) => apiForSession(scope.sessions.list.getSnapshot().current).agentPresets.list(payload, signal),
+        select: (payload, signal) => apiForSession(payload.sessionId).agentPresets.select(payload, signal),
+      },
+    }
     const seat = new AgentPresetSeatController(api, (): SeatSessionSummary | undefined => {
       const state = scope.sessions.list.getSnapshot()
       const summary = state.current === undefined ? undefined : state.byId[state.current]

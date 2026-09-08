@@ -10,10 +10,12 @@ export interface ConnectionConfig {
   /** Upper bound for the backoff cap in ms. */
   backoffMaxMs?: number
   /** Cap on waiting for both streams' onOpen before onConnected, in ms. The strict handshake
-   *  waits for mux+host stream establishment plus describe; a carrier that never
-   *  fires onOpen (misbehaving proxy) must not wedge the connection forever — on timeout the
-   *  generation proceeds as connected and the live-gap repair path covers stragglers. */
+   *  waits for mux+host stream establishment plus describe. */
   streamOpenTimeoutMs?: number
+  /** Warn before cancelling a generation whose readiness handshake is stalled. */
+  generationReadyWarnMs?: number
+  /** Hard deadline for the readiness handshake. */
+  generationReadyTimeoutMs?: number
 }
 
 const CONNECTION_DEFAULTS: Required<ConnectionConfig> = {
@@ -21,16 +23,24 @@ const CONNECTION_DEFAULTS: Required<ConnectionConfig> = {
   backoffFactor: 2,
   backoffMaxMs: 10_000,
   streamOpenTimeoutMs: 3_000,
+  generationReadyWarnMs: 3_000,
+  generationReadyTimeoutMs: 15_000,
 }
 
 const MAX_TIMER_DELAY_MS = 2_147_483_647
 
-function resolveConnectionConfig(config: ConnectionConfig): Required<ConnectionConfig> {
+/** Resolve effective connection recovery timings.
+ * @param config - requested connection settings.
+ * @returns effective settings with defaults applied.
+ */
+export function resolveConnectionConfig(config: ConnectionConfig): Required<ConnectionConfig> {
   const resolved = { ...CONNECTION_DEFAULTS, ...config }
   for (const [name, value] of [
     ['backoffBaseMs', resolved.backoffBaseMs],
     ['backoffMaxMs', resolved.backoffMaxMs],
     ['streamOpenTimeoutMs', resolved.streamOpenTimeoutMs],
+    ['generationReadyWarnMs', resolved.generationReadyWarnMs],
+    ['generationReadyTimeoutMs', resolved.generationReadyTimeoutMs],
   ] as const) {
     if (!Number.isFinite(value) || value <= 0 || value > MAX_TIMER_DELAY_MS) {
       throw new RangeError(`${name} must be a positive finite delay no greater than ${String(MAX_TIMER_DELAY_MS)}`)
@@ -58,23 +68,34 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
 }
 
 /** Resolve when both streams open, the opening deadline elapses, or the generation aborts. */
-function waitForStreamOpen(
-  streamsOpen: Promise<unknown>,
+function waitForReadiness<T>(
+  ready: Promise<T>,
+  warnMs: number,
   timeoutMs: number,
   signal: AbortSignal,
-): Promise<void> {
-  return new Promise<void>((resolve) => {
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
     let settled = false
-    const finish = (): void => {
+    const finish = (error?: Error, value?: T): void => {
       if (settled) return
       settled = true
+      clearTimeout(warning)
       clearTimeout(timer)
-      signal.removeEventListener('abort', finish)
-      resolve()
+      signal.removeEventListener('abort', aborted)
+      if (error !== undefined) reject(error)
+      else resolve(value as T)
     }
-    const timer = setTimeout(finish, timeoutMs)
-    signal.addEventListener('abort', finish, { once: true })
-    void streamsOpen.then(finish, finish)
+    const warning = setTimeout(() => {
+      console.warn(`[connection] generation is still not ready after ${String(warnMs)}ms`)
+    }, warnMs)
+    const timer = setTimeout(() => {
+      finish(new Error(`connection generation was not ready within ${String(timeoutMs)}ms`))
+    }, timeoutMs)
+    const aborted = (): void => { finish(new Error('connection generation aborted', { cause: signal.reason })) }
+    signal.addEventListener('abort', aborted, { once: true })
+    void ready.then((value) => { finish(undefined, value) }, (error: unknown) => {
+      finish(error instanceof Error ? error : new Error(String(error)))
+    })
   })
 }
 
@@ -235,17 +256,15 @@ export class ConnectionController {
         // (see ConnectionConfig.streamOpenTimeoutMs).
         const handshake = Promise.all([
           this.api.host.describe({}, ac.signal),
-          // Aborting the generation must wake the open-timeout branch too;
-          // otherwise a carrier that ignores AbortSignal delays reconnect for
-          // the full configured timeout after its stream has already failed.
-          waitForStreamOpen(streamsOpen, this.config.streamOpenTimeoutMs, ac.signal),
+          streamsOpen,
         ])
         void handshake.catch(() => {})
         // A third-party unary carrier may ignore AbortSignal. Race the
         // handshake against the generation's failure edge so stop/reconnect
         // cannot leave the controller suspended behind that promise.
         const [description] = await Promise.race([
-          handshake,
+          waitForReadiness(handshake, this.config.generationReadyWarnMs,
+            Math.max(this.config.streamOpenTimeoutMs, this.config.generationReadyTimeoutMs), ac.signal),
           failed.then(() => { throw new Error('connection generation ended during readiness') }),
         ])
         const descriptionResult = description.result

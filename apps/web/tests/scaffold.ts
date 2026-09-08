@@ -170,6 +170,10 @@ export interface WebScaffold {
 
 /** Options for {@link launchWebScaffold}. */
 export interface LaunchOptions {
+  /** Compose the optional multi-session workbench; ordinary scenarios exercise single-session fallback. */
+  workbench?: boolean
+  /** Disable the optional native Open In app rows when the host package is not built in a fixture. */
+  openInApp?: boolean
   /**
    * Optional product overlay applied after the shipped Web surface and before
    * the scaffold's hermetic test patches, matching the launcher's `--patch`
@@ -418,6 +422,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     // workspace, keeping the composition untouched.
     { id: 'agent-instructions', disabled: true },
     { id: 'session-title-llm', disabled: true },
+    { id: 'ui-workbench', disabled: options.workbench !== true },
     // Fixture sessions must never leave the process: the shipped row defaults
     // to the production OTLP endpoint (or whatever DSH_TELEMETRY_OTLP_URL
     // names in the ambient environment). A scenario that pins a real backend
@@ -460,6 +465,8 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     // host: patch `name` is an assertion, not an override, hence the
     // disable+insert pair.
     { id: 'directory-picker', disabled: true },
+    { id: 'open-in-app', disabled: options.openInApp === false },
+    { id: 'ui-open-in-app', disabled: options.openInApp === false },
     { insert: [
       { id: 'directory-picker-browse', name: '@deepseek-ai/dsh-host-directory-picker-browse' },
       { id: 'ui-directory-picker-browse', name: '@deepseek-ai/dsh-client-ui-directory-picker-browse' },

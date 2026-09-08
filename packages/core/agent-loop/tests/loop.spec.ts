@@ -354,7 +354,7 @@ describe('agent loop', () => {
 
     expect(adapter.requests).toHaveLength(0) // the request was never sent
     expect(errors.map(error => error.message)).toEqual([
-      'prompt variable "{{cwd}}" has no value for this assembly (section "deployment:persona")',
+      'prompt variable "{{cwd}}" has no value for this assembly (section "deployment:persona-prefix")',
     ])
     const turnEnd = agent.session.snapshotEvents().find(e => e.type === 'turn/end')
     expect(turnEnd?.type === 'turn/end' && turnEnd.data.reason.kind).toBe('error')

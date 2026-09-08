@@ -13,7 +13,7 @@ import {
 export const UNGROUPED_KEY = ''
 
 /** Display label for the ungrouped bucket row. */
-export const UNGROUPED_LABEL = 'Ungrouped'
+export const UNGROUPED_LABEL = 'Independent sessions'
 
 /** One top-level session row in a group or the flat list. */
 export interface SessionNode {

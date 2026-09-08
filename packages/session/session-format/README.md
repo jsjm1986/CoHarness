@@ -17,6 +17,7 @@ The default catalog in `src/catalog-default.ts` contains the static v0 â†’ v1 â†
 - Older versions migrate through every adjacent step; a missing step is an explicit unsupported-migration error.
 - Inputs are detached and deeply frozen at the JSON boundary.
 - Header classification never writes or repairs storage.
+- Whole-artifact migration validates every adjacent target, including migrations implemented with incremental stages. Streaming stages own event validation and flush in source-to-target order; the stream does not run whole-artifact validators.
 
 The catalog is a pure value operation. JSONL, Gateway, and SQLite adapters remain responsible for their own raw bytes, crash-tail recovery, backups, and atomic publication.
 

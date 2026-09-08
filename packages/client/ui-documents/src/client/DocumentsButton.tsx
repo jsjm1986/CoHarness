@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import { IconBrowseOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import { DocumentsModal } from './DocumentsModal.tsx'
 import type { UserDocRef } from './documents-client.ts'
@@ -9,7 +10,7 @@ import css from './DocumentsButton.module.css'
 /** Business callback supplied by the host composition for existing documents. */
 export interface DocumentsButtonInjected {
   /** Add a durable document to the current conversation composer. */
-  attachDocument?: ((document: UserDocRef) => boolean) | undefined
+  attachDocument?: ((document: UserDocRef, sessionId?: SessionId) => boolean) | undefined
 }
 
 export type DocumentsButtonProps =
@@ -24,28 +25,32 @@ export type DocumentsButtonProps =
  * @returns the footer trigger and, while open, the document manager dialog.
  */
 export function DocumentsButton({
-  t, wide, attachDocument,
+  t, wide, attachDocument, useSessions,
 }: DocumentsButtonProps) {
+  const currentSessionId = useSessions(snapshot => snapshot.current)
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState<'manage' | 'select'>('manage')
+  const [targetSessionId, setTargetSessionId] = useState<SessionId | undefined>()
   const handleOpen = useCallback(() => {
     setMode('manage')
+    setTargetSessionId(currentSessionId)
     setOpen(true)
-  }, [])
+  }, [currentSessionId])
   const handleClose = useCallback(() => { setOpen(false) }, [])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
     const openPicker = (event: Event): void => {
       const detail = event instanceof CustomEvent && typeof event.detail === 'object' && event.detail !== null
-        ? event.detail as { mode?: unknown }
+        ? event.detail as { mode?: unknown; sessionId?: unknown }
         : undefined
       setMode(detail?.mode === 'select' ? 'select' : 'manage')
+      setTargetSessionId(typeof detail?.sessionId === 'string' ? detail.sessionId as SessionId : currentSessionId)
       setOpen(true)
     }
     window.addEventListener('dsh-documents-open-picker', openPicker)
     return () => { window.removeEventListener('dsh-documents-open-picker', openPicker) }
-  }, [])
+  }, [currentSessionId])
 
   return (
     <>
@@ -65,7 +70,9 @@ export function DocumentsButton({
         onClose={handleClose}
         t={t}
         mode={mode}
-        {...(attachDocument === undefined ? {} : { onAttachDocument: attachDocument })}
+        {...(attachDocument === undefined ? {} : {
+          onAttachDocument: (document: UserDocRef) => targetSessionId === undefined ? false : attachDocument(document, targetSessionId),
+        })}
       />
     </>
   )

@@ -50,6 +50,22 @@ export interface ConversationAccess {
   canManage: boolean
 }
 
+/** Lightweight account-wide conversation row for the multi-runtime workbench. */
+export interface AccountConversationView {
+  sessionId: string
+  runtime: { kind: 'personal' } | { kind: 'project'; projectId: number; projectName: string }
+  title?: string
+  cwd?: string
+  visibility: 'personal' | 'project' | 'private'
+  creatorUserId: number
+  creatorDisplayName: string
+  updatedAt: number
+  blank: boolean
+  visibleContentSeq?: number
+  lastPromptAt?: number
+  canWrite: boolean
+}
+
 /** Stable collaboration denial used by HTTP and runtime transports. */
 export class CollaborationDeniedError extends Error {
   constructor(readonly code: 'not-member' | 'conversation-not-found' | 'forbidden' | 'visibility-locked') {

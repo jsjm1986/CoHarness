@@ -230,6 +230,18 @@
         "tests/**/*.tsx"
       ]
     },
+    "packages/client/ui-workbench": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.spec.tsx"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "tests/**/*.ts",
+        "tests/**/*.tsx"
+      ]
+    },
     "packages/client/ui-usage-alert": {
       "project": [
         "src/**/*.ts",

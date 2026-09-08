@@ -8,6 +8,7 @@
  * details open/close from ui-conversation) — writes stay inside the store's
  * declared action set, delivered as the registration's bound actions.
  */
+import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { BoundActions } from '@deepseek-ai/dsh-client-ui-slots'
 import type { createLayoutStore } from './stores.ts'
 
@@ -23,10 +24,14 @@ export type PanelActions = BoundActions<ReturnType<typeof createLayoutStore>>
 export interface ILayout {
   /** Toggle the sidebar panel (closed ⟷ contract default width). */
   toggleSidebar(): void
-  /** Open the details panel (no-op when already open). */
-  openDetails(): void
-  /** Close the details panel. */
-  closeDetails(): void
+  /** Open details, optionally pinned to an explicit Session.
+   * @param sessionId - fixed target; omission follows current selection.
+   */
+  openDetails(sessionId?: SessionId): void
+  /** Close details, optionally only when pinned to a given Session.
+   * @param sessionId - target to release; omission closes unconditionally.
+   */
+  closeDetails(sessionId?: SessionId): void
 }
 
 /** Cross-plugin panel-action face (ctx.layout). */
@@ -49,14 +54,18 @@ export class LayoutController implements ILayout {
     this.#require().toggleSidebar()
   }
 
-  /** Open the details panel (no-op when already open). */
-  openDetails(): void {
-    this.#require().openDetails()
+  /** Open details, optionally pinned to an explicit Session.
+   * @param sessionId - fixed target; omission follows current selection.
+   */
+  openDetails(sessionId?: SessionId): void {
+    this.#require().openDetails(sessionId)
   }
 
-  /** Close the details panel. */
-  closeDetails(): void {
-    this.#require().closeDetails()
+  /** Close details, optionally only when pinned to a given Session.
+   * @param sessionId - target to release; omission closes unconditionally.
+   */
+  closeDetails(sessionId?: SessionId): void {
+    this.#require().closeDetails(sessionId)
   }
 
   #require(): PanelActions {

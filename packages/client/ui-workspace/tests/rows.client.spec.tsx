@@ -366,7 +366,7 @@ describe('workspace browser rows', () => {
       sessionCount: 0, expanded: false, containsCurrent: false, sessions: [],
     }
     render(<ProjectRowItem group={group} onToggle={vi.fn()} onCreate={vi.fn()} t={t} />)
-    expect(screen.queryByRole('button', { name: /工作区/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: '独立会话' })).toBeNull()
   })
 
   it('blank New Session rows carry no menu, no time label, and no hover-card time', () => {

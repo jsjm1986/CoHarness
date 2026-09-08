@@ -71,6 +71,19 @@ class SocketQueue<F> {
 
 /** Browser platform subclass: unary/respond use fetch; mux/host use downlink-only WebSockets. */
 export class WebApiClient extends AbstractApiClient {
+  /**
+   * @param target - optional authenticated Gateway runtime target.
+   * @param timeoutMs - bounded unary timeout.
+   * @param maxResponseBytes - successful unary response budget.
+   */
+  constructor(
+    target?: { readonly kind: 'personal' } | { readonly kind: 'project'; readonly projectId: number },
+    timeoutMs?: number,
+    maxResponseBytes?: number,
+  ) {
+    super(timeoutMs, maxResponseBytes, target)
+  }
+
   protected doFetch(input: URL, init?: RequestInit): Promise<Response> {
     return globalThis.fetch(input, init)
   }
@@ -97,7 +110,7 @@ export class WebApiClient extends AbstractApiClient {
     frameSchema: Parser<F>,
     onOpen?: () => void,
   ): AsyncGenerator<RpcRequest<F>> {
-    const url = new URL(path, this.resolveBase())
+    const url = this.resolveUrl(path)
     url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
     const socket = new WebSocket(url)
     const inbox = new SocketQueue<F>()

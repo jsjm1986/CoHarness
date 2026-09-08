@@ -218,16 +218,18 @@ export interface PersistenceBackend<TornMarker = unknown> {
 
   /**
    * Publish a current-format successor for one legacy body read.
-   * @param sourceMeta - header read from the preserved source generation.
-   * @param currentMeta - normalized current-format header.
+   * @param sourceStorage - metadata read from the preserved source generation.
+   * @param currentStorage - normalized current-format metadata.
    * @param events - validated source event prefix to encode in the successor.
    * @param sourceRevision - revision observed before conversion.
+   * @param signal - optional cancellation before successor publication.
    */
   migrateStored?(
     sourceStorage: SessionStorageMetadata,
     currentStorage: SessionStorageMetadata,
     events: readonly SessionEvent[],
     sourceRevision: SessionPersistenceRevision,
+    signal?: AbortSignal,
   ): Promise<void>
 
   /** Durably create an empty header-only session artifact. */
@@ -1081,7 +1083,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     if (stored === undefined) throw new Error(`session "${id}" not found`)
     this.assertStoredId(id, stored.meta)
     const currentMeta = this.assertVersion(stored.meta)
-    let events = snapshotStoredEvents(stored.events, id)
+    let events = adoptStoredEvents(stored.events, id)
     if (stored.meta.version !== currentMeta.version && this.backend.migrateStored !== undefined) {
       const migrated = migrateFormatEvents(stored.meta, stored.inheritedEventCount, events)
       await this.backend.migrateStored(
@@ -1089,6 +1091,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
         { meta: migrated.header, inheritedEventCount: stored.inheritedEventCount },
         migrated.events,
         stored.revision,
+        signal,
       )
       events = migrated.events
     }
