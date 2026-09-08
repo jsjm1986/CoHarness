@@ -20,6 +20,13 @@ async function harness() {
     add: vi.fn(() => ({ ok: true })),
     replaceActive: vi.fn(() => ({ ok: true })),
     focus: vi.fn(), move: vi.fn(), setMode: vi.fn(), markCatalogReady: vi.fn(),
+    listWorkbenches: vi.fn(() => []),
+    currentWorkbench: vi.fn(() => ({ id: 'w1', name: 'Sessions', paneIds: [], updatedAt: 1 })),
+    createWorkbench: vi.fn(() => 'w2'),
+    renameWorkbench: vi.fn(),
+    duplicateWorkbench: vi.fn(() => 'w3'),
+    deleteWorkbench: vi.fn(),
+    switchWorkbench: vi.fn(),
   }
   const sessions = { ensureSession: vi.fn(async () => true), createSession: vi.fn(async () => A), setBaseRuntimeTarget: vi.fn() }
   ctx.provide('conversationViewport', viewport as never)
@@ -39,6 +46,13 @@ async function harness() {
     markCatalogReady(): void
     focusSession(id: SessionId): void
     setMode(mode: 'single' | 'workbench'): void
+    listWorkbenches(): readonly unknown[]
+    currentWorkbench(): unknown
+    createWorkbench(name: string): string
+    renameWorkbench(id: string, name: string): void
+    duplicateWorkbench(id: string, name: string): string
+    deleteWorkbench(id: string): void
+    switchWorkbench(id: string): void
   })()
   return { ctx, slots, fiber, sessions, viewport, snapshot, actions }
 }
@@ -122,5 +136,42 @@ describe('workbench navigation lifecycle', () => {
     expect(h.viewport.markCatalogReady).not.toHaveBeenCalled()
     expect(h.slots.entries('conversation.workbench.toolbar')).toHaveLength(0)
     await h.ctx.fiber.dispose()
+  })
+
+  it('delegates workbench layout management to the viewport capability', async () => {
+    const h = await harness()
+    try {
+      expect(h.actions.listWorkbenches()).toEqual([])
+      expect(h.viewport.listWorkbenches).toHaveBeenCalledOnce()
+      expect(h.actions.currentWorkbench()).toEqual({ id: 'w1', name: 'Sessions', paneIds: [], updatedAt: 1 })
+      expect(h.viewport.currentWorkbench).toHaveBeenCalledOnce()
+      expect(h.actions.createWorkbench('Studio')).toBe('w2')
+      expect(h.viewport.createWorkbench).toHaveBeenCalledWith('Studio')
+      h.actions.renameWorkbench('w1', 'Renamed')
+      expect(h.viewport.renameWorkbench).toHaveBeenCalledWith('w1', 'Renamed')
+      expect(h.actions.duplicateWorkbench('w1', 'Copy')).toBe('w3')
+      expect(h.viewport.duplicateWorkbench).toHaveBeenCalledWith('w1', 'Copy')
+      h.actions.deleteWorkbench('w2')
+      expect(h.viewport.deleteWorkbench).toHaveBeenCalledWith('w2')
+      h.actions.switchWorkbench('w1')
+      expect(h.viewport.switchWorkbench).toHaveBeenCalledWith('w1')
+    } finally { await h.ctx.fiber.dispose() }
+  })
+
+  it('defaults workbench layout reads when the viewport lacks the optional methods', async () => {
+    const h = await harness()
+    try {
+      Object.assign(h.viewport, {
+        listWorkbenches: undefined, currentWorkbench: undefined, createWorkbench: undefined,
+        renameWorkbench: undefined, duplicateWorkbench: undefined, deleteWorkbench: undefined, switchWorkbench: undefined,
+      })
+      expect(h.actions.listWorkbenches()).toEqual([])
+      expect(h.actions.currentWorkbench()).toBeUndefined()
+      expect(h.actions.createWorkbench('Studio')).toBe('')
+      h.actions.renameWorkbench('w1', 'Renamed')
+      expect(h.actions.duplicateWorkbench('w1', 'Copy')).toBe('')
+      h.actions.deleteWorkbench('w2')
+      h.actions.switchWorkbench('w1')
+    } finally { await h.ctx.fiber.dispose() }
   })
 })

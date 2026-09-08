@@ -1,5 +1,11 @@
-import { describe, expect, it } from 'vitest'
-import { parseWorkbenchCatalog } from '../src/client/catalog.ts'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { loadWorkbenchCatalog, parseWorkbenchCatalog } from '../src/client/catalog.ts'
+
+const okResponse = { ok: true, status: 200, json: async () => ({
+  personal: { id: 1, name: 'Me' }, activeRuntime: { kind: 'personal' }, projects: [], items: [],
+}) } as unknown as Response
+
+afterEach(() => vi.unstubAllGlobals())
 
 describe('workbench account catalog', () => {
   it('preserves personal and project runtime targets', () => {
@@ -55,5 +61,25 @@ describe('catalog wire validation', () => {
   })
   it('accepts a complete personal row and rw project', () => {
     expect(parseWorkbenchCatalog({ ...valid(), projects: [{ projectId: 1, name: 'A', mode: 'rw' }], items: [{ sessionId: 's', runtime: { kind: 'personal' }, title: 'Title', cwd: '/work', visibility: 'personal', creatorUserId: 1, creatorDisplayName: 'A', updatedAt: 1, blank: false, canWrite: true }] }).items).toHaveLength(1)
+  })
+})
+
+describe('loadWorkbenchCatalog', () => {
+  it('fetches and parses the catalog without a signal', async () => {
+    const fetch = vi.fn(async () => okResponse)
+    vi.stubGlobal('fetch', fetch)
+    const catalog = await loadWorkbenchCatalog()
+    expect(fetch).toHaveBeenCalledWith('/account/api/workbench/catalog', { headers: { accept: 'application/json' } })
+    expect(catalog.activeRuntime).toEqual({ kind: 'personal' })
+  })
+
+  it('forwards an abort signal and rejects on a failed status', async () => {
+    const signal = new AbortController().signal
+    const fetch = vi.fn(async () => okResponse)
+    vi.stubGlobal('fetch', fetch)
+    await loadWorkbenchCatalog(signal)
+    expect(fetch).toHaveBeenCalledWith('/account/api/workbench/catalog', { headers: { accept: 'application/json' }, signal })
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 503 }) as Response))
+    await expect(loadWorkbenchCatalog(signal)).rejects.toThrow('workbench catalog unavailable (503)')
   })
 })

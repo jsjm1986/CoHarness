@@ -49,7 +49,11 @@ export function WorkbenchPaneHeader({
           { id: 'previous', label: t('previous') },
           { id: 'next', label: t('next') },
         ]}
-        onSelect={(id) => { setMenuOpen(false); if (id === 'replace') replacePane(); else if (id === 'previous' || id === 'next') movePane(id) }}
+        onSelect={(id: string) => {
+          setMenuOpen(false)
+          if (id === 'replace') { replacePane() }
+          else { movePane(id as 'previous' | 'next') }
+        }}
         anchor={<button type="button" className={css.moreButton} aria-label={t('more')} onClick={(event) => { event.stopPropagation(); setMenuOpen(open => !open) }}>···</button>}
       />
       <Button
