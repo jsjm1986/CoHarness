@@ -25,5 +25,6 @@ export function createSessionFormatCatalog(options: SessionFormatCatalogOptions)
     },
     migrateHeader: chain.migrateHeader.bind(chain),
     migrate: chain.migrate.bind(chain),
+    createStream: chain.createStream.bind(chain),
   })
 }

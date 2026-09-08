@@ -1,4 +1,4 @@
-/** Pure adjacent whole-artifact Session format migration machinery. */
+/** Pure adjacent Session format migration machinery with legacy and streaming faces. */
 
 export * from './chain.ts'
 export * from './catalog.ts'

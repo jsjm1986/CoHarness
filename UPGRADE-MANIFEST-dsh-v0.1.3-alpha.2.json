@@ -1,0 +1,161 @@
+{
+  "schemaVersion": 1,
+  "reviewDate": "2026-09-08",
+  "upstream": {
+    "repository": "https://github.com/deepseek-ai/deepseek-harness",
+    "tag": "dsh-v0.1.3-alpha.2",
+    "commit": "82a5fd61a7cf5c293cec4bdff68f455398d685e9",
+    "previousTag": "dsh-v0.1.3-alpha.1",
+    "releasePage": "https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.1.3-alpha.2",
+    "comparePage": "https://github.com/deepseek-ai/deepseek-harness/compare/dsh-v0.1.3-alpha.1...dsh-v0.1.3-alpha.2",
+    "diffStats": "git diff d347e703908d0406b7a7ef80e3a0e594d86b2215 FETCH_HEAD = 4761 files, +89713/-59158",
+    "masterAudit": {
+      "commit": "c389f96bf3a9b6807cb71ed6bdad5849be0df6d8",
+      "scope": "post-alpha2 master audit"
+    }
+  },
+  "baseline": {
+    "repository": "https://github.com/jsjm1986/CoHarness.git",
+    "commit": "d5274caced + 380c4d597b",
+    "branch": "codex/ui-workbench",
+    "synchronization": "semantic-selective",
+    "workingTreePreserved": true
+  },
+  "audit": {
+    "branch": "codex/upstream-alignment-audit",
+    "comparison": {
+      "mergeBase": null,
+      "localTreeFiles": 9191,
+      "upstreamTreeFiles": 9080,
+      "changedPaths": 9562,
+      "commonPackages": 227,
+      "localOnlyPackages": 24,
+      "upstreamOnlyPackages": 28
+    },
+    "policy": "shared-core-behavior-and-protocol-parity-with-upstream; preserve-CoHarness-product-owners",
+    "status": "revised-selective-audit-in-progress",
+    "knownFindings": [
+      "agent-loop-resume-open-before-read-and-dispose-before-registry-detach",
+      "sqlite-test-sql-resource-boundary",
+      "session-v2-documentation-and-generator-drift",
+      "subagent-parent-activation-hold-during-establishment-and-delivery",
+      "durable-session-id-reuse-test-aligned-with-identity-contract",
+      "keyless-snapshot-output-version-v2-refresh",
+      "preset-recomposition-event-reconciles-agent-owned-registrations",
+      "web-preset-e2e-session-root-isolation",
+      "acp-capability-e2e-expectations-aligned",
+      "workspace-files-unintegrated-upstream-prototype",
+      "session-migration-not-streaming-equivalent",
+      "inbox-cold-queue-projection-gap-candidate",
+      "multi-runtime-workbench-resource-routing-risk"
+    ]
+  },
+  "targetVersion": "0.1.3-alpha.2.coharness.2-after-verification",
+  "decisions": {
+    "adopt": [
+      "pi-ai-0.85.1",
+      "model-switch-notice",
+      "system-prompt-persona-prefix-suffix",
+      "session-observation-lazy-materialization",
+      "connection-continuous-recovery",
+      "ordinary-subprocess-pid-privacy",
+      "windows-picker-and-process-cleanup-targeted-fixes",
+      "default-file-tools-for-headless-sdk-acp"
+    ],
+    "adapt": [
+      "continuable-subagent-human-queue-controls",
+      "queue-sending-state",
+      "ptc-terminal-expansion",
+      "long-session-scroll-and-history-performance",
+      "session-migration-streaming",
+      "session-migration-streaming-internal",
+      "inbox-projection-race-validation",
+      "assistant-stream-record-reader-after-profile",
+      "deepFreeze-weakset-after-profile"
+    ],
+    "retain": [
+      "coharness-workbench",
+      "gateway-acl-and-cloud-host-boundary",
+      "message-feedback-sidecar-and-cas",
+      "host-open-path-default-opener",
+      "web-minimal-str-replace-editor",
+      "sqlite-and-gateway-persistence"
+    ],
+    "desktopOptional": [
+      "open-in-app-full-catalog-and-icons"
+    ],
+    "notAdopted": [
+      "upstream-ui-chat-replacement",
+      "upstream-remote-gateway-control-plane",
+      "projection-cache-per-record-layout",
+      "ordinary-chat-telemetry-or-otlp-default",
+      "bulk-ci-benchmark-and-archived-note-copy"
+    ],
+    "defer": [
+      "workspace-path",
+      "workspace-files",
+      "client-resources",
+      "readByteRange",
+      "remote-workspace-preview",
+      "sidebar-file-tree",
+      "sidebar-text-preview"
+    ],
+    "reject": [
+      "workspace-files-absolute-path-wire",
+      "workspace-files-absolute-resource-address",
+      "workspace-files-agent-auto-resume",
+      "upstream-controller-package-split"
+    ]
+  },
+  "implementedFoundation": [
+    "session-handle-process-local-ownership",
+    "agent-factory-persistent-handle-lifecycle",
+    "session-format-v0-v1-v2-adjacent-catalog",
+    "jsonl-and-sqlite-provider-generation-migration",
+    "jsonl-cross-process-session-write-lock",
+    "projection-cache-format-version-binding",
+    "outbound-http-proxy-policy"
+  ],
+  "migration": {
+    "trigger": "first-body-read",
+    "sourcePreserved": true,
+    "immutableSuccessor": true,
+    "automaticDowngrade": false,
+    "productionPrerequisites": [
+      "backup",
+      "copy-dry-run",
+      "canary",
+      "migration-metrics"
+    ]
+  },
+  "verification": {
+    "focused": [
+      "open-in-app",
+      "system-prompt",
+      "persona",
+      "model-selection",
+      "connection",
+      "queue-dock",
+      "subprocess",
+      "lsp-stdio"
+    ],
+    "required": [
+      "typecheck",
+      "lint",
+      "build",
+      "hygiene",
+      "doc-sync",
+      "release-verify",
+      "test",
+      "test:coverage"
+    ],
+    "external": [
+      "windows-native",
+      "macos-x64-runtime",
+      "real-api",
+      "cloud-gateway",
+      "desktop-open-in-app",
+      "long-session-benchmark"
+    ]
+  }
+}

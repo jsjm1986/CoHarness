@@ -1,0 +1,17 @@
+# Agent Note：增量 Session 格式迁移阶段
+
+Status: implemented
+
+[English](2026-09-08-session-format-streaming-stage.md) | 中文
+
+## 问题
+
+CoHarness 目前通过整体 artifact 迁移 API 校验旧 Session。这样可以保持正确性，但能够增量读取数据行的提供方没有格式层提供的接口，无法逐事件转换而不再构建一份完整 artifact。
+
+## 决定
+
+Session 格式链现在提供可选的逐事件迁移阶段。每个相邻迁移可以创建有状态阶段，并同步发出已校验的目标事件；未提供阶段的迁移继续使用现有整体 artifact 方法。公开 Session 事件和持久化契约保持不变。提供方必须先增加增量原始行读取，再使用该阶段降低内存占用。
+
+## 后果
+
+无需一次性改动所有现有迁移或提供方即可提供流式接口。当前 v0/v1/v2 迁移提供直通阶段；JSONL 与 Gateway 提供方的接入仍是独立实现，因为它们分别负责物理读取、解码和发布。

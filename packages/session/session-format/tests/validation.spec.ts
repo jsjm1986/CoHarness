@@ -4,7 +4,7 @@ import {
   inspectSessionFormatVersion, sessionFormatCatalog, sessionFormatCount,
   snapshotSessionFormatArtifact, snapshotSessionFormatHeader, snapshotSessionFormatJson,
 } from '../src/index.ts'
-import type { SessionFormatArtifact, SessionFormatChainOptions, SessionFormatHeader, SessionFormatMigration } from '../src/index.ts'
+import type { SessionFormatArtifact, SessionFormatChainOptions, SessionFormatEvent, SessionFormatHeader, SessionFormatMigration } from '../src/index.ts'
 
 const header = (version = 0): SessionFormatHeader => ({ id: 'session', version, createdAt: 1 })
 const artifact = (version = 0): SessionFormatArtifact => ({
@@ -118,5 +118,31 @@ describe('adjacent migration declarations and output validation', () => {
     const catalog = createSessionFormatCatalog(options())
     expect(catalog.migrateHeader(header())).toEqual(header(1))
     expect(catalog.migrate(artifact()).header).toEqual(header(1))
+  })
+})
+
+describe('streaming migration stages', () => {
+  it('emits events incrementally and flushes each adjacent stage', () => {
+    const calls: string[] = []
+    const chain = createSessionFormatChain(options({
+      migrations: [migration({
+        createStage: ({ targetHeader }) => ({
+          transformEvent: (event, context) => { calls.push(`event:${targetHeader.version}:${event.seq}`); context.emitEvent({ ...event, type: 'migrated' }) },
+          finish: () => { calls.push(`finish:${targetHeader.version}`) },
+        }),
+      })],
+    }))
+    const output: SessionFormatEvent[] = []
+    const stream = chain.createStream(header(), 0, { emitEvent: event => output.push(event) })
+    stream.emitEvent(artifact().events[0] as SessionFormatEvent)
+    expect(output).toEqual([{ type: 'migrated', seq: 0, time: 2, data: { turn: 1 } }])
+    stream.finish()
+    expect(calls).toEqual(['event:1:0', 'finish:1'])
+    expect(stream.header.version).toBe(1)
+  })
+
+  it('fails when an adjacent migration has no streaming stage', () => {
+    const noStage = migration()
+    expect(() => createSessionFormatChain(options({ migrations: [noStage] })).createStream(header(), 0, { emitEvent: () => {} })).toThrow('does not provide a streaming stage')
   })
 })

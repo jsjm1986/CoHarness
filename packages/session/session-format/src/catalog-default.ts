@@ -8,6 +8,7 @@ const bump = (fromVersion: number) => defineSessionFormatMigration({
   toVersion: fromVersion + 1,
   migrateHeader: (header: SessionFormatHeader) => ({ ...header, version: fromVersion + 1 }),
   migrate: (artifact: SessionFormatArtifact) => ({ ...artifact, header: { ...artifact.header, version: fromVersion + 1 } }),
+  createStage: () => ({ transformEvent: (event, context) => { context.emitEvent(event) }, finish: () => {} }),
   validateTargetHeader: () => {},
   validateTarget: () => {},
 })
