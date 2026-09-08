@@ -395,6 +395,28 @@ Source: [`packages/compaction/compaction/src/types.ts:34`](../packages/compactio
 
 ### `feedback/*`
 
+<a id="feedbackmessage-delete--log-only"></a>
+
+#### `feedback/message-delete` — log-only
+
+```ts persistence-catalog
+/** Explicit message feedback removed by the sidecar CAS operation. */
+'feedback/message-delete': { sessionId: SessionId; messageId: string; version: string }
+```
+
+Source: [`packages/feedback/message-feedback/src/index.ts:61`](../packages/feedback/message-feedback/src/index.ts)
+
+<a id="feedbackmessage-put--log-only"></a>
+
+#### `feedback/message-put` — log-only
+
+```ts persistence-catalog
+/** Explicit message feedback accepted by the sidecar CAS operation. */
+'feedback/message-put': { sessionId: SessionId; item: MessageFeedbackItem }
+```
+
+Source: [`packages/feedback/message-feedback/src/index.ts:59`](../packages/feedback/message-feedback/src/index.ts)
+
 <a id="feedbackrecord--log-only"></a>
 
 #### `feedback/record` — log-only

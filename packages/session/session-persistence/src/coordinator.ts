@@ -28,7 +28,7 @@ import type {
   SessionSeq as SessionSeqType,
 } from '@deepseek-ai/dsh-session'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
-import { sessionFormatCatalog, type SessionFormatHeader } from '@deepseek-ai/dsh-session-format'
+import { sessionFormatCatalog, type SessionFormatEvent, type SessionFormatHeader } from '@deepseek-ai/dsh-session-format'
 import type {
   SessionEventSuffix,
   SessionInspection,
@@ -100,6 +100,23 @@ export function sessionFormatVersionRefusal(id: string, version: number): string
   return version > SESSION_FORMAT_VERSION
     ? `session "${id}" uses log format v${version}, but this harness reads only v${SESSION_FORMAT_VERSION}: the log was written by a newer harness — upgrade the harness to open it`
     : `session "${id}" uses log format v${version}, older than the supported v${SESSION_FORMAT_VERSION}, and this build ships no upgrade path for it`
+}
+
+/** Transform a legacy event sequence through the format chain without intermediate artifacts. */
+function migrateFormatEvents(
+  header: SessionHeader,
+  inheritedEventCount: SessionLogOffsetType,
+  events: readonly SessionEvent[],
+): { header: SessionHeader; events: SessionEvent[] } {
+  const migrated: SessionEvent[] = []
+  const stream = sessionFormatCatalog.createStream(
+    header as unknown as SessionFormatHeader,
+    inheritedEventCount,
+    { emitEvent: (event) => { migrated.push(event as unknown as SessionEvent) } },
+  )
+  for (const event of events) stream.emitEvent(event as unknown as SessionFormatEvent)
+  stream.finish()
+  return { header: stream.header as unknown as SessionHeader, events: migrated }
 }
 
 /** Coordinator policy supplied by a concrete persistence backend. */
@@ -1064,14 +1081,16 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     if (stored === undefined) throw new Error(`session "${id}" not found`)
     this.assertStoredId(id, stored.meta)
     const currentMeta = this.assertVersion(stored.meta)
-    const events = snapshotStoredEvents(stored.events, id)
+    let events = snapshotStoredEvents(stored.events, id)
     if (stored.meta.version !== currentMeta.version && this.backend.migrateStored !== undefined) {
+      const migrated = migrateFormatEvents(stored.meta, stored.inheritedEventCount, events)
       await this.backend.migrateStored(
         stored,
-        { meta: currentMeta, inheritedEventCount: stored.inheritedEventCount },
-        events,
+        { meta: migrated.header, inheritedEventCount: stored.inheritedEventCount },
+        migrated.events,
         stored.revision,
       )
+      events = migrated.events
     }
     this.assertEventsSupported(currentMeta, events)
     return {
@@ -1089,9 +1108,16 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       const { meta, inheritedEventCount, events, revision, tornMarker } = stored
       this.assertStoredId(id, meta)
       const currentMeta = this.assertVersion(meta)
-      const storedEvents = adoptStoredEvents(events, id)
+      let storedEvents = adoptStoredEvents(events, id)
       if (meta.version !== currentMeta.version && this.backend.migrateStored !== undefined) {
-        await this.backend.migrateStored({ meta, inheritedEventCount }, { meta: currentMeta, inheritedEventCount }, storedEvents, revision)
+        const migrated = migrateFormatEvents(meta, inheritedEventCount, storedEvents)
+        await this.backend.migrateStored(
+          { meta, inheritedEventCount },
+          { meta: migrated.header, inheritedEventCount },
+          migrated.events,
+          revision,
+        )
+        storedEvents = migrated.events
       }
       this.assertEventsSupported(currentMeta, storedEvents)
       if (inheritedEventCount > storedEvents.length) {
