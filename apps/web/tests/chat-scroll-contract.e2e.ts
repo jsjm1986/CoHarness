@@ -176,7 +176,7 @@ async function launchScrollWorld(options: ScrollWorldOptions): Promise<ScrollWor
     // for the seeded baseline before openSeed starts the lazy content query
     // (the compact layout dropped group session counts; the Ungrouped bucket
     // row is the barrier).
-    await page.getByText('Ungrouped', { exact: true }).waitFor({ timeout: 30_000 })
+    await page.getByText('Independent sessions', { exact: true }).waitFor({ timeout: 30_000 })
     return {
       events,
       page,

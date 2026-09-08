@@ -214,7 +214,7 @@ describe('web e2e: Trajectory virtualization over tail-paged history', () => {
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     // The compact layout dropped group session counts; the seeded baseline is
     // the Ungrouped bucket once cold summaries load.
-    await page.getByText('Ungrouped', { exact: true }).waitFor({ timeout: 30_000 })
+    await page.getByText('Independent sessions', { exact: true }).waitFor({ timeout: 30_000 })
   }, 120_000)
 
   afterAll(async () => {

@@ -139,7 +139,7 @@ async function closeDrawer(page: Page): Promise<void> {
 
 async function openSeededChat(page: Page): Promise<void> {
   await openDrawer(page)
-  await page.getByText(/未分组|Ungrouped/, { exact: true }).waitFor({ timeout: 30_000 })
+  await page.getByText(/独立会话|Ungrouped/, { exact: true }).waitFor({ timeout: 30_000 })
   const searchButton = page.getByRole('button', { name: /搜索会话|Search sessions/ })
   if (await searchButton.count() > 0 && await searchButton.getAttribute('aria-expanded') !== 'true') {
     await searchButton.click()
