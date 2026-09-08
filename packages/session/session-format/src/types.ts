@@ -40,6 +40,7 @@ export interface SessionFormatMigrationStage {
   readonly finish: (context: SessionFormatMigrationContext) => void
 }
 
+/** One adjacent migration with optional incremental event transformation. */
 export interface SessionFormatMigration {
   readonly name: string
   readonly fromVersion: number
@@ -71,6 +72,7 @@ export interface SessionFormatMigrationStream extends SessionFormatMigrationCont
   readonly finish: () => void
 }
 
+/** Pure planner and runner for a complete adjacent migration chain. */
 export interface SessionFormatChain {
   readonly currentVersion: number
   plan(fromVersion: number): readonly SessionFormatMigration[]

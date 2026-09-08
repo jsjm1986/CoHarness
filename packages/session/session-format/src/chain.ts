@@ -101,7 +101,24 @@ class CompiledSessionFormatChain implements SessionFormatChain {
 
   migrate(source: SessionFormatArtifact): SessionFormatArtifact {
     let current = snapshotSessionFormatArtifact(source, 'stored Session artifact')
-    for (const migration of this.plan(inspectSessionFormatVersion(current.header))) {
+    const plan = this.plan(inspectSessionFormatVersion(current.header))
+    if (plan.length > 0 && plan.every(migration => migration.createStage !== undefined)) {
+      const events: SessionFormatEvent[] = []
+      const stream = this.createStream(current.header, current.inheritedEventCount, {
+        emitEvent: (event) => { events.push(event) },
+      })
+      for (const event of current.events) stream.emitEvent(event)
+      stream.finish()
+      current = snapshotSessionFormatArtifact({
+        header: stream.header,
+        inheritedEventCount: current.inheritedEventCount,
+        events,
+      }, 'streamed Session migration output')
+      const restored = snapshotSessionFormatArtifact(this.options.restoreCurrent(current), 'current Session artifact')
+      if (restored.header.version !== this.currentVersion) throw new SessionFormatError('current Session restorer returned an invalid version')
+      return restored
+    }
+    for (const migration of plan) {
       current = snapshotSessionFormatArtifact(migration.migrate(current), `${migration.name} output`)
       if (current.header.version !== migration.toVersion) throw new SessionFormatError(`${migration.name} returned an invalid artifact version`)
       migration.validateTarget(current)
