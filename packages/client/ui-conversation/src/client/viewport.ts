@@ -39,7 +39,7 @@ function normalizedRatios(count: number, ratios: readonly number[]): number[] {
 
 function restoredState(value: unknown): ViewState {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    return { mode: 'workbench', paneIds: [], paneRatios: [] }
+    return { mode: 'single', paneIds: [], paneRatios: [] }
   }
   const row = value as Record<string, unknown>
   const paneIds = Array.isArray(row.paneIds)
@@ -65,7 +65,7 @@ type ViewActions = {
  */
 export function createConversationViewportStore(): EngineStoreHandle<ViewState, ViewActions> {
   const handle = defineStore({
-    init: (): ViewState => ({ mode: 'workbench', paneIds: [], paneRatios: [] }),
+    init: (): ViewState => ({ mode: 'single', paneIds: [], paneRatios: [] }),
     persist: 'dsh.conversation.workbench.v1',
     actions: {
       replace: (draft, state: ViewState) => {

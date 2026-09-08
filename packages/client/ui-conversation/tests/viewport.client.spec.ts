@@ -34,7 +34,7 @@ describe('ConversationViewportController', () => {
   it('bounds panes, focuses duplicates, and stages only workbench panes', () => {
     const h = harness()
     const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
-    expect(viewport.snapshot.getSnapshot().mode).toBe('workbench')
+    expect(viewport.snapshot.getSnapshot().mode).toBe('single')
     viewport.setEnabled(true)
     expect(viewport.add(id('a'))).toEqual({ ok: true })
     expect(viewport.add(id('a'))).toEqual({ ok: false, reason: 'duplicate' })
