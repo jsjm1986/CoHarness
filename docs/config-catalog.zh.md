@@ -252,6 +252,10 @@ export interface Config {
   includeRuntimeContext?: SystemPromptConfig['includeRuntimeContext']
   /** The deployment persona (see dsh-system-prompt's `Config`). */
   persona?: SystemPromptConfig['persona']
+  /** Persona prefix forwarded to the system-prompt plugin. */
+  personaPrefix?: SystemPromptConfig['personaPrefix']
+  /** Persona suffix forwarded to the system-prompt plugin. */
+  personaSuffix?: SystemPromptConfig['personaSuffix']
   /** The explicit model-facing tool order (see dsh-system-prompt's `Config`). */
   toolOrder?: SystemPromptConfig['toolOrder']
   /** The tool registry's config — its presentation `mode` (see dsh-tools' `Config`). */
@@ -424,6 +428,21 @@ Requires: `webServer`
 ```ts config-catalog
 /** Plugin config: the deployment's non-loopback serving authorities. */
 export interface ConnectionConfig {
+  /** Browser generation recovery timing delivered through the served index. */
+  recovery?: {
+    /** First retry delay cap in milliseconds. */
+    backoffBaseMs?: number
+    /** Multiplicative retry growth factor. */
+    backoffFactor?: number
+    /** Maximum retry delay cap in milliseconds. */
+    backoffMaxMs?: number
+    /** Legacy stream-open guard in milliseconds. */
+    streamOpenTimeoutMs?: number
+    /** Warning delay for a stalled generation. */
+    generationReadyWarnMs?: number
+    /** Hard readiness deadline in milliseconds. */
+    generationReadyTimeoutMs?: number
+  }
   /**
    * Authorities this deployment serves beyond loopback: exact `host:port`, or
    * port-less `host` matching any port. The /api trust fence refuses any
@@ -966,6 +985,38 @@ export interface Config {
 
 Source: [`packages/host/frontend-static/src/index.ts:28`](../packages/host/frontend-static/src/index.ts)
 
+<a id="deepseek-aidsh-host-open-in-app"></a>
+
+## `@deepseek-ai/dsh-host-open-in-app`
+
+Requires: `webServer` · `subprocess`
+
+```ts config-catalog
+/** Open-in-app host configuration. */
+export interface Config {
+  /**
+   * Per-command deadline in milliseconds for catalog-resolution host
+   * commands (`xcode-select`, the Windows registry reads).
+   */
+  readonly probeTimeoutMs: number
+  /**
+   * Per-command deadline in milliseconds for icon-extraction host commands
+   * (`plutil`/`sips` on macOS, the PowerShell extraction on Windows).
+   */
+  readonly iconTimeoutMs: number
+  /**
+   * Early-failure watch window per launch, in milliseconds: a launcher still
+   * running when the window closes counts as launched and keeps running, so
+   * this bounds how long the open route holds a successful launch, not how
+   * long an application may live.
+   */
+  readonly launchWatchMs: number
+}
+```
+
+Source: [`packages/host/open-in-app/src/index.ts:46`](../packages/host/open-in-app/src/index.ts)
+
+
 <a id="deepseek-aidsh-host-webserver"></a>
 
 ## `@deepseek-ai/dsh-host-webserver`
@@ -1347,7 +1398,11 @@ export interface PiAiCompatProfile {
   /** Arguments sent as `chat_template_args` for the baseten format. */
   chatTemplateArgs?: NonNullable<OpenAICompletionsCompat['chatTemplateArgs']>
   /** Top-level field used for provider-specific thinking token budgets. */
-  thinkingTokenBudgetField?: ThinkingTokenBudgetField
+  thinkingTokenBudgetField?: PiAiThinkingTokenBudgetField
+  /** vLLM scheduler priority; lower values run earlier. */
+  vllmPriority?: number
+  /** Whether an OpenAI Responses endpoint accepts max_output_tokens. */
+  supportsMaxOutputTokens?: boolean
   /** Whether the endpoint accepts a vLLM thinking token budget. */
   supportsThinkingTokenBudget?: boolean
   /**
@@ -1391,6 +1446,9 @@ export type PiAiReasoningEfforts = Partial<Record<ModelThinkingLevel, string | n
 
 /** One reasoning-dispatch wire format a profile may name. */
 export type PiAiThinkingFormat = NonNullable<OpenAICompletionsCompat['thinkingFormat']>
+
+/** Reasoning-budget field spellings accepted by pi-ai. */
+export type PiAiThinkingTokenBudgetField = NonNullable<OpenAICompletionsCompat['thinkingTokenBudgetField']>
 ```
 
 Depends on: `Api` (`@earendil-works/pi-ai`) · `CacheRetention` (`@earendil-works/pi-ai`) · `Model` (`@earendil-works/pi-ai`) · `ModelThinkingLevel` (`@earendil-works/pi-ai`) · `OpenAICompletionsCompat` (`@earendil-works/pi-ai`) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts) · `ThinkingBudgets` (`@earendil-works/pi-ai`) · `ThinkingTokenBudgetField` (`@earendil-works/pi-ai`) · `Transport` (`@earendil-works/pi-ai`)
@@ -1659,12 +1717,19 @@ Requires: `systemPrompt`
 /** Plugin config: the persona text this composition contributes. */
 export interface Config {
   /**
-   * Persona prose rendered as the `deployment:persona` section. A template:
+   * Persona prose rendered as the `deployment:persona-prefix` section. A template:
    * complete `{{…}}` groups interpolate strictly against registered prompt
    * variables. Empty text drops the section at render, matching the registry.
    */
-  text: string
-  /** Make this persona the complete system prompt, suppressing every other section. */
+  prefix?: string
+  /** Legacy preset alias for prefix. */
+  text?: string
+  /**
+   * Persona suffix template rendered after first-party guidance. Omitted or empty
+   * text shadows the deployment suffix away; interpolation is strict.
+   */
+  suffix?: string
+  /** Make the prefix the complete system prompt, suppressing the suffix and every other section. */
   complete?: boolean
   /** Suppress dynamic runtime-context snapshots for this persona's agent scope. */
   includeRuntimeContext?: boolean
@@ -2661,17 +2726,24 @@ Source: [`packages/e2b/subprocess-e2b/src/index.ts:25`](../packages/e2b/subproce
 ## `@deepseek-ai/dsh-system-prompt`
 
 ```ts config-catalog
-/** Plugin config: the deployment-authored fragment of the system prompt (see {@link Config.persona} for its contract). */
+/** Plugin config: the deployment-authored fragment of the system prompt (see {@link Config.personaPrefix} for its contract). */
 export interface Config {
   /** Include the fixed DeepSeek Harness identity before the deployment persona (default true). */
   includeHarnessIdentity?: boolean
   /** Include dynamic runtime-context snapshots in model history (default true). */
   includeRuntimeContext?: boolean
   /**
-   * Deployment-wide order-0 persona template. A scoped section named
-   * `deployment:persona` shadows it; `{{variable}}` references are strict.
+   * Deployment-wide persona prefix template before first-party guidance. A scoped section named
+   * `deployment:persona-prefix` shadows it; `{{variable}}` references are strict.
    */
+  personaPrefix?: string
+  /** Legacy profile alias for personaPrefix. */
   persona?: string
+  /**
+   * Persona suffix template after first-party guidance. A scoped `deployment:persona-suffix`
+   * section shadows it; `{{variable}}` references are strict. Defaults to empty.
+   */
+  personaSuffix?: string
   /**
    * Model-facing tool names in order, with {@link TOOL_ORDER_REST} exactly once.
    * Invalid fields fail at load and unknown names fail at assembly; known names
@@ -3093,7 +3165,7 @@ export interface Config {
    */
   agentOptions?: AgentOptions
   /**
-   * Per-child persona that shadows `deployment:persona`. Requires the
+   * Per-child persona that shadows `deployment:persona-prefix`. Requires the
    * provider's `persona` capability; omission preserves the deployment persona.
    */
   persona?: string
@@ -3585,6 +3657,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-client-ui-layout` ([`packages/client/ui-layout/src/index.ts`](../packages/client/ui-layout/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-message-feedback` ([`packages/client/ui-message-feedback/src/index.ts`](../packages/client/ui-message-feedback/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-model-selection` ([`packages/client/ui-model-selection/src/index.ts`](../packages/client/ui-model-selection/src/index.ts))
+- `@deepseek-ai/dsh-client-ui-open-in-app` ([`packages/client/ui-open-in-app/src/index.ts`](../packages/client/ui-open-in-app/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-permission-presets` ([`packages/client/ui-permission-presets/src/index.ts`](../packages/client/ui-permission-presets/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-plan` ([`packages/client/ui-plan/src/index.ts`](../packages/client/ui-plan/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-reference` ([`packages/client/ui-reference/src/index.ts`](../packages/client/ui-reference/src/index.ts))
@@ -3603,6 +3676,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-client-ui-trajectory` ([`packages/client/ui-trajectory/src/index.ts`](../packages/client/ui-trajectory/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-usage-alert` ([`packages/client/ui-usage-alert/src/index.ts`](../packages/client/ui-usage-alert/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-user-questions` ([`packages/client/ui-user-questions/src/index.ts`](../packages/client/ui-user-questions/src/index.ts))
+- `@deepseek-ai/dsh-client-ui-workbench` ([`packages/client/ui-workbench/src/index.ts`](../packages/client/ui-workbench/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-workflow-run` ([`packages/client/ui-workflow-run/src/index.ts`](../packages/client/ui-workflow-run/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-workspace` ([`packages/client/ui-workspace/src/index.ts`](../packages/client/ui-workspace/src/index.ts))
 - `@deepseek-ai/dsh-collaboration-context` — requires `agents` ([`packages/context/collaboration-context/src/index.ts`](../packages/context/collaboration-context/src/index.ts))
