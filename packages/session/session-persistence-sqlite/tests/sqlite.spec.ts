@@ -675,7 +675,7 @@ describe('SessionPersistenceSqlite schema ownership', () => {
 })
 
 describe('SessionPersistenceSqlite edge behavior', () => {
-  it('publishes a v2 metadata generation after reading a legacy header', async () => {
+  it('keeps a migrated legacy row immutable when event content changes', async () => {
     const path = await freshDbPath('dsh-sqlite-format-migration-')
     const id = SessionId('sqlite-legacy-format')
     const first = new Context()
@@ -695,7 +695,7 @@ describe('SessionPersistenceSqlite edge behavior', () => {
     const loaded = await second.sessionPersistence.load(id)
     expect(loaded.meta.version).toBe(3)
     const migrated = new DatabaseSync(path)
-    expect(migrated.prepare(testSql('select-session-version')).get(id)).toEqual({ version: 3 })
+    expect(migrated.prepare(testSql('select-session-version')).get(id)).toEqual({ version: 0 })
     migrated.close()
     await second.fiber.dispose()
   })
