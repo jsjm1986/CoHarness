@@ -223,7 +223,12 @@ export function createAssistantMessage(
   })
 }
 
-/** Create and freeze one identified system-role message. */
+/**
+ * Create and freeze one identified system-role message.
+ * @param text - rendered system prompt text; an empty value creates no content blocks.
+ * @param plugin - plugin identifier recorded in the message source.
+ * @returns an immutable system message with a fresh stable identity.
+ */
 export function createSystemMessage(text: string, plugin: string): SystemMessage {
   return createMessage({
     role: 'system',

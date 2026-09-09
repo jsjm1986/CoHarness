@@ -84,6 +84,8 @@ interface InvocationDescriptor {
   readonly method: string
   /** Service member invoked when the exported method name is an alias. */
   readonly implementation?: string
+  /** Absent for unary calls; stream calls validate and deliver every yielded item. */
+  readonly mode?: 'stream'
   /** Receiver selection mode. */
   readonly invocation:
     | { readonly kind: 'direct' }
@@ -95,7 +97,7 @@ interface InvocationDescriptor {
     }
   /** Optional consuming-Context projection for one direct lookup parameter. */
   readonly scope?: {
-    /** Context kind whose Client binder supplies the identity. */
+    /** Context kind whose Client adapter supplies the identity. */
     readonly context: string
     /** Lookup parameter wire field replaced by the Context identity. */
     readonly wire: string
@@ -107,7 +109,7 @@ interface InvocationDescriptor {
     /** Reserved final Host method parameter. */
     readonly parameter: 'signal'
   }
-  /** Codec for the resolved method result. */
+  /** Codec for the unary result or each yielded stream item. */
   readonly result: TypertCodec
   /** Source declaration used only for diagnostics. */
   readonly sourceLocation?: InvocationSourceLocation
@@ -201,28 +203,18 @@ interface TypertClientRemote extends TypertRemoteNamespaceMap {
    * @returns disposer after namespace services and concrete methods are ready.
    */
   $mount(contribution: TypertRemoteContribution): Promise<TypertDisposer>
+  /** Dispatch one decoded forwarded frame to registered Client listeners. */
+  $dispatch(event: string, args: readonly unknown[]): void
   /**
-   * Subscribe to one forwarded Host event; delivery is one-way, in registration
-   * order, and isolates a throwing listener from the rest. Official `cordis/*`
-   * names and their `@deepseek-ai/cordis/*` counterparts form one delivery family.
+   * Subscribe to one forwarded Host event. Notifications run in registration
+   * order and isolate failures; scoped waterfalls return, delegate through
+   * `next()`, or reject the Host dispatch.
    * @template Event - forwarded event name selected by the Host assembly.
-   * @param event - forwarded Host event name or its supported Cordis alias.
-   * @param listener - receives the Host's argument list as declared by Cordis `Events`.
+   * @param event - forwarded Host event name, unchanged on the wire.
+   * @param listener - receives the Client projection of the Cordis `Events` declaration.
    * @returns disposer owned by the calling fiber.
    */
-  $on<Event extends TypertRemoteEvent>(event: Event, listener: Events[Event]): () => void
-  /**
-   * Hand one decoded forwarded frame to the subscription table. The carrier
-   * owning the Host frame sink calls this; a consumer subscribes with
-   * {@link TypertClientRemote.$on} and never calls it.
-   *
-   * `event` is a plain string because this is the wire boundary: the name is
-   * whatever the Host assembly's allowlist selected. Cordis aliases are matched
-   * as one family, and a name nobody subscribed to is dropped silently.
-   * @param event - forwarded Host event name exactly as the Host emitted it.
-   * @param args - the Host argument list, already JSON-decoded.
-   */
-  $dispatch(event: string, args: readonly unknown[]): void
+  $on<Event extends TypertRemoteEvent>(event: Event, listener: TypertClientEventListener<Event>): () => void
 }
 ```
 
