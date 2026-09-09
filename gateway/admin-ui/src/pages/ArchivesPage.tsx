@@ -189,13 +189,30 @@ export function ArchivesPage() {
           </div>
         </div>
         <ErrorBanner message={emptyError} />
-        {emptyCandidates.length === 0 ? <p className="mutedText">尚未发现待维护的空白会话。</p> : (
-          <div className="mobileList">{emptyCandidates.map(candidate => (
-            <label className="mobileItem" key={candidate.rootSessionId}>
-              <span className="checkLabel"><input type="checkbox" checked={emptySelected.has(candidate.rootSessionId)} onChange={event => setEmptySelected(nextSelection(emptySelected, candidate.rootSessionId, event.target.checked))} /><strong>{candidate.rootSessionId}</strong></span>
-              <span className="mutedText">{candidate.creator?.displayName ?? '未知用户'} · {candidate.eventCount} 条事件 · {formatTime(candidate.updatedAt)}</span>
-            </label>
-          ))}</div>
+        {emptyCandidates.length === 0 ? <p className="muted">尚未发现待维护的空白会话。</p> : (
+          <>
+            <div className="tableWrap desktopOnly emptyDraftTableWrap">
+              <table className="dataTable emptyDraftTable" aria-label="空白会话维护列表">
+                <thead><tr><th aria-label="选择" /><th>会话</th><th>归属</th><th>创建者</th><th>更新时间</th><th>事件</th></tr></thead>
+                <tbody>{emptyCandidates.map(candidate => (
+                  <tr key={candidate.rootSessionId}>
+                    <td><input type="checkbox" aria-label={`选择 ${candidate.rootSessionId}`} checked={emptySelected.has(candidate.rootSessionId)} onChange={event => setEmptySelected(nextSelection(emptySelected, candidate.rootSessionId, event.target.checked))} /></td>
+                    <td><span className="codeText">{candidate.rootSessionId}</span></td>
+                    <td><span className="archiveOwner"><strong>{candidate.project?.name ?? '个人会话'}</strong><small>{candidate.runtime.kind === 'project' ? `项目 #${candidate.runtime.id}` : `个人运行时 #${candidate.runtime.id}`}</small></span></td>
+                    <td>{candidate.creator?.displayName ?? '未知用户'}</td>
+                    <td><time dateTime={new Date(candidate.updatedAt).toISOString()}>{formatTime(candidate.updatedAt)}</time></td>
+                    <td>{candidate.eventCount}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+            <div className="mobileList emptyDraftMobileList">{emptyCandidates.map(candidate => (
+              <label className="mobileItem" key={candidate.rootSessionId}>
+                <span className="mobileItemHeader"><span className="checkLabel"><input type="checkbox" aria-label={`选择 ${candidate.rootSessionId}`} checked={emptySelected.has(candidate.rootSessionId)} onChange={event => setEmptySelected(nextSelection(emptySelected, candidate.rootSessionId, event.target.checked))} /><strong className="codeText">{candidate.rootSessionId}</strong></span><strong>{candidate.project?.name ?? '个人会话'}</strong></span>
+                <span className="mobileItemBody"><span className="muted">{candidate.creator?.displayName ?? '未知用户'} · {candidate.runtime.kind === 'project' ? `项目 #${candidate.runtime.id}` : `个人运行时 #${candidate.runtime.id}`}</span><span className="muted">{candidate.eventCount} 条事件 · {formatTime(candidate.updatedAt)}</span></span>
+              </label>
+            ))}</div>
+          </>
         )}
       </Section>
       <Section title="筛选条件">

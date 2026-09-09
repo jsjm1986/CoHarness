@@ -1426,6 +1426,24 @@ a {
   padding: 12px;
 }
 
+.emptyDraftTableWrap {
+  margin-top: 12px;
+}
+
+.emptyDraftTable th:first-child,
+.emptyDraftTable td:first-child {
+  width: 44px;
+  text-align: center;
+}
+
+.emptyDraftTable td {
+  vertical-align: middle;
+}
+
+.emptyDraftMobileList {
+  padding: 0;
+}
+
 .mobileItem {
   min-width: 0;
   padding: 14px;
