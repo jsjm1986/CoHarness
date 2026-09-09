@@ -34,6 +34,7 @@ import { readResponseJson, ResponseBodyTooLargeError } from './response-budget.t
 import { createProxyHandlers } from './proxy.ts'
 import { createPostgresPushService } from './push-notifications.ts'
 import { createRuntimeApiHandler } from './runtime-api.ts'
+import { createGatewayWorkbenchCatalogHandler } from './workbench.ts'
 import {
   createDocumentTransferCapabilitiesHandler,
   createDocumentTransferDirectoriesHandler,
@@ -281,6 +282,13 @@ const documentAdmin = createGatewayDocumentAdminHandler({
 })
 const server = createGatewayServer(deps, {
   ...proxyHandlers,
+  workbenchCatalog: createGatewayWorkbenchCatalogHandler({
+    instances,
+    collaboration,
+    principals: principalKeys.signer,
+    maxResponseBytes: cfg.upstreamResponseLimitBytes,
+    upstreamTimeoutMs: cfg.upstreamTimeoutMs,
+  }),
   // Authenticate loopback runtime calls before the Gateway starts buffering
   // their body. The runtime handler repeats the check at dispatch time; this
   // early probe is deliberately narrow and exists to turn unauthenticated

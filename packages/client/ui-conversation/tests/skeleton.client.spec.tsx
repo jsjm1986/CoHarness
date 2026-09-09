@@ -12,7 +12,7 @@ import {
 import type {
   ConversationSnapshot, SessionId, SessionListState, WorkspaceId, WorkspaceListState, WorkspaceView,
 } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ConversationRootProps } from '../src/client/skeleton/ConversationRoot.tsx'
+import type { ConversationPaneProps, ConversationPaneProps as ConversationRootProps } from '../src/client/skeleton/ConversationRoot.tsx'
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts'
@@ -20,7 +20,7 @@ import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts
 import { createChatStore } from '../src/client/stores.ts'
 import { SessionInputShell } from '../src/client/input/facade.ts'
 import { en, zh } from '../src/client/locales.ts'
-import { ConversationRoot } from '../src/client/skeleton/ConversationRoot.tsx'
+import { ConversationPane as ConversationRoot } from '../src/client/skeleton/ConversationRoot.tsx'
 import { ConversationSession, ConversationSessionHeader } from '../src/client/skeleton/ConversationSession.tsx'
 import { HeroShell } from '../src/client/skeleton/EmptyHero.tsx'
 import type { HeroShellProps } from '../src/client/skeleton/EmptyHero.tsx'
@@ -29,6 +29,7 @@ import type { InputBarProps } from '../src/client/skeleton/InputBar.tsx'
 import type {
   ComposerBarOwnerProps,
 } from '../src/client/contract/slots.ts'
+import type { ComposerBlock } from '../src/client/input/blocks.ts'
 import type { ConversationDisplaySettingsSnapshot } from '../src/client/display-settings.ts'
 import type { ViewTab } from '../src/client/contract/views.ts'
 
@@ -239,7 +240,7 @@ function mount(
     }
     return <div data-testid={`view-${opts?.only ?? key}`} />
   }) as ConversationRootProps['renderSlot']
-  const renderSlotChain = ((_key, _owner, opts) => (
+  const renderSlotChain = ((_key: string, _owner: object, opts: { fallback?: ReactNode } | undefined) => (
     options.overlayTakeover === true
       ? (
         <>
@@ -250,17 +251,17 @@ function mount(
         </>
       )
       : (opts?.fallback ?? null)
-  )) as ConversationRootProps['renderSlotChain']
-  const props: ConversationRootProps = {
+  )) as ConversationPaneProps['renderSlotChain']
+  const props = {
     sessionId: SID,
-    SessionProvider: ({ children }) => children(SID),
+    SessionProvider: ({ children }: { children: (id: SessionId) => ReactNode }) => children(SID),
     useSession,
     useSessions: bindSnapshotSelector(sessions),
     useWorkspaces: bindSnapshotSelector(workspaces),
     useProjection: (() => undefined),
-    useComposerBlock: select => select(options.composerBlock),
+    useComposerBlock: (select: (value: ComposerBlock | undefined) => unknown) => select(options.composerBlock),
     useDisplaySettings: bindSnapshotSelector(displaySettings),
-    setDisplayWidth: (value) => {
+    setDisplayWidth: (value: number) => {
       displaySettings.set({ ...displaySettings.getSnapshot(), chatContentWidth: value })
     },
     useInput,
@@ -270,7 +271,7 @@ function mount(
     selectWorkspace: retargetWorkspace,
     newSession,
     t,
-  }
+  } as unknown as ConversationRootProps
   const view = render(<ConversationRoot {...props} />)
   return {
     view, chat, sink, retargetWorkspace, newSession, session, slotCalls, seatOwners, open, displaySettings,

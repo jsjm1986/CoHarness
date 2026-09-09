@@ -43,6 +43,8 @@ const NO_MODEL_EXPERIENCE_SECTION: Readonly<Record<string, string>> = {
  * blocks. A package moves on or off this list with its context behavior.
  */
 const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
+  'packages/client/ui-open-in-app': { kind: 'none', reason: 'Desktop application launch controls do not register model-visible prompts or results.' },
+  'packages/host/open-in-app': { kind: 'none', reason: 'Host application launch routes do not register model-visible prompts or results.' },
   'packages/session/session-format': { kind: 'none', reason: 'The package validates and migrates durable Session data; provider and prompt consumers own every model-visible effect.' },
   'packages/util/values': { kind: 'none', reason: 'JSON-safe value operations register no prompt, schema, or result text.' },
   'packages/credentials/authorization': { kind: 'none', reason: 'Authorization is a configuration-time human conversation; its flow, notice, and prompt never enter a model request.' },
@@ -75,6 +77,7 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/client/connection': { kind: 'none', reason: 'Browser-side UI plugin layer; registers nothing model-facing.' },
   'packages/api/remotes': { kind: 'none', reason: 'The Remote BFF selects business methods and identity policy; selected services own any model-visible effect.' },
   'packages/client/runtime': { kind: 'none', reason: 'Browser-side UI plugin layer; registers nothing model-facing.' },
+  'packages/client/ui-workbench': { kind: 'none', reason: 'Browser-only pane controls; the existing conversation submission path owns all model-visible content.' },
   'packages/client/ui-layout': { kind: 'none', reason: 'Browser-side UI plugin layer; registers nothing model-facing.' },
   'packages/client/ui-sidebar': { kind: 'none', reason: 'Browser-side UI plugin layer; registers nothing model-facing.' },
   'packages/client/ui-brand-official': { kind: 'none', reason: 'Browser-side presentation occupants; registers nothing model-facing.' },

@@ -810,11 +810,16 @@ export function WorkspaceBrowser({
   searchResultLimit,
   useDirectoryFlow,
   useHostDescription,
+  useViewport = selector => selector({ mode: 'single', paneIds: [], paneRatios: [] }),
+  useCurrentSessions = useSessions,
+  exitWorkbench,
   renderSlot,
   t,
   listDirectory,
 }: WorkspaceBrowserProps) {
   const home = useHostDescription(description => description?.home)
+  const viewportMode = useViewport(state => state.mode)
+  const workbenchMode = viewportMode === 'workbench'
   const workspaces = useWorkspaces(state => state.items)
   const workspacePhase = useWorkspaces(state => state.phase)
   const archivedSessionIds = useWorkspaces(state => state.archivedSessionIds)
@@ -826,12 +831,12 @@ export function WorkspaceBrowser({
   const groupExpansion = useStore(s => s.groupExpansion)
   const sessionOrderByAccount = useStore(s => s.sessionOrderByAccount)
   const sessionUpdatedAtByAccount = useStore(s => s.sessionUpdatedAtByAccount)
-  const currentBlankSessionId = useSessions((state) => {
+  const currentBlankSessionId = useCurrentSessions((state) => {
     const current = state.current
     const summary = current === undefined ? undefined : state.byId[current]
     return summary?.blank === true ? current : undefined
   })
-  const currentBlankWorkspaceId = useSessions(state => currentBlankSessionId === undefined
+  const currentBlankWorkspaceId = useCurrentSessions(state => currentBlankSessionId === undefined
     ? undefined
     : state.byId[currentBlankSessionId]?.workspaceId)
   const currentBlankAccount = currentBlankSessionId === undefined
@@ -1061,7 +1066,14 @@ export function WorkspaceBrowser({
   }
 
   return (
-    <div className={clsx(css.root, !wide && css.rail)}>
+    <div className={clsx(css.root, !wide && css.rail, workbenchMode && css.workbenchMode)}>
+      {workbenchMode && wide && (
+        <div className={css.workbenchNotice} role="status">
+          <strong>工作台模式</strong>
+          <span>当前空间会话列表已暂时收起</span>
+          <button type="button" onClick={() => { exitWorkbench?.() }}>返回当前空间</button>
+        </div>
+      )}
       <div className={css.sectionHeader}>
         {wide && (
           <span className={clsx(css.sectionLabel, css.wide, searchExpanded && css.sectionLabelHidden)}>
@@ -1194,11 +1206,11 @@ export function WorkspaceBrowser({
 
       {/* Always-mounted seat keeps the region's flex slot while the list
           itself is wide-only. */}
-      <div className={css.listArea}>
+      <div className={clsx(css.listArea, workbenchMode && css.workbenchListHidden)}>
         {wide && (normalizedQuery !== ''
           ? (
             <SearchResults
-              useSessions={useSessions}
+              useSessions={useCurrentSessions}
               open={open}
               workspaces={workspaces}
               archivedSessionIds={archivedSessionIds}
@@ -1211,7 +1223,7 @@ export function WorkspaceBrowser({
           : groupBy === 'flat'
             ? (
               <FlatList
-                useSessions={useSessions} open={open} forkSession={forkSession}
+                useSessions={useCurrentSessions} open={open} forkSession={forkSession}
                 onSessionRename={onSessionRename} onSessionArchive={onSessionArchive}
                 archivedSessionIds={archivedSessionIds}
                 orderBy={orderBy}
@@ -1224,7 +1236,7 @@ export function WorkspaceBrowser({
             )
             : (
               <SessionTree
-                useSessions={useSessions}
+                useSessions={useCurrentSessions}
                 onSessionRename={onSessionRename}
                 onSessionArchive={onSessionArchive}
                 forkSession={forkSession}

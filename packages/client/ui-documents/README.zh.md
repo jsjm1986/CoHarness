@@ -4,6 +4,8 @@ CoHarness Web UI 的工作区文档管理器。整理、预览、上传、移动
 
 [English](README.md) | 中文
 
+打开文档选择器时固定目标 Session。弹窗打开期间切换面板，不会改变所选文档加入的输入框。
+
 ## 安装
 
 本包是 `@deepseek-ai/dsh-client-ui-documents` 功能包的一部分，由 web-app profile 自动加载。

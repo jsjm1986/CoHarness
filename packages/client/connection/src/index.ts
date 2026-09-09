@@ -5,7 +5,7 @@ import z from '@deepseek-ai/schemastery'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import type {} from '@deepseek-ai/dsh-attachment'
 // Activates the webServer Context merge used below.
-import type { WebRoute, WebUpgradeRoute } from '@deepseek-ai/dsh-host-webserver'
+import type { IndexInjection, WebRoute, WebUpgradeRoute } from '@deepseek-ai/dsh-host-webserver'
 import {
   DEFAULT_HISTORY_PAGE_TARGET_BYTES,
   toFetchHandler,
@@ -79,6 +79,21 @@ export const inject = ['webServer']
 
 /** Plugin config: the deployment's non-loopback serving authorities. */
 export interface ConnectionConfig {
+  /** Browser generation recovery timing delivered through the served index. */
+  recovery?: {
+    /** First retry delay cap in milliseconds. */
+    backoffBaseMs?: number
+    /** Multiplicative retry growth factor. */
+    backoffFactor?: number
+    /** Maximum retry delay cap in milliseconds. */
+    backoffMaxMs?: number
+    /** Legacy stream-open guard in milliseconds. */
+    streamOpenTimeoutMs?: number
+    /** Warning delay for a stalled generation. */
+    generationReadyWarnMs?: number
+    /** Hard readiness deadline in milliseconds. */
+    generationReadyTimeoutMs?: number
+  }
   /**
    * Authorities this deployment serves beyond loopback: exact `host:port`, or
    * port-less `host` matching any port. The /api trust fence refuses any
@@ -101,6 +116,21 @@ export interface ConnectionConfig {
 }
 
 export const Config: z<ConnectionConfig> = z.object({
+  recovery: z.object({
+    backoffBaseMs: z.natural().min(1).max(MAX_TIMER_DELAY_MS).default(500),
+    backoffFactor: z.number().min(1).default(2),
+    backoffMaxMs: z.natural().min(1).max(MAX_TIMER_DELAY_MS).default(10_000),
+    streamOpenTimeoutMs: z.natural().min(1).max(MAX_TIMER_DELAY_MS).default(3_000),
+    generationReadyWarnMs: z.natural().min(1).max(MAX_TIMER_DELAY_MS).default(3_000),
+    generationReadyTimeoutMs: z.natural().min(1).max(MAX_TIMER_DELAY_MS).default(15_000),
+  }).default({
+    backoffBaseMs: 500,
+    backoffFactor: 2,
+    backoffMaxMs: 10_000,
+    streamOpenTimeoutMs: 3_000,
+    generationReadyWarnMs: 3_000,
+    generationReadyTimeoutMs: 15_000,
+  }),
   trustedHosts: z.array(String).default([]),
   maxRequestBodyBytes: z.natural().min(1).default(DEFAULT_MAX_REQUEST_BODY_BYTES),
   historyPageTargetBytes: z.natural().min(1).default(DEFAULT_HISTORY_PAGE_TARGET_BYTES),
@@ -175,6 +205,7 @@ export function apply(ctx: Context, config?: ConnectionConfig): void {
   const historyPageTargetBytes =
     config?.historyPageTargetBytes ?? DEFAULT_HISTORY_PAGE_TARGET_BYTES
   const websocketHeartbeatIntervalMs = config?.websocketHeartbeatIntervalMs ?? 30_000
+  const recovery = config?.recovery ?? {}
   if (!Number.isSafeInteger(maxRequestBodyBytes) || maxRequestBodyBytes < 1) {
     throw new Error('client-connection maxRequestBodyBytes must be a positive safe integer')
   }
@@ -191,6 +222,9 @@ export function apply(ctx: Context, config?: ConnectionConfig): void {
   for (const entry of trustedHosts) assertTrustedAuthority(entry)
   if (ctx.get('apiProxy') !== undefined) assertImageBodyCapacity(ctx, maxRequestBodyBytes)
   const connection = new HostConnectionService(ctx, trustedHosts)
+  ctx.on('webserver/index-inject', (table: IndexInjection[]) => {
+    table.push({ kind: 'global', name: '__DSH_CONNECTION_RECOVERY__', value: recovery })
+  })
   // Construct the Fetch carrier once per resident ApiProxy. Rebuilding its
   // route tables on every request adds avoidable allocations on the hot path;
   // a WeakMap still lets HMR replace the proxy without retaining the old one.

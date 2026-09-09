@@ -9,6 +9,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
 import type { FC } from 'react'
 import type { SlotRendererHost } from '@deepseek-ai/dsh-client-ui-slots'
+import { defineStore } from '../src/client/contract/store.ts'
 import { SlotRegistry } from '../src/client/slots.ts'
 
 // Test-only slot keys (merged so the typed entries/spec faces accept them).
@@ -662,5 +663,22 @@ describe('event bridge', () => {
     }, C)
     bench.erased.register({ name: 't.rows', id: 'a' }, C)
     expect(seen).toEqual(['root', 't.rows', 't.rows'])
+  })
+})
+
+
+describe('store service consumers', () => {
+  it('shares the declared root instance with the renderer and rejects an unloaded handle', async () => {
+    const b = await boot()
+    const host = captureHost(b, { 't.host': { kind: 'single', scope: 'root' } })
+    const handle = defineStore({ init: () => ({ count: 0 }), actions: { increment: (draft) => { draft.count++ } } })
+    expect(() => b.svc.bindStore(handle)).toThrow(/not registered/)
+    const off = b.erased.register({ name: 't.host', store: handle }, C)
+    const instance = b.svc.bindStore(handle)
+    instance.actions.increment()
+    expect(host.storeOf(b.svc.entries('t.host')[0]!, undefined)).toBe(instance)
+    expect(instance.getSnapshot().count).toBe(1)
+    off()
+    expect(() => b.svc.bindStore(handle)).toThrow(/not registered/)
   })
 })

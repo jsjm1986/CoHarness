@@ -153,10 +153,11 @@ export const InputBar = memo(function InputBar({
   renderSlot, useNotices, useLexicon, useMenuLauncher, useDocuments,
   useProjection, sessionId, variant, disabled: inert = false, blocked,
   workspacePickerOpen = false, onRequestWorkspace,
-  placeholder, accessory, overlay, leftItems, rightItems, footer,
+  placeholder, accessory, overlay, leftItems, rightItems, footer, active = true, compact = false,
 }: InputBarProps) {
   const input = useInput(s => s)
-  const phone = useMediaQuery('(max-width: 767px)')
+  const viewportPhone = useMediaQuery('(max-width: 767px)')
+  const phone = compact || viewportPhone
   const narrowPhone = useMediaQuery('(max-width: 359px)')
   const notice = useNotices(s => s)
   const lexicon = useLexicon(s => s)
@@ -270,7 +271,8 @@ export const InputBar = memo(function InputBar({
   // and keyboard users can reach the recovery action.
   const workspaceTrigger = inert && !removed && onRequestWorkspace !== undefined
   const textareaDisabled = removed || (locked && !workspaceTrigger)
-  const canSteerQueue = !locked && !machineBusy && !commandMenuOpen && empty && running && subagent === null
+  const steeringAvailable = subagent === null || continuable
+  const canSteerQueue = !locked && !machineBusy && !commandMenuOpen && empty && running && steeringAvailable
     && input.queue.some(row => row.placement === 'queued')
 
   useEffect(() => {
@@ -354,10 +356,15 @@ export const InputBar = memo(function InputBar({
   // down). Suppress the walk, then reveal in our own box.
   useEffect(() => {
     const el = inputRef.current
-    if (locked || el === null) return
+    if (!active || locked || el === null) return
+    // Pane activation must preserve a user's focus on tabs, menus, or another
+    // control. Automatic focus remains available on an otherwise empty page.
+    const focused = document.activeElement
+    if (el.closest('[data-session-pane]') !== null && focused instanceof HTMLElement
+      && focused !== document.body && focused !== el) return
     el.focus({ preventScroll: true })
     revealSelectionFocus(el)
-  }, [locked, sessionId])
+  }, [active, locked, sessionId])
 
   // A persisted draft arrives AFTER the unlock effect: ConversationSession
   // adopts it in its own mount effect, and a parent's mount effect runs after
@@ -528,7 +535,7 @@ export const InputBar = memo(function InputBar({
     keyboard.submit(resolveSubmitMode(
       running,
       accelerated ? 'accelerated' : 'enter',
-      subagent === null,
+      steeringAvailable,
     ))
   }
 
@@ -651,7 +658,7 @@ export const InputBar = memo(function InputBar({
     intakeFiles(files)
   }
 
-  const canAcceptDrop = !locked && !machineBusy && (addImages !== undefined || addDocuments !== undefined)
+  const canAcceptDrop = active && !locked && !machineBusy && (addImages !== undefined || addDocuments !== undefined)
 
   const onSelect = (e: React.SyntheticEvent<HTMLTextAreaElement>): void => {
     // Any caret/selection gesture ends a live paste attempt (the machine
@@ -913,6 +920,7 @@ export const InputBar = memo(function InputBar({
         {renderSlot('conversation.input.attachments', {
           attachments,
           canAcceptDrop,
+          active,
           onAddImages: intakeFiles,
           onRemoveImage: (id) => { removeImage?.(id) },
           dropLimits: imageLimits === undefined ? undefined : {
@@ -1000,7 +1008,7 @@ export const InputBar = memo(function InputBar({
                 onMouseDown={keepFocus}
                 onClick={() => {
                   if (typeof window !== 'undefined') {
-                    window.dispatchEvent(new CustomEvent('dsh-documents-open-picker', { detail: { mode: 'select' } }))
+                    window.dispatchEvent(new CustomEvent('dsh-documents-open-picker', { detail: { mode: 'select', sessionId } }))
                   }
                 }}
               >

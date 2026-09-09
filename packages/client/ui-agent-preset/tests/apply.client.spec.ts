@@ -168,6 +168,7 @@ function sessionsDouble(state: {
         return () => listeners.delete(fn)
       },
     },
+    scopeOf: () => undefined,
     noteAgentPreset: (sessionId: string, agentPreset: string) => {
       const summary = state.byId[sessionId]
       if (summary === undefined || summary.agentPreset === agentPreset) return
@@ -583,4 +584,28 @@ describe('ui-agent-preset apply', () => {
     const section = (slots.entries('settings.section')[0]!.inject as unknown as () => AgentPresetSectionInjected)()
     expect(section.startCreatorDraft).toBeUndefined()
   })
+})
+
+it.each([false, true])('reads the selected Session roster through its runtime connection when available (%s)', async (withTarget) => {
+  const { ctx, slots, calls } = await bench()
+  declareRoot(slots)
+  declareConversation(slots)
+  const state = { current: 's1', byId: { s1: { id: 's1', blank: true, agentPreset: 'standard' } } }
+  const sessions = sessionsDouble(state)
+  Object.assign(sessions, { runtimeTargetFor: () => ({ kind: 'project', projectId: 7 }) })
+  ctx.provide('sessions', sessions as never)
+  ctx.provide('conversation', {} as never)
+  ctx.provide('workspaces', workspacesDouble() as never)
+  const connection = ctx.get('connection')!
+  const list = vi.fn(async () => ROSTER_MOVED)
+  if (withTarget) Object.assign(connection, {
+    forTarget: () => ({ api: { ...connection.api, agentPresets: { ...connection.api.agentPresets, list } } }),
+  })
+  try {
+    await ctx.plugin({ inject: [...inject, 'conversation', 'sessions', 'workspaces'], apply }).await()
+    const seat = (slots.entries('conversation.hero.agentPreset')[0]!.inject as unknown as () => AgentPresetSeatInjected)()
+    await seat.load()
+    if (withTarget) expect(list).toHaveBeenCalled()
+    else expect(calls).toContain('list')
+  } finally { await ctx.fiber.dispose() }
 })

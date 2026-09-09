@@ -8,9 +8,8 @@
  * Scope lifecycle is stage-driven: a scope is minted lazily on first
  * resolution (pure — resolution has no side effects and is render-safe);
  * the event window and deferred teardown key off the STAGED session, which
- * follows `list.current` exactly. Staging is the open signal: the window
- * opens ⟺ the session is on stage (today the stage is `current`; the staged
- * state can widen to a multi-pane list later). A session leaving the stage
+ * follows `list.current` plus an optional multi-pane set. Staging is the open
+ * signal: the window opens iff the session is on stage. A session leaving the stage
  * releases its browser history window; its scope and durable interaction
  * mirrors remain resident until the ordinary eligibility prune tears them down.
  */
@@ -53,6 +52,8 @@ export interface SessionSummary {
    * Workspace during that interval and is never sent on the wire.
    */
   workspaceId?: WorkspaceId
+  /** Account catalog label for a project runtime session. */
+  workspaceName?: string
   /**
    * Agent preset this session's agent was composed from; absent when the
    * deployment composes no presets. The session header labels what the
@@ -273,12 +274,10 @@ export class SessionRuntime implements ISessions {
   private readonly scopes = new Map<SessionId, ScopeRecord>()
   /** The provide channel (roster, materialization rules, current projection) — shared with the test runtime's double. */
   private readonly provideChannel: SessionProvideChannel
-  /**
-   * The staged session id — follows `list.current` exactly, holding its last
-   * defined value across masked gaps (a transiently absent selection blanks
-   * `current` without moving the stage, so reconnect re-pulls and removals
-   * keep the staged scope's frozen view alive until the stage moves on).
-   */
+  /** Extra windows requested by a multi-pane surface and their active stage set. */
+  private readonly additionalStaged = new Set<SessionId>()
+  private readonly staged = new Set<SessionId>()
+  /** Last selected id retained across a transient list mask on reconnect. */
   private watched: SessionId | undefined
   /** Removed-while-staged sessions whose teardown waits for the stage to move away. */
   private readonly deferredRemovals = new Set<SessionId>()
@@ -290,16 +289,18 @@ export class SessionRuntime implements ISessions {
    * @param api - wire client shared with every Session.
    * @param remote - generated Remote namespaces shared with every Session.
    * @param conversationRuntime - same-pass registry instances, when runtime apply owns them.
+   * @param options - optional selection persistence and service-registration controls.
    */
   constructor(
     private readonly rootCtx: Context,
     api: IApiClient,
     remote: SessionRemotes,
     conversationRuntime?: ConversationRuntime,
+    options: { persistSelection?: boolean; provideService?: boolean } = {},
   ) {
     this.selection = createSnapshotStore<SessionSelection>(
       {},
-      { persist: { name: 'dsh.sessions.current' } })
+      options.persistSelection === false ? undefined : { persist: { name: 'dsh.sessions.current' } })
     const restored = this.selection.getSnapshot()
     const conversationEvents = rootCtx.get('conversationEvents')
     const conversationViews = rootCtx.get('conversationViews')
@@ -370,7 +371,9 @@ export class SessionRuntime implements ISessions {
     // single static plugin row. Own a final root teardown that closes every
     // remaining scope and waits for any prune already in progress.
     rootCtx.effect(() => async () => {
+      this.additionalStaged.clear()
       this.watched = undefined
+      this.staged.clear()
       for (const [id, record] of this.scopes) {
         this.scopes.delete(id)
         this.deferredRemovals.delete(id)
@@ -386,7 +389,7 @@ export class SessionRuntime implements ISessions {
         }
       }
     }, 'sessions: scope disposal')
-    rootCtx.reflect.provide('sessions', this, undefined)
+    if (options.provideService !== false) rootCtx.reflect.provide('sessions', this, undefined)
   }
 
   /**
@@ -461,8 +464,19 @@ export class SessionRuntime implements ISessions {
    * staged browser history window; a transient list mask does not.
    */
   clear(): void {
-    this.leaveWatched()
+    this.watched = undefined
+    this.reconcileStage(undefined)
     this.manager.clearSelection()
+  }
+
+  /** Replace the additional staged sessions retained by a multi-pane view. */
+  setAdditionalStaged(ids: readonly SessionId[]): void {
+    this.additionalStaged.clear()
+    for (const id of ids) {
+      if (this.eligible(id)) this.additionalStaged.add(id)
+    }
+    this.reconcileStage(this.list.getSnapshot().current, true)
+    this.pruneScopes()
   }
 
   /**
@@ -672,8 +686,8 @@ export class SessionRuntime implements ISessions {
    * no staging, no window side effects (StrictMode double-invokes and
    * concurrent discarded passes must stay free).
    */
-  private provideInfo(id: string): SessionProvideInfo | undefined {
-    return this.resolve(id as SessionId)?.provideInfo
+  provideInfoFor(id: SessionId): SessionProvideInfo | undefined {
+    return this.resolve(id)?.provideInfo
   }
 
   /**
@@ -681,43 +695,35 @@ export class SessionRuntime implements ISessions {
    * return the static no-session projection rather than removing hook props.
    */
   private maybeProvideInfo(id: string | undefined): SessionMaybeProvideInfo {
-    return (id === undefined ? undefined : this.provideInfo(id)) ?? this.provideChannel.maybeInfo
+    return (id === undefined ? undefined : this.provideInfoFor(id as SessionId)) ?? this.provideChannel.maybeInfo
   }
 
-  /**
-   * Move the stage to the list's current session: sweep teardowns deferred
-   * behind the previous occupant and pull the new occupant's history window.
-   * Staging IS the open signal — the window opens ⟺ the session is on stage
-   * — and open() is idempotent (an in-flight or completed open no-ops; a
-   * failed one retries the next time current is touched).
-   */
+  /** Reconcile staged history windows with current selection and pane requests. */
   private followCurrent(): void {
     const snapshot = this.list.getSnapshot()
-    const current = snapshot.current
-    // A masked gap (current blanked while the selection's session is
-    // transiently absent) holds the stage: tearing down on the gap would
-    // destroy exactly the frozen scope the mask exists to preserve.
-    if (current === undefined || snapshot.byId[current] === undefined || current === this.watched) return
-    const previous = this.watched
-    if (previous !== undefined) this.scopes.get(previous)?.session.leaveStage()
-    this.watched = current
-    this.sweepDeferred()
-    const record = this.resolve(current)
-    /* v8 ignore next 3 -- defensive: current is always a listed id (open()
-     * validates and the projection masks absent selections), so resolve
-     * cannot miss; kept so a future current writer cannot crash the notify. */
-    if (record !== undefined) {
-      record.session.enterStage()
-      void this.manager.refreshSubagents(current)
-    }
+    if (snapshot.current !== undefined) this.watched = snapshot.current
+    this.reconcileStage(snapshot.current, snapshot.current === undefined)
   }
 
-  /** Leave the staged history window for an explicit clear-selection action. */
-  private leaveWatched(): void {
-    const watched = this.watched
-    if (watched === undefined) return
-    this.scopes.get(watched)?.session.leaveStage()
-    this.watched = undefined
+  /** Reconcile Session stage membership without touching current selection. */
+  private reconcileStage(current: SessionId | undefined, preserveMaskedCurrent = false): void {
+    const desired = new Set<SessionId>(this.additionalStaged)
+    if (current !== undefined && this.eligible(current)) desired.add(current)
+    if (preserveMaskedCurrent && current === undefined && this.watched !== undefined) desired.add(this.watched)
+    for (const id of [...this.staged]) {
+      if (desired.has(id)) continue
+      this.scopes.get(id)?.session.leaveStage()
+      this.staged.delete(id)
+    }
+    this.sweepDeferred()
+    for (const id of desired) {
+      if (this.staged.has(id)) continue
+      const record = this.resolve(id)
+      if (record === undefined) continue
+      this.staged.add(id)
+      record.session.enterStage()
+      void this.manager.refreshSubagents(id)
+    }
   }
 
   /**
@@ -836,7 +842,7 @@ export class SessionRuntime implements ISessions {
   private pruneScopes(): void {
     for (const [id, record] of this.scopes) {
       if (this.eligible(id)) continue
-      if (id === this.watched) {
+      if (this.staged.has(id)) {
         this.deferredRemovals.add(id)
         continue
       }
@@ -893,7 +899,7 @@ export class SessionRuntime implements ISessions {
       /* v8 ignore next -- defensive: only the staged id ever defers, and every
        * stage move sweeps first, so the set cannot contain the id the stage just
        * moved to; kept as a guard against future extra sweep call sites. */
-      if (id === this.watched) continue
+      if (this.staged.has(id)) continue
       // Eligible again? (A re-added id cancels the deferred teardown.)
       if (this.eligible(id)) {
         this.deferredRemovals.delete(id)

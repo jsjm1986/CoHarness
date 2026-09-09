@@ -7,6 +7,7 @@ import {
 } from '@deepseek-ai/dsh-host-apiproxy/api'
 import { readApiResponseJson } from '@deepseek-ai/dsh-host-apiproxy/client'
 import type { ClientConnectionRpc } from '../rpc.ts'
+import type { ConnectionRuntimeTarget } from './api.ts'
 import { randomUuid } from './random-uuid.ts'
 
 const INTERNAL_BASE = 'http://dsh.internal'
@@ -19,9 +20,10 @@ export type RpcFetch = (input: URL, init: RequestInit) => Promise<Response>
 /**
  * Create the browser-backed generic RPC caller.
  * @param doFetch - transport override; defaults to the page's global fetch.
+ * @param target - optional authenticated Gateway runtime target.
  * @returns caller that owns request correlation and response-envelope validation.
  */
-export function createWebConnectionRpc(doFetch?: RpcFetch): ClientConnectionRpc {
+export function createWebConnectionRpc(doFetch?: RpcFetch, target?: ConnectionRuntimeTarget): ClientConnectionRpc {
   const send: RpcFetch = doFetch ?? ((input, init) => globalThis.fetch(input, init))
   return {
     async call(channel, endpoint, payload, signal) {
@@ -33,8 +35,10 @@ export function createWebConnectionRpc(doFetch?: RpcFetch): ClientConnectionRpc 
         method: endpoint,
         payload,
       }
+      const url = new URL(`${channel}/${endpoint}`, resolveBase())
+      if (target !== undefined) url.searchParams.set('dshTarget', target.kind === 'personal' ? 'personal' : `project:${String(target.projectId)}`)
       const response = await send(
-        new URL(`${channel}/${endpoint}`, resolveBase()),
+        url,
         {
           method: 'POST',
           headers: { 'content-type': 'application/json' },

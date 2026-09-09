@@ -316,6 +316,14 @@
   overflow: visible;
 }
 
+/* The workbench is a separate navigation surface. Keep this owner mounted
+   for lifecycle stability, but hide its ordinary Workspace history chrome. */
+.workbenchMode .sectionHeader,
+.workbenchListHidden { display: none; }
+.workbenchNotice { display: flex; flex-direction: column; gap: 6px; margin: 8px; padding: 12px; border: 0.5px solid var(--dsw-alias-border-l1); border-radius: var(--dsw-radius-md); background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-secondary); font-size: 12px; }
+.workbenchNotice strong { color: var(--dsw-alias-label-primary); font-size: 13px; }
+.workbenchNotice button { align-self: flex-start; padding: 4px 0; border: 0; background: transparent; color: var(--dsw-alias-brand-primary); cursor: pointer; font: inherit; }
+
 .rail .listArea {
   margin-left: 0;
   margin-right: 0;

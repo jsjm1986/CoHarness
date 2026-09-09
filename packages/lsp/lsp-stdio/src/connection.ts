@@ -131,11 +131,6 @@ export class LspConnection {
     this.handle.stdout.on('data', (chunk: Buffer) => { this.onStdout(chunk) })
   }
 
-  /** The child's pid, or `-1` when the spawn produced no pid (so signalling is a no-op). */
-  get pid(): number {
-    return this.handle.pid
-  }
-
   /** The retained stderr tail, for diagnostics on a failed server. */
   get stderrTail(): string {
     /* v8 ignore next -- the collect disposition always exposes a stderr reader; defensive. */

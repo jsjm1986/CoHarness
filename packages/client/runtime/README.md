@@ -4,11 +4,15 @@ English | [中文](README.zh.md)
 
 Client cordis boot and React-free object services: SlotRegistry wraps SlotCore and supplies renderer data sources; SessionRuntime owns Session objects, list and scope state, and the shared event window and history paging used by registered conversation view targets. WorkspaceRuntime depends on SessionRuntime and owns Workspace objects, list/actions, default-target derivation, the history-first Workspace entry (`openWorkspace`), and the New Session blank-reuse entry (`connectWorkspace`). The runtime fans the shared Host stream into Session and Workspace owners and hands each generic `host/remote-event` frame to `ctx.remote.$dispatch`; domain packages subscribe to their owner events through `ctx.remote.$on` and decide which caches or session rows they invalidate. Client sessions are always Host-born (Session+Agent+cwd in one `session.create`); the client holds no pre-entity session state — a session's Agent scope (the client mirror of host dsh-scope, keyed by the shared agent/session id) is born when its row enters the list mirror and dies with the prune. Contract: api-contracts v3 §4. Each `Session` holds a generic `ProjectionValueStore` seeded from the history-tail `projections` block and updated by `session/projection` frames under higher-seq-wins; domain keys (including `todos`) are read via `projections.faceOf` / `useProjection`, not via `ConversationSnapshot`. The store also publishes one reference-stable whole-value map through `SessionSummary.projectionValues`, allowing global list consumers to reuse the same projections without creating per-session subscriptions.
 
+The account workbench extends this object layer with a lazy `SessionRuntimePool`. The pool aggregates list and standard-props lookups for the authenticated account, while each target runtime keeps its own API client, ConnectionController, SessionManager, event stream, and scoped resources. A target is admitted only after the Gateway validates membership and issues a generation-bound principal; removing a pane releases its history window without stopping the target runtime task.
+
 Direct browser consumers that read JSON responses reuse the Host carrier's streaming reader, which rejects declared or chunked bodies above the default 16 MiB limit before parsing. The helper is a transport guard, not a replacement for endpoint-specific response validation.
 
 For each prompt that can reach a local root or continuable child Agent, the runtime samples the browser's current `Intl.DateTimeFormat().resolvedOptions().timeZone` and attaches it to that one Session or subagent prompt RPC. It is neither cached nor included in Session creation or fork state, so travel and concurrent tabs keep message-local provenance. A browser that cannot provide a non-empty zone fails the prompt locally instead of silently substituting deployment state.
 
 Settings owners share the React-free `SettingsScopeSpec`, `SettingsScope`, and snapshot types defined here. ui-settings owns `ctx.settingsScope.bind(spec)`, its Host transport, schema validation, and lifecycle; see [its package contract](../ui-settings/README.md).
+
+`SlotRegistry.bindStore(handle, sessionId?)` resolves the framework-owned instance of an already registered handle. Service consumers share that instance with renderer entries and write through its declared actions; an unregistered handle or missing session scope throws.
 
 ## Slot declaration injection
 
@@ -92,6 +96,8 @@ A `turn/end` whose reason is `max-tokens` projects one `turn-max-tokens` node at
 
 Each resident `Session` owns a `modelSelection` snapshot containing the current `ModelSelection`, provider-grouped directory, provider-local failures, and the `idle`/`loading`/`ready`/`selecting`/`error` state. History establishes or refreshes the current selection, opening a selector refreshes the directory, and selection failures preserve the last selection and usable groups. Directory and selection operations share a monotonically increasing generation so an older response cannot overwrite a newer selection. A reconnect rebuild restores the selection reported by the Host without replacing unchanged selection substructure.
 
+Each Session reads cold pending input from its own `inbox` projection store, retaining runtime isolation. Projection subscriptions close when the Session is disposed.
+
 ## Model Experience
 
 None, as the session object layer selects the provider/model route used by a later Host request but adds no model-visible content.
@@ -103,5 +109,5 @@ Changing the model selection can change or invalidate provider-side cache reuse;
 ## Known Limitations and Deferred Work
 
 - **`loader.unload` is a stub** — it throws not-implemented; the client has no unload chain from fiber disposal through registration and style removal.
-- **Scope teardown is stage-driven, single-occupant today** — the staged session follows `list.current` exactly (staging is the open signal: the event window opens ⟺ the session is on stage); a removed-while-staged session's scope survives frozen until the stage moves on, not until true observer count reaches zero. Resolution (`binding()`/`scope()`) is pure addressing, render-safe; the render layer reads the current bundle through the `currentProvideInfo` observable. The staged state can widen to a multi-pane list when concurrent panes land.
+- **Scope teardown is stage-driven** — the staged set contains `list.current` plus ids requested by a multi-pane viewport; staging is the open signal and a removed-while-staged Session stays frozen until it leaves that set. Resolution (`binding()`/`scope()`) is pure addressing, render-safe; the render layer reads the current bundle through `currentProvideInfo` and explicit bundles through `provideInfoFor(id)`.
 - **Value imports of this package from plugin bundles must use the `/client` subpath** — the bare package name is not in the loader externals table and inlines a second module instance, whose private scope-tag Symbol never matches.

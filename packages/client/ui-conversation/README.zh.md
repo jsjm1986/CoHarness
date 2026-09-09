@@ -18,7 +18,7 @@ Hero 将“选择工作区”和“新建对话”作为两个独立操作：选
 
 在 composer 中直接选择的文件也使用与文档管理器相同的可续传上传会话，包括有界分片、SHA-256 校验、重试，以及重新选择同一文件后继续上传。
 
-视图环是一个 slot：严格会话主体注册在 `children` 表中声明会话作用域的 `'conversation.view'` 列表，并通过自身的 renderSlot share 渲染活跃配置项（`only: <active id>`）；视图标签页则从注册选项（`id`／`order`／`label`）投影而来。聊天视图是该包自身的配置项；ui-trajectory 等插件通过 `ctx.slots.register` 贡献标签页，每个视图负责自己的 chrome。Chat 留在 conversation 档历史快照上；处于舞台的活动会话会补齐更早页面而不替换已显示行，空闲且处于舞台的会话在阅读器接近顶部时会自动请求一页更早历史。右侧轮次轨道把有界的完整会话索引与已加载锚点合并，保持固定刻度间距并在内部滚动，支持预览索引轮次；点击未加载轮次时会先载入对应历史再落位。较早历史控件保留为自动读取失败或未完成时的无障碍重试入口。inspect 交接与 Trajectory 标签页调用 `ensureHistoryDetail()`（[两档会话历史传输](../../../.agents/notes/implemented/architecture/2026-08-18-conversation-history-tier.zh.md)）。
+根作用域的 `conversation` 入口声明 `conversation.pane`（允许当前 Session 缺席的对话树），以及可选工作台使用的工具栏、空状态和面板头 slots。它的 `conversationViewport` Cordis 能力通过 `slots.bindStore()` 与入口共享已声明的根级 store。提供方使用当前 Session 列表和归档列表校验恢复的 Session ID，最多保留四个面板，并协调额外历史窗口而不取消任务。显式 SessionProvider 实例保留各面板独立的标准 props 和 store；卸载工作台贡献后恢复单会话渲染。[工作台包](../ui-workbench/README.zh.md)负责 Workspace 选择器和面板操作。
 
 Chat 业务行是彼此独立的注册表贡献，不是封闭的内建联合。Client 插件通过 declaration merging 增加类型化 `ChatNodeDataMap` key，在 `ctx.conversationEvents` 上注册 `ConversationNodeDefinition`，再向 `conversation.chat.node` 注册匹配的 keyed renderer；它无须修改会话 fold 或中央 renderer switch。稳定事件 id、append/prepend 回放、Location data 与 renderer 约束见 [Conversation Node 实操手册](../../../docs/cookbook/adding-a-conversation-node.zh.md)。
 

@@ -270,16 +270,23 @@ describe('connection lifecycle', () => {
     }
   })
 
-  it('proceeds as connected via the timeout guard when a carrier never fires onOpen', async () => {
+  it('retries when a carrier never completes the readiness handshake', async () => {
     const api = new FakeApiClient()
     api.suppressStreamOpen = true // misbehaving carrier: streams open but onOpen never fires
     let connected = 0
-    const controller = new ConnectionController(api, { onConnected: () => { connected++ } }, { ...FAST, streamOpenTimeoutMs: 20 })
+    const states: ConnectionState[] = []
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const controller = new ConnectionController(api, {
+      onConnected: () => { connected++ },
+      onStateChange: state => states.push(state),
+    }, { ...FAST, streamOpenTimeoutMs: 20, generationReadyTimeoutMs: 20 })
     controller.start()
     try {
-      await vi.waitFor(() => { expect(connected).toBe(1) }) // handshake resolved by the guard, not wedged
+      await vi.waitFor(() => { expect(states).toContain('reconnecting') })
+      expect(connected).toBe(0)
     } finally {
       controller.stop()
+      warnSpy.mockRestore()
     }
   })
 

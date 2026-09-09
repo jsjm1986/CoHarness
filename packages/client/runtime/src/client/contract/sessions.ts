@@ -11,7 +11,8 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {
   RpcResult, SessionId, SubagentAddress,
 } from '@deepseek-ai/dsh-api-remotes/client'
-import type { HostObservable, SessionMaybeProvideInfo } from '@deepseek-ai/dsh-client-ui-slots'
+import type { ConnectionRuntimeTarget } from '@deepseek-ai/dsh-client-connection/client'
+import type { HostObservable, SessionMaybeProvideInfo, SessionProvideInfo } from '@deepseek-ai/dsh-client-ui-slots'
 import type { AgentContext } from '../scope.ts'
 import type { SessionSearchResultItem } from '../sessions/manager.ts'
 import type {
@@ -22,12 +23,22 @@ import type { ObservableSnapshot } from './store.ts'
 
 export type { AgentContext } from '../scope.ts'
 
+/** Account Gateway target used to bind a workbench pane to one runtime. */
+export type SessionRuntimeTarget = ConnectionRuntimeTarget
+
 /** The sessions-service face injected as `ctx.sessions`. */
 export interface ISessions {
   /** The useSessions standard feed (list rows + current selection; read face — writes stay inside the domain). */
   readonly list: ObservableSnapshot<SessionListState>
+  /** Current authenticated space list; unlike list, it excludes staged workbench targets. */
+  readonly currentScopeList?: ObservableSnapshot<SessionListState>
   /** Atomic current-session provide projection (the renderer host's `sessions.provideInfo` feed). */
   readonly currentProvideInfo: HostObservable<SessionMaybeProvideInfo>
+  /** Resolve the standard-props bundle without selecting or staging a Session.
+   * @param id - listed or retained Session identity.
+   * @returns the bundle, or undefined when the identity cannot be resolved.
+   */
+  provideInfoFor(id: SessionId): SessionProvideInfo | undefined
   /**
    * The `session.search` result bound the wire schema fixes, exposed to
    * presentation as injected data. Not per-connection state: every transport
@@ -73,6 +84,10 @@ export interface ISessions {
   noteAgentPreset(sessionId: SessionId, agentPreset: string): void
   /** Clear the current selection into the no-session view state. */
   clear(): void
+  /** Replace additional history windows retained alongside the current Session.
+   * @param ids - eligible Session identities; duplicates and unknown ids are ignored.
+   */
+  setAdditionalStaged(ids: readonly SessionId[]): void
   /**
    * Search the Host's visible message-content index. Results stay
    * request-local; the list snapshot remains the metadata authority.
@@ -127,4 +142,12 @@ export interface ISessions {
    * @returns binding, or undefined for a session neither listed nor already scoped.
    */
   binding(id: SessionId): SessionBinding | undefined
+  /** Ensure an account-visible session is loaded into its target runtime. */
+  ensureSession?(target: SessionRuntimeTarget, id: SessionId): Promise<boolean>
+  /** Create a new conversation in an explicitly selected account runtime. */
+  createSession?(target: SessionRuntimeTarget): Promise<SessionId>
+  /** Reconcile the bootstrap connection with the account's current scope. */
+  setBaseRuntimeTarget?(target: SessionRuntimeTarget): void
+  /** Resolve the target runtime currently owning one session. */
+  runtimeTargetFor?(id: SessionId): SessionRuntimeTarget | undefined
 }

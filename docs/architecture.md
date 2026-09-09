@@ -107,6 +107,10 @@ Seams are why one provider swap changes the whole product. Filesystem and subpro
 
 [Experimental Agent Teams](subsystems/agent-team.md) is a private opt-in coordination seam on `ctx.agentTeams`, with a durable roster, task board, and mailbox layered over continuable subagents.
 
+## Browser presentation
+
+The [client runtime](../packages/client/runtime/README.md) retains the current Session plus an explicit staged set, sharing one connection and bounded history windows. The [conversation plugin](../packages/client/ui-conversation/README.md) owns Session rendering and provides a root-scoped viewport capability; the optional [Workspace workbench](../packages/client/ui-workbench/README.md) composes up to four panes through its slots. Its account catalog is ACL-filtered and starts target runtimes lazily through the SessionRuntimePool, so each pane keeps an independent principal, event stream, and scope resources. Pane selection changes browser viewing state, while Session logs, model requests, sandbox policy, and Collaboration authorization retain their existing owners.
+
 ## Where new behavior goes
 
 New behavior attaches to a documented extension point. Changing the loop itself updates this map.

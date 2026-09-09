@@ -4,6 +4,8 @@ Workspace document manager for the CoHarness Web UI. Organize, preview, upload, 
 
 English | [中文](README.zh.md)
 
+Opening the document picker captures its destination Session. Switching panes while the dialog is open does not change which composer receives a selected document.
+
 ## Installation
 
 This package is part of the `@deepseek-ai/dsh-client-ui-documents` bundle and is loaded automatically by the web-app profile.

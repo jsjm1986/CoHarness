@@ -144,6 +144,7 @@ import type { ApprovalOutcome, ApprovalRequestId } from '@deepseek-ai/dsh-user-a
 // `ctx.get('approval')` without a value dependency on the seam (optional composition).
 import type {} from '@deepseek-ai/dsh-user-approval'
 import { approvalResponsePayloadSchema } from './api/approvals.schema.ts'
+import { inboxProjectionDefinition } from './inbox-projection.ts'
 import { imageLimitsProjectionSchema, sessionListMetadataProjectionSchema } from './api/sessions.schema.ts'
 import { questionResponsePayloadSchema } from './api/questions.schema.ts'
 import type { ClientResponse, RpcError, RpcReceipt, RpcRequest, RpcResponse } from './api/rpc.ts'
@@ -1365,7 +1366,9 @@ function projectionsFor(ctx: Context, session: Session): SessionProjectionsBlock
  * empty value set — yields an absent block: a listing without projections
  * is degraded, never broken.
  */
-function listProjectionsFor(ctx: Context, meta: SessionHeader, session: Session | undefined): SessionProjectionsBlock | undefined {
+function listProjectionsFor(
+  ctx: Context, meta: SessionHeader, session: Session | undefined, includeInbox = false,
+): SessionProjectionsBlock | undefined {
   try {
     // A seeded header lacks its exact inherited cut, so its cache identity
     // cannot be formed from the listing alone; opening the session refreshes it.
@@ -1374,7 +1377,10 @@ function listProjectionsFor(ctx: Context, meta: SessionHeader, session: Session 
       : meta.isSeeded
         ? undefined
         : ctx.get('sessionProjectionCache')?.cachedSnapshot(meta, SessionLogOffset(0))
-    return block !== undefined && Object.keys(block.values).length > 0 ? block : undefined
+    if (block === undefined) return undefined
+    if (includeInbox) return block
+    const { inbox: _inbox, ...values } = block.values
+    return Object.keys(values).length > 0 ? { ...block, values } : undefined
   } catch (error) {
     ctx.logger.warn(`session.list: projection column for "${meta.id}" failed (serving the row without it): ${String(error)}`)
     return undefined
@@ -2223,6 +2229,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     })
   })
 
+  ctx.inject(['sessionProjections'], (projectionCtx) => {
+    projectionCtx.effect(() => projectionCtx.sessionProjections.register(inboxProjectionDefinition), 'apiproxy.inboxProjection()')
+  })
+
   /** Project both durable inbox lists, optionally including the splice currently being emitted. */
   const queueItems = (
     agent: Agent,
@@ -2716,6 +2726,23 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     }
   }
 
+  /** Rebuild a bounded cold tail's projections through the existing persistence cache owner. */
+  async function coldHistoryBaseline(source: HistorySource, signal?: AbortSignal): Promise<SessionProjectionsBlock | undefined> {
+    if (source.kind !== 'detached' || !source.bounded) return undefined
+    const lastSeq = source.events.at(-1)?.seq ?? -1
+    if (!source.hasMore && !source.header.isSeeded && source.events[0]?.seq === 0) {
+      return detachedProjectionsFor(ctx, source.header, SessionLogOffset(0), source.events)
+    }
+    const cache = ctx.get('sessionProjectionCache')
+    if (cache === undefined) return undefined
+    const baseline = await cache.coldSnapshot(source.header.id, signal)
+    signal?.throwIfAborted()
+    if (baseline.asOfSeq !== lastSeq) {
+      throw new SessionPersistenceReadError('dependency', 'session persistence changed during projection read')
+    }
+    return baseline
+  }
+
   /**
    * The header and events {@link presenterScopeFor} reads to decide which
    * composition a transcript ran under.
@@ -2744,6 +2771,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   function historyCutOf(
     source: HistorySource,
     includeProjections: boolean,
+    detachedBaseline?: SessionProjectionsBlock,
   ): { events: SessionEvent[]; projections?: SessionProjectionsBlock } {
     if (source.kind === 'detached') {
       // A bounded detached range cannot reconstruct a whole-log projection.
@@ -2751,7 +2779,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       // inspections still have the complete range and can fold it directly.
       const projections = includeProjections
         ? source.bounded
-          ? listProjectionsFor(ctx, source.header, undefined)
+          ? detachedBaseline ?? listProjectionsFor(ctx, source.header, undefined, true)
           : detachedProjectionsFor(ctx, source.header, source.inheritedEventCount, source.events)
         : undefined
       return { events: source.events, ...projections === undefined ? {} : { projections } }
@@ -3825,7 +3853,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           // appending, so awaiting between the two reads would pair events cut
           // at N with a baseline folded to N+1.
           const scope = await presenterScopeFor(sessionId, sourceSession(source))
-          const cut = historyCutOf(source, beforeSeq === undefined)
+          const detachedBaseline = beforeSeq === undefined ? await coldHistoryBaseline(source, signal) : undefined
+          const cut = historyCutOf(source, beforeSeq === undefined, detachedBaseline)
           const page = historyPage(ctx, cut.events, beforeSeq, maxMessages, scope)
           const value = historyValue({
             events: page.events,
@@ -4260,7 +4289,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         }
         const agent = ctx.agents.get(sessionId)
         if (agent !== undefined && hasSubagentOwner(agent.session, agent)) {
-          return err(request, subagentOwnershipError(sessionId))
+          const identity = ctx.get('sessionProjections')?.snapshot(agent.session).values.subagent
+          if (identity?.mode !== 'continuable' || !agent.session.isOwnSeq(identity.seq)) {
+            return err(request, subagentOwnershipError(sessionId))
+          }
         }
         if (agent === undefined) {
           return err(request, {
@@ -4373,12 +4405,14 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         if (verified.error !== undefined) return err(request, verified.error)
         // The generic-history data plane: an attached child serves its
         // in-memory snapshot; a cold child uses one bounded persistence page.
+        let detachedBaseline: SessionProjectionsBlock | undefined
         let source: HistorySource
         try {
           source = await historySourceFor(childSessionId, {
             ...(beforeSeq === undefined ? {} : { beforeSeq }),
             ...(maxMessages === undefined ? {} : { maxMessages }),
           }, signal)
+          detachedBaseline = beforeSeq === undefined ? await coldHistoryBaseline(source, signal) : undefined
         } catch (error: unknown) {
           if (signal?.aborted) {
             return err(request, {
@@ -4424,7 +4458,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           ? subagentHistoryProjections(ctx, childSessionId, () => source.kind === 'attached'
             ? projectionsFor(ctx, source.session)
             : source.bounded
-              ? listProjectionsFor(ctx, source.header, undefined)
+              ? detachedBaseline ?? listProjectionsFor(ctx, source.header, undefined, true)
               : detachedProjectionsFor(ctx, source.header, source.inheritedEventCount, source.events))
           : undefined
         if (header.parentSession !== parentSessionId) {

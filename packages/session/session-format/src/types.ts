@@ -26,13 +26,33 @@ export interface SessionFormatArtifact {
   readonly inheritedEventCount: number
 }
 
-/** One adjacent, whole-artifact migration. */
+/** One adjacent migration; the legacy whole-artifact method remains for compatibility. */
+export interface SessionFormatMigrationContext {
+  /** Deliver one migrated event before the source reader advances. */
+  readonly emitEvent: (event: SessionFormatEvent) => void
+}
+
+/** Stateful adjacent migration stage used by bounded persistence readers. */
+export interface SessionFormatMigrationStage {
+  /** Transform one event and synchronously emit zero or more target events. */
+  readonly transformEvent: (event: SessionFormatEvent, context: SessionFormatMigrationContext) => void
+  /** Finish the stage and emit any trailing events. */
+  readonly finish: (context: SessionFormatMigrationContext) => void
+}
+
+/** One adjacent migration with optional incremental event transformation. */
 export interface SessionFormatMigration {
   readonly name: string
   readonly fromVersion: number
   readonly toVersion: number
   migrateHeader(header: SessionFormatHeader): SessionFormatHeader
   migrate(artifact: SessionFormatArtifact): SessionFormatArtifact
+  /** Optional streaming stage; migrations without one remain whole-artifact only. */
+  readonly createStage?: (input: {
+    sourceHeader: SessionFormatHeader
+    targetHeader: SessionFormatHeader
+    sourceInheritedEventCount: number
+  }) => SessionFormatMigrationStage
   validateTargetHeader(header: SessionFormatHeader): void
   validateTarget(artifact: SessionFormatArtifact): void
 }
@@ -46,11 +66,24 @@ export interface SessionFormatChainOptions {
 }
 
 /** Pure planner and whole-artifact runner for one format family. */
+export interface SessionFormatMigrationStream extends SessionFormatMigrationContext {
+  readonly header: SessionFormatHeader
+  /** Finish all stages and flush trailing output. */
+  readonly finish: () => void
+}
+
+/** Pure planner and runner for a complete adjacent migration chain. */
 export interface SessionFormatChain {
   readonly currentVersion: number
   plan(fromVersion: number): readonly SessionFormatMigration[]
   migrateHeader(header: SessionFormatHeader): SessionFormatHeader
   migrate(artifact: SessionFormatArtifact): SessionFormatArtifact
+  /** Create a synchronous event-by-event migration stream for a source generation. */
+  createStream(
+    source: SessionFormatHeader,
+    inheritedEventCount: number,
+    output: SessionFormatMigrationContext,
+  ): SessionFormatMigrationStream
 }
 
 /** Header-only classification returned before a body read. */
@@ -77,4 +110,10 @@ export interface SessionFormatCatalog {
   readHeader(value: unknown): SessionFormatHeaderReadResult
   migrateHeader(header: SessionFormatHeader): SessionFormatHeader
   migrate(artifact: SessionFormatArtifact): SessionFormatArtifact
+  /** Create an event-by-event migration stream for a legacy generation. */
+  createStream(
+    source: SessionFormatHeader,
+    inheritedEventCount: number,
+    output: SessionFormatMigrationContext,
+  ): SessionFormatMigrationStream
 }

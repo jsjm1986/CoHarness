@@ -36,6 +36,7 @@ The JSONL durable session-persistence backend — a concrete `SessionPersistence
 | `readStableMaxDurationMs` | positive integer (default `2,000`) | Maximum elapsed milliseconds spent retrying a revision-stable read; values cannot exceed Node's `2_147_483_647` ms timer limit. |
 | `maxDecompressedBytes` | positive integer (default `256 MiB`) | Maximum total plaintext bytes decoded from one zstd artifact by raw, load, or recovery reads. |
 | `maxArtifactBytes` | positive integer (default `256 MiB`) | Maximum physical bytes read from one session artifact; bounded reads reject a larger file before retaining it in memory. |
+| `migrationBatchMaxBytes` | positive integer (default `2 MiB`) | Expanded JSON byte target for successor encoding batches; a single indivisible event may exceed the target. |
 
 `locate(meta)` returns `{ kind: 'jsonl', path }` for the fixed transcript inside the resolved project/session directories. It performs no filesystem I/O: the target can be returned before the directory or file exists, and an existing file contains only the last flushed prefix.
 
@@ -58,6 +59,8 @@ A root belongs to one encoding. Startup discovery and targeted lookup reject the
 ## Write path
 
 The plugin copies frozen session events into one controller per live session. The first pending event starts the configured fixed batching window, and later events join without resetting it. Expiry starts one durable append; events admitted during that write form a separately bounded follow-up batch. `session/flush` cancels the wait and drains current and pending batches. A per-session cursor prevents resumed sessions from re-appending stored events, and live sessions are seeded when the plugin loads. The owning backend instance serializes operations for one session; disposal drains every retained controller before teardown. Every logical event remains present: batching only lets one compressed frame or raw fsync carry more records.
+
+Plaintext body reads scan bounded byte windows and retain decoded events without a complete raw-file buffer. They check cancellation between reads and retry changed revisions. Successor publication rechecks the source revision after writing the temporary file; a changed or missing source refuses publication. Successors are encoded in bounded batches with cancellation checks between events and writes. Compressed reads and logical preparation still retain complete input or event arrays.
 
 ## Model Experience
 

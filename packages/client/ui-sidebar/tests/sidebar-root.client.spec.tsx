@@ -36,7 +36,7 @@ function mountShell({ collapsed = false, width = 300 }: { collapsed?: boolean; w
   const root = () => (
     <SidebarRoot
       collapsed={current.collapsed} width={current.width}
-      useSessions={neverHook} useWorkspaces={neverHook}
+      useSessions={neverHook} useWorkspaces={neverHook} useViewport={selector => selector({ mode: 'single', paneIds: [], paneRatios: [] })}
       startSession={startSession} toggleSidebar={toggleSidebar} t={t}
       renderSlot={((
         key: string,
@@ -103,11 +103,44 @@ describe('SidebarRoot shell', () => {
     expect(b.toggleSidebar).toHaveBeenCalledOnce()
   })
 
+  it('leaves the workbench instead of starting a session when in workbench mode', () => {
+    const startSession = vi.fn()
+    const exitWorkbench = vi.fn()
+    render(<SidebarRoot
+      collapsed={false} width={300}
+      useSessions={neverHook} useWorkspaces={neverHook}
+      useViewport={selector => selector({ mode: 'workbench', paneIds: [], paneRatios: [] })}
+      exitWorkbench={exitWorkbench}
+      startSession={startSession} toggleSidebar={vi.fn()} t={t}
+      renderSlot={((_key: string, owner: SidebarSectionOwnerProps) =>
+        <div data-testid="region" data-wide={owner.wide} />) as SidebarRootComponentProps['renderSlot']}
+    />)
+    const starters = screen.getAllByRole('button', { name: 'New session' })
+    for (const button of starters) fireEvent.click(button)
+    expect(exitWorkbench).toHaveBeenCalledTimes(starters.length)
+    expect(startSession).not.toHaveBeenCalled()
+  })
+
+  it('falls back to the single-session viewport default and starts a session', () => {
+    const startSession = vi.fn()
+    render(<SidebarRoot
+      collapsed={false} width={300}
+      useSessions={neverHook} useWorkspaces={neverHook}
+      useViewport={undefined as never}
+      startSession={startSession} toggleSidebar={vi.fn()} t={t}
+      renderSlot={((_key: string, owner: SidebarSectionOwnerProps) =>
+        <div data-testid="region" data-wide={owner.wide} />) as SidebarRootComponentProps['renderSlot']}
+    />)
+    const starters = screen.getAllByRole('button', { name: 'New session' })
+    for (const button of starters) fireEvent.click(button)
+    expect(startSession).toHaveBeenCalledTimes(starters.length)
+  })
+
   it('renders generic brand fallbacks when no package fills the slots', () => {
     vi.stubEnv('DSH_CLIENT_COMMIT_HASH', '0123456')
     const { container } = render(<SidebarRoot
       collapsed={false} width={300}
-      useSessions={neverHook} useWorkspaces={neverHook}
+      useSessions={neverHook} useWorkspaces={neverHook} useViewport={selector => selector({ mode: 'single', paneIds: [], paneRatios: [] })}
       startSession={vi.fn()} toggleSidebar={vi.fn()} t={t}
       renderSlot={((_key: string, _owner: unknown, options?: { fallback?: ReactNode }) =>
         options?.fallback ?? null) as SidebarRootComponentProps['renderSlot']}

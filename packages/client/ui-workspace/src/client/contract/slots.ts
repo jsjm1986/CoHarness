@@ -29,7 +29,7 @@ import type { HostObservable, PropsHooks, PropsLocale, PropsRenderSlots, PropsRu
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {
-  DirectoryListing, SessionId, SessionSearchResultItem, WorkspaceId, WorkspaceView,
+  ConversationViewportSnapshot, DirectoryListing, SessionId, SessionListState, SessionSearchResultItem, WorkspaceId, WorkspaceView,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { createWorkspaceViewStore } from '../stores.ts'
 
@@ -97,9 +97,15 @@ export type DirectoryPickingHooks = PropsHooks<DirectoryPickingInjected['hooks']
  */
 export type WorkspaceBrowserInjected = {
   hooks: DirectoryPickingInjected['hooks'] & {
+    /** Current conversation presentation; workbench mode temporarily replaces the history tree. */
+    viewport: HostObservable<ConversationViewportSnapshot>
+    /** Session list for the authenticated current space, excluding workbench targets. */
+    currentSessions: HostObservable<SessionListState>
     /** Current generation's Host description, bound by the slot renderer. */
     hostDescription: HostDescriptionSource
   }
+  /** Leave the independent workbench view and restore the current space. */
+  exitWorkbench?: () => void
   /**
    * Start a New Session in a Workspace: reuse-or-create its blank session and
    * open it; without an explicit workspace, inherit the current Session

@@ -80,7 +80,7 @@ export function QueueDock({ useSession, updateQueue, notify, loadImage, t }: Que
   }, [pendingSubmissions, queue])
   const rowCount = queue.length + pendingQueue.length
   const running = useSession(s => s.running)
-  const queueMutable = useSession(s => s.subagent === null)
+  const queueMutable = useSession(s => s.subagent === null || s.subagent.address.mode === 'continuable')
   const [editing, setEditing] = useState<{ id: QueueItemId; text: string } | null>(null)
   const [busy, setBusy] = useState<QueueItemId | null>(null)
   const [collapsed, setCollapsed] = useState(true)
@@ -289,6 +289,7 @@ export function QueueDock({ useSession, updateQueue, notify, loadImage, t }: Que
                 </span>
               )}
               {submission.text !== '' && <span className={css.preview}>{submission.text}</span>}
+              <span className={css.status} role="status">{t('queue.sending')}</span>
             </li>
           ))}
         </ul>

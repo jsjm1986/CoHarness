@@ -357,13 +357,13 @@ async function pointAt(page: Page, where: 'list' | 'away'): Promise<void> {
  * @param page - the page under test.
  */
 async function expandSeededSessions(page: Page): Promise<void> {
-  const bucket = page.getByText('Ungrouped', { exact: true }).locator('..').locator('..')
+  const bucket = page.getByText('Independent sessions', { exact: true }).locator('..').locator('..')
   await bucket.waitFor({ timeout: 15_000 })
   const rows = page.locator('[role="tree"][aria-label="Sessions"] [role="treeitem"]')
   const deadline = Date.now() + 30_000
   for (;;) {
     if (await bucket.getAttribute('aria-expanded') !== 'true') {
-      await page.getByText('Ungrouped', { exact: true }).click()
+      await page.getByText('Independent sessions', { exact: true }).click()
     }
     const showMore = page.getByRole('button', { name: /Show \d+ more sessions/ })
     if (await bucket.getAttribute('aria-expanded') === 'true'
@@ -474,7 +474,7 @@ describe('web e2e: sidebar session list scrollbar (reserved gutter / themed thum
   it('keeps the row background inset when overflow disappears', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-sidebar-scrollbar-stable-inset'))
     expect(await measureRowInset(page)).toEqual({ overflows: true, rowEdgeInset: 12 })
-    const bucket = page.getByText('Ungrouped', { exact: true }).locator('..').locator('..')
+    const bucket = page.getByText('Independent sessions', { exact: true }).locator('..').locator('..')
     await bucket.click()
     try {
       await expect.poll(async () => (await measureRowInset(page)).overflows, { timeout: 10_000 }).toBe(false)

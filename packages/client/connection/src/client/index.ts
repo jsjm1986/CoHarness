@@ -4,8 +4,8 @@
  * controller with its sinks.
  */
 import type { Context } from '@deepseek-ai/cordis'
-import type { HostDescription, IApiClient } from './api.ts'
-import { ConnectionController, type ConnectionConfig, type ConnectionSinks, type ConnectionState } from './connection.ts'
+import type { ConnectionRuntimeTarget, HostDescription, IApiClient, SessionId } from './api.ts'
+import { ConnectionController, resolveConnectionConfig, type ConnectionConfig, type ConnectionSinks, type ConnectionState } from './connection.ts'
 import { FixtureApiClient } from './fixture.ts'
 import { WebApiClient } from './web-api-client.ts'
 import {
@@ -34,7 +34,7 @@ export type {
   JobView,
   RpcRequest, RpcResponse, RpcResult, RpcError, RpcErrorCode,
   ClientRequest, ServerResponse, ServerRequest, ClientResponse, RpcMessage, RpcReceipt,
-  HostDescription, IApiClient, SessionDraftId, SessionId, SessionEvent, ContentBlock, StreamChunk,
+  HostDescription, IApiClient, ConnectionRuntimeTarget, SessionDraftId, SessionId, SessionEvent, ContentBlock, StreamChunk,
   GoalsApi, GoalRef,
   SettingsApi, SettingsNamespaceView, SettingsOwner, SettingsPathOpView, SettingsSecretView, SettingsWritableReason,
   CredentialsApi, CredentialView, ConfigurableProviderView, DiscoveredModelView, LlmApi,
@@ -100,6 +100,7 @@ export interface ClientTransportHooks {
 
 interface ClientTransportGlobal {
   __DSH_TRANSPORT__?: ClientTransportHooks
+  __DSH_CONNECTION_RECOVERY__?: unknown
 }
 
 /**
@@ -122,6 +123,12 @@ export interface ConnectionHandle {
   readonly state: ConnectionStateSource
   /** Generic logical RPC channels over the same Connection transport. */
   readonly rpc: ClientConnectionRpc
+  /** Create an independent authenticated transport for another runtime target. */
+  readonly forTarget?: (target: ConnectionRuntimeTarget) => ConnectionHandle
+  /** Resolve a session-addressed operation through its owning runtime transport. */
+  readonly forSession?: (sessionId: SessionId) => ConnectionHandle
+  /** Register the runtime object's session-to-target resolver. */
+  readonly registerSessionTargetResolver?: (resolve: (sessionId: SessionId) => ConnectionRuntimeTarget | undefined) => () => void
   /** Request an immediate retry of the current connection generation. */
   reconnect(): void
   /**
@@ -139,23 +146,19 @@ export interface ConnectionHandle {
  * Client plugin body: pick the api by page mode and provide ctx.connection.
  * @param ctx - client cordis context.
  */
-export function apply(ctx: Context): void {
-  const pageLocation = typeof location === 'undefined' ? undefined : location
-  const fixture = pageLocation !== undefined && new URLSearchParams(pageLocation.search).has('fixture')
-  const fixtureClient = fixture ? new FixtureApiClient() : undefined
-  const transport = (globalThis as ClientTransportGlobal).__DSH_TRANSPORT__
-  const api: IApiClient = fixtureClient ?? transport?.createApiClient() ?? new WebApiClient()
-  const accountPreferences = fixtureClient === undefined
-    ? transport?.createAccountPreferencesTransport?.() ?? createBrowserAccountPreferencesTransport()
-    : undefined
-  const projectModelSettings = fixtureClient === undefined
-    ? transport?.createProjectModelSettingsTransport?.() ?? createBrowserProjectModelSettingsTransport()
-    : undefined
-  const rpc = fixtureClient?.rpc ?? createWebConnectionRpc(transport?.fetch)
+function createConnectionHandle(
+  api: IApiClient,
+  pageLocation: Location | undefined,
+  bootstrapRecovery: Required<ConnectionConfig>,
+  rpc: ClientConnectionRpc,
+  accountPreferences?: AccountPreferencesTransport,
+  projectModelSettings?: ProjectModelSettingsTransport,
+): ConnectionHandle {
   let started = false
   let controller: ConnectionController | undefined
   let description: HostDescription | undefined
   let state: ConnectionState | undefined
+  let sessionTarget: ((sessionId: SessionId) => ConnectionRuntimeTarget | undefined) | undefined
   const descriptionListeners = new Set<() => void>()
   const stateListeners = new Set<() => void>()
   const publishDescription = (next: HostDescription | undefined): void => {
@@ -200,6 +203,23 @@ export function apply(ctx: Context): void {
       },
     },
     rpc,
+    forTarget: next => createConnectionHandle(
+      new WebApiClient(next),
+      pageLocation,
+      bootstrapRecovery,
+      createWebConnectionRpc(undefined, next),
+      undefined,
+      undefined,
+    ),
+    forSession: (id) => {
+      const target = sessionTarget?.(id)
+      return target === undefined ? handle : handle.forTarget?.(target) ?? handle
+    },
+    registerSessionTargetResolver: (resolve) => {
+      if (sessionTarget !== undefined) throw new Error('connection: session target resolver is already registered')
+      sessionTarget = resolve
+      return () => { if (sessionTarget === resolve) sessionTarget = undefined }
+    },
     reconnect() {
       controller?.reconnect()
     },
@@ -222,7 +242,7 @@ export function apply(ctx: Context): void {
           publishState(state)
           sinks.onStateChange?.(state)
         },
-      }, config ?? {})
+      }, { ...bootstrapRecovery, ...config })
       controller.start()
       return {
         stop: () => {
@@ -234,5 +254,32 @@ export function apply(ctx: Context): void {
       }
     },
   }
+  return handle
+}
+
+export function apply(ctx: Context): void {
+  const pageLocation = typeof location === 'undefined' ? undefined : location
+  const fixture = pageLocation !== undefined && new URLSearchParams(pageLocation.search).has('fixture')
+  const fixtureClient = fixture ? new FixtureApiClient() : undefined
+  const transport = (globalThis as ClientTransportGlobal).__DSH_TRANSPORT__
+  const api: IApiClient = fixtureClient ?? transport?.createApiClient() ?? new WebApiClient()
+  const accountPreferences = fixtureClient === undefined
+    ? transport?.createAccountPreferencesTransport?.() ?? createBrowserAccountPreferencesTransport()
+    : undefined
+  const projectModelSettings = fixtureClient === undefined
+    ? transport?.createProjectModelSettingsTransport?.() ?? createBrowserProjectModelSettingsTransport()
+    : undefined
+  const bootstrapRecovery = resolveConnectionConfig(
+    (globalThis as ClientTransportGlobal).__DSH_CONNECTION_RECOVERY__ as ConnectionConfig | undefined ?? {},
+  )
+  const rpc = fixtureClient?.rpc ?? createWebConnectionRpc(transport?.fetch)
+  const handle = createConnectionHandle(
+    api,
+    pageLocation,
+    bootstrapRecovery,
+    rpc,
+    accountPreferences,
+    projectModelSettings,
+  )
   ctx.provide('connection', handle)
 }

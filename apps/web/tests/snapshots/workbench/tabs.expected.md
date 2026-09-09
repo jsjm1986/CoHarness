@@ -1,0 +1,10 @@
+- strong: Workbench
+- text: 3/4
+- button "Add conversation":
+  - img
+  - text: Add conversation
+- button "Single conversation"
+- tablist "Workbench":
+  - tab "Write a file named notes.txt Ready"
+  - tab "Reply with a one-sentence description Ready"
+  - tab "delta-with-a-long-workspace-name Ready" [selected]

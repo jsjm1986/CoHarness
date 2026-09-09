@@ -36,7 +36,7 @@ async function bench() {
   // Declared by ui-layout's root entry in production; the test root declares
   // them here so the contributions land.
   await runtime.root.declare({
-    'conversation': { kind: 'single', scope: 'session-maybe' },
+    'conversation': { kind: 'single', scope: 'root' },
     'details': { kind: 'single', scope: 'session' },
     'settings.general.item': { kind: 'list', scope: 'root' },
   }, (_p: { renderSlot?: unknown }) => null)

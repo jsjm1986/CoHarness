@@ -144,6 +144,7 @@ export class Session implements SessionFace {
   private pendingCache: { rev: number; value: PendingInteraction[] } | null = null
   /** Authoritative stream-only inbox snapshot; pending work never hits history. */
   private readonly queueMirror = new SessionQueueMirror()
+  private readonly disposeInboxProjection: () => void
   /** Session-owned business Context engine over the contiguous raw window. */
   private readonly conversation: ConversationNodeAssembler
   private running = false
@@ -233,6 +234,19 @@ export class Session implements SessionFace {
       this.snapshotCache = this.buildSnapshot()
     })
     this.snapshotCache = this.buildSnapshot()
+    this.disposeInboxProjection = this.projections.faceOf('inbox').subscribe(() => {
+      const inbox = this.projections.values().inbox
+      if (inbox !== undefined) {
+        this.queueMirror.replace(inbox)
+        this.observeSubmissionQueue(inbox)
+        this.notifier.markDirty()
+      }
+    })
+    const inbox = this.projections.values().inbox
+    if (inbox !== undefined) {
+      this.queueMirror.replace(inbox)
+      this.snapshotCache = this.buildSnapshot()
+    }
   }
 
   /**
@@ -699,7 +713,11 @@ export class Session implements SessionFace {
         // snapshot AFTER the subscribed frame on the same stream, so the
         // stale mirror clears here — race-free against onConnected/resync
         // timing (clearing there could wipe a baseline that already landed).
-        if (this.queueMirror.reset()) this.notifier.markDirty()
+        const inbox = this.projections.values().inbox
+        if (inbox !== undefined) {
+          this.queueMirror.replace(inbox)
+          this.notifier.markDirty()
+        } else if (this.queueMirror.reset()) this.notifier.markDirty()
         // A baseline past the open window's tail means events landed while no
         // stream was attached; an idle session would otherwise show them only
         // after its next live event exposes the gap.
@@ -809,6 +827,7 @@ export class Session implements SessionFace {
 
   /** Stop in-flight history work and release submission observers for this scope. */
   dispose(): void {
+    this.disposeInboxProjection()
     this.openGeneration++
     this.historyAbortController?.abort(new Error('session disposed'))
     this.historyAbortController = null

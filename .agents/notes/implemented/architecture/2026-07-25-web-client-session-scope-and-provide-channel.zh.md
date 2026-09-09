@@ -53,7 +53,7 @@ id→ctx 换乘只许三类位置（业务提供方永不换乘）：
 Session 实例与 scope 同生命周期，存活资格 = host listed（一个判据，mint 与 prune 共用）：
 
 - 出生 = 会话行进入 client 视野（list 基线拉取 / `create()` 本地回声 / `host/session-added` 帧），lazy 首次 resolve 铸 scope（resolution 纯函数、渲染安全）。
-- prune 一次同拆三样：Session 实例、scope fiber（级联挂在 actx 上的一切消费方）、会话键控 slot store。暂存会话（= `list.current`）例外：被移除仍在台上时保留冻结只读视图，stage 移走才拆。
+- prune 一次同拆三样：Session 实例、scope fiber（级联挂在 actx 上的一切消费方）、会话键控 slot store。暂存会话（当前选择加显式 viewport 面板）例外：被移除但仍 staged 时保留冻结只读视图，退出 stage 集合才拆。[工作台决策](2026-09-08-cordis-multi-session-workbench.zh.md)负责有界的多 Session 视图集合。
 - 重开 = lazy 重建实例 + `open()` 拉 history（host 会话日志是持久真相）。
 - 遗留 TODO：approval/question 帧不进 history，跨 prune 不可恢复（manager 级 pendingBuffers 只覆盖「从未实例化」窗口）。
 

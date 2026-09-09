@@ -20,6 +20,11 @@ export type {
   SubagentsApi, SubagentAddress, SubagentCatalog, SubagentListEntry, SubagentPromptContentPart, SubagentPromptReceipt,
   JobView,
 } from '@deepseek-ai/dsh-host-apiproxy/api'
+
+/** Authenticated Gateway runtime selected by a workbench pane. */
+export type ConnectionRuntimeTarget =
+  | { readonly kind: 'personal' }
+  | { readonly kind: 'project'; readonly projectId: number; readonly projectName?: string }
 export type { ToolCallView, ToolResultView } from '@deepseek-ai/dsh-tools/presentation'
 export type {
   RpcRequest, RpcResponse, RpcResult, RpcError, RpcErrorCode,

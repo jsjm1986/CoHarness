@@ -102,7 +102,7 @@ export function AppFrame({
 }: AppFrameProps) {
   const panels = useStore(s => s)
   const detailsSession = useSessions((s) => {
-    const current = s.current
+    const current = panels.detailsSessionId ?? s.current
     return current !== undefined && s.byId[current]?.blank === false ? current : undefined
   })
   const currentSession = useSessions(s => s.current)
@@ -126,12 +126,12 @@ export function AppFrame({
 
   const lastSession = useRef(detailsSession)
   useLayoutEffect(() => {
-    if (detailsSession === undefined) return
+    if (detailsSession === undefined || panels.detailsSessionId !== undefined) return
     if (lastSession.current !== undefined && lastSession.current !== detailsSession) {
       actions.closeDetails()
     }
     lastSession.current = detailsSession
-  }, [actions, detailsSession])
+  }, [actions, detailsSession, panels.detailsSessionId])
 
   // Compact session navigation dismisses the drawer: tapping a session in it
   // must land on the conversation, not stay under the still-open drawer.
@@ -317,10 +317,8 @@ export function AppFrame({
             })}
           </div>
         )}
-      {/* Both occupants stay at fixed tree positions from first paint — no
-          loading gate: a bare status line reads worse than the shell's own
-          pending rendering. The conversation is session-maybe; the strict
-          details entry naturally renders empty while no session is current. */}
+      {/* The conversation viewport is root-scoped; details use the selected
+          Session unless an explicit pane action pins their target. */}
       <CenterColumn>{renderSlot('conversation', { compact: mode === 'compact' })}</CenterColumn>
       {overlayPanels
         ? (
@@ -333,11 +331,15 @@ export function AppFrame({
               // compact stretches it edge to edge (AppFrame.module.css).
               style={{ '--frame-details-overlay-width': `${DETAILS_DEFAULT}px` } as CSSProperties}
             >
-              {renderSlot('details', {})}
+              {panels.detailsSessionId === undefined ? renderSlot('details', {}) : (
+                <SessionProvider sessionId={panels.detailsSessionId}>{() => renderSlot('details', {})}</SessionProvider>
+              )}
             </div>
           </>
         )
-        : <DetailsColumn>{renderSlot('details', {})}</DetailsColumn>}
+        : <DetailsColumn>{panels.detailsSessionId === undefined ? renderSlot('details', {}) : (
+          <SessionProvider sessionId={panels.detailsSessionId}>{() => renderSlot('details', {})}</SessionProvider>
+        )}</DetailsColumn>}
       <div className={css.overlayLayer} data-shell-overlay>
         {renderSlot('shell.overlay', {})}
       </div>

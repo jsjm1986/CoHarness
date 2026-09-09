@@ -67,7 +67,7 @@ export function apply(ctx: ClientContext): void {
     SkillRow,
   ))
 
-  const skills = (ctx.get('connection') as ConnectionHandle).api.skills
+  const connection = ctx.get('connection') as ConnectionHandle
   const sessions = ctx.get('sessions') as ISessions
   // Session-keyed catalog cache; single-flight per key. Plugin-closure state:
   // the fiber effect below is its teardown boundary.
@@ -94,6 +94,8 @@ export function apply(ctx: ClientContext): void {
     if (existing !== undefined) return existing.promise
     const abort = new AbortController()
     const promise = (async () => {
+      const target = sessions.runtimeTargetFor?.(sessionId)
+      const skills = (target === undefined ? connection : connection.forTarget?.(target) ?? connection).api.skills
       const { result } = await skills.list({ sessionId }, abort.signal)
       if (!result.ok) throw new Error(`skill.list failed: ${result.error.code}: ${result.error.message}`)
       return result.value.skills

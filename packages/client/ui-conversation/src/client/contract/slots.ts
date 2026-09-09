@@ -10,6 +10,7 @@ import type {
   ObservableSnapshot, PendingInteraction, PendingWait, SessionId, ToolCallBlock,
   TurnLocation, WorkspaceId,
 } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ConversationViewportSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import type { MarkdownFileMentions } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { MessageId } from '@deepseek-ai/dsh-client-connection/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
@@ -17,6 +18,7 @@ import type { ComposerBlock } from '../input/blocks.ts'
 import type {
   ComposerKeyboard, DraftAttachmentId, DraftDocument, DraftDocumentId, EditSelection, InputActions, InputNotice, InputState,
 } from '../input/contract.ts'
+import type { createConversationViewportStore } from '../viewport.ts'
 import type { createChatStore } from '../stores.ts'
 import type { ConversationDisplaySettingsSnapshot } from '../display-settings.ts'
 import type { ComposerSubmitGesture, InputSubmitMode } from './composer-submission.ts'
@@ -42,6 +44,8 @@ export interface ComposerAttachmentsOwnerProps {
   attachments: readonly ComposerAttachment[]
   /** Whether a document-level file drop may add images now. */
   canAcceptDrop: boolean
+  /** Whether this composer owns page-level drop gestures. */
+  active?: boolean
   /** Add one dropped batch through the composer's validation path. */
   onAddImages: (files: readonly File[]) => void
   /** Remove one draft image through the conversation service. */
@@ -85,6 +89,14 @@ export type RenderMessageImages = (owner: Omit<MessageImagesOwnerProps, 'loadIma
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
+    /** One explicit Session pane rendered by the conversation viewport. */
+    'conversation.pane': { kind: 'single'; scope: 'session-maybe'; owner: ConversationPaneOwnerProps }
+    /** Workbench controls rendered above the multi-pane surface. */
+    'conversation.workbench.toolbar': { kind: 'single'; scope: 'root'; owner: ConversationWorkbenchToolbarOwnerProps }
+    /** Empty state rendered when the workbench has no selected panes. */
+    'conversation.workbench.empty': { kind: 'single'; scope: 'root'; owner: ConversationWorkbenchEmptyOwnerProps }
+    /** Per-pane header actions contributed by the workbench plugin. */
+    'conversation.workbench.pane.header': { kind: 'list'; scope: 'session'; owner: ConversationWorkbenchPaneHeaderOwnerProps }
     /**
      * The entire body of one session: taking this seat means rendering that
      * session's conversation yourself. The occupant also owns the per-session
@@ -349,6 +361,8 @@ export interface ConversationHeaderActionOwnerProps {
 
 /** Owner share of the strict session header. */
 export interface ConversationSessionHeaderOwnerProps {
+  /** Optional root-owned navigation rendered beside the session title. */
+  leading?: ReactNode
   /** Whether the shell is using the compact phone presenter. */
   compact?: boolean
 }
@@ -578,6 +592,9 @@ export interface ConversationSessionHeaderInjected {
 export interface ComposerBarOwnerProps {
   /** Hero = empty-state centered card; composer = resident bottom bar. */
   variant: 'hero' | 'composer'
+  /** Focus ownership and compact controls supplied by a multi-pane surface. */
+  active?: boolean
+  compact?: boolean
   /**
    * A block another plugin raised for this session: the bar refuses input and
    * shows the blocker's reason as the placeholder, but — unlike `disabled` —
@@ -691,6 +708,8 @@ export type ComposerBarProps =
  * with zero owner changes.
  */
 export interface ComposerChainProps {
+  /** Whether this pane may request automatic input focus. */
+  active?: boolean
   interactions: readonly PendingInteraction[]
   /** Current conversation facts for feature-owned takeover selectors. */
   session: ConversationSnapshot | undefined
@@ -709,8 +728,51 @@ export interface HeroBrandMarkOwnerProps {
  * + composer chain/bar + input-region + hero picker slots) & store & injected
  * shares & the locale seat.
  */
-export type ConversationSlotProps =
-  PropsRuntime<'conversation'> & PropsRenderSlots<
+/** Owner share of one explicit Session pane. */
+export interface ConversationPaneOwnerProps {
+  /** Optional root-owned navigation for the session header. */
+  headerLeading?: ReactNode
+  /** Whether the shell is using the compact phone presenter. */
+  compact?: boolean
+  /** Whether the pane owns focus and global input gestures. */
+  active?: boolean
+  /** Whether this pane is rendered inside the multi-session Workbench. */
+  workbench?: boolean
+}
+
+/** Owner share for the root-level workbench toolbar. */
+export interface ConversationWorkbenchToolbarOwnerProps {
+  /** Fit the controls into an existing session title row. */
+  inline?: boolean
+  /** Current viewport state, supplied as immutable render data. */
+  viewport: ConversationViewportSnapshot
+  /** Show tabs when the conversation container cannot fit parallel panes. */
+  tabbed: boolean
+}
+
+/** Owner share for the empty workbench state. */
+export interface ConversationWorkbenchEmptyOwnerProps {
+  /** Marker owner share for the empty workbench surface. */
+  children?: never
+}
+
+/** Owner share for one workbench pane header. */
+export interface ConversationWorkbenchPaneHeaderOwnerProps {
+  /** Whether this pane has focus. */
+  active: boolean
+  /** Focus this pane. */
+  onFocus: () => void
+  /** Remove this pane from the workbench. */
+  onClose: () => void
+  /** Whether this pane occupies the entire workbench surface. */
+  maximized: boolean
+  /** Toggle temporary full-width presentation for this pane. */
+  onMaximize: () => void
+}
+
+/** Full props of one explicit Session pane. */
+export type ConversationPaneSlotProps =
+  PropsRuntime<'conversation.pane'> & PropsRenderSlots<
     | 'conversation.session' | 'conversation.session.header'
     | 'conversation.composer' | 'conversation.composer.bar'
     | 'conversation.input.overlay'
@@ -721,6 +783,26 @@ export type ConversationSlotProps =
     | 'conversation.hero.agentPreset'
   >
   & InjectFace<ConversationInjected>
+  & PropsLocale<'conversation'>
+
+/** Root viewport navigation and plugin-availability callbacks. */
+export interface ConversationViewportInjected {
+  onViewportFocus: (sessionId: SessionId) => void
+  onViewportRemove: (sessionId: SessionId) => void
+  onViewportRatios: (ratios: readonly number[]) => void
+  onViewportMaximize: (sessionId: SessionId, maximized: boolean) => void
+  onViewportEnabled: (enabled: boolean) => void
+  hooks: { viewportAvailable: ObservableSnapshot<boolean> }
+}
+
+/** Full props of the current-session or multi-pane conversation host. */
+export type ConversationSlotProps =
+  PropsRuntime<'conversation'> & PropsRenderSlots<
+    'conversation.pane' | 'conversation.workbench.toolbar' | 'conversation.workbench.empty'
+    | 'conversation.workbench.pane.header'
+  >
+  & PropsStore<ReturnType<typeof createConversationViewportStore>>
+  & InjectFace<ConversationViewportInjected>
   & PropsLocale<'conversation'>
 
 /** Full strict-session body props: per-session store, view ring, and draft mirror. */

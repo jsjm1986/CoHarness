@@ -249,6 +249,46 @@ describe('session.history projections block', () => {
     })
   })
 
+  it('includes pending content in history but omits it from the Session list', async () => {
+    const { ctx, session } = await harness(true)
+    const message = createUserMessage({ content: [{ type: 'text', text: 'pending body' }], source: { kind: 'user' } })
+    session.append('agent/inbox/spliced', { target: 'next-turn', start: 0, inserted: [message] })
+    const gateway = api(ctx)
+    const history = await gateway.sessions.history(request({ sessionId: session.id }))
+    expect(history.result.ok).toBe(true)
+    if (!history.result.ok) throw new Error('unexpected history refusal')
+    expect(history.result.value.projections?.values.inbox).toMatchObject([{ id: message.id, message }])
+    const list = await gateway.sessions.list(request({}))
+    expect(list.result.ok).toBe(true)
+    if (!list.result.ok) throw new Error('unexpected list refusal')
+    expect(list.result.value.items[0]?.projections?.values.inbox).toBeUndefined()
+    await ctx.fiber.dispose()
+  })
+
+  it('replays pending inbox without an Agent and removes the projection on gateway disposal', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(AgentRegistry)
+    await ctx.plugin(UserQuestionService)
+    await ctx.plugin(SessionProjectionRegistry)
+    const session = ctx.sessions.create()
+    const message = createUserMessage({ content: [{ type: 'text', text: 'pending after restart' }], source: { kind: 'user' } })
+    session.append('agent/inbox/spliced', { target: 'next-turn', start: 0, inserted: [message] })
+    const fiber = ctx.plugin(Object.assign((gatewayCtx: Context) => {
+      createApiProxy(gatewayCtx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })
+    }, { inject: ['sessions', 'agents', 'userQuestions', 'sessionProjections'] }))
+    await fiber.await()
+    await vi.waitFor(() => {
+      expect(ctx.sessionProjections.snapshot(session).values.inbox).toEqual([{ id: message.id, placement: 'queued', message }])
+    })
+    expect(ctx.agents.get(session.id)).toBeUndefined()
+    session.append('agent/inbox/spliced', { target: 'next-turn', start: 0, removedCount: 1, inserted: [] })
+    expect(ctx.sessionProjections.snapshot(session).values.inbox).toEqual([])
+    await fiber.dispose()
+    expect(ctx.sessionProjections.snapshot(session).values.inbox).toBeUndefined()
+    await ctx.fiber.dispose()
+  })
+
   it('removes the gateway-owned Session-list unit when the gateway fiber unloads', async () => {
     const { ctx, session } = await harness(true)
     expect('sessionListMetadata' in ctx.sessionProjections.snapshot(session).values).toBe(false)

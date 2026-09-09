@@ -498,7 +498,7 @@ describe('Enter semantics', () => {
       running: true,
       queue: [row('q-1')],
       subagent: {
-        address: { parentSessionId: 'parent' as SessionId, childSessionId: SID, mode: 'continuable' },
+        address: { parentSessionId: 'parent' as SessionId, childSessionId: SID, mode: 'one-shot' },
         parentAvailable: true,
       },
     }).textarea.placeholder).toBe('给智能体发消息')
@@ -592,7 +592,7 @@ describe('Enter semantics', () => {
     expect(ctrl.sink).not.toHaveBeenCalled()
   })
 
-  it('queue steering stays gated: idle, subagent, plain Enter, empty queue, or steering-only rows', () => {
+  it('queue steering stays gated: idle, one-shot child, plain Enter, empty queue, or steering-only rows', () => {
     // Idle: the gesture falls through to the machine's empty-draft no-op.
     const idle = bench({ queue: [row('q-1')], steerQueue: vi.fn() })
     fireEvent.keyDown(idle.textarea, { key: 'Enter', metaKey: true })
@@ -605,12 +605,12 @@ describe('Enter semantics', () => {
     expect(plain.steerQueue).not.toHaveBeenCalled()
     expect(plain.sink).not.toHaveBeenCalled()
 
-    // Subagent sessions keep the queue transport (no steering face).
+    // One-shot children have no human steering lifecycle.
     const subagent = {
       address: {
         parentSessionId: 'parent' as SessionId,
         childSessionId: SID,
-        mode: 'continuable' as const,
+        mode: 'one-shot' as const,
       },
       parentAvailable: true,
     }
@@ -820,7 +820,7 @@ describe('running and lock semantics', () => {
     expect(stop).not.toHaveBeenCalled()
   })
 
-  it('keeps both running subagent Enter gestures on Queue transport', () => {
+  it('supports both running continuable child Enter gestures on Steer transport', () => {
     const subagent = {
       address: {
         parentSessionId: 'parent' as SessionId,
@@ -831,11 +831,11 @@ describe('running and lock semantics', () => {
     }
     const plain = bench({ running: true, busyEnter: 'steer', draft: 'plain', subagent })
     fireEvent.keyDown(plain.textarea, { key: 'Enter' })
-    expect(plain.sink).toHaveBeenCalledWith('plain', [], [], 'queue', expect.any(AbortSignal))
+    expect(plain.sink).toHaveBeenCalledWith('plain', [], [], 'steer', expect.any(AbortSignal))
 
     const accelerated = bench({ running: true, draft: 'accelerated', subagent })
     fireEvent.keyDown(accelerated.textarea, { key: 'Enter', metaKey: true })
-    expect(accelerated.sink).toHaveBeenCalledWith('accelerated', [], [], 'queue', expect.any(AbortSignal))
+    expect(accelerated.sink).toHaveBeenCalledWith('accelerated', [], [], 'steer', expect.any(AbortSignal))
   })
 
   it('disabled (session removed) locks the textarea and chrome', () => {

@@ -663,7 +663,7 @@ describe('PiAiAdapter provider routing', () => {
     const result = await assemble(ctx, { model: 'claude-test', messages: [] })
 
     expect(result.message.content).toEqual([{ type: 'text', text: 'hello' }])
-    expect(server.paths).toEqual(['/v1/messages'])
+    expect(server.paths.map(path => new URL(path, 'http://localhost').pathname)).toEqual(['/v1/messages'])
     expect(server.headers[0]?.['x-api-key']).toBe('test-key')
     expect(server.headers[0]?.authorization).toBeUndefined()
   })

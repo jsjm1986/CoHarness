@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto'
 import { Context, Service } from '@deepseek-ai/cordis'
 import s from '@deepseek-ai/schemastery'
 import { SessionLogOffset } from '@deepseek-ai/dsh-session'
+import type { Session, SessionEventMap } from '@deepseek-ai/dsh-session'
 import { deriveEventMessage, isAppendSurfaceEvent } from '@deepseek-ai/dsh-session/surface'
 import type { SessionHeader, SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SessionInspection } from '@deepseek-ai/dsh-session-persistence'
@@ -50,6 +51,15 @@ export type { MessageFeedbackRow, MessageFeedbackSessionIdentity } from './spec.
 export interface Config {
   /** Maximum UTF-8 byte length accepted for one note. */
   readonly maxNoteBytes: number
+}
+
+declare module '@deepseek-ai/dsh-session/types' {
+  interface SessionEventMap {
+    /** Explicit message feedback accepted by the sidecar CAS operation. */
+    'feedback/message-put': { sessionId: SessionId; item: MessageFeedbackItem }
+    /** Explicit message feedback removed by the sidecar CAS operation. */
+    'feedback/message-delete': { sessionId: SessionId; messageId: string; version: string }
+  }
 }
 
 declare module '@deepseek-ai/cordis' {
@@ -143,6 +153,12 @@ type KnownSession =
 type ResolvedNote =
   | MessageFeedbackSuccess<string | undefined>
   | MessageFeedbackRejected<MessageFeedbackNoteBlank | MessageFeedbackNoteTooLarge>
+
+/** Append one merge-extensible feedback event without widening Session.append. */
+function appendFeedbackEvent<K extends keyof SessionEventMap>(session: Session, type: K, data: SessionEventMap[K]): void {
+  const append = session.append.bind(session) as unknown as (eventType: K, eventData: SessionEventMap[K]) => void
+  append(type, data)
+}
 
 /**
  * Storage-domain sidecar service. It inspects persisted Session history and
@@ -259,6 +275,7 @@ export class MessageFeedbackService extends TypertRemoteService {
         request.sessionId,
         rowSnapshot(identityOf(durable.meta), nextItems),
       )
+      this.appendLogEvent(durable.meta.id, 'feedback/message-put', { sessionId: durable.meta.id, item })
       return success(snapshotItem(item))
     })
   }
@@ -291,6 +308,9 @@ export class MessageFeedbackService extends TypertRemoteService {
         request.sessionId,
         rowSnapshot(identityOf(known.value.meta), items.filter(item => item !== existing)),
       )
+      this.appendLogEvent(known.value.meta.id, 'feedback/message-delete', {
+        sessionId: known.value.meta.id, messageId: existing.messageId, version: existing.version,
+      })
       return success<MessageFeedbackDeleteValue>(Object.freeze({ absent: true }))
     })
   }
@@ -384,6 +404,17 @@ export class MessageFeedbackService extends TypertRemoteService {
       throw new Error('message-feedback: durable domain is not initialized')
     }
     return this.table
+  }
+
+  /** Record an accepted feedback mutation when its Session is live. */
+  private appendLogEvent(
+    sessionId: SessionId,
+    type: 'feedback/message-put' | 'feedback/message-delete',
+    data: { sessionId: SessionId; item: MessageFeedbackItem } | { sessionId: SessionId; messageId: string; version: string },
+  ): void {
+    const session = this.ctx.sessions.get(sessionId)
+    if (session === undefined) return
+    appendFeedbackEvent(session, type, data)
   }
 }
 

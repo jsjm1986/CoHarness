@@ -8,6 +8,8 @@ compact 顶栏显示当前非 blank Session 标题，低于短高度阈值的框
 
 `/client` 导出表层包含插件主体（`apply`／`inject`）、`LayoutController` 和 owner-share 接口（包括 `MobileHeaderActionOwnerProps`）。AppFrame、面板 store 与让步求解器仍属于包内部。
 
+`conversation` slot 属于根作用域，切换当前 Session 不会重挂多面板容器。`layout.openDetails(sessionId?)` 可把唯一的详情栏固定到触发操作的 Session；省略参数时保留跟随当前会话的导航行为。关闭对应的工作台面板会释放固定的详情栏。
+
 ## 模型体验
 
 无。布局外壳管理浏览器查看状态；这里没有任何内容进入模型请求。

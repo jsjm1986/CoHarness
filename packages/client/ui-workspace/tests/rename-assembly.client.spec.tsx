@@ -37,6 +37,7 @@ async function createRuntime(): Promise<SlotTestRuntime> {
   })
   const locale = new LocaleRuntime(runtime.ctx)
   runtime.provide('locale', locale)
+  runtime.provide('conversationViewport', { snapshot: { getSnapshot: () => ({ mode: 'single', paneIds: [], paneRatios: [] }), subscribe: () => () => {} } } as never)
   runtime.slots.installLocale(locale)
   return runtime
 }

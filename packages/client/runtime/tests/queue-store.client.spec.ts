@@ -3,7 +3,7 @@
  * change, reconnect re-baselining, pre-instantiation buffering, editable-text
  * projection, and snapshot reference stability.
  */
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, UserMessage } from '@deepseek-ai/dsh-llm/types'
 import { SessionSeq } from '@deepseek-ai/dsh-session/types'
@@ -47,6 +47,22 @@ function makeSession(): Session {
 }
 
 describe('queue snapshot intake', () => {
+  it('restores a cold inbox projection, keeps it across subscription baselines, and releases its listener', async () => {
+    const session = makeSession()
+    const frame = queueFrame([{ id: 'cold', body: 'pending' }])
+    if (frame.type !== 'session/queue') throw new Error('unexpected fixture frame')
+    session.projections.seed({ asOfSeq: 4, values: { inbox: frame.items } })
+    await vi.waitFor(() => { expect(session.getSnapshot().queue).toMatchObject([{ id: 'cold', text: 'pending' }]) })
+    session.handleMuxEnvelope(rid('reconnect'), { type: 'session/subscribed', sessionId: SID, lastSeq: 4 })
+    expect(session.getSnapshot().queue).toMatchObject([{ id: 'cold' }])
+    session.projections.seed({ asOfSeq: 3, values: { inbox: [] } })
+    expect(session.getSnapshot().queue).toHaveLength(1)
+    session.dispose()
+    session.projections.seed({ asOfSeq: 5, values: { inbox: [] } })
+    await Promise.resolve()
+    expect(session.getSnapshot().queue).toHaveLength(1)
+  })
+
   it('projects stable ids, flat previews, and complete text', () => {
     const session = makeSession()
     session.handleMuxEnvelope(rid('env-1'), queueFrame([

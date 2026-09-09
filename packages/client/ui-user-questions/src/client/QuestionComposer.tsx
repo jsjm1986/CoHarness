@@ -129,6 +129,7 @@ export function QuestionComposer(props: QuestionComposerProps) {
       <QuestionFlow
         key={question.key}
         pending={question}
+        active={props.active !== false}
         t={props.t}
         useStore={useStore}
         actions={actions}
@@ -137,7 +138,8 @@ export function QuestionComposer(props: QuestionComposerProps) {
     : <PlanReviewPanel key={question.key} pending={question} review={review} t={props.t} />
 }
 
-function QuestionFlow({ pending, t, useStore, actions }: {
+function QuestionFlow({ pending, active, t, useStore, actions }: {
+  active: boolean
   pending: PendingQuestion
   t: QuestionComposerProps['t']
   useStore: NonNullable<QuestionComposerProps['useStore']>
@@ -395,7 +397,7 @@ function QuestionFlow({ pending, t, useStore, actions }: {
                   : (
                     <AnswerField
                       variant="block"
-                      autoFocus={!focusedQuestions.current.has(index)}
+                      autoFocus={active && !focusedQuestions.current.has(index)}
                       value={draft.custom}
                       disabled={busy !== null}
                       placeholder={t('custom.placeholder')}

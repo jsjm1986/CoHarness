@@ -313,6 +313,8 @@ export type UseSession<Snap extends object = object> = SnapshotSelectorHook<Snap
 export interface SessionAreaProps {
   /** No-session body (also covers a current id whose session cannot be resolved). */
   empty?: (() => ReactNode) | undefined
+  /** Optional explicit Session id for multi-pane renderers; omitted follows current selection. */
+  sessionId?: SessionIdOf
   /** Session body; the framework remounts it per session (key=sessionId). */
   children: (sessionId: SessionIdOf) => ReactNode
 }

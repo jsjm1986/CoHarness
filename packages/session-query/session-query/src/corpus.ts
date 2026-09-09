@@ -1,12 +1,12 @@
 /** Live/persisted logical-corpus resolution for session-query. */
 
 import type { Context, Fiber } from '@deepseek-ai/cordis'
+import { SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type {
   Session,
   SessionEvent,
   SessionHeader,
   SessionId,
-  SessionLogOffset,
 } from '@deepseek-ai/dsh-session'
 import type SessionPersistence from '@deepseek-ai/dsh-session-persistence'
 import type { SessionRecord } from './types.ts'
@@ -251,10 +251,15 @@ function projectSource<Value>(
 }
 
 function sourceLive(session: Session): LogicalSessionSource {
+  const end = session.seq
+  let materialized: readonly SessionEvent[] | undefined
   return {
     header: session.header,
     inheritedEventCount: session.inheritedEventCount,
-    events: session.snapshotEvents(),
+    get events() {
+      materialized ??= session.snapshotEvents(SessionLogOffset(0), SessionLogOffset(end))
+      return materialized
+    },
   }
 }
 

@@ -8,13 +8,13 @@
 
 ## 仅限 scope 内使用
 
-在 agent scope 之外挂载本行，会与注册表自身的 `deployment:persona` 注册相撞并明确报错。这不是需要绕开的限制：部署级人设已经有归属，而本行存在的意义正是为某一个 agent 遮蔽它。请把它挂在 preset 组装内部，由 preset 的挂载过程提供 agent scope。
+在 agent scope 之外挂载本行，会与注册表自身的 `deployment:persona-prefix` 注册相撞并明确报错。这不是需要绕开的限制：部署级人设已经有归属，而本行存在的意义正是为某一个 agent 遮蔽它。请把它挂在 preset 组装内部，由 preset 的挂载过程提供 agent scope。
 
 ## 配置
 
 | 字段 | 默认值 | 含义 |
 |---|---|---|
-| `text` | 必填 | 作为 `deployment:persona` 段落渲染的人设文本 |
+| `text` | 必填 | 作为 `deployment:persona-prefix` 段落渲染的人设文本 |
 | `complete` | `false` | 组装后将此人设恢复为唯一的系统提示词段落 |
 | `includeRuntimeContext` | `true` | 是否为此 agent 作用域包含动态 runtime-context 快照；false 会抑制所有上下文贡献，但不禁用拥有它们的服务 |
 
@@ -26,7 +26,7 @@
 
 #### What the model sees
 
-位于 order 0 的 `deployment:persona` 段落，紧随 harness 身份开场白之后，携带本行配置的 `text`，其中的提示词变量已解析。对于其 preset 挂载了本行的 agent，它会替换部署所配置的任何人设。在完整模式下，模型只会看到这个渲染后的段落作为系统提示词。Runtime context 默认保持启用。禁用后，新建 agent 不会收到来自沙箱策略、批准策略、委派或其他 system-prompt 上下文提供方的 runtime-context 快照。
+位于 order 0 的 `deployment:persona-prefix` 段落，紧随 harness 身份开场白之后，携带本行配置的 `text`，其中的提示词变量已解析。对于其 preset 挂载了本行的 agent，它会替换部署所配置的任何人设。在完整模式下，模型只会看到这个渲染后的段落作为系统提示词。Runtime context 默认保持启用。禁用后，新建 agent 不会收到来自沙箱策略、批准策略、委派或其他 system-prompt 上下文提供方的 runtime-context 快照。
 
 #### Token effect
 

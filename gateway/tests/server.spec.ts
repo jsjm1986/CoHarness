@@ -439,6 +439,53 @@ describe('gateway server', () => {
     expect(detail).not.toHaveBeenCalled()
   })
 
+  it('serves an ACL-filtered account conversation catalog for the workbench', async () => {
+    const { deps, base } = await setup()
+    const project = await deps.projects.create({ name: 'workbench-project', createdBy: 1 })
+    deps.collaboration = {
+      projectsForUser: () => [{ projectId: project.id, name: project.name, path: project.path, mode: 'ro' }],
+      projectForUser: () => ({ projectId: project.id, name: project.name, path: project.path, mode: 'ro', administrator: false }),
+      listAccountConversations: () => [{
+        sessionId: 'project-session',
+        runtime: { kind: 'project', projectId: project.id, projectName: project.name },
+        visibility: 'project', creatorUserId: 2, creatorDisplayName: 'Alice',
+        updatedAt: 123, blank: false, canWrite: false,
+      }],
+      access: () => { throw new Error('not implemented in catalog test') },
+      listConversations: () => [],
+      readableSessionIds: () => [],
+      setVisibility: () => { throw new Error('not implemented in catalog test') },
+      claimInteraction: () => false,
+    } satisfies GatewayCollaborationService
+    const cookie = await login(base, 'root-admin', 'pw-12345678')
+    const response = await fetch(`${base}/account/api/workbench/catalog`, { headers: { cookie } })
+    expect(response.status).toBe(200)
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(await response.json()).toMatchObject({
+      personal: { id: 1 },
+      projects: [expect.objectContaining({ projectId: project.id, mode: 'ro' })],
+      items: [expect.objectContaining({ sessionId: 'project-session', canWrite: false })],
+    })
+  })
+
+  it('routes a target-runtime API request through membership-checked context', async () => {
+    const proxy = vi.fn(async (_req, res, context) => {
+      res.writeHead(200, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ kind: context.scope.kind, projectId: context.scope.kind === 'project' ? context.scope.projectId : null }))
+    })
+    const { deps, base } = await setup({}, { proxy })
+    const project = await deps.projects.create({ name: 'target-project', createdBy: 1 })
+    installProjectCollaboration(deps)
+    deps.collaboration!.projectForUser = async (projectId, userId) => projectId === project.id && userId === 1
+      ? { projectId, name: project.name, path: project.path, mode: 'ro', administrator: false }
+      : null
+    const cookie = await login(base, 'root-admin', 'pw-12345678')
+    const response = await fetch(`${base}/api/session.list?dshTarget=project:${String(project.id)}`, { headers: { cookie } })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ kind: 'project', projectId: project.id })
+    expect(proxy).toHaveBeenCalledOnce()
+  })
+
   it('keeps the detail fallback for legacy catalogs without owner metadata', async () => {
     const { deps, base } = await setup()
     const project = await deps.projects.create({ name: 'legacy-context-project', createdBy: 1 })

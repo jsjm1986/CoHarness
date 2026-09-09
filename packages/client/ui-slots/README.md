@@ -21,6 +21,8 @@ The store family (`defineStore` spec in / `StoreHandle<T, A>` out) types the sto
 
 `SlotCore` seeds the a-priori `'root'` slot at construction and enforces load-time validation (undeclared-slot registration, duplicate child declaration, one shared handle under two scopes, a chain registration without `select` — all throw at register). An entry's disposer collapses its declared child slots recursively: ledger rows, contributions, and store mounts die on one lifecycle axis. Each key also carries a declaration epoch that advances only on declaration and collapse; the runtime uses it for [`ctx.slots.inject`](../runtime/README.md#slot-declaration-injection), independently from ordinary entry versions. `renderer.ts` carries the installation contract (`SlotRenderer`, `SlotRendererHost`) plus `StaleAuthorizationError`/`SlotOwnershipError`; ui-renderer owns both the implementation and its plugin-lifecycle installation.
 
+`SessionAreaProps.sessionId` optionally binds SessionProvider to an explicit Session. Omission follows current selection; an unresolved id renders the empty branch. The renderer resolves that Session’s provide bundle, including its projection and input sources, and observes provider-roster changes through the existing provide notification channel.
+
 ## Model Experience
 
 None, as the slot registry is browser-side UI plumbing; nothing here reaches a model request.

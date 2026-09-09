@@ -29,3 +29,13 @@ describe('Session format catalog', () => {
     expect(migrated).not.toBe(source)
   })
 })
+
+it('streams both default legacy generations without changing event identity', () => {
+  const event = { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } }
+  const output: unknown[] = []
+  const stream = sessionFormatCatalog.createStream({ version: 0, id: 'stream', createdAt: 1 }, 0, { emitEvent: (value) => { output.push(value) } })
+  stream.emitEvent(event)
+  stream.finish()
+  expect(stream.header.version).toBe(2)
+  expect(output).toEqual([event])
+})

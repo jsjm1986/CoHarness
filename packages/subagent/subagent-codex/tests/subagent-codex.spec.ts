@@ -212,7 +212,6 @@ function fakeChild(options: FakeChildOptions = {}): FakeChild {
     })
   })
   const handle: SubprocessHandle = {
-    pid: options.pid ?? 1234,
     stdin: toChild,
     stdout: fromChild,
     stderr,
@@ -2286,6 +2285,16 @@ describe('disposeCodexChild', () => {
       .resolves.toBeUndefined()
     expect(child.terminate).not.toHaveBeenCalled()
     expect(child.waitForExit).not.toHaveBeenCalled()
+  })
+
+  it('settles cleanup when a spawn-level failure arrives during the tree wait', async () => {
+    const child = fakeChild()
+    const done = Promise.withResolvers<SubprocessOutcome>()
+    const handle = { ...child.handle, done: done.promise, waitForExit: async () => {
+      done.reject(new Error('late spawn failure'))
+      return true
+    } }
+    await expect(disposeCodexChild(defaultWire(child), handle)).resolves.toBeUndefined()
   })
 
   it('reports tree-wait failure with safe teardown facts', async () => {

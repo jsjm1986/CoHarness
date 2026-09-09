@@ -62,12 +62,11 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * registering here replaces the entire conversation surface (and removes
      * every seat it declares) rather than adding to it.
      *
-     * Current-session-optional: the occupant owns both states without
-     * changing its React identity, so it keeps its own state across a session
-     * switch. It receives no owner props; session facts arrive through the
-     * framework hooks of the `session-maybe` scope.
+     * Root scope keeps the viewport mounted across active-pane changes.
+     * The occupant owns explicit session providers and receives the shell's
+     * compact presentation flag; session facts belong to its pane children.
      */
-    'conversation': { kind: 'single'; scope: 'session-maybe'; owner: ConvOwnerProps }
+    'conversation': { kind: 'single'; scope: 'root'; owner: ConvOwnerProps }
     /**
      * The right details column, shown when the layout opens it. OCCUPIED by
      * ui-conversation's DetailsPanel, which declares the tool-details seat
@@ -143,7 +142,7 @@ export function apply(ctx: ClientContext): void {
       locale: NS,
       children: {
         'sidebar': { kind: 'single', scope: 'root' },
-        'conversation': { kind: 'single', scope: 'session-maybe' },
+        'conversation': { kind: 'single', scope: 'root' },
         'details': { kind: 'single', scope: 'session' },
         'shell.overlay': { kind: 'list', scope: 'root' },
         'shell.mobile.header.actions': { kind: 'list', scope: 'session' },

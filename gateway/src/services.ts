@@ -3,6 +3,7 @@ import type { GatewayAccountPreferencesService } from './account-preferences.ts'
 import type { UserRow } from './auth.ts'
 import type {
   CollaborationAction,
+  AccountConversationView,
   ConversationAccess,
   ConversationCollaborationView,
   ProjectAuthorityView,
@@ -119,6 +120,8 @@ export interface GatewayCollaborationService {
   projectForUser(projectId: number, userId: number): Awaitable<ProjectAuthorityView | null>
   access(userId: number, sessionId: string, action: CollaborationAction): Awaitable<ConversationAccess>
   listConversations(userId: number, projectId: number): Awaitable<ConversationCollaborationView[]>
+  /** Account-wide, ACL-filtered conversation catalog for the multi-runtime workbench. */
+  listAccountConversations?(userId: number): Awaitable<AccountConversationView[]>
   readableSessionIds(userId: number, projectId: number, sessionIds: readonly string[]): Awaitable<string[]>
   setVisibility(userId: number, sessionId: string, visibility: 'project' | 'private'): Awaitable<void>
   claimInteraction(

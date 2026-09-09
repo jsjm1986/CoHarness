@@ -1,6 +1,6 @@
 import { SessionFormatError, SessionFormatUnsupportedMigrationError } from './error.ts'
 import { inspectSessionFormatVersion, snapshotSessionFormatArtifact, snapshotSessionFormatHeader } from './json.ts'
-import type { SessionFormatArtifact, SessionFormatChain, SessionFormatChainOptions, SessionFormatHeader, SessionFormatMigration } from './types.ts'
+import type { SessionFormatArtifact, SessionFormatChain, SessionFormatChainOptions, SessionFormatHeader, SessionFormatMigration, SessionFormatMigrationContext, SessionFormatMigrationStage, SessionFormatMigrationStream, SessionFormatEvent } from './types.ts'
 
 /** Validate one exact adjacent migration declaration.
  * @param migration - migration declaration to validate.
@@ -54,12 +54,59 @@ class CompiledSessionFormatChain implements SessionFormatChain {
       if (current.version !== migration.toVersion) throw new SessionFormatError(`${migration.name} returned an invalid header version`)
       migration.validateTargetHeader(current)
     }
-    return snapshotSessionFormatHeader(this.options.restoreCurrentHeader(current), 'current Session header')
+    const restored = snapshotSessionFormatHeader(this.options.restoreCurrentHeader(current), 'current Session header')
+    if (restored.version !== this.currentVersion) throw new SessionFormatError('current Session restorer returned an invalid version')
+    return restored
+  }
+
+  createStream(
+    source: SessionFormatHeader,
+    inheritedEventCount: number,
+    output: SessionFormatMigrationContext,
+  ): SessionFormatMigrationStream {
+    const plan = this.plan(source.version)
+    let header = snapshotSessionFormatHeader(source, 'stored Session header')
+    const stages: SessionFormatMigrationStage[] = []
+    for (const migration of plan) {
+      const targetHeader = snapshotSessionFormatHeader(migration.migrateHeader(header), `${migration.name} header output`)
+      if (targetHeader.version !== migration.toVersion) throw new SessionFormatError(`${migration.name} returned invalid header version`)
+      migration.validateTargetHeader(targetHeader)
+      if (migration.createStage === undefined) throw new SessionFormatError(`${migration.name} does not provide a streaming stage`)
+      stages.push(migration.createStage({ sourceHeader: header, targetHeader, sourceInheritedEventCount: inheritedEventCount }))
+      header = targetHeader
+    }
+    const contexts: SessionFormatMigrationContext[] = []
+    for (let index = 0; index < stages.length; index += 1) {
+      const next = stages[index + 1]
+      contexts.push({
+        emitEvent: (event) => {
+          if (next === undefined) output.emitEvent(event)
+          else next.transformEvent(event, contexts[index + 1] as SessionFormatMigrationContext)
+        },
+      })
+    }
+    const emitEvent = (event: SessionFormatEvent): void => {
+      const first = stages[0]
+      if (first === undefined) output.emitEvent(event)
+      else first.transformEvent(event, contexts[0] as SessionFormatMigrationContext)
+    }
+    const restoredHeader = snapshotSessionFormatHeader(this.options.restoreCurrentHeader(header), 'current Session header')
+    if (restoredHeader.version !== this.currentVersion) throw new SessionFormatError('current Session restorer returned an invalid version')
+    return {
+      header: restoredHeader,
+      emitEvent,
+      finish: () => {
+        for (let index = 0; index < stages.length; index += 1) {
+          stages[index]?.finish(contexts[index] as SessionFormatMigrationContext)
+        }
+      },
+    }
   }
 
   migrate(source: SessionFormatArtifact): SessionFormatArtifact {
     let current = snapshotSessionFormatArtifact(source, 'stored Session artifact')
-    for (const migration of this.plan(inspectSessionFormatVersion(current.header))) {
+    const plan = this.plan(inspectSessionFormatVersion(current.header))
+    for (const migration of plan) {
       current = snapshotSessionFormatArtifact(migration.migrate(current), `${migration.name} output`)
       if (current.header.version !== migration.toVersion) throw new SessionFormatError(`${migration.name} returned an invalid artifact version`)
       migration.validateTarget(current)

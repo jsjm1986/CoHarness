@@ -125,6 +125,7 @@ async function bench(snapshot: ConversationSnapshot) {
   let infoCell: { sessionId: SessionId; hooks: Record<string, unknown>; props: Record<string, unknown> } | undefined
   const sessionsFake = {
     list,
+    setAdditionalStaged: vi.fn(),
     binding: (id: SessionId) => (id === SID
       ? { sessionId: SID, session, ctx: { effect: () => {}, on: () => () => {} } }
       : undefined),
@@ -174,7 +175,7 @@ async function bench(snapshot: ConversationSnapshot) {
   slots.register({
     name: 'root',
     children: {
-      'conversation': { kind: 'single', scope: 'session-maybe' },
+      'conversation': { kind: 'single', scope: 'root' },
       'details': { kind: 'single', scope: 'session' },
     },
   }, AppRoot)

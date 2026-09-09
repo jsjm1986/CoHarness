@@ -966,13 +966,13 @@ async function openPerformancePage(
   await world.page.goto(world.scaffold.baseUrl, { waitUntil: 'load' })
   await world.page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
   const group = world.page.getByRole('treeitem').first()
-  // Workspace grouping renders the stable `Ungrouped` bucket label without a
+  // Workspace grouping renders the stable `Independent sessions` bucket label without a
   // count. The caller asserts cardinality after expanding the bucket; waiting
   // on a presentation count here would skip the measured path.
   await group.waitFor({ timeout: 30_000 })
   const countLabel = `${String(expectedSessions)} ${expectedSessions === 1 ? 'session' : 'sessions'}`
   await expect.poll(() => group.textContent(), { timeout: 30_000 })
-    .toMatch(new RegExp(`Ungrouped|未分组|${countLabel}`, 'i'))
+    .toMatch(new RegExp(`Independent sessions|独立会话|${countLabel}`, 'i'))
   return group
 }
 

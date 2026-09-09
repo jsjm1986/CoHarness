@@ -53,7 +53,7 @@ id→ctx handoff is allowed in only three kinds of places (business providers ne
 Session instances share the scope's lifecycle; liveness eligibility = host-listed (one criterion, shared by mint and prune):
 
 - Birth = a session row entering client view (the list baseline pull / the local `create()` echo / the `host/session-added` frame); a lazy first resolve mints the scope (resolution is a pure function, render-safe).
-- One prune tears down three things together: the Session instance, the scope fiber (cascading through every consumer hung on the actx), and the session-keyed slot store. The staged session (= `list.current`) is the exception: removed while still on stage, it keeps a frozen read-only view, torn down only once the stage moves away.
+- One prune tears down three things together: the Session instance, the scope fiber (cascading through every consumer hung on the actx), and the session-keyed slot store. Staged Sessions (the current selection plus explicit viewport panes) are the exception: removed while still staged, they retain a frozen read-only view until stage membership ends. The [workbench decision](2026-09-08-cordis-multi-session-workbench.md) owns the bounded multi-Session viewing set.
 - Reopening = lazily rebuilding the instance + `open()` pulling history (the host session log is the durable truth).
 - Remaining TODO: approval/question frames never enter history and cannot be recovered across a prune (the manager-level pendingBuffers cover only the never-instantiated window).
 

@@ -39,11 +39,11 @@ function main(): void {
   const base = process.argv[2]
   if (base === undefined || base === '') throw new Error('ci-pr-scope: expected a base commit')
   const range = `${base}...HEAD`
-  const paths = execFileSync('git', ['diff', '--name-only', range], { encoding: 'utf8' })
+  const paths = execFileSync('git', ['diff', '--name-only', range], { encoding: 'utf8', maxBuffer: 100 * 1024 * 1024 })
     .trim()
     .split('\n')
     .filter(Boolean)
-  const diff = execFileSync('git', ['diff', '--unified=0', range], { encoding: 'utf8' })
+  const diff = execFileSync('git', ['diff', '--unified=0', range], { encoding: 'utf8', maxBuffer: 100 * 1024 * 1024 })
   const result = classifyCiPrScope(paths, diff)
   process.stdout.write(`run_expensive=${String(result.runExpensive)}\nreason=${result.reason}\n`)
 }

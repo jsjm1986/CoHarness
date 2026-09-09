@@ -10,7 +10,8 @@
  */
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ConversationViewport } from '@deepseek-ai/dsh-client-runtime/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { WorkspaceBrowserInjected, WorkspacePickerInjected } from './contract/slots.ts'
@@ -43,7 +44,7 @@ const NS = 'workspace'
  * provides a waitable service. apply therefore depends on each slot
  * declaration through `slots.inject()` instead of assuming order.
  */
-export const inject = ['slots', 'sessions', 'workspaces', 'locale', 'connection']
+export const inject = ['slots', 'sessions', 'workspaces', 'locale', 'connection', 'conversationViewport']
 
 /**
  * Register the browser and picker once their slot declarations are on the
@@ -53,6 +54,7 @@ export const inject = ['slots', 'sessions', 'workspaces', 'locale', 'connection'
  */
 export function apply(ctx: ClientContext): void {
   const connection = ctx.get('connection') as ConnectionHandle
+  const viewport = ctx.get('conversationViewport') as ConversationViewport | undefined
   const hostDescription = connection.hostDescription
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-workspace: dictionaries')
 
@@ -70,11 +72,16 @@ export function apply(ctx: ClientContext): void {
   })
   const browserFlowSource = flowSource('sidebar.workspaces.directoryFlow')
   const pickerFlowSource = flowSource('conversation.hero.workspace.directoryFlow')
+  const openSession = (sessionId: SessionId): void => {
+    ctx.get('conversationViewport')?.replaceActive(sessionId)
+    ctx.sessions.open(sessionId)
+  }
   const browserInjected = (): WorkspaceBrowserInjected => ({
+    exitWorkbench: () => { viewport?.setMode('single') },
     // Explicit group actions keep their target; unscoped New Session inherits
     // the current Session Workspace before the recent-Workspace fallback.
     startSession: (workspaceId) => { ctx.workspaces.startSession(workspaceId) },
-    open: (sessionId) => { ctx.sessions.open(sessionId) },
+    open: openSession,
     searchSessions,
     searchResultLimit: ctx.sessions.searchResultLimit,
     renameSession: async (sessionId, title) => {
@@ -87,7 +94,7 @@ export function apply(ctx: ClientContext): void {
     },
     forkSession: (sessionId) => {
       ctx.sessions.fork({ sessionId, increaseTitle: true })
-        .then((childId) => { ctx.sessions.open(childId) })
+        .then((childId) => { openSession(childId) })
         .catch(() => {
           // Fork or child-rename failure keeps the current selection.
         })
@@ -103,7 +110,12 @@ export function apply(ctx: ClientContext): void {
     },
     createWorkspace: input => ctx.workspaces.create(input),
     listDirectory: (path, signal) => ctx.workspaces.listDirectory(path, signal),
-    hooks: { directoryFlow: browserFlowSource, hostDescription },
+    hooks: {
+      directoryFlow: browserFlowSource,
+      hostDescription,
+      viewport: viewport?.snapshot ?? { getSnapshot: () => ({ mode: 'single', paneIds: [], paneRatios: [] }), subscribe: () => () => {} },
+      currentSessions: ctx.sessions.currentScopeList ?? ctx.sessions.list,
+    },
   })
   const pickerInjected = (): WorkspacePickerInjected => ({
     createWorkspace: input => ctx.workspaces.create(input),

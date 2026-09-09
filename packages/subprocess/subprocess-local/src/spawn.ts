@@ -64,6 +64,8 @@ export interface SpawnInternals {
  * intentionally absent from the public subprocess seam.
  */
 export interface LocalSubprocessHandle extends SubprocessHandle {
+  /** Provider-private process identity used by local tree observation. */
+  readonly pid: number
   /** Force-terminate the current tree synchronously without starting timers or waits. */
   terminateForHostExit(): void
 }

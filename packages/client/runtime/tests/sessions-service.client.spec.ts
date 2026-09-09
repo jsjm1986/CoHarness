@@ -337,6 +337,45 @@ describe('cell (render-layer session kit)', () => {
     expect(historyCalls().map(c => (c.payload as { sessionId: string }).sessionId)).toEqual(['s1', 's2', 's1'])
   })
 
+  it('stages four independent windows, receives per-session events, and closes a window without cancelling its task', async () => {
+    const b = bench()
+    const ids = ['a', 'b', 'c', 'd'].map(sid)
+    await feedList(b, ids.map(id => ({ id, blank: true, running: true })))
+    b.svc.open(ids[0]!)
+    b.svc.setAdditionalStaged([...ids, ids[0]!, sid('unknown')])
+    await Promise.resolve()
+    await Promise.resolve()
+    const historyIds = () => b.api.calls.filter(call => call.method === 'session.history').map(call => (call.payload as { sessionId: string }).sessionId)
+    expect(historyIds()).toEqual(ids)
+    for (const id of ids) {
+      b.svc.handleMuxEnvelope({ rpcId: id as never, payload: {
+        type: 'session/event', sessionId: id,
+        event: { type: 'user/message', seq: 0, time: 2, surfaceOp: 'append',
+          data: createUserMessage({ content: [{ type: 'text', text: `Prompt ${id}` }], source: { kind: 'user' } }) },
+      } as never })
+      await Promise.resolve()
+      for (const candidate of ids) {
+        expect(b.svc.binding(candidate)!.session.getSnapshot().blank).toBe(ids.indexOf(candidate) > ids.indexOf(id))
+      }
+    }
+    await Promise.resolve()
+    for (const id of ids) {
+      const body = b.svc.binding(id)!.session.getSnapshot()
+      expect(body.blank).toBe(false)
+    }
+    b.svc.open(ids[1]!)
+    b.svc.setAdditionalStaged(ids.slice(1))
+    expect(b.svc.binding(ids[0]!)!.session.getSnapshot().openState).toBe('cold')
+    expect(b.svc.binding(ids[0]!)!.session.getSnapshot().running).toBe(true)
+    expect(b.api.calls.some(call => call.method === 'session.cancel')).toBe(false)
+    b.svc.clear()
+    expect(historyIds()).toEqual(ids)
+    expect(b.svc.binding(ids[2]!)!.session.getSnapshot().openState).toBe('open')
+    b.svc.setAdditionalStaged([])
+    b.svc.open(ids[0]!)
+    expect(historyIds()).toEqual([...ids, ids[0]])
+  })
+
   it('startup restore: a persisted selection validated by the first projection opens its window unprompted', async () => {
     const storage = new Map<string, string>([
       ['dsh.sessions.current', JSON.stringify({ sessionId: 's1' })],

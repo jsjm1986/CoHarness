@@ -9,6 +9,7 @@ import type { TypertContext } from '@deepseek-ai/dsh-typert-protocol'
 import type { MaybeSnapshotSelectorHook, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
 import { SlotRegistry } from './slots.ts'
 import { SessionRuntime } from './sessions/service.ts'
+import { SessionRuntimePool } from './sessions/pool.ts'
 import type { SessionListState } from './sessions/service.ts'
 import { WorkspaceRuntime } from './workspaces/service.ts'
 import type { ConversationSnapshot } from './sessions/conversation.ts'
@@ -39,6 +40,7 @@ export type {
 export type { ConversationRuntime } from './sessions/conversation-assembler.ts'
 export type { RootOwnerProps } from './slots.ts'
 export { SessionCreateError, SessionRuntime, scopeOf, workspaceTitleOf } from './sessions/service.ts'
+export { SessionRuntimePool } from './sessions/pool.ts'
 export { indexSubagentDescendants } from './sessions/subagent-lineage.ts'
 export type { SubagentDescendantSummary } from './sessions/subagent-lineage.ts'
 // The provide channel is shared with the client test runtime (one
@@ -69,7 +71,7 @@ export type {
   SessionFace,
   SubmissionHandle,
 } from './contract/session.ts'
-export type { AgentContext, ISessions } from './contract/sessions.ts'
+export type { AgentContext, ISessions, SessionRuntimeTarget } from './contract/sessions.ts'
 export type { IWorkspaces } from './contract/workspaces.ts'
 export type { SessionBlankReuseRequest, SessionCreateOptions } from './contract/session-create.ts'
 export type {
@@ -133,6 +135,9 @@ export type {
   ProjectionsBaseline, ProjectionValueStore, SessionProjectionMap, UseProjection,
 } from './sessions/projection-store.ts'
 export type { SessionId } from '@deepseek-ai/dsh-client-connection/client'
+export type {
+  AddPaneResult, ConversationViewport, ConversationViewportMode, ConversationViewportSnapshot,
+} from './contract/conversation-viewport.ts'
 
 /** Client-side Cordis context after declaration merging. */
 export type ClientContext = Context
@@ -227,6 +232,8 @@ declare module '@deepseek-ai/cordis' {
     workspaces: import('./contract/workspaces.ts').IWorkspaces
     /** Active project UI policy shared by theme and project settings surfaces. */
     projectUiPolicy: import('./project-policy.ts').ProjectUiPolicyRuntime
+    /** Optional provider for the multi-session conversation viewport. */
+    conversationViewport?: import('./contract/conversation-viewport.ts').ConversationViewport
   }
 }
 
@@ -244,7 +251,10 @@ export function apply(ctx: Context): void {
     views: new ConversationViewRegistry(ctx),
   }
   const connection = ctx.get('connection') as ConnectionHandle
-  const sessions = new SessionRuntime(ctx, connection.api, ctx.remote, conversation)
+  const baseSessions = new SessionRuntime(ctx, connection.api, ctx.remote, conversation, {
+    provideService: false,
+  })
+  const sessions = new SessionRuntimePool(ctx, baseSessions, connection, ctx.remote, conversation)
   ctx.typert.contexts.registerClient('agent', {
     identity: candidate => sessions.scopeOf(candidate),
   })

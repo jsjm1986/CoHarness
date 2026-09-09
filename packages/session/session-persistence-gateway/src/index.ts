@@ -799,10 +799,11 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
    * Ask the remote store to publish a v2 metadata successor when supported.
    * A missing route is a compatibility no-op; the coordinator still exposes
    * the normalized in-memory view for older Gateway deployments.
-   * @param sourceMeta - legacy stored header.
-   * @param currentMeta - normalized current header.
+   * @param sourceStorage - legacy storage metadata.
+   * @param currentStorage - normalized current storage metadata.
    * @param _events - validated logical events, not sent over the wire.
    * @param sourceRevision - revision that the remote transaction must match.
+   * @param signal - optional cancellation of the migration request.
    * @returns after the optional remote migration request settles.
    */
   async migrateStored(
@@ -810,8 +811,9 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     currentStorage: SessionStorageMetadata,
     _events: readonly SessionEvent[],
     sourceRevision: PersistenceRevision,
+    signal?: AbortSignal,
   ): Promise<void> {
-    await this.optional('/internal/runtime/session/migrate', undefined, {
+    await this.optional('/internal/runtime/session/migrate', signal, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({

@@ -6,8 +6,9 @@
 
 - id: system-prompt
   config:
-    persona: >-
-      You are a coding agent powered by the {{model}} model. Your working directory is {{cwd}}.
+    personaPrefix: >-
+      You are a coding agent powered by the {{model}} model.
+    personaSuffix: Your working directory is {{cwd}}.
 
 # The shared module-reload HMR row stays off; the launcher's watch-only
 # fallback still keeps the user patch layers live until the run exits.
@@ -18,6 +19,11 @@
   config:
     # Keep the same temporary process-wide Code Mode opt-in as the Web surface.
     mode: !!js process.env.DSH_TOOLS_MODE
+
+# Headless uses the structured read/write/edit file tools. The legacy editor
+# remains available to the minimal Web preset and the base/TUI composition.
+- id: tool-str-replace-editor
+  disabled: true
 
 - insert:
     # Code Mode is a core execution capability, not a Web component.

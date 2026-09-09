@@ -17,7 +17,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {
   ConnectionHandle, ModelSelection, RpcError, SessionId,
 } from '@deepseek-ai/dsh-api-remotes/client'
-import type { SessionRuntime } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ISessions } from '@deepseek-ai/dsh-client-runtime/client'
 import { ModelDirectory } from './directory.ts'
 import type { ModelInputCapability } from './capabilities.ts'
 
@@ -89,12 +89,17 @@ export class ModelDirectoryResolver extends Service {
     const { live } = this
     const existing = live.directories.get(sessionId)
     if (existing !== undefined) return existing
-    const sessions = this.ctx.get('sessions') as SessionRuntime
+    const sessions = this.ctx.get('sessions') as ISessions
     const actx = sessions.scope(sessionId)
     if (actx === undefined) throw new Error(`ui-model-selection: session "${String(sessionId)}" resolved no scope`)
     const connection = this.ctx.get('connection') as ConnectionHandle
+    const target = sessions.runtimeTargetFor?.(sessionId)
+    const targetConnection = target === undefined || connection.forTarget === undefined
+      ? undefined
+      : connection.forTarget(target)
+    const api = targetConnection?.api ?? connection.api
     const directory = new ModelDirectory(
-      connection.api.sessions,
+      api.sessions,
       sessionId,
       () => sessions.subagentAddress(sessionId) === undefined,
       this.formatSelectionError,

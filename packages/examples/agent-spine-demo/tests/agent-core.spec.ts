@@ -286,7 +286,7 @@ describe('dsh-agent-spine-demo bundle', () => {
     expect(agent?.id).toBe(agent?.session.id)
     expect(agent?.id).toMatch(/^main-session-/)
     const assembly = await ctx.get('systemPrompt')!.assemble()
-    expect(assembly.sections.find(s => s.name === 'deployment:persona')?.text).toBe('You are main.')
+    expect(assembly.sections.find(s => s.name === 'deployment:persona-prefix')?.text).toBe('You are main.')
     await ctx.fiber.dispose()
   })
 
@@ -331,7 +331,7 @@ describe('dsh-agent-spine-demo bundle', () => {
     expect(ctx.get('agentLoop')).toBeDefined()
     expect(ctx.get('agents')?.list()).toHaveLength(0)
     const assembly = await ctx.get('systemPrompt')!.assemble()
-    expect(assembly.sections.find(s => s.name === 'deployment:persona')?.text).toBe('')
+    expect(assembly.sections.find(s => s.name === 'deployment:persona-prefix')?.text).toBe('')
     await ctx.fiber.dispose()
   })
 
