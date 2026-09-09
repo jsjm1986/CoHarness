@@ -14,7 +14,7 @@ vi.mock('../api.ts', () => ({
 }))
 
 const row: api.ConversationArchiveRow = {
-  rootSessionId: 'session-1', title: '产品讨论',
+  rootSessionId: 'session-1', title: '产品讨论', contentPreview: '请整理产品需求和下一步计划',
   creator: { id: 1, displayName: '管理员' }, project: { id: 2, name: '产品' },
   runtime: { kind: 'project', id: 2 }, workspace: { path: '/project', title: '产品', position: 0 },
   state: 'archived', archivedAt: Date.UTC(2026, 7, 25), restoredAt: null, trashedAt: null, purgeAfter: null,
@@ -102,6 +102,11 @@ describe('ArchivesPage', () => {
     expect((await screen.findAllByText('产品讨论')).length).toBeGreaterThan(0)
     const table = screen.getByRole('table')
     expect(within(table).getByText('管理员')).toBeTruthy()
+    expect(within(table).getByText('请整理产品需求和下一步计划')).toBeTruthy()
+    expect(within(table).getByText('session-1')).toBeTruthy()
+    const selectAll = within(table).getByRole('checkbox', { name: '全选本页' })
+    await userEvent.click(selectAll)
+    expect(screen.getByText('已选择 1 条')).toBeTruthy()
     await userEvent.click(within(table).getByRole('button', { name: '查看 产品讨论' }))
     expect(await screen.findByRole('heading', { name: '对话记录' })).toBeTruthy()
     expect(screen.getByText('你好，我可以帮你整理产品讨论。')).toBeTruthy()

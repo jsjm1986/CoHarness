@@ -76,6 +76,7 @@ export type ConversationArchiveState = 'archived' | 'trash' | 'purged'
 export type ConversationArchiveRow = {
   rootSessionId: string
   title: string
+  contentPreview?: string | null
   creator: { id: number; displayName: string } | null
   project: { id: number; name: string } | null
   runtime: { kind: 'user' | 'project'; id: number }

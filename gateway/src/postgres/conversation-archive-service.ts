@@ -56,6 +56,8 @@ export class ConversationArchiveError extends Error {
 export interface ConversationArchiveRow {
   readonly rootSessionId: string
   readonly title: string
+  /** Shortest safe preview of the earliest user-visible message, when indexed. */
+  readonly contentPreview: string | null
   readonly creator: { readonly id: number; readonly displayName: string } | null
   readonly project: { readonly id: number; readonly name: string } | null
   readonly runtime: { readonly kind: 'user' | 'project'; readonly id: number }
@@ -302,6 +304,7 @@ interface ArchiveDbRow {
   child_count: string
   message_count: string
   updated_at_ms: string
+  content_preview?: string | null
   record_kind: 'conversation' | 'empty-draft'
 }
 
@@ -368,6 +371,7 @@ function archiveRow(row: ArchiveDbRow): ConversationArchiveRow {
   return {
     rootSessionId: row.root_session_id,
     title: row.title ?? '未命名对话',
+    contentPreview: row.content_preview ?? null,
     creator: row.creator_public_id === null || row.creator_display_name === null
       ? null
       : { id: publicNumber(row.creator_public_id, 'creator'), displayName: row.creator_display_name },
@@ -393,6 +397,19 @@ function archiveRow(row: ArchiveDbRow): ConversationArchiveRow {
 
 const ARCHIVE_COLUMNS = `a.root_session_id,
   COALESCE(a.title,r.title) title,
+  COALESCE(
+    (SELECT regexp_replace(left(cs.content,160), E'[\\r\\n]+', ' ', 'g')
+      FROM harness.conversation_search cs
+      JOIN harness.conversation_sessions csi ON csi.id=cs.session_id
+      WHERE csi.organization_id=a.organization_id AND csi.root_session_id=a.root_session_id
+        AND cs.role='user'
+      ORDER BY cs.occurred_at,cs.event_seq LIMIT 1),
+    (SELECT regexp_replace(left(cas.content,160), E'[\\r\\n]+', ' ', 'g')
+      FROM harness.conversation_archive_search cas
+      WHERE cas.organization_id=a.organization_id AND cas.root_session_id=a.root_session_id
+        AND cas.role='user'
+      ORDER BY cas.occurred_at,cas.event_seq LIMIT 1)
+  ) content_preview,
   creator.public_id::text creator_public_id,creator.display_name creator_display_name,
   project.public_id::text project_public_id,project.name::text project_name,
   a.runtime_kind,a.runtime_public_id::text,
