@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "reviewDate": "2026-09-09",
+  "target": {"tag": "dsh-v0.1.5-alpha.1", "commit": "5dda764ed3aa172535a7967b06ff95d9cbfe536a"},
+  "baseline": {"commit": "29c6373ddf1d26408e4da5ddd18c1e4ec6cef40f", "branch": "master"},
+  "statusLegend": {"retain":"CoHarness owner", "equivalent":"existing behavior", "adapt":"selective adaptation", "required":"must implement", "defer":"separate decision", "reject":"unsafe or incompatible"},
+  "rows": [
+    {"area":"session-format","status":"required","upstream":"v2-to-v3; system prompt surface; PTC migration","local":"v2 catalog with v0/v1 migration","wire":"yes","permission":"no","test":"add V3 content admission and provider migration"},
+    {"area":"agent-api","status":"required","upstream":"remove ctx.agent; explicit Agent setup","local":"ctx.agent accessor and implicit setup association","wire":"yes","permission":"parent attribution","test":"Loader composition plus all consumers"},
+    {"area":"inbox","status":"required","upstream":"type-only Inbox; loop-owned implementation","local":"public constructible Inbox class","wire":"no","permission":"no","test":"public export and cold projection regressions"},
+    {"area":"system-prompt","status":"adapt","upstream":"dynamic in-history prompt only for declared capability","local":"prefix/suffix, runtime context and surface projection","wire":"yes","permission":"model route policy","test":"replay, model switch and cache behavior"},
+    {"area":"subagent-runtimes","status":"required","upstream":"Codex 0.153.4; Claude Agent SDK 0.3.263","local":"Codex 0.149.1; Claude Agent SDK 0.3.241","wire":"no","permission":"credential scrubbing retained","test":"wrapper, permission, steer, teardown"},
+    {"area":"input-admission","status":"required","upstream":"reject empty message and blank queue edit","local":"multiple ingress paths require audit","wire":"yes","permission":"no","test":"Host/Gateway/SDK/ACP/Headless"},
+    {"area":"goal","status":"required","upstream":"manual pause authoritative","local":"existing Goal activation/pause owner","wire":"yes","permission":"user authority","test":"pause/resume/reconnect/cold restore"},
+    {"area":"agent-instructions","status":"adapt","upstream":"surface root marker I/O and permission errors","local":"root marker lookup needs error distinction","wire":"no","permission":"workspace scope","test":"permission and I/O fixtures"},
+    {"area":"file-media-api","status":"adapt","upstream":"bounded file route and POSIX media display","local":"bounded provider and Gateway ACL","wire":"yes","permission":"ACL/path","test":"range, regular file, allowlist, remote path denial"},
+    {"area":"workbench-sidebar","status":"defer","upstream":"right Sidebar, file tabs, dockkit","local":"multi-runtime Workbench and Documents","wire":"no","permission":"data egress","test":"document non-regression only"},
+    {"area":"typert","status":"adapt","upstream":"forwarding identity and edge priority","local":"custom generated Remote merge point","wire":"no","permission":"plugin graph","test":"generator and built Loader graph"},
+    {"area":"native","status":"retain/adapt","upstream":"node-addon-system and flock","local":"node-addon-landlock-run independent line","wire":"no","permission":"process lock","test":"evaluate flock separately"},
+    {"area":"cordis-build","status":"retain/adapt","upstream":"new packages and generated client/host faces","local":"Cordis plugin catalog, tsconfig faces, invariants","wire":"yes for new APIs","permission":"lifecycle/ACL","test":"catalog, dependency, build, Loader disposal"}
+  ]
+}

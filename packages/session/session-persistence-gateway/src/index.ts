@@ -819,10 +819,10 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
       body: JSON.stringify({
         sessionId: sourceStorage.meta.id,
         sourceRevision: String(sourceRevision),
-        targetHeader: currentStorage.meta,
+        targetHeader: wireHeader(currentStorage),
         migrationId: deterministicBatchId('migrate', sourceStorage.meta.id, {
           sourceRevision: String(sourceRevision),
-          targetHeader: currentStorage.meta,
+          targetHeader: wireHeader(currentStorage),
         }),
       }),
     })

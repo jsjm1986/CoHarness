@@ -3151,6 +3151,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     open: (path: string, signal: AbortSignal) => Promise<void>,
   ): Promise<RpcResponse<{ opened: true }>> {
     try {
+      if (!canOpenPaths()) throw new Error('native path opening is disabled for this deployment')
       await open(path, signal)
       return ok(request, { opened: true as const })
     } catch (error: unknown) {
@@ -3189,9 +3190,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
 
   /** Whether this deployment can hand a path to a native opener at all. */
   function canOpenPaths(): boolean {
+    if (ctx.get('collaboration') !== undefined) return false
     if (defaults.canOpenPath !== undefined) return defaults.canOpenPath()
     // An injected opener is by definition usable; otherwise ask the platform.
-    return defaults.openPath !== undefined || canOpenNativePath()
+    return defaults.openPath !== undefined || defaults.openTextFile !== undefined || canOpenNativePath()
   }
 
   /** Missing-service report shared by the credentials domain. */

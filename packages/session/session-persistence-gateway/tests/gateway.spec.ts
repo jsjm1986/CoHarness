@@ -70,9 +70,9 @@ class GatewayTransport {
   private readonly reservations = new Map<string, string>()
   private readonly pending = new Map<SessionId, Promise<GatewaySessionCreationAuthorization>>()
 
-  seed(id: string, events: unknown[]): void {
+  seed(id: string, events: unknown[], header: Record<string, unknown> = {}): void {
     this.sessions.set(id, {
-      header: { id, version: 0, createdAt: 1_786_698_000_000 },
+      header: { id, version: 0, createdAt: 1_786_698_000_000, ...header },
       events: structuredClone(events),
       revision: 1,
     })
@@ -380,6 +380,26 @@ describe('GatewaySessionPersistence collaboration creation', () => {
       targetHeader: { id, version: 2 },
     })
     await fiber.dispose()
+  })
+
+  it('preserves a seeded Session inherited cut through remote migration and reload', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const transport = new GatewayTransport()
+    const id = SessionId('seeded-legacy')
+    const events = oneTurnLog()
+    transport.seed(id, events, { parentSession: 'parent', seedLength: events.length })
+    const fiber = await mountBackend(ctx, transport)
+    try {
+      const loaded = await ctx.sessionPersistence.load(id)
+      expect(loaded.meta).toMatchObject({ version: 2, isSeeded: true, parentSession: 'parent' })
+      expect(loaded.inheritedEventCount).toBe(events.length)
+      expect(transport.migrations[0]?.body.targetHeader).toMatchObject({ version: 2, seedLength: events.length })
+      expect(transport.migrations[0]?.body.targetHeader).not.toHaveProperty('isSeeded')
+      const reloaded = await (ctx.sessionPersistence as GatewaySessionPersistence).loadStored(id)
+      expect(reloaded?.inheritedEventCount).toBe(events.length)
+      expect(reloaded?.meta.isSeeded).toBe(true)
+    } finally { await fiber.dispose(); await ctx.fiber.dispose() }
   })
 
   it('keeps the in-memory migration fallback when the remote endpoint is not deployed', async () => {
