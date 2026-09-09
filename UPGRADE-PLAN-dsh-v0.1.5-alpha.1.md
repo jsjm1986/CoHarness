@@ -5,7 +5,7 @@
 - 上游目标：[dsh-v0.1.5-alpha.1](https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.1.5-alpha.1)，提交 `5dda764ed3aa172535a7967b06ff95d9cbfe536a`；上一个对齐基线为 dsh-v0.1.3-alpha.2（`82a5fd61a7cf5c293cec4bdff68f455398d685e9`）。
 - 上游发布说明明确包含 Session format V3、显式 Agent API、Inbox 类型化、动态系统提示词、文件资源 Sidebar、子代理运行时升级、空消息拒绝、目标暂停保护和 Node addon system 重构。
 - 上游 alpha.2 到 alpha.1.5 的比较不是可直接合并的共同祖先树；本计划以行为、协议、生命周期、权限和构建产物核对，不以包名或提交数量判断等价。
-- 目标版本：`0.1.5-alpha.1.coharness.1`。P0 协议和数据迁移未完成前不改版本。
+- 目标版本：`0.1.5-alpha.1.coharness.1`。本地实现与生成物已完成；外部平台验收仍按发布门禁执行。
 
 ## 处置规则
 
@@ -20,14 +20,14 @@
 
 | 领域 | 当前 CoHarness | 与 alpha.1 的判断 |
 | --- | --- | --- |
-| Session 格式 | `SESSION_FORMAT_VERSION = 2`，已有 v0/v1→v2 adjacent migration 和 immutable successor | `required`，增加 v2→v3，不覆盖现有迁移规则 |
-| Agent API | `ctx.agent` 仍存在，`AgentSetup` 未要求显式 Agent | `required`，迁移所有消费者并删除隐式上下文关联 |
-| Inbox | `Inbox` 是从 `dsh-agent` 导出的运行时 class | `required`，公共面改为类型接口，具体实现留在 agent-loop/private face |
+| Session 格式 | `SESSION_FORMAT_VERSION = 3`，已有 v0/v1→v2 adjacent migration、v2→v3 system/message stage 和 immutable successor | `adapted`，保留旧 generation 并在 provider 不支持流式时安全 fallback |
+| Agent API | `ctx.agent` 已移除；setup 为 `(agentCtx, agent)`，子代理显式传递 `parentAgent` | `adapted`，Gateway/ACP/子代理/Headless 消费方已更新 |
+| Inbox | CoHarness `Inbox` 保留兼容构造器；ApiProxy 已有 agent-free cold `inbox` projection，AgentLoop live owner 仍使用现有 O(1) implementation | `equivalent/retain`，不重复搬运上游 class 拆分；后续 major 版本再移除兼容构造器 |
 | 系统提示词 | 已有 prefix/suffix、runtime context 和 surface 投影，但当前日志格式仍为 v2 | `adapt`，接入 V3 system/message 和 route capability，不重复建立第二个 prompt owner |
 | LLM/prompt cache | 已有 `systemPromptUpdate: in-history` 的部分能力和 request header | `adapt`，验证模型显式 capability、动态更新与 KV cache 语义 |
 | Session persistence | JSONL、SQLite、Gateway 都有 migration/generation 机制，但 target V3 payload admission 尚未覆盖 | `required`，先做 format catalog、历史内容审计和 provider 迁移 |
 | 子代理 | continuable、parent Activation、冷恢复和 sender attribution 已有 CoHarness 实现 | `equivalent/adapt`，保留现有归属和权限；补上 alpha.1 的显式 Agent API |
-| Codex/Claude | Codex `0.149.1`，Claude SDK `0.3.241` | `required`，升级到 Codex `0.153.4`、Claude Agent SDK `0.3.263`，并做协议回归 |
+| Codex/Claude | Codex `0.153.4`，Claude Agent SDK `0.3.263` / Claude Code `2.1.263` | `adapted`，保留 CoHarness provider、权限、超时和 teardown |
 | Web UI | 当前是 Workbench + ui-conversation/ui-sidebar/ui-workspace，非上游右 Sidebar 树 | `retain/defer`，只移植行为修复，不替换组件树 |
 | Workspace 文件资源 | 当前远程 Workspace 文件资源链未作为默认能力启用；User Documents 是独立业务 | `defer`，不因 alpha.1 的 Sidebar 能力自动开启数据出域 |
 | 本地绝对路径图片 | 云端不能信任或展示服务器绝对路径 | `adapt/reject`，桌面 loopback 可保留，远程 Web 只使用安全的 attachment/document 引用 |
@@ -146,9 +146,19 @@
 - 现有 vendored Cordis 的本地生命周期 hardening、lazy config、Include/HMR transactional update 和 scoped rescope 必须保留并重新跑 vendor manifest guard。
 - native system/flock 作为独立可选能力评估；不改 Landlock 公共包名和独立版本线。
 
+## 本轮已落地的实现证据
+
+- Session V3：`system/message`、v2→v3 immutable migration、surface reference remap、compact assistant stream 和 failed `assistant/attempt` 已进入现有 Session/JSONL/SQLite/Gateway owner。
+- Cordis/Typert：`Context.agent` 已删除；Agent setup 与 parent ownership 显式化；Remote decorator 使用版本化 prototype descriptor；Typert generator 已支持 package-local forwarding、显式 Remote stream marker 和真实 CompilerHost resolution。
+- 业务安全：Host prompt/queue edit 拒绝空白内容；Goal 人工 pause 会取消非模型发起的运行；root marker 只吞明确缺失，权限/I/O 失败原样返回。
+- 第三方运行时：Codex、Claude Agent SDK 和 Claude Code fixture 已更新，协议测试通过；CoHarness Gateway、ACL、Documents、Workbench 和 Open in App 继续作为 owner。
+- 生成物：Cordis、persistence、tool catalog 和双语 pairing 已重新生成并校验；`lint:contracts-ready`、Host/Client typecheck 和定向测试通过。
+
+未默认启用 Workspace 远程文件资源、右 Sidebar、完整 `ui-chat`、native system/flock 或任意服务器路径打开；这些仍属于独立产品/平台验收范围。
+
 ## 版本、迁移和验收
 
-代码实现完成且外部验收通过后，版本改为 `0.1.5-alpha.1.coharness.1`。Android、native 和 tree-external plugins 保留独立版本线；不能只改根包版本而留下 peer/API 不一致。
+本地代码实现、类型/构建/定向测试和生成物已收口为 `0.1.5-alpha.1.coharness.1`；Windows、macOS x64、真实 API 和生产回滚仍需在 GitHub/部署环境验收后发布。Android、native 和 tree-external plugins 保留独立版本线；不能只改根包版本而留下 peer/API 不一致。
 
 定向测试：
 
