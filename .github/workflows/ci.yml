@@ -60,6 +60,11 @@ jobs:
     outputs:
       run_expensive: ${{ steps.scope.outputs.run_expensive }}
       reason: ${{ steps.scope.outputs.reason }}
+      changed_source_files: ${{ steps.scope.outputs.changed_source_files }}
+      changed_package_files: ${{ steps.scope.outputs.changed_package_files }}
+      changed_docs_only: ${{ steps.scope.outputs.changed_docs_only }}
+      coverage_mode: ${{ steps.scope.outputs.coverage_mode }}
+      snapshot_mode: ${{ steps.scope.outputs.snapshot_mode }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -1050,4 +1055,9 @@ jobs:
           echo "::error::Needed job results: scope=${{ needs.pr-scope.result }}, static=${{ needs.node-24.result }}, compat=${{ needs.node-compat.result }}, python=${{ needs.python-sdk.result }}, expensive=${{ needs.pr-scope.outputs.run_expensive }}, coverage=${{ needs.node-24-coverage.result }}, consumers=${{ needs.node-24-consumers.result }}, runtime=${{ needs.python-runtime.result }}, wine=${{ needs.windows.result }}"
           exit 1
       - name: All checks passed
-        run: echo "Required checks passed; expensive lanes=${{ needs.pr-scope.outputs.run_expensive }} (${{ needs.pr-scope.outputs.reason }})"
+        run: |
+          echo "Required checks passed"
+          echo "scope reason=${{ needs.pr-scope.outputs.reason }}"
+          echo "changed docs only=${{ needs.pr-scope.outputs.changed_docs_only }}"
+          echo "coverage mode=${{ needs.pr-scope.outputs.coverage_mode }}"
+          echo "snapshot mode=${{ needs.pr-scope.outputs.snapshot_mode }}"
