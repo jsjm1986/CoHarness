@@ -36,6 +36,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:coverage:partitioned": "tsx scripts/run-coverage-partitions.ts",
+    "test:coverage:incremental": "tsx scripts/incremental-coverage.ts",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "test:issue-management": "node .github/issue-management/policy.test.mjs",
     "test:snapshot": "vitest run --config vitest.snapshot.config.ts",
