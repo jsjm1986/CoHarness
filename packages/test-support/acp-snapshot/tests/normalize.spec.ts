@@ -47,6 +47,12 @@ describe('normalizeStdout', () => {
     expect(out).not.toContain(ctx.sessionIds[0] as string)
   })
 
+  it('normalizes platform smart quotes in stderr-like text fields', () => {
+    const raw = JSON.stringify({ jsonrpc: '2.0', result: { text: 'find: ‘/tmp/work’ failed; “retry”' } })
+    const out = normalizeStdout(raw, ctx)
+    expect(out).toContain("find: '/tmp/work' failed; \\\"retry\\\"")
+  })
+
   it('scrubs cwd at file URI and chained-punctuation boundaries', () => {
     const raw = JSON.stringify({
       jsonrpc: '2.0',

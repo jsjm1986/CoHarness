@@ -172,6 +172,7 @@ function scrubString(value: string, ctx: NormalizeContext, cwdPathMode: CwdPathM
     out = out.replace(CWD_ROOTED_PATH_RE, path => path.replaceAll('\\', '/'))
     out = canonicalizeEmbeddedPaths(out)
   }
+  out = out.replaceAll(/[‘’]/gu, "'").replaceAll(/[“”]/gu, '"')
   out = out.replace(LOCAL_SPILL_PATH_RE, (_match, name: string) => `{{spillLocator:${name}}}`)
   out = out.replace(SNAPSHOT_SPILL_PATH_RE, (_match, name: string) => `{{spillLocator:${name}}}`)
   // Exact event-read results render the target as pretty JSON inside a
