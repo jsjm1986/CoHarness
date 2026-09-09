@@ -98,7 +98,7 @@ dsh --profile <name>
 
 ## 产品兼容性与证据
 
-运行时依赖精确锁定为 `@anthropic-ai/claude-agent-sdk@0.3.263`，其八个平台包都携带 Claude Code 2.1.241。普通安装会按当前操作系统、CPU 及 Linux libc 选择一个载荷。对于当前 darwin-arm64 载荷，`npm pack --dry-run --json` 报告压缩包为 92,295,035 字节、解包后为 325,056,216 字节；其他平台可能不同，这些数值只用于披露而不是安装阈值。无密钥真实产品测试会让 SDK 选择 CLI，通过回环 Messages fixture 运行它，并断言共享子进程 argv 的首项就是该平台包的原生可执行文件。Loader 组合证明安装该 Bundle 只会注册休眠的 Claude Code provider，不会启动产品进程。
+运行时依赖精确锁定为 `@anthropic-ai/claude-agent-sdk@0.3.263`，其八个平台包都携带 Claude Code 2.1.263。普通安装会按当前操作系统、CPU 及 Linux libc 选择一个载荷。对于当前 darwin-arm64 载荷，`npm pack --dry-run --json` 报告压缩包为 92,295,035 字节、解包后为 325,056,216 字节；其他平台可能不同，这些数值只用于披露而不是安装阈值。无密钥真实产品测试会让 SDK 选择 CLI，通过回环 Messages fixture 运行它，并断言共享子进程 argv 的首项就是该平台包的原生可执行文件。Loader 组合证明安装该 Bundle 只会注册休眠的 Claude Code provider，不会启动产品进程。
 
 如果安装时省略 optional dependencies、当前平台不受支持，或所选载荷缺失，提供方注册仍保持休眠，但第一次委派会在 SDK 启动边界失败。调用方只会收到安全的 `query-start` / `unknown` 失败事实；原生载荷错误只保留在内部 cause 链和提供方 Host 日志中。提供方既不会探测宿主 CLI，也不会用它重试。
 

@@ -19,6 +19,7 @@ import {
   LlmError,
   resolveRetryPolicy,
   type GenerateOptions,
+  type ContentBlock,
   type Message,
   type ResolvedRetryPolicy,
   type StreamChunk,
@@ -375,8 +376,14 @@ describe('dsh-agent-spine-demo bundle', () => {
       const firstRequestText = adapter.requests[0]?.messages.map(messageText).join('\n')
       expect(firstRequestText).toContain('hi')
       expect(firstRequestText).toContain('bundled project rule')
-      expect(adapter.requests[0]?.system).toContain('You are an AI agent powered by DeepSeek Harness.')
-      expect(adapter.requests[0]?.system).not.toContain('bundled project rule')
+      const systemText = adapter.requests[0]?.messages
+        .filter(message => message.role === 'system')
+        .flatMap(message => message.content)
+        .filter((block): block is Extract<ContentBlock, { type: 'text' }> => block.type === 'text')
+        .map(block => block.text)
+        .join('\n') ?? ''
+      expect(systemText).toContain('You are an AI agent powered by DeepSeek Harness.')
+      expect(systemText).not.toContain('bundled project rule')
       await handle.dispose()
       await ctx.fiber.dispose()
     } finally {
@@ -401,7 +408,7 @@ describe('dsh-agent-spine-demo bundle', () => {
       handle.agent.followup(createUserMessage({ content: [{ type: 'text', text: 'hi' }], source: { kind: 'user' } }))
       await waitForIdle(ctx, handle.agent)
 
-      expect(adapter.requests[0]?.messages).toEqual([{
+      expect(adapter.requests[0]?.messages.filter(message => message.role === 'user')).toEqual([{
         id: expect.any(String) as unknown,
         role: 'user',
         content: [{ type: 'text', text: 'hi' }],
