@@ -17,9 +17,10 @@ import type {
   RequestErrorAction,
 } from '@deepseek-ai/dsh-agent'
 import { Inbox, agentEvents, assembleContextFor } from '@deepseek-ai/dsh-agent'
-import type { GenerateOptions, LlmCallConfig, Message, PreparedLlmCall } from '@deepseek-ai/dsh-llm'
+import type { GenerateOptions, LlmCallConfig, PreparedLlmCall } from '@deepseek-ai/dsh-llm'
 import {
   BlockAssembler,
+  AssistantStreamAccumulator,
   LlmError,
   createAssistantMessage,
   deepFreeze,
@@ -33,7 +34,7 @@ import { canonicalHeader, headerEquals } from '@deepseek-ai/dsh-session'
 import { joinContextSections, renderContextSections, renderPrompt } from '@deepseek-ai/dsh-system-prompt'
 import type { PromptAssembly } from '@deepseek-ai/dsh-system-prompt'
 import type { Context } from '@deepseek-ai/cordis'
-import { RuntimeContextProjection } from './runtime-context.ts'
+import { RuntimeContextProjection, SystemPromptProjection } from './runtime-context.ts'
 import { executeToolCalls } from './tool-calls.ts'
 
 type Phase =
@@ -85,6 +86,7 @@ export class ReactLoopAgent implements Agent {
   /** Whether this loop instance has appended its initial/resume request anchor. */
   private requestHeaderLogged = false
   private readonly runtimeContext: RuntimeContextProjection
+  private readonly systemPrompt: SystemPromptProjection
 
   constructor(
     private loopCtx: Context,
@@ -108,8 +110,9 @@ export class ReactLoopAgent implements Agent {
     const lastTurn = session.snapshotEvents().findLast(event => event.type === 'turn/start')?.data.turn ?? 0
     this.phase = { kind: 'idle', lastTurn }
     this.scope = createScope(loopCtx, this)
-    this.ctx = this.scope.ctx.extend({ agent: this })
+    this.ctx = this.scope.ctx
     this.runtimeContext = new RuntimeContextProjection(this.ctx, session)
+    this.systemPrompt = new SystemPromptProjection(session)
   }
 
   get status(): AgentStatus {
@@ -312,6 +315,13 @@ export class ReactLoopAgent implements Agent {
         this.session.append('step/start', { turn, step })
         phase.step = step
         try {
+          // Reserve the system surface node before user messages enter the
+          // surface. The prepared model capability is applied again when the
+          // request is built; an unchanged prompt produces no duplicate event.
+          const prompt = renderPrompt(decision.assembly)
+          for (const commit of this.systemPrompt.project(prompt, { inHistory: true, startsSeries: false })) {
+            this.session.append('system/message', { turn, step, message: commit.message }, commit.intent)
+          }
           const entered = decision.messages.map(message =>
             this.session.append('user/message', message, { surfaceOp: 'append' }))
           for (const event of entered) {
@@ -374,16 +384,19 @@ export class ReactLoopAgent implements Agent {
 
     while (true) {
       const { request, preparedCall } = await this.buildRequest(
-        turn, step, assembly.tools, system, this.session.deriveMessages(), signal,
+        turn, step, assembly.tools, system, signal,
       )
       const assembler = new BlockAssembler()
+      const streamAccumulator = new AssistantStreamAccumulator()
       const chunkSeqs: SessionSeq[] = []
       try {
         const stream = preparedCall?.stream(request) ?? this.loopCtx.llm.stream(request)
         signal.throwIfAborted()
         for await (const chunk of stream) {
           signal.throwIfAborted()
-          chunkSeqs.push(this.session.append('assistant/chunk', { turn, step, chunk }).seq)
+          const chunkEvent = this.session.append('assistant/chunk', { turn, step, chunk })
+          chunkSeqs.push(chunkEvent.seq)
+          streamAccumulator.push({ time: chunkEvent.time, chunk })
           assembler.push(chunk)
         }
         signal.throwIfAborted()
@@ -400,6 +413,7 @@ export class ReactLoopAgent implements Agent {
               }),
               interrupted: true,
               ...assembler.usage === undefined ? {} : { usage: assembler.usage },
+              ...streamAccumulator.snapshot().length === 0 ? {} : { stream: [...streamAccumulator.snapshot()] },
             }, { surfaceOp: 'append', sourceEventSeqs: chunkSeqs })
           }
         }
@@ -407,6 +421,8 @@ export class ReactLoopAgent implements Agent {
       }
       const finish = assembler.finish
       if (finish.kind === 'error' || finish.kind === 'aborted') {
+        const stream = streamAccumulator.snapshot()
+        if (stream.length > 0) this.session.append('assistant/attempt', { turn, step, stream: [...stream] })
         const action = await this.dispatch.waterfall(
           'agent/request-error', {
             turn,
@@ -440,6 +456,7 @@ export class ReactLoopAgent implements Agent {
           step,
           message,
           ...assembler.usage === undefined ? {} : { usage: assembler.usage },
+          ...streamAccumulator.snapshot().length === 0 ? {} : { stream: [...streamAccumulator.snapshot()] },
         },
         { surfaceOp: 'append', sourceEventSeqs: chunkSeqs },
       )
@@ -464,7 +481,6 @@ export class ReactLoopAgent implements Agent {
     step: number,
     tools: GenerateOptions['tools'] & object,
     system: string,
-    boundaryMessages: Message[],
     signal: AbortSignal,
   ): Promise<{ request: GenerateOptions; preparedCall?: PreparedLlmCall }> {
     const { session } = this
@@ -514,9 +530,18 @@ export class ReactLoopAgent implements Agent {
     const header = canonicalHeader({
       config,
       ...preparedCall === undefined ? {} : { adapterDefaults: preparedCall.adapterDefaults },
-      ...system ? { system } : {},
       ...tools.length > 0 ? { tools } : {},
     })
+    for (const commit of this.systemPrompt.project(system, {
+      inHistory: preparedCall?.systemPromptUpdate === 'in-history',
+      startsSeries: false,
+    })) {
+      this.session.append('system/message', {
+        turn,
+        step,
+        message: commit.message,
+      }, commit.intent)
+    }
     const baseline = this.session.requestHeader()
     if (!this.requestHeaderLogged) {
       this.session.append('request/header', { header, reason: baseline === undefined ? 'initial' : 'resume' })
@@ -526,23 +551,29 @@ export class ReactLoopAgent implements Agent {
     }
 
     const contextWindow = preparedCall?.context?.contextWindow
+    const systemPromptUpdate = preparedCall?.systemPromptUpdate
     const requestContext: RequestContext = {
       provider: config.provider,
       model: config.model,
       ...contextWindow === undefined ? {} : { contextWindow },
+      ...systemPromptUpdate === undefined ? {} : { systemPromptUpdate },
     }
     const previousContext = session.requestContext()
     if (previousContext?.provider !== requestContext.provider
       || previousContext.model !== requestContext.model
-      || previousContext.contextWindow !== requestContext.contextWindow) {
+      || previousContext.contextWindow !== requestContext.contextWindow
+      || previousContext.systemPromptUpdate !== requestContext.systemPromptUpdate) {
       session.append('request/context', requestContext)
     }
     signal.throwIfAborted()
 
+    // System-prompt capability resolution may append or replace surface nodes
+    // above. Re-derive after those commits so the dispatched request and the
+    // durable log share the exact same message prefix.
+    const resolvedMessages = this.session.deriveMessages()
     const request = markAgentLoopRequest(deepFreeze({
       ...header.config,
-      messages: boundaryMessages,
-      ...header.system !== undefined ? { system: header.system } : {},
+      messages: resolvedMessages,
       ...header.tools !== undefined ? { tools: header.tools } : {},
       sessionId: this.session.id,
       signal,

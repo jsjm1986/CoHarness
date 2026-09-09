@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { bindSnapshotSelector, makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { createSnapshotStore, type SessionListState, type SessionId, type WorkspaceListState } from '@deepseek-ai/dsh-client-runtime/client'
+import { SessionId as brandSessionId } from '@deepseek-ai/dsh-session/types'
 import { WorkbenchEmpty } from '../src/client/components/WorkbenchEmpty.tsx'
 import { WorkbenchPaneHeader } from '../src/client/components/WorkbenchPaneHeader.tsx'
 import { WorkbenchToolbar } from '../src/client/components/WorkbenchToolbar.tsx'
@@ -322,13 +323,13 @@ describe('workbench toolbar edge paths', () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('offline'))))
     const p = props()
     const list = p.sessionsStore.getSnapshot()
-    p.sessionsStore.set({ ...list, ids: [...list.ids, 'sc' as SessionId, 'arch' as SessionId, 'blank' as SessionId, 'proj' as SessionId], byId: {
+    p.sessionsStore.set({ ...list, ids: [...list.ids, brandSessionId('sc'), brandSessionId('arch'), brandSessionId('blank'), brandSessionId('proj')], byId: {
       ...list.byId,
       [SID_B]: { id: SID_B, displayTitle: 'Subtask', cwd: undefined, running: false, blank: false, updatedAt: 0, origin: 'subagent' },
       ['blank' as SessionId]: { id: 'blank' as SessionId, displayTitle: 'Draft', cwd: undefined, running: false, blank: true, updatedAt: 0 },
       ['arch' as SessionId]: { id: 'arch' as SessionId, displayTitle: 'Archived', cwd: '/arch', running: false, blank: false, updatedAt: 0 },
       ['proj' as SessionId]: { id: 'proj' as SessionId, displayTitle: 'Team chat', cwd: '/team', running: false, blank: false, updatedAt: 0, projectId: 7 },
-    } as never })
+    } })
     p.workspacesStore.set({ ...p.workspacesStore.getSnapshot(), archivedSessionIds: ['arch' as never] })
     renderToolbar(p)
     fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
@@ -413,7 +414,7 @@ describe('workbench toolbar edge paths', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
       personal: { id: 1, name: 'Me' }, activeRuntime: { kind: 'project', projectId: 7 },
       projects: [{ projectId: 7, name: 'Read only', mode: 'ro' }], items: [],
-    } as never))))
+    }))))
     renderToolbar()
     fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
     await screen.findByRole('button', { name: 'Workspace' })
@@ -513,10 +514,10 @@ describe('workbench toolbar edge paths', () => {
   it('renders waiting and missing-session tabs, and focuses a tab on click', () => {
     const p = props()
     const list = p.sessionsStore.getSnapshot()
-    p.sessionsStore.set({ ...list, ids: [...list.ids, 'missing' as SessionId], byId: {
+    p.sessionsStore.set({ ...list, ids: [...list.ids, brandSessionId('missing')], byId: {
       ...list.byId,
       [SID_B]: { id: SID_B, displayTitle: 'Beta', cwd: '/work/beta', running: true, blank: false, updatedAt: 0, pendingInteraction: 'approval' },
-    } as never })
+    } })
     const focus = vi.fn()
     render(<WorkbenchToolbar {...p} viewport={{ mode: 'workbench' as const, paneIds: [SID_B, 'missing' as SessionId], activePaneId: SID_B, paneRatios: [1, 1] }} tabbed
       chooseSession={vi.fn()} focusSession={focus} createSession={vi.fn()} setMode={vi.fn()} t={t} />)

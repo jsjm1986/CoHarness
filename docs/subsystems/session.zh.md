@@ -824,7 +824,7 @@ fork(source: SessionForkSource, boundary?: SessionSeq, childSessionId?: SessionI
 
 Types: [CreateSessionOptions](persistence.zh.md) · [PrepareSessionOptions](persistence.zh.md) · [SessionId](core.zh.md)
 
-Source: [`packages/core/session/src/index.ts:891`](../../packages/core/session/src/index.ts)
+Source: [`packages/core/session/src/index.ts:930`](../../packages/core/session/src/index.ts)
 
 <a id="session-events"></a>
 

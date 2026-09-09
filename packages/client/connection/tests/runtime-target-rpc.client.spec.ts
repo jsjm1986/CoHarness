@@ -5,7 +5,8 @@ it.each([{ kind: 'personal' as const }, { kind: 'project' as const, projectId: 7
   let sent: URL | undefined
   const rpc = createWebConnectionRpc(async (url, init) => {
     sent = url
-    const request = JSON.parse(String(init.body)) as { rpcId: string }
+    const body = typeof init.body === 'string' ? init.body : JSON.stringify(init.body)
+    const request = JSON.parse(body) as { rpcId: string }
     return new Response(JSON.stringify({ type: 'server-response', rpcId: request.rpcId, result: { ok: true, value: 'ok' } }))
   }, target)
   await expect(rpc.call('/api', 'session.list', {})).resolves.toEqual({ ok: true, value: 'ok' })

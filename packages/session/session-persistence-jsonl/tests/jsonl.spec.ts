@@ -473,10 +473,10 @@ describe('JsonlSessionPersistence: durability and crash semantics', () => {
       const sourceBytes = await readFile(sourcePath)
       const stored = await persistence.loadStored(m.id)
       if (stored === undefined) throw new Error('missing source')
-      await persistence.migrateStored(stored, { ...stored, meta: { ...stored.meta, version: 2 } }, stored.events, stored.revision)
+      await persistence.migrateStored(stored, { ...stored, meta: { ...stored.meta, version: 3 } }, stored.events, stored.revision)
       expect(await readFile(sourcePath)).toEqual(sourceBytes)
       const successor = await persistence.loadStored(m.id)
-      expect(successor?.meta.version).toBe(2)
+      expect(successor?.meta.version).toBe(3)
       expect(successor?.events).toEqual(oneTurnLog())
     } finally {
       await localCtx.fiber.dispose()
@@ -498,7 +498,7 @@ describe('JsonlSessionPersistence: durability and crash semantics', () => {
       return value
     })
     await expect(persistence.migrateStored(
-      stored, { ...stored, meta: { ...stored.meta, version: 2 } }, stored.events, stored.revision, abort.signal,
+      stored, { ...stored, meta: { ...stored.meta, version: 3 } }, stored.events, stored.revision, abort.signal,
     ))
       .rejects.toThrow('cancel migration')
     expect(await readdir(sessionDir(root, '/work', m.id))).toEqual(['session.jsonl'])
@@ -518,7 +518,7 @@ describe('JsonlSessionPersistence: durability and crash semantics', () => {
       if (++reads === 2) await appendFile(rawLogPath(root, '/work', m.id), 'incomplete')
       return revision(id)
     })
-    await expect(persistence.migrateStored(stored, { ...stored, meta: { ...stored.meta, version: 2 } }, stored.events, stored.revision))
+    await expect(persistence.migrateStored(stored, { ...stored, meta: { ...stored.meta, version: 3 } }, stored.events, stored.revision))
       .rejects.toThrow('changed while its format migration was preparing')
     expect(await readdir(sessionDir(root, '/work', m.id))).toEqual(['session.jsonl'])
     expect((await readFile(rawLogPath(root, '/work', m.id), 'utf8')).endsWith('incomplete')).toBe(true)
@@ -1352,7 +1352,7 @@ describe('JsonlSessionPersistence: default packed chunk rows', () => {
     const loaded = await ctx.sessionPersistence.load(m.id)
     expect(loaded.events).toEqual([...log, ...secondTurn])
     // The packed append really packed: the file's tail carries a text-chunks row.
-    const tags = (await readFile(generationLogPath(root, '/work', m.id, 'none', 2), 'utf8')).split('\n').filter(Boolean)
+    const tags = (await readFile(generationLogPath(root, '/work', m.id, 'none', 3), 'utf8')).split('\n').filter(Boolean)
       .map(line => (JSON.parse(line) as { type: string }).type)
     expect(tags.filter(t => t === 'text-chunks')).toHaveLength(2)
     expect(tags.filter(t => t === 'assistant/chunk')).toHaveLength(0)

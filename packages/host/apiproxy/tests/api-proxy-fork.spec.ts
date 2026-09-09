@@ -39,7 +39,7 @@ async function composed(workspaces: readonly Workspace[] = []): Promise<Context>
       const agent = {} as Agent
       const agentCtx = ownerCtx.extend({ agent })
       Object.assign(agent, { id: session.id, session, status: 'idle', ctx: agentCtx })
-      await options.setup?.(agentCtx)
+      await options.setup?.(agentCtx, agent)
       ctx.agents.register(agent)
       return { agent, dispose: () => Promise.resolve() }
     },

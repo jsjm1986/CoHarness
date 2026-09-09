@@ -86,20 +86,30 @@ function toolsOf(options: GenerateOptions): PiTool[] | undefined {
   }))
 }
 
+/** Split the leading durable system message into pi-ai's single system slot. */
+function splitSystemPrompt(options: GenerateOptions): { systemPrompt?: string; messages: readonly Message[] } {
+  if (options.system !== undefined) return { systemPrompt: options.system, messages: options.messages }
+  const [first, ...rest] = options.messages
+  if (first?.role !== 'system') return { messages: options.messages }
+  const text = flattenText(first)
+  return text.length === 0 ? { messages: rest } : { systemPrompt: text, messages: rest }
+}
+
 /** Assemble the request-level pi-ai context envelope shared by both conversion paths. */
-function piContext(options: GenerateOptions, messages: PiMessage[]): PiContext {
+function piContext(systemPrompt: string | undefined, options: GenerateOptions, messages: PiMessage[]): PiContext {
   const tools = toolsOf(options)
   return {
-    ...options.system !== undefined ? { systemPrompt: options.system } : {},
+    ...systemPrompt !== undefined ? { systemPrompt } : {},
     messages,
     ...tools !== undefined && tools.length > 0 ? { tools } : {},
   }
 }
 
 function textOnlyContext(options: GenerateOptions, onReplayDegrade?: (reason: string) => void): PiContext {
+  const split = splitSystemPrompt(options)
   const toolNames = new Map<CallId, string>()
   const messages: PiMessage[] = []
-  for (const message of options.messages) {
+  for (const message of split.messages) {
     if (contentHasImage(message.content)) {
       throw new LlmError('pi-ai image conversion requires the durable attachment service', 'UNSUPPORTED_CONTENT')
     }
@@ -130,7 +140,7 @@ function textOnlyContext(options: GenerateOptions, onReplayDegrade?: (reason: st
       })
     }
   }
-  return piContext(options, messages)
+  return piContext(split.systemPrompt, options, messages)
 }
 
 /**
@@ -182,7 +192,8 @@ async function toPiContextWithImages(
   maxRequestImageBytes?: number,
 ): Promise<PiContext> {
   assertSupportedImageRoles(options.messages)
-  const requestMessages = offloadRequestImages(options.messages, maxRequestImageBytes)
+  const split = splitSystemPrompt(options)
+  const requestMessages = offloadRequestImages(split.messages, maxRequestImageBytes)
   const toolNames = new Map<CallId, string>()
   const messages: PiMessage[] = []
 
@@ -226,5 +237,5 @@ async function toPiContextWithImages(
     }
   }
 
-  return piContext(options, messages)
+  return piContext(split.systemPrompt, options, messages)
 }

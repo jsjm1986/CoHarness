@@ -96,9 +96,12 @@ class CompiledSessionFormatChain implements SessionFormatChain {
       header: restoredHeader,
       emitEvent,
       finish: () => {
+        let targetInheritedEventCount = inheritedEventCount
         for (let index = 0; index < stages.length; index += 1) {
-          stages[index]?.finish(contexts[index] as SessionFormatMigrationContext)
+          const cut = stages[index]?.finish(contexts[index] as SessionFormatMigrationContext)
+          if (cut !== undefined) targetInheritedEventCount = cut
         }
+        return targetInheritedEventCount
       },
     }
   }

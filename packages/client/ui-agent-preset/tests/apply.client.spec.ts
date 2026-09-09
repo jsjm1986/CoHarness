@@ -11,6 +11,7 @@ import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { TestRemote } from '@deepseek-ai/dsh-client-test-runtime'
+import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import { apply as settingsApply, inject as settingsInject } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { apply, inject } from '@deepseek-ai/dsh-client-ui-agent-preset/client'
 import { AgentPresetLabel } from '../src/client/AgentPresetLabel.tsx'
@@ -596,10 +597,13 @@ it.each([false, true])('reads the selected Session roster through its runtime co
   ctx.provide('sessions', sessions as never)
   ctx.provide('conversation', {} as never)
   ctx.provide('workspaces', workspacesDouble() as never)
-  const connection = ctx.get('connection')!
+  const connection = ctx.get('connection') as ConnectionHandle
   const list = vi.fn(async () => ROSTER_MOVED)
   if (withTarget) Object.assign(connection, {
-    forTarget: () => ({ api: { ...connection.api, agentPresets: { ...connection.api.agentPresets, list } } }),
+    forTarget: (): ConnectionHandle => ({
+      ...connection,
+      api: { ...connection.api, agentPresets: { ...connection.api.agentPresets, list: list as never } },
+    }),
   })
   try {
     await ctx.plugin({ inject: [...inject, 'conversation', 'sessions', 'workspaces'], apply }).await()

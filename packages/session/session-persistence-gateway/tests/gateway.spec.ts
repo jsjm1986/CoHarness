@@ -372,12 +372,12 @@ describe('GatewaySessionPersistence collaboration creation', () => {
     const fiber = await mountBackend(ctx, transport)
 
     const loaded = await ctx.sessionPersistence.load(id)
-    expect(loaded.meta.version).toBe(2)
+    expect(loaded.meta.version).toBe(3)
     expect(transport.migrations).toHaveLength(1)
     expect(transport.migrations[0]?.body).toMatchObject({
       sessionId: id,
       sourceRevision: 'revision-1',
-      targetHeader: { id, version: 2 },
+      targetHeader: { id, version: 3 },
     })
     await fiber.dispose()
   })
@@ -392,9 +392,9 @@ describe('GatewaySessionPersistence collaboration creation', () => {
     const fiber = await mountBackend(ctx, transport)
     try {
       const loaded = await ctx.sessionPersistence.load(id)
-      expect(loaded.meta).toMatchObject({ version: 2, isSeeded: true, parentSession: 'parent' })
+      expect(loaded.meta).toMatchObject({ version: 3, isSeeded: true, parentSession: 'parent' })
       expect(loaded.inheritedEventCount).toBe(events.length)
-      expect(transport.migrations[0]?.body.targetHeader).toMatchObject({ version: 2, seedLength: events.length })
+      expect(transport.migrations[0]?.body.targetHeader).toMatchObject({ version: 3, seedLength: events.length })
       expect(transport.migrations[0]?.body.targetHeader).not.toHaveProperty('isSeeded')
       const reloaded = await (ctx.sessionPersistence as GatewaySessionPersistence).loadStored(id)
       expect(reloaded?.inheritedEventCount).toBe(events.length)
@@ -411,7 +411,7 @@ describe('GatewaySessionPersistence collaboration creation', () => {
     transport.seed(String(id), oneTurnLog())
     const fiber = await mountBackend(ctx, transport)
 
-    await expect(ctx.sessionPersistence.load(id)).resolves.toMatchObject({ meta: { id, version: 2 } })
+    await expect(ctx.sessionPersistence.load(id)).resolves.toMatchObject({ meta: { id, version: 3 } })
     expect(transport.migrations).toHaveLength(0)
     await fiber.dispose()
   })

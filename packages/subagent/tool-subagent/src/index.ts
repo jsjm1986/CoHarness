@@ -16,7 +16,7 @@ import type { Agent, AgentOptions } from '@deepseek-ai/dsh-agent'
 import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
-import type { JsonValue } from '@deepseek-ai/dsh-session'
+import type { JsonValue, Session } from '@deepseek-ai/dsh-session'
 import {
   assertSubagentMaxDepth,
   parentAgentOptionsForDelegation,
@@ -306,7 +306,7 @@ function resolveDelegationRun(
   }
 }
 
-export function apply(ctx: Context, config: Config): void {
+export function apply(ctx: Context, config: Config, session?: Session): void {
   // Direct apply() bypasses Schemastery's numeric constraints. A direct-apply
   // omission stays capless (the schema default only runs through the loader).
   if (config.maxDepth !== 'provider-managed') assertSubagentMaxDepth(config.maxDepth)
@@ -618,18 +618,13 @@ export function apply(ctx: Context, config: Config): void {
       + '@deepseek-ai/dsh-tool-subagent/model-selection-settings in the Host scope',
     )
   }
-  const compositionScope = scopeOf(ctx)
-  if (compositionScope === undefined) {
-    throw new Error('tool-subagent: `modelSelectionSettings` requires an Agent or preset scope')
-  }
-
-  const selectForAgent = (agent: NonNullable<Context['agent']>): ModelSelectionPolicy | undefined => {
-    const freshSession = agent.session.firstLiveSeq === 0
-      && agent.session.eventAt(SessionSeq(0))?.type !== 'session/end-seed'
-    let allowedModels = subagentModelSelectionPolicy(agent.session)
+  const selectForSession = (target: Session): ModelSelectionPolicy | undefined => {
+    const freshSession = target.firstLiveSeq === 0
+      && target.eventAt(SessionSeq(0))?.type !== 'session/end-seed'
+    let allowedModels = subagentModelSelectionPolicy(target)
     if (allowedModels === undefined) {
-      const parentId = agent.session.header.origin === 'subagent'
-        ? agent.session.header.parentSession
+      const parentId = target.header.origin === 'subagent'
+        ? target.header.parentSession
         : undefined
       if (parentId !== undefined) {
         const parent = ctx.get('agents')?.get(parentId)
@@ -639,14 +634,17 @@ export function apply(ctx: Context, config: Config): void {
         allowedModels = current.enabled ? current.allowedModels : undefined
       }
     }
-    if (allowedModels !== undefined) recordSubagentModelSelection(agent.session, allowedModels)
+    if (allowedModels !== undefined) recordSubagentModelSelection(target, allowedModels)
     return allowedModels === undefined ? undefined : { routes: allowedModels }
   }
 
-  const agent = ctx.agent
-  if (agent !== undefined) {
-    install(ctx, selectForAgent(agent))
+  if (session !== undefined) {
+    install(ctx, selectForSession(session))
     return
+  }
+  const compositionScope = scopeOf(ctx)
+  if (compositionScope === undefined) {
+    throw new Error('tool-subagent: `modelSelectionSettings` requires an Agent or preset scope')
   }
   const agents = ctx.get('agents')
   /* v8 ignore next -- Agent and preset scopes are minted only by the Agent registry. */
@@ -662,7 +660,7 @@ export function apply(ctx: Context, config: Config): void {
     installing.add(candidate)
     let fiber: ReturnType<Context['inject']>
     try {
-      const policy = selectForAgent(candidate)
+      const policy = selectForSession(candidate.session)
       fiber = candidate.ctx.inject(['tools', 'subagents', 'systemPrompt'], (runtimeCtx) => {
         install(runtimeCtx, policy)
       })

@@ -2238,7 +2238,7 @@ describe('workspace context request injection', () => {
     }
   })
 
-  it('treats ctx.fs marker lookup failures as absent root markers', async () => {
+  it('preserves ctx.fs marker lookup failures instead of crossing into an ancestor root', async () => {
     const root = await tempRepo()
     const home = await tempRepo()
     try {
@@ -2252,9 +2252,7 @@ describe('workspace context request injection', () => {
       await ctx.plugin(workspaceContext, { dshHome: home, maxBytes: 65536 })
       const agent = stubAgent(root)
 
-      await composeBaselinePrefix(ctx, agent)
-
-      expect(derivedText(agent)).toContain('repo rule')
+      await expect(composeBaselinePrefix(ctx, agent)).rejects.toThrow('stat failed')
     } finally {
       await rm(root, { recursive: true, force: true })
       await rm(home, { recursive: true, force: true })

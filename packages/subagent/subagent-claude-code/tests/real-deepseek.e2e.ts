@@ -123,9 +123,9 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)(
       })
       await ctx.plugin(claudeCode, { env, disposeGraceMs: 3_000 })
 
-      expect(sdkPackage.version).toBe('0.3.241')
+      expect(sdkPackage.version).toBe('0.3.263')
       expect(sdkPackage.claudeCodeVersion).toBe('2.1.241')
-      expect(sdkPackage.optionalDependencies[platformPackage]).toBe('0.3.241')
+      expect(sdkPackage.optionalDependencies[platformPackage]).toBe('0.3.263')
       const version = await execFileAsync(claudeBin, ['--version'], {
         env: { ...process.env, ...env },
       })

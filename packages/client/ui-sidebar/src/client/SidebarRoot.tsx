@@ -45,7 +45,7 @@ export function SidebarRoot({
   collapsed,
   width,
   startSession,
-  useViewport = selector => selector({ mode: 'single', paneIds: [], paneRatios: [] }),
+  useViewport,
   exitWorkbench,
   toggleSidebar,
   t,

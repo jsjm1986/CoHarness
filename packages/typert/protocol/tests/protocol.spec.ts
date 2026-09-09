@@ -124,7 +124,12 @@ describe('typert-protocol Remote declarations', () => {
       { method: 'scoped', invocation: { kind: 'context', context: 'metaFixture' } },
     ])
     expect(Reflect.ownKeys(Goals)).toEqual(['length', 'name', 'prototype'])
-    expect(Reflect.ownKeys(Goals.prototype)).toEqual(['constructor', 'create', 'scoped'])
+    expect(Reflect.ownKeys(Goals.prototype)).toEqual([
+      'constructor',
+      'create',
+      'scoped',
+      '@deepseek-ai/dsh-typert-protocol/remote-methods',
+    ])
   })
 
   it('keeps markers idempotent across instances and returns detached snapshots', () => {

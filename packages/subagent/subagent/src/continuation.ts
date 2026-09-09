@@ -1211,12 +1211,12 @@ export class SubagentContinuationManager {
     // `AgentRegistry.enter()` is the authoritative collision boundary for an id
     // some other owner holds — a duplicate would reject there with rollback.
     inputs.signal.throwIfAborted()
-    const setup = (childCtx: Context): void => {
+    const setup = (childCtx: Context, child: Agent): void => {
       // Only fresh creation seeds the delegation policy onto the child's own
       // log (after any fork seed, so fresh policy wins stale seed state); a
       // cold resume replays those persisted events instead.
       if (create !== undefined) {
-        appendDelegatedPolicyOverrides((childCtx.agent as Agent).session, create.delegatedPolicies)
+        appendDelegatedPolicyOverrides(child.session, create.delegatedPolicies)
       }
       applyChildComposition(childCtx, parent, inputs.composition)
     }
@@ -1226,12 +1226,14 @@ export class SubagentContinuationManager {
     const handle: AgentHandle = create === undefined
       ? await this.ownerCtx.agents.resume({
         resumeSessionId: childId,
+        parentAgent: parent,
         agentOptions: inputs.agentOptions,
         signal: inputs.signal,
         setup,
       })
       : await this.ownerCtx.agents.create({
         sessionId: childId,
+        parentAgent: parent,
         meta: create.meta,
         seed: create.seed,
         inheritedEventCount: create.inheritedEventCount,

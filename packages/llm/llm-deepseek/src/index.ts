@@ -187,6 +187,7 @@ const catalogModel: z<DeepSeekCatalogModel> = z.object({
   imagePixelBudget: z.union([z.number().step(1).min(1), 'low']),
   imageMaxBytes: z.number().step(1).min(1),
   imageDetail: z.union(['auto', 'low']),
+  systemPromptUpdate: z.const('in-history'),
 })
 
 export const Config: z<Config> = z.object({
@@ -286,6 +287,7 @@ function resolveModels(models: readonly DeepSeekCatalogModel[] | undefined): Dee
       ...model.description === undefined ? {} : { description: model.description },
       ...model.contextWindow === undefined ? {} : { contextWindow: model.contextWindow },
       ...model.maxTokens === undefined ? {} : { maxTokens: model.maxTokens },
+      ...model.systemPromptUpdate === undefined ? {} : { systemPromptUpdate: model.systemPromptUpdate },
       inputModalities: [...inputModalities],
       ...hasImage
         ? {

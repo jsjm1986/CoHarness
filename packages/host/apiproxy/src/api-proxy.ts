@@ -401,6 +401,11 @@ function messagesHaveImage(messages: readonly { content: readonly ContentBlock[]
   return messages.some(message => contentHasImage(message.content))
 }
 
+/** Reject prompts that carry no model-visible text or attachment. */
+function hasPromptContent(content: readonly { type: string; text?: string }[]): boolean {
+  return content.some(part => part.type !== 'text' || (typeof part.text === 'string' && part.text.trim().length > 0))
+}
+
 /** Resolve the first reference matching one opaque id. */
 function referencedImage(events: readonly SessionEvent[], attachmentId: string): ImageAttachmentRef | undefined {
   for (const event of events) {
@@ -2076,9 +2081,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   }
 
   /** Pre-publication setup used by both fresh and resumed Web agents. */
-  function installSelection(agentCtx: Context): void {
-    const agent = agentCtx.agent
-    if (agent === undefined) throw new Error('api-proxy: agent setup has no scoped agent')
+  function installSelection(_agentCtx: Context, agent: Agent): void {
     selectionFor(agent)
   }
 
@@ -2121,13 +2124,13 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
    */
   async function composeAgent(presetId: string | undefined): Promise<{
     agentPreset?: string
-    setup: (agentCtx: Context) => Promise<void>
+    setup: (agentCtx: Context, agent: Agent) => Promise<void>
   }> {
     const presets = ctx.get('agentPresets')
     if (presets === undefined) {
       return {
-        setup: (agentCtx: Context) => {
-          installSelection(agentCtx)
+        setup: (agentCtx: Context, agent: Agent) => {
+          installSelection(agentCtx, agent)
           return Promise.resolve()
         },
       }
@@ -2135,8 +2138,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     const resolvedId = (await presets.resolve(presetId)).id
     return {
       agentPreset: resolvedId,
-      setup: async (agentCtx: Context) => {
-        installSelection(agentCtx)
+      setup: async (agentCtx: Context, agent: Agent) => {
+        installSelection(agentCtx, agent)
         await presets.mount(agentCtx, resolvedId)
       },
     }
@@ -4157,6 +4160,13 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
 
       async prompt(request) {
         const { sessionId, mode, content, clientTimeZone, requestId } = request.payload
+        if (!hasPromptContent(content)) {
+          return err(request, {
+            code: 'bad-request',
+            message: 'prompt content must include non-whitespace text or an attachment',
+            details: { issues: [] },
+          })
+        }
         const authorized = await authorizeSession(sessionId, 'write')
         if ('error' in authorized) return err(request, authorized.error)
         const canonicalTimeZone = clientTimeZone === undefined
@@ -4287,6 +4297,13 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             code: 'attachment-error',
             message: 'queue edits accept text content only',
             details: { reason: 'QUEUE_EDIT_NON_TEXT' },
+          })
+        }
+        if (action.kind === 'edit' && !hasPromptContent(action.content)) {
+          return err(request, {
+            code: 'bad-request',
+            message: 'queue edit content must include non-whitespace text',
+            details: { issues: [] },
           })
         }
         const agent = ctx.agents.get(sessionId)

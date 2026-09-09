@@ -724,10 +724,10 @@ describe('PersistenceCoordinator session preparations', () => {
     }, { inject: ['sessions'] }))
     try {
       const suffix = await coordinator.readFrom(id, SessionLogOffset(1))
-      expect(suffix.meta.version).toBe(2)
+      expect(suffix.meta.version).toBe(3)
       expect(suffix.events).toEqual(stored.events.slice(1))
       expect(stored.meta.version).toBe(0)
-      expect(medium.store.get(id)?.meta.version).toBe(withMigration ? 2 : 0)
+      expect(medium.store.get(id)?.meta.version).toBe(withMigration ? 3 : 0)
       expect(migrateStored).toHaveBeenCalledTimes(withMigration ? 1 : 0)
       if (withMigration) expect(migrateStored.mock.calls[0]?.[3]).toBe(memoryRevision(stored))
     } finally {
