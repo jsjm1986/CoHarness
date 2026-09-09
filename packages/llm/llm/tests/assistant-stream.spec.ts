@@ -19,7 +19,7 @@ import {
   ToolCallId,
   expandAssistantStream,
 } from '@deepseek-ai/dsh-llm'
-import type { TimedStreamChunk } from '@deepseek-ai/dsh-llm'
+import type { StreamChunk, TimedStreamChunk } from '@deepseek-ai/dsh-llm'
 
 describe('AssistantStreamAccumulator', () => {
   it('preserves block starts as raw records across expansion', () => {
