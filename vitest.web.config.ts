@@ -1,5 +1,6 @@
 import tsconfigPaths from 'vite-tsconfig-paths'
 import { defineConfig } from 'vitest/config'
+import { snapshotRecordPreflight } from './scripts/snapshot-preflight.ts'
 import { standardDecoratorPlugin, vitestExecArgv } from './vitest.shared.ts'
 
 // Web browser lane: real host entry points, built-client interaction snapshots,
@@ -12,6 +13,7 @@ try {
 } catch {
   // No .env — fine, the environment may already carry the variables.
 }
+if (process.env.DSH_SNAPSHOT === 'record') snapshotRecordPreflight()
 
 export default defineConfig({
   // Same resolution note as vitest.config.ts: the tsconfig.base.json paths
