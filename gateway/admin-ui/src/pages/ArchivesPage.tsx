@@ -56,6 +56,7 @@ export function ArchivesPage() {
   const [confirmAction, setConfirmAction] = useState<'restore' | 'trash' | 'purge' | null>(null)
   const [actionError, setActionError] = useState('')
   const [emptyCandidates, setEmptyCandidates] = useState<EmptyDraftCandidate[]>([])
+  const [emptyScanned, setEmptyScanned] = useState(false)
   const [emptySelected, setEmptySelected] = useState<Set<string>>(new Set())
   const [emptyLoading, setEmptyLoading] = useState(false)
   const [emptyError, setEmptyError] = useState('')
@@ -102,6 +103,7 @@ export function ArchivesPage() {
     try {
       const result = await previewEmptyDrafts({ limit: 200 })
       setEmptyCandidates(result.candidates)
+      setEmptyScanned(true)
       setEmptySelected(new Set())
     } catch (cause) {
       setEmptyError(messageFrom(cause))
@@ -180,16 +182,20 @@ export function ArchivesPage() {
         )}
       />
       <ErrorBanner message={error} />
-      <Section title="空白会话维护" meta="仅管理员可见">
+      <Section title="空白会话维护" meta={emptyScanned ? '扫描完成' : '仅管理员可见'}>
         <div className="archiveBulkBar">
           <span>先扫描一小时无可见内容的会话，再将选中项移入可恢复回收站。</span>
           <div className="pageActionGroup">
             <Button icon={SearchCheck} onClick={() => { void scanEmptyDrafts() }} loading={emptyLoading}>扫描</Button>
-            <Button icon={Trash2} variant="danger" disabled={emptySelected.size === 0 || emptyLoading} onClick={() => { void moveEmptyDraftsToTrash() }}>清理选中空草稿</Button>
+            {emptySelected.size > 0 ? <Button icon={Trash2} variant="danger" disabled={emptyLoading} onClick={() => { void moveEmptyDraftsToTrash() }}>清理选中空草稿</Button> : null}
           </div>
         </div>
         <ErrorBanner message={emptyError} />
-        {emptyCandidates.length === 0 ? <p className="muted">尚未发现待维护的空白会话。</p> : (
+        {emptyCandidates.length === 0 ? <div className="emptyDraftState">
+          <span className="emptyDraftStateIcon" aria-hidden="true"><Archive /></span>
+          <strong>{emptyScanned ? '当前没有符合条件的空白会话' : '还没有扫描结果'}</strong>
+          <p>{emptyScanned ? '扫描完成，未发现超过一小时且没有可见内容的会话。' : '点击“扫描”查找超过一小时且没有可见内容的会话。'}</p>
+        </div> : (
           <>
             <div className="tableWrap desktopOnly emptyDraftTableWrap">
               <table className="dataTable emptyDraftTable" aria-label="空白会话维护列表">
