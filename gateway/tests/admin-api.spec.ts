@@ -78,7 +78,7 @@ async function setup(
 describe('admin JSON API', () => {
   it('lists, reads, and batches archive lifecycle actions for administrators', async () => {
     const row: ConversationArchiveRow = {
-      rootSessionId: 'session-archive-1', title: '已归档对话', creator: { id: 2, displayName: 'worker' },
+      rootSessionId: 'session-archive-1', title: '已归档对话', contentPreview: '首条用户内容摘要', creator: { id: 2, displayName: 'worker' },
       project: null, runtime: { kind: 'user', id: 2 }, workspace: null, state: 'archived',
       archivedAt: 1000, restoredAt: null, trashedAt: null, purgeAfter: null, syncState: 'synced',
       childCount: 0, messageCount: 2, updatedAt: 1000,

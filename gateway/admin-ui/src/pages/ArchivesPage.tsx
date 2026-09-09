@@ -9,7 +9,7 @@ import {
   Trash2,
   Undo2,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
   applyArchiveAction,
   exportArchive,
@@ -56,6 +56,7 @@ export function ArchivesPage() {
   const [confirmAction, setConfirmAction] = useState<'restore' | 'trash' | 'purge' | null>(null)
   const [actionError, setActionError] = useState('')
   const [emptyCandidates, setEmptyCandidates] = useState<EmptyDraftCandidate[]>([])
+  const [emptyScanned, setEmptyScanned] = useState(false)
   const [emptySelected, setEmptySelected] = useState<Set<string>>(new Set())
   const [emptyLoading, setEmptyLoading] = useState(false)
   const [emptyError, setEmptyError] = useState('')
@@ -102,6 +103,7 @@ export function ArchivesPage() {
     try {
       const result = await previewEmptyDrafts({ limit: 200 })
       setEmptyCandidates(result.candidates)
+      setEmptyScanned(true)
       setEmptySelected(new Set())
     } catch (cause) {
       setEmptyError(messageFrom(cause))
@@ -160,10 +162,18 @@ export function ArchivesPage() {
     }
   }
 
-  const allSelected = rows.length > 0 && rows.every(row => selected.has(row.rootSessionId))
   const hasFilters = Object.entries(active).some(([key, value]) => key !== 'state' ? value !== '' : value !== 'archived')
   const page = Math.floor(offset / PAGE_SIZE) + 1
   const selectedRows = useMemo(() => rows.filter(row => selected.has(row.rootSessionId)), [rows, selected])
+  const allSelected = rows.length > 0 && selectedRows.length === rows.length
+  const indeterminate = selectedRows.length > 0 && !allSelected
+  const selectAllRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (selectAllRef.current !== null) selectAllRef.current.indeterminate = indeterminate
+  }, [indeterminate])
+  const toggleAll = (checked: boolean): void => {
+    setSelected(checked ? new Set(rows.map(row => row.rootSessionId)) : new Set())
+  }
 
   return (
     <div className="page">
@@ -180,22 +190,43 @@ export function ArchivesPage() {
         )}
       />
       <ErrorBanner message={error} />
-      <Section title="空白会话维护" meta="仅管理员可见">
+      <Section title="空白会话维护" meta={emptyScanned ? '扫描完成' : '仅管理员可见'}>
         <div className="archiveBulkBar">
           <span>先扫描一小时无可见内容的会话，再将选中项移入可恢复回收站。</span>
           <div className="pageActionGroup">
             <Button icon={SearchCheck} onClick={() => { void scanEmptyDrafts() }} loading={emptyLoading}>扫描</Button>
-            <Button icon={Trash2} variant="danger" disabled={emptySelected.size === 0 || emptyLoading} onClick={() => { void moveEmptyDraftsToTrash() }}>清理选中空草稿</Button>
+            {emptySelected.size > 0 ? <Button icon={Trash2} variant="danger" disabled={emptyLoading} onClick={() => { void moveEmptyDraftsToTrash() }}>清理选中空草稿</Button> : null}
           </div>
         </div>
         <ErrorBanner message={emptyError} />
-        {emptyCandidates.length === 0 ? <p className="mutedText">尚未发现待维护的空白会话。</p> : (
-          <div className="mobileList">{emptyCandidates.map(candidate => (
-            <label className="mobileItem" key={candidate.rootSessionId}>
-              <span className="checkLabel"><input type="checkbox" checked={emptySelected.has(candidate.rootSessionId)} onChange={event => setEmptySelected(nextSelection(emptySelected, candidate.rootSessionId, event.target.checked))} /><strong>{candidate.rootSessionId}</strong></span>
-              <span className="mutedText">{candidate.creator?.displayName ?? '未知用户'} · {candidate.eventCount} 条事件 · {formatTime(candidate.updatedAt)}</span>
-            </label>
-          ))}</div>
+        {emptyCandidates.length === 0 ? <div className="emptyDraftState">
+          <span className="emptyDraftStateIcon" aria-hidden="true"><Archive /></span>
+          <strong>{emptyScanned ? '当前没有符合条件的空白会话' : '还没有扫描结果'}</strong>
+          <p>{emptyScanned ? '扫描完成，未发现超过一小时且没有可见内容的会话。' : '点击“扫描”查找超过一小时且没有可见内容的会话。'}</p>
+        </div> : (
+          <>
+            <div className="tableWrap desktopOnly emptyDraftTableWrap">
+              <table className="dataTable emptyDraftTable" aria-label="空白会话维护列表">
+                <thead><tr><th aria-label="选择" /><th>会话</th><th>归属</th><th>创建者</th><th>更新时间</th><th>事件</th></tr></thead>
+                <tbody>{emptyCandidates.map(candidate => (
+                  <tr key={candidate.rootSessionId}>
+                    <td><input type="checkbox" aria-label={`选择 ${candidate.rootSessionId}`} checked={emptySelected.has(candidate.rootSessionId)} onChange={event => setEmptySelected(nextSelection(emptySelected, candidate.rootSessionId, event.target.checked))} /></td>
+                    <td><span className="codeText">{candidate.rootSessionId}</span></td>
+                    <td><span className="archiveOwner"><strong>{candidate.project?.name ?? '个人会话'}</strong><small>{candidate.runtime.kind === 'project' ? `项目 #${candidate.runtime.id}` : `个人运行时 #${candidate.runtime.id}`}</small></span></td>
+                    <td>{candidate.creator?.displayName ?? '未知用户'}</td>
+                    <td><time dateTime={new Date(candidate.updatedAt).toISOString()}>{formatTime(candidate.updatedAt)}</time></td>
+                    <td>{candidate.eventCount}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+            <div className="mobileList emptyDraftMobileList">{emptyCandidates.map(candidate => (
+              <label className="mobileItem" key={candidate.rootSessionId}>
+                <span className="mobileItemHeader"><span className="checkLabel"><input type="checkbox" aria-label={`选择 ${candidate.rootSessionId}`} checked={emptySelected.has(candidate.rootSessionId)} onChange={event => setEmptySelected(nextSelection(emptySelected, candidate.rootSessionId, event.target.checked))} /><strong className="codeText">{candidate.rootSessionId}</strong></span><strong>{candidate.project?.name ?? '个人会话'}</strong></span>
+                <span className="mobileItemBody"><span className="muted">{candidate.creator?.displayName ?? '未知用户'} · {candidate.runtime.kind === 'project' ? `项目 #${candidate.runtime.id}` : `个人运行时 #${candidate.runtime.id}`}</span><span className="muted">{candidate.eventCount} 条事件 · {formatTime(candidate.updatedAt)}</span></span>
+              </label>
+            ))}</div>
+          </>
         )}
       </Section>
       <Section title="筛选条件">
@@ -230,13 +261,12 @@ export function ArchivesPage() {
           <EmptyState icon={Archive} title="没有匹配的归档对话" detail={hasFilters ? '调整筛选条件后重试。' : '当前还没有归档对话。'} />
         ) : (
           <>
-            <div className="archiveBulkBar">
-              <label className="checkLabel"><input type="checkbox" checked={allSelected} onChange={event => setSelected(event.target.checked ? new Set(rows.map(row => row.rootSessionId)) : new Set())} /><span>全选本页</span></label>
+            <div className="archiveBulkBar archiveSelectionSummary">
               <span>{selectedRows.length > 0 ? `已选择 ${selectedRows.length} 条` : '选择记录后可批量操作'}</span>
             </div>
             <div className="tableWrap desktopOnly">
               <table className="dataTable archiveTable">
-                <thead><tr><th aria-label="选择" /><th>对话</th><th>归属</th><th>归档时间</th><th>状态</th><th>消息</th><th aria-label="查看" /></tr></thead>
+                <thead><tr><th aria-label="选择"><label className="checkLabel archiveSelectAll"><input ref={selectAllRef} type="checkbox" checked={allSelected} aria-checked={indeterminate ? 'mixed' : allSelected} onChange={event => toggleAll(event.target.checked)} /><span>全选本页</span></label></th><th>对话</th><th>归属</th><th>归档时间</th><th>状态</th><th>消息</th><th aria-label="查看" /></tr></thead>
                 <tbody>{rows.map(row => <ArchiveTableRow key={row.rootSessionId} row={row} checked={selected.has(row.rootSessionId)} onCheck={checked => setSelected(nextSelection(selected, row.rootSessionId, checked))} onOpen={() => void openDetail(row)} />)}</tbody>
               </table>
             </div>
@@ -262,11 +292,11 @@ export function ArchivesPage() {
 }
 
 function ArchiveTableRow({ row, checked, onCheck, onOpen }: { row: ConversationArchiveRow; checked: boolean; onCheck: (checked: boolean) => void; onOpen: () => void }) {
-  return <tr><td><input type="checkbox" aria-label={`选择 ${row.title}`} checked={checked} onChange={event => onCheck(event.target.checked)} /></td><td><button type="button" className="tableLink" onClick={onOpen}><strong>{row.title}</strong><span className="codeText">{row.rootSessionId}</span></button></td><td><span className="archiveOwner">{row.creator?.displayName ?? '未知用户'}<small>{row.project?.name ?? '个人会话'}</small></span></td><td><time dateTime={new Date(row.archivedAt).toISOString()}>{formatTime(row.archivedAt)}</time></td><td><ArchiveStateBadge state={row.state} /></td><td>{row.messageCount}</td><td className="alignRight"><IconButton label={`查看 ${row.title}`} icon={Eye} onClick={onOpen} /></td></tr>
+  return <tr><td><input type="checkbox" aria-label={`选择 ${row.title}`} checked={checked} onChange={event => onCheck(event.target.checked)} /></td><td><button type="button" className="tableLink" onClick={onOpen}><strong>{row.title}</strong>{row.contentPreview === undefined || row.contentPreview === null ? <small className="archivePreview archivePreviewEmpty">暂无正文摘要</small> : <small className="archivePreview" title={row.contentPreview}>{row.contentPreview}</small>}<span className="codeText archiveSessionId">{row.rootSessionId}</span></button></td><td><span className="archiveOwner">{row.creator?.displayName ?? '未知用户'}<small>{row.project?.name ?? '个人会话'}</small></span></td><td><time dateTime={new Date(row.archivedAt).toISOString()}>{formatTime(row.archivedAt)}</time></td><td><ArchiveStateBadge state={row.state} /></td><td>{row.messageCount}</td><td className="alignRight"><IconButton label={`查看 ${row.title}`} icon={Eye} onClick={onOpen} /></td></tr>
 }
 
 function ArchiveMobileRow({ row, checked, onCheck, onOpen }: { row: ConversationArchiveRow; checked: boolean; onCheck: (checked: boolean) => void; onOpen: () => void }) {
-  return <article className="mobileItem archiveMobileItem"><div className="mobileItemHeader"><label className="checkLabel"><input type="checkbox" aria-label={`选择 ${row.title}`} checked={checked} onChange={event => onCheck(event.target.checked)} /><strong>{row.title}</strong></label><ArchiveStateBadge state={row.state} /></div><button type="button" className="archiveMobileOpen" onClick={onOpen}><span className="codeText">{row.rootSessionId}</span><span>{row.creator?.displayName ?? '未知用户'} · {row.project?.name ?? '个人会话'}</span><span>{formatTime(row.archivedAt)} · {row.messageCount} 条消息</span></button></article>
+  return <article className="mobileItem archiveMobileItem"><div className="mobileItemHeader"><label className="checkLabel"><input type="checkbox" aria-label={`选择 ${row.title}`} checked={checked} onChange={event => onCheck(event.target.checked)} /><span className="archiveIdentity"><strong>{row.title}</strong><small className="archivePreview">{row.contentPreview ?? '暂无正文摘要'}</small><small className="codeText archiveSessionId">{row.rootSessionId}</small></span></label><ArchiveStateBadge state={row.state} /></div><button type="button" className="archiveMobileOpen" onClick={onOpen}><span>{row.creator?.displayName ?? '未知用户'} · {row.project?.name ?? '个人会话'}</span><span>{formatTime(row.archivedAt)} · {row.messageCount} 条消息</span></button></article>
 }
 
 function ArchiveDetail({ detail, error }: { detail: ConversationArchiveDetail; error: string }) {

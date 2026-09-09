@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as api from '../api.ts'
@@ -14,12 +14,17 @@ vi.mock('../api.ts', () => ({
 }))
 
 const row: api.ConversationArchiveRow = {
-  rootSessionId: 'session-1', title: '产品讨论',
+  rootSessionId: 'session-1', title: '产品讨论', contentPreview: '请整理产品需求和下一步计划',
   creator: { id: 1, displayName: '管理员' }, project: { id: 2, name: '产品' },
   runtime: { kind: 'project', id: 2 }, workspace: { path: '/project', title: '产品', position: 0 },
   state: 'archived', archivedAt: Date.UTC(2026, 7, 25), restoredAt: null, trashedAt: null, purgeAfter: null,
   syncState: 'synced', childCount: 1, messageCount: 4, updatedAt: Date.UTC(2026, 7, 25),
 }
+
+const emptyCandidates: api.EmptyDraftCandidate[] = [
+  { rootSessionId: 'draft-project', runtime: { kind: 'project', id: 2 }, creator: { id: 1, displayName: '管理员' }, project: { id: 2, name: '产品' }, createdAt: Date.UTC(2026, 7, 24), updatedAt: Date.UTC(2026, 7, 25), eventCount: 0 },
+  { rootSessionId: 'draft-personal', runtime: { kind: 'user', id: 1 }, creator: null, project: null, createdAt: Date.UTC(2026, 7, 24), updatedAt: Date.UTC(2026, 7, 25), eventCount: 0 },
+]
 
 describe('ArchivesPage', () => {
   afterEach(() => cleanup())
@@ -39,6 +44,57 @@ describe('ArchivesPage', () => {
       hasMore: false,
     })
     vi.mocked(api.applyArchiveAction).mockResolvedValue({ action: 'restore', results: [{ rootSessionId: row.rootSessionId, ok: true }] })
+    vi.mocked(api.previewEmptyDrafts).mockResolvedValue({ cutoff: Date.now() - 3_600_000, candidates: [] })
+    vi.mocked(api.trashEmptyDrafts).mockResolvedValue({ trashed: [] })
+  })
+
+  it('scans empty drafts and shows project or personal ownership without exposing paths', async () => {
+    vi.mocked(api.previewEmptyDrafts).mockResolvedValue({ cutoff: Date.now() - 3_600_000, candidates: emptyCandidates })
+    render(<ArchivesPage />)
+    expect(screen.getByText('还没有扫描结果')).toBeTruthy()
+    expect(screen.getByText('点击“扫描”查找超过一小时且没有可见内容的会话。')).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: '扫描' }))
+    expect((await screen.findAllByText('draft-project')).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('产品').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('项目 #2').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('个人会话').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('个人运行时 #1').length).toBeGreaterThan(0)
+    expect(screen.queryByText('/project')).toBeNull()
+    const emptyTable = screen.getByRole('table', { name: '空白会话维护列表' })
+    expect(emptyTable).toBeTruthy()
+    expect(within(emptyTable).getByRole('columnheader', { name: '归属' })).toBeTruthy()
+  })
+
+  it('disables cleanup until selected and refreshes after cleanup', async () => {
+    vi.mocked(api.previewEmptyDrafts)
+      .mockResolvedValueOnce({ cutoff: 1, candidates: emptyCandidates })
+      .mockResolvedValueOnce({ cutoff: 2, candidates: [] })
+    vi.mocked(api.trashEmptyDrafts).mockResolvedValue({ trashed: ['draft-project'] })
+    render(<ArchivesPage />)
+    await userEvent.click(screen.getByRole('button', { name: '扫描' }))
+    expect(screen.queryByRole('button', { name: '清理选中空草稿' })).toBeNull()
+    await userEvent.click(screen.getAllByRole('checkbox', { name: '选择 draft-project' })[0]!)
+    const cleanupButton = screen.getByRole('button', { name: '清理选中空草稿' })
+    expect(cleanupButton.hasAttribute('disabled')).toBe(false)
+    await userEvent.click(cleanupButton)
+    expect(api.trashEmptyDrafts).toHaveBeenCalledWith(['draft-project'])
+    await waitFor(() => expect(api.previewEmptyDrafts).toHaveBeenCalledTimes(2))
+    expect(await screen.findByText('当前没有符合条件的空白会话')).toBeTruthy()
+  })
+
+  it('shows scan and cleanup errors', async () => {
+    vi.mocked(api.previewEmptyDrafts).mockResolvedValue({ cutoff: 1, candidates: [] })
+    render(<ArchivesPage />)
+    await screen.findByText('还没有扫描结果')
+    vi.mocked(api.previewEmptyDrafts).mockRejectedValue(new Error('扫描失败'))
+    await userEvent.click(screen.getByRole('button', { name: '扫描' }))
+    expect(await screen.findByText('扫描失败')).toBeTruthy()
+    vi.mocked(api.previewEmptyDrafts).mockResolvedValue({ cutoff: 1, candidates: emptyCandidates })
+    await userEvent.click(screen.getByRole('button', { name: '扫描' }))
+    await userEvent.click(screen.getAllByRole('checkbox', { name: '选择 draft-project' })[0]!)
+    vi.mocked(api.trashEmptyDrafts).mockRejectedValueOnce(new Error('清理失败'))
+    await userEvent.click(screen.getByRole('button', { name: '清理选中空草稿' }))
+    expect(await screen.findByText('清理失败')).toBeTruthy()
   })
 
   it('lists archived roots, opens the reader, and restores one record', async () => {
@@ -46,6 +102,11 @@ describe('ArchivesPage', () => {
     expect((await screen.findAllByText('产品讨论')).length).toBeGreaterThan(0)
     const table = screen.getByRole('table')
     expect(within(table).getByText('管理员')).toBeTruthy()
+    expect(within(table).getByText('请整理产品需求和下一步计划')).toBeTruthy()
+    expect(within(table).getByText('session-1')).toBeTruthy()
+    const selectAll = within(table).getByRole('checkbox', { name: '全选本页' })
+    await userEvent.click(selectAll)
+    expect(screen.getByText('已选择 1 条')).toBeTruthy()
     await userEvent.click(within(table).getByRole('button', { name: '查看 产品讨论' }))
     expect(await screen.findByRole('heading', { name: '对话记录' })).toBeTruthy()
     expect(screen.getByText('你好，我可以帮你整理产品讨论。')).toBeTruthy()
