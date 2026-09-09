@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as api from '../api.ts'
@@ -21,6 +21,11 @@ const row: api.ConversationArchiveRow = {
   syncState: 'synced', childCount: 1, messageCount: 4, updatedAt: Date.UTC(2026, 7, 25),
 }
 
+const emptyCandidates: api.EmptyDraftCandidate[] = [
+  { rootSessionId: 'draft-project', runtime: { kind: 'project', id: 2 }, creator: { id: 1, displayName: '管理员' }, project: { id: 2, name: '产品' }, createdAt: Date.UTC(2026, 7, 24), updatedAt: Date.UTC(2026, 7, 25), eventCount: 0 },
+  { rootSessionId: 'draft-personal', runtime: { kind: 'user', id: 1 }, creator: null, project: null, createdAt: Date.UTC(2026, 7, 24), updatedAt: Date.UTC(2026, 7, 25), eventCount: 0 },
+]
+
 describe('ArchivesPage', () => {
   afterEach(() => cleanup())
 
@@ -39,6 +44,54 @@ describe('ArchivesPage', () => {
       hasMore: false,
     })
     vi.mocked(api.applyArchiveAction).mockResolvedValue({ action: 'restore', results: [{ rootSessionId: row.rootSessionId, ok: true }] })
+    vi.mocked(api.previewEmptyDrafts).mockResolvedValue({ cutoff: Date.now() - 3_600_000, candidates: [] })
+    vi.mocked(api.trashEmptyDrafts).mockResolvedValue({ trashed: [] })
+  })
+
+  it('scans empty drafts and shows project or personal ownership without exposing paths', async () => {
+    vi.mocked(api.previewEmptyDrafts).mockResolvedValue({ cutoff: Date.now() - 3_600_000, candidates: emptyCandidates })
+    render(<ArchivesPage />)
+    await screen.findByText('尚未发现待维护的空白会话。')
+    await userEvent.click(screen.getByRole('button', { name: '扫描' }))
+    expect((await screen.findAllByText('draft-project')).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('产品').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('项目 #2').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('个人会话').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('个人运行时 #1').length).toBeGreaterThan(0)
+    expect(screen.queryByText('/project')).toBeNull()
+    const emptyTable = screen.getByRole('table', { name: '空白会话维护列表' })
+    expect(emptyTable).toBeTruthy()
+    expect(within(emptyTable).getByRole('columnheader', { name: '归属' })).toBeTruthy()
+  })
+
+  it('disables cleanup until selected and refreshes after cleanup', async () => {
+    vi.mocked(api.previewEmptyDrafts)
+      .mockResolvedValueOnce({ cutoff: 1, candidates: emptyCandidates })
+      .mockResolvedValueOnce({ cutoff: 2, candidates: [] })
+    vi.mocked(api.trashEmptyDrafts).mockResolvedValue({ trashed: ['draft-project'] })
+    render(<ArchivesPage />)
+    await userEvent.click(screen.getByRole('button', { name: '扫描' }))
+    const cleanupButton = screen.getByRole('button', { name: '清理选中空草稿' })
+    expect(cleanupButton.hasAttribute('disabled')).toBe(true)
+    await userEvent.click(screen.getAllByRole('checkbox', { name: '选择 draft-project' })[0]!)
+    expect(cleanupButton.hasAttribute('disabled')).toBe(false)
+    await userEvent.click(cleanupButton)
+    expect(api.trashEmptyDrafts).toHaveBeenCalledWith(['draft-project'])
+    await waitFor(() => expect(api.previewEmptyDrafts).toHaveBeenCalledTimes(2))
+    expect(await screen.findByText('尚未发现待维护的空白会话。')).toBeTruthy()
+  })
+
+  it('shows scan and cleanup errors', async () => {
+    vi.mocked(api.previewEmptyDrafts).mockRejectedValueOnce(new Error('扫描失败'))
+    render(<ArchivesPage />)
+    await userEvent.click(screen.getByRole('button', { name: '扫描' }))
+    expect(await screen.findByText('扫描失败')).toBeTruthy()
+    vi.mocked(api.previewEmptyDrafts).mockResolvedValue({ cutoff: 1, candidates: emptyCandidates })
+    await userEvent.click(screen.getByRole('button', { name: '扫描' }))
+    await userEvent.click(screen.getAllByRole('checkbox', { name: '选择 draft-project' })[0]!)
+    vi.mocked(api.trashEmptyDrafts).mockRejectedValueOnce(new Error('清理失败'))
+    await userEvent.click(screen.getByRole('button', { name: '清理选中空草稿' }))
+    expect(await screen.findByText('清理失败')).toBeTruthy()
   })
 
   it('lists archived roots, opens the reader, and restores one record', async () => {
