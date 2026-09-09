@@ -149,6 +149,12 @@ export interface AssistantMessage extends Message {
   readonly source: ModelMessageSource
 }
 
+/** A system-role message holding a rendered prompt attributed to its producer. */
+export interface SystemMessage extends Message {
+  readonly role: 'system'
+  readonly source: MessageSourceMap['plugin']
+}
+
 /** A tool-result specialization whose model-facing block retains call correlation. */
 export interface ToolResultMessage extends Message {
   readonly role: 'user'
@@ -214,6 +220,15 @@ export function createAssistantMessage(
       kind: 'model',
       ...input.source,
     },
+  })
+}
+
+/** Create and freeze one identified system-role message. */
+export function createSystemMessage(text: string, plugin: string): SystemMessage {
+  return createMessage({
+    role: 'system',
+    content: text.length === 0 ? [] : [{ type: 'text', text }],
+    source: { kind: 'plugin', plugin },
   })
 }
 
