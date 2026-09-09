@@ -388,12 +388,39 @@ export function fixtureContext(fixture: string): NormalizeContext {
  * @returns The normalized `data.header` payloads, in log order.
  */
 export function normalizedHeaders(rawLog: string, ctx: NormalizeContext): unknown[] {
-  return normalizeSessionLog(rawLog, ctx)
+  const records = normalizeSessionLog(rawLog, ctx)
     .split('\n')
     .filter(line => line.trim().length > 0)
-    .map(line => JSON.parse(line) as { type?: unknown; data?: { header?: unknown } })
-    .filter(record => record.type === 'request/header')
-    .map(record => record.data?.header)
+    .map(line => JSON.parse(line) as {
+      type?: unknown
+      data?: { header?: unknown; message?: { content?: unknown[] } }
+    })
+  let lastSystem: string | undefined
+  const headers: unknown[] = []
+  for (const record of records) {
+    if (record.type === 'system/message') {
+      const content = record.data?.message?.content
+      const text = Array.isArray(content)
+        ? content.flatMap((block) => {
+          if (block === null || typeof block !== 'object') return []
+          const value = (block as { type?: unknown; text?: unknown })
+          return value.type === 'text' && typeof value.text === 'string' ? [value.text] : []
+        }).join('')
+        : undefined
+      if (text !== undefined) lastSystem = text
+      continue
+    }
+    if (record.type !== 'request/header') continue
+    const header = record.data?.header
+    if (lastSystem !== undefined && header !== null && typeof header === 'object') {
+      const withSystem = { ...(header as Record<string, unknown>) }
+      if (!Object.hasOwn(withSystem, 'system')) withSystem.system = lastSystem
+      headers.push(withSystem)
+    } else {
+      headers.push(header)
+    }
+  }
+  return headers
 }
 
 /**
@@ -574,6 +601,9 @@ function surfaceEventMessage(record: Record<string, unknown>): Record<string, un
   if (!isRecord(data)) return undefined
   let message: unknown
   switch (type) {
+    case 'system/message':
+      message = data.message
+      break
     case 'user/message':
       message = data
       break
@@ -1353,7 +1383,7 @@ export function defineAcpSnapshotSuite(options: SnapshotSuiteOptions): void {
         const schemaSource = schemaSourceByClass.get(classOf(scenario)) ?? pinningScenario
         const pinningDir = join(snapshotsDir, pinningScenario.name)
         const pinnedFixture = await readFile(join(pinningDir, 'session.jsonl'), 'utf8')
-        const pinned = normalizedHeaders(pinnedFixture, fixtureContext(pinnedFixture))
+        const pinned = normalizedHeaders(scrubSystemPrompts(pinnedFixture), fixtureContext(pinnedFixture))
         const promptSnapshot = await readFile(
           join(snapshotsDir, promptSource.name, SYSTEM_PROMPT_SNAPSHOT),
           'utf8',
@@ -1506,7 +1536,7 @@ export function defineAcpSnapshotSuite(options: SnapshotSuiteOptions): void {
         /* v8 ignore next -- registration guarantees every pin has resolved sources. */
         const schemaSource = schemaSourceByClass.get(classOf(scenario)) ?? scenario
         const fixture = await readFile(join(snapshotsDir, scenario.name, 'session.jsonl'), 'utf8')
-        const headers = normalizedHeaders(fixture, fixtureContext(fixture))
+        const headers = normalizedHeaders(scrubSystemPrompts(fixture), fixtureContext(fixture))
         const promptSnapshot = await readFile(
           join(snapshotsDir, promptSource.name, SYSTEM_PROMPT_SNAPSHOT),
           'utf8',

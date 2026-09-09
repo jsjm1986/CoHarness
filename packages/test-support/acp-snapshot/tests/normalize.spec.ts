@@ -413,6 +413,42 @@ describe('normalizeSessionLog', () => {
     expect(out).not.toContain('212')
   })
 
+  it('normalizes compact assistant timing and system prompt payloads', () => {
+    const raw = [
+      header({}),
+      JSON.stringify({
+        type: 'system/message',
+        seq: 1,
+        time: 7,
+        data: {
+          message: {
+            role: 'system',
+            content: [{ type: 'text', text: 'volatile prompt' }],
+            source: { kind: 'plugin', plugin: 'system-prompt' },
+            id: ctx.sessionIds[0],
+          },
+        },
+      }),
+      JSON.stringify({
+        type: 'assistant/message',
+        seq: 2,
+        time: 8,
+        data: {
+          turn: 1,
+          step: 1,
+          message: { role: 'assistant', content: [], source: { kind: 'model', provider: 'p', model: 'm' }, id: ctx.sessionIds[0] },
+          stream: [{ type: 'text-chunks', time0: 42, index: 0, dt: [9, 4], texts: ['a', 'b', 'c'] }],
+        },
+      }),
+      '',
+    ].join('\n')
+    const out = normalizeSessionLog(raw, ctx)
+    expect(out).toContain('"text":"volatile prompt"')
+    expect(out).toContain('"time0":0')
+    expect(out).toContain('"dt":[0,0]')
+    expect(out).not.toContain('"time0":42')
+  })
+
   it('projects range-encoded source event references to logical arrays', () => {
     const ev = JSON.stringify({
       type: 'assistant/message',
@@ -630,6 +666,23 @@ describe('scrubRequestHeaders', () => {
 })
 
 describe('scrubSystemPrompts', () => {
+  it('tokenizes durable system messages while leaving identities, replacements, and unrelated payloads intact', () => {
+    const record = {
+      type: 'system/message', seq: 4, time: 5,
+      data: { turn: 1, step: 2, message: { role: 'system', id: 'system-id', content: [{ type: 'text', text: 'private prompt' }] } },
+      surfaceOp: { op: 'replace', start: 0, end: 0 }, sourceEventSeqs: [0],
+    }
+    const raw = `${JSON.stringify(record)}\n`
+    expect(JSON.parse(scrubSystemPrompts(raw))).toEqual({
+      ...record,
+      data: { ...record.data, message: { ...record.data.message, content: [{ type: 'text', text: '{{system}}' }] } },
+    })
+    expect(scrubToolSchemas(raw)).toBe(raw)
+    const malformed = [null, [], 'invalid', { content: null }]
+      .map(message => JSON.stringify({ type: 'system/message', data: { message } })).join('\n')
+    expect(scrubSystemPrompts(malformed)).toBe(malformed)
+  })
+
   it('scrubs only system prompt payloads while keeping tools verbatim', () => {
     const header = JSON.stringify({
       type: 'request/header', seq: 1, time: 2,

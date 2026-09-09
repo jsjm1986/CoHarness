@@ -314,6 +314,19 @@ describe('same-session goal driving', () => {
     expect(test.adapter.requests).toHaveLength(1)
   })
 
+  it('cancels an active goal turn when the host explicitly pauses the goal', async () => {
+    const test = await harness(['hang'])
+    test.ctx.goals.create(test.agent, { objective: 'pause from the host' })
+    await waitForRequests(test.adapter, 1)
+    const goal = test.ctx.goals.get(test.agent)
+    if (goal === undefined) throw new Error('missing active goal')
+    test.ctx.goals.pause(test.agent, { id: goal.id, revision: goal.revision })
+    await test.agent.whenIdle()
+    expect(test.agent.status).toBe('idle')
+    expect(test.ctx.goals.get(test.agent)?.phase).toBe('paused')
+    expect(test.adapter.requests).toHaveLength(1)
+  })
+
   it('lets already-queued human work finish before reserving the next round', async () => {
     const test = await harness([textResponse('human answer'), textResponse('goal answer')])
     test.ctx.goals.create(test.agent, { objective: 'continue after the human', maxGoalRounds: 1 })

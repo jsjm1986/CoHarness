@@ -363,7 +363,7 @@ const PRINCIPAL: GatewayRequestPrincipal = {
 }
 
 describe('GatewaySessionPersistence collaboration creation', () => {
-  it('requests optional v2 migration and keeps the in-memory fallback compatible', async () => {
+  it('keeps a body-changing v2 migration local when Gateway exposes metadata-only migration', async () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)
     const transport = new GatewayTransport()
@@ -373,12 +373,7 @@ describe('GatewaySessionPersistence collaboration creation', () => {
 
     const loaded = await ctx.sessionPersistence.load(id)
     expect(loaded.meta.version).toBe(3)
-    expect(transport.migrations).toHaveLength(1)
-    expect(transport.migrations[0]?.body).toMatchObject({
-      sessionId: id,
-      sourceRevision: 'revision-1',
-      targetHeader: { id, version: 3 },
-    })
+    expect(transport.migrations).toHaveLength(0)
     await fiber.dispose()
   })
 
@@ -393,9 +388,8 @@ describe('GatewaySessionPersistence collaboration creation', () => {
     try {
       const loaded = await ctx.sessionPersistence.load(id)
       expect(loaded.meta).toMatchObject({ version: 3, isSeeded: true, parentSession: 'parent' })
-      expect(loaded.inheritedEventCount).toBe(events.length)
-      expect(transport.migrations[0]?.body.targetHeader).toMatchObject({ version: 3, seedLength: events.length })
-      expect(transport.migrations[0]?.body.targetHeader).not.toHaveProperty('isSeeded')
+      expect(loaded.inheritedEventCount).toBe(events.length + 1)
+      expect(transport.migrations).toHaveLength(0)
       const reloaded = await (ctx.sessionPersistence as GatewaySessionPersistence).loadStored(id)
       expect(reloaded?.inheritedEventCount).toBe(events.length)
       expect(reloaded?.meta.isSeeded).toBe(true)

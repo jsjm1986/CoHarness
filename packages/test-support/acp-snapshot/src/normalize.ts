@@ -211,6 +211,28 @@ function scrubValue(
   return value
 }
 
+/**
+ * Remove run-to-run timing noise from compact assistant attempts while
+ * retaining the lossless stream payload and record boundaries in fixtures.
+ * @param record - one parsed session record, mutated in place before generic scrubbing.
+ */
+function normalizeDurableVolatileFields(record: Record<string, unknown>): void {
+  if (record.type !== 'assistant/message' && record.type !== 'assistant/attempt') return
+  const data = record.data
+  if (data === null || typeof data !== 'object') return
+  const stream = (data as Record<string, unknown>).stream
+  if (!Array.isArray(stream)) return
+  const normalizedData = data as Record<string, unknown>
+  normalizedData.stream = (stream as unknown[]).map((candidate: unknown) => {
+    if (candidate === null || typeof candidate !== 'object') return candidate
+    const normalized = { ...(candidate as Record<string, unknown>) }
+    if ('time0' in normalized) normalized.time0 = 0
+    if ('time' in normalized) normalized.time = 0
+    if (Array.isArray(normalized.dt)) normalized.dt = normalized.dt.map(() => 0)
+    return normalized
+  })
+}
+
 /** Escape one literal path segment for use in a regular expression. */
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -359,6 +381,7 @@ export function normalizeSessionLog(
     if (Object.hasOwn(record, 'sourceEventSeqs')) {
       record.sourceEventSeqs = decodeSeqRanges(record.sourceEventSeqs)
     }
+    normalizeDurableVolatileFields(record)
     return scrubValue(record, ctx, cwdPathMode) as Record<string, unknown>
   })
   return records.map(r => JSON.stringify(r)).join('\n') + '\n'
@@ -492,6 +515,15 @@ function scrubHeaderContent(rawLog: string, options: HeaderScrubOptions): string
     const record = JSON.parse(line) as Record<string, unknown>
     const data = record.data as Record<string, unknown> | null | undefined
     if (data === null || typeof data !== 'object') return line
+    if (record.type === 'system/message' && options.system === true) {
+      const message = data.message
+      if (message === null || typeof message !== 'object' || Array.isArray(message)) return line
+      const content = (message as Record<string, unknown>).content
+      if (!Array.isArray(content)) return line
+      const normalizedMessage = message as Record<string, unknown>
+      normalizedMessage.content = [{ type: 'text', text: SYSTEM }]
+      return JSON.stringify(record)
+    }
     if (record.type === 'request/header') {
       const header = data.header as Record<string, unknown> | null | undefined
       if (header === null || typeof header !== 'object') return line

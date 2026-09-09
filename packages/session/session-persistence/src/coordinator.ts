@@ -123,6 +123,12 @@ function migrateFormatEvents(
   }
 }
 
+/** Remote metadata migration is safe only when the backend can retain the exact event sequence. */
+function canPublishMetadataOnlyMigration(source: readonly SessionEvent[], migrated: readonly SessionEvent[]): boolean {
+  if (source.length !== migrated.length) return false
+  return source.every((event, index) => JSON.stringify(event) === JSON.stringify(migrated[index]))
+}
+
 /** Coordinator policy supplied by a concrete persistence backend. */
 export interface PersistenceCoordinatorOptions {
   /** Maximum completed unpublished preparations retained for reuse. */
@@ -1091,7 +1097,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     let inheritedEventCount = SessionLogOffset(stored.inheritedEventCount)
     if (stored.meta.version !== currentMeta.version) {
       const migrated = migrateFormatEvents(stored.meta, stored.inheritedEventCount, events)
-      if (this.backend.migrateStored !== undefined) {
+      if (this.backend.migrateStored !== undefined && canPublishMetadataOnlyMigration(events, migrated.events)) {
         await this.backend.migrateStored(
           stored,
           { meta: migrated.header, inheritedEventCount: migrated.inheritedEventCount },
@@ -1123,7 +1129,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       let currentInheritedEventCount = SessionLogOffset(inheritedEventCount)
       if (meta.version !== currentMeta.version) {
         const migrated = migrateFormatEvents(meta, inheritedEventCount, storedEvents)
-        if (this.backend.migrateStored !== undefined) {
+        if (this.backend.migrateStored !== undefined && canPublishMetadataOnlyMigration(storedEvents, migrated.events)) {
           await this.backend.migrateStored(
             { meta, inheritedEventCount },
             { meta: migrated.header, inheritedEventCount: migrated.inheritedEventCount },

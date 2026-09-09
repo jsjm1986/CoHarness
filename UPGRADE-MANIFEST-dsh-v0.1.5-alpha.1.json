@@ -42,7 +42,7 @@
       "wire": true,
       "dataMigration": true,
       "permissionImpact": "none",
-      "evidence": "SESSION_FORMAT_VERSION=3 with v2-to-v3 system/message migration, immutable generation handling, compact assistant stream and focused persistence tests."
+      "evidence": "SESSION_FORMAT_VERSION=3 with chronology-preserving v2-to-v3 system/message migration, deterministic system identities, core carrier validation, immutable generation handling, compact assistant stream and focused persistence tests; CoHarness retains code/tool-code-dispatch identities and extension event payloads."
     },
     {
       "id": "explicit-agent-api",
@@ -82,7 +82,7 @@
       "wire": true,
       "dataMigration": true,
       "permissionImpact": "model-governance",
-      "evidence": "local prefix/suffix and surface projection exist but V3 system-message migration does not"
+      "evidence": "V3 system/message projection and adapter-declared in-history capability are wired through the existing prefix/suffix owner; model-switch and replay snapshots cover supported and fallback routes."
     },
     {
       "id": "subagent-runtimes",

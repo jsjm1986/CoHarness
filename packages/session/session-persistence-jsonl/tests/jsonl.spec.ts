@@ -8,7 +8,7 @@ import SessionStore, { encodeSeqRanges, SessionId, SessionLogOffset, SessionSeq 
 import type { Session, SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import {
-  encodeSegment, eventLines, generationLogPath, logPath, parseHeader, projectDir, projectKey, scanLog, sessionDir, SessionLogScanner,
+  encodeSegment, eventLines, logPath, parseHeader, projectDir, projectKey, scanLog, sessionDir, SessionLogScanner,
   toHeaderLine,
 } from '../src/format.ts'
 import { runPersistenceContract, meta, oneTurnLog, appendLog } from '../../session-persistence/tests/contract.ts'
@@ -1336,7 +1336,7 @@ describe('JsonlSessionPersistence: default packed chunk rows', () => {
     // file, hand-planted so this packed-config backend adopts it on load).
     await mkdir(sessionDir(root, '/work', m.id), { recursive: true })
     await writeFile(rawLogPath(root, '/work', m.id), [
-      JSON.stringify({ type: 'session', version: 0, id: 'mixed', createdAt: 1000, cwd: '/work', delegationDepth: 0 }),
+      JSON.stringify({ type: 'session', version: 3, id: 'mixed', createdAt: 1000, cwd: '/work', delegationDepth: 0 }),
       ...log.map(e => JSON.stringify(e)),
     ].join('\n') + '\n')
     // Adopt the stored log (cursor = stored length), then append a second turn
@@ -1352,10 +1352,10 @@ describe('JsonlSessionPersistence: default packed chunk rows', () => {
     const loaded = await ctx.sessionPersistence.load(m.id)
     expect(loaded.events).toEqual([...log, ...secondTurn])
     // The packed append really packed: the file's tail carries a text-chunks row.
-    const tags = (await readFile(generationLogPath(root, '/work', m.id, 'none', 3), 'utf8')).split('\n').filter(Boolean)
+    const tags = (await readFile(logPath(root, '/work', m.id, 'none'), 'utf8')).split('\n').filter(Boolean)
       .map(line => (JSON.parse(line) as { type: string }).type)
-    expect(tags.filter(t => t === 'text-chunks')).toHaveLength(2)
-    expect(tags.filter(t => t === 'assistant/chunk')).toHaveLength(0)
+    expect(tags.filter(t => t === 'text-chunks')).toHaveLength(1)
+    expect(tags.filter(t => t === 'assistant/chunk')).toHaveLength(5)
   })
 
   it('scanLog: a packed row advances the seq cursor by its whole run', () => {

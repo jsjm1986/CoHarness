@@ -2,6 +2,7 @@ import { defineSessionFormatMigration } from './chain.ts'
 import { createSessionFormatCatalog } from './catalog.ts'
 import type { SessionFormatArtifact, SessionFormatHeader } from './types.ts'
 import type { SessionFormatEvent, SessionFormatMigrationContext, SessionFormatMigrationStage } from './types.ts'
+import { createHash } from 'node:crypto'
 
 const bump = (fromVersion: number) => defineSessionFormatMigration({
   name: `@deepseek-ai/dsh-session-format-v${fromVersion}-to-v${fromVersion + 1}`,
@@ -26,7 +27,6 @@ const v2ToV3 = defineSessionFormatMigration({
   migrateHeader: (header: SessionFormatHeader) => ({
     ...header,
     version: 3,
-    ...header.agentPreset === 'code' ? { agentPreset: 'ptc' } : {},
   }),
   migrate: (artifact: SessionFormatArtifact) => {
     const output: SessionFormatEvent[] = []
@@ -35,14 +35,16 @@ const v2ToV3 = defineSessionFormatMigration({
       targetHeader: { ...artifact.header, version: 3 },
       sourceInheritedEventCount: artifact.inheritedEventCount,
     })
+    /* v8 ignore next -- the catalog declares this stage; the guard protects future declaration drift. */
     if (stream === undefined) throw new Error('v2-to-v3 migration stage is unavailable')
     const context: SessionFormatMigrationContext = { emitEvent: event => output.push(event) }
     for (const event of artifact.events) stream.transformEvent(event, context)
     const cut = stream.finish(context)
     return {
       ...artifact,
-      header: { ...artifact.header, version: 3 },
+      header: v2ToV3.migrateHeader(artifact.header),
       events: output,
+      /* v8 ignore next -- V2ToV3Stage.finish always returns its inherited cut. */
       inheritedEventCount: cut ?? artifact.inheritedEventCount,
     }
   },
@@ -60,11 +62,13 @@ class V2ToV3Stage implements SessionFormatMigrationStage {
   private targetSeq = 0
   private inheritedCut = 0
   private systemSeq: number | undefined
+  private currentPrompt = ''
   private step: { turn: number; step: number } | undefined
 
   constructor(private readonly sourceHeader: SessionFormatHeader, private readonly sourceCut: number) {}
 
   transformEvent(event: SessionFormatEvent, context: SessionFormatMigrationContext): void {
+    assertV2CarrierShape(event)
     this.observeMessageIds(event)
     if (event.type === 'step/start') {
       const data = event.data as Record<string, unknown>
@@ -76,11 +80,16 @@ class V2ToV3Stage implements SessionFormatMigrationStage {
       const header = data.header as Record<string, unknown> | undefined
       const system = typeof header?.system === 'string' ? header.system : ''
       if (this.step === undefined) throw new Error('v2 request/header appears outside an open step')
-      this.emitSystem(system, event, context)
+      if (this.systemSeq === undefined || system !== this.currentPrompt) this.emitSystem(system, event, context)
       const { system: _system, ...withoutSystem } = header ?? {}
       this.emitMapped({ ...event, data: { ...data, header: withoutSystem } as never }, context)
     } else {
-      this.emitMapped(event, context)
+      if (event.type === 'step/start' && this.systemSeq === undefined) {
+        this.emitMapped(event, context)
+        this.emitSystem('', event, context)
+      } else {
+        this.emitMapped(event, context)
+      }
     }
     if (event.type === 'step/end' || event.type === 'turn/end') this.step = undefined
     if (event.seq < this.sourceCut) this.inheritedCut = this.targetSeq
@@ -112,8 +121,10 @@ class V2ToV3Stage implements SessionFormatMigrationStage {
   }
 
   private emitSystem(text: string, anchor: SessionFormatEvent, context: SessionFormatMigrationContext): void {
+    /* v8 ignore next -- transformEvent establishes the step before calling this helper. */
     if (this.step === undefined) throw new Error('v2 system prompt appears outside an open step')
-    const id = `v2-to-v3-system-${this.sourceHeader.id}-${anchor.seq}`
+    const identity = JSON.stringify(['session-format-v2-to-v3', this.sourceHeader.id, anchor.seq, anchor.type])
+    const id = `v2-to-v3-system-${createHash('sha256').update(identity).digest('hex')}`
     if (this.sourceMessageIds.has(id) || this.generatedMessageIds.has(id)) throw new Error('v2-to-v3 generated system message id collides with a source message')
     this.generatedMessageIds.add(id)
     const seq = this.targetSeq++
@@ -136,6 +147,7 @@ class V2ToV3Stage implements SessionFormatMigrationStage {
       ...this.systemSeq === undefined ? {} : { sourceEventSeqs: [this.systemSeq] },
     })
     this.systemSeq = seq
+    this.currentPrompt = text
   }
 
   private mappingNumber(value: unknown): number {
@@ -156,6 +168,43 @@ class V2ToV3Stage implements SessionFormatMigrationStage {
       if (this.generatedMessageIds.has(id)) throw new Error('v2 source message id collides with a generated system message')
       this.sourceMessageIds.add(id)
     }
+  }
+}
+
+/** Validate the JSON containers owned by message carriers before migration rewrites them. */
+function assertV2CarrierShape(event: SessionFormatEvent): void {
+  const data = event.data
+  if (event.type === 'assistant/attempt') {
+    if (data === null || typeof data !== 'object' || Array.isArray(data)
+      || !Array.isArray((data as Record<string, unknown>).stream)) {
+      throw new Error(`v2 ${event.type} has invalid stream`)
+    }
+    return
+  }
+  if (event.type === 'user/message') {
+    if (data === null || typeof data !== 'object' || Array.isArray(data)
+      || !Array.isArray((data as Record<string, unknown>).content)) {
+      throw new Error(`v2 ${event.type} has invalid content`)
+    }
+    return
+  }
+  if (event.type !== 'assistant/message' && event.type !== 'tool/result'
+    && event.type !== 'agent/inbox/spliced' && event.type !== 'session/title-llm-request') return
+  if (data === null || typeof data !== 'object' || Array.isArray(data)) throw new Error(`v2 ${event.type} has invalid data`)
+  const record = data as Record<string, unknown>
+  const field = event.type === 'assistant/message' || event.type === 'tool/result' ? 'message'
+    : event.type === 'agent/inbox/spliced' ? 'inserted' : 'messages'
+  const value = record[field]
+  if (field === 'message') {
+    if (value === null || typeof value !== 'object' || Array.isArray(value)
+      || !Array.isArray((value as Record<string, unknown>).content)) {
+      throw new Error(`v2 ${event.type} has invalid message content`)
+    }
+    return
+  }
+  if (!Array.isArray(value) || value.some(item => item === null || typeof item !== 'object' || Array.isArray(item)
+    || !Array.isArray((item as Record<string, unknown>).content))) {
+    throw new Error(`v2 ${event.type} has invalid messages`)
   }
 }
 

@@ -7,7 +7,10 @@ import {
   TypertRemoteService,
   Remote,
   RemoteScope,
+  RemoteError,
+  remoteErrorOf,
   remoteMethods,
+  TypertLookupFailure,
   type TypertContext,
   type TypertForwardableEvent,
   type TypertRemoteEvent,
@@ -44,6 +47,12 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
 }
 
 describe('typert-protocol Remote declarations', () => {
+  it('constructs lookup failures with the typed adapter payload', () => {
+    const failure = new TypertLookupFailure<{ code: string }>({ code: 'denied' })
+    expect(failure.name).toBe('TypertLookupFailure')
+    expect(failure.failure).toEqual({ code: 'denied' })
+    expect(failure.message).toContain('policy rejected')
+  })
   it('binds a TypertRemoteService name and executes decorators through the Vitest source transform', async () => {
     class Goals extends TypertRemoteService {
       constructor(ctx: Context) {
@@ -189,6 +198,23 @@ describe('typert-protocol Remote declarations', () => {
     expect(remoteMethods(prototypeLess)).toEqual([])
   })
 
+  it('records stream markers and treats equivalent context markers as idempotent', () => {
+    class Service {
+      stream(): string { return 'ok' }
+      scoped(): string { return 'ok' }
+    }
+    const initializers: Array<(this: Service) => void> = []
+    Remote({ mode: 'stream' })(Reflect.get(Service.prototype, 'stream'), methodContext('stream', initializers))
+    RemoteScope('metaFixture')(Reflect.get(Service.prototype, 'scoped'), methodContext('scoped', initializers))
+    RemoteScope('metaFixture')(Reflect.get(Service.prototype, 'scoped'), methodContext('scoped', initializers))
+    const service = new Service()
+    for (const initialize of initializers) initialize.call(service)
+    expect(remoteMethods(service)).toEqual([
+      { method: 'stream', mode: 'stream', invocation: { kind: 'direct' } },
+      { method: 'scoped', invocation: { kind: 'context', context: 'metaFixture' } },
+    ])
+  })
+
   it('rejects malformed decorator calls and targets', () => {
     const method: (this: object) => void = function (this: object): void {}
     expect(() => { (Remote as unknown as (value: typeof method) => void)(method) }).toThrow('context is missing')
@@ -197,6 +223,8 @@ describe('typert-protocol Remote declarations', () => {
     expect(() => Remote('bad name')).toThrow('export name')
     expect(() => Remote('.')).toThrow('export name')
     expect(() => Remote('..')).toThrow('export name')
+    expect(() => Remote({ mode: 'unary' } as never)).toThrow('exactly mode')
+    expect(() => Remote({ mode: 'stream', extra: true } as never)).toThrow('exactly mode')
     expect(() => RemoteScope('' as 'metaFixture')).toThrow('Scope key')
     expect(() => RemoteScope('metaFixture', 'bad/name')).toThrow('export name')
 
@@ -235,6 +263,25 @@ describe('typert-protocol Remote declarations', () => {
     expect(() => { conflicting[1]!.call(service) }).toThrow('conflicting invocation markers')
   })
 
+  it('rejects malformed prototype descriptors and accepts a context/direct mismatch as a conflict', () => {
+    class Broken { readonly marker = true }
+    Object.defineProperty(Broken.prototype, '@deepseek-ai/dsh-typert-protocol/remote-methods', { value: null })
+    expect(() => remoteMethods(new Broken())).toThrow('descriptor must be an object')
+    class WrongVersion { readonly marker = true }
+    Object.defineProperty(WrongVersion.prototype, '@deepseek-ai/dsh-typert-protocol/remote-methods', { value: { version: 2, methods: [] } })
+    expect(() => remoteMethods(new WrongVersion())).toThrow('unsupported Remote method descriptor version')
+    class WrongMethods { readonly marker = true }
+    Object.defineProperty(WrongMethods.prototype, '@deepseek-ai/dsh-typert-protocol/remote-methods', { value: { version: 1, methods: 'bad' } })
+    expect(() => remoteMethods(new WrongMethods())).toThrow('methods must be an array')
+    class Service { run(): void {} }
+    const initializers: Array<(this: Service) => void> = []
+    RemoteScope('metaFixture')(Reflect.get(Service.prototype, 'run'), methodContext('run', initializers))
+    Remote(Reflect.get(Service.prototype, 'run'), methodContext('run', initializers))
+    const service = new Service()
+    initializers[0]!.call(service)
+    expect(() => { initializers[1]!.call(service) }).toThrow('conflicting invocation markers')
+  })
+
   it('rejects ambiguous binding names', () => {
     expect(() => bindTypertRemote({}, '')).toThrow('service key')
     expect(() => bindTypertRemote({}, 'goals', { namespace: 'api/goals' })).toThrow('namespace')
@@ -249,6 +296,22 @@ describe('typert-protocol Remote declarations', () => {
     expectTypeOf<'meta-fixture/forwardable'>().toExtend<TypertRemoteEvent>()
     expectTypeOf<'meta-fixture/scoped'>().not.toExtend<TypertRemoteEvent>()
     expectTypeOf<'meta-fixture/absent'>().not.toExtend<TypertRemoteEvent>()
+  })
+})
+
+describe('typert-protocol RemoteError', () => {
+  it('keeps typed details and detects cross-realm structural failures', () => {
+    const error = new RemoteError('gateway/bad-request', 'invalid request', { issues: [{ path: 'name' }] })
+    expect(error).toBeInstanceOf(Error)
+    expect(error.name).toBe('RemoteError')
+    expect(error.code).toBe('gateway/bad-request')
+    expect(error.details.issues).toEqual([{ path: 'name' }])
+    expect(remoteErrorOf(error)).toBe(error)
+    expect(remoteErrorOf({ isDSHRemoteError: true, code: 'gateway/internal', message: 'x', details: {} })).toMatchObject({ code: 'gateway/internal' })
+    expect(remoteErrorOf({ isDSHRemoteError: false, code: 'gateway/internal' })).toBeUndefined()
+    expect(remoteErrorOf({ isDSHRemoteError: true })).toBeUndefined()
+    expect(remoteErrorOf(null)).toBeUndefined()
+    expect(remoteErrorOf('error')).toBeUndefined()
   })
 })
 

@@ -914,6 +914,7 @@ it('packed ACP fixture retains every chunk row kind without changing the logical
         id?: unknown
         inserted?: Array<{ id?: unknown }>
         message?: { id?: unknown }
+        stream?: unknown
       }
     }
     delete cloned.time
@@ -921,10 +922,14 @@ it('packed ACP fixture retains every chunk row kind without changing the logical
       for (const message of cloned.data?.inserted ?? []) delete message.id
     }
     if (cloned.type === 'user/message') delete cloned.data?.id
-    if (cloned.type === 'assistant/message'
+    if (cloned.type === 'system/message'
+      || cloned.type === 'assistant/message'
       || cloned.type === 'tool/result') {
       delete cloned.data?.message?.id
     }
+    // The decoded assistant/chunk events above retain the sequence under test;
+    // settlement streams additionally carry the replay run's volatile clocks.
+    if (cloned.type === 'assistant/message' || cloned.type === 'assistant/attempt') delete cloned.data?.stream
     if (cloned.type === 'hook/result') delete cloned.data?.durationMs
     return cloned
   }

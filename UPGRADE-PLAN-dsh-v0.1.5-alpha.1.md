@@ -20,12 +20,12 @@
 
 | 领域 | 当前 CoHarness | 与 alpha.1 的判断 |
 | --- | --- | --- |
-| Session 格式 | `SESSION_FORMAT_VERSION = 3`，已有 v0/v1→v2 adjacent migration、v2→v3 system/message stage 和 immutable successor | `adapted`，保留旧 generation 并在 provider 不支持流式时安全 fallback |
+| Session 格式 | `SESSION_FORMAT_VERSION = 3`，v0/v1→v2 与 v2→v3 均走 adjacent migration；v2→v3 生成 chronology-preserving system/message、surface reference remap 和 immutable successor；CoHarness 保留 `code` preset 与 `tool/code-dispatch*` 作为业务兼容词汇 | `adapted`，CoHarness 扩展事件保留原 payload；核心 message carrier 在迁移入口校验，保留旧 generation 并在 provider 不支持流式时安全 fallback |
 | Agent API | `ctx.agent` 已移除；setup 为 `(agentCtx, agent)`，子代理显式传递 `parentAgent` | `adapted`，Gateway/ACP/子代理/Headless 消费方已更新 |
 | Inbox | CoHarness `Inbox` 保留兼容构造器；ApiProxy 已有 agent-free cold `inbox` projection，AgentLoop live owner 仍使用现有 O(1) implementation | `equivalent/retain`，不重复搬运上游 class 拆分；后续 major 版本再移除兼容构造器 |
-| 系统提示词 | 已有 prefix/suffix、runtime context 和 surface 投影，但当前日志格式仍为 v2 | `adapt`，接入 V3 system/message 和 route capability，不重复建立第二个 prompt owner |
+| 系统提示词 | prefix/suffix、runtime context 和 V3 `system/message` surface 投影已接入；`systemPromptUpdate: in-history` 由 adapter capability 决定 | `adapt`，保留单一 prompt owner，不重复建立第二套 prompt history |
 | LLM/prompt cache | 已有 `systemPromptUpdate: in-history` 的部分能力和 request header | `adapt`，验证模型显式 capability、动态更新与 KV cache 语义 |
-| Session persistence | JSONL、SQLite、Gateway 都有 migration/generation 机制，但 target V3 payload admission 尚未覆盖 | `required`，先做 format catalog、历史内容审计和 provider 迁移 |
+| Session persistence | JSONL、SQLite、Gateway 都复用 V3 format catalog、streaming stage、generation/fingerprint/no-overwrite 规则；核心 carrier admission 与 PTC 引用已覆盖 | `adapted`，CoHarness 扩展业务事件继续由现有 owner 保留，未将上游独立 migration 包直接替换进 Gateway |
 | 子代理 | continuable、parent Activation、冷恢复和 sender attribution 已有 CoHarness 实现 | `equivalent/adapt`，保留现有归属和权限；补上 alpha.1 的显式 Agent API |
 | Codex/Claude | Codex `0.153.4`，Claude Agent SDK `0.3.263` / Claude Code `2.1.263` | `adapted`，保留 CoHarness provider、权限、超时和 teardown |
 | Web UI | 当前是 Workbench + ui-conversation/ui-sidebar/ui-workspace，非上游右 Sidebar 树 | `retain/defer`，只移植行为修复，不替换组件树 |
@@ -50,9 +50,9 @@
 
 1. 在现有 `session-format` 后增加 `session-format-v2-to-v3` 和组合 catalog；v0→v1、v1→v2 继续保持相邻边。
 2. 目标版本提升到 3；旧 generation 永不覆盖、删除或自动降级。
-3. V2→V3 stage 逐条审计所有 message carrier：`user/message`、`assistant/message`、`tool/result`、Inbox inserted、title request、team delivery、compaction、assistant stream 和反馈旁路。
+3. V2→V3 stage 逐条审计 CoHarness 现有 message carrier：`user/message`、`assistant/message`、`tool/result`、Inbox inserted、title request 和 assistant stream；CoHarness 的 team/delivery/feedback 扩展事件保留原始 payload，不猜测其业务坐标。
 4. 将旧 `request/header.system` 转为带确定性 identity 的 `system/message` surface；在无法证明 chronology 或消息 identity 安全时拒绝迁移并保留原 generation。
-5. 将 `tools-code-mode`、旧 `tool/code-dispatch*`、`agentPreset: code` 的历史引用映射到 PTC 语义；不改变 CoHarness 当前工具显示 owner。
+5. 将 `tools-code-mode`、旧 `tool/code-dispatch*`、`agentPreset: code` 解释为现有 CoHarness PTC 语义；不重命名这些业务可见 identity，系统 identity 使用确定性 hash，避免破坏 Workbench、spill、replay 和 preset owner。
 6. JSONL、SQLite、Gateway 分别实现 bounded/streaming restore；没有分页能力时使用受控整体 fallback，并记录降级。
 7. 在发布前执行备份、复制 dry-run、torn-tail、并发写入、取消、失败回滚、重启恢复和 seeded inherited cut 验收。
 8. 更新 TypeScript/Python SDK、ACP、Headless、Web snapshot 和生成 catalog；V3 读取不支持降级回到 v2。
@@ -148,7 +148,7 @@
 
 ## 本轮已落地的实现证据
 
-- Session V3：`system/message`、v2→v3 immutable migration、surface reference remap、compact assistant stream 和 failed `assistant/attempt` 已进入现有 Session/JSONL/SQLite/Gateway owner。
+- Session V3：`system/message`、v2→v3 immutable migration、核心 carrier admission、surface reference remap、compact assistant stream 和 failed `assistant/attempt` 已进入现有 Session/JSONL/SQLite/Gateway owner；`code`/`tool/code-dispatch*` 保持 CoHarness 业务 identity，未审计的扩展事件不被迁移器重写。
 - Cordis/Typert：`Context.agent` 已删除；Agent setup 与 parent ownership 显式化；Remote decorator 使用版本化 prototype descriptor；Typert generator 已支持 package-local forwarding、显式 Remote stream marker 和真实 CompilerHost resolution。
 - 业务安全：Host prompt/queue edit 拒绝空白内容；Goal 人工 pause 会取消非模型发起的运行；root marker 只吞明确缺失，权限/I/O 失败原样返回。
 - 第三方运行时：Codex、Claude Agent SDK 和 Claude Code fixture 已更新，协议测试通过；CoHarness Gateway、ACL、Documents、Workbench 和 Open in App 继续作为 owner。
