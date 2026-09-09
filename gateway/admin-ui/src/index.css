@@ -1430,6 +1430,45 @@ a {
   margin-top: 12px;
 }
 
+.archiveSelectionSummary {
+  margin-top: 0;
+  border-top: 0;
+}
+
+.archiveSelectAll {
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.archiveIdentity {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.archivePreview {
+  display: block;
+  max-width: 360px;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.archivePreviewEmpty {
+  color: var(--text-tertiary);
+}
+
+.archiveSessionId {
+  display: block;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .emptyDraftState {
   display: flex;
   min-height: 172px;

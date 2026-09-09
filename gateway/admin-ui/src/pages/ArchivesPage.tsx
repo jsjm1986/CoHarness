@@ -9,7 +9,7 @@ import {
   Trash2,
   Undo2,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
   applyArchiveAction,
   exportArchive,
@@ -162,10 +162,18 @@ export function ArchivesPage() {
     }
   }
 
-  const allSelected = rows.length > 0 && rows.every(row => selected.has(row.rootSessionId))
   const hasFilters = Object.entries(active).some(([key, value]) => key !== 'state' ? value !== '' : value !== 'archived')
   const page = Math.floor(offset / PAGE_SIZE) + 1
   const selectedRows = useMemo(() => rows.filter(row => selected.has(row.rootSessionId)), [rows, selected])
+  const allSelected = rows.length > 0 && selectedRows.length === rows.length
+  const indeterminate = selectedRows.length > 0 && !allSelected
+  const selectAllRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (selectAllRef.current !== null) selectAllRef.current.indeterminate = indeterminate
+  }, [indeterminate])
+  const toggleAll = (checked: boolean): void => {
+    setSelected(checked ? new Set(rows.map(row => row.rootSessionId)) : new Set())
+  }
 
   return (
     <div className="page">
@@ -253,13 +261,12 @@ export function ArchivesPage() {
           <EmptyState icon={Archive} title="没有匹配的归档对话" detail={hasFilters ? '调整筛选条件后重试。' : '当前还没有归档对话。'} />
         ) : (
           <>
-            <div className="archiveBulkBar">
-              <label className="checkLabel"><input type="checkbox" checked={allSelected} onChange={event => setSelected(event.target.checked ? new Set(rows.map(row => row.rootSessionId)) : new Set())} /><span>全选本页</span></label>
+            <div className="archiveBulkBar archiveSelectionSummary">
               <span>{selectedRows.length > 0 ? `已选择 ${selectedRows.length} 条` : '选择记录后可批量操作'}</span>
             </div>
             <div className="tableWrap desktopOnly">
               <table className="dataTable archiveTable">
-                <thead><tr><th aria-label="选择" /><th>对话</th><th>归属</th><th>归档时间</th><th>状态</th><th>消息</th><th aria-label="查看" /></tr></thead>
+                <thead><tr><th aria-label="选择"><label className="checkLabel archiveSelectAll"><input ref={selectAllRef} type="checkbox" checked={allSelected} aria-checked={indeterminate ? 'mixed' : allSelected} onChange={event => toggleAll(event.target.checked)} /><span>全选本页</span></label></th><th>对话</th><th>归属</th><th>归档时间</th><th>状态</th><th>消息</th><th aria-label="查看" /></tr></thead>
                 <tbody>{rows.map(row => <ArchiveTableRow key={row.rootSessionId} row={row} checked={selected.has(row.rootSessionId)} onCheck={checked => setSelected(nextSelection(selected, row.rootSessionId, checked))} onOpen={() => void openDetail(row)} />)}</tbody>
               </table>
             </div>
@@ -285,11 +292,11 @@ export function ArchivesPage() {
 }
 
 function ArchiveTableRow({ row, checked, onCheck, onOpen }: { row: ConversationArchiveRow; checked: boolean; onCheck: (checked: boolean) => void; onOpen: () => void }) {
-  return <tr><td><input type="checkbox" aria-label={`选择 ${row.title}`} checked={checked} onChange={event => onCheck(event.target.checked)} /></td><td><button type="button" className="tableLink" onClick={onOpen}><strong>{row.title}</strong><span className="codeText">{row.rootSessionId}</span></button></td><td><span className="archiveOwner">{row.creator?.displayName ?? '未知用户'}<small>{row.project?.name ?? '个人会话'}</small></span></td><td><time dateTime={new Date(row.archivedAt).toISOString()}>{formatTime(row.archivedAt)}</time></td><td><ArchiveStateBadge state={row.state} /></td><td>{row.messageCount}</td><td className="alignRight"><IconButton label={`查看 ${row.title}`} icon={Eye} onClick={onOpen} /></td></tr>
+  return <tr><td><input type="checkbox" aria-label={`选择 ${row.title}`} checked={checked} onChange={event => onCheck(event.target.checked)} /></td><td><button type="button" className="tableLink" onClick={onOpen}><strong>{row.title}</strong>{row.contentPreview === undefined || row.contentPreview === null ? <small className="archivePreview archivePreviewEmpty">暂无正文摘要</small> : <small className="archivePreview" title={row.contentPreview}>{row.contentPreview}</small>}<span className="codeText archiveSessionId">{row.rootSessionId}</span></button></td><td><span className="archiveOwner">{row.creator?.displayName ?? '未知用户'}<small>{row.project?.name ?? '个人会话'}</small></span></td><td><time dateTime={new Date(row.archivedAt).toISOString()}>{formatTime(row.archivedAt)}</time></td><td><ArchiveStateBadge state={row.state} /></td><td>{row.messageCount}</td><td className="alignRight"><IconButton label={`查看 ${row.title}`} icon={Eye} onClick={onOpen} /></td></tr>
 }
 
 function ArchiveMobileRow({ row, checked, onCheck, onOpen }: { row: ConversationArchiveRow; checked: boolean; onCheck: (checked: boolean) => void; onOpen: () => void }) {
-  return <article className="mobileItem archiveMobileItem"><div className="mobileItemHeader"><label className="checkLabel"><input type="checkbox" aria-label={`选择 ${row.title}`} checked={checked} onChange={event => onCheck(event.target.checked)} /><strong>{row.title}</strong></label><ArchiveStateBadge state={row.state} /></div><button type="button" className="archiveMobileOpen" onClick={onOpen}><span className="codeText">{row.rootSessionId}</span><span>{row.creator?.displayName ?? '未知用户'} · {row.project?.name ?? '个人会话'}</span><span>{formatTime(row.archivedAt)} · {row.messageCount} 条消息</span></button></article>
+  return <article className="mobileItem archiveMobileItem"><div className="mobileItemHeader"><label className="checkLabel"><input type="checkbox" aria-label={`选择 ${row.title}`} checked={checked} onChange={event => onCheck(event.target.checked)} /><span className="archiveIdentity"><strong>{row.title}</strong><small className="archivePreview">{row.contentPreview ?? '暂无正文摘要'}</small><small className="codeText archiveSessionId">{row.rootSessionId}</small></span></label><ArchiveStateBadge state={row.state} /></div><button type="button" className="archiveMobileOpen" onClick={onOpen}><span>{row.creator?.displayName ?? '未知用户'} · {row.project?.name ?? '个人会话'}</span><span>{formatTime(row.archivedAt)} · {row.messageCount} 条消息</span></button></article>
 }
 
 function ArchiveDetail({ detail, error }: { detail: ConversationArchiveDetail; error: string }) {
