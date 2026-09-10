@@ -4,14 +4,19 @@ import { extname } from 'node:path'
 import { access, constants, readFile, rename, writeFile } from 'node:fs/promises'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { NOT_RESOLVED, defineScalarTag } from 'js-yaml'
 import * as yaml from 'js-yaml'
 
-const JsExpr = new yaml.Type('tag:yaml.org,2002:js', {
-  kind: 'scalar',
-  resolve: (data) => typeof data === 'string',
-  construct: (data) => ({ __jsExpr: data }),
-  predicate: isJsExpr,
-  represent: (data) => data['__jsExpr'],
+/**
+ * The `!!js` scalar tag in the js-yaml v5 API: an explicit tag with a non-empty
+ * body resolves to an expression node the Loader evaluates at entry activation,
+ * the node identity selects it when dumping, and an empty body is unresolvable
+ * (a bare `!!js` is a misconfiguration, not a no-op expression).
+ */
+const JsExpr = defineScalarTag<{ __jsExpr: string }>('tag:yaml.org,2002:js', {
+  resolve: (source, isExplicit) => (isExplicit && source.length > 0 ? { __jsExpr: source } : NOT_RESOLVED),
+  identify: isJsExpr,
+  represent: (data) => data.__jsExpr,
 })
 
 /**
@@ -20,7 +25,7 @@ const JsExpr = new yaml.Type('tag:yaml.org,2002:js', {
  * (`dsh --dump-config`) parses and prints exactly the dialect this include
  * mounts.
  */
-export const entryListSchema = yaml.JSON_SCHEMA.extend(JsExpr)
+export const entryListSchema = yaml.JSON_SCHEMA.withTags(JsExpr)
 
 const schema = entryListSchema
 
@@ -248,7 +253,9 @@ export class Include extends EntryTree {
     let data: any
     try {
       if (this.type === 'application/yaml') {
-        data = yaml.load(content, { schema })
+        // js-yaml 5 throws on an empty document where v4 returned undefined;
+        // the undefined result reaches the top-level-array validation below.
+        data = content.trim() === '' ? undefined : yaml.load(content, { schema })
       } else if (this.type === 'application/json') {
         data = JSON.parse(content)
       } else {

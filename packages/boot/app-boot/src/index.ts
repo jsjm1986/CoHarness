@@ -322,7 +322,9 @@ function parsePatchList(
 ): PatchOptions[] {
   let parsed: unknown
   try {
-    parsed = yaml.load(content, { schema: userPatchesSchema })
+    // js-yaml 5 throws on an empty document where v4 returned undefined; the
+    // undefined result reaches the top-level-array check below.
+    parsed = content.trim() === '' ? undefined : yaml.load(content, { schema: userPatchesSchema })
   } catch (error) {
     throw new Error(`${binName}: failed to parse ${label} ${file}: ${String(error)}`)
   }
@@ -390,7 +392,9 @@ export function renderConfigDump(
   }
   let parsed: unknown
   try {
-    parsed = yaml.load(content, { schema: entryListSchema })
+    // js-yaml 5 throws on an empty document where v4 returned undefined; the
+    // undefined result reaches the top-level-array check below.
+    parsed = content.trim() === '' ? undefined : yaml.load(content, { schema: entryListSchema })
   } catch (error) {
     throw new Error(`${binName}: failed to parse config ${absoluteConfigPath}: ${String(error)}`)
   }

@@ -90,6 +90,11 @@ describe('loadOptionalPatches', () => {
     writeFileSync(join(dir, PROFILE_PATCH_FILENAME), '- just-a-string\n')
     expect(() => loadOptionalPatches(NAME, join(dir, PROFILE_PATCH_FILENAME)))
       .toThrow(`${NAME}: patches entry 1 in`)
+    // js-yaml 5 throws on an empty document where v4 returned undefined; the
+    // undefined result must still reach the top-level-array rejection.
+    writeFileSync(join(dir, PROFILE_PATCH_FILENAME), '')
+    expect(() => loadOptionalPatches(NAME, join(dir, PROFILE_PATCH_FILENAME)))
+      .toThrow('must be a top-level YAML array of loader patch entries')
   })
 })
 
