@@ -747,7 +747,7 @@ describe('PersistenceCoordinator session preparations', () => {
     // without step/start migrates with an identical body, so the coordinator
     // can publish a current-version successor in place.
     const storedFor = (id: string): { meta: SessionHeader; events: SessionEvent[] } => ({
-      meta: { ...meta(id), version: 0 } as unknown as SessionHeader,
+      meta: { ...meta(id), version: 0 },
       events: [
         { type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } },
         { type: 'user/message', seq: SessionSeq(1), time: 2, data: freezeMessage({

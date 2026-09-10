@@ -135,7 +135,7 @@ describe('Session format catalog', () => {
   it('rejects message carriers whose data container is not a record', () => {
     expect(() => sessionFormatCatalog.migrate({
       header: { version: 2, id: 'bad-data', createdAt: 1 }, inheritedEventCount: 0,
-      events: [{ type: 'assistant/message', seq: 0, time: 1, data: [] } as unknown as SessionFormatEvent],
+      events: [{ type: 'assistant/message', seq: 0, time: 1, data: [] }],
     })).toThrow('v2 assistant/message has invalid data')
   })
 
