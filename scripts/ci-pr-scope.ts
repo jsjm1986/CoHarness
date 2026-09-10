@@ -3,12 +3,23 @@ import { execFileSync } from 'node:child_process'
 /** The expensive pull-request CI lanes that a scope decision controls. */
 export interface CiPrScope {
   readonly runExpensive: boolean
-  readonly reason: 'action-only' | 'docs-only' | 'full'
+  readonly reason: 'action-only' | 'docs-only' | 'scoped' | 'full'
   readonly changedSourceFiles: readonly string[]
   readonly changedPackageFiles: readonly string[]
   readonly changedDocsOnly: boolean
-  readonly coverageMode: 'skip' | 'full'
-  readonly snapshotMode: 'skip' | 'full'
+  readonly coverageMode: 'skip' | 'scoped' | 'full'
+  readonly snapshotMode: 'skip' | 'scoped' | 'full'
+}
+
+const MAX_SCOPED_PACKAGES = 4
+
+function scopedPackage(path: string): string | undefined {
+  const match = /^packages\/([^/]+\/[^/]+)\/(?:src|tests)\//.exec(path)
+  return match?.[1]
+}
+
+function isScopedPath(path: string): boolean {
+  return /^packages\/[^/]+\/[^/]+\/(?:src|tests)\/[^/]+\.(?:ts|tsx)$/.test(path)
 }
 
 /**
@@ -60,6 +71,16 @@ export function classifyCiPrScope(paths: readonly string[], diff: string): CiPrS
     snapshotMode: 'skip',
   }
 
+  const packages = [...new Set(paths.map(scopedPackage).filter((value): value is string => value !== undefined))]
+  const scoped = paths.every(isScopedPath) && packages.length > 0 && packages.length <= MAX_SCOPED_PACKAGES
+  if (scoped) return {
+    ...common,
+    runExpensive: true,
+    reason: 'scoped',
+    coverageMode: 'scoped',
+    snapshotMode: 'scoped',
+  }
+
   return {
     ...common,
     runExpensive: true,
@@ -79,6 +100,9 @@ function main(): void {
     .filter(Boolean)
   const diff = execFileSync('git', ['diff', '--unified=0', range], { encoding: 'utf8', maxBuffer: 100 * 1024 * 1024 })
   const result = classifyCiPrScope(paths, diff)
+  const scopedPackages = result.coverageMode === 'scoped'
+    ? [...new Set(paths.map(scopedPackage).filter((value): value is string => value !== undefined))]
+    : []
   process.stdout.write(`${[
     `run_expensive=${String(result.runExpensive)}`,
     `reason=${result.reason}`,
@@ -87,6 +111,7 @@ function main(): void {
     `changed_docs_only=${String(result.changedDocsOnly)}`,
     `coverage_mode=${result.coverageMode}`,
     `snapshot_mode=${result.snapshotMode}`,
+    `scoped_packages=${JSON.stringify(scopedPackages)}`,
   ].join('\n')}\n`)
 }
 

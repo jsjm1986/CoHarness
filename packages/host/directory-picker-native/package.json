@@ -48,6 +48,6 @@
   "devDependencies": {
     "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^",
-    "tsx": "^4.23.11"
+    "tsx": "^4.23.12"
   }
 }
