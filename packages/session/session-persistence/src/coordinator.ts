@@ -107,7 +107,7 @@ function migrateFormatEvents(
   header: SessionHeader,
   inheritedEventCount: SessionLogOffsetType,
   events: readonly SessionEvent[],
-): { header: SessionHeader; events: SessionEvent[] } {
+): { header: SessionHeader; events: SessionEvent[]; inheritedEventCount: SessionLogOffsetType } {
   const migrated: SessionEvent[] = []
   const stream = sessionFormatCatalog.createStream(
     header as unknown as SessionFormatHeader,
@@ -115,8 +115,18 @@ function migrateFormatEvents(
     { emitEvent: (event) => { migrated.push(event as unknown as SessionEvent) } },
   )
   for (const event of events) stream.emitEvent(event as unknown as SessionFormatEvent)
-  stream.finish()
-  return { header: stream.header as unknown as SessionHeader, events: migrated }
+  const targetInheritedEventCount = stream.finish()
+  return {
+    header: stream.header as unknown as SessionHeader,
+    events: migrated,
+    inheritedEventCount: SessionLogOffset(targetInheritedEventCount),
+  }
+}
+
+/** Remote metadata migration is safe only when the backend can retain the exact event sequence. */
+function canPublishMetadataOnlyMigration(source: readonly SessionEvent[], migrated: readonly SessionEvent[]): boolean {
+  if (source.length !== migrated.length) return false
+  return source.every((event, index) => JSON.stringify(event) === JSON.stringify(migrated[index]))
 }
 
 /** Coordinator policy supplied by a concrete persistence backend. */
@@ -1044,7 +1054,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       if (suffix === undefined) throw new Error(`session "${id}" not found`)
       this.assertStoredId(id, suffix.meta)
       const currentMeta = this.assertVersion(suffix.meta)
-      if (suffix.events.some(needsLegacyPrefix)) {
+      if (suffix.meta.version !== currentMeta.version || suffix.events.some(needsLegacyPrefix)) {
         const whole = await this.readStoredPrefix(id, signal)
         return {
           meta: whole.meta,
@@ -1084,21 +1094,25 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     this.assertStoredId(id, stored.meta)
     const currentMeta = this.assertVersion(stored.meta)
     let events = adoptStoredEvents(stored.events, id)
-    if (stored.meta.version !== currentMeta.version && this.backend.migrateStored !== undefined) {
+    let inheritedEventCount = SessionLogOffset(stored.inheritedEventCount)
+    if (stored.meta.version !== currentMeta.version) {
       const migrated = migrateFormatEvents(stored.meta, stored.inheritedEventCount, events)
-      await this.backend.migrateStored(
-        stored,
-        { meta: migrated.header, inheritedEventCount: stored.inheritedEventCount },
-        migrated.events,
-        stored.revision,
-        signal,
-      )
+      if (this.backend.migrateStored !== undefined && canPublishMetadataOnlyMigration(events, migrated.events)) {
+        await this.backend.migrateStored(
+          stored,
+          { meta: migrated.header, inheritedEventCount: migrated.inheritedEventCount },
+          migrated.events,
+          stored.revision,
+          signal,
+        )
+      }
       events = migrated.events
+      inheritedEventCount = migrated.inheritedEventCount
     }
     this.assertEventsSupported(currentMeta, events)
     return {
       meta: structuredClone(currentMeta),
-      inheritedEventCount: SessionLogOffset(stored.inheritedEventCount),
+      inheritedEventCount,
       events,
     }
   }
@@ -1112,18 +1126,22 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       this.assertStoredId(id, meta)
       const currentMeta = this.assertVersion(meta)
       let storedEvents = adoptStoredEvents(events, id)
-      if (meta.version !== currentMeta.version && this.backend.migrateStored !== undefined) {
+      let currentInheritedEventCount = SessionLogOffset(inheritedEventCount)
+      if (meta.version !== currentMeta.version) {
         const migrated = migrateFormatEvents(meta, inheritedEventCount, storedEvents)
-        await this.backend.migrateStored(
-          { meta, inheritedEventCount },
-          { meta: migrated.header, inheritedEventCount },
-          migrated.events,
-          revision,
-        )
+        if (this.backend.migrateStored !== undefined && canPublishMetadataOnlyMigration(storedEvents, migrated.events)) {
+          await this.backend.migrateStored(
+            { meta, inheritedEventCount },
+            { meta: migrated.header, inheritedEventCount: migrated.inheritedEventCount },
+            migrated.events,
+            revision,
+          )
+        }
         storedEvents = migrated.events
+        currentInheritedEventCount = migrated.inheritedEventCount
       }
       this.assertEventsSupported(currentMeta, storedEvents)
-      if (inheritedEventCount > storedEvents.length) {
+      if (currentInheritedEventCount > storedEvents.length) {
         throw new Error(`session "${id}" inherited event count exceeds its stored event count`)
       }
 
@@ -1133,7 +1151,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       const session = this.ctx.sessions.prepare(id, {
         seed: balanced,
         meta: currentMeta,
-        inheritedEventCount,
+        inheritedEventCount: currentInheritedEventCount,
         seedSource: 'persistence',
       })
       const inspection: SessionInspection = Object.freeze({
@@ -1285,7 +1303,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
 
   private assertVersion(meta: SessionHeader): SessionHeader {
     if (meta.version === SESSION_FORMAT_VERSION) return meta
-    if (meta.version === 0 || meta.version === 1) {
+    if (meta.version === 0 || meta.version === 1 || meta.version === 2) {
       return sessionFormatCatalog.migrateHeader(meta as unknown as SessionFormatHeader) as unknown as SessionHeader
     }
     throw this.unsupported(meta, sessionFormatVersionRefusal(meta.id, meta.version))

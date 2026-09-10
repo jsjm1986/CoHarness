@@ -12,7 +12,7 @@ Session provider 需要在读取事件体前对存储 header 分类，也需要�
 
 `@deepseek-ai/dsh-session-format` 编译完整的相邻链，并提供只读 header 分类以及脱离原对象的完整 artifact 迁移。默认静态 catalog 声明 v0→v1 和 v1→v2。新代次在读取事件体前拒绝；旧代次必须经过每条声明的边。输入会被快照并冻结，catalog 不会写入存储。
 
-当前 CoHarness 步骤保留现有事件词汇并推进代次标记。JSONL 会原子发布 `session.v2.*`，SQLite 只在写事务中更新元数据行；两者都保留逻辑事件行／源 bytes。Gateway 的物理发布、超出共享协调器的旧 payload 归一化以及 provider 备份仍由 adapter 负责，本纯包不会隐藏这些行为。
+当前 CoHarness 步骤保留现有事件词汇并推进代次标记。v2→v3 步骤会把旧请求头中的系统提示提升为 `system/message` surface 事件，并从当前请求头移除；assistant chunk 行继续兼容，新的结算事件可以携带紧凑流元数据。JSONL 会原子发布当前 generation，SQLite 只在写事务中更新元数据行；两者都保留逻辑事件行／源 bytes。Gateway 的物理发布、超出共享协调器的旧 payload 归一化以及 provider 备份仍由 adapter 负责，本纯包不会隐藏这些行为。
 
 ## 考虑过的替代方案
 
@@ -28,4 +28,4 @@ Provider 实现拥有统一的迁移规划器和稳定诊断类别。catalog 本
 
 ## 验证
 
-Catalog 测试覆盖只读 header 分类、新版本拒绝、相邻迁移、脱离原对象的输出、包级类型检查、依赖检查和 release 排序。
+Catalog 测试覆盖只读 header 分类、新版本拒绝、相邻 v0/v1/v2→v3 migration、脱离原对象的输出、包级类型检查、依赖检查和 release 排序。

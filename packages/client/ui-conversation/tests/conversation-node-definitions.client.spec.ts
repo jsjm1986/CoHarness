@@ -247,6 +247,39 @@ describe('built-in conversation node Definitions', () => {
     expect(after.slice(1).map(candidate => candidate.key)).toEqual(before.map(candidate => candidate.key))
   })
 
+  it('renders a surface system/message as the system-prompt row, skipping empty content', () => {
+    const value = assembler([
+      at(3, 'system/message', {
+        turn: 1,
+        step: 1,
+        message: {
+          role: 'system',
+          content: [{ type: 'text', text: 'surface system prompt' }],
+          source: { kind: 'plugin', plugin: '@deepseek-ai/dsh-system-prompt' },
+          id: 'system-1',
+        },
+      }, { surfaceOp: 'append' }),
+    ])
+    const nodes = [...snapshot(value).nodes.values()]
+      .filter((candidate): candidate is ChatConversationViewNode => candidate?.kind === 'system-prompt')
+    expect(nodes.map(candidate => candidate.data)).toEqual([{ text: 'surface system prompt' }])
+
+    const empty = assembler([
+      at(4, 'system/message', {
+        turn: 1,
+        step: 1,
+        message: {
+          role: 'system',
+          content: [{ type: 'text', text: '   ' }],
+          source: { kind: 'plugin', plugin: '@deepseek-ai/dsh-system-prompt' },
+          id: 'system-2',
+        },
+      }, { surfaceOp: 'append' }),
+    ])
+    expect([...snapshot(empty).nodes.values()].filter(candidate => candidate?.kind === 'system-prompt'))
+      .toHaveLength(0)
+  })
+
   it('keeps one keyed Assistant node while streaming settles and materializes interruption from Location', () => {
     const value = assembler([
       at(1, 'turn/start', { turn: 1 }),

@@ -430,7 +430,7 @@ describe('request stability across the loop', () => {
     expect(agent.session.snapshotEvents().filter(e => e.type === 'request/header')).toHaveLength(1)
   })
 
-  it('a real system-prompt change is a full changed-header snapshot; a stable prompt logs nothing', async () => {
+  it('a real system-prompt change appends a durable system message while the request header stays stable', async () => {
     const adapter = new MockAdapter([textResponse('one'), textResponse('two'), textResponse('three')])
     const ctx = await harness(adapter)
     const agent = ctx.agentLoop.create(SessionId('a1'), { provider: 'mock', model: 'mock' })
@@ -447,10 +447,11 @@ describe('request stability across the loop', () => {
     await waitForIdle(ctx, agent)
 
     const snapshots = agent.session.snapshotEvents().filter(e => e.type === 'request/header')
-    expect(snapshots).toHaveLength(2)
-    expect(snapshots[1]?.data.reason).toBe('change')
-    expect(adapter.requests[2]!.system).toContain('new guidance')
-    // History is preserved across the change — only the header moved.
+    expect(snapshots).toHaveLength(1)
+    expect(adapter.requests[2]!.messages.some(message =>
+      message.role === 'system' && message.content.some(block => block.type === 'text' && block.text.includes('new guidance')),
+    )).toBe(true)
+    // History is preserved across the change and the new system message is part of it.
     expect(adapter.requests[2]!.messages.length).toBeGreaterThan(adapter.requests[1]!.messages.length)
   })
 
@@ -604,7 +605,6 @@ describe('request stability across the loop', () => {
       const header = foldRequestHeader(events.slice(0, firstChunk.seq))!
       expect(request.model).toBe(header.config.model)
       expect(request.reasoningEffort).toBe(header.config.reasoningEffort)
-      expect(request.system).toEqual(header.system)
       expect(structuredClone(request.tools ?? [])).toEqual(structuredClone(header.tools ?? []))
       expect(request.temperature).toBe(header.config.temperature)
       expect(request.maxTokens).toBe(header.config.maxTokens)

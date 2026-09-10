@@ -124,6 +124,7 @@ export function QuestionComposer(props: QuestionComposerProps) {
   // select/render dispatch — per-dispatch minting would churn memo identity).
   const question = useMemo(() => new PendingQuestion(props.matched), [props.matched])
   const review = useMemo(() => planReviewOf(question.questions), [question])
+  if (question.questions.length === 0) return null
   return review === undefined
     ? (
       <QuestionFlow

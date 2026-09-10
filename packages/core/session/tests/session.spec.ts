@@ -20,6 +20,9 @@ describe('Session', () => {
 
     expectTypeOf(surface).toEqualTypeOf<SessionSurface>()
     expect(surface).toBe(session.surface)
+    // Compatibility assertion: this intentionally exercises the retained deprecated getter.
+    // oxlint-disable-next-line typescript/no-deprecated
+    expect(session.events).toBe(session.snapshotEvents())
   })
 
   it('derives message history from the event log', () => {
@@ -304,6 +307,37 @@ describe('Session', () => {
     }
   })
 
+  it('adopts every core message family and compact attempt without copying', () => {
+    const system = {
+      type: 'system/message', seq: 0, time: 1, surfaceOp: 'append',
+      data: { turn: 1, step: 1, message: { id: 'system', role: 'system', content: [], source: { kind: 'plugin', plugin: 'p' } } },
+    } as unknown as SessionEvent
+    const user = {
+      type: 'user/message', seq: 1, time: 1, surfaceOp: 'append',
+      data: { id: 'user', role: 'user', content: [], source: { kind: 'user' } },
+    } as unknown as SessionEvent
+    const assistant = {
+      type: 'assistant/message', seq: 2, time: 1, surfaceOp: 'append',
+      data: { turn: 1, step: 1, message: { id: 'assistant', role: 'assistant', content: [], source: { kind: 'model', provider: 'p', model: 'm' } } },
+    } as unknown as SessionEvent
+    const tool = {
+      type: 'tool/result', seq: 3, time: 1, surfaceOp: 'append',
+      data: { turn: 1, step: 1, message: { id: 'tool', role: 'user', content: [{ type: 'tool-result', toolCallId: 'c', content: [] }], source: { kind: 'tool', callId: 'c' } } },
+    } as unknown as SessionEvent
+    const attempt = {
+      type: 'assistant/attempt', seq: 4, time: 1,
+      data: { turn: 1, step: 1, stream: [{ type: 'chunk', time: 1, chunk: { type: 'finish', reason: { kind: 'stop' } } }] },
+    } as unknown as SessionEvent
+    for (const candidate of [system, user, assistant, tool, attempt]) {
+      expect(adoptSessionEvent(candidate)).toBe(candidate)
+    }
+    expect(Object.isFrozen((system.data as unknown as { message: unknown }).message)).toBe(true)
+    expect(Object.isFrozen(user.data)).toBe(true)
+    expect(Object.isFrozen((assistant.data as unknown as { message: unknown }).message)).toBe(true)
+    expect(Object.isFrozen((tool.data as unknown as { message: unknown }).message)).toBe(true)
+    expect(Object.isFrozen((attempt.data as unknown as { stream: unknown }).stream)).toBe(true)
+  })
+
   it('snapshots message events without validating plugin-owned block details', () => {
     const boundary = snapshotSessionEvent({
       type: 'turn/start',
@@ -371,6 +405,27 @@ describe('Session', () => {
       },
     } as unknown as SessionEvent
     expect(() => adoptSessionEvent(malformed)).toThrow('message must have role "user"')
+  })
+
+  it('rejects untrusted system producers and malformed compact attempt records at durable ingress', () => {
+    for (const source of [{ kind: 'user' }, { kind: 'plugin' }, { kind: 'plugin', plugin: '' }]) {
+      expect(() => Session.create(SessionId('invalid-system-source'), [{
+        type: 'system/message', seq: 0, time: 1, surfaceOp: 'append',
+        data: { turn: 1, step: 1, message: { id: 'sys', role: 'system', source, content: [] } },
+      } as unknown as SessionEvent])).toThrow('system message must have plugin source')
+    }
+    for (const data of [null, 'bad', {}, { stream: 'bad' }, { stream: [{ type: 'unrecognized' }] }]) {
+      expect(() => Session.create(SessionId('invalid-attempt'), [{
+        type: 'assistant/attempt', seq: 0, time: 1, data,
+      } as unknown as SessionEvent])).toThrow(/has invalid (?:assistant )?stream/)
+    }
+    const message = { id: 'a', role: 'assistant', content: [], source: { kind: 'model', provider: 'p', model: 'm' } }
+    for (const stream of ['not-an-array', [{ type: 'unrecognized' }]]) {
+      expect(() => Session.create(SessionId('invalid-settlement-stream'), [{
+        type: 'assistant/message', seq: 0, time: 1, surfaceOp: 'append',
+        data: { turn: 1, step: 1, message, stream },
+      } as unknown as SessionEvent])).toThrow('invalid assistant stream')
+    }
   })
 
   it('round-trips a non-empty reasoning effort and rejects invalid durable values', () => {
@@ -1171,6 +1226,21 @@ describe('SessionStore', () => {
     }), { surfaceOp: 'append' })
     const forked = ctx.sessions.create(SessionId('fork'), { seed: a.snapshotEvents() })
     expect(forked.deriveMessages()).toEqual(a.deriveMessages())
+  })
+
+  it('restores a persistence-owned seed through prepare without entering it', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const seed = [{ type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } }] as unknown as SessionEvent[]
+    const restored = ctx.sessions.prepare(SessionId('restored'), {
+      seed,
+      seedSource: 'persistence',
+      meta: { version: SESSION_FORMAT_VERSION, id: SessionId('restored'), createdAt: 1, isSeeded: false },
+      inheritedEventCount: SessionLogOffset(0),
+    })
+    expect(restored.snapshotEvents()).toHaveLength(2)
+    expect(ctx.sessions.get(restored.id)).toBeUndefined()
+    await ctx.fiber.dispose()
   })
 
   it('enter() rejects a stale prepared session whose id is already live (no overwrite)', async () => {

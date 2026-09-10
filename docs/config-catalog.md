@@ -1089,7 +1089,7 @@ export interface LlmRuntimeConfig {
 }
 ```
 
-Source: [`packages/llm/llm/src/index.ts:272`](../packages/llm/llm/src/index.ts)
+Source: [`packages/llm/llm/src/index.ts:275`](../packages/llm/llm/src/index.ts)
 
 <a id="deepseek-aidsh-llm-deepseek"></a>
 
@@ -1180,10 +1180,12 @@ export interface DeepSeekCatalogModel {
   /** Provider detail tier; `low` uses the 512-by-512 total-pixel default. */
   /** Legacy alias for the low-detail preset; new configs use imagePixelBudget: 'low'. */
   imageDetail?: 'auto' | 'low'
+  /** Whether the route accepts system prompt changes at any history position. */
+  systemPromptUpdate?: SystemPromptUpdate
 }
 ```
 
-Depends on: [`ModelModality`](../packages/llm/llm/src/index.ts) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts)
+Depends on: [`ModelModality`](../packages/llm/llm/src/index.ts) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts) · [`SystemPromptUpdate`](../packages/llm/llm/src/index.ts)
 
 Source: [`packages/llm/llm-deepseek/src/index.ts:127`](../packages/llm/llm-deepseek/src/index.ts)
 

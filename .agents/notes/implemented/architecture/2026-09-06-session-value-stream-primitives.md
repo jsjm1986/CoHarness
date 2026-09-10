@@ -14,6 +14,8 @@ Session migration and replay need lossless JSON snapshots, immutable published v
 
 These are additive primitives. The existing Session format and persistence coordinator remain authoritative until the SessionHandle and migration layers adopt them.
 
+The assistant-stream module also exposes bounded record readers for first-token time, visible content, visible text, terminal chunks, and assembly. They scan compact runs only through the first needed member; the validating expander remains the durable-boundary entry point.
+
 ## Alternatives considered
 
 **Copy validation into each persistence provider.** Rejected because JSON loss rules and snapshot ownership would diverge across JSONL, Gateway, and future providers.
@@ -28,4 +30,4 @@ Session migration can use one runtime definition of lossless JSON and immutable 
 
 ## Verification
 
-The assistant-stream unit suite, package typecheck, host library build, and workspace dependency checks cover this addition.
+The assistant-stream unit suite covers compaction, validation, bounded readers, and early exits. Package typecheck, host library build, and workspace dependency checks cover the published face.

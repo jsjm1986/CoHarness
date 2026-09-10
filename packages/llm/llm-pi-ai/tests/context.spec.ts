@@ -41,6 +41,7 @@ describe('pi-ai request context conversion', () => {
     const base = { provider: 'openai', model: 'gpt-4.1', messages: [] }
     expect(toPiContext(base)).toEqual({ messages: [] })
     expect(toPiContext({ ...base, tools: [] })).toEqual({ messages: [] })
+    expect(toPiContext({ ...base, messages: [history('system', [])] })).toEqual({ messages: [] })
   })
 
   it('converts complete text-only history and rejects nested images without storage', () => {

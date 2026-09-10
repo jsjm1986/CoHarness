@@ -1,0 +1,170 @@
+{
+  "schemaVersion": 1,
+  "reviewDate": "2026-09-09",
+  "target": {
+    "tag": "dsh-v0.1.5-alpha.1",
+    "commit": "5dda764ed3aa172535a7967b06ff95d9cbfe536a"
+  },
+  "baseline": {
+    "commit": "29c6373ddf1d26408e4da5ddd18c1e4ec6cef40f",
+    "branch": "master"
+  },
+  "statusLegend": {
+    "retain": "CoHarness owner",
+    "equivalent": "existing behavior",
+    "adapt": "selective adaptation",
+    "required": "must implement",
+    "defer": "separate decision",
+    "reject": "unsafe or incompatible"
+  },
+  "rows": [
+    {
+      "area": "session-format",
+      "status": "adapt",
+      "upstream": "v2-to-v3; system prompt surface; PTC migration",
+      "local": "v2-to-v3 system/message stage, immutable generation and compact assistant attempt metadata",
+      "wire": "yes",
+      "permission": "none",
+      "testEvidence": "session-format catalog + persistence suites (711/649 focused tests)",
+      "externalValidation": "external migration RSS/Gateway revision pending",
+      "upstreamCommit": "v2-to-v3; system prompt surface; PTC migration"
+    },
+    {
+      "area": "agent-api",
+      "status": "adapt",
+      "upstream": "remove ctx.agent; explicit Agent setup",
+      "local": "explicit `(agentCtx, agent)` setup and `parentAgent`; no Context.agent",
+      "wire": "yes",
+      "permission": "parent attribution",
+      "testEvidence": "AgentLoop, ACP, ApiProxy, subagent and Headless suites",
+      "externalValidation": "Windows/native external pending",
+      "upstreamCommit": "remove ctx.agent; explicit Agent setup"
+    },
+    {
+      "area": "inbox",
+      "status": "equivalent",
+      "upstream": "type-only Inbox; loop-owned implementation",
+      "local": "ApiProxy agent-free inbox projection plus CoHarness bounded live Inbox compatibility class",
+      "wire": "no",
+      "permission": "none",
+      "testEvidence": "cold inbox projection and queue tests",
+      "externalValidation": "external multi-user queue pending",
+      "upstreamCommit": "type-only Inbox; loop-owned implementation"
+    },
+    {
+      "area": "system-prompt",
+      "status": "adapt",
+      "upstream": "dynamic in-history prompt only for declared capability",
+      "local": "V3 system/message surface with explicit LLM `in-history` capability",
+      "wire": "yes",
+      "permission": "model governance",
+      "testEvidence": "LLM + AgentLoop reconstruction and replay tests",
+      "externalValidation": "real model KV-cache behavior pending",
+      "upstreamCommit": "dynamic in-history prompt only for declared capability"
+    },
+    {
+      "area": "subagent-runtimes",
+      "status": "adapt",
+      "upstream": "Codex 0.153.4; Claude Agent SDK 0.3.263",
+      "local": "Codex 0.153.4; Claude Agent SDK/Code 0.3.263/2.1.263",
+      "wire": "no",
+      "permission": "credential scrubbing retained",
+      "testEvidence": "Codex/Claude provider protocol suites",
+      "externalValidation": "real binary smoke external pending",
+      "upstreamCommit": "Codex 0.153.4; Claude Agent SDK 0.3.263"
+    },
+    {
+      "area": "input-admission",
+      "status": "adapt",
+      "upstream": "reject empty message and blank queue edit",
+      "local": "Host prompt and queue edit reject blank content; UI busy Enter already serialized",
+      "wire": "yes",
+      "permission": "none",
+      "testEvidence": "Host, ACP, subagent and UI focused suites",
+      "externalValidation": "SDK/Headless snapshot rerun pending",
+      "upstreamCommit": "reject empty message and blank queue edit"
+    },
+    {
+      "area": "goal",
+      "status": "adapt",
+      "upstream": "manual pause authoritative",
+      "local": "host pause cancellation with revision/initiator fence",
+      "wire": "yes",
+      "permission": "user authority",
+      "testEvidence": "goal-round-driver and Goal tool suites",
+      "externalValidation": "Gateway external pending",
+      "upstreamCommit": "manual pause authoritative"
+    },
+    {
+      "area": "agent-instructions",
+      "status": "adapt",
+      "upstream": "surface root marker I/O and permission errors",
+      "local": "known absence only; provider permission/I/O propagated",
+      "wire": "no",
+      "permission": "workspace scope",
+      "testEvidence": "agent-instructions suite 152 passed",
+      "externalValidation": "remote provider pending",
+      "upstreamCommit": "surface root marker I/O and permission errors"
+    },
+    {
+      "area": "file-media-api",
+      "status": "equivalent",
+      "upstream": "bounded file route and POSIX media display",
+      "local": "existing bounded attachment/file providers and ACL",
+      "wire": "yes",
+      "permission": "ACL/path",
+      "testEvidence": "attachment, API and remote path suites",
+      "externalValidation": "Windows/E2B external pending",
+      "upstreamCommit": "bounded file route and POSIX media display"
+    },
+    {
+      "area": "workbench-sidebar",
+      "status": "defer",
+      "upstream": "right Sidebar, file tabs, dockkit",
+      "local": "retain Workbench/Documents; no right Sidebar/resource egress",
+      "wire": "no",
+      "permission": "data egress",
+      "testEvidence": "Workbench/UI suites",
+      "externalValidation": "product decision pending",
+      "upstreamCommit": "right Sidebar, file tabs, dockkit"
+    },
+    {
+      "area": "typert",
+      "status": "adapt",
+      "upstream": "forwarding identity and edge priority",
+      "local": "upstream forwarding analyzer, stream marker and versioned prototype descriptor with CoHarness auth aliases",
+      "wire": "no",
+      "permission": "plugin resolution",
+      "testEvidence": "Typert generator 172 passed; protocol/registry 30 passed",
+      "externalValidation": "built Loader graph pending",
+      "upstreamCommit": "forwarding identity and edge priority"
+    },
+    {
+      "area": "native",
+      "status": "retain/adapt",
+      "upstream": "node-addon-system and flock",
+      "local": "retain Landlock line; evaluate native system/flock independently",
+      "wire": "no",
+      "permission": "process lock",
+      "testEvidence": "existing native manifest/CI checks",
+      "externalValidation": "macOS x64/Windows external pending",
+      "upstreamCommit": "node-addon-system and flock"
+    },
+    {
+      "area": "cordis-build",
+      "status": "adapt",
+      "upstream": "new packages and generated client/host faces",
+      "local": "two compiler faces, generated catalogs, explicit plugin lifecycle and invariants",
+      "wire": "yes",
+      "permission": "lifecycle/ACL",
+      "testEvidence": "typecheck, lint, catalog checks passed",
+      "externalValidation": "full CI/release pending",
+      "upstreamCommit": "new packages and generated client/host faces"
+    }
+  ],
+  "status": "implemented-local-external-validation-pending",
+  "implementationCommits": [
+    "9c82cc0df7",
+    "f208cfb05e"
+  ]
+}

@@ -57,6 +57,8 @@ Status: implemented
 
 规范化会替换会话、cwd、协议 id、时间戳、路径和进程易变值，同时保留确定性序号。录制与刷新还会在回放 fixture 中将生成的 workspace 及其文件系统解析出的别名存储为 `{{cwd}}`，使平台临时根目录和随机 basename 不影响录制结果；手工编写的临时路径与显式 `workspaceParent` 下的 cwd 值仍保留字面值。场景把真实 bash 使用限制在稳定命令上。stdout 预期输出仍是符合协议格式的 JSONL，每个原始行都必须可解析为 JSON。普通 Vitest 快照更新只写入 stdout 预期输出；回放 fixture 的写入由显式 `record` 和 `refresh` 模式负责。
 
+Session V3 fixture 保留持久化的 `system/message` 投影和 compact assistant-attempt 流记录。快照辅助工具只在结构 header 比较中清理提示词正文，在独立 sidecar 中保留完整提示词，并在保留分片顺序与载荷的同时归零 compact 流时钟。Python runtime 快照使用相同的提示词与流规范化，使 SDK 消费方覆盖已发布的事件词汇。
+
 ### 隔离：当前靠归一化，后续可加沙箱
 
 工具确定性来自生成的 cwd、清理后的环境、全新的非登录 shell、受限命令和规范化。cwd 默认为平台临时目录；当临时目录是始终可写的策略根，而行为需要独立项目位置时，场景可以改为提供其父目录。并发回放运行各自拥有独立 cwd、持久化目录和定长且按场景键区分的 spill 根目录，因此一个场景的清理操作无法删除另一个场景仍在进行的完整输出恢复，同时真实路径预览预算保持稳定。该层不声称提供 OS 级隔离。如果需要更强层级，沙箱执行器可以通过现有[能力 seam](../architecture/2026-06-13-capability-seams.zh.md)替换本地后端。

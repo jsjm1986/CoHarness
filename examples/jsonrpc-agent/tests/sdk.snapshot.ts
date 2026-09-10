@@ -173,11 +173,22 @@ function assembledToolDescriptions(log: PersistedLog): Record<string, string> {
 }
 
 function assembledSystem(log: PersistedLog): string {
-  const event = log.content.trimEnd().split('\n')
-    .map(line => JSON.parse(line) as LoggedRequestHeader)
-    .find(candidate => candidate.type === 'request/header')
-  const system = event?.data?.header?.system
-  if (typeof system !== 'string') throw new Error('session log has no request/header system')
+  const records = log.content.trimEnd().split('\n').map(line => JSON.parse(line) as {
+    type?: string
+    data?: {
+      header?: { system?: unknown }
+      message?: { content?: Array<{ type?: unknown; text?: unknown }> }
+    }
+  })
+  const systemMessage = records.find(candidate => candidate.type === 'system/message')
+  const content = systemMessage?.data?.message?.content
+  if (Array.isArray(content)) {
+    const system = content.flatMap(block => block.type === 'text' && typeof block.text === 'string' ? [block.text] : []).join('')
+    if (system.length > 0) return system
+  }
+  const header = records.find(candidate => candidate.type === 'request/header')
+  const system = header?.data?.header?.system
+  if (typeof system !== 'string') throw new Error('session log has no system message')
   return system
 }
 

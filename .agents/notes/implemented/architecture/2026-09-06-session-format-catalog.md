@@ -12,7 +12,7 @@ Session providers need to classify a stored header before reading its body and n
 
 `@deepseek-ai/dsh-session-format` compiles a complete adjacent chain and exposes header-only classification plus detached whole-artifact migration. The default static catalog declares v0→v1 and v1→v2. Newer generations refuse before body decoding; older generations must traverse every declared edge. Inputs are snapshotted and frozen, and the catalog never writes storage.
 
-The current CoHarness steps preserve the existing event vocabulary and advance the generation marker. JSONL atomically publishes `session.v2.*` while SQLite updates only the metadata row in a write transaction; both preserve logical event rows/source bytes. Gateway physical publication, legacy payload normalization beyond the shared coordinator, and provider backups remain adapter work; they are intentionally not hidden in this pure package.
+The current CoHarness steps preserve the existing event vocabulary while advancing the generation marker. The v2→v3 step promotes legacy request-header system text to `system/message` surface events and removes it from the current request header; assistant chunk rows remain compatible and new settlements may carry compact stream metadata. JSONL atomically publishes the current generation while SQLite updates only the metadata row in a write transaction; both preserve logical event rows/source bytes. Gateway physical publication, legacy payload normalization beyond the shared coordinator, and provider backups remain adapter work; they are intentionally not hidden in this pure package.
 
 ## Alternatives considered
 
@@ -28,4 +28,4 @@ Provider implementations have one reusable migration planner and a stable diagno
 
 ## Verification
 
-Catalog tests cover header-only classification, newer-version refusal, adjacent migration, detached output, package typecheck, dependency verification, and release ordering.
+Catalog tests cover header-only classification, newer-version refusal, adjacent v0/v1/v2→v3 migration, detached output, package typecheck, dependency verification, and release ordering.

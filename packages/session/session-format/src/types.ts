@@ -37,7 +37,7 @@ export interface SessionFormatMigrationStage {
   /** Transform one event and synchronously emit zero or more target events. */
   readonly transformEvent: (event: SessionFormatEvent, context: SessionFormatMigrationContext) => void
   /** Finish the stage and emit any trailing events. */
-  readonly finish: (context: SessionFormatMigrationContext) => void
+  readonly finish: (context: SessionFormatMigrationContext) => number | void
 }
 
 /** One adjacent migration with optional incremental event transformation. */
@@ -69,7 +69,7 @@ export interface SessionFormatChainOptions {
 export interface SessionFormatMigrationStream extends SessionFormatMigrationContext {
   readonly header: SessionFormatHeader
   /** Finish all stages and flush trailing output. */
-  readonly finish: () => void
+  readonly finish: () => number
 }
 
 /** Pure planner and runner for a complete adjacent migration chain. */

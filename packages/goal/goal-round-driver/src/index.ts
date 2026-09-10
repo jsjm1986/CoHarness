@@ -275,9 +275,16 @@ export function apply(ctx: Context): void {
         requestDrive(state)
       }
     })
-    ctx.on('goal/changed', ({ agent }) => {
+    ctx.on('goal/changed', ({ agent, change }) => {
       const state = stateFor(agent)
       state.needsCheckpoint = true
+      // A human pause must stop an in-flight goal turn immediately. A model
+      // pause is already inside this Agent's initiator boundary and should
+      // finish the current turn so its explanation reaches the user.
+      if (change.operation === 'pause' && agent.status === 'running'
+        && ctx.agents.currentInitiator() !== agent) {
+        agent.cancel({ kind: 'user' }, { keepInbox: true })
+      }
       requestDrive(state)
     })
 

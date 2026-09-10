@@ -572,6 +572,7 @@ export class AgentLoop extends Service implements AgentFactory {
     session: Session,
     callerSignal?: AbortSignal,
     handle?: SessionHandle,
+    parentAgent?: Agent,
   ): PreparedAgent {
     assertAgentOptions(options)
     ownerCtx.fiber.assertActive()
@@ -690,7 +691,7 @@ export class AgentLoop extends Service implements AgentFactory {
         publish: (source) => {
           assertLive()
           detachSession = agent.ctx.sessions.enter(session)
-          detachAgent = loopCtx.agents.enter(agent, ownerCtx.agent)
+          detachAgent = loopCtx.agents.enter(agent, parentAgent)
           agent.ctx.sessions.announce(session)
           assertLive()
           loopCtx.agents.announce(agent)
@@ -763,6 +764,7 @@ export class AgentLoop extends Service implements AgentFactory {
         options.signal,
         'startup',
         handle,
+        options.parentAgent,
       )
       this.ownership.trackWrapper(published)
       const result = await published
@@ -784,12 +786,13 @@ export class AgentLoop extends Service implements AgentFactory {
     signal: AbortSignal | undefined,
     source: SessionStartSource,
     handle?: SessionHandle,
+    parentAgent?: Agent,
   ): Promise<AgentHandle> {
     using ownedPreparation = preparation
     const session = ownedPreparation.session
-    const prepared = this.prepare(ownerCtx, id, agentOptions, session, signal, handle)
+    const prepared = this.prepare(ownerCtx, id, agentOptions, session, signal, handle, parentAgent)
     try {
-      const setupCommit = await raceAbort(setup?.(prepared.agent.ctx), prepared.signal, id)
+      const setupCommit = await raceAbort(setup?.(prepared.agent.ctx, prepared.agent), prepared.signal, id)
       setupCommit?.commit()
       return prepared.publish(source)
     } catch (error: unknown) {
@@ -865,6 +868,7 @@ export class AgentLoop extends Service implements AgentFactory {
           options.signal,
           'resume',
           handle,
+          options.parentAgent,
         )
         handle = undefined
         return result

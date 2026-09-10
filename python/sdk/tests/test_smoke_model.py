@@ -10,6 +10,26 @@ ROOT = Path(__file__).resolve().parents[3]
 SMOKE = runpy.run_path(ROOT / "scripts" / "smoke-python-runtime.py")
 
 
+def test_session_v3_snapshot_retains_messages_and_compact_payloads() -> None:
+    records = [
+        {"type": "system/message", "data": {"message": {
+            "role": "system", "id": "system-uuid", "content": [{"type": "text", "text": "prompt"}],
+        }}},
+        {"type": "assistant/message", "data": {"stream": [
+            {"type": "text-chunks", "time0": 42, "dt": [5], "index": 0, "texts": ["a", "b"]},
+            {"type": "chunk", "time": 47, "chunk": {"type": "finish", "reason": {"kind": "stop"}}},
+        ]}},
+    ]
+    normalized = SMOKE["normalize_snapshot_value"](records, [])
+    assert normalized[0]["data"]["message"] == {
+        "role": "system", "id": "{{messageId}}", "content": [{"type": "text", "text": "{{system}}"}],
+    }
+    assert normalized[1]["data"]["stream"] == [
+        {"type": "text-chunks", "time0": 0, "dt": [0], "index": 0, "texts": ["a", "b"]},
+        {"type": "chunk", "time": 0, "chunk": {"type": "finish", "reason": {"kind": "stop"}}},
+    ]
+
+
 @pytest.mark.parametrize(
     ("prompt_name", "expected"),
     [

@@ -24,7 +24,7 @@ const options = (overrides: Partial<SessionFormatChainOptions> = {}): SessionFor
 
 describe('Session format input validation', () => {
   it.each([undefined, null, [], 1, 'header', true])('classifies a non-object header as malformed (%j)', (value) => {
-    expect(sessionFormatCatalog.readHeader(value)).toMatchObject({ status: 'malformed', targetVersion: 2 })
+    expect(sessionFormatCatalog.readHeader(value)).toMatchObject({ status: 'malformed', targetVersion: 3 })
     expect(() => inspectSessionFormatVersion(value)).toThrow('must be a JSON object')
   })
 
@@ -39,7 +39,7 @@ describe('Session format input validation', () => {
     })
     const throwing = { get version(): number { throw new Error('unreadable header') } }
     expect(sessionFormatCatalog.readHeader(throwing)).toMatchObject({ status: 'malformed', reason: 'Error: unreadable header' })
-    expect(sessionFormatCatalog.readHeader(header(2))).toMatchObject({ status: 'current', storedVersion: 2 })
+    expect(sessionFormatCatalog.readHeader(header(3))).toMatchObject({ status: 'current', storedVersion: 3 })
   })
 
   it('snapshots lossless JSON and rejects values JSON would discard', () => {

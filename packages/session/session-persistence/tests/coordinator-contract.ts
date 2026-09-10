@@ -1462,7 +1462,7 @@ export function runCoordinatorContract(name: string, makeFixture: () => Promise<
         await ctx.sessionPersistence.append(m.id, oneTurnLog())
         const failure = await ctx.sessionPersistence.load(m.id).then(() => undefined, (error: unknown) => error as Error)
         expect(failure?.name).toBe('SessionFormatUnsupportedError')
-        expect(failure?.message).toMatch(/older than the supported v2.*no upgrade path/)
+        expect(failure?.message).toMatch(/older than the supported v3.*no upgrade path/)
       } finally {
         await fiber.dispose()
         await fix.cleanup()

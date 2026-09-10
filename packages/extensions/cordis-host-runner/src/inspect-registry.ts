@@ -140,14 +140,22 @@ export class CordisInspectRegistryService extends Service {
   ): CordisInspectResolveAck {
     const pending = this.pending.get(requestId)
     if (pending === undefined || pending.request.agentId !== agent.id) return { accepted: false }
-    if (!resolution.ok) return { accepted: false }
+    if (!resolution.ok) {
+      this.pending.delete(requestId)
+      pending.settle(resolution)
+      this.ctx.emit('@deepseek-ai/cordis/inspect-query-resolved', { requestId })
+      return { accepted: true }
+    }
     try {
       resolution = {
         ok: true,
         data: validateOutput('Client', pending.request.provider, pending.method, resolution.data),
       }
     } catch {
-      return { accepted: false }
+      this.pending.delete(requestId)
+      pending.settle({ ok: false, reason: 'provider-error', message: 'Client inspect provider returned invalid output' })
+      this.ctx.emit('@deepseek-ai/cordis/inspect-query-resolved', { requestId })
+      return { accepted: true }
     }
     this.pending.delete(requestId)
     pending.settle(resolution)

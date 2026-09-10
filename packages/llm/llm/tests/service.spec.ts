@@ -829,7 +829,7 @@ describe('LlmRuntime', () => {
       .rejects.toMatchObject({ code: 'INVALID_MODEL_INFO' })
   })
 
-  it('preserves modality metadata through exact model resolution', async () => {
+  it('preserves modality and system-update capabilities through exact model resolution', async () => {
     const ctx = new Context()
     await ctx.plugin(LlmRuntime)
     const adapter = new class extends ScriptedAdapter {
@@ -837,6 +837,7 @@ describe('LlmRuntime', () => {
         return Promise.resolve({
           provider: 'route', id: 'model', name: 'Model',
           inputModalities: ['text', 'image'],
+          systemPromptUpdate: 'in-history',
         })
       }
     }(SCRIPT)
@@ -847,6 +848,7 @@ describe('LlmRuntime', () => {
     await expect(ctx.llm.resolveModelInfo('route', 'model')).resolves.toEqual({
       provider: 'route', id: 'model', name: 'Model',
       inputModalities: ['text', 'image'],
+      systemPromptUpdate: 'in-history',
     })
   })
 
@@ -1177,7 +1179,7 @@ describe('LlmRuntime', () => {
       override prepareCall(provider: string, model: string) {
         const captured = generation
         return Promise.resolve({
-          model: { provider, id: model, name: model, inputModalities: ['text'] as const },
+          model: { provider, id: model, name: model, inputModalities: ['text'] as const, systemPromptUpdate: 'in-history' as const },
           stream: (options: GenerateOptions) => {
             dispatched = captured
             return super.stream(options)
@@ -1190,6 +1192,7 @@ describe('LlmRuntime', () => {
     const prepared = await ctx.llm.prepareCall({ provider: 'route', model: 'model' })
     generation = 'second'
     expect(prepared.inputModalities).toEqual(['text'])
+    expect(prepared.systemPromptUpdate).toBe('in-history')
     expect(Object.isFrozen(prepared.inputModalities)).toBe(true)
     await collect(prepared.stream({ ...prepared.config, messages: [] }))
     expect(dispatched).toBe('first')

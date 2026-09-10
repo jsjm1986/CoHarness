@@ -40,6 +40,7 @@ import {
   type InstructionVersionCache,
 } from '../src/state.ts'
 import { resolveConfig } from '../src/config.ts'
+import { findProjectRoot } from '../src/files.ts'
 import { candidateScopeKey, renderInstructionChanges, renderWorkspaceInstructionSet, USER_GLOBAL_DIRECTORY, USER_GLOBAL_FILE } from '../src/render.ts'
 import { MockAdapter, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 
@@ -2238,7 +2239,7 @@ describe('workspace context request injection', () => {
     }
   })
 
-  it('treats ctx.fs marker lookup failures as absent root markers', async () => {
+  it('preserves ctx.fs marker lookup failures instead of crossing into an ancestor root', async () => {
     const root = await tempRepo()
     const home = await tempRepo()
     try {
@@ -2252,12 +2253,40 @@ describe('workspace context request injection', () => {
       await ctx.plugin(workspaceContext, { dshHome: home, maxBytes: 65536 })
       const agent = stubAgent(root)
 
-      await composeBaselinePrefix(ctx, agent)
-
-      expect(derivedText(agent)).toContain('repo rule')
+      await expect(composeBaselinePrefix(ctx, agent)).rejects.toThrow('stat failed')
     } finally {
       await rm(root, { recursive: true, force: true })
       await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('treats only provider not-found codes as absent root markers', async () => {
+    class MarkerFileSystem extends RecordingFileSystem {
+      failure: Error = Object.assign(new Error('missing marker'), { code: 'FS_NOT_FOUND' })
+      override async stat(): Promise<FsInfo | undefined> { throw this.failure }
+    }
+    const ctx = new Context()
+    await ctx.plugin(MarkerFileSystem)
+    const fs = ctx.fs as MarkerFileSystem
+    const root = resolve('/')
+    await expect(findProjectRoot(root, ['.git'], fs)).resolves.toBe(root)
+    fs.failure = Object.assign(new Error('marker denied'), { code: 'EACCES' })
+    await expect(findProjectRoot(root, ['.git'], fs)).rejects.toThrow('marker denied')
+    await ctx.fiber.dispose()
+  })
+
+  it('propagates a host root-marker permission failure', async () => {
+    vi.resetModules()
+    vi.doMock('node:fs/promises', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('node:fs/promises')>()
+      return { ...actual, stat: async () => { throw Object.assign(new Error('host marker denied'), { code: 'EACCES' }) } }
+    })
+    try {
+      const isolated = await import('../src/files.ts')
+      await expect(isolated.findProjectRoot(resolve('/'), ['.git'])).rejects.toThrow('host marker denied')
+    } finally {
+      vi.doUnmock('node:fs/promises')
+      vi.resetModules()
     }
   })
 
