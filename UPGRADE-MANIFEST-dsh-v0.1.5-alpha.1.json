@@ -1,0 +1,283 @@
+{
+  "schemaVersion": 1,
+  "reviewDate": "2026-09-09",
+  "upstream": {
+    "repository": "https://github.com/deepseek-ai/deepseek-harness",
+    "targetTag": "dsh-v0.1.5-alpha.1",
+    "targetCommit": "5dda764ed3aa172535a7967b06ff95d9cbfe536a",
+    "previousTag": "dsh-v0.1.3-alpha.2",
+    "previousCommit": "82a5fd61a7cf5c293cec4bdff68f455398d685e9",
+    "releasePage": "https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.1.5-alpha.1",
+    "comparePage": "https://github.com/deepseek-ai/deepseek-harness/compare/dsh-v0.1.3-alpha.2...dsh-v0.1.5-alpha.1",
+    "releaseNotesVerified": true
+  },
+  "baseline": {
+    "repository": "https://github.com/jsjm1986/CoHarness",
+    "commit": "29c6373ddf1d26408e4da5ddd18c1e4ec6cef40f",
+    "branch": "master",
+    "worktreePreserved": true,
+    "unappliedPriorValidationHead": "aeb55d9991"
+  },
+  "targetVersion": "0.1.5-alpha.1.coharness.1",
+  "status": "implemented-local-external-validation-pending",
+  "inventory": {
+    "localPackageManifests": 263,
+    "upstreamPackageManifests": 274,
+    "commonNamedPackages": 238,
+    "commonVersionDrift": 229,
+    "upstreamOnlyPackages": 36,
+    "localOnlyPackages": 25,
+    "versionDriftInterpretation": "release-version bump plus local product packages; not proof of missing code"
+  },
+  "decisions": [
+    {
+      "id": "session-format-v3",
+      "status": "adapt",
+      "upstreamCommits": [
+        "e04cfc4c87",
+        "f7a4f0b95c",
+        "5212603a4b"
+      ],
+      "owner": "session-format and all persistence providers",
+      "wire": true,
+      "dataMigration": true,
+      "permissionImpact": "none",
+      "evidence": "SESSION_FORMAT_VERSION=3 with chronology-preserving v2-to-v3 system/message migration, deterministic system identities, core carrier validation, immutable generation handling, compact assistant stream and focused persistence tests; CoHarness retains code/tool-code-dispatch identities and extension event payloads."
+    },
+    {
+      "id": "explicit-agent-api",
+      "status": "adapt",
+      "upstreamCommits": [
+        "ebce3a5f04",
+        "0b8956aab9"
+      ],
+      "owner": "core/agent, agent-loop, remotes, subagents and SDKs",
+      "wire": true,
+      "dataMigration": false,
+      "permissionImpact": "parent-attribution",
+      "evidence": "Context.agent declaration/accessor removed; setup callbacks, parentAgent ownership and all production consumers use explicit Agent values."
+    },
+    {
+      "id": "inbox-type-only",
+      "status": "equivalent",
+      "upstreamCommits": [
+        "bd3b651ea8",
+        "1101422362"
+      ],
+      "owner": "core/agent and agent-loop",
+      "wire": false,
+      "dataMigration": false,
+      "permissionImpact": "none",
+      "evidence": "ApiProxy already owns an agent-free cold inbox projection with inherited-cut filtering; the legacy constructible class remains a compatibility surface until a planned major release."
+    },
+    {
+      "id": "dynamic-system-prompt",
+      "status": "adapt",
+      "upstreamCommits": [
+        "ee956c720d",
+        "4c9f5efc07",
+        "3ef3bc17c5"
+      ],
+      "owner": "system-prompt, agent-loop and LLM adapters",
+      "wire": true,
+      "dataMigration": true,
+      "permissionImpact": "model-governance",
+      "evidence": "V3 system/message projection and adapter-declared in-history capability are wired through the existing prefix/suffix owner; model-switch and replay snapshots cover supported and fallback routes."
+    },
+    {
+      "id": "subagent-runtimes",
+      "status": "adapt",
+      "upstreamCommits": [
+        "ace0c4619e"
+      ],
+      "owner": "subagent-codex and subagent-claude-code",
+      "wire": false,
+      "dataMigration": false,
+      "permissionImpact": "credential-scrubbing-retained",
+      "evidence": "Codex 0.153.4 and Claude Agent SDK 0.3.263/Claude Code 2.1.263 are pinned; provider protocol tests pass."
+    },
+    {
+      "id": "busy-send-and-empty-input",
+      "status": "adapt",
+      "upstreamCommits": [
+        "9a5ed6fb60",
+        "a56619d9f7",
+        "ae19d9383b"
+      ],
+      "owner": "conversation admission and API ingress",
+      "wire": true,
+      "dataMigration": false,
+      "permissionImpact": "none",
+      "evidence": "Host session.prompt and updateQueue edit reject blank content with bad-request; UI already serializes busy Enter and queue operations."
+    },
+    {
+      "id": "goal-manual-pause",
+      "status": "adapt",
+      "upstreamCommits": [
+        "e26fc35d4b",
+        "66ac8cc094"
+      ],
+      "owner": "goal and goal-round-driver",
+      "wire": true,
+      "dataMigration": false,
+      "permissionImpact": "user-authority",
+      "evidence": "goal-round-driver cancels host-initiated pause with keepInbox and fences against same-turn model pause."
+    },
+    {
+      "id": "root-marker-errors",
+      "status": "adapt",
+      "upstreamCommits": [
+        "08ed3bcf10",
+        "40b20be9f5"
+      ],
+      "owner": "agent-instructions",
+      "wire": false,
+      "dataMigration": false,
+      "permissionImpact": "workspace-scope",
+      "evidence": "agent-instructions distinguishes ENOENT/ENOTDIR/FS_NOT_FOUND from provider permission/I/O failures; focused suite passes."
+    },
+    {
+      "id": "api-file-bounds",
+      "status": "adapt",
+      "upstreamCommits": [
+        "b52966922a",
+        "67c5136c7e",
+        "ba4a536030"
+      ],
+      "owner": "api/remotes and file response provider",
+      "wire": true,
+      "dataMigration": false,
+      "permissionImpact": "ACL/path",
+      "evidence": "CoHarness already has bounded file access; prove range, regular-file and allowlist equivalence"
+    },
+    {
+      "id": "safe-media-paths",
+      "status": "adapt",
+      "upstreamCommits": [
+        "88ab8e9133",
+        "9da174c304",
+        "7a715e7919"
+      ],
+      "owner": "ui-chat and media API",
+      "wire": true,
+      "dataMigration": false,
+      "permissionImpact": "server-path",
+      "evidence": "remote Web cannot expose server absolute paths"
+    },
+    {
+      "id": "workspace-resources",
+      "status": "defer",
+      "upstreamCommits": [
+        "4ce4f0bac4",
+        "3a85ac6d81",
+        "bd4199f48c",
+        "508831624f"
+      ],
+      "owner": "workspace-files, client/resources and Workbench",
+      "wire": true,
+      "dataMigration": false,
+      "permissionImpact": "high-data-egress",
+      "evidence": "User Documents and multi-runtime Workbench are existing owners"
+    },
+    {
+      "id": "right-sidebar-tree",
+      "status": "defer",
+      "upstreamCommits": [
+        "b67e0a838c",
+        "9e7c570094",
+        "b24ebc8cce",
+        "d10af0654f"
+      ],
+      "owner": "ui-sidebar-right, ui-sidebar-files, ui-sidebar-textpreview and ui-dockkit",
+      "wire": false,
+      "dataMigration": false,
+      "permissionImpact": "UI/product",
+      "evidence": "would replace existing Workbench and Details contracts"
+    },
+    {
+      "id": "typert-forwarding",
+      "status": "adapt",
+      "upstreamCommits": [
+        "5acf3cd09b",
+        "b2a3a0335d",
+        "b72919827a",
+        "606b85cd58"
+      ],
+      "owner": "typert generator, loader and registry",
+      "wire": false,
+      "dataMigration": false,
+      "permissionImpact": "plugin-resolution",
+      "evidence": "Upstream analyzer forwarding traversal, explicit edge priority, Remote stream marker and prototype descriptor are integrated; CoHarness Gateway auth remains."
+    },
+    {
+      "id": "node-addon-system",
+      "status": "retain/adapt",
+      "upstreamCommits": [
+        "336ebb235e",
+        "7264906f99",
+        "97e7223d5f",
+        "d927cbff99"
+      ],
+      "owner": "native independent version line",
+      "wire": false,
+      "dataMigration": false,
+      "permissionImpact": "process-lock",
+      "evidence": "do not rename Landlock public family; evaluate optional flock separately"
+    },
+    {
+      "id": "visualizer",
+      "status": "defer",
+      "upstreamCommits": [
+        "f1f6ca1c77",
+        "92b3b02622",
+        "36bd297293"
+      ],
+      "owner": "experimental visualizer",
+      "wire": false,
+      "dataMigration": false,
+      "permissionImpact": "none",
+      "evidence": "dormant Host capability was reverted before release"
+    },
+    {
+      "id": "cordis-vendor",
+      "status": "retain",
+      "upstreamCommits": [],
+      "owner": "vendor and local Cordis hardening",
+      "wire": false,
+      "dataMigration": false,
+      "permissionImpact": "lifecycle",
+      "evidence": "Vendored Cordis is unchanged; manifest guard and existing lifecycle hardening remain authoritative."
+    }
+  ],
+  "gates": {
+    "local": [
+      "typecheck",
+      "build",
+      "lint",
+      "hygiene",
+      "doc-sync",
+      "verify-cordis-config",
+      "verify-plugin-surfaces",
+      "verify-package-dependencies",
+      "verify-package-invariants",
+      "verify-built-package-invariants",
+      "verify-client-packages",
+      "test",
+      "test:coverage",
+      "test:snapshot"
+    ],
+    "external": [
+      "gateway-postgresql-acl",
+      "windows-native",
+      "macos-x64-runtime",
+      "codex-claude-wrapper",
+      "real-api",
+      "long-session-migration",
+      "cloud-open-path-negative"
+    ]
+  },
+  "implementationCommits": [
+    "9c82cc0df7",
+    "f208cfb05e"
+  ]
+}

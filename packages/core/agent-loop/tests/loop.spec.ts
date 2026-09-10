@@ -191,8 +191,8 @@ describe('agent loop', () => {
 
     // derived history: user + assistant
     const messages = agent.session.deriveMessages()
-    expect(messages.map(m => m.role)).toEqual(['user', 'assistant'])
-    expect(messages[1]!.content).toEqual([{ type: 'text', text: 'hello there' }])
+    expect(messages.filter(m => m.role !== 'system').map(m => m.role)).toEqual(['user', 'assistant'])
+    expect(messages.filter(m => m.role !== 'system')[1]!.content).toEqual([{ type: 'text', text: 'hello there' }])
   })
 
   it('re-wakes a follow-up that arrives in the normal turn-closing microtask', async () => {
@@ -319,7 +319,7 @@ describe('agent loop', () => {
     await waitForIdle(ctx, agent)
 
     const request = adapter.requests[0]
-    expect(request!.system).toBe('You are an AI agent powered by DeepSeek Harness.\n\nYou are a test agent on mock.\n\nUse the noop tool wisely.')
+    expect(request!.messages.find(message => message.role === 'system')?.content).toEqual([{ type: 'text', text: 'You are an AI agent powered by DeepSeek Harness.\n\nYou are a test agent on mock.\n\nUse the noop tool wisely.' }])
     expect(request!.tools?.map(t => t.name)).toEqual(['noop'])
   })
 
@@ -336,7 +336,7 @@ describe('agent loop', () => {
     send(agent, 'hi')
     await waitForIdle(ctx, agent)
 
-    expect(adapter.requests[0]!.system).toBe('You are an AI agent powered by DeepSeek Harness.\n\nWorking in /work/space.')
+    expect(adapter.requests[0]!.messages.find(message => message.role === 'system')?.content).toEqual([{ type: 'text', text: 'You are an AI agent powered by DeepSeek Harness.\n\nWorking in /work/space.' }])
   })
 
   it('contains a strict-variable render failure: the turn errors, the loop keeps serving turns', async () => {
@@ -372,7 +372,7 @@ describe('agent loop', () => {
     await waitForIdle(ctx, agent)
 
     expect(adapter.requests).toHaveLength(1)
-    expect(adapter.requests[0]!.system).toBe('You are an AI agent powered by DeepSeek Harness.\n\nIn /rescued.')
+    expect(adapter.requests[0]!.messages.find(message => message.role === 'system')?.content).toEqual([{ type: 'text', text: 'You are an AI agent powered by DeepSeek Harness.\n\nIn /rescued.' }])
     const turnEnds = agent.session.snapshotEvents().filter(e => e.type === 'turn/end')
     expect(turnEnds).toHaveLength(2)
     expect(turnEnds[1]?.type === 'turn/end' && turnEnds[1].data.reason.kind).toBe('completed')
@@ -402,7 +402,7 @@ describe('agent loop', () => {
 
     expect(adapter.requests).toHaveLength(1)
     expect(adapter.requests[0]!.model).toBe('mock')
-    expect(adapter.requests[0]!.system).toBe('You are an AI agent powered by DeepSeek Harness.\n\nYou run on mock.')
+    expect(adapter.requests[0]!.messages.find(message => message.role === 'system')?.content).toEqual([{ type: 'text', text: 'You are an AI agent powered by DeepSeek Harness.\n\nYou run on mock.' }])
   })
 
   it('omits the system field when system-prompt/assemble short-circuits with an empty assembly', async () => {
@@ -473,7 +473,8 @@ describe('agent loop', () => {
     send(agent, 'still clear')
     await waitForIdle(ctx, agent)
     expect(contextEvents()).toHaveLength(3)
-    expect(adapter.requests.map(request => request.system)).toEqual(Array(5).fill(adapter.requests[0]?.system))
+    const systemMessages = adapter.requests.map(request => request.messages.find(message => message.role === 'system')?.content)
+    expect(systemMessages).toEqual(Array(5).fill(systemMessages[0]))
     expect(agent.session.snapshotEvents().flatMap(event =>
       event.type === 'request/header' ? [event.data.reason] : [])).toEqual(['initial'])
   })
@@ -509,7 +510,8 @@ describe('agent loop', () => {
         : [])
     expect(runtimeContexts).toHaveLength(2)
     expect(adapter.requests[1]?.messages.some(message =>
-      message.source.kind === 'plugin'
+      message.role === 'user'
+      && message.source.kind === 'plugin'
       && message.source.plugin === '@deepseek-ai/dsh-system-prompt')).toBe(true)
   })
 
@@ -538,7 +540,8 @@ describe('agent loop', () => {
     send(agent, 'after compaction')
     await waitForIdle(ctx, agent)
     const clearing = adapter.requests[1]?.messages.find(message =>
-      message.source.kind === 'plugin'
+      message.role === 'user'
+      && message.source.kind === 'plugin'
       && message.source.plugin === '@deepseek-ai/dsh-system-prompt')
     expect(clearing?.content).toEqual([{
       type: 'text',
@@ -565,7 +568,8 @@ describe('agent loop', () => {
     send(agent, 'after compaction')
     await waitForIdle(ctx, agent)
     expect(adapter.requests[0]?.messages.some(message =>
-      message.source.kind === 'plugin'
+      message.role === 'user'
+      && message.source.kind === 'plugin'
       && message.source.plugin === '@deepseek-ai/dsh-system-prompt')).toBe(false)
   })
 
@@ -1076,7 +1080,7 @@ describe('agent loop', () => {
 
     expect(steps).toBe(2)
     expect(adapter.requests).toHaveLength(2)
-    expect(adapter.requests[1]!.messages).toEqual([
+    expect(adapter.requests[1]!.messages.filter(message => message.role !== 'system')).toEqual([
       {
         id: expect.any(String) as unknown,
         role: 'user',
@@ -1149,7 +1153,7 @@ describe('agent loop', () => {
 
     expect(executions).toBe(0)
     expect(agent.session.snapshotEvents().some(e => e.type === 'tool/call')).toBe(false)
-    expect(agent.session.deriveMessages()).toEqual([{
+    expect(agent.session.deriveMessages().filter(message => message.role !== 'system')).toEqual([{
       id: expect.any(String) as unknown,
       role: 'user',
       content: [{ type: 'text', text: 'go' }],
@@ -1159,7 +1163,7 @@ describe('agent loop', () => {
     // Empty content still needs an assistant/message to carry usage; derivation
     // skips that host so it does not create a spurious assistant turn.
     const assistantMessage = agent.session.snapshotEvents().find(e => e.type === 'assistant/message')
-    expect(assistantMessage?.type === 'assistant/message' && assistantMessage.data).toEqual({
+    expect(assistantMessage?.type === 'assistant/message' && assistantMessage.data).toEqual(expect.objectContaining({
       turn: 1,
       step: 1,
       message: {
@@ -1169,7 +1173,8 @@ describe('agent loop', () => {
         source: { kind: 'model', provider: 'mock', model: 'mock' },
       },
       usage: { inputTokens: 10, outputTokens: 5 },
-    })
+    }))
+    expect(assistantMessage?.type === 'assistant/message' && assistantMessage.data.stream?.length).toBeGreaterThan(0)
   })
 
   it('appends an empty completion anchor for a max-tokens step with no usage', async () => {
@@ -1199,7 +1204,7 @@ describe('agent loop', () => {
 
     expect(reasons).toEqual([{ kind: 'max-tokens' }])
     const assistant = agent.session.snapshotEvents().find(e => e.type === 'assistant/message')!
-    expect(assistant.type === 'assistant/message' && assistant.data).toEqual({
+    expect(assistant.type === 'assistant/message' && assistant.data).toEqual(expect.objectContaining({
       turn: 1,
       step: 1,
       message: {
@@ -1208,9 +1213,10 @@ describe('agent loop', () => {
         content: [],
         source: { kind: 'model', provider: 'mock', model: 'mock' },
       },
-    })
+    }))
+    expect(assistant.type === 'assistant/message' && assistant.data.stream?.length).toBeGreaterThan(0)
     expect(assistant.sourceEventSeqs?.length).toBeGreaterThan(0)
-    expect(agent.session.deriveMessages()).toEqual([{
+    expect(agent.session.deriveMessages().filter(message => message.role !== 'system')).toEqual([{
       id: expect.any(String) as unknown,
       role: 'user',
       content: [{ type: 'text', text: 'go' }],
@@ -1233,7 +1239,7 @@ describe('agent loop', () => {
 
     expect(reasons).toEqual([{ kind: 'completed' }])
     const assistant = agent.session.snapshotEvents().find(e => e.type === 'assistant/message')!
-    expect(assistant.type === 'assistant/message' && assistant.data).toEqual({
+    expect(assistant.type === 'assistant/message' && assistant.data).toEqual(expect.objectContaining({
       turn: 1,
       step: 1,
       message: {
@@ -1242,9 +1248,10 @@ describe('agent loop', () => {
         content: [],
         source: { kind: 'model', provider: 'mock', model: 'mock' },
       },
-    })
+    }))
+    expect(assistant.type === 'assistant/message' && assistant.data.stream?.length).toBeGreaterThan(0)
     expect(assistant.sourceEventSeqs?.length).toBe(1)
-    expect(agent.session.deriveMessages()).toEqual([{
+    expect(agent.session.deriveMessages().filter(message => message.role !== 'system')).toEqual([{
       id: expect.any(String) as unknown,
       role: 'user',
       content: [{ type: 'text', text: 'go' }],
@@ -1277,13 +1284,13 @@ describe('agent loop', () => {
     expect(agent.session.snapshotEvents().some(e => e.type === 'tool/call')).toBe(false)
     // The follow-up request replays the truncated message with its replay
     // metadata pruned in step with the dropped tool call.
-    expect(adapter.requests[1]?.messages[1]?.source).toEqual({
+    expect(adapter.requests[1]?.messages[2]?.source).toEqual({
       kind: 'model',
       provider: 'mock',
       model: 'mock',
       replayState: { response: { responseId: 'resp-1' }, blocks: ['text-meta'] },
     })
-    expect(agent.session.deriveMessages()).toEqual([
+    expect(agent.session.deriveMessages().filter(message => message.role !== 'system')).toEqual([
       {
         id: expect.any(String) as unknown,
         role: 'user',

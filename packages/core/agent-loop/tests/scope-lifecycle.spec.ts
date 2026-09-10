@@ -185,9 +185,9 @@ describe('agent scope lifecycle', () => {
     const ctx = await harness()
     const agent = ctx.agentLoop.create(SessionId('a1'), { provider: 'mock', model: 'mock' })
     expect(scopeOf(agent.ctx)).toBe(agent)
-    expect(agent.ctx.agent).toBe(agent)
-    // The root accessor default: a plain context answers undefined, not a throw.
-    expect(ctx.agent).toBeUndefined()
+    expect(() => { Reflect.get(agent.ctx, 'agent') }).toThrow(/without inject/)
+    // The removed ambient accessor is unavailable on an ordinary context.
+    expect(Reflect.get(ctx, 'agent')).toBeUndefined()
     await agent.whenIdle()
   })
 
@@ -199,6 +199,7 @@ describe('agent scope lifecycle', () => {
     })
     const child = await root.agent.ctx.agents.create({
       sessionId: SessionId('runtime-child'),
+      parentAgent: root.agent,
       agentOptions: { model: 'mock' },
     })
 
@@ -297,8 +298,8 @@ describe('agent scope lifecycle', () => {
     const creating = ctx.agents.create({
       sessionId: SessionId('atomic'),
       agentOptions: acceptedOptions,
-      setup: async (agentCtx) => {
-        expect(agentCtx.agent?.id).toBe(SessionId('atomic'))
+      setup: async (agentCtx, preparedAgent) => {
+        expect(preparedAgent.id).toBe(SessionId('atomic'))
         agentCtx.on('session/created', () => void order.push('setup-listener:session/created'))
         agentCtx.on('agent/created', () => void order.push('setup-listener:agent/created'))
         order.push('setup:start')

@@ -8,7 +8,7 @@
 
 import { Context, Service } from '@deepseek-ai/cordis'
 import { isAbsolute } from 'node:path'
-import { deepFreeze } from '@deepseek-ai/dsh-llm'
+import { deepFreeze, expandAssistantStream } from '@deepseek-ai/dsh-llm'
 import { scopeOf, scopeTarget } from '@deepseek-ai/dsh-scope'
 import type { Scoped } from '@deepseek-ai/dsh-scope'
 import type { Message } from '@deepseek-ai/dsh-llm'
@@ -113,7 +113,7 @@ function validateSessionHeader(id: SessionId, input: unknown): SessionHeader {
   if (Object.hasOwn(record, 'seedLength')) {
     throw new Error('session header has invalid field "seedLength"')
   }
-  if (record.version !== SESSION_FORMAT_VERSION && record.version !== 0 && record.version !== 1) {
+  if (record.version !== SESSION_FORMAT_VERSION && record.version !== 0 && record.version !== 1 && record.version !== 2) {
     throw new Error(`session header version must be ${SESSION_FORMAT_VERSION}, got ${String(record.version)}`)
   }
   if (record.id !== id) {
@@ -190,12 +190,18 @@ export function adoptSessionEvent<T extends SessionEvent>(event: T): T {
     `session event at seq ${event.seq}`,
   )
   switch (event.type) {
+    case 'system/message':
+      deepFreeze(event.data.message)
+      break
     case 'user/message':
       deepFreeze(event.data)
       break
     case 'assistant/message':
     case 'tool/result':
       deepFreeze(event.data.message)
+      break
+    case 'assistant/attempt':
+      deepFreeze(event.data.stream)
       break
     default:
       // SessionEventMap is merge-extensible; plugin-owned events carry no core message.
@@ -261,10 +267,14 @@ function assertSessionEventEnvelope(value: Record<string, unknown>, index: numbe
   }
   switch (type) {
     case 'request/header':
+    case 'system/message':
     case 'user/message':
     case 'assistant/message':
     case 'tool/result':
       assertCurrentLlmShape(event, index)
+      break
+    case 'assistant/attempt':
+      assertAssistantAttemptShape(event, index)
       break
   }
 }
@@ -291,7 +301,7 @@ function assertCurrentLlmShape(event: Record<string, unknown>, index: number): v
     assertAdapterDefaults(headerRecord?.['adapterDefaults'], configRecord, index)
   }
   const type = event['type']
-  if (type !== 'user/message' && type !== 'assistant/message'
+  if (type !== 'system/message' && type !== 'user/message' && type !== 'assistant/message'
     && type !== 'tool/result') return
   assertMessageEventShape(event, `seed ${type} at index ${index}`)
 }
@@ -320,7 +330,7 @@ function assertAdapterDefaults(
 /** Validate only the event-specific invariants needed to safely replay a message. */
 function assertMessageEventShape(event: Record<string, unknown>, subject: string): void {
   const type = event['type']
-  if (type !== 'user/message' && type !== 'assistant/message'
+  if (type !== 'system/message' && type !== 'user/message' && type !== 'assistant/message'
     && type !== 'tool/result') return
   const data = event['data']
   const record = typeof data === 'object' && data !== null
@@ -333,7 +343,8 @@ function assertMessageEventShape(event: Record<string, unknown>, subject: string
     throw new Error(`${subject} lacks an identified message`)
   }
   const messageRecord = message as Record<string, unknown>
-  const expectedRole = type === 'assistant/message' ? 'assistant' : 'user'
+  const eventType = type as string
+  const expectedRole = eventType === 'system/message' ? 'system' : eventType === 'assistant/message' ? 'assistant' : 'user'
   if (messageRecord['role'] !== expectedRole) {
     throw new Error(`${subject} message must have role "${expectedRole}"`)
   }
@@ -347,10 +358,18 @@ function assertMessageEventShape(event: Record<string, unknown>, subject: string
     throw new Error(`${subject} message has invalid content`)
   }
   const sourceRecord = source as Record<string, unknown>
+  if (eventType === 'system/message') {
+    if (sourceRecord['kind'] !== 'plugin' || typeof sourceRecord['plugin'] !== 'string' || sourceRecord['plugin'] === '') {
+      throw new Error(`${subject} system message must have plugin source`)
+    }
+    return
+  }
   if (type === 'assistant/message') {
     if (sourceRecord['kind'] !== 'model' || !hasProviderModel(sourceRecord)) {
       throw new Error(`${subject} message must have model source`)
     }
+    const stream = record?.['stream']
+    if (stream !== undefined) assertAssistantStream(stream, subject)
     return
   }
   if (type !== 'tool/result') return
@@ -368,6 +387,26 @@ function assertMessageEventShape(event: Record<string, unknown>, subject: string
   }
   if ((block as Record<string, unknown>)['toolCallId'] !== sourceRecord['callId']) {
     throw new Error(`${subject} message has mismatched tool call ids`)
+  }
+}
+
+/** Validate an embedded assistant attempt stream at durable ingress. */
+function assertAssistantAttemptShape(event: Record<string, unknown>, index: number): void {
+  const record = typeof event['data'] === 'object' && event['data'] !== null
+    ? event['data'] as Record<string, unknown>
+    : undefined
+  if (record === undefined || !Array.isArray(record['stream'])) {
+    throw new Error(`seed assistant/attempt at index ${index} has invalid stream`)
+  }
+  assertAssistantStream(record['stream'], `seed assistant/attempt at index ${index}`)
+}
+
+function assertAssistantStream(value: unknown, subject: string): void {
+  if (!Array.isArray(value)) throw new Error(`${subject} has invalid assistant stream`)
+  try {
+    expandAssistantStream(value as never)
+  } catch (error: unknown) {
+    throw new Error(`${subject} has invalid assistant stream`, { cause: error })
   }
 }
 
@@ -1129,7 +1168,7 @@ export class SessionStore extends Service {
       } catch (error: unknown) {
         // Preserve the listener's exact rejection value; flush is a caller-owned
         // failure boundary, and Cordis listeners may throw arbitrary values.
-        // oxlint-disable-next-line typescript/prefer-promise-reject-errors
+        // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- flush preserves arbitrary listener rejection values.
         return Promise.reject(error)
       }
     }))

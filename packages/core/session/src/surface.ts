@@ -20,6 +20,7 @@ import type {
 
 /** Runtime counterpart of the message-producing event union. */
 const SURFACE_EVENT_TYPES = new Set<string>([
+  'system/message',
   'user/message',
   'assistant/message',
   'tool/result',
@@ -103,12 +104,12 @@ export function deriveEventMessage(event: SessionEvent): Message | null {
     case 'user/message': {
       return event.data
     }
+    case 'system/message': return nonEmptyMessage(event.data.message)
     case 'assistant/message': {
       // Skip an empty-content assistant/message: it exists only to host a
       // max-tokens step's usage and must not inject a content-less assistant
       // turn into the provider transcript.
-      if (event.data.message.content.length === 0) return null
-      return event.data.message
+      return nonEmptyMessage(event.data.message)
     }
     case 'tool/result': {
       return event.data.message
@@ -118,6 +119,11 @@ export function deriveEventMessage(event: SessionEvent): Message | null {
       // no message. Merge-extensible union: no assertNever here.
       return null
   }
+}
+
+/** Project a message only when it carries model-visible content. */
+function nonEmptyMessage(message: Message): Message | null {
+  return message.content.length === 0 ? null : message
 }
 
 /**

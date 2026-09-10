@@ -27,6 +27,7 @@ declare module '@deepseek-ai/cordis' {
 export type {
   AssistantMessage,
   AssistantProvenance,
+  SystemMessage,
   Message,
   MessageSource,
   MessageSourceMap,
@@ -270,6 +271,8 @@ export interface LlmModelInfo {
   description?: string
   /** Accepted request modalities; absent means unknown, while an explicit omission is negative capability. */
   inputModalities?: readonly ModelModality[]
+  /** Declared support for changing the system prompt in history. */
+  systemPromptUpdate?: SystemPromptUpdate
 }
 
 /** Provider-owned context capacity for one exact provider/model route. */
@@ -277,6 +280,9 @@ export interface LlmModelContext {
   /** Maximum combined request and response context in tokens. */
   contextWindow: number
 }
+
+/** Model capability for changing a system prompt without rebuilding its cached prefix. */
+export type SystemPromptUpdate = 'in-history'
 
 /** Display metadata for one adapter-owned reasoning effort. */
 export interface LlmReasoningEffortInfo {
@@ -305,6 +311,8 @@ export interface LlmResolvedModelInfo extends LlmModelInfo {
   context?: LlmModelContext
   /** Adapter-configured per-request output cap materialized when callers omit one. */
   defaultMaxTokens?: number
+  /** Declared support for changing the system prompt in history. */
+  systemPromptUpdate?: SystemPromptUpdate
   /** Adapter-owned selectable reasoning levels when exposed. */
   reasoning?: LlmModelReasoningInfo
 }

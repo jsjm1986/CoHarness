@@ -599,7 +599,8 @@ Initiator methods provide same-process causal attribution only. Ambient presence
  * Read the Agent that initiated the inherited asynchronous driver chain.
  * Use this optional form for logging, tracing, metrics, or host attribution
  * that also supports agentless calls. When a parent creates a child, setup
- * reports the causal parent while `agentCtx.agent` identifies the child.
+ * reports the causal parent while the setup callback's explicit `agent`
+ * parameter identifies the child.
  * @returns the inherited Agent, or `undefined` outside an initiator boundary
  *   and inside an explicit clearing boundary.
  * @throws when this service instance has been disposed.
@@ -756,7 +757,7 @@ list(): Agent[]
 roots(): Agent[]
 ```
 
-Source: [`packages/core/agent/src/index.ts:259`](../../packages/core/agent/src/index.ts)
+Source: [`packages/core/agent/src/index.ts:254`](../../packages/core/agent/src/index.ts)
 
 <a id="agent-events"></a>
 

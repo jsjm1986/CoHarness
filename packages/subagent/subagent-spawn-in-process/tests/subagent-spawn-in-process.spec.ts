@@ -396,7 +396,9 @@ describe('dsh-subagent-spawn-in-process', () => {
       })
       await run.result
       const childRequest = adapter.requests.at(-1)!
-      expect(childRequest.system).toContain('You are the tersest test runner.')
+      expect(childRequest.messages.some(message =>
+        message.role === 'system' && message.content.some(block => block.type === 'text' && block.text.includes('You are the tersest test runner.')),
+      )).toBe(true)
       // The parent's earlier request carried no such persona.
       expect(adapter.requests[0]!.system ?? '').not.toContain('tersest test runner')
       await run.dispose()

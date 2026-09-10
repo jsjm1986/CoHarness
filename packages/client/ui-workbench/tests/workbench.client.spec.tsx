@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { bindSnapshotSelector, makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { createSnapshotStore, type SessionListState, type SessionId, type WorkspaceListState } from '@deepseek-ai/dsh-client-runtime/client'
+import { SessionId as brandSessionId } from '@deepseek-ai/dsh-session/types'
 import { WorkbenchEmpty } from '../src/client/components/WorkbenchEmpty.tsx'
 import { WorkbenchPaneHeader } from '../src/client/components/WorkbenchPaneHeader.tsx'
 import { WorkbenchToolbar } from '../src/client/components/WorkbenchToolbar.tsx'
@@ -322,7 +323,7 @@ describe('workbench toolbar edge paths', () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('offline'))))
     const p = props()
     const list = p.sessionsStore.getSnapshot()
-    p.sessionsStore.set({ ...list, ids: [...list.ids, 'sc' as SessionId, 'arch' as SessionId, 'blank' as SessionId, 'proj' as SessionId], byId: {
+    p.sessionsStore.set({ ...list, ids: [...list.ids, brandSessionId('sc'), brandSessionId('arch'), brandSessionId('blank'), brandSessionId('proj')], byId: {
       ...list.byId,
       [SID_B]: { id: SID_B, displayTitle: 'Subtask', running: false, blank: false, updatedAt: 0, origin: 'subagent' },
       ['blank' as SessionId]: { id: 'blank' as SessionId, displayTitle: 'Draft', running: false, blank: true, updatedAt: 0 },
@@ -513,7 +514,7 @@ describe('workbench toolbar edge paths', () => {
   it('renders waiting and missing-session tabs, and focuses a tab on click', () => {
     const p = props()
     const list = p.sessionsStore.getSnapshot()
-    p.sessionsStore.set({ ...list, ids: [...list.ids, 'missing' as SessionId], byId: {
+    p.sessionsStore.set({ ...list, ids: [...list.ids, brandSessionId('missing')], byId: {
       ...list.byId,
       [SID_B]: { id: SID_B, displayTitle: 'Beta', cwd: '/work/beta', running: true, blank: false, updatedAt: 0, pendingInteraction: 'approval' },
     } })

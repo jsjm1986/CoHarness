@@ -446,7 +446,13 @@ describe('SessionPersistenceSqlite schema ownership', () => {
         : undefined
     })
 
-    const db = await openDatabase(BusyOnceDatabase, path, 'wal', 100)
+    // The deadline is open-relative, so this budget also covers the security and
+    // schema setup that runs before the journal transition starts. A tight budget
+    // made the test depend on the runner completing that setup faster than the
+    // budget: under coverage on Windows the setup alone exceeded 100 ms, the first
+    // busy error escaped without a retry, and attempts stayed at 1. The production
+    // budget is the one the retry path is meant to work within.
+    const db = await openDatabase(BusyOnceDatabase, path, 'wal', DEFAULT_BUSY_TIMEOUT_MS)
     expect(attempts).toBe(2)
     expect(db.prepare(sql('journal-mode-wal')).get()).toEqual({ journal_mode: 'wal' })
     expect(db.prepare(sql('select-trusted-schema')).get()).toEqual({ trusted_schema: 0 })
@@ -675,13 +681,13 @@ describe('SessionPersistenceSqlite schema ownership', () => {
 })
 
 describe('SessionPersistenceSqlite edge behavior', () => {
-  it('publishes a v2 metadata generation after reading a legacy header', async () => {
+  it('keeps a migrated legacy row immutable when event content changes', async () => {
     const path = await freshDbPath('dsh-sqlite-format-migration-')
     const id = SessionId('sqlite-legacy-format')
     const first = new Context()
     await first.plugin(SessionStore)
     await first.plugin(SessionPersistenceSqlite, { path })
-    await first.sessionPersistence.create({ id, version: 2, createdAt: 1, cwd: '/work', isSeeded: false })
+    await first.sessionPersistence.create({ id, version: 3, createdAt: 1, cwd: '/work', isSeeded: false })
     await first.sessionPersistence.append(id, chunkLog(1))
     await first.fiber.dispose()
 
@@ -693,9 +699,9 @@ describe('SessionPersistenceSqlite edge behavior', () => {
     await second.plugin(SessionStore)
     await second.plugin(SessionPersistenceSqlite, { path })
     const loaded = await second.sessionPersistence.load(id)
-    expect(loaded.meta.version).toBe(2)
+    expect(loaded.meta.version).toBe(3)
     const migrated = new DatabaseSync(path)
-    expect(migrated.prepare(testSql('select-session-version')).get(id)).toEqual({ version: 2 })
+    expect(migrated.prepare(testSql('select-session-version')).get(id)).toEqual({ version: 0 })
     migrated.close()
     await second.fiber.dispose()
   })

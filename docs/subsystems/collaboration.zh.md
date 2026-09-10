@@ -325,17 +325,16 @@ Source: [`packages/context/gateway-runtime/src/index.ts:399`](../../packages/con
 
 #### `typert-gateway/authorize` — serial
 
-Authorize a validated Remote request before Context or lookup resolution and before the business method runs. A listener rejects by throwing.
+Authorize a validated Remote request before Context or lookup resolution.
 
 ```ts cordis-catalog
 /**
- * Authorize a validated Remote request before Context or lookup resolution
- * and before the business method runs. A listener rejects by throwing.
- * @param payload - endpoint, selected service, decoded wire values, and cancellation.
+ * Authorize a validated Remote request before Context or lookup resolution.
+ * @param payload - decoded endpoint, service, method, arguments, and signal.
  * @mode serial
  */
 'typert-gateway/authorize'(payload: TypertGatewayAuthorizationRequest): Promise<void> | void
 ```
 
-Source: [`packages/typert/protocol/src/types.ts:516`](../../packages/typert/protocol/src/types.ts)
+Source: [`packages/typert/protocol/src/types.ts:610`](../../packages/typert/protocol/src/types.ts)
 <!-- END GENERATED cordis-surface -->

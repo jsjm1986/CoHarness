@@ -11,6 +11,10 @@
 - button "1 tool call · 2 intermediate messages" [expanded]:
   - text: 1 tool call · 2 intermediate messages
   - img
+- button "System prompt":
+  - img
+  - img
+  - text: System prompt
 - text: Load the editing-cordis-compositions skill with the skill tool, then reply DONE. {{date}} {{clock}}
 - button "Copy":
   - img
@@ -22,10 +26,6 @@
   - img
   - img
   - text: Context injection skill-catalog
-- button "System prompt":
-  - img
-  - img
-  - text: System prompt
 - button "Think Load the requested skill.":
   - img
   - img

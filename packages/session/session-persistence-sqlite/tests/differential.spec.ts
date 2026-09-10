@@ -270,6 +270,11 @@ describe('SQLite cross-backend differential behavior', () => {
         await verifyBackend(name, join(directory, name), events, batchSizes)
       }
     }), { numRuns: 100, seed: 0x5A17E })
-  }, 60_000)
+    // 100 seeded runs, each churning temp directories and reopening both
+    // backends. That costs ~7s on Linux but 35-60s+ on the Windows runners,
+    // where temp-file and SQLite I/O is several times slower. The budget is
+    // sized for the slower platform so a busy runner cannot turn a passing
+    // workload into a timeout; it does not change what the test asserts.
+  }, 120_000)
 
 })

@@ -1250,17 +1250,32 @@ def normalize_snapshot_value(
         normalized["createdAt"] = 0
     if "seq" in normalized and "time" in normalized:
         normalized["time"] = 0
-    if isinstance(normalized.get("id"), str) and normalized.get("role") in ("assistant", "user"):
+    if isinstance(normalized.get("id"), str) and normalized.get("role") in ("system", "assistant", "user"):
         normalized["id"] = "{{messageId}}"
     scrub_snapshot_header(normalized)
     return normalized
 
 
 def scrub_snapshot_header(value: dict[object, object]) -> None:
-    """Tokenize full request-header bulk while retaining tool names."""
+    """Tokenize prompt bulk and compact-stream clocks while retaining payloads."""
     data = value.get("data")
     if not isinstance(data, dict):
         return
+    if value.get("type") == "system/message":
+        message = data.get("message")
+        if isinstance(message, dict) and isinstance(message.get("content"), list):
+            message["content"] = [{"type": "text", "text": "{{system}}"}]
+    if value.get("type") in ("assistant/message", "assistant/attempt"):
+        stream = data.get("stream")
+        if isinstance(stream, list):
+            for record in stream:
+                if not isinstance(record, dict):
+                    continue
+                for key in ("time", "time0"):
+                    if key in record:
+                        record[key] = 0
+                if isinstance(record.get("dt"), list):
+                    record["dt"] = [0 for _ in record["dt"]]
     if value.get("type") == "request/header":
         header = data.get("header")
         if not isinstance(header, dict):
