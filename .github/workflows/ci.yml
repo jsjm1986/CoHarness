@@ -417,6 +417,52 @@ jobs:
         run: pnpm run check:ci:consumers
 
 
+  # The browser suite only ever ran on pull requests, and a red pull request is
+  # still mergeable, so it rotted unnoticed: the workbench tree change broke
+  # roughly fifteen e2e files on master and nothing surfaced it, because master
+  # never re-ran this lane. This sweep replays the full consumer inventory after
+  # the merge and nightly, so the suite cannot rot silently again. It mirrors
+  # `node-24-consumers` but cannot depend on `pr-scope`, which is pull-request
+  # only, so it always runs the complete inventory rather than a scoped one.
+  web-snapshot-sweep:
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/master')
+      || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    name: web browser snapshot sweep
+    timeout-minutes: 90
+    env:
+      DSH_WEB_SNAPSHOT_WORKERS: '2'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6.0.10
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install (immutable)
+        run: pnpm install --frozen-lockfile
+
+      # Gateway is an independent npm project outside the root pnpm workspace.
+      # Root snapshot tests import its runtime modules.
+      - name: Install Gateway runtime dependencies
+        run: npm ci --prefix gateway --omit=dev
+
+      - name: Install Playwright Chromium and hosted dependencies
+        run: pnpm --filter @deepseek-ai/dsh-web-frontend exec playwright install --with-deps chromium
+
+      - name: Run the consumer inventory with the browser snapshot
+        env:
+          DSH_SNAPSHOT: replay
+        run: pnpm run check:ci:consumers
+
   node-compat:
     needs: pr-scope
     # The compatibility smokes exercise runtime behaviour, so documentation-only

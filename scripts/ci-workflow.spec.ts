@@ -185,11 +185,12 @@ describe('CI workflow', () => {
     }
 
     // What bounds the cost of exempting push: a master push carries the cache
-    // seeder, the two drills, and the native Windows platform inventory. Any job
-    // reachable on push starts accumulating uncancelled runs, so the set is
-    // pinned here. `windows-native` was deliberately added when the Windows
-    // inventory moved off the pull-request path: it is the compensating
-    // post-merge platform sweep, and the nightly schedule covers a quiet master.
+    // seeder, the two drills, the native Windows inventory, and the browser
+    // sweep. Any job reachable on push starts accumulating uncancelled runs, so
+    // the set is pinned here. `windows-native` and `web-snapshot-sweep` were
+    // deliberately added when those two inventories moved off the pull-request
+    // path: they are the compensating post-merge sweeps, and the nightly
+    // schedule covers a quiet master.
     //
     // Classification is an exact allowlist of the conditions in use, not a
     // substring match: `github.event_name != 'pull_request'` mentions
@@ -215,7 +216,23 @@ describe('CI workflow', () => {
       })
       .map(([name]) => name)
       .sort()
-    expect(pushReachable).toEqual(['serial-linux-selfhosted', 'serial-windows', 'windows-native', 'wine-apt-cache'])
+    expect(pushReachable).toEqual(['serial-linux-selfhosted', 'serial-windows', 'web-snapshot-sweep', 'windows-native', 'wine-apt-cache'])
+
+    // The browser sweep is the other compensating post-merge lane. The browser
+    // suite only ran on pull requests, and a red pull request stays mergeable,
+    // so the workbench tree change broke ~15 e2e files on master without
+    // anything surfacing it.
+    const browserSweep = workflow.jobs['web-snapshot-sweep']
+    if (!isRecord(browserSweep)) throw new TypeError('web-snapshot-sweep must be defined')
+    expect(browserSweep.if).toContain("github.event_name == 'schedule'")
+    expect(browserSweep.if).toContain("github.ref == 'refs/heads/master'")
+    expect(browserSweep.if).not.toContain('pull_request')
+    expect(browserSweep.needs).toBeUndefined()
+    const sweepSteps = (browserSweep.steps as unknown[]).filter(isRecord)
+    const sweepRuns = sweepSteps.filter((step): step is Record<string, unknown> & { run: string } => (
+      typeof step.run === 'string'
+    ))
+    expect(sweepRuns.some(step => step.run.includes('check:ci:consumers'))).toBe(true)
 
     // Why workflow_dispatch must keep cancelling: each benchmark fans out to a
     // dozen larger runners at once, in this same group on master. If it stopped
