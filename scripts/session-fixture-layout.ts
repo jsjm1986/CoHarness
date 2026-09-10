@@ -4,7 +4,7 @@ import { deepStrictEqual } from 'node:assert'
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { encodeSeqRanges, packChunkRuns, type SessionEvent } from '@deepseek-ai/dsh-session'
+import { encodeSeqRanges, packChunkRuns, type SessionEvent, type SessionSeq } from '@deepseek-ai/dsh-session'
 import { parseSessionLog } from '@deepseek-ai/dsh-llm-replay'
 
 /** Whether a path intentionally preserves physical persistence bytes. */
@@ -56,7 +56,7 @@ function renderFixture(headerLine: string, events: readonly SessionEvent[], prov
       delete record.seq0
       delete record.time0
       if (provenance === 'ranges' && 'sourceEventSeqs' in record) {
-        record.sourceEventSeqs = encodeSeqRanges(record.sourceEventSeqs as number[])
+        record.sourceEventSeqs = encodeSeqRanges(record.sourceEventSeqs as SessionSeq[])
       }
       return JSON.stringify(record)
     }),
