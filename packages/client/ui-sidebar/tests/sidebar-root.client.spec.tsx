@@ -121,12 +121,12 @@ describe('SidebarRoot shell', () => {
     expect(startSession).not.toHaveBeenCalled()
   })
 
-  it('falls back to the single-session viewport default and starts a session', () => {
+  it('routes New Session to start a session from a single viewport mode', () => {
     const startSession = vi.fn()
     render(<SidebarRoot
       collapsed={false} width={300}
       useSessions={neverHook} useWorkspaces={neverHook}
-      useViewport={undefined as never}
+      useViewport={selector => selector({ mode: 'single', paneIds: [], paneRatios: [] })}
       startSession={startSession} toggleSidebar={vi.fn()} t={t}
       renderSlot={((_key: string, owner: SidebarSectionOwnerProps) =>
         <div data-testid="region" data-wide={owner.wide} />) as SidebarRootComponentProps['renderSlot']}

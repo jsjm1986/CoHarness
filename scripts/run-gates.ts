@@ -11,12 +11,8 @@ import { resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { CLIENT_BUILD_PROFILE_SELECTOR } from './client-build-environment.ts'
 import { COVERAGE_EXEMPT_ENV, coverageExemptHeavySuites } from './coverage-exempt.ts'
-import {
-  COVERAGE_PARTITIONS_ENV,
-  COVERAGE_TEST_TIMEOUT_ENV,
-  coverageTestTimeoutArgs,
-  parseCoveragePartitionCount,
-} from './coverage-partitions.ts'
+import { COVERAGE_PARTITIONS_ENV, COVERAGE_TEST_TIMEOUT_ENV, coverageTestTimeoutArgs, parseCoveragePartitionCount } from './coverage-partitions.ts'
+import { COVERAGE_SCOPED_MODE_ENV, SCOPED_BASE_ENV, SCOPED_PACKAGES_ENV, scopedPackageTestDirs } from './coverage-scoped.ts'
 import { pnpmInvocation } from './pnpm-invocation.ts'
 
 /** A named aggregate exposed by the gate runner. */
@@ -26,9 +22,11 @@ export type Mode =
   | 'ci-static'
   | 'ci-lint-contracts-ready'
   | 'ci-coverage'
+  | 'ci-coverage-scoped'
   | 'ci-snapshot'
   | 'ci-artifacts'
   | 'ci-consumers'
+  | 'ci-consumers-scoped'
   | 'ci-windows-blocking'
   | 'ci-windows-complete'
   | 'ci-windows-observational'
@@ -116,9 +114,11 @@ function parseMode(raw: string | undefined): Mode {
     case 'ci-static':
     case 'ci-lint-contracts-ready':
     case 'ci-coverage':
+    case 'ci-coverage-scoped':
     case 'ci-snapshot':
     case 'ci-artifacts':
     case 'ci-consumers':
+    case 'ci-consumers-scoped':
     case 'ci-windows-blocking':
     case 'ci-windows-complete':
     case 'ci-windows-observational':
@@ -128,7 +128,7 @@ function parseMode(raw: string | undefined): Mode {
       return raw
     default:
       throw new Error(
-        `run-gates: expected mode ci-primary | ci-linux-primary | ci-static | ci-lint-contracts-ready | ci-coverage | ci-snapshot | ci-artifacts | ci-consumers | ci-windows-blocking | ci-windows-complete | ci-windows-observational | node-compat | check-all | doc-sync, got ${JSON.stringify(raw)}.`,
+        `run-gates: expected mode ci-primary | ci-linux-primary | ci-static | ci-lint-contracts-ready | ci-coverage | ci-coverage-scoped | ci-snapshot | ci-artifacts | ci-consumers | ci-consumers-scoped | ci-windows-blocking | ci-windows-complete | ci-windows-observational | node-compat | check-all | doc-sync, got ${JSON.stringify(raw)}.`,
       )
   }
 }
@@ -216,12 +216,16 @@ export function gatesForMode(selected: Mode): Gate[] {
       ]
     case 'ci-coverage':
       return coverageGates()
+    case 'ci-coverage-scoped':
+      return ciCoverageScopedGates()
     case 'ci-snapshot':
       return [ciBuildGate(), snapshotGate()]
     case 'ci-artifacts':
       return ciArtifactGates()
     case 'ci-consumers':
       return ciConsumerGates()
+    case 'ci-consumers-scoped':
+      return ciConsumerGates({ includeWebSnapshot: false })
     case 'ci-windows-blocking':
       return ciWindowsBlockingGates()
     case 'ci-windows-complete':
@@ -402,7 +406,7 @@ function ciArtifactGates(): Gate[] {
   ]
 }
 
-function ciConsumerGates(): Gate[] {
+function ciConsumerGates(options: { includeWebSnapshot?: boolean } = {}): Gate[] {
   const builtTree = ['build']
   const validatedBuild = ['built-package-invariants']
   return [
@@ -418,7 +422,9 @@ function ciConsumerGates(): Gate[] {
       needs: validatedBuild,
     }),
     snapshotGate(validatedBuild),
-    webSnapshotGate(validatedBuild),
+    ...options.includeWebSnapshot === false
+      ? []
+      : [webSnapshotGate(validatedBuild)],
     pnpmScript('doc-typecheck', 'doc-typecheck:contracts-ready', {
       needs: validatedBuild,
       env: { DSH_DOC_TYPECHECK_USE_BUILD_OUTPUT: '1' },
@@ -574,6 +580,48 @@ function coverageGates(): Gate[] {
       label: 'test:coverage-exempt-heavy',
     }),
   ]
+}
+
+// The scoped lane runs only the changed packages' tests and then enforces the
+// authoritative per-file 100% gate over the produced map
+// (scripts/incremental-coverage.ts). Vitest runs without global thresholds in
+// this mode (COVERAGE_SCOPED_MODE_ENV), because the selected tests import
+// unchanged packages they never fully exercise; the incremental gate owns the
+// verdict for exactly the changed files. The complete lane remains the
+// repository-wide authoritative run and is unchanged.
+function ciCoverageScopedGates(): Gate[] {
+  const workers = coverageWorkerArgs()
+  const timeouts = coverageTestTimeoutArgs(process.env[COVERAGE_TEST_TIMEOUT_ENV])
+  const scopedBase = process.env[SCOPED_BASE_ENV]
+  const testDirs = scopedPackageTestDirs(process.env[SCOPED_PACKAGES_ENV])
+  if (scopedBase === undefined || scopedBase === '') {
+    throw new Error(`run-gates: ${SCOPED_BASE_ENV} must name the pull-request base ref for the scoped coverage lane.`)
+  }
+  const instrumented = pnpmExec('coverage', [
+    'vitest',
+    'run',
+    '--coverage',
+    '--coverage.reporter=json',
+    ...testDirs,
+    ...workers.instrumented,
+    ...timeouts,
+  ], {
+    label: 'test:coverage (scoped)',
+    displayCommand: `${COVERAGE_SCOPED_MODE_ENV}=1 pnpm exec vitest run --coverage --coverage.reporter=json ${testDirs.join(' ')}`,
+    env: {
+      [COVERAGE_SCOPED_MODE_ENV]: '1',
+    },
+  })
+  const incremental = pnpmExec('coverage-incremental', [
+    'tsx',
+    'scripts/incremental-coverage.ts',
+    scopedBase,
+  ], {
+    label: 'changed-source coverage',
+    displayCommand: `pnpm exec tsx scripts/incremental-coverage.ts ${scopedBase}`,
+    needs: ['coverage'],
+  })
+  return [instrumented, incremental]
 }
 
 // Example and package snapshots boot their bins in `lib` mode (built artifacts under plain Node,

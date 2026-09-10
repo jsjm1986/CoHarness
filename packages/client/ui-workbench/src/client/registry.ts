@@ -20,7 +20,7 @@ const KEY = 'dsh.conversation.workbenches.v1'
  */
 export function readWorkbenchRegistry(fallback: WorkbenchLayout): WorkbenchRegistrySnapshot {
   try {
-    const raw = globalThis.localStorage?.getItem(KEY)
+    const raw = globalThis.localStorage.getItem(KEY)
     if (raw !== null) {
       const value: unknown = JSON.parse(raw)
       if (isSnapshot(value)) return value
@@ -33,12 +33,12 @@ export function readWorkbenchRegistry(fallback: WorkbenchLayout): WorkbenchRegis
  * @param snapshot - the current registry to persist.
  */
 export function writeWorkbenchRegistry(snapshot: WorkbenchRegistrySnapshot): void {
-  try { globalThis.localStorage?.setItem(KEY, JSON.stringify(snapshot)) } catch { /* storage quota/private mode */ }
+  try { globalThis.localStorage.setItem(KEY, JSON.stringify(snapshot)) } catch { /* storage quota/private mode */ }
 }
 
 function isSnapshot(value: unknown): value is WorkbenchRegistrySnapshot {
   if (typeof value !== 'object' || value === null) return false
   const row = value as Partial<WorkbenchRegistrySnapshot>
   return row.version === 1 && typeof row.activeId === 'string' && Array.isArray(row.workbenches)
-    && row.workbenches.every(item => typeof item?.id === 'string' && typeof item.name === 'string' && Array.isArray(item.paneIds))
+    && row.workbenches.every(item => typeof item.id === 'string' && typeof item.name === 'string' && Array.isArray(item.paneIds))
 }

@@ -60,6 +60,12 @@ jobs:
     outputs:
       run_expensive: ${{ steps.scope.outputs.run_expensive }}
       reason: ${{ steps.scope.outputs.reason }}
+      changed_source_files: ${{ steps.scope.outputs.changed_source_files }}
+      changed_package_files: ${{ steps.scope.outputs.changed_package_files }}
+      changed_docs_only: ${{ steps.scope.outputs.changed_docs_only }}
+      coverage_mode: ${{ steps.scope.outputs.coverage_mode }}
+      snapshot_mode: ${{ steps.scope.outputs.snapshot_mode }}
+      scoped_packages: ${{ steps.scope.outputs.scoped_packages }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -245,7 +251,17 @@ jobs:
           if (( install_status != 0 )); then exit "$install_status"; fi
           exit "$sandbox_status"
 
+      # Scoped PRs run only the changed packages' tests and then enforce the
+      # per-file 100% gate over exactly the changed source files
+      # (scripts/incremental-coverage.ts); full PRs keep the complete lane.
+      - name: Run coverage (scoped or full)
+        if: needs.pr-scope.outputs.coverage_mode == 'scoped'
+        env:
+          DSH_INCREMENTAL_BASE: ${{ github.event.pull_request.base.sha }}
+          DSH_SCOPED_PACKAGES: ${{ needs.pr-scope.outputs.scoped_packages }}
+        run: pnpm run check:ci:coverage:scoped
       - name: Run exhaustive coverage
+        if: needs.pr-scope.outputs.coverage_mode != 'scoped'
         run: pnpm run check:ci:coverage
 
   node-24-consumers:
@@ -366,21 +382,30 @@ jobs:
 
       - name: Install Playwright Chromium and hosted dependencies
         if: >-
+          needs.pr-scope.outputs.snapshot_mode != 'scoped' && (
           vars.DSH_CI_FAILOVER_LINUX != 'selfhosted'
           || github.event.pull_request.head.repo.full_name != github.repository
-          || github.event.pull_request.user.login == 'dependabot[bot]'
+          || github.event.pull_request.user.login == 'dependabot[bot]')
         run: pnpm --filter @deepseek-ai/dsh-web-frontend exec playwright install --with-deps chromium
 
       # The persistent VM image owns Playwright's Linux system packages; do
       # not mutate the shared host with apt on every failover run.
       - name: Install Playwright Chromium on the failover VM
         if: >-
+          needs.pr-scope.outputs.snapshot_mode != 'scoped' && (
           vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
           && github.event.pull_request.head.repo.full_name == github.repository
-          && github.event.pull_request.user.login != 'dependabot[bot]'
+          && github.event.pull_request.user.login != 'dependabot[bot]')
         run: pnpm --filter @deepseek-ai/dsh-web-frontend exec playwright install chromium
 
+      # Scoped PRs keep the keyless ACP/CLI snapshots but drop the Playwright
+      # browser snapshot (web-snapshot gate is absent from the scoped consumer
+      # aggregate); full PRs run the complete consumer inventory.
+      - name: Run compatibility, snapshot, and artifact gates (scoped)
+        if: needs.pr-scope.outputs.snapshot_mode == 'scoped'
+        run: pnpm run check:ci:consumers:scoped
       - name: Run compatibility, snapshot, and artifact gates
+        if: needs.pr-scope.outputs.snapshot_mode != 'scoped'
         run: pnpm run check:ci:consumers
 
 
@@ -448,7 +473,7 @@ jobs:
   # GLIBC, and manylinux checks; release validation retains all native targets.
   python-runtime:
     needs: pr-scope
-    if: github.event_name == 'pull_request' && needs.pr-scope.outputs.run_expensive == 'true'
+    if: github.event_name == 'pull_request' && needs.pr-scope.outputs.coverage_mode == 'full'
     name: python runtime / release-shaped Linux x64
     uses: ./.github/workflows/build-exe-for-python-sdk.yml
     with:
@@ -467,7 +492,7 @@ jobs:
   # .agents/notes/implemented/process/2026-08-08-native-windows-pull-request-ci.md
   windows:
     needs: pr-scope
-    if: github.event_name == 'pull_request' && needs.pr-scope.outputs.run_expensive == 'true'
+    if: github.event_name == 'pull_request' && needs.pr-scope.outputs.coverage_mode == 'full'
     runs-on: ubuntu-latest
     name: windows node 24 / wine blocking
     timeout-minutes: 15
@@ -589,7 +614,7 @@ jobs:
   # and the all-checks-passed verdict above.
   windows-native:
     needs: pr-scope
-    if: github.event_name == 'pull_request' && needs.pr-scope.outputs.run_expensive == 'true'
+    if: github.event_name == 'pull_request' && needs.pr-scope.outputs.coverage_mode == 'full'
     runs-on: >-
       ${{ vars.DSH_CI_FAILOVER_WINDOWS == 'selfhosted'
           && github.event.pull_request.head.repo.full_name == github.repository
@@ -1043,11 +1068,18 @@ jobs:
           || needs.python-sdk.result != 'success'
           || (needs.pr-scope.outputs.run_expensive == 'true'
             && (needs.node-24-coverage.result != 'success'
-              || needs.node-24-consumers.result != 'success'
-              || needs.python-runtime.result != 'success'
+              || needs.node-24-consumers.result != 'success'))
+          || (needs.pr-scope.outputs.coverage_mode == 'full'
+            && (needs.python-runtime.result != 'success'
               || needs.windows.result != 'success'))
         run: |
-          echo "::error::Needed job results: scope=${{ needs.pr-scope.result }}, static=${{ needs.node-24.result }}, compat=${{ needs.node-compat.result }}, python=${{ needs.python-sdk.result }}, expensive=${{ needs.pr-scope.outputs.run_expensive }}, coverage=${{ needs.node-24-coverage.result }}, consumers=${{ needs.node-24-consumers.result }}, runtime=${{ needs.python-runtime.result }}, wine=${{ needs.windows.result }}"
+          echo "::error::Needed job results: scope=${{ needs.pr-scope.result }}, static=${{ needs.node-24.result }}, compat=${{ needs.node-compat.result }}, python=${{ needs.python-sdk.result }}, expensive=${{ needs.pr-scope.outputs.run_expensive }}, coverageMode=${{ needs.pr-scope.outputs.coverage_mode }}, coverage=${{ needs.node-24-coverage.result }}, consumers=${{ needs.node-24-consumers.result }}, runtime=${{ needs.python-runtime.result }}, wine=${{ needs.windows.result }}"
           exit 1
       - name: All checks passed
-        run: echo "Required checks passed; expensive lanes=${{ needs.pr-scope.outputs.run_expensive }} (${{ needs.pr-scope.outputs.reason }})"
+        run: |
+          echo "Required checks passed"
+          echo "scope reason=${{ needs.pr-scope.outputs.reason }}"
+          echo "changed docs only=${{ needs.pr-scope.outputs.changed_docs_only }}"
+          echo "coverage mode=${{ needs.pr-scope.outputs.coverage_mode }}"
+          echo "snapshot mode=${{ needs.pr-scope.outputs.snapshot_mode }}"
+          echo "scoped packages=${{ needs.pr-scope.outputs.scoped_packages }}"

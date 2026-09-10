@@ -792,7 +792,6 @@ function SearchResults({
 export function WorkspaceBrowser({
   wide,
   expandSidebar,
-  useSessions,
   useWorkspaces,
   useStore,
   actions,
@@ -810,8 +809,8 @@ export function WorkspaceBrowser({
   searchResultLimit,
   useDirectoryFlow,
   useHostDescription,
-  useViewport = selector => selector({ mode: 'single', paneIds: [], paneRatios: [] }),
-  useCurrentSessions = useSessions,
+  useViewport,
+  useCurrentSessions,
   exitWorkbench,
   renderSlot,
   t,

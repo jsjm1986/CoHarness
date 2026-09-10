@@ -11,7 +11,6 @@
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ConversationViewport } from '@deepseek-ai/dsh-client-runtime/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { WorkspaceBrowserInjected, WorkspacePickerInjected } from './contract/slots.ts'
@@ -54,7 +53,7 @@ export const inject = ['slots', 'sessions', 'workspaces', 'locale', 'connection'
  */
 export function apply(ctx: ClientContext): void {
   const connection = ctx.get('connection') as ConnectionHandle
-  const viewport = ctx.get('conversationViewport') as ConversationViewport | undefined
+  const viewport = ctx.get('conversationViewport')
   const hostDescription = connection.hostDescription
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-workspace: dictionaries')
 
