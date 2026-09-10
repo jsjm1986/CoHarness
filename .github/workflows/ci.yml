@@ -4,6 +4,11 @@ on:
   push:
     branches: [master]
   pull_request:
+  # Nightly native-Windows sweep. The platform inventory moved off the pull
+  # request path, so this guarantees it still runs when master is quiet. The
+  # minute is offset from the hour because GitHub queues the top-of-hour load.
+  schedule:
+    - cron: '17 18 * * *'
   workflow_dispatch:
     inputs:
       suite:
@@ -613,21 +618,28 @@ jobs:
           cp /var/cache/apt/archives/*.deb "$HOME/wine-debs/"
           du -sh "$HOME/wine-debs"
 
-  # Every pull request also gets a real Windows-kernel signal. This job keeps
-  # its own unmasked conclusion but is deliberately absent from
-  # all-checks-passed.needs, so it never delays or changes that required
-  # verdict. The portable default is windows-2025. A deployment with the named
+  # Platform coverage runs after the merge, not on every pull request. This job
+  # re-runs the complete gate inventory on a real Windows kernel - build, docs
+  # build, the full coverage suite, and the observational static gates - which
+  # measured 1391s of a 3703s pull-request run and was the only 22-minute
+  # critical path. It is deliberately absent from all-checks-passed.needs, so it
+  # never gated a merge: it only added wall clock and runner minutes to each one.
+  # It now runs on every master move plus a nightly sweep, which keeps the
+  # platform coverage while charging it to the merge instead of the review.
+  # The portable default is windows-2025. A deployment with the named
   # larger pool may set DSH_CI_ENTERPRISE_RUNNERS_ENABLED=true; Windows failover
   # (DSH_CI_FAILOVER_WINDOWS=selfhosted) takes priority and retargets onto the
   # in-house self-hosted Windows pool. Fork and Dependabot PRs are excluded
   # from the self-hosted pool and stay on hosted capacity — see the failover
-  # runbook.
+  # runbook. A push or schedule event carries no pull_request payload, so those
+  # runs take the hosted or enterprise pool instead of the self-hosted one.
   # This Windows switch is independent of the Linux
   # DSH_CI_FAILOVER_LINUX variable that retargets the three required Linux jobs
   # and the all-checks-passed verdict above.
   windows-native:
-    needs: pr-scope
-    if: github.event_name == 'pull_request' && needs.pr-scope.outputs.windows_mode == 'full'
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/master')
+      || github.event_name == 'schedule'
     runs-on: >-
       ${{ vars.DSH_CI_FAILOVER_WINDOWS == 'selfhosted'
           && github.event.pull_request.head.repo.full_name == github.repository

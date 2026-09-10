@@ -82,8 +82,11 @@ describe('CI workflow', () => {
     expect(windowsNative['runs-on']).toContain('dsh-windows-2025-16core')
     expect(windowsNative['runs-on']).toContain('windows-2025')
     expect(windowsNative.name).toBe('windows node 24 / native complete')
-    expect(windowsNative.if).toContain("github.event_name == 'pull_request'")
-    expect(windowsNative.if).toContain('needs.pr-scope.outputs.windows_mode')
+    // Platform coverage moved off the pull-request path: this job runs after the
+    // merge and on a nightly sweep, so it no longer reads a scope output.
+    expect(windowsNative.if).toContain("github.event_name == 'schedule'")
+    expect(windowsNative.if).toContain("github.ref == 'refs/heads/master'")
+    expect(windowsNative.if).not.toContain('pull_request')
     expect(windowsNative.env).toMatchObject({
       DSH_COVERAGE_TEST_TIMEOUT_MS: '30000',
     })
@@ -181,9 +184,12 @@ describe('CI workflow', () => {
       expect(job.if).toContain("vars.DSH_CI_SELF_HOSTED_STANDBY_ENABLED == 'true'")
     }
 
-    // What bounds the cost of exempting push: a master push may only carry the
-    // cache seeder and the two drills. Any job reachable on push would start
-    // accumulating uncancelled runs, so the set is pinned here.
+    // What bounds the cost of exempting push: a master push carries the cache
+    // seeder, the two drills, and the native Windows platform inventory. Any job
+    // reachable on push starts accumulating uncancelled runs, so the set is
+    // pinned here. `windows-native` was deliberately added when the Windows
+    // inventory moved off the pull-request path: it is the compensating
+    // post-merge platform sweep, and the nightly schedule covers a quiet master.
     //
     // Classification is an exact allowlist of the conditions in use, not a
     // substring match: `github.event_name != 'pull_request'` mentions
@@ -209,7 +215,7 @@ describe('CI workflow', () => {
       })
       .map(([name]) => name)
       .sort()
-    expect(pushReachable).toEqual(['serial-linux-selfhosted', 'serial-windows', 'wine-apt-cache'])
+    expect(pushReachable).toEqual(['serial-linux-selfhosted', 'serial-windows', 'windows-native', 'wine-apt-cache'])
 
     // Why workflow_dispatch must keep cancelling: each benchmark fans out to a
     // dozen larger runners at once, in this same group on master. If it stopped
