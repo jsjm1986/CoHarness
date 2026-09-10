@@ -186,13 +186,16 @@ describe('gate graph validation', () => {
 
   it('runs the changed packages and the incremental gate in the scoped coverage lane', () => {
     const gates = withPnpmEntrypoint(() => withEnv('DSH_SCOPED_PACKAGES', 'session/session-format,core/session', () =>
-      withEnv('DSH_INCREMENTAL_BASE', 'abcdef0123', () => gatesForMode('ci-coverage-scoped'))))
+      withEnv('DSH_INCREMENTAL_BASE', 'abcdef0123', () =>
+        withEnv('DSH_COVERAGE_MAX_WORKERS', '2', () =>
+          withEnv('DSH_COVERAGE_TEST_TIMEOUT_MS', '30000', () => gatesForMode('ci-coverage-scoped'))))))
 
     expect(gates.map(subject => subject.id)).toEqual(['coverage', 'coverage-incremental'])
     expect(gates[0]).toMatchObject({
       label: 'test:coverage (scoped)',
       args: ['/private/pnpm.cjs', 'exec', 'vitest', 'run', '--coverage', '--coverage.reporter=json',
-        'packages/session/session-format/tests', 'packages/core/session/tests'],
+        'packages/session/session-format/tests', 'packages/core/session/tests',
+        '--maxWorkers=1', '--testTimeout=30000', '--expect.poll.timeout=30000'],
       env: { DSH_COVERAGE_SCOPED_MODE: '1' },
     })
     expect(gates[1]).toMatchObject({
