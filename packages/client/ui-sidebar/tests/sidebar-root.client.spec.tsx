@@ -121,7 +121,7 @@ describe('SidebarRoot shell', () => {
     expect(startSession).not.toHaveBeenCalled()
   })
 
-  it('uses the injected single-session viewport hook and starts a session', () => {
+  it('routes New Session to start a session from a single viewport mode', () => {
     const startSession = vi.fn()
     render(<SidebarRoot
       collapsed={false} width={300}

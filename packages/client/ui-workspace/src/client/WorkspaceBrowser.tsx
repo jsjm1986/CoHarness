@@ -792,7 +792,6 @@ function SearchResults({
 export function WorkspaceBrowser({
   wide,
   expandSidebar,
-  useSessions: _useSessions,
   useWorkspaces,
   useStore,
   actions,

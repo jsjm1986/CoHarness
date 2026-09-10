@@ -597,7 +597,10 @@ it.each([false, true])('reads the selected Session roster through its runtime co
   ctx.provide('sessions', sessions as never)
   ctx.provide('conversation', {} as never)
   ctx.provide('workspaces', workspacesDouble() as never)
-  const connection = ctx.get('connection') as ConnectionHandle
+  const connection = ctx.get('connection') as {
+    api: { agentPresets: { list: typeof ROSTER_MOVED } }
+    forTarget?: () => { api: { agentPresets: { list: typeof ROSTER_MOVED } } }
+  }
   const list = vi.fn(async () => ROSTER_MOVED)
   if (withTarget) Object.assign(connection, {
     forTarget: (): ConnectionHandle => ({

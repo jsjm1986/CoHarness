@@ -325,8 +325,8 @@ describe('workbench toolbar edge paths', () => {
     const list = p.sessionsStore.getSnapshot()
     p.sessionsStore.set({ ...list, ids: [...list.ids, brandSessionId('sc'), brandSessionId('arch'), brandSessionId('blank'), brandSessionId('proj')], byId: {
       ...list.byId,
-      [SID_B]: { id: SID_B, displayTitle: 'Subtask', cwd: undefined, running: false, blank: false, updatedAt: 0, origin: 'subagent' },
-      ['blank' as SessionId]: { id: 'blank' as SessionId, displayTitle: 'Draft', cwd: undefined, running: false, blank: true, updatedAt: 0 },
+      [SID_B]: { id: SID_B, displayTitle: 'Subtask', running: false, blank: false, updatedAt: 0, origin: 'subagent' },
+      ['blank' as SessionId]: { id: 'blank' as SessionId, displayTitle: 'Draft', running: false, blank: true, updatedAt: 0 },
       ['arch' as SessionId]: { id: 'arch' as SessionId, displayTitle: 'Archived', cwd: '/arch', running: false, blank: false, updatedAt: 0 },
       ['proj' as SessionId]: { id: 'proj' as SessionId, displayTitle: 'Team chat', cwd: '/team', running: false, blank: false, updatedAt: 0, projectId: 7 },
     } })
@@ -433,8 +433,8 @@ describe('workbench toolbar edge paths', () => {
     const p = props()
     const list = p.sessionsStore.getSnapshot()
     p.sessionsStore.set({ ...list, ids: ['t' as SessionId], byId: {
-      ['t' as SessionId]: { id: 't' as SessionId, displayTitle: 'Project conv', cwd: undefined, running: false, blank: false, updatedAt: 0, projectId: 7 },
-    } as never })
+      ['t' as SessionId]: { id: 't' as SessionId, displayTitle: 'Project conv', running: false, blank: false, updatedAt: 0, projectId: 7 },
+    } })
     render(<WorkbenchToolbar {...p} viewport={{ mode: 'workbench' as const, paneIds: ['t' as SessionId], activePaneId: 't' as SessionId, paneRatios: [1] }} tabbed
       chooseSession={vi.fn()} focusSession={focus} createSession={vi.fn()} setMode={vi.fn()} t={t} />)
     const tab = screen.getByRole('tab')
