@@ -12,7 +12,7 @@ Status: implemented
 
 新增 `scripts/incremental-coverage.ts` 及其测试，作为增量 PR 门禁的第一块基础。工具会计算变更的 package 源码文件，统一 Istanbul coverage map 的绝对/相对路径，拒绝不在 coverage map 中的变更源码，并要求每个选中文件的 lines、statements、functions、branches 均为 100%。package script 为 `test:coverage:incremental`。
 
-本次不替换或放宽完整 coverage lane。后续 CI 接入时，只有在 runner 生成选定测试的完整 coverage map 后才使用该工具；全量改动和 baseline 维护仍以完整 lane 为准。
+本次不替换或放宽完整 coverage lane。CI 在 `ci-coverage-scoped` 聚合中接入该工具（见[增量 CI lane 分级](2026-09-10-incremental-ci-lane-gating.zh.md)）：先运行变更包的测试，再把 merge-base ref 与生成的 coverage map 传到这里，获得权威的变更文件判定。全量改动和 baseline 维护仍以完整 lane 为准。
 
 ## Alternatives considered
 

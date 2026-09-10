@@ -12,7 +12,7 @@ The repository's complete coverage lane is intentionally strict, but it runs the
 
 Add `scripts/incremental-coverage.ts` and its tests as the first building block for an incremental pull-request gate. The utility derives changed package source files, normalizes absolute and relative Istanbul coverage-map keys, rejects a changed source file that is absent from the map, and requires 100% lines, statements, functions, and branches for every selected file. The package script is `test:coverage:incremental`.
 
-This change does not replace or weaken the complete coverage lane. CI wiring will use the utility only after a runner produces a complete coverage map for the selected tests; the existing full lane remains authoritative for repository-wide changes and baseline maintenance.
+This change does not replace or weaken the complete coverage lane. CI wiring uses the utility in the `ci-coverage-scoped` aggregate ([incremental CI lane gating](2026-09-10-incremental-ci-lane-gating.md)): it runs the changed packages' tests, then passes the merge-base ref and the produced coverage map here for the authoritative changed-file verdict. The existing full lane remains authoritative for repository-wide changes and baseline maintenance.
 
 ## Alternatives considered
 
