@@ -12,18 +12,20 @@ export interface JsExpr {
 }
 
 const jsExprType = defineScalarTag<JsExpr>('tag:yaml.org,2002:js', {
-  resolve: (source, isExplicit) => (isExplicit ? { __jsExpr: source } : NOT_RESOLVED),
+  resolve: (source, isExplicit) => (isExplicit && source.length > 0 ? { __jsExpr: source } : NOT_RESOLVED),
   identify: isJsExpr,
 })
 const schema = yaml.JSON_SCHEMA.withTags(jsExprType)
 
 /**
  * Parse a Cordis config while preserving Loader `!!js` expressions as data.
+ * An empty document parses to `undefined` (js-yaml 4 returned undefined where
+ * v5 throws), keeping the caller's handling of an absent YAML value unchanged.
  * @param source - Cordis YAML source text.
  * @returns the parsed YAML value.
  */
 export function loadCordisYaml(source: string): unknown {
-  return yaml.load(source, { schema })
+  return source.trim() === '' ? undefined : yaml.load(source, { schema })
 }
 
 /**
