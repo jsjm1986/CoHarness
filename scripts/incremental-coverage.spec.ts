@@ -44,12 +44,12 @@ describe('summarizeIncrementalCoverage', () => {
 
 describe('assertIncrementalCoverage', () => {
   it('accepts an empty changed-source set', () => {
-    expect(() => assertIncrementalCoverage([])).not.toThrow()
+    expect(() => { assertIncrementalCoverage([]) }).not.toThrow()
   })
 
   it('rejects any metric below 100%', () => {
-    expect(() => assertIncrementalCoverage([{
+    expect(() => { assertIncrementalCoverage([{
       path: source, lines: 100, statements: 99, functions: 100, branches: 100,
-    }])).toThrow(/incremental coverage below 100%/u)
+    }]) }).toThrow(/incremental coverage below 100%/u)
   })
 })

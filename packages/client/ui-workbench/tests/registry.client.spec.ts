@@ -13,7 +13,7 @@ const snapshot = (overrides: Partial<WorkbenchRegistrySnapshot> = {}): Workbench
   version: 1, activeId: 'w1', workbenches: [layout()], ...overrides,
 })
 
-beforeEach(() => globalThis.localStorage.clear())
+beforeEach(() => { globalThis.localStorage.clear() })
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
 describe('readWorkbenchRegistry', () => {
@@ -57,12 +57,12 @@ describe('writeWorkbenchRegistry', () => {
 
   it('swallows a storage quota/private-mode failure', () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('quota') })
-    expect(() => writeWorkbenchRegistry(snapshot())).not.toThrow()
+    expect(() => { writeWorkbenchRegistry(snapshot()) }).not.toThrow()
   })
 
   it('swallows a missing localStorage', () => {
     vi.stubGlobal('localStorage', undefined)
-    expect(() => writeWorkbenchRegistry(snapshot())).not.toThrow()
+    expect(() => { writeWorkbenchRegistry(snapshot()) }).not.toThrow()
   })
 })
 
