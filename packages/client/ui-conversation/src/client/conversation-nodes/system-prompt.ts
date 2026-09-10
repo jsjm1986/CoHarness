@@ -39,7 +39,7 @@ export const systemPromptDefinition: ConversationNodeDefinition<SystemPromptStat
       ? { id: String(event.seq), role: 'start' }
       : null
   },
-  start: (context, match) => {
+  start: (_context, match) => {
     if (match.event.type === 'system/message') {
       return {
         seq: match.event.seq,
