@@ -67,7 +67,7 @@ describe('CI workflow', () => {
     expect(windows['runs-on']).toBe('ubuntu-latest')
     expect(windows.name).toBe('windows node 24 / wine blocking')
     expect(windows.if).toContain("github.event_name == 'pull_request'")
-    expect(windows.if).toContain('needs.pr-scope.outputs.coverage_mode')
+    expect(windows.if).toContain('needs.pr-scope.outputs.windows_mode')
     expect(commandSteps.some(step => step.run.includes('wine-windows-gates.sh'))).toBe(true)
 
     // windows-native: portable standard Windows by default, optional enterprise
@@ -83,7 +83,7 @@ describe('CI workflow', () => {
     expect(windowsNative['runs-on']).toContain('windows-2025')
     expect(windowsNative.name).toBe('windows node 24 / native complete')
     expect(windowsNative.if).toContain("github.event_name == 'pull_request'")
-    expect(windowsNative.if).toContain('needs.pr-scope.outputs.coverage_mode')
+    expect(windowsNative.if).toContain('needs.pr-scope.outputs.windows_mode')
     expect(windowsNative.env).toMatchObject({
       DSH_COVERAGE_TEST_TIMEOUT_MS: '30000',
     })
@@ -192,7 +192,9 @@ describe('CI workflow', () => {
     const NOT_PUSH_REACHABLE = new Set([
       "github.event_name == 'pull_request'",
       "github.event_name == 'pull_request' && needs.pr-scope.outputs.run_expensive == 'true'",
-      "github.event_name == 'pull_request' && needs.pr-scope.outputs.coverage_mode == 'full'",
+      "github.event_name == 'pull_request' && needs.pr-scope.outputs.compat_mode == 'full'",
+      "github.event_name == 'pull_request' && needs.pr-scope.outputs.python_mode == 'full'",
+      "github.event_name == 'pull_request' && needs.pr-scope.outputs.windows_mode == 'full'",
       "always() && github.event_name == 'pull_request'",
       "github.event_name == 'workflow_dispatch' && inputs.suite == 'larger-runner-benchmark' && vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true'",
       "github.event_name == 'workflow_dispatch' && inputs.suite == 'consolidated-runner-benchmark' && vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true'",
@@ -249,7 +251,7 @@ describe('CI workflow', () => {
       },
     })
     expect(pythonRuntime.if).toContain("github.event_name == 'pull_request'")
-    expect(pythonRuntime.if).toContain('needs.pr-scope.outputs.coverage_mode')
+    expect(pythonRuntime.if).toContain('needs.pr-scope.outputs.python_mode')
     expect(aggregate.needs).toContain('python-runtime')
   })
 
