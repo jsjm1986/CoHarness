@@ -59,7 +59,7 @@ async function harness() {
 
 describe('workbench navigation lifecycle', () => {
   it('rejects missing viewport configuration at application', () => {
-    expect(() => apply(new Context() as never)).toThrow('requires the conversation viewport')
+    expect(() => { apply(new Context()) }).toThrow('requires the conversation viewport')
   })
 
   it('checks capacity before remote creation and dispatches add, replace, focus and pane controls', async () => {

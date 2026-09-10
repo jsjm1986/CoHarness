@@ -324,11 +324,11 @@ describe('workbench toolbar edge paths', () => {
     const list = p.sessionsStore.getSnapshot()
     p.sessionsStore.set({ ...list, ids: [...list.ids, 'sc' as SessionId, 'arch' as SessionId, 'blank' as SessionId, 'proj' as SessionId], byId: {
       ...list.byId,
-      [SID_B]: { id: SID_B, displayTitle: 'Subtask', cwd: undefined, running: false, blank: false, updatedAt: 0, origin: 'subagent' },
-      ['blank' as SessionId]: { id: 'blank' as SessionId, displayTitle: 'Draft', cwd: undefined, running: false, blank: true, updatedAt: 0 },
+      [SID_B]: { id: SID_B, displayTitle: 'Subtask', running: false, blank: false, updatedAt: 0, origin: 'subagent' },
+      ['blank' as SessionId]: { id: 'blank' as SessionId, displayTitle: 'Draft', running: false, blank: true, updatedAt: 0 },
       ['arch' as SessionId]: { id: 'arch' as SessionId, displayTitle: 'Archived', cwd: '/arch', running: false, blank: false, updatedAt: 0 },
       ['proj' as SessionId]: { id: 'proj' as SessionId, displayTitle: 'Team chat', cwd: '/team', running: false, blank: false, updatedAt: 0, projectId: 7 },
-    } as never })
+    } })
     p.workspacesStore.set({ ...p.workspacesStore.getSnapshot(), archivedSessionIds: ['arch' as never] })
     renderToolbar(p)
     fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
@@ -413,7 +413,7 @@ describe('workbench toolbar edge paths', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
       personal: { id: 1, name: 'Me' }, activeRuntime: { kind: 'project', projectId: 7 },
       projects: [{ projectId: 7, name: 'Read only', mode: 'ro' }], items: [],
-    } as never))))
+    }))))
     renderToolbar()
     fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
     await screen.findByRole('button', { name: 'Workspace' })
@@ -432,8 +432,8 @@ describe('workbench toolbar edge paths', () => {
     const p = props()
     const list = p.sessionsStore.getSnapshot()
     p.sessionsStore.set({ ...list, ids: ['t' as SessionId], byId: {
-      ['t' as SessionId]: { id: 't' as SessionId, displayTitle: 'Project conv', cwd: undefined, running: false, blank: false, updatedAt: 0, projectId: 7 },
-    } as never })
+      ['t' as SessionId]: { id: 't' as SessionId, displayTitle: 'Project conv', running: false, blank: false, updatedAt: 0, projectId: 7 },
+    } })
     render(<WorkbenchToolbar {...p} viewport={{ mode: 'workbench' as const, paneIds: ['t' as SessionId], activePaneId: 't' as SessionId, paneRatios: [1] }} tabbed
       chooseSession={vi.fn()} focusSession={focus} createSession={vi.fn()} setMode={vi.fn()} t={t} />)
     const tab = screen.getByRole('tab')
@@ -516,7 +516,7 @@ describe('workbench toolbar edge paths', () => {
     p.sessionsStore.set({ ...list, ids: [...list.ids, 'missing' as SessionId], byId: {
       ...list.byId,
       [SID_B]: { id: SID_B, displayTitle: 'Beta', cwd: '/work/beta', running: true, blank: false, updatedAt: 0, pendingInteraction: 'approval' },
-    } as never })
+    } })
     const focus = vi.fn()
     render(<WorkbenchToolbar {...p} viewport={{ mode: 'workbench' as const, paneIds: [SID_B, 'missing' as SessionId], activePaneId: SID_B, paneRatios: [1, 1] }} tabbed
       chooseSession={vi.fn()} focusSession={focus} createSession={vi.fn()} setMode={vi.fn()} t={t} />)
