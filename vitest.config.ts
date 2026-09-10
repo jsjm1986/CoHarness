@@ -7,6 +7,7 @@ import { standardDecoratorPlugin, vitestExecArgv } from './vitest.shared.ts'
 import { coverageBaselineFiles } from './scripts/coverage-baseline.ts'
 import { COVERAGE_EXEMPT_ENV, coverageExemptHeavySuites } from './scripts/coverage-exempt.ts'
 import { COVERAGE_PARTITION_MODE_ENV } from './scripts/coverage-partitions.ts'
+import { COVERAGE_SCOPED_MODE_ENV } from './scripts/coverage-scoped.ts'
 
 // Prints exact `path:line:col` records for every uncovered statement, branch
 // path, and function when a file misses the per-file 100% gate — the built-in
@@ -112,6 +113,18 @@ if (coveragePartitionRaw !== undefined && coveragePartitionRaw !== '' && coverag
   throw new Error(`vitest config: ${COVERAGE_PARTITION_MODE_ENV} must be '1' or unset, got ${JSON.stringify(coveragePartitionRaw)}.`)
 }
 const coveragePartitionMode = coveragePartitionRaw === '1'
+
+// The scoped changed-package lane runs the changed packages' tests only. Its
+// per-file 100% thresholds are enforced by scripts/incremental-coverage.ts over
+// the produced coverage map, so the global per-file threshold would reject
+// packages outside the changed set that those tests import without fully
+// exercising. Uncapping here keeps the intermediate vitest run green; the
+// incremental gate owns the authoritative verdict.
+const coverageScopedRaw = process.env[COVERAGE_SCOPED_MODE_ENV]
+if (coverageScopedRaw !== undefined && coverageScopedRaw !== '' && coverageScopedRaw !== '1') {
+  throw new Error(`vitest config: ${COVERAGE_SCOPED_MODE_ENV} must be '1' or unset, got ${JSON.stringify(coverageScopedRaw)}.`)
+}
+const coverageScopedMode = coverageScopedRaw === '1'
 
 // These suites exercise process-global state, process APIs, or timing-sensitive process I/O
 // that worker threads cannot isolate reliably under aggregate gate contention.
@@ -297,7 +310,7 @@ export default defineConfig({
       // Per-file so a well-covered big file can't subsidize a bare one.
       // Every v8 ignore comment must carry a reason — see the quality-gates Agent Note
       // (.agents/notes/implemented/process/2026-06-11-quality-gates.md).
-      thresholds: coveragePartitionMode
+      thresholds: coveragePartitionMode || coverageScopedMode
         ? undefined
         : {
             perFile: true,

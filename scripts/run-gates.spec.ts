@@ -71,9 +71,11 @@ describe('gate graph validation', () => {
     'ci-static',
     'ci-lint-contracts-ready',
     'ci-coverage',
+    'ci-coverage-scoped',
     'ci-snapshot',
     'ci-artifacts',
     'ci-consumers',
+    'ci-consumers-scoped',
     'ci-windows-blocking',
     'ci-windows-complete',
     'ci-windows-observational',
@@ -81,7 +83,11 @@ describe('gate graph validation', () => {
     'check-all',
     'doc-sync',
   ] as const)('constructs and executes preflight for a valid non-empty %s graph', async (mode) => {
-    const subject = withPnpmEntrypoint(() => gatesForMode(mode))
+    const build = () => gatesForMode(mode)
+    const subject = mode === 'ci-coverage-scoped'
+      ? withEnv('DSH_SCOPED_PACKAGES', 'session/session-format', () =>
+        withEnv('DSH_INCREMENTAL_BASE', 'abcdef0123', () => withPnpmEntrypoint(build)))
+      : withPnpmEntrypoint(build)
     const execute = vi.fn(async (item: Gate) => resultFor(item))
 
     await expect(runGates(subject, subject.length, execute)).resolves.toHaveLength(subject.length)
@@ -176,6 +182,41 @@ describe('gate graph validation', () => {
     expect(() => withEnv('DSH_COVERAGE_PARTITIONS', '1', () =>
       withPnpmEntrypoint(() => gatesForMode('ci-windows-complete'))))
       .toThrow('DSH_COVERAGE_PARTITIONS must be an integer greater than 1')
+  })
+
+  it('runs the changed packages and the incremental gate in the scoped coverage lane', () => {
+    const gates = withPnpmEntrypoint(() => withEnv('DSH_SCOPED_PACKAGES', 'session/session-format,core/session', () =>
+      withEnv('DSH_INCREMENTAL_BASE', 'abcdef0123', () => gatesForMode('ci-coverage-scoped'))))
+
+    expect(gates.map(subject => subject.id)).toEqual(['coverage', 'coverage-incremental'])
+    expect(gates[0]).toMatchObject({
+      label: 'test:coverage (scoped)',
+      args: ['/private/pnpm.cjs', 'exec', 'vitest', 'run', '--coverage', '--coverage.reporter=json',
+        'packages/session/session-format/tests', 'packages/core/session/tests'],
+      env: { DSH_COVERAGE_SCOPED_MODE: '1' },
+    })
+    expect(gates[1]).toMatchObject({
+      needs: ['coverage'],
+      args: ['/private/pnpm.cjs', 'exec', 'tsx', 'scripts/incremental-coverage.ts', 'abcdef0123'],
+    })
+  })
+
+  it('rejects the scoped coverage lane without a base ref or changed packages', () => {
+    expect(() => withPnpmEntrypoint(() => gatesForMode('ci-coverage-scoped')))
+      .toThrow('DSH_SCOPED_PACKAGES must list the changed packages')
+    expect(() => withPnpmEntrypoint(() => withEnv('DSH_SCOPED_PACKAGES', 'session/session-format', () =>
+      gatesForMode('ci-coverage-scoped'))))
+      .toThrow('DSH_INCREMENTAL_BASE must name the pull-request base ref')
+  })
+
+  it('drops only the web browser snapshot from the scoped consumer lane', () => {
+    const full = withPnpmEntrypoint(() => gatesForMode('ci-consumers'))
+    const scoped = withPnpmEntrypoint(() => gatesForMode('ci-consumers-scoped'))
+
+    expect(full.map(subject => subject.id)).toContain('web-snapshot')
+    expect(scoped.map(subject => subject.id)).not.toContain('web-snapshot')
+    expect(full.filter(subject => subject.id !== 'web-snapshot').map(subject => subject.id))
+      .toEqual(scoped.map(subject => subject.id))
   })
 
   it.each([
