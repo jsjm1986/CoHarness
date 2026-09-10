@@ -6,6 +6,7 @@ const repo = resolve(import.meta.dirname, '../..')
 export default defineConfig({
   resolve: {
     alias: {
+      '@deepseek-ai/dsh-llm/package.json': resolve(repo, 'packages/llm/llm/package.json'),
       '@deepseek-ai/cordis': resolve(repo, 'vendor/cordis/src/index.ts'),
       '@deepseek-ai/dsh-agent': resolve(repo, 'packages/core/agent/src/index.ts'),
       '@deepseek-ai/dsh-credentials': resolve(repo, 'packages/credentials/credentials/src/index.ts'),

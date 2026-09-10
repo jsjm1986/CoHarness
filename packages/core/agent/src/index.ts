@@ -37,16 +37,6 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
 declare module '@deepseek-ai/cordis' {
   interface Context {
     agents: AgentRegistry
-    /**
-     * The agent association installed as an own property on `Agent.ctx`, or
-     * `undefined` on a plain context. Contexts derived from `Agent.ctx` inherit
-     * the association; a deliberately nested scope may carry a nearer
-     * `dsh-scope` tag while retaining it, so this field is DX context rather
-     * than the scope resolver. {@link AgentRegistry} registers a root accessor
-     * defaulting to `undefined`, and core packages below the agent layer use
-     * `scopeOf()` for layer selection instead of reading this field.
-     */
-    agent?: Agent
   }
 }
 
@@ -69,6 +59,7 @@ export interface AgentSetupCommit {
  */
 export type AgentSetup = (
   agentCtx: Context,
+  agent: Agent,
 ) => AgentSetupCommit | Promise<AgentSetupCommit | void> | void
 
 /**
@@ -112,6 +103,8 @@ export interface CreateAgentOptions {
   readonly seed?: readonly SessionEvent[]
   /** Per-agent options (model, …). */
   readonly agentOptions?: AgentOptions
+  /** Live parent Agent for runtime ownership; omit for a root Agent. */
+  readonly parentAgent?: Agent
   /** Optional creation-only cancellation signal; detached before the returned handle becomes visible. */
   readonly signal?: AbortSignal
   /**
@@ -144,6 +137,8 @@ export interface ResumeAgentOptions {
   readonly resumeSessionId: SessionId
   /** Per-agent options (model, …). */
   readonly agentOptions?: AgentOptions
+  /** Live parent Agent for runtime ownership; omit for a root Agent. */
+  readonly parentAgent?: Agent
   /** Optional creation-only cancellation signal for persistence load/setup; detached before return. */
   readonly signal?: AbortSignal
   /**
@@ -282,13 +277,6 @@ export class AgentRegistry extends Service {
         resolve: sessionId => this.get(sessionId)?.ctx,
       })
     })
-    // The `ctx.agent` DX accessor: default `undefined` on every context, so a
-    // plain plugin context reads cleanly instead of hitting the Cordis
-    // unknown-property throw. Each Agent.ctx shadows it with an own property
-    // (own properties resolve before the context proxy is consulted), so the
-    // accessor body never needs to resolve a scope itself. Effect-scoped:
-    // unwinds with this service's fiber.
-    ctx.accessor('agent', { get: () => undefined })
     ctx.on('internal/status', (fiber) => {
       if (fiber.state === FiberState.UNLOADING && this.hasLifecycleAncestor(fiber)) {
         this.closeInitiators()
@@ -304,7 +292,8 @@ export class AgentRegistry extends Service {
    * Read the Agent that initiated the inherited asynchronous driver chain.
    * Use this optional form for logging, tracing, metrics, or host attribution
    * that also supports agentless calls. When a parent creates a child, setup
-   * reports the causal parent while `agentCtx.agent` identifies the child.
+   * reports the causal parent while the setup callback's explicit `agent`
+   * parameter identifies the child.
    * @returns the inherited Agent, or `undefined` outside an initiator boundary
    *   and inside an explicit clearing boundary.
    * @throws when this service instance has been disposed.
@@ -452,7 +441,7 @@ export class AgentRegistry extends Service {
    */
   register(agent: Agent): () => void {
     const dispose = this.ctx.effect(function* (this: AgentRegistry) {
-      yield this.enter(agent, this.ctx.agent)
+      yield this.enter(agent, undefined)
       this.announce(agent)
     }.bind(this), 'agents.register()')
     // oxlint-disable-next-line typescript/no-misused-promises -- synchronous cleanup; direct return preserves disposer identity

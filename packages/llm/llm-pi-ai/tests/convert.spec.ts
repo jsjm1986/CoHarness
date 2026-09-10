@@ -312,7 +312,8 @@ describe('toPiContext', () => {
         }),
       ],
     })
-    expect(context.messages.map(message => message.role)).toEqual(['user', 'user', 'toolResult'])
+    expect(context.systemPrompt).toBe('rule')
+    expect(context.messages.map(message => message.role)).toEqual(['user', 'toolResult'])
   })
 
   it('skips plugin-added (unknown) blocks in assistant content', () => {

@@ -1,15 +1,18 @@
 import type { Branded, BrandedNumber } from '@deepseek-ai/dsh-brand'
 import type {
   AssistantMessage,
+  AssistantStreamRecord,
   CallId,
   LlmCallConfig,
   LlmCallConfigAdapterDefaults,
   LlmFailure,
   StreamChunk,
+  SystemPromptUpdate,
   TokenUsage,
   ToolResultMessage,
   ToolSchema,
   UserMessage,
+  SystemMessage,
 } from '@deepseek-ai/dsh-llm'
 import type { JsonValue } from './json.ts'
 
@@ -101,7 +104,7 @@ export type OptionalSessionSeq = SessionSeq | null
  * recorded in the session-log-version-mechanism Agent Note
  * (`.agents/notes/implemented/architecture/2026-08-10-session-log-version-mechanism.md`).
  */
-export const SESSION_FORMAT_VERSION = 2
+export const SESSION_FORMAT_VERSION = 3
 
 /**
  * Immutable validated storage metadata, kept outside the conversation event log.
@@ -275,6 +278,8 @@ export interface RequestContext {
   model: string
   /** Maximum combined request and response context in tokens, when advertised. */
   contextWindow?: number
+  /** Model capability used for mid-conversation system prompt updates. */
+  systemPromptUpdate?: SystemPromptUpdate
 }
 
 /**
@@ -320,6 +325,8 @@ export interface SessionEventMap {
    * project their `content` verbatim; `source` tells them apart.
    */
   'user/message': UserMessage
+  /** Rendered system prompt on the model-visible surface. */
+  'system/message': { turn: number; step: number; message: SystemMessage }
   /** Raw stream chunk — token-level replay fidelity. */
   'assistant/chunk': { turn: number; step: number; chunk: StreamChunk }
   /**
@@ -332,7 +339,9 @@ export interface SessionEventMap {
    * marker distinguishes that prefix without re-deriving interruption from turn
    * boundaries. An aborted turn with no such event streamed no visible content.
    */
-  'assistant/message': { turn: number; step: number; message: AssistantMessage; usage?: TokenUsage; interrupted?: true }
+  'assistant/message': { turn: number; step: number; message: AssistantMessage; usage?: TokenUsage; interrupted?: true; stream?: AssistantStreamRecord[] }
+  /** Compact lossless stream retained with an assistant settlement for replay and diagnostics. */
+  'assistant/attempt': { turn: number; step: number; stream: AssistantStreamRecord[] }
   /**
    * The model requested one tool invocation: `name` with the raw `arguments`
    * JSON string exactly as the model produced it (unparsed). `callId` pairs the
@@ -403,6 +412,7 @@ export type SessionEventType = keyof SessionEventMap
  * event types may carry {@link SurfaceOp} and {@link SessionEvent.sourceEventSeqs}.
  */
 export type SurfaceEventType =
+  | 'system/message'
   | 'user/message'
   | 'assistant/message'
   | 'tool/result'

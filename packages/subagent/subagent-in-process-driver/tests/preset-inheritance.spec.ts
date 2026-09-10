@@ -86,7 +86,7 @@ describe('a child agent composed in-process', () => {
     await run.result
 
     expect(run.localAgent?.session.snapshotEvents().some(event =>
-      event.type === 'request/header'
+      event.type === 'system/message'
       && JSON.stringify(event.data).includes('section for preset_only'))).toBe(true)
     await run.dispose()
   })

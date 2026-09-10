@@ -8,7 +8,7 @@ import SessionStore, { encodeSeqRanges, SessionId, SessionLogOffset, SessionSeq 
 import type { Session, SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import {
-  encodeSegment, eventLines, generationLogPath, logPath, parseHeader, projectDir, projectKey, scanLog, sessionDir, SessionLogScanner,
+  encodeSegment, eventLines, logPath, parseHeader, projectDir, projectKey, scanLog, sessionDir, SessionLogScanner,
   toHeaderLine,
 } from '../src/format.ts'
 import { runPersistenceContract, meta, oneTurnLog, appendLog } from '../../session-persistence/tests/contract.ts'
@@ -473,10 +473,10 @@ describe('JsonlSessionPersistence: durability and crash semantics', () => {
       const sourceBytes = await readFile(sourcePath)
       const stored = await persistence.loadStored(m.id)
       if (stored === undefined) throw new Error('missing source')
-      await persistence.migrateStored(stored, { ...stored, meta: { ...stored.meta, version: 2 } }, stored.events, stored.revision)
+      await persistence.migrateStored(stored, { ...stored, meta: { ...stored.meta, version: 3 } }, stored.events, stored.revision)
       expect(await readFile(sourcePath)).toEqual(sourceBytes)
       const successor = await persistence.loadStored(m.id)
-      expect(successor?.meta.version).toBe(2)
+      expect(successor?.meta.version).toBe(3)
       expect(successor?.events).toEqual(oneTurnLog())
     } finally {
       await localCtx.fiber.dispose()
@@ -498,7 +498,7 @@ describe('JsonlSessionPersistence: durability and crash semantics', () => {
       return value
     })
     await expect(persistence.migrateStored(
-      stored, { ...stored, meta: { ...stored.meta, version: 2 } }, stored.events, stored.revision, abort.signal,
+      stored, { ...stored, meta: { ...stored.meta, version: 3 } }, stored.events, stored.revision, abort.signal,
     ))
       .rejects.toThrow('cancel migration')
     expect(await readdir(sessionDir(root, '/work', m.id))).toEqual(['session.jsonl'])
@@ -518,7 +518,7 @@ describe('JsonlSessionPersistence: durability and crash semantics', () => {
       if (++reads === 2) await appendFile(rawLogPath(root, '/work', m.id), 'incomplete')
       return revision(id)
     })
-    await expect(persistence.migrateStored(stored, { ...stored, meta: { ...stored.meta, version: 2 } }, stored.events, stored.revision))
+    await expect(persistence.migrateStored(stored, { ...stored, meta: { ...stored.meta, version: 3 } }, stored.events, stored.revision))
       .rejects.toThrow('changed while its format migration was preparing')
     expect(await readdir(sessionDir(root, '/work', m.id))).toEqual(['session.jsonl'])
     expect((await readFile(rawLogPath(root, '/work', m.id), 'utf8')).endsWith('incomplete')).toBe(true)
@@ -1336,7 +1336,7 @@ describe('JsonlSessionPersistence: default packed chunk rows', () => {
     // file, hand-planted so this packed-config backend adopts it on load).
     await mkdir(sessionDir(root, '/work', m.id), { recursive: true })
     await writeFile(rawLogPath(root, '/work', m.id), [
-      JSON.stringify({ type: 'session', version: 0, id: 'mixed', createdAt: 1000, cwd: '/work', delegationDepth: 0 }),
+      JSON.stringify({ type: 'session', version: 3, id: 'mixed', createdAt: 1000, cwd: '/work', delegationDepth: 0 }),
       ...log.map(e => JSON.stringify(e)),
     ].join('\n') + '\n')
     // Adopt the stored log (cursor = stored length), then append a second turn
@@ -1352,10 +1352,10 @@ describe('JsonlSessionPersistence: default packed chunk rows', () => {
     const loaded = await ctx.sessionPersistence.load(m.id)
     expect(loaded.events).toEqual([...log, ...secondTurn])
     // The packed append really packed: the file's tail carries a text-chunks row.
-    const tags = (await readFile(generationLogPath(root, '/work', m.id, 'none', 2), 'utf8')).split('\n').filter(Boolean)
+    const tags = (await readFile(logPath(root, '/work', m.id, 'none'), 'utf8')).split('\n').filter(Boolean)
       .map(line => (JSON.parse(line) as { type: string }).type)
-    expect(tags.filter(t => t === 'text-chunks')).toHaveLength(2)
-    expect(tags.filter(t => t === 'assistant/chunk')).toHaveLength(0)
+    expect(tags.filter(t => t === 'text-chunks')).toHaveLength(1)
+    expect(tags.filter(t => t === 'assistant/chunk')).toHaveLength(5)
   })
 
   it('scanLog: a packed row advances the seq cursor by its whole run', () => {

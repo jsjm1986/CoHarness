@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { afterAll, describe, expect, it } from 'vitest'
 import {
   defineAcpSnapshotSuite,
+  scrubSystemPrompts,
   stabilizeFixtureMessageIds,
   tokenizeSessionFixtureCwd,
   type HarvestedLog,
@@ -548,6 +549,22 @@ describe('normalizedHeaders', () => {
 })
 
 describe('normalizedSystemPrompts', () => {
+  it('retains a durable system prompt across headers and follows later replacements', () => {
+    const system = (text: string): string => JSON.stringify({
+      type: 'system/message',
+      data: { message: { role: 'system', content: [{ type: 'text', text }] } },
+    })
+    const request = JSON.stringify({ type: 'request/header', data: { header: { tools: [] } } })
+    const raw = [system('first /w'), request, request, system('second /w'), request].join('\n')
+    const context = { sessionIds: [], cwd: '/w' }
+    expect(normalizedSystemPrompts(raw, context)).toEqual(['first {{cwd}}', 'first {{cwd}}', 'second {{cwd}}'])
+    expect(normalizedHeaders(scrubSystemPrompts(raw), context)).toEqual([
+      { tools: [], system: '{{system}}' },
+      { tools: [], system: '{{system}}' },
+      { tools: [], system: '{{system}}' },
+    ])
+  })
+
   it('extracts normalized string prompts and omits absent or non-string fields', () => {
     const log = [
       '{"type":"session","id":"a","createdAt":5,"cwd":"/w"}',

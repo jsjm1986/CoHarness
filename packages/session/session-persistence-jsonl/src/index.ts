@@ -1147,15 +1147,15 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
       await this.rejectLegacyFlatArtifact(project, id, signal)
       signal?.throwIfAborted()
       const dir = join(project, encodeSegment(id))
-      const generation = join(dir, `session.v2${logSuffix(this.compression)}`)
-      const path = await this.exists(generation)
-        ? generation
-        : join(dir, `session${logSuffix(this.compression)}`)
-      const oppositeGeneration = join(dir, `session.v2${logSuffix(this.oppositeCompression())}`)
-      const opposite = await this.exists(oppositeGeneration)
-        ? oppositeGeneration
-        : join(dir, `session${logSuffix(this.oppositeCompression())}`)
-      const oppositeExists = await this.exists(opposite)
+      const entries: string[] = await readdir(dir).catch((error: unknown) => {
+        if (isENOENT(error)) return [] as string[]
+        throw error
+      })
+      const path = latestGenerationPath(dir, this.compression, entries)
+        ?? join(dir, `session${logSuffix(this.compression)}`)
+      const opposite = latestGenerationPath(dir, this.oppositeCompression(), entries)
+        ?? join(dir, `session${logSuffix(this.oppositeCompression())}`)
+      const oppositeExists = entries.includes(opposite.slice(dir.length + 1))
       signal?.throwIfAborted()
       if (oppositeExists) throw this.encodingMismatch(opposite)
       const pathExists = await this.exists(path)
@@ -1343,6 +1343,17 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     }
   }
   /* v8 ignore stop */
+}
+
+/** Pick the highest published generation for one physical compression. */
+function latestGenerationPath(dir: string, compression: JsonlCompression, entries: readonly string[]): string | undefined {
+  const suffix = logSuffix(compression)
+  const candidates = entries
+    .map(name => /^session\.v(\d+)(\.jsonl(?:\.zstd)?)$/.exec(name))
+    .filter((match): match is RegExpExecArray => match !== null && match[2] === suffix)
+    .sort((left, right) => Number(right[1]) - Number(left[1]))
+  const latest = candidates[0]
+  return latest === undefined ? undefined : join(dir, latest[0])
 }
 
 export default JsonlSessionPersistence

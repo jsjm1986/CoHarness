@@ -13,6 +13,10 @@
 - button "Process details" [expanded]:
   - text: Process details
   - img
+- button "System prompt":
+  - img
+  - img
+  - text: System prompt
 - text: Reply with a one-sentence description of event sourcing, then stop. {{clock}}
 - button "Copy":
   - img
@@ -20,10 +24,6 @@
   - img
   - img
   - text: Context injection @deepseek-ai/dsh-system-prompt
-- button "System prompt":
-  - img
-  - img
-  - text: System prompt
 - paragraph: partial
 - status: Deep diving...
 - textbox "Message the agent"

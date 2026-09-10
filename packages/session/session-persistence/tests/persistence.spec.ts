@@ -7,7 +7,7 @@ import SessionStore, {
   SessionSeq,
 } from '@deepseek-ai/dsh-session'
 import { isJsonValue, SessionDraftId } from '@deepseek-ai/dsh-session'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, freezeMessage, MessageId } from '@deepseek-ai/dsh-llm'
 import type {
   SessionEvent,
   SessionHeader,
@@ -724,12 +724,108 @@ describe('PersistenceCoordinator session preparations', () => {
     }, { inject: ['sessions'] }))
     try {
       const suffix = await coordinator.readFrom(id, SessionLogOffset(1))
-      expect(suffix.meta.version).toBe(2)
-      expect(suffix.events).toEqual(stored.events.slice(1))
+      expect(suffix.meta.version).toBe(3)
+      expect(suffix.events.map(event => event.type)).toEqual([
+        'user/message', 'step/start', 'system/message', 'assistant/message', 'step/end', 'turn/end',
+      ])
       expect(stored.meta.version).toBe(0)
-      expect(medium.store.get(id)?.meta.version).toBe(withMigration ? 2 : 0)
-      expect(migrateStored).toHaveBeenCalledTimes(withMigration ? 1 : 0)
-      if (withMigration) expect(migrateStored.mock.calls[0]?.[3]).toBe(memoryRevision(stored))
+      // V2→V3 inserts a durable system node, so a metadata-only backend hook
+      // cannot publish the successor without rewriting its body.
+      expect(medium.store.get(id)?.meta.version).toBe(0)
+      expect(migrateStored).toHaveBeenCalledTimes(0)
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('publishes a metadata-only successor when legacy migration leaves the body unchanged', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const medium = new ControlledBackend()
+    // The v2→v3 catalog inserts a system node only per open step; a legacy log
+    // without step/start migrates with an identical body, so the coordinator
+    // can publish a current-version successor in place.
+    const storedFor = (id: string): { meta: SessionHeader; events: SessionEvent[] } => ({
+      meta: { ...meta(id), version: 0 },
+      events: [
+        { type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } },
+        { type: 'user/message', seq: SessionSeq(1), time: 2, data: freezeMessage({
+          id: MessageId('metadata-only'),
+          role: 'user',
+          content: [{ type: 'text', text: 'hi' }],
+          source: { kind: 'user' },
+        }), surfaceOp: 'append' },
+        { type: 'turn/end', seq: SessionSeq(2), time: 3, data: { turn: 1, reason: { kind: 'completed' } } },
+      ],
+    })
+    const readId = SessionId('legacy-metadata-read')
+    const loadId = SessionId('legacy-metadata-load')
+    medium.store.set(readId, storedFor(readId))
+    medium.store.set(loadId, storedFor(loadId))
+    const migrateStored = vi.fn(async (
+      _source: StoredPrefix<never>, target: SessionStorageMetadata, events: readonly SessionEvent[],
+      _revision: SessionPersistenceRevision,
+    ): Promise<void> => {
+      const id = target.meta.id
+      medium.store.set(id, { meta: structuredClone(target.meta), events: [...events] })
+    })
+    const backend: PersistenceBackend<never> = {
+      name: medium.name,
+      loadStored: medium.loadStored.bind(medium),
+      readStoredRevision: medium.readStoredRevision.bind(medium),
+      appendBatch: medium.appendBatch.bind(medium),
+      commitRepair: medium.commitRepair.bind(medium),
+      list: medium.list.bind(medium),
+      close: medium.close.bind(medium),
+      migrateStored,
+    }
+    let coordinator!: PersistenceCoordinator<never>
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      coordinator = new PersistenceCoordinator(inner, backend)
+    }, { inject: ['sessions'] }))
+    try {
+      // The sequential readFrom path publishes the successor through its prefix read.
+      const suffix = await coordinator.readFrom(readId, SessionLogOffset(0))
+      expect(suffix.meta.version).toBe(3)
+      expect(suffix.events.map(event => event.type)).toEqual(['turn/start', 'user/message', 'turn/end'])
+      expect(medium.store.get(readId)?.meta.version).toBe(3)
+      // The cold load path publishes through its preparation pass.
+      const loaded = await coordinator.load(loadId)
+      expect(loaded.meta.version).toBe(3)
+      expect(medium.store.get(loadId)?.meta.version).toBe(3)
+      expect(migrateStored).toHaveBeenCalledTimes(2)
+      // Re-running a load over the already-published log is a no-op.
+      await coordinator.load(readId)
+      expect(migrateStored).toHaveBeenCalledTimes(2)
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('preserves a current-format error turn ending through legacy normalization', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const backend = new ControlledBackend()
+    const id = SessionId('current-error-turn')
+    backend.store.set(id, {
+      meta: meta(id),
+      events: [
+        { type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } },
+        { type: 'turn/end', seq: SessionSeq(1), time: 2, data: { turn: 1, reason: { kind: 'error', error: { message: 'boom', code: 'E_BOOM' } } } } as unknown as SessionEvent,
+      ],
+    })
+    let coordinator!: PersistenceCoordinator<never>
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      coordinator = new PersistenceCoordinator(inner, backend)
+    }, { inject: ['sessions'] }))
+    try {
+      const loaded = await coordinator.load(id)
+      expect(loaded.events.at(-1)?.data).toEqual({
+        turn: 1,
+        reason: { kind: 'error', error: { message: 'boom', code: 'E_BOOM' } },
+      })
     } finally {
       await fiber.dispose()
       await ctx.fiber.dispose()

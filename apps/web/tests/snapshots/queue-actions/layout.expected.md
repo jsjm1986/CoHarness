@@ -18,6 +18,10 @@
 - button "Process details" [expanded]:
   - text: Process details
   - img
+- button "System prompt":
+  - img
+  - img
+  - text: System prompt
 - button "Context injection goal":
   - img
   - img
@@ -26,10 +30,6 @@
   - img
   - img
   - text: Context injection @deepseek-ai/dsh-system-prompt
-- button "System prompt":
-  - img
-  - img
-  - text: System prompt
 - paragraph: partial
 - status: Deep diving...
 - region "To-dos":

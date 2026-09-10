@@ -97,8 +97,15 @@ describe('minimal agent preset', () => {
       .replaceAll(scaffold.workspaceCwd, '{{cwd}}')
       .trimEnd()
 
+    const systemPrompt = agentHandle.agent.session.snapshotEvents()
+      .filter((event): event is Extract<typeof event, { type: 'system/message' }> => event.type === 'system/message')
+      .flatMap(event => event.data.message.content)
+      .filter(block => block.type === 'text')
+      .map(block => block.text)
+      .join('')
+
     expect({
-      prompt: requestHeader.system,
+      prompt: systemPrompt,
       tools: requestHeader.tools?.map(tool => tool.name),
       bash: text(bash),
       editor: text(editor),

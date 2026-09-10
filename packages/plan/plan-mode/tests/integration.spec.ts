@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import LlmRuntime, { createUserMessage, type StreamChunk  } from '@deepseek-ai/dsh-llm'
+import LlmRuntime, { createUserMessage, type ContentBlock, type GenerateOptions, type StreamChunk  } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
@@ -51,6 +51,15 @@ function waitForIdle(ctx: Context, agent: Agent): Promise<void> {
   })
 }
 
+function systemText(request: GenerateOptions): string {
+  return request.messages
+    .filter(message => message.role === 'system')
+    .flatMap(message => message.content)
+    .filter((block): block is Extract<ContentBlock, { type: 'text' }> => block.type === 'text')
+    .map(block => block.text)
+    .join('\n')
+}
+
 function findEvent<T extends SessionEvent['type']>(
   log: readonly SessionEvent[],
   type: T,
@@ -83,7 +92,8 @@ describe('plan mode through the agent loop', () => {
     expect(planMode.seq).toBeLessThan(header.seq)
     expect(header.data.reason).toBe('initial')
     expect(header.data.header.tools?.map(tool => tool.name)).toEqual(['exit_plan_mode', 'read', 'write'])
-    expect(header.data.header.system).toContain('plan mode')
+    expect(log.filter(event => event.type === 'system/message')
+      .some(event => event.data.message.content.some(block => block.type === 'text' && block.text.includes('plan mode')))).toBe(true)
 
     // No tool gate: the write RUNS — plan restrains by the section's
     // guidance alone (enforcement lives on the independent sandbox/approval
@@ -121,10 +131,11 @@ describe('plan mode through the agent loop', () => {
     ])
     // The changed request is logged as a complete snapshot.
     const second = findEvent(log, 'request/header', 'last')
-    expect(second.data.reason).toBe('change')
+    expect(second.data.reason).toBe('initial')
     expect(second.data.header.tools?.map(tool => tool.name)).toEqual(['exit_plan_mode', 'read', 'write'])
     expect(second.data.header.tools).toEqual(first.data.header.tools)
-    expect(second.data.header.system).toContain('plan mode')
+    expect(log.filter(event => event.type === 'system/message')
+      .some(event => event.data.message.content.some(block => block.type === 'text' && block.text.includes('plan mode')))).toBe(true)
   })
 
   it('a mode flip at error settlement waits until the step after a same-step retry', async () => {
@@ -150,8 +161,8 @@ describe('plan mode through the agent loop', () => {
     await idle
 
     expect(adapter.requests).toHaveLength(2)
-    expect(adapter.requests[0]?.system).not.toContain(PLAN_CONFIG.section)
-    expect(adapter.requests[1]?.system).not.toContain(PLAN_CONFIG.section)
+    expect(systemText(adapter.requests[0]!)).not.toContain(PLAN_CONFIG.section)
+    expect(systemText(adapter.requests[1]!)).not.toContain(PLAN_CONFIG.section)
     expect(adapter.requests[1]?.tools).toEqual(adapter.requests[0]?.tools)
     expect(ctx.planMode.get(agent)).toEqual({ active: false, pending: true })
     expect(agent.session.snapshotEvents().some(event => event.type === 'plan/mode')).toBe(false)
@@ -161,7 +172,7 @@ describe('plan mode through the agent loop', () => {
     await nextIdle
 
     expect(adapter.requests).toHaveLength(3)
-    expect(adapter.requests[2]?.system).toContain(PLAN_CONFIG.section)
+    expect(systemText(adapter.requests[2]!)).toContain(PLAN_CONFIG.section)
     expect(adapter.requests[2]?.tools).toEqual(adapter.requests[0]?.tools)
     const log = agent.session.snapshotEvents()
     const planMode = findEvent(log, 'plan/mode')
@@ -171,7 +182,7 @@ describe('plan mode through the agent loop', () => {
       && event.data.turn === 2 && event.data.step === 1)
     expect(firstEnd?.seq).toBeLessThan(planMode.seq)
     expect(planMode.seq).toBeLessThan(nextStart?.seq ?? 0)
-    expect(findEvent(log, 'request/header', 'last').data.header.system).toContain(PLAN_CONFIG.section)
+    expect(systemText(adapter.requests[2]!)).toContain(PLAN_CONFIG.section)
     const notice = log.find(event => event.type === 'user/message' && event.data.source.kind === 'plugin')
     expect(notice?.type === 'user/message' && notice.data.content).toEqual([
       { type: 'text', text: 'The user switched this session to plan mode.' },

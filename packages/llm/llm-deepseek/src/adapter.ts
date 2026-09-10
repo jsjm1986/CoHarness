@@ -20,6 +20,7 @@ import type {
   ModelModality,
   ResolvedRetryPolicy,
   StreamChunk,
+  SystemPromptUpdate,
 } from '@deepseek-ai/dsh-llm'
 import type {
   AttachmentId,
@@ -67,6 +68,8 @@ export interface DeepSeekCatalogModel {
   /** Provider detail tier; `low` uses the 512-by-512 total-pixel default. */
   /** Legacy alias for the low-detail preset; new configs use imagePixelBudget: 'low'. */
   imageDetail?: 'auto' | 'low'
+  /** Whether the route accepts system prompt changes at any history position. */
+  systemPromptUpdate?: SystemPromptUpdate
 }
 
 /**
@@ -458,6 +461,7 @@ function modelInfo(provider: string, model: DeepSeekCatalogModel): LlmModelInfo 
     name: model.name ?? model.id,
     ...model.description === undefined ? {} : { description: model.description },
     inputModalities: model.inputModalities ?? ['text'],
+    ...model.systemPromptUpdate === undefined ? {} : { systemPromptUpdate: model.systemPromptUpdate },
   }
 }
 
@@ -564,6 +568,7 @@ export class DeepSeekAdapter extends LlmAdapter {
         : modelInfo(provider, configured),
       context: { contextWindow },
       defaultMaxTokens: configured?.maxTokens ?? connection.maxTokens,
+      ...configured?.systemPromptUpdate === undefined ? {} : { systemPromptUpdate: configured.systemPromptUpdate },
       ...connection.defaults.thinking === 'disabled'
         ? {
           reasoning: {
