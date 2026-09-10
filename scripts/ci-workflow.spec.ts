@@ -67,7 +67,7 @@ describe('CI workflow', () => {
     expect(windows['runs-on']).toBe('ubuntu-latest')
     expect(windows.name).toBe('windows node 24 / wine blocking')
     expect(windows.if).toContain("github.event_name == 'pull_request'")
-    expect(windows.if).toContain('needs.pr-scope.outputs.coverage_mode')
+    expect(windows.if).toContain('needs.pr-scope.outputs.windows_mode')
     expect(commandSteps.some(step => step.run.includes('wine-windows-gates.sh'))).toBe(true)
 
     // windows-native: portable standard Windows by default, optional enterprise
@@ -82,8 +82,11 @@ describe('CI workflow', () => {
     expect(windowsNative['runs-on']).toContain('dsh-windows-2025-16core')
     expect(windowsNative['runs-on']).toContain('windows-2025')
     expect(windowsNative.name).toBe('windows node 24 / native complete')
-    expect(windowsNative.if).toContain("github.event_name == 'pull_request'")
-    expect(windowsNative.if).toContain('needs.pr-scope.outputs.coverage_mode')
+    // Platform coverage moved off the pull-request path: this job runs after the
+    // merge and on a nightly sweep, so it no longer reads a scope output.
+    expect(windowsNative.if).toContain("github.event_name == 'schedule'")
+    expect(windowsNative.if).toContain("github.ref == 'refs/heads/master'")
+    expect(windowsNative.if).not.toContain('pull_request')
     expect(windowsNative.env).toMatchObject({
       DSH_COVERAGE_TEST_TIMEOUT_MS: '30000',
     })
@@ -181,9 +184,13 @@ describe('CI workflow', () => {
       expect(job.if).toContain("vars.DSH_CI_SELF_HOSTED_STANDBY_ENABLED == 'true'")
     }
 
-    // What bounds the cost of exempting push: a master push may only carry the
-    // cache seeder and the two drills. Any job reachable on push would start
-    // accumulating uncancelled runs, so the set is pinned here.
+    // What bounds the cost of exempting push: a master push carries the cache
+    // seeder, the two drills, the native Windows inventory, and the browser
+    // sweep. Any job reachable on push starts accumulating uncancelled runs, so
+    // the set is pinned here. `windows-native` and `web-snapshot-sweep` were
+    // deliberately added when those two inventories moved off the pull-request
+    // path: they are the compensating post-merge sweeps, and the nightly
+    // schedule covers a quiet master.
     //
     // Classification is an exact allowlist of the conditions in use, not a
     // substring match: `github.event_name != 'pull_request'` mentions
@@ -192,7 +199,9 @@ describe('CI workflow', () => {
     const NOT_PUSH_REACHABLE = new Set([
       "github.event_name == 'pull_request'",
       "github.event_name == 'pull_request' && needs.pr-scope.outputs.run_expensive == 'true'",
-      "github.event_name == 'pull_request' && needs.pr-scope.outputs.coverage_mode == 'full'",
+      "github.event_name == 'pull_request' && needs.pr-scope.outputs.compat_mode == 'full'",
+      "github.event_name == 'pull_request' && needs.pr-scope.outputs.python_mode == 'full'",
+      "github.event_name == 'pull_request' && needs.pr-scope.outputs.windows_mode == 'full'",
       "always() && github.event_name == 'pull_request'",
       "github.event_name == 'workflow_dispatch' && inputs.suite == 'larger-runner-benchmark' && vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true'",
       "github.event_name == 'workflow_dispatch' && inputs.suite == 'consolidated-runner-benchmark' && vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true'",
@@ -207,7 +216,23 @@ describe('CI workflow', () => {
       })
       .map(([name]) => name)
       .sort()
-    expect(pushReachable).toEqual(['serial-linux-selfhosted', 'serial-windows', 'wine-apt-cache'])
+    expect(pushReachable).toEqual(['serial-linux-selfhosted', 'serial-windows', 'web-snapshot-sweep', 'windows-native', 'wine-apt-cache'])
+
+    // The browser sweep is the other compensating post-merge lane. The browser
+    // suite only ran on pull requests, and a red pull request stays mergeable,
+    // so the workbench tree change broke ~15 e2e files on master without
+    // anything surfacing it.
+    const browserSweep = workflow.jobs['web-snapshot-sweep']
+    if (!isRecord(browserSweep)) throw new TypeError('web-snapshot-sweep must be defined')
+    expect(browserSweep.if).toContain("github.event_name == 'schedule'")
+    expect(browserSweep.if).toContain("github.ref == 'refs/heads/master'")
+    expect(browserSweep.if).not.toContain('pull_request')
+    expect(browserSweep.needs).toBeUndefined()
+    const sweepSteps = (browserSweep.steps as unknown[]).filter(isRecord)
+    const sweepRuns = sweepSteps.filter((step): step is Record<string, unknown> & { run: string } => (
+      typeof step.run === 'string'
+    ))
+    expect(sweepRuns.some(step => step.run.includes('check:ci:consumers'))).toBe(true)
 
     // Why workflow_dispatch must keep cancelling: each benchmark fans out to a
     // dozen larger runners at once, in this same group on master. If it stopped
@@ -249,7 +274,7 @@ describe('CI workflow', () => {
       },
     })
     expect(pythonRuntime.if).toContain("github.event_name == 'pull_request'")
-    expect(pythonRuntime.if).toContain('needs.pr-scope.outputs.coverage_mode')
+    expect(pythonRuntime.if).toContain('needs.pr-scope.outputs.python_mode')
     expect(aggregate.needs).toContain('python-runtime')
   })
 

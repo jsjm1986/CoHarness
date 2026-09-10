@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { classifyCiPrScope } from './ci-pr-scope.ts'
+import { classifyCiPrScope, clientSurfacePackages } from './ci-pr-scope.ts'
 
 describe('classifyCiPrScope', () => {
   it('skips expensive lanes for pnpm action pin updates', () => {
@@ -60,6 +60,88 @@ describe('classifyCiPrScope', () => {
       'packages/c/c1/src/x.ts',
       'packages/d/d1/src/x.ts',
       'packages/e/e1/src/x.ts',
-    ], '')).toMatchObject({ reason: 'full', coverageMode: 'full', snapshotMode: 'full' })
+      // Coverage falls back to the full suite, but none of these packages render
+      // in the browser, so the Playwright inventory stays out of the lane.
+    ], '')).toMatchObject({ reason: 'full', coverageMode: 'full', snapshotMode: 'scoped' })
+  })
+
+  it('keeps the browser inventory when the lockfile or a manifest moves', () => {
+    expect(classifyCiPrScope([
+      'packages/session/session-format/src/catalog-default.ts',
+      'pnpm-lock.yaml',
+    ], '')).toMatchObject({ coverageMode: 'full', snapshotMode: 'full' })
+  })
+
+  it('drops the compatibility, Python, and Windows lanes for documentation', () => {
+    expect(classifyCiPrScope(['docs/testing.md'], '')).toMatchObject({
+      reason: 'docs-only',
+      coverageMode: 'skip',
+      compatMode: 'skip',
+      pythonMode: 'skip',
+      windowsMode: 'skip',
+    })
+  })
+
+  it('keeps only the Python lanes for a python-only change', () => {
+    expect(classifyCiPrScope([
+      'python/sdk/src/deepseek_harness/session.py',
+    ], '')).toMatchObject({
+      reason: 'python-only',
+      runExpensive: false,
+      coverageMode: 'skip',
+      snapshotMode: 'skip',
+      compatMode: 'full',
+      pythonMode: 'full',
+      windowsMode: 'skip',
+    })
+  })
+
+  it('keeps the Windows and compatibility lanes for a script change', () => {
+    expect(classifyCiPrScope([
+      'scripts/run-gates.ts',
+    ], '')).toMatchObject({
+      reason: 'full',
+      coverageMode: 'full',
+      compatMode: 'full',
+      pythonMode: 'skip',
+      windowsMode: 'full',
+    })
+  })
+
+  it('keeps the browser snapshot when a scoped change touches a browser-rendered package', () => {
+    expect(classifyCiPrScope([
+      'packages/client/ui-conversation/src/message-row.ts',
+    ], '', new Set(['client/ui-conversation']))).toMatchObject({
+      reason: 'scoped',
+      coverageMode: 'scoped',
+      snapshotMode: 'full',
+    })
+  })
+
+  it('keeps the scoped snapshot when no changed package is browser-rendered', () => {
+    expect(classifyCiPrScope([
+      'packages/session/session-format/src/catalog-default.ts',
+    ], '', new Set(['client/ui-conversation']))).toMatchObject({
+      reason: 'scoped',
+      coverageMode: 'scoped',
+      snapshotMode: 'scoped',
+    })
+  })
+
+  it('keeps the scoped snapshot when the browser surface is not supplied', () => {
+    expect(classifyCiPrScope([
+      'packages/client/ui-conversation/src/message-row.ts',
+    ], '')).toMatchObject({ reason: 'scoped', snapshotMode: 'scoped' })
+  })
+})
+
+describe('clientSurfacePackages', () => {
+  it('covers the browser-rendered packages that live outside packages/client', () => {
+    const packages = clientSurfacePackages(process.cwd())
+    // The client surface spans two markers; neither is sufficient alone.
+    expect(packages.has('client/ui-conversation')).toBe(true)
+    expect(packages.has('client/ui-primitives')).toBe(true)
+    expect(packages.has('extensions/ui-cordis')).toBe(true)
+    expect(packages.has('session/session-format')).toBe(false)
   })
 })
