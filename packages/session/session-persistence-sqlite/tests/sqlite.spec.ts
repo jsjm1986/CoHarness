@@ -446,7 +446,13 @@ describe('SessionPersistenceSqlite schema ownership', () => {
         : undefined
     })
 
-    const db = await openDatabase(BusyOnceDatabase, path, 'wal', 100)
+    // The deadline is open-relative, so this budget also covers the security and
+    // schema setup that runs before the journal transition starts. A tight budget
+    // made the test depend on the runner completing that setup faster than the
+    // budget: under coverage on Windows the setup alone exceeded 100 ms, the first
+    // busy error escaped without a retry, and attempts stayed at 1. The production
+    // budget is the one the retry path is meant to work within.
+    const db = await openDatabase(BusyOnceDatabase, path, 'wal', DEFAULT_BUSY_TIMEOUT_MS)
     expect(attempts).toBe(2)
     expect(db.prepare(sql('journal-mode-wal')).get()).toEqual({ journal_mode: 'wal' })
     expect(db.prepare(sql('select-trusted-schema')).get()).toEqual({ trusted_schema: 0 })
