@@ -4,14 +4,18 @@ import { extname } from 'node:path'
 import { access, constants, readFile, rename, writeFile } from 'node:fs/promises'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { NOT_RESOLVED, defineScalarTag } from 'js-yaml'
 import * as yaml from 'js-yaml'
 
-const JsExpr = new yaml.Type('tag:yaml.org,2002:js', {
-  kind: 'scalar',
-  resolve: (data) => typeof data === 'string',
-  construct: (data) => ({ __jsExpr: data }),
-  predicate: isJsExpr,
-  represent: (data) => data['__jsExpr'],
+/**
+ * The `!!js` scalar tag in the js-yaml v5 API: an explicit tag resolves to an
+ * expression node the Loader evaluates at entry activation, and the node
+ * identity selects it when dumping.
+ */
+const JsExpr = defineScalarTag<{ __jsExpr: string }>('tag:yaml.org,2002:js', {
+  resolve: (source, isExplicit) => (isExplicit ? { __jsExpr: source } : NOT_RESOLVED),
+  identify: isJsExpr,
+  represent: (data) => data.__jsExpr,
 })
 
 /**
@@ -20,7 +24,7 @@ const JsExpr = new yaml.Type('tag:yaml.org,2002:js', {
  * (`dsh --dump-config`) parses and prints exactly the dialect this include
  * mounts.
  */
-export const entryListSchema = yaml.JSON_SCHEMA.extend(JsExpr)
+export const entryListSchema = yaml.JSON_SCHEMA.withTags(JsExpr)
 
 const schema = entryListSchema
 
