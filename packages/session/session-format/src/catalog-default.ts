@@ -159,9 +159,14 @@ class V2ToV3Stage implements SessionFormatMigrationStage {
     const data = event.data as Record<string, unknown>
     const values: unknown[] = event.type === 'user/message' ? [data]
       : event.type === 'assistant/message' || event.type === 'tool/result' ? [data.message]
-        : event.type === 'agent/inbox/spliced' ? (Array.isArray(data.inserted) ? data.inserted : [])
-          : event.type === 'session/title-llm-request' ? (Array.isArray(data.messages) ? data.messages : []) : []
+        : event.type === 'agent/inbox/spliced' ? (Array.isArray(data.inserted) ? data.inserted :
+          /* v8 ignore next -- assertV2CarrierShape has already rejected a non-array inserted list */
+          [])
+          : event.type === 'session/title-llm-request' ? (Array.isArray(data.messages) ? data.messages :
+            /* v8 ignore next -- assertV2CarrierShape has already rejected a non-array messages list */
+            []) : []
     for (const value of values) {
+      /* v8 ignore next -- assertV2CarrierShape guarantees every collected message carrier is an object */
       if (typeof value !== 'object' || value === null) continue
       const id = (value as Record<string, unknown>).id
       if (typeof id !== 'string') continue

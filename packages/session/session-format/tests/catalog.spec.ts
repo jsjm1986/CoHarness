@@ -119,6 +119,26 @@ describe('Session format catalog', () => {
     expect(missingHeader.events.at(-1)?.type).toBe('request/header')
   })
 
+  it('passes valid v2 assistant/attempt streams through and skips messages without a string id', () => {
+    const migrated = sessionFormatCatalog.migrate({
+      header: { version: 2, id: 'attempt', createdAt: 1 },
+      inheritedEventCount: 0,
+      events: [
+        event('assistant/attempt', 0, { stream: [] }),
+        event('user/message', 1, { role: 'user', content: [], source: { kind: 'user' } }),
+      ],
+    })
+    expect(migrated.events.map(item => item.type)).toEqual(['assistant/attempt', 'user/message'])
+    expect(migrated.events[1]?.data).toEqual({ role: 'user', content: [], source: { kind: 'user' } })
+  })
+
+  it('rejects message carriers whose data container is not a record', () => {
+    expect(() => sessionFormatCatalog.migrate({
+      header: { version: 2, id: 'bad-data', createdAt: 1 }, inheritedEventCount: 0,
+      events: [{ type: 'assistant/message', seq: 0, time: 1, data: [] } as unknown as SessionFormatEvent],
+    })).toThrow('v2 assistant/message has invalid data')
+  })
+
 })
 
 it('streams both default legacy generations without changing event identity', () => {
