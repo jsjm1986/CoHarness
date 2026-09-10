@@ -1,4 +1,6 @@
 import { execFileSync } from 'node:child_process'
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 /** The expensive pull-request CI lanes that a scope decision controls. */
 export interface CiPrScope {
@@ -23,13 +25,53 @@ function isScopedPath(path: string): boolean {
 }
 
 /**
+ * Collect the `<group>/<name>` keys of every package whose source can change
+ * browser-rendered output.
+ *
+ * Two markers are needed, because neither covers the whole surface on its own.
+ * Everything under `packages/client/` is browser-rendered, including the shared
+ * primitives that other client packages bundle without publishing a `./client`
+ * entry of their own. Outside that directory the `./client` export is the
+ * marker, and it is not optional: 16 browser-rendered packages live under other
+ * groups, so the directory layout alone would miss them.
+ *
+ * @param root - Repository root holding the `packages/` workspace.
+ * @returns The set of browser-rendered package keys.
+ */
+export function clientSurfacePackages(root: string): ReadonlySet<string> {
+  const packages = new Set<string>()
+  for (const group of readdirSync(join(root, 'packages'), { withFileTypes: true })) {
+    if (!group.isDirectory()) continue
+    const groupRoot = join(root, 'packages', group.name)
+    for (const entry of readdirSync(groupRoot, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue
+      let manifest: { exports?: Record<string, unknown> }
+      try {
+        manifest = JSON.parse(readFileSync(join(groupRoot, entry.name, 'package.json'), 'utf8')) as typeof manifest
+      } catch {
+        continue
+      }
+      if (group.name === 'client' || (manifest.exports !== undefined && Object.hasOwn(manifest.exports, './client'))) {
+        packages.add(`${group.name}/${entry.name}`)
+      }
+    }
+  }
+  return packages
+}
+
+/**
  * Classify a pull-request diff for the CI lane selector.
  *
  * @param paths - Repository-relative paths changed by the pull request.
  * @param diff - Zero-context unified diff for identifying pin-only workflow edits.
+ * @param clientPackages - Keys of browser-rendered packages, from {@link clientSurfacePackages}.
  * @returns Whether coverage, consumer, runtime, and Windows lanes should run.
  */
-export function classifyCiPrScope(paths: readonly string[], diff: string): CiPrScope {
+export function classifyCiPrScope(
+  paths: readonly string[],
+  diff: string,
+  clientPackages: ReadonlySet<string> = new Set(),
+): CiPrScope {
   const changedSourceFiles = paths.filter(path => /^packages\/[^/]+\/[^/]+\/src\//.test(path))
   const changedPackageFiles = paths.filter(path => path.endsWith('/package.json') || path === 'package.json' || path === 'pnpm-lock.yaml')
   const docsOnlyPaths = paths.every(path => path.startsWith('docs/')
@@ -78,7 +120,11 @@ export function classifyCiPrScope(paths: readonly string[], diff: string): CiPrS
     runExpensive: true,
     reason: 'scoped',
     coverageMode: 'scoped',
-    snapshotMode: 'scoped',
+    // The scoped consumer aggregate drops the Playwright browser snapshot, which
+    // is only sound while the change cannot alter browser-rendered output. A
+    // browser-rendered package breaks that assumption, so those pull requests
+    // keep the full snapshot inventory while coverage stays scoped.
+    snapshotMode: packages.some(pkg => clientPackages.has(pkg)) ? 'full' : 'scoped',
   }
 
   return {
@@ -99,7 +145,10 @@ function main(): void {
     .split('\n')
     .filter(Boolean)
   const diff = execFileSync('git', ['diff', '--unified=0', range], { encoding: 'utf8', maxBuffer: 100 * 1024 * 1024 })
-  const result = classifyCiPrScope(paths, diff)
+  const result = classifyCiPrScope(paths, diff, clientSurfacePackages(process.cwd()))
+  if (result.reason === 'scoped' && result.snapshotMode === 'full') {
+    console.error('ci-pr-scope: client-surface change, keeping the full snapshot inventory')
+  }
   const scopedPackages = result.coverageMode === 'scoped'
     ? [...new Set(paths.map(scopedPackage).filter((value): value is string => value !== undefined))]
     : []

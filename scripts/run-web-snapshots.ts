@@ -21,20 +21,33 @@ if (!Number.isSafeInteger(workers) || workers < 1 || String(workers) !== workerR
   throw new Error(`DSH_WEB_SNAPSHOT_WORKERS must be a positive integer, got ${JSON.stringify(workerRaw)}.`)
 }
 const invocation = pnpmInvocation(['exec', 'vitest', 'run', '--config', 'vitest.web.config.ts'])
-let serialStatus = 0
+
+// Every serial owner runs even when an earlier one fails. Each suite already
+// gets its own Vitest process, so a failure cannot corrupt the next one;
+// stopping at the first failure only hides the remaining ones until the next CI
+// round, which makes a change that touches many goldens converge one file per
+// round instead of in one round.
+const failedSerial: string[] = []
 for (const file of serialFiles) {
-  serialStatus = await run(invocation.command, [...invocation.args, file])
-  if (serialStatus !== 0) break
+  const status = await run(invocation.command, [...invocation.args, file])
+  if (status !== 0) failedSerial.push(file)
 }
-if (serialStatus === 0) {
-  process.exitCode = await run(invocation.command, [
-    ...invocation.args,
-    ...serialFiles.map(file => `--exclude=${file}`),
-    '--fileParallelism',
-    `--maxWorkers=${String(workers)}`,
-  ])
+
+// The pool owns exactly the files the serial list excludes, so a serial failure
+// says nothing about it. Running it regardless reports the whole failure set in
+// one round rather than spending another round to discover the pooled failures.
+const poolStatus = await run(invocation.command, [
+  ...invocation.args,
+  ...serialFiles.map(file => `--exclude=${file}`),
+  '--fileParallelism',
+  `--maxWorkers=${String(workers)}`,
+])
+
+if (failedSerial.length > 0) {
+  console.error(`web snapshots failed in serial owners: ${failedSerial.join(', ')}`)
+  process.exitCode = 1
 } else {
-  process.exitCode = serialStatus
+  process.exitCode = poolStatus
 }
 
 function run(command: string, args: string[]): Promise<number> {
