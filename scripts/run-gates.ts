@@ -413,7 +413,14 @@ function ciConsumerGates(options: { includeWebSnapshot?: boolean } = {}): Gate[]
     ciBuildGate(),
     pnpmScript('node-compat', 'check:node-compat', {
       label: 'Node compatibility',
-      env: { [CLIENT_BUILD_PROFILE_SELECTOR]: 'official' },
+      // The consumer aggregate already owns the one build that its compiled
+      // checks consume. Keeping this nested compatibility smoke source-only
+      // prevents a second typecheck/build from writing lib/ concurrently with
+      // the browser, built-bin, and documentation consumers.
+      env: {
+        [CLIENT_BUILD_PROFILE_SELECTOR]: 'official',
+        DSH_NODE_COMPAT_SKIP_TYPECHECK: '1',
+      },
     }),
     pnpmScript('publint', 'publint', { needs: builtTree }),
     builtPackageInvariantsGate(builtTree),

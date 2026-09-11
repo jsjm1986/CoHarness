@@ -33,12 +33,12 @@ describe('classifyCiPrScope', () => {
 
   it('selects the scoped lane for package source and test changes only', () => {
     expect(classifyCiPrScope([
-      'packages/session/session-format/src/catalog-default.ts',
-      'packages/session/session-format/tests/catalog.spec.ts',
+      'packages/util/timeout/src/nested/reader.ts',
+      'packages/util/timeout/tests/nested/reader.spec.ts',
     ], '')).toMatchObject({
       runExpensive: true,
       reason: 'scoped',
-      changedSourceFiles: ['packages/session/session-format/src/catalog-default.ts'],
+      changedSourceFiles: ['packages/util/timeout/src/nested/reader.ts'],
       changedPackageFiles: [],
       changedDocsOnly: false,
       coverageMode: 'scoped',
@@ -120,7 +120,7 @@ describe('classifyCiPrScope', () => {
 
   it('keeps the scoped snapshot when no changed package is browser-rendered', () => {
     expect(classifyCiPrScope([
-      'packages/session/session-format/src/catalog-default.ts',
+      'packages/util/timeout/src/index.ts',
     ], '', new Set(['client/ui-conversation']))).toMatchObject({
       reason: 'scoped',
       coverageMode: 'scoped',
@@ -132,6 +132,48 @@ describe('classifyCiPrScope', () => {
     expect(classifyCiPrScope([
       'packages/client/ui-conversation/src/message-row.ts',
     ], '')).toMatchObject({ reason: 'scoped', snapshotMode: 'scoped' })
+  })
+
+  it('forces full runtime coverage for Session and Cordis seams', () => {
+    for (const path of [
+      'packages/core/session/src/index.ts',
+      'packages/typert/generator/src/analyzer.ts',
+      'packages/client/connection/src/index.ts',
+    ]) {
+      expect(classifyCiPrScope([path], '')).toMatchObject({
+        reason: 'full',
+        coverageMode: 'full',
+        gatewayMode: 'skip',
+      })
+    }
+  })
+
+  it('treats model-visible skill files as runtime inputs', () => {
+    expect(classifyCiPrScope([
+      'apps/cli/config/agent-presets/cordis/skills/cordis-plugin-development/SKILL.md',
+    ], '')).toMatchObject({
+      changedDocsOnly: false,
+      reason: 'full',
+      runExpensive: true,
+      snapshotMode: 'scoped',
+    })
+  })
+
+  it('selects the independent Gateway lanes for cloud protocol changes', () => {
+    expect(classifyCiPrScope(['gateway/src/principal.ts'], '')).toMatchObject({
+      reason: 'full',
+      gatewayMode: 'full',
+      adminUiMode: 'skip',
+    })
+    expect(classifyCiPrScope(['gateway/admin-ui/src/App.tsx'], '')).toMatchObject({
+      reason: 'full',
+      gatewayMode: 'full',
+      adminUiMode: 'full',
+    })
+    expect(classifyCiPrScope(['packages/util/timeout/package.json'], '')).toMatchObject({
+      gatewayMode: 'skip',
+      adminUiMode: 'skip',
+    })
   })
 })
 

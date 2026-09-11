@@ -24,10 +24,14 @@ async function bootHmr(dir: string, root: string[] = [], usePolling?: boolean): 
 }
 
 async function eventually(test: () => boolean, message: string): Promise<void> {
-  const deadline = Date.now() + 10_000
+  // Sized to the tests' declared 20 s budgets: on a saturated shared-loop
+  // runner the fs.watch callback can be delayed past a 10 s wall-clock window
+  // while a sibling file transforms. Poll loosely so the observation itself
+  // does not add loop contention.
+  const deadline = Date.now() + 15_000
   while (!test()) {
     if (Date.now() >= deadline) throw new Error(message)
-    await new Promise(resolve => setTimeout(resolve, 10))
+    await new Promise(resolve => setTimeout(resolve, 25))
   }
 }
 

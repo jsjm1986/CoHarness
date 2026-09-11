@@ -10,8 +10,8 @@ const source = 'packages/client/foo/src/index.ts'
 const component = 'packages/client/foo/src/view.tsx'
 
 const covered = {
-  [source]: { l: { '1': 1 }, s: { '1': 1 }, f: { '1': 1 }, b: { '1': [1, 1] } },
-  [`${root}/${component}`]: { l: { '1': 1 }, s: { '1': 1 }, f: { '1': 1 }, b: { '1': [1] } },
+  [source]: { statementMap: { '1': { start: { line: 1 } } }, s: { '1': 1 }, f: { '1': 1 }, b: { '1': [1, 1] } },
+  [`${root}/${component}`]: { statementMap: { '1': { start: { line: 1 } } }, s: { '1': 1 }, f: { '1': 1 }, b: { '1': [1] } },
 }
 
 describe('changedMeasuredSources', () => {
@@ -37,8 +37,24 @@ describe('summarizeIncrementalCoverage', () => {
   })
 
   it('rejects an uncovered metric', () => {
-    const map = { [source]: { l: { '1': 1, '2': 0 }, s: { '1': 1 }, f: { '1': 1 }, b: { '1': [1] } } }
+    const map = { [source]: {
+      statementMap: { '1': { start: { line: 1 } }, '2': { start: { line: 2 } } },
+      s: { '1': 1, '2': 0 }, f: { '1': 1 }, b: { '1': [1] },
+    } }
     expect(() => summarizeIncrementalCoverage(root, map, [source])).toThrow(/lines coverage is below 100%/u)
+  })
+
+  it('derives line coverage from the standard Istanbul statement map', () => {
+    const map = { [source]: {
+      statementMap: { '1': { start: { line: 4 } }, '2': { start: { line: 4 } } },
+      s: { '1': 1, '2': 1 }, f: { '1': 1 }, b: { '1': [1] },
+    } }
+    expect(summarizeIncrementalCoverage(root, map, [source])[0]?.lines).toBe(100)
+  })
+
+  it('rejects malformed generated coverage instead of treating missing fields as covered', () => {
+    expect(() => summarizeIncrementalCoverage(root, { [source]: {} }, [source]))
+      .toThrow(/missing statementMap, s, f, or b/u)
   })
 })
 

@@ -17,6 +17,10 @@ export interface CiPrScope {
   readonly pythonMode: 'skip' | 'full'
   /** The Wine blocking gate and the native Windows gate inventory. */
   readonly windowsMode: 'skip' | 'full'
+  /** The independent cloud Gateway project and its ACL/runtime API tests. */
+  readonly gatewayMode: 'skip' | 'full'
+  /** The independent Gateway administration UI project. */
+  readonly adminUiMode: 'skip' | 'full'
 }
 
 const MAX_SCOPED_PACKAGES = 4
@@ -27,7 +31,7 @@ function scopedPackage(path: string): string | undefined {
 }
 
 function isScopedPath(path: string): boolean {
-  return /^packages\/[^/]+\/[^/]+\/(?:src|tests)\/[^/]+\.(?:ts|tsx)$/.test(path)
+  return /^packages\/[^/]+\/[^/]+\/(?:src|tests)\/[^*?{}\[\]]+\.(?:ts|tsx)$/.test(path)
 }
 
 /** Lockfile and build configuration, which every lane's inputs depend on. */
@@ -41,6 +45,32 @@ function isInertPath(path: string): boolean {
     || path.endsWith('.md')
     || path.endsWith('.mdx')
     || path.endsWith('.i18n.yaml')
+}
+
+/** Runtime seams whose changes can alter generated contracts, durable history, model requests, authorization, or process confinement. */
+function isFullRuntimePath(path: string): boolean {
+  return path.startsWith('vendor/')
+    || path.startsWith('gateway/')
+    || path.startsWith('native/')
+    || /^packages\/(?:core|session|agent|api|typert|llm|subagent|sandbox|subprocess|terminal)\//.test(path)
+    || path.startsWith('packages/client/connection/')
+    || path.startsWith('packages/host/apiproxy/')
+}
+
+/** Model-visible files are inputs even when they are stored as Markdown. */
+function isModelInputPath(path: string): boolean {
+  return path.startsWith('apps/cli/config/')
+    || /(?:^|\/)\b(?:AGENTS|SKILL)\.md$/u.test(path)
+}
+
+function isGatewayPath(path: string): boolean {
+  return path.startsWith('gateway/')
+    || path.startsWith('packages/api/')
+    || path.startsWith('packages/host/apiproxy/')
+}
+
+function isAdminUiPath(path: string): boolean {
+  return path.startsWith('gateway/admin-ui/')
 }
 
 /** Paths that reach browser-rendered output: the web app and client-surface packages. */
@@ -105,12 +135,22 @@ export function classifyCiPrScope(
   const changedSourceFiles = paths.filter(path => /^packages\/[^/]+\/[^/]+\/src\//.test(path))
   const changedPackageFiles = paths.filter(path => path.endsWith('/package.json') || path === 'package.json' || path === 'pnpm-lock.yaml')
   const inertOnly = paths.length > 0 && paths.every(isInertPath)
-  const common = { changedSourceFiles, changedPackageFiles, changedDocsOnly: inertOnly }
+  const fullRuntime = paths.some(isFullRuntimePath)
+  const modelInput = paths.some(isModelInputPath)
+  const gatewayReachable = paths.some(isGatewayPath)
+  const adminUiReachable = paths.some(isAdminUiPath)
+  const common = {
+    changedSourceFiles,
+    changedPackageFiles,
+    changedDocsOnly: inertOnly && !modelInput,
+    gatewayMode: gatewayReachable ? 'full' as const : 'skip' as const,
+    adminUiMode: adminUiReachable ? 'full' as const : 'skip' as const,
+  }
   // The Node lanes run the whole runtime suite. Only documentation and the Python
   // SDK are provably outside their input domain; `scripts/**` is deliberately not
   // exempt, because it holds the gate runner every lane invokes and the fixture
   // generator the snapshot lane consumes.
-  const nodeLanesUnreachable = paths.length > 0 && paths.every(path => isInertPath(path) || path.startsWith('python/'))
+  const nodeLanesUnreachable = !modelInput && paths.length > 0 && paths.every(path => isInertPath(path) || path.startsWith('python/'))
   // The Python lanes build and exercise `python/**` plus the packaged runtime, so
   // only a Python or dependency change can reach them.
   const pythonLanesReachable = paths.some(path => path.startsWith('python/') || DEPENDENCY_PATH.test(path))
@@ -130,6 +170,8 @@ export function classifyCiPrScope(
     compatMode: 'full',
     pythonMode: 'full',
     windowsMode: 'full',
+    gatewayMode: 'full',
+    adminUiMode: 'full',
   }
 
   const changedLines = diff
@@ -148,7 +190,7 @@ export function classifyCiPrScope(
     pythonMode: 'skip',
     windowsMode: 'skip',
   }
-  if (inertOnly) return {
+  if (inertOnly && !modelInput) return {
     ...common,
     runExpensive: false,
     reason: 'docs-only',
@@ -160,7 +202,7 @@ export function classifyCiPrScope(
   }
 
   const packages = [...new Set(paths.map(scopedPackage).filter((value): value is string => value !== undefined))]
-  const scoped = paths.every(isScopedPath) && packages.length > 0 && packages.length <= MAX_SCOPED_PACKAGES
+  const scoped = !fullRuntime && !modelInput && paths.every(isScopedPath) && packages.length > 0 && packages.length <= MAX_SCOPED_PACKAGES
   if (scoped) return {
     ...common,
     runExpensive: true,
@@ -215,6 +257,8 @@ function main(): void {
     `compat_mode=${result.compatMode}`,
     `python_mode=${result.pythonMode}`,
     `windows_mode=${result.windowsMode}`,
+    `gateway_mode=${result.gatewayMode}`,
+    `admin_ui_mode=${result.adminUiMode}`,
     `scoped_packages=${JSON.stringify(scopedPackages)}`,
   ].join('\n')}\n`)
 }

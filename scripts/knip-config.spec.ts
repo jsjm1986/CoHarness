@@ -22,9 +22,11 @@ describe('generated Typert Knip dependencies', () => {
   it('ignores face dependencies when the generated JavaScript face exists', () => {
     const configured = configureGeneratedTypertDependencies(typedBaseConfig, {
       root: '/repo',
+      // Match on the basename so the seam holds on Windows, where `resolve`
+      // joins with backslashes and a forward-slash suffix would never match.
       fileExists: path =>
-        path.endsWith('lib/typert.remote-client.d.ts') ||
-        path.endsWith('lib/types/sessions.d.ts'),
+        path.endsWith('typert.remote-client.d.ts') ||
+        path.endsWith('sessions.d.ts'),
     })
 
     for (const [workspace, { deps }] of Object.entries(GENERATED_TYPERT_FACE_DEPENDENCIES)) {

@@ -222,6 +222,16 @@ describe('gate graph validation', () => {
       .toEqual(scoped.map(subject => subject.id))
   })
 
+  it('keeps the consumer compatibility smoke source-only', () => {
+    const gate = withPnpmEntrypoint(() => gatesForMode('ci-consumers').find(subject => subject.id === 'node-compat'))
+    expect(gate).toMatchObject({
+      env: {
+        DSH_BUILD_CLIENT_PROFILE: 'official',
+        DSH_NODE_COMPAT_SKIP_TYPECHECK: '1',
+      },
+    })
+  })
+
   it.each([
     ['empty', [], /gate graph has no gates/],
     ['duplicate ids', [gate('same'), gate('same')], /duplicate gate id "same"/],
@@ -403,6 +413,7 @@ describe('Node 24 lane ownership', () => {
     })
     expect(subject.find(item => item.id === 'node-compat')?.env).toEqual({
       DSH_BUILD_CLIENT_PROFILE: 'official',
+      DSH_NODE_COMPAT_SKIP_TYPECHECK: '1',
     })
     expect(subject.find(item => item.id === 'built-package-invariants')?.needs).toEqual(['build'])
     expect(subject.find(item => item.id === 'lint-and-duplication')?.needs).toEqual(['built-package-invariants'])

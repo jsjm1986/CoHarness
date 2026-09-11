@@ -9,8 +9,38 @@ name: Release (dsh)
 
 on:
   pull_request:
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - 'plugins/**'
+      - 'vendor/**'
+      - 'native/landlock-run/**'
+      - 'python/**'
+      - 'scripts/build-*.ts'
+      - 'scripts/release/**'
+      - 'scripts/publication-payload*'
+      - '.github/workflows/release.yml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig*.json'
   push:
     branches: [master]
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - 'plugins/**'
+      - 'vendor/**'
+      - 'native/landlock-run/**'
+      - 'python/**'
+      - 'scripts/build-*.ts'
+      - 'scripts/release/**'
+      - 'scripts/publication-payload*'
+      - '.github/workflows/release.yml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig*.json'
   workflow_dispatch:
     inputs:
       publish:
@@ -23,10 +53,10 @@ permissions:
   contents: read
 
 concurrency:
-  # Pack runs per ref so concurrent pull requests never displace each
-  # other; the publish job below serializes the shared dist-tag state.
+  # A newer commit supersedes an in-flight pull-request pack. Pushes and manual
+  # publication runs remain serialized and are never cancelled.
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   PRIMARY_NODE_VERSION: '24'
