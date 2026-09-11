@@ -146,6 +146,8 @@ Follow [gateway/deploy/README.md](gateway/deploy/README.md) for database prepara
 | [`apps/android-shell/`](apps/android-shell/README.md) | Capacitor Android shell for a hosted CoHarness Web UI. |
 | [`gateway/`](gateway/README.md) | Authenticated PostgreSQL control plane, Admin SPA, proxy, runtime lifecycle, governance, usage, audit, and deployment assets. |
 | [`packages/`](packages/README.md) | Cordis capability packages and browser/host UI packages. |
+| [`engineering/`](engineering/README.md) | Cross-package quality, performance, and security records. |
+| [`upgrades/`](upgrades/README.md) | Per-release upstream plans, manifests, alignment matrices, and audits. |
 | [`plugins/`](plugins) | Tree-external policy and security plugins, including model governance and directory enforcement. |
 | [`python/`](python/README.md) | Python SDK and bundled runtime carriers. |
 | [`native/`](native/README.md) | Native launchers, including Landlock-based process confinement. |

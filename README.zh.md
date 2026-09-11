@@ -146,6 +146,8 @@ pnpm run build:production
 | [`apps/android-shell/`](apps/android-shell/README.zh.md) | 加载托管 CoHarness Web UI 的 Capacitor Android 壳。 |
 | [`gateway/`](gateway/README.zh.md) | PostgreSQL 认证控制面、Admin SPA、代理、运行时生命周期、治理、用量、审计和部署资源。 |
 | [`packages/`](packages/README.zh.md) | Cordis 能力软件包以及浏览器/Host UI 软件包。 |
+| [`engineering/`](engineering/README.zh.md) | 跨软件包的质量、性能和安全记录。 |
+| [`upgrades/`](upgrades/README.zh.md) | 按 release 保存的上游计划、manifest、对齐矩阵和审查记录。 |
 | [`plugins/`](plugins) | 树外策略和安全插件，包括模型治理与目录强制。 |
 | [`python/`](python/README.zh.md) | Python SDK 和 bundled runtime carrier。 |
 | [`native/`](native/README.zh.md) | 原生启动器，包括基于 Landlock 的进程隔离。 |
