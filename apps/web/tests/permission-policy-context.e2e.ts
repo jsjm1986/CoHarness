@@ -1,8 +1,9 @@
 // Web acceptance for current sandbox-policy context. A real Chromium drives
 // the shipped /permission command through all three presets; record mode uses
 // the real provider, while replay keeps the same provider-authored behavior
-// keyless. Assertions read the exact durable header, runtime-context messages,
-// and tool calls, so assistant prose alone cannot satisfy the scenario.
+// keyless. Assertions read the exact durable system-prompt surface,
+// runtime-context messages, and tool calls, so assistant prose alone cannot
+// satisfy the scenario.
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -13,7 +14,7 @@ import { canonicalPath } from '@deepseek-ai/dsh-sandbox'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import {
   assertFixtureInventory, fixtureUserPrompts, launchWebScaffold, recordFixture,
-  watchConsole, webSnapshotMode, type WebScaffold,
+  systemPromptTexts, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
 import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
 
@@ -29,13 +30,6 @@ const PROMPTS = [
 ] as const
 
 const PRESET_LABELS = ['Read Only', 'Full access', 'Workspace Write'] as const
-
-function requestSystems(events: readonly SessionEvent[]): string[] {
-  return events.flatMap((event) => {
-    if (event.type !== 'request/header') return []
-    return typeof event.data.header.system === 'string' ? [event.data.header.system] : []
-  })
-}
 
 function runtimeContexts(events: readonly SessionEvent[]): string[] {
   return events.flatMap((event) => {
@@ -122,7 +116,7 @@ describe('web e2e: current sandbox policy reaches the model before tools', () =>
   }, 240_000)
 
   it.skipIf(MODE === 'record')('records cache-safe current policy before the corresponding model behavior', async () => {
-    const systems = requestSystems(sessionEvents)
+    const systems = systemPromptTexts(sessionEvents)
     expect(systems).toHaveLength(1)
     expect(systems[0]).not.toContain('Current DSH file policy:')
     expect(systems[0]).not.toContain('Approval policy:')

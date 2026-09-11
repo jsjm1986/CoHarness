@@ -72,7 +72,11 @@ export function apply(ctx: ClientContext): void {
   const browserFlowSource = flowSource('sidebar.workspaces.directoryFlow')
   const pickerFlowSource = flowSource('conversation.hero.workspace.directoryFlow')
   const openSession = (sessionId: SessionId): void => {
-    ctx.get('conversationViewport')?.replaceActive(sessionId)
+    // A single-mode open must not materialize a workbench pane: on an empty
+    // pane list `replaceActive` falls back to `add`, which switches the
+    // viewport into workbench mode and collapses the session list. Route
+    // through the active pane only while the workbench is actually engaged.
+    if (viewport?.snapshot.getSnapshot().mode === 'workbench') viewport.replaceActive(sessionId)
     ctx.sessions.open(sessionId)
   }
   const browserInjected = (): WorkspaceBrowserInjected => ({

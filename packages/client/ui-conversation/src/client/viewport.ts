@@ -350,8 +350,14 @@ export class ConversationViewportController implements ConversationViewport {
     if (active !== undefined && active.paneIds.length) {
       this.store.update((draft) => {
         draft.paneIds = [...active.paneIds]
-        if (active.paneIds[0] === undefined) delete draft.activePaneId
-        else draft.activePaneId = active.paneIds[0]
+        // The workbench row carries no active marker; the ViewState persist
+        // already restored the user's active pane, so keep it while it still
+        // resolves inside the restored pane set.
+        const restored = draft.activePaneId
+        const first = active.paneIds[0]
+        if (restored !== undefined && active.paneIds.includes(restored)) draft.activePaneId = restored
+        else if (first !== undefined) draft.activePaneId = first
+        else delete draft.activePaneId
         draft.paneRatios = normalizedRatios(active.paneIds.length, [])
       })
     }

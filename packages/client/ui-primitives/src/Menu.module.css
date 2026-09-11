@@ -274,8 +274,11 @@
   /* Primary menu lists use JS anchor coordinates on desktop. On a phone, a
      bottom sheet gives every row a stable touch target and avoids a card being
      placed behind the keyboard or outside a narrow composer. `!important`
-     overrides portal inline top/left coordinates intentionally. */
+     overrides portal inline top/left coordinates intentionally. Fixed (not the
+     desktop absolute) so the sheet escapes overflow-clipping anchor subtrees —
+     an in-place list clipped by its own toolbar sits under the shared scrim. */
   .list {
+    position: fixed;
     top: auto !important;
     right: max(var(--dsw-mobile-sheet-edge), var(--dsw-safe-right)) !important;
     bottom: var(--dsw-mobile-sheet-bottom) !important;

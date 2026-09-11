@@ -1,6 +1,7 @@
-- strong: Workbench
+- button "选择工作台":
+  - text: 我的工作台
+  - img
 - text: 3/4
 - button "Add conversation":
   - img
   - text: Add conversation
-- button "Single conversation"
