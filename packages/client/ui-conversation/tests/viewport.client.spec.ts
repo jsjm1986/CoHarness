@@ -159,6 +159,16 @@ describe('ConversationViewportController', () => {
     viewport.dispose()
   })
 
+  it('keeps the persisted active pane when the saved workbench restores its pane set', () => {
+    localStorage.setItem('dsh.conversation.workbench.v1', JSON.stringify({ mode: 'workbench', paneIds: ['a', 'b', 'd'], activePaneId: 'd', paneRatios: [] }))
+    localStorage.setItem('dsh.conversation.workbenches.v1', JSON.stringify({ activeId: 'default', workbenches: [{ id: 'default', name: '我的工作台', paneIds: ['a', 'b', 'd'], paneRatios: [], updatedAt: 1 }] }))
+    const h = harness()
+    const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    expect(viewport.snapshot.getSnapshot().activePaneId).toBe(id('d'))
+    expect(viewport.snapshot.getSnapshot().paneIds).toEqual([id('a'), id('b'), id('d')])
+    viewport.dispose()
+  })
+
   it('restores an added pane after a new viewport instance is created', () => {
     const first = harness()
     const original = new ConversationViewportController(first.sessions, createConversationViewportStore().create())

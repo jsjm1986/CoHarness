@@ -31,7 +31,9 @@ async function bench() {
     create, startSession, rename, insertSessionBefore,
   } as never)
   ctx.provide('sessions', { open, clear, search, searchResultLimit: 20, binding, fork } as never)
-  ctx.provide('conversationViewport', { snapshot: { getSnapshot: () => ({ mode: 'single', paneIds: [], paneRatios: [] }), subscribe: () => () => {} }, replaceActive: vi.fn(), setMode: vi.fn() } as never)
+  const viewportState = { mode: 'single' as 'single' | 'workbench' }
+  const replaceActive = vi.fn()
+  ctx.provide('conversationViewport', { snapshot: { getSnapshot: () => ({ mode: viewportState.mode, paneIds: [], paneRatios: [] }), subscribe: () => () => {} }, replaceActive, setMode: vi.fn() } as never)
   ctx.provide('connection', {
     hostDescription: { getSnapshot: () => undefined, subscribe: () => () => {} },
   } as never)
@@ -44,6 +46,7 @@ async function bench() {
   return {
     ctx, slots: ctx.get('slots') as SlotRegistry, locale, create, startSession, rename,
     insertSessionBefore, open, clear, search, renameSession, binding, fork,
+    viewportState, replaceActive,
   }
 }
 
@@ -91,6 +94,12 @@ describe('ui-workspace apply', () => {
     expect(b.startSession).toHaveBeenLastCalledWith(undefined)
     browser.open('session' as never)
     expect(b.open).toHaveBeenCalledWith('session')
+    // Single-mode opens must not materialize a workbench pane.
+    expect(b.replaceActive).not.toHaveBeenCalled()
+    b.viewportState.mode = 'workbench'
+    browser.open('session-2' as never)
+    expect(b.replaceActive).toHaveBeenCalledWith('session-2')
+    b.viewportState.mode = 'single'
     const signal = new AbortController().signal
     await expect(browser.searchSessions('match', signal)).resolves.toEqual({
       items: [{ sessionId: 'session', snippet: 'match' }],
