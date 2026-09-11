@@ -5,6 +5,7 @@ import scopePolicy from './ci-scope-policy.json' with { type: 'json' }
 describe('classifyCiPrScope', () => {
   it('uses a versioned declarative policy for shared and model-input paths', () => {
     expect(scopePolicy.version).toBe(1)
+    expect(scopePolicy.inertPrefixes).toContain('upgrades/')
     expect(scopePolicy.scopedPackageGroups).toContain('util')
     expect(scopePolicy.scopedPackageGroups).not.toContain('session')
     expect(scopePolicy.modelInputPrefixes).toContain('apps/cli/config/')
@@ -24,6 +25,24 @@ describe('classifyCiPrScope', () => {
       changedDocsOnly: true,
       coverageMode: 'skip',
       snapshotMode: 'skip',
+    })
+  })
+
+  it('skips expensive lanes for upgrade and engineering records, including JSON', () => {
+    expect(classifyCiPrScope([
+      'upgrades/plans/UPGRADE-PLAN-dsh-v0.1.5-alpha.1.md',
+      'upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.5-alpha.1.json',
+      'upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.5-alpha.1.json',
+      'engineering/BENCHMARK.md',
+    ], '')).toMatchObject({
+      runExpensive: false,
+      reason: 'docs-only',
+      changedDocsOnly: true,
+      coverageMode: 'skip',
+      snapshotMode: 'skip',
+      compatMode: 'skip',
+      pythonMode: 'skip',
+      windowsMode: 'skip',
     })
   })
 

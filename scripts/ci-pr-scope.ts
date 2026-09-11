@@ -28,6 +28,7 @@ const MAX_SCOPED_PACKAGES = 4
 
 interface CiScopePolicy {
   readonly version: number
+  readonly inertPrefixes: readonly string[]
   readonly fullRuntimePrefixes: readonly string[]
   readonly fullRuntimePackagePrefixes: readonly string[]
   readonly scopedPackageGroups: readonly string[]
@@ -52,11 +53,9 @@ function isScopedPath(path: string): boolean {
 /** Lockfile and build configuration, which every lane's inputs depend on. */
 const DEPENDENCY_PATH = /(^|\/)(?:package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|\.npmrc|tsconfig[^/]*\.json)$/
 
-/** Documentation and agent notes, which no lane's inputs depend on. */
+/** Documentation records and agent notes, which no lane's inputs depend on. */
 function isInertPath(path: string): boolean {
-  return path.startsWith('docs/')
-    || path.startsWith('website/')
-    || path.startsWith('.agents/')
+  return policy.inertPrefixes.some(prefix => path.startsWith(prefix))
     || path.endsWith('.md')
     || path.endsWith('.mdx')
     || path.endsWith('.i18n.yaml')
