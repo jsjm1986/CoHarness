@@ -738,8 +738,10 @@ jobs:
           || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
           && '8' || '1' }}
     steps:
+      # Fetch complete history so the upstream sovereignty gate can diff mirrored release tags.
       - uses: actions/checkout@v7
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Enable Developer Mode (symlink support)
@@ -869,7 +871,10 @@ jobs:
     runs-on: [self-hosted, dsh-win-ci, windows]
     timeout-minutes: 120
     steps:
+      # Fetch complete history so the upstream sovereignty gate can diff mirrored release tags.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Enable Developer Mode (symlink support)
         shell: pwsh

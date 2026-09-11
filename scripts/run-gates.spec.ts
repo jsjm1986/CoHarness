@@ -117,6 +117,15 @@ describe('gate graph validation', () => {
     },
   )
 
+  it.each(['ci-static', 'ci-windows-observational'] as const)(
+    'keeps the upstream sovereignty manifest gate in %s',
+    (mode) => {
+      const ids = withPnpmEntrypoint(() => gatesForMode(mode).map(subject => subject.id))
+
+      expect(ids).toContain('upstream-sovereignty')
+    },
+  )
+
   it('keeps native Windows coverage blocking while retaining the observational inventory', () => {
     const complete = withPnpmEntrypoint(() => gatesForMode('ci-windows-complete'))
     const observational = withPnpmEntrypoint(() => gatesForMode('ci-windows-observational'))
