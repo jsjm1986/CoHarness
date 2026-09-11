@@ -4,6 +4,18 @@
 
 关联 Issue：
 
+变更轨道：
+
+- [ ] 产品轨道：CoHarness 新功能或修复（Cordis capability seam / 业务 owner）
+- [ ] 上游轨道：针对确切 upstream tag/commit 的选择性对齐
+
+如果选择上游轨道：
+
+- 上游基线与目标：
+- 升级 plan / manifest / alignment matrix：
+- 破坏性 API、wire、Session 或迁移影响：
+- 与 CoHarness 业务等价实现或保留边界：
+
 <details>
 <summary>变更与验证</summary>
 
