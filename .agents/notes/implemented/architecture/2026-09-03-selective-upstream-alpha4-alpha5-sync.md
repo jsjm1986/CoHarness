@@ -10,7 +10,7 @@ The upstream `dsh-v0.1.2-alpha.4` tag changes the session protocol rather than a
 
 ## Decision
 
-The fork integrates both tags with a file-level three-way merge (`git merge-file` with the upstream alpha.3 version as base, the fork version as ours, and the upstream alpha.5 version as theirs) and resolves the 245 conflicted files hunk by hunk; fork-owned packages that upstream never touched are adapted until `typecheck` is clean. The complete matrix lives in [`UPGRADE-PLAN-dsh-v0.1.2-alpha.4-alpha.5.md`](../../../../UPGRADE-PLAN-dsh-v0.1.2-alpha.4-alpha.5.md); the machine-readable inventory is [`UPGRADE-MANIFEST-dsh-v0.1.2-alpha.4-alpha.5.json`](../../../../UPGRADE-MANIFEST-dsh-v0.1.2-alpha.4-alpha.5.json).
+The fork integrates both tags with a file-level three-way merge (`git merge-file` with the upstream alpha.3 version as base, the fork version as ours, and the upstream alpha.5 version as theirs) and resolves the 245 conflicted files hunk by hunk; fork-owned packages that upstream never touched are adapted until `typecheck` is clean. The complete matrix lives in [`UPGRADE-PLAN-dsh-v0.1.2-alpha.4-alpha.5.md`](../../../../upgrades/plans/UPGRADE-PLAN-dsh-v0.1.2-alpha.4-alpha.5.md); the machine-readable inventory is [`UPGRADE-MANIFEST-dsh-v0.1.2-alpha.4-alpha.5.json`](../../../../upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.2-alpha.4-alpha.5.json).
 
 The shipped code adopts these upstream behaviors:
 

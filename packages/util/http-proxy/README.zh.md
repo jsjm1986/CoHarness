@@ -84,7 +84,7 @@ loopback 始终被绕过——`localhost`、整个 `127.0.0.0/8` 段、`::1`、`
 <a id="further-exploration"></a>
 ## 进一步探索
 
-- [代理策略与上游审计](../../../UPGRADE-PLAN-dsh-v0.1.3-alpha.1.md)——策略决策和集成范围。
+- [代理策略与上游审计](../../../upgrades/plans/UPGRADE-PLAN-dsh-v0.1.3-alpha.1.md)——策略决策和集成范围。
 - [`dsh-web-fetch-http`](../../web/web-fetch-http/README.zh.md)——唯一一个安全规则会因代理而改变的消费方。
 
 -----

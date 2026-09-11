@@ -336,7 +336,7 @@ JSONL 是另一条物理格式：I03 的 `sourceEventSeqs` range 编码只改变
 
 - 已建立 `upgrade/dsh-v0.1.2-alpha.1` 分支和 `baseline/2026-08-29` tag；`master` 未被本轮改写。
 - 已保存 `pnpm-lock.yaml`、候选代码 checkpoint、构建产物清单和由运维生成的 Session/Gateway 数据库备份及 hash；真实数据和凭据未写入仓库。生产已运行 release 目录 `coharness-19cb329009`，上一 release `coharness-2d1b6785ab`、`coharness-a5cd5ba34b` 与旧目录 `coharness-6464092040` 均保留用于回滚。
-- §4.5 提供可审计的 52 项状态索引；`UPGRADE-MANIFEST-dsh-v0.1.2-alpha.1.json` 保存上游/基线/实现 commit、逐项状态、验证结果、备份 hash 和生产健康 id。
+- §4.5 提供可审计的 52 项状态索引；`../manifests/UPGRADE-MANIFEST-dsh-v0.1.2-alpha.1.json` 保存上游/基线/实现 commit、逐项状态、验证结果、备份 hash 和生产健康 id。
 - 当前已接入的开关是 `COHARNESS_SEND_PLUGIN_METADATA`、`COHARNESS_UPLOAD_SESSION_LOG`、`COHARNESS_DISABLE_SESSION_LOG_UPLOAD` 和 `COHARNESS_HEADLESS_PROGRESS`；`COHARNESS_REMOTE_READS`、`COHARNESS_PUBLIC_WEB_FETCH` 尚未有生产代码，不得当作可用开关。所有已接入开关默认不改变现有安全行为。
 
 单个上游改动的应用方式：在 topic branch 上对实现 commit 执行 `git show --format= --binary <commit> > /tmp/dsh-upstream.patch`；若矩阵列的是 merge commit，先用 `git diff <merge>^1 <merge>` 取得相对 first-parent 的 patch。再用 `git apply --reject` 识别文件级冲突，按矩阵中的当前路径手工合流；检查二进制资源、生成文件和中英文 README 后提交一个语义完整的 commit。禁止在无共同祖先的两棵树上直接 `cherry-pick`，也禁止用“全部接受 ours/theirs”消除冲突。
@@ -583,7 +583,7 @@ pnpm exec vitest run --project=process-bound --no-file-parallelism --maxWorkers=
 - 上游 `e14d354e83` 的 connection contract 拆分、`a789637db6` 的 `ToolCallId` 命名、`64bb0427f9` 的 workspace-path 包、Win32 原语抽取和 session-snapshot 包已逐一核对；CoHarness 分别保留现有 Gateway/ApiProxy seam、提供 `ToolCallId` alias、使用 runtime/path 与 sandbox/acp-snapshot 等价实现，不为目录或命名一致性引入重复闭包。Windows native、跨浏览器和性能证据仍不能由 macOS 本地构建代替。
 - 远端 Sandbox 新候选 `33303408766` 的 bwrap、两架构 Landlock 和 macOS seatbelt 全部通过；相较前一候选/基线 seatbelt 的三个 pwsh 失败，本轮 terminal protocol replies 与 canonical-path 断言已消除该差异。远端 real-API E2E `33303408783` 仍因缺少受保护的 `DEEPSEEK_API_KEY_EXTERNAL` 在 preflight 停止；不得把它改写成代码通过。
 - Release(dsh) `33303408769`、Release(vendor) `33303408793` 和 Sandbox `33303408766` 均成功；push 触发的 CI `33303408921` 已取消且没有 job（工作流只为 pull request 调度具体矩阵），CI #105 的 node 24 snapshot job 同样因 runner 等待取消且没有执行 step，因此两者都不能作为快照通过或失败的证据。
-- 阶段 A 所列机器可读 manifest、依赖/NOTICE 清单和生产数据备份/hash 已生成；manifest 位于 `UPGRADE-MANIFEST-dsh-v0.1.2-alpha.1.json`，备份文件名和 SHA-256 记录在 manifest 中。Profile dump、负责人签字和安全批准仍由发布流程存放在受控外部位置，不能用仓库文本替代。
+- 阶段 A 所列机器可读 manifest、依赖/NOTICE 清单和生产数据备份/hash 已生成；manifest 位于 `../manifests/UPGRADE-MANIFEST-dsh-v0.1.2-alpha.1.json`，备份文件名和 SHA-256 记录在 manifest 中。Profile dump、负责人签字和安全批准仍由发布流程存放在受控外部位置，不能用仓库文本替代。
 - `process.exit` listener 的 per-runtime 注册根因已改为模块级共享 handler，并由 focused/process-bound trace 验证；若 thread-safe 重跑仍报告 Socket listener warning，必须单独定位 teardown owner，不得提高全局 listener 上限。持久 pwsh marker-only 等待提案已撤回并记录在 [rejected Agent Note](.agents/notes/rejected/bug-fix/2026-08-30-pwsh-marker-readiness.md)；旧候选曾出现的三项 PowerShell 平台失败已由本轮协议应答和 canonical-path 修复消除，后续仍以跨平台实机车道作为证据。
 - 上游 `4f3a47d792` 的 terminal protocol replies 先前未进入候选；本轮已补入 `@xterm/headless`、协议回复串行队列、并发 foreground 重检和 pwsh 单一启动 deadline，并以 session/index focused tests 固定该语义。跨平台实机结果仍是 F01/F02 的外部门，不得用本地 fake PTY 代替。
 - 2026-08-30 本次 tag-wide 对照又执行了稳定的 `--no-renames` 统计（6823 文件、348411 新增、151493 删除）、基线/候选 package inventory（250→254，对照上游 254）和源文件残差扫描（按声明过滤条件为 256 个基线缺口、候选仍有 224 个同路径残差，按 §8.2 全部归并，未分类为 0）。这证明了范围覆盖，不代表这些路径都应复制到 CoHarness。

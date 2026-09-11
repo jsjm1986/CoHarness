@@ -10,7 +10,7 @@ The upstream `dsh-v0.1.2-alpha.2` and `dsh-v0.1.2-alpha.3` tags contain product 
 
 ## Decision
 
-The fork records both tags and ports behavior at the owning capability rather than merging histories. The complete comparison and status matrix lives in [`UPGRADE-PLAN-dsh-v0.1.2-alpha.2-alpha.3.md`](../../../../UPGRADE-PLAN-dsh-v0.1.2-alpha.2-alpha.3.md); the machine-readable source and decision inventory is [`UPGRADE-MANIFEST-dsh-v0.1.2-alpha.2-alpha.3.json`](../../../../UPGRADE-MANIFEST-dsh-v0.1.2-alpha.2-alpha.3.json).
+The fork records both tags and ports behavior at the owning capability rather than merging histories. The complete comparison and status matrix lives in [`UPGRADE-PLAN-dsh-v0.1.2-alpha.2-alpha.3.md`](../../../../upgrades/plans/UPGRADE-PLAN-dsh-v0.1.2-alpha.2-alpha.3.md); the machine-readable source and decision inventory is [`UPGRADE-MANIFEST-dsh-v0.1.2-alpha.2-alpha.3.json`](../../../../upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.2-alpha.2-alpha.3.json).
 
 The shipped code adopts these upstream behaviors:
 
