@@ -7,10 +7,7 @@
     "bwrap",
     "icacls",
     "musl-gcc",
-    "python3",
     "sandbox-exec",
-    "tar",
-    "taskkill",
     "where.exe"
   ],
   "ignoreWorkspaces": [
@@ -79,15 +76,6 @@
         "@deepseek-ai/.+"
       ]
     },
-    "packages/util/home": {
-      "entry": [
-        "tests/**/*.spec.ts"
-      ],
-      "project": [
-        "src/**/*.ts",
-        "tests/**/*.ts"
-      ]
-    },
     "packages/host/webserver": {
       "entry": [
         "tests/**/*.spec.ts"
@@ -123,15 +111,6 @@
       "entry": [
         "tests/**/*.spec.{ts,tsx}",
         "tests/**/*.e2e.ts"
-      ],
-      "project": [
-        "src/**/*.{ts,tsx}",
-        "tests/**/*.{ts,tsx}"
-      ]
-    },
-    "packages/client/web-ui": {
-      "entry": [
-        "tests/**/*.spec.{ts,tsx}"
       ],
       "project": [
         "src/**/*.{ts,tsx}",
@@ -228,6 +207,9 @@
         "src/**/*.tsx",
         "tests/**/*.ts",
         "tests/**/*.tsx"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
       ]
     },
     "packages/client/ui-workbench": {
@@ -317,6 +299,9 @@
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
       ]
     },
     "packages/context/time-context": {
@@ -375,6 +360,9 @@
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
       ]
     },
     "packages/util/brand": {
@@ -438,6 +426,9 @@
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
       ]
     },
     "packages/goal/goal": {
@@ -506,6 +497,9 @@
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
       ]
     },
     "packages/llm/llm-pi-ai": {
@@ -516,6 +510,9 @@
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
       ]
     },
     "packages/llm/model-access": {
@@ -608,6 +605,9 @@
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
       ]
     },
     "packages/web/web-search-deepseek": {
@@ -713,6 +713,9 @@
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
       ]
     },
     "packages/fs/tool-fs-search": {
@@ -779,10 +782,7 @@
       "ignoreDependencies": [
         "@deepseek-ai/dsh-client-ui-primitives",
         "@deepseek-ai/dsh-client-ui-slots",
-        "@types/react",
-        "@types/react-dom",
-        "react",
-        "react-dom"
+        "@deepseek-ai/.+"
       ]
     },
     "apps/android-shell": {
@@ -817,6 +817,9 @@
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "react"
       ]
     },
     "packages/client/hmr": {
@@ -863,6 +866,113 @@
       ]
     },
     "packages/bundle/web-app": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
+      ]
+    },
+    "packages/subagent/subagent": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
+      ]
+    },
+    "packages/subagent/tool-subagent": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
+      ]
+    },
+    "packages/client/ui-settings-models": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.spec.tsx"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
+      ]
+    },
+    "packages/test-support/client-runtime": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.spec.tsx"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/session/session-persistence-sqlite": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
+      ]
+    },
+    "packages/schedule/schedule": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
+      ]
+    },
+    "packages/host/apiproxy": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
+      ]
+    },
+    "packages/core/scope": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
+      ]
+    },
+    "packages/acp/acp": {
       "entry": [
         "tests/**/*.spec.ts"
       ],

@@ -1,4 +1,14 @@
-/** State-independent Knip configuration for dependencies owned by generated Typert faces. */
+/**
+ * Knip configuration for dependencies owned by generated Typert JavaScript.
+ *
+ * Two reference sources make the published faces visible to Knip: the
+ * generated `zod` binding (always ignored, the workspace `project` never
+ * includes `lib/`) and external imports in generated `.d.ts` faces that
+ * monorepo-internal imports resolve to through `exports` types. The latter
+ * report only when the build artifact is present, so the ignore is applied
+ * conditionally on the face existing — a static ignore would be flagged as
+ * unused on clean checkouts.
+ */
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 
@@ -14,17 +24,35 @@ export const GENERATED_TYPERT_WORKSPACES = [
   'packages/interaction/commands',
 ] as const
 
-const GENERATED_TYPERT_FILES = ['lib/typert.host.js', 'lib/typert.remote-client.js'] as const
+/**
+ * External dependencies imported only by generated Typert JavaScript under
+ * `lib/`. Keyed by workspace; `libFile` is the face whose imports report, and
+ * `deps` are the package names Knip attributes the imports to (subpaths such
+ * as `@deepseek-ai/dsh-session/types` report as `@deepseek-ai/dsh-session`).
+ */
+export const GENERATED_TYPERT_FACE_DEPENDENCIES = {
+  'packages/context/file-reference': {
+    libFile: 'lib/typert.remote-client.d.ts',
+    deps: ['@deepseek-ai/dsh-session'],
+  },
+  'packages/test-support/client-runtime': {
+    libFile: 'lib/types/sessions.d.ts',
+    deps: ['@deepseek-ai/dsh-attachment'],
+  },
+} as const satisfies Readonly<
+  Record<string, { readonly libFile: string; readonly deps: readonly string[] }>
+>
 
-interface GeneratedTypertConfigOptions {
+/** Filesystem seam for the real config and focused tests. */
+export interface GeneratedTypertConfigOptions {
   readonly root?: string
-  readonly fileExists?: (path: string) => boolean
+  readonly fileExists?: (filePath: string) => boolean
 }
 
 /**
- * Add a workspace-scoped `zod` exception only while generated Typert JavaScript is absent.
  * @param config - checked-in source configuration.
- * @param options - filesystem seam used by the real config and focused tests.
+ * @param options - filesystem seam; `root` is the repository root and
+ *   `fileExists` defaults to `existsSync`.
  * @returns a cloned configuration for the current artifact state.
  */
 export function configureGeneratedTypertDependencies(
@@ -36,16 +64,20 @@ export function configureGeneratedTypertDependencies(
   const configured = structuredClone(config)
 
   for (const workspace of GENERATED_TYPERT_WORKSPACES) {
-    const generatedFileExists = GENERATED_TYPERT_FILES.some(file =>
-      fileExists(resolve(root, workspace, file)),
-    )
-    if (generatedFileExists) continue
-
     const workspaceConfig = configured.workspaces?.[workspace]
     if (!workspaceConfig) throw new Error(`Knip workspace config is missing: ${workspace}`)
     workspaceConfig.ignoreDependencies = [...new Set([
       ...(workspaceConfig.ignoreDependencies ?? []),
       'zod',
+    ])]
+  }
+  for (const [workspace, { libFile, deps }] of Object.entries(GENERATED_TYPERT_FACE_DEPENDENCIES)) {
+    const workspaceConfig = configured.workspaces?.[workspace]
+    if (!workspaceConfig) throw new Error(`Knip workspace config is missing: ${workspace}`)
+    if (!fileExists(resolve(root, workspace, libFile))) continue
+    workspaceConfig.ignoreDependencies = [...new Set([
+      ...(workspaceConfig.ignoreDependencies ?? []),
+      ...deps,
     ])]
   }
 
