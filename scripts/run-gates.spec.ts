@@ -432,6 +432,20 @@ describe('Node 24 lane ownership', () => {
   })
 })
 
+describe('web verification lanes', () => {
+  it.each(['ci-web-focused', 'ci-web-full'] as const)(
+    'runs the complete build before the %s browser gate',
+    (mode) => {
+      const subject = withPnpmEntrypoint(() => gatesForMode(mode))
+      const browser = subject.find(item => item.id !== 'build')
+
+      expect(subject.map(item => item.id)).toEqual(['build', browser?.id])
+      expect(browser?.needs).toEqual(['build'])
+      expect(subject.some(item => item.id === 'build:web')).toBe(false)
+    },
+  )
+})
+
 describe('Linux primary graph', () => {
   it('adds the same compare-only web gate after built client artifacts', () => {
     const subject = withPnpmEntrypoint(() => gatesForMode('ci-linux-primary'))

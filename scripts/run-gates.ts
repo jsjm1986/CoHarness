@@ -27,6 +27,8 @@ export type Mode =
   | 'ci-artifacts'
   | 'ci-consumers'
   | 'ci-consumers-scoped'
+  | 'ci-web-focused'
+  | 'ci-web-full'
   | 'ci-windows-blocking'
   | 'ci-windows-complete'
   | 'ci-windows-observational'
@@ -119,6 +121,8 @@ function parseMode(raw: string | undefined): Mode {
     case 'ci-artifacts':
     case 'ci-consumers':
     case 'ci-consumers-scoped':
+    case 'ci-web-focused':
+    case 'ci-web-full':
     case 'ci-windows-blocking':
     case 'ci-windows-complete':
     case 'ci-windows-observational':
@@ -128,7 +132,7 @@ function parseMode(raw: string | undefined): Mode {
       return raw
     default:
       throw new Error(
-        `run-gates: expected mode ci-primary | ci-linux-primary | ci-static | ci-lint-contracts-ready | ci-coverage | ci-coverage-scoped | ci-snapshot | ci-artifacts | ci-consumers | ci-consumers-scoped | ci-windows-blocking | ci-windows-complete | ci-windows-observational | node-compat | check-all | doc-sync, got ${JSON.stringify(raw)}.`,
+        `run-gates: expected mode ci-primary | ci-linux-primary | ci-static | ci-lint-contracts-ready | ci-coverage | ci-coverage-scoped | ci-snapshot | ci-artifacts | ci-consumers | ci-consumers-scoped | ci-web-focused | ci-web-full | ci-windows-blocking | ci-windows-complete | ci-windows-observational | node-compat | check-all | doc-sync, got ${JSON.stringify(raw)}.`,
       )
   }
 }
@@ -226,6 +230,9 @@ export function gatesForMode(selected: Mode): Gate[] {
       return ciConsumerGates()
     case 'ci-consumers-scoped':
       return ciConsumerGates({ includeWebSnapshot: false })
+    case 'ci-web-focused':
+    case 'ci-web-full':
+      return ciWebGates(selected === 'ci-web-focused')
     case 'ci-windows-blocking':
       return ciWindowsBlockingGates()
     case 'ci-windows-complete':
@@ -444,9 +451,9 @@ function webSnapshotGate(needs: string[]): Gate {
     if (!Number.isSafeInteger(workers) || workers < 1 || String(workers) !== workerRaw) {
       throw new Error(`run-gates: DSH_WEB_SNAPSHOT_WORKERS must be a positive integer, got ${JSON.stringify(workerRaw)}.`)
     }
-    return pnpmScript('web-snapshot', 'test:web:ci', {
+    return pnpmScript('web-snapshot', 'test:web:full', {
       label: 'web browser snapshot',
-      displayCommand: `DSH_SNAPSHOT=replay DSH_WEB_SNAPSHOT_WORKERS=${workers} pnpm run test:web:ci`,
+      displayCommand: `DSH_SNAPSHOT=replay DSH_WEB_SNAPSHOT_WORKERS=${workers} pnpm run test:web:full`,
       env: { DSH_SNAPSHOT: 'replay' },
       needs,
       streamOutput: true,
@@ -458,6 +465,29 @@ function webSnapshotGate(needs: string[]): Gate {
     env: { DSH_SNAPSHOT: 'replay' },
     needs,
   })
+}
+
+/**
+ * The dedicated web verification aggregates behind the `web-verification` CI
+ * lane: the complete build, which includes the web bundle and the client
+ * build record, then either the complete browser inventory or the focused
+ * selection read from `DSH_WEB_GROUPS` by the runner.
+ * @param focused - Whether the aggregate narrows to the policy-selected groups.
+ * @returns The aggregate's gate graph.
+ */
+function ciWebGates(focused: boolean): Gate[] {
+  return [
+    ciBuildGate(),
+    focused
+      ? pnpmScript('web-snapshot-focused', 'test:web:focused', {
+        label: 'web browser snapshot (focused)',
+        displayCommand: 'DSH_SNAPSHOT=replay pnpm run test:web:focused',
+        env: { DSH_SNAPSHOT: 'replay' },
+        needs: ['build'],
+        streamOutput: true,
+      })
+      : webSnapshotGate(['build']),
+  ]
 }
 
 function ciWindowsBlockingGates(): Gate[] {

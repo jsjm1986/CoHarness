@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { classifyCiPrScope, clientSurfacePackages } from './ci-pr-scope.ts'
+import { classifyCiPrScope, classifyWebVerification, clientSurfacePackages } from './ci-pr-scope.ts'
+import { loadWebTestPolicy } from './web-test-policy.ts'
 
 describe('classifyCiPrScope', () => {
   it('skips expensive lanes for pnpm action pin updates', () => {
@@ -108,13 +109,23 @@ describe('classifyCiPrScope', () => {
     })
   })
 
-  it('keeps the browser snapshot when a scoped change touches a browser-rendered package', () => {
+  it('focuses web verification on the changed browser-rendered package group', () => {
     expect(classifyCiPrScope([
       'packages/client/ui-conversation/src/message-row.ts',
     ], '', new Set(['client/ui-conversation']))).toMatchObject({
       reason: 'scoped',
       coverageMode: 'scoped',
-      snapshotMode: 'full',
+      snapshotMode: 'focused',
+      webGroups: ['conversation'],
+    })
+  })
+
+  it('focuses web verification on every group a shared UI package reaches', () => {
+    expect(classifyCiPrScope([
+      'packages/client/ui-workbench/src/pane.ts',
+    ], '', new Set(['client/ui-workbench']))).toMatchObject({
+      snapshotMode: 'focused',
+      webGroups: ['lifecycle', 'shell', 'workbench'],
     })
   })
 
@@ -125,6 +136,7 @@ describe('classifyCiPrScope', () => {
       reason: 'scoped',
       coverageMode: 'scoped',
       snapshotMode: 'scoped',
+      webGroups: [],
     })
   })
 
@@ -132,6 +144,156 @@ describe('classifyCiPrScope', () => {
     expect(classifyCiPrScope([
       'packages/client/ui-conversation/src/message-row.ts',
     ], '')).toMatchObject({ reason: 'scoped', snapshotMode: 'scoped' })
+  })
+})
+
+describe('web verification tier selection', () => {
+  const packages = clientSurfacePackages(process.cwd())
+
+  function web(paths: readonly string[], supplied = packages) {
+    return classifyCiPrScope(paths, '', supplied)
+  }
+
+  it('runs the full inventory for web app, runtime, loader, and api changes', () => {
+    for (const path of [
+      'apps/web/src/main.ts',
+      'apps/web/public/manifest.webmanifest',
+      'apps/web/index.html',
+      'apps/web/vite.config.ts',
+      'apps/web/package.json',
+      'packages/client/runtime/src/boot.ts',
+      'packages/client/connection/src/socket.ts',
+      'packages/client/modules/src/loader.ts',
+      'packages/client/web/src/kernel.ts',
+      'packages/api/remotes/src/web.ts',
+      'packages/api/gateway/src/plugin.ts',
+      'packages/extensions/cordis-client-runner/src/run.ts',
+      'packages/typert/registry/src/face.ts',
+      'packages/host/apiproxy/src/fetch.ts',
+    ]) {
+      expect(web([path]), path).toMatchObject({ snapshotMode: 'full', webGroups: [] })
+    }
+  })
+
+  it('runs the full inventory for dependency, web-infra, and gateway changes', () => {
+    for (const path of [
+      'pnpm-lock.yaml',
+      'packages/client/ui-goal/package.json',
+      'scripts/run-web-snapshots.ts',
+      'scripts/web-test-policy.json',
+      'vitest.web.config.ts',
+      'gateway/src/plugin.ts',
+    ]) {
+      expect(web([path]), path).toMatchObject({ snapshotMode: 'full', webGroups: [] })
+    }
+  })
+
+  it('falls back to the full inventory for an unmapped browser-rendered package', () => {
+    expect(web(['packages/fake/unknown/src/row.ts'], new Set(['fake/unknown']))).toMatchObject({
+      snapshotMode: 'full',
+    })
+  })
+
+  it('keeps web verification out of provably browser-irrelevant paths', () => {
+    for (const path of [
+      'scripts/verify-md-links.ts',
+      '.github/workflows/ci.yml',
+      'vitest.snapshot.config.ts',
+      'knip.config.ts',
+      '.oxlintrc.json',
+      'packages/session/session-format/src/catalog-default.ts',
+      'packages/interaction/commands/src/router.ts',
+      'apps/cli/tests/source-launch.compat.spec.ts',
+      'python/sdk/src/deepseek_harness/session.py',
+      'examples/acp-agent/cordis.yml',
+    ]) {
+      const expected = path.startsWith('python/') ? 'skip' : 'scoped'
+      expect(web([path]), path).toMatchObject({ snapshotMode: expected, webGroups: [] })
+    }
+  })
+
+  it('treats unclassified root sources as full-inventory triggers', () => {
+    expect(web(['vitest.shared.ts'])).toMatchObject({ snapshotMode: 'full' })
+  })
+
+  it('routes a scenario file to its owning business group', () => {
+    expect(web(['apps/web/tests/goal-bar.e2e.ts'])).toMatchObject({
+      snapshotMode: 'focused',
+      webGroups: ['conversation'],
+    })
+    expect(web(['apps/web/tests/workbench.e2e.ts'])).toMatchObject({
+      snapshotMode: 'focused',
+      webGroups: ['workbench'],
+    })
+  })
+
+  it('routes a committed golden to the groups of the scenarios that reference it', () => {
+    expect(web(['apps/web/tests/snapshots/goal-bar/active.expected.md'])).toMatchObject({
+      snapshotMode: 'focused',
+      webGroups: ['conversation'],
+    })
+    expect(web(['apps/web/tests/snapshots/seeded-history/seed.jsonl'])).toMatchObject({
+      snapshotMode: 'focused',
+      webGroups: ['conversation', 'documents', 'lifecycle', 'workbench'],
+    })
+  })
+
+  it('runs the full inventory for unowned goldens and shared test fixtures', () => {
+    for (const path of [
+      'apps/web/tests/snapshots/no-such-golden/ui.expected.md',
+      'apps/web/tests/assembled-boot.ts',
+      'apps/web/tests/chat-scroll-fixture.ts',
+      'apps/web/tests/agent-preset-authoring.overlay.yml',
+      'apps/web/tests/support/listen-probe.mjs',
+    ]) {
+      expect(web([path]), path).toMatchObject({ snapshotMode: 'full', webGroups: [] })
+    }
+  })
+
+  it('keeps test-tree documentation inert instead of widening the selection', () => {
+    expect(web(['apps/web/tests/README.md'])).toMatchObject({ reason: 'docs-only', snapshotMode: 'skip' })
+    expect(web([
+      'packages/client/ui-goal/src/row.ts',
+      'apps/web/tests/README.md',
+    ])).toMatchObject({ snapshotMode: 'focused', webGroups: ['conversation'] })
+  })
+
+  it('keeps a UI change focused when it carries its own scenario and golden', () => {
+    expect(web([
+      'packages/client/ui-goal/src/row.ts',
+      'apps/web/tests/goal-bar.e2e.ts',
+      'apps/web/tests/snapshots/goal-bar/active.expected.md',
+    ])).toMatchObject({ snapshotMode: 'focused', webGroups: ['conversation'] })
+  })
+
+  it('focuses every group a multi-group package mapping reaches', () => {
+    expect(web(['packages/client/ui-commands/src/client/index.ts'])).toMatchObject({
+      snapshotMode: 'focused',
+      webGroups: ['conversation', 'workbench'],
+    })
+  })
+
+  it('runs the full inventory when a golden owner is outside the scenario table', () => {
+    const owners = new Map<string, readonly string[]>([
+      ['half-known', ['goal-bar.e2e.ts', 'removed-scenario.e2e.ts']],
+    ])
+    expect(classifyWebVerification(
+      ['apps/web/tests/snapshots/half-known/ui.expected.md'],
+      packages,
+      loadWebTestPolicy(process.cwd()),
+      owners,
+    )).toEqual({ mode: 'full', groups: [] })
+  })
+
+  it('focuses a mixed UI-and-inert change but upgrades to full with a dependency', () => {
+    expect(web([
+      'packages/client/ui-goal/src/row.ts',
+      'docs/testing.md',
+    ])).toMatchObject({ snapshotMode: 'focused', webGroups: ['conversation'] })
+    expect(web([
+      'packages/client/ui-goal/src/row.ts',
+      'pnpm-lock.yaml',
+    ])).toMatchObject({ snapshotMode: 'full', webGroups: [] })
   })
 })
 
