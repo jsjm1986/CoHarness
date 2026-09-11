@@ -39,7 +39,7 @@ interface PatchEntry extends ConfigRow {
 }
 
 const jsExprType = defineScalarTag<string>('tag:yaml.org,2002:js', {
-  resolve: (source, isExplicit) => (isExplicit && source.length > 0 ? String(source) : NOT_RESOLVED),
+  resolve: (source, isExplicit) => (isExplicit && source.length > 0 ? source : NOT_RESOLVED),
   identify: () => false,
 })
 const configSchema = yaml.JSON_SCHEMA.withTags(jsExprType)
