@@ -30,7 +30,7 @@ interface CiScopePolicy {
   readonly version: number
   readonly fullRuntimePrefixes: readonly string[]
   readonly fullRuntimePackagePrefixes: readonly string[]
-  readonly fullRuntimePackageGroups: readonly string[]
+  readonly scopedPackageGroups: readonly string[]
   readonly modelInputPrefixes: readonly string[]
   readonly modelInputSuffixes: readonly string[]
   readonly gatewayPrefixes: readonly string[]
@@ -66,7 +66,12 @@ function isInertPath(path: string): boolean {
 function isFullRuntimePath(path: string): boolean {
   return policy.fullRuntimePrefixes.some(prefix => path.startsWith(prefix))
     || policy.fullRuntimePackagePrefixes.some(prefix => path.startsWith(prefix))
-    || policy.fullRuntimePackageGroups.some(group => path.startsWith(`packages/${group}/`))
+}
+
+function isKnownScopedPackagePath(path: string): boolean {
+  const match = /^packages\/([^/]+)\//.exec(path)
+  const group = match?.[1]
+  return group !== undefined && policy.scopedPackageGroups.includes(group)
 }
 
 /** Model-visible files are inputs even when they are stored as Markdown. */
@@ -212,7 +217,11 @@ export function classifyCiPrScope(
   }
 
   const packages = [...new Set(paths.map(scopedPackage).filter((value): value is string => value !== undefined))]
-  const scoped = !fullRuntime && !modelInput && paths.every(isScopedPath) && packages.length > 0 && packages.length <= MAX_SCOPED_PACKAGES
+  const scoped = !fullRuntime
+    && !modelInput
+    && paths.every(path => isScopedPath(path) && isKnownScopedPackagePath(path))
+    && packages.length > 0
+    && packages.length <= MAX_SCOPED_PACKAGES
   if (scoped) return {
     ...common,
     runExpensive: true,

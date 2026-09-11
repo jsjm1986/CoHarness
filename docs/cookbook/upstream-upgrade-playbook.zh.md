@@ -62,7 +62,7 @@
 
 ## 5. 按影响选择证据
 
-先运行覆盖变更 owner 的最小检查集，再对共享 seam 扩大范围。带版本的 `scripts/ci-scope-policy.json` 描述仓库当前已知的稳定 CI 影响域；升级决定仍必须检查实际 consumer，并且可能需要更宽的手动审计。只有新领域足够稳定、且 false-negative 与 false-positive 行为有证据时才增加策略项，否则使用 full 或 manual audit lane：
+先运行覆盖变更 owner 的最小检查集，再对共享 seam 扩大范围。带版本的 `scripts/ci-scope-policy.json` 描述仓库当前已知的稳定 CI 影响域；升级决定仍必须检查实际 consumer，并且可能需要更宽的手动审计。新的 package group 在完成影响分类前默认使用 full。只有新领域足够稳定、且 false-negative 与 false-positive 行为有证据时才增加策略项，否则使用 full 或 manual audit lane：
 
 - 叶子包源码：owner 测试和变更源码 coverage；
 - Session、Cordis、Typert、Gateway、LLM、子代理、sandbox、subprocess、terminal、vendor、native 或 client-connection：完整运行时和生成产物检查；

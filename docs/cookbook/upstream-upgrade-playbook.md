@@ -62,7 +62,7 @@ For Gateway or ACL changes, test the direct API, alternate RPC or Web paths, pri
 
 ## 5. Select evidence by impact
 
-Use the smallest check set that covers the changed owner, then broaden it for shared seams. The versioned `scripts/ci-scope-policy.json` file describes the stable CI domains currently known to the repository; an upgrade decision must still inspect the actual consumers and may require a broader manual audit. Add a policy entry only when a new domain is stable enough to reuse and its false-negative and false-positive behavior has evidence; otherwise use the full or manual audit lane.
+Use the smallest check set that covers the changed owner, then broaden it for shared seams. The versioned `scripts/ci-scope-policy.json` file describes the stable CI domains currently known to the repository; an upgrade decision must still inspect the actual consumers and may require a broader manual audit. New package groups remain full by default until their impact is classified. Add a policy entry only when a new domain is stable enough to reuse and its false-negative and false-positive behavior has evidence; otherwise use the full or manual audit lane.
 
 - leaf package source: owning tests and changed-source coverage;
 - Session, Cordis, Typert, Gateway, LLM, subagent, sandbox, subprocess, terminal, vendor, native, or client-connection: full runtime and generated-artifact checks;

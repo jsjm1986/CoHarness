@@ -5,7 +5,8 @@ import scopePolicy from './ci-scope-policy.json' with { type: 'json' }
 describe('classifyCiPrScope', () => {
   it('uses a versioned declarative policy for shared and model-input paths', () => {
     expect(scopePolicy.version).toBe(1)
-    expect(scopePolicy.fullRuntimePackageGroups).toContain('session')
+    expect(scopePolicy.scopedPackageGroups).toContain('util')
+    expect(scopePolicy.scopedPackageGroups).not.toContain('session')
     expect(scopePolicy.modelInputPrefixes).toContain('apps/cli/config/')
     expect(scopePolicy.gatewayPrefixes).toContain('gateway/')
   })
@@ -153,6 +154,13 @@ describe('classifyCiPrScope', () => {
         gatewayMode: 'skip',
       })
     }
+  })
+
+  it('fails closed for a new package group until its impact is classified', () => {
+    expect(classifyCiPrScope(['packages/future/new-capability/src/index.ts'], '')).toMatchObject({
+      reason: 'full',
+      coverageMode: 'full',
+    })
   })
 
   it('treats model-visible skill files as runtime inputs', () => {
