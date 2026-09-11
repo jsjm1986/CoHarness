@@ -431,6 +431,22 @@ jobs:
     if: github.event_name == 'pull_request' && needs.pr-scope.outputs.gateway_mode == 'full'
     runs-on: ubuntu-latest
     name: gateway / typecheck and unit tests
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: hgw
+          POSTGRES_PASSWORD: hgw
+          POSTGRES_DB: hgw_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hgw -d hgw_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      HGW_TEST_DATABASE_URL: postgres://hgw:hgw@127.0.0.1:5432/hgw_test
     steps:
       - uses: actions/checkout@v7
         with:

@@ -282,6 +282,10 @@ describe('CI workflow', () => {
     const adminUi = workflowJob(workflow, 'gateway-admin-ui')
     expect(gateway.if).toContain("needs.pr-scope.outputs.gateway_mode == 'full'")
     expect(adminUi.if).toContain("needs.pr-scope.outputs.admin_ui_mode == 'full'")
+    expect(gateway.env).toMatchObject({
+      HGW_TEST_DATABASE_URL: 'postgres://hgw:hgw@127.0.0.1:5432/hgw_test',
+    })
+    expect(gateway.services).toHaveProperty('postgres')
     const gatewayRuns = (gateway.steps as unknown[]).filter(isRecord).flatMap(step => typeof step.run === 'string' ? [step.run] : [])
     expect(gatewayRuns).toEqual(expect.arrayContaining([
       'npm run typecheck --prefix gateway',
