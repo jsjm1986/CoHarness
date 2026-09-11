@@ -42,6 +42,14 @@ function header(id: string, createdAt: number, extra: Partial<SessionHeader> = {
   return { version: 0, id: sid(id), createdAt, cwd: '/proj', isSeeded: false, ...extra }
 }
 
+const userMessage = (seq: number, body: string): SessionEvent => ({
+  type: 'user/message',
+  seq: SessionSeq(seq),
+  time: 2000 + seq,
+  data: createUserMessage({ content: [{ type: 'text', text: body }], source: { kind: 'user' } }),
+  surfaceOp: 'append',
+})
+
 describe('sessions.list cold merge', () => {
   it('verifies only small possibly-blank artifacts and treats every unavailable probe as visible', async () => {
     const ctx = new Context()
@@ -480,19 +488,12 @@ describe('cold history recovery view', () => {
     await ctx.plugin(UserQuestionService)
     const sessionId = sid('session-attached-mid-walk')
     const meta = header(sessionId, 1000)
-    const message = (seq: number, body: string): SessionEvent => ({
-      type: 'user/message',
-      seq: SessionSeq(seq),
-      time: 2000 + seq,
-      data: createUserMessage({ content: [{ type: 'text', text: body }], source: { kind: 'user' } }),
-      surfaceOp: 'append',
-    })
     const readPage = vi.fn(async (_id: SessionId, pageRequest: { cursor?: string }): Promise<SessionPersistencePage> => {
       if (pageRequest.cursor === undefined) {
         return {
           meta,
           revision: SessionPersistenceRevision('walk:1'),
-          events: [message(1, 'tail')],
+          events: [userMessage(1, 'tail')],
           startSeq: 1,
           endSeq: 1,
           hasMore: true,
@@ -503,7 +504,7 @@ describe('cold history recovery view', () => {
       // The open that started this read also resumed the session; its
       // lifecycle events moved the log between the two page reads.
       ctx.sessions.create(sessionId, {
-        seed: [message(0, 'head'), message(1, 'tail'), { type: 'turn/start', seq: SessionSeq(2), time: 2002, data: { turn: 2 } }],
+        seed: [userMessage(0, 'head'), userMessage(1, 'tail'), { type: 'turn/start', seq: SessionSeq(2), time: 2002, data: { turn: 2 } }],
         meta: { cwd: '/proj', createdAt: 1000 },
       })
       throw new SessionPersistenceReadError('dependency', 'session persistence revision changed since the page cursor was issued')
@@ -585,6 +586,51 @@ describe('cold history recovery view', () => {
         details: {},
       },
     })
+  })
+
+  it('serves the resident log when the resume lands between the page walk and the baseline fold', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(UserQuestionService)
+    const sessionId = sid('session-attached-at-baseline')
+    const meta = header(sessionId, 1000)
+    // The detached tail page resolves BEFORE the open's resume commits: the
+    // walk completes on the old revision and only the projection baseline —
+    // folded against the now-longer log — observes the moved revision.
+    const readPage = vi.fn(async (): Promise<SessionPersistencePage> => ({
+      meta,
+      revision: SessionPersistenceRevision('walk:1'),
+      events: [userMessage(0, 'head'), userMessage(1, 'tail')],
+      startSeq: 0,
+      endSeq: 1,
+      hasMore: true,
+      nextCursor: 'walk-next' as never,
+      uncompressedBytes: 512,
+    }))
+    ctx.provide('sessionPersistence', {
+      list: () => Promise.resolve([meta]),
+      readPage,
+      revision: () => Promise.resolve(SessionPersistenceRevision('walk:1')),
+      locate: () => undefined,
+    } as never)
+    ctx.provide('sessionProjectionCache', {
+      coldSnapshot: async () => {
+        ctx.sessions.create(sessionId, {
+          seed: [userMessage(0, 'head'), userMessage(1, 'tail'), { type: 'turn/start', seq: SessionSeq(2), time: 2002, data: { turn: 2 } }],
+          meta: { cwd: '/proj', createdAt: 1000 },
+        })
+        return { asOfSeq: 99 as never, values: {} }
+      },
+    } as never)
+    const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })
+
+    const response = await api.sessions.history(request({ sessionId, maxMessages: 2 }))
+    expect(response.result.ok).toBe(true)
+    if (!response.result.ok) throw new Error('history failed')
+    expect(response.result.value.events.map(entry => entry.event.seq)).toEqual([0, 1, 2, 3])
+    expect(response.result.value.events.at(-1)?.event.type).toBe('session/end-seed')
+    expect(response.result.value.hasMore).toBe(false)
+    expect(readPage).toHaveBeenCalledTimes(1)
   })
 
   it('reuses a detached conversation tail through the persistence revision', async () => {
