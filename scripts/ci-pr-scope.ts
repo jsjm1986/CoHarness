@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import scopePolicy from './ci-scope-policy.json' with { type: 'json' }
 
 /** The expensive pull-request CI lanes that a scope decision controls. */
 export interface CiPrScope {
@@ -24,6 +25,20 @@ export interface CiPrScope {
 }
 
 const MAX_SCOPED_PACKAGES = 4
+
+interface CiScopePolicy {
+  readonly version: number
+  readonly fullRuntimePrefixes: readonly string[]
+  readonly fullRuntimePackagePrefixes: readonly string[]
+  readonly fullRuntimePackageGroups: readonly string[]
+  readonly modelInputPrefixes: readonly string[]
+  readonly modelInputSuffixes: readonly string[]
+  readonly gatewayPrefixes: readonly string[]
+  readonly adminUiPrefix: string
+}
+
+const policy = scopePolicy as CiScopePolicy
+if (policy.version !== 1) throw new Error(`ci-pr-scope: unsupported policy version ${String(policy.version)}`)
 
 function scopedPackage(path: string): string | undefined {
   const match = /^packages\/([^/]+\/[^/]+)\/(?:src|tests)\//.exec(path)
@@ -49,28 +64,23 @@ function isInertPath(path: string): boolean {
 
 /** Runtime seams whose changes can alter generated contracts, durable history, model requests, authorization, or process confinement. */
 function isFullRuntimePath(path: string): boolean {
-  return path.startsWith('vendor/')
-    || path.startsWith('gateway/')
-    || path.startsWith('native/')
-    || /^packages\/(?:core|session|agent|api|typert|llm|subagent|sandbox|subprocess|terminal)\//.test(path)
-    || path.startsWith('packages/client/connection/')
-    || path.startsWith('packages/host/apiproxy/')
+  return policy.fullRuntimePrefixes.some(prefix => path.startsWith(prefix))
+    || policy.fullRuntimePackagePrefixes.some(prefix => path.startsWith(prefix))
+    || policy.fullRuntimePackageGroups.some(group => path.startsWith(`packages/${group}/`))
 }
 
 /** Model-visible files are inputs even when they are stored as Markdown. */
 function isModelInputPath(path: string): boolean {
-  return path.startsWith('apps/cli/config/')
-    || /(?:^|\/)\b(?:AGENTS|SKILL)\.md$/u.test(path)
+  return policy.modelInputPrefixes.some(prefix => path.startsWith(prefix))
+    || policy.modelInputSuffixes.some(suffix => path.endsWith(suffix))
 }
 
 function isGatewayPath(path: string): boolean {
-  return path.startsWith('gateway/')
-    || path.startsWith('packages/api/')
-    || path.startsWith('packages/host/apiproxy/')
+  return policy.gatewayPrefixes.some(prefix => path.startsWith(prefix))
 }
 
 function isAdminUiPath(path: string): boolean {
-  return path.startsWith('gateway/admin-ui/')
+  return path.startsWith(policy.adminUiPrefix)
 }
 
 /** Paths that reach browser-rendered output: the web app and client-surface packages. */

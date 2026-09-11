@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "fullRuntimePrefixes": [
+    "vendor/",
+    "gateway/",
+    "native/"
+  ],
+  "fullRuntimePackagePrefixes": [
+    "packages/client/connection/",
+    "packages/host/apiproxy/"
+  ],
+  "fullRuntimePackageGroups": [
+    "core",
+    "session",
+    "agent",
+    "api",
+    "typert",
+    "llm",
+    "subagent",
+    "sandbox",
+    "subprocess",
+    "terminal"
+  ],
+  "modelInputPrefixes": [
+    "apps/cli/config/"
+  ],
+  "modelInputSuffixes": [
+    "/AGENTS.md",
+    "/SKILL.md"
+  ],
+  "gatewayPrefixes": [
+    "gateway/",
+    "packages/api/",
+    "packages/host/apiproxy/"
+  ],
+  "adminUiPrefix": "gateway/admin-ui/"
+}

@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { classifyCiPrScope, clientSurfacePackages } from './ci-pr-scope.ts'
+import scopePolicy from './ci-scope-policy.json' with { type: 'json' }
 
 describe('classifyCiPrScope', () => {
+  it('uses a versioned declarative policy for shared and model-input paths', () => {
+    expect(scopePolicy.version).toBe(1)
+    expect(scopePolicy.fullRuntimePackageGroups).toContain('session')
+    expect(scopePolicy.modelInputPrefixes).toContain('apps/cli/config/')
+    expect(scopePolicy.gatewayPrefixes).toContain('gateway/')
+  })
   it('skips expensive lanes for pnpm action pin updates', () => {
     expect(classifyCiPrScope(
       ['.github/workflows/ci.yml', '.github/workflows/e2e.yml'],

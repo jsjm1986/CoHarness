@@ -58,7 +58,7 @@ For Gateway or ACL changes, test the direct API, alternate RPC or Web paths, pri
 
 ## 5. Select evidence by impact
 
-Use the smallest check set that covers the changed owner, then broaden it for shared seams:
+Use the smallest check set that covers the changed owner, then broaden it for shared seams. The versioned `scripts/ci-scope-policy.json` file owns shared-runtime, model-input, Gateway, and platform path classes; update that policy when a new capability owner is introduced instead of adding a one-off condition to the workflow.
 
 - leaf package source: owning tests and changed-source coverage;
 - Session, Cordis, Typert, Gateway, LLM, subagent, sandbox, subprocess, terminal, vendor, native, or client-connection: full runtime and generated-artifact checks;

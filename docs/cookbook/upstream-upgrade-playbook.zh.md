@@ -58,7 +58,7 @@
 
 ## 5. 按影响选择证据
 
-先运行覆盖变更 owner 的最小检查集，再对共享 seam 扩大范围：
+先运行覆盖变更 owner 的最小检查集，再对共享 seam 扩大范围。带版本的 `scripts/ci-scope-policy.json` 统一维护共享运行时、模型输入、Gateway 和平台路径分类；引入新的 capability owner 时更新这份策略，不要向 workflow 增加一次性条件：
 
 - 叶子包源码：owner 测试和变更源码 coverage；
 - Session、Cordis、Typert、Gateway、LLM、子代理、sandbox、subprocess、terminal、vendor、native 或 client-connection：完整运行时和生成产物检查；
