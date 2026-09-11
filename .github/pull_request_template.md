@@ -15,6 +15,8 @@
 - 升级 plan / manifest / alignment matrix：
 - 破坏性 API、wire、Session 或迁移影响：
 - 与 CoHarness 业务等价实现或保留边界：
+- 完整 diff / release notes / package / generated / vendor / native 审查证据：
+- 本次特有的分类或未标准化决定：
 
 <details>
 <summary>变更与验证</summary>

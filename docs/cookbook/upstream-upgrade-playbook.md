@@ -13,6 +13,8 @@ Product changes and upstream alignment use different records and review paths. L
 
 If an upstream change is breaking, the Upstream track records the old and new public types, wire fields, Session format or persistence effects, and every consumer that must move. A compatibility adapter is temporary and has an owner and removal condition; it is not a reason to leave two permanent APIs.
 
+The two tracks are stable process labels, not fixed implementation templates. An upgrade may contain a small compatibility fix, a large migration, a dependency-only change, or a decision to retain an existing CoHarness behavior. Let the actual diff and business impact decide the work; do not force every release into the same sequence of code changes.
+
 ## 1. Freeze the baseline
 
 Record the CoHarness commit, upstream tag and commit, Node and package-manager versions, release family, and the exact worktree state before reading or changing code.
@@ -23,7 +25,7 @@ Run the change-scope report against the verified upstream or release base. Keep 
 
 ## 2. Build the alignment record
 
-Use one row for each behavior or protocol area rather than one row per upstream commit or package. Each row records the upstream commits, the CoHarness owner, the local equivalent, wire impact, permission or data-egress impact, migration impact, focused tests, external evidence, and the chosen disposition.
+Use one row for each behavior or protocol area rather than one row per upstream commit or package. First read the complete release notes, compare range, commit list, package inventory, generated outputs, vendor changes, native changes, tests, and documentation. Then record the upstream commits, the CoHarness owner, the local equivalent, wire impact, permission or data-egress impact, migration impact, focused tests, external evidence, and the chosen disposition.
 
 Use these dispositions consistently:
 
@@ -35,6 +37,8 @@ Use these dispositions consistently:
 - reject: the change violates the cloud, multi-runtime, permission, data-egress, or rollback boundary.
 
 Do not use package-name similarity as evidence of equivalence. Trace the producer, consumer, lifecycle, persisted data, and model-visible result on both sides.
+
+The record format is standardized; the decisions inside it are not. A release can add a new category when the diff introduces a responsibility that the previous matrix did not contain. Explain the category and its owner in the plan instead of hiding it under a nearby label. A category with no credible CoHarness consumer may be recorded as deferred or rejected without creating a placeholder implementation.
 
 ## 3. Audit Cordis seams first
 
@@ -58,7 +62,7 @@ For Gateway or ACL changes, test the direct API, alternate RPC or Web paths, pri
 
 ## 5. Select evidence by impact
 
-Use the smallest check set that covers the changed owner, then broaden it for shared seams. The versioned `scripts/ci-scope-policy.json` file owns shared-runtime, model-input, Gateway, and platform path classes; update that policy when a new capability owner is introduced instead of adding a one-off condition to the workflow.
+Use the smallest check set that covers the changed owner, then broaden it for shared seams. The versioned `scripts/ci-scope-policy.json` file describes the stable CI domains currently known to the repository; an upgrade decision must still inspect the actual consumers and may require a broader manual audit. Add a policy entry only when a new domain is stable enough to reuse and its false-negative and false-positive behavior has evidence; otherwise use the full or manual audit lane.
 
 - leaf package source: owning tests and changed-source coverage;
 - Session, Cordis, Typert, Gateway, LLM, subagent, sandbox, subprocess, terminal, vendor, native, or client-connection: full runtime and generated-artifact checks;
@@ -84,7 +88,13 @@ Update the plan, manifest, alignment matrix, Agent Note, package README or subsy
 
 The final record names what remains deferred or externally unverified. A release is closed only when the required local and CI checks pass, every required external environment has evidence, the deployment rollback path is exercised, and the current version and commit are recorded.
 
-Each upgrade has one durable record set: a plan for intent and choices, a manifest for exact commits and implementation state, and an alignment matrix for area-level evidence. Keep the record set under the repository's upgrade directory and link it from the PR. A later upgrade starts from the last released commit and references the preceding record instead of rewriting it.
+Each upgrade has one durable record set: a plan for intent and choices, a manifest for exact commits and implementation state, and an alignment matrix for area-level evidence. Keep the record set under the repository's upgrade directory and link it from the PR. A later upgrade starts from the last released commit and references the preceding record instead of rewriting its decisions. Update stale paths or current verification facts only when the repository's documentation policy requires the record to describe the current owner.
+
+## What stays deliberately flexible
+
+Do not standardize the number of rows, priority labels, commit groups, compatibility adapters, migration stages, or test commands across releases. Those choices depend on the upstream diff and the CoHarness business topology at that point in time.
+
+Do standardize the questions: what changed, who owns the behavior, what reaches the wire or model, what data or permissions move, what is equivalent, what is intentionally retained, what is deferred, what can fail during rollback, and what evidence closes the decision.
 
 ## 8. Avoid these shortcuts
 

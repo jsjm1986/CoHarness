@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/cookbook/upstream-upgrade-playbook.md
-upstream-upgrade-playbook.md: 18fbf77130f78951a87a4aae960b8356e1371c60
-upstream-upgrade-playbook.zh.md: 22cdee836c8bd112f5b75373ee6cbaad183468f5
+upstream-upgrade-playbook.md: 3e2a5e4d1e45dc92da7bf01c1e520752699df118
+upstream-upgrade-playbook.zh.md: 4f9b3c0a7d78862683c9656e3fd88a8c17a91d5b
