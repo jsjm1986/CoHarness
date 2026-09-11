@@ -9,6 +9,12 @@
 - [ ] 产品轨道：CoHarness 新功能或修复（Cordis capability seam / 业务 owner）
 - [ ] 上游轨道：针对确切 upstream tag/commit 的选择性对齐
 
+如果选择产品轨道：
+
+- capability owner 与 Cordis Service Definition / Provider / Consumer：
+- 生命周期、权限、Session/wire 或模型可见影响：
+- Agent Note、README/JSDoc、snapshot 和 invariant：
+
 如果选择上游轨道：
 
 - 上游基线与目标：
