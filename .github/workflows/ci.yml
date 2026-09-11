@@ -215,6 +215,9 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+          # The scoped changed-source gate diffs against pr-scope's inferred
+          # base commit; a depth-1 clone cannot resolve it.
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v6.0.10
         with:
