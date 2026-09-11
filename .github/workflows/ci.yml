@@ -215,6 +215,9 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+          # The scoped changed-source gate diffs against pr-scope's inferred
+          # base commit; a depth-1 clone cannot resolve it.
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v6.0.10
         with:
@@ -448,7 +451,17 @@ jobs:
           cache: pnpm
 
       - name: Install (immutable)
-        run: pnpm install --frozen-lockfile
+        run: |
+          pnpm install --frozen-lockfile &
+          install_pid=$!
+          bash scripts/prepare-ci-bubblewrap.sh &
+          sandbox_pid=$!
+          install_status=0
+          wait "$install_pid" || install_status=$?
+          sandbox_status=0
+          wait "$sandbox_pid" || sandbox_status=$?
+          if (( install_status != 0 )); then exit "$install_status"; fi
+          exit "$sandbox_status"
 
       # Gateway is an independent npm project outside the root pnpm workspace.
       # Root snapshot tests import its runtime modules.

@@ -35,6 +35,11 @@ const WORKSPACE_CLOSURE = [
   'packages/sandbox/sandbox',
   'packages/core/session',
   'packages/core/scope',
+  // core/session depends on session-format (workspace:*) and, with llm/llm,
+  // on util-values; both publish only coharness versions the registry cannot
+  // supply, so the consumer needs their exact local tarballs.
+  'packages/session/session-format',
+  'packages/util/values',
   'packages/llm/llm',
   'packages/typert/protocol',
   'packages/attachment/attachment',
@@ -52,6 +57,10 @@ const WORKSPACE_CLOSURE = [
   'vendor/cordis',
   'vendor/cosmokit',
   'vendor/schemastery',
+  // cordis declares these rescoped framework plugins as peer dependencies;
+  // include their local tarballs so npm does not query the registry for them.
+  'vendor/include',
+  'vendor/loader',
 ]
 
 /** ELF `e_machine` (offset 18, LE) for this host: x86-64 = 62, AArch64 = 183. */
