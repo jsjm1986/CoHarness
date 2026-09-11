@@ -753,6 +753,9 @@ export function systemPromptTexts(events: readonly SessionEvent[]): string[] {
  * @param id - the seeded session id (stable for deterministic goldens).
  * @param agentPreset - the preset the recorded session was composed from,
  *   for scenarios asserting what a resumed session reports running.
+ * @param cwd - an explicit Session header and event cwd overriding the
+ *   scaffold workspace root, for seeds that must satisfy
+ *   `Workspace.attachSession` cwd validation against a child workspace path.
  * @returns the seeded id.
  */
 /**
@@ -781,8 +784,12 @@ export async function seedSession(
   fixtureText: string,
   id: string,
   agentPreset?: string,
+  cwd?: string,
 ): Promise<SessionId> {
-  const realized = realizeSeedFixture(scaffold, fixtureText, id)
+  const normalized = realizeSeedFixture(scaffold, fixtureText, id)
+  const realized = cwd === undefined
+    ? normalized
+    : normalized.split(scaffold.workspaceCwd).join(cwd)
   const events = parseSessionLog(realized)
   if (events.length === 0) throw new Error('seed fixture has no events')
   const last = events[events.length - 1]!
@@ -793,7 +800,7 @@ export async function seedSession(
     version: SESSION_FORMAT_VERSION,
     id: SessionId(id),
     createdAt: Date.now() - 60_000,
-    cwd: scaffold.workspaceCwd,
+    cwd: cwd ?? scaffold.workspaceCwd,
     isSeeded: false,
     delegationDepth: 0,
     ...agentPreset === undefined ? {} : { agentPreset },

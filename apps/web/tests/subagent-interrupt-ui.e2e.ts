@@ -265,7 +265,10 @@ describe.skipIf(MODE === 'record')('web e2e: composer interrupt for a running co
       .getByRole('button').first().click()
     await page.getByRole('button', { name: /1 subagent/ }).click()
     await page.getByRole('treeitem', { name: new RegExp(LABEL) }).click()
-    const input = page.getByRole('textbox', { name: 'Message the agent' })
+    // The parked setup queue keeps the composer in its steer-queue state, so
+    // the input's accessible name is the steer hint, not the empty-queue
+    // placeholder — the composer seat is the state-independent handle.
+    const input = page.locator('[data-composer-seat] textarea')
     await input.waitFor({ timeout: 15_000 })
     expect(await input.isDisabled()).toBe(false)
 
