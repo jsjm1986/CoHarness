@@ -124,8 +124,9 @@ export async function saveFailureShot(page: Page, name: string): Promise<void> {
 
 /**
  * DOM/layout evidence for "element resolved but not visible" failures: the
- * composer's aria dump, each data-marked surface's bounding box and computed
- * visibility, and the live viewport size. Best-effort like saveFailureShot.
+ * bounding box, computed display/visibility, and attributes of every marked
+ * surface (composer seat, queue dock, question card, tree rows, dialogs) plus
+ * the live viewport size. Best-effort like saveFailureShot.
  * @param page - the page whose layout to record.
  * @param name - artifact basename inside `.artifacts/`.
  */
@@ -135,7 +136,7 @@ export async function saveFailureDom(page: Page, name: string): Promise<void> {
   try {
     const dump = await page.evaluate(() => {
       const entries: string[] = [`viewport: ${window.innerWidth}x${window.innerHeight}`]
-      for (const el of document.querySelectorAll('[data-composer-seat], [data-queue-dock], [data-question-key], [class*="composerStack"], [class*="centerCol"]')) {
+      for (const el of document.querySelectorAll('[data-composer-seat], [data-queue-dock], [data-question-key], [role="treeitem"], [role="dialog"], [class*="composerStack"], [class*="centerCol"]')) {
         const rect = el.getBoundingClientRect()
         const style = getComputedStyle(el)
         entries.push(
