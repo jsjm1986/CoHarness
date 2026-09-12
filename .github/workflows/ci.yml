@@ -697,9 +697,10 @@ jobs:
       - name: Install Playwright Chromium and hosted dependencies
         run: pnpm --filter @deepseek-ai/dsh-web-frontend exec playwright install --with-deps chromium
 
+      # DSH_SNAPSHOT stays off the step environment: every consumer defaults to
+      # replay, and exporting it here would leak the replay config swap
+      # (cordis.yml -> cordis.snapshot.yml) into spawned built-bin children.
       - name: Run the consumer inventory with the browser snapshot
-        env:
-          DSH_SNAPSHOT: replay
         run: pnpm run check:ci:consumers
 
   node-compat:

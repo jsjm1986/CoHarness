@@ -353,10 +353,12 @@ describe('web e2e: empty-draft Cmd+Enter steers the whole queue', () => {
       { timeout: 10_000 },
     ).toBe(2)
     expect(await page.locator('[data-queue-dock]').count()).toBe(0)
-    // The reasoning row streams independently of the steering handoff. Wait
-    // for the block to settle so the mid snapshot does not race its transient
-    // visually-hidden Running label while the question keeps the turn open.
+    // The reasoning row streams independently of the steering handoff, and the
+    // question card mounts as soon as the replayed tool call arrives. Wait for
+    // both so the mid snapshot captures a deterministic state instead of racing
+    // the think block's transient Running label or the card mount.
     await page.locator('[data-variant="think"][data-state="ok"]').first().waitFor({ timeout: 10_000 })
+    await page.locator('[data-question-key]').waitFor({ timeout: 30_000 })
     const mid = (await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd))
       .replace(/^- button "\d+% of context used"\n/gm, '')
       .replace(/^- text: Cache hit .*\n/gm, '')
