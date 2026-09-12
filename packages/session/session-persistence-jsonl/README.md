@@ -80,7 +80,7 @@ JSONL storage does not mutate live request prefixes. A resumed loop can reuse pr
 
 ## Known Limitations and Deferred Work
 
-- **Only the configured encoding and catalogued generations load** — this backend migrates released v0/v1 artifacts to current v2 beside the preserved source; changing compression requires a separate root, and retained predecessors do not provide automatic fallback or downgrade support.
+- **Only the configured encoding and catalogued generations load** — this backend migrates released v0/v1/v2 artifacts to current v3 beside the preserved source; changing compression requires a separate root, and retained predecessors do not provide automatic fallback or downgrade support.
 - **The flat-file storage layout does not load** — use a separate root or move pre-release artifacts into the project/session directory layout before loading.
 - **Compressed files are not directly line-readable** — use the backend to load them, or select `compression: 'none'` before writing a fresh root when external line readers are required.
 - **Nothing deletes session files** — logs accumulate under `root` until removed externally (the seam has no deletion API).

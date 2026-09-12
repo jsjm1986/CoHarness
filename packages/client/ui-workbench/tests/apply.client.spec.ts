@@ -28,7 +28,10 @@ async function harness() {
     deleteWorkbench: vi.fn(),
     switchWorkbench: vi.fn(),
   }
-  const sessions = { ensureSession: vi.fn(async () => true), createSession: vi.fn(async () => A), setBaseRuntimeTarget: vi.fn() }
+  const sessions = {
+    ensureSession: vi.fn(async () => true), createSession: vi.fn(async () => A), setBaseRuntimeTarget: vi.fn(),
+    runtimeTargetFor: vi.fn((_id: SessionId) => undefined as { kind: 'project'; projectId: number } | undefined),
+  }
   ctx.provide('conversationViewport', viewport as never)
   ctx.provide('sessions', sessions as never)
   ctx.provide('workspaces', {} as never)
@@ -53,6 +56,7 @@ async function harness() {
     duplicateWorkbench(id: string, name: string): string
     deleteWorkbench(id: string): void
     switchWorkbench(id: string): void
+    workspaceResourceOwner(): { sessionId: SessionId; runtimeTarget: { kind: 'base' } } | undefined
   })()
   return { ctx, slots, fiber, sessions, viewport, snapshot, actions }
 }
@@ -97,6 +101,20 @@ describe('workbench navigation lifecycle', () => {
       expect(h.viewport.markCatalogReady).toHaveBeenCalledOnce()
       h.actions.markCatalogReady()
       expect(h.viewport.markCatalogReady).toHaveBeenCalledTimes(2)
+    } finally { await h.ctx.fiber.dispose() }
+  })
+
+  it('resolves Workspace resources from the currently active pane', async () => {
+    const h = await harness()
+    try {
+      const owner = h.slots.entries('conversation.workbench.toolbar')[0]!.inject as unknown as () => {
+        workspaceResourceOwner(): { sessionId: SessionId; runtimeTarget: { kind: 'base' } } | undefined
+      }
+      expect(owner().workspaceResourceOwner()).toBeUndefined()
+      h.snapshot.set({ mode: 'workbench', activePaneId: A, paneIds: [A], paneRatios: [1] })
+      expect(owner().workspaceResourceOwner()).toEqual({ sessionId: A, runtimeTarget: { kind: 'base' } })
+      h.sessions.runtimeTargetFor = vi.fn(() => ({ kind: 'project' as const, projectId: 9 }))
+      expect(owner().workspaceResourceOwner()).toEqual({ sessionId: A, runtimeTarget: { kind: 'project', projectId: 9 } })
     } finally { await h.ctx.fiber.dispose() }
   })
 

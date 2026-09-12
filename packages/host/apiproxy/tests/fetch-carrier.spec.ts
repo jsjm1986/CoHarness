@@ -5,7 +5,7 @@ import type { ResponseValue } from '../src/api/rpc-map.ts'
 import type { ClientResponse, RpcMessage, RpcReceipt, RpcRequest } from '../src/api/rpc.ts'
 import { RpcId } from '../src/api/rpc.ts'
 import { toFetchHandler } from '../src/fetch/handler.ts'
-import { AbstractApiClient, ApiResponseTooLargeError, InProcessApiClient, readApiResponseText } from '../src/fetch/client.ts'
+import { AbstractApiClient, ApiTransportError, ApiResponseTooLargeError, InProcessApiClient, readApiResponseText } from '../src/fetch/client.ts'
 
 const SCRIPTED_HISTORY_PAGE = {
   events: [
@@ -251,6 +251,12 @@ function fakeApi(overrides: Partial<{ muxFrames: MuxFrame[]; hostFrames: HostFra
       async archiveSession(request) {
         return { rpcId: request.rpcId, result: { ok: true, value: { archivedSessionIds: [request.payload.sessionId] } } }
       },
+    },
+    workspaceFiles: {
+      async list(request) { return { rpcId: request.rpcId, result: { ok: true, value: { path: '', entries: [], truncated: false } } } },
+      async stat(request) { return { rpcId: request.rpcId, result: { ok: true, value: { path: request.payload.path, type: 'file', bytes: 0, version: 'v' } } } },
+      async read(request) { return { rpcId: request.rpcId, result: { ok: true, value: { path: request.payload.path, offset: request.payload.offset ?? 1, limit: request.payload.limit ?? 1, text: '', eof: true, version: 'v' } } } },
+      async readBytes(request) { return { rpcId: request.rpcId, result: { ok: true, value: { path: request.payload.path, offset: request.payload.offset ?? 0, bytes: '', eof: true, version: 'v' } } } },
     },
     agentPresets: {
       list(request: RpcRequest<{}>) {
@@ -1010,6 +1016,7 @@ describe('client respond and transport failures', () => {
   it('throws on non-OK unary and respond and stream transport', async () => {
     const broken = new InProcessApiClient({ fetch: async () => new Response('down', { status: 503 }) })
     await expect(broken.sessions.list({})).rejects.toThrow('transport failure for /api/session.list: HTTP 503')
+    await expect(broken.sessions.list({})).rejects.toBeInstanceOf(ApiTransportError)
     await expect(broken.respond({ type: 'client-response', rpcId: RpcId('r'), result: { ok: true, value: null } }))
       .rejects.toThrow('transport failure for /api/respond')
     await expect(collect(broken.events.mux({}, new AbortController().signal))).rejects.toThrow('transport failure for /api/events.mux')

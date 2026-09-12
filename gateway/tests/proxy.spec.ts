@@ -1,3 +1,4 @@
+import { once } from 'node:events'
 import { generateKeyPairSync } from 'node:crypto'
 import { existsSync, mkdtempSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
@@ -38,6 +39,7 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify({ version: 1, runtime: credential.runtime, proof: proof('response', nonce) }))
     return
   }
+  if (req.url === '/api/hold') { res.writeHead(200); res.write('authorized-prefix'); return }
   if (req.url === '/api/redirect') { res.writeHead(302, { location: 'http://127.0.0.1:' + process.argv[1] + '/landing' }); res.end(); return }
   if (req.url === '/api/external-redirect') { res.writeHead(302, { location: 'https://127.0.0.1.evil/landing' }); res.end(); return }
   res.setHeader('content-type', 'application/json')
@@ -91,7 +93,7 @@ async function setup(withPrincipal = false) {
     body: new URLSearchParams({ username: 'alice', password: 'pw-12345678' }),
   })
   const cookie = (loginRes.headers.get('set-cookie') ?? '').split(';')[0] ?? ''
-  return { deps, base, cookie, root, signer }
+  return { deps, base, cookie, root, signer, handlers, alice }
 }
 
 describe('proxy handlers', () => {
@@ -186,6 +188,42 @@ describe('proxy handlers', () => {
       method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' }, body: '{}',
     })
     expect(proxied.status).toBe(200)
+  })
+
+  it('closes an admitted WebSocket on logout and requires new authentication', async () => {
+    const { deps, base, cookie } = await setup(true)
+    await deps.instances.ensureRunning((await deps.users.getByUsername('alice'))!)
+    const ws = new WebSocket(`${base.replace('http', 'ws')}/api/events.mux`, { headers: { cookie, origin: base } })
+    cleanup.push(() => ws.terminate())
+    await once(ws, 'message', { signal: AbortSignal.timeout(5000) })
+    const closed = once(ws, 'close', { signal: AbortSignal.timeout(5000) })
+    const response = await fetch(`${base}/logout`, { method: 'POST', redirect: 'manual', headers: { cookie, origin: base } })
+    expect(response.status).toBe(302)
+    await closed
+    expect((await fetch(`${base}/api/echo`, { headers: { cookie } })).status).toBe(401)
+  })
+
+  it('invalidates only matching targets and terminates in-flight HTTP bodies', async () => {
+    const { deps, base, cookie, handlers, alice } = await setup(true)
+    await deps.instances.ensureRunning(alice)
+    const ws = new WebSocket(`${base.replace('http', 'ws')}/api/events.host`, { headers: { cookie, origin: base } })
+    cleanup.push(() => ws.terminate())
+    await once(ws, 'message', { signal: AbortSignal.timeout(5000) })
+    handlers.invalidateAccess({ projectId: 999 })
+    handlers.invalidateAccess({ userId: alice.id + 100 })
+    expect(ws.readyState).toBe(WebSocket.OPEN)
+    const response = await fetch(`${base}/api/hold`, { headers: { cookie } })
+    const reader = response.body!.getReader()
+    expect((await reader.read()).done).toBe(false)
+    const closed = once(ws, 'close', { signal: AbortSignal.timeout(5000) })
+    const reading = reader.read()
+    const ended = reading.then(
+      next => { expect(next).toEqual({ done: true, value: undefined }) },
+      (error: unknown) => { expect(error).toBeInstanceOf(Error) },
+    )
+    handlers.invalidateAccess({ userId: alice.id })
+    await Promise.all([closed, ended])
+    reader.releaseLock()
   })
 
   it('proxies websocket upgrades with rewritten host', async () => {

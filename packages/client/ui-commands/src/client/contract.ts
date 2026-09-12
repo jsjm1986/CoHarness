@@ -3,7 +3,9 @@
  * CommandUiRuntime (`ctx.commandUi`) implements this face; business packages
  * consume `register` alone.
  */
+import type { ComponentType } from 'react'
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { IconProps } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ClientSessionContext } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 
 /** Copy for an option that must be acknowledged before onSelect can run. */
@@ -46,8 +48,12 @@ export type CommandUiSpec = {
 export interface CommandContribution {
   /** Command name without the leading slash (unique across contributions). */
   readonly name: string
-  /** Menu row description. */
-  readonly description: string
+  /** Localized menu row title; the name itself when absent. */
+  readonly label?: string | (() => string)
+  /** Localized menu row description; the row shows none when absent. */
+  readonly description?: string | (() => string)
+  /** Menu row glyph from the shared icon set. */
+  readonly icon?: ComponentType<IconProps>
   /** Capability filter, called with a fresh projection per candidate pass. */
   available(session: ClientSessionContext): boolean
   /** The command's UI behavior (this phase: popupSelect only). */

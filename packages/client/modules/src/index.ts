@@ -31,7 +31,7 @@ import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/cordis-plugin-loader'
 import { renderIndexInjections, type IndexInjection } from '@deepseek-ai/dsh-host-webserver'
-import { optionalStringArray, stripClientSuffix } from './client/manifest.ts'
+import { parseDshClient, stripClientSuffix } from './client/manifest.ts'
 import type { WebBootEntry, WebBootGraph } from './client/manifest.ts'
 
 export { stripClientSuffix } from './client/manifest.ts'
@@ -44,22 +44,6 @@ declare module '@deepseek-ai/cordis' {
     /** The web plugin table (provided by the client-modules node half). */
     clientModules: ClientModuleRegistry
   }
-}
-
-/** package.json `dsh.client` declaration fields, validated one by one after reading the file. */
-interface DshClientDeclaration {
-  inject?: string[]
-  platform: string
-  /** Boot phase-one prefetch mark; absent means lazy (fetched on demand). */
-  immediately?: boolean
-  /**
-   * Exact module-table requests beyond the implicit client baseline. Any
-   * specifier is valid, including subpaths such as `<pkg>/client`; each
-   * importing package declares its own exceptional requests. A type-only
-   * import is not a request because the transform erases it before resolution.
-   * Absent means the package uses only the baseline externals.
-   */
-  external?: string[]
 }
 
 /** The declared fields a graph row carries, normalized (absent array declarations become empty). */
@@ -120,29 +104,6 @@ class ClientPackageCompositionError extends AggregateError {
 interface WebPluginRecord {
   entry: WebBootEntry
   meta: PkgMeta
-}
-
-/** Narrow an unknown parsed JSON value to the `dsh.client` declaration, throwing on malformed fields. */
-function parseDshClient(pkgName: string, value: unknown): DshClientDeclaration | undefined {
-  if (value === undefined) return undefined
-  if (typeof value !== 'object' || value === null) {
-    throw new Error(`client-modules: ${pkgName} has a non-object dsh.client declaration`)
-  }
-  const decl = value as Record<string, unknown>
-  if (typeof decl.platform !== 'string') {
-    throw new Error(`client-modules: ${pkgName} dsh.client.platform must be a string`)
-  }
-  const inject = optionalStringArray(pkgName, 'dsh.client.inject', decl.inject)
-  const external = optionalStringArray(pkgName, 'dsh.client.external', decl.external)
-  if (decl.immediately !== undefined && typeof decl.immediately !== 'boolean') {
-    throw new Error(`client-modules: ${pkgName} dsh.client.immediately must be a boolean`)
-  }
-  return {
-    platform: decl.platform,
-    ...(inject !== undefined ? { inject } : {}),
-    ...(external !== undefined ? { external } : {}),
-    ...(decl.immediately !== undefined ? { immediately: decl.immediately } : {}),
-  }
 }
 
 /** Resolve `exports["./client"]` to a relative path, accepting the string and one-level conditional forms. */

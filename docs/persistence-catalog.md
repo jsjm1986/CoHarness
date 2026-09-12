@@ -272,7 +272,7 @@ Source: [`packages/core/session/src/types.ts:342`](../packages/core/session/src/
 }
 ```
 
-Source: [`packages/interaction/commands/src/types.ts:104`](../packages/interaction/commands/src/types.ts)
+Source: [`packages/interaction/commands/src/types.ts:106`](../packages/interaction/commands/src/types.ts)
 
 <a id="commandrun--log-only"></a>
 
@@ -292,7 +292,7 @@ Source: [`packages/interaction/commands/src/types.ts:104`](../packages/interacti
 'command/run': { commandId: CommandId; name: string; args?: string; source: CommandSource }
 ```
 
-Source: [`packages/interaction/commands/src/types.ts:97`](../packages/interaction/commands/src/types.ts)
+Source: [`packages/interaction/commands/src/types.ts:99`](../packages/interaction/commands/src/types.ts)
 
 ### `compaction/*`
 
@@ -441,7 +441,7 @@ Source: [`packages/feedback/message-feedback/src/index.ts:59`](../packages/feedb
 'feedback/record': { text: string }
 ```
 
-Source: [`packages/feedback/command-feedback/src/index.ts:62`](../packages/feedback/command-feedback/src/index.ts)
+Source: [`packages/feedback/command-feedback/src/index.ts:63`](../packages/feedback/command-feedback/src/index.ts)
 
 ### `goal/*`
 
@@ -551,7 +551,7 @@ Source: [`packages/llm/llm-retry/src/types.ts:11`](../packages/llm/llm-retry/src
 'permission/preset': { preset: string; origin?: 'default' | 'selection' | 'inferred' }
 ```
 
-Source: [`packages/interaction/permission-presets/src/index.ts:55`](../packages/interaction/permission-presets/src/index.ts)
+Source: [`packages/interaction/permission-presets/src/index.ts:56`](../packages/interaction/permission-presets/src/index.ts)
 
 ### `plan/*`
 
@@ -568,7 +568,7 @@ Source: [`packages/interaction/permission-presets/src/index.ts:55`](../packages/
 'plan/mode': { active: boolean }
 ```
 
-Source: [`packages/plan/plan-mode/src/index.ts:53`](../packages/plan/plan-mode/src/index.ts)
+Source: [`packages/plan/plan-mode/src/index.ts:56`](../packages/plan/plan-mode/src/index.ts)
 
 ### `request/*`
 

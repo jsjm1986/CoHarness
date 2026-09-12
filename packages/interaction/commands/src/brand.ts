@@ -12,6 +12,18 @@
 
 import type { Branded } from '@deepseek-ai/dsh-brand'
 
+/** Stable, plugin-owned identity of a command definition, independent of its name and copy. */
+export type CommandDefinitionId = Branded<'CommandDefinitionId'>
+
+/**
+ * Brand a plugin-namespaced command definition identity.
+ * @param id - stable identity chosen by the registering plugin.
+ * @returns the same string, branded; no validation is performed.
+ */
+export function CommandDefinitionId(id: string): CommandDefinitionId {
+  return id as CommandDefinitionId
+}
+
 /**
  * Pairs one command execution's `command/run`/`command/done` lifecycle
  * records with each other and with the `command.execute` admission response.

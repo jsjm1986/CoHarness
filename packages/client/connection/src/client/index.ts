@@ -27,6 +27,7 @@ export type {
   SessionHistoryIndex, SessionHistoryIndexItem, ToolEventView,
   DirectoryEntry, DirectoryListing,
   ToolCallView, ToolResultView, WorkspaceApi, WorkspaceId, WorkspaceView,
+  WorkspaceFilesApi, WorkspaceFileByteWindow, WorkspaceFileEntry, WorkspaceFileStat, WorkspaceFileTextPage,
   SkillsApi, SkillEntry,
   ModelCatalogFailure, ModelCatalogModel, ModelProviderGroup, ModelReasoning,
   MessageId, ModelReasoningEffort, ModelSelection, QueueAction, QueuedInboxItem, SessionModels,
@@ -47,6 +48,8 @@ export {
 
 // Connection loop types are public through ConnectionHandle.start; the
 // controller remains package-internal.
+export type { ConnectionFailure } from './connection.ts'
+export { ApiTransportError } from './api.ts'
 export type { ConnectionConfig, ConnectionSinks, ConnectionState }
 export type { ClientConnectionRpc } from '../rpc.ts'
 export type { RpcFetch } from './rpc.ts'

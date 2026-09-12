@@ -30,6 +30,7 @@
  */
 
 import type {} from '@deepseek-ai/cordis'
+import type { DshClientManifest } from '@deepseek-ai/dsh-package-manifest'
 import type { ClientModuleSystem } from './system.ts'
 
 declare module '@deepseek-ai/cordis' {
@@ -122,6 +123,36 @@ export function optionalStringArray(subject: string, field: string, value: unkno
     throw new Error(`client-modules: ${subject} ${field} must be a string array`)
   }
   return value as string[]
+}
+
+/**
+ * Narrow an unknown package manifest value to the browser declaration shared
+ * by the Node graph scanner and client build tooling.
+ * @param pkgName - package name used in diagnostics.
+ * @param value - raw `dsh.client` value.
+ * @returns the validated declaration, or undefined when absent.
+ * @throws {Error} when a present declaration has malformed fields.
+ */
+export function parseDshClient(pkgName: string, value: unknown): DshClientManifest | undefined {
+  if (value === undefined) return undefined
+  if (typeof value !== 'object' || value === null) {
+    throw new Error(`client-modules: ${pkgName} has a non-object dsh.client declaration`)
+  }
+  const decl = value as Record<string, unknown>
+  if (typeof decl.platform !== 'string') {
+    throw new Error(`client-modules: ${pkgName} dsh.client.platform must be a string`)
+  }
+  const inject = optionalStringArray(pkgName, 'dsh.client.inject', decl.inject)
+  const external = optionalStringArray(pkgName, 'dsh.client.external', decl.external)
+  if (decl.immediately !== undefined && typeof decl.immediately !== 'boolean') {
+    throw new Error(`client-modules: ${pkgName} dsh.client.immediately must be a boolean`)
+  }
+  return {
+    platform: decl.platform,
+    ...(inject !== undefined ? { inject } : {}),
+    ...(external !== undefined ? { external } : {}),
+    ...(decl.immediately !== undefined ? { immediately: decl.immediately } : {}),
+  }
 }
 
 /**

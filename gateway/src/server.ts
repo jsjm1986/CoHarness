@@ -351,7 +351,12 @@ export interface GatewayRequestContext {
 export type ProxyHandler = (req: IncomingMessage, res: ServerResponse, context: GatewayRequestContext) => Promise<void>
 export type UpgradeHandler = (req: IncomingMessage, socket: Duplex, head: Buffer, context: GatewayRequestContext) => Promise<void>
 
+/** Invalidate already admitted runtime traffic after a committed access change. */
+export type GatewayAccessInvalidation = (subject: { userId?: number; projectId?: number }) => void
+
 export interface GatewayHandlers {
+  /** Stops affected HTTP responses and WebSockets; new requests authorize normally. */
+  invalidateAccess?: GatewayAccessInvalidation
   proxy?: ProxyHandler
   upgrade?: UpgradeHandler
   /** Account catalog including personal runtime metadata and ACL-filtered projects. */
@@ -598,6 +603,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
 
     if (pathname === '/logout' && req.method === 'POST') {
       await auth.revoke(token)
+      handlers.invalidateAccess?.({ userId: user.id })
       await audit.write({ userId: user.id, action: 'logout', ip: clientIp(req) })
       redirect(res, '/login', [sessionCookie('', cfg, true)])
       return
@@ -627,6 +633,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         const password = new URLSearchParams(await readBody(req)).get('password') ?? ''
         if (password.length < 8) { send(res, 400, passwordPage('密码至少 8 位')); return }
         await users.changeOwnPassword(user.id, password)
+        handlers.invalidateAccess?.({ userId: user.id })
         await removeBootstrapAdminPassword(cfg.bootstrapAdminPasswordFile).catch((error: unknown) => {
           // Password change remains successful; operators can remove a stale
           // one-time file after the warning if the filesystem rejected it.
@@ -1461,7 +1468,9 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
             send(res, 400, '{"error":"invalid-visibility"}', 'application/json')
             return
           }
+          const access = await deps.collaboration.access(user.id, sessionId, 'read')
           await deps.collaboration.setVisibility(user.id, sessionId, body.visibility)
+          handlers.invalidateAccess?.({ projectId: access.projectId })
           res.writeHead(204)
           res.end()
           return

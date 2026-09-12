@@ -123,6 +123,35 @@ describe('sessionStats projection unit (registry drive)', () => {
       .toMatchObject({ turns: 1, steps: 1, ttftSteps: 0, decodeTokens: 0 })
   })
 
+  it('keeps an embedded attempt first-token marker for a later assistant message', () => {
+    const state = sessionStatsProjectionDefinition.init()
+    const start: SessionEvent = { seq: 0 as SessionEvent['seq'], time: 10, type: 'step/start', data: { turn: 1, step: 1 } }
+    const attempt: SessionEvent = {
+      seq: 1, time: 25, type: 'assistant/attempt', data: {
+        turn: 1,
+        step: 1,
+        stream: [
+          { type: 'chunk', time: 15, chunk: { type: 'text-delta', index: 0, text: 'partial' } },
+          { type: 'chunk', time: 20, chunk: { type: 'finish', reason: { kind: 'error', failure: { code: 'HTTP', message: 'failed' } } } },
+        ],
+      },
+    } as unknown as SessionEvent
+    const messageEvent: SessionEvent = {
+      seq: 2, time: 40, type: 'assistant/message', data: {
+        turn: 1,
+        step: 1,
+        message: createMessage({ role: 'assistant', content: [{ type: 'text', text: 'done' }], source: { kind: 'model', provider: 'mock', model: 'mock' } }),
+        usage: { inputTokens: 1, outputTokens: 2 },
+      },
+    } as unknown as SessionEvent
+    const next = sessionStatsProjectionDefinition.apply(
+      sessionStatsProjectionDefinition.apply(state, start),
+      attempt,
+    )
+    const settled = sessionStatsProjectionDefinition.apply(next, messageEvent)
+    expect(settled).toMatchObject({ llmMs: 30, ttftMs: 5, ttftSteps: 1, decodeMs: 25, decodeTokens: 2 })
+  })
+
   it('folds steps already in the log when the plugin mounts late (lazy cell build)', async () => {
     const { ctx, session } = await harness(false)
     session.append('turn/start', { turn: 1 })

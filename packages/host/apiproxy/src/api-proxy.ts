@@ -4,6 +4,7 @@
  */
 
 import { randomUUID } from 'node:crypto'
+import { createWorkspaceFilesApi, subscribeWorkspaceFileChanges, DEFAULT_WORKSPACE_FILE_MAX_BYTES, DEFAULT_WORKSPACE_FILE_MAX_LINES, DEFAULT_WORKSPACE_FILE_MAX_ENTRIES, DEFAULT_WORKSPACE_FILE_MAX_RESOURCES } from './workspace-files.ts'
 import { mkdir, realpath, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path'
@@ -1061,6 +1062,14 @@ export interface ApiProxyDefaults {
    * falls back to platform detection ({@link canOpenNativePath}).
    */
   canOpenPath?: () => boolean
+  /** Maximum UTF-8 bytes returned by one Workspace page or byte window. */
+  workspaceFileMaxBytes?: number
+  /** Maximum lines in a Workspace text page. */
+  workspaceFileMaxLines?: number
+  /** Maximum direct directory entries processed in a Workspace listing. */
+  workspaceFileMaxEntries?: number
+  /** Maximum Client metadata records retained per runtime. */
+  workspaceFileMaxResources?: number
 }
 
 /** The tool/call payload fields the presenter path reads. */
@@ -3462,7 +3471,21 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     return ok(request, namespaceView(descriptor))
   }
 
+  if (defaults.workspaceFileMaxResources !== undefined
+    && (!Number.isSafeInteger(defaults.workspaceFileMaxResources) || defaults.workspaceFileMaxResources < 1)) {
+    throw new RangeError('workspaceFileMaxResources must be a positive safe integer')
+  }
+  const workspaceFiles = createWorkspaceFilesApi(ctx, {
+    maxBytes: defaults.workspaceFileMaxBytes,
+    maxLines: defaults.workspaceFileMaxLines,
+    maxEntries: defaults.workspaceFileMaxEntries,
+    authorize: sessionId => authorizeSession(sessionId, 'read'),
+    validateRoot: resolveProjectPath,
+    principalSignal,
+  })
+
   return {
+    workspaceFiles,
     sessions: {
       // Attached sessions summarize from memory; persisted-but-unattached (cold)
       // sessions merge in from the persistence store so history survives restarts.
@@ -4849,6 +4872,12 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           attachedSessions,
           home: homedir(),
           canOpenPath: !projectScope && canOpenPaths(),
+          ...(ctx.get('fs') === undefined ? {} : { workspaceFiles: {
+            maxBytes: defaults.workspaceFileMaxBytes ?? DEFAULT_WORKSPACE_FILE_MAX_BYTES,
+            maxLines: defaults.workspaceFileMaxLines ?? DEFAULT_WORKSPACE_FILE_MAX_LINES,
+            maxEntries: defaults.workspaceFileMaxEntries ?? DEFAULT_WORKSPACE_FILE_MAX_ENTRIES,
+            maxResources: defaults.workspaceFileMaxResources ?? DEFAULT_WORKSPACE_FILE_MAX_RESOURCES,
+          } }),
         })
       },
 
@@ -5703,6 +5732,12 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           }
 
           const disposers = [
+            subscribeWorkspaceFileChanges(ctx, {
+              authority, signal: streamSignal,
+              publish: (change) => { queue.push(frame(change)) },
+              fail,
+              validateRoot: resolveProjectPath,
+            }),
             ctx.on('session/created', (session: Session) => {
               publish(() => {
                 void ensureReadable(session.id).then((allowed) => {

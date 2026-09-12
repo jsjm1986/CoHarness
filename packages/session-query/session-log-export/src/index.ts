@@ -1,6 +1,7 @@
 /** Web Session-log download command over the host endpoint owned by ApiProxy. */
 
 import type { Context } from '@deepseek-ai/cordis'
+import { CommandDefinitionId } from '@deepseek-ai/dsh-commands/brand'
 import type { CommandResult } from '@deepseek-ai/dsh-commands'
 
 export const name = 'session-log-download'
@@ -17,6 +18,7 @@ const REQUESTED: CommandResult = {
  */
 export function apply(ctx: Context): void {
   ctx.effect(() => ctx.commands.register({
+    definitionId: CommandDefinitionId('@deepseek-ai/dsh-session-log-export'),
     name: 'export',
     description: 'Download this Session log as a ZIP archive',
     handler: invocation => Promise.resolve(invocation.rawInput.trim() === ''

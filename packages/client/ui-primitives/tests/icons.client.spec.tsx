@@ -16,8 +16,8 @@ const icons = Object.fromEntries(
 const iconNames = Object.keys(icons)
 
 describe('ic_ds_ icon set', () => {
-  it('exports the full icon set (46 deepsuite + 20 figma extracts + five product glyphs outside those sets)', () => {
-    expect(iconNames.length).toBe(71)
+  it('exports the full icon set (46 deepsuite + 23 figma extracts + eight product glyphs outside those sets)', () => {
+    expect(iconNames.length).toBe(77)
   })
 
   it.each(iconNames)('%s renders an svg with currentColor fills and no hardcoded palette', (name) => {

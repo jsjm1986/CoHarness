@@ -16,7 +16,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
-import HttpServer from '../src/index.ts'
+import HttpServer, { renderIndexInjections } from '../src/index.ts'
 
 let root: string | undefined
 let context: Context | undefined
@@ -302,6 +302,12 @@ describe('real Loader composition', () => {
     expect(upgradedServerClosed).toBe(true)
     upgraded.destroy()
     await expect(request(port, '/probe')).rejects.toThrow()
+  })
+
+  it('appends the boot-readiness tail after structured injections', () => {
+    expect(renderIndexInjections('<head></head><body>x</body>', [])).toBe(
+      '<head></head><body>x</body><script>(globalThis.__DSH_BOOT_READY__ ??= Promise.withResolvers()).resolve()</script>',
+    )
   })
 
   it('fails the fiber when the port is already taken (fail-loud at activation)', { timeout: 60_000 }, async () => {

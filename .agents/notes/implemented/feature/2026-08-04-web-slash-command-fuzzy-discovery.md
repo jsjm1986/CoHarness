@@ -12,7 +12,7 @@ The web command menu required a command-name prefix, so discovery failed when a 
 
 The `/` command source fuzzy-matches the typed query against command names as a case-insensitive ordered subsequence. Exact prefixes form the highest ranking class. Within each class, the strongest alignment score rewards separator boundaries and adjacent characters while penalizing leading characters and gaps; equal scores retain the host-directory and client-contribution order. Position filtering still removes argument-taking commands from inline menus before ranking.
 
-The scorer uses dynamic programming in `O(query length × name length)` time and `O(name length)` memory per candidate. Candidate scoring stays client-side and examines names only; descriptions do not affect matching. Menu selection still dispatches the selected exact name, while space and Enter adjudication continue to require an exact command token.
+The scorer uses dynamic programming in `O(query length × name length)` time and `O(name length)` memory per candidate. Candidate scoring stays client-side and considers the canonical name plus an optional localized label; descriptions do not affect matching. First-party rows use stable definition identities for localized labels, grouped empty-query sections, and shared glyphs. A localized token is only a draft spelling: menu and Enter claims execute the canonical descriptor name, while exact canonical names still win over aliases.
 
 ## Alternatives considered
 

@@ -16,7 +16,7 @@
  * may add node types this renderer has no mapping for.
  */
 
-import { Fragment, createElement } from 'react'
+import { Fragment, createElement, useState } from 'react'
 import type { Key, ReactNode } from 'react'
 import clsx from 'clsx'
 import type * as Md from 'mdast'
@@ -495,12 +495,19 @@ function renderImage(url: string, alt: string, key: Key): ReactNode {
   if (imageSrc === undefined) {
     return <span key={key} className={css.imageAlt}>{alt}</span>
   }
+  return <MarkdownImage key={`${key}:${imageSrc}`} src={imageSrc} alt={alt} destination={url} />
+}
+
+/** Replace a failed remote image with its authored fallback without retrying on every render. */
+function MarkdownImage({ src, alt, destination }: { src: string; alt: string; destination: string }): ReactNode {
+  const [failed, setFailed] = useState(false)
+  if (failed) return <span className={css.imageAlt}>{alt || destination}</span>
   return (
     <img
-      key={key}
       className={css.image}
-      src={imageSrc}
+      src={src}
       alt={alt}
+      onError={() => { setFailed(true) }}
       loading="lazy"
       decoding="async"
       referrerPolicy="no-referrer"

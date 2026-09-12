@@ -2,14 +2,14 @@
 
 [English](README.md) | 中文
 
-注册 `sessionStats` projection 单元的函数插件：从步边界、流式 chunk、工具配对与已组装的 assistant 消息折叠出全日志会话数字——轮/步计数以及 LLM、工具、首 token、解码墙钟时间——经 session-projection 缝对外提供（registry 快照、变更流，以及每一个 projection 载体：history 尾页、`session/projection` 推送帧、会话列表行）。客户端由此渲染分页与压缩都无法改变的全会话数字；参考消费者是 Web 聊天统计条，其窗口折叠以相同字段名充当无单元时的回退。
+注册 `sessionStats` projection 单元的函数插件：从步边界、流式 chunk、紧凑的 `assistant/attempt` 记录、工具配对与已组装的 assistant 消息折叠出全日志会话数字——轮/步计数以及 LLM、工具、首 token、解码墙钟时间——经 session-projection 缝对外提供（registry 快照、变更流，以及每一个 projection 载体：history 尾页、`session/projection` 推送帧、会话列表行）。客户端由此渲染分页与压缩都无法改变的全会话数字；参考消费者是 Web 聊天统计条，其窗口折叠以相同字段名充当无单元时的回退。
 
 ## 折叠语义
 
 - `steps` 统计 `step/end` 事件。agent loop 对每个进入的步在 `finally` 中恰好追加一条，因此完成、失败、取消、max-tokens 的步全部计入。若改按已组装的 assistant 消息计数，则会多算 max-tokens 的 usage 宿主消息（空内容、被排除在 surface 之外），并少算被取消的步（在消息组装前已中止）。
 - `turns` 统计含至少一个已关闭步的不同 turn；被拒绝或空轮（未进入任何步即关闭）不计。turn 号由宿主分配、按会话单调递增，因此折叠只需保留最近计入的 turn。
 - `llmMs` 按步累加 `step/start` → `assistant/message`（组装出消息的步；步内重试的等待与窗口折叠一样计入模型时间）。
-- `ttftMs`/`ttftSteps` 累加并统计 `step/start` → 首个非空 delta chunk；首次尝试的边界在步内 `llm/retry` 后保留（与窗口 `resetForRetry` 对齐）。
+- `ttftMs`/`ttftSteps` 累加并统计 `step/start` → 首个非空 delta chunk；紧凑 `assistant/attempt` 也使用其记录级首 token 时间；首次尝试的边界在步内 `llm/retry` 后保留（与窗口 `resetForRetry` 对齐）。
 - `decodeMs`/`decodeTokens` 累加首 token → 已组装消息的时长与提供方上报的输出 token，仅统计两者兼备的步。
 - `toolMs` 按 callId 配对累加 `tool/call` → `tool/result`；未解决的调用在 `turn/end` 时丢弃（结果总在其轮内落地）。
 - 每个字段在首个贡献事件之前均为 0。已装配的 registry 恒提供该键，客户端读取值本身，而非键的存在性。

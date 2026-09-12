@@ -3,7 +3,8 @@
  */
 
 import { z } from 'zod'
-import type { TokenUsage } from '@deepseek-ai/dsh-llm'
+import { lastAssistantStreamChunk } from '@deepseek-ai/dsh-llm/assistant-stream'
+import type { TokenUsage } from '@deepseek-ai/dsh-llm/types'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
@@ -77,13 +78,15 @@ const pressureSchema: z.ZodType<ContextPressureProjection> = z.object({
 const pressureFrom = (usage: TokenUsage): number =>
   usage.inputTokens + (usage.cacheReadTokens ?? 0) + (usage.cacheWriteTokens ?? 0)
 
-/** The usage a chunk or finalized message reports for its step, if any. */
-const usageOf = (event: SessionEvent): TokenUsage | undefined =>
-  event.type === 'assistant/chunk' && event.data.chunk.type === 'usage'
-    ? event.data.chunk.usage
-    : event.type === 'assistant/message'
-      ? event.data.usage
-      : undefined
+/** The usage a streamed chunk or durable Assistant settlement reports. */
+function usageOf(event: SessionEvent): TokenUsage | undefined {
+  if (event.type === 'assistant/chunk' && event.data.chunk.type === 'usage') return event.data.chunk.usage
+  if (event.type === 'assistant/message' && event.data.usage !== undefined) return event.data.usage
+  if (event.type !== 'assistant/message' && event.type !== 'assistant/attempt') return undefined
+  return event.data.stream === undefined
+    ? undefined
+    : lastAssistantStreamChunk(event.data.stream, 'usage')?.usage
+}
 
 declare module '@deepseek-ai/dsh-session-projection/types' {
   interface SessionProjectionStateMap {
@@ -111,29 +114,30 @@ type ContextPressureState = z.infer<typeof contextPressureStateSchema>
  * Token-meter's session projection unit.
  *
  * Usage chunks provide an early sample that survives a later request failure;
- * an assistant message provides the final sample for the same turn/step. A
- * repeated sample replaces that step's earlier value instead of double
- * counting it. The single `last` slot relies on the session-log invariant
- * that usage reports for one turn/step are adjacent: once a later step begins,
- * a legal log never reports usage for an earlier step again.
+ * embedded Assistant settlements provide the same sample when compact records
+ * are the only durable representation. A repeated sample replaces the current
+ * attempt's earlier value instead of double counting it. Retry-started clears
+ * that replacement slot so a retried request in the same step is accumulated as
+ * a separate billed attempt.
  */
 export const tokenUsageProjectionDefinition = {
   key: 'tokenUsage',
-  stateVersion: 1,
+  stateVersion: 2,
   stateSchema: tokenUsageStateSchema,
   init: () => ({ totals: zeroBuckets(), last: null }),
   apply: (state, event) => {
+    if (event.type === 'llm/retry-started') {
+      return state.last?.turn === event.data.turn && state.last.step === event.data.step
+        ? { ...state, last: null }
+        : state
+    }
     let turn: number
     let step: number
-    let usage: TokenUsage
-    if (event.type === 'assistant/chunk' && event.data.chunk.type === 'usage') {
+    const usage = usageOf(event)
+    if (usage === undefined) return state
+    if (event.type === 'assistant/chunk' || event.type === 'assistant/message' || event.type === 'assistant/attempt') {
       ;({ turn, step } = event.data)
-      usage = event.data.chunk.usage
-    } else if (event.type === 'assistant/message' && event.data.usage !== undefined) {
-      ;({ turn, step, usage } = event.data)
-    } else {
-      return state
-    }
+    } else return state
 
     const buckets = bucketsFrom(usage)
     const previous = state.last !== null

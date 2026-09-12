@@ -24,6 +24,7 @@
  */
 
 import { z } from 'zod'
+import { assistantStreamFirstTokenTime } from '@deepseek-ai/dsh-llm/assistant-stream'
 import { isTokenDelta } from '@deepseek-ai/dsh-llm/message'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 
@@ -140,9 +141,20 @@ export const sessionStatsProjectionDefinition = {
         if (open.firstTokenTime !== null || !isTokenDelta(event.data.chunk)) return state
         return { ...state, openStep: { ...open, firstTokenTime: event.time } }
       }
+      case 'assistant/attempt': {
+        const open = state.openStep
+        if (open === null || open.turn !== event.data.turn || open.step !== event.data.step) return state
+        const first = assistantStreamFirstTokenTime(event.data.stream) ?? null
+        if (open.firstTokenTime !== null || first === null) return state
+        return { ...state, openStep: { ...open, firstTokenTime: first } }
+      }
       case 'assistant/message': {
         const open = state.openStep
         if (open === null || open.turn !== event.data.turn || open.step !== event.data.step) return state
+        const embeddedFirst = event.data.stream === undefined
+          ? undefined
+          : assistantStreamFirstTokenTime(event.data.stream)
+        const firstToken = open.firstTokenTime ?? embeddedFirst ?? null
         // One assembled message per step: closing the boundary means a
         // defensive duplicate cannot accrue twice.
         const next: SessionStatsState = {
@@ -150,12 +162,12 @@ export const sessionStatsProjectionDefinition = {
           llmMs: state.llmMs + Math.max(0, event.time - open.startTime),
           openStep: null,
         }
-        if (open.firstTokenTime !== null) {
-          next.ttftMs += Math.max(0, open.firstTokenTime - open.startTime)
+        if (firstToken !== null) {
+          next.ttftMs += Math.max(0, firstToken - open.startTime)
           next.ttftSteps += 1
           const outputTokens = usageOutputTokens(event.data.usage)
           if (outputTokens !== null) {
-            next.decodeMs += Math.max(0, event.time - open.firstTokenTime)
+            next.decodeMs += Math.max(0, event.time - firstToken)
             next.decodeTokens += outputTokens
           }
         }

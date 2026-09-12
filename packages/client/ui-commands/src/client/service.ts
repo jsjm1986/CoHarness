@@ -2,10 +2,10 @@
  * CommandUiRuntime (`ctx.commandUi`): the '/' command source over the
  * session-keyed directory, the client-contribution registry, and the
  * per-session popupSelect controllers. Candidate synthesis merges the host
- * catalog with contributions by availability, then fuzzy query/position
- * filtering; a host/contribution name collision fails loud. Every execute
- * addresses the session's agent by sessionId — sessions are always
- * agent-backed.
+ * catalog with contributions by availability, adds first-party presentation,
+ * then applies sectioning and fuzzy query/position filtering; a
+ * host/contribution name collision fails loud. Every execute addresses the
+ * session's agent by sessionId — sessions are always agent-backed.
  */
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
@@ -23,6 +23,8 @@ import type { CommandContribution, CommandDecoration, CommandUiContract } from '
 import type { CommandDescriptor } from './directory.ts'
 import { CommandDirectory } from './directory.ts'
 import { PopupSelectController } from './popup.ts'
+import { builtinRowFace, sectionRows } from './presentation.ts'
+import { claimToken } from './resolution.ts'
 import type { TokenSegment } from './popup.ts'
 
 declare module '@deepseek-ai/cordis' {
@@ -109,8 +111,18 @@ function fuzzyCandidates(candidates: readonly InputTriggerCandidate[], rawQuery:
   const ranked: RankedCandidate[] = []
   candidates.forEach((candidate, index) => {
     const name = candidate.name.toLowerCase()
-    const score = fuzzyScore(name, query)
-    if (score !== undefined) ranked.push({ candidate, index, prefix: name.startsWith(query), score })
+    const label = candidate.label?.toLowerCase()
+    const nameScore = fuzzyScore(name, query)
+    const labelScore = label === undefined ? undefined : fuzzyScore(label, query)
+    const score = Math.max(nameScore ?? Number.NEGATIVE_INFINITY, labelScore ?? Number.NEGATIVE_INFINITY)
+    if (score !== Number.NEGATIVE_INFINITY) {
+      ranked.push({
+        candidate,
+        index,
+        prefix: name.startsWith(query) || label?.startsWith(query) === true,
+        score,
+      })
+    }
   })
   ranked.sort((left, right) =>
     Number(right.prefix) - Number(left.prefix) || right.score - left.score || left.index - right.index)
@@ -155,9 +167,8 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
     ctx.remote.$on('commands/change', () => { this.directory.invalidateAll() })
     // A preset switch changes which commands one session's agent resolves and
     // registers nothing globally, so the registry-wide signal above never
-    // fires for it: repull that key alone, soft, so the old snapshot serves
-    // the menu until the new one lands.
-    ctx.remote.$on('agent-preset/selected', (sessionId) => { void this.directory.refresh(sessionId) })
+    // fires for it: drop that key before prewarming its replacement.
+    ctx.remote.$on('agent-preset/selected', (sessionId) => { this.directory.resetSession(sessionId) })
     ctx.on('connection/reset', () => { this.directory.resetConnected() })
   }
 
@@ -245,26 +256,34 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
     }
   }
 
-  /** Menu candidates: host catalog + contribution availability, then position filtering and fuzzy name ranking. */
+  /** Menu candidates: host catalog + contributions, first-party presentation, sections, and label/name ranking. */
   private async candidates(session: ClientSessionContext, req: CandidateRequest): Promise<readonly InputTriggerCandidate[]> {
     const list = await this.directory.ensureReady(session.sessionId, req.signal)
     const rows: InputTriggerCandidate[] = []
     const seen = new Set<string>()
     for (const c of list) {
       seen.add(c.name)
-      rows.push({ name: c.name, description: c.description, ...(c.input !== undefined ? { hint: c.input.hint } : {}) })
+      rows.push({
+        name: c.name,
+        ...(builtinRowFace(c, this.t) ?? { description: c.description }),
+        ...(c.input !== undefined ? { hint: c.input.hint } : {}),
+      })
     }
     for (const contribution of this.live.contributions.values()) {
       if (!contribution.available(session)) continue
       if (seen.has(contribution.name)) {
         throw new Error(`ui-commands: contribution /${contribution.name} collides with a host command`)
       }
-      rows.push({ name: contribution.name, description: contribution.description })
+      const description = contribution.description
+      rows.push({
+        name: contribution.name,
+        ...(contribution.label === undefined ? {} : { label: typeof contribution.label === 'function' ? contribution.label() : contribution.label }),
+        ...(description === undefined ? {} : { description: typeof description === 'function' ? description() : description }),
+        ...(contribution.icon === undefined ? {} : { icon: contribution.icon }),
+      })
     }
-    return fuzzyCandidates(
-      rows.filter(c => req.position === 'leading' || c.hint === undefined),
-      req.query,
-    )
+    const visible = rows.filter(c => req.position === 'leading' || c.hint === undefined)
+    return req.query === '' ? sectionRows(visible, this.t) : fuzzyCandidates(visible, req.query)
   }
 
   /** Decision table, menu column: contribution/decorated-host → popup; host input → claim; host bare → detached execute. */
@@ -285,7 +304,7 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
       this.openPopup(name, decoration.ui, pick.session, { via: 'menu', span: pick.span })
       return 'handled'
     }
-    if (desc.input !== undefined) return { claim: this.leadingClaim(desc, pick.session) }
+    if (desc.input !== undefined) return { claim: this.leadingClaim(desc, pick.session, claimToken(desc, this.t)) }
     // Menu-pick execute consumes the trigger span before the detached run
     // (scoped event; the input owns the CAS guard).
     this.consumeVia(pick.session.sessionId, { via: 'menu', span: pick.span })
@@ -300,7 +319,7 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
     if (this.live.contributions.has(name)) return undefined // popup kinds never claim on space
     const desc = this.directory.resolve(session.sessionId, name)
     if (desc === undefined || desc.input === undefined) return undefined
-    return { claim: this.leadingClaim(desc, session) }
+    return { claim: this.leadingClaim(desc, session, name) }
   }
 
   /**
@@ -341,24 +360,26 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
     await this.directory.ensureReady(session.sessionId, signal)
     const desc = this.directory.resolve(session.sessionId, name)
     if (desc === undefined) return undefined
+    const canonicalName = desc.name
+    const canonicalLine = `/${canonicalName}${trimmed.slice(token.length)}`
     // Bare enter on a decorated host command opens its popup; an argued line
     // never consults the decoration (the claim/detached paths below own it).
     if (bare) {
-      const decoration = this.live.decorations.get(name)
+      const decoration = this.live.decorations.get(canonicalName)
       if (decoration !== undefined && decoration.available(session)) {
         if (envelope.images > 0) refuseImages()
-        this.openPopup(name, decoration.ui, session, { via: 'enter', token })
+        this.openPopup(canonicalName, decoration.ui, session, { via: 'enter', token })
         return 'handled'
       }
     }
     if (desc.input !== undefined) {
       if (envelope.images > 0 && desc.input.images !== true) refuseImages()
-      return { claim: this.leadingClaim(desc, session) }
+      return { claim: this.leadingClaim(desc, session, name) }
     }
     if (!bare) return undefined
     if (envelope.images > 0) refuseImages()
     this.consumeVia(session.sessionId, { via: 'enter', token })
-    this.runDetached(desc, session, trimmed)
+    this.runDetached(desc, session, canonicalLine)
     return 'handled'
   }
 
@@ -374,14 +395,15 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
     this.popupFor(actx).open(name, ui, session, segment)
   }
 
-  /** Build the leadingInput claim: token `/name ` + the command.execute submit transaction. */
-  private leadingClaim(desc: CommandDescriptor, session: ClientSessionContext): CommandClaim {
-    const token = `/${desc.name} `
+  /** Build a leadingInput claim with its shown spelling and canonical execute line. */
+  private leadingClaim(desc: CommandDescriptor, session: ClientSessionContext, shown: string): CommandClaim {
+    const token = `/${shown} `
+    const line = `/${desc.name} `
     return {
       token,
       ...(desc.input !== undefined ? { hint: desc.input.hint } : {}),
       ...(desc.input?.images === true ? { images: true } : {}),
-      submit: (args, _actx, images) => this.execute(session, token + args, images),
+      submit: (args, _actx, images) => this.execute(session, line + args, images),
     }
   }
 

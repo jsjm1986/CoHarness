@@ -2,7 +2,11 @@
 
 [English](README.md) | 中文
 
-所有客户端共用的 API 网关由三部分组成：TypeScript API 约定（`src/api/`，不依赖 Node，可从浏览器导入）、fetch 载体对（`src/fetch/`：宿主侧的 `toFetchHandler`，以及客户端侧的 `AbstractApiClient` 与平台子类）和宿主侧实现（`src/api-proxy.ts`：`createApiProxy` 加上默认导出的 `ApiProxyService` 网关插件，其配置为 `{nativeOpen?, sessionExportCompressionLevel?, coldBlankProbeMaxBytes?}`，提供 `ctx.apiProxy`）。该包不注册任何路由；HTTP 等载体自行包装 `ctx.apiProxy`。随发行版交付的 Web 组合位于 [`packages/bundle/web-app/cordis.patch.yml`](../../bundle/web-app/cordis.patch.yml)，其默认 Agent（智能体）模型选择属于 base 组合包中的 [`@deepseek-ai/dsh-agent-default-model`](../../core/agent-default-model/README.zh.md)。
+所有客户端共用的 API 网关由三部分组成：TypeScript API 约定（`src/api/`，不依赖 Node，可从浏览器导入）、fetch 载体对（`src/fetch/`：宿主侧的 `toFetchHandler`，以及客户端侧的 `AbstractApiClient` 与平台子类）和宿主侧实现（`src/api-proxy.ts`：`createApiProxy` 加上默认导出的 `ApiProxyService` 网关插件，其配置为 `{nativeOpen?, sessionExportCompressionLevel?, coldBlankProbeMaxBytes?, workspaceFileMaxBytes?, workspaceFileMaxLines?, workspaceFileMaxEntries?, workspaceFileMaxResources?}`，提供 `ctx.apiProxy`）。该包不注册任何路由；HTTP 等载体自行包装 `ctx.apiProxy`。随发行版交付的 Web 组合位于 [`packages/bundle/web-app/cordis.patch.yml`](../../bundle/web-app/cordis.patch.yml)，其默认 Agent（智能体）模型选择属于 base 组合包中的 [`@deepseek-ai/dsh-agent-default-model`](../../core/agent-default-model/README.zh.md)。
+
+`workspaceFiles.*` 在 Session 授权、canonical containment、符号链接检查和已组合的 `workspace-files/authorize` 目录策略通过后，读取 Session 相对文件。冷读取只加载 header。Host 在返回相对元数据、UTF-8 文本页或 Base64 窗口前复核文件身份与权限；可选版本保护拒绝混合版本分页。`host.describe.workspaceFiles` 声明支持情况与配置上限：默认每页／窗口 2 MiB、5,000 行、2,000 个目录项和 512 条 Client 元数据记录。Agent 工具继续拥有写入、CAS 与审计语义。
+
+现有 Host 流以 `host/workspace-file-changed` 交付已授权的 Agent 观察，不执行 OS 文件监视。该文件 API 不传输 provider 路径或 `FsTargetKey`。`ApiTransportError.status` 保留 HTTP 401/403/429/503 状态，与 RPC 文件错误分开，且不读取错误响应正文。
 
 ## 共享 Agent 默认值（`agent-default-model` Settings 分节）
 

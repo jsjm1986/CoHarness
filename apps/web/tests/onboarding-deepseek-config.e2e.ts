@@ -187,7 +187,9 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
     expect(document).toContain('name: Private Preview')
     expect(document).toContain('contextWindow: 131072')
     expect(document).toContain('maxTokens: 64000')
-    expect(document).not.toMatch(/^\s*- id: deepseek-v4-flash$/m)
+    // V41 Flash is the first shipped model; deleting the first row must remove
+    // that model while retaining the older V4 fallback rows.
+    expect(document).not.toMatch(/^\s*- id: deepseek-flash$/m)
 
     await page.keyboard.press('Escape')
     // A connected Workspace is what puts a live composer — and its model
@@ -198,7 +200,7 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
     await modelTrigger.waitFor({ timeout: 10_000 })
     await modelTrigger.click()
     await page.getByRole('menuitem', { name: /模型/ }).click()
-    expect(await page.getByText('deepseek-v4-flash', { exact: true }).count()).toBe(0)
+    expect(await page.getByText('deepseek-flash', { exact: true }).count()).toBe(0)
     await page.getByRole('menuitemradio', { name: 'Private Preview' }).waitFor({ timeout: 10_000 })
     expect(tripwire.warnings).toEqual([])
     expect(tripwire.pageErrors).toEqual([])

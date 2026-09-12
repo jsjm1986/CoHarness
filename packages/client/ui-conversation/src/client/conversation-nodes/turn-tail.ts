@@ -57,6 +57,8 @@ function turnCoordinates(event: Parameters<ConversationNodeDefinition['match']>[
 } | undefined {
   if (event.type === 'assistant/message'
     || event.type === 'assistant/chunk'
+    || event.type === 'assistant/attempt'
+    || event.type === 'step/start'
     || event.type === 'step/end') {
     return { turn: event.data.turn, step: event.data.step }
   }

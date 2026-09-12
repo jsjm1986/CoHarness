@@ -13,7 +13,9 @@
     // this file, which is how a bare-specifier mapping resolves without it.
     "paths": {
       "@deepseek-ai/cordis": ["../../vendor/cordis/lib/types/index.d.ts"],
-      "@deepseek-ai/dsh-tools": ["../../packages/core/tools/lib/types/index.d.ts"]
+      "@deepseek-ai/dsh-tools": ["../../packages/core/tools/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-fs": ["../../packages/fs/fs/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-host-apiproxy": ["../../packages/host/apiproxy/lib/types/index.d.ts"]
     }
   },
   "include": ["src", "tests"]

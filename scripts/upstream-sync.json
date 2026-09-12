@@ -726,6 +726,10 @@
     "util/output-retention": {
       "sovereignty": "adapted"
     },
+    "util/package-manifest": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-05-package-manifest-types.md"
+    },
     "util/timeout": {
       "sovereignty": "adapted"
     },
@@ -791,7 +795,6 @@
     "subprocess/win32-process",
     "test-support/session-snapshot",
     "util/deque",
-    "util/package-manifest",
     "util/time",
     "util/workspace-path",
     "webhook/webhook",

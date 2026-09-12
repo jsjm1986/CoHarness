@@ -4,6 +4,8 @@
 
 一个树外 dsh 插件 bundle，在 dsh 实例**内部**强制执行按用户的目录权限，是网关操作系统层（systemd）强制的 philosophy-native 对应层。见平台设计文档 §7 与 §14。
 
+Workspace 文件 RPC 通过 Host 的 `workspace-files/authorize` 事件使用同一份 grants。监听器在读取元数据或内容前检查 canonical provider 路径，路径不属于任何 grant 时返回 `FS_PERMISSION_DENIED`，并在插件卸载时与工具监听器一起移除。这条读取路径独立于模型工具受到保护，不新增第二份授权存储。
+
 ## 功能
 
 - 注册一个 `tools/pre-execute` 监听器（文档钦定的"权限门"扩展点——不改 agent loop），**拒绝**解析到授权目录之外的文件系统工具调用。

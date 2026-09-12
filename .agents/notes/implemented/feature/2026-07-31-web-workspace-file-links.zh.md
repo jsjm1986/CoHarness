@@ -6,6 +6,8 @@ Status: implemented
 
 > 范围：完成的轮次以其产出文件收尾的那一行、读得出是链接的文件路径链接，以及 Host 打开器对浏览器可渲染文档优先选用默认浏览器。经决定不在范围内：以 HTTP 提供工作区文件，以及为不在 Host 机器上的客户端提供预览。
 
+> 本笔记中关于远程预览的部分由[云端 Workspace 文件资源](2026-09-12-cloud-workspace-file-resources.zh.md)取代。同源 HTTP 的否决与桌面专用的 `openPath` 行为仍分别对各自传输方式有效。
+
 ## 问题
 
 一个产出了文件的 web 会话，没有办法看到那个文件。agent（智能体）写出了 `deepseek-homepage.html` 并如实告知，而用户唯一的办法是把 `/private/tmp/dsh-client-hotplug.ygPvsm/workspaces/plugin-hotplug/deepseek-homepage.html` 这样的绝对路径复制进终端。

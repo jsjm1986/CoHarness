@@ -45,9 +45,12 @@ function sessionFakeFor() {
   } satisfies SessionBehaviorOverrides
 }
 
-async function bench() {
+async function bench(desktop = false) {
   const runtime = await SlotTestRuntime.create()
-  runtime.provide('connection', { api: { settings: {} }, isLoopback: false })
+  runtime.provide('connection', {
+    api: { settings: {} }, isLoopback: desktop,
+    hostDescription: { getSnapshot: () => desktop ? { canOpenPath: true } : undefined },
+  })
   // The plugin injects both; these specs exercise no settings path.
   runtime.provide('remote', { $on: () => () => {} })
   runtime.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
@@ -234,8 +237,36 @@ describe('conversation slot inject API', () => {
     await b.runtime.dispose()
   })
 
-  it('openFile (chat view face) resolves against session cwd and calls workspaces.openPath', async () => {
+  it('opens remote files as resources even before Host description is available', async () => {
     const b = await bench()
+    const accepted = vi.fn(() => true as const)
+    b.runtime.ctx.on('workspace/resource-open', accepted)
+    await b.chatViewApi(ROOT).injected.openFile('/proj/src/a.ts')
+    expect(accepted).toHaveBeenCalledWith(expect.objectContaining({ runtimeTarget: { kind: 'base' }, sessionId: ROOT, path: 'src/a.ts' }))
+    expect(b.runtime.workspaces.calls.some(call => call.method === 'openPath')).toBe(false)
+    await b.runtime.dispose()
+  })
+
+  it('retains a non-focused project target even from a loopback Web page', async () => {
+    const b = await bench(true)
+    b.runtime.ctx.sessions.runtimeTargetFor = () => ({ kind: 'project', projectId: 9 })
+    const accepted = vi.fn(() => true as const)
+    b.runtime.ctx.on('workspace/resource-open', accepted)
+    await b.chatViewApi(ROOT).injected.openFile('src/a.ts')
+    expect(accepted).toHaveBeenCalledWith(expect.objectContaining({ runtimeTarget: { kind: 'project', projectId: 9 } }))
+    expect(b.runtime.workspaces.calls.some(call => call.method === 'openPath')).toBe(false)
+    await b.runtime.dispose()
+  })
+
+  it('reports an absent preview consumer and rejects outside-workspace links', async () => {
+    const b = await bench()
+    await expect(b.chatViewApi(ROOT).injected.openFile('src/a.ts')).rejects.toThrow('preview is unavailable')
+    await expect(b.chatViewApi(ROOT).injected.openFile('/etc/passwd')).rejects.toThrow('outside')
+    await b.runtime.dispose()
+  })
+
+  it('openFile on a local desktop resolves against session cwd and calls workspaces.openPath', async () => {
+    const b = await bench(true)
     const { injected } = b.chatViewApi(ROOT)
     await injected.openFile('src/a.ts')
     await vi.waitFor(() => {
@@ -244,8 +275,8 @@ describe('conversation slot inject API', () => {
     await b.runtime.dispose()
   })
 
-  it('openFile rejects when the Host cannot open the path', async () => {
-    const b = await bench()
+  it('openFile rejects when a local desktop cannot open the path', async () => {
+    const b = await bench(true)
     b.runtime.workspaces.stub('openPath', () => Promise.reject(new Error('xdg-open is not available')))
     const { injected } = b.chatViewApi(ROOT)
     await expect(injected.openFile('src/a.ts')).rejects.toThrow('xdg-open is not available')

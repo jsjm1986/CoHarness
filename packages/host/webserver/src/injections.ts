@@ -55,6 +55,14 @@ function splice(html: string, at: number, markup: string): string {
 }
 
 /**
+ * Tail script settling the optional boot-readiness deferred consumed by the
+ * browser kernel. A preview bootstrap may create the same deferred earlier and
+ * resolve it after its handshake; the served page has all rows inline and can
+ * resolve it immediately.
+ */
+const READY_MARKUP = '<script>(globalThis.__DSH_BOOT_READY__ ??= Promise.withResolvers()).resolve()</script>'
+
+/**
  * Render structured rows into an index.html body.
  * @param html - the raw index.html document.
  * @param rows - structured rows collected from active Host plugins.
@@ -77,5 +85,5 @@ export function renderIndexInjections(html: string, rows: readonly IndexInjectio
     const open = /<body(?:\s[^>]*)?>/i.exec(out)
     out = open === null ? `${out}${body}` : splice(out, open.index + open[0].length, body)
   }
-  return out
+  return splice(out, out.length, READY_MARKUP)
 }

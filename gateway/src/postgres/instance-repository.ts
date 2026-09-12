@@ -28,7 +28,24 @@ export class PostgresInstanceRepository implements InstanceRepository {
   async initialize(instancesOutliveGateway: boolean): Promise<void> {
     await transaction(this.context.pool, async (client) => {
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`gateway-port:${this.context.nodeId}`])
-      const missing = await client.query<{ project_id: string }>(`SELECT p.id project_id
+      // Older SQLite-to-PostgreSQL imports may contain active users without
+      // an instance row. Repair those rows during the same startup
+      // reconciliation that already repairs newly mounted projects; without
+      // this, every personal Workbench catalog request fails before a runtime
+      // can be started.
+      const missingUsers = await client.query<{ user_id: string }>(`SELECT u.id user_id
+        FROM harness.users u
+        WHERE u.organization_id=$1 AND u.status='active' AND u.deleted_at IS NULL
+          AND EXISTS (
+            SELECT 1 FROM harness.memberships membership
+            WHERE membership.organization_id=u.organization_id
+              AND membership.user_id=u.id AND membership.status='active'
+          )
+          AND NOT EXISTS(
+            SELECT 1 FROM harness.instances i
+            WHERE i.organization_id=u.organization_id AND i.user_id=u.id
+          ) ORDER BY u.public_id`, [this.context.organizationId])
+      const missingProjects = await client.query<{ project_id: string }>(`SELECT p.id project_id
         FROM harness.projects p
         JOIN harness.project_mounts pm ON pm.project_id=p.id AND pm.organization_id=p.organization_id
           AND pm.node_id=$2 AND pm.status='active'
@@ -36,21 +53,32 @@ export class PostgresInstanceRepository implements InstanceRepository {
           SELECT 1 FROM harness.instances i
           WHERE i.organization_id=p.organization_id AND i.project_id=p.id
         ) ORDER BY p.public_id`, [this.context.organizationId, this.context.nodeId])
+      const missingCount = missingUsers.rows.length + missingProjects.rows.length
       const ports = await allocateInstancePorts(
         client,
         this.context.nodeId,
         this.instancePortBase,
-        missing.rows.length,
+        missingCount,
         this.context.nodeName,
       )
-      if (missing.rows.length > 0) {
+      if (missingUsers.rows.length > 0) {
+        await client.query(`INSERT INTO harness.instances(organization_id,user_id,assigned_node_id,port)
+          SELECT $1,item.user_id,$2,item.port
+          FROM unnest($3::uuid[],$4::integer[]) AS item(user_id,port)`, [
+          this.context.organizationId,
+          this.context.nodeId,
+          missingUsers.rows.map(row => row.user_id),
+          ports.slice(0, missingUsers.rows.length),
+        ])
+      }
+      if (missingProjects.rows.length > 0) {
         await client.query(`INSERT INTO harness.instances(organization_id,project_id,assigned_node_id,port)
           SELECT $1,item.project_id,$2,item.port
           FROM unnest($3::uuid[],$4::integer[]) AS item(project_id,port)`, [
           this.context.organizationId,
           this.context.nodeId,
-          missing.rows.map(row => row.project_id),
-          ports,
+          missingProjects.rows.map(row => row.project_id),
+          ports.slice(missingUsers.rows.length),
         ])
       }
       if (!instancesOutliveGateway) {

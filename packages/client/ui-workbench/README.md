@@ -4,11 +4,11 @@ English | [中文](README.zh.md)
 
 The Cordis browser plugin that presents up to four existing Workspace Sessions as one multi-pane conversation workbench. It owns the Workspace/session chooser and controls for pane selection, ordering, ratios, and mode switching; it consumes the `conversationViewport` capability and contributes toolbar, empty-state, and pane-header entries through ui-conversation's declared slots.
 
-The plugin never imports ConversationRoot, ChatView, InputBar, or another presentation implementation. The conversation slot owner renders each pane through an explicit SessionProvider, so every pane receives the ordinary Session standard kit, session-scoped stores, projections, and injected actions from the same object layer.
+The plugin never imports ConversationRoot, ChatView, InputBar, or another presentation implementation. The conversation slot owner renders each pane through an explicit SessionProvider, so every pane receives the ordinary Session standard kit, session-scoped stores, projections, and injected actions from the same object layer. Root-slot injected controls resolve the active pane at render time; a cached root injection never owns a fixed Session or runtime target.
 
 ## Composition
 
-`apply()` waits for `conversationViewport` and registers the workbench controls through `ctx.slots.inject()`. The provider owns a bounded Session stage set; removing this plugin releases additional history windows and leaves the ordinary current-session view available. The Gateway supplies an ACL-filtered account catalog, while each selected project runtime receives its own target-aware transport and principal assertion. No Session JSONL, persistence format, or Collaboration authorization semantics change.
+`apply()` waits for `conversationViewport` and registers the workbench controls through `ctx.slots.inject()`. The provider owns a bounded Session stage set; removing this plugin releases additional history windows and leaves the ordinary current-session view available. The Gateway supplies an ACL-filtered account catalog, while each selected project runtime receives its own target-aware transport and principal assertion. In cloud Web, `workspace/resource-open` asks a preview consumer to accept an explicitly targeted file. The toolbar browses direct Workspace directories, uses shared resource metadata and version-guarded `workspaceFiles.read` pages, and falls back to bounded Base64 windows for binary files. Changed files require reload, transient reconnects retain content, and access denial hides it. Local loopback uses `host.openPath` only when the owning connection advertises native opening. No Session JSONL, persistence format, or Collaboration authorization semantics change.
 
 ## View state
 
@@ -31,3 +31,4 @@ None; the plugin does not assemble or send a model request.
 - The workbench is limited to four root Sessions and does not yet expose nested split trees or cross-session context sharing.
 - The catalog is metadata-only and loads conversation history lazily when a pane is selected; it does not preload every project runtime.
 - The browser-local view state is not synchronized between devices or browser profiles.
+- The preview currently opens one text resource at a time; binary files and files rejected by the text policy are shown through a bounded Base64 byte window and do not provide an editor or upload path.

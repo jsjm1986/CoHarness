@@ -8,7 +8,7 @@ import SessionStore, { encodeSeqRanges, SessionId, SessionLogOffset, SessionSeq 
 import type { Session, SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import {
-  encodeSegment, eventLines, logPath, parseHeader, projectDir, projectKey, scanLog, sessionDir, SessionLogScanner,
+  encodeSegment, eventLines, generationLogPath, logPath, parseHeader, projectDir, projectKey, scanLog, sessionDir, SessionLogScanner,
   toHeaderLine,
 } from '../src/format.ts'
 import { runPersistenceContract, meta, oneTurnLog, appendLog } from '../../session-persistence/tests/contract.ts'
@@ -289,6 +289,32 @@ describe('JsonlSessionPersistence: format helpers', () => {
   it('refuses a foreign version on the header-only read path', () => {
     expect(() => parseHeader(JSON.stringify({ version: 42, id: 'future', futureOnly: true })))
       .toThrow(expect.objectContaining({ name: 'SessionFormatUnsupportedError' }))
+  })
+
+  it('accepts the previous v2 header so the coordinator can migrate it to v3', () => {
+    const parsed = parseHeader(JSON.stringify({
+      type: 'session', version: 2, id: 'legacy-v2', createdAt: 1, delegationDepth: 0,
+    }))
+    expect(parsed?.meta.version).toBe(2)
+    expect(parsed?.meta.id).toBe(SessionId('legacy-v2'))
+  })
+
+  it('lists and opens a v2 artifact through the complete v2-to-v3 chain', async () => {
+    const absoluteRoot = await freshRoot()
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const fiber = await ctx.plugin(JsonlSessionPersistence, { root: absoluteRoot, compression: 'none' })
+    const id = SessionId('legacy-v2-load')
+    const path = rawLogPath(resolve(absoluteRoot), '/work', id)
+    await mkdir(dirname(path), { recursive: true })
+    await writeFile(path, `${JSON.stringify({ type: 'session', version: 2, id, createdAt: 1, cwd: '/work', delegationDepth: 0 })}\n${JSON.stringify({ type: 'turn/start', seq: 0, time: 2, data: { turn: 1 } })}\n`)
+
+    await expect(ctx.sessionPersistence.list()).resolves.toEqual([
+      expect.objectContaining({ id, version: 2 }),
+    ])
+    await expect(ctx.sessionPersistence.load(id)).resolves.toMatchObject({ meta: { id, version: 3 } })
+    await expect(stat(generationLogPath(resolve(absoluteRoot), '/work', id, 'none', 3))).resolves.toBeDefined()
+    await fiber.dispose()
   })
 
   it('points a format refusal at the raw log path', async () => {

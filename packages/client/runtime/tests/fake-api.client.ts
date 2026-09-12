@@ -257,6 +257,13 @@ export class FakeApiClient implements IApiClient {
       this.record('workspace.archiveSession', payload, this.onWorkspaceArchiveSession(payload)),
   }
 
+  readonly workspaceFiles: IApiClient['workspaceFiles'] = {
+    list: (payload: unknown) => this.record('workspaceFiles.list', payload, Promise.resolve(ok({ path: '', entries: [], truncated: false }))),
+    stat: (payload: unknown) => this.record('workspaceFiles.stat', payload, Promise.resolve(ok({ path: (payload as { path: string }).path, type: 'file' as const, bytes: 0, version: 'fake' }))),
+    read: (payload: unknown) => this.record('workspaceFiles.read', payload, Promise.resolve(ok({ path: (payload as { path: string }).path, offset: 1, limit: 1, text: '', eof: true, version: 'fake' }))),
+    readBytes: (payload: unknown) => this.record('workspaceFiles.readBytes', payload, Promise.resolve(ok({ path: (payload as { path: string }).path, offset: 0, bytes: '', eof: true, version: 'fake' }))),
+  }
+
   // Payloads stay `unknown` (lint-lane note above); response rows are the real
   // wire shapes so cases can program requires-bearing catalogs and dual-address
   // skill lists without casts.

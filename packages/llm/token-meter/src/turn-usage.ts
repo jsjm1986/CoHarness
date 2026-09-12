@@ -1,4 +1,5 @@
-import type { AssistantMessage, TokenUsage } from '@deepseek-ai/dsh-llm'
+import { lastAssistantStreamChunk } from '@deepseek-ai/dsh-llm/assistant-stream'
+import type { AssistantMessage, TokenUsage } from '@deepseek-ai/dsh-llm/types'
 import type {} from '@deepseek-ai/dsh-llm-retry/types'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 
@@ -54,9 +55,25 @@ function safeSum(values: readonly number[]): number | undefined {
   return total
 }
 
-function messageRoute(message: AssistantMessage): TurnTokenUsageRoute | undefined {
-  const { provider, model } = message.source
-  return provider.length > 0 && model.length > 0 ? { provider, model } : undefined
+function messageRoute(message: AssistantMessage | undefined): TurnTokenUsageRoute | undefined {
+  // A projection reader may be handed a legacy or malformed durable envelope
+  // before the persistence migration has normalized it. Usage totals remain
+  // useful when the provider route is absent, but the optional attribution
+  // must never turn a disclosure read into a runtime exception.
+  if (message === undefined || typeof message !== 'object') return undefined
+  const source = (message as { readonly source?: unknown }).source
+  if (source === null || typeof source !== 'object') return undefined
+  const provider = (source as { readonly provider?: unknown }).provider
+  const model = (source as { readonly model?: unknown }).model
+  return typeof provider === 'string' && provider.length > 0
+    && typeof model === 'string' && model.length > 0
+    ? { provider, model }
+    : undefined
+}
+
+/** Read the last provider usage sample from one compact Assistant stream. */
+function streamUsage(stream: SessionEvent<'assistant/attempt'>['data']['stream']): TokenUsage | undefined {
+  return lastAssistantStreamChunk(stream, 'usage')?.usage
 }
 
 function normalizeUsage(usage: TokenUsage, route?: TurnTokenUsageRoute): NormalizedAttempt | undefined {
@@ -183,10 +200,28 @@ export function deriveTurnTokenUsage(events: readonly SessionEvent[]): TurnToken
       }
       continue
     }
+    if (event.type === 'assistant/attempt') {
+      // CoHarness currently records streamed chunks before this settlement;
+      // in that representation the error finish already closed the attempt.
+      // Compact-only logs arrive with the attempt while the step is open.
+      if (state.kind === 'finishClosed' && sameAttempt(state, event.data.turn, event.data.step)) continue
+      if (event.data.turn !== turn || state.kind !== 'open'
+        || !sameAttempt(state, event.data.turn, event.data.step)) {
+        invalid = true
+        continue
+      }
+      const sample: TokenUsage | undefined = streamUsage(event.data.stream) ?? state.sample
+      state = { ...state, ...(sample === undefined ? {} : { sample }) }
+      if (!closeOpen()) invalid = true
+      else state = { kind: 'finishClosed', turn, step: event.data.step }
+      continue
+    }
     if (event.type === 'assistant/message') {
       if (event.data.turn !== turn || state.kind !== 'open'
         || !sameAttempt(state, event.data.turn, event.data.step)) { invalid = true; continue }
-      if (event.data.usage !== undefined) state = { ...state, sample: event.data.usage }
+      const sample: TokenUsage | undefined = event.data.usage
+        ?? (event.data.stream === undefined ? undefined : lastAssistantStreamChunk(event.data.stream, 'usage')?.usage)
+      if (sample !== undefined) state = { ...state, sample }
       if (!closeOpen(messageRoute(event.data.message))) invalid = true
       else state = { kind: 'settled', turn, step: event.data.step, by: 'message' }
       continue

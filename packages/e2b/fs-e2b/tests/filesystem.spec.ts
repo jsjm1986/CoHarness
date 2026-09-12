@@ -509,6 +509,18 @@ describe('E2BFileSystem identity, metadata, and reads', () => {
     expect((await fs.readBytes(await fs.resolve('empty.bin'), undefined, 4)).byteLength).toBe(0)
   })
 
+  it('reads a bounded byte window and cancels the remote stream at its end', async () => {
+    const remote = new FakeRemote()
+    remote.file('/workspace/window.bin', [0, 1, 2, 3, 4, 5])
+    const { fs } = await setup(remote)
+    remote.streamChunks = [bytes([0, 1]), bytes([2, 3]), bytes([4, 5])]
+    remote.streamKeepOpen = true
+    const result = await fs.readByteRange(await fs.resolve('window.bin'), { offset: 2, length: 3 })
+    expect(Array.from(result)).toEqual([2, 3, 4])
+    expect(remote.streamCancel).toHaveBeenCalledOnce()
+    await expectCode(fs.readByteRange(await fs.resolve('window.bin'), { offset: -1, length: 1 }), 'FS_IO_ERROR')
+  })
+
   it('honors aborts before and during remote reads', async () => {
     const remote = new FakeRemote()
     remote.file('/workspace/a', 'a')

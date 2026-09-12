@@ -226,7 +226,7 @@ export function ConversationPane({
     leftItems: zone === undefined ? null : renderSlot('conversation.input.left', zone),
     rightItems: zone === undefined ? null : renderSlot('conversation.input.right', zone),
     // Stats band under the card, inside the bar's width column so both
-    // share one constraint (composer.dock = stats-line family).
+    // share one constraint (composer.dock = session-stats pill family).
     footer: !hero && zone !== undefined ? renderSlot('conversation.composer.dock', zone) : null,
   })
 

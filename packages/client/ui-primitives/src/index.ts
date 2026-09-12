@@ -60,3 +60,8 @@ export { MessageText } from './markdown/MessageText.tsx'
 export { extractMarkdownPlainText } from './markdown/plain-text.ts'
 export type { MarkdownPlainTextMode, MarkdownPlainTextOptions } from './markdown/plain-text.ts'
 export * from './icons/index.tsx'
+
+export { LinkIcon, classifyLinkPath } from './LinkIcon.tsx'
+export type { LinkIconKind, LinkIconProps } from './LinkIcon.tsx'
+export { FileTypeIcon, classifyFileType, fileExtension } from './FileTypeIcon.tsx'
+export type { CodeFileType, FileType, FileTypeIconProps, FileTypeKind, FileTypeProjectContext } from './FileTypeIcon.tsx'

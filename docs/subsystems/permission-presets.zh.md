@@ -91,7 +91,7 @@ Optional policy supplied by a deployment that owns the request identity.
 canSelect(name: string): boolean
 ```
 
-Source: [`packages/interaction/permission-presets/src/index.ts:186`](../../packages/interaction/permission-presets/src/index.ts)
+Source: [`packages/interaction/permission-presets/src/index.ts:187`](../../packages/interaction/permission-presets/src/index.ts)
 
 <a id="ctxpermissionpresets--permissionpresetservice"></a>
 
@@ -156,5 +156,5 @@ set(session: Session, name: string): void
 
 Types: [Session](session.zh.md) · [SessionEvent](session.zh.md)
 
-Source: [`packages/interaction/permission-presets/src/index.ts:200`](../../packages/interaction/permission-presets/src/index.ts)
+Source: [`packages/interaction/permission-presets/src/index.ts:201`](../../packages/interaction/permission-presets/src/index.ts)
 <!-- END GENERATED cordis-surface -->

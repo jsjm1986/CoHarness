@@ -21,6 +21,7 @@ import {
   createApiProxy,
   DEFAULT_COLD_BLANK_PROBE_MAX_BYTES,
 } from './api-proxy.ts'
+import { DEFAULT_WORKSPACE_FILE_MAX_BYTES, DEFAULT_WORKSPACE_FILE_MAX_ENTRIES, DEFAULT_WORKSPACE_FILE_MAX_LINES, DEFAULT_WORKSPACE_FILE_MAX_RESOURCES } from './workspace-files.ts'
 import {
   DEFAULT_SESSION_LOG_COMPRESSION_LEVEL,
   type SessionLogCompressionLevel,
@@ -40,7 +41,10 @@ export {
   readApiResponseText,
 } from './fetch/client.ts'
 export type { IApiClient } from './fetch/client.ts'
-export { createApiProxy } from './api-proxy.ts'
+export {
+  createApiProxy,
+} from './api-proxy.ts'
+export { DEFAULT_WORKSPACE_FILE_MAX_BYTES, DEFAULT_WORKSPACE_FILE_MAX_ENTRIES, DEFAULT_WORKSPACE_FILE_MAX_LINES, DEFAULT_WORKSPACE_FILE_MAX_RESOURCES } from './workspace-files.ts'
 export type { ApiProxyDefaults } from './api-proxy.ts'
 
 declare module '@deepseek-ai/cordis' {
@@ -72,6 +76,14 @@ export interface Config {
    * @default 1024
    */
   coldBlankProbeMaxBytes?: number
+  /** Maximum bytes retained by one remote Workspace file operation. */
+  workspaceFileMaxBytes?: number
+  /** Maximum lines returned by one remote Workspace text page. */
+  workspaceFileMaxLines?: number
+  /** Maximum direct children returned by one remote Workspace listing. */
+  workspaceFileMaxEntries?: number
+  /** Maximum Client metadata records retained for this runtime. */
+  workspaceFileMaxResources?: number
 }
 
 /**
@@ -90,11 +102,16 @@ export class ApiProxyService extends Service implements ApiProxy {
     sessionExportCompressionLevel: z.number().step(1).min(0).max(9)
       .default(DEFAULT_SESSION_LOG_COMPRESSION_LEVEL) as z<SessionLogCompressionLevel>,
     coldBlankProbeMaxBytes: z.natural().default(DEFAULT_COLD_BLANK_PROBE_MAX_BYTES),
+    workspaceFileMaxBytes: z.number().step(1).min(1).default(DEFAULT_WORKSPACE_FILE_MAX_BYTES),
+    workspaceFileMaxLines: z.number().step(1).min(1).default(DEFAULT_WORKSPACE_FILE_MAX_LINES),
+    workspaceFileMaxEntries: z.number().step(1).min(1).default(DEFAULT_WORKSPACE_FILE_MAX_ENTRIES),
+    workspaceFileMaxResources: z.number().step(1).min(1).default(DEFAULT_WORKSPACE_FILE_MAX_RESOURCES),
   })
 
   readonly sessions: ApiProxy['sessions']
   readonly subagents: ApiProxy['subagents']
   readonly workspace: ApiProxy['workspace']
+  readonly workspaceFiles: ApiProxy['workspaceFiles']
   readonly host: ApiProxy['host']
   readonly goals: ApiProxy['goals']
   readonly skills: ApiProxy['skills']
@@ -120,10 +137,15 @@ export class ApiProxyService extends Service implements ApiProxy {
       ...(config.coldBlankProbeMaxBytes === undefined
         ? {}
         : { coldBlankProbeMaxBytes: config.coldBlankProbeMaxBytes }),
+      ...(config.workspaceFileMaxBytes === undefined ? {} : { workspaceFileMaxBytes: config.workspaceFileMaxBytes }),
+      ...(config.workspaceFileMaxLines === undefined ? {} : { workspaceFileMaxLines: config.workspaceFileMaxLines }),
+      ...(config.workspaceFileMaxEntries === undefined ? {} : { workspaceFileMaxEntries: config.workspaceFileMaxEntries }),
+      ...(config.workspaceFileMaxResources === undefined ? {} : { workspaceFileMaxResources: config.workspaceFileMaxResources }),
     })
     this.sessions = api.sessions
     this.subagents = api.subagents
     this.workspace = api.workspace
+    this.workspaceFiles = api.workspaceFiles
     this.host = api.host
     this.goals = api.goals
     this.skills = api.skills

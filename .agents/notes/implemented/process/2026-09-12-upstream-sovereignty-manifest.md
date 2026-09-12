@@ -24,7 +24,7 @@ Per-package sovereignty now lives in `scripts/upstream-sync.json`, a versioned m
 
 ## Testing
 
-`pnpm exec vitest run scripts/verify-upstream-sovereignty.spec.ts scripts/sync-upstream-report.spec.ts scripts/run-gates.spec.ts scripts/ci-workflow.spec.ts` covers manifest validation, the disk/tag bijections, the `tracked` zero-diff re-check, the report's bucketing and `--from`/`--tag` parsing, the gate's membership in the `ci-static` and `ci-windows-observational` aggregates, and the Windows checkouts' `fetch-depth: 0`. `pnpm run verify-upstream-sovereignty` reports 4 tracked, 225 adapted, 25 owned, and 29 upstream-only against `dsh-v0.1.3-alpha.2`.
+`pnpm exec vitest run scripts/verify-upstream-sovereignty.spec.ts scripts/sync-upstream-report.spec.ts scripts/run-gates.spec.ts scripts/ci-workflow.spec.ts` covers manifest validation, the disk/tag bijections, the `tracked` zero-diff re-check, the report's bucketing and `--from`/`--tag` parsing, the gate's membership in the `ci-static` and `ci-windows-observational` aggregates, and the Windows checkouts' `fetch-depth: 0`. `pnpm run verify-upstream-sovereignty` reports 4 tracked, 226 adapted, 25 owned, and 28 upstream-only against `dsh-v0.1.3-alpha.2`; the adapted count includes the shared `util/package-manifest` package and its local invariant companion.
 
 ## Consequences
 

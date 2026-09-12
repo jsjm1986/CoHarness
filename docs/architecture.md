@@ -111,6 +111,8 @@ Seams are why one provider swap changes the whole product. Filesystem and subpro
 
 The [client runtime](../packages/client/runtime/README.md) retains the current Session plus an explicit staged set, sharing one connection and bounded history windows. The [conversation plugin](../packages/client/ui-conversation/README.md) owns Session rendering and provides a root-scoped viewport capability; the optional [Workspace workbench](../packages/client/ui-workbench/README.md) composes up to four panes through its slots. Its account catalog is ACL-filtered and starts target runtimes lazily through the SessionRuntimePool, so each pane keeps an independent principal, event stream, and scope resources. Pane selection changes browser viewing state, while Session logs, model requests, sandbox policy, and Collaboration authorization retain their existing owners.
 
+Remote Workspace file preview is a separate read-only capability: the Host ApiProxy resolves a Session-relative path through `ctx.fs` after Gateway authorization, while the Client runtime keeps metadata in `WorkspaceResourceRegistry` and routes each read through the owning runtime target. It does not replace User Documents, add a second write protocol, or invoke `host.openPath` from cloud Web.
+
 ## Where new behavior goes
 
 New behavior attaches to a documented extension point. Changing the loop itself updates this map.

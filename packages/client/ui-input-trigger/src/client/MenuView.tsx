@@ -14,6 +14,7 @@ import {
   MobileSheetBackdrop, useAnchoredMaxHeight,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
+import type { InputTriggerCandidate } from '../types.ts'
 import css from './MenuView.module.css'
 import type { MenuViewInjected } from './slots.ts'
 import type { MenuKey } from './locales.ts'
@@ -30,7 +31,11 @@ function optionId(source: string, index: number): string {
 }
 
 /** Render a built-in reference icon while retaining text icons from extensions. */
-function candidateIcon(icon: string | undefined): ReactNode {
+function candidateIcon(icon: InputTriggerCandidate['icon']): ReactNode {
+  if (typeof icon === 'function') {
+    const Icon = icon
+    return <Icon size={16} />
+  }
   switch (icon) {
     case 'file': return <IconBrowseOutline16 />
     case 'folder': return <IconFolderClose16 />
@@ -157,7 +162,10 @@ export function MenuView({ menu, headers, onPick, onCrumb, onHover, onDismiss, t
                             onMouseMove={active ? undefined : () => { onHover(group.source, index) }}
                           >
                             {item.icon !== undefined && <span className={css.itemIcon} aria-hidden>{candidateIcon(item.icon)}</span>}
-                            <span className={css.itemName}>{item.name}</span>
+                            <span className={css.itemName}>{item.label ?? item.name}</span>
+                            {item.label !== undefined && item.label.toLowerCase() !== item.name.toLowerCase() && (
+                              <span className={css.itemAlias}>{item.name}</span>
+                            )}
                             {item.description !== undefined && <span className={css.itemDescription}>{item.description}</span>}
                             {item.drill === true && (
                               <span className={css.trailing}>

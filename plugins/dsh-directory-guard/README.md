@@ -4,6 +4,8 @@ English | [中文](README.zh.md)
 
 An out-of-tree dsh plugin bundle that enforces per-user directory permissions **inside** a dsh instance, as the philosophy-native counterpart to the gateway's OS-level (systemd) enforcement. See the platform design doc §7 and §14.
 
+Workspace file RPCs use the same grants through the Host `workspace-files/authorize` event. The listener checks the canonical provider path before metadata or content is read and returns `FS_PERMISSION_DENIED` outside every grant. It is removed with the tool listener on plugin disposal. This closes the read path independently of model tools; it does not add a second grant store.
+
 ## What it does
 
 - Registers a `tools/pre-execute` listener (the documented "permission gate" extension point — no change to the agent loop) that **denies** filesystem tool calls resolving outside the caller's granted directories.

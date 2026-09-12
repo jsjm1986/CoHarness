@@ -491,7 +491,7 @@ async function firstBrowserHistoryPage(
 }
 
 async function stableUiEvidence(page: Page, scaffold: WebScaffold): Promise<StableUiEvidence> {
-  const stats = page.getByText(FULL_COUNTS, { exact: false }).locator('..')
+  const stats = page.locator('[data-composer-stats]').first()
   const tails = page.locator('[data-chat-flow-kind="turn-tail"]')
   const tailCount = await tails.count()
   if (tailCount < 2) throw new Error('expected settled and interrupted turn tails')
@@ -652,8 +652,14 @@ describe('web e2e: lossless history wire pagination', () => {
     initialUi = await stableUiEvidence(page, scaffold)
     expect(initialUi.stats).toContain(FULL_COUNTS)
     expect(initialUi.stats).toContain('Cache hit 75%')
-    expect(initialUi.stats).toContain('Input 3.2K tok · Output 400 tok')
-    expect(initialUi.stats).toContain('Tool call')
+    expect(initialUi.stats).toContain('tok')
+    const usageButton = page.getByRole('button', { name: /Cache hit 75%/u })
+    await usageButton.click()
+    const usageDetails = page.locator('[data-session-stats-usage]')
+    await usageDetails.waitFor({ timeout: 10_000 })
+    expect((await usageDetails.textContent()) ?? '').toMatch(/input/i)
+    expect((await usageDetails.textContent()) ?? '').toContain('Output')
+    await usageButton.press('Escape')
     expect(initialUi.settledFooter).not.toContain('TTFT')
     expect(initialUi.settledFooter).not.toContain('tok/s')
     expect(initialUi.interruptedTextCount).toBe(1)
@@ -725,8 +731,13 @@ describe('web e2e: lossless history wire pagination', () => {
     }
 
     const expandedUi = await stableUiEvidence(page, scaffold)
-    expect(expandedUi.stats).toContain('TTFT avg')
     expect(expandedUi.stats).toContain('tok/s')
+    const timeButton = page.getByRole('button', { name: /TTFT|turns.*steps/u }).first()
+    await timeButton.click()
+    const timeDetails = page.locator('[data-session-stats-details]')
+    await timeDetails.waitFor({ timeout: 10_000 })
+    expect((await timeDetails.textContent()) ?? '').toContain('TTFT')
+    await timeButton.press('Escape')
     expect(expandedUi.settledFooter).toContain('TTFT')
     expect(expandedUi.settledFooter).toContain('tok/s')
     expect(expandedUi.interruptedTextCount).toBe(1)

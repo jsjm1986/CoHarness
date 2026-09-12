@@ -25,5 +25,5 @@ MenuView 把菜单 store 渲染进 `conversation.input.overlay` slot（列表类
 ## 已知限制与暂缓事项
 
 - **只有全局 source 层**：会话 scope 的 source 注册（逐会话遮蔽、类 ScopedLayers 机制）已有设计但未启用；台账记录着触发条件（出现真实的逐会话 source 需求）。
-- **扩展图标保持文本兼容**：内置的 `file`、`folder`、`session` 值使用共享图标；扩展提供的图标字符串仍按文本保留。
+- **扩展图标只影响显示**：内置的 `file`、`folder`、`session` 值使用共享图标；source 也可以提供共享图标组件，任意字符串仍按文本兼容。
 - **overlay 的 SlotMap 合并归属与 slot 所有权分离**：唯一的 `conversation.input.overlay` 合并放在本包，而 ui-conversation 负责其锚点、children 声明和生命周期，因为依赖方向是 ui-conversation → ui-input-trigger。

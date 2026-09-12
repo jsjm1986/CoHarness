@@ -2,7 +2,7 @@
  * Provider-side request-image pricing for DeepSeek routes: reproduces the
  * adapter's deterministic request projection (per-model pixel budget,
  * oldest-first offload under the raw-byte and count budgets) and prices every
- * retained image with the published v4 vision-token accounting. Consumed
+ * retained image with the published vision-token accounting. Consumed
  * synchronously by the token meter through `LlmAdapter.imageRequestPricing`;
  * provider usage remains the authoritative anchor for completed requests.
  *

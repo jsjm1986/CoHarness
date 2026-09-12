@@ -4,10 +4,12 @@ import { createMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { TokenUsage } from '@deepseek-ai/dsh-llm'
 import SessionStore from '@deepseek-ai/dsh-session'
 import type { Session, SessionSeq } from '@deepseek-ai/dsh-session'
+import type { AssistantStreamRecord } from '@deepseek-ai/dsh-llm'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import type { ContextPressureProjection, TokenUsageProjection } from '@deepseek-ai/dsh-token-meter/client'
 import { CompactionId } from '@deepseek-ai/dsh-compaction'
+import { RetryId } from '@deepseek-ai/dsh-llm-retry'
 import type {} from '../src/usage-projection.ts'
 
 const ZERO: TokenUsageProjection = {
@@ -64,6 +66,19 @@ function finalUsage(
     usage,
   }, { surfaceOp: 'append', sourceEventSeqs: sourceSeqs })
   session.append('step/end', { turn, step })
+}
+
+function attemptWithUsage(
+  session: Session,
+  usage: TokenUsage,
+  turn: number,
+  step: number,
+): void {
+  const stream: AssistantStreamRecord[] = [
+    { type: 'chunk', time: 1, chunk: { type: 'usage', usage } },
+    { type: 'chunk', time: 2, chunk: { type: 'finish', reason: { kind: 'error', failure: { code: 'HTTP', message: 'failed' } } } },
+  ]
+  session.append('assistant/attempt', { turn, step, stream })
 }
 
 const projected = (ctx: Context, session: Session): TokenUsageProjection => {
@@ -194,6 +209,41 @@ describe('tokenUsage session projection', () => {
       uncachedInputTokens: 9,
       outputTokens: 1,
       cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+    })
+  })
+
+  it('reads usage from a compact assistant attempt settlement', async () => {
+    const { ctx, session } = await harness()
+    session.append('turn/start', { turn: 1 })
+    startStep(session, 1, 1)
+    attemptWithUsage(session, { inputTokens: 12, outputTokens: 3, totalTokens: 15, cacheReadTokens: 4 }, 1, 1)
+    session.append('step/end', { turn: 1, step: 1 })
+    session.append('turn/end', { turn: 1, reason: { kind: 'error', error: { code: 'HTTP', message: 'failed' } } })
+    expect(projected(ctx, session)).toEqual({
+      uncachedInputTokens: 12,
+      outputTokens: 3,
+      cacheReadTokens: 4,
+      cacheWriteTokens: 0,
+    })
+  })
+
+  it('accumulates a retried same-step attempt after clearing the prior sample', async () => {
+    const { ctx, session } = await harness()
+    session.append('turn/start', { turn: 1 })
+    startStep(session, 1, 1)
+    const first = { inputTokens: 10, outputTokens: 2, totalTokens: 12, cacheReadTokens: 1 }
+    usageChunk(session, first, 1, 1)
+    session.append('assistant/chunk', { turn: 1, step: 1, chunk: { type: 'finish', reason: { kind: 'error', failure: { code: 'HTTP', message: 'failed' } } } })
+    session.append('llm/retry-started', { retryId: RetryId('retry-1'), turn: 1, step: 1, retry: 1 })
+    const second = { inputTokens: 20, outputTokens: 4, totalTokens: 24, cacheReadTokens: 3 }
+    usageChunk(session, second, 1, 1)
+    finalUsage(session, second, 1, 1, [])
+    session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    expect(projected(ctx, session)).toEqual({
+      uncachedInputTokens: 30,
+      outputTokens: 6,
+      cacheReadTokens: 4,
       cacheWriteTokens: 0,
     })
   })

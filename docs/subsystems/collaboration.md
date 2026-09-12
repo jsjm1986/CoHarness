@@ -337,4 +337,27 @@ Authorize a validated Remote request before Context or lookup resolution.
 ```
 
 Source: [`packages/typert/protocol/src/types.ts:610`](../../packages/typert/protocol/src/types.ts)
+
+<a id="workspace-files-events"></a>
+
+### `workspace-files/*` events
+
+<a id="workspace-filesauthorize--serial"></a>
+
+#### `workspace-files/authorize` — serial
+
+Authorize a canonical provider path before Workspace metadata or content is read.
+
+```ts cordis-catalog
+/** Authorize a canonical provider path before Workspace metadata or content is read.
+ * @mode serial
+ * @param sessionId - Session whose Workspace bounds the request.
+ * @param path - internal provider path; never emitted on the wire.
+ */
+'workspace-files/authorize'(sessionId: SessionId, path: string): void | Promise<void>
+```
+
+Types: [SessionId](core.md)
+
+Source: [`packages/host/apiproxy/src/workspace-files.ts:22`](../../packages/host/apiproxy/src/workspace-files.ts)
 <!-- END GENERATED cordis-surface -->

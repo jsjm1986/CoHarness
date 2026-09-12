@@ -24,7 +24,7 @@ Status: implemented
 
 ## Testing
 
-`pnpm exec vitest run scripts/verify-upstream-sovereignty.spec.ts scripts/sync-upstream-report.spec.ts scripts/run-gates.spec.ts scripts/ci-workflow.spec.ts` 覆盖清单校验、磁盘/tag 双射、`tracked` 零差异重查、报告分桶与 `--from`/`--tag` 解析、门禁在 `ci-static` 与 `ci-windows-observational` 聚合中的成员关系，以及两个 Windows checkout 的 `fetch-depth: 0`。`pnpm run verify-upstream-sovereignty` 报告 4 tracked、225 adapted、25 owned、29 upstream-only，对照 `dsh-v0.1.3-alpha.2`。
+`pnpm exec vitest run scripts/verify-upstream-sovereignty.spec.ts scripts/sync-upstream-report.spec.ts scripts/run-gates.spec.ts scripts/ci-workflow.spec.ts` 覆盖清单校验、磁盘/tag 双射、`tracked` 零差异重查、报告分桶与 `--from`/`--tag` 解析、门禁在 `ci-static` 与 `ci-windows-observational` 聚合中的成员关系，以及两个 Windows checkout 的 `fetch-depth: 0`。`pnpm run verify-upstream-sovereignty` 报告 4 tracked、226 adapted、25 owned、28 upstream-only，对照 `dsh-v0.1.3-alpha.2`；adapted 数包含共享 `util/package-manifest` 包及其本地不变量伴随模块。
 
 ## Consequences
 

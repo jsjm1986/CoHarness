@@ -63,8 +63,9 @@ async function setup(
   await deps.users.changeOwnPassword(admin.id, 'pw-12345678')
   const member = await deps.users.create({ username: 'worker', password: 'pw-12345678' })
   await deps.users.changeOwnPassword(member.id, 'pw-12345678')
+  const invalidated: Array<{ userId?: number; projectId?: number }> = []
   const server = createGatewayServer(deps, {
-    admin: createAdminApiHandler(deps),
+    admin: createAdminApiHandler(deps, undefined, subject => invalidated.push(subject)),
     adminRoot: join(root, 'public/admin'),
   })
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
@@ -72,7 +73,7 @@ async function setup(
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   cfg.publicOrigins.push(base)
   const cookie = await login(base, 'boss', 'pw-12345678')
-  return { deps, base, cookie, root, member, admin, stoppedTargets }
+  return { deps, base, cookie, root, member, admin, stoppedTargets, invalidated }
 }
 
 describe('admin JSON API', () => {
@@ -162,7 +163,7 @@ describe('admin JSON API', () => {
   })
 
   it('lets an admin create a project and assign members; non-admin is 403', async () => {
-    const { base, cookie, root, member } = await setup()
+    const { base, cookie, root, member, invalidated } = await setup()
     const shared = join(root, 'shared'); mkdirSync(shared)
     const created = await fetch(`${base}/admin/api/projects`, {
       method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' },
@@ -174,6 +175,7 @@ describe('admin JSON API', () => {
       method: 'PUT', headers: { cookie, origin: base, 'content-type': 'application/json' },
       body: JSON.stringify({ mode: 'ro' }),
     })).status).toBe(204)
+    expect(invalidated).toContainEqual({ userId: member.id })
     const workerCookie = await login(base, 'worker', 'pw-12345678')
     const forbidden = await fetch(`${base}/admin/api/users`, { headers: { cookie: workerCookie } })
     expect(forbidden.status).toBe(403)

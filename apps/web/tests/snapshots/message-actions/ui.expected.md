@@ -75,4 +75,9 @@
   - text: DeepSeek-V4-Flash
   - img
 - button "Send message" [disabled]
-- text: 2 turns · 3 steps LLM {{duration}} · Tool call {{duration}} TTFT avg {{duration}} · {{throughput}} tok/s Cache hit 98% Input 7.8K tok · Output 103 tok
+- button "2 turns · 3 steps · {{throughput}} tok/s":
+  - img
+  - text: 2 turns · 3 steps{{throughput}} tok/s
+- button "7.9K tok · Cache hit 98%":
+  - img
+  - text: 7.9K tokCache hit 98%

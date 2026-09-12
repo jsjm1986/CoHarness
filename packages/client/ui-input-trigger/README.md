@@ -25,5 +25,5 @@ None; this package neither assembles nor sends a provider request.
 ## Known Limitations and Deferred Work
 
 - **Global source layer only** — session-scope source registration (per-session shadowing, ScopedLayers-alike) is designed but not enabled; the ledger tracks the trigger condition (a real per-session source need).
-- **Extension icons remain text-compatible** — built-in `file`, `folder`, and `session` values use the shared glyphs; an extension-provided icon string is retained as text.
+- **Extension icons are display-only** — built-in `file`, `folder`, and `session` values use shared glyphs; sources may also provide a shared icon component, while arbitrary strings remain text-compatible.
 - **Overlay SlotMap merge home is split from slot ownership** — the sole `conversation.input.overlay` merge lives here, while ui-conversation owns its anchor, children declaration, and lifecycle because the dependency direction is ui-conversation → ui-input-trigger.

@@ -1,0 +1,280 @@
+{
+  "schemaVersion": 1,
+  "reviewDate": "2026-09-13",
+  "upstream": {
+    "repository": "https://github.com/deepseek-ai/deepseek-harness",
+    "previousTag": "dsh-v0.1.3-alpha.2",
+    "previousCommit": "82a5fd61a7cf5c293cec4bdff68f455398d685e9",
+    "targetTags": [
+      {
+        "tag": "dsh-v0.1.5-alpha.1",
+        "commit": "5dda764ed3aa172535a7967b06ff95d9cbfe536a"
+      },
+      {
+        "tag": "dsh-v0.1.5-alpha.2",
+        "commit": "b2e3b2a0125854567a4a5fcba75782e42fe84901"
+      },
+      {
+        "tag": "dsh-v0.1.5-rc.1",
+        "commit": "183f08e9c6dde7e36cd2318eaee70b0da08fb35e"
+      },
+      {
+        "tag": "dsh-v0.1.5-rc.2",
+        "commit": "fb2c4b9e698e30edb738bca4cf0618587db7d203"
+      }
+    ],
+    "comparePage": "https://github.com/deepseek-ai/deepseek-harness/compare/dsh-v0.1.3-alpha.2...dsh-v0.1.5-rc.2",
+    "releaseNotesVerified": true
+  },
+  "baseline": {
+    "repository": "https://github.com/jsjm1986/CoHarness",
+    "commit": "caed29fdd0964f3efe5e59101bbd1446539c9b26",
+    "branch": "master",
+    "worktreePreserved": true,
+    "userMatrixPreserved": true
+  },
+  "targetVersion": "0.1.5-rc.2.coharness.1",
+  "status": "implementation-in-progress",
+  "decisions": [
+    {
+      "id": "session-and-cordis-core",
+      "status": "adapt",
+      "wire": true,
+      "dataMigration": true,
+      "permissionImpact": "preserve",
+      "upstreamCommits": [],
+      "localOwner": "core/session, persistence, agent, agent-loop",
+      "evidence": "The v2-to-v3 adjacent migration is selected from the shared format catalog; JSONL publishes transformed bodies to an immutable v3 successor while metadata-only providers keep their existing rules. Root Workbench injections resolve the active runtime at render time.",
+      "reviewState": "implemented-local-tests-passing"
+    },
+    {
+      "id": "v41-default-model",
+      "status": "adapt",
+      "wire": true,
+      "dataMigration": false,
+      "permissionImpact": "model-governance",
+      "upstreamCommits": [
+        "bc5fd3b8dc3125b262bc1d52169029d2dca4ac94",
+        "441385fe3887e5ea5a699737f8835d5997e3f85a",
+        "0729dbec6668b6502e9d3512101a5fbb031236bc"
+      ],
+      "localOwner": "llm-deepseek and agent-default-model",
+      "evidence": "V41 catalog/default and V41 image-token pricing are adapted; V4 entries retained; explicit selection and Gateway policy remain authoritative",
+      "reviewState": "local-tests-passing-real-provider-unverified"
+    },
+    {
+      "id": "bounded-filesystem-window",
+      "status": "required",
+      "wire": true,
+      "dataMigration": false,
+      "permissionImpact": "workspace-root",
+      "upstreamCommits": [
+        "f7b6a13321c1a3c2b89852deb069722560822e06",
+        "bc2174e3aa48f76ad328538caec122fff1f398b3",
+        "4429763445d70f3015dfef0115177d39570eebae"
+      ],
+      "localOwner": "fs Service Definition and local/E2B providers",
+      "evidence": "readByteRange implementation and focused tests",
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "id": "workspace-files-remote-read",
+      "status": "adapt",
+      "wire": true,
+      "dataMigration": false,
+      "permissionImpact": "Gateway ACL and path containment",
+      "upstreamCommits": [
+        "4ce4f0bac4ef9b1b19e7c06347c94b2711e24b61",
+        "9f2b07cea85eb0c445156bdcd1f1e62fbce58c2f",
+        "508831624fb8270ecfe2fddf3e6eb1152f4eda29",
+        "bd4199f48c7ee483de361b7b012e167ed510342f"
+      ],
+      "localOwner": "ApiProxy workspaceFiles + client runtime resources",
+      "evidence": "11 real local-FS ApiProxy tests, 25 resource lifecycle tests; explicit runtime binding; full changes-stream, browser and PostgreSQL acceptance pending.",
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "id": "feedback-sidecar",
+      "status": "retain",
+      "wire": true,
+      "dataMigration": false,
+      "permissionImpact": "feedback isolation",
+      "upstreamCommits": [
+        "f2f9700de2a8a9ad115e048fd7dae128c1fc19ae",
+        "3e53a08f36432b8b79039b1dab5f66e618efe278",
+        "d692289533fc08b3d5a8b804ad7fc94c3e83bd81"
+      ],
+      "localOwner": "message-feedback sidecar and command-feedback",
+      "evidence": "CoHarness storage and telemetry policy remain authoritative",
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "id": "delivered-file-visuals",
+      "status": "adapt",
+      "wire": false,
+      "dataMigration": false,
+      "permissionImpact": "cloud openPath disabled",
+      "upstreamCommits": [
+        "37d27fcdf970c890c50283bf5c1bd54e8bbf491a",
+        "060323d8e2f355022cfa9dbdb9226a421a7b7638"
+      ],
+      "localOwner": "ui-deliverables",
+      "evidence": "Shared LinkIcon/FileTypeIcon and cloud-safe Workbench/produced-file preview tests pass; server openPath remains loopback-only.",
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "id": "upstream-ui-package-replacement",
+      "status": "reject",
+      "wire": false,
+      "dataMigration": false,
+      "permissionImpact": "would bypass Workbench/Gateway",
+      "upstreamCommits": [],
+      "localOwner": "existing ui-conversation/ui-sidebar/ui-workbench",
+      "evidence": "package replacement is incompatible with multi-runtime cloud UI",
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "id": "electron-native-and-ci-only",
+      "status": "defer",
+      "wire": false,
+      "dataMigration": false,
+      "permissionImpact": "deployment-specific",
+      "upstreamCommits": [],
+      "localOwner": "Android/native/deployment owners",
+      "evidence": "requires separate platform release and external acceptance",
+      "reviewState": "pending-cumulative-source-review"
+    },
+    {
+      "id": "token-cache-disclosure-replay",
+      "status": "adapt",
+      "wire": true,
+      "dataMigration": false,
+      "permissionImpact": "preserve existing projection ACL",
+      "upstreamCommits": [
+        "165cc31eb8f65a364253c9b1369805e52c37ba8e",
+        "3997f36999",
+        "2c45dfe71e",
+        "1c044f5140",
+        "3435dbd690"
+      ],
+      "localOwner": "token-meter, session-stats, ui-conversation",
+      "evidence": "Stats pills/footer panels, compact attempt usage and retry accumulation implemented; per-turn disclosure is omitted when exact provider totals cannot be proven; focused tests pass; real provider cache values unverified. Regression covers compact assistant/attempt replay into the turn footer.",
+      "reviewState": "local-tests-passing-real-provider-unverified",
+      "localImplementation": "Stats pills/footer panels, compact attempt usage and retry accumulation; turn-tail matches step/start and assistant/attempt so exact per-turn usage survives compact replay. Strict disclosure remains omitted when totals cannot be proven."
+    },
+    {
+      "id": "v41-image-token-calculator",
+      "status": "adapt",
+      "wire": false,
+      "dataMigration": false,
+      "permissionImpact": "none",
+      "upstreamCommits": [
+        "a64dc3a690"
+      ],
+      "localOwner": "llm-deepseek image pricing",
+      "evidence": "V41 grid estimator and request pricing tests pass; exact provider usage remains authoritative",
+      "reviewState": "local-tests-passing-real-provider-unverified"
+    },
+    {
+      "id": "persistent-bash-model-status",
+      "status": "adapt",
+      "wire": true,
+      "dataMigration": false,
+      "permissionImpact": "owner-scoped PTY",
+      "upstreamCommits": [
+        "1f1537914fb7605ecad13f0af5def9be3db4abd6"
+      ],
+      "localOwner": "tool-bash-persistent and minimal preset",
+      "evidence": "Explicit settled/timeout markers and neutral network description implemented; focused tests pass; one-shot Bash and pwsh contracts remain independent.",
+      "reviewState": "local-tests-passing-platform-unverified"
+    },
+    {
+      "id": "composer-command-presentation",
+      "status": "adapt",
+      "wire": true,
+      "dataMigration": false,
+      "permissionImpact": "command definition identity; existing ACL",
+      "upstreamCommits": [
+        "2c9eda5b6f752a48396ce22387f569d0712e3183",
+        "5b1bb021cf9984dd75bfedb0ccb1ff9a913e3214",
+        "c75e100893084b6d999e8e5cdc3eb62ebce5d310",
+        "996278e6ce7a859ae4bfb7119bf42780e0b6c41d",
+        "ca827aa2ad05f69554690fce26f1926eb3437c12"
+      ],
+      "localOwner": "commands, ui-commands, ui-input-trigger, ui-primitives",
+      "evidence": "Definition identity, localized labels/sections, icon components and label fuzzy search implemented; focused suites pass; CoHarness attachment/dispatch behavior retained.",
+      "reviewState": "local-tests-passing-browser-unverified"
+    },
+    {
+      "id": "web-boot-readiness",
+      "status": "adapt",
+      "wire": true,
+      "dataMigration": false,
+      "permissionImpact": "none",
+      "upstreamCommits": [
+        "48d83eca66b1b5ca0eaa3af896d36a32371b9e27",
+        "fd3112a23fb8e670ac8e5eadc573ea0fbc74cd83"
+      ],
+      "localOwner": "client/web and host/webserver",
+      "evidence": "boot-client/mount split and optional HTML boot-ready signal implemented; focused tests pass; custom runtime transport retained.",
+      "reviewState": "local-tests-passing-production-unverified"
+    },
+    {
+      "id": "shared-package-manifest-types",
+      "status": "adapt",
+      "wire": false,
+      "dataMigration": false,
+      "permissionImpact": "none",
+      "upstreamCommits": [
+        "220678e57d135e21817dc31bc621e6b8111005e3",
+        "5c82aa9371124a3a07eed26c8d93d180513094b3",
+        "ce7ceb6071a600b91dff6b6d72c16080afeea370"
+      ],
+      "localOwner": "util/package-manifest, app-boot, client/modules",
+      "evidence": "Shared type-only manifest package and validators compile; Cordis catalog generation passes; launcher semantics were not replaced.",
+      "reviewState": "local-tests-passing-artifact-unverified"
+    },
+    {
+      "id": "markdown-image-failure-ux",
+      "status": "adapt",
+      "wire": false,
+      "dataMigration": false,
+      "permissionImpact": "none",
+      "upstreamCommits": [
+        "88ab8e9133"
+      ],
+      "localOwner": "ui-primitives MarkdownText",
+      "evidence": "Failed image fallback and source-key remount are covered by focused tests.",
+      "reviewState": "local-tests-passing-browser-unverified"
+    },
+    {
+      "id": "linux-process-cancellation",
+      "status": "defer",
+      "wire": false,
+      "dataMigration": false,
+      "permissionImpact": "provider-owned process identity",
+      "upstreamCommits": [
+        "4c024cf252eb42973f04ad5d87b5270c1359fc8e",
+        "b79a227cec941405c9b368524446145298e9d48d",
+        "aaa02a39709893ea45ac220aa87194d8522325fe"
+      ],
+      "localOwner": "subprocess-local existing owner architecture",
+      "evidence": "Upstream systemd scope files are not source-compatible; retain current owner and defer until hosted Linux teardown evidence is available.",
+      "reviewState": "deferred-platform-review"
+    },
+    {
+      "id": "repo-file-discovery",
+      "status": "adapt",
+      "wire": false,
+      "dataMigration": false,
+      "permissionImpact": "none",
+      "upstreamCommits": [
+        "d79294f23a2fd62d37f7c997ec97e51fec9d905a"
+      ],
+      "localOwner": "scripts/repo-files",
+      "evidence": "Dirent walker and nine focused tests remove Node 24 symlink ENOTDIR variance from static/document gates.",
+      "reviewState": "local-tests-passing-ci-unverified"
+    }
+  ],
+  "evidenceScope": "Only explicitly recorded current-worktree commands are validation evidence. Historical CI and inventory counts do not prove this upgrade."
+}

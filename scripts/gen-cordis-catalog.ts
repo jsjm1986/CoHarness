@@ -170,6 +170,7 @@ export const SERVICE_WALK_EXEMPTIONS: Record<string, string> = {
   slots: 'client-side interface-typed browser service — packages/client/runtime/README.md owns the API',
   theme: 'client-side interface-typed browser service — packages/client/ui-theme/README.md owns the API',
   workspaces: 'client-side interface-typed browser service — packages/client/runtime/README.md owns the API',
+  workspaceResources: 'client-side metadata-only resource registry — packages/client/runtime/README.md owns the API',
 }
 
 /**
@@ -205,6 +206,7 @@ export const EVENT_SCOPE_PAGE: Record<string, string> = {
   'workflow': 'workflow.md',
   'webserver': 'web-server.md',
   'workspace': 'workspace.md',
+  'workspace-files': 'collaboration.md',
 }
 
 /**
@@ -220,6 +222,7 @@ export const EVENT_SCOPE_PAGE: Record<string, string> = {
 export const EVENT_WALK_EXEMPTIONS: Record<string, string> = {
   'command/executed': 'client-face local command acknowledgment — packages/client/ui-commands/README.md owns the API',
   'connection/request': 'split Host Connection request-context waterfall — docs/subsystems/collaboration.md owns the API',
+  'workspace/resource-open': 'client-face file preview request — packages/client/ui-workbench/README.md owns the API',
   'connection/reset': 'client-face transport signal — packages/client/runtime/README.md owns the API',
   'locale/change': 'client-face locale switch signal — packages/client/locale/README.md owns the API',
   'slash/input-begin-command': 'client-face slash-input protocol — packages/client/ui-input-trigger/README.md owns the API',

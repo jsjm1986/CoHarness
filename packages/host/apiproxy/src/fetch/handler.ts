@@ -44,6 +44,12 @@ import {
   workspaceListRequestSchema,
   workspaceRenameRequestSchema,
 } from '../api/workspace.schema.ts'
+import {
+  workspaceFilesListRequestSchema,
+  workspaceFilesReadBytesRequestSchema,
+  workspaceFilesReadRequestSchema,
+  workspaceFilesStatRequestSchema,
+} from '../api/workspace-files.schema.ts'
 import { skillListRequestSchema } from '../api/skills.schema.ts'
 import {
   agentPresetCopyRequestSchema, agentPresetListRequestSchema, agentPresetOpenDocumentRequestSchema,
@@ -134,6 +140,10 @@ const UNARY_ROUTES: UnaryRoutes = {
   'workspace.insertBefore': { schema: workspaceInsertBeforeRequestSchema, invoke: (api, r) => api.workspace.insertBefore(r) },
   'workspace.insertSessionBefore': { schema: workspaceInsertSessionBeforeRequestSchema, invoke: (api, r) => api.workspace.insertSessionBefore(r) },
   'workspace.archiveSession': { schema: workspaceArchiveSessionRequestSchema, invoke: (api, r) => api.workspace.archiveSession(r) },
+  'workspaceFiles.list': { schema: workspaceFilesListRequestSchema, invoke: (api, r, signal) => api.workspaceFiles.list(r, signal) },
+  'workspaceFiles.stat': { schema: workspaceFilesStatRequestSchema, invoke: (api, r, signal) => api.workspaceFiles.stat(r, signal) },
+  'workspaceFiles.read': { schema: workspaceFilesReadRequestSchema, invoke: (api, r, signal) => api.workspaceFiles.read(r, signal) },
+  'workspaceFiles.readBytes': { schema: workspaceFilesReadBytesRequestSchema, invoke: (api, r, signal) => api.workspaceFiles.readBytes(r, signal) },
   'skill.list': { schema: skillListRequestSchema, invoke: (api, r) => api.skills.list(r) },
   'agentPreset.list': { schema: agentPresetListRequestSchema, invoke: (api, r) => api.agentPresets.list(r) },
   'agentPreset.select': { schema: agentPresetSelectRequestSchema, invoke: (api, r) => api.agentPresets.select(r) },

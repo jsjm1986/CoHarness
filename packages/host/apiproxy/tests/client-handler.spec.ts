@@ -28,6 +28,7 @@ function scriptedApi(overrides: {
   settings?: Partial<ApiProxy['settings']>
   credentials?: Partial<ApiProxy['credentials']>
   llm?: Partial<ApiProxy['llm']>
+  workspaceFiles?: Partial<ApiProxy['workspaceFiles']>
   respond?: ApiProxy['respond']
 } = {}): ApiProxy {
   async function *empty<F>(): AsyncGenerator<RpcRequest<F>> { /* no frames */ }
@@ -89,6 +90,13 @@ function scriptedApi(overrides: {
       insertBefore: r => ok(r, { workspaceIds: [r.payload.workspaceId] }),
       insertSessionBefore: r => ok(r, { workspace: { workspaceId: 'w1' as never, path: '/t', title: 't', sessionIds: [], createdAt: '0', updatedAt: '0' } }),
       archiveSession: r => ok(r, { archivedSessionIds: [r.payload.sessionId] }),
+    },
+    workspaceFiles: {
+      list: r => ok(r, { path: '', entries: [], truncated: false }),
+      stat: r => ok(r, { path: r.payload.path, type: 'file', bytes: 0, version: 'v' }),
+      read: r => ok(r, { path: r.payload.path, offset: r.payload.offset ?? 1, limit: r.payload.limit ?? 1, text: '', eof: true, version: 'v' }),
+      readBytes: r => ok(r, { path: r.payload.path, offset: r.payload.offset ?? 0, bytes: '', eof: true, version: 'v' }),
+      ...overrides.workspaceFiles,
     },
     skills: { list: r => ok(r, { skills: [] }), ...overrides.skills },
     agentPresets: {

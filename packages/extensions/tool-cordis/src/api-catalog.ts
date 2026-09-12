@@ -849,9 +849,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the full decoded UTF-8 content.',
       },
       {
-        signature: 'abstract streamText(target: FsTarget, signal?: AbortSignal): Promise<AsyncIterable<string>>',
+        signature: 'abstract streamText(target: FsTarget, signal?: AbortSignal, expectedVersion?: FsVersion): Promise<AsyncIterable<string>>',
         description: 'Stream the whole regular text file as decoded text chunks (same text semantics as readText, for large files). The backend owns cross-chunk UTF-8 decoding and binary rejection so the policy layer never touches raw bytes.',
-        parameters: [{ name: 'target', description: 'the resolved target to read.' }, { name: 'signal', description: 'aborts the stream, including between chunks.' }],
+        parameters: [{ name: 'target', description: 'the resolved target to read.' }, { name: 'signal', description: 'aborts the stream, including between chunks.' }, { name: 'expectedVersion', description: 'reject when the opened file differs from this observed version.' }],
         returns: 'the chunk iterable, decoded and validated like {@link readText}.',
       },
       {
@@ -861,9 +861,15 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the full raw content, at most `maxBytes` long.',
       },
       {
-        signature: 'abstract listDir(target: FsTarget, signal?: AbortSignal): Promise<FsDirEntry[]>',
+        signature: 'abstract readByteRange( target: FsTarget, range: { offset: number; length: number; expectedVersion?: FsVersion }, signal?: AbortSignal, ): Promise<Uint8Array>',
+        description: 'Read one bounded raw-byte window without buffering bytes outside the window. `offset` is zero-based and `length` is non-negative; an offset at or beyond EOF returns an empty array.',
+        parameters: [{ name: 'target', description: 'the resolved regular-file target.' }, { name: 'range', description: 'zero-based offset, requested byte length, and optional observed version guard.' }, { name: 'signal', description: 'aborts the read.' }],
+        returns: 'at most `range.length` bytes from the requested window.',
+      },
+      {
+        signature: 'abstract listDir(target: FsTarget, signal?: AbortSignal, maxEntries?: number): Promise<FsDirEntry[]>',
         description: 'List direct children of a directory in stable name order. Returns resolved child targets plus cheap metadata only; never reads file contents.',
-        parameters: [{ name: 'target', description: 'the resolved directory target.' }, { name: 'signal', description: 'aborts the listing.' }],
+        parameters: [{ name: 'target', description: 'the resolved directory target.' }, { name: 'signal', description: 'aborts the listing.' }, { name: 'maxEntries', description: 'optional processing limit; providers may stop after this many children.' }],
         returns: 'one entry per direct child, in stable name order.',
       },
       {
@@ -3347,6 +3353,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'info', description: 'the run\'s identity snapshot (id + meta).' }],
   },
   {
+    name: 'workspace-files/authorize',
+    mode: 'serial',
+    signature: '\'workspace-files/authorize\'(sessionId: SessionId, path: string): void | Promise<void>',
+    summary: 'Authorize a canonical provider path before Workspace metadata or content is read.',
+    description: 'Authorize a canonical provider path before Workspace metadata or content is read.',
+    parameters: [{ name: 'sessionId', description: 'Session whose Workspace bounds the request.' }, { name: 'path', description: 'internal provider path; never emitted on the wire.' }],
+  },
+  {
     name: 'workspace/archive-changed',
     mode: 'emit',
     signature: '\'workspace/archive-changed\': (snapshot: WorkspaceArchiveSnapshot) => void',
@@ -3632,11 +3646,15 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'CommandDefinition',
-    declaration: 'export interface CommandDefinition {\n    readonly name: string;\n    readonly description: string;\n    readonly input?: CommandInputDescriptor;\n    readonly recordInput?: boolean;\n    readonly handler: (invocation: CommandInvocation) => CommandResult | Promise<CommandResult>;\n}',
+    declaration: 'export interface CommandDefinition {\n    readonly definitionId?: CommandDefinitionIdType;\n    readonly name: string;\n    readonly description: string;\n    readonly input?: CommandInputDescriptor;\n    readonly recordInput?: boolean;\n    readonly handler: (invocation: CommandInvocation) => CommandResult | Promise<CommandResult>;\n}',
+  },
+  {
+    name: 'CommandDefinitionId',
+    declaration: 'export type CommandDefinitionId = Branded<\'CommandDefinitionId\'>;',
   },
   {
     name: 'CommandDescriptor',
-    declaration: 'export interface CommandDescriptor {\n    readonly name: string;\n    readonly description: string;\n    readonly input?: CommandInputDescriptor;\n}',
+    declaration: 'export interface CommandDescriptor {\n    readonly definitionId?: CommandDefinitionId;\n    readonly name: string;\n    readonly description: string;\n    readonly input?: CommandInputDescriptor;\n}',
   },
   {
     name: 'CommandExecution',
@@ -4664,7 +4682,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'RpcErrorDetailsMap',
-    declaration: 'export interface RpcErrorDetailsMap {\n    \'bad-request\': {\n        issues: ZodIssue[];\n    };\n    \'cancelled\': {};\n    \'collaboration-forbidden\': {\n        sessionId?: SessionId;\n        action: \'read\' | \'write\' | \'manage\' | \'approve\';\n        reason: \'not-member\' | \'conversation-not-found\' | \'forbidden\' | \'visibility-locked\' | \'gateway-unavailable\';\n    };\n    \'session-not-found\': {\n        sessionId: SessionId;\n    };\n    \'model-unavailable\': {\n        provider: string;\n        model: string;\n    };\n    \'model-forbidden\': {\n        provider: string;\n        model: string;\n    };\n    \'session-conflict\': {\n        sessionId: SessionId;\n        requestedCwd: string;\n        existingCwd?: string;\n    };\n    \'invalid-time-zone\': {\n        value: string;\n    };\n    \'workspace-attach-failed\': {\n        sessionId: SessionId;\n        workspaceId: string;\n    };\n    \'workspace-not-found\': {\n        workspaceId: string;\n    };\n    \'workspace-invalid-path\': {\n        path: string;\n    };\n    \'workspace-name-conflict\': {\n        name: string;\n    };\n    \'workspace-move-invalid\': {\n        workspaceId: string;\n        sessionId: SessionId;\n        beforeSessionId?: SessionId;\n    };\n    \'directory-unreadable\': {\n        path: string;\n    };\n    \'directory-exists\': {\n        path: string;\n    };\n    \'directory-create-failed\': {\n        path: string;\n    };\n    \'directory-picker-unavailable\': {\n        capability: string;\n    };\n    \'agent-preset-read-only\': {\n        agentPreset: string;\n /* …truncated — full shape in source */',
+    declaration: 'export interface RpcErrorDetailsMap {\n    \'bad-request\': {\n        issues: ZodIssue[];\n    };\n    \'cancelled\': {};\n    \'collaboration-forbidden\': {\n        sessionId?: SessionId;\n        action: \'read\' | \'write\' | \'manage\' | \'approve\';\n        reason: \'not-member\' | \'conversation-not-found\' | \'forbidden\' | \'visibility-locked\' | \'gateway-unavailable\';\n    };\n    \'session-not-found\': {\n        sessionId: SessionId;\n    };\n    \'model-unavailable\': {\n        provider: string;\n        model: string;\n    };\n    \'model-forbidden\': {\n        provider: string;\n        model: string;\n    };\n    \'session-conflict\': {\n        sessionId: SessionId;\n        requestedCwd: string;\n        existingCwd?: string;\n    };\n    \'invalid-time-zone\': {\n        value: string;\n    };\n    \'workspace-attach-failed\': {\n        sessionId: SessionId;\n        workspaceId: string;\n    };\n    \'workspace-not-found\': {\n        workspaceId: string;\n    };\n    \'workspace-invalid-path\': {\n        path: string;\n    };\n    \'workspace-name-conflict\': {\n        name: string;\n    };\n    \'workspace-move-invalid\': {\n        workspaceId: string;\n        sessionId: SessionId;\n        beforeSessionId?: SessionId;\n    };\n    \'workspace-file/not-found\': {\n        sessionId: SessionId;\n        path: string;\n    };\n    \'workspace-file/outside-workspace\': {\n        sessionId: SessionId;\n        path: string;\n    };\n    \'workspace-file/not-directory\': {\n        sessionId: SessionId;\n        path: string;\n    };\n    \'workspace-file /* …truncated — full shape in source */',
   },
   {
     name: 'RpcId',

@@ -8,7 +8,7 @@
  */
 
 import type { SessionSeq } from '@deepseek-ai/dsh-session/types'
-import type { CommandId } from './brand.ts'
+import type { CommandDefinitionId, CommandId } from './brand.ts'
 
 /** Immutable metadata for a command's optional unstructured input. */
 export interface CommandInputDescriptor {
@@ -49,6 +49,8 @@ export interface CommandExecution {
 
 /** Handler-free immutable command view returned to UI adapters. */
 export interface CommandDescriptor {
+  /** Stable plugin-owned identity; absent for legacy or third-party definitions. */
+  readonly definitionId?: CommandDefinitionId
   /** Lowercase command name without the leading slash. */
   readonly name: string
   /** Human-readable summary used in discovery UI. */

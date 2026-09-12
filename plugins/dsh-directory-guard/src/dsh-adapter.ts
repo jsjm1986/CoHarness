@@ -4,8 +4,11 @@
  * design doc's upstream-sync strategy). Everything else in this plugin is pure
  * Node logic.
  */
+import { FsError } from '@deepseek-ai/dsh-fs'
+import type {} from '@deepseek-ai/dsh-host-apiproxy'
 import type { Context } from '@deepseek-ai/cordis'
 import type { PreToolDecision, ToolExecution } from '@deepseek-ai/dsh-tools'
+import { classify } from './grants.ts'
 import { decideDeny } from './guard.ts'
 import type { Grant } from './grants.ts'
 
@@ -23,7 +26,7 @@ function sessionCwd(exec: ToolExecution): string | undefined {
  * @returns the listener disposer (also unwound automatically on plugin unload).
  */
 export function registerGuard(ctx: Context, getGrants: () => readonly Grant[]): () => void {
-  return ctx.on(
+  const stopTools = ctx.on(
     'tools/pre-execute',
     async (exec: ToolExecution, next: () => Promise<PreToolDecision>): Promise<PreToolDecision> => {
       const reason = decideDeny(
@@ -34,4 +37,8 @@ export function registerGuard(ctx: Context, getGrants: () => readonly Grant[]): 
       return reason === null ? next() : { kind: 'deny', reason }
     },
   )
+  const stopFiles = ctx.on('workspace-files/authorize', (_sessionId, path) => {
+    if (classify(getGrants(), path) === 'none') throw new FsError('Workspace path is outside authorized directories', 'FS_PERMISSION_DENIED')
+  })
+  return () => { stopTools(); stopFiles() }
 }

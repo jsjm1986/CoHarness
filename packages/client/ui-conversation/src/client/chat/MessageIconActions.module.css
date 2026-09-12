@@ -5,8 +5,23 @@
 .actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   height: 28px;
+}
+
+/* Completed turns keep the latest actions available for keyboard and pointer
+   use; older tails reveal the same row on hover or focus without changing the
+   transcript's reserved height. */
+@media (hover: hover) {
+  :global([data-actions-reveal='hover']) .actions {
+    opacity: 0;
+    transition: opacity 80ms ease;
+  }
+
+  :global([data-actions-reveal='hover']:hover) .actions,
+  :global([data-actions-reveal='hover']:focus-within) .actions {
+    opacity: 1;
+  }
 }
 
 /* Clock before icons (user figma 388:20051) / after (assistant 43:32997). */

@@ -332,7 +332,7 @@ const server = createGatewayServer(deps, {
     maxResponseBytes: cfg.upstreamResponseLimitBytes,
     upstreamTimeoutMs: cfg.upstreamTimeoutMs,
   }),
-  admin: createAdminApiHandler(deps, documentAdmin),
+  admin: createAdminApiHandler(deps, documentAdmin, proxyHandlers.invalidateAccess),
   runtime: createRuntimeApiHandler({
     context,
     instances: instanceRepository,

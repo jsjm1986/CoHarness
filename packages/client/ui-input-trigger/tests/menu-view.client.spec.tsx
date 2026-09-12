@@ -15,6 +15,7 @@ import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts
 import { zh } from '../src/client/locales.ts'
 import type { InputTriggerCrumb, MenuState, TriggerHit } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import { MenuView } from '../src/client/MenuView.tsx'
+import { IconGoalOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 
 const hit: TriggerHit = {
   trigger: '/',
@@ -99,6 +100,20 @@ describe('MenuView', () => {
     const options = screen.getAllByRole('option')
     expect(options.map(o => o.textContent)).toEqual(['⚑goalSet up a goal', 'plan'])
     expect(screen.queryByText('正在加载…')).not.toBeNull()
+  })
+
+  it('renders a localized label with its canonical alias and accepts component icons', () => {
+    mount(openState({
+      groups: [{
+        source: 'command',
+        status: 'ready',
+        items: [{ name: 'goal', label: '目标', description: '设置任务目标', icon: IconGoalOutline16 }],
+      }],
+      highlight: { source: 'command', index: 0 },
+    }))
+    const option = screen.getByRole('option')
+    expect(option.textContent).toBe('目标goal设置任务目标')
+    expect(option.querySelector('svg')).not.toBeNull()
   })
 
   it('keeps an opted-out source title hidden while its candidates are pending', () => {

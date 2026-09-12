@@ -9,6 +9,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { SessionId } from '../src/client/api.ts'
 import type { ConnectionState } from '../src/client/connection.ts'
+import { ApiTransportError } from '../src/client/api.ts'
 import { ConnectionController } from '../src/client/connection.ts'
 import { FakeApiClient, deferred, ok } from './fake-api.client.ts'
 
@@ -178,11 +179,13 @@ describe('connection lifecycle', () => {
   it('converges stream/error frames into reconnect instead of dispatching them', async () => {
     const api = new FakeApiClient()
     const muxSeen: string[] = []
+    const failure = vi.fn()
     let connected = 0
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     const controller = new ConnectionController(api, {
       onMuxEnvelope: envelope => muxSeen.push(envelope.payload.type),
       onConnected: () => { connected++ },
+      onFailure: failure,
     }, FAST)
     controller.start()
     try {
@@ -190,10 +193,22 @@ describe('connection lifecycle', () => {
       api.pushMux({ type: 'stream/error', error: { code: 'internal', message: 'impl broke', details: {} } })
       await vi.waitFor(() => { expect(connected).toBe(2) }) // treated as loss → reconnect
       expect(muxSeen).toEqual([]) // never forwarded to the business sink
+      expect(failure).toHaveBeenCalledWith({ kind: 'rpc', error: { code: 'internal', message: 'impl broke', details: {} } })
     } finally {
       controller.stop()
       warnSpy.mockRestore()
     }
+  })
+
+  it.each([401, 403, 429, 503])('preserves HTTP %i handshake failures for the resource owner', async (status) => {
+    const api = new FakeApiClient()
+    api.onDescribe = () => Promise.reject(new ApiTransportError(status, '/api/host.describe'))
+    const failure = vi.fn()
+    const controller = new ConnectionController(api, { onFailure: failure }, FAST)
+    controller.start()
+    try {
+      await vi.waitFor(() => { expect(failure).toHaveBeenCalledWith({ kind: 'transport', error: new ApiTransportError(status, '/api/host.describe') }) })
+    } finally { controller.stop() }
   })
 
   it('isolates sink exceptions from the pump', async () => {

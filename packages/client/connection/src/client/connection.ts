@@ -1,4 +1,4 @@
-import type { HostDescription, IApiClient, HostFrame, MuxFrame, RpcRequest } from './api.ts'
+import type { HostDescription, IApiClient, HostFrame, MuxFrame, RpcError, RpcRequest } from './api.ts'
 
 /** Reconnect/backoff tunables (deployment-varying — no hardcoded tunables; these become the
  *  future `ctx.connection` plugin's Config). All fields optional; defaults below. */
@@ -103,6 +103,14 @@ function waitForReadiness<T>(
  *  'reconnecting' the moment the generation fails (covers the whole backoff+retry span). */
 export type ConnectionState = 'connected' | 'reconnecting'
 
+/** Failure category preserved for consumers that must invalidate authorized data. */
+export type ConnectionFailure = { readonly kind: 'rpc'; readonly error: RpcError }
+  | { readonly kind: 'transport'; readonly error: unknown }
+
+class HandshakeRpcError extends Error {
+  constructor(readonly error: RpcError) { super(`host.describe failed: ${error.code}: ${error.message}`) }
+}
+
 /** Frame sink callbacks: the Controller owns the physical streams; business dispatch belongs to
  *  SessionManager. */
 export interface ConnectionSinks {
@@ -114,6 +122,8 @@ export interface ConnectionSinks {
   /** Coarse state transitions (deduplicated: fires only on change). The initial pre-connect
    *  span reports nothing — the UI treats "no state yet" as connecting, not as an outage. */
   onStateChange?: (state: ConnectionState) => void
+  /** Current-generation failure, before reconnect; old-generation outcomes are discarded. */
+  onFailure?: (failure: ConnectionFailure) => void
 }
 
 /**
@@ -237,6 +247,10 @@ export class ConnectionController {
         new Promise<void>((resolve) => { hostOpened = resolve }),
       ])
 
+      const reportFailure = (failure: ConnectionFailure): void => {
+        if (!generationLive || !this.isGenerationActive(ac, token)) return
+        this.callSink(() => { this.sinks.onFailure?.(failure) })
+      }
       const failed = new Promise<void>((resolve) => {
         const settle = (): void => {
           if (gen === this.generation && token === this.runToken && !ac.signal.aborted) ac.abort()
@@ -244,8 +258,8 @@ export class ConnectionController {
           buffered.length = 0
           resolve()
         }
-        void this.pumpStream(this.api.events.mux({}, ac.signal, muxOpened), dispatchMux, settle)
-        void this.pumpStream(this.api.events.host({}, ac.signal, hostOpened), dispatchHost, settle)
+        void this.pumpStream(this.api.events.mux({}, ac.signal, muxOpened), dispatchMux, settle, reportFailure)
+        void this.pumpStream(this.api.events.host({}, ac.signal, hostOpened), dispatchHost, settle, reportFailure)
       })
 
       try {
@@ -269,7 +283,7 @@ export class ConnectionController {
         ])
         const descriptionResult = description.result
         if (!descriptionResult.ok) {
-          throw new Error(`host.describe failed: ${descriptionResult.error.code}: ${descriptionResult.error.message}`)
+          throw new HandshakeRpcError(descriptionResult.error)
         }
         if (ac.signal.aborted) throw new Error('generation aborted during readiness handshake')
         this.attempt = 0
@@ -296,8 +310,9 @@ export class ConnectionController {
             }
           }
         }
-      } catch {
-        // Transport failure: treat as generation failure, fall through to the shared backoff.
+      } catch (error: unknown) {
+        reportFailure(error instanceof HandshakeRpcError ? { kind: 'rpc', error: error.error } : { kind: 'transport', error })
+        // Every failure converges on the same generation cancellation and backoff.
         ac.abort()
         generationLive = false
         buffered.length = 0
@@ -327,18 +342,22 @@ export class ConnectionController {
     this.callSink(() => this.sinks.onStateChange?.(state))
   }
 
-  private async pumpStream<F extends { type: string }>(
+  private async pumpStream<F extends MuxFrame | HostFrame>(
     stream: AsyncIterable<RpcRequest<F>>,
     sink: ((envelope: RpcRequest<F>) => void) | undefined,
     onEnd: () => void,
+    reportFailure: (failure: ConnectionFailure) => void,
   ): Promise<void> {
     try {
       for await (const envelope of stream) {
-        if (envelope.payload.type === 'stream/error') break
+        if (envelope.payload.type === 'stream/error') {
+          reportFailure({ kind: 'rpc', error: envelope.payload.error })
+          break
+        }
         if (sink !== undefined) this.callSink(() => { sink(envelope) })
       }
-    } catch {
-      // Stream loss: converge on onEnd, which triggers the shared reconnect.
+    } catch (error: unknown) {
+      reportFailure({ kind: 'transport', error })
     }
     onEnd()
   }

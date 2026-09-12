@@ -163,6 +163,7 @@ function isENOENT(error: unknown): boolean {
  */
 export class JsonlSessionPersistence extends SessionPersistence implements PersistenceBackend<JsonlTornMarker> {
   override readonly supportsRawArtifacts = true
+  readonly supportsBodyMigration = true
 
   static inject = ['sessions']
 

@@ -289,6 +289,18 @@ describe('MarkdownText', () => {
     }
   })
 
+  it.each([
+    ['diagram', 'diagram'],
+    ['', 'https://example.com/missing.png'],
+  ] as const)('shows authored fallback after an image load failure (alt=%j)', (alt, expected) => {
+    const { container } = render(<MarkdownText text={`![${alt}](https://example.com/missing.png)`} />)
+    const image = container.querySelector('img')
+    expect(image).not.toBeNull()
+    fireEvent.error(image!)
+    expect(container.querySelector('img')).toBeNull()
+    expect(container.textContent).toContain(expected)
+  })
+
   it('neutralizes raw HTML, unsafe or relative links, and unsupported images', () => {
     const markdown = [
       '<script>globalThis.compromised = true</script>',

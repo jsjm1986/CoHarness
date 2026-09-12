@@ -334,7 +334,7 @@ describe('web e2e: seeded history renders through cold resume', () => {
     // This scenario issues zero model calls — the scaffold's route-only
     // adapter serves the catalog and refuses to stream — so history restores
     // the routed id and the seat resolves it against an advertised row.
-    await page.getByRole('button', { name: /^Select model, current/ })
+    await page.getByRole('button', { name: /^Select model/ })
       .waitFor({ timeout: 10_000 })
     const snapshot = (await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd))
       .split(SEED_ID).join('{{seededId}}')

@@ -2,7 +2,6 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { IncomingHttpHeaders } from 'node:http'
 import z from '@deepseek-ai/schemastery'
-import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import type {} from '@deepseek-ai/dsh-attachment'
 // Activates the webServer Context merge used below.
 import type { IndexInjection, WebRoute, WebUpgradeRoute } from '@deepseek-ai/dsh-host-webserver'
@@ -56,6 +55,9 @@ declare module '@deepseek-ai/cordis' {
 
 /** Stable Cordis plugin name. */
 export const name = 'client-connection'
+
+/** Maximum delay accepted by the browser timer APIs (the platform limit). */
+const MAX_TIMER_DELAY_MS = 2_147_483_647
 
 /** Headroom for RPC JSON fields around aggregate base64 image payloads. */
 const REQUEST_ENVELOPE_HEADROOM_BYTES = 1024 * 1024
