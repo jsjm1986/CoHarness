@@ -19,6 +19,7 @@ on:
         options:
           - larger-runner-benchmark
           - consolidated-runner-benchmark
+          - full-audit
 
 # Cancel a superseded run on every event EXCEPT push. A deployment may enable
 # the two self-hosted standby drills; they can take longer than the interval
@@ -73,6 +74,8 @@ jobs:
       compat_mode: ${{ steps.scope.outputs.compat_mode }}
       python_mode: ${{ steps.scope.outputs.python_mode }}
       windows_mode: ${{ steps.scope.outputs.windows_mode }}
+      gateway_mode: ${{ steps.scope.outputs.gateway_mode }}
+      admin_ui_mode: ${{ steps.scope.outputs.admin_ui_mode }}
       scoped_packages: ${{ steps.scope.outputs.scoped_packages }}
     steps:
       - uses: actions/checkout@v7
@@ -419,6 +422,118 @@ jobs:
         if: needs.pr-scope.outputs.snapshot_mode != 'scoped'
         run: pnpm run check:ci:consumers
 
+  # The Gateway is an independent npm project, so the root Vitest inventory
+  # cannot exercise its ACL, principal, and PostgreSQL-facing code. Run its
+  # own package checks when the cloud control plane or its shared API seam can
+  # change; ordinary package-only PRs do not pay for this installation.
+  gateway:
+    needs: pr-scope
+    if: github.event_name == 'pull_request' && needs.pr-scope.outputs.gateway_mode == 'full'
+    runs-on: ubuntu-latest
+    name: gateway / typecheck and unit tests
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: hgw
+          POSTGRES_PASSWORD: hgw
+          POSTGRES_DB: hgw_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hgw -d hgw_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      HGW_TEST_DATABASE_URL: postgres://hgw:hgw@127.0.0.1:5432/hgw_test
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: gateway/package-lock.json
+      - name: Install Gateway dependencies
+        run: npm ci --prefix gateway
+      - name: Typecheck Gateway
+        run: npm run typecheck --prefix gateway
+      - name: Build Gateway
+        run: npm run build --prefix gateway
+      - name: Build the directory guard bundle used by Gateway tests
+        run: pnpm exec tsc -p plugins/dsh-directory-guard/tsconfig.build.json
+      - name: Test Gateway
+        run: npm test --prefix gateway
+
+  gateway-admin-ui:
+    needs: pr-scope
+    if: github.event_name == 'pull_request' && needs.pr-scope.outputs.admin_ui_mode == 'full'
+    runs-on: ubuntu-latest
+    name: gateway admin UI / build and tests
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: gateway/admin-ui/package-lock.json
+      - name: Install Gateway admin UI dependencies
+        run: npm ci --prefix gateway/admin-ui
+      - name: Test Gateway admin UI
+        run: npm test --prefix gateway/admin-ui
+      - name: Build Gateway admin UI
+        run: npm run build --prefix gateway/admin-ui
+
+  # Explicit full audit for a release candidate or a change whose impact is
+  # uncertain. Pull requests use the scoped selector; this manual lane keeps a
+  # complete Linux runtime, coverage, built-consumer, and browser rehearsal
+  # available without making every PR pay its cost.
+  full-audit:
+    if: github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit'
+    runs-on: ubuntu-latest
+    name: manual / full audit
+    timeout-minutes: 120
+    env:
+      DSH_COVERAGE_MAX_WORKERS: '2'
+      DSH_COVERAGE_PARTITIONS: '2'
+      DSH_GATE_CONCURRENCY: '1'
+      DSH_NODE_COMPAT_SKIP_TYPECHECK: '1'
+      DSH_OXLINT_THREADS: '1'
+      DSH_PUBLINT_CONCURRENCY: '1'
+      DSH_SNAPSHOT_MAX_CONCURRENCY: '1'
+      DSH_WEB_SNAPSHOT_WORKERS: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6.0.10
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+      - name: Install dependencies and prepare bubblewrap
+        run: |
+          pnpm install --frozen-lockfile &
+          install_pid=$!
+          bash scripts/prepare-ci-bubblewrap.sh &
+          sandbox_pid=$!
+          install_status=0
+          wait "$install_pid" || install_status=$?
+          sandbox_status=0
+          wait "$sandbox_pid" || sandbox_status=$?
+          if (( install_status != 0 )); then exit "$install_status"; fi
+          exit "$sandbox_status"
+      - name: Install Gateway runtime dependencies
+        run: npm ci --prefix gateway --omit=dev
+      - name: Run full Linux audit
+        run: pnpm run check:ci:linux-primary
+
 
   # The browser suite only ever ran on pull requests, and a red pull request is
   # still mergeable, so it rotted unnoticed: the workbench tree change broke
@@ -436,6 +551,14 @@ jobs:
     timeout-minutes: 90
     env:
       DSH_WEB_SNAPSHOT_WORKERS: '2'
+      # Match the bounded PR consumer lane. The master sweep runs the same
+      # build-backed inventory, so it must not re-enable nested typecheck/build
+      # work or unbounded gate fan-out that races the live HMR browser owner.
+      DSH_GATE_CONCURRENCY: '1'
+      DSH_NODE_COMPAT_SKIP_TYPECHECK: '1'
+      DSH_OXLINT_THREADS: '1'
+      DSH_PUBLINT_CONCURRENCY: '1'
+      DSH_SNAPSHOT_MAX_CONCURRENCY: '1'
     steps:
       - uses: actions/checkout@v7
         with:
@@ -1141,13 +1264,17 @@ jobs:
           && github.event.pull_request.user.login != 'dependabot[bot]'
           && fromJSON('["self-hosted", "linux", "x64", "vm-backup"]')
           || 'ubuntu-latest' }}
-    needs: [pr-scope, node-24, node-24-coverage, node-24-consumers, node-compat, python-sdk, python-runtime, windows]
+    needs: [pr-scope, node-24, node-24-coverage, node-24-consumers, node-compat, python-sdk, python-runtime, windows, gateway, gateway-admin-ui]
     if: always() && github.event_name == 'pull_request'
     steps:
       - name: Fail if any needed job did not succeed
         if: >-
           needs.pr-scope.result != 'success'
           || needs.node-24.result != 'success'
+          || (needs.pr-scope.outputs.gateway_mode == 'full'
+            && needs.gateway.result != 'success')
+          || (needs.pr-scope.outputs.admin_ui_mode == 'full'
+            && needs.gateway-admin-ui.result != 'success')
           || (needs.pr-scope.outputs.compat_mode == 'full'
             && needs.node-compat.result != 'success')
           || (needs.pr-scope.outputs.python_mode == 'full'
@@ -1160,7 +1287,7 @@ jobs:
           || (needs.pr-scope.outputs.windows_mode == 'full'
             && needs.windows.result != 'success')
         run: |
-          echo "::error::Needed job results: scope=${{ needs.pr-scope.result }}, static=${{ needs.node-24.result }}, compatMode=${{ needs.pr-scope.outputs.compat_mode }}, compat=${{ needs.node-compat.result }}, pythonMode=${{ needs.pr-scope.outputs.python_mode }}, python=${{ needs.python-sdk.result }}, expensive=${{ needs.pr-scope.outputs.run_expensive }}, coverageMode=${{ needs.pr-scope.outputs.coverage_mode }}, coverage=${{ needs.node-24-coverage.result }}, consumers=${{ needs.node-24-consumers.result }}, runtime=${{ needs.python-runtime.result }}, windowsMode=${{ needs.pr-scope.outputs.windows_mode }}, wine=${{ needs.windows.result }}"
+          echo "::error::Needed job results: scope=${{ needs.pr-scope.result }}, static=${{ needs.node-24.result }}, gatewayMode=${{ needs.pr-scope.outputs.gateway_mode }}, gateway=${{ needs.gateway.result }}, adminUiMode=${{ needs.pr-scope.outputs.admin_ui_mode }}, adminUi=${{ needs.gateway-admin-ui.result }}, compatMode=${{ needs.pr-scope.outputs.compat_mode }}, compat=${{ needs.node-compat.result }}, pythonMode=${{ needs.pr-scope.outputs.python_mode }}, python=${{ needs.python-sdk.result }}, expensive=${{ needs.pr-scope.outputs.run_expensive }}, coverageMode=${{ needs.pr-scope.outputs.coverage_mode }}, coverage=${{ needs.node-24-coverage.result }}, consumers=${{ needs.node-24-consumers.result }}, runtime=${{ needs.python-runtime.result }}, windowsMode=${{ needs.pr-scope.outputs.windows_mode }}, wine=${{ needs.windows.result }}"
           exit 1
       - name: All checks passed
         run: |
@@ -1172,4 +1299,6 @@ jobs:
           echo "compat mode=${{ needs.pr-scope.outputs.compat_mode }}"
           echo "python mode=${{ needs.pr-scope.outputs.python_mode }}"
           echo "windows mode=${{ needs.pr-scope.outputs.windows_mode }}"
+          echo "gateway mode=${{ needs.pr-scope.outputs.gateway_mode }}"
+          echo "admin UI mode=${{ needs.pr-scope.outputs.admin_ui_mode }}"
           echo "scoped packages=${{ needs.pr-scope.outputs.scoped_packages }}"

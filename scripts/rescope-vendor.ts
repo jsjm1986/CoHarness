@@ -210,23 +210,6 @@ const EXACT_EDITS: readonly ExactEdit[] = [
     expect: 1,
   },
   {
-    // The rescoped name is already covered by the `@deepseek-ai/.+` pattern beside it.
-    id: 'knip-logger-console',
-    file: 'knip.json',
-    find: `      "ignoreDependencies": [
-        "@cordisjs/plugin-logger-console",
-        "@deepseek-ai/.+"
-      ]
-    },
-    "packages/util/home": {`,
-    replace: `      "ignoreDependencies": [
-        "@deepseek-ai/.+"
-      ]
-    },
-    "packages/util/home": {`,
-    expect: 1,
-  },
-  {
     id: 'knip-bundle-base',
     file: 'knip.json',
     find: `    "packages/bundle/base": {
@@ -461,6 +444,10 @@ const VENDORED_LIBRARY = /^@deepseek-ai\\/(cosmokit|schemastery)(\\/|$)/
   'vendor/cordis',
   'vendor/cosmokit',
   'vendor/schemastery',
+  // cordis declares these rescoped framework plugins as peer dependencies;
+  // include their local tarballs so npm does not query the registry for them.
+  'vendor/include',
+  'vendor/loader',
 ]`,
     expect: 1,
   },
