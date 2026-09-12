@@ -5,12 +5,16 @@
  * are mirrored onto origin so `git diff <tag> HEAD` resolves. The manifest
  * records, per `packages/<group>/<pkg>` directory, how the local tree relates to
  * the synced tag: `tracked` packages hold a `src/` identical to the synced
- * commit, `adapted` packages exist upstream but carry owned `src/` deltas, and
- * `owned` packages have no upstream counterpart. Directories upstream ships
- * that the fork does not carry sit in `upstreamOnly`. The gate re-checks every
- * `tracked` claim against `git diff --quiet` and enforces the manifest↔disk↔tag
- * bijections, so which packages faithfully track upstream is a mechanical fact
- * instead of prose in upgrade docs.
+ * commit, `adapted` packages exist upstream but carry owned `src/` deltas,
+ * `replaced` packages exist upstream but substitute a wholesale owned contract
+ * (upstream diffs land by behavior port, never by file merge), and `owned`
+ * packages have no upstream counterpart. Directories upstream ships that the
+ * fork does not carry sit in `upstreamOnly` with a recorded reason. The gate
+ * re-checks every `tracked` claim against `git diff --quiet`, verifies each
+ * `removedUpstreamPaths` entry exists at the synced commit and is absent on
+ * disk, and enforces the manifest↔disk↔tag bijections, so which packages
+ * faithfully track upstream is a mechanical fact instead of prose in upgrade
+ * docs.
  */
 
 import { spawnSync } from 'node:child_process'
@@ -22,7 +26,7 @@ const root = resolve(import.meta.dirname, '..')
 /** Manifest path relative to the repository root. */
 const MANIFEST_REL = 'scripts/upstream-sync.json'
 
-const SOVEREIGNTIES = ['tracked', 'adapted', 'owned'] as const
+const SOVEREIGNTIES = ['tracked', 'adapted', 'owned', 'replaced'] as const
 
 /** The `<group>/<pkg>` key grammar the manifest and both bijections share. */
 const PACKAGE_KEY = /^[0-9A-Za-z._-]+\/[0-9A-Za-z._-]+$/
@@ -31,14 +35,25 @@ const PACKAGE_KEY = /^[0-9A-Za-z._-]+\/[0-9A-Za-z._-]+$/
 const COMMIT_ID = /^[0-9a-f]{40,64}$/
 
 const TOP_LEVEL_KEYS = new Set(['version', 'syncedTag', 'syncedCommit', 'packages', 'upstreamOnly'])
-const ENTRY_KEYS = new Set(['sovereignty', 'note'])
+const ENTRY_KEYS = new Set(['sovereignty', 'note', 'removedUpstreamPaths'])
+const UPSTREAM_ONLY_KEYS = new Set(['package', 'reason', 'replacedBy'])
 
 /** How one package's `src/` relates to the synced upstream commit. */
 export type Sovereignty = (typeof SOVEREIGNTIES)[number]
 
+/** One upstream package the fork does not carry, with the recorded reason. */
+export interface UpstreamOnlyEntry {
+  /** `<group>/<pkg>` key present at the synced commit and absent on disk. */
+  package: string
+  /** Why the fork does not carry the package; empty reasons fail validation. */
+  reason: string
+  /** Optional `<group>/<pkg>` key of the local package that substitutes it. */
+  replacedBy?: string
+}
+
 /** The validated contents of `scripts/upstream-sync.json`. */
 export interface UpstreamSyncManifest {
-  version: 1
+  version: 2
   syncedTag: string
   syncedCommit: string
   /** Per-package sovereignty, keyed `<group>/<pkg>`. */
@@ -46,8 +61,14 @@ export interface UpstreamSyncManifest {
     sovereignty: Sovereignty
     /** Repo-relative path of a file recording why the package carries this class. */
     note?: string
+    /**
+     * Files present under this package at the synced commit that the fork
+     * deliberately does not carry; makes intentional surface removal a
+     * recorded decision instead of invisible merge drift.
+     */
+    removedUpstreamPaths?: string[]
   }>
-  upstreamOnly: string[]
+  upstreamOnly: UpstreamOnlyEntry[]
 }
 
 /** One sovereignty sweep: fatal violations plus printed-but-passing advisories. */
@@ -75,7 +96,7 @@ export function validateUpstreamSyncManifest(raw: unknown, repoRoot: string): Up
   for (const key of Object.keys(raw)) {
     if (!TOP_LEVEL_KEYS.has(key)) fail(`manifest has unknown key "${key}"`)
   }
-  if (raw.version !== 1) fail(`manifest version must be 1, got ${JSON.stringify(raw.version)}`)
+  if (raw.version !== 2) fail(`manifest version must be 2, got ${JSON.stringify(raw.version)}`)
   if (typeof raw.syncedTag !== 'string' || raw.syncedTag === '') {
     fail(`manifest syncedTag must be a non-empty string, got ${JSON.stringify(raw.syncedTag)}`)
   }
@@ -106,19 +127,52 @@ export function validateUpstreamSyncManifest(raw: unknown, repoRoot: string): Up
       }
       entry.note = note
     }
+    if (sovereignty === 'replaced' && entry.note === undefined) {
+      fail(`manifest package "${key}" is "replaced" and must name a note file recording the replacement contract`)
+    }
+    const removed = value.removedUpstreamPaths
+    if (removed !== undefined) {
+      if (!Array.isArray(removed) || removed.length === 0) {
+        fail(`manifest package "${key}" removedUpstreamPaths must be a non-empty array`)
+      }
+      for (const removedPath of removed) {
+        if (typeof removedPath !== 'string' || !removedPath.startsWith(`packages/${key}/`) || removedPath.split('/').includes('..')) {
+          fail(`manifest package "${key}" removedUpstreamPaths entry must be a "packages/${key}/…" path, got ${JSON.stringify(removedPath)}`)
+        }
+        if (existsSync(resolve(repoRoot, removedPath))) {
+          fail(`manifest package "${key}" lists removedUpstreamPaths entry "${removedPath}" that exists on disk`)
+        }
+      }
+      entry.removedUpstreamPaths = [...removed]
+    }
     packages[key] = entry
   }
-  if (!Array.isArray(raw.upstreamOnly)) fail('manifest upstreamOnly must be an array of "<group>/<pkg>" keys')
-  const upstreamOnly: string[] = []
-  for (const key of raw.upstreamOnly) {
-    if (typeof key !== 'string' || !PACKAGE_KEY.test(key)) {
-      fail(`manifest upstreamOnly entry must be a "<group>/<pkg>" string, got ${JSON.stringify(key)}`)
+  if (!Array.isArray(raw.upstreamOnly)) fail('manifest upstreamOnly must be an array of { package, reason } objects')
+  const upstreamOnly: UpstreamOnlyEntry[] = []
+  for (const item of raw.upstreamOnly) {
+    if (!isRecord(item)) fail('manifest upstreamOnly entry must be an object')
+    for (const field of Object.keys(item)) {
+      if (!UPSTREAM_ONLY_KEYS.has(field)) fail(`manifest upstreamOnly entry has unknown field "${field}"`)
     }
-    if (upstreamOnly.includes(key)) fail(`manifest upstreamOnly lists "${key}" twice`)
+    const key = item.package
+    if (typeof key !== 'string' || !PACKAGE_KEY.test(key)) {
+      fail(`manifest upstreamOnly entry package must be a "<group>/<pkg>" string, got ${JSON.stringify(key)}`)
+    }
+    const reason = item.reason
+    if (typeof reason !== 'string' || reason.trim() === '') {
+      fail(`manifest upstreamOnly entry "${key}" must record a non-empty reason`)
+    }
+    const replacedBy = item.replacedBy
+    if (replacedBy !== undefined) {
+      if (typeof replacedBy !== 'string' || !(replacedBy in packages)) {
+        fail(`manifest upstreamOnly entry "${key}" replacedBy must name a packages key, got ${JSON.stringify(replacedBy)}`)
+      }
+    }
+    if (upstreamOnly.some(existing => existing.package === key)) fail(`manifest upstreamOnly lists "${key}" twice`)
     if (key in packages) fail(`manifest lists "${key}" in both packages and upstreamOnly`)
-    upstreamOnly.push(key)
+    upstreamOnly.push({ package: key, reason, ...(replacedBy === undefined ? {} : { replacedBy }) })
   }
-  return { version: 1, syncedTag: raw.syncedTag, syncedCommit: raw.syncedCommit, packages, upstreamOnly }
+  return { version: 2, syncedTag: raw.syncedTag, syncedCommit: raw.syncedCommit, packages, upstreamOnly }
 }
 
 /**
@@ -231,7 +285,7 @@ export function checkUpstreamSovereignty(repoRoot: string, manifest: UpstreamSyn
   const advisories: string[] = []
   const entries = Object.entries(manifest.packages)
   const manifestKeys = new Set(entries.map(([key]) => key))
-  const upstreamOnly = new Set(manifest.upstreamOnly)
+  const upstreamOnly = new Set(manifest.upstreamOnly.map(item => item.package))
 
   if (tagCommit !== manifest.syncedCommit) {
     violations.push(`tag "${manifest.syncedTag}" resolves to ${tagCommit}, not manifest syncedCommit ${manifest.syncedCommit}`)
@@ -269,11 +323,11 @@ export function checkUpstreamSovereignty(repoRoot: string, manifest: UpstreamSyn
   if (absentAtUpstream.length > 0) {
     violations.push(`classified "tracked"/"adapted" but absent at ${manifest.syncedTag}: ${absentAtUpstream.join(', ')}`)
   }
-  const upstreamOnlyAbsent = manifest.upstreamOnly.filter(key => !upstream.has(key)).sort()
+  const upstreamOnlyAbsent = manifest.upstreamOnly.map(item => item.package).filter(key => !upstream.has(key)).sort()
   if (upstreamOnlyAbsent.length > 0) {
     violations.push(`listed in upstreamOnly but absent at ${manifest.syncedTag}: ${upstreamOnlyAbsent.join(', ')}`)
   }
-  const upstreamOnlyOnDisk = manifest.upstreamOnly.filter(key => disk.has(key)).sort()
+  const upstreamOnlyOnDisk = manifest.upstreamOnly.map(item => item.package).filter(key => disk.has(key)).sort()
   if (upstreamOnlyOnDisk.length > 0) {
     violations.push(`listed in upstreamOnly but present on disk: ${upstreamOnlyOnDisk.join(', ')}`)
   }
@@ -284,10 +338,19 @@ export function checkUpstreamSovereignty(repoRoot: string, manifest: UpstreamSyn
     if (entry.sovereignty === 'tracked' && upstream.has(key) && !packageSrcMatchesCommit(repoRoot, manifest.syncedCommit, key)) {
       violations.push(`classified "tracked" but packages/${key}/src differs from ${manifest.syncedTag}`)
     }
+    for (const removedPath of entry.removedUpstreamPaths ?? []) {
+      const present = git(repoRoot, ['cat-file', '-e', `${manifest.syncedCommit}:${removedPath}`])
+      if (present.status !== 0) {
+        violations.push(`removedUpstreamPaths entry "${removedPath}" is absent at ${manifest.syncedTag}`)
+      }
+    }
   }
   for (const [key, entry] of entries) {
     if (entry.sovereignty === 'adapted' && upstream.has(key) && packageSrcMatchesCommit(repoRoot, manifest.syncedCommit, key)) {
       advisories.push(`classified "adapted" but packages/${key}/src is identical to ${manifest.syncedTag}; promote it to "tracked"`)
+    }
+    if (entry.sovereignty === 'replaced' && upstream.has(key) && packageSrcMatchesCommit(repoRoot, manifest.syncedCommit, key)) {
+      advisories.push(`classified "replaced" but packages/${key}/src is identical to ${manifest.syncedTag}; reclassify it "tracked"`)
     }
   }
   return { violations, advisories }
@@ -305,11 +368,11 @@ function main(): number {
     for (const violation of violations) console.error(`  ${violation}`)
     return 1
   }
-  const counts: Record<Sovereignty, number> = { tracked: 0, adapted: 0, owned: 0 }
+  const counts: Record<Sovereignty, number> = { tracked: 0, adapted: 0, owned: 0, replaced: 0 }
   for (const entry of Object.values(manifest.packages)) counts[entry.sovereignty] += 1
   console.log(
     `verify-upstream-sovereignty: ${counts.tracked} tracked, ${counts.adapted} adapted, ${counts.owned} owned,`
-    + ` ${manifest.upstreamOnly.length} upstream-only package(s) conform to ${manifest.syncedTag}.`,
+    + ` ${counts.replaced} replaced, ${manifest.upstreamOnly.length} upstream-only package(s) conform to ${manifest.syncedTag}.`,
   )
   return 0
 }

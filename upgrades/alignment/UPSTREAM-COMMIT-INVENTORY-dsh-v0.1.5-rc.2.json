@@ -1,0 +1,6124 @@
+{
+  "schemaVersion": 1,
+  "generatedFrom": {
+    "baseline": "dsh-v0.1.3-alpha.2",
+    "baselineCommit": "82a5fd61a7cf5c293cec4bdff68f455398d685e9",
+    "target": "dsh-v0.1.5-rc.2",
+    "targetCommit": "fb2c4b9e698e30edb738bca4cf0618587db7d203"
+  },
+  "commitCount": 580,
+  "commits": [
+    {
+      "sha": "a30530342297e6006623a775166fee1d14fd413a",
+      "subject": "release(dsh): 0.1.5-rc.2",
+      "packages": [
+        "acp/acp",
+        "api/gateway",
+        "api/remotes",
+        "api/session-controller",
+        "api/settings-controller",
+        "api/workspace-controller",
+        "api/workspace-files",
+        "attachment/attachment",
+        "attachment/attachment-local",
+        "boot/app-boot",
+        "boot/cmdline",
+        "bundle/acp-app",
+        "bundle/base",
+        "bundle/headless",
+        "bundle/sdk-app",
+        "bundle/sdk-minimal",
+        "bundle/web-app",
+        "client/connection",
+        "client/file-upload",
+        "client/hmr",
+        "client/locale",
+        "client/modules",
+        "client/resources",
+        "client/store",
+        "client/ui-agent-preset",
+        "client/ui-approval",
+        "client/ui-attachment",
+        "client/ui-brand-official",
+        "client/ui-chat",
+        "client/ui-commands",
+        "client/ui-conversation",
+        "client/ui-deliverables",
+        "client/ui-directory-picker-browse",
+        "client/ui-directory-picker-native",
+        "client/ui-dockkit",
+        "client/ui-goal",
+        "client/ui-input-trigger",
+        "client/ui-jobs",
+        "client/ui-layout",
+        "client/ui-message-feedback",
+        "client/ui-model-selection",
+        "client/ui-open-in-app",
+        "client/ui-permission-presets",
+        "client/ui-plan",
+        "client/ui-primitives",
+        "client/ui-reference",
+        "client/ui-renderer",
+        "client/ui-schedule",
+        "client/ui-session",
+        "client/ui-settings",
+        "client/ui-settings-general",
+        "client/ui-settings-models",
+        "client/ui-settings-plugin-inventory",
+        "client/ui-settings-plugins",
+        "client/ui-sidebar",
+        "client/ui-sidebar-documentpreview",
+        "client/ui-sidebar-files",
+        "client/ui-sidebar-right",
+        "client/ui-skill",
+        "client/ui-slots",
+        "client/ui-subagent",
+        "client/ui-theme",
+        "client/ui-tool",
+        "client/ui-trajectory",
+        "client/ui-user-questions",
+        "client/ui-workflow-run",
+        "client/ui-workspace",
+        "client/web",
+        "code-runtime/code-runtime",
+        "code-runtime/code-runtime-worker-thread",
+        "compaction/command-compact",
+        "compaction/compaction",
+        "compaction/compaction-basic",
+        "compaction/compaction-tool-result-pruner",
+        "context/agent-instructions",
+        "context/file-reference",
+        "context/file-reference-local",
+        "context/session-reference",
+        "context/time-context",
+        "context/tmux-context",
+        "core/agent",
+        "core/agent-default-model",
+        "core/agent-loop",
+        "core/agent-tool-presentation",
+        "core/scope",
+        "core/session",
+        "core/system-prompt",
+        "core/tools",
+        "credentials/authorization",
+        "credentials/credentials",
+        "credentials/credentials-local",
+        "e2b/e2b",
+        "e2b/fs-e2b",
+        "e2b/subprocess-e2b",
+        "experimental/agent-team",
+        "experimental/agent-team-profile",
+        "experimental/agent-team-web-profile",
+        "experimental/client-ui-agent-team",
+        "experimental/code-runtime-python",
+        "experimental/inspector",
+        "experimental/tool-agent-team",
+        "experimental/webworker-packer",
+        "experimental/webworker-runtime",
+        "extensions/cordis-client-runner",
+        "extensions/cordis-host-runner",
+        "extensions/tool-cordis",
+        "extensions/ui-cordis",
+        "feedback/command-feedback",
+        "feedback/message-feedback",
+        "fs/fs",
+        "fs/fs-local",
+        "fs/fs-observation-policy",
+        "fs/fs-sandbox",
+        "fs/tool-fs",
+        "fs/tool-fs-search",
+        "fs/tool-present",
+        "fs/tool-str-replace-editor",
+        "goal/command-goal",
+        "goal/goal",
+        "goal/goal-round-driver",
+        "goal/tool-goal",
+        "guard/repeat-tool-reminder",
+        "guard/timeout-policy",
+        "hooks/hook-protocol",
+        "hooks/hooks-claude-code",
+        "hooks/hooks-codex",
+        "host/directory-picker",
+        "host/directory-picker-auto",
+        "host/directory-picker-browse",
+        "host/directory-picker-native",
+        "host/frontend-static",
+        "host/open-in-app",
+        "host/plugin-inventory",
+        "host/webserver",
+        "identity/anonymous-user-id",
+        "interaction/commands",
+        "interaction/permission-presets",
+        "interaction/tool-ask-user",
+        "interaction/user-approval",
+        "interaction/user-questions",
+        "jobs/jobs",
+        "jobs/jobs-local",
+        "jobs/tool-jobs",
+        "llm/deepseek-llm-api-extensions",
+        "llm/llm",
+        "llm/llm-deepseek",
+        "llm/llm-pi-ai",
+        "llm/llm-retry",
+        "llm/plugin-package-inventory-deepseek",
+        "llm/token-meter",
+        "lsp/lsp",
+        "lsp/lsp-stdio",
+        "lsp/tool-lsp",
+        "mcp/mcp-client",
+        "plan/plan-mode",
+        "preset/agent-presets",
+        "preset/persona",
+        "runtime-diagnostics/invariants",
+        "sandbox/sandbox",
+        "sandbox/sandbox-local",
+        "sandbox/sandbox-policy",
+        "sandbox/sandbox-windows-acl",
+        "schedule/schedule",
+        "sdk/client",
+        "sdk/protocol",
+        "sdk/server",
+        "session-query/session-log-export",
+        "session-query/session-query",
+        "session-query/session-query-sqlite",
+        "session-query/tool-session-query",
+        "session/session-checkpoint-policy",
+        "session/session-format",
+        "session/session-format-catalog",
+        "session/session-format-v0-to-v1",
+        "session/session-format-v1-to-v2",
+        "session/session-format-v2-to-v3",
+        "session/session-log-deepseek",
+        "session/session-persistence",
+        "session/session-persistence-jsonl",
+        "session/session-projection",
+        "session/session-projection-cache",
+        "session/session-stats",
+        "session/session-telemetry",
+        "session/session-telemetry-otel",
+        "session/session-title",
+        "session/session-title-all-prompts-llm",
+        "session/session-title-first-prompt-llm",
+        "session/session-title-llm",
+        "session/session-turn-outline",
+        "settings/settings",
+        "settings/settings-file",
+        "shell/bash-local",
+        "shell/bash-sandbox",
+        "shell/pwsh-local",
+        "shell/pwsh-sandbox",
+        "shell/shell",
+        "shell/shell-env",
+        "shell/tool-bash",
+        "shell/tool-bash-persistent",
+        "shell/tool-pwsh",
+        "shell/tool-pwsh-persistent",
+        "skill/skill",
+        "skill/skill-badge",
+        "skill/skill-filesystem",
+        "skill/tool-skill",
+        "spill/spill",
+        "spill/spill-local",
+        "spill/spill-policy",
+        "storage/storage",
+        "storage/storage-domain",
+        "storage/storage-json",
+        "storage/storage-sqlite",
+        "subagent/subagent",
+        "subagent/subagent-acp",
+        "subagent/subagent-claude-code",
+        "subagent/subagent-codex",
+        "subagent/subagent-dsh-sdk",
+        "subagent/subagent-fork-in-process",
+        "subagent/subagent-in-process-driver",
+        "subagent/subagent-spawn-in-process",
+        "subagent/tool-subagent",
+        "subagent/tool-subagent-control",
+        "subprocess/subprocess",
+        "subprocess/subprocess-local",
+        "subprocess/win32-process",
+        "terminal/terminal",
+        "terminal/terminal-bash",
+        "terminal/tool-terminal",
+        "test-support/agent-loop-testkit",
+        "test-support/client-runtime",
+        "test-support/llm-mock-server",
+        "test-support/llm-replay",
+        "test-support/loader-smoke",
+        "test-support/session-snapshot",
+        "todo/tool-todo",
+        "typert/generator",
+        "typert/loader",
+        "typert/protocol",
+        "typert/registry",
+        "util/atomic-write",
+        "util/brand",
+        "util/chunked-list",
+        "util/crypto",
+        "util/deque",
+        "util/home-paths",
+        "util/http-proxy",
+        "util/launch-environment",
+        "util/native-command",
+        "util/output-retention",
+        "util/package-manifest",
+        "util/time",
+        "util/timeout",
+        "util/values",
+        "util/workspace-path",
+        "web/tool-web",
+        "web/web",
+        "web/web-fetch-http",
+        "web/web-search-deepseek",
+        "web/web-search-exa",
+        "web/web-search-perplexity",
+        "webhook/webhook",
+        "webhook/webhook-github",
+        "workflow/tool-ralph",
+        "workflow/tool-workflow",
+        "workflow/workflow",
+        "workflow/workflow-worker-thread",
+        "workspace/workspace"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "060323d8e2f355022cfa9dbdb9226a421a7b7638",
+      "subject": "feat(web): backport feedback and file refinements to 0.1.5",
+      "packages": [
+        "client/ui-chat",
+        "client/ui-deliverables",
+        "client/ui-message-feedback",
+        "client/ui-primitives",
+        "feedback/command-feedback",
+        "feedback/message-feedback"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "1ef9c1fa9afbea78c5537bfc8b6d1c27d598798e",
+      "subject": "release(dsh): 0.1.5-rc.1",
+      "packages": [
+        "acp/acp",
+        "api/gateway",
+        "api/remotes",
+        "api/session-controller",
+        "api/settings-controller",
+        "api/workspace-controller",
+        "api/workspace-files",
+        "attachment/attachment",
+        "attachment/attachment-local",
+        "boot/app-boot",
+        "boot/cmdline",
+        "bundle/acp-app",
+        "bundle/base",
+        "bundle/headless",
+        "bundle/sdk-app",
+        "bundle/sdk-minimal",
+        "bundle/web-app",
+        "client/connection",
+        "client/file-upload",
+        "client/hmr",
+        "client/locale",
+        "client/modules",
+        "client/resources",
+        "client/store",
+        "client/ui-agent-preset",
+        "client/ui-approval",
+        "client/ui-attachment",
+        "client/ui-brand-official",
+        "client/ui-chat",
+        "client/ui-commands",
+        "client/ui-conversation",
+        "client/ui-deliverables",
+        "client/ui-directory-picker-browse",
+        "client/ui-directory-picker-native",
+        "client/ui-dockkit",
+        "client/ui-goal",
+        "client/ui-input-trigger",
+        "client/ui-jobs",
+        "client/ui-layout",
+        "client/ui-message-feedback",
+        "client/ui-model-selection",
+        "client/ui-open-in-app",
+        "client/ui-permission-presets",
+        "client/ui-plan",
+        "client/ui-primitives",
+        "client/ui-reference",
+        "client/ui-renderer",
+        "client/ui-schedule",
+        "client/ui-session",
+        "client/ui-settings",
+        "client/ui-settings-general",
+        "client/ui-settings-models",
+        "client/ui-settings-plugin-inventory",
+        "client/ui-settings-plugins",
+        "client/ui-sidebar",
+        "client/ui-sidebar-documentpreview",
+        "client/ui-sidebar-files",
+        "client/ui-sidebar-right",
+        "client/ui-skill",
+        "client/ui-slots",
+        "client/ui-subagent",
+        "client/ui-theme",
+        "client/ui-tool",
+        "client/ui-trajectory",
+        "client/ui-user-questions",
+        "client/ui-workflow-run",
+        "client/ui-workspace",
+        "client/web",
+        "code-runtime/code-runtime",
+        "code-runtime/code-runtime-worker-thread",
+        "compaction/command-compact",
+        "compaction/compaction",
+        "compaction/compaction-basic",
+        "compaction/compaction-tool-result-pruner",
+        "context/agent-instructions",
+        "context/file-reference",
+        "context/file-reference-local",
+        "context/session-reference",
+        "context/time-context",
+        "context/tmux-context",
+        "core/agent",
+        "core/agent-default-model",
+        "core/agent-loop",
+        "core/agent-tool-presentation",
+        "core/scope",
+        "core/session",
+        "core/system-prompt",
+        "core/tools",
+        "credentials/authorization",
+        "credentials/credentials",
+        "credentials/credentials-local",
+        "e2b/e2b",
+        "e2b/fs-e2b",
+        "e2b/subprocess-e2b",
+        "experimental/agent-team",
+        "experimental/agent-team-profile",
+        "experimental/agent-team-web-profile",
+        "experimental/client-ui-agent-team",
+        "experimental/code-runtime-python",
+        "experimental/inspector",
+        "experimental/tool-agent-team",
+        "experimental/webworker-packer",
+        "experimental/webworker-runtime",
+        "extensions/cordis-client-runner",
+        "extensions/cordis-host-runner",
+        "extensions/tool-cordis",
+        "extensions/ui-cordis",
+        "feedback/command-feedback",
+        "feedback/message-feedback",
+        "fs/fs",
+        "fs/fs-local",
+        "fs/fs-observation-policy",
+        "fs/fs-sandbox",
+        "fs/tool-fs",
+        "fs/tool-fs-search",
+        "fs/tool-present",
+        "fs/tool-str-replace-editor",
+        "goal/command-goal",
+        "goal/goal",
+        "goal/goal-round-driver",
+        "goal/tool-goal",
+        "guard/repeat-tool-reminder",
+        "guard/timeout-policy",
+        "hooks/hook-protocol",
+        "hooks/hooks-claude-code",
+        "hooks/hooks-codex",
+        "host/directory-picker",
+        "host/directory-picker-auto",
+        "host/directory-picker-browse",
+        "host/directory-picker-native",
+        "host/frontend-static",
+        "host/open-in-app",
+        "host/plugin-inventory",
+        "host/webserver",
+        "identity/anonymous-user-id",
+        "interaction/commands",
+        "interaction/permission-presets",
+        "interaction/tool-ask-user",
+        "interaction/user-approval",
+        "interaction/user-questions",
+        "jobs/jobs",
+        "jobs/jobs-local",
+        "jobs/tool-jobs",
+        "llm/deepseek-llm-api-extensions",
+        "llm/llm",
+        "llm/llm-deepseek",
+        "llm/llm-pi-ai",
+        "llm/llm-retry",
+        "llm/plugin-package-inventory-deepseek",
+        "llm/token-meter",
+        "lsp/lsp",
+        "lsp/lsp-stdio",
+        "lsp/tool-lsp",
+        "mcp/mcp-client",
+        "plan/plan-mode",
+        "preset/agent-presets",
+        "preset/persona",
+        "runtime-diagnostics/invariants",
+        "sandbox/sandbox",
+        "sandbox/sandbox-local",
+        "sandbox/sandbox-policy",
+        "sandbox/sandbox-windows-acl",
+        "schedule/schedule",
+        "sdk/client",
+        "sdk/protocol",
+        "sdk/server",
+        "session-query/session-log-export",
+        "session-query/session-query",
+        "session-query/session-query-sqlite",
+        "session-query/tool-session-query",
+        "session/session-checkpoint-policy",
+        "session/session-format",
+        "session/session-format-catalog",
+        "session/session-format-v0-to-v1",
+        "session/session-format-v1-to-v2",
+        "session/session-format-v2-to-v3",
+        "session/session-log-deepseek",
+        "session/session-persistence",
+        "session/session-persistence-jsonl",
+        "session/session-projection",
+        "session/session-projection-cache",
+        "session/session-stats",
+        "session/session-telemetry",
+        "session/session-telemetry-otel",
+        "session/session-title",
+        "session/session-title-all-prompts-llm",
+        "session/session-title-first-prompt-llm",
+        "session/session-title-llm",
+        "session/session-turn-outline",
+        "settings/settings",
+        "settings/settings-file",
+        "shell/bash-local",
+        "shell/bash-sandbox",
+        "shell/pwsh-local",
+        "shell/pwsh-sandbox",
+        "shell/shell",
+        "shell/shell-env",
+        "shell/tool-bash",
+        "shell/tool-bash-persistent",
+        "shell/tool-pwsh",
+        "shell/tool-pwsh-persistent",
+        "skill/skill",
+        "skill/skill-badge",
+        "skill/skill-filesystem",
+        "skill/tool-skill",
+        "spill/spill",
+        "spill/spill-local",
+        "spill/spill-policy",
+        "storage/storage",
+        "storage/storage-domain",
+        "storage/storage-json",
+        "storage/storage-sqlite",
+        "subagent/subagent",
+        "subagent/subagent-acp",
+        "subagent/subagent-claude-code",
+        "subagent/subagent-codex",
+        "subagent/subagent-dsh-sdk",
+        "subagent/subagent-fork-in-process",
+        "subagent/subagent-in-process-driver",
+        "subagent/subagent-spawn-in-process",
+        "subagent/tool-subagent",
+        "subagent/tool-subagent-control",
+        "subprocess/subprocess",
+        "subprocess/subprocess-local",
+        "subprocess/win32-process",
+        "terminal/terminal",
+        "terminal/terminal-bash",
+        "terminal/tool-terminal",
+        "test-support/agent-loop-testkit",
+        "test-support/client-runtime",
+        "test-support/llm-mock-server",
+        "test-support/llm-replay",
+        "test-support/loader-smoke",
+        "test-support/session-snapshot",
+        "todo/tool-todo",
+        "typert/generator",
+        "typert/loader",
+        "typert/protocol",
+        "typert/registry",
+        "util/atomic-write",
+        "util/brand",
+        "util/chunked-list",
+        "util/crypto",
+        "util/deque",
+        "util/home-paths",
+        "util/http-proxy",
+        "util/launch-environment",
+        "util/native-command",
+        "util/output-retention",
+        "util/package-manifest",
+        "util/time",
+        "util/timeout",
+        "util/values",
+        "util/workspace-path",
+        "web/tool-web",
+        "web/web",
+        "web/web-fetch-http",
+        "web/web-search-deepseek",
+        "web/web-search-exa",
+        "web/web-search-perplexity",
+        "webhook/webhook",
+        "webhook/webhook-github",
+        "workflow/tool-ralph",
+        "workflow/tool-workflow",
+        "workflow/workflow",
+        "workflow/workflow-worker-thread",
+        "workspace/workspace"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "0729dbec6668b6502e9d3512101a5fbb031236bc",
+      "subject": "feat(llm): restore V4 Flash Vision Exp catalog entry",
+      "packages": [
+        "llm/llm-deepseek"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "441385fe3887e5ea5a699737f8835d5997e3f85a",
+      "subject": "feat(llm): retain V4 models alongside V41 Flash",
+      "packages": [
+        "llm/llm-deepseek"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "c98fe6ecdd71ba25843991e0596dd5cfafdcaf91",
+      "subject": "test(web): pin the recorded model before scenario overlays",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "719331ecb755846acb558fa42c76b6fdabb52104",
+      "subject": "test: keep webhook smoke on the shipped model route",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "61c59543723d2be5682b5cb8aa33f08aeb9f6699",
+      "subject": "test: pin model routes in webhook and Cordis fixtures",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "bc5fd3b8dc3125b262bc1d52169029d2dca4ac94",
+      "subject": "feat(llm): default Chat Completions to DeepSeek V41 Flash",
+      "packages": [
+        "bundle/base",
+        "llm/llm-deepseek"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "3435dbd690967fe49b6fce92b39535e8e6785637",
+      "subject": "fix(web): address sidebar and stats review feedback",
+      "packages": [
+        "client/ui-chat",
+        "client/ui-primitives",
+        "client/ui-sidebar-documentpreview",
+        "client/ui-sidebar-files",
+        "client/ui-sidebar-right"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "ded26f225dd9b3a7d3e6d21616e729bf47025603",
+      "subject": "chore(client): refresh slot catalog",
+      "packages": [
+        "extensions/cordis-client-runner"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "19b3c4c34b474a90d59a36d750cd686c902ea694",
+      "subject": "fix(client): keep preview scrollports current",
+      "packages": [
+        "client/ui-primitives",
+        "client/ui-sidebar-documentpreview"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "53d5c9386e3705ea22c1f4185949ecda97622915",
+      "subject": "fix(sidebar): pin the guide hero to the pure-gray ramp",
+      "packages": [
+        "client/ui-sidebar-right"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "1c044f5140228472828215e3adc1f54de5d61184",
+      "subject": "feat(sidebar): refine guide start page and quiet stat pill noise",
+      "packages": [
+        "client/ui-chat",
+        "client/ui-sidebar-files",
+        "client/ui-sidebar-right"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "284ab155195d9ed7c06199a7ed0928b57a4d67e2",
+      "subject": "fix(client): refine sidebar document previews",
+      "packages": [
+        "client/ui-dockkit",
+        "client/ui-primitives",
+        "client/ui-sidebar-documentpreview"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "dd393c18202b25f9734d51cb61aac8fa8b2c5ecf",
+      "subject": "release(dsh): 0.1.5-alpha.2",
+      "packages": [
+        "acp/acp",
+        "api/gateway",
+        "api/remotes",
+        "api/session-controller",
+        "api/settings-controller",
+        "api/workspace-controller",
+        "api/workspace-files",
+        "attachment/attachment",
+        "attachment/attachment-local",
+        "boot/app-boot",
+        "boot/cmdline",
+        "bundle/acp-app",
+        "bundle/base",
+        "bundle/headless",
+        "bundle/sdk-app",
+        "bundle/sdk-minimal",
+        "bundle/web-app",
+        "client/connection",
+        "client/file-upload",
+        "client/hmr",
+        "client/locale",
+        "client/modules",
+        "client/resources",
+        "client/store",
+        "client/ui-agent-preset",
+        "client/ui-approval",
+        "client/ui-attachment",
+        "client/ui-brand-official",
+        "client/ui-chat",
+        "client/ui-commands",
+        "client/ui-conversation",
+        "client/ui-deliverables",
+        "client/ui-directory-picker-browse",
+        "client/ui-directory-picker-native",
+        "client/ui-dockkit",
+        "client/ui-goal",
+        "client/ui-input-trigger",
+        "client/ui-jobs",
+        "client/ui-layout",
+        "client/ui-message-feedback",
+        "client/ui-model-selection",
+        "client/ui-open-in-app",
+        "client/ui-permission-presets",
+        "client/ui-plan",
+        "client/ui-primitives",
+        "client/ui-reference",
+        "client/ui-renderer",
+        "client/ui-schedule",
+        "client/ui-session",
+        "client/ui-settings",
+        "client/ui-settings-general",
+        "client/ui-settings-models",
+        "client/ui-settings-plugin-inventory",
+        "client/ui-settings-plugins",
+        "client/ui-sidebar",
+        "client/ui-sidebar-documentpreview",
+        "client/ui-sidebar-files",
+        "client/ui-sidebar-right",
+        "client/ui-skill",
+        "client/ui-slots",
+        "client/ui-subagent",
+        "client/ui-theme",
+        "client/ui-tool",
+        "client/ui-trajectory",
+        "client/ui-user-questions",
+        "client/ui-workflow-run",
+        "client/ui-workspace",
+        "client/web",
+        "code-runtime/code-runtime",
+        "code-runtime/code-runtime-worker-thread",
+        "compaction/command-compact",
+        "compaction/compaction",
+        "compaction/compaction-basic",
+        "compaction/compaction-tool-result-pruner",
+        "context/agent-instructions",
+        "context/file-reference",
+        "context/file-reference-local",
+        "context/session-reference",
+        "context/time-context",
+        "context/tmux-context",
+        "core/agent",
+        "core/agent-default-model",
+        "core/agent-loop",
+        "core/agent-tool-presentation",
+        "core/scope",
+        "core/session",
+        "core/system-prompt",
+        "core/tools",
+        "credentials/authorization",
+        "credentials/credentials",
+        "credentials/credentials-local",
+        "e2b/e2b",
+        "e2b/fs-e2b",
+        "e2b/subprocess-e2b",
+        "experimental/agent-team",
+        "experimental/agent-team-profile",
+        "experimental/agent-team-web-profile",
+        "experimental/client-ui-agent-team",
+        "experimental/code-runtime-python",
+        "experimental/inspector",
+        "experimental/tool-agent-team",
+        "experimental/webworker-packer",
+        "experimental/webworker-runtime",
+        "extensions/cordis-client-runner",
+        "extensions/cordis-host-runner",
+        "extensions/tool-cordis",
+        "extensions/ui-cordis",
+        "feedback/command-feedback",
+        "feedback/message-feedback",
+        "fs/fs",
+        "fs/fs-local",
+        "fs/fs-observation-policy",
+        "fs/fs-sandbox",
+        "fs/tool-fs",
+        "fs/tool-fs-search",
+        "fs/tool-present",
+        "fs/tool-str-replace-editor",
+        "goal/command-goal",
+        "goal/goal",
+        "goal/goal-round-driver",
+        "goal/tool-goal",
+        "guard/repeat-tool-reminder",
+        "guard/timeout-policy",
+        "hooks/hook-protocol",
+        "hooks/hooks-claude-code",
+        "hooks/hooks-codex",
+        "host/directory-picker",
+        "host/directory-picker-auto",
+        "host/directory-picker-browse",
+        "host/directory-picker-native",
+        "host/frontend-static",
+        "host/open-in-app",
+        "host/plugin-inventory",
+        "host/webserver",
+        "identity/anonymous-user-id",
+        "interaction/commands",
+        "interaction/permission-presets",
+        "interaction/tool-ask-user",
+        "interaction/user-approval",
+        "interaction/user-questions",
+        "jobs/jobs",
+        "jobs/jobs-local",
+        "jobs/tool-jobs",
+        "llm/deepseek-llm-api-extensions",
+        "llm/llm",
+        "llm/llm-deepseek",
+        "llm/llm-pi-ai",
+        "llm/llm-retry",
+        "llm/plugin-package-inventory-deepseek",
+        "llm/token-meter",
+        "lsp/lsp",
+        "lsp/lsp-stdio",
+        "lsp/tool-lsp",
+        "mcp/mcp-client",
+        "plan/plan-mode",
+        "preset/agent-presets",
+        "preset/persona",
+        "runtime-diagnostics/invariants",
+        "sandbox/sandbox",
+        "sandbox/sandbox-local",
+        "sandbox/sandbox-policy",
+        "sandbox/sandbox-windows-acl",
+        "schedule/schedule",
+        "sdk/client",
+        "sdk/protocol",
+        "sdk/server",
+        "session-query/session-log-export",
+        "session-query/session-query",
+        "session-query/session-query-sqlite",
+        "session-query/tool-session-query",
+        "session/session-checkpoint-policy",
+        "session/session-format",
+        "session/session-format-catalog",
+        "session/session-format-v0-to-v1",
+        "session/session-format-v1-to-v2",
+        "session/session-format-v2-to-v3",
+        "session/session-log-deepseek",
+        "session/session-persistence",
+        "session/session-persistence-jsonl",
+        "session/session-projection",
+        "session/session-projection-cache",
+        "session/session-stats",
+        "session/session-telemetry",
+        "session/session-telemetry-otel",
+        "session/session-title",
+        "session/session-title-all-prompts-llm",
+        "session/session-title-first-prompt-llm",
+        "session/session-title-llm",
+        "session/session-turn-outline",
+        "settings/settings",
+        "settings/settings-file",
+        "shell/bash-local",
+        "shell/bash-sandbox",
+        "shell/pwsh-local",
+        "shell/pwsh-sandbox",
+        "shell/shell",
+        "shell/shell-env",
+        "shell/tool-bash",
+        "shell/tool-bash-persistent",
+        "shell/tool-pwsh",
+        "shell/tool-pwsh-persistent",
+        "skill/skill",
+        "skill/skill-badge",
+        "skill/skill-filesystem",
+        "skill/tool-skill",
+        "spill/spill",
+        "spill/spill-local",
+        "spill/spill-policy",
+        "storage/storage",
+        "storage/storage-domain",
+        "storage/storage-json",
+        "storage/storage-sqlite",
+        "subagent/subagent",
+        "subagent/subagent-acp",
+        "subagent/subagent-claude-code",
+        "subagent/subagent-codex",
+        "subagent/subagent-dsh-sdk",
+        "subagent/subagent-fork-in-process",
+        "subagent/subagent-in-process-driver",
+        "subagent/subagent-spawn-in-process",
+        "subagent/tool-subagent",
+        "subagent/tool-subagent-control",
+        "subprocess/subprocess",
+        "subprocess/subprocess-local",
+        "subprocess/win32-process",
+        "terminal/terminal",
+        "terminal/terminal-bash",
+        "terminal/tool-terminal",
+        "test-support/agent-loop-testkit",
+        "test-support/client-runtime",
+        "test-support/llm-mock-server",
+        "test-support/llm-replay",
+        "test-support/loader-smoke",
+        "test-support/session-snapshot",
+        "todo/tool-todo",
+        "typert/generator",
+        "typert/loader",
+        "typert/protocol",
+        "typert/registry",
+        "util/atomic-write",
+        "util/brand",
+        "util/chunked-list",
+        "util/crypto",
+        "util/deque",
+        "util/home-paths",
+        "util/http-proxy",
+        "util/launch-environment",
+        "util/native-command",
+        "util/output-retention",
+        "util/package-manifest",
+        "util/time",
+        "util/timeout",
+        "util/values",
+        "util/workspace-path",
+        "web/tool-web",
+        "web/web",
+        "web/web-fetch-http",
+        "web/web-search-deepseek",
+        "web/web-search-exa",
+        "web/web-search-perplexity",
+        "webhook/webhook",
+        "webhook/webhook-github",
+        "workflow/tool-ralph",
+        "workflow/tool-workflow",
+        "workflow/workflow",
+        "workflow/workflow-worker-thread",
+        "workspace/workspace"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "58956c1a8a3643677fe2820a8a40f3aee5612b39",
+      "subject": "Revert \"feat(web): preview Mermaid, Graphviz, SVG, and HTML code fences\"",
+      "packages": [
+        "client/locale",
+        "client/ui-chat",
+        "client/ui-primitives"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "8870a13aa941fee98455fc4e82877b0bc0ca69a7",
+      "subject": "feat(sidebar): preview image files",
+      "packages": [
+        "client/ui-sidebar-documentpreview",
+        "extensions/cordis-client-runner"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "516bfd5f30fd4d388fddb7f73da9f4bc38b923eb",
+      "subject": "test(web): cover preview import recovery and color schemes",
+      "packages": [
+        "client/ui-primitives"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "63187de80f686d66dd404cfc2ee72f01501fc8ef",
+      "subject": "release: publish experimental Agent Teams packages",
+      "packages": [
+        "experimental/agent-team",
+        "experimental/agent-team-profile",
+        "experimental/agent-team-web-profile",
+        "experimental/client-ui-agent-team",
+        "experimental/tool-agent-team"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "0b3248e67d44d2324b532815c2f5470160bbf6d8",
+      "subject": "test(web): stabilize delivered-file snapshots across CI hosts",
+      "packages": [
+        "client/ui-primitives"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "d7ecdcf02cbb1ff233c4704c6a4bffc61a577c17",
+      "subject": "fix(lint): parenthesize file handle callback",
+      "packages": [
+        "experimental/webworker-runtime"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "60a3d0fbc2cb549b0c800b29d020130eb83abe29",
+      "subject": "fix(webworker): support file handle chmod",
+      "packages": [
+        "experimental/webworker-runtime"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "950474605f9995e675a71ba64618021d2d0108cb",
+      "subject": "docs(webworker): record file handle compatibility",
+      "packages": [
+        "experimental/webworker-runtime"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "a7bd71e0245d64a4603e6d71fd08a73e0db23ab2",
+      "subject": "fix(webworker): preserve bigint file handle identity",
+      "packages": [
+        "experimental/webworker-runtime"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "0a9c77461777598f8adf67d242044b91aaeb73ca",
+      "subject": "docs(webworker): document bigint handle identity",
+      "packages": [
+        "experimental/webworker-runtime"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "3c4c6c3d7b7079d1ea3f721ddf3d519ba8ba7cc9",
+      "subject": "fix(ci): cancel superseded PR and master validation",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "b9587ada121a4fc322dc4f94328682fb64fba845",
+      "subject": "fix(web): open delivered files using the viewed session scope",
+      "packages": [
+        "client/ui-deliverables"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "4e0a405a9b0723b5b0d817077265590ef8ea3258",
+      "subject": "fix(web): size diagram previews to image content",
+      "packages": [
+        "client/ui-primitives"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "7f69a3ec37e022812544b334362f8d1a998bb1c1",
+      "subject": "fix(web): complete shared file icon consumers and browser checks",
+      "packages": [
+        "client/ui-primitives",
+        "client/ui-sidebar-files"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "454caf0280f2fded5696afa38a7dcf038225f5e6",
+      "subject": "fix(web): reject empty sidebar splits and clarify page targeting",
+      "packages": [
+        "client/ui-primitives",
+        "client/ui-sidebar-right"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "9961eedec860552181501a3376db9d13d0b5fbbb",
+      "subject": "fix(web): preserve office file icons and lazy sidebar replay",
+      "packages": [
+        "client/ui-primitives"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "9e050260e4559707a65c904bf0a9427c98096d05",
+      "subject": "feat(web): adapt diagram previews to application theme",
+      "packages": [
+        "client/ui-primitives"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "fb84576ea7a4cae41b52997901d722ab02cbc2f5",
+      "subject": "refactor(web): unify markdown preview components and notes",
+      "packages": [
+        "client/locale",
+        "client/ui-chat",
+        "client/ui-primitives"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "a8f9d81f3a68266f4d268b877fd2715697062c87",
+      "subject": "feat(client): preview Graphviz, SVG, and HTML Markdown fences",
+      "packages": [
+        "client/locale",
+        "client/ui-chat",
+        "client/ui-primitives"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "4fabbd39c588039e8967f95f3d427b1158b0cce7",
+      "subject": "test(web): scope Mermaid snapshots to diagram content",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "0bfd594875662bce0007371195e9354a5cf84ac4",
+      "subject": "refactor(ui): use tagged Mermaid preview results",
+      "packages": [
+        "client/ui-primitives"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "220103670aef3ae830cf91f47abfccd31c1bdca2",
+      "subject": "fix(ui): retain Mermaid previews and support hybrid touch controls",
+      "packages": [
+        "client/ui-primitives"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "fc0c885287f327d67ea2b6df49960d1287b054ed",
+      "subject": "style(ui): simplify Mermaid preview controls",
+      "packages": [
+        "client/ui-chat",
+        "client/ui-primitives"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "ee35e40bc83e45faeab86b62c74c5e207c72737a",
+      "subject": "feat(ui): preview Mermaid diagrams in Chat code blocks",
+      "packages": [
+        "client/locale",
+        "client/ui-chat",
+        "client/ui-primitives"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "d7dcc5f5afff70d7d4ac5435578a537b0ed4c0df",
+      "subject": "test(web): update sidebar preview expectations",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "177eacbe8bf95e3a1656ccb8d5090bdc316606cd",
+      "subject": "docs(workspace-files): clarify session scope behavior",
+      "packages": [
+        "api/workspace-files"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "c5432b94f98ef987cf9d8814dac02340d03e428c",
+      "subject": "chore: satisfy workspace files CI gates",
+      "packages": [
+        "api/workspace-files",
+        "extensions/tool-cordis"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "7214a97723204362b71080fe09ceb4167dbb8ade",
+      "subject": "fix(workspace-files): resolve subagent session roots",
+      "packages": [
+        "api/workspace-files",
+        "extensions/tool-cordis"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "3b4122ac168a29cf5c78a91cb77bb434de338067",
+      "subject": "feat(client): polish sidebar and file preview interactions",
+      "packages": [
+        "client/ui-dockkit",
+        "client/ui-primitives",
+        "client/ui-sidebar-documentpreview",
+        "client/ui-sidebar-right"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "1d55cab9e66108ba536961402d3b8e6a0caa5ec0",
+      "subject": "fix(web): use shared file type icons in delivery cards",
+      "packages": [
+        "client/ui-deliverables"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "8a41f7a8e1a63fcd63641b82672b121a8a17d1ec",
+      "subject": "docs(session): clarify release authority review findings",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "56c4c3e47c195ff5edbfe3d307bdef81f3de348b",
+      "subject": "docs(session): centralize format status and timeless guidance",
+      "packages": [
+        "core/session",
+        "session/session-format-catalog",
+        "session/session-format-v2-to-v3",
+        "session/session-persistence-jsonl",
+        "test-support/session-snapshot"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "dfda1d6aafa19a698f67b92c53b8994375682a5f",
+      "subject": "fix(web): ship protocol runtime dependency for delivered file actions",
+      "packages": [
+        "client/ui-deliverables"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "99bffa7f9a16fd3e87569d275c91d8f2c403e911",
+      "subject": "fix(web): update delivery card snapshot and remove unused button segments",
+      "packages": [
+        "client/ui-primitives"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "b443c4d2468f4240f21601930baa44078833a582",
+      "subject": "fix(present): resolve file services in live agent scope and refresh snapshots",
+      "packages": [
+        "client/ui-deliverables"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "00bfdfbce633076dd5510c91f3d328ccf6cfcdfc",
+      "subject": "fix(present): follow session filesystem access for deliverables",
+      "packages": [
+        "client/ui-deliverables",
+        "fs/tool-present"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "1eee75b424835dfb5d2766a953e88013a513ac14",
+      "subject": "fix(client): satisfy icon validation gates",
+      "packages": [
+        "client/ui-primitives"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "4ee9e055d549cd45850d549e5c375dc15d5fba83",
+      "subject": "feat(client): add shared file type icons",
+      "packages": [
+        "client/ui-attachment",
+        "client/ui-chat",
+        "client/ui-conversation",
+        "client/ui-primitives",
+        "client/ui-sidebar-documentpreview",
+        "client/ui-sidebar-files"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "a5fc275a56ba63e66e9285b23dd57c07ffab470f",
+      "subject": "docs(session): address scoped review clarifications",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "74bf7aaa2fdd56c419e46292215d15d1a3efee63",
+      "subject": "fix(web): preserve artifact actions across reconnects and keyboard use",
+      "packages": [
+        "client/ui-deliverables",
+        "client/ui-primitives",
+        "util/native-command"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "aed212657a3e9ca3a89f3b28913148b63c95f600",
+      "subject": "docs: clarify scoped guidance and file observation policy",
+      "packages": [
+        "core/system-prompt",
+        "fs/tool-fs",
+        "fs/tool-fs-search",
+        "subagent/subagent-in-process-driver"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "e9f1725b11646a12d8d7d945c69ad9125045d61b",
+      "subject": "docs: record pending weighted approval blockers",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "0d44848ba6849e4eeb55b35b43a9bff494cce1e7",
+      "subject": "Rename weighted approval publisher job",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "8eede0f60d524c44c86a6df7ee7e7007cbe18f61",
+      "subject": "Keep blocked approvals pending",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "057b4879cf47a0a7981d0f11ce8b604b5c0f48be",
+      "subject": "feat(web): align presented file cards with design",
+      "packages": [
+        "client/ui-deliverables",
+        "client/ui-primitives"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "4029451fa709db87375aa8d8ff3e456bde2fec09",
+      "subject": "test: refresh guidance for the fetch-only composition",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "9d6c964985fcfcbafcf4db7ecf888ba29f90a936",
+      "subject": "fix: respect scoped tools in filesystem and web guidance",
+      "packages": [
+        "fs/tool-fs",
+        "fs/tool-fs-search",
+        "web/tool-web"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "2e2489b888612607b6da962c6a3136c8412dbdaa",
+      "subject": "fix(web): trim composition marker from plugin subtitles",
+      "packages": [
+        "client/ui-settings-plugin-inventory"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "7b6b8a2baa0c18e803a8341adce124907500256e",
+      "subject": "docs(session): correct released V3 compatibility guidance",
+      "packages": [
+        "session/session-format-v1-to-v2",
+        "session/session-format-v2-to-v3",
+        "session/session-persistence",
+        "session/session-persistence-jsonl"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "2b631c064641c60ed66e9bcf63985764317e28e4",
+      "subject": "test(web): update plugin settings golden order",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "c83f02ad818ce8b94c009b140011805b3a36e218",
+      "subject": "fix(web): defer desktop metadata until delivery cards appear",
+      "packages": [
+        "client/ui-deliverables"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "5b671d7df3df08b3dee8cb681d8977cfd2f61fee",
+      "subject": "fix(web): show artifact paths relative to the workspace",
+      "packages": [
+        "client/ui-deliverables",
+        "client/ui-tool",
+        "util/workspace-path"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "b27d861741d3258de1fd5f480ed80f73d191bdf6",
+      "subject": "docs: refresh native file action catalog references",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "4158a96e14ecb615e4f3d3f7c31c347bb45ee5dd",
+      "subject": "feat(web): add native file actions to artifact cards",
+      "packages": [
+        "api/session-controller",
+        "client/ui-deliverables",
+        "client/ui-primitives",
+        "extensions/tool-cordis",
+        "util/native-command"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "1349af8e97b645ad5c9e9e18af193e3f1acecb50",
+      "subject": "fix(web): give plugin identities a full row",
+      "packages": [
+        "client/ui-settings-plugin-inventory"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "1eaba2809be317b727c8ef65412a7ec93dc520e7",
+      "subject": "Remove cyborg wording from weighted approval",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "224f75dc63c564f046f56435fae19af104cb864c",
+      "subject": "test(web): strengthen composer placeholder regression evidence",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "0f1164cdeee625431df10e950f9614a7ba0ed015",
+      "subject": "fix(web): hide composer placeholder for whitespace drafts",
+      "packages": [
+        "client/ui-conversation"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "4b3cfcfaf378ab886ec9789d36c20d7556171b23",
+      "subject": "style(feedback): refine feedback dialog disclosure and layout",
+      "packages": [
+        "client/ui-message-feedback"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "9708c4bb426d613bbf5aca69258f6094c776b4a2",
+      "subject": "test(web): scope SVG delivery snapshot to the chat transcript",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "152e0f42ca04784b7b486886a9b31ec9014f5d57",
+      "subject": "fix(web): await settled browser state and shorten file-change label",
+      "packages": [
+        "client/ui-deliverables"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "7a0afea27f4dcb28360ab492037d8d66200206d9",
+      "subject": "fix(deliverables): distinguish file changes and require explicit delivery",
+      "packages": [
+        "client/ui-deliverables",
+        "fs/tool-present"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "6bc836c0c0bd5a0b40a3fc8c4a3ff41a4e87c7df",
+      "subject": "docs(ci): distinguish fixture controls from completion policy",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "1b56cf601307ae9fe318d4dbf93d4232cc90d2b2",
+      "subject": "test(ci): retain useful regression controls after master rebase",
+      "packages": [
+        "code-runtime/code-runtime-worker-thread",
+        "host/open-in-app",
+        "lsp/lsp-stdio",
+        "shell/pwsh-local",
+        "subagent/subagent-acp"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "da1df501b8190d098b7caf5b7cf47f31511570ff",
+      "subject": "test(runtime): isolate busy-meter decisions from worker startup",
+      "packages": [
+        "code-runtime/code-runtime-worker-thread"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "43d00069a9259ba75b606a195fc262acfd7c6f87",
+      "subject": "test(web): await restoration before workspace actions",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "bc55f10a468d63157d122c0e141c6e9357c57f4e",
+      "subject": "test(web): wait for admitted queue before steering shortcut",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "d85bdd80c10bb78cca286d6005237ea4ec83d324",
+      "subject": "test(ci): observe command readiness and transport settlement",
+      "packages": [
+        "host/open-in-app"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "c93bfee16edefe597ad72b00e461330910ce9ace",
+      "subject": "test(web): drain retained request handlers before teardown",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "e7feedab5e3a0d0a099395b8fb5e8b8f63404719",
+      "subject": "test(web): await durable UI and responsive layout publication",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "d38391d6293849e547f9b5833a0d2ee042c09de0",
+      "subject": "test(web): release timed-out barriers and await frame animations",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "94a2b0a24876d829e26aa120c385b3f2827895c7",
+      "subject": "test(ci): await details transitions and report benchmark runtime",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "5b0d65fd728577ed9154f30b8d12abbd057db1c9",
+      "subject": "test(ci): observe asynchronous completion and settled layout",
+      "packages": [
+        "experimental/webworker-runtime",
+        "shell/pwsh-local",
+        "subagent/subagent-acp"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "939222a4ad258d06086cd7248f7501800d2db09f",
+      "subject": "fix(web): normalize custom provider base URLs",
+      "packages": [
+        "client/ui-settings-models"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "d6ed693f236d8ea708739ce6fdeac0ef04fab419",
+      "subject": "ci: remove automatic review requests",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "700e8df91a1ca0c9b3cedabe89271476ad380e5b",
+      "subject": "test(feedback): cover the seed-failure and unmount paths of the Dislike control",
+      "packages": [
+        "client/ui-message-feedback"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "2f2831f033ccf702d5c7646f40c17b4be5c4915a",
+      "subject": "test(web): align sidebar interaction expectations",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "ff3ccb4d7c5b739cf3cab9ff49780e837b0375d9",
+      "subject": "test(web): use supported sidebar visibility assertion",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "3481d4043ee06342d95f956e54384c891c0bc962",
+      "subject": "fix(client): align sidebar checks after rebase",
+      "packages": [
+        "client/ui-sidebar-documentpreview"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "d0a1ab8723a160512c5845ecc5129677b25dc28d",
+      "subject": "chore(client): regenerate slot catalog after master merge",
+      "packages": [
+        "extensions/cordis-client-runner"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "c73dcecb961bb2f2d48f2a8ec9ac982f2ab3c81e",
+      "subject": "fix(textpreview): say a stat-and-read failure once",
+      "packages": [
+        "client/ui-sidebar-documentpreview"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "284758cbc3b6f6179419990fd8b127c5d927504a",
+      "subject": "test(web): refresh goldens for the sidebar aria renames",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "c76e371874edaac88f0e19268c9bec0b9cde46ae",
+      "subject": "fix(sidebar): address review feedback on aria names, touch hits, and fullscreen close",
+      "packages": [
+        "client/ui-dockkit",
+        "client/ui-open-in-app",
+        "client/ui-sidebar-documentpreview",
+        "client/ui-sidebar-right"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "814f447b8f8acd09acac8892d4013ff40a4ded22",
+      "subject": "fix(dockkit): move ui-primitives to devDependencies and hoist zone glyph paths past the i18n gate",
+      "packages": [
+        "client/ui-dockkit"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "5e44fc79d3e53f67d7af49e103f6e167440c96a9",
+      "subject": "test(web): refresh header and file-preview goldens for renamed controls",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "7a032b636616db21dac016edcfbe6e46c5623338",
+      "subject": "test(web): disambiguate the left sidebar toggle from the right expand control",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "237618ca33347d21d8747d4b8c346d56161ef516",
+      "subject": "test(dockkit): cover the bottom drop-zone glyph",
+      "packages": [
+        "client/ui-dockkit"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "e94241f6017c9cf45195b25a6fa9273f6be9c364",
+      "subject": "feat(web): move the session-log control into the header more-actions menu",
+      "packages": [
+        "client/ui-conversation",
+        "client/ui-open-in-app",
+        "session-query/session-log-export"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "5ee343f7351e1bedab7929e3f2fe56f8e1820df0",
+      "subject": "feat(sidebar): live tab titles with file-type icons and disambiguated paths",
+      "packages": [
+        "client/ui-sidebar-documentpreview",
+        "client/ui-sidebar-files",
+        "util/workspace-path"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "f4c1e31ba87529a1b95f80787405cfcdf0401e41",
+      "subject": "feat(sidebar): last-tab close rules and collapsed expand button",
+      "packages": [
+        "client/ui-sidebar-right"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "838dbbe0d0e1262013b6666dd4c2fe3cf7533b2e",
+      "subject": "feat(dockkit): refine strip and chip presentation, close policy, and room reading",
+      "packages": [
+        "client/ui-dockkit"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "69a13cef6d3429c36d3fa5c6f7fcfdd559aed2f4",
+      "subject": "feat(primitives): add file-type icon set and shared link icon",
+      "packages": [
+        "client/ui-primitives"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "bc4fde06ac175bddf5a15205ac8eec02d79b76db",
+      "subject": "fix(web): validate custom provider base URLs",
+      "packages": [
+        "client/ui-settings-models"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "4b88085c2a95782768d57cd45364549ee771b27b",
+      "subject": "style(feedback): refine dialog proportions",
+      "packages": [
+        "client/ui-message-feedback"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "2c0596c1ba8c9487fd0a89eaa678b8b03edcd5ac",
+      "subject": "docs(bench): clarify reviewed request-history limit",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "ba4b8fddebcc7dc04db011f269639c81c3c210e5",
+      "subject": "test(bench): calibrate hosted cold Agent resume limit",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "2567d35cdfd1ec37950e7b332389bc2d249a2e6b",
+      "subject": "docs(bench): synchronize request-history limit",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "843029448a080519e1ab1280be0e9119428e8290",
+      "subject": "test(code-runtime): allow measured worker initialization time",
+      "packages": [
+        "code-runtime/code-runtime-worker-thread"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "d1b1488ed328b770bb99c51bd6c293e4fd07d8ed",
+      "subject": "test(session): await durable live writes with owned teardown",
+      "packages": [
+        "session/session-persistence",
+        "session/session-persistence-jsonl"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "bd24f8a17f8073797a6c0b6cb98c8a0e104263f0",
+      "subject": "test(app-boot): control user-patch HMR event delivery",
+      "packages": [
+        "boot/app-boot"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "dc14f5e4f9da513ed822b4ad892843efaa060ac0",
+      "subject": "test(web): await resized details geometry through its transition",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "48007d76f20d84b0ffc421e4ed9b20b4853373fd",
+      "subject": "test(bench): allow measured request-history runner variation",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "fd5d68586f5b0a31fb109449142d158fbe17d26a",
+      "subject": "test(web): wait for model selection menu closure",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "d692289533fc08b3d5a8b804ad7fc94c3e83bd81",
+      "subject": "style(feedback): compact the dialog to a 540px card with lighter chips and a grown detail box",
+      "packages": [
+        "client/ui-message-feedback"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "1094431de9bf792a47cbf84fef8f8d25e40430d6",
+      "subject": "docs(feedback): document the FeedbackSurface fields for the export-jsdoc gate",
+      "packages": [
+        "client/ui-message-feedback"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "a25e5fd8a99463c2b56256db258cdc6195e8ecdd",
+      "subject": "test(sdk): refresh the feedback expectations on the V3 base and restore the frozen v2 generation",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "3e53a08f36432b8b79039b1dab5f66e618efe278",
+      "subject": "fix(feedback): keep the category tuple out of types.ts, retire the toast with its entry, and answer the review",
+      "packages": [
+        "client/ui-message-feedback",
+        "feedback/command-feedback",
+        "feedback/message-feedback"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "f2f9700de2a8a9ad115e048fd7dae128c1fc19ae",
+      "subject": "feat(feedback): open one feedback dialog from /feedback and Dislike, with categories and a toast",
+      "packages": [
+        "api/remotes",
+        "bundle/web-app",
+        "client/ui-commands",
+        "client/ui-message-feedback",
+        "client/ui-model-selection",
+        "client/ui-permission-presets",
+        "client/ui-primitives",
+        "extensions/cordis-client-runner",
+        "extensions/tool-cordis",
+        "feedback/command-feedback",
+        "feedback/message-feedback",
+        "session/session-log-deepseek",
+        "session/session-telemetry-otel"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "64560eaff1a1f0bb2831cb2dcbbf11cca0cb6b78",
+      "subject": "fix(client): remove stale preview contracts",
+      "packages": [
+        "bundle/web-app",
+        "client/ui-sidebar-documentpreview"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "93b30b9765b41b5a67cc0240cce999db5c893a4b",
+      "subject": "fix(client): narrow document preview contracts",
+      "packages": [
+        "client/ui-sidebar-documentpreview"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "be58ae0577d3fa0bb832293b24cb5c7ddadc6cbd",
+      "subject": "test(web): await sidebar collapse before snapshots",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "4d07fbcb8598452a43b73bdc6b964ca97fae1835",
+      "subject": "fix(client): address document preview review feedback",
+      "packages": [
+        "client/ui-sidebar-documentpreview",
+        "client/ui-sidebar-right",
+        "util/workspace-path"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "ce28b0672ffc6845e697ab81809a6bcfdcef2523",
+      "subject": "fix(client): simplify PDF observer cleanup",
+      "packages": [
+        "client/ui-sidebar-documentpreview"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "39872bafe633c1a52fb4272cb6642739aa329d7e",
+      "subject": "docs(client): record sidebar guide translation",
+      "packages": [
+        "client/ui-sidebar-right"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "c78fdb583abead515c4f19e212abace8328ca6e7",
+      "subject": "fix(ci): refresh document preview metadata",
+      "packages": [
+        "api/workspace-files",
+        "client/ui-sidebar-documentpreview",
+        "extensions/cordis-client-runner",
+        "extensions/tool-cordis"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "693621dcad4afb834c59c57ecf9ec010a0e8ef31",
+      "subject": "fix(client): streamline continuous PDF previews",
+      "packages": [
+        "client/ui-sidebar-documentpreview"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "dcfd8c299dc3bb88f25b6807093d5b003861125b",
+      "subject": "refactor(client): rename document preview package",
+      "packages": [
+        "api/workspace-files",
+        "bundle/web-app",
+        "client/ui-chat",
+        "client/ui-sidebar-documentpreview",
+        "client/ui-sidebar-right",
+        "client/ui-sidebar-textpreview",
+        "extensions/cordis-client-runner"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "5c283d27e298f221797f716e4389edc32718c333",
+      "subject": "fix(client): allow outside previews and streamline document readers",
+      "packages": [
+        "api/workspace-files",
+        "client/ui-sidebar-textpreview",
+        "util/workspace-path"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "4321766ead539d457dbbcad4414ca1c4fba8b525",
+      "subject": "feat(client): add extensible document previews and sidebar defaults",
+      "packages": [
+        "api/workspace-files",
+        "client/resources",
+        "client/ui-chat",
+        "client/ui-conversation",
+        "client/ui-dockkit",
+        "client/ui-layout",
+        "client/ui-primitives",
+        "client/ui-sidebar-right",
+        "client/ui-sidebar-textpreview",
+        "extensions/cordis-client-runner",
+        "extensions/tool-cordis",
+        "util/workspace-path"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "063165a8004d677ce5933e16a1665eca5b772369",
+      "subject": "ci(native): consolidate platform compatibility jobs",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "887c1efd7a020f13d15c2f23daf690a8f753b2a5",
+      "subject": "ci(npm): expose failed install HTTP diagnostics",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "0f6e7442d7cf20a80d7ac5c7023f22fb0f66ec31",
+      "subject": "perf(session): bundle migration verifier dependencies",
+      "packages": [
+        "session/session-persistence-jsonl"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "228f3aef8375affabf6d9176a8b2000d6c846551",
+      "subject": "test(ci): stabilize completion waits and Session fixtures",
+      "packages": [
+        "acp/acp",
+        "fs/tool-present",
+        "spill/spill-local",
+        "test-support/llm-replay"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "72549e91a07c892731993a850006e07a3e39ef50",
+      "subject": "test(present): pass the event to delivery matcher",
+      "packages": [
+        "client/ui-deliverables"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "cd2b9ca04ab926d5959f41f36d1117eb0cf13c98",
+      "subject": "refactor(present): restore existing conversation coordinate handling",
+      "packages": [
+        "client/ui-conversation",
+        "client/ui-deliverables"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "207dce0bee272def00d923c0a6295a1149375bb4",
+      "subject": "docs(present): refresh module graph after removing attachments",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "c9038b4b31ce605cfcfd95fbac4e51d49deddfe6",
+      "subject": "refactor(present): declare and open workspace source files",
+      "packages": [
+        "client/ui-deliverables",
+        "fs/tool-present"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "387e437af4552af908d5d0bbb55f34ea560f2e6d",
+      "subject": "fix(web): use the preview-compatible stream promises entry",
+      "packages": [
+        "client/ui-deliverables"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "6d8a400d79ac6905a9b55352314342a4061d14f7",
+      "subject": "fix(web): open delivered snapshots in the default application",
+      "packages": [
+        "client/ui-deliverables"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "37d27fcdf970c890c50283bf5c1bd54e8bbf491a",
+      "subject": "feat(web): present immutable file deliveries with download cards",
+      "packages": [
+        "bundle/base",
+        "client/ui-chat",
+        "client/ui-conversation",
+        "client/ui-deliverables",
+        "core/session",
+        "core/tools",
+        "extensions/cordis-client-runner",
+        "fs/tool-present",
+        "preset/agent-presets"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "f39a37a523e312f1fdcfcd2bb4e846f3f389d7fb",
+      "subject": "fix(client): keep browser dependencies out of production installs",
+      "packages": [
+        "client/store",
+        "client/ui-attachment",
+        "client/ui-commands",
+        "client/ui-conversation",
+        "client/ui-directory-picker-browse",
+        "client/ui-dockkit",
+        "client/ui-input-trigger",
+        "client/ui-model-selection",
+        "client/ui-primitives",
+        "client/ui-renderer",
+        "client/ui-settings-general",
+        "client/ui-settings-plugins",
+        "client/ui-sidebar",
+        "client/ui-sidebar-files",
+        "client/ui-sidebar-right",
+        "client/ui-sidebar-textpreview",
+        "client/ui-theme",
+        "client/ui-tool",
+        "client/ui-trajectory",
+        "client/ui-user-questions",
+        "client/ui-workspace"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "f3d7ef2b9596889f03ace066b76bf16ca5a55c1c",
+      "subject": "docs(client): define browser third-party build inputs",
+      "packages": [
+        "client/store",
+        "client/ui-dockkit",
+        "client/ui-primitives"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "58144ccf785c63fe7678bd7b0397a0bbff4b9cfc",
+      "subject": "test(web): await command and settings readiness before assertions",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "e807447288648dfb25d4598af0e458ef2b3eaf59",
+      "subject": "fix(client): re-read navigation cancellation after preparation",
+      "packages": [
+        "client/ui-workspace"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "713b1aacad688d5c1fdf77c979ede6d21b3dda9d",
+      "subject": "docs(client): synchronize panel navigation APIs and contracts",
+      "packages": [
+        "client/ui-conversation",
+        "client/ui-layout",
+        "client/ui-sidebar",
+        "client/ui-sidebar-right",
+        "client/ui-workspace",
+        "extensions/cordis-client-runner",
+        "test-support/client-runtime"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "385f651c5ff047b87bd6b6027a161bd3c84a7166",
+      "subject": "fix(test): release default slot runtime sources symmetrically",
+      "packages": [
+        "test-support/client-runtime"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "8715fd2a870b161cf0f6cd04350330ee00b46cd7",
+      "subject": "fix(client): preserve the latest panel and session navigation",
+      "packages": [
+        "client/ui-chat",
+        "client/ui-conversation",
+        "client/ui-layout",
+        "client/ui-tool",
+        "client/ui-workspace"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "bc840b483e1bbd772a9efd5a139cc980408aa0a8",
+      "subject": "feat(client): simplify and exercise sidebar panel entries",
+      "packages": [
+        "client/ui-sidebar",
+        "client/ui-workspace"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "092d16d7ab5a64a55596af74899d2b3db4647310",
+      "subject": "style(client): satisfy panel lint rules",
+      "packages": [
+        "client/ui-layout",
+        "client/ui-sidebar"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "9736136d9598f76d5114b8e58e71d2e74bf95965",
+      "subject": "fix(client): leave global panel entries empty by default",
+      "packages": [
+        "client/ui-sidebar",
+        "extensions/cordis-client-runner"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "fbbcbf33fe69740a3492a8abb2e8011738b26a41",
+      "subject": "docs(client): document global main-panel extension points",
+      "packages": [
+        "client/ui-conversation",
+        "client/ui-layout",
+        "client/ui-sidebar",
+        "client/ui-sidebar-right",
+        "client/ui-workspace",
+        "test-support/client-runtime"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "f95e781f3d419747283b3cc2b57752b2dac2c839",
+      "subject": "test(client): migrate panel navigation fixtures and snapshots",
+      "packages": [
+        "client/locale",
+        "client/ui-attachment",
+        "client/ui-chat",
+        "client/ui-conversation",
+        "client/ui-layout",
+        "client/ui-permission-presets",
+        "client/ui-settings-general",
+        "client/ui-settings-models",
+        "client/ui-sidebar",
+        "client/ui-sidebar-right",
+        "client/ui-theme",
+        "client/ui-tool",
+        "client/ui-trajectory",
+        "client/ui-user-questions",
+        "client/ui-workflow-run",
+        "client/ui-workspace"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "fe460f7fd1fc5e101583f65986e61b5f8a7863da",
+      "subject": "test(client): support panel selection in slot runtime",
+      "packages": [
+        "test-support/client-runtime"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "581803bf57949c303ee6cbbaab0142e00f64b2c0",
+      "subject": "feat(client): add global sidebar panels",
+      "packages": [
+        "client/ui-conversation",
+        "client/ui-layout",
+        "client/ui-sidebar",
+        "client/ui-sidebar-right",
+        "client/ui-workspace",
+        "extensions/cordis-client-runner"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "b42b5b5e9483041f6a596dcff225f44af67a9ef0",
+      "subject": "fix(ci): align minimal prompt-history expectations with shell-only turns",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "594305ce19765086472c6ef95c09c3f2a70ce37c",
+      "subject": "fix(mcp): reject repeated tool discovery cursors",
+      "packages": [
+        "mcp/mcp-client"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "4977ccc965b93e7bf6fff0c2c8399014c5c0d198",
+      "subject": "chore(chunked-list): follow master release version",
+      "packages": [
+        "util/chunked-list"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "3c05dcb537328792cc1cfd6bd2b62a73c3682251",
+      "subject": "fix(ci): refresh persistent bash fixtures and synchronize LSP lifecycle test",
+      "packages": [
+        "lsp/lsp-stdio"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "5ab91467e25d539b244f407718ef878b23585453",
+      "subject": "test(cli): include catalog facts in profile expectations",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "79dda6cf4512e466e58ffce930ffa7153cc328c7",
+      "subject": "test(subagent): align catalog snapshots with Session V3",
+      "packages": [
+        "test-support/session-snapshot"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "e2fa69f5e20d0350f72acf34caa3a58582df4976",
+      "subject": "test(snapshot): bind sibling roles to catalog publication order",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "9f69a7fb16114f6474302531c868320b61bb2a8b",
+      "subject": "refactor(subagent): extract persistent chunked list utility",
+      "packages": [
+        "subagent/subagent",
+        "util/chunked-list"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "661135fe2930464481496d8b4859e7cbf5d324ef",
+      "subject": "fix(subagent): reject invalid catalogs and preserve snapshot event order",
+      "packages": [
+        "subagent/subagent",
+        "test-support/session-snapshot"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "ba731d1c9e2f94e1f8d1b6c42db5744280f26608",
+      "subject": "fix(subagent): handle rejected runs after catalog failure",
+      "packages": [
+        "extensions/tool-cordis",
+        "session/session-projection",
+        "subagent/subagent"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "867c47c415789efe73b9a633c8b6f2d5ee2abc3e",
+      "subject": "docs: drop unrelated projection README whitespace changes",
+      "packages": [
+        "session/session-projection",
+        "session/session-projection-cache"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "59623c8ff4043d14db34249d552f752bff2a9bbe",
+      "subject": "docs(subagent): refresh event declaration references",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "0274a6dd75e8eb054949134560c16d8ac1ec4501",
+      "subject": "fix(subagent): preserve catalog augmentation in declarations",
+      "packages": [
+        "subagent/subagent"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "924282cbcda68b002e9fd709c0668473e0e6e151",
+      "subject": "fix(subagent): retain catalog event types in host exports",
+      "packages": [
+        "subagent/subagent"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "532e712c7beab9cbe2d16a76c89e9a5a8128d67a",
+      "subject": "refactor(subagent): expose catalog through existing projection views",
+      "packages": [
+        "extensions/tool-cordis",
+        "session-query/session-query",
+        "subagent/subagent"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "3dcabbba4411f15b9b08f1eb56da6b2e8e2e0e0d",
+      "subject": "refactor(session-query): return all projection states by default",
+      "packages": [
+        "extensions/tool-cordis",
+        "session-query/session-query",
+        "session/session-projection",
+        "session/session-projection-cache"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "e3cb6dd352da219b814989b034d9570ca1aeab50",
+      "subject": "refactor(session): limit hydration views to all or none",
+      "packages": [
+        "extensions/tool-cordis",
+        "session-query/session-query",
+        "session/session-projection",
+        "session/session-projection-cache"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "80e34ce7095c4b7721a32d4587c69adba828b56e",
+      "subject": "perf(subagent): list parent catalog in event order",
+      "packages": [
+        "subagent/subagent"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "99462aef9823cf07f95b8e96634b3ab64b99a742",
+      "subject": "fix(subagent): preserve catalog citations and skip unrequested views",
+      "packages": [
+        "extensions/tool-cordis",
+        "session-query/session-query",
+        "session/session-projection",
+        "session/session-projection-cache",
+        "test-support/session-snapshot"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "399d7313c4f3084ae52e94d33105a57159586d79",
+      "subject": "test(session): cover historical catalog comparison failures",
+      "packages": [
+        "test-support/session-snapshot"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "2db4bdd31d5e92cdf4657bd7d709881215ad8943",
+      "subject": "feat(subagent): record and observe parent-owned child catalogs",
+      "packages": [
+        "core/session",
+        "extensions/tool-cordis",
+        "session-query/session-query",
+        "subagent/subagent",
+        "test-support/session-snapshot"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "2faa751be99c8fbee0524e478f4c53d93b408131",
+      "subject": "release(dsh): 0.1.5-alpha.1",
+      "packages": [
+        "acp/acp",
+        "api/gateway",
+        "api/remotes",
+        "api/session-controller",
+        "api/settings-controller",
+        "api/workspace-controller",
+        "api/workspace-files",
+        "attachment/attachment",
+        "attachment/attachment-local",
+        "boot/app-boot",
+        "boot/cmdline",
+        "bundle/acp-app",
+        "bundle/base",
+        "bundle/headless",
+        "bundle/sdk-app",
+        "bundle/sdk-minimal",
+        "bundle/web-app",
+        "client/connection",
+        "client/file-upload",
+        "client/hmr",
+        "client/locale",
+        "client/modules",
+        "client/resources",
+        "client/store",
+        "client/ui-agent-preset",
+        "client/ui-approval",
+        "client/ui-attachment",
+        "client/ui-brand-official",
+        "client/ui-chat",
+        "client/ui-commands",
+        "client/ui-conversation",
+        "client/ui-deliverables",
+        "client/ui-directory-picker-browse",
+        "client/ui-directory-picker-native",
+        "client/ui-dockkit",
+        "client/ui-goal",
+        "client/ui-input-trigger",
+        "client/ui-jobs",
+        "client/ui-layout",
+        "client/ui-message-feedback",
+        "client/ui-model-selection",
+        "client/ui-open-in-app",
+        "client/ui-permission-presets",
+        "client/ui-plan",
+        "client/ui-primitives",
+        "client/ui-reference",
+        "client/ui-renderer",
+        "client/ui-schedule",
+        "client/ui-session",
+        "client/ui-settings",
+        "client/ui-settings-general",
+        "client/ui-settings-models",
+        "client/ui-settings-plugin-inventory",
+        "client/ui-settings-plugins",
+        "client/ui-sidebar",
+        "client/ui-sidebar-files",
+        "client/ui-sidebar-right",
+        "client/ui-sidebar-textpreview",
+        "client/ui-skill",
+        "client/ui-slots",
+        "client/ui-subagent",
+        "client/ui-theme",
+        "client/ui-tool",
+        "client/ui-trajectory",
+        "client/ui-user-questions",
+        "client/ui-workflow-run",
+        "client/ui-workspace",
+        "client/web",
+        "code-runtime/code-runtime",
+        "code-runtime/code-runtime-worker-thread",
+        "compaction/command-compact",
+        "compaction/compaction",
+        "compaction/compaction-basic",
+        "compaction/compaction-tool-result-pruner",
+        "context/agent-instructions",
+        "context/file-reference",
+        "context/file-reference-local",
+        "context/session-reference",
+        "context/time-context",
+        "context/tmux-context",
+        "core/agent",
+        "core/agent-default-model",
+        "core/agent-loop",
+        "core/agent-tool-presentation",
+        "core/scope",
+        "core/session",
+        "core/system-prompt",
+        "core/tools",
+        "credentials/authorization",
+        "credentials/credentials",
+        "credentials/credentials-local",
+        "e2b/e2b",
+        "e2b/fs-e2b",
+        "e2b/subprocess-e2b",
+        "experimental/agent-team",
+        "experimental/agent-team-profile",
+        "experimental/agent-team-web-profile",
+        "experimental/client-ui-agent-team",
+        "experimental/code-runtime-python",
+        "experimental/inspector",
+        "experimental/tool-agent-team",
+        "experimental/webworker-packer",
+        "experimental/webworker-runtime",
+        "extensions/cordis-client-runner",
+        "extensions/cordis-host-runner",
+        "extensions/tool-cordis",
+        "extensions/ui-cordis",
+        "feedback/command-feedback",
+        "feedback/message-feedback",
+        "fs/fs",
+        "fs/fs-local",
+        "fs/fs-observation-policy",
+        "fs/fs-sandbox",
+        "fs/tool-fs",
+        "fs/tool-fs-search",
+        "fs/tool-str-replace-editor",
+        "goal/command-goal",
+        "goal/goal",
+        "goal/goal-round-driver",
+        "goal/tool-goal",
+        "guard/repeat-tool-reminder",
+        "guard/timeout-policy",
+        "hooks/hook-protocol",
+        "hooks/hooks-claude-code",
+        "hooks/hooks-codex",
+        "host/directory-picker",
+        "host/directory-picker-auto",
+        "host/directory-picker-browse",
+        "host/directory-picker-native",
+        "host/frontend-static",
+        "host/open-in-app",
+        "host/plugin-inventory",
+        "host/webserver",
+        "identity/anonymous-user-id",
+        "interaction/commands",
+        "interaction/permission-presets",
+        "interaction/tool-ask-user",
+        "interaction/user-approval",
+        "interaction/user-questions",
+        "jobs/jobs",
+        "jobs/jobs-local",
+        "jobs/tool-jobs",
+        "llm/deepseek-llm-api-extensions",
+        "llm/llm",
+        "llm/llm-deepseek",
+        "llm/llm-pi-ai",
+        "llm/llm-retry",
+        "llm/plugin-package-inventory-deepseek",
+        "llm/token-meter",
+        "lsp/lsp",
+        "lsp/lsp-stdio",
+        "lsp/tool-lsp",
+        "mcp/mcp-client",
+        "plan/plan-mode",
+        "preset/agent-presets",
+        "preset/persona",
+        "runtime-diagnostics/invariants",
+        "sandbox/sandbox",
+        "sandbox/sandbox-local",
+        "sandbox/sandbox-policy",
+        "sandbox/sandbox-windows-acl",
+        "schedule/schedule",
+        "sdk/client",
+        "sdk/protocol",
+        "sdk/server",
+        "session-query/session-log-export",
+        "session-query/session-query",
+        "session-query/session-query-sqlite",
+        "session-query/tool-session-query",
+        "session/session-checkpoint-policy",
+        "session/session-format",
+        "session/session-format-catalog",
+        "session/session-format-v0-to-v1",
+        "session/session-format-v1-to-v2",
+        "session/session-format-v2-to-v3",
+        "session/session-log-deepseek",
+        "session/session-persistence",
+        "session/session-persistence-jsonl",
+        "session/session-projection",
+        "session/session-projection-cache",
+        "session/session-stats",
+        "session/session-telemetry",
+        "session/session-telemetry-otel",
+        "session/session-title",
+        "session/session-title-all-prompts-llm",
+        "session/session-title-first-prompt-llm",
+        "session/session-title-llm",
+        "session/session-turn-outline",
+        "settings/settings",
+        "settings/settings-file",
+        "shell/bash-local",
+        "shell/bash-sandbox",
+        "shell/pwsh-local",
+        "shell/pwsh-sandbox",
+        "shell/shell",
+        "shell/shell-env",
+        "shell/tool-bash",
+        "shell/tool-bash-persistent",
+        "shell/tool-pwsh",
+        "shell/tool-pwsh-persistent",
+        "skill/skill",
+        "skill/skill-badge",
+        "skill/skill-filesystem",
+        "skill/tool-skill",
+        "spill/spill",
+        "spill/spill-local",
+        "spill/spill-policy",
+        "storage/storage",
+        "storage/storage-domain",
+        "storage/storage-json",
+        "storage/storage-sqlite",
+        "subagent/subagent",
+        "subagent/subagent-acp",
+        "subagent/subagent-claude-code",
+        "subagent/subagent-codex",
+        "subagent/subagent-dsh-sdk",
+        "subagent/subagent-fork-in-process",
+        "subagent/subagent-in-process-driver",
+        "subagent/subagent-spawn-in-process",
+        "subagent/tool-subagent",
+        "subagent/tool-subagent-control",
+        "subprocess/subprocess",
+        "subprocess/subprocess-local",
+        "subprocess/win32-process",
+        "terminal/terminal",
+        "terminal/terminal-bash",
+        "terminal/tool-terminal",
+        "test-support/agent-loop-testkit",
+        "test-support/client-runtime",
+        "test-support/llm-mock-server",
+        "test-support/llm-replay",
+        "test-support/loader-smoke",
+        "test-support/session-snapshot",
+        "todo/tool-todo",
+        "typert/generator",
+        "typert/loader",
+        "typert/protocol",
+        "typert/registry",
+        "util/atomic-write",
+        "util/brand",
+        "util/crypto",
+        "util/deque",
+        "util/home-paths",
+        "util/http-proxy",
+        "util/launch-environment",
+        "util/native-command",
+        "util/output-retention",
+        "util/package-manifest",
+        "util/time",
+        "util/timeout",
+        "util/values",
+        "util/workspace-path",
+        "web/tool-web",
+        "web/web",
+        "web/web-fetch-http",
+        "web/web-search-deepseek",
+        "web/web-search-exa",
+        "web/web-search-perplexity",
+        "webhook/webhook",
+        "webhook/webhook-github",
+        "workflow/tool-ralph",
+        "workflow/tool-workflow",
+        "workflow/workflow",
+        "workflow/workflow-worker-thread",
+        "workspace/workspace"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "5212603a4bcceaae6b77629039936a9e1501dd63",
+      "subject": "fix(session): audit every historical content carrier before V3 migration",
+      "packages": [
+        "session/session-format-v2-to-v3",
+        "session/session-persistence-jsonl"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "2c21c7a03e1cf333b8038f554107a6d0169879ab",
+      "subject": "ci: 1",
+      "packages": [
+        "experimental/agent-team"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "9ddc35c26bc070447f3aa440069589c327fd737e",
+      "subject": "release(node-addon-system): 0.1.2",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "ae4919634dedf7447591d399501399c62680efb1",
+      "subject": "test(web): align SSH replay with V3 release fixtures",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "5924d4c1524140ebf71f95161579e7edcd6b7e1c",
+      "subject": "test(session): audit V3 migration composition and centralize upgrade spec",
+      "packages": [
+        "session/session-format-catalog",
+        "session/session-format-v2-to-v3",
+        "session/session-persistence-jsonl"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "36997d853c973544ee0184e6cab150778e521e6e",
+      "subject": "test(ci): inherit runner budgets in publint and LSP fixtures",
+      "packages": [
+        "lsp/lsp-stdio"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "59ec2d3e94ae69d66465f296f81efb5b2e1542ac",
+      "subject": "test(ci): clean up fixture workers after test timeouts",
+      "packages": [
+        "shell/pwsh-local"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "475f5648b3d45550ba1eee71c01da6201ed86257",
+      "subject": "test(ci): wait for owned completion in master tests",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "c2a5540ddb5d67cb05b326ecb54ada5edf1310ab",
+      "subject": "fix(web): distinguish plugin configuration instances",
+      "packages": [
+        "client/ui-settings-plugin-inventory"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "555c04bdfcda76fd023c71668bb00cfd70ea8c25",
+      "subject": "fix(web): localize Chinese model copy",
+      "packages": [
+        "client/ui-chat",
+        "client/ui-model-selection"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "97e7223d5f7f3d7e9190d44fc78d729aa423ca4b",
+      "subject": "refactor(native): expose Landlock through its capability subpath",
+      "packages": [
+        "experimental/webworker-packer",
+        "experimental/webworker-runtime",
+        "sandbox/sandbox-local",
+        "shell/bash-sandbox"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "a2784a223e2f1d35ba746c0cf5e8d034d5d8fa88",
+      "subject": "test(web): synchronize theme writes and focus assertions",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "3a445b802ddb0bb3797bb83567232ae8a34153bb",
+      "subject": "test(ci): stabilize storage and subprocess lifecycle checks",
+      "packages": [
+        "storage/storage-sqlite",
+        "subagent/subagent-acp"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "d927cbff9915ff779d7ca99ed54d8cd33dd559ce",
+      "subject": "feat(native): add prebuilt Node-API flock support",
+      "packages": [
+        "experimental/webworker-runtime",
+        "session/session-persistence-jsonl"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "7264906f99fc0f0fbef6855765f8378e348f1c4d",
+      "subject": "refactor(native): rename package family to node-addon-system",
+      "packages": [
+        "experimental/webworker-packer",
+        "experimental/webworker-runtime",
+        "sandbox/sandbox-local",
+        "shell/bash-sandbox"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "336ebb235e06b8fd186138bacef41e921a6f299a",
+      "subject": "refactor(native): move Landlock workspace to native/system",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "3c21d4c28ccfa66c4cf72e982f042ded69f2aad2",
+      "subject": "fix(client): name collapsed Settings trigger",
+      "packages": [
+        "client/ui-settings-general"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "c4855581c3e01b8d0e735741f117483d0df06d65",
+      "subject": "fix: preserve weighted approval review semantics",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "3a98d05a3dc29aec960c89fbb45913a3a1ecc271",
+      "subject": "refactor(subagent): keep preset teardown outside identity changes",
+      "packages": [
+        "subagent/tool-subagent"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "d5e6b4e2b2e81cb0f790996ff13a3d1042ed87dc",
+      "subject": "chore: remove unrelated PTY test repair from agent refactor",
+      "packages": [
+        "terminal/terminal-bash"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "5045631a9a27687902987397f87909d9c3b2b9f2",
+      "subject": "chore: remove unrelated sidebar test notes from agent refactor",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "fde15a83940f0100b92e20bc6000410896543ae7",
+      "subject": "fix(ci): do not re-request approved reviewers",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "ace0c4619e34b2af7213b29a4a9dc085b86cf928",
+      "subject": "chore(subagent): upgrade Codex and Claude Code runtimes",
+      "packages": [
+        "subagent/subagent-claude-code",
+        "subagent/subagent-codex"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "606b85cd586170177d28c73a7e2e8a073aa347f2",
+      "subject": "refactor(typert): track forwarding visits without a delimiter",
+      "packages": [
+        "typert/generator"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "b72919827a4c38cadd7a9833b126b73aa0db8b0a",
+      "subject": "fix(typert): distinguish forwarding visits by export name",
+      "packages": [
+        "typert/generator"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "1f1537914fb7605ecad13f0af5def9be3db4abd6",
+      "subject": "feat(minimal): align persistent bash output with the one-shot shell contract",
+      "packages": [
+        "bundle/sdk-minimal",
+        "preset/agent-presets",
+        "shell/tool-bash-persistent"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "6c87f030a334652b67b5aa4eea8a5c6eb92a1ab6",
+      "subject": "fix(checks): preserve visualizer composition preset identifiers",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "36bd2972935f7113715ba2b402610e498ebc2481",
+      "subject": "fix(visualizer): keep model registration independent of agent identity",
+      "packages": [
+        "extensions/tool-cordis",
+        "visualizer/tool-visualizer"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "795a9cc22643e5ea9d8f5c42c5baf9e2b0252c0f",
+      "subject": "test(web): sample queue alignment in one layout",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "55660e8a9e2659220be43056b5d1aad16ff9e832",
+      "subject": "test(terminal): decouple descendant identity from startup",
+      "packages": [
+        "terminal/terminal-bash"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "44008a79cae91552cbbb0830156a3c0eed01877b",
+      "subject": "test(team): await mailbox acknowledgement flushes before teardown",
+      "packages": [
+        "experimental/agent-team"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "4550bb6e69e018770061b5ae45026f0bac5feea5",
+      "subject": "feat: enforce weighted pull request approvals",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "404097f813e8f7062896f8692ca8bfd4f8d844a1",
+      "subject": "test(subagent): reap SDK startup before readiness fixture cleanup",
+      "packages": [
+        "subagent/subagent-dsh-sdk"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "939e6907da3b95db17d28f85d7d953e0ec6d2499",
+      "subject": "test(shell): gate consuming PowerShell reads on parent acknowledgement",
+      "packages": [
+        "shell/pwsh-local"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "71e96aebae6518ad6ebe97ccfc65b93629e15ff5",
+      "subject": "test(subagent): preserve ACP readiness budgets and teardown ownership",
+      "packages": [
+        "subagent/subagent-acp"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "b76a6d9963451104695d4fac721eedc16b247c61",
+      "subject": "fix(web): keep animated connection dots hidden on hover",
+      "packages": [
+        "client/ui-primitives"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "a433eec5e7c3dcc946fa59142c58f9a708cc15f2",
+      "subject": "test(web): await editor credential state before snapshots",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "92b3b0262270dc2ecc1356cbcf63c1555add6ab9",
+      "subject": "Revert \"feat(visualizer): add dormant Host capability\"",
+      "packages": [
+        "core/system-prompt",
+        "core/tools",
+        "extensions/tool-cordis",
+        "preset/agent-presets",
+        "visualizer/tool-visualizer"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "e186c218c0fd903965f0cd8b872b26dd9fb28322",
+      "subject": "test(web): release workflow gates after failed submissions",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "0f9d944f98630f0623ef5a8324f811814907d8ee",
+      "subject": "test(worker): account for the dockkit browser CSS entry",
+      "packages": [
+        "experimental/webworker-runtime"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "7627622c7abb1b0c994c67464b39a683a19d1661",
+      "subject": "test(session): await durable cold projection cache writes",
+      "packages": [
+        "session/session-projection-cache"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "3ec2191246b59a55d560fe80a5f46aa9353d4d75",
+      "subject": "test(web): await feedback submit replies before snapshots",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "19d87778a1647b209f887b4a111861299b9b67de",
+      "subject": "test(web): hold workflow children through live navigation checks",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "e7bde97aa0cfea0e55aa07f4a9362a56b58fa549",
+      "subject": "fix(tool-subagent): await agent-started preset cleanup",
+      "packages": [
+        "subagent/tool-subagent"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "180bdede47fa83dd5aa75134cf975b566ff62cd0",
+      "subject": "fix(test): retain child turn diagnostics when log reads time out",
+      "packages": [
+        "test-support/session-snapshot"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "f7ef7103f38d06edd1fdadcf3febb3fe791fe838",
+      "subject": "test(subagent): await the image capability read before draining",
+      "packages": [
+        "subagent/subagent"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "f7c9170b3bf0732dac877f9769dc990788820fb7",
+      "subject": "fix(web): dismiss tooltips when composer actions become disabled",
+      "packages": [
+        "client/ui-conversation"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "ef8f166ccc4002b708b3faf913659ddde5ba9626",
+      "subject": "test(ci): preserve the lane budget for invariant verifier children",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "3fc9027a01e5030f1e59cc6d7a20822e2161fb60",
+      "subject": "docs(session): refresh replay config source location",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "53f42a781bb5404f72be05b563fc482de6f91164",
+      "subject": "test(session): close canonical envelope CI gaps",
+      "packages": [
+        "client/ui-trajectory",
+        "core/agent-loop",
+        "core/session",
+        "plan/plan-mode",
+        "session/session-format-v2-to-v3",
+        "session/session-log-deepseek",
+        "subagent/subagent-in-process-driver",
+        "test-support/llm-replay",
+        "test-support/session-snapshot"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "c4d8ee5ff2db7ce2696bf8965f51533f39611d91",
+      "subject": "test(session): canonicalize headless expected system replacements",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "920e91798803b38bb75619e1f6500d6da43ca3e2",
+      "subject": "fix(session): retain unknown required events for vocabulary validation",
+      "packages": [
+        "session/session-format-v2-to-v3",
+        "session/session-persistence-jsonl"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "b7622e9f13006b848325b0707077475c44f09b69",
+      "subject": "chore(session): refresh canonical API catalog after integration",
+      "packages": [
+        "extensions/tool-cordis"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "756b10fcfe391ea3b890d36c983f06d7a9f8b243",
+      "subject": "test(session): cover composed canonical and PTC restoration",
+      "packages": [
+        "client/ui-conversation",
+        "compaction/compaction-basic",
+        "core/agent-loop",
+        "core/session",
+        "llm/token-meter",
+        "session/session-format-v2-to-v3",
+        "session/session-log-deepseek",
+        "session/session-persistence-jsonl"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "c28639587ad40b915e6550736f99bf73ee9c9956",
+      "subject": "test(session): keep historical fixtures outside current V3 encoding",
+      "packages": [
+        "session/session-persistence",
+        "session/session-persistence-jsonl",
+        "subagent/subagent"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "657e68186a34b75fd97a68220713ba9ada4ff69a",
+      "subject": "fix(session): canonicalize V3 envelopes through adjacent migration",
+      "packages": [
+        "acp/acp",
+        "api/session-controller",
+        "client/ui-chat",
+        "client/ui-conversation",
+        "compaction/compaction",
+        "compaction/compaction-basic",
+        "compaction/compaction-tool-result-pruner",
+        "context/agent-instructions",
+        "context/session-reference",
+        "context/time-context",
+        "core/agent-loop",
+        "core/session",
+        "experimental/agent-team",
+        "extensions/tool-cordis",
+        "llm/token-meter",
+        "session-query/session-query",
+        "session-query/session-query-sqlite",
+        "session-query/tool-session-query",
+        "session/session-format-catalog",
+        "session/session-format-v2-to-v3",
+        "session/session-log-deepseek",
+        "session/session-persistence-jsonl",
+        "skill/tool-skill",
+        "subagent/subagent",
+        "test-support/client-runtime",
+        "test-support/llm-replay",
+        "test-support/session-snapshot"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "8e468c13a05a65059af49a00e231e8b0d1d54b02",
+      "subject": "test(visualizer): remove redundant host web replay",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "934d4b6501e990d25a43171e7d1ec5fdb727929d",
+      "subject": "refactor(visualizer): trust settled widget contents",
+      "packages": [
+        "visualizer/tool-visualizer"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "e7dc1322a38f57e2af7e09a78d5e6e657224ce04",
+      "subject": "fix(visualizer): leave motion to presentation choice",
+      "packages": [
+        "visualizer/tool-visualizer"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "b80e22ec2dfdb9789c69ce9b30a29b18cb38d5a8",
+      "subject": "docs(visualizer): require self-contained widget sources",
+      "packages": [
+        "visualizer/tool-visualizer"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "b75b8ce49e4fa06fe04a7dcdf127d00ebaf74454",
+      "subject": "chore(visualizer): align release metadata and snapshots",
+      "packages": [
+        "visualizer/tool-visualizer"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "7729e0ffee07726eb44a24bffac1548264011722",
+      "subject": "refactor(visualizer): simplify host contract",
+      "packages": [
+        "extensions/tool-cordis",
+        "visualizer/tool-visualizer"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "b17e90f78afd3a43c61bbf4fd81c73a4140a67fb",
+      "subject": "fix(visualizer): validate fragment contracts precisely",
+      "packages": [
+        "visualizer/tool-visualizer"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "f1f6ca1c77314fecf1ddf8241d524a89bda09267",
+      "subject": "feat(visualizer): add dormant Host capability",
+      "packages": [
+        "core/system-prompt",
+        "core/tools",
+        "extensions/tool-cordis",
+        "preset/agent-presets",
+        "visualizer/tool-visualizer"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "839a6fa995349ed8bbabc076958ffab952909434",
+      "subject": "test(web): await mutation replies before capturing settled UI",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "3aee29c657c0a5e304645cdaf2c461216c217ee6",
+      "subject": "test(lsp): hold queued source reads behind a response barrier",
+      "packages": [
+        "lsp/lsp-stdio"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "e33834f5228a301c4551ccf61d5c529c3276e6d5",
+      "subject": "test(web): await session and responsive layout readiness",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "614ff048425f7a5ad0e2ea358a0ca4a1bf7d6bf9",
+      "subject": "fix: reconcile automated review requests",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "f8828b2ce1e839b6e63e02de5d286ed745817bc1",
+      "subject": "fix(ci): auto-repair invalid Issue labels",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "f96fbba2db4455304502cdcd1be12eabaf2c3046",
+      "subject": "fix: cap counted review requests at one",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "8932b8670e0282cef4716ac3300cf0819c5a678a",
+      "subject": "test(ci): make Lefthook lock replacement deterministic",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "a189104d812c416fe23c5196904bc1e43677c6cb",
+      "subject": "docs: refresh session controller module dependencies",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "a04bffb7ed93badb090f0c7b055a80ccb0bdd509",
+      "subject": "feat: rank review owners by changed LOC",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "f37eb3de47665a55a903ff8d0ec06a4ebec6bb27",
+      "subject": "test: exercise request-review routing",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "be9d401c33fae665007fe399c8ec5bef45e59f86",
+      "subject": "test(web): await action acknowledgements before following controls",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "7d8546b4db3e4a10d48c48b8bf0a8fa3a265cd95",
+      "subject": "fix: cap reviewers per pull request",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "6c0e258b27d89b58139ce424043a0bd17ac28596",
+      "subject": "test(web): await observed browser settlement in replay scenarios",
+      "packages": [
+        "test-support/session-snapshot"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "0b43d89d5f08e0edda163053a49f4ceacf2f0cbc",
+      "subject": "fix: cap review owners per module",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "cb3df20cf3cdcd06d32aa9f221238d48d116b2f0",
+      "subject": "docs(api): remove obsolete media path restrictions",
+      "packages": [
+        "api/session-controller"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "fe834c7f92b69a0a7bd527bd17e661a3f557781a",
+      "subject": "fix: reconcile automated review requests",
+      "packages": [
+        "subagent/subagent"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "d05889919435a894ebaa4a3bcdadab40d1f7babf",
+      "subject": "test(snapshot): isolate child-turn diagnostic timeout from harvesting",
+      "packages": [
+        "test-support/session-snapshot"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "f1c1ff5a08409c94b992e1b95af14ae2aed0d772",
+      "subject": "docs: constrain package README summaries",
+      "packages": [
+        "acp/acp",
+        "api/workspace-files",
+        "attachment/attachment",
+        "attachment/attachment-local",
+        "boot/cmdline",
+        "bundle/web-app",
+        "client/locale",
+        "client/resources",
+        "client/ui-agent-preset",
+        "client/ui-brand-official",
+        "client/ui-chat",
+        "client/ui-goal",
+        "client/ui-input-trigger",
+        "client/ui-model-selection",
+        "client/ui-permission-presets",
+        "client/ui-primitives",
+        "client/ui-reference",
+        "client/ui-settings",
+        "client/ui-settings-general",
+        "client/ui-settings-plugin-inventory",
+        "client/ui-settings-plugins",
+        "client/ui-sidebar",
+        "client/ui-skill",
+        "client/ui-slots",
+        "client/ui-subagent",
+        "client/ui-trajectory",
+        "client/ui-user-questions",
+        "client/ui-workflow-run",
+        "client/ui-workspace",
+        "code-runtime/code-runtime",
+        "code-runtime/code-runtime-worker-thread",
+        "compaction/compaction-basic",
+        "compaction/compaction-tool-result-pruner",
+        "context/agent-instructions",
+        "context/file-reference-local",
+        "context/tmux-context",
+        "core/agent",
+        "core/agent-default-model",
+        "core/agent-loop",
+        "core/agent-tool-presentation",
+        "core/scope",
+        "core/session",
+        "core/system-prompt",
+        "core/tools",
+        "credentials/authorization",
+        "credentials/credentials",
+        "credentials/credentials-local",
+        "e2b/e2b",
+        "e2b/subprocess-e2b",
+        "experimental/code-runtime-python",
+        "experimental/tool-agent-team",
+        "extensions/tool-cordis",
+        "extensions/ui-cordis",
+        "fs/fs",
+        "fs/fs-local",
+        "fs/fs-observation-policy",
+        "fs/fs-sandbox",
+        "fs/tool-fs",
+        "fs/tool-fs-search",
+        "goal/command-goal",
+        "goal/goal",
+        "goal/goal-round-driver",
+        "goal/tool-goal",
+        "guard/repeat-tool-reminder",
+        "guard/timeout-policy",
+        "hooks/hooks-claude-code",
+        "hooks/hooks-codex",
+        "host/directory-picker",
+        "host/frontend-static",
+        "host/open-in-app",
+        "host/plugin-inventory",
+        "identity/anonymous-user-id",
+        "interaction/commands",
+        "interaction/permission-presets",
+        "interaction/tool-ask-user",
+        "interaction/user-approval",
+        "jobs/jobs",
+        "jobs/tool-jobs",
+        "llm/llm",
+        "llm/llm-deepseek",
+        "llm/llm-pi-ai",
+        "llm/llm-retry",
+        "llm/token-meter",
+        "lsp/lsp",
+        "lsp/lsp-stdio",
+        "lsp/tool-lsp",
+        "mcp/mcp-client",
+        "plan/plan-mode",
+        "preset/agent-presets",
+        "sandbox/sandbox",
+        "sandbox/sandbox-local",
+        "sandbox/sandbox-policy",
+        "sandbox/sandbox-windows-acl",
+        "schedule/schedule",
+        "sdk/client",
+        "session-query/session-query",
+        "session-query/session-query-sqlite",
+        "session-query/tool-session-query",
+        "session/session-checkpoint-policy",
+        "session/session-format-v0-to-v1",
+        "session/session-persistence",
+        "session/session-projection",
+        "session/session-projection-cache",
+        "session/session-stats",
+        "session/session-telemetry",
+        "session/session-title",
+        "session/session-title-llm",
+        "session/session-turn-outline",
+        "settings/settings",
+        "shell/bash-sandbox",
+        "shell/shell",
+        "shell/tool-bash",
+        "shell/tool-bash-persistent",
+        "shell/tool-pwsh-persistent",
+        "skill/skill",
+        "skill/tool-skill",
+        "spill/spill",
+        "spill/spill-policy",
+        "storage/storage",
+        "storage/storage-domain",
+        "subagent/subagent",
+        "subagent/subagent-acp",
+        "subagent/subagent-claude-code",
+        "subagent/subagent-codex",
+        "subagent/subagent-dsh-sdk",
+        "subagent/tool-subagent",
+        "subprocess/subprocess",
+        "terminal/tool-terminal",
+        "test-support/agent-loop-testkit",
+        "test-support/client-runtime",
+        "test-support/llm-mock-server",
+        "test-support/llm-replay",
+        "test-support/loader-smoke",
+        "typert/generator",
+        "util/atomic-write",
+        "util/home-paths",
+        "util/http-proxy",
+        "util/launch-environment",
+        "util/output-retention",
+        "util/timeout",
+        "web/tool-web",
+        "web/web",
+        "workflow/tool-ralph",
+        "workflow/tool-workflow",
+        "workflow/workflow",
+        "workflow/workflow-worker-thread",
+        "workspace/workspace"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "c41b2895eb27afaddf86e9aa05c0c826d9c085da",
+      "subject": "test: exercise request-review routing",
+      "packages": [
+        "subagent/subagent"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "1c06f1d3ac9fa2dacd5f4ab4d5418a005bc07644",
+      "subject": "test(snapshot): declare spill command fixture plugin types",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "154b2a3cd694128b670c0c23a4f63cc86243f8ac",
+      "subject": "test(snapshot): reconcile V3 fixtures with isolated master replay",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "da313e4fdc0681318a54be7b9733c977e3b0ca97",
+      "subject": "fix(llm-pi-ai): preserve actionable model diagnostics",
+      "packages": [
+        "llm/llm-pi-ai"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "2b64ea5f1a9dba739579c1dfa34c37850a6a26c5",
+      "subject": "test(web): align V3 seeded stats with absent decode timing",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "a39d3091875727c83cc50db656ddc775b259c552",
+      "subject": "fix(directory-picker-native): foreground-activate the Win32 folder dialog via a synthesized Alt press",
+      "packages": [
+        "host/directory-picker-native"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "ea60e1c8a73b70e2abbd80d3fae496e26b7cea8c",
+      "subject": "chore(web): remove command description gate",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "b08310ac1d75227ead893e50c6d53d5deba575c8",
+      "subject": "fix(web): strip bold markers from think summaries",
+      "packages": [
+        "client/ui-chat"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "40c5ef4fc3c8e4adac8e0bd8a1c442d41dcdc3d4",
+      "subject": "refactor(api): reuse attachment limits for file responses",
+      "packages": [
+        "api/session-controller"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "5b8c8b781feb9a94a5a057364e5e5787bc1e57c0",
+      "subject": "test(open-in-app): scope SSH snapshot to the session header",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "88ab8e91332f0a1a868bf1a899190c22ed1f0351",
+      "subject": "fix(ui): show authored text when markdown images fail",
+      "packages": [
+        "client/ui-primitives"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "b52966922a29e08ebd82312adf75b2251e1d6a11",
+      "subject": "fix(api): serve bounded files through the filesystem provider",
+      "packages": [
+        "api/session-controller"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "8dc30d270c4757571f30ebecad78d15d7530cb83",
+      "subject": "test(llm-pi-ai): cover recovery diagnostics and document repair limits",
+      "packages": [
+        "client/ui-settings-models",
+        "llm/llm-pi-ai"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "614cffda8f95514c86a02b81f1386ef06723a47c",
+      "subject": "docs(skills): preserve browser-control workflow preference",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "e57e7dc57f8b4e268a988aaa8b662cccceb0e198",
+      "subject": "feat(skills): record browser GIFs with Playwright video",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "e970408acd8c6ae08a7bcd1381b545f3bb3a2edf",
+      "subject": "chore: automate static review ownership",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "ad05ed6ad815f2c6ae4a0bb72d5f577c01df28b2",
+      "subject": "docs(minimal): describe current editor availability",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "7f47954cadeac0987dfadedc36de55208b578210",
+      "subject": "fix(open-in-app,directory-picker): share inherited SSH detection",
+      "packages": [
+        "bundle/web-app",
+        "host/directory-picker-auto",
+        "host/open-in-app",
+        "util/launch-environment"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "5bc792f6291cb660e697e0b704dd1515f6200890",
+      "subject": "refactor(llm): keep diagnostics in configurable provider metadata",
+      "packages": [
+        "client/ui-settings-models",
+        "extensions/tool-cordis",
+        "llm/llm",
+        "llm/llm-pi-ai"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "a56619d9f79fae81d13e6870eed89076bf8d8689",
+      "subject": "fix(session): reject empty queue edits",
+      "packages": [
+        "api/session-controller"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "40b20be9f5dec568c8e53563e3cd6d61d8ad4294",
+      "subject": "docs(context): record root marker failure policy",
+      "packages": [
+        "context/agent-instructions"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "99a49712e63b120d89014d3f9524b5feb2d77114",
+      "subject": "test(agent-instructions): model provider absence in resolve",
+      "packages": [
+        "context/agent-instructions"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "08edb3cf10aef21fd997d83c8d2f949c1e3c7cb7",
+      "subject": "fix(agent-instructions): surface root marker stat errors",
+      "packages": [
+        "context/agent-instructions"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "ae19d9383b55d34be7156ed7231f51036a3e12ee",
+      "subject": "fix(session-controller): reject empty prompts",
+      "packages": [
+        "api/session-controller"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "a12d30df2a93c8b074cd4fd61ea0f0a14ecf7bf4",
+      "subject": "refactor(llm-pi-ai): reuse settings validation for startup recovery",
+      "packages": [
+        "extensions/tool-cordis",
+        "llm/llm-pi-ai",
+        "settings/settings"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "fe03b0686df1d9513144ee2d74276529a18b0d7a",
+      "subject": "fix(llm-pi-ai): keep catalog-invalid settings repairable",
+      "packages": [
+        "client/ui-settings-models",
+        "extensions/tool-cordis",
+        "llm/llm",
+        "llm/llm-pi-ai",
+        "settings/settings"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "76235ecfb70e62ecb6a404496b482691f374b439",
+      "subject": "docs: align Chinese WSL use cases with English",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "0ffbd658431dbda5b042a708aec6bd5ea64bffb4",
+      "subject": "test(web): follow hero headline nesting and Tool definitions copy in e2e",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "bbd899d47824f2a94e46ec1691c2f6fa71bb0130",
+      "subject": "fix(client): count IconGaugeOutline16 in the icon-set pin; keep the hero headline text addressable",
+      "packages": [
+        "client/ui-conversation",
+        "client/ui-primitives"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "a5a9746277c635a748258072e06f6e3910ac906e",
+      "subject": "docs: explain Windows and WSL development environments",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "eec9c3b69478feb4f8542d121dd1d8d3ee32e212",
+      "subject": "test(snapshot): avoid duplicate projection registry setup",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "2c45dfe71e39e2b874ba514ccc79414b6275b2bd",
+      "subject": "fix(client): address review — pill accessible names, static untimed pill, exclusive stat dialogs",
+      "packages": [
+        "client/ui-chat",
+        "client/ui-conversation",
+        "client/ui-model-selection"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "47434e8554f8d7862e9961285a5e81ccd8bcd7d7",
+      "subject": "fix(session-format): align v3 migration with merged release version",
+      "packages": [
+        "session/session-format-v2-to-v3"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "e73906d06f1b62675fd6810d4397ae47217dd51f",
+      "subject": "test(web): await seeded workspace membership before selection",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "4eebc70df29acfe1bc194c5a94c22cf8cb8def2a",
+      "subject": "test(agent-loop): account for route switch notice during prompt admission",
+      "packages": [
+        "core/agent-loop"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "08cfbd89701a31cf5bfa9b447044499e341d39ed",
+      "subject": "chore(api): remove stale session controller file dependencies",
+      "packages": [
+        "api/session-controller"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "4a60189a6368cf4049033ea26f47d078a5643059",
+      "subject": "fix(layout): prepare destination widths before fullscreen retreat",
+      "packages": [
+        "client/ui-layout",
+        "client/ui-sidebar-right"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "b92cc94122b98c98c9c5b331f517b1f2a297d603",
+      "subject": "test(minimal): cover documented editor opt-in",
+      "packages": [
+        "bundle/sdk-minimal",
+        "client/ui-user-questions"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "77690644b559a5f2f5bf15bbfc8a33db96c9594c",
+      "subject": "fix(sidebar): show full file paths and refine split and fullscreen controls",
+      "packages": [
+        "api/workspace-files",
+        "client/ui-dockkit",
+        "client/ui-layout",
+        "client/ui-sidebar-right",
+        "client/ui-sidebar-textpreview"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "755e3ceca730ffab9a353bbe512df0ee4becd2cf",
+      "subject": "test: cover file subscription and tab lifecycle edge cases",
+      "packages": [
+        "api/workspace-files",
+        "client/ui-sidebar-right"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "5e19460c28272f7cb20747267831a117c7ccf620",
+      "subject": "docs(notes): sync the continuable-subagent Send clause and tighten the label-state enumerations",
+      "packages": [
+        "client/ui-conversation"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "4fef2786a977cf58674e6c7631cac5588b6bb9a5",
+      "subject": "chore: regenerate catalogs, dependency lock, and translation hashes",
+      "packages": [
+        "api/workspace-files",
+        "client/resources",
+        "client/ui-chat",
+        "client/ui-deliverables",
+        "client/ui-dockkit",
+        "client/ui-layout",
+        "client/ui-sidebar-files",
+        "client/ui-sidebar-right",
+        "client/ui-sidebar-textpreview",
+        "client/ui-tool",
+        "e2b/fs-e2b",
+        "extensions/cordis-client-runner",
+        "extensions/tool-cordis",
+        "fs/fs",
+        "fs/fs-local",
+        "util/workspace-path"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "fe5aee7e718f558adfdd0ab532cf055795957e31",
+      "subject": "test(web): cover Sidebar interactions and refresh recorded UI expectations",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "bd4199f48c7ee483de361b7b012e167ed510342f",
+      "subject": "test: cover filesystem resources and Sidebar domain behavior",
+      "packages": [
+        "api/workspace-files",
+        "client/connection",
+        "client/locale",
+        "client/resources",
+        "client/ui-attachment",
+        "client/ui-chat",
+        "client/ui-conversation",
+        "client/ui-deliverables",
+        "client/ui-dockkit",
+        "client/ui-layout",
+        "client/ui-permission-presets",
+        "client/ui-settings-general",
+        "client/ui-settings-models",
+        "client/ui-sidebar",
+        "client/ui-sidebar-files",
+        "client/ui-sidebar-right",
+        "client/ui-sidebar-textpreview",
+        "client/ui-theme",
+        "client/ui-tool",
+        "client/ui-trajectory",
+        "client/ui-user-questions",
+        "client/ui-workflow-run",
+        "client/ui-workspace",
+        "context/agent-instructions",
+        "e2b/fs-e2b",
+        "fs/fs",
+        "fs/fs-local",
+        "fs/tool-fs",
+        "skill/skill-filesystem",
+        "util/workspace-path"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "508831624fb8270ecfe2fddf3e6eb1152f4eda29",
+      "subject": "chore(web): assemble Sidebar domains and register workspace packages",
+      "packages": [
+        "api/session-controller",
+        "bundle/web-app",
+        "client/web"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "a7c7e996522c3d226b0592455c66355ab5c9d86b",
+      "subject": "feat(deliverables): open produced files through Sidebar resources",
+      "packages": [
+        "client/ui-deliverables"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "108a7478c9b9b86b342cbc1e7a19daa2efbdb9fd",
+      "subject": "refactor(tool-ui): route file navigation and remove ToolDetails",
+      "packages": [
+        "client/ui-tool"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "7e017046caa8a7d12c7570a079a483d2f0b9b8ff",
+      "subject": "refactor(chat): open file resources in the Sidebar and remove Details",
+      "packages": [
+        "client/ui-chat"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "d10af0654f191cdf309ca8f7ef2920002683267e",
+      "subject": "feat(textpreview): add paged file tabs and retained reader state",
+      "packages": [
+        "client/ui-sidebar-textpreview"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "b24ebc8cce461e6df86413ac9cff8df0f0966e89",
+      "subject": "feat(sidebar-files): add lazy workspace file tree tabs",
+      "packages": [
+        "client/ui-sidebar-files"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "b67e0a838cbc50fbec8b8b6b9b66cc4486766c09",
+      "subject": "feat(sidebar): add tab navigation, injected information, and fullscreen shell",
+      "packages": [
+        "client/ui-sidebar-right"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "49095507824431a31638b2ed54d9f6e54878a486",
+      "subject": "feat(conversation): provide the session header corner slot",
+      "packages": [
+        "client/ui-conversation"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "9241e10a47f6633042d5d681cddad8a1116340a3",
+      "subject": "feat(layout): add responsive right column and width concessions",
+      "packages": [
+        "client/ui-layout"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "9e7c570094b6c7cd90b1a8606e073242eaf00d73",
+      "subject": "feat(dockkit): add reversible docking engine and pointer interactions",
+      "packages": [
+        "client/ui-dockkit"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "9f2b07cea85eb0c445156bdcd1f1e62fbce58c2f",
+      "subject": "feat(remotes): expose workspace file operations to the Client",
+      "packages": [
+        "api/remotes"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "4ce4f0bac4ef9b1b19e7c06347c94b2711e24b61",
+      "subject": "feat(workspace-files): add dual-face file API and Host-resolved resources",
+      "packages": [
+        "api/workspace-files"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "3a85ac6d8161b845edfdbc8ce51477da6fe2dcca",
+      "subject": "feat(resources): add Client resource registry and retained subscriptions",
+      "packages": [
+        "client/resources",
+        "client/ui-slots"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "4a4b86d9b044b9967cf532f41f9802a9109c18d1",
+      "subject": "feat(workspace-path): define Session and absolute file resource addresses",
+      "packages": [
+        "util/workspace-path"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "4429763445d70f3015dfef0115177d39570eebae",
+      "subject": "feat(fs-e2b): implement cancellable sandbox byte windows",
+      "packages": [
+        "e2b/fs-e2b"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "bc2174e3aa48f76ad328538caec122fff1f398b3",
+      "subject": "feat(fs-local): implement bounded local byte windows",
+      "packages": [
+        "fs/fs-local"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "f7b6a13321c1a3c2b89852deb069722560822e06",
+      "subject": "feat(fs): define bounded byte-range reads",
+      "packages": [
+        "fs/fs"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "ad38d636265ff442abe50b4922e35c6b4e75284c",
+      "subject": "fix(client): ellipsize the composer placeholder — one docked line, two hero lines",
+      "packages": [
+        "client/ui-conversation"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "4a89178785e594630ea372b4c2d45b16a487df13",
+      "subject": "fix(open-in-app): hide workspace app actions over SSH",
+      "packages": [
+        "client/ui-open-in-app",
+        "host/open-in-app"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "dbb9db5f343235a818062d67b192a65bdfe94e1b",
+      "subject": "docs(session-controller): refresh translation pairing record",
+      "packages": [
+        "api/session-controller"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "3997f36999a186e9a24944f162f3fe0882ccd8e4",
+      "subject": "feat(client): replace the stats strip with two icon pills and click-open stat dialogs",
+      "packages": [
+        "client/ui-attachment",
+        "client/ui-chat",
+        "client/ui-conversation",
+        "client/ui-model-selection",
+        "client/ui-primitives",
+        "extensions/cordis-client-runner"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "2cb684c754452f4903c1d19398c921daba956658",
+      "subject": "test(web): pin the failed-upload Send label and document the bench mirror scope",
+      "packages": [
+        "client/ui-conversation"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "68643a07f966c02f495ee3ddc3309a5f9d9c9e3d",
+      "subject": "docs(session-controller): unwrap zh readme paragraph",
+      "packages": [
+        "api/session-controller"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "753effe602b5c49598843614d1caa33b6689dbf3",
+      "subject": "fix(bench): rely on testkit session projection mounting",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "2555474a7d778a588aa571cab1bed444af6d33c9",
+      "subject": "refactor(cli): simplify profile option forwarding",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "7a7b7d5a534cec26f515cb757a525e54d6d8d070",
+      "subject": "fix(cli): make profile template creation exclusive",
+      "packages": [
+        "boot/app-boot"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "8935c3d725b16ceb8ac28d5f75398af26e04993f",
+      "subject": "fix(web): keep plain Send while a file upload is pending",
+      "packages": [
+        "client/ui-conversation"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "dd25e1e6b389423d2f3ae021783c0221ac80c352",
+      "subject": "feat(cli): create profiles from shipped templates",
+      "packages": [
+        "boot/app-boot"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "5c98a81a50a27e3e492d73471ce421ac5b4d0d6f",
+      "subject": "test(benchmarks): explicitly compose the SDK file editor",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "d3281d0218c3176028eb265a3cef2481e1b5cb28",
+      "subject": "docs(minimal): explain editor opt-in configuration",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "2f630626b89012485fdcdf36a1e2c1d62fe62a47",
+      "subject": "fix(web): name the running Send mode only for a plain message draft",
+      "packages": [
+        "client/ui-conversation"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "4bcabe6da463fc74716d9f4222bb981e998e69a0",
+      "subject": "test: pair spill cleanup roots with concurrent run results",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "9a5ed6fb60ef21fab0876be330fe60931384b270",
+      "subject": "fix(web): make the running Send button follow the busy-Enter setting",
+      "packages": [
+        "client/ui-conversation"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "f3c98e45397e0e7b393e28f09519c3dc1fdfd727",
+      "subject": "test(web): settle queue tooltip and select exact seeded session",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "3ae70558e7faf7843626288ce2cb11b556b31bd8",
+      "subject": "test: make publint assertion callbacks explicitly void",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "f4e10a61b160e496057c5b78b29a80fa9fe39669",
+      "subject": "test: make publint assertion callbacks explicitly void",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "153d54a2f207fb47990cc4c2500b739796c0c560",
+      "subject": "ci: retain shared persistent npm cache",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "d792a694efed8824f9f5f5493608b4edfcfe053c",
+      "subject": "test: bind publint subprocess lifetime to lane cancellation",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "f91f33094a6f1b8acae44060dcd1d15dceb7b374",
+      "subject": "test: bind publint subprocess lifetime to lane cancellation",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "c4ad45378d2188d0059b14dc6727b180b7b30d36",
+      "subject": "test(web): await admitted queue image before snapshot",
+      "packages": [
+        "client/ui-conversation"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "07b9d2e780f6da8cad80428bf27aee1e2685b556",
+      "subject": "test(web): await admitted queue image before snapshot",
+      "packages": [
+        "client/ui-conversation"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "67c5136c7ea1c2a7c1088797d8db2eeeef1c05cf",
+      "subject": "fix(api): refuse non-regular files before open and bound full streams",
+      "packages": [
+        "api/session-controller"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "ba4a536030fe8f84fa36018271a62432110e4cea",
+      "subject": "fix(api): honor only bytes ranges and ignore malformed or multi-range headers",
+      "packages": [
+        "api/session-controller"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "5acf3cd09ba204bb32a6cb6a71f73ed6b405924e",
+      "subject": "fix(typert): try explicit forwarding edges before star edges and reuse the resolution cache",
+      "packages": [
+        "typert/generator"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "4ee338532ad1b735d9e18315c727767a3a00a393",
+      "subject": "ci: retain shared pnpm store across runner instances",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "8b8a051c7a3846ad8e0da88718b281e833dd71a0",
+      "subject": "fix(api): address /api/file review findings",
+      "packages": [
+        "api/session-controller",
+        "client/ui-primitives"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "dbd28a8071a89d41e9055b79c06eacd4736f2e8b",
+      "subject": "fix(benchmarks): keep composer focus during streamed input",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "9baebd8f3f3d0b20e11d25ccc250fd0963c1430f",
+      "subject": "fix(benchmarks): keep composer focus during streamed input",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "201987b374dea255229f0724749a33a14880b3b5",
+      "subject": "perf(llm): scan file content without per-array callbacks",
+      "packages": [
+        "llm/llm"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "a7661e2672b408e5194220456f2595e750813620",
+      "subject": "perf(llm): scan file content without per-array callbacks",
+      "packages": [
+        "llm/llm"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "ead14339bc2908d8764300b873fe35c816a3058f",
+      "subject": "refactor(ui-chat): fold local-path media mapping into AssistantMarkdown",
+      "packages": [
+        "client/ui-chat"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "4b009e7f942425f537ece03b112b6220cb0e1abd",
+      "subject": "refactor(api): shrink media-references surface and reuse maintained libs",
+      "packages": [
+        "api/session-controller"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "f81c5072bdd885b3f8a8d438337e6bb49aeaf7be",
+      "subject": "fix(api): close coverage edges in media-references route",
+      "packages": [
+        "api/session-controller"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "b685a9a6b09d8dd302f8fc0124564d4680f0f22f",
+      "subject": "fix(api): satisfy oxlint same-type operand rule in range header",
+      "packages": [
+        "api/session-controller"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "b2a3a0335dbfd11cb49417acc5f8c07a292f5d3e",
+      "subject": "fix(typert): follow package-local forwarding modules in cross-package references",
+      "packages": [
+        "typert/generator"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "7a715e7919269f590161480266144bb9b6fa2a87",
+      "subject": "refactor(api): serve /api/file media by extension allowlist only",
+      "packages": [
+        "api/session-controller"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "0c823f4b6fea7313817933fbf480c46cfff58fd7",
+      "subject": "chore(docs): re-record config catalog translation-pair record",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "d9042f61e1ed165af6aeac313d013cce8d441fc5",
+      "subject": "test(snapshot): refresh V3 human-steering child recording",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "b7f66f4440f76359253050a843d381fe720a6ae1",
+      "subject": "test(sdk): record native V3 human-steering inbox transitions",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "2aaa88ca1a6613929d14adcafdc7f901884f4a19",
+      "subject": "chore(docs): regenerate config catalog after session-controller import shift",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "e2b3800a7ea1f2e80684d89b6b5f1c2c218ef08f",
+      "subject": "fix(python): challenge fresh file state in live SDK smoke",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "9da174c3043aece0f71eb972dc2133d13e5c52a9",
+      "subject": "fix(web): display local media paths referenced in session prose",
+      "packages": [
+        "api/session-controller",
+        "client/ui-chat",
+        "client/ui-primitives"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "f7b1658ff244fa305416b9afd5eba732cf63af05",
+      "subject": "fix(benchmarks): reserve system heads in generated V3 histories",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "0d0914b81438080a733c5c23c3b3dc2cc9c2c397",
+      "subject": "fix(agent-loop): import message type for freeze provenance",
+      "packages": [
+        "core/agent-loop"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "1ca0df2e24d8b34e2c53c08f9e67111c62cf96f0",
+      "subject": "test(python): synchronize advanced snapshot workflow membership",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "d1e925445451aceb5f2f67cae710a438f1f66d1f",
+      "subject": "fix(web-tests): author preset and stats seeds in current format",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "dda0f059998a714316edcfb9b1011ddbb74de553",
+      "subject": "fix(web-tests): generate native system head before chat users",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "73865675a41321130f5df2be696010b659ed4d8d",
+      "subject": "docs(system-prompt): combine cache guarantees in model-experience field",
+      "packages": [
+        "core/system-prompt"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "ff33f79eb1591be145cd2942e63c2e643feef312",
+      "subject": "fix(session): migrate legacy code preset references to ptc",
+      "packages": [
+        "session/session-format-catalog",
+        "session/session-format-v2-to-v3"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "21db102cea652e7e6b80210be9a60a2990f5d055",
+      "subject": "refactor(ui-goal): keep activation slot types private",
+      "packages": [
+        "client/ui-goal"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "d43d93d89fe839a0bfe4b0231fec4fc6810eb1b4",
+      "subject": "test(agent-loop): use current persona slots in admission harness",
+      "packages": [
+        "core/agent-loop"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "4879a8a33ab8f772d9f25577794a85d3ce644fae",
+      "subject": "refactor(desktop): remove unrelated changes and own host dependencies",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "74a6d30aba7da3caceda44ceb7d238937058f71b",
+      "subject": "test(cli): seed resumed native V3 sessions with protected system heads",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "78f03ffef9823228acd1bcf9ae93da6bcc15458e",
+      "subject": "fix(session): cover V3 admission and keep compressed fixture migratable",
+      "packages": [
+        "session/session-persistence-jsonl"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "0125f9019e6171d05842aa90beab85a7905ad66d",
+      "subject": "revert: remove pwsh changes from desktop PR",
+      "packages": [
+        "shell/tool-pwsh-persistent"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "fbb385c58fca949406e540f08f06989bf1381502",
+      "subject": "test(web): pin replay timezone and await UI settlement",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "d006772ab6a524629cf858cef206e89dd7e25753",
+      "subject": "fix(goal): enforce durable pause at execution time",
+      "packages": [
+        "goal/tool-goal"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "8188dc55f92c9093632e742c0462c8bff4ddc83e",
+      "subject": "test(snapshot): make ACP diagnostic wait deterministic",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "35bc3a3c606821f87433fda184c3bfa5f097c799",
+      "subject": "test(web): normalize browser timezone in snapshots",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "541dc51e9e0377cd5a418e45e7ff34f206797a38",
+      "subject": "fix(desktop): allow fs-ext in generated projects",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "8551b04e95ea3e9b79380d15f90d571fd2fa0803",
+      "subject": "test(tool-subagent): use current session format in fixture",
+      "packages": [
+        "subagent/tool-subagent"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "8b250f5df56c289e3b95b979477199dc49e4e320",
+      "subject": "test: synchronize console and shell readiness and pin browser timezone",
+      "packages": [
+        "experimental/inspector",
+        "terminal/terminal-bash"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "ed3c7efade634757ab024c890cc6ed4451aca71d",
+      "subject": "test: sync pwsh snapshots and readiness",
+      "packages": [
+        "terminal/terminal-bash"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "24f6b30d101f58a1a96b53b827889dd8d7636ddd",
+      "subject": "test(web): isolate browser timezone and settle reference fixture queries",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "1ed20364cd398965b2485732982cdc2e7f9840b2",
+      "subject": "test(snapshot): refresh PowerShell fixtures",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "571ee55ca6e573f419aa4d8bcf40ed304fd03bd2",
+      "subject": "test(web): pin recorded Cordis browser timezone",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "313a8958c4c32e6b8ff2d9f125f6e23ae3f371dd",
+      "subject": "fix(test): pin minimal PowerShell fixtures and wait for exact prompt readiness",
+      "packages": [
+        "terminal/terminal-bash"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "8def94aa5ab3c5b9ed08a2bbb4d93e1744479c8c",
+      "subject": "test(sdk): record in-history admission in composed V3 PTC scenario",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "691861091f4625183a5840b11e8ea35800dd6889",
+      "subject": "test(python): record upper V3 native event ordering",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "6cb0bc1e69bf9d571b1cc186cb14b0d6bcf399df",
+      "subject": "test(session): record upper V3 PowerShell admission order",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "afec36839d29f179dfabdbe6d13df8099df968bf",
+      "subject": "test(snapshot): refresh upper V3 ACP and Web event ordering",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "b2d1cd942ed0fef24b8b9ba377b909b70836a9e1",
+      "subject": "docs(token-meter): distinguish projection cache from Session V3",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "1fb187b31eee98a1ccc6275e9919b9fd16b59c57",
+      "subject": "test(session): record final V3 admission order across native profiles",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "179699a8c8789bb5abf5004c9308a94c02c76fc5",
+      "subject": "test(snapshot): mark in-history scenarios as native V3",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "621d03d00301fe607547828d6ba2f37e33f3e3bd",
+      "subject": "test(trajectory): pass partial-window state to the assembler fixture",
+      "packages": [
+        "client/ui-trajectory"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "cea0aff474d607136e81c4b8e5fbaf3167a792fa",
+      "subject": "fix(web): display known prompts in headerless history windows",
+      "packages": [
+        "client/ui-chat",
+        "client/ui-trajectory",
+        "extensions/cordis-client-runner"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "4574602c071a301f6aed9bddf79b576cd51b4dd9",
+      "subject": "fix(token-meter): distinguish compact caches from parent scalar version",
+      "packages": [
+        "llm/token-meter"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "85421f31bc3c3171b22c55299bb955c53b8932ed",
+      "subject": "fix(agent-loop): detect first resumed pre-step replacement",
+      "packages": [
+        "core/agent-loop"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "c562a4193c6b503d84426bb4bdc1a950257f01f7",
+      "subject": "test(web): omit throughput for zero-duration skill seed",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "6861ac745992a970910d8ca90cc35529ce46aded",
+      "subject": "refactor(client): trust narrowed surface event markers",
+      "packages": [
+        "client/ui-chat",
+        "client/ui-trajectory"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "044777fc2b381e0e46ee58de73d9b0850e68b32e",
+      "subject": "docs(prompt): remove stale representation claims after integration",
+      "packages": [
+        "client/ui-chat"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "f7b3f237bdd5fffb3c03774f91ad7268d6b074f1",
+      "subject": "test(session): target the admitted request header in spill replay",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "af87e576dacc3ad595383b4e7916fab11c0fffea",
+      "subject": "test(token-meter): preserve shadow-price mismatch rejection coverage",
+      "packages": [
+        "llm/token-meter"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "42955a346a53568fa2b39dca7f709cb620ba0a46",
+      "subject": "test(python): record final admitted-input notification order",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "fc1bc118e9562ab2e241cb1a599ebc5b2639590d",
+      "subject": "docs: align generated admission contracts and SDK evidence",
+      "packages": [
+        "extensions/tool-cordis"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "326f5ef8692d7f2f833e5e90f1a158172587892a",
+      "subject": "test(session): refresh admitted-input ordering across shipped profiles",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "627747d8faee6f0237e5ff88e2f49232d88b5569",
+      "subject": "docs: synchronize prompt admission contracts and repair lifecycle diagram",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "2b363223da55f222864e296f224173c0f39acb65",
+      "subject": "fix(agent-loop): clear noncanonical retained system content",
+      "packages": [
+        "core/agent-loop"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "99cffb4de7e8b30cc5ad275cd753bd5cb0f02191",
+      "subject": "test(client): construct immutable multi-block system fixture",
+      "packages": [
+        "client/ui-conversation"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "84e94d8394c12599db39d12393b14c95accb5ca2",
+      "subject": "test(token-meter): narrow optional projection state before checkpoint checks",
+      "packages": [
+        "llm/token-meter"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "1721a9c566b72162e69110c5c02143736c330716",
+      "subject": "test(compaction): expect admitted instructions on metered retry",
+      "packages": [
+        "compaction/compaction-basic"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "7e253f399533cef286396fc4c64b0a37ba6977ed",
+      "subject": "test(llm-deepseek): isolate in-history cache retention evidence",
+      "packages": [
+        "llm/llm-deepseek"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "b3116b604873f4899a69a693c2558001dabd6cf4",
+      "subject": "fix(client): derive effective system prompts from surviving surface nodes",
+      "packages": [
+        "client/ui-chat",
+        "client/ui-conversation",
+        "client/ui-trajectory"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "9c8884284f3c772e38c96aea77f084a57dc2840f",
+      "subject": "test(sdk): record in-history system prompt updates in both clients",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "8d0bf14eb69fa10948626119b93c5dc9500f9d9b",
+      "subject": "docs(notes): remove superseded in-history prompt proposal",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "095c51aa1c25595f539e1a64fe0177a8969b5856",
+      "subject": "fix(ui-trajectory): compare consecutive prompt updates with latest state",
+      "packages": [
+        "client/ui-trajectory"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "6525195953d19a0f45a433ac362caa5718a95a7a",
+      "subject": "fix(token-meter): classify surviving prompts in surface order",
+      "packages": [
+        "llm/token-meter"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "40286861367f4f193a47d890647bcb1a64915ecf",
+      "subject": "fix(agent-loop): clear every retained system instruction",
+      "packages": [
+        "core/agent-loop",
+        "core/session",
+        "core/system-prompt"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "425a0a55e31e5684bbeb64f336594e2e76316261",
+      "subject": "fix(agent-loop): reconcile prompts after retry compaction",
+      "packages": [
+        "core/agent-loop",
+        "core/system-prompt"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "2ce9738564965e2e8b760158b8075e2f9e21f1ce",
+      "subject": "fix(agent-loop): admit prompts under the prepared route",
+      "packages": [
+        "core/agent",
+        "core/agent-loop",
+        "core/session",
+        "core/system-prompt"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "c988a6796f838c2d0060bac648f647ab117f2ec4",
+      "subject": "feat(agent-loop): append system prompt changes on capable routes",
+      "packages": [
+        "client/ui-chat",
+        "client/ui-conversation",
+        "client/ui-trajectory",
+        "compaction/compaction-basic",
+        "core/agent-loop",
+        "core/session",
+        "core/system-prompt",
+        "extensions/tool-cordis",
+        "llm/llm",
+        "llm/llm-deepseek",
+        "llm/token-meter",
+        "test-support/llm-replay",
+        "test-support/session-snapshot"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "fcbadb07dbc135ef63d29ace9bd183aacd4a85b6",
+      "subject": "fix(benchmarks): keep Session opening fixture migratable to V3",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "f7c5621db696275beeffa66a90b6a4f70ee882ec",
+      "subject": "test(snapshot): refresh current V3 PowerShell fixtures",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "15345af731ff19f51a76215ef1b740098c2ae081",
+      "subject": "fix(test): synchronize console enablement and verify fresh SDK file content",
+      "packages": [
+        "experimental/inspector"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "cc69d5fcac5462d383f9215f53bcb25499e9b0d8",
+      "subject": "fix(ci): isolate Playwright cache and installation locks per runner",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "4158a8118854a3a5baea7a189e95539c8c074a90",
+      "subject": "test(snapshot): cover cleanup when spill allocation fails",
+      "packages": [
+        "test-support/session-snapshot"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "362ee7931d9e58d2673d8cc6cb967aa151450ae4",
+      "subject": "fix(test): isolate recorded spill and sandbox fixture storage",
+      "packages": [
+        "fs/fs-sandbox",
+        "test-support/session-snapshot"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "f50dce316c315aae95ddb38e8f22e5182619202a",
+      "subject": "fix(ci): isolate persistent pnpm indexes on runner data volumes",
+      "packages": [
+        "test-support/session-snapshot"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "350dcad963ae3d28b8a7fbf5d150a328db761fe6",
+      "subject": "fix(test): allocate sandbox snapshot outside temp grants on runner volume",
+      "packages": [
+        "test-support/session-snapshot"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "e61d9fc0c7202f870c8981386cb9f67a9c6df6b3",
+      "subject": "fix(ci): isolate npm caches and synchronize ACP snapshot completion",
+      "packages": [
+        "subagent/subagent-acp"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "6ad07994196935cba19cc77b6786db12f6c5fcc8",
+      "subject": "test(cli): seed diagnostic parent with native system head",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "4107ae75167ba360429ad408c50b734f487736e7",
+      "subject": "test(sdk): record combined V3 PTC system-message notifications",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "1439887241f467842adf81b0a9b144046f858f42",
+      "subject": "fix(ci): keep PR temporary files under runner cleanup",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "5f2c6765818d1c012a279a03df05270a84885559",
+      "subject": "test(cli): author native v3 inheritance replay fixture",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "a4dcff874e34702385d660ffadd20a7c56355cd6",
+      "subject": "fix(scripts): validate historical fixture layout with source codecs",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "2890cf3a189462b52bc532654f835295316869dd",
+      "subject": "docs(replay): regenerate catalog after removing notification shim",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "b47bfa711b171d11ab7fc99be1ccb5b03596b390",
+      "subject": "test(session): pin structural v3 chain expectations",
+      "packages": [
+        "session/session-format-catalog"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "ab74a93ed32a322355bda9f460629e9975241d02",
+      "subject": "test: compare current notification outputs without legacy migration shim",
+      "packages": [
+        "test-support/llm-replay"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "449fb9c71e8c72533678e77db42f55af6118c7d1",
+      "subject": "docs(notes): remove duplicate promoted system-prompt proposal",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "cfc10f7e1f28e4cfb9936303b26f0eee613a4ae5",
+      "subject": "test(session): keep migration assertions type-aware",
+      "packages": [
+        "session/session-persistence-jsonl",
+        "test-support/llm-replay"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "e9957a2671ae2fedf2bb3bc5089638deae803d5a",
+      "subject": "test(python): record native V3 delivery provenance",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "49e10500920c5fcc5a0754aea10b6c16f8a3b7e9",
+      "subject": "fix(session-format): narrow repair identities for native validation",
+      "packages": [
+        "session/session-format-v2-to-v3"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "9e5f8a1e44d6b60bd31c20cc2e5c03b0ac6b59fd",
+      "subject": "test(session-format): cover V3 durable admission branches",
+      "packages": [
+        "session/session-format-v2-to-v3"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "5c48f8101a52a273808179ff08da21ca23d6b363",
+      "subject": "test(session): retain positive predecessor migration lifecycle coverage",
+      "packages": [
+        "session/session-persistence-jsonl"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "6579d53a979daf879f544ad9c53e6806db04cc92",
+      "subject": "test(sdk): preserve current V3 output and shared-base message spacing",
+      "packages": [
+        "test-support/session-snapshot"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "8f48afe851410525f0fe325c23751d7d3aeb7753",
+      "subject": "test(session): record native V3 writer oracles without rewriting history",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "ab7f19cd3dab895d35764190a5ebc2cb493ebcdb",
+      "subject": "test(session): refuse frozen pre-step fixture at current open",
+      "packages": [
+        "session/session-persistence-jsonl"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "c09ca68e6f2d55309a709430e2f9ad1cb7e2a7bf",
+      "subject": "test(session): pin deliberate historical corpus refusals",
+      "packages": [
+        "test-support/llm-replay"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "3d898cb9547701d4b21e87638ba2b35c558f30af",
+      "subject": "test(session): cover V2 system prompt persistence migration",
+      "packages": [
+        "session/session-persistence-jsonl"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "d551f5a118fdad557184fa186ee24500e107bec7",
+      "subject": "test(session-snapshot): pin migrated empty system head",
+      "packages": [
+        "test-support/session-snapshot"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "e6499cd2cc8dd91fcff02e8fc2ead0c593e485da",
+      "subject": "test(session-snapshot): preserve historical retired fixture roles",
+      "packages": [
+        "test-support/session-snapshot"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "6f5fc05ea3b2618c90a94846be93113685c9d8f2",
+      "subject": "fix(session-format): admit audited V2 corpus payloads",
+      "packages": [
+        "session/session-format-v2-to-v3"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "9fa3c8e7f6451d700fc0b25e626b9f6cea56d676",
+      "subject": "build(session): link V3 source-validation dependency",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "e04cfc4c872dd510f9e2fc6d6289b3f8cbfbf040",
+      "subject": "feat(session-format): migrate V2 prompts into V3 system surfaces",
+      "packages": [
+        "session/session-format-v2-to-v3"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "9efabace8681268c51aecffdab9c219071be352e",
+      "subject": "docs(snapshot): separate historical inputs from V3 writer oracles",
+      "packages": [
+        "test-support/session-snapshot"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "a592e70ebc62c23af65d71bdffb64a578cae18cb",
+      "subject": "test: compare packed history using its released codec expansion",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "1a9bef60c239d9c728a70db81382f5b0372642cf",
+      "subject": "test: separate native V3 writer expectations from historical replay",
+      "packages": [
+        "test-support/session-snapshot"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "19fdc374489a2b17f0a56ce8bfee9f09c9065b4c",
+      "subject": "docs(session): define V3 system-head migration guarantees",
+      "packages": [
+        "core/session"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "8cdc6eba0235df064b00f487c615deb868a556ee",
+      "subject": "test(session): preserve released fixtures with corrected V3 successors",
+      "packages": [
+        "test-support/session-snapshot"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "7af8a596ceb8168e5affcb21a6654a1d734d640f",
+      "subject": "test(llm-pi-ai): keep rejection assertions type-safe",
+      "packages": [
+        "llm/llm-pi-ai"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "eba829784bd43f2ebbd179e05e376d6ebadb9cf6",
+      "subject": "fix(token-meter): invalidate header-based breakdown caches",
+      "packages": [
+        "llm/token-meter"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "454b80b90ea246951b863edea3f99395f73ad8cc",
+      "subject": "fix(llm-pi-ai): reject leading system images before splitting",
+      "packages": [
+        "llm/llm-pi-ai"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "fe2ac749b91707c8b9f8f1e54fc292f870f00ca6",
+      "subject": "test(web): refresh plan and goal recorded session metadata",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "f92eff58e08f4bf4172291a54eee10c6ca4830ba",
+      "subject": "test(web): align seeded expectations with resumed system prompts",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "ae2be09813ae8c953ceaa8ab3136c5e9e3401946",
+      "subject": "test(web): refresh stale system-message session fixtures",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "7901c6bc9cbd1a54382d0b1321c65205c3b860be",
+      "subject": "test(replay): type decoded fixture records without unsafe any",
+      "packages": [
+        "test-support/llm-replay"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "616803de74a2611e067c6b99dd0147e450b53f37",
+      "subject": "test(session): verify the live session-query spill locator",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "77b6b10c2139c0f37925c41a9c545d88ed23e51c",
+      "subject": "fix(ui-chat): preserve prompt cards on resumed requests",
+      "packages": [
+        "client/ui-chat"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "237ed693c1426cf07065c5eade87a851608b898c",
+      "subject": "test(session): adapt upstream spill fixture to system surface node",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "af07d59d101567c6ba474750ed5825592d4b1d1e",
+      "subject": "test(session-reference): capture the actual pre-spill watermark",
+      "packages": [
+        "context/session-reference"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "1616c99dae156eef119d058e7276553f7eb40edc",
+      "subject": "test(snapshot): expect rejection of invalid historical citations",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "b4d8a31ae87e26cb59e810f43901d64d10059334",
+      "subject": "test(session-snapshot): regenerate current rec-pin recording",
+      "packages": [
+        "test-support/session-snapshot"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "dac85fada1743d2bec3f7b86492bd9fcad2e2e7a",
+      "subject": "test(session-snapshot): close pin-turn step before replacement",
+      "packages": [
+        "test-support/session-snapshot"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "eba45d9add924ab00d5e356f436bc9b128a267f1",
+      "subject": "fix(rebase): preserve the complete replay plugin after migration API merge",
+      "packages": [
+        "test-support/llm-replay"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "db5e57347b73b80984986a23c946cc20844683da",
+      "subject": "fix(snapshots): separate historical replay inputs from current header pins",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "0a02da4ba68bde69cc03809c287e8dfe7ec34fcd",
+      "subject": "docs: regenerate catalogs for corrected prompt ownership",
+      "packages": [
+        "extensions/tool-cordis"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "4c9f5efc07ad18dbe24987f16b4be97219889a20",
+      "subject": "fix(agent-loop): reserve the initial empty system head",
+      "packages": [
+        "core/agent-loop"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "c29b97ad945aa3ee106c282453c159ed2608c6dc",
+      "subject": "test(python): refresh system-node and packed restart expectations",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "3607b320c7cde96cb36f65c0ab247c45fef6f7c0",
+      "subject": "test(snapshot): repair recorded child system message UUID",
+      "packages": [
+        "test-support/session-snapshot"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "bba5ec5f7a5e968e193adb3d055422cb1b4b6a3e",
+      "subject": "style(snapshot): restore one-event-per-line behavior fixtures",
+      "packages": [
+        "test-support/session-snapshot"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "e8e0ec417631a91f0365225767bd2df7c3fb79f8",
+      "subject": "docs(snapshot): remove stale prompt scrubber conflict residue",
+      "packages": [
+        "test-support/session-snapshot"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "7b182e95e1ff8c8f4e5557bd8a763db56b4d0b5e",
+      "subject": "fix(snapshot): enforce fixture storage for every selected role",
+      "packages": [
+        "test-support/session-snapshot"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "1adcd8203a7a3ef1c7875835d29f7f55347733de",
+      "subject": "fix(token-meter): anchor usage after admitted prompt inputs",
+      "packages": [
+        "compaction/compaction-basic",
+        "llm/token-meter"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "8bde91378438e6c4d5b0fefe74f9634edd6b2d42",
+      "subject": "refactor(compaction): replay the derived system head as a message",
+      "packages": [
+        "compaction/compaction-basic",
+        "llm/llm-deepseek",
+        "llm/llm-pi-ai"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "be53ea7dff83d68334496af053578dd95702dd90",
+      "subject": "fix(snapshot): preserve unexpected request header fields",
+      "packages": [
+        "test-support/llm-replay",
+        "test-support/session-snapshot"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "ee956c720d23051a028828ccbedca18195f4ae53",
+      "subject": "refactor(session): represent the system prompt as surface node zero",
+      "packages": [
+        "acp/acp",
+        "client/connection",
+        "client/ui-chat",
+        "client/ui-conversation",
+        "client/ui-trajectory",
+        "compaction/compaction-basic",
+        "context/session-reference",
+        "context/time-context",
+        "core/agent-loop",
+        "core/session",
+        "core/system-prompt",
+        "extensions/tool-cordis",
+        "llm/llm",
+        "llm/llm-deepseek",
+        "llm/llm-pi-ai",
+        "llm/token-meter",
+        "plan/plan-mode",
+        "session/session-checkpoint-policy",
+        "subagent/subagent-in-process-driver",
+        "subagent/subagent-spawn-in-process",
+        "test-support/llm-replay",
+        "test-support/session-snapshot"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "573485e8b5e64501d90cab47e7436d633d14a8a8",
+      "subject": "fix(snapshots): align V3 subagent message spacing",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "e53df8b64a7423bddf613e4ac2aba9b454aec2b4",
+      "subject": "fix(session): guard V3 delivery activation and smoke writer generation",
+      "packages": [
+        "session/session-format-catalog",
+        "session/session-format-v2-to-v3"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "5895f46b345dcbb0b8dc8e148d15daa95efd18c9",
+      "subject": "fix(session): preserve unsupported V3 events during tail recovery",
+      "packages": [
+        "client/ui-chat",
+        "core/tools",
+        "session/session-format-catalog",
+        "session/session-format-v2-to-v3",
+        "session/session-persistence-jsonl"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "eaae3502aea4ed25f6790bb7692328431923fc55",
+      "subject": "test(session): synchronize shared migration cancellation waiters",
+      "packages": [
+        "session/session-persistence-jsonl"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "d8d86b7eb8bb2a4743ccf157bcc780cf4a3721a4",
+      "subject": "Cover PTC dispatches through explicit TypeScript SDK profile patch",
+      "packages": [
+        "session/session-format-v2-to-v3"
+      ],
+      "bucket": "newUpstream"
+    },
+    {
+      "sha": "eb4259e405f6d999a1b589456be27c3fad9ef886",
+      "subject": "test(session): distinguish frozen PTC tags from current inventory",
+      "packages": [
+        "session/session-format-v0-to-v1"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "bad4254d71448679d9f850447dfcaf8a33d5dac8",
+      "subject": "Rename durable PTC vocabulary with identity-preserving v2 migration",
+      "packages": [
+        "api/session-controller",
+        "client/connection",
+        "client/ui-chat",
+        "client/ui-conversation",
+        "client/ui-tool",
+        "client/ui-trajectory",
+        "core/session",
+        "core/tools",
+        "extensions/tool-cordis",
+        "plan/plan-mode",
+        "session/session-format-catalog",
+        "session/session-format-v2-to-v3",
+        "session/session-persistence-jsonl",
+        "spill/spill-policy"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "82ed0673546b1c2839e02b25cb3d2a3d7a7a167a",
+      "subject": "fix(session): synchronize V3 graph and preview fixtures",
+      "packages": [
+        "experimental/webworker-runtime"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "d56f2d2cb41a3414fd7bed2107a999080b4dac87",
+      "subject": "test(session): use explicit void callbacks in migration assertions",
+      "packages": [
+        "session/session-format",
+        "session/session-format-v2-to-v3"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "4cacd5829dfec1a216cf6d288de98e5c4a7a766f",
+      "subject": "docs(session): register V3 migration in generated config catalog",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "705f84f9527d52f3c46b9d5b31efbfe5d5678283",
+      "subject": "docs(session): document format upgrades and advance current V3 fixtures",
+      "packages": [
+        "experimental/webworker-packer",
+        "experimental/webworker-runtime",
+        "session/session-persistence-jsonl",
+        "test-support/llm-replay",
+        "test-support/session-snapshot"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "f7a622115882a93fda819ff71a5274fc223fd622",
+      "subject": "feat(session): add identity V2-to-V3 migration and writer skeleton",
+      "packages": [
+        "core/session",
+        "session/session-format",
+        "session/session-format-catalog",
+        "session/session-format-v0-to-v1",
+        "session/session-format-v1-to-v2",
+        "session/session-format-v2-to-v3"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "8b94ed9c21fa7329edbb46016defce9205b75833",
+      "subject": "test: align hygiene gate expectation",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "fd1e51b097ed962b0a634cd37dc497fed9831920",
+      "subject": "test(web): refresh master-added goldens for the reworded placeholder",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "eac164392d1b35de75107826dd610c3eeac6da4d",
+      "subject": "fix(client): name the context meter's tools row precisely and drop the header approximation",
+      "packages": [
+        "client/ui-conversation"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "a49376a2ca4082c19a1c5670e1ed1d803e196bee",
+      "subject": "fix(client): reword composer placeholders around the / and @ triggers",
+      "packages": [
+        "client/ui-conversation"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "a3208573a6d9aaeb1c7ff08bb0c6ac9a10522084",
+      "subject": "fix(client): polish composer and hero spacing",
+      "packages": [
+        "client/ui-attachment",
+        "client/ui-conversation"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "5813c14deece17dd632ccb4db6fe6c9db6a08d82",
+      "subject": "fix(client): portal composer menus over the sidebar and float toasts near the top",
+      "packages": [
+        "client/ui-agent-preset",
+        "client/ui-model-selection",
+        "client/ui-primitives"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "9e5745de3b0f687273960d5b272988402aca9d8d",
+      "subject": "fix(desktop): align app versions with release",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "42c7317bac70ac356ca39bb9aadf2174f4ed8095",
+      "subject": "chore(cli): remove obsolete desktop host exclusion",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "a19065017fc38e5dc0e558b279b927b76e0f1b83",
+      "subject": "chore(ci): deduplicate client static gates",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "5d9603b7638a9913c9fff952c1e54c9997cf033f",
+      "subject": "feat(web): localize slash command descriptions",
+      "packages": [
+        "client/locale",
+        "client/ui-commands",
+        "client/ui-input-trigger",
+        "client/ui-model-selection"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "64ca04e8fbfe49032e6c73cf218c1f1e6c4cd83b",
+      "subject": "test(compaction): allow complete live summaries",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "81c6f740e03dfd2133edcb6c65d7bdc84d3e6ce3",
+      "subject": "test(web): stabilize snapshot replay",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "588be2d3c51fe004913a20cbf524812c195498e9",
+      "subject": "test(web): refresh clickable links after upload merge",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "e09407e655504951c243358f0cdc1cbfc01d67ce",
+      "subject": "fix(desktop): adapt host fetch handlers",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "fe0b7f281450a4b128570c5cb1eda60d4c568c99",
+      "subject": "fix(desktop): move host out of CLI package",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "56d6c25c9d4d8e935b356a057d4677162745bfcc",
+      "subject": "fix(client): keep goal activation coverage in client face",
+      "packages": [
+        "client/ui-goal"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "206e79ee3dbf95b4232973988e7ae11a359956ea",
+      "subject": "fix(client): order goal activation through inject hooks",
+      "packages": [
+        "client/connection",
+        "client/ui-goal",
+        "extensions/tool-cordis",
+        "goal/goal"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "8d06ebb5ac9aa8424c1eaf6684feae4f2bd9f625",
+      "subject": "Revert \"refactor: remove str_replace_editor\"",
+      "packages": [
+        "bundle/base",
+        "bundle/sdk-minimal",
+        "bundle/web-app",
+        "client/ui-deliverables",
+        "client/ui-tool",
+        "core/tools",
+        "fs/tool-str-replace-editor"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "79b3d7a59445fe56bb47457891dd7fa4f0ba28fc",
+      "subject": "refactor: remove str_replace_editor",
+      "packages": [
+        "bundle/base",
+        "bundle/sdk-minimal",
+        "bundle/web-app",
+        "client/ui-deliverables",
+        "client/ui-tool",
+        "core/tools",
+        "fs/tool-str-replace-editor"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "63795eaa5cba78cc0a92d95fccd8db5523d7f050",
+      "subject": "feat(minimal): remove str_replace_editor from minimal profiles",
+      "packages": [
+        "bundle/sdk-minimal",
+        "client/ui-agent-preset",
+        "preset/agent-presets"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "1d6633ae047658ab1569c89475bc7c2cc3c95b0c",
+      "subject": "test(snapshot): sync web goal prompt fixtures",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "3f848e1aa0bed58c6fc539869a5a8d85028c1734",
+      "subject": "docs(client): align goal bar activation comments",
+      "packages": [
+        "client/ui-goal"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "c724617593945f0cd4d3412e614983cebd322b0f",
+      "subject": "test(snapshot): migrate packed session fixtures",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "34f897d1ca3cabc2a137d8d552954195c299ee9f",
+      "subject": "refactor(goal): share goal bar resume branch",
+      "packages": [
+        "client/ui-goal"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "e26fc35d4b1b4ea2bff597738b6a81b402b9edc2",
+      "subject": "fix(goal): keep manual pause authoritative and show activation",
+      "packages": [
+        "api/remotes",
+        "client/connection",
+        "client/ui-goal",
+        "extensions/tool-cordis",
+        "goal/goal",
+        "goal/tool-goal"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "0c84f773d99c9edb388fd798f9c6754d39ec71ea",
+      "subject": "fix(desktop): align package version with release",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "b272d985f502aa25e182cc3c8723130ac53e9efe",
+      "subject": "test(shell): bound pwsh readiness fallback",
+      "packages": [
+        "shell/tool-pwsh-persistent"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "9f05e5a077abaa23d0bd460a38ab87f3890d9827",
+      "subject": "test(shell): assert persistent pwsh result text",
+      "packages": [
+        "shell/tool-pwsh-persistent"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "29e60f2c30af08ebbf010c1e9066cc418e28736e",
+      "subject": "fix(shell): avoid duplicate pwsh bootstrap",
+      "packages": [
+        "shell/tool-pwsh-persistent"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "94651815f2793b2f17f56f5d502b718117e49c82",
+      "subject": "fix(shell): preserve pwsh prompt readiness",
+      "packages": [
+        "shell/tool-pwsh-persistent"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "633b3c0f6959cd1e81d07c38557d6c2f33813c47",
+      "subject": "fix(desktop): keep package helpers platform-neutral",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "44d7ebf12f694e6873e2aeee7b7f03a79809e77a",
+      "subject": "fix(release): keep desktop version aligned with dsh",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "eeda3cb562d9fd0dc5a3545234ebf172a62db86a",
+      "subject": "test: stabilize desktop and pwsh coverage checks",
+      "packages": [
+        "shell/tool-pwsh-persistent"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "22461aedb08b2e7a2af3ff093736b79eef82efeb",
+      "subject": "feat(desktop): update packaging and auto-update paths for target-specific builds",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "0b8956aab9d5caab935249d06cdfec9755c84ea6",
+      "subject": "refactor(agent): move runtime parent into options",
+      "packages": [
+        "compaction/compaction-basic",
+        "core/agent",
+        "core/agent-loop",
+        "extensions/tool-cordis",
+        "schedule/schedule",
+        "sdk/server",
+        "subagent/subagent",
+        "subagent/subagent-in-process-driver"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "d5363c88398faf0c7523e8127a216291490b1986",
+      "subject": "feat(desktop): enhance auto-update configuration and add upload scripts",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "600dff4ca4155920923b4a0b7c4a04c2cd4a1dcc",
+      "subject": "test(tool-subagent): cover missing session registry",
+      "packages": [
+        "subagent/tool-subagent"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "8292ea45ba367b362bf275dc07e0226c6e08aad7",
+      "subject": "fix(tool-subagent): simplify standing preset cleanup",
+      "packages": [
+        "subagent/tool-subagent"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "c8f76ca39976472301cd482f91f8ad582b3b94cb",
+      "subject": "chore: remove unrelated changes from Inbox PR",
+      "packages": [
+        "client/ui-chat"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "8fa72e3d6011068b654091993fe43a1eeaac0bc4",
+      "subject": "fix(chat): settle scroll sample before resize follow",
+      "packages": [
+        "client/ui-chat"
+      ],
+      "bucket": "upstreamOnly"
+    },
+    {
+      "sha": "a596a02bbde95aee3e892b4e3a368a8bc7df5676",
+      "subject": "test(desktop): load pnpm fixture by file URL",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "c3447a2c15e4cf71cb0a94eb89462eda0a9f7420",
+      "subject": "test(headless): cover pre-turn inbox events",
+      "packages": [
+        "bundle/headless"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "6f4b38ea2e8ac74d20a9a8a437e0db7e77349d4a",
+      "subject": "docs: refresh agent loop testkit graph",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "dc160810da8b0cd5865471e006ff9a1fdbf1e2c6",
+      "subject": "test(agent-loop): use production inbox harness",
+      "packages": [
+        "api/session-controller",
+        "bundle/headless",
+        "context/agent-instructions",
+        "goal/command-goal",
+        "goal/goal",
+        "goal/tool-goal",
+        "test-support/agent-loop-testkit"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "f90d57f38921380c0d993d5028073e75a06c40bf",
+      "subject": "fix(desktop): address lifecycle review findings",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "a96ec3dbd696b5588827461e4ff8a578992cc555",
+      "subject": "test(agent-loop): keep inbox internals private",
+      "packages": [
+        "api/session-controller",
+        "bundle/headless",
+        "context/agent-instructions",
+        "core/agent-loop",
+        "goal/command-goal",
+        "goal/goal",
+        "goal/tool-goal",
+        "test-support/agent-loop-testkit"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "f0265146107cb92de84b693b69d4a9ad1e20613c",
+      "subject": "fix(desktop): align merged release lifecycle",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "6aaba0c3349ab2ba7caefaa93f11497c98a3ee9f",
+      "subject": "feat: windows build & sign",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "194bad298a0a67ee76d8f590a40fef6ddc347b4a",
+      "subject": "fix: mac build",
+      "packages": [
+        "extensions/tool-cordis"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "3f0b7779e6a10e9e876d8eb1b9ab69bc8a66ea24",
+      "subject": "test(headless): derive captured session length",
+      "packages": [
+        "bundle/headless"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "5f135ea9778ee617290fc567eae415e4a0bbee00",
+      "subject": "feat: mac code sign & notarize",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "03ec1ca57c220e843f54151400a1891777e5468d",
+      "subject": "fix(agent): preserve explicit identity lifecycle behavior",
+      "packages": [
+        "api/remotes",
+        "extensions/tool-cordis",
+        "subagent/subagent",
+        "subagent/tool-subagent"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "8e1c47f82f19941743064feccf54ee34ad1637b6",
+      "subject": "test(sdk): avoid duplicate projection registry",
+      "packages": [
+        "sdk/server"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "2aeb9920ee40323fb1e36fb699955dd409bed81f",
+      "subject": "test(agent-loop): remove duplicated Inbox fixture",
+      "packages": [
+        "api/session-controller",
+        "bundle/headless",
+        "context/agent-instructions",
+        "context/time-context",
+        "context/tmux-context",
+        "core/agent-loop",
+        "e2b/e2b",
+        "feedback/command-feedback",
+        "fs/tool-str-replace-editor",
+        "goal/command-goal",
+        "goal/goal",
+        "goal/tool-goal",
+        "jobs/jobs-local",
+        "schedule/schedule",
+        "shell/tool-bash-persistent",
+        "shell/tool-pwsh-persistent",
+        "skill/tool-skill",
+        "terminal/terminal",
+        "terminal/terminal-bash",
+        "terminal/tool-terminal",
+        "test-support/agent-loop-testkit",
+        "todo/tool-todo"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "d776df110652de11b661144842e21b8e8548a45a",
+      "subject": "test(agent-loop): exclude unreachable teardown paths",
+      "packages": [
+        "core/agent-loop"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "c33fe6265e0715a1f5efe989910c1d96a9b8bbd5",
+      "subject": "fix(agent-loop): restore inbox projection test wiring",
+      "packages": [
+        "acp/acp",
+        "compaction/compaction-basic",
+        "context/time-context",
+        "core/agent-loop",
+        "experimental/agent-team",
+        "experimental/tool-agent-team",
+        "fs/tool-fs",
+        "goal/goal-round-driver",
+        "guard/repeat-tool-reminder",
+        "hooks/hooks-claude-code",
+        "hooks/hooks-codex",
+        "llm/llm-retry",
+        "schedule/schedule",
+        "session/session-checkpoint-policy",
+        "shell/tool-bash",
+        "subagent/subagent",
+        "subagent/subagent-fork-in-process",
+        "subagent/subagent-in-process-driver",
+        "subagent/subagent-spawn-in-process",
+        "subagent/tool-subagent",
+        "subagent/tool-subagent-report",
+        "test-support/agent-loop-testkit",
+        "todo/tool-todo",
+        "workflow/tool-ralph",
+        "workflow/workflow-worker-thread"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "fc746f7851fb1465bdd4fc761765d6a58f78d842",
+      "subject": "refactor(agent-loop): own inbox projection in loop",
+      "packages": [
+        "core/agent",
+        "core/agent-loop",
+        "test-support/agent-loop-testkit"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "1101422362d08c3646fe97744e73ee660b97055c",
+      "subject": "refactor(agent): keep concrete inbox loop-internal",
+      "packages": [
+        "api/session-controller",
+        "bundle/headless",
+        "context/agent-instructions",
+        "context/time-context",
+        "context/tmux-context",
+        "core/agent",
+        "core/agent-loop",
+        "e2b/e2b",
+        "feedback/command-feedback",
+        "fs/tool-str-replace-editor",
+        "goal/command-goal",
+        "goal/goal",
+        "goal/tool-goal",
+        "jobs/jobs-local",
+        "schedule/schedule",
+        "shell/tool-bash-persistent",
+        "shell/tool-pwsh-persistent",
+        "skill/tool-skill",
+        "terminal/terminal",
+        "terminal/terminal-bash",
+        "terminal/tool-terminal",
+        "test-support/agent-loop-testkit",
+        "todo/tool-todo"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "ea222a1f729f15efb1cbd210b40c535a9111b7d7",
+      "subject": "fix(agent): report missing inbox projection",
+      "packages": [
+        "core/agent"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "77d0ee38d2c2e7db4cb483ad96bbd0d622118cba",
+      "subject": "docs: refresh Claude SDK notices",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "c46c3df2f250adc9117416a0f56e1ba5fc604bda",
+      "subject": "test: cover projection-aware session helpers",
+      "packages": [
+        "preset/agent-presets",
+        "session-query/session-query"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "8b0ea3e46101a022c17ca204a1dd2b66b5f67cdc",
+      "subject": "fix(session-controller): derive queues from projections",
+      "packages": [
+        "api/session-controller",
+        "core/agent-loop"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "e5f2fbd9a2c9babc4273c8cbefc288921cc2960f",
+      "subject": "fix(agent): validate durable inbox reconstruction",
+      "packages": [
+        "core/agent"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "f9227e0be6e9702216c59e69d9981992517f8dc7",
+      "subject": "docs(session-projection): keep registry contract unchanged",
+      "packages": [
+        "extensions/tool-cordis",
+        "session/session-projection"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "8eb0c50e743d59b4ce2c219af2495e6f67aa6576",
+      "subject": "test(session-projection): scope projection assertions",
+      "packages": [
+        "goal/goal",
+        "plan/plan-mode"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "90b7ac94e2005a3dc2aa71580ccaf585ec37b653",
+      "subject": "test: trim unrelated inbox changes",
+      "packages": [
+        "core/agent-loop",
+        "host/apiproxy"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "bd3b651ea8909440b2eec36f5dbd7bf4e2ddb6e1",
+      "subject": "refactor(agent): remove inbox service",
+      "packages": [
+        "bundle/base",
+        "bundle/headless",
+        "context/agent-instructions",
+        "context/time-context",
+        "context/tmux-context",
+        "core/agent",
+        "core/agent-loop",
+        "e2b/e2b",
+        "examples/agent-spine-demo",
+        "extensions/tool-cordis",
+        "feedback/command-feedback",
+        "fs/tool-str-replace-editor",
+        "goal/command-goal",
+        "goal/goal",
+        "goal/tool-goal",
+        "host/apiproxy",
+        "jobs/jobs-local",
+        "llm/llm-retry",
+        "plan/plan-mode",
+        "preset/agent-presets",
+        "schedule/schedule",
+        "shell/tool-bash-persistent",
+        "shell/tool-pwsh-persistent",
+        "skill/tool-skill",
+        "terminal/terminal",
+        "terminal/terminal-bash",
+        "terminal/tool-terminal",
+        "test-support/agent-loop-testkit",
+        "todo/tool-todo"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "aaf50dc39adcad8c34e4909b7d8d9c5dd9fcd874",
+      "subject": "refactor(agent): back Inbox with a durable projection",
+      "packages": [
+        "bundle/base",
+        "bundle/headless",
+        "context/agent-instructions",
+        "context/time-context",
+        "context/tmux-context",
+        "core/agent",
+        "core/agent-loop",
+        "e2b/e2b",
+        "examples/agent-spine-demo",
+        "extensions/tool-cordis",
+        "feedback/command-feedback",
+        "fs/tool-str-replace-editor",
+        "goal/command-goal",
+        "goal/goal",
+        "goal/tool-goal",
+        "host/apiproxy",
+        "jobs/jobs-local",
+        "llm/llm-retry",
+        "plan/plan-mode",
+        "preset/agent-presets",
+        "schedule/schedule",
+        "session/session-projection",
+        "shell/tool-bash-persistent",
+        "skill/tool-skill",
+        "subagent/subagent",
+        "subagent/tool-subagent-control",
+        "terminal/terminal",
+        "terminal/terminal-bash",
+        "terminal/tool-terminal",
+        "test-support/agent-loop-testkit",
+        "todo/tool-todo",
+        "workflow/workflow-worker-thread"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "903a9268978623429775457480663eb581cbe9aa",
+      "subject": "feat: optimize ipc perf",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "52b84e8564eea843b931d9e42de10c68594fe0e9",
+      "subject": "chore: missing content",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "2ef85b1e17591fb9fadc78549726413c56f38dfa",
+      "subject": "fix: windows build",
+      "packages": [
+        "client/connection",
+        "client/modules"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "19444907f096d62f667c5b8456f38869c817c997",
+      "subject": "feat: electron 打包",
+      "packages": [
+        "boot/app-boot",
+        "client/connection",
+        "client/modules"
+      ],
+      "bucket": "carried"
+    },
+    {
+      "sha": "71c34ff13a6d01c9a2080fa4f9a1e5622818471f",
+      "subject": "docs: refresh module graph",
+      "packages": [],
+      "bucket": "none"
+    },
+    {
+      "sha": "ebce3a5f04045e85bd76e5133fa9ecd0befb2862",
+      "subject": "refactor(agent): make runtime identity explicit",
+      "packages": [
+        "acp/acp",
+        "api/gateway",
+        "api/remotes",
+        "api/session-controller",
+        "bundle/headless",
+        "compaction/compaction-basic",
+        "core/agent",
+        "core/agent-loop",
+        "extensions/tool-cordis",
+        "schedule/schedule",
+        "sdk/server",
+        "subagent/subagent",
+        "subagent/subagent-in-process-driver",
+        "subagent/tool-subagent",
+        "typert/protocol",
+        "typert/registry",
+        "webhook/webhook"
+      ],
+      "bucket": "carried"
+    }
+  ]
+}

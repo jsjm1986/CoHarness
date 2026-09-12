@@ -116,6 +116,7 @@
     "verify-client-packages": "tsx scripts/verify-client-packages.ts",
     "verify-plugin-surfaces": "tsx scripts/verify-plugin-surfaces.ts",
     "verify-upstream-sovereignty": "tsx scripts/verify-upstream-sovereignty.ts",
+    "verify-upgrade-records": "tsx scripts/verify-upgrade-records.ts",
     "verify-vendored-links": "tsx scripts/verify-vendored-links.ts",
     "verify-cordis-config": "tsx scripts/verify-cordis-config.ts",
     "rescope-vendor": "tsx scripts/rescope-vendor.ts",
@@ -160,7 +161,8 @@
     "demo:acp": "node --import tsx packages/examples/acp-demo/src/bin.ts --config examples/acp-agent/cordis.yml",
     "mock:llm": "node --import tsx packages/test-support/llm-mock-server/src/bin.ts",
     "dev:web": "tsx scripts/dev-web.ts --poll",
-    "postinstall": "node scripts/install-lefthook.mjs"
+    "postinstall": "node scripts/install-lefthook.mjs",
+    "gen-upstream-commit-inventory": "tsx scripts/gen-upstream-commit-inventory.ts"
   },
   "devDependencies": {
     "@agentclientprotocol/sdk": "1.4.0",
