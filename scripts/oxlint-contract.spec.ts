@@ -69,7 +69,7 @@ probePromise()
     try {
       const paths: Array<readonly [label: string, path: string, tsconfig: string]> = []
       for (const [label, parent, tsconfig, extension = '.ts'] of probes) {
-        const path = join(repositoryRoot, parent, `oxlint-contract-${suffix}${extension}`)
+        const path = join(repositoryRoot, parent, `lint-contract-probe-${suffix}${extension}`)
         await writeFile(path, source)
         paths.push([label, relative(repositoryRoot, path), tsconfig])
       }
@@ -101,7 +101,7 @@ probePromise()
     } finally {
       await Promise.all([
         ...probes.map(([, parent, , extension = '.ts']) =>
-          rm(join(repositoryRoot, parent, `oxlint-contract-${suffix}${extension}`), { force: true })),
+          rm(join(repositoryRoot, parent, `lint-contract-probe-${suffix}${extension}`), { force: true })),
         rm(configPath, { force: true }),
       ])
     }
@@ -110,7 +110,7 @@ probePromise()
   it('runs JavaScript compatibility and nursery rules', async () => {
     const suffix = randomUUID()
     const configPath = await writeContractConfig(suffix)
-    const path = join(repositoryRoot, 'scripts', `oxlint-contract-${suffix}.ts`)
+    const path = join(repositoryRoot, 'scripts', `lint-contract-probe-${suffix}.ts`)
     const source = `export function firstProbe(): number {
   const first = 1
   const second = 2
@@ -230,7 +230,7 @@ export const longProbe = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 +
   it('reports an unused suppression', async () => {
     const suffix = randomUUID()
     const configPath = await writeContractConfig(suffix)
-    const path = join(repositoryRoot, 'scripts', `oxlint-contract-${suffix}.ts`)
+    const path = join(repositoryRoot, 'scripts', `lint-contract-probe-${suffix}.ts`)
 
     try {
       await writeFile(path, '// oxlint-disable-next-line no-console\nexport const value = 1\n')
@@ -353,7 +353,7 @@ export const longProbe = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 +
     'converges overlapping staged stylistic fixes through Oxlint under %s',
     async (fixFlag) => {
       const suffix = randomUUID()
-      const directory = join(repositoryRoot, 'scripts', `.oxlint-contract-${suffix}`)
+      const directory = join(repositoryRoot, 'scripts', `.lint-contract-${suffix}`)
       const path = join(directory, 'fix.ts')
 
       try {
