@@ -1,10 +1,11 @@
-- strong: Workbench
+- button "选择工作台":
+  - text: 我的工作台
+  - img
 - text: 3/4
 - button "Add conversation":
   - img
   - text: Add conversation
-- button "Single conversation"
 - tablist "Workbench":
-  - tab "Write a file named notes.txt Ready"
-  - tab "Reply with a one-sentence description Ready"
-  - tab "delta-with-a-long-workspace-name Ready" [selected]
+  - tab "Use the read tool twice Ready"
+  - tab "Use the read tool twice Ready"
+  - tab "Use the read tool twice Ready" [selected]

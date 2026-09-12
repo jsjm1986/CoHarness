@@ -79,13 +79,23 @@ describe('web e2e: fresh round trip through the real assembly', () => {
     }
   }, 200_000)
 
-  it('records the Web surface, source checkout, and session cwd in the request header', async () => {
+  it('records the Web surface, source checkout, and session cwd in the system prompt', async () => {
     if (settledSessionId === undefined) throw new Error('the drive turn did not publish a session id')
     const agent = scaffold.ctx.agents.get(settledSessionId)
     if (agent === undefined) throw new Error(`the settled Web agent ${settledSessionId} is no longer live`)
-    const system = agent.session.requestHeader()?.system
-    if (system === undefined) throw new Error('the settled Web request has no system prompt')
-    const prefix = system.split('\n\n').slice(0, 4).join('\n\n')
+    const system = agent.session.surface.nodes
+      .map(seq => agent.session.eventAt(seq))
+      .filter((event): event is Extract<SessionEvent, { type: 'system/message' }> => event?.type === 'system/message')
+      .flatMap(event => event.data.message.content)
+      .filter(block => block.type === 'text')
+      .map(block => block.text)
+      .join('')
+    if (system.length === 0) throw new Error('the settled Web request has no system prompt')
+    // The persona suffix ("Your working directory is …") renders as the
+    // prompt's last paragraph, after every tool-guidance section.
+    const paragraphs = system.split('\n\n')
+    const prefix = [...paragraphs.slice(0, 4), paragraphs.at(-1) ?? '']
+      .join('\n\n')
       .split(REPO_ROOT).join('{{sourceRoot}}')
       .split(join(scaffold.workspaceCwd, 'workspace')).join('{{cwd}}')
       .split(scaffold.baseUrl).join('{{webUrl}}')
