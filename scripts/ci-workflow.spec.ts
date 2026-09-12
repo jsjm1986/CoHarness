@@ -245,9 +245,12 @@ describe('CI workflow', () => {
       "github.event_name == 'pull_request' && needs.pr-scope.outputs.compat_mode == 'full'",
       "github.event_name == 'pull_request' && needs.pr-scope.outputs.python_mode == 'full'",
       "github.event_name == 'pull_request' && needs.pr-scope.outputs.windows_mode == 'full'",
+      "github.event_name == 'pull_request' && needs.pr-scope.outputs.gateway_mode == 'full'",
+      "github.event_name == 'pull_request' && needs.pr-scope.outputs.admin_ui_mode == 'full'",
       "always() && github.event_name == 'pull_request'",
       "github.event_name == 'workflow_dispatch' && inputs.suite == 'larger-runner-benchmark' && vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true'",
       "github.event_name == 'workflow_dispatch' && inputs.suite == 'consolidated-runner-benchmark' && vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true'",
+      "github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit'",
     ])
     const pushReachable = Object.entries(workflow.jobs)
       .filter(([, job]) => {
@@ -298,6 +301,62 @@ describe('CI workflow', () => {
     expect(config).not.toContain('packages/lsp/lsp-stdio/src/connection.ts')
     expect(config).not.toContain('packages/lsp/lsp-stdio/src/index.ts')
     expect(config).not.toContain('packages/lsp/lsp-stdio/src/instance.ts')
+  })
+
+  it('keeps the post-merge consumer sweep bounded like the pull-request lane', () => {
+    const workflow = loadWorkflow('.github/workflows/ci.yml')
+    const sweep = workflowJob(workflow, 'web-snapshot-sweep')
+    if (!isRecord(sweep.env)) throw new TypeError('web-snapshot-sweep must define an environment map')
+    expect(sweep.env).toMatchObject({
+      DSH_GATE_CONCURRENCY: '1',
+      DSH_NODE_COMPAT_SKIP_TYPECHECK: '1',
+      DSH_OXLINT_THREADS: '1',
+      DSH_PUBLINT_CONCURRENCY: '1',
+      DSH_SNAPSHOT_MAX_CONCURRENCY: '1',
+    })
+    const consumers = workflowJob(workflow, 'node-24-consumers')
+    const nodeCompat = (consumers.steps as unknown[]).find(step => isRecord(step) && step.name === 'Run keyless compatibility, snapshot, and artifact gates')
+    expect(nodeCompat).toBeDefined()
+  })
+
+  it('runs the independent Gateway checks only for their own selected mode', () => {
+    const workflow = loadWorkflow('.github/workflows/ci.yml')
+    const gateway = workflowJob(workflow, 'gateway')
+    const adminUi = workflowJob(workflow, 'gateway-admin-ui')
+    expect(gateway.if).toContain("needs.pr-scope.outputs.gateway_mode == 'full'")
+    expect(adminUi.if).toContain("needs.pr-scope.outputs.admin_ui_mode == 'full'")
+    expect(gateway.env).toMatchObject({
+      HGW_TEST_DATABASE_URL: 'postgres://hgw:hgw@127.0.0.1:5432/hgw_test',
+    })
+    expect(gateway.services).toHaveProperty('postgres')
+    const gatewayRuns = (gateway.steps as unknown[]).filter(isRecord).flatMap(step => typeof step.run === 'string' ? [step.run] : [])
+    expect(gatewayRuns).toEqual(expect.arrayContaining([
+      'npm run typecheck --prefix gateway',
+      'npm run build --prefix gateway',
+      'npm test --prefix gateway',
+    ]))
+  })
+
+  it('limits release and sandbox workflows to relevant changes while retaining manual or scheduled runs', () => {
+    for (const [file, expected] of [
+      ['.github/workflows/release.yml', 'apps/**'],
+      ['.github/workflows/release-vendor.yml', 'vendor/**'],
+      ['.github/workflows/sandbox.yml', 'native/**'],
+    ] as const) {
+      const workflow = loadWorkflow(file)
+      const trigger = workflow.on
+      if (!isRecord(trigger)) throw new TypeError(`${file} must define trigger mappings`)
+      expect(isRecord(trigger.pull_request) || file.endsWith('sandbox.yml')).toBe(true)
+      const push = trigger.push
+      if (isRecord(push)) {
+        const paths = push.paths
+        expect(paths).toContain(expected)
+      }
+      if (file.endsWith('sandbox.yml')) {
+        expect(trigger.schedule).toBeDefined()
+        expect(trigger.workflow_dispatch).toBeDefined()
+      }
+    }
   })
 
   it('requires one release-shaped Python runtime target on every pull request', () => {

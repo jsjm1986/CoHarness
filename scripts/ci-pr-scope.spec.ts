@@ -1,8 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { classifyCiPrScope, classifyWebVerification, clientSurfacePackages } from './ci-pr-scope.ts'
+import scopePolicy from './ci-scope-policy.json' with { type: 'json' }
 import { loadWebTestPolicy } from './web-test-policy.ts'
 
 describe('classifyCiPrScope', () => {
+  it('uses a versioned declarative policy for shared and model-input paths', () => {
+    expect(scopePolicy.version).toBe(1)
+    expect(scopePolicy.inertPrefixes).toContain('upgrades/')
+    expect(scopePolicy.scopedPackageGroups).toContain('util')
+    expect(scopePolicy.scopedPackageGroups).not.toContain('session')
+    expect(scopePolicy.modelInputPrefixes).toContain('apps/cli/config/')
+    expect(scopePolicy.gatewayPrefixes).toContain('gateway/')
+  })
   it('skips expensive lanes for pnpm action pin updates', () => {
     expect(classifyCiPrScope(
       ['.github/workflows/ci.yml', '.github/workflows/e2e.yml'],
@@ -20,6 +29,24 @@ describe('classifyCiPrScope', () => {
     })
   })
 
+  it('skips expensive lanes for upgrade and engineering records, including JSON', () => {
+    expect(classifyCiPrScope([
+      'upgrades/plans/UPGRADE-PLAN-dsh-v0.1.5-alpha.1.md',
+      'upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.5-alpha.1.json',
+      'upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.5-alpha.1.json',
+      'engineering/BENCHMARK.md',
+    ], '')).toMatchObject({
+      runExpensive: false,
+      reason: 'docs-only',
+      changedDocsOnly: true,
+      coverageMode: 'skip',
+      snapshotMode: 'skip',
+      compatMode: 'skip',
+      pythonMode: 'skip',
+      windowsMode: 'skip',
+    })
+  })
+
   it('keeps expensive lanes for source and dependency changes', () => {
     expect(classifyCiPrScope(['packages/e2b/e2b/package.json', 'pnpm-lock.yaml'], '')).toMatchObject({
       runExpensive: true,
@@ -34,12 +61,12 @@ describe('classifyCiPrScope', () => {
 
   it('selects the scoped lane for package source and test changes only', () => {
     expect(classifyCiPrScope([
-      'packages/session/session-format/src/catalog-default.ts',
-      'packages/session/session-format/tests/catalog.spec.ts',
+      'packages/util/timeout/src/nested/reader.ts',
+      'packages/util/timeout/tests/nested/reader.spec.ts',
     ], '')).toMatchObject({
       runExpensive: true,
       reason: 'scoped',
-      changedSourceFiles: ['packages/session/session-format/src/catalog-default.ts'],
+      changedSourceFiles: ['packages/util/timeout/src/nested/reader.ts'],
       changedPackageFiles: [],
       changedDocsOnly: false,
       coverageMode: 'scoped',
@@ -116,7 +143,7 @@ describe('classifyCiPrScope', () => {
       reason: 'scoped',
       coverageMode: 'scoped',
       snapshotMode: 'focused',
-      webGroups: ['conversation'],
+      webGroups: ['conversation', 'mobile', 'subagent', 'workbench'],
     })
   })
 
@@ -131,7 +158,7 @@ describe('classifyCiPrScope', () => {
 
   it('keeps the scoped snapshot when no changed package is browser-rendered', () => {
     expect(classifyCiPrScope([
-      'packages/session/session-format/src/catalog-default.ts',
+      'packages/util/timeout/src/index.ts',
     ], '', new Set(['client/ui-conversation']))).toMatchObject({
       reason: 'scoped',
       coverageMode: 'scoped',
@@ -144,6 +171,55 @@ describe('classifyCiPrScope', () => {
     expect(classifyCiPrScope([
       'packages/client/ui-conversation/src/message-row.ts',
     ], '')).toMatchObject({ reason: 'scoped', snapshotMode: 'scoped' })
+  })
+
+  it('forces full runtime coverage for Session and Cordis seams', () => {
+    for (const path of [
+      'packages/core/session/src/index.ts',
+      'packages/typert/generator/src/analyzer.ts',
+      'packages/client/connection/src/index.ts',
+    ]) {
+      expect(classifyCiPrScope([path], '')).toMatchObject({
+        reason: 'full',
+        coverageMode: 'full',
+        gatewayMode: 'skip',
+      })
+    }
+  })
+
+  it('fails closed for a new package group until its impact is classified', () => {
+    expect(classifyCiPrScope(['packages/future/new-capability/src/index.ts'], '')).toMatchObject({
+      reason: 'full',
+      coverageMode: 'full',
+    })
+  })
+
+  it('treats model-visible skill files as runtime inputs', () => {
+    expect(classifyCiPrScope([
+      'apps/cli/config/agent-presets/cordis/skills/cordis-plugin-development/SKILL.md',
+    ], '')).toMatchObject({
+      changedDocsOnly: false,
+      reason: 'full',
+      runExpensive: true,
+      snapshotMode: 'scoped',
+    })
+  })
+
+  it('selects the independent Gateway lanes for cloud protocol changes', () => {
+    expect(classifyCiPrScope(['gateway/src/principal.ts'], '')).toMatchObject({
+      reason: 'full',
+      gatewayMode: 'full',
+      adminUiMode: 'skip',
+    })
+    expect(classifyCiPrScope(['gateway/admin-ui/src/App.tsx'], '')).toMatchObject({
+      reason: 'full',
+      gatewayMode: 'full',
+      adminUiMode: 'full',
+    })
+    expect(classifyCiPrScope(['packages/util/timeout/package.json'], '')).toMatchObject({
+      gatewayMode: 'skip',
+      adminUiMode: 'skip',
+    })
   })
 })
 

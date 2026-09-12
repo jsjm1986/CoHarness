@@ -10,6 +10,19 @@ name: Sandbox
 on:
   push:
     branches: [master]
+    paths:
+      - '.github/workflows/sandbox.yml'
+      - 'native/**'
+      - 'packages/sandbox/**'
+      - 'packages/shell/**'
+      - 'packages/subprocess/**'
+      - 'vendor/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+  schedule:
+    - cron: '47 19 * * *'
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
+import scopePolicy from './ci-scope-policy.json' with { type: 'json' }
 import { expandPackageGroups, loadWebTestPolicy, scanGoldenOwners, WEB_TESTS_ROOT, type WebTestPolicy } from './web-test-policy.ts'
 
 /** The expensive pull-request CI lanes that a scope decision controls. */
@@ -28,6 +29,10 @@ export interface CiPrScope {
   readonly pythonMode: 'skip' | 'full'
   /** The Wine blocking gate and the native Windows gate inventory. */
   readonly windowsMode: 'skip' | 'full'
+  /** The independent cloud Gateway project and its ACL/runtime API tests. */
+  readonly gatewayMode: 'skip' | 'full'
+  /** The independent Gateway administration UI project. */
+  readonly adminUiMode: 'skip' | 'full'
 }
 
 /** The web browser verification tier for one changed path set. */
@@ -42,32 +47,71 @@ const MAX_SCOPED_PACKAGES = 4
 const FULL_WEB_VERIFICATION: WebVerificationPlan = { mode: 'full', groups: [] }
 const SKIP_WEB_VERIFICATION: WebVerificationPlan = { mode: 'skip', groups: [] }
 
+interface CiScopePolicy {
+  readonly version: number
+  readonly inertPrefixes: readonly string[]
+  readonly fullRuntimePrefixes: readonly string[]
+  readonly fullRuntimePackagePrefixes: readonly string[]
+  readonly scopedPackageGroups: readonly string[]
+  readonly modelInputPrefixes: readonly string[]
+  readonly modelInputSuffixes: readonly string[]
+  readonly gatewayPrefixes: readonly string[]
+  readonly adminUiPrefix: string
+}
+
+const policy = scopePolicy as CiScopePolicy
+if (policy.version !== 1) throw new Error(`ci-pr-scope: unsupported policy version ${String(policy.version)}`)
+
 function scopedPackage(path: string): string | undefined {
   const match = /^packages\/([^/]+\/[^/]+)\/(?:src|tests)\//.exec(path)
   return match?.[1]
 }
 
 function isScopedPath(path: string): boolean {
-  return /^packages\/[^/]+\/[^/]+\/(?:src|tests)\/[^/]+\.(?:ts|tsx)$/.test(path)
+  return /^packages\/[^/]+\/[^/]+\/(?:src|tests)\/[^*?{}\[\]]+\.(?:ts|tsx)$/.test(path)
 }
 
 /** Lockfile and build configuration, which every lane's inputs depend on. */
 const DEPENDENCY_PATH = /(^|\/)(?:package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|\.npmrc|tsconfig[^/]*\.json)$/
 
 /**
- * Documentation and agent notes, which no lane's inputs depend on. Golden
- * payloads under `apps/web/tests/snapshots/` are test data, not docs: their
- * `.md` extension must not read as documentation, or a golden-only diff would
- * skip every lane.
+ * Documentation records and agent notes, which no lane's inputs depend on.
+ * Golden payloads under `apps/web/tests/snapshots/` are test data, not docs:
+ * their `.md` extension must not read as documentation, or a golden-only diff
+ * would skip every lane.
  */
 function isInertPath(path: string): boolean {
   if (path.startsWith(`${WEB_TESTS_ROOT}snapshots/`)) return false
-  return path.startsWith('docs/')
-    || path.startsWith('website/')
-    || path.startsWith('.agents/')
+  return policy.inertPrefixes.some(prefix => path.startsWith(prefix))
     || path.endsWith('.md')
     || path.endsWith('.mdx')
     || path.endsWith('.i18n.yaml')
+}
+
+/** Runtime seams whose changes can alter generated contracts, durable history, model requests, authorization, or process confinement. */
+function isFullRuntimePath(path: string): boolean {
+  return policy.fullRuntimePrefixes.some(prefix => path.startsWith(prefix))
+    || policy.fullRuntimePackagePrefixes.some(prefix => path.startsWith(prefix))
+}
+
+function isKnownScopedPackagePath(path: string): boolean {
+  const match = /^packages\/([^/]+)\//.exec(path)
+  const group = match?.[1]
+  return group !== undefined && policy.scopedPackageGroups.includes(group)
+}
+
+/** Model-visible files are inputs even when they are stored as Markdown. */
+function isModelInputPath(path: string): boolean {
+  return policy.modelInputPrefixes.some(prefix => path.startsWith(prefix))
+    || policy.modelInputSuffixes.some(suffix => path.endsWith(suffix))
+}
+
+function isGatewayPath(path: string): boolean {
+  return policy.gatewayPrefixes.some(prefix => path.startsWith(prefix))
+}
+
+function isAdminUiPath(path: string): boolean {
+  return path.startsWith(policy.adminUiPrefix)
 }
 
 /**
@@ -244,13 +288,23 @@ export function classifyCiPrScope(
   const changedSourceFiles = paths.filter(path => /^packages\/[^/]+\/[^/]+\/src\//.test(path))
   const changedPackageFiles = paths.filter(path => path.endsWith('/package.json') || path === 'package.json' || path === 'pnpm-lock.yaml')
   const inertOnly = paths.length > 0 && paths.every(isInertPath)
-  const common = { changedSourceFiles, changedPackageFiles, changedDocsOnly: inertOnly }
+  const fullRuntime = paths.some(isFullRuntimePath)
+  const modelInput = paths.some(isModelInputPath)
+  const gatewayReachable = paths.some(isGatewayPath)
+  const adminUiReachable = paths.some(isAdminUiPath)
+  const common = {
+    changedSourceFiles,
+    changedPackageFiles,
+    changedDocsOnly: inertOnly && !modelInput,
+    gatewayMode: gatewayReachable ? 'full' as const : 'skip' as const,
+    adminUiMode: adminUiReachable ? 'full' as const : 'skip' as const,
+  }
   const webPlan = classifyWebVerification(paths, clientPackages, policy, goldenOwners)
   // The Node lanes run the whole runtime suite. Only documentation and the Python
   // SDK are provably outside their input domain; `scripts/**` is deliberately not
   // exempt, because it holds the gate runner every lane invokes and the fixture
   // generator the snapshot lane consumes.
-  const nodeLanesUnreachable = paths.length > 0 && paths.every(path => isInertPath(path) || path.startsWith('python/'))
+  const nodeLanesUnreachable = !modelInput && paths.length > 0 && paths.every(path => isInertPath(path) || path.startsWith('python/'))
   // The Python lanes build and exercise `python/**` plus the packaged runtime, so
   // only a Python or dependency change can reach them.
   const pythonLanesReachable = paths.some(path => path.startsWith('python/') || DEPENDENCY_PATH.test(path))
@@ -272,6 +326,8 @@ export function classifyCiPrScope(
     compatMode: 'full',
     pythonMode: 'full',
     windowsMode: 'full',
+    gatewayMode: 'full',
+    adminUiMode: 'full',
   }
 
   const changedLines = diff
@@ -291,7 +347,7 @@ export function classifyCiPrScope(
     pythonMode: 'skip',
     windowsMode: 'skip',
   }
-  if (inertOnly) return {
+  if (inertOnly && !modelInput) return {
     ...common,
     runExpensive: false,
     reason: 'docs-only',
@@ -304,7 +360,11 @@ export function classifyCiPrScope(
   }
 
   const packages = [...new Set(paths.map(scopedPackage).filter((value): value is string => value !== undefined))]
-  const scoped = paths.every(isScopedPath) && packages.length > 0 && packages.length <= MAX_SCOPED_PACKAGES
+  const scoped = !fullRuntime
+    && !modelInput
+    && paths.every(path => isScopedPath(path) && isKnownScopedPackagePath(path))
+    && packages.length > 0
+    && packages.length <= MAX_SCOPED_PACKAGES
   if (scoped) return {
     ...common,
     runExpensive: true,
@@ -365,6 +425,8 @@ function main(): void {
     `compat_mode=${result.compatMode}`,
     `python_mode=${result.pythonMode}`,
     `windows_mode=${result.windowsMode}`,
+    `gateway_mode=${result.gatewayMode}`,
+    `admin_ui_mode=${result.adminUiMode}`,
     `scoped_packages=${JSON.stringify(scopedPackages)}`,
   ].join('\n')}\n`)
 }

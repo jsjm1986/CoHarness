@@ -2550,9 +2550,16 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         if (!(error instanceof SessionPersistenceReadError) || error.code !== 'dependency') throw error
         // The revision moved under the page walk. Opening a session in the
         // browser attaches it concurrently with the first history read, and
-        // the resume appends lifecycle events, so the resident log is now the
-        // authoritative source; any other writer gets one restart on the new
-        // revision before the failure reaches the client.
+        // the resume appends lifecycle events across its whole settle window —
+        // an in-flight creation can still outlast one immediate retry — so an
+        // announced creation is awaited to completion before the resident-log
+        // check; any other writer gets one restart on the new revision before
+        // the failure reaches the client.
+        const pending = sessionCreations.get(sessionId)
+        if (pending !== undefined) {
+          // A rejected or disposed creation simply leaves the detached retry.
+          await pending.then(() => undefined, () => undefined)
+        }
         const nowAttached = ctx.sessions.get(sessionId)
         if (nowAttached !== undefined) return { kind: 'attached', session: nowAttached }
         return await boundedDetachedHistory(persistence, sessionId, request, signal)
@@ -3823,7 +3830,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               }
             }
           }
-          const source = await historySourceFor(sessionId, {
+          let source = await historySourceFor(sessionId, {
             ...(beforeSeq === undefined ? {} : { beforeSeq }),
             ...(maxMessages === undefined ? {} : { maxMessages }),
           }, signal)
@@ -3837,7 +3844,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               ? source.revision
               : await detachedHistoryRevision(sessionId, signal)
           }
-          const sourceSignature = historySourceSignature(source)
+          let sourceSignature = historySourceSignature(source)
           if (tailRequest && source.kind === 'attached') {
             const cached = readHistoryTailCache(
               sessionId, source.kind, sourceSignature, normalizedMaxMessages, projectionRevision, undefined,
@@ -3858,7 +3865,23 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           // appending, so awaiting between the two reads would pair events cut
           // at N with a baseline folded to N+1.
           const scope = await presenterScopeFor(sessionId, sourceSession(source))
-          const detachedBaseline = beforeSeq === undefined ? await coldHistoryBaseline(source, signal) : undefined
+          let detachedBaseline: SessionProjectionsBlock | undefined
+          if (beforeSeq === undefined) {
+            try {
+              detachedBaseline = await coldHistoryBaseline(source, signal)
+            } catch (error: unknown) {
+              if (!(error instanceof SessionPersistenceReadError) || error.code !== 'dependency') throw error
+              const nowAttached = ctx.sessions.get(sessionId)
+              if (nowAttached === undefined) throw error
+              // The walk finished on the pre-attach revision and the resume's
+              // lifecycle events landed before the baseline fold could match
+              // the window's last seq. Serve the resident log instead — the
+              // detached revision pair captured above no longer applies.
+              void detachedRevisionAfterPromise?.then(() => undefined, () => undefined)
+              source = { kind: 'attached', session: nowAttached }
+              sourceSignature = historySourceSignature(source)
+            }
+          }
           const cut = historyCutOf(source, beforeSeq === undefined, detachedBaseline)
           const page = historyPage(ctx, cut.events, beforeSeq, maxMessages, scope)
           const value = historyValue({

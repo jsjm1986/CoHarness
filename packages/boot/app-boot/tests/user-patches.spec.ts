@@ -4,7 +4,7 @@
  * a real Loader tree, kept live through transactional HMR.
  */
 
-import { mkdirSync, mkdtempSync, unlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -26,11 +26,25 @@ const NAME = 'dsh-test-bin'
 const tmp = (): string => mkdtempSync(join(tmpdir(), 'dsh-user-patches-'))
 
 async function eventually(test: () => boolean, message: string): Promise<void> {
-  const deadline = Date.now() + 10_000
+  // The refresh transactionally re-applies the real Loader tree, so the change
+  // can land long after the fs.watch callback on a saturated shared-loop
+  // runner; the window is sized to the test's declared budget below. Poll
+  // loosely so the observation itself does not add loop contention.
+  const deadline = Date.now() + 15_000
   while (!test()) {
     if (Date.now() >= deadline) throw new Error(message)
-    await new Promise(resolve => setTimeout(resolve, 10))
+    await new Promise(resolve => setTimeout(resolve, 25))
   }
+}
+
+/** Publish one patch generation as editors do — temp file then rename. A
+ * refresh triggered between writeFileSync's truncate and its data write reads
+ * a partial file and broadcasts a spurious parse failure; the rename pattern
+ * is exactly the single coalesced change chokidar's atomic-write
+ * normalization publishes. */
+function writePatch(filename: string, content: string): void {
+  writeFileSync(`${filename}.tmp`, content)
+  renameSync(`${filename}.tmp`, filename)
 }
 
 const settleChokidarChangeThrottle = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 75))
@@ -317,7 +331,7 @@ describe('boot with user patches', () => {
     }
   })
 
-  it('watches add, failure, recovery, and removal through transactional HMR', { timeout: 20_000 }, async () => {
+  it('watches add, failure, recovery, and removal through transactional HMR', { timeout: 30_000 }, async () => {
     const dir = tmp()
     const userDir = tmp()
     const filename = join(userDir, PROFILE_PATCH_FILENAME)
@@ -335,23 +349,23 @@ describe('boot with user patches', () => {
       compose: userPatches => [...basePatches, ...userPatches],
     })
     try {
-      writeFileSync(filename, '- id: noop\n  config:\n    value: live\n')
+      writePatch(filename, '- id: noop\n  config:\n    value: live\n')
       await eventually(() => (entryConfig(ctx, 'noop') as { value?: string }).value === 'live', 'user patch addition was not applied')
 
-      writeFileSync(filename, '- id: noop\n  config:\n    fail: true\n')
+      writePatch(filename, '- id: noop\n  config:\n    fail: true\n')
       await eventually(() => failures.length === 1, 'failed candidate was not broadcast')
       expect(failures[0]).toMatchObject({ filename })
       expect(failures[0]?.error).toBeInstanceOf(Error)
       expect((entryConfig(ctx, 'noop') as { value?: string }).value).toBe('live')
       await settleChokidarChangeThrottle()
 
-      writeFileSync(filename, 'invalid: [unclosed\n')
+      writePatch(filename, 'invalid: [unclosed\n')
       await eventually(() => failures.length === 2, 'parse failure was not broadcast')
       expect(failures[1]?.error).toBeInstanceOf(Error)
       expect((entryConfig(ctx, 'noop') as { value?: string }).value).toBe('live')
       await settleChokidarChangeThrottle()
 
-      writeFileSync(filename, '- id: noop\n  config:\n    value: recovered\n')
+      writePatch(filename, '- id: noop\n  config:\n    value: recovered\n')
       await eventually(() => (entryConfig(ctx, 'noop') as { value?: string }).value === 'recovered', 'valid recovery was not applied')
       await settleChokidarChangeThrottle()
 
@@ -365,7 +379,7 @@ describe('boot with user patches', () => {
       await dispose()
       const disposeDefault = await watchUserPatches(ctx, { binName: NAME, filename })
       try {
-        writeFileSync(filename, '- id: noop\n  config:\n    value: identity\n')
+        writePatch(filename, '- id: noop\n  config:\n    value: identity\n')
         await eventually(() => (entryConfig(ctx, 'noop') as { value?: string }).value === 'identity', 'default-compose user patch was not applied')
       } finally {
         await disposeDefault()

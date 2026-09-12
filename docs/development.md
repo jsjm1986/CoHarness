@@ -120,7 +120,7 @@ Contributors can opt into the comprehensive local gate set with `pnpm run check:
 
 ### CI gates
 
-The keyless [CI workflow](../.github/workflows/ci.yml) groups independent gates into broad lanes and runs a smaller compatibility signal across supported Node versions. Artifact consumers wait for one build within their lane. The separate real-API workflow runs `pnpm run test:e2e` with its configured worker bound. See [scripts/run-gates.ts](../scripts/run-gates.ts) and the workflow files for the current gate and job inventory.
+The keyless [CI workflow](../.github/workflows/ci.yml) selects lanes by impact. Shared Session, Cordis, Typert, Gateway, LLM, subagent, sandbox, subprocess, terminal, vendored, native, and client-connection changes keep the full runtime inventory; ordinary leaf-package changes can use scoped coverage and consumers. The independent Gateway checks run for cloud-control-plane changes, while model-visible skills and preset inputs remain runtime inputs. Artifact consumers wait for one build within their lane. Release and Sandbox workflows are path-scoped, with scheduled or manual runs preserving platform coverage; the CI `full-audit` dispatch runs the complete Linux runtime and browser inventory for release candidates. The separate real-API workflow runs `pnpm run test:e2e` with its configured worker bound. The [upstream upgrade playbook](cookbook/upstream-upgrade-playbook.md) defines the two change tracks and the evidence record. See [scripts/run-gates.ts](../scripts/run-gates.ts) and the workflow files for the current gate and job inventory.
 
 ### Daily commands
 

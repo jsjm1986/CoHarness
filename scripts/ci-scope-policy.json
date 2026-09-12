@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "inertPrefixes": [
+    ".agents/",
+    "docs/",
+    "engineering/",
+    "upgrades/",
+    "website/"
+  ],
+  "fullRuntimePrefixes": [
+    "vendor/",
+    "gateway/",
+    "native/"
+  ],
+  "fullRuntimePackagePrefixes": [
+    "packages/client/connection/",
+    "packages/host/apiproxy/"
+  ],
+  "scopedPackageGroups": [
+    "acp",
+    "attachment",
+    "compaction",
+    "context",
+    "credentials",
+    "e2b",
+    "feedback",
+    "fs",
+    "goal",
+    "guard",
+    "hooks",
+    "identity",
+    "interaction",
+    "jobs",
+    "lsp",
+    "mcp",
+    "plan",
+    "preset",
+    "runtime-diagnostics",
+    "schedule",
+    "sdk",
+    "session-query",
+    "settings",
+    "skill",
+    "spill",
+    "storage",
+    "test-support",
+    "todo",
+    "util",
+    "web",
+    "workflow",
+    "workspace",
+    "client"
+  ],
+  "modelInputPrefixes": [
+    "apps/cli/config/"
+  ],
+  "modelInputSuffixes": [
+    "/AGENTS.md",
+    "/SKILL.md"
+  ],
+  "gatewayPrefixes": [
+    "gateway/",
+    "packages/api/",
+    "packages/host/apiproxy/"
+  ],
+  "adminUiPrefix": "gateway/admin-ui/"
+}
