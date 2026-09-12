@@ -14,7 +14,7 @@ import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts,
   launchWebScaffold, recordFixture, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, newEnglishPage, saveFailureDom, saveFailureShot } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/steering', import.meta.url))
 const FIXTURE = join(SNAPSHOT_DIR, 'session.jsonl')
@@ -43,6 +43,13 @@ const STEER_ALL_FIXTURE = join(STEER_ALL_DIR, 'session.jsonl')
 const STEER_ALL_OVERRIDE = join(STEER_ALL_DIR, 'replay.override.json')
 const STEER_ALL_MID = join(STEER_ALL_DIR, 'mid-steer.expected.md')
 const STEER_ALL_SETTLED = join(STEER_ALL_DIR, 'settled.expected.md')
+// The whole scenario prefix — three fills, three Enters, and the dock
+// expansion — must land inside call 0's stream, before the question card
+// elects the composer overlay and hides the dock behind display:none. The
+// window is the server's wall-clock pacing, not the client's, so a starved
+// runner loses a 50 ms window outright; 300 ms gives the six browser
+// round trips room on the serialized sweep lane.
+const STEER_ALL_PACE_MS = 300
 const STEER_ONE = 'Interjection: include the word BANANA in your final reply.'
 const STEER_TWO = 'Interjection: include the word ORANGE in your final reply.'
 
@@ -304,7 +311,7 @@ describe('web e2e: empty-draft Cmd+Enter steers the whole queue', () => {
     scaffold = await launchWebScaffold({
       replayFixture: STEER_ALL_FIXTURE,
       replayOverride: STEER_ALL_OVERRIDE,
-      paceMs: REPLAY_PACE_MS,
+      paceMs: STEER_ALL_PACE_MS,
     })
     scaffold.ctx.on('session/event', (_session, event) => { sessionEvents.push(event) })
     browser = await chromium.launch()
@@ -322,10 +329,19 @@ describe('web e2e: empty-draft Cmd+Enter steers the whole queue', () => {
   })
 
   it.skipIf(MODE === 'record')('queues two messages, then flushes both with an empty-draft Cmd+Enter', async () => {
-    onTestFailed(() => saveFailureShot(page, 'web-e2e-steer-all'))
+    onTestFailed(async () => {
+      await Promise.all([
+        saveFailureShot(page, 'web-e2e-steer-all'),
+        saveFailureDom(page, 'web-e2e-steer-all'),
+      ])
+    })
     const input = page.locator('textarea').first()
     await input.waitFor({ timeout: 10_000 })
     const settled = scaffold.whenTurnSettled(30_000)
+    // The deadline rejects on schedule even when an upstream step already
+    // failed the test; mark it handled so the fallout is not an unhandled
+    // rejection. `await settled` below still surfaces a real timeout.
+    void settled.catch(() => {})
 
     // Call 0 streams a question-tool call; the fills must land inside the
     // first replay window, before the question composer replaces the textarea.
@@ -338,9 +354,13 @@ describe('web e2e: empty-draft Cmd+Enter steers the whole queue', () => {
     const dock = page.locator('[data-queue-dock]')
     // Both messages queued: the two-row dock shows a collapsed count header,
     // and Playwright text matching skips the hidden rows — expand the list,
-    // then assert each row's content.
+    // then assert each row's content. The expander is matched by name because
+    // it carries the count text; the whole sequence must still land inside
+    // the call-0 replay window — once the question card elects the composer
+    // overlay, the dock stays mounted under display:none and this click can
+    // never become visible.
     await dock.getByText('2 queued messages').waitFor({ timeout: 10_000 })
-    await dock.getByRole('button').click()
+    await dock.getByRole('button', { name: '2 queued messages' }).click()
     await dock.getByText(STEER_ONE, { exact: true }).waitFor({ timeout: 10_000 })
     await dock.getByText(STEER_TWO, { exact: true }).waitFor({ timeout: 10_000 })
     expect(await page.locator('[data-pending-steering]').count()).toBe(0)
