@@ -1,5 +1,6 @@
 // Shared plumbing for the web smoke tests (dist location, free port, failure shots).
 import { existsSync, mkdirSync } from 'node:fs'
+import { writeFile } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -116,6 +117,36 @@ export async function saveFailureShot(page: Page, name: string): Promise<void> {
   mkdirSync(dir, { recursive: true })
   try {
     await page.screenshot({ path: `${dir}/${name}.png`, fullPage: true })
+  } catch {
+    // Best-effort evidence: a dead page/browser at failure time must not mask the real assertion error.
+  }
+}
+
+/**
+ * DOM/layout evidence for "element resolved but not visible" failures: the
+ * composer's aria dump, each data-marked surface's bounding box and computed
+ * visibility, and the live viewport size. Best-effort like saveFailureShot.
+ * @param page - the page whose layout to record.
+ * @param name - artifact basename inside `.artifacts/`.
+ */
+export async function saveFailureDom(page: Page, name: string): Promise<void> {
+  const dir = fileURLToPath(new URL('../../../.artifacts', import.meta.url))
+  mkdirSync(dir, { recursive: true })
+  try {
+    const dump = await page.evaluate(() => {
+      const entries: string[] = [`viewport: ${window.innerWidth}x${window.innerHeight}`]
+      for (const el of document.querySelectorAll('[data-composer-seat], [data-queue-dock], [data-question-key], [class*="composerStack"], [class*="centerCol"]')) {
+        const rect = el.getBoundingClientRect()
+        const style = getComputedStyle(el)
+        entries.push(
+          `<${el.tagName.toLowerCase()} ${Array.from(el.attributes).map(a => `${a.name}=${JSON.stringify(a.value)}`).join(' ')}>`
+          + ` box=${Math.round(rect.x)},${Math.round(rect.y)} ${Math.round(rect.width)}x${Math.round(rect.height)}`
+          + ` display=${style.display} visibility=${style.visibility}`,
+        )
+      }
+      return entries.join('\n')
+    })
+    await writeFile(`${dir}/${name}.dom.txt`, `${dump}\n`)
   } catch {
     // Best-effort evidence: a dead page/browser at failure time must not mask the real assertion error.
   }

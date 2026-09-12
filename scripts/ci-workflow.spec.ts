@@ -326,6 +326,14 @@ describe('CI workflow', () => {
     const consumers = workflowJob(workflow, 'node-24-consumers')
     const nodeCompat = (consumers.steps as unknown[]).find(step => isRecord(step) && step.name === 'Run keyless compatibility, snapshot, and artifact gates')
     expect(nodeCompat).toBeDefined()
+
+    // The consumer inventory spawns built bins; a step-level DSH_SNAPSHOT would
+    // leak the replay config swap into their children and kill them at boot.
+    // Every snapshot consumer defaults to replay on its own.
+    const consumerStep = (sweep.steps as unknown[]).find(step =>
+      isRecord(step) && typeof step.run === 'string' && step.run.includes('check:ci:consumers'))
+    if (!isRecord(consumerStep)) throw new TypeError('web-snapshot-sweep must run check:ci:consumers')
+    expect(!isRecord(consumerStep.env) || consumerStep.env.DSH_SNAPSHOT === undefined).toBe(true)
   })
 
   it('runs the independent Gateway checks only for their own selected mode', () => {

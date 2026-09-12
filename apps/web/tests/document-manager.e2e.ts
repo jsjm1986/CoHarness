@@ -334,12 +334,29 @@ describe('web e2e: document manager', () => {
     const dialog = page.getByRole('dialog', { name: 'Document Manager' })
     await dialog.waitFor({ timeout: 10_000 })
 
-    const search = dialog.getByPlaceholder('Search document name')
     const upload = dialog.getByRole('button', { name: 'Upload Document' })
     const more = dialog.locator('[data-documents-toolbar-more]')
-    const [dialogBox, searchBox, uploadBox, moreBox] = await Promise.all([
-      dialog.boundingBox(), search.boundingBox(), upload.boundingBox(), more.boundingBox(),
-    ])
+    // Measure all four boxes in one synchronous pass: sequential boundingBox
+    // calls observe different layouts while the dialog still settles, and on a
+    // loaded runner upload/more can read rows apart mid-reflow.
+    const boxes = await page.evaluate(() => {
+      const box = (el: Element | null | undefined) => {
+        const rect = el?.getBoundingClientRect()
+        return rect === undefined ? null
+          : { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+      }
+      const dialog = [...document.querySelectorAll('[role="dialog"]')]
+        .find(el => el.getAttribute('aria-label') === 'Document Manager')
+      return {
+        dialogBox: box(dialog),
+        searchBox: box(dialog?.querySelector('input[placeholder="Search document name"]')),
+        uploadBox: box(dialog && [...dialog.querySelectorAll('button')]
+          .find(el => el.getAttribute('aria-label') === 'Upload Document'
+            || el.textContent?.includes('Upload Document'))),
+        moreBox: box(dialog?.querySelector('[data-documents-toolbar-more]')),
+      }
+    })
+    const { dialogBox, searchBox, uploadBox, moreBox } = boxes
     if ([dialogBox, searchBox, uploadBox, moreBox].some(box => box === null)) {
       throw new Error('document manager narrow geometry missing')
     }

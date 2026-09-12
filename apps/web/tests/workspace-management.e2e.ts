@@ -22,7 +22,7 @@ import {
   acknowledgeReloadConnectionLoss, assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
   launchWebScaffold, seedSession, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { newEnglishPage, saveFailureShot } from './support.ts'
+import { newEnglishPage, saveFailureDom, saveFailureShot } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/workspace-management', import.meta.url))
 // The seed is another scenario's committed fixture, reused read-only: this
@@ -102,15 +102,26 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
 
   /**
    * Reveal and click a row action, re-hovering if a projection update replaces
-   * the row before its hover-only button becomes visible.
+   * the row before its hover-only button becomes visible. The hover and the
+   * click share one bounded retry: a projection refresh can replace the row
+   * node between the two, dropping :hover and unmounting the button for good.
    */
   async function clickHoverAction(row: Locator, name: string): Promise<void> {
     const button = row.getByRole('button', { name })
-    await expect.poll(async () => {
+    const deadline = Date.now() + 30_000
+    for (;;) {
+      await row.scrollIntoViewIfNeeded()
       await row.hover()
-      return await button.isVisible()
-    }, { timeout: 10_000 }).toBe(true)
-    await button.click()
+      try {
+        await button.click({ timeout: 2_000 })
+        return
+      } catch (error) {
+        if (Date.now() >= deadline) {
+          await saveFailureDom(page, 'web-e2e-ws-hover')
+          throw error
+        }
+      }
+    }
   }
 
   beforeAll(async () => {

@@ -703,6 +703,17 @@ jobs:
       - name: Run the consumer inventory with the browser snapshot
         run: pnpm run check:ci:consumers
 
+      # Browser evidence lands in the gitignored .artifacts/; publish it only on
+      # failure so a red sweep keeps its screenshots and DOM dumps.
+      - name: Upload browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: web-sweep-failure-evidence
+          path: .artifacts/
+          if-no-files-found: ignore
+          retention-days: 14
+
   node-compat:
     needs: pr-scope
     # The compatibility smokes exercise runtime behaviour, so documentation-only
