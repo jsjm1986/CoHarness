@@ -724,6 +724,20 @@ export function fixtureUserPrompts(fixtureText: string): string[] {
 }
 
 /**
+ * The rendered system prompts on the durable system-prompt surface, one entry
+ * per `system/message` event — the post-migration replacement for reads of
+ * the removed `request/header` `system` field.
+ * @param events - session events to scan.
+ * @returns each system prompt's text blocks joined, in log order.
+ */
+export function systemPromptTexts(events: readonly SessionEvent[]): string[] {
+  return events.flatMap((event) => {
+    if (event.type !== 'system/message') return []
+    return [event.data.message.content.flatMap(block => block.type === 'text' ? [block.text] : []).join('')]
+  })
+}
+
+/**
  * Seed a recorded session fixture into the scaffold's persistence root
  * through the REAL backend API (throwaway Context + SessionStore + JSONL
  * plugin — the semantic-checkpoint precedent), never raw file writes: no
@@ -739,6 +753,9 @@ export function fixtureUserPrompts(fixtureText: string): string[] {
  * @param id - the seeded session id (stable for deterministic goldens).
  * @param agentPreset - the preset the recorded session was composed from,
  *   for scenarios asserting what a resumed session reports running.
+ * @param cwd - an explicit Session header and event cwd overriding the
+ *   scaffold workspace root, for seeds that must satisfy
+ *   `Workspace.attachSession` cwd validation against a child workspace path.
  * @returns the seeded id.
  */
 /**
@@ -767,8 +784,12 @@ export async function seedSession(
   fixtureText: string,
   id: string,
   agentPreset?: string,
+  cwd?: string,
 ): Promise<SessionId> {
-  const realized = realizeSeedFixture(scaffold, fixtureText, id)
+  const normalized = realizeSeedFixture(scaffold, fixtureText, id)
+  const realized = cwd === undefined
+    ? normalized
+    : normalized.split(scaffold.workspaceCwd).join(cwd)
   const events = parseSessionLog(realized)
   if (events.length === 0) throw new Error('seed fixture has no events')
   const last = events[events.length - 1]!
@@ -779,7 +800,7 @@ export async function seedSession(
     version: SESSION_FORMAT_VERSION,
     id: SessionId(id),
     createdAt: Date.now() - 60_000,
-    cwd: scaffold.workspaceCwd,
+    cwd: cwd ?? scaffold.workspaceCwd,
     isSeeded: false,
     delegationDepth: 0,
     ...agentPreset === undefined ? {} : { agentPreset },

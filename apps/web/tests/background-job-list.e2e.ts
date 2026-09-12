@@ -118,7 +118,9 @@ describe.skipIf(MODE === 'record')('web e2e: background job list', () => {
 
     // The trigger drops its live count once the task leaves running/stopping,
     // which is also the proof that settlement reached the browser unprompted.
-    const idle = page.getByRole('button', { name: '1 background job' })
+    // Exact match: the live label is a superstring of the idle one, so a
+    // substring match would resolve while the job still runs.
+    const idle = page.getByRole('button', { name: '1 background job', exact: true })
     await idle.waitFor({ timeout: 20_000 })
 
     const snapshot = await captureStableAria(page, '[class*="menu"]', scaffold.workspaceCwd)

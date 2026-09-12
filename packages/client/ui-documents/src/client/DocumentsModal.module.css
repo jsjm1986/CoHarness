@@ -1540,7 +1540,7 @@
     white-space: nowrap;
   }
 
-  .mobileMore {
+  .mobileActionGroup .mobileMore {
     display: inline-flex;
     flex: 0 0 auto;
     min-width: var(--dsw-touch-target);

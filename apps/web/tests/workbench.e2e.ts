@@ -11,12 +11,13 @@ import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-workspace'
 import {
   captureStableAria, compareOrRefreshGolden,
-  fixtureUserPrompts, launchWebScaffold, seedBlankSession, watchConsole, webSnapshotMode, type WebScaffold,
+  fixtureUserPrompts, launchWebScaffold, seedSession, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
 import { saveFailureShot } from './support.ts'
 
 const APPROVAL = fileURLToPath(new URL('./snapshots/approval-composer/session.jsonl', import.meta.url))
 const REPLY = fileURLToPath(new URL('./snapshots/live-interactions/session.jsonl', import.meta.url))
+const SEED = fileURLToPath(new URL('./snapshots/seeded-history/seed.jsonl', import.meta.url))
 const SNAPSHOTS = fileURLToPath(new URL('./snapshots/workbench', import.meta.url))
 const MODE = webSnapshotMode()
 
@@ -53,16 +54,19 @@ describe('web: Cordis Workspace workbench', () => {
       log.push(event)
       events.set(session.id, log)
     })
-    // Seed one normal blank Session per Workspace through the production
-    // persistence and Workspace registry paths. The browser exercises chooser
-    // selection and pane binding; no Session internals are injected.
+    // Seed one content-bearing Session per Workspace through the production
+    // persistence and Workspace registry paths; the chooser's history list
+    // hides blank Sessions, and attachSession validates the header cwd against
+    // the workspace path. The browser exercises chooser selection and pane
+    // binding; no Session internals are injected.
+    const seed = await readFile(SEED, 'utf8')
     const workspaceIds: string[] = []
     for (const name of ['alpha', 'beta', 'gamma', 'delta-with-a-long-workspace-name']) {
       const path = join(scaffold.workspaceCwd, name)
       await mkdir(path)
       await mkdir(join(path, 'workspace'))
       const workspace = await scaffold.ctx.workspaceRegistry.create(path)
-      const session = await seedBlankSession(scaffold, `workbench-${name}`, path)
+      const session = await seedSession(scaffold, seed, `workbench-${name}`, undefined, path)
       await workspace.attachSession(session)
       await scaffold.ctx.agents.resume({
         resumeSessionId: session,
@@ -79,6 +83,11 @@ describe('web: Cordis Workspace workbench', () => {
     await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
     const toolbar = page.locator('[data-workbench-toolbar]')
     await toolbar.waitFor({ timeout: 30_000 })
+    // The conversation viewport boots in single-session mode; entering the
+    // workbench is an explicit gesture through the toolbar's chooser, which
+    // switches the viewport and mounts the default layout's (empty) panes.
+    await toolbar.getByRole('button', { name: '选择工作台' }).click()
+    await page.getByRole('menuitem', { name: /我的工作台/ }).click()
     await page.locator('[data-workbench-empty-content]').waitFor({ timeout: 30_000 })
     for (const workspaceId of workspaceIds) {
       await toolbar.getByRole('button', { name: 'Add conversation', exact: true }).click()
@@ -125,10 +134,12 @@ describe('web: Cordis Workspace workbench', () => {
     await page.reload({ waitUntil: 'load' })
     await page.locator('[data-session-pane]').waitFor({ timeout: 30_000 })
     await expect.poll(() => page.locator('[data-session-pane] textarea').first().inputValue()).toBe('Delta draft survives pane changes')
-    await toolbar.getByRole('button', { name: 'Single conversation', exact: true }).click()
+    await toolbar.getByRole('button', { name: '选择工作台' }).click()
+    await page.getByRole('menuitem', { name: 'Exit workbench', exact: true }).click()
     expect(await page.locator('[data-session-pane]').count()).toBe(0)
     expect(await page.locator('textarea').first().inputValue()).toBe('Delta draft survives pane changes')
-    await toolbar.getByRole('button', { name: 'Workbench', exact: true }).click()
+    await toolbar.getByRole('button', { name: '选择工作台' }).click()
+    await page.getByRole('menuitem', { name: /我的工作台/ }).click()
     expect(await toolbar.getByRole('tab').count()).toBe(3)
     expect(tripwire.pageErrors).toEqual([])
   }, 240_000)
