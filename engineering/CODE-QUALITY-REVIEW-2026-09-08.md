@@ -99,7 +99,7 @@
 ### D1. [高] `SAFETY.md:20` 声称 WebFetch"默认关闭"，但发行默认组合实际开启
 - 文档要求（`SAFETY.md:20` / `SAFETY.zh.md:20`）：除非端点/脱敏/限流/审计/回滚获批，否则保持 WebFetch、插件 metadata、Session-log upload **关闭**。
 - 实现：`packages/bundle/base/cordis.patch.yml:410-438` 默认 `fetchProvider: http` + `fetch: true`；`apps/cli/config/agent-presets/{code,cordis,standard}/agent.cordis.yml` 均 `fetch: true`。即 **headless/ACP/SDK/默认 CLI 组合 WebFetch 默认可出网**；仅 `web-app/cordis.patch.yml:463` 在 Web UI 层 `tool-web: disabled`。
-- 该默认开启是**有意的跟随上游决策**（`UPGRADE-PLAN-dsh-v0.1.2-alpha.4-alpha.5.md:37`，#3382），并带公网-only / 地址校验 / 连接 pinning 缓解（web 审查确认 SSRF 防护扎实）。
+- 该默认开启是**有意的跟随上游决策**（`upgrades/plans/UPGRADE-PLAN-dsh-v0.1.2-alpha.4-alpha.5.md:37`，#3382），并带公网-only / 地址校验 / 连接 pinning 缓解（web 审查确认 SSRF 防护扎实）。
 - **结论**：不是漏洞，而是 `SAFETY.md` 措辞与实现默认值脱节。应在文件级明确 WebFetch 在 headless/preset 下默认开启并指向安全缓解，或在 base bundle 默认关闭。
 
 ---

@@ -10,7 +10,7 @@ Status: implemented
 
 ## Decision
 
-本 fork 记录两个 tag，并在对应能力的所有者处移植行为，而不合并历史。完整对比与状态矩阵位于 [`UPGRADE-PLAN-dsh-v0.1.2-alpha.2-alpha.3.md`](../../../../UPGRADE-PLAN-dsh-v0.1.2-alpha.2-alpha.3.md)，机器可读的来源与决策清单位于 [`UPGRADE-MANIFEST-dsh-v0.1.2-alpha.2-alpha.3.json`](../../../../UPGRADE-MANIFEST-dsh-v0.1.2-alpha.2-alpha.3.json)。
+本 fork 记录两个 tag，并在对应能力的所有者处移植行为，而不合并历史。完整对比与状态矩阵位于 [`UPGRADE-PLAN-dsh-v0.1.2-alpha.2-alpha.3.md`](../../../../upgrades/plans/UPGRADE-PLAN-dsh-v0.1.2-alpha.2-alpha.3.md)，机器可读的来源与决策清单位于 [`UPGRADE-MANIFEST-dsh-v0.1.2-alpha.2-alpha.3.json`](../../../../upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.2-alpha.2-alpha.3.json)。
 
 已随代码采用的上游行为如下：
 

@@ -93,7 +93,7 @@ Gateway 把协同哲学落实为经过认证的项目边界。每个账户拥有
 
 请先阅读[架构文档](docs/architecture.zh.md)了解插件模型，再阅读[用户指南](docs/user/guide/index.zh.md)了解当前 Web 流程。[Gateway 参考](gateway/README.zh.md)和[部署手册](gateway/deploy/README.zh.md)负责自托管多用户控制面。
 
-最新的上游对比记录在 [`UPGRADE-PLAN-dsh-v0.1.3-alpha.2.md`](UPGRADE-PLAN-dsh-v0.1.3-alpha.2.md)，机器可读的决策清单在 [`UPGRADE-MANIFEST-dsh-v0.1.3-alpha.2.json`](UPGRADE-MANIFEST-dsh-v0.1.3-alpha.2.json)。
+最新的上游对比记录在 [`UPGRADE-PLAN-dsh-v0.1.3-alpha.2.md`](upgrades/plans/UPGRADE-PLAN-dsh-v0.1.3-alpha.2.md)，机器可读的决策清单在 [`UPGRADE-MANIFEST-dsh-v0.1.3-alpha.2.json`](upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.3-alpha.2.json)。
 
 <a id="run"></a>
 
@@ -146,6 +146,8 @@ pnpm run build:production
 | [`apps/android-shell/`](apps/android-shell/README.zh.md) | 加载托管 CoHarness Web UI 的 Capacitor Android 壳。 |
 | [`gateway/`](gateway/README.zh.md) | PostgreSQL 认证控制面、Admin SPA、代理、运行时生命周期、治理、用量、审计和部署资源。 |
 | [`packages/`](packages/README.zh.md) | Cordis 能力软件包以及浏览器/Host UI 软件包。 |
+| [`engineering/`](engineering/README.zh.md) | 跨软件包的质量、性能和安全记录。 |
+| [`upgrades/`](upgrades/README.zh.md) | 按 release 保存的上游计划、manifest、对齐矩阵和审查记录。 |
 | [`plugins/`](plugins) | 树外策略和安全插件，包括模型治理与目录强制。 |
 | [`python/`](python/README.zh.md) | Python SDK 和 bundled runtime carrier。 |
 | [`native/`](native/README.zh.md) | 原生启动器，包括基于 Landlock 的进程隔离。 |

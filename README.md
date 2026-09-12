@@ -93,7 +93,7 @@ The repository keeps these upstream conventions deliberately:
 
 Use the [architecture guide](docs/architecture.md) for the plugin model and the [user guide](docs/user/guide/index.md) for the current Web workflow. The [Gateway reference](gateway/README.md) and [deployment runbook](gateway/deploy/README.md) own the hosted multi-user control plane.
 
-The latest upstream comparison is recorded in [`UPGRADE-PLAN-dsh-v0.1.3-alpha.2.md`](UPGRADE-PLAN-dsh-v0.1.3-alpha.2.md), with its machine-readable decision inventory in [`UPGRADE-MANIFEST-dsh-v0.1.3-alpha.2.json`](UPGRADE-MANIFEST-dsh-v0.1.3-alpha.2.json).
+The latest upstream comparison is recorded in [`UPGRADE-PLAN-dsh-v0.1.3-alpha.2.md`](upgrades/plans/UPGRADE-PLAN-dsh-v0.1.3-alpha.2.md), with its machine-readable decision inventory in [`UPGRADE-MANIFEST-dsh-v0.1.3-alpha.2.json`](upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.3-alpha.2.json).
 
 <a id="run"></a>
 
@@ -146,6 +146,8 @@ Follow [gateway/deploy/README.md](gateway/deploy/README.md) for database prepara
 | [`apps/android-shell/`](apps/android-shell/README.md) | Capacitor Android shell for a hosted CoHarness Web UI. |
 | [`gateway/`](gateway/README.md) | Authenticated PostgreSQL control plane, Admin SPA, proxy, runtime lifecycle, governance, usage, audit, and deployment assets. |
 | [`packages/`](packages/README.md) | Cordis capability packages and browser/host UI packages. |
+| [`engineering/`](engineering/README.md) | Cross-package quality, performance, and security records. |
+| [`upgrades/`](upgrades/README.md) | Per-release upstream plans, manifests, alignment matrices, and audits. |
 | [`plugins/`](plugins) | Tree-external policy and security plugins, including model governance and directory enforcement. |
 | [`python/`](python/README.md) | Python SDK and bundled runtime carriers. |
 | [`native/`](native/README.md) | Native launchers, including Landlock-based process confinement. |

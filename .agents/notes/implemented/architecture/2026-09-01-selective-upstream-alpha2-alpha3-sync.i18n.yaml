@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-01-selective-upstream-alpha2-alpha3-sync.md
-2026-09-01-selective-upstream-alpha2-alpha3-sync.md: 03832368d873a86783d49ae85793535bc52a5723
-2026-09-01-selective-upstream-alpha2-alpha3-sync.zh.md: a9e40ac1d059ee06d4c96a356ee2494b734e5c1d
+2026-09-01-selective-upstream-alpha2-alpha3-sync.md: b782624c317bc4daf105ffcef4dc3f0750753ad4
+2026-09-01-selective-upstream-alpha2-alpha3-sync.zh.md: cc3b60a05c833e8621fa3beddd2a80796f7a9098

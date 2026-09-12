@@ -41,7 +41,7 @@ CoHarness 已经拥有上游 alpha.1 的部分能力：模型发现、任意 MIM
 | macOS x64 runtime wheel | 当前 release 验证没有该 carrier | 作为独立发布构建和 CI 任务适配 |
 | 上游历史 Session 性能回退 | 上游 release 明确标记已知回退；本轮未运行长历史 benchmark | 新增 history-load benchmark；性能未达基线前阻止发布 |
 
-逐项状态和命令证据记录在 [`UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.3-alpha.2.json`](UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.3-alpha.2.json)。
+逐项状态和命令证据记录在 [`UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.3-alpha.2.json`](../alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.3-alpha.2.json)。
 
 ## 实施顺序
 

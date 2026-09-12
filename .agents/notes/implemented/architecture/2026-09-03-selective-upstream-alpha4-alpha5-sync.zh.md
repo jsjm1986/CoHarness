@@ -10,7 +10,7 @@ Status: implemented
 
 ## Decision
 
-fork 用文件级三方合并整合两个 tag（`git merge-file`，base 为上游 alpha.3 版本、ours 为 fork 版本、theirs 为上游 alpha.5 版本），对 245 个冲突文件逐块裁决；上游从未触及的 fork 自有包按 `typecheck` 报错逐点适配直到清零。完整矩阵见 [`UPGRADE-PLAN-dsh-v0.1.2-alpha.4-alpha.5.md`](../../../../UPGRADE-PLAN-dsh-v0.1.2-alpha.4-alpha.5.md)；机器可读清单是 [`UPGRADE-MANIFEST-dsh-v0.1.2-alpha.4-alpha.5.json`](../../../../UPGRADE-MANIFEST-dsh-v0.1.2-alpha.4-alpha.5.json)。
+fork 用文件级三方合并整合两个 tag（`git merge-file`，base 为上游 alpha.3 版本、ours 为 fork 版本、theirs 为上游 alpha.5 版本），对 245 个冲突文件逐块裁决；上游从未触及的 fork 自有包按 `typecheck` 报错逐点适配直到清零。完整矩阵见 [`UPGRADE-PLAN-dsh-v0.1.2-alpha.4-alpha.5.md`](../../../../upgrades/plans/UPGRADE-PLAN-dsh-v0.1.2-alpha.4-alpha.5.md)；机器可读清单是 [`UPGRADE-MANIFEST-dsh-v0.1.2-alpha.4-alpha.5.json`](../../../../upgrades/manifests/UPGRADE-MANIFEST-dsh-v0.1.2-alpha.4-alpha.5.json)。
 
 已交付代码采纳以下上游行为：
 
