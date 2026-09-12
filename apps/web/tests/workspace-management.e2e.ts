@@ -102,17 +102,19 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
 
   /**
    * Reveal and click a row action, re-hovering if a projection update replaces
-   * the row before its hover-only button becomes visible. The hover and the
-   * click share one bounded retry: a projection refresh can replace the row
-   * node between the two, dropping :hover and unmounting the button for good.
+   * the row before its hover-only button becomes visible. Scroll, hover, and
+   * the click share one bounded retry: a projection refresh can replace the
+   * row node between any two of them, dropping :hover and unmounting the
+   * button for good, and a scroll/hover stall must also land in the evidence
+   * dump rather than escaping the deadline.
    */
   async function clickHoverAction(row: Locator, name: string): Promise<void> {
     const button = row.getByRole('button', { name })
     const deadline = Date.now() + 30_000
     for (;;) {
-      await row.scrollIntoViewIfNeeded()
-      await row.hover()
       try {
+        await row.scrollIntoViewIfNeeded({ timeout: 2_000 })
+        await row.hover({ timeout: 2_000 })
         await button.click({ timeout: 2_000 })
         return
       } catch (error) {
