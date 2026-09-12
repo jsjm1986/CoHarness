@@ -48,7 +48,7 @@
     "@deepseek-ai/cordis": "workspace:^"
   },
   "dependencies": {
-    "eventsource-parser": "^3.1.0",
+    "eventsource-parser": "^4.0.0",
     "@deepseek-ai/schemastery": "workspace:^"
   },
   "devDependencies": {
