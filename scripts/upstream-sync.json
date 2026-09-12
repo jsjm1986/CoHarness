@@ -1,0 +1,800 @@
+{
+  "version": 1,
+  "syncedTag": "dsh-v0.1.3-alpha.2",
+  "syncedCommit": "82a5fd61a7cf5c293cec4bdff68f455398d685e9",
+  "packages": {
+    "acp/acp": {
+      "sovereignty": "adapted"
+    },
+    "api/gateway": {
+      "sovereignty": "adapted"
+    },
+    "api/remotes": {
+      "sovereignty": "adapted"
+    },
+    "attachment/attachment": {
+      "sovereignty": "adapted"
+    },
+    "attachment/attachment-local": {
+      "sovereignty": "adapted"
+    },
+    "attachment/tool-userdoc": {
+      "sovereignty": "owned"
+    },
+    "attachment/userdoc": {
+      "sovereignty": "owned"
+    },
+    "attachment/userdoc-local": {
+      "sovereignty": "owned"
+    },
+    "boot/app-boot": {
+      "sovereignty": "adapted"
+    },
+    "boot/cmdline": {
+      "sovereignty": "adapted"
+    },
+    "bundle/base": {
+      "sovereignty": "adapted"
+    },
+    "bundle/headless": {
+      "sovereignty": "adapted"
+    },
+    "bundle/web-app": {
+      "sovereignty": "adapted"
+    },
+    "client/connection": {
+      "sovereignty": "adapted"
+    },
+    "client/hmr": {
+      "sovereignty": "adapted"
+    },
+    "client/locale": {
+      "sovereignty": "adapted"
+    },
+    "client/modules": {
+      "sovereignty": "adapted"
+    },
+    "client/runtime": {
+      "sovereignty": "owned"
+    },
+    "client/ui-agent-preset": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-attachment": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-brand-official": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-collaboration": {
+      "sovereignty": "owned"
+    },
+    "client/ui-commands": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-conversation": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-deliverables": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-directory-picker-browse": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-directory-picker-native": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-documents": {
+      "sovereignty": "owned"
+    },
+    "client/ui-goal": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-input-trigger": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-jobs": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-layout": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-message-feedback": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-model-selection": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-open-in-app": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-permission-presets": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-plan": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-primitives": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-reference": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-renderer": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-schedule": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-settings": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-settings-general": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-settings-models": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-settings-plugin-inventory": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-settings-plugins": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-sidebar": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-skill": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-slots": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-subagent": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-theme": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-tool": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-trajectory": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-usage-alert": {
+      "sovereignty": "owned"
+    },
+    "client/ui-user-questions": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-workbench": {
+      "sovereignty": "owned"
+    },
+    "client/ui-workflow-run": {
+      "sovereignty": "adapted"
+    },
+    "client/ui-workspace": {
+      "sovereignty": "adapted"
+    },
+    "client/userdoc-upload": {
+      "sovereignty": "owned"
+    },
+    "client/web": {
+      "sovereignty": "adapted"
+    },
+    "code-runtime/code-runtime": {
+      "sovereignty": "adapted"
+    },
+    "code-runtime/code-runtime-worker-thread": {
+      "sovereignty": "adapted"
+    },
+    "compaction/command-compact": {
+      "sovereignty": "adapted"
+    },
+    "compaction/compaction": {
+      "sovereignty": "tracked"
+    },
+    "compaction/compaction-basic": {
+      "sovereignty": "adapted"
+    },
+    "compaction/compaction-tool-result-pruner": {
+      "sovereignty": "adapted"
+    },
+    "context/agent-instructions": {
+      "sovereignty": "adapted"
+    },
+    "context/archive-gateway": {
+      "sovereignty": "owned"
+    },
+    "context/collaboration": {
+      "sovereignty": "owned"
+    },
+    "context/collaboration-context": {
+      "sovereignty": "owned"
+    },
+    "context/collaboration-gateway": {
+      "sovereignty": "owned"
+    },
+    "context/file-reference": {
+      "sovereignty": "adapted"
+    },
+    "context/file-reference-local": {
+      "sovereignty": "adapted"
+    },
+    "context/gateway-runtime": {
+      "sovereignty": "owned"
+    },
+    "context/session-reference": {
+      "sovereignty": "adapted"
+    },
+    "context/time-context": {
+      "sovereignty": "adapted"
+    },
+    "context/tmux-context": {
+      "sovereignty": "adapted"
+    },
+    "context/userdoc-context": {
+      "sovereignty": "owned"
+    },
+    "core/agent": {
+      "sovereignty": "adapted"
+    },
+    "core/agent-default-model": {
+      "sovereignty": "adapted"
+    },
+    "core/agent-loop": {
+      "sovereignty": "adapted"
+    },
+    "core/agent-tool-presentation": {
+      "sovereignty": "adapted"
+    },
+    "core/scope": {
+      "sovereignty": "adapted"
+    },
+    "core/session": {
+      "sovereignty": "adapted"
+    },
+    "core/system-prompt": {
+      "sovereignty": "adapted"
+    },
+    "core/tools": {
+      "sovereignty": "adapted"
+    },
+    "credentials/authorization": {
+      "sovereignty": "adapted"
+    },
+    "credentials/credentials": {
+      "sovereignty": "adapted"
+    },
+    "credentials/credentials-local": {
+      "sovereignty": "adapted"
+    },
+    "e2b/e2b": {
+      "sovereignty": "adapted"
+    },
+    "e2b/fs-e2b": {
+      "sovereignty": "adapted"
+    },
+    "e2b/subprocess-e2b": {
+      "sovereignty": "adapted"
+    },
+    "examples/acp-demo": {
+      "sovereignty": "owned"
+    },
+    "examples/agent-spine-demo": {
+      "sovereignty": "owned"
+    },
+    "examples/jsonrpc-demo": {
+      "sovereignty": "owned"
+    },
+    "experimental/agent-team": {
+      "sovereignty": "adapted"
+    },
+    "experimental/code-runtime-python": {
+      "sovereignty": "adapted"
+    },
+    "experimental/tool-agent-team": {
+      "sovereignty": "adapted"
+    },
+    "extensions/cordis-client-runner": {
+      "sovereignty": "adapted"
+    },
+    "extensions/cordis-host-runner": {
+      "sovereignty": "adapted"
+    },
+    "extensions/tool-cordis": {
+      "sovereignty": "adapted"
+    },
+    "extensions/ui-cordis": {
+      "sovereignty": "adapted"
+    },
+    "feedback/command-feedback": {
+      "sovereignty": "adapted"
+    },
+    "feedback/message-feedback": {
+      "sovereignty": "adapted"
+    },
+    "fs/fs": {
+      "sovereignty": "adapted"
+    },
+    "fs/fs-local": {
+      "sovereignty": "adapted"
+    },
+    "fs/fs-observation-policy": {
+      "sovereignty": "adapted"
+    },
+    "fs/fs-sandbox": {
+      "sovereignty": "adapted"
+    },
+    "fs/tool-fs": {
+      "sovereignty": "adapted"
+    },
+    "fs/tool-fs-search": {
+      "sovereignty": "adapted"
+    },
+    "fs/tool-str-replace-editor": {
+      "sovereignty": "adapted"
+    },
+    "goal/command-goal": {
+      "sovereignty": "adapted"
+    },
+    "goal/goal": {
+      "sovereignty": "adapted"
+    },
+    "goal/goal-round-driver": {
+      "sovereignty": "adapted"
+    },
+    "goal/tool-goal": {
+      "sovereignty": "adapted"
+    },
+    "guard/repeat-tool-reminder": {
+      "sovereignty": "adapted"
+    },
+    "guard/timeout-policy": {
+      "sovereignty": "adapted"
+    },
+    "hooks/hook-protocol": {
+      "sovereignty": "tracked"
+    },
+    "hooks/hooks-claude-code": {
+      "sovereignty": "adapted"
+    },
+    "hooks/hooks-codex": {
+      "sovereignty": "adapted"
+    },
+    "host/apiproxy": {
+      "sovereignty": "owned"
+    },
+    "host/directory-picker": {
+      "sovereignty": "adapted"
+    },
+    "host/directory-picker-auto": {
+      "sovereignty": "adapted"
+    },
+    "host/directory-picker-browse": {
+      "sovereignty": "adapted"
+    },
+    "host/directory-picker-native": {
+      "sovereignty": "adapted"
+    },
+    "host/frontend-static": {
+      "sovereignty": "adapted"
+    },
+    "host/open-in-app": {
+      "sovereignty": "adapted"
+    },
+    "host/plugin-inventory": {
+      "sovereignty": "adapted"
+    },
+    "host/userdoc-http": {
+      "sovereignty": "owned"
+    },
+    "host/webserver": {
+      "sovereignty": "adapted"
+    },
+    "identity/anonymous-user-id": {
+      "sovereignty": "adapted"
+    },
+    "interaction/commands": {
+      "sovereignty": "adapted"
+    },
+    "interaction/permission-presets": {
+      "sovereignty": "adapted"
+    },
+    "interaction/tool-ask-user": {
+      "sovereignty": "adapted"
+    },
+    "interaction/user-approval": {
+      "sovereignty": "adapted"
+    },
+    "interaction/user-questions": {
+      "sovereignty": "adapted"
+    },
+    "jobs/jobs": {
+      "sovereignty": "tracked"
+    },
+    "jobs/jobs-local": {
+      "sovereignty": "adapted"
+    },
+    "jobs/tool-jobs": {
+      "sovereignty": "adapted"
+    },
+    "llm/deepseek-llm-api-extensions": {
+      "sovereignty": "adapted"
+    },
+    "llm/llm": {
+      "sovereignty": "adapted"
+    },
+    "llm/llm-deepseek": {
+      "sovereignty": "adapted"
+    },
+    "llm/llm-pi-ai": {
+      "sovereignty": "adapted"
+    },
+    "llm/llm-retry": {
+      "sovereignty": "adapted"
+    },
+    "llm/model-access": {
+      "sovereignty": "owned"
+    },
+    "llm/model-provider-config": {
+      "sovereignty": "owned"
+    },
+    "llm/plugin-package-inventory-deepseek": {
+      "sovereignty": "adapted"
+    },
+    "llm/token-meter": {
+      "sovereignty": "adapted"
+    },
+    "lsp/lsp": {
+      "sovereignty": "adapted"
+    },
+    "lsp/lsp-stdio": {
+      "sovereignty": "adapted"
+    },
+    "lsp/tool-lsp": {
+      "sovereignty": "adapted"
+    },
+    "mcp/mcp-client": {
+      "sovereignty": "adapted"
+    },
+    "plan/plan-mode": {
+      "sovereignty": "adapted"
+    },
+    "preset/agent-presets": {
+      "sovereignty": "adapted"
+    },
+    "preset/persona": {
+      "sovereignty": "adapted"
+    },
+    "runtime-diagnostics/invariants": {
+      "sovereignty": "adapted"
+    },
+    "sandbox/sandbox": {
+      "sovereignty": "adapted"
+    },
+    "sandbox/sandbox-local": {
+      "sovereignty": "adapted"
+    },
+    "sandbox/sandbox-policy": {
+      "sovereignty": "adapted"
+    },
+    "sandbox/sandbox-windows-acl": {
+      "sovereignty": "adapted"
+    },
+    "schedule/schedule": {
+      "sovereignty": "adapted"
+    },
+    "sdk/client": {
+      "sovereignty": "adapted"
+    },
+    "sdk/protocol": {
+      "sovereignty": "adapted"
+    },
+    "sdk/server": {
+      "sovereignty": "adapted"
+    },
+    "session-query/session-log-export": {
+      "sovereignty": "adapted"
+    },
+    "session-query/session-query": {
+      "sovereignty": "adapted"
+    },
+    "session-query/session-query-sqlite": {
+      "sovereignty": "adapted"
+    },
+    "session-query/tool-session-query": {
+      "sovereignty": "adapted"
+    },
+    "session/session-checkpoint-policy": {
+      "sovereignty": "adapted"
+    },
+    "session/session-format": {
+      "sovereignty": "adapted"
+    },
+    "session/session-log-deepseek": {
+      "sovereignty": "adapted"
+    },
+    "session/session-persistence": {
+      "sovereignty": "adapted"
+    },
+    "session/session-persistence-gateway": {
+      "sovereignty": "owned"
+    },
+    "session/session-persistence-jsonl": {
+      "sovereignty": "adapted"
+    },
+    "session/session-persistence-sqlite": {
+      "sovereignty": "owned"
+    },
+    "session/session-projection": {
+      "sovereignty": "adapted"
+    },
+    "session/session-projection-cache": {
+      "sovereignty": "adapted"
+    },
+    "session/session-stats": {
+      "sovereignty": "adapted"
+    },
+    "session/session-telemetry": {
+      "sovereignty": "adapted"
+    },
+    "session/session-telemetry-otel": {
+      "sovereignty": "adapted"
+    },
+    "session/session-title": {
+      "sovereignty": "adapted"
+    },
+    "session/session-title-all-prompts-llm": {
+      "sovereignty": "adapted"
+    },
+    "session/session-title-first-prompt-llm": {
+      "sovereignty": "adapted"
+    },
+    "session/session-title-llm": {
+      "sovereignty": "adapted"
+    },
+    "settings/settings": {
+      "sovereignty": "adapted"
+    },
+    "settings/settings-file": {
+      "sovereignty": "adapted"
+    },
+    "shell/bash-local": {
+      "sovereignty": "adapted"
+    },
+    "shell/bash-sandbox": {
+      "sovereignty": "adapted"
+    },
+    "shell/pwsh-local": {
+      "sovereignty": "adapted"
+    },
+    "shell/pwsh-sandbox": {
+      "sovereignty": "adapted"
+    },
+    "shell/shell": {
+      "sovereignty": "adapted"
+    },
+    "shell/shell-env": {
+      "sovereignty": "adapted"
+    },
+    "shell/tool-bash": {
+      "sovereignty": "adapted"
+    },
+    "shell/tool-bash-persistent": {
+      "sovereignty": "adapted"
+    },
+    "shell/tool-pwsh": {
+      "sovereignty": "adapted"
+    },
+    "shell/tool-pwsh-persistent": {
+      "sovereignty": "adapted"
+    },
+    "skill/skill": {
+      "sovereignty": "adapted"
+    },
+    "skill/skill-badge": {
+      "sovereignty": "adapted"
+    },
+    "skill/skill-filesystem": {
+      "sovereignty": "adapted"
+    },
+    "skill/tool-skill": {
+      "sovereignty": "adapted"
+    },
+    "spill/spill": {
+      "sovereignty": "adapted"
+    },
+    "spill/spill-local": {
+      "sovereignty": "adapted"
+    },
+    "spill/spill-policy": {
+      "sovereignty": "adapted"
+    },
+    "storage/storage": {
+      "sovereignty": "adapted"
+    },
+    "storage/storage-domain": {
+      "sovereignty": "adapted"
+    },
+    "storage/storage-json": {
+      "sovereignty": "adapted"
+    },
+    "storage/storage-sqlite": {
+      "sovereignty": "adapted"
+    },
+    "subagent/subagent": {
+      "sovereignty": "adapted"
+    },
+    "subagent/subagent-acp": {
+      "sovereignty": "adapted"
+    },
+    "subagent/subagent-claude-code": {
+      "sovereignty": "adapted"
+    },
+    "subagent/subagent-codex": {
+      "sovereignty": "adapted"
+    },
+    "subagent/subagent-dsh-sdk": {
+      "sovereignty": "adapted"
+    },
+    "subagent/subagent-fork-in-process": {
+      "sovereignty": "adapted"
+    },
+    "subagent/subagent-in-process-driver": {
+      "sovereignty": "adapted"
+    },
+    "subagent/subagent-spawn-in-process": {
+      "sovereignty": "adapted"
+    },
+    "subagent/tool-subagent": {
+      "sovereignty": "adapted"
+    },
+    "subagent/tool-subagent-control": {
+      "sovereignty": "adapted"
+    },
+    "subprocess/subprocess": {
+      "sovereignty": "adapted"
+    },
+    "subprocess/subprocess-local": {
+      "sovereignty": "adapted"
+    },
+    "terminal/terminal": {
+      "sovereignty": "adapted"
+    },
+    "terminal/terminal-bash": {
+      "sovereignty": "adapted"
+    },
+    "terminal/tool-terminal": {
+      "sovereignty": "adapted"
+    },
+    "test-support/acp-snapshot": {
+      "sovereignty": "owned"
+    },
+    "test-support/agent-loop-testkit": {
+      "sovereignty": "adapted"
+    },
+    "test-support/client-runtime": {
+      "sovereignty": "adapted"
+    },
+    "test-support/llm-mock-server": {
+      "sovereignty": "adapted"
+    },
+    "test-support/llm-replay": {
+      "sovereignty": "adapted"
+    },
+    "test-support/loader-smoke": {
+      "sovereignty": "adapted"
+    },
+    "todo/tool-todo": {
+      "sovereignty": "adapted"
+    },
+    "typert/generator": {
+      "sovereignty": "adapted"
+    },
+    "typert/loader": {
+      "sovereignty": "adapted"
+    },
+    "typert/protocol": {
+      "sovereignty": "adapted"
+    },
+    "typert/registry": {
+      "sovereignty": "adapted"
+    },
+    "util/atomic-write": {
+      "sovereignty": "adapted"
+    },
+    "util/brand": {
+      "sovereignty": "adapted"
+    },
+    "util/crypto": {
+      "sovereignty": "adapted"
+    },
+    "util/home-paths": {
+      "sovereignty": "adapted"
+    },
+    "util/http-proxy": {
+      "sovereignty": "adapted"
+    },
+    "util/launch-environment": {
+      "sovereignty": "adapted"
+    },
+    "util/native-command": {
+      "sovereignty": "adapted"
+    },
+    "util/output-retention": {
+      "sovereignty": "adapted"
+    },
+    "util/timeout": {
+      "sovereignty": "adapted"
+    },
+    "util/values": {
+      "sovereignty": "adapted"
+    },
+    "web/tool-web": {
+      "sovereignty": "adapted"
+    },
+    "web/web": {
+      "sovereignty": "adapted"
+    },
+    "web/web-fetch-http": {
+      "sovereignty": "adapted"
+    },
+    "web/web-search-deepseek": {
+      "sovereignty": "adapted"
+    },
+    "web/web-search-exa": {
+      "sovereignty": "adapted"
+    },
+    "web/web-search-perplexity": {
+      "sovereignty": "adapted"
+    },
+    "workflow/tool-ralph": {
+      "sovereignty": "adapted"
+    },
+    "workflow/tool-workflow": {
+      "sovereignty": "adapted"
+    },
+    "workflow/workflow": {
+      "sovereignty": "tracked"
+    },
+    "workflow/workflow-worker-thread": {
+      "sovereignty": "adapted"
+    },
+    "workspace/workspace": {
+      "sovereignty": "adapted"
+    }
+  },
+  "upstreamOnly": [
+    "api/session-controller",
+    "api/settings-controller",
+    "api/workspace-controller",
+    "bundle/acp-app",
+    "bundle/sdk-app",
+    "bundle/sdk-minimal",
+    "client/file-upload",
+    "client/store",
+    "client/ui-approval",
+    "client/ui-chat",
+    "client/ui-session",
+    "experimental/agent-team-profile",
+    "experimental/agent-team-web-profile",
+    "experimental/client-ui-agent-team",
+    "experimental/inspector",
+    "experimental/webworker-packer",
+    "experimental/webworker-runtime",
+    "session/session-format-catalog",
+    "session/session-format-v0-to-v1",
+    "session/session-format-v1-to-v2",
+    "session/session-turn-outline",
+    "subprocess/win32-process",
+    "test-support/session-snapshot",
+    "util/deque",
+    "util/package-manifest",
+    "util/time",
+    "util/workspace-path",
+    "webhook/webhook",
+    "webhook/webhook-github"
+  ]
+}

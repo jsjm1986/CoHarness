@@ -389,6 +389,7 @@ function ciStaticGates(options: { ownsBuild: boolean }): Gate[] {
       docsBuildScript: 'docs:build:mpa',
     }),
     pnpmScript('module-graph', 'verify-module-graph', { label: 'module graph' }),
+    pnpmScript('upstream-sovereignty', 'verify-upstream-sovereignty', { label: 'upstream sovereignty' }),
     pnpmScript('knip', 'knip'),
   ]
 }

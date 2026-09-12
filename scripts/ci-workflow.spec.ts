@@ -97,6 +97,11 @@ describe('CI workflow', () => {
       isRecord(step) && typeof step.run === 'string'
     ))
     expect(nativeCommandSteps.map(step => step.run)).toContain('pnpm run check:ci:windows-complete')
+    // The upstream sovereignty gate diffs mirrored release tags, which a
+    // depth-1 clone does not carry; the same applies to serial-windows below.
+    const windowsNativeCheckout = (windowsNative.steps as unknown[]).filter(isRecord)
+      .find(step => typeof step.uses === 'string' && step.uses.startsWith('actions/checkout@'))
+    expect(windowsNativeCheckout).toMatchObject({ with: { 'fetch-depth': 0 } })
 
     // wine-apt-cache: master-only, seeds the Wine apt cache.
     expect(wineAptCache.if).toBe("github.event_name == 'push' && github.ref == 'refs/heads/master'")
@@ -108,6 +113,10 @@ describe('CI workflow', () => {
     expect(serialWindows.if).toContain("vars.DSH_CI_SELF_HOSTED_STANDBY_ENABLED == 'true'")
     expect(serialWindows['runs-on']).toEqual(['self-hosted', 'dsh-win-ci', 'windows'])
     expect(serialWindows.name).toBe('serial / windows (self-hosted standby)')
+    if (!Array.isArray(serialWindows.steps)) throw new TypeError('serial-windows must define steps')
+    const serialWindowsCheckout = serialWindows.steps.filter(isRecord)
+      .find(step => typeof step.uses === 'string' && step.uses.startsWith('actions/checkout@'))
+    expect(serialWindowsCheckout).toMatchObject({ with: { 'fetch-depth': 0 } })
 
     // Aggregate: Wine `windows` required, native `windows-native` excluded.
     expect(aggregate.needs).toContain('pr-scope')
