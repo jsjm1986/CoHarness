@@ -142,17 +142,59 @@ describe('CI workflow', () => {
     expectExternalCapacityExpression(node24Consumers.env.DSH_GATE_CONCURRENCY, '8', '1')
     expectExternalCapacityExpression(node24Consumers.env.DSH_OXLINT_THREADS, '8', '1')
     expectExternalCapacityExpression(node24Consumers.env.DSH_PUBLINT_CONCURRENCY, '8', '1')
-    expectExternalCapacityExpression(node24Consumers.env.DSH_WEB_SNAPSHOT_WORKERS, '6', '1')
     expectExternalCapacityExpression(node24Consumers.env.DSH_SNAPSHOT_MAX_CONCURRENCY, '32', '1')
     expect(String(node24Consumers.env.DSH_SNAPSHOT_MAX_CONCURRENCY)).toContain("&& '12'")
     const consumerSteps = node24Consumers.steps.filter(isRecord)
     const gatewayInstallIndex = consumerSteps.findIndex(step => step.name === 'Install Gateway runtime dependencies')
-    const consumerGateIndex = consumerSteps.findIndex(step => step.name === 'Run compatibility, snapshot, and artifact gates')
+    const consumerGateIndex = consumerSteps.findIndex(step => step.name === 'Run keyless compatibility, snapshot, and artifact gates')
     expect(gatewayInstallIndex).toBeGreaterThanOrEqual(0)
     expect(consumerSteps[gatewayInstallIndex]).toMatchObject({
       run: 'npm ci --prefix gateway --omit=dev',
     })
     expect(consumerGateIndex).toBeGreaterThan(gatewayInstallIndex)
+    expect(consumerSteps[consumerGateIndex]).toMatchObject({ run: 'pnpm run check:ci:consumers:scoped' })
+    // The browser tier moved to the web-verification job; no Playwright work
+    // (cache, install) stays in the consumer aggregate.
+    expect(consumerSteps.some(step => typeof step.name === 'string' && step.name.includes('Playwright'))).toBe(false)
+
+    // The dedicated web verification lane: one stable required check whose
+    // steps branch on the selector's snapshot mode.
+    const webVerification = workflow.jobs['web-verification']
+    if (!isRecord(webVerification) || !Array.isArray(webVerification.steps) || !isRecord(webVerification.env)) {
+      throw new TypeError('CI workflow must define the web-verification job with steps and environment')
+    }
+    expect(webVerification.if).toBe("github.event_name == 'pull_request'")
+    expect(webVerification.needs).toContain('pr-scope')
+    expect(String(webVerification['runs-on'])).toContain('DSH_CI_FAILOVER_LINUX')
+    expectExternalCapacityExpression(webVerification.env.DSH_WEB_SNAPSHOT_WORKERS, '6', '1')
+    // One stable check name lets branch protection require the lane; the
+    // selected tier and groups surface in the job summary instead.
+    expect(webVerification.name).toBe('web verification')
+    const webSteps = webVerification.steps.filter(isRecord)
+    expect(webSteps.some(step => step.name === 'Record skipped web verification')).toBe(true)
+    expect(webSteps.find(step => step.name === 'Record web verification tier')).toMatchObject({
+      if: "needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full'",
+    })
+    expect(String(webSteps.find(step => step.name === 'Record web verification tier')?.run)).toContain('web_groups')
+    expect(webSteps.find(step => step.name === 'Run focused web verification')).toMatchObject({
+      run: 'pnpm run check:ci:web:focused',
+      env: {
+        DSH_WEB_GROUPS: '${{ needs.pr-scope.outputs.web_groups }}',
+        DSH_WEB_SNAPSHOT_WORKERS: '2',
+      },
+    })
+    expect(webSteps.find(step => step.name === 'Run full web verification')).toMatchObject({
+      run: 'pnpm run check:ci:web:full',
+    })
+    expect(webSteps.filter(step => typeof step.name === 'string' && step.name.includes('Playwright')).length).toBe(2)
+    // Every step beyond the skip record only runs when the selector chose a
+    // browser tier, so a skipped lane spends no runner minutes on setup.
+    for (const step of webSteps) {
+      if (step.if === undefined || step.name === 'Record skipped web verification') continue
+      const condition = typeof step.if === 'string' ? step.if : ''
+      expect(condition, String(step.name)).toMatch(/snapshot_mode == '(?:focused|full)'/)
+    }
+    expect(aggregate.needs).toContain('web-verification')
     expect(aggregate['runs-on']).toContain('DSH_CI_FAILOVER_LINUX')
     expect(aggregate['runs-on']).toContain('github.event.pull_request.head.repo.full_name == github.repository')
     expect(aggregate['runs-on']).not.toContain('DSH_CI_FAILOVER_WINDOWS')
@@ -161,6 +203,7 @@ describe('CI workflow', () => {
     expect(prScope.outputs).toMatchObject({
       run_expensive: '${{ steps.scope.outputs.run_expensive }}',
       reason: '${{ steps.scope.outputs.reason }}',
+      web_groups: '${{ steps.scope.outputs.web_groups }}',
     })
   })
 
@@ -281,7 +324,7 @@ describe('CI workflow', () => {
       DSH_SNAPSHOT_MAX_CONCURRENCY: '1',
     })
     const consumers = workflowJob(workflow, 'node-24-consumers')
-    const nodeCompat = (consumers.steps as unknown[]).find(step => isRecord(step) && step.name === 'Run compatibility, snapshot, and artifact gates')
+    const nodeCompat = (consumers.steps as unknown[]).find(step => isRecord(step) && step.name === 'Run keyless compatibility, snapshot, and artifact gates')
     expect(nodeCompat).toBeDefined()
   })
 

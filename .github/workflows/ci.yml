@@ -71,6 +71,7 @@ jobs:
       changed_docs_only: ${{ steps.scope.outputs.changed_docs_only }}
       coverage_mode: ${{ steps.scope.outputs.coverage_mode }}
       snapshot_mode: ${{ steps.scope.outputs.snapshot_mode }}
+      web_groups: ${{ steps.scope.outputs.web_groups }}
       compat_mode: ${{ steps.scope.outputs.compat_mode }}
       python_mode: ${{ steps.scope.outputs.python_mode }}
       windows_mode: ${{ steps.scope.outputs.windows_mode }}
@@ -310,12 +311,6 @@ jobs:
           && github.event.pull_request.user.login != 'dependabot[bot]')
           || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
           && '8' || '1' }}
-      DSH_WEB_SNAPSHOT_WORKERS: >-
-        ${{ ((vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
-          && github.event.pull_request.head.repo.full_name == github.repository
-          && github.event.pull_request.user.login != 'dependabot[bot]')
-          || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
-          && '6' || '1' }}
       # Failover uses the shared-VM bound; enterprise keeps the measured larger
       # bound, while the portable standard pool serializes browser snapshots.
       DSH_SNAPSHOT_MAX_CONCURRENCY: >-
@@ -347,10 +342,10 @@ jobs:
           store_path=$(PNPM_CONFIG_STORE_DIR="$store_root" pnpm store path --silent)
           echo "path=$store_path" >> "$GITHUB_OUTPUT"
 
-      # Pull requests restore the pnpm store and Playwright caches without paying
-      # compression and upload on the required path. No master job saves these
-      # hosted cache keys, so each restore-keys fallback hits the matching archived
-      # entry until it evicts, after which the store is cold. Skipped under failover
+      # Pull requests restore the pnpm store without paying compression and
+      # upload on the required path. No master job saves these hosted cache
+      # keys, so each restore-keys fallback hits the matching archived entry
+      # until it evicts, after which the store is cold. Skipped under failover
       # — the self-hosted VM's persistent store is already warm.
       - uses: actions/cache/restore@v4
         if: >-
@@ -362,18 +357,6 @@ jobs:
           key: ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-
-
-      # Skipped under failover: the VM's persistent browser cache is already warm.
-      - uses: actions/cache/restore@v4
-        if: >-
-          vars.DSH_CI_FAILOVER_LINUX != 'selfhosted'
-          || github.event.pull_request.head.repo.full_name != github.repository
-          || github.event.pull_request.user.login == 'dependabot[bot]'
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-
 
       - name: Install dependencies and prepare bubblewrap
         run: |
@@ -394,10 +377,127 @@ jobs:
       - name: Install Gateway runtime dependencies
         run: npm ci --prefix gateway --omit=dev
 
+      # The browser snapshot left this aggregate: the keyless consumer gates run
+      # here for every snapshot mode, and the dedicated web-verification lane
+      # below owns skip/focused/full browser verification.
+      - name: Run keyless compatibility, snapshot, and artifact gates
+        run: pnpm run check:ci:consumers:scoped
+
+  # The dedicated web browser verification lane. One stable check name lets
+  # branch protection require it regardless of the tier; the selected tier and
+  # groups go to the job summary. Skip and scoped modes record the selector's
+  # reason and pass; focused replays the policy-selected business groups plus
+  # the stable smoke set; full replays the complete inventory. The selector
+  # lives in scripts/ci-pr-scope.ts over scripts/web-test-policy.json, and the
+  # nightly/master sweep below still replays the whole inventory after every
+  # merge.
+  web-verification:
+    if: github.event_name == 'pull_request'
+    needs: pr-scope
+    runs-on: >-
+      ${{ vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
+          && github.event.pull_request.head.repo.full_name == github.repository
+          && github.event.pull_request.user.login != 'dependabot[bot]'
+          && fromJSON('["self-hosted", "linux", "x64", "vm-backup"]')
+          || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true'
+          && 'dsh-ubuntu-24-04-16core'
+          || 'ubuntu-latest' }}
+    name: web verification
+    timeout-minutes: 90
+    env:
+      DSH_WEB_SNAPSHOT_WORKERS: >-
+        ${{ ((vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
+          && github.event.pull_request.head.repo.full_name == github.repository
+          && github.event.pull_request.user.login != 'dependabot[bot]')
+          || vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true')
+          && '6' || '1' }}
+    steps:
+      - name: Record skipped web verification
+        if: needs.pr-scope.outputs.snapshot_mode == 'skip' || needs.pr-scope.outputs.snapshot_mode == 'scoped'
+        run: |
+          echo "Web browser verification skipped: snapshot_mode=${{ needs.pr-scope.outputs.snapshot_mode }}; no changed path can reach browser-rendered output." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Record web verification tier
+        if: needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full'
+        run: |
+          echo "Web browser verification: snapshot_mode=${{ needs.pr-scope.outputs.snapshot_mode }}; groups=${{ needs.pr-scope.outputs.web_groups || '(complete inventory)' }}" >> "$GITHUB_STEP_SUMMARY"
+
+      # Every step below only runs when the selector chose a browser tier.
+      - uses: actions/checkout@v7
+        if: needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full'
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6.0.10
+        if: needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full'
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+
+      - uses: actions/setup-node@v7
+        if: needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full'
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+
+      - name: Configure pnpm store path
+        if: needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full'
+        id: pnpm-store
+        run: |
+          store_root="$HOME/.local/share/pnpm/store"
+          echo "PNPM_CONFIG_STORE_DIR=$store_root" >> "$GITHUB_ENV"
+          store_path=$(PNPM_CONFIG_STORE_DIR="$store_root" pnpm store path --silent)
+          echo "path=$store_path" >> "$GITHUB_OUTPUT"
+
+      # Skipped under failover — the self-hosted VM's persistent store is
+      # already warm (same rationale as the consumer job's restore).
+      - uses: actions/cache/restore@v4
+        if: >-
+          (needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full')
+          && (vars.DSH_CI_FAILOVER_LINUX != 'selfhosted'
+          || github.event.pull_request.head.repo.full_name != github.repository
+          || github.event.pull_request.user.login == 'dependabot[bot]')
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-
+
+      # Skipped under failover: the VM's persistent browser cache is already warm.
+      - uses: actions/cache/restore@v4
+        if: >-
+          (needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full')
+          && (vars.DSH_CI_FAILOVER_LINUX != 'selfhosted'
+          || github.event.pull_request.head.repo.full_name != github.repository
+          || github.event.pull_request.user.login == 'dependabot[bot]')
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install dependencies and prepare bubblewrap
+        if: needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full'
+        run: |
+          pnpm install --frozen-lockfile &
+          install_pid=$!
+          bash scripts/prepare-ci-bubblewrap.sh &
+          sandbox_pid=$!
+          install_status=0
+          wait "$install_pid" || install_status=$?
+          sandbox_status=0
+          wait "$sandbox_pid" || sandbox_status=$?
+          if (( install_status != 0 )); then exit "$install_status"; fi
+          exit "$sandbox_status"
+
+      # Gateway is an independent npm project outside the root pnpm workspace.
+      # Root web snapshot tests import its runtime modules.
+      - name: Install Gateway runtime dependencies
+        if: needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full'
+        run: npm ci --prefix gateway --omit=dev
+
       - name: Install Playwright Chromium and hosted dependencies
         if: >-
-          needs.pr-scope.outputs.snapshot_mode != 'scoped' && (
-          vars.DSH_CI_FAILOVER_LINUX != 'selfhosted'
+          (needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full')
+          && (vars.DSH_CI_FAILOVER_LINUX != 'selfhosted'
           || github.event.pull_request.head.repo.full_name != github.repository
           || github.event.pull_request.user.login == 'dependabot[bot]')
         run: pnpm --filter @deepseek-ai/dsh-web-frontend exec playwright install --with-deps chromium
@@ -406,21 +506,24 @@ jobs:
       # not mutate the shared host with apt on every failover run.
       - name: Install Playwright Chromium on the failover VM
         if: >-
-          needs.pr-scope.outputs.snapshot_mode != 'scoped' && (
-          vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
+          (needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full')
+          && (vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
           && github.event.pull_request.head.repo.full_name == github.repository
           && github.event.pull_request.user.login != 'dependabot[bot]')
         run: pnpm --filter @deepseek-ai/dsh-web-frontend exec playwright install chromium
 
-      # Scoped PRs keep the keyless ACP/CLI snapshots but drop the Playwright
-      # browser snapshot (web-snapshot gate is absent from the scoped consumer
-      # aggregate); full PRs run the complete consumer inventory.
-      - name: Run compatibility, snapshot, and artifact gates (scoped)
-        if: needs.pr-scope.outputs.snapshot_mode == 'scoped'
-        run: pnpm run check:ci:consumers:scoped
-      - name: Run compatibility, snapshot, and artifact gates
-        if: needs.pr-scope.outputs.snapshot_mode != 'scoped'
-        run: pnpm run check:ci:consumers
+      # Focused verification caps the pool at two workers: the selection is a
+      # business group plus the smoke set, which parallelizes poorly past that.
+      - name: Run focused web verification
+        if: needs.pr-scope.outputs.snapshot_mode == 'focused'
+        env:
+          DSH_WEB_GROUPS: ${{ needs.pr-scope.outputs.web_groups }}
+          DSH_WEB_SNAPSHOT_WORKERS: '2'
+        run: pnpm run check:ci:web:focused
+
+      - name: Run full web verification
+        if: needs.pr-scope.outputs.snapshot_mode == 'full'
+        run: pnpm run check:ci:web:full
 
   # The Gateway is an independent npm project, so the root Vitest inventory
   # cannot exercise its ACL, principal, and PostgreSQL-facing code. Run its
@@ -1269,7 +1372,7 @@ jobs:
           && github.event.pull_request.user.login != 'dependabot[bot]'
           && fromJSON('["self-hosted", "linux", "x64", "vm-backup"]')
           || 'ubuntu-latest' }}
-    needs: [pr-scope, node-24, node-24-coverage, node-24-consumers, node-compat, python-sdk, python-runtime, windows, gateway, gateway-admin-ui]
+    needs: [pr-scope, node-24, node-24-coverage, node-24-consumers, web-verification, node-compat, python-sdk, python-runtime, windows, gateway, gateway-admin-ui]
     if: always() && github.event_name == 'pull_request'
     steps:
       - name: Fail if any needed job did not succeed
@@ -1291,8 +1394,9 @@ jobs:
             && needs.python-runtime.result != 'success')
           || (needs.pr-scope.outputs.windows_mode == 'full'
             && needs.windows.result != 'success')
+          || needs.web-verification.result != 'success'
         run: |
-          echo "::error::Needed job results: scope=${{ needs.pr-scope.result }}, static=${{ needs.node-24.result }}, gatewayMode=${{ needs.pr-scope.outputs.gateway_mode }}, gateway=${{ needs.gateway.result }}, adminUiMode=${{ needs.pr-scope.outputs.admin_ui_mode }}, adminUi=${{ needs.gateway-admin-ui.result }}, compatMode=${{ needs.pr-scope.outputs.compat_mode }}, compat=${{ needs.node-compat.result }}, pythonMode=${{ needs.pr-scope.outputs.python_mode }}, python=${{ needs.python-sdk.result }}, expensive=${{ needs.pr-scope.outputs.run_expensive }}, coverageMode=${{ needs.pr-scope.outputs.coverage_mode }}, coverage=${{ needs.node-24-coverage.result }}, consumers=${{ needs.node-24-consumers.result }}, runtime=${{ needs.python-runtime.result }}, windowsMode=${{ needs.pr-scope.outputs.windows_mode }}, wine=${{ needs.windows.result }}"
+          echo "::error::Needed job results: scope=${{ needs.pr-scope.result }}, static=${{ needs.node-24.result }}, gatewayMode=${{ needs.pr-scope.outputs.gateway_mode }}, gateway=${{ needs.gateway.result }}, adminUiMode=${{ needs.pr-scope.outputs.admin_ui_mode }}, adminUi=${{ needs.gateway-admin-ui.result }}, compatMode=${{ needs.pr-scope.outputs.compat_mode }}, compat=${{ needs.node-compat.result }}, pythonMode=${{ needs.pr-scope.outputs.python_mode }}, python=${{ needs.python-sdk.result }}, expensive=${{ needs.pr-scope.outputs.run_expensive }}, coverageMode=${{ needs.pr-scope.outputs.coverage_mode }}, coverage=${{ needs.node-24-coverage.result }}, consumers=${{ needs.node-24-consumers.result }}, web=${{ needs.web-verification.result }}, runtime=${{ needs.python-runtime.result }}, windowsMode=${{ needs.pr-scope.outputs.windows_mode }}, wine=${{ needs.windows.result }}"
           exit 1
       - name: All checks passed
         run: |
@@ -1301,6 +1405,7 @@ jobs:
           echo "changed docs only=${{ needs.pr-scope.outputs.changed_docs_only }}"
           echo "coverage mode=${{ needs.pr-scope.outputs.coverage_mode }}"
           echo "snapshot mode=${{ needs.pr-scope.outputs.snapshot_mode }}"
+          echo "web groups=${{ needs.pr-scope.outputs.web_groups }}"
           echo "compat mode=${{ needs.pr-scope.outputs.compat_mode }}"
           echo "python mode=${{ needs.pr-scope.outputs.python_mode }}"
           echo "windows mode=${{ needs.pr-scope.outputs.windows_mode }}"
