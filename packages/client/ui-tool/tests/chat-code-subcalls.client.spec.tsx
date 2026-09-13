@@ -161,8 +161,8 @@ async function bench(snapshot: ConversationSnapshot) {
   ctx.provide('layout', layout)
   ctx.provide('connection', {
     api: { settings: {} },
-    isLoopback: false,
-    hostDescription: { getSnapshot: () => undefined, subscribe: () => () => {} },
+    isLoopback: true,
+    hostDescription: { getSnapshot: () => ({ canOpenPath: true }), subscribe: () => () => {} },
   } as never)
   // ui-theme's Appearance row binds a durable scope through these two.
   ctx.provide('remote', { $on: () => () => {} } as never)

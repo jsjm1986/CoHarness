@@ -327,13 +327,13 @@ describe('tool-bash-persistent', () => {
     expect(ctx.tools.get('bash')?.presentCall?.({ command: 'pwd' }))
       .toEqual({ card: 'terminal', title: 'pwd' })
 
-    expect(text(await call(ctx, owner, 'echo one'))).toBe('hello from stub')
-    expect(text(await call(ctx, owner, 'echo two'))).toBe('hello from stub')
+    expect(text(await call(ctx, owner, 'echo one'))).toBe('hello from stub\n[Command finished with exit code 0]')
+    expect(text(await call(ctx, owner, 'echo two'))).toBe('hello from stub\n[Command finished with exit code 0]')
     expect(stub.sessions).toHaveLength(1)
     expect(stub.sessions[0]?.sends).toBe(3)
 
     const ownerWithoutCwd = agent(ctx, undefined)
-    expect(text(await call(ctx, ownerWithoutCwd, 'pwd'))).toBe('hello from stub')
+    expect(text(await call(ctx, ownerWithoutCwd, 'pwd'))).toBe('hello from stub\n[Command finished with exit code 0]')
     expect(stub.sessions).toHaveLength(2)
 
     await fiber.dispose()
@@ -376,13 +376,13 @@ describe('tool-bash-persistent', () => {
     expect(text(await call(ctx, owner, 'large'))).toContain('<response clipped>')
 
     session.mode = 'nonzero'
-    expect(text(await call(ctx, owner, 'false'))).toBe('[exit code: 7]')
+    expect(text(await call(ctx, owner, 'false'))).toBe('[Command finished with exit code 7]')
 
     session.mode = 'exit'
     const exited = text(await call(ctx, owner, 'exit'))
     expect(exited).toContain('hello from')
     expect(exited).toContain('[shell exited: code 9]')
-    expect(exited).not.toContain('[exit code: 9]')
+    expect(exited).not.toContain('[Command finished with exit code 9]')
     expect(exited).toContain('next bash call starts from the workspace')
     expect(session.closed).toContain('persistent bash shell exited')
 
@@ -408,7 +408,7 @@ describe('tool-bash-persistent', () => {
     stub.sessions[0]!.mode = 'torn-status'
     stub.sessions[0]!.scrollback = ''
 
-    expect(text(await call(ctx, owner, 'torn status'))).toBe('hello from stub\n[exit code: 7]')
+    expect(text(await call(ctx, owner, 'torn status'))).toBe('hello from stub\n[Command finished with exit code 7]')
   })
 
   it('reports the exit path when the shell exits between send settlement and the next poll', async () => {
@@ -422,7 +422,7 @@ describe('tool-bash-persistent', () => {
     expect(result).toContain('next bash call starts from the workspace')
     expect(session.closed).toContain('persistent bash shell exited')
 
-    expect(text(await call(ctx, owner, 'echo "$PWD"'))).toBe('hello from stub')
+    expect(text(await call(ctx, owner, 'echo "$PWD"'))).toBe('hello from stub\n[Command finished with exit code 0]')
     expect(stub.sessions).toHaveLength(2)
   })
 
@@ -461,7 +461,7 @@ describe('tool-bash-persistent', () => {
     session.mode = 'paged-scrollback'
     session.scrollback = 'older one\nolder two\nolder three\nolder four\n'
 
-    expect(text(await call(ctx, owner, 'paged output'))).toBe('hello from stub')
+    expect(text(await call(ctx, owner, 'paged output'))).toBe('hello from stub\n[Command finished with exit code 0]')
   })
 
   it('returns a stdin_read fallback reached after multiple polling rounds', async () => {
@@ -483,7 +483,7 @@ describe('tool-bash-persistent', () => {
     await call(ctx, owner, 'warm up')
     stub.sessions[0]!.historyTruncated = true
     const result = text(await call(ctx, owner, 'short command'))
-    expect(result).toBe('hello from stub')
+    expect(result).toBe('hello from stub\n[Command finished with exit code 0]')
     expect(result).not.toContain('<response clipped>')
     expect(result).not.toContain('beginning of this command output was dropped')
   })
@@ -513,7 +513,7 @@ describe('tool-bash-persistent', () => {
       }, 5)
 
       expect((await cancelled).isError).toBe(true)
-      expect(text(await queued)).toBe('hello from stub')
+      expect(text(await queued)).toBe('hello from stub\n[Command finished with exit code 0]')
       expect(stub.sessions[0]?.closed).toContain('persistent bash command aborted')
       expect(stub.sessions).toHaveLength(2)
     },
@@ -540,7 +540,7 @@ describe('tool-bash-persistent', () => {
     stub.sessions[0]!.mode = 'send-error'
     expect((await call(ctx, owner, 'fails')).isError).toBe(true)
     expect(stub.sessions[0]?.closed).toContain('persistent bash send failed')
-    expect(text(await call(ctx, owner, 'recovers'))).toBe('hello from stub')
+    expect(text(await call(ctx, owner, 'recovers'))).toBe('hello from stub\n[Command finished with exit code 0]')
     expect(stub.sessions).toHaveLength(2)
   })
 

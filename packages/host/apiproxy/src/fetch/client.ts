@@ -41,6 +41,12 @@ import {
   workspaceListValueSchema,
   workspaceRenameValueSchema,
 } from '../api/workspace.schema.ts'
+import {
+  workspaceFilesListValueSchema,
+  workspaceFilesReadBytesValueSchema,
+  workspaceFilesReadValueSchema,
+  workspaceFilesStatValueSchema,
+} from '../api/workspace-files.schema.ts'
 import { skillListValueSchema } from '../api/skills.schema.ts'
 import {
   agentPresetCopyValueSchema, agentPresetListValueSchema, agentPresetOpenDocumentValueSchema,
@@ -123,6 +129,12 @@ export interface IApiClient {
     insertSessionBefore(payload: RequestPayload<'workspace.insertSessionBefore'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspace.insertSessionBefore'>>>
     archiveSession(payload: RequestPayload<'workspace.archiveSession'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspace.archiveSession'>>>
   }
+  workspaceFiles: {
+    list(payload: RequestPayload<'workspaceFiles.list'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspaceFiles.list'>>>
+    stat(payload: RequestPayload<'workspaceFiles.stat'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspaceFiles.stat'>>>
+    read(payload: RequestPayload<'workspaceFiles.read'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspaceFiles.read'>>>
+    readBytes(payload: RequestPayload<'workspaceFiles.readBytes'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspaceFiles.readBytes'>>>
+  }
   skills: {
     list(payload: RequestPayload<'skill.list'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'skill.list'>>>
   }
@@ -201,6 +213,10 @@ const UNARY_VALUE_SCHEMAS: { [K in keyof RpcMethodMap]: z.ZodType<Wire<ResponseV
   'workspace.insertBefore': workspaceInsertBeforeValueSchema,
   'workspace.insertSessionBefore': workspaceInsertSessionBeforeValueSchema,
   'workspace.archiveSession': workspaceArchiveSessionValueSchema,
+  'workspaceFiles.list': workspaceFilesListValueSchema,
+  'workspaceFiles.stat': workspaceFilesStatValueSchema,
+  'workspaceFiles.read': workspaceFilesReadValueSchema,
+  'workspaceFiles.readBytes': workspaceFilesReadBytesValueSchema,
   'skill.list': skillListValueSchema,
   'agentPreset.list': agentPresetListValueSchema,
   'agentPreset.select': agentPresetSelectValueSchema,
@@ -336,6 +352,14 @@ function requestSignalLease(
 }
 
 /** URL base for in-process handler injection (fake authority, opencode precedent). */
+/** HTTP failure before an RPC envelope is received; response bodies remain unread. */
+export class ApiTransportError extends Error {
+  constructor(readonly status: number, path: string) {
+    super(`transport failure for ${path}: HTTP ${String(status)}`)
+    this.name = 'ApiTransportError'
+  }
+}
+
 const INTERNAL_BASE = 'http://dsh.internal'
 
 /** Read a unary response body with an explicit byte budget before JSON parsing. */
@@ -625,7 +649,7 @@ export abstract class AbstractApiClient implements IApiClient {
       if (!response.ok) {
         await response.body?.cancel().catch(() => {})
         lease.dispose()
-        throw new Error(`transport failure for ${path}: HTTP ${response.status}`)
+        throw new ApiTransportError(response.status, path)
       }
       return { response, signal: lease.signal, dispose: () => { lease.dispose() } }
     } catch (error: unknown) {
@@ -692,7 +716,7 @@ export abstract class AbstractApiClient implements IApiClient {
     const response = await this.doFetch(this.resolveUrl(path), { signal })
     if (!response.ok || response.body === null) {
       await response.body?.cancel().catch(() => {})
-      throw new Error(`transport failure for ${path}: HTTP ${response.status}`)
+      throw new ApiTransportError(response.status, path)
     }
     try {
       onOpen?.()
@@ -786,6 +810,13 @@ export abstract class AbstractApiClient implements IApiClient {
     insertBefore: (payload, signal) => this.callUnary('workspace.insertBefore', payload, signal),
     insertSessionBefore: (payload, signal) => this.callUnary('workspace.insertSessionBefore', payload, signal),
     archiveSession: (payload, signal) => this.callUnary('workspace.archiveSession', payload, signal),
+  }
+
+  readonly workspaceFiles: IApiClient['workspaceFiles'] = {
+    list: (payload, signal) => this.callUnary('workspaceFiles.list', payload, signal),
+    stat: (payload, signal) => this.callUnary('workspaceFiles.stat', payload, signal),
+    read: (payload, signal) => this.callUnary('workspaceFiles.read', payload, signal),
+    readBytes: (payload, signal) => this.callUnary('workspaceFiles.readBytes', payload, signal),
   }
 
   readonly skills: IApiClient['skills'] = {

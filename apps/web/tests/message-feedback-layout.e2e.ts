@@ -291,6 +291,11 @@ describe('web e2e: the feedback note editor floats above the column', () => {
       await like.scrollIntoViewIfNeeded()
       await like.hover()
       await like.click()
+      // Creating or changing a rating is confirmed in the feedback sidecar;
+      // complete that explicit step before measuring the note affordance.
+      const confirmDialog = page.getByRole('dialog')
+      await confirmDialog.waitFor({ timeout: 10_000 })
+      await confirmDialog.getByRole('button', { name: 'Submit', exact: true }).click()
       await page.getByRole('button', { name: 'Remove rating' }).first()
         .waitFor({ timeout: 15_000 })
       const noteTrigger = page.getByRole('button', { name: 'Add a note' }).first()

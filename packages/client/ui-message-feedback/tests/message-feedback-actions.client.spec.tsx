@@ -8,7 +8,7 @@
  */
 import { useSyncExternalStore } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, waitFor, within } from '@testing-library/react'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import type { MessageId } from '@deepseek-ai/dsh-client-connection/client'
@@ -101,8 +101,9 @@ describe('MessageFeedbackActions', () => {
     const ui = mount()
 
     fireEvent.click(ui.getByLabelText(zh['action.like']))
+    fireEvent.click(ui.getByRole('button', { name: zh['confirm.submit'] }))
 
-    await waitFor(() => { expect(ui.toggle).toHaveBeenCalledWith(MSG, 'positive') })
+    await waitFor(() => { expect(ui.rate).toHaveBeenCalledWith(MSG, 'positive') })
     expect(ui.clear).not.toHaveBeenCalled()
   })
 
@@ -110,8 +111,17 @@ describe('MessageFeedbackActions', () => {
     const ui = mount({ current: item({ rating: 'positive', note: 'keep me' }) })
 
     fireEvent.click(ui.getByLabelText(zh['action.dislike']))
+    fireEvent.click(ui.getByRole('button', { name: zh['confirm.submit'] }))
 
-    await waitFor(() => { expect(ui.toggle).toHaveBeenCalledWith(MSG, 'negative') })
+    await waitFor(() => { expect(ui.rate).toHaveBeenCalledWith(MSG, 'negative') })
+  })
+
+  it('cancels a pending rating confirmation without writing the sidecar', () => {
+    const ui = mount()
+    fireEvent.click(ui.getByLabelText(zh['action.like']))
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(ui.queryByRole('dialog', { name: zh['confirm.title'] })).toBeNull()
+    expect(ui.rate).not.toHaveBeenCalled()
   })
 
   it('retracts the feedback when the active rating is clicked again', async () => {
@@ -168,6 +178,7 @@ describe('MessageFeedbackActions', () => {
     })
 
     fireEvent.click(ui.getByLabelText(zh['action.like']))
+    fireEvent.click(ui.getByRole('button', { name: zh['confirm.submit'] }))
 
     await waitFor(() => { expect(ui.getByText(zh['error.conflict'])).toBeTruthy() })
   })
@@ -178,8 +189,12 @@ describe('MessageFeedbackActions', () => {
     })
 
     fireEvent.click(ui.getByLabelText(zh['action.like']))
+    fireEvent.click(ui.getByRole('button', { name: zh['confirm.submit'] }))
 
     await waitFor(() => { expect(ui.getByText(zh['error.generic'])).toBeTruthy() })
+    const dialog = ui.getByRole('dialog', { name: zh['confirm.title'] })
+    fireEvent.click(within(dialog).getByText(zh['confirm.cancel']))
+    expect(ui.getByText(zh['error.generic'])).toBeTruthy()
   })
 
   it('keeps the editor open when the note fails to save', async () => {
@@ -202,7 +217,7 @@ describe('MessageFeedbackActions', () => {
     const gate = new Promise<MessageFeedbackActionResult>((resolve) => {
       release = () => { resolve({ ok: false, error: { code: 'target-not-found', message: 'gone' } }) }
     })
-    const view: MessageFeedbackView = { status: 'ready', items: new Map(), error: null }
+    const view: MessageFeedbackView = { status: 'ready', items: new Map([[MSG, item({ rating: 'positive' })]]), error: null }
     const useFeedback = (<T,>(select: (v: MessageFeedbackView) => T): T =>
       useSyncExternalStore(() => () => {}, () => select(view))) as never
     const props = {
@@ -220,7 +235,7 @@ describe('MessageFeedbackActions', () => {
     const onError = (event: ErrorEvent): void => { errors.push(event.error) }
     window.addEventListener('error', onError)
 
-    fireEvent.click(ui.getByLabelText(zh['action.like']))
+    fireEvent.click(ui.getByLabelText(zh['action.likeActive']))
     ui.unmount()
     release()
     await gate
@@ -242,6 +257,7 @@ describe('MessageFeedbackActions', () => {
     })
 
     fireEvent.click(ui.getByLabelText(zh['action.like']))
+    fireEvent.click(ui.getByRole('button', { name: zh['confirm.submit'] }))
 
     await waitFor(() => { expect(ui.getByText(zh['error.generic'])).toBeTruthy() })
     expect(ui.queryByText(zh['error.load'])).toBeNull()

@@ -19,6 +19,11 @@
     "lightningcss"
   ],
   "workspaces": {
+    "packages/util/package-manifest": {
+      "project": [
+        "src/**/*.ts"
+      ]
+    },
     ".": {
       "entry": [
         "scripts/**/*.mjs",

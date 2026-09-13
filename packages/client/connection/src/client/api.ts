@@ -19,6 +19,7 @@ export type {
   CredentialsApi, CredentialView, ConfigurableProviderView, DiscoveredModelView, LlmApi,
   SubagentsApi, SubagentAddress, SubagentCatalog, SubagentListEntry, SubagentPromptContentPart, SubagentPromptReceipt,
   JobView,
+  WorkspaceFilesApi, WorkspaceFileByteWindow, WorkspaceFileEntry, WorkspaceFileStat, WorkspaceFileTextPage,
 } from '@deepseek-ai/dsh-host-apiproxy/api'
 
 /** Authenticated Gateway runtime selected by a workbench pane. */
@@ -38,7 +39,7 @@ export {
   SESSION_SEARCH_RESULT_LIMIT,
   transportError,
 } from '@deepseek-ai/dsh-host-apiproxy/api'
-export { AbstractApiClient } from '@deepseek-ai/dsh-host-apiproxy/client'
+export { AbstractApiClient, ApiTransportError } from '@deepseek-ai/dsh-host-apiproxy/client'
 export type { IApiClient } from '@deepseek-ai/dsh-host-apiproxy/client'
 export type { AccountPreferenceMutation, AccountPreferenceNamespace, AccountPreferencesTransport, AccountPreferencesView } from './account-preferences.ts'
 export type {

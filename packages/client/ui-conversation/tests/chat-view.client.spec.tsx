@@ -450,6 +450,7 @@ describe('Chat node rendering', () => {
     expect(formatRunDuration(-500, t)).toBe('0秒')
     expect(formatRunDuration(15_999, t)).toBe('15秒')
     expect(formatRunDuration(125_000, t)).toBe('2分05秒')
+    expect(formatRunDuration(3_903_000, t)).toBe('1小时05分03秒')
   })
 
 })
@@ -831,9 +832,12 @@ describe('ChatView', () => {
     })
     const view = render(<h.ChatView {...h.props} />)
     // First-step ttft (1.2s) plus 100 tokens over 5s of decode.
-    expect(view.getAllByText(/用时 19秒/)).toHaveLength(1)
-    expect(view.getAllByText(/首 token 1\.2秒/)).toHaveLength(1)
-    expect(view.getAllByText(/20 tok\/s/)).toHaveLength(1)
+    expect(view.getByRole('button', { name: '用时 19秒' })).toBeTruthy()
+    const time = view.getByRole('button', { name: '用时 19秒' })
+    fireEvent.click(time)
+    const dialog = view.getByRole('dialog', { name: '本轮用时和速度' })
+    expect(dialog.textContent).toContain('首 token 用时（TTFT）1.2秒')
+    expect(dialog.textContent).toContain('20 tok/s')
   })
 
   it('withholds ttft and throughput while the turn is still running', () => {
@@ -919,8 +923,10 @@ describe('ChatView', () => {
       turnEnds: new Map([[1, 2]]),
     })
     const view = render(<h.ChatView {...h.props} />)
-    // The user row and the settled assistant's Turn Tail each own one clock scope.
-    expect(view.container.querySelectorAll('[data-time-hover-root]')).toHaveLength(2)
+    // The user row keeps its time hover scope; the settled assistant tail now
+    // owns the upstream recency reveal attribute for its action row.
+    expect(view.container.querySelectorAll('[data-time-hover-root]')).toHaveLength(1)
+    expect(view.container.querySelectorAll('[data-actions-reveal]')).toHaveLength(1)
   })
 
   it('the run-time label is withheld when the turn start is outside the window', () => {

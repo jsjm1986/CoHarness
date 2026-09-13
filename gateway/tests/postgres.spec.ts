@@ -704,6 +704,40 @@ describePg('PostgreSQL baseline', () => {
     expect(assigned.rows[0]).toEqual({ port: 47000, count: '1' })
   })
 
+  it('repairs active users imported without a PostgreSQL instance row', async () => {
+    const suffix = randomUUID().slice(0, 8)
+    const organization = await pool.query<{ id: string }>(`INSERT INTO harness.organizations(
+      slug,display_name
+    ) VALUES($1,'User Instance Repair Test') RETURNING id`, [`user-instance-${suffix}`])
+    const isolatedOrganizationId = organization.rows[0]!.id
+    const node = await pool.query<{ id: string }>(`INSERT INTO harness.compute_nodes(
+      organization_id,name
+    ) VALUES($1,$2) RETURNING id`, [isolatedOrganizationId, `user-instance-node-${suffix}`])
+    const isolatedNodeId = node.rows[0]!.id
+    const user = await pool.query<{ id: string; public_id: string }>(`INSERT INTO harness.users(
+      organization_id,username,display_name,home_path
+    ) VALUES($1,$2,'Imported User',$3) RETURNING id,public_id::text`,
+    [isolatedOrganizationId, `imported-user-${suffix}`, `/tmp/imported-user-${suffix}`])
+    await pool.query(`INSERT INTO harness.memberships(organization_id,user_id,role)
+      VALUES($1,$2,'member')`, [isolatedOrganizationId, user.rows[0]!.id])
+
+    const instances = new PostgresInstanceRepository({
+      pool,
+      organizationId: isolatedOrganizationId,
+      organizationSlug: `user-instance-${suffix}`,
+      nodeId: isolatedNodeId,
+      nodeName: `user-instance-node-${suffix}`,
+    }, 47100)
+    await instances.initialize(true)
+    await instances.initialize(true)
+
+    const assigned = await pool.query<{ port: number; count: string }>(`SELECT min(port) port,count(*)::text count
+      FROM harness.instances WHERE organization_id=$1 AND assigned_node_id=$2 AND user_id=$3`,
+    [isolatedOrganizationId, isolatedNodeId, user.rows[0]!.id])
+    expect(assigned.rows[0]).toEqual({ port: 47100, count: '1' })
+    expect(await instances.portOf({ kind: 'user', id: Number(user.rows[0]!.public_id) })).toBe(47100)
+  })
+
   it('reuses PostgreSQL node-local port holes without crossing the configured base', async () => {
     const root = await mkdtemp(join(tmpdir(), 'hgw-postgres-port-base-'))
     const suffix = randomUUID().slice(0, 8)

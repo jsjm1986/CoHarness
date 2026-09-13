@@ -47,6 +47,7 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/host/open-in-app': { kind: 'none', reason: 'Host application launch routes do not register model-visible prompts or results.' },
   'packages/session/session-format': { kind: 'none', reason: 'The package validates and migrates durable Session data; provider and prompt consumers own every model-visible effect.' },
   'packages/util/values': { kind: 'none', reason: 'JSON-safe value operations register no prompt, schema, or result text.' },
+  'packages/util/package-manifest': { kind: 'none', reason: 'Shared package manifest declarations register no prompt, schema, or result text.' },
   'packages/credentials/authorization': { kind: 'none', reason: 'Authorization is a configuration-time human conversation; its flow, notice, and prompt never enter a model request.' },
   'packages/attachment/attachment': { kind: 'indirect', reason: 'The storage seam delegates model request rendering to provider adapters.' },
   'packages/attachment/attachment-local': { kind: 'indirect', reason: 'The local backend delegates model request rendering to provider adapters.' },

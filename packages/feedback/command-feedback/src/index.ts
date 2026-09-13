@@ -7,6 +7,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import { CommandDefinitionId } from '@deepseek-ai/dsh-commands/brand'
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
 import type { SessionTelemetryBackend, SessionTelemetrySharingStatus } from '@deepseek-ai/dsh-session-telemetry'
 import type { Session } from '@deepseek-ai/dsh-session'
@@ -99,6 +100,7 @@ function executeFeedbackCommand(invocation: CommandInvocation, ctx: Context): Co
 /** Register the global `/feedback` command for every composed command adapter. */
 export function apply(ctx: Context): void {
   ctx.commands.register({
+    definitionId: CommandDefinitionId('@deepseek-ai/dsh-command-feedback'),
     name: 'feedback',
     description: 'record feedback about this session',
     input: { hint: '<text>' },

@@ -61,4 +61,19 @@ describe('deriveTurnTokenUsage', () => {
     ]
     expect(deriveTurnTokenUsage(events)).toEqual({ uncachedInputTokens: 200, outputTokens: 40, totalTokens: 340 })
   })
+
+  it('keeps usage readable when a legacy assistant envelope has no normalized message route', () => {
+    const legacy = event(3, 'assistant/message', {
+      turn: 1,
+      step: 1,
+      content: [{ type: 'text', text: 'done' }],
+      provenance: { provider: 'deepseek', model: 'deepseek-chat' },
+      usage: usage({ cacheReadTokens: undefined, cacheWriteTokens: undefined }),
+    })
+    expect(deriveTurnTokenUsage(complete(legacy))).toEqual({
+      uncachedInputTokens: 100,
+      outputTokens: 20,
+      totalTokens: 170,
+    })
+  })
 })

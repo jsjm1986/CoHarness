@@ -80,7 +80,7 @@ JSONL 存储不修改实时请求前缀。只有重建历史、当前 envelope �
 
 ## 已知限制与暂缓事项
 
-- **只加载已配置编码和 catalog 中的 generation**：此 backend 会把发布版 v0/v1 artifact 迁移到当前 v2，并保留源文件；更改压缩需要独立 root，保留的旧 generation 不提供自动回退或降级。
+- **只加载已配置编码和 catalog 中的 generation**：此 backend 会把发布版 v0/v1/v2 artifact 迁移到当前 v3，并保留源文件；更改压缩需要独立 root，保留的旧 generation 不提供自动回退或降级。
 - **平铺文件存储布局不加载**：加载前使用独立根，或将预发布产物移入项目/会话目录布局。
 - **压缩文件不能直接按行读取**：使用后端加载；或在写入新根前选择 `compression: 'none'`，以便外部行 reader 使用。
 - **不删除会话文件**：日志在 `root` 下累积，直到外部移除（seam 无删除接口）。

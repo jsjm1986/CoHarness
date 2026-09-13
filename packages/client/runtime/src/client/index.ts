@@ -18,6 +18,7 @@ import type { UseProjection } from './sessions/projection-store.ts'
 import { ConversationEventRegistry } from './conversation/event-registry.ts'
 import { ConversationViewRegistry } from './conversation/view-registry.ts'
 import { ProjectUiPolicyRuntime } from './project-policy.ts'
+import { WorkspaceResourceRegistry } from './workspace-resources.ts'
 
 export { isAppendSurfaceEvent, isReplacementSurfaceEvent } from '@deepseek-ai/dsh-session/surface'
 
@@ -62,6 +63,24 @@ export { onSettingsNavigation, requestSettingsSection } from './contract/setting
 export type { SettingsNavigationRequest } from './contract/settings-navigation.ts'
 export { ProjectUiPolicyRuntime } from './project-policy.ts'
 export type { ProjectThemePolicy, ProjectUiPolicySnapshot } from './project-policy.ts'
+export {
+  WorkspaceResourceRegistry,
+  parseWorkspaceResourceAddress,
+  workspaceResourceProvider,
+  WorkspaceResourceError,
+  isWorkspaceAccessFailure,
+  workspaceResourceAddress,
+  workspacePathForResource,
+} from './workspace-resources.ts'
+export type {
+  WorkspaceResourceAddress,
+  WorkspaceResourceProvider,
+  WorkspaceResourceOpenRequest,
+  WorkspaceResourceTarget,
+  WorkspaceResourceSource,
+  WorkspaceResourceState,
+  WorkspaceResourceValue,
+} from './workspace-resources.ts'
 export type { Session } from './sessions/session.ts'
 export type {
   BeginSubmissionInput,
@@ -219,6 +238,13 @@ declare module '@deepseek-ai/cordis' {
      * @mode emit
      */
     'connection/reset'(): void
+    /**
+     * Open one Session-relative Workspace file in the browser.
+     * @param request - owning Session and relative resource address.
+     * @mode bail
+     * @returns true when a preview consumer accepts the resource.
+     */
+    'workspace/resource-open'(request: import('./workspace-resources.ts').WorkspaceResourceOpenRequest): true | undefined
   }
   interface Context {
     slots: import('./slots.ts').SlotRegistry
@@ -232,6 +258,8 @@ declare module '@deepseek-ai/cordis' {
     workspaces: import('./contract/workspaces.ts').IWorkspaces
     /** Active project UI policy shared by theme and project settings surfaces. */
     projectUiPolicy: import('./project-policy.ts').ProjectUiPolicyRuntime
+    /** Metadata-only Workspace resource registry; providers bind one runtime target. */
+    workspaceResources: WorkspaceResourceRegistry
     /** Optional provider for the multi-session conversation viewport. */
     conversationViewport?: import('./contract/conversation-viewport.ts').ConversationViewport
   }
@@ -246,6 +274,8 @@ export const inject = ['connection', 'typert', 'remote', 'remote.commands']
 export function apply(ctx: Context): void {
   ctx.plugin(SlotRegistry)
   ctx.provide('projectUiPolicy', new ProjectUiPolicyRuntime())
+  const workspaceResources = new WorkspaceResourceRegistry()
+  ctx.provide('workspaceResources', workspaceResources)
   const conversation = {
     events: new ConversationEventRegistry(ctx),
     views: new ConversationViewRegistry(ctx),
@@ -277,11 +307,12 @@ export function apply(ctx: Context): void {
       const frame = envelope.payload
       if (frame.type === 'host/remote-event') ctx.remote.$dispatch(frame.event, frame.args)
     },
-    onConnected: () => {
-      sessions.handleConnected()
+    onConnected: (description) => {
+      sessions.handleConnected(description)
       workspaces.handleConnected()
       ctx.emit('connection/reset')
     },
+    onFailure: (failure) => { sessions.handleConnectionFailure(failure) },
     onStateChange: (state) => {
       // Generation death fires before the next generation's business frames
       // are released: ConnectionController buffers stream replay until after

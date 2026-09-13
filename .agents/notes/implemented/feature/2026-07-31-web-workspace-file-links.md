@@ -6,6 +6,8 @@ English | [中文](2026-07-31-web-workspace-file-links.zh.md)
 
 > Scope: the produced-files row a finished turn ends with, the file-path link that reads as one, and the Host opener preferring the default browser for documents a browser renders. Not in scope, by decision: serving workspace files over HTTP, and previews for a client that is not on the Host machine.
 
+> The remote-preview part of this note is superseded by [cloud Workspace file resources](2026-09-12-cloud-workspace-file-resources.md). The same-origin HTTP rejection and the desktop-only `openPath` behavior remain authoritative for their respective transports.
+
 ## Problem
 
 A web session that produced a file had no way to look at it. The agent wrote `deepseek-homepage.html`, said so, and the user's only recourse was to copy an absolute path like `/private/tmp/dsh-client-hotplug.ygPvsm/workspaces/plugin-hotplug/deepseek-homepage.html` into a terminal.

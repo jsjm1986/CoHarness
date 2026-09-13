@@ -123,6 +123,10 @@ class RecordingFileSystem extends FileSystem {
     throw new Error('not needed in agent-instructions tests')
   }
 
+  override async readByteRange(_target: FsTarget, _range: { offset: number; length: number }): Promise<Uint8Array> {
+    throw new Error('not needed in agent-instructions tests')
+  }
+
   override async streamText(target: FsTarget, signal?: AbortSignal): Promise<AsyncIterable<string>> {
     if (signal !== undefined) this.signals.push(signal)
     signal?.throwIfAborted()

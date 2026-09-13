@@ -302,6 +302,69 @@ describe('readBytes', () => {
   })
 })
 
+describe('readByteRange', () => {
+  it('reads only the requested raw byte window and handles EOF', async () => {
+    await writeFile(join(dir, 'window.bin'), Buffer.from([0, 1, 2, 3, 4, 5]))
+    const target = await fs.resolve('window.bin')
+    expect(Array.from(await fs.readByteRange(target, { offset: 2, length: 3 }))).toEqual([2, 3, 4])
+    expect(Array.from(await fs.readByteRange(target, { offset: 5, length: 10 }))).toEqual([5])
+    expect(Array.from(await fs.readByteRange(target, { offset: 6, length: 2 }))).toEqual([])
+    await expect(fs.readByteRange(target, { offset: -1, length: 1 })).rejects.toMatchObject({ code: 'FS_IO_ERROR' })
+  })
+
+  it('rejects a missing target, directory, and an aborted read', async () => {
+    await expect(fs.readByteRange(await fs.resolve('missing'), { offset: 0, length: 1 })).rejects.toMatchObject({ code: 'FS_NOT_FOUND' })
+    await expect(fs.readByteRange(await fs.resolve('.'), { offset: 0, length: 1 })).rejects.toMatchObject({ code: 'FS_NOT_REGULAR_FILE' })
+    await writeFile(join(dir, 'abort.bin'), 'data')
+    await expect(fs.readByteRange(await fs.resolve('abort.bin'), { offset: 0, length: 1 }, AbortSignal.abort())).rejects.toMatchObject({ code: 'FS_ABORTED' })
+  })
+})
+
+describe('guarded file reads', () => {
+  it('reads a matching version and rejects replacement before opening', async () => {
+    await writeFile(join(dir, 'guarded'), 'one\ntwo\n')
+    const target = await fs.resolve('guarded')
+    const expectedVersion = await versionOf(target)
+    expect(Buffer.from(await fs.readByteRange(target, { offset: 4, length: 4, expectedVersion })).toString()).toBe('two\n')
+    const chunks: string[] = []
+    for await (const chunk of await fs.streamText(target, undefined, expectedVersion)) chunks.push(chunk)
+    expect(chunks.join('')).toBe('one\ntwo\n')
+    await writeFile(join(dir, 'guarded'), 'replacement')
+    await expect(fs.readByteRange(target, { offset: 0, length: 4, expectedVersion })).rejects.toMatchObject({ code: 'FS_STALE_VERSION' })
+    await expect(async () => {
+      for await (const _chunk of await fs.streamText(target, undefined, expectedVersion)) { /* Drain the guarded stream. */ }
+    }).rejects.toMatchObject({ code: 'FS_STALE_VERSION' })
+  })
+
+  it('checks freshness when a text consumer stops at a page boundary', async () => {
+    await writeFile(join(dir, 'guarded'), 'line\n'.repeat(100_000))
+    const target = await fs.resolve('guarded')
+    const expectedVersion = await versionOf(target)
+    const stream = await fs.streamText(target, undefined, expectedVersion)
+    for await (const chunk of stream) { expect(chunk.length).toBeGreaterThan(0); break }
+    const changed = await fs.streamText(target, undefined, expectedVersion)
+    await expect(async () => {
+      for await (const _chunk of changed) {
+        await writeFile(join(dir, 'guarded'), 'new bytes')
+        break
+      }
+    }).rejects.toMatchObject({ code: 'FS_STALE_VERSION' })
+  })
+
+  it('refuses a symlink swapped into a previously resolved target', async () => {
+    await writeFile(join(dir, 'guarded'), 'public')
+    await writeFile(join(dir, 'secret'), 'secret')
+    const target = await fs.resolve('guarded')
+    const expectedVersion = await versionOf(target)
+    await unlink(join(dir, 'guarded'))
+    await symlink(join(dir, 'secret'), join(dir, 'guarded'))
+    await expect(fs.readByteRange(target, { offset: 0, length: 6, expectedVersion })).rejects.toBeDefined()
+    await expect(async () => {
+      for await (const _chunk of await fs.streamText(target, undefined, expectedVersion)) { /* No file bytes may escape. */ }
+    }).rejects.toBeDefined()
+  })
+})
+
 describe('listDir', () => {
   it('lists files and directories in stable name order with resolved child targets', async () => {
     await mkdir(join(dir, 'skills', 'dir-skill'), { recursive: true })

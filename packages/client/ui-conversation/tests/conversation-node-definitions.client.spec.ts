@@ -162,6 +162,33 @@ describe('built-in conversation node Definitions', () => {
     expect(assistantDefinition.publication?.(match(at(16, 'step/start', {})))).toBe('none')
   })
 
+  it('keeps compact Assistant attempts in the turn tail so exact usage remains visible after replay', () => {
+    const value = assembler([
+      at(1, 'turn/start', { turn: 1 }),
+      at(2, 'step/start', { turn: 1, step: 1 }),
+      at(3, 'assistant/attempt', {
+        turn: 1,
+        step: 1,
+        stream: [
+          { type: 'chunk', time: 3_000, chunk: { type: 'usage', usage: { inputTokens: 10, outputTokens: 2, totalTokens: 17, cacheReadTokens: 5, cacheWriteTokens: 0 } } },
+        ],
+      }),
+      at(4, 'step/end', { turn: 1, step: 1 }),
+      at(5, 'turn/end', { turn: 1, reason: { kind: 'completed' } }),
+    ])
+    const tail = node(snapshot(value), 'turn-tail')
+    expect(tail?.data).toMatchObject({
+      turn: 1,
+      tokenUsage: {
+        uncachedInputTokens: 10,
+        cacheReadTokens: 5,
+        cacheWriteTokens: 0,
+        outputTokens: 2,
+        totalTokens: 17,
+      },
+    })
+  })
+
   it('projects turn process evidence, counts delegation tools precisely, and keeps answer anchors', () => {
     const empty = assembler([
       at(1, 'turn/start', { turn: 1 }),

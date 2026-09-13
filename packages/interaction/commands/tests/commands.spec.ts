@@ -4,7 +4,7 @@ import { createScope } from '@deepseek-ai/dsh-scope'
 import type { Scope } from '@deepseek-ai/dsh-scope'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
-import CommandRuntime, { parseCommand, type CommandDefinition } from '@deepseek-ai/dsh-commands'
+import CommandRuntime, { CommandDefinitionId, parseCommand, type CommandDefinition } from '@deepseek-ai/dsh-commands'
 import { AttachmentStore } from '@deepseek-ai/dsh-attachment'
 
 function command(name: string, text = `ran:${name}`): CommandDefinition {
@@ -54,10 +54,11 @@ describe('parseCommand()', () => {
 })
 
 describe('CommandRuntime', () => {
-  it('lists immutable global descriptors with input metadata', async () => {
+  it('lists immutable global descriptors with optional plugin identity and input metadata', async () => {
     const ctx = await mount()
     const { agent } = await mintAgentScope(ctx, 'a')
     const definition: CommandDefinition = {
+      definitionId: CommandDefinitionId('example/inspect'),
       name: 'inspect',
       description: 'Inspect state',
       input: { hint: '<target>' },
@@ -67,6 +68,7 @@ describe('CommandRuntime', () => {
 
     const listed = ctx.commands.list(agent)
     expect(listed).toEqual([{
+      definitionId: CommandDefinitionId('example/inspect'),
       name: 'inspect',
       description: 'Inspect state',
       input: { hint: '<target>' },
@@ -74,7 +76,7 @@ describe('CommandRuntime', () => {
     expect(Object.isFrozen(listed)).toBe(true)
     expect(Object.isFrozen(listed[0])).toBe(true)
     expect(Object.isFrozen(listed[0]?.input)).toBe(true)
-    expect(ctx.commands.find(agent, 'inspect')).toMatchObject({ name: 'inspect' })
+    expect(ctx.commands.find(agent, 'inspect')).toMatchObject({ name: 'inspect', definitionId: CommandDefinitionId('example/inspect') })
     expect(ctx.commands.find(agent, 'missing')).toBeUndefined()
   })
 

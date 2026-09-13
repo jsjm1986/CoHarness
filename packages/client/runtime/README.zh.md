@@ -12,6 +12,12 @@
 
 设置所有者共用本包定义的不依赖 React 的 `SettingsScopeSpec`、`SettingsScope` 与快照类型。ui-settings 拥有 `ctx.settingsScope.bind(spec)`、对应的 Host 传输、schema 校验与生命周期；详见[该包的约定](../ui-settings/README.zh.md)。
 
+## Workspace 文件资源
+
+`WorkspaceResourceRegistry` 按明确的 runtime 目标和 Session 相对资源地址保留元数据。启动连接使用独立的 `base` 身份；各项目连接在 Host 握手声明支持文件后，以自己的 API client 注册 `workspaceResourceProvider(api)`。文件请求不从当前焦点面板推导目标。Host 的 `workspaceFileMaxResources` 配置限制每个 runtime 保留的记录数；空闲记录按使用顺序淘汰，全部记录活跃时拒绝超限接入。
+
+订阅与 pin 共用元数据读取，最后一个持有者释放时取消未完成读取。文件变化由现有 Host 流交付，打开更多文件不会增加流。重连取消旧代次请求并复核保留的元数据，版本不同则标记 changed，直到显式重新加载。临时失败保留元数据，权限拒绝、provider 移除或 runtime 移除会清除它。预览内容只保存在视图中，通过有界且带版本保护的 RPC 读取。
+
 <a id="slot-declaration-injection"></a>
 
 `SlotRegistry.bindStore(handle, sessionId?)` 解析已注册 handle 对应的框架实例。服务消费方与渲染入口共享该实例，并通过已声明的 actions 写入；未注册的 handle 或缺失的 Session 作用域会抛错。

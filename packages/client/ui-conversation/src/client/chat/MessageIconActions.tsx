@@ -34,6 +34,11 @@ export interface MessageIconActionsProps {
    * built-in copy and branch controls.
    */
   extraActions?: ReactNode
+  /**
+   * Turn-stat controls owned by the conversation renderer, placed after the
+   * branch control and before the assistant timestamp.
+   */
+  usageAction?: ReactNode
   /** The owning view's locale seat, passed down as a plain prop. */
   t: ChatViewSlotProps['t']
 }
@@ -45,7 +50,7 @@ export interface MessageIconActionsProps {
  */
 export function MessageIconActions({
   text, time, runMs, ttftMs, tokensPerSecond, clock, onBranch, branchUnavailable = false, className,
-  extraActions, t,
+  extraActions, usageAction, t,
 }: MessageIconActionsProps) {
   const day = useCalendarDay()
   const reasonId = useId()
@@ -135,6 +140,7 @@ export function MessageIconActions({
       {onBranch !== undefined && branchUnavailable && (
         <span id={reasonId} className={css.visuallyHidden}>{t('message.branchUnavailable')}</span>
       )}
+      {usageAction}
       {clock === 'end' ? clockEl : null}
     </div>
   )

@@ -48,4 +48,30 @@ describe('workbench account catalog', () => {
       [{ kind: 'user', id: 1 }, -1, 3],
     ])
   })
+
+  it('keeps project conversations visible when a personal runtime cannot list legacy sessions', async () => {
+    const projectRows = [{
+      sessionId: 'project-session', runtime: { kind: 'project' as const, projectId: 7, projectName: 'Demo' },
+      visibility: 'project' as const, creatorUserId: 2, creatorDisplayName: 'Alice',
+      updatedAt: 5, blank: false, canWrite: false,
+    }]
+    const instances = {
+      ensureRunning: async () => ({ port: 42000, generation: 3 }),
+    } as unknown as GatewayInstanceService
+    const collaboration = {
+      listAccountConversations: async () => projectRows,
+    } as unknown as GatewayCollaborationService
+    const user: UserRow = {
+      id: 1, username: 'me', displayName: 'Me', role: 'user', status: 'active',
+      homePath: '/home/me', mustChangePassword: false,
+    }
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('legacy session list failed', { status: 500 })))
+    const handler = createGatewayWorkbenchCatalogHandler({
+      instances, collaboration,
+      principals: new GatewayPrincipalSigner(generateKeyPairSync('ed25519').privateKey, 'test', 30_000),
+      maxResponseBytes: 1024 * 1024, upstreamTimeoutMs: 30_000,
+    })
+
+    await expect(handler(user, new AbortController().signal)).resolves.toEqual(projectRows)
+  })
 })

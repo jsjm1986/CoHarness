@@ -6,6 +6,7 @@
  * gate, and the per-key ensureReady strong-wait policy.
  */
 import { describe, expect, it } from 'vitest'
+import { CommandDefinitionId } from '@deepseek-ai/dsh-commands'
 import type { SessionId } from '@deepseek-ai/dsh-api-remotes/client'
 import type { CommandDescriptor } from '../src/client/directory.ts'
 import { CommandDirectory } from '../src/client/directory.ts'
@@ -67,6 +68,18 @@ describe('status and resolve (per key)', () => {
     expect(dir.status(S1)).toBe('ready')
     expect(dir.resolve(S1, 'goal')).toEqual(CMDS[1])
     expect(dir.resolve(S1, 'nope')).toBeUndefined()
+  })
+
+  it('resolves a localized built-in alias only when its definition identity matches', async () => {
+    const { dir, pull } = bench()
+    const refreshed = dir.refresh(S1)
+    pull(S1, 0).resolve([{
+      definitionId: CommandDefinitionId('@deepseek-ai/dsh-plan-mode'),
+      name: 'plan', description: 'plan mode', input: { hint: 'message' },
+    }])
+    await refreshed
+    expect(dir.resolve(S1, '计划')?.name).toBe('plan')
+    expect(dir.resolve(S1, 'plan')?.name).toBe('plan')
   })
 
   it('drops the snapshot and records failure on a failed pull', async () => {
@@ -157,6 +170,23 @@ describe('invalidateAll (commands-changed soft)', () => {
     const { dir, calls } = bench()
     dir.invalidateAll()
     expect(calls).toEqual([])
+  })
+})
+
+describe('resetSession (composition change)', () => {
+  it('drops the old catalog before prewarming its replacement', async () => {
+    const { dir, pull, countOf } = bench()
+    const first = dir.refresh(S1)
+    pull(S1, 0).resolve(CMDS)
+    await first
+    dir.resetSession(S1)
+    expect(dir.resolve(S1, 'plan')).toBeUndefined()
+    expect(dir.status(S1)).toBe('pending')
+    expect(countOf(S1)).toBe(2)
+    pull(S1, 1).resolve(S2_CMDS)
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(dir.resolve(S1, 'attach')).toBeDefined()
   })
 })
 

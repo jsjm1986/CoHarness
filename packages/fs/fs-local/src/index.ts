@@ -29,6 +29,7 @@ import {
   readForEdit,
   readTextForDiff,
   readWholeBytes,
+  readByteRange,
   readWholeText,
   resolveLocalTarget,
   restoreLineEndings,
@@ -149,16 +150,24 @@ export class LocalFileSystem extends FileSystem {
     return readWholeText({ displayPath: target.displayPath, targetKey: target.targetKey }, signal)
   }
 
-  override streamText(target: FsTarget, signal?: AbortSignal): Promise<AsyncIterable<string>> {
-    return Promise.resolve(streamWholeText({ displayPath: target.displayPath, targetKey: target.targetKey }, signal))
+  override streamText(target: FsTarget, signal?: AbortSignal, expectedVersion?: FsVersion): Promise<AsyncIterable<string>> {
+    return Promise.resolve(streamWholeText({ displayPath: target.displayPath, targetKey: target.targetKey }, signal, expectedVersion))
   }
 
   override async readBytes(target: FsTarget, signal: AbortSignal | undefined, maxBytes: number): Promise<Uint8Array> {
     return readWholeBytes({ displayPath: target.displayPath, targetKey: target.targetKey }, signal, maxBytes, this.internals)
   }
 
-  override async listDir(target: FsTarget, signal?: AbortSignal): Promise<FsDirEntry[]> {
-    const entries = await listDirectory({ displayPath: target.displayPath, targetKey: target.targetKey }, signal)
+  override async readByteRange(
+    target: FsTarget,
+    range: { offset: number; length: number; expectedVersion?: FsVersion },
+    signal?: AbortSignal,
+  ): Promise<Uint8Array> {
+    return readByteRange({ displayPath: target.displayPath, targetKey: target.targetKey }, range, signal)
+  }
+
+  override async listDir(target: FsTarget, signal?: AbortSignal, maxEntries?: number): Promise<FsDirEntry[]> {
+    const entries = await listDirectory({ displayPath: target.displayPath, targetKey: target.targetKey }, signal, maxEntries)
     return entries.map(entry => ({
       name: entry.name,
       type: entry.type,

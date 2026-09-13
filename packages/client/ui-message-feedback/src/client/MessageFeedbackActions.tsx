@@ -16,7 +16,7 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import {
-  IconDislikeOutline16, IconLikeOutline16, MobileSheetBackdrop, Tooltip, useAnchoredPosition,
+  IconDislikeOutline16, IconLikeOutline16, MobileSheetBackdrop, Modal, Tooltip, useAnchoredPosition,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { MessageFeedbackRating } from '@deepseek-ai/dsh-message-feedback/types'
 import type { MessageFeedbackActionProps } from './slots.ts'
@@ -48,6 +48,7 @@ export function MessageFeedbackActions({ messageId, ensure, rate, toggle, clearN
   const loadFailed = useFeedback(view => view.status === 'error')
   const rating = item?.rating
   const [noteOpen, setNoteOpen] = useState(false)
+  const [confirmRating, setConfirmRating] = useState<MessageFeedbackRating>()
   const [draft, setDraft] = useState('')
   const [pending, setPending] = useState(false)
   // A rating or load failure surfaces beside the rating buttons, always legible
@@ -94,15 +95,31 @@ export function MessageFeedbackActions({ messageId, ensure, rate, toggle, clearN
     setNoteOpen(false)
   }, [])
 
-  const onRate = useCallback((next: MessageFeedbackRating) => {
+  const submitRating = useCallback((next: MessageFeedbackRating) => {
     setPending(true)
     setRowFailure(null)
-    // The controller decides retract-vs-replace from the committed item, so a
-    // click that lands before the first list read still toggles the stored
-    // value instead of this render's empty view.
     closeNote()
-    void toggle(messageId, next).then(settleRating)
-  }, [closeNote, messageId, settleRating, toggle])
+    // Confirmation sets the requested judgment, even if the initial list read
+    // discovers a matching rating while the dialog is open.
+    void rate(messageId, next).then((result) => {
+      if (!alive.current) return
+      settleRating(result)
+      if (result.ok) setConfirmRating(undefined)
+    })
+  }, [closeNote, messageId, rate, settleRating])
+
+  const onRate = useCallback((next: MessageFeedbackRating) => {
+    if (rating === next) {
+      setPending(true)
+      setRowFailure(null)
+      closeNote()
+      void toggle(messageId, next).then(settleRating)
+      return
+    }
+    closeNote()
+    setRowFailure(null)
+    setConfirmRating(next)
+  }, [closeNote, messageId, rating, settleRating, toggle])
 
   // The rating is a parameter because only the note editor's render site can
   // prove one is recorded; that removes an unreachable undefined guard here.
@@ -274,7 +291,7 @@ export function MessageFeedbackActions({ messageId, ensure, rate, toggle, clearN
       {rowFailure === null && loadFailed && (
         <span className={css.failure} role="status">{t('error.load')}</span>
       )}
-      {rowFailure !== null && <span className={css.failure} role="status">{rowFailure}</span>}
+      {rowFailure !== null && confirmRating === undefined && <span className={css.failure} role="status">{rowFailure}</span>}
       {/* A note-save failure normally lives inside the panel, beside the buttons
           that produced it. Whenever the panel is not on screen it falls back to
           the row instead: the rating may have disappeared underneath an open
@@ -284,6 +301,23 @@ export function MessageFeedbackActions({ messageId, ensure, rate, toggle, clearN
           reports that the save did not land rather than dropping it. */}
       {!(rating !== undefined && noteOpen) && noteFailure !== null && (
         <span className={css.failure} role="status">{noteFailure}</span>
+      )}
+      {confirmRating !== undefined && (
+        <Modal
+          open
+          title={t('confirm.title')}
+          closeLabel={t('confirm.cancel')}
+          onClose={() => { setConfirmRating(undefined) }}
+          description={t('confirm.body')}
+          footer={(
+            <>
+              <button type="button" className={css.noteCancel} onClick={() => { setConfirmRating(undefined) }}>{t('confirm.cancel')}</button>
+              <button type="button" className={css.noteSave} disabled={pending} onClick={() => { submitRating(confirmRating) }}>{t('confirm.submit')}</button>
+            </>
+          )}
+        >
+          {rowFailure !== null && <p role="alert">{rowFailure}</p>}
+        </Modal>
       )}
       {rating !== undefined && noteOpen && createPortal(
         <>

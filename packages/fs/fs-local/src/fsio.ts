@@ -6,8 +6,9 @@
  */
 
 import { randomUUID } from 'node:crypto'
-import { createReadStream } from 'node:fs'
-import { chmod, link, lstat, mkdir, open, readFile, realpath, readdir, rename, rm, stat } from 'node:fs/promises'
+import { createReadStream, constants as fsConstants } from 'node:fs'
+import { constants as bufferConstants } from 'node:buffer'
+import { chmod, link, lstat, mkdir, open, opendir, readFile, realpath, readdir, rename, rm, stat } from 'node:fs/promises'
 import type { BigIntStats, Dirent, Stats } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import { TextDecoder } from 'node:util'
@@ -277,9 +278,10 @@ async function resolveListedChildTarget(parent: LocalTarget, name: string): Prom
  * never read.
  * @param target - the resolved directory to list; a missing or non-directory target throws.
  * @param signal - aborts the listing, checked between children (`FS_ABORTED`).
- * @returns one entry per direct child, sorted by name.
+ * @param maxEntries - optional finite enumeration and metadata limit.
+ * @returns the enumerated children, sorted by name.
  */
-export async function listDirectory(target: LocalTarget, signal?: AbortSignal): Promise<LocalDirEntry[]> {
+export async function listDirectory(target: LocalTarget, signal?: AbortSignal, maxEntries?: number): Promise<LocalDirEntry[]> {
   throwIfAborted(signal, 'list')
   let info: PathInfo | null
   try {
@@ -292,7 +294,20 @@ export async function listDirectory(target: LocalTarget, signal?: AbortSignal): 
 
   let entries: Dirent[]
   try {
-    entries = await readdir(target.targetKey, { withFileTypes: true, encoding: 'utf8' })
+    if (maxEntries === undefined) {
+      entries = await readdir(target.targetKey, { withFileTypes: true, encoding: 'utf8' })
+    } else {
+      if (!Number.isSafeInteger(maxEntries) || maxEntries < 0) throw new FsError('invalid directory entry limit', 'FS_IO_ERROR')
+      entries = []
+      if (maxEntries > 0) {
+        const directory = await opendir(target.targetKey, { bufferSize: Math.min(32, maxEntries) })
+        for await (const entry of directory) {
+          throwIfAborted(signal, 'list')
+          entries.push(entry)
+          if (entries.length >= maxEntries) break
+        }
+      }
+    }
   } catch (error: unknown) {
     /* v8 ignore next -- requires permission/kernel failure from readdir after a successful directory stat. */
     throw listingIoError(target.displayPath, error)
@@ -300,7 +315,8 @@ export async function listDirectory(target: LocalTarget, signal?: AbortSignal): 
   throwIfAborted(signal, 'list')
 
   const result: LocalDirEntry[] = []
-  for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+  const sorted = entries.sort((left, right) => left.name.localeCompare(right.name))
+  for (const entry of sorted) {
     throwIfAborted(signal, 'list')
     try {
       const childTarget = await resolveListedChildTarget(target, entry.name)
@@ -411,7 +427,7 @@ export async function readWholeBytes(
   const chunks: Buffer[] = []
   let bytes = 0
   try {
-    for await (const chunk of stream as AsyncIterable<Buffer>) {
+    for await (const chunk of stream.iterator({ destroyOnReturn: false }) as AsyncIterable<Buffer>) {
       bytes += chunk.length
       if (bytes > maxBytes) {
         throw new FsError(`cannot read "${target.displayPath}": content exceeds the ${maxBytes}-byte limit`, 'FS_TOO_LARGE')
@@ -427,16 +443,80 @@ export async function readWholeBytes(
 }
 
 /**
+ * Read one regular-file byte window through a bounded FileHandle buffer. The
+ * descriptor is opened once and never reads beyond the requested range.
+ * @param target - the resolved file to read.
+ * @param range - zero-based offset and non-negative requested length.
+ * @param signal - aborts before or between descriptor reads.
+ * @returns at most `range.length` bytes from the file.
+ */
+export async function readByteRange(
+  target: LocalTarget,
+  range: { offset: number; length: number; expectedVersion?: FsVersion },
+  signal?: AbortSignal,
+): Promise<Uint8Array> {
+  if (!Number.isSafeInteger(range.offset) || range.offset < 0
+    || !Number.isSafeInteger(range.length) || range.length < 0) {
+    throw new FsError('invalid byte range', 'FS_IO_ERROR')
+  }
+  if (range.length > bufferConstants.MAX_LENGTH) throw new FsError('byte range exceeds the allocation limit', 'FS_TOO_LARGE')
+  await statRegularFile(target, 'read', signal)
+  const flags = range.expectedVersion === undefined ? fsConstants.O_RDONLY : fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW
+  const handle = await open(target.targetKey, flags)
+  try {
+    throwIfAborted(signal, 'read')
+    const info = await handle.stat({ bigint: true })
+    if (!info.isFile()) throw new FsError('byte range target is not a regular file', 'FS_NOT_REGULAR_FILE')
+    checkReadVersion(info, range.expectedVersion)
+    const available = info.size <= BigInt(range.offset) ? 0 : Number(info.size - BigInt(range.offset))
+    const expected = Math.min(range.length, available)
+    const buffer = Buffer.allocUnsafe(expected)
+    let total = 0
+    while (total < expected) {
+      throwIfAborted(signal, 'read')
+      const length = Math.min(expected - total, DIFF_BASIS_READ_CHUNK_BYTES)
+      const { bytesRead } = await handle.read(buffer, total, length, range.offset + total)
+      if (bytesRead === 0) break
+      total += bytesRead
+    }
+    throwIfAborted(signal, 'read')
+    checkReadVersion(await handle.stat({ bigint: true }), range.expectedVersion)
+    return buffer.subarray(0, total)
+  } finally {
+    await handle.close()
+  }
+}
+
+function checkReadVersion(info: BigIntStats, expected: FsVersion | undefined): void {
+  if (expected !== undefined && versionOf(info) !== expected) throw new FsError('file changed during guarded read', 'FS_STALE_VERSION')
+}
+
+/**
  * Stream a whole regular UTF-8 text file as decoded text chunks. Same text
  * semantics as {@link readWholeText} (regular-file check, binary/NUL rejection,
  * cross-chunk UTF-8 decoding), but never holds the whole file in memory.
  * @param target - the resolved file to stream.
  * @param signal - aborts the stream, including between chunks (`FS_ABORTED`).
+ * @param expectedVersion - optional opened-descriptor freshness guard.
  * @returns decoded text chunks in file order; chunk boundaries carry no meaning.
  */
-export async function* streamWholeText(target: LocalTarget, signal?: AbortSignal): AsyncIterable<string> {
+export async function* streamWholeText(target: LocalTarget, signal?: AbortSignal, expectedVersion?: FsVersion): AsyncIterable<string> {
   await statRegularFile(target, 'read', signal)
-  const stream = createReadStream(target.targetKey, signal ? { signal } : {})
+  const handle = expectedVersion === undefined ? undefined : await open(target.targetKey, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW)
+  let stream: ReturnType<typeof createReadStream>
+  try {
+    if (handle !== undefined) {
+      const info = await handle.stat({ bigint: true })
+      if (!info.isFile()) throw new FsError('text target is not a regular file', 'FS_NOT_REGULAR_FILE')
+      checkReadVersion(info, expectedVersion)
+    }
+    stream = handle === undefined
+      ? createReadStream(target.targetKey, signal ? { signal } : {})
+      : handle.createReadStream({ autoClose: false, ...(signal === undefined ? {} : { signal }) })
+  } catch (error: unknown) {
+    await handle?.close()
+    throw error
+  }
   const decoder = new TextDecoder('utf-8', { fatal: true })
   let sampledBytes = 0
 
@@ -450,7 +530,7 @@ export async function* streamWholeText(target: LocalTarget, signal?: AbortSignal
   }
 
   try {
-    for await (const chunk of stream as AsyncIterable<Buffer>) {
+    for await (const chunk of stream.iterator({ destroyOnReturn: false }) as AsyncIterable<Buffer>) {
       scanBinarySample(chunk)
       yield decodeUtf8Stream(decoder, chunk, 'read', target.displayPath)
     }
@@ -459,6 +539,13 @@ export async function* streamWholeText(target: LocalTarget, signal?: AbortSignal
     /* v8 ignore next 4 -- mid-stream errors need an abort/IO fault racing the loop; pre-abort is caught by throwIfAborted. */
     if (isAbortError(error)) throw new FsError('read aborted', 'FS_ABORTED')
     throw error
+  } finally {
+    try {
+      if (handle !== undefined && signal?.aborted !== true) checkReadVersion(await handle.stat({ bigint: true }), expectedVersion)
+    } finally {
+      stream.destroy()
+      await handle?.close()
+    }
   }
 }
 

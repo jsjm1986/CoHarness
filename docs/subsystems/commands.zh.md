@@ -33,6 +33,8 @@ interface CommandInputDescriptor {
 ```ts type-equiv
 /** Plugin-owned command registration. */
 interface CommandDefinition {
+  /** Stable plugin-owned identity, independent of command name and copy. */
+  readonly definitionId?: CommandDefinitionIdType
   /** Lowercase command name without the leading slash. */
   readonly name: string
   /** Human-readable summary used in discovery UI. */
@@ -97,6 +99,8 @@ type CommandResult =
 ```ts type-equiv
 /** Handler-free immutable command view returned to UI adapters. */
 interface CommandDescriptor {
+  /** Stable plugin-owned identity; absent for legacy or third-party definitions. */
+  readonly definitionId?: CommandDefinitionId
   /** Lowercase command name without the leading slash. */
   readonly name: string
   /** Human-readable summary used in discovery UI. */
@@ -184,7 +188,7 @@ find(agent: Agent, name: string): CommandDefinition | undefined
 
 Types: [Agent](core.zh.md) · [EncodedImageAttachment](attachment.zh.md)
 
-Source: [`packages/interaction/commands/src/index.ts:254`](../../packages/interaction/commands/src/index.ts)
+Source: [`packages/interaction/commands/src/index.ts:259`](../../packages/interaction/commands/src/index.ts)
 
 <a id="commands-events"></a>
 
@@ -206,5 +210,5 @@ A command was registered or unregistered. This is an unfiltered registry notific
 'commands/change'(): void
 ```
 
-Source: [`packages/interaction/commands/src/types.ts:81`](../../packages/interaction/commands/src/types.ts)
+Source: [`packages/interaction/commands/src/types.ts:83`](../../packages/interaction/commands/src/types.ts)
 <!-- END GENERATED cordis-surface -->

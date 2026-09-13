@@ -8,7 +8,9 @@
  * never a Cordis context or the mutable Session. RPC and service access go
  * through the provider plugin's own root context captured at registration.
  */
+import type { ComponentType } from 'react'
 import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { IconProps } from '@deepseek-ai/dsh-client-ui-primitives'
 
 /**
  * The provider-facing projection of one client session. It carries stable
@@ -37,9 +39,13 @@ export type InputTriggerCandidateIcon = 'file' | 'folder' | 'session'
 
 /** One menu candidate. Pure display data — zero behavior declaration. */
 export interface InputTriggerCandidate {
+  /** Stable source identity and exact-match key. */
   readonly name: string
+  /** Localized display title; the name itself when absent. */
+  readonly label?: string
   readonly description?: string
-  readonly icon?: string
+  /** Reference glyph token, arbitrary legacy text, or a shared icon component. */
+  readonly icon?: string | ComponentType<IconProps>
   readonly hint?: string
   /** Optional visual heading shared by adjacent candidates; sectioned groups omit their source-title row. */
   readonly section?: string

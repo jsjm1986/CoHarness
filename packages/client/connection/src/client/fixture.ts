@@ -29,7 +29,7 @@ import type {
 } from '@deepseek-ai/dsh-session/types'
 // Type-only: the brand constructor is host-side; the fixture casts at its
 // wire-fabrication boundary (the schema layer's one-cast-point posture).
-import type { CommandId } from '@deepseek-ai/dsh-commands/brand'
+import type { CommandDefinitionId, CommandId } from '@deepseek-ai/dsh-commands/brand'
 import type { CommandDescriptor, CommandExecution, CommandResult } from '@deepseek-ai/dsh-commands/types'
 import { deriveEventMessage, foldSurface } from '@deepseek-ai/dsh-session/surface'
 import type {
@@ -41,6 +41,9 @@ import type { RequestPayload, ResponseValue, RpcMethodMap } from '@deepseek-ai/d
 import { AbstractApiClient, RpcId, SESSION_SEARCH_RESULT_LIMIT } from './api.ts'
 import { randomUuid } from './random-uuid.ts'
 import type { ClientConnectionRpc } from '../rpc.ts'
+
+/** Brand fixture-only command metadata without a runtime edge to Host commands. */
+const commandDefinitionId = (id: string): CommandDefinitionId => id as CommandDefinitionId
 
 /** The fake carrier mints like a real one (business code never mints). */
 function rpcRequest<P>(payload: P): RpcRequest<P> {
@@ -1821,11 +1824,11 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
       return {
         ok: true,
         value: [
-          { name: 'compact', description: 'fixture：压缩当前会话上下文' },
+          { definitionId: commandDefinitionId('@deepseek-ai/dsh-command-compact'), name: 'compact', description: 'fixture：压缩当前会话上下文' },
           { name: 'echo', description: 'fixture：回显参数', input: { hint: 'text to echo' } },
-          { name: 'goal', description: 'set or view the goal for a long-running task', input: { hint: '<objective>', images: true } },
-          { name: 'permission', description: 'Switch the permission preset (sandbox mode + approval policy)', input: { hint: '<preset>' } },
-          { name: 'plan', description: 'Enter or leave plan mode', input: { hint: '[off|message]', images: true } },
+          { definitionId: commandDefinitionId('@deepseek-ai/dsh-command-goal'), name: 'goal', description: 'set or view the goal for a long-running task', input: { hint: '<objective>', images: true } },
+          { definitionId: commandDefinitionId('@deepseek-ai/dsh-permission-presets'), name: 'permission', description: 'Switch the permission preset (sandbox mode + approval policy)', input: { hint: '<preset>' } },
+          { definitionId: commandDefinitionId('@deepseek-ai/dsh-plan-mode'), name: 'plan', description: 'Enter or leave plan mode', input: { hint: '[off|message]', images: true } },
         ],
       }
     },
@@ -2871,6 +2874,17 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         return ok(request, { archivedSessionIds: [...archivedSessionIds] })
       },
     },
+    workspaceFiles: {
+      list: request => ok(request, { path: request.payload.path ?? '', entries: [], truncated: false }),
+      stat: request => ok(request, { path: request.payload.path, type: 'file', bytes: 0, version: 'fixture' }),
+      read: request => ok(request, {
+        path: request.payload.path, offset: request.payload.offset ?? 1, limit: request.payload.limit ?? 1,
+        text: '', eof: true, version: 'fixture',
+      }),
+      readBytes: request => ok(request, {
+        path: request.payload.path, offset: request.payload.offset ?? 0, bytes: '', eof: true, version: 'fixture',
+      }),
+    },
     agentPresets: {
       // Both trusts appear, because a surface must present a locally authored
       // preset differently from one the deployment vetted.
@@ -3290,6 +3304,10 @@ export class FixtureApiClient extends AbstractApiClient {
       case 'workspace.insertBefore': return this.api.workspace.insertBefore(request)
       case 'workspace.insertSessionBefore': return this.api.workspace.insertSessionBefore(request)
       case 'workspace.archiveSession': return this.api.workspace.archiveSession(request)
+      case 'workspaceFiles.list': return this.api.workspaceFiles.list(request)
+      case 'workspaceFiles.stat': return this.api.workspaceFiles.stat(request)
+      case 'workspaceFiles.read': return this.api.workspaceFiles.read(request, signal)
+      case 'workspaceFiles.readBytes': return this.api.workspaceFiles.readBytes(request, signal)
       case 'skill.list': return this.api.skills.list(request)
       case 'agentPreset.list': return this.api.agentPresets.list(request)
       case 'agentPreset.select': return this.api.agentPresets.select(request)

@@ -2,12 +2,14 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { resolveSlotLabel, type BoundActions } from '@deepseek-ai/dsh-client-ui-slots'
 import {
-  resolveWorkspacePath, type ISessions, type SessionId,
+  resolveWorkspacePath, workspacePathForResource, workspaceResourceAddress, type ISessions, type SessionId,
 } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 // Type-only: the ctx.settingsScope Context merge. Cross-plugin collaboration
 // goes through the service, never a value import (client bundle purity gate).
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+import type {} from '@deepseek-ai/dsh-client-connection/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { ViewTab } from './contract/views.ts'
@@ -31,7 +33,7 @@ import type { EnterBehaviorRowInjected } from './settings/EnterBehaviorRow.tsx'
 import { DisplaySettingsRow } from './settings/DisplaySettingsRow.tsx'
 import type { DisplaySettingsRowInjected } from './settings/DisplaySettingsRow.tsx'
 import { ChatView } from './chat/ChatView.tsx'
-import { StatsLine } from './chat/StatsLine.tsx'
+import { StatsPills } from './chat/StatsPills.tsx'
 import { ApprovalPanel } from './skeleton/ApprovalPanel.tsx'
 import { todoDockEntry } from './skeleton/TodoPanel.tsx'
 import { queueDockEntry } from './queue/QueueDock.tsx'
@@ -127,6 +129,7 @@ export function apply(ctx: Context): void {
   const workspaces = ctx.workspaces
   const layout = ctx.layout
   const slots = ctx.slots
+  const connection = ctx.get('connection') as ConnectionHandle
 
   const viewportStore = createConversationViewportStore()
   const viewportAvailable = {
@@ -483,8 +486,18 @@ export function apply(ctx: Context): void {
           layout.openDetails(viewportAvailable.getSnapshot() && viewport.snapshot.getSnapshot().mode === 'workbench' ? sessionId : undefined)
         },
         fileMentions: owner => ctx.get('chatFileMentions')?.forClosing(owner),
-        openFile: (path) => {
+        openFile: async (path) => {
           const cwd = sessions.list.getSnapshot().byId[sessionId]?.cwd
+          const runtimeTarget = sessions.runtimeTargetFor?.(sessionId) ?? { kind: 'base' as const }
+          const localDesktop = runtimeTarget.kind === 'base' && connection.isLoopback
+            && connection.hostDescription.getSnapshot()?.canOpenPath === true
+          if (!localDesktop) {
+            const relativePath = workspacePathForResource(cwd, path)
+            const address = workspaceResourceAddress(sessionId, relativePath)
+            const opened = ctx.bail('workspace/resource-open', { runtimeTarget, sessionId, path: relativePath, address })
+            if (opened !== true) throw new Error('Workspace file preview is unavailable in this application')
+            return
+          }
           return workspaces.openPath(resolveWorkspacePath(cwd, path))
         },
         loadOlder: () => { void scoped.loadOlder() },
@@ -514,8 +527,9 @@ export function apply(ctx: Context): void {
     },
   }, ChatView)
 
-  // Session stats stick with the composer (composer.dock = stats-line family).
-  slots.register({ name: 'conversation.composer.dock', id: 'stats', order: 0, locale: NS }, StatsLine)
+  // Session stats stick with the composer; the two pills expose time and
+  // token/cache details without adding another runtime or transport path.
+  slots.register({ name: 'conversation.composer.dock', id: 'stats', order: 0, locale: NS }, StatsPills)
 
   // Class-plugin mount (packages/AGENTS.md service form): the service
   // registers itself as `conversation` and lives on its own child fiber.

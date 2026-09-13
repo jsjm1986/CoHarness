@@ -2,6 +2,8 @@
 import type { Context, Fiber } from '@deepseek-ai/cordis'
 import type {
   ConnectionHandle,
+  ConnectionFailure,
+  HostDescription,
   ConnectionRuntimeTarget,
   SessionId,
 } from '@deepseek-ai/dsh-client-connection/client'
@@ -24,6 +26,8 @@ import type { SessionFace } from '../contract/session.ts'
 import type { SubagentAddress } from '@deepseek-ai/dsh-api-remotes/client'
 import type { SessionSearchResultItem } from './manager.ts'
 import type { RpcResult } from '@deepseek-ai/dsh-api-remotes/client'
+import { WorkspaceResourceError, workspaceResourceProvider } from '../workspace-resources.ts'
+import type { WorkspaceResourceTarget } from '../workspace-resources.ts'
 import { createSnapshotStore, type ObservableSnapshot, type SnapshotStore } from '../contract/store.ts'
 
 interface RuntimeEntry {
@@ -34,6 +38,7 @@ interface RuntimeEntry {
   readonly fiber?: Fiber
   stop?: () => void
   stopSubscriptions?: () => void
+  stopResources?: (() => void) | undefined
   ready?: Promise<void>
   rejectReady?: (error: unknown) => void
 }
@@ -96,6 +101,7 @@ export class SessionRuntimePool implements ISessions {
       for (const entry of this.entries.values()) {
         entry.stop?.()
         entry.stopSubscriptions?.()
+        entry.stopResources?.()
       }
     }, 'runtime: session runtime pool')
   }
@@ -213,8 +219,10 @@ export class SessionRuntimePool implements ISessions {
           runtime.handleHostEnvelope(envelope)
           const frame = envelope.payload
           if (frame.type === 'host/remote-event') this.rootCtx.remote.$dispatch(frame.event, frame.args)
+          if (frame.type === 'host/workspace-file-changed') this.rootCtx.get('workspaceResources')?.handleChange(establishedEntry.target, frame)
         },
-        onConnected: () => {
+        onConnected: (description) => {
+          this.connectResources(establishedEntry, description)
           runtime.handleConnected()
           void runtime.refresh().then(() => {
             if (runtime.list.getSnapshot().phase === 'ready') resolveReady()
@@ -227,8 +235,10 @@ export class SessionRuntimePool implements ISessions {
             }
           }, rejectReady)
         },
+        onFailure: (failure) => { this.resourceFailure(establishedEntry.target, failure) },
         onStateChange: (state: 'connected' | 'reconnecting') => {
           if (state !== 'reconnecting') return
+          this.rootCtx.get('workspaceResources')?.disconnect(establishedEntry.target)
           runtime.handleDisconnected()
           rejectReady(new Error('target runtime connection unavailable'))
         },
@@ -291,9 +301,14 @@ export class SessionRuntimePool implements ISessions {
    */
   handleHostEnvelope(envelope: Parameters<Runtime['handleHostEnvelope']>[0]): void {
     this.base.handleHostEnvelope(envelope)
+    if (envelope.payload.type === 'host/workspace-file-changed') this.rootCtx.get('workspaceResources')?.handleChange({ kind: 'base' }, envelope.payload)
   }
-  /** Mark the base runtime connection as ready. */
-  handleConnected(): void {
+  /** Mark the base runtime connection as ready.
+   * @param description - Host capabilities from the completed handshake.
+   */
+  handleConnected(description?: HostDescription): void {
+    const entry = [...this.entries.values()].find(candidate => candidate.runtime === this.base)
+    if (entry !== undefined && description !== undefined) this.connectResources(entry, description)
     this.base.handleConnected()
     void this.baseConnection.api.workspace.list({}).then(({ result }) => {
       if (result.ok) {
@@ -303,7 +318,46 @@ export class SessionRuntimePool implements ISessions {
     })
   }
   /** Mark the base runtime connection as unavailable. */
-  handleDisconnected(): void { this.base.handleDisconnected() }
+  handleDisconnected(): void {
+    this.rootCtx.get('workspaceResources')?.disconnect({ kind: 'base' })
+    this.base.handleDisconnected()
+  }
+
+  /** Invalidate bootstrap resources when the connection reports authorization loss.
+   * @param failure - current-generation RPC or transport failure.
+   */
+  handleConnectionFailure(failure: ConnectionFailure): void {
+    this.resourceFailure({ kind: 'base' }, failure)
+  }
+
+  private resourceFailure(target: WorkspaceResourceTarget, failure: ConnectionFailure): void {
+    const denied = failure.kind === 'rpc' ? failure.error.code === 'collaboration-forbidden'
+      : failure.error instanceof Error
+        && typeof (failure.error as unknown as { status?: unknown }).status === 'number'
+        && ((failure.error as unknown as { status: number }).status === 401
+          || (failure.error as unknown as { status: number }).status === 403)
+    if (denied) {
+      this.rootCtx.get('workspaceResources')?.disconnect(target,
+        new WorkspaceResourceError('access-revoked', 'Workspace access has expired or been revoked'))
+    }
+  }
+
+  private connectResources(entry: RuntimeEntry, description: HostDescription): void {
+    const registry = this.rootCtx.get('workspaceResources')
+    if (registry === undefined || entry.connection === undefined) return
+    const target: WorkspaceResourceTarget = entry.runtime === this.base ? { kind: 'base' } : entry.target
+    if (description.workspaceFiles === undefined) {
+      entry.stopResources?.()
+      entry.stopResources = undefined
+      return
+    }
+    if (entry.stopResources === undefined) {
+      entry.stopResources = registry.register(
+        target, workspaceResourceProvider(entry.connection.api), description.workspaceFiles.maxResources,
+      )
+    }
+    registry.connected(target)
+  }
 
   runtimeTargetFor(id: SessionId): SessionRuntimeTarget | undefined {
     const owner = this.sessionOwners.get(id)
@@ -376,6 +430,7 @@ export class SessionRuntimePool implements ISessions {
     this.archivedByTarget.delete(entry.key)
     entry.stop?.()
     entry.stopSubscriptions?.()
+    entry.stopResources?.()
     entry.rejectReady?.(new Error('target runtime was released before it became ready'))
     for (const disposers of this.providers.values()) {
       disposers.get(entry)?.()

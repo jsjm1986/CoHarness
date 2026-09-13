@@ -30,6 +30,9 @@ import { basename, dirname, join } from 'node:path'
 import type { EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
 import { applyEntryPatches, type PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
+import type {
+  DshBundleManifest, DshManifest, DshPackageManifest, DshProfileManifest,
+} from '@deepseek-ai/dsh-package-manifest'
 import { loadOverlayPatches } from './index.ts'
 
 /** Directory under the Harness home holding every profile. */
@@ -38,36 +41,14 @@ export const PROFILES_DIR = 'profiles'
 /** The user patch layer inside a profile directory (hot-reloaded on long-lived surfaces). */
 export const PROFILE_PATCH_FILENAME = 'cordis.patch.yml'
 
-/** The bundle half of the `dsh` manifest section: what a bundle package exports. */
-export interface DshBundleManifest {
-  /** The patch layer this bundle exports, relative to its package root. */
-  patch: string
-}
+/** Shared public DSH metadata retained under the historical app-boot alias. */
+export type DshManifestSection = DshManifest
 
-/** The profile half of the `dsh` manifest section: what a profile directory composes. */
-export interface DshProfileManifest {
-  /** Ordered bundle layer list (package names). */
-  bundles?: string[]
-}
+/** Historical app-boot export for the shared bundle metadata declaration. */
+export type { DshBundleManifest, DshProfileManifest }
 
-/**
- * The profile-launcher slice of the `dsh`-owned package.json section. A
- * manifest may declare both roles; other consumers own additional keys.
- */
-export interface DshManifestSection {
-  /** Bundle metadata consumed by the profile launcher. */
-  bundle?: DshBundleManifest
-  /** Profile metadata consumed by the profile launcher. */
-  profile?: DshProfileManifest
-}
-
-/** The slice of package.json both profiles and bundles use. */
-export interface ProfileManifest {
-  name?: string
-  dependencies?: Record<string, string>
-  peerDependencies?: Record<string, string>
-  dsh?: DshManifestSection
-}
+/** The profile reader accepts partial package metadata for local profiles. */
+export type ProfileManifest = Partial<DshPackageManifest>
 
 /** One resolved bundle layer of a profile. */
 export interface ProfileLayer {

@@ -760,6 +760,10 @@
     "util/output-retention": {
       "sovereignty": "adapted"
     },
+    "util/package-manifest": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-05-package-manifest-types.md"
+    },
     "util/timeout": {
       "sovereignty": "adapted"
     },
@@ -905,10 +909,6 @@
     {
       "package": "util/deque",
       "reason": "no current consumer requires it"
-    },
-    {
-      "package": "util/package-manifest",
-      "reason": "adopted by the in-flight rc.2 branch; moves to packages when that work lands"
     },
     {
       "package": "util/time",

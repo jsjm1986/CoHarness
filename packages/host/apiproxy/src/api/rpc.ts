@@ -47,6 +47,15 @@ export interface RpcErrorDetailsMap {
   'workspace-invalid-path': { path: string }
   'workspace-name-conflict': { name: string }
   'workspace-move-invalid': { workspaceId: string; sessionId: SessionId; beforeSessionId?: SessionId }
+  'workspace-file/not-found': { sessionId: SessionId; path: string }
+  'workspace-file/outside-workspace': { sessionId: SessionId; path: string }
+  'workspace-file/not-directory': { sessionId: SessionId; path: string }
+  'workspace-file/not-regular-file': { sessionId: SessionId; path: string }
+  'workspace-file/not-text': { sessionId: SessionId; path: string }
+  'workspace-file/too-large': { sessionId: SessionId; path: string; limit: number }
+  'workspace-file/unsupported-address': { sessionId: SessionId }
+  'workspace-file/stale-version': { sessionId: SessionId; path: string }
+  'workspace-file/unknown-session': { sessionId: SessionId }
   'directory-unreadable': { path: string }
   'directory-exists': { path: string }
   'directory-create-failed': { path: string }

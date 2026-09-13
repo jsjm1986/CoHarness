@@ -122,11 +122,12 @@ function mapError(error: unknown): { status: number; error: string } {
 export function createAdminApiHandler(
   deps: GatewayDeps,
   documentAdmin?: GatewayDocumentAdminHandler,
+  invalidateAccess?: GatewayHandlers['invalidateAccess'],
 ): NonNullable<GatewayHandlers['admin']> {
   return async (req: IncomingMessage, res: ServerResponse, admin: UserRow, pathname: string, body: string): Promise<boolean> => {
     if (!pathname.startsWith('/admin/api')) return false
     try {
-      const ok = await dispatch(deps, req, res, admin, pathname, body, documentAdmin)
+      const ok = await dispatch(deps, req, res, admin, pathname, body, documentAdmin, invalidateAccess)
       if (!ok) sendError(res, 404, 'not found')
     } catch (error) {
       if (res.writableEnded) throw error
@@ -145,6 +146,7 @@ async function dispatch(
   pathname: string,
   body: string,
   documentAdmin?: GatewayDocumentAdminHandler,
+  invalidateAccess?: GatewayHandlers['invalidateAccess'],
 ): Promise<boolean> {
   const method = req.method ?? 'GET'
   const ip = req.socket.remoteAddress ?? ''
@@ -557,6 +559,7 @@ async function dispatch(
     const password = str(parseObject(body), 'password')
     if (password === undefined) { sendError(res, 400, 'password required'); return true }
     await deps.users.resetPassword(userId, password)
+    invalidateAccess?.({ userId })
     await write('admin.users.reset-password', { id: userId })
     sendNoContent(res)
     return true
@@ -574,6 +577,7 @@ async function dispatch(
         async () => deps.users.remove(userId),
       )
       if (!removed) { sendError(res, 404, 'user not found'); return true }
+      invalidateAccess?.({ userId })
       await write('admin.users.delete', { id: userId, username: target.username })
       sendNoContent(res)
       return true
@@ -591,6 +595,7 @@ async function dispatch(
         ...(status === undefined ? {} : { status }),
         ...(displayName === undefined ? {} : { displayName }),
       })
+      if (role !== undefined || status !== undefined) invalidateAccess?.({ userId })
       if (role !== undefined) {
         await applyGrantsToUser(deps, userId, admin.id)
         if (deps.governance !== undefined) await applyModelGovernanceToUser(deps, userId)
@@ -606,12 +611,14 @@ async function dispatch(
       // adopted the atomic patch method. Production UserService providers do.
       if (role !== undefined) {
         await deps.users.setRole(userId, role)
+        invalidateAccess?.({ userId })
         await applyGrantsToUser(deps, userId, admin.id)
         if (deps.governance !== undefined) await applyModelGovernanceToUser(deps, userId)
         await write('admin.users.role', { id: userId, role })
       }
       if (status !== undefined) {
         await deps.users.setStatus(userId, status)
+        invalidateAccess?.({ userId })
         if (status === 'disabled') await deps.instances.stop(userId)
         await write('admin.users.status', { id: userId, status })
       }
@@ -996,6 +1003,7 @@ async function dispatch(
       const mode = str(parseObject(body), 'mode')
       if (mode !== 'ro' && mode !== 'rw') { sendError(res, 400, 'invalid mode'); return true }
       await deps.projects.setMember(projectId, userId, mode as GrantMode)
+      invalidateAccess?.({ userId })
       await write('admin.members.set', { projectId, userId, mode })
       await apply(userId)
       sendNoContent(res)
@@ -1003,6 +1011,7 @@ async function dispatch(
     }
     if (method === 'DELETE') {
       await deps.projects.removeMember(projectId, userId)
+      invalidateAccess?.({ userId })
       await write('admin.members.remove', { projectId, userId })
       await apply(userId)
       sendNoContent(res)
@@ -1070,6 +1079,8 @@ async function dispatch(
         { kind: 'project', id: projectId },
         async () => deps.projects.remove(projectId),
       )
+      invalidateAccess?.({ projectId })
+      for (const userId of userIds) invalidateAccess?.({ userId })
       await write('admin.projects.delete', { id: projectId })
       for (const userId of userIds) await apply(userId)
       sendNoContent(res)

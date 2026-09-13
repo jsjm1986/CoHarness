@@ -5,7 +5,7 @@
  */
 
 import { createHash, randomUUID } from 'node:crypto'
-import { Buffer } from 'node:buffer'
+import { Buffer, constants as bufferConstants } from 'node:buffer'
 import { posix } from 'node:path'
 import { FileSystem, FsError, FsTargetKey, FsVersion } from '@deepseek-ai/dsh-fs'
 import type {
@@ -106,6 +106,24 @@ async function openReadStream(
   } catch (error: unknown) {
     throw mapError(error, 'read', target.displayPath, signal)
   }
+}
+
+/** Read or cancel a stalled SDK stream without retaining an abort listener. */
+async function readChunk(
+  reader: ReadableStreamDefaultReader<Uint8Array>, signal?: AbortSignal,
+): Promise<ReadableStreamReadResult<Uint8Array>> {
+  assertNotAborted(signal, 'read')
+  if (signal === undefined) return reader.read()
+  return new Promise((resolve, reject) => {
+    const aborted = (): void => {
+      void reader.cancel().catch((_cancellationFailure: unknown) => {
+        // Cancellation is cleanup; the caller receives FS_ABORTED.
+      })
+      reject(new FsError('read aborted', 'FS_ABORTED'))
+    }
+    signal.addEventListener('abort', aborted, { once: true })
+    void reader.read().then(resolve, reject).finally(() => { signal.removeEventListener('abort', aborted) })
+  })
 }
 
 function entryType(entry: EntryInfo): FsInfo['type'] {
@@ -292,9 +310,64 @@ export class E2BFileSystem extends FileSystem {
     return whole
   }
 
-  override async streamText(target: FsTarget, signal?: AbortSignal): Promise<AsyncIterable<string>> {
+  override async readByteRange(
+    target: FsTarget,
+    range: { offset: number; length: number; expectedVersion?: ReturnType<typeof FsVersion> },
+    signal?: AbortSignal,
+  ): Promise<Uint8Array> {
+    assertNotAborted(signal, 'read')
+    if (!Number.isSafeInteger(range.offset) || range.offset < 0
+      || !Number.isSafeInteger(range.length) || range.length < 0) {
+      throw new FsError('invalid byte range', 'FS_IO_ERROR')
+    }
+    if (range.length > bufferConstants.MAX_LENGTH) throw new FsError('byte range exceeds the allocation limit', 'FS_TOO_LARGE')
+    const info = await this.requireRegular(target, signal)
+    if (range.expectedVersion !== undefined && info.version !== range.expectedVersion) throw new FsError('file changed during guarded read', 'FS_STALE_VERSION')
+    if (range.length === 0 || (info.size !== undefined && range.offset >= info.size)) return new Uint8Array(0)
+    const length = info.size === undefined ? range.length : Math.min(range.length, info.size - range.offset)
     const sandbox = await this.ctx.e2b.getSandbox()
-    await this.requireRegular(target, signal)
+    const stream = await openReadStream(sandbox, target, signal)
+    const reader = stream.getReader()
+    const window = new Uint8Array(length)
+    let position = 0
+    let filled = 0
+    let drained = false
+    try {
+      while (filled < length) {
+        const next = await readChunk(reader, signal)
+        if (next.done) { drained = true; break }
+        const start = Math.max(0, range.offset - position)
+        const count = Math.min(next.value.byteLength - start, length - filled)
+        if (count > 0) {
+          window.set(next.value.subarray(start, start + count), filled)
+          filled += count
+        }
+        position += next.value.byteLength
+      }
+      assertNotAborted(signal, 'read')
+      if (range.expectedVersion !== undefined && (await this.stat(target, signal))?.version !== range.expectedVersion) throw new FsError('file changed during guarded read', 'FS_STALE_VERSION')
+      return filled === length ? window : window.subarray(0, filled)
+    } catch (error: unknown) {
+      throw mapError(error, 'read', target.displayPath, signal)
+    } finally {
+      if (!drained) {
+        try { await reader.cancel() } catch (_streamCancellationFailure) {
+          // The primary read outcome owns the result; cleanup cannot replace it.
+        }
+      }
+      reader.releaseLock()
+    }
+  }
+
+  override async streamText(
+    target: FsTarget, signal?: AbortSignal, expectedVersion?: ReturnType<typeof FsVersion>,
+  ): Promise<AsyncIterable<string>> {
+    const sandbox = await this.ctx.e2b.getSandbox()
+    const info = await this.requireRegular(target, signal)
+    if (expectedVersion !== undefined && info.version !== expectedVersion) throw new FsError('file changed during guarded read', 'FS_STALE_VERSION')
+    const verifyVersion = async (): Promise<void> => {
+      if (expectedVersion !== undefined && (await this.stat(target, signal))?.version !== expectedVersion) throw new FsError('file changed during guarded read', 'FS_STALE_VERSION')
+    }
     const stream = await openReadStream(sandbox, target, signal)
     const displayPath = target.displayPath
     return {
@@ -306,7 +379,7 @@ export class E2BFileSystem extends FileSystem {
         try {
           while (true) {
             assertNotAborted(signal, 'read')
-            const next = await reader.read()
+            const next = await readChunk(reader, signal)
             if (next.done) break
             if (sampledBytes < BINARY_SAMPLE_BYTES) {
               const sample = next.value.subarray(0, BINARY_SAMPLE_BYTES - sampledBytes)
@@ -338,12 +411,14 @@ export class E2BFileSystem extends FileSystem {
             }
           }
           reader.releaseLock()
+          if (signal?.aborted !== true) await verifyVersion()
         }
       },
     }
   }
 
-  override async listDir(target: FsTarget, signal?: AbortSignal): Promise<FsDirEntry[]> {
+  override async listDir(target: FsTarget, signal?: AbortSignal, maxEntries?: number): Promise<FsDirEntry[]> {
+    if (maxEntries !== undefined && (!Number.isSafeInteger(maxEntries) || maxEntries < 0)) throw new FsError('invalid directory entry limit', 'FS_IO_ERROR')
     const info = await this.stat(target, signal)
     if (info === undefined) throw new FsError(`cannot list "${target.displayPath}": not found`, 'FS_NOT_FOUND')
     if (info.type !== 'directory') throw new FsError(`cannot list "${target.displayPath}": not a directory`, 'FS_NOT_DIRECTORY')
@@ -351,7 +426,9 @@ export class E2BFileSystem extends FileSystem {
       const sandbox = await this.ctx.e2b.getSandbox()
       const listed = await sandbox.files.list(String(target.targetKey), { depth: 1, ...signalOpts(signal) })
       const entries: FsDirEntry[] = []
-      for (const entry of listed) {
+      const sorted = [...listed].sort((left, right) => left.name.localeCompare(right.name))
+      const limit = maxEntries ?? sorted.length
+      for (const entry of sorted.slice(0, limit)) {
         const displayPath = posix.join(target.displayPath, entry.name)
         const canonical = entry.symlinkTarget === undefined
           ? entry.path
@@ -367,7 +444,7 @@ export class E2BFileSystem extends FileSystem {
           ...(resolved?.type === FileType.FILE ? { size: resolved.size } : {}),
         })
       }
-      return entries.sort((left, right) => left.name.localeCompare(right.name))
+      return entries
     } catch (error: unknown) {
       throw mapError(error, 'list', target.displayPath, signal)
     }

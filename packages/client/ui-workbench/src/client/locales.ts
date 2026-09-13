@@ -48,6 +48,14 @@ export const zh = {
   more: '更多面板操作',
   previous: '向前移动',
   next: '向后移动',
+  previewClose: '关闭预览',
+  previewReload: '重新加载',
+  previewPrevious: '上一页',
+  previewNext: '下一页',
+  previewLoading: '正在读取 Workspace 文件…',
+  previewChanged: '文件已更改，请重新加载以查看当前内容。',
+  previewBinary: '二进制内容（Base64）',
+  files: 'Workspace 文件', filesRoot: 'Workspace 根目录', filesUp: '返回上一级', filesEmpty: '此目录为空', filesDirectory: '目录 ', filesTruncated: '目录内容已按上限截断',
 } as const
 
 /** English workbench copy. */
@@ -95,6 +103,14 @@ export const en = {
   more: 'More pane actions',
   previous: 'Move earlier',
   next: 'Move later',
+  previewClose: 'Close preview',
+  previewReload: 'Reload',
+  previewPrevious: 'Previous page',
+  previewNext: 'Next page',
+  previewLoading: 'Reading Workspace file…',
+  previewChanged: 'This file changed. Reload to see its current content.',
+  previewBinary: 'Binary content (Base64)',
+  files: 'Workspace files', filesRoot: 'Workspace root', filesUp: 'Up one level', filesEmpty: 'This directory is empty', filesDirectory: 'Directory ', filesTruncated: 'Directory listing is truncated',
 } as const
 
 /** Localized workbench message keys. */

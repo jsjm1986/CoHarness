@@ -14,6 +14,12 @@ Settings owners share the React-free `SettingsScopeSpec`, `SettingsScope`, and s
 
 `SlotRegistry.bindStore(handle, sessionId?)` resolves the framework-owned instance of an already registered handle. Service consumers share that instance with renderer entries and write through its declared actions; an unregistered handle or missing session scope throws.
 
+## Workspace file resources
+
+`WorkspaceResourceRegistry` keeps metadata by explicit runtime target and Session-relative resource address. The bootstrap connection has a distinct `base` identity; each project connection registers `workspaceResourceProvider(api)` with its own API client after the Host handshake advertises file support. File requests never derive a target from the focused pane. The Host-configured `workspaceFileMaxResources` bounds retained records per runtime; idle records are evicted in usage order, while active resources refuse admission at the bound.
+
+Subscribers and pins share metadata loads. Releasing the last owner cancels pending reads. Existing Host streams deliver file observations, so opening more files creates no additional streams. Reconnect aborts old-generation requests and revalidates retained metadata; differing versions mark it changed until an explicit reload. Transient failures preserve metadata, while access denial, provider removal, or runtime removal discards it. Preview content stays in the view and is fetched through bounded, version-guarded RPCs.
+
 ## Slot declaration injection
 
 `ctx.slots.inject(name, callback)` makes a full `SlotMap` key the dependency for a contribution whose plugin can activate independently from the declaring entry. It runs `callback` synchronously when the declaration exists, otherwise waits; declaration collapse disposes the callback effect, and redeclaration reruns it. The controller belongs to the caller's plugin fiber, so unloading the contributor cancels either the wait or its active registrations. A direct `slots.register()` into an undeclared slot still throws.

@@ -12,7 +12,6 @@ import {
   interruptedTurnClosers,
   KNOWN_SESSION_EVENT_TYPES,
   materializesSession,
-  SESSION_FORMAT_VERSION,
   SessionLogOffset,
   SessionPreparation,
   SessionSeq,
@@ -97,9 +96,9 @@ export class SessionFormatUnsupportedError extends Error {
  * @returns the stable refusal text, without a raw-log path suffix.
  */
 export function sessionFormatVersionRefusal(id: string, version: number): string {
-  return version > SESSION_FORMAT_VERSION
-    ? `session "${id}" uses log format v${version}, but this harness reads only v${SESSION_FORMAT_VERSION}: the log was written by a newer harness — upgrade the harness to open it`
-    : `session "${id}" uses log format v${version}, older than the supported v${SESSION_FORMAT_VERSION}, and this build ships no upgrade path for it`
+  return version > sessionFormatCatalog.currentVersion
+    ? `session "${id}" uses log format v${version}, but this harness reads only v${sessionFormatCatalog.currentVersion}: the log was written by a newer harness — upgrade the harness to open it`
+    : `session "${id}" uses log format v${version}, older than the supported v${sessionFormatCatalog.currentVersion}, and this build ships no upgrade path for it`
 }
 
 /** Transform a legacy event sequence through the format chain without intermediate artifacts. */
@@ -241,6 +240,9 @@ export interface PersistenceBackend<TornMarker = unknown> {
     sourceRevision: SessionPersistenceRevision,
     signal?: AbortSignal,
   ): Promise<void>
+
+  /** Set when migrateStored persists transformed event bodies in a new generation. */
+  readonly supportsBodyMigration?: boolean
 
   /** Durably create an empty header-only session artifact. */
   materializeHeader?(storage: SessionStorageMetadata): Promise<void>
@@ -1097,7 +1099,8 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     let inheritedEventCount = SessionLogOffset(stored.inheritedEventCount)
     if (stored.meta.version !== currentMeta.version) {
       const migrated = migrateFormatEvents(stored.meta, stored.inheritedEventCount, events)
-      if (this.backend.migrateStored !== undefined && canPublishMetadataOnlyMigration(events, migrated.events)) {
+      if (this.backend.migrateStored !== undefined
+        && (this.backend.supportsBodyMigration === true || canPublishMetadataOnlyMigration(events, migrated.events))) {
         await this.backend.migrateStored(
           stored,
           { meta: migrated.header, inheritedEventCount: migrated.inheritedEventCount },
@@ -1129,7 +1132,8 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       let currentInheritedEventCount = SessionLogOffset(inheritedEventCount)
       if (meta.version !== currentMeta.version) {
         const migrated = migrateFormatEvents(meta, inheritedEventCount, storedEvents)
-        if (this.backend.migrateStored !== undefined && canPublishMetadataOnlyMigration(storedEvents, migrated.events)) {
+        if (this.backend.migrateStored !== undefined
+          && (this.backend.supportsBodyMigration === true || canPublishMetadataOnlyMigration(storedEvents, migrated.events))) {
           await this.backend.migrateStored(
             { meta, inheritedEventCount },
             { meta: migrated.header, inheritedEventCount: migrated.inheritedEventCount },
@@ -1302,7 +1306,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
   }
 
   private assertVersion(meta: SessionHeader): SessionHeader {
-    if (meta.version === SESSION_FORMAT_VERSION) return meta
+    if (meta.version === sessionFormatCatalog.currentVersion) return meta
     if (meta.version === 0 || meta.version === 1 || meta.version === 2) {
       return sessionFormatCatalog.migrateHeader(meta as unknown as SessionFormatHeader) as unknown as SessionHeader
     }
