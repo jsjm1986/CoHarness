@@ -1585,3 +1585,31 @@ describe('LlmRuntime', () => {
     expect(ctx.llm.listProviders()).toEqual([])
   })
 })
+
+describe('remoteDiscoverModels', () => {
+  it('serves the registered interrogation and wraps refusals in RemoteError', async () => {
+    const runtime = new SourceLlmRuntime(new Context())
+    runtime.registerModelDiscovery('remote-ns', () => Promise.resolve([
+      { id: 'a', name: 'A' },
+      { id: 'b' },
+    ] as never))
+
+    const discovered = await runtime.remoteDiscoverModels(
+      'remote-ns', { baseURL: 'https://models.example' }, new AbortController().signal)
+    expect(discovered).toEqual([{ id: 'a', name: 'A' }, { id: 'b' }])
+
+    const refused = await runtime.remoteDiscoverModels(
+      'remote-ns', { baseURL: '' }, new AbortController().signal).catch((error: unknown) => error)
+    expect(refused).toMatchObject({
+      code: 'llm/model-discovery-rejected',
+      details: { settingsNs: 'remote-ns', baseURL: '' },
+    })
+
+    const missing = await runtime.remoteDiscoverModels(
+      'no-such-ns', { provider: 'route' }, new AbortController().signal).catch((error: unknown) => error)
+    expect(missing).toMatchObject({
+      code: 'llm/model-discovery-rejected',
+      details: { settingsNs: 'no-such-ns' },
+    })
+  })
+})

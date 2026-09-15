@@ -676,3 +676,15 @@ describe('launchDetachedApp', () => {
     expect(JSON.parse(await readFile(witness, 'utf8'))).toEqual([null, 'overridden', '1'])
   })
 })
+
+describe('SSH sessions', () => {
+  it('skips all probing: resolveLaunch and the catalog map answer empty', async () => {
+    const resolveExecutable = vi.fn(pathTable())
+    const run = vi.fn(runner(() => null))
+    const internals = bare({ ssh: true, run, resolveExecutable })
+    expect(await resolveLaunch(byId('vscode'), TIMEOUT_MS, internals)).toBeNull()
+    expect(await resolveOpenInAppApps(TIMEOUT_MS, internals)).toEqual(new Map())
+    expect(resolveExecutable).not.toHaveBeenCalled()
+    expect(run).not.toHaveBeenCalled()
+  })
+})

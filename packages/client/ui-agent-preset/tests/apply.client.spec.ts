@@ -58,7 +58,7 @@ const ROSTER_MOVED = {
   },
 }
 
-async function bench() {
+async function bench(hostSnapshot: unknown = { canOpenPath: true }) {
   const ctx = new Context()
   // The host's answer, mutable so a spec can move the default the way the
   // settings surface does and watch who re-reads it.
@@ -115,7 +115,7 @@ async function bench() {
         update: (payload: { patch: unknown }) => { calls.push(`settings:${JSON.stringify(payload.patch)}`); return Promise.resolve({ rpcId: 'r', result: { ok: true as const, value: {} } }) },
       },
     },
-    hostDescription: { getSnapshot: () => ({ canOpenPath: true }) },
+    hostDescription: { getSnapshot: () => hostSnapshot },
   } as never)
   await ctx.plugin({ inject: [...settingsInject], apply: settingsApply }).await()
   return { ctx, slots: ctx.get('slots') as SlotRegistry, calls, moveDefault }
@@ -606,4 +606,14 @@ it('hands the owning session to the Remote select the Gateway routes by', async 
     expect(select).toHaveBeenCalledWith('s1', 'minimal')
     expect(calls).toContain('select:minimal')
   } finally { await ctx.fiber.dispose() }
+})
+
+it('treats a missing host description as no native-open support', async () => {
+  const { ctx, slots } = await bench(null)
+  declareRoot(slots)
+  await ctx.plugin({ inject: [...inject], apply }).await()
+  const section = (slots.entries('settings.section')[0]!.inject as unknown as () => AgentPresetSectionInjected)()
+  // The section loads its roster even when the host cannot open paths.
+  await section.load()
+  expect(section.hooks.agentPresetSection.getSnapshot().status).toBe('ready')
 })

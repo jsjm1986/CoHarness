@@ -124,6 +124,17 @@ describe('MessageFeedbackActions', () => {
     expect(ui.rate).not.toHaveBeenCalled()
   })
 
+  it('keeps the confirmation dismissed and shows the failure when the write is refused', async () => {
+    const ui = mount({ rateResult: { ok: false as const, error: { code: 'rate/refused', message: 'refused' } } })
+
+    fireEvent.click(ui.getByLabelText(zh['action.like']))
+    fireEvent.click(ui.getByRole('button', { name: zh['confirm.submit'] }))
+
+    await waitFor(() => { expect(ui.rate).toHaveBeenCalledWith(MSG, 'positive') })
+    await waitFor(() => { expect(ui.getByRole('alert')).toBeTruthy() })
+    expect(ui.getByRole('button', { name: zh['confirm.submit'] })).toBeTruthy()
+  })
+
   it('retracts the feedback when the active rating is clicked again', async () => {
     const ui = mount({ current: item({ rating: 'positive' }) })
 

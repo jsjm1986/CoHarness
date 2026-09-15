@@ -10,7 +10,7 @@
 import { describe, expect, it } from 'vitest'
 import { SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
-import { resolveSessionPreset } from '../src/session.ts'
+import { agentPresetProjectionDefinition, resolveSessionPreset } from '../src/session.ts'
 
 /** A header carrying the creation-time preset, if any. */
 function header(agentPreset?: string): SessionHeader {
@@ -59,5 +59,18 @@ describe('resolving which preset a session ran', () => {
     // A valid deployment: every session shares the host composition, and no
     // surface should invent a preset name for it.
     expect(resolveSessionPreset({ header: header(), events: [] })).toBeUndefined()
+  })
+})
+
+describe('agentPresetProjectionDefinition', () => {
+  it('initializes from the header and advances on selection events', () => {
+    expect(agentPresetProjectionDefinition.init(header('standard') as never)).toBe('standard')
+    expect(agentPresetProjectionDefinition.init(header() as never)).toBeNull()
+
+    const fold = agentPresetProjectionDefinition.apply
+    expect(fold(null, selected('minimal', SessionSeq(0)))).toBe('minimal')
+
+    const later = { type: 'turn/end', seq: 1, time: 1, data: { turn: 1 } } as SessionEvent
+    expect(fold('minimal', later)).toBe('minimal')
   })
 })

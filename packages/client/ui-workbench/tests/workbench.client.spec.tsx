@@ -252,6 +252,27 @@ describe('workbench account targets and asynchronous chooser', () => {
     await waitFor(() => { expect(screen.queryByRole('dialog')).toBeNull() })
   })
 
+  it('creates without a name when the project left the reloaded catalog', async () => {
+    serve()
+    const createSession = vi.fn(async () => ({ ok: true as const }))
+    toolbar({ createSession })
+    fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
+    await screen.findByRole('button', { name: 'Workspace' })
+    fireEvent.click(screen.getByRole('button', { name: 'Workspace' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Team/ }))
+    fireEvent.click(screen.getByRole('button', { name: '关闭选择器' }))
+
+    // Reopening the picker refetches the catalog; project 7 vanished, so the
+    // stale workspace id no longer resolves a name to stamp.
+    serve({ ...directory, projects: [], items: [] })
+    fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
+    await screen.findByRole('button', { name: '新建对话' })
+    fireEvent.click(screen.getByRole('button', { name: '新建对话' }))
+    await waitFor(() => {
+      expect(createSession).toHaveBeenCalledWith({ kind: 'project', projectId: 7 }, false)
+    })
+  })
+
   it('ignores catalog completion after unmount and marks a failed catalog ready', async () => {
     const pending = Promise.withResolvers<Response>()
     vi.stubGlobal('fetch', vi.fn(() => pending.promise))

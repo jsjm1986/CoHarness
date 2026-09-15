@@ -353,3 +353,26 @@ describe('sessionStats wall-time fold (controlled timestamps)', () => {
     ])).toEqual(totals({ turns: 1, steps: 1 }))
   })
 })
+
+describe('assistant/message with an embedded stream record', () => {
+  it('uses the stream first-token marker when the step never saw a chunk', () => {
+    const state = sessionStatsProjectionDefinition.init()
+    const started = sessionStatsProjectionDefinition.apply(state, {
+      seq: 0 as SessionEvent['seq'], time: 10, type: 'step/start',
+      data: { turn: 1, step: 1 },
+    })
+    const messageEvent = {
+      seq: 1, time: 40, type: 'assistant/message', data: {
+        turn: 1,
+        step: 1,
+        stream: [
+          { type: 'chunk', time: 15, chunk: { type: 'text-delta', index: 0, text: 'partial' } },
+        ],
+        message: createMessage({ role: 'assistant', content: [{ type: 'text', text: 'done' }], source: { kind: 'model', provider: 'mock', model: 'mock' } }),
+        usage: { inputTokens: 1, outputTokens: 3 },
+      },
+    } as unknown as SessionEvent
+    const settled = sessionStatsProjectionDefinition.apply(started, messageEvent)
+    expect(settled).toMatchObject({ llmMs: 30, ttftMs: 5, ttftSteps: 1, decodeMs: 25, decodeTokens: 3 })
+  })
+})
