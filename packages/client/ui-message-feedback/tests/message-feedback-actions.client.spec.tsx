@@ -255,6 +255,32 @@ describe('MessageFeedbackActions', () => {
     expect(errors).toEqual([])
   })
 
+  it('drops a confirmed write that lands after the row unmounts', async () => {
+    let release = (): void => {}
+    const gate = new Promise<MessageFeedbackActionResult>((resolve) => {
+      release = () => { resolve({ ok: true }) }
+    })
+    const view: MessageFeedbackView = { status: 'ready', items: new Map(), error: null }
+    const useFeedback = (<T,>(select: (v: MessageFeedbackView) => T): T =>
+      useSyncExternalStore(() => () => {}, () => select(view))) as never
+    const props = {
+      messageId: MSG,
+      ensure: vi.fn(() => Promise.resolve<MessageFeedbackActionResult>({ ok: true })),
+      rate: vi.fn(() => gate),
+      toggle: vi.fn(() => gate),
+      clearNote: vi.fn(() => Promise.resolve<MessageFeedbackActionResult>({ ok: true })),
+      clear: vi.fn(() => Promise.resolve<MessageFeedbackActionResult>({ ok: true })),
+      useFeedback,
+      t,
+    } as unknown as Parameters<typeof MessageFeedbackActions>[0]
+    const ui = render(<MessageFeedbackActions {...props} />)
+    fireEvent.click(ui.getByLabelText(zh['action.like']))
+    fireEvent.click(ui.getByRole('button', { name: zh['confirm.submit'] }))
+    ui.unmount()
+    release()
+    await gate
+  })
+
   it('surfaces a failed list load next to the controls', async () => {
     const ui = mount({ status: 'error' })
 

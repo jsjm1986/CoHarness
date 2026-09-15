@@ -44,6 +44,12 @@ describe('modelSelectionProjectionDefinition', () => {
     expect(state.pending).toEqual({ provider: 'deepseek', model: 'v4-flash' })
   })
 
+  it('returns the same state when a header repeats the last used selection', () => {
+    const state = apply(empty, header('deepseek', 'v4-flash'))
+    expect(state.lastUsed).toEqual({ provider: 'deepseek', model: 'v4-flash' })
+    expect(apply(state, header('deepseek', 'v4-flash'))).toBe(state)
+  })
+
   it('ignores unrelated event types', () => {
     const event = { type: 'turn/start', seq: 3, time: 3, data: { turn: 1 } } as SessionEvent
     expect(apply(empty, event)).toBe(empty)

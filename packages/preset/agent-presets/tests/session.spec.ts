@@ -67,6 +67,8 @@ describe('agentPresetProjectionDefinition', () => {
     expect(agentPresetProjectionDefinition.init(header('standard') as never)).toBe('standard')
     expect(agentPresetProjectionDefinition.init(header() as never)).toBeNull()
 
+    expect(agentPresetProjectionDefinition.wire.view('minimal')).toBe('minimal')
+
     const fold = agentPresetProjectionDefinition.apply
     expect(fold(null, selected('minimal', SessionSeq(0)))).toBe('minimal')
 

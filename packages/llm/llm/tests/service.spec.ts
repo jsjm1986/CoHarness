@@ -1611,5 +1611,12 @@ describe('remoteDiscoverModels', () => {
       code: 'llm/model-discovery-rejected',
       details: { settingsNs: 'no-such-ns' },
     })
+
+    // oxlint-disable-next-line typescript/prefer-promise-reject-errors
+    runtime.registerModelDiscovery('odd-refusal', () => Promise.reject('flat refusal'))
+    const odd = await runtime.remoteDiscoverModels(
+      'odd-refusal', { baseURL: 'https://models.example' }, new AbortController().signal).catch((error: unknown) => error)
+    // The provider threw a non-Error: the wrapper strings it into the message.
+    expect(odd).toMatchObject({ code: 'llm/model-discovery-rejected', message: 'flat refusal' })
   })
 })
