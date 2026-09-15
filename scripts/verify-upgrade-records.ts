@@ -88,8 +88,9 @@ function requireCommits(owner: string, row: Record<string, unknown>): void {
 
 function checkRow(owner: string, row: unknown): void {
   if (!isRecord(row)) fail(`${owner} must be an object`)
-  const name = `${owner} "${String(row.area ?? row.id ?? '?')}"`
-  requireString(name, row.area ?? row.id, 'area/id')
+  const area = row.area ?? row.id
+  const name = `${owner} "${typeof area === 'string' && area !== '' ? area : '?'}"`
+  requireString(name, area, 'area/id')
   const status = requireString(name, row.status, 'status')
   if (!STATUSES.has(status)) fail(`${name} status must be one of ${[...STATUSES].join(' | ')}, got ${JSON.stringify(status)}`)
   requireString(name, row.localOwner, 'localOwner')
@@ -114,7 +115,9 @@ export function checkMatrix(path: string, raw: unknown): void {
   requireString(`${path} target`, raw.target.tag, 'tag')
   if (!COMMIT_ID.test(String(raw.target.commit))) fail(`${path} target.commit must be a commit id`)
   if (!Array.isArray(raw.rows) || raw.rows.length === 0) fail(`${path} requires a non-empty rows array`)
-  raw.rows.forEach((row, i) => checkRow(`${path} row ${String(i)}`, row))
+  raw.rows.forEach((row, i) => {
+    checkRow(`${path} row ${String(i)}`, row)
+  })
 }
 
 export function checkManifest(path: string, raw: unknown): void {
@@ -135,7 +138,9 @@ export function checkManifest(path: string, raw: unknown): void {
   requireString(path, raw.targetVersion, 'targetVersion')
   requireString(path, raw.status, 'status')
   if (!Array.isArray(raw.decisions) || raw.decisions.length === 0) fail(`${path} requires a non-empty decisions array`)
-  raw.decisions.forEach((row, i) => checkRow(`${path} decision ${String(i)}`, row))
+  raw.decisions.forEach((row, i) => {
+    checkRow(`${path} decision ${String(i)}`, row)
+  })
 }
 
 /** Files present in one directory matching `prefix` and `suffix`. */
