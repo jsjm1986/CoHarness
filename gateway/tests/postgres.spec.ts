@@ -622,7 +622,7 @@ describePg('PostgreSQL baseline', () => {
     const batchId = randomUUID()
     const events = [
       { type: 'user/message', seq: 0, time: Date.now(), data: {
-        role: 'user', content: [{ type: 'text', text: '企业级 Agent 对话' }],
+        role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: '企业级 Agent 对话' }],
       } },
       { type: 'tool/result', seq: 1, time: Date.now(), data: { message: { content: [{
         type: 'tool-result', toolCallId: 'call-1', content: [{ type: 'text', text: '工具执行完成' }],
