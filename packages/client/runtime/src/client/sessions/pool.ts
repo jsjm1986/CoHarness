@@ -49,6 +49,13 @@ function targetKey(target: ConnectionRuntimeTarget): string {
   return target.kind === 'personal' ? 'personal' : `project:${String(target.projectId)}`
 }
 
+/** Bound on a lazily opened target runtime's initial readiness wait. A failed
+ *  generation is only a transient while the connection's reconnect loop keeps
+ *  retrying inside this window; two generation-handshake budgets give one
+ *  stalled attempt plus its retry room to establish before the entry is
+ *  released as unavailable. */
+const TARGET_RUNTIME_READY_TIMEOUT_MS = 30_000
+
 /**
  * Coordinates one base runtime with lazily opened project runtimes. Every
  * runtime keeps its own transport, event stream, history windows, and scope
@@ -240,10 +247,19 @@ export class SessionRuntimePool implements ISessions {
           if (state !== 'reconnecting') return
           this.rootCtx.get('workspaceResources')?.disconnect(establishedEntry.target)
           runtime.handleDisconnected()
-          rejectReady(new Error('target runtime connection unavailable'))
         },
       })
       entry.stop = () => { loop.stop() }
+      // The connection loop retries a failed generation with backoff; the
+      // ready wait must outlast transient outages or the first handshake
+      // failure would release a target whose retry was about to succeed.
+      const readyDeadline = setTimeout(() => {
+        rejectReady(new Error('target runtime connection unavailable'))
+      }, TARGET_RUNTIME_READY_TIMEOUT_MS)
+      void entry.ready.then(
+        () => { clearTimeout(readyDeadline) },
+        () => { clearTimeout(readyDeadline) },
+      )
     }
     try {
       if (entry.ready !== undefined) await entry.ready

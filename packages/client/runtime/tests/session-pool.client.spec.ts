@@ -68,6 +68,51 @@ describe('SessionRuntimePool', () => {
     expect(pool.runtimeTargetFor('project-session' as SessionId)).toBeUndefined()
   })
 
+  it('keeps the pending target entry across a transient reconnect', async () => {
+    const ctx = new Context()
+    const baseApi = new FakeApiClient()
+    const projectApi = new FakeApiClient()
+    projectApi.onList = () => Promise.resolve(ok({ items: [{
+      sessionId: 'project-session' as SessionId,
+      updatedAt: 10, running: false, blank: false, cwd: '/projects/demo',
+    }] }))
+    const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
+    const targetConnection = connection(projectApi, (sinks) => {
+      queueMicrotask(() => {
+        sinks.onStateChange?.('reconnecting')
+        sinks.onConnected?.({
+          version: 'test', cwd: '/projects/demo', attachedSessions: 0, home: '/home/test', canOpenPath: true,
+        })
+      })
+    })
+    const baseConnection: ConnectionHandle = { ...connection(baseApi), forTarget: () => targetConnection }
+    const pool = new SessionRuntimePool(ctx, base, baseConnection, fakeRemote())
+    await expect(pool.ensureSession({ kind: 'project', projectId: 7, projectName: 'Demo' }, 'project-session' as SessionId)).resolves.toBe(true)
+    expect(projectApi.callsOf('session.list')).toHaveLength(1)
+  })
+
+  it('releases a target runtime that stays unready past the ready window', async () => {
+    const ctx = new Context()
+    const baseApi = new FakeApiClient()
+    const projectApi = new FakeApiClient()
+    const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
+    const targetConnection = connection(projectApi, (sinks) => {
+      queueMicrotask(() => sinks.onStateChange?.('reconnecting'))
+    })
+    const baseConnection: ConnectionHandle = { ...connection(baseApi), forTarget: () => targetConnection }
+    const pool = new SessionRuntimePool(ctx, base, baseConnection, fakeRemote())
+    vi.useFakeTimers()
+    try {
+      const attempt = pool.ensureSession({ kind: 'project', projectId: 7, projectName: 'Demo' }, 'project-session' as SessionId)
+      const rejection = expect(attempt).rejects.toThrow('target runtime connection unavailable')
+      await vi.advanceTimersByTimeAsync(60_000)
+      await rejection
+      expect(pool.runtimeTargetFor('project-session' as SessionId)).toBeUndefined()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('keeps base-runtime sessions on the base connection with no rerouted target', async () => {
     const ctx = new Context()
     const baseApi = new FakeApiClient()
