@@ -413,6 +413,10 @@ describe('web e2e: seeded history renders through cold resume', () => {
       }))
     try {
       await fileLink.click()
+      // The RPC lands on the in-process host asynchronously: restoring the
+      // spy before arrival lets the real host opener run (on Linux a missing
+      // xdg-open pops the refusal dialog, whose mask then blocks later cases).
+      await expect.poll(() => openPath.mock.calls.length, { timeout: 5_000 }).toBe(1)
       await expect.poll(() => frame.getAttribute('data-details-collapsed'), { timeout: 5_000 }).toBe('true')
     } finally {
       openPath.mockRestore()

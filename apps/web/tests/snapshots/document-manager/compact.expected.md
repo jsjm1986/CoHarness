@@ -22,9 +22,9 @@
     - button "More actions":
       - img
       - text: More
+  - checkbox "Select this page"
   - text: Visible only to you 2 documents
   - list "Document Manager":
-    - checkbox "Select this page"
     - listitem:
       - button "Open folder reports": reports
       - 'button "More actions: folder reports"':
