@@ -2015,7 +2015,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/session/session-persistence-gateway/src/index.ts:87`](../packages/session/session-persistence-gateway/src/index.ts)
+Source: [`packages/session/session-persistence-gateway/src/index.ts:90`](../packages/session/session-persistence-gateway/src/index.ts)
 
 <a id="deepseek-aidsh-session-persistence-jsonl"></a>
 

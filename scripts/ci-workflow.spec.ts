@@ -349,7 +349,7 @@ describe('CI workflow', () => {
     const gatewayRuns = (gateway.steps as unknown[]).filter(isRecord).flatMap(step => typeof step.run === 'string' ? [step.run] : [])
     expect(gatewayRuns).toEqual(expect.arrayContaining([
       'npm run typecheck --prefix gateway',
-      'npm run build --prefix gateway',
+      'npm run build:check --prefix gateway',
       'npm test --prefix gateway',
     ]))
   })
