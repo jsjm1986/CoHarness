@@ -113,6 +113,49 @@ describe('SessionRuntimePool', () => {
     }
   })
 
+  it('heals a nameless project target when a later descriptor carries the name', async () => {
+    const ctx = new Context()
+    const baseApi = new FakeApiClient()
+    const projectApi = new FakeApiClient()
+    projectApi.onCreate = () => Promise.resolve(ok({ sessionId: 'created' as SessionId }))
+    const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
+    const targetConnection = connection(projectApi, (sinks) => {
+      queueMicrotask(() => sinks.onConnected?.({
+        version: 'test', cwd: '/projects/demo', attachedSessions: 0, home: '/home/test', canOpenPath: true,
+      }))
+    })
+    const baseConnection: ConnectionHandle = { ...connection(baseApi), forTarget: () => targetConnection }
+    const pool = new SessionRuntimePool(ctx, base, baseConnection, fakeRemote())
+
+    const created = await pool.createSession({ kind: 'project', projectId: 7 })
+    expect(created).toBe('created')
+    expect(projectApi.callsOf('session.create')).toHaveLength(1)
+    expect(pool.runtimeTargetFor('created' as SessionId)).toEqual({ kind: 'project', projectId: 7 })
+    expect(pool.list.getSnapshot().byId['created' as SessionId]?.workspaceName).toBeUndefined()
+
+    await expect(pool.ensureSession({ kind: 'project', projectId: 7, projectName: 'Demo' }, 'created' as SessionId)).resolves.toBe(true)
+    expect(pool.runtimeTargetFor('created' as SessionId)).toEqual({ kind: 'project', projectId: 7, projectName: 'Demo' })
+    expect(pool.list.getSnapshot().byId['created' as SessionId]?.workspaceName).toBe('Demo')
+  })
+
+  it('stamps the project name on sessions created through a name-bearing target', async () => {
+    const ctx = new Context()
+    const baseApi = new FakeApiClient()
+    const projectApi = new FakeApiClient()
+    projectApi.onCreate = () => Promise.resolve(ok({ sessionId: 'created' as SessionId }))
+    const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
+    const targetConnection = connection(projectApi, (sinks) => {
+      queueMicrotask(() => sinks.onConnected?.({
+        version: 'test', cwd: '/projects/demo', attachedSessions: 0, home: '/home/test', canOpenPath: true,
+      }))
+    })
+    const baseConnection: ConnectionHandle = { ...connection(baseApi), forTarget: () => targetConnection }
+    const pool = new SessionRuntimePool(ctx, base, baseConnection, fakeRemote())
+
+    await pool.createSession({ kind: 'project', projectId: 7, projectName: 'Demo' })
+    expect(pool.list.getSnapshot().byId['created' as SessionId]).toMatchObject({ projectId: 7, workspaceName: 'Demo' })
+  })
+
   it('keeps base-runtime sessions on the base connection with no rerouted target', async () => {
     const ctx = new Context()
     const baseApi = new FakeApiClient()

@@ -26,7 +26,7 @@ interface Actions {
   switchWorkbench?: (id: string) => void
   chooseSession: (item: WorkbenchConversation, replace: boolean) => Promise<AddPaneResult>
   focusSession: (id: SessionId) => void
-  createSession: (target: { kind: 'personal' } | { kind: 'project'; projectId: number }, replace: boolean) => Promise<AddPaneResult>
+  createSession: (target: SessionRuntimeTarget, replace: boolean) => Promise<AddPaneResult>
   hydrateCatalog?: (catalog: WorkbenchCatalog, paneIds: readonly SessionId[]) => Promise<void>
   markCatalogReady?: () => void
   setMode: (mode: ConversationViewportMode) => void
@@ -34,8 +34,6 @@ interface Actions {
   readBytesPreview?: import('./WorkspaceFilePreview.tsx').ReadWorkspaceBytesPreview
   listWorkspaceDirectory?: ListWorkspaceDirectory
   openWorkspaceResource?: OpenWorkspaceResource
-  workspaceResourceOwner?: () => { sessionId: SessionId; runtimeTarget: import('@deepseek-ai/dsh-client-runtime/client').WorkspaceResourceTarget } | undefined
-  workspaceRemote?: boolean
   resources?: WorkspaceResourceRegistry | undefined
 }
 type Props = PropsRuntime<'conversation.workbench.toolbar'> & PropsLocale<typeof NS>
@@ -59,13 +57,9 @@ export function WorkbenchToolbar({
   chooseSession, focusSession, createSession, hydrateCatalog, markCatalogReady, setMode,
   listWorkbenches, currentWorkbench, switchWorkbench, createWorkbench, renameWorkbench,
   duplicateWorkbench, deleteWorkbench, readPreview, readBytesPreview,
-  listWorkspaceDirectory, openWorkspaceResource, workspaceResourceOwner,
-  workspaceRemote, resources, t,
+  listWorkspaceDirectory, openWorkspaceResource, resources, t,
 }: Props) {
-  const { pickerOpen, replace, preview } = useStore(state => state)
-  // The injected face is cached by the root slot; resolve the active pane at
-  // render time so multi-runtime Workbench controls follow focus changes.
-  const activeWorkspaceOwner = workspaceResourceOwner?.()
+  const { pickerOpen, replace, preview, browser } = useStore(state => state)
   const sessions = useSessions(s => s)
   const workspaces = useWorkspaces(s => s)
   const [query, setQuery] = useState('')
@@ -74,7 +68,6 @@ export function WorkbenchToolbar({
   const [workbenchMenuOpen, setWorkbenchMenuOpen] = useState(false)
   const [workbenchDialog, setWorkbenchDialog] = useState<'create' | 'rename' | 'duplicate' | undefined>()
   const [deleteWorkbenchOpen, setDeleteWorkbenchOpen] = useState(false)
-  const [fileBrowserOpen, setFileBrowserOpen] = useState(false)
   const [workbenchName, setWorkbenchName] = useState('')
   const [catalog, setCatalog] = useState<WorkbenchCatalog | undefined>()
   const [pending, setPending] = useState(false)
@@ -98,11 +91,16 @@ export function WorkbenchToolbar({
     return () => { abort.abort() }
   }, [pickerOpen])
   const full = viewport.paneIds.length >= 4 && !replace
-  const showFileBrowser = workspaceRemote === true && resources !== undefined
-    && activeWorkspaceOwner !== undefined && resources.hasProvider(activeWorkspaceOwner.runtimeTarget)
-    && listWorkspaceDirectory !== undefined && openWorkspaceResource !== undefined
+  // The root crumb names the owning pane's Workspace so cross-project browsing
+  // cannot be mistaken for the active pane's scope.
+  const browserSummary = browser === undefined ? undefined : sessions.byId[browser.sessionId]
+  const browserScope = browser === undefined ? undefined
+    : workspaces.items.find(item => item.sessionIds.includes(browser.sessionId))?.title
+      ?? browserSummary?.workspaceName
+      ?? (browser.runtimeTarget.kind === 'project' ? browser.runtimeTarget.projectName : undefined)
+      ?? (browserSummary?.cwd === undefined ? undefined : workspaceTitleOf(browserSummary.cwd) || browserSummary.cwd)
   const browserLabels = {
-    close: t('previewClose'), title: t('files'), root: t('filesRoot'), up: t('filesUp'),
+    close: t('previewClose'), title: t('files'), root: browserScope ?? t('filesRoot'), up: t('filesUp'),
     loading: t('previewLoading'), empty: t('filesEmpty'), directory: t('filesDirectory'),
     truncated: t('filesTruncated'), error: t('createError'), reload: t('previewReload'),
   }
@@ -152,9 +150,14 @@ export function WorkbenchToolbar({
     }
     setPending(true)
     setError(undefined)
-    const target = workspace === 'personal'
+    const target: SessionRuntimeTarget = workspace === 'personal'
       ? { kind: 'personal' as const }
-      : { kind: 'project' as const, projectId: Number(workspace) }
+      : {
+        kind: 'project' as const, projectId: Number(workspace),
+        // The name rides the target so a runtime first opened by this create
+        // still stamps workspaceName on its summaries (pane scope label).
+        ...(selectedProject === undefined ? {} : { projectName: selectedProject.name }),
+      }
     void createSession(target, replace).then(finish, (cause: unknown) => {
       setError(cause instanceof Error ? cause.message : t('createError'))
     }).finally(() => { setPending(false) })
@@ -186,25 +189,20 @@ export function WorkbenchToolbar({
         {viewport.mode === 'workbench' && <span className={css.paneCount} aria-label={`${viewport.paneIds.length}/4`}>{viewport.paneIds.length}/4</span>}
       </div>
       <div className={css.toolbarActions}>
-        {showFileBrowser && (
-          <Button size="sm" variant="toolbar" onClick={() => { setFileBrowserOpen(true) }}>
-            {t('files')}
-          </Button>
-        )}
         {viewport.mode === 'workbench' && (
           <Button size="sm" variant="toolbar" icon={<IconPlusOutline16 />} onClick={() => { setError(undefined); actions.openPicker() }}>
             {t('add')}
           </Button>
         )}
       </div>
-      {fileBrowserOpen && showFileBrowser && (
+      {browser !== undefined && listWorkspaceDirectory !== undefined && openWorkspaceResource !== undefined && (
         <WorkspaceFileBrowser
-          key={`${activeWorkspaceOwner.runtimeTarget.kind}:${activeWorkspaceOwner.runtimeTarget.kind === 'project' ? String(activeWorkspaceOwner.runtimeTarget.projectId) : 'base'}:${activeWorkspaceOwner.sessionId}`}
-          sessionId={activeWorkspaceOwner.sessionId}
-          runtimeTarget={activeWorkspaceOwner.runtimeTarget}
+          key={`${browser.runtimeTarget.kind}:${browser.runtimeTarget.kind === 'project' ? String(browser.runtimeTarget.projectId) : 'base'}:${browser.sessionId}`}
+          sessionId={browser.sessionId}
+          runtimeTarget={browser.runtimeTarget}
           list={listWorkspaceDirectory}
           open={openWorkspaceResource}
-          close={() => { setFileBrowserOpen(false) }}
+          close={actions.closeBrowser}
           labels={browserLabels}
         />
       )}

@@ -179,6 +179,7 @@ export function apply(ctx: Context): void {
     inject: (): DisplaySettingsRowInjected => ({
       hooks: { displaySettings },
       setWidth: (value) => { displaySettings.setWidth(value) },
+      setFullWidth: (value) => { displaySettings.setFullWidth(value) },
       setFontSize: (value) => { displaySettings.setFontSize(value) },
     }),
   }, DisplaySettingsRow))
@@ -282,7 +283,6 @@ export function apply(ctx: Context): void {
         composerBlock: sessionId === undefined ? ABSENT_BLOCK : composerBlocks.storeFor(sessionId),
         displaySettings,
       },
-      setDisplayWidth: (value) => { displaySettings.setWidth(value) },
       selectWorkspace: async (workspaceId, options: WorkspaceSelectionOptions = {}) => {
         const nextId = await workspaces.openWorkspace(workspaceId)
         sessions.open(nextId)
@@ -290,7 +290,7 @@ export function apply(ctx: Context): void {
           inputHub.discardDraft(sessionId)
         }
       },
-      newSession: (workspaceId) => { workspaces.startSession(workspaceId) },
+      setDisplayWidth: (value) => { displaySettings.setWidth(value) },
     }),
   }, ConversationPane)
 

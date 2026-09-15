@@ -96,6 +96,7 @@ export class AccountPreferencesMirror {
         : {
           busyEnter: 'queue',
           chatContentWidth: 748,
+          chatFullWidth: false,
           chatFontSize: 14,
         }
     const value = ns === 'locale'

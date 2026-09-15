@@ -32,6 +32,8 @@ export interface ConversationSettings {
   busyEnter: BusyEnterBehavior
   /** Persisted transcript width. */
   chatContentWidth: number
+  /** Fill the pane instead of clamping to `chatContentWidth`. */
+  chatFullWidth?: boolean
   /** Persisted transcript font size. */
   chatFontSize: number
 }
@@ -40,5 +42,6 @@ export interface ConversationSettings {
 export const ConversationSettingsSchema: z<ConversationSettings> = z.object({
   [BUSY_ENTER_FIELD]: z.union([...BUSY_ENTER_BEHAVIORS]).default(DEFAULT_BUSY_ENTER_BEHAVIOR),
   chatContentWidth: z.number().min(CHAT_CONTENT_WIDTH_RANGE.min).max(CHAT_CONTENT_WIDTH_RANGE.max).default(DEFAULT_CHAT_CONTENT_WIDTH),
+  chatFullWidth: z.boolean().default(false),
   chatFontSize: z.number().min(CHAT_FONT_SIZE_RANGE.min).max(CHAT_FONT_SIZE_RANGE.max).default(DEFAULT_CHAT_FONT_SIZE),
 })

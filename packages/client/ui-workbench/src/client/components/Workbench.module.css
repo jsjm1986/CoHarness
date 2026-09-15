@@ -4,7 +4,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--dsw-space-3);
-  min-height: 40px;
+  min-height: 36px;
   padding: 0 var(--dsw-space-3);
   border-bottom: 0.5px solid var(--dsw-alias-border-l1);
   background: var(--dsw-alias-bg-layer-1);
@@ -18,8 +18,14 @@
 }
 
 .toolbarTitle { gap: var(--dsw-space-2); min-width: 0; }
-.workbenchTrigger { display: inline-flex; align-items: center; gap: 6px; max-width: 180px; padding: 5px 8px; border: 0.5px solid var(--dsw-alias-border-l2); border-radius: var(--dsw-radius-md); background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); font: inherit; cursor: pointer; }
+/* The workbench menu trigger shares the hero-row ghost-chip family (28px pill,
+   transparent at rest) so it does not read as a separate control next to the
+   Workspace chip and preset seat. */
+.workbenchTrigger { display: inline-flex; align-items: center; gap: var(--dsw-space-1); max-width: 180px; min-height: 28px; padding: 0 var(--dsw-space-2); border: none; border-radius: var(--dsw-radius-xl); background: transparent; color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 20px; font-weight: 500; cursor: pointer; }
 .workbenchTrigger { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workbenchTrigger:not(:disabled):hover,
+.workbenchTrigger[aria-expanded='true'] { background: var(--dsw-alias-interactive-bg-hover); }
+.workbenchTrigger:focus-visible { outline: 2px solid var(--dsw-alias-border-l3); outline-offset: 2px; }
 .workbenchNameInput { display: block; width: 100%; min-height: 38px; box-sizing: border-box; padding: 8px 11px; border: 0.5px solid var(--dsw-alias-border-l2); border-radius: var(--dsw-radius-md); background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font: inherit; outline: none; }
 .workbenchNameInput:focus { border-color: var(--dsw-alias-brand-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-alias-brand-primary) 18%, transparent); }
 .workbenchDeleteDescription { margin: 0; color: var(--dsw-alias-label-secondary); font-size: 13px; line-height: 20px; }
@@ -27,29 +33,23 @@
 .toolbarTitle span { color: var(--dsw-alias-label-caption); font-size: 12px; }
 .paneCount { padding: 2px 6px; border-radius: 999px; corner-shape: round; background: var(--dsw-alias-bg-layer-2); font-variant-numeric: tabular-nums; }
 .toolbarActions { gap: var(--dsw-space-2); }
-.modeButton { border: 0; background: transparent; color: var(--dsw-alias-label-secondary); cursor: pointer; font-size: 12px; }
-.modeButton:hover { color: var(--dsw-alias-label-primary); }
-.tabs { display: none; }
 
 .paneHeader {
   position: relative;
   flex: none;
-  gap: 10px;
-  min-height: 36px;
-  padding: 0 var(--dsw-space-2) 0 var(--dsw-space-3);
-  border-bottom: 0.5px solid var(--dsw-alias-border-l1);
-  background: var(--dsw-alias-bg-layer-1);
+  gap: var(--dsw-space-1);
+  min-height: 34px;
+  padding: 0 var(--dsw-space-1) 0 var(--dsw-space-2);
   cursor: pointer;
 }
-.paneHeader:has(.activeMark[data-active]) { background: var(--dsw-alias-bg-layer-1); }
+.paneHeader:has(.activeMark[data-active]) { box-shadow: inset 3px 0 0 var(--dsw-alias-brand-primary); }
 
-.paneTitle { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; line-height: 18px; }
-.paneStatus { color: var(--dsw-alias-label-caption); font-size: 11px; white-space: nowrap; }
+.paneTitle { display: flex; min-width: 0; flex: 1; align-items: baseline; gap: 6px; }
+.paneStatus { display: inline-flex; flex: none; align-items: center; }
 .paneTitle strong, .paneTitle span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.paneTitle strong { color: var(--dsw-alias-label-primary); font-size: 14px; line-height: 19px; font-weight: 600; }
-.paneTitle span { color: var(--dsw-alias-label-secondary); font-size: 13px; line-height: 17px; font-weight: 500; }
-.paneWorkspace { max-width: 260px; padding: 1px 7px; border-radius: 999px; corner-shape: round; background: var(--dsw-alias-bg-layer-2); }
-.closeButton { color: var(--dsw-alias-label-caption); }
+.paneTitle strong { min-width: 0; color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 18px; font-weight: 500; }
+.paneWorkspace { flex: none; max-width: 45%; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 16px; }
+.paneWorkspace::before { content: '·'; margin-right: 6px; color: var(--dsw-alias-label-caption); }
 .activeMark { display: none; }
 
 .empty { display: flex; flex: 1; align-items: center; justify-content: center; gap: var(--dsw-space-2); flex-direction: column; color: var(--dsw-alias-label-secondary); text-align: center; }
@@ -63,7 +63,9 @@
 .tabs button > span { overflow: hidden; text-overflow: ellipsis; }
 .tabs button[aria-selected='true'] { color: var(--dsw-alias-label-primary); box-shadow: inset 0 -2px var(--dsw-alias-brand-primary); }
 .srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.moreButton { border: 0; padding: 4px; background: transparent; color: var(--dsw-alias-label-secondary); cursor: pointer; }
+.iconAction { display: inline-flex; align-items: center; justify-content: center; border: 0; padding: 4px; border-radius: var(--dsw-radius-sm); corner-shape: round; background: transparent; color: var(--dsw-alias-label-secondary); cursor: pointer; }
+.iconAction:hover { color: var(--dsw-alias-label-primary); background: var(--dsw-alias-interactive-bg-hover); }
+.iconAction:focus-visible { outline: 2px solid var(--dsw-alias-border-l3); outline-offset: -2px; }
 .picker { width: min(620px, calc(100vw - 24px)); }
 .pickerFilters { display: flex; gap: var(--dsw-space-2); }
 .pickerFilters input, .workspaceTrigger { min-width: 0; padding: 8px 10px; border: 0.5px solid var(--dsw-alias-border-l2); border-radius: var(--dsw-radius-md); corner-shape: round; background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font: inherit; }
@@ -88,7 +90,7 @@
 .notice, .pickerFooter { color: var(--dsw-alias-label-secondary); font-size: 12px; }
 .pickerFooter { display: flex; align-items: center; justify-content: space-between; gap: var(--dsw-space-3); padding-top: var(--dsw-space-3); border-top: 0.5px solid var(--dsw-alias-border-l1); }
 .pickerFooter > span { flex: 1; }
-.modeButton:focus-visible, .moreButton:focus-visible, .tabs button:focus-visible, .candidate:focus-visible { outline: 2px solid var(--dsw-alias-border-l3); outline-offset: -2px; }
+.tabs button:focus-visible, .candidate:focus-visible { outline: 2px solid var(--dsw-alias-border-l3); outline-offset: -2px; }
 
 .catalogSummary { display: flex; justify-content: space-between; align-items: center; padding: 14px 6px 8px; color: var(--dsw-alias-label-caption); font-size: 12px; }
 .rowBadge { flex: none; padding: 3px 8px; border-radius: 999px; corner-shape: round; background: var(--dsw-alias-bg-layer-1); font-size: 11px; }

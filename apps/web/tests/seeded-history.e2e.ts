@@ -28,6 +28,8 @@ import {
 } from './scaffold.ts'
 import { newEnglishPage, saveFailureShot } from './support.ts'
 
+const OVERLAY = fileURLToPath(new URL('./seeded-history.overlay.yml', import.meta.url))
+
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/seeded-history', import.meta.url))
 const SEED = fileURLToPath(new URL('./snapshots/seeded-history/seed.jsonl', import.meta.url))
 const UI_EXPECTED = fileURLToPath(new URL('./snapshots/seeded-history/ui.expected.md', import.meta.url))
@@ -180,7 +182,7 @@ describe('web e2e: seeded history renders through cold resume', () => {
   let tripwire: ReturnType<typeof watchConsole>
 
   beforeAll(async () => {
-    scaffold = await launchWebScaffold({})
+    scaffold = await launchWebScaffold({ extraOverlayPath: OVERLAY })
     // The workspace-aware flow runs sessions in <workspaceCwd>/workspace
     // (the composer's default draft name); the read-tool targets must live in
     // that session cwd. Pre-creating the directory is safe because the picker

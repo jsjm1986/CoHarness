@@ -68,6 +68,27 @@
   color: var(--dsw-alias-label-primary);
 }
 
+.widthOutput {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--dsw-space-2);
+}
+
+.fillToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+
+.fillToggle input {
+  width: auto;
+  margin: 0;
+  accent-color: var(--dsw-alias-state-business-primary);
+}
+
 @media (max-width: 767px) {
   .row {
     align-items: stretch;

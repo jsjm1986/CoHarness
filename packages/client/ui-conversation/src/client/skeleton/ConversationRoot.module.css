@@ -64,6 +64,9 @@
 /* WorkbenchPaneHeader is the single source for pane identity. Keep the
    conversation tabs, but avoid repeating the same session title in each pane. */
 .workbenchPane .header .titleRow { display: none; }
+/* With the title row hidden, the header's own padding is dead space above the
+   tabs; the pane header already carries the column's chrome. */
+.workbenchPane .header { padding: 0 var(--dsw-space-3); }
 
 .titleCluster {
   display: flex;
@@ -125,19 +128,20 @@
   display: flex;
   flex: none;
   align-items: center;
-  gap: var(--dsw-space-2);
+  gap: var(--dsw-space-1);
+}
+
+.headerActions:empty,
+.headerUtilities:empty {
+  display: none;
 }
 
 .headerUtilities {
   display: flex;
   flex: none;
   align-items: center;
-  gap: var(--dsw-space-2);
+  gap: var(--dsw-space-1);
   margin-left: var(--dsw-space-5);
-}
-
-.headerUtilities:empty {
-  display: none;
 }
 
 /* figma Tab_Group 34:11441: 35px strip, gap 36, pad-left 8, tabs bottom-aligned. */
@@ -231,6 +235,17 @@
   flex: none;
 }
 
+/* Positioned box for chrome that overlays the scrollport (the transcript
+   width handle): it must not live inside .scrollBody, where absolute
+   positioning would scroll away with the content. */
+.scrollRegion {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .scrollBody {
   position: relative;
   display: flex;
@@ -253,8 +268,6 @@
   scrollbar-gutter: stable;
 }
 
-/* Desktop-only grabber for the shared transcript width axis. The target is
-   transparent at rest, so it does not steal visual space from the flow. */
 .widthHandle {
   position: absolute;
   top: 0;
@@ -264,15 +277,31 @@
   width: 12px;
   margin-left: -6px;
   border: 0;
-  border-inline: 1px solid transparent;
   background: transparent;
   cursor: col-resize;
   touch-action: none;
 }
 
-.widthHandle:hover,
+/* A centered grip reads as a resize affordance; the earlier full-height edge
+   pair looked like stray divider lines. */
+.widthHandle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 40px;
+  transform: translate(-50%, -50%);
+  border-radius: 2px;
+  background: transparent;
+}
+
+.widthHandle:hover::after,
+.widthHandle:focus-visible::after {
+  background: var(--dsw-alias-brand-primary);
+}
+
 .widthHandle:focus-visible {
-  border-inline-color: var(--dsw-alias-state-business-primary);
   outline: none;
 }
 
@@ -411,34 +440,6 @@
   padding-left: var(--dsw-space-5);
 }
 
-/* The hero keeps Workspace selection and New conversation as two explicit
-   actions so choosing a Workspace never hides the way to start a fresh chat. */
-.newSession {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--dsw-space-1);
-  min-height: 28px;
-  padding: 0 var(--dsw-space-2);
-  border: none;
-  border-radius: var(--dsw-radius-xl);
-  background: transparent;
-  color: var(--dsw-alias-label-secondary);
-  font-size: 13px;
-  line-height: 20px;
-  cursor: pointer;
-}
-
-.newSession:hover,
-.newSession:focus-visible {
-  background: var(--dsw-alias-interactive-bg-hover);
-  color: var(--dsw-alias-label-primary);
-}
-
-.newSession:focus-visible {
-  outline: 2px solid var(--dsw-alias-border-l3);
-  outline-offset: 2px;
-}
-
 :global([data-viewport='compact']) .root {
   --dsh-composer-side-clearance: 12px;
 }
@@ -536,10 +537,6 @@
   justify-content: center;
   gap: var(--dsw-space-1);
   padding-left: 0;
-}
-
-:global([data-viewport='compact']) .newSession {
-  min-height: var(--dsw-touch-target);
 }
 
 :global([data-viewport-short]) .composerHero {

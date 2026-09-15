@@ -21,6 +21,7 @@ export interface AccountPreferencesView {
     'ui-conversation': {
       busyEnter: 'queue' | 'steer'
       chatContentWidth: number
+      chatFullWidth: boolean
       chatFontSize: number
     }
   }
@@ -30,6 +31,7 @@ export interface AccountPreferencesView {
     'ui-conversation': {
       busyEnter?: 'queue' | 'steer'
       chatContentWidth?: number
+      chatFullWidth?: boolean
       chatFontSize?: number
     }
   }
@@ -39,9 +41,9 @@ export interface AccountPreferencesView {
 /** Narrow account preference mutation sent to the Gateway. */
 export interface AccountPreferenceMutation {
   namespace: AccountPreferenceNamespace
-  field: 'preference' | 'busyEnter' | 'chatContentWidth' | 'chatFontSize'
+  field: 'preference' | 'busyEnter' | 'chatContentWidth' | 'chatFullWidth' | 'chatFontSize'
   operation: 'set' | 'unset'
-  value?: string | number
+  value?: string | number | boolean
   expectedRevision?: number
 }
 
@@ -129,14 +131,20 @@ function optionalNumberPreference(value: unknown, min: number, max: number): num
 function conversation(value: unknown): {
   busyEnter: 'queue' | 'steer'
   chatContentWidth: number
+  chatFullWidth: boolean
   chatFontSize: number
 } {
   const row = object(value)
+  const chatFullWidth = row.chatFullWidth
+  if (chatFullWidth !== undefined && typeof chatFullWidth !== 'boolean') {
+    throw new Error('invalid account preferences response')
+  }
   return {
     busyEnter: busyEnter(value).busyEnter,
     chatContentWidth: numberPreference(
       row.chatContentWidth, DEFAULT_CHAT_CONTENT_WIDTH, CHAT_CONTENT_WIDTH_MIN, CHAT_CONTENT_WIDTH_MAX,
     ),
+    chatFullWidth: chatFullWidth ?? false,
     chatFontSize: numberPreference(row.chatFontSize, DEFAULT_CHAT_FONT_SIZE, CHAT_FONT_SIZE_MIN, CHAT_FONT_SIZE_MAX),
   }
 }
@@ -144,14 +152,20 @@ function conversation(value: unknown): {
 function optionalConversation(value: unknown): {
   busyEnter?: 'queue' | 'steer'
   chatContentWidth?: number
+  chatFullWidth?: boolean
   chatFontSize?: number
 } {
   const row = object(value)
+  const chatFullWidth = row.chatFullWidth
+  if (chatFullWidth !== undefined && typeof chatFullWidth !== 'boolean') {
+    throw new Error('invalid account preferences response')
+  }
   const chatContentWidth = optionalNumberPreference(row.chatContentWidth, CHAT_CONTENT_WIDTH_MIN, CHAT_CONTENT_WIDTH_MAX)
   const chatFontSize = optionalNumberPreference(row.chatFontSize, CHAT_FONT_SIZE_MIN, CHAT_FONT_SIZE_MAX)
   return {
     ...optionalBusyEnter(value),
     ...(chatContentWidth === undefined ? {} : { chatContentWidth }),
+    ...(chatFullWidth === undefined ? {} : { chatFullWidth }),
     ...(chatFontSize === undefined ? {} : { chatFontSize }),
   }
 }

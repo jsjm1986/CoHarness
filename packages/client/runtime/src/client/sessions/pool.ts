@@ -191,6 +191,13 @@ export class SessionRuntimePool implements ISessions {
   private async runtimeForTarget(target: SessionRuntimeTarget): Promise<RuntimeEntry | undefined> {
     const key = targetKey(target)
     let entry = this.entries.get(key)
+    // A later name-bearing descriptor (catalog row, scope-aware create) heals
+    // an entry first opened by a nameless target; the key pins projectId, and
+    // resource lookups key on {kind, projectId}, never the object identity.
+    if (entry !== undefined && entry.target.kind === 'project' && target.kind === 'project'
+      && entry.target.projectName === undefined && target.projectName !== undefined) {
+      entry.target = target
+    }
     if (entry === undefined) {
       const connection = this.baseConnection.forTarget?.(target)
       if (connection === undefined) return undefined

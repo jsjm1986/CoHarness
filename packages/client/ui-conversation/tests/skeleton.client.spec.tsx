@@ -129,6 +129,7 @@ function mount(
   const displaySettings = createSnapshotStore<ConversationDisplaySettingsSnapshot>({
     chatContentWidth: 748,
     chatFontSize: 14,
+    chatFullWidth: false,
     settings: { status: 'ready', writable: true, writableReason: undefined, write: { status: 'idle' } },
   })
   chat.actions.setDraft('ordinary draft')
@@ -136,7 +137,6 @@ function mount(
   const useInput = bindSnapshotSelector(wiring.state)
   const inputActions = wiring.actions
   const stop = vi.fn()
-  const newSession = vi.fn()
   const open = vi.fn()
   const slotCalls: string[] = []
   const viewTabs = options.viewTabs ?? [
@@ -262,19 +262,19 @@ function mount(
     useComposerBlock: (select: (value: ComposerBlock | undefined) => unknown) => select(options.composerBlock),
     useDisplaySettings: bindSnapshotSelector(displaySettings),
     setDisplayWidth: (value: number) => {
-      displaySettings.set({ ...displaySettings.getSnapshot(), chatContentWidth: value })
+      const width = Math.min(1080, Math.max(560, Math.round(value)))
+      displaySettings.set({ ...displaySettings.getSnapshot(), chatContentWidth: width, chatFullWidth: false })
     },
     useInput,
     inputActions,
     renderSlot,
     renderSlotChain,
     selectWorkspace: retargetWorkspace,
-    newSession,
     t,
   } as unknown as ConversationRootProps
   const view = render(<ConversationRoot {...props} />)
   return {
-    view, chat, sink, retargetWorkspace, newSession, session, slotCalls, seatOwners, open, displaySettings,
+    view, chat, sink, retargetWorkspace, session, slotCalls, seatOwners, open, displaySettings,
     pickerOwner: () => pickerOwner,
     rerender: () => { view.rerender(<ConversationRoot {...props} />) },
   }
@@ -338,6 +338,25 @@ describe('ConversationRoot resident composer', () => {
     expect(b.displaySettings.getSnapshot().chatContentWidth).toBe(1080)
   })
 
+  it('fills the pane in full-width mode and starts a drag from the rendered width', () => {
+    const b = mount(conversationSnapshot())
+    b.displaySettings.set({ ...b.displaySettings.getSnapshot(), chatFullWidth: true })
+    b.rerender()
+    const root = b.view.container.firstElementChild as HTMLElement
+    expect(root.style.getPropertyValue('--dsh-chat-content-width')).toContain('100%')
+    Object.defineProperty(root, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({ left: 0, width: 1200, top: 0, right: 1200, bottom: 800, height: 800 }),
+    })
+    const handle = b.view.getByRole('separator', { name: '调整对话内容宽度' })
+    expect(handle.getAttribute('aria-valuetext')).toBe('占满')
+
+    // Rendered width is the measured pane width (jsdom reports no gutter), so
+    // grabbing the edge and pulling in exits fill into a clamped pixel width.
+    fireEvent.pointerDown(handle, { pointerId: 7, clientX: 1192 })
+    expect(b.displaySettings.getSnapshot()).toMatchObject({ chatContentWidth: 1080, chatFullWidth: false })
+  })
+
   it('renders the composer inert with the blocker\u2019s own reason', () => {
     const b = mount(conversationSnapshot(), undefined, undefined, {
       composerBlock: { reason: 'select a model first' },
@@ -384,12 +403,6 @@ describe('ConversationRoot resident composer', () => {
     expect(typeof (modelSeat as { onOpenSettings?: unknown } | undefined)?.onOpenSettings).toBe('function')
   })
 
-  it('offers an explicit New conversation action in the Hero', () => {
-    const b = mount(conversationSnapshot({ composerPhase: 'blank', blank: true }))
-    fireEvent.click(b.view.getByRole('button', { name: '新建对话' }))
-    expect(b.newSession).toHaveBeenCalledWith(wid('one'))
-  })
-
   it('uses the local Workspace hint while a blank draft is not attached yet', () => {
     const b = mount(
       conversationSnapshot({ composerPhase: 'blank', blank: true }),
@@ -398,18 +411,17 @@ describe('ConversationRoot resident composer', () => {
       { summaryBlank: true, summaryWorkspaceId: wid('pending') },
     )
     expect(b.view.getByText('pending')).toBeTruthy()
-    fireEvent.click(b.view.getByRole('button', { name: '新建对话' }))
-    expect(b.newSession).toHaveBeenCalledWith(wid('pending'))
+    expect((b.pickerOwner() as { selectedId?: string }).selectedId).toBe('pending')
   })
 
-  it('does not keep a deleted Workspace as a New conversation target', () => {
+  it('does not offer a deleted Workspace as the picker selection', () => {
     const b = mount(
       conversationSnapshot({ composerPhase: 'blank', blank: true }),
       [],
       undefined,
       { summaryBlank: true, summaryWorkspaceId: wid('deleted') },
     )
-    expect(b.view.queryByRole('button', { name: '新建对话' })).toBeNull()
+    expect((b.pickerOwner() as { selectedId?: string }).selectedId).toBeUndefined()
   })
 
   it('keeps composer text in the machine, mirrors to the chat store, and submits through the sink', () => {

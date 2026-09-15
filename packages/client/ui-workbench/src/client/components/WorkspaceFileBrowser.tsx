@@ -4,13 +4,14 @@ import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { WorkspaceFileEntry } from '@deepseek-ai/dsh-api-remotes/client'
 import type { WorkspaceResourceOpenRequest, WorkspaceResourceTarget } from '@deepseek-ai/dsh-client-runtime/client'
 import { workspaceResourceAddress } from '@deepseek-ai/dsh-client-runtime/client'
+import type { WorkspaceBrowserOwner } from '../stores.ts'
 import css from './Workbench.module.css'
 
-/** List one direct directory level through its owning runtime. */
+/** List one direct directory level for the pane-bound Workspace owner. */
 export type ListWorkspaceDirectory = (
-  path: string, signal: AbortSignal,
+  owner: WorkspaceBrowserOwner, path: string, signal: AbortSignal,
 ) => Promise<{ entries: readonly WorkspaceFileEntry[]; truncated: boolean }>
-/** Open a file resource using the identity of the active Workbench pane. */
+/** Open a file resource using the identity of the owning Workbench pane. */
 export type OpenWorkspaceResource = (request: WorkspaceResourceOpenRequest) => void
 
 /** Browse direct children without treating the directory as a User Document.
@@ -51,7 +52,7 @@ export function WorkspaceFileBrowser({
     setError(undefined)
     setEntries([])
     setTruncated(false)
-    void list(path, controller.signal).then((value) => {
+    void list({ sessionId, runtimeTarget }, path, controller.signal).then((value) => {
       if (controller.signal.aborted) return
       setEntries(value.entries)
       setTruncated(value.truncated)

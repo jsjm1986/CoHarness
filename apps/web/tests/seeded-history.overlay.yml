@@ -1,0 +1,7 @@
+# The host-open cases spy on the apiProxy host surface, which only runs on the
+# local-desktop branch: a remote or headless host without a native opener takes
+# the workspace resource-open preview instead. Pin the capability so Linux CI
+# and desktop developer hosts exercise the same branch.
+- id: api-gateway
+  config:
+    nativeOpen: true

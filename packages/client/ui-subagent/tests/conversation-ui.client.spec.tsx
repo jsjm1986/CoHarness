@@ -630,14 +630,14 @@ describe('SubagentHeaderLineage', () => {
     expect(empty.setCatalogOpen).toHaveBeenCalledWith(CHILD, false)
   })
 
-  it('places a separator before a visible ordinary-session descendant count', () => {
+  it('shows an ordinary-session descendant count as a bare title suffix', () => {
     const view = render(<SubagentHeaderLineage {...props(catalog())} />)
 
-    expect(screen.getByText('/')).toBeTruthy()
     expect(screen.getByRole('button', { name: /2 个子代理/ })).toBeTruthy()
+    expect(screen.queryByText('/')).toBeNull()
 
     view.rerender(<SubagentHeaderLineage {...props(catalog({ entries: [] }))} />)
-    expect(screen.queryByText('/')).toBeNull()
+    expect(screen.queryByRole('button')).toBeNull()
   })
 
   it('combines the current subagent title and chevron into the parent-catalog trigger', () => {

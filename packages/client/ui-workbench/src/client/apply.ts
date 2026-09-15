@@ -11,7 +11,7 @@ import type { WorkbenchCatalog } from './catalog.ts'
 import { WorkbenchEmpty } from './components/WorkbenchEmpty.tsx'
 import { WorkbenchPaneHeader } from './components/WorkbenchPaneHeader.tsx'
 import { WorkbenchToolbar } from './components/WorkbenchToolbar.tsx'
-import { createWorkbenchStore } from './stores.ts'
+import { createWorkbenchStore, type WorkspaceBrowserOwner } from './stores.ts'
 import { en, NS, zh } from './locales.ts'
 
 /** Required Cordis capabilities; slot declarations may arrive in either order. */
@@ -106,26 +106,16 @@ export function apply(ctx: ClientContext): void {
         markCatalogReady: () => { if (!disposed) viewport.markCatalogReady() },
         setMode: (mode: 'single' | 'workbench') => { viewport.setMode(mode) },
         resources: ctx.get('workspaceResources'),
-        workspaceRemote: connection?.isLoopback === false,
-        // Root slot inject faces are cached for the registration lifetime by
-        // the Cordis renderer.  Keep the owner as a getter so a pane switch
-        // cannot leave Workspace browsing bound to the first active Session.
-        workspaceResourceOwner: () => {
-          const sessionId = viewport.snapshot.getSnapshot().activePaneId
-          if (sessionId === undefined) return undefined
-          return { sessionId, runtimeTarget: ctx.sessions.runtimeTargetFor?.(sessionId) ?? { kind: 'base' as const } }
-        },
         openWorkspaceResource: (request: WorkspaceResourceOpenRequest) => {
           ctx.slots.bindStore(chooser).actions.openPreview(request)
         },
-        listWorkspaceDirectory: async (path: string, signal: AbortSignal) => {
+        listWorkspaceDirectory: async (owner: WorkspaceBrowserOwner, path: string, signal: AbortSignal) => {
           if (connection === undefined) throw new WorkspaceResourceError('access-revoked', 'Workspace connection is unavailable')
-          const owner = viewport.snapshot.getSnapshot().activePaneId
-          if (owner === undefined) throw new WorkspaceResourceError('workspace-file/unknown-session', 'No active Workspace Session')
-          const target = ctx.sessions.runtimeTargetFor?.(owner)
-          const targetConnection = target === undefined ? connection : connection.forTarget?.(target)
+          const targetConnection = owner.runtimeTarget.kind === 'base'
+            ? connection
+            : connection.forTarget?.(owner.runtimeTarget)
           if (targetConnection === undefined) throw new WorkspaceResourceError('access-revoked', 'Workspace runtime is unavailable')
-          const response = await targetConnection.api.workspaceFiles.list({ sessionId: owner, path }, signal)
+          const response = await targetConnection.api.workspaceFiles.list({ sessionId: owner.sessionId, path }, signal)
           if (!response.result.ok) throw new WorkspaceResourceError(response.result.error.code, response.result.error.message)
           return response.result.value
         },
@@ -175,6 +165,17 @@ export function apply(ctx: ClientContext): void {
         ctx.slots.bindStore(chooser).actions.openPicker(true)
       },
       movePane: (direction: 'previous' | 'next') => { viewport.move(sessionId, direction) },
+      // Provider availability follows runtime connection state, so evaluate it
+      // at render time instead of freezing it into the inject face.
+      filesAvailable: () =>
+        connection?.isLoopback === false
+        && ctx.get('workspaceResources')?.hasProvider(ctx.sessions.runtimeTargetFor?.(sessionId) ?? { kind: 'base' as const }) === true,
+      openFiles: () => {
+        ctx.slots.bindStore(chooser).actions.openBrowser({
+          sessionId,
+          runtimeTarget: ctx.sessions.runtimeTargetFor?.(sessionId) ?? { kind: 'base' as const },
+        })
+      },
     }),
   }, WorkbenchPaneHeader))
 }

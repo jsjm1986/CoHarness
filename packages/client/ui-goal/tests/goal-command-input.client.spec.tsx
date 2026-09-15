@@ -131,4 +131,20 @@ describe('goal command input projection', () => {
     expect(bubble.textContent).toBe('/goal ship it')
     expect(within(bubble).queryByRole('button')).toBeNull()
   })
+
+  it('renders a whitespace-free command line as head-only', () => {
+    const t = makeTranslate(zh, commonZh)
+    const props = {
+      node: {
+        key: 'goal-command-input:bare',
+        data: { commandId: 'command-goal', text: '/goal', time: 1_700_000_000_000 },
+      },
+      t,
+    } as unknown as Parameters<typeof GoalCommandInputView>[0]
+    const view = render(<GoalCommandInputView {...props} />)
+    const bubble = view.getByRole('group', { name: '命令输入' })
+
+    expect(bubble.textContent).toBe('/goal')
+    expect(bubble.querySelector('[data-ref-chip="command"]')).not.toBeNull()
+  })
 })
