@@ -65,8 +65,8 @@ function fixture() {
     instances: { ensureRunning },
     users: { getById: async () => USER },
     projects: { getById: async (id) => id === 41
-      ? { id, name: 'Compiler', path: '/tmp/compiler', memberCount: 1, members: [] }
-      : { id, name: 'Read only', path: '/tmp/readonly', memberCount: 1, members: [] } },
+      ? { id, name: 'Compiler', path: '/tmp/compiler', memberCount: 1, origin: 'admin' as const, members: [] }
+      : { id, name: 'Read only', path: '/tmp/readonly', memberCount: 1, origin: 'admin' as const, members: [] } },
     collaboration: {
       projectForUser,
       projectsForUser: async () => [
@@ -82,8 +82,8 @@ function fixture() {
     instances: { ensureRunning },
     users: { getById: async () => USER },
     projects: { getById: async (id: number) => id === 41
-      ? { id, name: 'Compiler', path: '/tmp/compiler', memberCount: 1, members: [] }
-      : { id, name: id === 43 ? 'Runtime' : 'Read only', path: '/tmp/readonly', memberCount: 1, members: [] } },
+      ? { id, name: 'Compiler', path: '/tmp/compiler', memberCount: 1, origin: 'admin' as const, members: [] }
+      : { id, name: id === 43 ? 'Runtime' : 'Read only', path: '/tmp/readonly', memberCount: 1, origin: 'admin' as const, members: [] } },
     collaboration: {
       projectForUser,
       projectsForUser: async () => [
@@ -106,14 +106,14 @@ function fixture() {
   const list = createDocumentTransferListHandler({
     instances: { ensureRunning },
     users: { getById: async () => USER },
-    projects: { getById: async (id) => ({ id, name: 'Compiler', path: '/tmp/compiler', memberCount: 1, members: [] }) },
+    projects: { getById: async (id) => ({ id, name: 'Compiler', path: '/tmp/compiler', memberCount: 1, origin: 'admin' as const, members: [] }) },
     collaboration,
     principals,
   })
   const publicList = createGatewayDocumentTransferListHandler({
     instances: { ensureRunning },
     users: { getById: async () => USER },
-    projects: { getById: async (id) => ({ id, name: 'Compiler', path: '/tmp/compiler', memberCount: 1, members: [] }) },
+    projects: { getById: async (id) => ({ id, name: 'Compiler', path: '/tmp/compiler', memberCount: 1, origin: 'admin' as const, members: [] }) },
     collaboration,
     principals,
   })
@@ -121,8 +121,8 @@ function fixture() {
     ...dependencies,
     users: { getById: async () => USER },
     projects: { getById: async (id) => id === 41
-      ? { id, name: 'Compiler', path: '/tmp/compiler', memberCount: 1, members: [] }
-      : { id, name: 'Read only', path: '/tmp/readonly', memberCount: 1, members: [] } },
+      ? { id, name: 'Compiler', path: '/tmp/compiler', memberCount: 1, origin: 'admin' as const, members: [] }
+      : { id, name: 'Read only', path: '/tmp/readonly', memberCount: 1, origin: 'admin' as const, members: [] } },
   })
   return {
     handler,
