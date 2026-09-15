@@ -316,6 +316,8 @@ export class E2BFileSystem extends FileSystem {
     signal?: AbortSignal,
   ): Promise<Uint8Array> {
     assertNotAborted(signal, 'read')
+    /* jscpd:ignore-start -- sibling FS providers enforce the same capability
+     * range contract locally; fs-local keeps the symmetric check. */
     if (!Number.isSafeInteger(range.offset) || range.offset < 0
       || !Number.isSafeInteger(range.length) || range.length < 0) {
       throw new FsError('invalid byte range', 'FS_IO_ERROR')
@@ -323,6 +325,7 @@ export class E2BFileSystem extends FileSystem {
     /* v8 ignore next -- reachable only where bufferConstants.MAX_LENGTH < Number.MAX_SAFE_INTEGER;
      * on 64-bit hosts any length past it already fails the safe-integer check above. */
     if (range.length > bufferConstants.MAX_LENGTH) throw new FsError('byte range exceeds the allocation limit', 'FS_TOO_LARGE')
+    /* jscpd:ignore-end */
     const info = await this.requireRegular(target, signal)
     if (range.expectedVersion !== undefined && info.version !== range.expectedVersion) throw new FsError('file changed during guarded read', 'FS_STALE_VERSION')
     if (range.length === 0 || (info.size !== undefined && range.offset >= info.size)) return new Uint8Array(0)

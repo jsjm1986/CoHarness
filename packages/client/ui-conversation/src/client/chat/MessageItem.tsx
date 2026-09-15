@@ -157,6 +157,9 @@ function TurnMaxTokensItem({ t }: {
  * scan as the composer, minus the lexicon: sent tokens were validated at
  * compose time, so shape alone decorates).
  */
+/* jscpd:ignore-start -- intentional lexicon-less variant of the primitives
+ * projectUserText: it decorates every token shape (compose-time validation
+ * already ran) and renders refChips over MessageText plain runs. */
 function projectUserText(text: string, sessionLabels: readonly string[]): ReactNode {
   const ranges: { start: number; end: number; label: string; kind: 'session' | 'plain' }[] = []
   for (const rawLabel of [...new Set(sessionLabels)].sort((a, b) => b.length - a.length)) {
@@ -215,6 +218,7 @@ function projectUserText(text: string, sessionLabels: readonly string[]): ReactN
   if (cursor < text.length) parts.push(<MessageText key={cursor} text={text.slice(cursor)} />)
   return <>{parts}</>
 }
+/* jscpd:ignore-end */
 
 /** Right-aligned bubble shared by user and steering rows. */
 function UserStyleBubble({

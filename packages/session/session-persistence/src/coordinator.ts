@@ -575,6 +575,9 @@ function migrateLegacyTurnEndEvent(event: SessionEvent, id: SessionId): SessionE
  * Current-looking malformed events remain untouched so validation rejects them
  * instead of disguising corruption as legacy data.
  */
+/* jscpd:ignore-start -- the same normalization applied to two event
+ * universes: SessionEvent here, SessionFormatEvent in session-format's
+ * normalizeLegacyMessage; the layers' types and id minting differ. */
 function migrateLegacyMessageEvent(
   event: SessionEvent,
   id: SessionId,
@@ -649,6 +652,7 @@ function migrateLegacyMessageEvent(
       return event
   }
 }
+/* jscpd:ignore-end */
 
 /** Rename the pre-PTC dispatch event types; their payloads are unchanged. */
 function migrateLegacyDispatchEvent(event: SessionEvent): SessionEvent {

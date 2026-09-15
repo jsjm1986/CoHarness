@@ -387,6 +387,9 @@ function addLegacyCompactionId(
   return { ...event, data: { ...data, compactionId } }
 }
 
+/* jscpd:ignore-start -- the same normalization applied to two event
+ * universes: SessionFormatEvent here, SessionEvent in session-persistence's
+ * migrateLegacyMessageEvent; the layers' types and id minting differ. */
 /** Early message carriers lacked the `message` envelope or `id`/`role` fields. */
 function normalizeLegacyMessage(
   event: SessionFormatEvent,
@@ -456,6 +459,7 @@ function normalizeLegacyMessage(
       return event
   }
 }
+/* jscpd:ignore-end */
 
 /** Legacy message lists inside `inserted`/`messages` payloads lacked `id`/`role`. */
 function normalizeLegacyMessageLists(

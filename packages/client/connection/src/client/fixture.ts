@@ -1024,6 +1024,9 @@ function estimateFixtureContent(blocks: readonly ContentBlock[]): number {
   }, 0)
 }
 
+/* jscpd:ignore-start -- deliberate self-contained parallel of token-meter's
+ * heuristic: the fixture stays dependency-free rather than pulling
+ * dsh-token-meter into the client fixture module. */
 /** Price a system-role message with token-meter's estimateSystemMessage heuristic. */
 function estimateFixtureSystemMessage(message: { content: readonly ContentBlock[] }): number {
   if (message.content.length === 0) return 0
@@ -1033,6 +1036,7 @@ function estimateFixtureSystemMessage(message: { content: readonly ContentBlock[
   }
   return Math.ceil(characters / CHARS_PER_TOKEN) + ROLE_OVERHEAD
 }
+/* jscpd:ignore-end */
 
 /** Fixture parallel of token-meter's heuristic context-composition projection. */
 function contextBreakdownOf(log: readonly SessionEvent[]): FixtureContextBreakdownProjection {

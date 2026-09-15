@@ -455,6 +455,8 @@ export async function readByteRange(
   range: { offset: number; length: number; expectedVersion?: FsVersion },
   signal?: AbortSignal,
 ): Promise<Uint8Array> {
+  /* jscpd:ignore-start -- sibling FS providers enforce the same capability
+   * range contract locally; fs-e2b keeps the symmetric check. */
   if (!Number.isSafeInteger(range.offset) || range.offset < 0
     || !Number.isSafeInteger(range.length) || range.length < 0) {
     throw new FsError('invalid byte range', 'FS_IO_ERROR')
@@ -462,6 +464,7 @@ export async function readByteRange(
   /* v8 ignore next -- reachable only where bufferConstants.MAX_LENGTH < Number.MAX_SAFE_INTEGER;
    * on 64-bit hosts any length past it already fails the safe-integer check above. */
   if (range.length > bufferConstants.MAX_LENGTH) throw new FsError('byte range exceeds the allocation limit', 'FS_TOO_LARGE')
+  /* jscpd:ignore-end */
   await statRegularFile(target, 'read', signal)
   const flags = range.expectedVersion === undefined ? fsConstants.O_RDONLY : fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW
   const handle = await open(target.targetKey, flags)
