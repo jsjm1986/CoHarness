@@ -228,6 +228,42 @@ describe('tokenUsage session projection', () => {
     })
   })
 
+  it('ignores an attempt without a usage chunk and a retry that has no sample to clear', async () => {
+    const { ctx, session } = await harness()
+    startStep(session, 1, 1)
+    session.append('assistant/attempt', {
+      turn: 1,
+      step: 1,
+      stream: [{ type: 'chunk', time: 1, chunk: { type: 'finish', reason: { kind: 'error', failure: { code: 'HTTP', message: 'failed' } } } }],
+    })
+    // A durable settlement carrying neither usage nor a stream record has no
+    // sample to read either.
+    session.append('assistant/message', {
+      turn: 1,
+      step: 1,
+      message: createMessage({
+        role: 'assistant',
+        content: [{ type: 'text', text: 'no usage here' }],
+        source: { kind: 'model', provider: 'mock', model: 'mock' },
+      }),
+    }, { surfaceOp: 'append', sourceEventSeqs: [] })
+    // A retry in a different step has no recorded sample to clear; either way
+    // the totals stay at zero and no change fires.
+    session.append('llm/retry-started', { retryId: RetryId('retry-none'), turn: 9, step: 9, retry: 1 })
+    expect(projected(ctx, session)).toEqual(ZERO)
+
+    // A retry ahead of the step that DID record a sample leaves that sample
+    // standing: clearing is scoped to the exact turn/step it names.
+    usageChunk(session, { inputTokens: 5, outputTokens: 1 }, 1, 1)
+    session.append('llm/retry-started', { retryId: RetryId('retry-other'), turn: 2, step: 1, retry: 1 })
+    expect(projected(ctx, session)).toEqual({
+      uncachedInputTokens: 5,
+      outputTokens: 1,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+    })
+  })
+
   it('accumulates a retried same-step attempt after clearing the prior sample', async () => {
     const { ctx, session } = await harness()
     session.append('turn/start', { turn: 1 })

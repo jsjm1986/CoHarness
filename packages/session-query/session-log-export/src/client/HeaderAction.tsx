@@ -26,7 +26,7 @@ export function SessionLogDownloadHeaderAction(props: SessionLogDownloadDialogPr
         onClick={() => { void request(sessionId) }}
       >
         <span>{t('button.desktop')}</span>
-        <IconDownloadOutline16 size={16} />
+        <IconDownloadOutline16 size={14} />
       </button>
       <SessionLogDownloadDialog {...props} />
     </>

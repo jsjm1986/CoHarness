@@ -12,6 +12,7 @@ import AttachmentStore, {
   type SaveImageAttachment,
   type StoredImageAttachment,
 } from '../src/index.ts'
+import { isAttachmentError } from '../src/error.ts'
 
 const LIMITS = {
   maxImageBytes: 4,
@@ -145,6 +146,18 @@ describe('AttachmentStore.readImageRequest', () => {
     const reason = new Error('cancel unsupported projection')
     controller.abort(reason)
     expect(() => store.readImageRequest(ref, { maxPixels: 1, maxBytes: 1 }, controller.signal)).toThrow(reason)
+  })
+})
+
+describe('isAttachmentError', () => {
+  it('identifies attachment failures by stable code across package copies', () => {
+    expect(isAttachmentError(new AttachmentError('bad bytes', 'INVALID_IMAGE'))).toBe(true)
+    expect(isAttachmentError(new AttachmentError('corrupt object', 'ATTACHMENT_CORRUPT'))).toBe(true)
+    expect(isAttachmentError(Object.assign(new Error('foreign'), { code: 'ATTACHMENT_NOT_FOUND' }))).toBe(true)
+    expect(isAttachmentError(Object.assign(new Error('wrong code'), { code: 'ENOENT' }))).toBe(false)
+    expect(isAttachmentError(Object.assign(new Error('numeric code'), { code: 7 }))).toBe(false)
+    expect(isAttachmentError(new Error('no code'))).toBe(false)
+    expect(isAttachmentError('not an error')).toBe(false)
   })
 })
 

@@ -218,6 +218,19 @@ describe('SessionTitleService Provider lifecycle', () => {
     await disposeReplacement()
   })
 
+  it('no-ops a provider dispose issued after the service already unloaded', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const fiber = await ctx.plugin(SessionTitleService, CONFIG)
+    const dispose = ctx.sessionTitle.register({
+      id: SessionTitleProviderId('post-unload'),
+      automatic: 'first-prompt',
+      generate: async () => ({ title: 'unused', messageSeqs: [SessionSeq(0)] }),
+    })
+    await fiber.dispose()
+    await dispose()
+  })
+
   it('supersedes an older all-messages revision and cannot commit an ignored abort', async () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)

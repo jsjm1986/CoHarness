@@ -25,6 +25,22 @@ describe('outcome mapping helpers', () => {
     })).resolves.toEqual(expected)
   })
 
+  it('maps a provider-diagnosed abort onto failed rather than killed', async () => {
+    await expect(settleRun({
+      id: SessionId('child-abort'),
+      localAgent: undefined,
+      result: Promise.resolve({
+        output: [],
+        diagnostic: 'remote side closed the stream',
+        stopReason: 'aborted',
+      }),
+      dispose: () => Promise.resolve(),
+    })).resolves.toEqual({
+      status: 'failed',
+      detail: 'aborted; diagnostic: remote side closed the stream',
+    })
+  })
+
   it('settleRun disposes the run before reporting, on both result paths', async () => {
     const order: string[] = []
     const completed = await settleRun({

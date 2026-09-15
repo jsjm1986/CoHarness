@@ -459,6 +459,8 @@ export async function readByteRange(
     || !Number.isSafeInteger(range.length) || range.length < 0) {
     throw new FsError('invalid byte range', 'FS_IO_ERROR')
   }
+  /* v8 ignore next -- reachable only where bufferConstants.MAX_LENGTH < Number.MAX_SAFE_INTEGER;
+   * on 64-bit hosts any length past it already fails the safe-integer check above. */
   if (range.length > bufferConstants.MAX_LENGTH) throw new FsError('byte range exceeds the allocation limit', 'FS_TOO_LARGE')
   await statRegularFile(target, 'read', signal)
   const flags = range.expectedVersion === undefined ? fsConstants.O_RDONLY : fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW
@@ -492,6 +494,24 @@ function checkReadVersion(info: BigIntStats, expected: FsVersion | undefined): v
 }
 
 /**
+ * Verify one opened guarded descriptor still names a regular file at the
+ * pinned version. A descriptor replaced between `statRegularFile` and `open`
+ * fails the regular-file check; a descriptor whose identity moved fails the
+ * version check.
+ * @param handle - the descriptor opened for the guard, absent when no version was pinned.
+ * @param expected - the pinned version; skipped when undefined.
+ */
+async function checkOpenedDescriptor(
+  handle: Awaited<ReturnType<typeof open>> | undefined,
+  expected: FsVersion | undefined,
+): Promise<void> {
+  if (handle === undefined) return
+  const info = await handle.stat({ bigint: true })
+  if (!info.isFile()) throw new FsError('text target is not a regular file', 'FS_NOT_REGULAR_FILE')
+  checkReadVersion(info, expected)
+}
+
+/**
  * Stream a whole regular UTF-8 text file as decoded text chunks. Same text
  * semantics as {@link readWholeText} (regular-file check, binary/NUL rejection,
  * cross-chunk UTF-8 decoding), but never holds the whole file in memory.
@@ -505,11 +525,7 @@ export async function* streamWholeText(target: LocalTarget, signal?: AbortSignal
   const handle = expectedVersion === undefined ? undefined : await open(target.targetKey, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW)
   let stream: ReturnType<typeof createReadStream>
   try {
-    if (handle !== undefined) {
-      const info = await handle.stat({ bigint: true })
-      if (!info.isFile()) throw new FsError('text target is not a regular file', 'FS_NOT_REGULAR_FILE')
-      checkReadVersion(info, expectedVersion)
-    }
+    await checkOpenedDescriptor(handle, expectedVersion)
     stream = handle === undefined
       ? createReadStream(target.targetKey, signal ? { signal } : {})
       : handle.createReadStream({ autoClose: false, ...(signal === undefined ? {} : { signal }) })

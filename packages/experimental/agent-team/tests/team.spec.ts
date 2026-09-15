@@ -1703,3 +1703,61 @@ describe('Team mailbox and waiting', () => {
     })
   })
 })
+
+describe('Team Remote surface', () => {
+  it('serves view and task mutations with typed rejections', async () => {
+    const { ctx, lead } = await setup([])
+    const empty = ctx.agentTeams.remoteView(lead)
+    expect(empty.members[0]).toMatchObject({ name: 'lead', role: 'lead' })
+    expect(empty.tasks).toEqual([])
+
+    const created = await ctx.agentTeams.remoteCreateTask(lead, { subject: 'remote task', description: 'd' })
+    expect(created).toMatchObject({ ok: true })
+    if (!created.ok) throw new Error('expected created task')
+    const task = created.value
+    expect(ctx.agentTeams.remoteView(lead).tasks.map(item => item.id)).toEqual([task.id])
+
+    const claimed = await ctx.agentTeams.remoteUpdateTask(lead, {
+      taskId: task.id,
+      expectedRevision: task.revision,
+      action: 'claim',
+      owner: 'lead',
+    })
+    expect(claimed).toMatchObject({ ok: true })
+
+    const stale = await ctx.agentTeams.remoteUpdateTask(lead, {
+      taskId: task.id,
+      expectedRevision: 999,
+      action: 'complete',
+    })
+    expect(stale).toMatchObject({ ok: false, error: { code: 'team-task-conflict' } })
+
+    const rejected = await ctx.agentTeams.remoteUpdateTask(lead, {
+      taskId: TeamTaskId('missing'),
+      expectedRevision: 1,
+      action: 'delete',
+    })
+    expect(rejected).toMatchObject({ ok: false, error: { code: 'team-rejected' } })
+  })
+
+  it('rejects the Remote call when a task mutation fails unexpectedly', async () => {
+    const { ctx, lead } = await setup([])
+    const tasks = (ctx.agentTeams as unknown as {
+      tasks: { update: () => Promise<never> }
+    }).tasks
+    tasks.update = () => Promise.reject(new TypeError('unexpected task failure'))
+    await expect(ctx.agentTeams.remoteUpdateTask(lead, {
+      taskId: TeamTaskId('task-1'),
+      expectedRevision: 1,
+      action: 'claim',
+      owner: 'lead',
+    })).rejects.toThrow('unexpected task failure')
+  })
+
+  it('resolves waitForChange on the next Team activity', async () => {
+    const { ctx, lead } = await setup([])
+    const waiting = ctx.agentTeams.waitForChange(lead, 60_000, new AbortController().signal)
+    await ctx.agentTeams.createTask(lead, { subject: 'wakes the waiter', description: 'd' })
+    await expect(waiting).resolves.toEqual({ timedOut: false })
+  })
+})

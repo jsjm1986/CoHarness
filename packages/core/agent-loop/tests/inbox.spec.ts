@@ -76,6 +76,24 @@ async function reconstructPersistedInbox(
 }
 
 describe('ReactLoopInbox', () => {
+  it('rejects non-positive or non-integer admission limits at construction', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(SessionProjectionRegistry)
+    const session = ctx.sessions.create(SessionId('inbox-limits'))
+    const agent = stubAgent('inbox-limits', { ctx, session })
+    const dispatch = agentEvents(ctx, agent)
+    const build = (limits: { maxMessages?: number; maxBytes?: number }): ReactLoopInbox =>
+      new ReactLoopInbox(ctx.sessionProjections, session, dispatch, limits)
+
+    for (const limits of [
+      { maxMessages: 0 }, { maxMessages: -1 }, { maxMessages: 1.5 }, { maxMessages: Number.NaN },
+      { maxBytes: 0 }, { maxBytes: -2 }, { maxBytes: 0.5 },
+    ]) {
+      expect(() => build(limits)).toThrow('must be a positive safe integer')
+    }
+  })
+
   it('registers the durable projection in its constructor', async () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)

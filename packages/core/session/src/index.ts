@@ -295,11 +295,10 @@ function assertCurrentLlmShape(event: Record<string, unknown>, index: number): v
     ? data as Record<string, unknown>
     : undefined
   if (event['type'] === 'request/header') {
-    const header = record?.['header']
-    const headerRecord = typeof header === 'object' && header !== null && !Array.isArray(header)
-      ? header as Record<string, unknown>
-      : undefined
-    const config = headerRecord?.['config']
+    // validateSessionEventData has already proven `data.header` is a record
+    // for this type, so the header reaches here only as an object.
+    const headerRecord = record?.['header'] as Record<string, unknown>
+    const config = headerRecord['config']
     if (!hasProviderModel(config)) throw new Error(`seed request/header at index ${index} lacks provider/model`)
     const configRecord = config as Record<string, unknown>
     const reasoningEffort = configRecord['reasoningEffort']
@@ -307,7 +306,7 @@ function assertCurrentLlmShape(event: Record<string, unknown>, index: number): v
       && (typeof reasoningEffort !== 'string' || reasoningEffort.length === 0)) {
       throw new Error(`seed request/header at index ${index} has an invalid reasoningEffort`)
     }
-    assertAdapterDefaults(headerRecord?.['adapterDefaults'], configRecord, index)
+    assertAdapterDefaults(headerRecord['adapterDefaults'], configRecord, index)
   }
   const type = event['type']
   if (type !== 'system/message' && type !== 'user/message' && type !== 'assistant/message'

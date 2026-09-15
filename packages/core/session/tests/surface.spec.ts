@@ -142,6 +142,50 @@ describe('foldSurface source-event references', () => {
     expect(() => foldSurface([event])).toThrow(/cannot carry sourceEventSeqs/)
   })
 
+  it.each([
+    ['a non-system rewrite', 'user/message', 1],
+    ['a system rewrite spanning more than the head node', 'system/message', 2],
+  ] as const)('protects the system prompt at node 0 from %s', (_name, type, coverage) => {
+    const systemHead = {
+      type: 'system/message',
+      seq: SessionSeq(0),
+      time: 0,
+      data: {
+        turn: 1,
+        step: 1,
+        message: createMessage({
+          role: 'system',
+          content: [{ type: 'text', text: 'prompt' }],
+          source: { kind: 'plugin', plugin: 'test' },
+        }),
+      },
+      surfaceOp: 'append',
+    } as unknown as SessionEvent
+    const filler = { ...provenanceEvent(SessionSeq(1), undefined) }
+    const events: SessionEvent[] = [systemHead, filler]
+    const shadowed = coverage === 1 ? [0] : [0, 1]
+    const rewrite = {
+      type,
+      seq: SessionSeq(2),
+      time: 2,
+      data: type === 'system/message'
+        ? {
+          turn: 1,
+          step: 2,
+          message: createMessage({
+            role: 'system',
+            content: [{ type: 'text', text: 'rewritten' }],
+            source: { kind: 'plugin', plugin: 'test' },
+          }),
+        }
+        : createUserMessage({ content: [{ type: 'text', text: 'x' }], source: { kind: 'user' } }),
+      surfaceOp: { op: 'replace', startSeq: SessionSeq(0), endSeq: SessionSeq(coverage - 1) },
+      sourceEventSeqs: sourceSeqs(...shadowed),
+    } as unknown as SessionEvent
+    expect(() => foldSurface([...events, rewrite]))
+      .toThrow(/node 0 holds the system prompt/)
+  })
+
   it('accepts an explicit empty source-event list on an assistant message', () => {
     const event = {
       type: 'assistant/message',

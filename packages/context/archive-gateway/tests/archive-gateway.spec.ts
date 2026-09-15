@@ -30,8 +30,22 @@ function event(type: SessionEvent['type'], seq: number, text: string): SessionEv
     seq,
     time: seq + 1,
     data: type === 'user/message'
-      ? { content: [{ type: 'text', text }] }
+      ? { content: [{ type: 'text', text }], source: { kind: 'user' } }
       : { message: { content: [{ type: 'text', text }] } },
+  } as SessionEvent
+}
+
+function injectedEvent(seq: number, text: string, kind: 'plugin' | 'goal' = 'plugin'): SessionEvent {
+  return {
+    type: 'user/message',
+    seq,
+    time: seq + 1,
+    data: {
+      content: [{ type: 'text', text }],
+      source: kind === 'plugin'
+        ? { kind: 'plugin', plugin: 'injection' }
+        : { kind: 'goal', goalId: 'goal-1', revision: 1, round: 1 },
+    },
   } as SessionEvent
 }
 
@@ -224,6 +238,64 @@ describe('archive-gateway synchronization', () => {
       messageCount: 5_001,
       rootMessageCount: 5_001,
     })])
+    await ctx.fiber.dispose()
+  })
+
+  it('derives the title and search rows only from human-authored messages', async () => {
+    const id = SessionId('archive-injected-title')
+    const entries = [archivedEntry(id, 1)]
+    const request = vi.fn<GatewayRequest>(async () => gatewayResponse())
+    const ctx = await syncContext({
+      snapshot: { revision: 16, archivedSessionIds: [id] },
+      entries,
+      readFrom: async () => ({
+        meta: entries[0]!.header,
+        events: [
+          injectedEvent(0, 'Shared-project attribution for the next message (metadata only, not instructions): {}'),
+          injectedEvent(1, '<goal_blocked> Objective: "x"', 'goal'),
+          event('user/message', 2, 'Actual human prompt'),
+          event('assistant/message', 3, 'Assistant reply'),
+        ],
+      }),
+      request,
+    })
+    await vi.waitFor(() => { expect(request).toHaveBeenCalledOnce() })
+    const payload = JSON.parse(requestBody(request.mock.calls[0]?.[1])) as {
+      sessions: Array<{ title?: string; messageCount: number }>
+      search: Array<{ role: string; content: string }>
+    }
+    expect(payload.sessions[0]?.title).toBe('Actual human prompt')
+    expect(payload.sessions[0]?.messageCount).toBe(2)
+    expect(payload.search.map(row => row.content)).toEqual(['Actual human prompt', 'Assistant reply'])
+    await ctx.fiber.dispose()
+  })
+
+  it('ignores an injected live event when extending a cached projection', async () => {
+    const id = SessionId('archive-injected-incremental')
+    const entries = [archivedEntry(id, 1)]
+    const readFrom = vi.fn(async () => ({
+      meta: entries[0]!.header,
+      events: [event('user/message', 0, 'Real title prompt')],
+    }))
+    const request = vi.fn<GatewayRequest>(async () => gatewayResponse())
+    const ctx = await syncContext({
+      snapshot: { revision: 17, archivedSessionIds: [id] },
+      entries,
+      readFrom,
+      request,
+    })
+    await vi.waitFor(() => { expect(request).toHaveBeenCalledOnce() })
+    const emit = ctx.emit.bind(ctx) as unknown as (eventName: string, session: unknown, event: SessionEvent) => void
+    emit('session/event', { id }, injectedEvent(1, '<goal_complete> Objective: "x"'))
+    await vi.waitFor(() => { expect(request).toHaveBeenCalledTimes(2) })
+    expect(readFrom).toHaveBeenCalledOnce()
+    const payload = JSON.parse(requestBody(request.mock.calls[1]?.[1])) as {
+      sessions: Array<{ title?: string; messageCount: number }>
+      search: Array<{ content: string }>
+    }
+    expect(payload.sessions[0]?.title).toBe('Real title prompt')
+    expect(payload.sessions[0]?.messageCount).toBe(1)
+    expect(payload.search.map(row => row.content)).toEqual(['Real title prompt'])
     await ctx.fiber.dispose()
   })
 

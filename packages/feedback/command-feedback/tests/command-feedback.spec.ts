@@ -106,6 +106,19 @@ function feedbackTexts(session: Session): (string | undefined)[] {
   return feedbackRecords(session).map(record => record.text)
 }
 
+describe('sessionFeedback Remote', () => {
+  it('records on a live session and reports session-not-found', async () => {
+    const test = await harness()
+    const remote = test.ctx.get('sessionFeedback') as commandFeedback.SessionFeedbackService
+    await expect(remote.record({ sessionId: test.session.id, text: ' remote remark ', category: 'other' }))
+      .resolves.toEqual({ ok: true, value: { recorded: true } })
+    expect(feedbackRecords(test.session)).toEqual([{ text: 'remote remark', category: 'other' }])
+    const missing = SessionId('command-feedback-missing')
+    await expect(remote.record({ sessionId: missing, text: 'x' }))
+      .resolves.toEqual({ ok: false, error: { code: 'session-not-found', sessionId: missing } })
+  })
+})
+
 describe('@deepseek-ai/dsh-command-feedback registration', () => {
   it('registers one global command with Loader-safe exports and disposes it', async () => {
     const test = await harness()

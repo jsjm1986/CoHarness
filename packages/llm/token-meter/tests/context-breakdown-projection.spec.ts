@@ -315,6 +315,53 @@ describe('contextBreakdown session projection', () => {
       ))
   })
 
+  it('treats a citation-less replace as covering nothing and reseats a rewritten system node', () => {
+    const definition = contextBreakdownProjectionDefinition
+    const systemAppend = (seq: SessionSeq, text: string): SessionEvent => ({
+      type: 'system/message',
+      seq,
+      time: 0,
+      data: { turn: 1, step: 1, message: systemMessage(text) },
+      surfaceOp: 'append',
+    } as unknown as SessionEvent)
+    let state = definition.init()
+    state = definition.apply(state, systemAppend(SessionSeq(1), 'first prompt'))
+    state = definition.apply(state, systemAppend(SessionSeq(2), 'second prompt, longer'))
+    const before = definition.wire.view(state)
+
+    // A committed replace always cites its shadowed nodes, but the citation
+    // field is optional on the wire: an uncited replace covers nothing, so a
+    // live system entry survives it untouched.
+    const uncited = {
+      type: 'user/message',
+      seq: SessionSeq(3),
+      time: 0,
+      data: createUserMessage({ content: [{ type: 'text', text: 'x' }], source: { kind: 'user' } }),
+      surfaceOp: { op: 'replace', startSeq: SessionSeq(1), endSeq: SessionSeq(1) },
+    } as unknown as SessionEvent
+    expect(definition.wire.view(definition.apply(state, uncited)).systemTokens).toBe(before.systemTokens)
+
+    // A system write that retires an in-history node is reseated where the
+    // oldest covered entry stood, keeping the live list in surface order: the
+    // rewrite of the head stays ahead of the surviving tail.
+    const rewrite = {
+      type: 'system/message',
+      seq: SessionSeq(3),
+      time: 0,
+      data: { turn: 1, step: 2, message: systemMessage('rewritten head prompt') },
+      surfaceOp: { op: 'replace', startSeq: SessionSeq(1), endSeq: SessionSeq(1) },
+      sourceEventSeqs: [SessionSeq(1)],
+    } as unknown as SessionEvent
+    state = definition.apply(state, rewrite)
+    const systems = (state.systems as readonly { seq: number; tokens: number }[]).map(entry => entry.seq)
+    expect(systems).toEqual([3, 2])
+    expect(definition.wire.view(state)).toEqual({
+      systemTokens: estimateSystemMessage(systemMessage('second prompt, longer')),
+      toolsTokens: 0,
+      messageTokens: estimateSystemMessage(systemMessage('rewritten head prompt')),
+    })
+  })
+
   it('keeps the persisted checkpoint O(1) as the surface grows and compacts', async () => {
     const { ctx, session } = await harness()
     const first = appendUser(session, 'the first of many messages')
@@ -397,6 +444,14 @@ describe('shared estimator', () => {
     })
     expect(estimateSystemMessage(empty)).toBe(0)
     expect(estimateSystemMessage(systemMessage('abcdefgh'))).toBe(6)
+    // A non-text block in a system message prices by its serialized length.
+    const structured = createMessage({
+      role: 'system',
+      content: [{ type: 'tool-call', id: 'c' as never, name: 'bash', arguments: '{}' }],
+      source: { kind: 'plugin', plugin: 'test' },
+    })
+    expect(estimateSystemMessage(structured))
+      .toBe(Math.ceil(JSON.stringify(structured.content[0]).length / 4) + 4)
     expect(estimateToolsTokens(undefined)).toBe(0)
     expect(estimateToolsTokens({ config: CONFIG, tools: [] })).toBe(0)
     expect(estimateToolsTokens({ config: CONFIG, tools: TOOLS }))

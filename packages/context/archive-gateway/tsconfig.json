@@ -12,6 +12,7 @@
     { "path": "../../runtime-diagnostics/invariants" },
     { "path": "../../core/session" },
     { "path": "../../session/session-persistence" },
+    { "path": "../../session/session-title" },
     { "path": "../../workspace/workspace" }
   ]
 }

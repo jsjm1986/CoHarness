@@ -1003,6 +1003,36 @@ describe('PersistenceCoordinator session preparations', () => {
     }
   })
 
+  it('claims an ownerless legacy load through the migrated prefix view', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const backend = new ControlledBackend()
+    const id = SessionId('legacy-claim')
+    // Without a migrateStored hook the committed v0 body stays in place and the
+    // coordinator migrates only its in-memory view — including the ownerless
+    // claim's seed-vs-stored comparison.
+    backend.store.set(id, {
+      meta: { ...meta(id), version: 0 },
+      events: oneTurnLog(),
+    })
+    let coordinator!: PersistenceCoordinator<never>
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      coordinator = new PersistenceCoordinator(inner, backend)
+    }, { inject: ['sessions'] }))
+    try {
+      const loaded = await coordinator.load(id)
+      expect(loaded.meta.version).toBe(3)
+      expect(backend.store.get(id)?.meta.version).toBe(0)
+
+      const resumed = ctx.sessions.create(id, { seed: loaded.events, meta: loaded.meta })
+      await expect(ctx.sessions.flush(resumed)).resolves.toBe(true)
+      expect(backend.store.get(id)?.meta.version).toBe(0)
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('preserves a current-format error turn ending through legacy normalization', async () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)

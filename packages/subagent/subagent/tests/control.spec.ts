@@ -376,8 +376,11 @@ describe('subagent prompt Remote', () => {
     const cases: readonly [string, string][] = [
       ['NOT_RESUMABLE', 'subagent/not-resumable'],
       ['UNAUTHORIZED', 'subagent/unauthorized'],
+      ['PARENT_UNAVAILABLE', 'subagent/delivery-unavailable'],
       ['DRAINING', 'subagent/delivery-unavailable'],
       ['ACTIVATION_CLOSING', 'subagent/delivery-unavailable'],
+      ['CONTINUATION_UNAVAILABLE', 'subagent/delivery-unavailable'],
+      ['PERSISTENCE_UNAVAILABLE', 'subagent/delivery-unavailable'],
       ['NO_PROVIDER', 'gateway/internal'],
     ]
     for (const [thrown, code] of cases) {

@@ -2,9 +2,9 @@
 
 English | [中文](README.zh.md)
 
-Log-backed session titles with an immediate deterministic fallback and one optional asynchronous provider. Every accepted revision is a log-only `session/title` event; `foldSessionTitle()` and `ctx.sessionTitle.get()` select the latest event and return its event seq and timestamp.
+Log-backed session titles with an immediate deterministic fallback and one optional asynchronous provider. Every accepted revision is a log-only `session/title` event; `foldSessionTitle()` and `ctx.sessionTitle.get()` select the latest valid event and return its event seq and timestamp. A `session/title` minted from injected context — envelope-prefixed text, or `messageSeqs` citing a non-human `user/message` — is legacy corruption: the fold skips it and replay yields the prior valid revision.
 
-Only text blocks from human `user/message` events are eligible. The first eligible prompt schedules a fallback from its first words within the configured UTF-8 byte limit. Whitespace is normalized, terminal control sequences are removed, and truncation never splits a code point. Empty and non-text prompts wait for later eligible input.
+Only text blocks from human `user/message` events are eligible, and a text opening with a known injection envelope — runtime-context snapshots, shared-project attribution notices, goal wrap-ups, model-change notices — is excluded even when a legacy build logged the injection under the `user` source. The first eligible prompt schedules a fallback from its first words within the configured UTF-8 byte limit. Whitespace is normalized, terminal control sequences are removed, and truncation never splits a code point. Empty and non-text prompts wait for later eligible input. A session announced with an existing log receives one up-front fallback pass, so a restored session whose durable title is absent or skipped gains the title a fresh session would mint.
 
 ## Service: `SessionTitleService` (ctx key: `sessionTitle`)
 

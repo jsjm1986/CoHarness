@@ -27,6 +27,8 @@ const LOCKS = vi.hoisted(() => '.locks')
 const refuse = vi.hoisted(() => ({
   /** Next open of a lock file fails EACCES (read-only directory). */
   lockOpen: false,
+  /** Next readFile of a lock file fails EACCES (unreadable record). */
+  lockRead: false,
   /** Next flock call fails EACCES (a non-contention kernel refusal). */
   flock: false,
   /** Next flock call fails EWOULDBLOCK. */
@@ -72,6 +74,13 @@ vi.mock('node:fs/promises', async (importOriginal) => {
       }
       return (actual.stat as (path: unknown, ...args: never[]) => Promise<unknown>)(path, ...rest)
     }) as typeof actual.stat,
+    readFile: (async (path: unknown, ...rest: never[]) => {
+      if (refuse.lockRead && isLock(path)) {
+        refuse.lockRead = false
+        denied('readFile')
+      }
+      return (actual.readFile as (path: unknown, ...args: never[]) => Promise<unknown>)(path, ...rest)
+    }) as typeof actual.readFile,
   }
 })
 
@@ -97,6 +106,7 @@ const contexts: Context[] = []
 
 afterEach(async () => {
   refuse.lockOpen = false
+  refuse.lockRead = false
   refuse.flock = false
   refuse.flockBusy = false
   refuse.lockStat = false
@@ -212,6 +222,40 @@ describe('SessionWriteLease', () => {
 
     await expect(SessionWriteLease.acquire(locksDir(root), id, `${encodeSegment(id)}.lock`))
       .rejects.toBeInstanceOf(SessionAlreadyOwnedError)
+  })
+
+  it('takes over a legacy lock file whose pid record is not a live pid', async () => {
+    const root = await freshRoot()
+    const id = SessionId('lease-legacy-invalid-pid')
+    const path = lockPath(root, 'lease-legacy-invalid-pid')
+    const { mkdir } = await import('node:fs/promises')
+    await mkdir(locksDir(root), { recursive: true })
+    await writeFile(path, JSON.stringify({ pid: -1 }))
+
+    const held = await SessionWriteLease.acquire(locksDir(root), id, `${encodeSegment(id)}.lock`)
+    await held.release()
+  })
+
+  it('treats an unreadable pid record as residue and locks through it', async () => {
+    const root = await freshRoot()
+    const id = SessionId('lease-unreadable-record')
+    const path = lockPath(root, 'lease-unreadable-record')
+    const { mkdir } = await import('node:fs/promises')
+    await mkdir(locksDir(root), { recursive: true })
+    await writeFile(path, JSON.stringify({ pid: process.pid }))
+    refuse.lockRead = true
+
+    const held = await SessionWriteLease.acquire(locksDir(root), id, `${encodeSegment(id)}.lock`)
+    await held.release()
+  })
+
+  it('propagates a non-ENOENT verification stat refusal', async () => {
+    const root = await freshRoot()
+    const id = SessionId('lease-stat-eacces')
+    refuse.lockStat = true
+
+    await expect(SessionWriteLease.acquire(locksDir(root), id, `${encodeSegment(id)}.lock`))
+      .rejects.toMatchObject({ code: 'EACCES' })
   })
 
   it('locks a residue file that carries no readable record', async () => {

@@ -314,12 +314,14 @@ export class TokenMeter extends Service {
     const assembler = new BlockAssembler()
     const seen = new Set<SessionSeqType>()
     for (const seq of sourceSeqs) {
+      /* v8 ignore start -- provenance validation already guarantees earlier, unique cited seqs */
       if (seq >= event.seq) {
         throw new Error(`token meter: assistant/message at seq ${event.seq} source seq ${seq} is not earlier`)
       }
       if (seen.has(seq)) {
         throw new Error(`token meter: assistant/message at seq ${event.seq} repeats source seq ${seq}`)
       }
+      /* v8 ignore stop */
       seen.add(seq)
       // Session construction validates contiguous seqs, and the explicit
       // earlier-than-assistant check above therefore guarantees existence.

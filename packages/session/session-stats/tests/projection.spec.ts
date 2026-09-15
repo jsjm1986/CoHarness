@@ -152,6 +152,40 @@ describe('sessionStats projection unit (registry drive)', () => {
     expect(settled).toMatchObject({ llmMs: 30, ttftMs: 5, ttftSteps: 1, decodeMs: 25, decodeTokens: 2 })
   })
 
+  it('ignores attempts outside the open step, without a token record, and after a chunk marker', () => {
+    const init = sessionStatsProjectionDefinition.init()
+    const attempt = (turn: number, step: number, stream: unknown[]): SessionEvent => ({
+      seq: 0 as SessionEvent['seq'],
+      time: 0,
+      type: 'assistant/attempt',
+      data: { turn, step, stream },
+    } as unknown as SessionEvent)
+    const started = sessionStatsProjectionDefinition.apply(
+      init,
+      { seq: 0 as SessionEvent['seq'], time: 10, type: 'step/start', data: { turn: 1, step: 1 } },
+    )
+    // No open step at all, a mismatched step key, and a stream with no token
+    // record each leave the fold untouched.
+    expect(sessionStatsProjectionDefinition.apply(init, attempt(1, 1, []))).toBe(init)
+    expect(sessionStatsProjectionDefinition.apply(started, attempt(2, 9, []))).toBe(started)
+    const tokenless = sessionStatsProjectionDefinition.apply(started, attempt(1, 1, [
+      { type: 'chunk', time: 12, chunk: { type: 'finish', reason: { kind: 'stop' } } },
+    ]))
+    expect(tokenless).toBe(started)
+    // A text chunk already pinned the first-token boundary; a later attempt's
+    // earlier-looking marker must not move it.
+    const marked = sessionStatsProjectionDefinition.apply(started, {
+      seq: 1 as SessionEvent['seq'],
+      time: 20,
+      type: 'assistant/chunk',
+      data: { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'x' } },
+    })
+    const late = sessionStatsProjectionDefinition.apply(marked, attempt(1, 1, [
+      { type: 'chunk', time: 11, chunk: { type: 'text-delta', index: 0, text: 'earlier' } },
+    ]))
+    expect(late.openStep?.firstTokenTime).toBe(20)
+  })
+
   it('folds steps already in the log when the plugin mounts late (lazy cell build)', async () => {
     const { ctx, session } = await harness(false)
     session.append('turn/start', { turn: 1 })

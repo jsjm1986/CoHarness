@@ -131,13 +131,12 @@ export const tokenUsageProjectionDefinition = {
         ? { ...state, last: null }
         : state
     }
-    let turn: number
-    let step: number
+    if (event.type !== 'assistant/chunk' && event.type !== 'assistant/message' && event.type !== 'assistant/attempt') {
+      return state
+    }
+    const { turn, step } = event.data
     const usage = usageOf(event)
     if (usage === undefined) return state
-    if (event.type === 'assistant/chunk' || event.type === 'assistant/message' || event.type === 'assistant/attempt') {
-      ;({ turn, step } = event.data)
-    } else return state
 
     const buckets = bucketsFrom(usage)
     const previous = state.last !== null

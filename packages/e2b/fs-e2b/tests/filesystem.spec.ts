@@ -473,6 +473,52 @@ describe('E2BFileSystem identity, metadata, and reads', () => {
     await expectCode(fs.streamText(raced), 'FS_NOT_FOUND')
   })
 
+  it('rejects a pinned stream on stale versions before open and after drain', async () => {
+    const remote = new FakeRemote()
+    remote.file('/workspace/guarded.txt', 'text')
+    const { fs } = await setup(remote)
+    const target = await fs.resolve('guarded.txt')
+    const version = (await fs.stat(target))!.version
+
+    await expectCode(fs.streamText(target, undefined, FsVersion('stale')), 'FS_STALE_VERSION')
+
+    const realStat = fs.stat.bind(fs)
+    let statCalls = 0
+    const statSpy = vi.spyOn(fs, 'stat').mockImplementation(async (statTarget, signal) => {
+      statCalls += 1
+      const real = await realStat(statTarget, signal)
+      return statCalls === 1 || real === undefined ? real : { ...real, version: FsVersion('mutated') }
+    })
+    const stream = await fs.streamText(target, undefined, version)
+    const drain = async (): Promise<void> => {
+      for await (const _chunk of stream) { /* Consume the guarded stream. */ }
+    }
+    await expectCode(drain(), 'FS_STALE_VERSION')
+    statSpy.mockRestore()
+  })
+
+  it('skips the post-drain version check when the reader aborted mid-stream', async () => {
+    const remote = new FakeRemote()
+    remote.file('/workspace/pending.txt', 'te')
+    remote.streamKeepOpen = true
+    const { fs } = await setup(remote)
+    const target = await fs.resolve('pending.txt')
+    const version = (await fs.stat(target))!.version
+    const statSpy = vi.spyOn(fs, 'stat')
+    const ac = new AbortController()
+
+    const stream = await fs.streamText(target, ac.signal, version)
+    const drain = async (): Promise<void> => {
+      for await (const _chunk of stream) {
+        ac.abort()
+      }
+    }
+    await expectCode(drain(), 'FS_ABORTED')
+    // The pre-open stat ran once; the post-drain verify was skipped on abort.
+    expect(statSpy).toHaveBeenCalledTimes(1)
+    statSpy.mockRestore()
+  })
+
   it('readBytes returns raw content, enforces the byte cap, and maps failures', async () => {
     const remote = new FakeRemote()
     remote.file('/workspace/img.bin', [0x89, 0, 0xff, 0x47])
@@ -521,6 +567,73 @@ describe('E2BFileSystem identity, metadata, and reads', () => {
     await expectCode(fs.readByteRange(await fs.resolve('window.bin'), { offset: -1, length: 1 }), 'FS_IO_ERROR')
   })
 
+  it('drains a short stream into a subarray and returns empty windows without reading', async () => {
+    const remote = new FakeRemote()
+    remote.file('/workspace/short.bin', [1, 2, 3, 4])
+    const { fs } = await setup(remote)
+    const target = await fs.resolve('short.bin')
+
+    expect((await fs.readByteRange(target, { offset: 0, length: 0 })).byteLength).toBe(0)
+    expect((await fs.readByteRange(target, { offset: 4, length: 2 })).byteLength).toBe(0)
+    // The stream drains before the window fills: the result shrinks to the bytes seen.
+    expect(Array.from(await fs.readByteRange(target, { offset: 0, length: 100 }))).toEqual([1, 2, 3, 4])
+  })
+
+  it('sizes the window from the request when the remote omits entry size', async () => {
+    const remote = new FakeRemote()
+    remote.file('/workspace/unsized.bin', [1, 2, 3, 4])
+    const { fs } = await setup(remote)
+    const original = remote.sandbox.files.getInfo.bind(remote.sandbox.files)
+    remote.sandbox.files.getInfo = async (path, options) => {
+      const info = await original(path, options)
+      delete (info as { size?: number }).size
+      return info
+    }
+
+    const target = await fs.resolve('unsized.bin')
+    // Without a stat size the window keeps the requested length; a stream that
+    // drains first shrinks the result to the bytes seen.
+    expect(Array.from(await fs.readByteRange(target, { offset: 0, length: 100 }))).toEqual([1, 2, 3, 4])
+  })
+
+  it('rejects guarded byte windows on stale versions before and after the read', async () => {
+    const remote = new FakeRemote()
+    remote.file('/workspace/guarded.bin', [1, 2, 3, 4])
+    const { fs } = await setup(remote)
+    const target = await fs.resolve('guarded.bin')
+    const version = (await fs.stat(target))!.version
+
+    await expectCode(fs.readByteRange(target, { offset: 0, length: 2, expectedVersion: FsVersion('stale') }), 'FS_STALE_VERSION')
+
+    const realStat = fs.stat.bind(fs)
+    let statCalls = 0
+    const statSpy = vi.spyOn(fs, 'stat').mockImplementation(async (statTarget, signal) => {
+      statCalls += 1
+      const real = await realStat(statTarget, signal)
+      return statCalls === 1 || real === undefined ? real : { ...real, version: FsVersion('mutated') }
+    })
+    await expectCode(fs.readByteRange(target, { offset: 0, length: 2, expectedVersion: version }), 'FS_STALE_VERSION')
+    statSpy.mockRestore()
+  })
+
+  it('aborts a pending byte-window read and swallows cancellation cleanup failures', async () => {
+    const remote = new FakeRemote()
+    remote.file('/workspace/pending.bin', [1, 2, 3, 4])
+    // The stream yields one byte of a four-byte file, then stalls open.
+    remote.streamChunks = [bytes([1])]
+    remote.streamKeepOpen = true
+    remote.streamCancel.mockImplementation(() => { throw new Error('remote cancel failed') })
+    const { fs } = await setup(remote)
+    const ac = new AbortController()
+    const pending = fs.readByteRange(await fs.resolve('pending.bin'), { offset: 0, length: 100 }, ac.signal)
+    // Let the read settle into a pending chunk wait before aborting, so the
+    // abort listener — not the pre-read check — owns the rejection.
+    await new Promise(resolve => setImmediate(resolve))
+    ac.abort()
+    await expectCode(pending, 'FS_ABORTED')
+    expect(remote.streamCancel).toHaveBeenCalled()
+  })
+
   it('honors aborts before and during remote reads', async () => {
     const remote = new FakeRemote()
     remote.file('/workspace/a', 'a')
@@ -542,6 +655,20 @@ describe('E2BFileSystem identity, metadata, and reads', () => {
     await expectCode(fs.listDir(await fs.resolve('/workspace/file')), 'FS_NOT_DIRECTORY')
     remote.nextListError = new Error('listing transport failed')
     await expectCode(fs.listDir(await fs.resolve('/workspace')), 'FS_IO_ERROR')
+  })
+
+  it('bounds listings to a validated maxEntries cap', async () => {
+    const remote = new FakeRemote()
+    remote.file('/workspace/a.txt', 'a')
+    remote.file('/workspace/b.txt', 'b')
+    remote.file('/workspace/c.txt', 'c')
+    const { fs } = await setup(remote)
+    const directory = await fs.resolve('.')
+
+    const limited = await fs.listDir(directory, undefined, 2)
+    expect(limited.map(entry => entry.name)).toEqual(['a.txt', 'b.txt'])
+    await expectCode(fs.listDir(directory, undefined, -1), 'FS_IO_ERROR')
+    await expectCode(fs.listDir(directory, undefined, 1.5), 'FS_IO_ERROR')
   })
 })
 

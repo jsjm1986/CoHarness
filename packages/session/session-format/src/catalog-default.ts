@@ -36,6 +36,7 @@ const v0ToV1 = defineSessionFormatMigration({
       ...artifact,
       header: v0ToV1.migrateHeader(artifact.header),
       events: output,
+      /* v8 ignore next -- LegacyNormalizationStage.finish always returns its inherited cut. */
       inheritedEventCount: cut ?? artifact.inheritedEventCount,
     }
   },
@@ -68,6 +69,7 @@ const v1ToV2 = defineSessionFormatMigration({
       ...artifact,
       header: v1ToV2.migrateHeader(artifact.header),
       events: output,
+      /* v8 ignore next -- LegacyNormalizationStage.finish always returns its inherited cut. */
       inheritedEventCount: cut ?? artifact.inheritedEventCount,
     }
   },

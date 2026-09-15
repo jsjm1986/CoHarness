@@ -493,3 +493,80 @@ function rejectWhenAborted<T>(signal: AbortSignal, release: Promise<unknown> = P
     if (signal.aborted) onAbort()
   })
 }
+
+describe('lsp-stdio provider transport retry', () => {
+  interface FakeInstance {
+    dead: boolean
+    dispose(): Promise<void>
+    query(): Promise<LspQueryResult>
+    isTransportFailure(error: unknown): boolean
+  }
+
+  /** Swap the pooled instance for a scripted double under the same workspace key. */
+  function swapInstance(provider: LspProvider | undefined, fake: FakeInstance): void {
+    if (provider === undefined) throw new Error('expected lsp-stdio to register a provider')
+    const instances = (provider as unknown as {
+      readonly instances: Map<string, FakeInstance>
+    }).instances
+    const key = [...instances.keys()][0]
+    if (key === undefined) throw new Error('expected a pooled instance after the first query')
+    instances.set(key, fake)
+  }
+
+  it('retries once on a dead transport and serves from the replacement instance', async () => {
+    let provider: LspProvider | undefined
+    const ctx = await mount({ LSP_FAKE_DEF: JSON.stringify(locationJson(0)) }, {}, (registered) => { provider = registered })
+    expect(await ctx.lsp.query(query('goToDefinition'))).toMatchObject({ kind: 'locations' })
+    swapInstance(provider, {
+      dead: true,
+      dispose: vi.fn(async () => {}),
+      query: vi.fn(async () => { throw new Error('transport gone') }),
+      isTransportFailure: vi.fn(() => true),
+    })
+    // The dead slot evicts, a real server spawns for the retry, and the caller sees one success.
+    expect(await ctx.lsp.query(query('goToDefinition'))).toMatchObject({ kind: 'locations' })
+    await ctx.fiber.dispose()
+  })
+
+  it('propagates a non-transport query failure without retrying', async () => {
+    let provider: LspProvider | undefined
+    const ctx = await mount({ LSP_FAKE_DEF: 'null' }, {}, (registered) => { provider = registered })
+    expect(await ctx.lsp.query(query('goToDefinition'))).toMatchObject({ kind: 'locations' })
+    swapInstance(provider, {
+      dead: false,
+      dispose: vi.fn(async () => {}),
+      query: vi.fn(async () => { throw new Error('not a transport failure') }),
+      isTransportFailure: vi.fn(() => false),
+    })
+    await expect(ctx.lsp.query(query('goToDefinition'))).rejects.toThrow('not a transport failure')
+    await ctx.fiber.dispose()
+  })
+
+  it('aggregates a query failure with a rejected teardown of the dead instance', async () => {
+    let provider: LspProvider | undefined
+    const ctx = await mount({ LSP_FAKE_DEF: 'null' }, {}, (registered) => { provider = registered })
+    expect(await ctx.lsp.query(query('goToDefinition'))).toMatchObject({ kind: 'locations' })
+    swapInstance(provider, {
+      dead: true,
+      dispose: vi.fn(async () => { throw new Error('teardown boom') }),
+      query: vi.fn(async () => { throw new Error('query boom') }),
+      isTransportFailure: vi.fn(() => true),
+    })
+    await expect(ctx.lsp.query(query('goToDefinition'))).rejects.toThrow('LSP operation and teardown failed')
+    await ctx.fiber.dispose()
+  })
+
+  it('propagates a rejected teardown when the dead instance still answered', async () => {
+    let provider: LspProvider | undefined
+    const ctx = await mount({ LSP_FAKE_DEF: 'null' }, {}, (registered) => { provider = registered })
+    expect(await ctx.lsp.query(query('goToDefinition'))).toMatchObject({ kind: 'locations' })
+    swapInstance(provider, {
+      dead: true,
+      dispose: vi.fn(async () => { throw new Error('teardown boom') }),
+      query: vi.fn(async () => ({ kind: 'locations' as const, locations: [], resolvedWorkspaceUri: 'file:///ws' })),
+      isTransportFailure: vi.fn(() => true),
+    })
+    await expect(ctx.lsp.query(query('goToDefinition'))).rejects.toThrow('teardown boom')
+    await ctx.fiber.dispose()
+  })
+})

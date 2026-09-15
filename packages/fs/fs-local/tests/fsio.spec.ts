@@ -25,7 +25,7 @@ import {
 } from '../src/fsio.ts'
 import type { LocalTarget } from '../src/fsio.ts'
 import { copyFileDaclWin32, readFileDaclWin32 } from '../src/win32.ts'
-import { FsError, FsTargetKey } from '@deepseek-ai/dsh-fs'
+import { FsError, FsTargetKey, FsVersion } from '@deepseek-ai/dsh-fs'
 
 let dir: string
 beforeEach(async () => {
@@ -189,6 +189,20 @@ describe('listDirectory', () => {
     expect(typeof entries.find(entry => entry.name === 'alpha.md')?.version).toBe('string')
     expect(entries.find(entry => entry.name === 'broken-link')?.version).toBeUndefined()
     expect(entries.find(entry => entry.name === 'dir-skill')?.size).toBeUndefined()
+  })
+
+  it('bounds enumeration and metadata resolution to maxEntries', async () => {
+    const root = join(dir, 'limited')
+    await mkdir(root)
+    for (const name of ['a', 'b', 'c', 'd']) await writeFile(join(root, name), name)
+
+    const limited = await listDirectory(localTarget(root), undefined, 2)
+    expect(limited).toHaveLength(2)
+    expect(limited.every(entry => ['a', 'b', 'c', 'd'].includes(entry.name))).toBe(true)
+    expect(await listDirectory(localTarget(root), undefined, 0)).toEqual([])
+    expect(await listDirectory(localTarget(root), undefined, 10)).toHaveLength(4)
+    await expect(listDirectory(localTarget(root), undefined, -1)).rejects.toMatchObject({ code: 'FS_IO_ERROR' })
+    await expect(listDirectory(localTarget(root), undefined, 1.5)).rejects.toMatchObject({ code: 'FS_IO_ERROR' })
   })
 
   it('derives child target keys from the listed parent identity', async () => {
@@ -630,6 +644,109 @@ describe('streamWholeText', () => {
       }
     }
     await expect(run()).rejects.toMatchObject({ code: 'FS_ABORTED' })
+  })
+
+  it('streams through the guarded descriptor when a version is pinned', async () => {
+    const file = join(dir, 'guarded.txt')
+    await writeFile(file, 'guarded text')
+    const info = await stat(file, { bigint: true })
+    const version = FsVersion(`${info.dev}:${info.ino}:${info.size}:${info.mtimeNs}:${info.ctimeNs}`)
+
+    expect(await collect(streamWholeText(localTarget(file), new AbortController().signal, version))).toBe('guarded text')
+  })
+
+  it('rejects a descriptor that no longer names a regular file', async () => {
+    const file = join(dir, 'swapped.txt')
+    await writeFile(file, 'data')
+    const version = FsVersion('1:1:1:1:1')
+    vi.resetModules()
+    vi.doMock('node:fs/promises', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('node:fs/promises')>()
+      return {
+        ...actual,
+        async open(...args: Parameters<typeof actual.open>) {
+          const handle = await actual.open(...args)
+          return {
+            close: handle.close.bind(handle),
+            async stat() {
+              return { isFile: () => false }
+            },
+          }
+        },
+      }
+    })
+
+    try {
+      const { streamWholeText: isolatedStream } = await import('../src/fsio.ts')
+      await expect(collect(isolatedStream(localTarget(file), undefined, version))).rejects.toMatchObject({ code: 'FS_NOT_REGULAR_FILE' })
+    } finally {
+      vi.doUnmock('node:fs/promises')
+      vi.resetModules()
+    }
+  })
+})
+
+describe('readByteRange', () => {
+  it('rejects a descriptor that no longer names a regular file', async () => {
+    const file = join(dir, 'swapped.bin')
+    await writeFile(file, 'data')
+    vi.resetModules()
+    vi.doMock('node:fs/promises', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('node:fs/promises')>()
+      return {
+        ...actual,
+        async open(...args: Parameters<typeof actual.open>) {
+          const handle = await actual.open(...args)
+          return {
+            close: handle.close.bind(handle),
+            async stat() {
+              return { isFile: () => false }
+            },
+          }
+        },
+      }
+    })
+
+    try {
+      const { readByteRange: isolatedRead } = await import('../src/fsio.ts')
+      await expect(isolatedRead(localTarget(file), { offset: 0, length: 4 }))
+        .rejects.toMatchObject({ code: 'FS_NOT_REGULAR_FILE' })
+    } finally {
+      vi.doUnmock('node:fs/promises')
+      vi.resetModules()
+    }
+  })
+
+  it('stops the chunked read at an early end of file', async () => {
+    const file = join(dir, 'shrinking.bin')
+    await writeFile(file, 'data')
+    vi.resetModules()
+    vi.doMock('node:fs/promises', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('node:fs/promises')>()
+      return {
+        ...actual,
+        async open(...args: Parameters<typeof actual.open>) {
+          const handle = await actual.open(...args)
+          return {
+            close: handle.close.bind(handle),
+            read: handle.read.bind(handle),
+            // Report a size past the real end so the read loop reaches EOF.
+            async stat() {
+              return { isFile: () => true, size: 100n, dev: 1n, ino: 1n, mtimeNs: 1n, ctimeNs: 1n }
+            },
+          }
+        },
+      }
+    })
+
+    try {
+      const { readByteRange: isolatedRead } = await import('../src/fsio.ts')
+      const bytes = await isolatedRead(localTarget(file), { offset: 0, length: 8 })
+      expect(Buffer.from(bytes).toString()).toBe('data')
+    } finally {
+      vi.doUnmock('node:fs/promises')
+      vi.resetModules()
+    }
   })
 })
 
