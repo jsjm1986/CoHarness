@@ -1248,6 +1248,8 @@ def normalize_snapshot_value(
     }
     if normalized.get("type") == "session" and "createdAt" in normalized:
         normalized["createdAt"] = 0
+    if "childCreatedAt" in normalized:
+        normalized["childCreatedAt"] = 0
     if "seq" in normalized and "time" in normalized:
         normalized["time"] = 0
     if isinstance(normalized.get("id"), str) and normalized.get("role") in ("system", "assistant", "user"):
