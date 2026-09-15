@@ -159,6 +159,11 @@ function eventPromptTime(event: ConversationEvent): number | undefined {
 }
 
 function serialized(value: unknown): string {
+  // Event strings may legitimately contain U+0000 (instruction scope-key
+  // separators). JSON.stringify emits them as \u0000 escapes, which json
+  // columns preserve verbatim and decode back to the real character; jsonb
+  // columns reject the escape outright, so event payloads must only ever be
+  // written to json columns.
   const encoded = JSON.stringify(value)
   if (encoded === undefined) throw new TypeError('conversation value is not JSON serializable')
   return encoded
@@ -166,7 +171,8 @@ function serialized(value: unknown): string {
 
 function eventText(event: ConversationEvent): { role: 'user' | 'assistant' | 'tool'; content: string } | undefined {
   if (event.type === 'user/message') {
-    const data = event.data as { content?: unknown }
+    const data = event.data as { content?: unknown; source?: { kind?: unknown } }
+    if (data.source?.kind !== 'user') return undefined
     return { role: 'user', content: messageText(data) }
   }
   if (event.type === 'assistant/message') {

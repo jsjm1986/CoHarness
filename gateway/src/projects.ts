@@ -47,8 +47,8 @@ export interface ProjectRow {
   name: string
   path: string
   memberCount: number
-  /** Source metadata is optional for legacy in-process callers; PostgreSQL always supplies it. */
-  origin?: ProjectOrigin
+  /** Whether an administrator imported the directory or the owner created it. */
+  origin: ProjectOrigin
   /** Whether project model authorization follows the organization catalog by default. */
   modelAccessDefaultAllowed?: boolean
   owner?: ProjectActor | null

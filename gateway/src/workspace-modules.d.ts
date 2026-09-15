@@ -3,8 +3,9 @@
 // relaxed tsconfig, and the Typert protocol package keeps a likewise distinct
 // checking face. The `paths` map in tsconfig.json covers the workspace sources
 // that do compile; only the merge targets needed by their module augmentations
-// are declared here. Production builds resolve the real packages through
-// node_modules links and their emitted declarations.
+// are declared here. tsconfig.build.json excludes this file, so production
+// builds resolve the real packages through node_modules links and their
+// emitted declarations.
 declare module '@deepseek-ai/cordis' {
   export interface Events {}
 }

@@ -36,6 +36,27 @@ describe('ConversationArchiveService', () => {
     expect((query.mock.calls[0] as unknown as [string, unknown[]])[1]).toEqual(['org-1', '%Archive%', 10, 0])
   })
 
+  it('sanitizes stored titles and skips injected search rows in list projections', async () => {
+    const query = vi.fn(async () => ({ rows: [archiveRow], rowCount: 1 }))
+    const service = new ConversationArchiveService({ ...context, pool: { query } as unknown as Pool })
+    await service.adminList({ limit: 10 })
+    const text = (query.mock.calls[0] as unknown as [string])[0]
+    expect(text).toContain('harness.human_session_title(COALESCE(a.title,r.title))')
+    expect(text).toContain(`cs.role='user' AND harness.human_session_title(cs.content) IS NOT NULL`)
+    expect(text).toContain(`cas.role='user' AND harness.human_session_title(cas.content) IS NOT NULL`)
+  })
+
+  it('sanitizes descendant titles in the detail projection', async () => {
+    const query = vi.fn()
+      .mockResolvedValueOnce({ rows: [archiveRow], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+    const service = new ConversationArchiveService({ ...context, pool: { query } as unknown as Pool })
+    await service.detail('session-1')
+    const text = (query.mock.calls[1] as unknown as [string])[0]
+    expect(text).toContain('harness.human_session_title(title) title')
+  })
+
   it('returns a root detail with descendants and a bounded event page', async () => {
     const query = vi.fn()
       .mockResolvedValueOnce({ rows: [archiveRow], rowCount: 1 })

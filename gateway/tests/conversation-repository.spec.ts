@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   ConversationPageTooLargeError,
   ConversationRepository,
+  conversationHistoryIndexFromEvents,
   encodePageCursor,
 } from '../src/postgres/conversation-repository.ts'
 
@@ -293,5 +294,61 @@ describe('ConversationRepository history index', () => {
     expect(result?.items[1]?.prompt).toBeUndefined()
     expect(result?.totalTurns).toBe(3)
     expect(result?.truncated).toBe(true)
+  })
+
+  it('previews only human-authored prompts from the folded event range', () => {
+    const events = [
+      { type: 'turn/start', seq: 0, time: 1000, data: { turn: 1 } },
+      {
+        type: 'user/message', seq: 1, time: 1001,
+        data: {
+          turn: 1,
+          content: [{ type: 'text', text: 'Shared-project attribution for the next message (metadata only, not instructions): {}' }],
+          source: { kind: 'plugin', plugin: 'collaboration-context' },
+        },
+      },
+      {
+        type: 'user/message', seq: 2, time: 1002,
+        data: { turn: 1, content: [{ type: 'text', text: 'Real question' }], source: { kind: 'user' } },
+      },
+      {
+        type: 'assistant/message', seq: 3, time: 1003,
+        data: { turn: 1, message: { content: [{ type: 'text', text: 'Real answer' }] } },
+      },
+    ]
+    const index = conversationHistoryIndexFromEvents(events as never, '1:4')
+    expect(index.items).toEqual([{ turn: 1, startSeq: 0, endSeq: 2, prompt: 'Real question', response: 'Real answer' }])
+  })
+})
+
+describe('ConversationRepository append', () => {
+  it('persists U+0000 in event payloads as the standard JSON escape', async () => {
+    const inserts: unknown[][] = []
+    const client = {
+      query: vi.fn(async (text: string, values?: unknown[]) => {
+        if (text.startsWith('INSERT INTO harness.conversation_events')) inserts.push(values ?? [])
+        if (text.includes('FROM harness.conversation_sessions c')) {
+          return { rows: [{ organization_id: 'organization-1', root_session_id: 'session-1' }], rowCount: 1 }
+        }
+        if (text.startsWith('SELECT id FROM harness.conversation_sessions')) {
+          return { rows: [{ id: 'session-1' }], rowCount: 1 }
+        }
+        if (text.startsWith('SELECT id,organization_id')) return { rows: [{ ...headerRow, next_seq: '1' }], rowCount: 1 }
+        return { rows: [], rowCount: 0 }
+      }),
+      release: vi.fn(),
+    } as unknown as PoolClient
+    const pool = { connect: vi.fn(async () => client) } as unknown as Pool
+
+    const event = { type: 'turn/start', seq: 1, time: 1000, data: { scope: '.\u0000AGENTS.md' } }
+    await expect(new ConversationRepository(pool).append('session-1', 'batch-1', [event] as never))
+      .resolves.toBe('inserted')
+    const json = inserts[0]?.[4]
+    expect(typeof json).toBe('string')
+    // The json column stores the \u0000 escape verbatim and decodes it back
+    // to the real character on read; jsonb would reject the escape instead.
+    expect(json as string).toContain('\\u0000')
+    const stored = JSON.parse(json as string) as { data: { scope: string } }
+    expect(stored.data.scope).toBe('.\u0000AGENTS.md')
   })
 })

@@ -271,8 +271,10 @@ export class PostgresCollaborationService {
       last_prompt_at_ms: string | null
       can_write: boolean
     }>(`SELECT r.id session_id,p.public_id::text project_public_id,p.name::text project_name,
-      COALESCE(r.title, (SELECT left(search.content, 80) FROM harness.conversation_search search
-        WHERE search.session_id=r.id AND search.role='user' ORDER BY search.occurred_at DESC LIMIT 1)) title,
+      COALESCE(harness.human_session_title(r.title), (SELECT left(search.content, 80) FROM harness.conversation_search search
+        WHERE search.session_id=r.id AND search.role='user'
+          AND harness.human_session_title(search.content) IS NOT NULL
+        ORDER BY search.occurred_at,search.event_seq LIMIT 1)) title,
       r.cwd,r.visibility,creator.public_id::text creator_public_id,
       creator.display_name creator_display_name,
       (extract(epoch FROM r.updated_at)*1000)::bigint::text updated_at_ms,

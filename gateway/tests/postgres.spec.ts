@@ -1798,7 +1798,7 @@ describePg('PostgreSQL baseline', () => {
         migrated: true,
         values: {
           'ui-theme': { preference: 'dark' },
-          'ui-conversation': { busyEnter: 'steer', chatContentWidth: 748, chatFontSize: 14 },
+          'ui-conversation': { busyEnter: 'steer', chatContentWidth: 748, chatFullWidth: false, chatFontSize: 14 },
         },
       })
       const changedPreferences = await accountPreferences.mutate(member, {
@@ -1813,6 +1813,14 @@ describePg('PostgreSQL baseline', () => {
       expect(changedDisplay).toMatchObject({
         revision: 3,
         values: { 'ui-conversation': { chatContentWidth: 920, chatFontSize: 14 } },
+      })
+      const widenedDisplay = await accountPreferences.mutate(member, {
+        namespace: 'ui-conversation', field: 'chatFullWidth', operation: 'set', value: true,
+        expectedRevision: changedDisplay.revision,
+      })
+      expect(widenedDisplay).toMatchObject({
+        revision: 4,
+        values: { 'ui-conversation': { chatFullWidth: true } },
       })
       await expect(accountPreferences.mutate(member, {
         namespace: 'locale', field: 'preference', operation: 'set', value: 'en',

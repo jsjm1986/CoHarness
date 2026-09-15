@@ -16,5 +16,5 @@
     }
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["tests", "scripts"]
+  "exclude": ["tests", "scripts", "src/workspace-modules.d.ts"]
 }

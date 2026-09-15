@@ -13,6 +13,7 @@ import type { ProjectRuntime } from './instances.ts'
 import type { PrincipalScope } from './principal.ts'
 import type { GatewayPushService, PushProvider } from './push-notifications.ts'
 import { loginPage, passwordPage } from './html.ts'
+import { MIN_PASSWORD_LENGTH } from './password.ts'
 import {
   DOCUMENT_TRANSFER_UPLOADS_PATH,
   DOCUMENT_SCOPE_PATH,
@@ -631,7 +632,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       if (req.method === 'GET') { send(res, 200, passwordPage()); return }
       if (req.method === 'POST') {
         const password = new URLSearchParams(await readBody(req)).get('password') ?? ''
-        if (password.length < 8) { send(res, 400, passwordPage('密码至少 8 位')); return }
+        if (password.length < MIN_PASSWORD_LENGTH) { send(res, 400, passwordPage(`密码至少 ${String(MIN_PASSWORD_LENGTH)} 位`)); return }
         await users.changeOwnPassword(user.id, password)
         handlers.invalidateAccess?.({ userId: user.id })
         await removeBootstrapAdminPassword(cfg.bootstrapAdminPasswordFile).catch((error: unknown) => {

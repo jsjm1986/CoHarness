@@ -1033,8 +1033,8 @@ async function dispatch(
         runtimeState = await deps.instances.stateOf(target)
         runtimeGeneration = await deps.instances.generationOf(target)
       } catch {
-        // The legacy SQLite repository has no shared project runtime rows;
-        // configuration summaries remain useful without inventing lifecycle data.
+        // A project can lack an instance row on this node; configuration
+        // summaries remain useful without inventing lifecycle data.
       }
       let projectModelSummary: { providerCount: number; revision: number } | undefined
       if (deps.governance?.listProjectProviders !== undefined && deps.governance.describeProjectModelSettings !== undefined) {

@@ -396,18 +396,18 @@ function archiveRow(row: ArchiveDbRow): ConversationArchiveRow {
 }
 
 const ARCHIVE_COLUMNS = `a.root_session_id,
-  COALESCE(a.title,r.title) title,
+  harness.human_session_title(COALESCE(a.title,r.title)) title,
   COALESCE(
     (SELECT regexp_replace(left(cs.content,160), E'[\\r\\n]+', ' ', 'g')
       FROM harness.conversation_search cs
       JOIN harness.conversation_sessions csi ON csi.id=cs.session_id
       WHERE csi.organization_id=a.organization_id AND csi.root_session_id=a.root_session_id
-        AND cs.role='user'
+        AND cs.role='user' AND harness.human_session_title(cs.content) IS NOT NULL
       ORDER BY cs.occurred_at,cs.event_seq LIMIT 1),
     (SELECT regexp_replace(left(cas.content,160), E'[\\r\\n]+', ' ', 'g')
       FROM harness.conversation_archive_search cas
       WHERE cas.organization_id=a.organization_id AND cas.root_session_id=a.root_session_id
-        AND cas.role='user'
+        AND cas.role='user' AND harness.human_session_title(cas.content) IS NOT NULL
       ORDER BY cas.occurred_at,cas.event_seq LIMIT 1)
   ) content_preview,
   creator.public_id::text creator_public_id,creator.display_name creator_display_name,
@@ -579,7 +579,7 @@ export class ConversationArchiveService {
       const needle = `%${filter.query.trim()}%`
       values.push(needle)
       const arg = `$${String(values.length)}`
-      clauses.push(`(a.root_session_id ILIKE ${arg} OR COALESCE(a.title,r.title,'') ILIKE ${arg}
+      clauses.push(`(a.root_session_id ILIKE ${arg} OR COALESCE(harness.human_session_title(COALESCE(a.title,r.title)),'') ILIKE ${arg}
         OR EXISTS (SELECT 1 FROM harness.conversation_search cs
           JOIN harness.conversation_sessions csi ON csi.id=cs.session_id
           WHERE csi.organization_id=a.organization_id AND csi.root_session_id=a.root_session_id AND cs.content ILIKE ${arg})
@@ -748,7 +748,7 @@ export class ConversationArchiveService {
     const bounded = boundedLimit(limit, maximum)
     const descendants = await this.context.pool.query<{
       id: string; parent_session_id: string | null; title: string | null
-    }>(`SELECT id,parent_session_id,title FROM harness.conversation_sessions
+    }>(`SELECT id,parent_session_id,harness.human_session_title(title) title FROM harness.conversation_sessions
       WHERE organization_id=$1 AND root_session_id=$2 AND status<>'deleted'
       ORDER BY created_at,id LIMIT $3`, [this.context.organizationId, rootSessionId, MAX_ARCHIVE_DETAIL_DESCENDANTS + 1])
     if (descendants.rows.length > MAX_ARCHIVE_DETAIL_DESCENDANTS) {
