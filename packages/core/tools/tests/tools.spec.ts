@@ -2028,7 +2028,7 @@ describe('ToolRuntime', () => {
     // probe yields during earlier teardown and would then observe the tool already removed.
     const ctx = await setup()
     const order: string[] = []
-    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+    const fiber = await ctx.plugin(Object.assign(async (inner: Context) => {
       inner.effect(function* () {
         yield () => { order.push('disposed-last') }
         yield inner.tools.register({ ...echoTool, name: 'nested' })

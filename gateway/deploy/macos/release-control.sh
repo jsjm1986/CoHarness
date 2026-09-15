@@ -266,12 +266,16 @@ prune_release() {
   [[ "$cwd" != "$release" && "$cwd" != "$release/"* ]] \
     || fail "refusing to delete release used by gateway pid $pid: $release"
 
+  # Capture the process table before scanning: a live <(ps) substitution would
+  # list its own fork under this script's argv, which contains $release.
+  local process_table=''
+  process_table="$(ps -axo pid=,command=)"
   while read -r process_pid command; do
     [[ "$process_pid" == "$$" || "$process_pid" == "$PPID" ]] && continue
     case "$command" in
       *"$release"*) fail "refusing to delete release referenced by process $process_pid" ;;
     esac
-  done < <(ps -axo pid=,command=)
+  done <<< "$process_table"
 
   local open_files=''
   open_files="$(lsof +D "$release" 2>/dev/null || true)"

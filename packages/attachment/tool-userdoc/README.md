@@ -6,7 +6,7 @@ Model-facing discovery and read tools for the personal document workspace. The p
 
 ## Installation
 
-Mount this function plugin in an Agent preset that already exposes `ctx.userDocs`, `ctx.tools`, and `ctx.systemPrompt`. The shipped Web `standard`, `code`, and `cordis` presets include the row; a minimal preset can omit it to keep personal-document access out of its tool catalog.
+Mount this function plugin in an Agent preset that already exposes `ctx.userDocs`, `ctx.tools`, and `ctx.systemPrompt`. The shipped Web `standard`, `ptc`, and `cordis` presets include the row; a minimal preset can omit it to keep personal-document access out of its tool catalog.
 
 ## Tools
 

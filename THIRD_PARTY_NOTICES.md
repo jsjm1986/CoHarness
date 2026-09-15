@@ -38,6 +38,7 @@ External packages that a workspace package resolves at runtime. The tier covers 
 | [`@capacitor/android`](https://github.com/ionic-team/capacitor) | MIT |
 | [`@capacitor/core`](https://github.com/ionic-team/capacitor) | MIT |
 | [`@capacitor/push-notifications`](https://github.com/ionic-team/capacitor-plugins) | MIT |
+| [`@deepseek-ai/node-addon-system`](https://github.com/deepseek-harness/deepseek-harness) | BSD-3-Clause |
 | [`@earendil-works/pi-ai`](https://github.com/earendil-works/pi) | MIT |
 | [`@joplin/turndown-plugin-gfm`](https://github.com/laurent22/joplin-turndown-plugin-gfm) | MIT |
 | [`@jridgewell/gen-mapping`](https://github.com/jridgewell/sourcemaps) | MIT |

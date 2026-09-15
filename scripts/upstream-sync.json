@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "syncedTag": "dsh-v0.1.3-alpha.2",
-  "syncedCommit": "82a5fd61a7cf5c293cec4bdff68f455398d685e9",
+  "syncedTag": "dsh-v0.1.5-rc.2",
+  "syncedCommit": "fb2c4b9e698e30edb738bca4cf0618587db7d203",
   "packages": {
     "acp/acp": {
       "sovereignty": "adapted"
@@ -15,7 +15,6 @@
         "packages/api/gateway/src/client/remote-stream.ts",
         "packages/api/gateway/src/client/snapshot-stream.ts",
         "packages/api/gateway/src/client/stream-client.ts",
-        "packages/api/gateway/src/remote-error-codes.ts",
         "packages/api/gateway/src/stream-protocol.ts",
         "packages/api/gateway/src/stream-server.ts"
       ]
@@ -307,7 +306,6 @@
     "experimental/agent-team": {
       "sovereignty": "adapted",
       "removedUpstreamPaths": [
-        "packages/experimental/agent-team/src/client.ts",
         "packages/experimental/agent-team/src/persisted.ts",
         "packages/experimental/agent-team/src/projection.ts"
       ]
@@ -652,14 +650,7 @@
       "sovereignty": "adapted"
     },
     "subagent/subagent": {
-      "sovereignty": "adapted",
-      "removedUpstreamPaths": [
-        "packages/subagent/subagent/src/continuation-activation.ts",
-        "packages/subagent/subagent/src/continuation-messages.ts",
-        "packages/subagent/subagent/src/control-types.ts",
-        "packages/subagent/subagent/src/control.ts",
-        "packages/subagent/subagent/src/inbox.ts"
-      ]
+      "sovereignty": "adapted"
     },
     "subagent/subagent-acp": {
       "sovereignty": "adapted"
@@ -742,6 +733,9 @@
     "util/brand": {
       "sovereignty": "adapted"
     },
+    "util/chunked-list": {
+      "sovereignty": "adapted"
+    },
     "util/crypto": {
       "sovereignty": "adapted"
     },
@@ -763,6 +757,9 @@
     "util/package-manifest": {
       "sovereignty": "adapted",
       "note": ".agents/notes/implemented/architecture/2026-09-05-package-manifest-types.md"
+    },
+    "util/time": {
+      "sovereignty": "adapted"
     },
     "util/timeout": {
       "sovereignty": "adapted"
@@ -821,6 +818,11 @@
       "replacedBy": "host/apiproxy"
     },
     {
+      "package": "api/workspace-files",
+      "reason": "workspace file reads are served by host/apiproxy workspaceFiles RPC under Session ACL and containment; the upstream standalone package is not carried",
+      "replacedBy": "host/apiproxy"
+    },
+    {
       "package": "bundle/acp-app",
       "reason": "CoHarness ships its own installable bundle profiles; the upstream ACP bundle is not carried"
     },
@@ -837,6 +839,11 @@
       "reason": "attachment/userdoc-local plus host/userdoc-http provide resumable chunked upload with SHA-256 resume; the upstream transient file-upload receipt surface is deferred"
     },
     {
+      "package": "client/resources",
+      "reason": "cloud runtime resources live in client/runtime WorkspaceResourceRegistry bound to bootstrap/project runtimes; the upstream single-session registry is not carried",
+      "replacedBy": "client/runtime"
+    },
+    {
       "package": "client/store",
       "reason": "Workbench multi-runtime client state replaces the single-session upstream store",
       "replacedBy": "client/runtime"
@@ -851,9 +858,25 @@
       "replacedBy": "client/ui-conversation"
     },
     {
+      "package": "client/ui-dockkit",
+      "reason": "the desktop docking layout belongs to the rejected upstream ui-package tree; the Workbench owns the cloud layout"
+    },
+    {
       "package": "client/ui-session",
       "reason": "client/ui-conversation and ui-workbench own the session surface",
       "replacedBy": "client/ui-conversation"
+    },
+    {
+      "package": "client/ui-sidebar-documentpreview",
+      "reason": "document preview is part of the rejected upstream sidebar tree; the Workbench document surface owns previews"
+    },
+    {
+      "package": "client/ui-sidebar-files",
+      "reason": "the desktop file sidebar is part of the rejected upstream ui-package tree; workspace browsing is owned by the cloud Workbench"
+    },
+    {
+      "package": "client/ui-sidebar-right",
+      "reason": "the right-sidebar dock is part of the rejected upstream ui-package tree; the Workbench owns the cloud panel layout"
     },
     {
       "package": "experimental/agent-team-profile",
@@ -880,6 +903,10 @@
       "reason": "experimental prototype with no cloud consumer"
     },
     {
+      "package": "fs/tool-present",
+      "reason": "the present-file tool adds a model-visible deliverable declaration surface; adoption is deferred pending a product decision on the cloud produced-files flow"
+    },
+    {
       "package": "session/session-format-catalog",
       "reason": "the format catalog is folded into session/session-format (catalog-default.ts); single-package policy",
       "replacedBy": "session/session-format"
@@ -892,6 +919,11 @@
     {
       "package": "session/session-format-v1-to-v2",
       "reason": "real v1 normalization inlines into session/session-format; kept as a read path for upstream-produced v1 logs",
+      "replacedBy": "session/session-format"
+    },
+    {
+      "package": "session/session-format-v2-to-v3",
+      "reason": "v2\u2192v3 generation migration inlines into session/session-format; kept as a read path for upstream-produced v2 logs",
       "replacedBy": "session/session-format"
     },
     {
@@ -908,10 +940,6 @@
     },
     {
       "package": "util/deque",
-      "reason": "no current consumer requires it"
-    },
-    {
-      "package": "util/time",
       "reason": "no current consumer requires it"
     },
     {

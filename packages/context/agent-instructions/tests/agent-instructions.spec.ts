@@ -7,7 +7,7 @@ import Loader from '@deepseek-ai/cordis-plugin-loader'
 import * as workspaceContext from '@deepseek-ai/dsh-agent-instructions'
 import LlmRuntime, { ToolCallId, createUserMessage, type Message, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import SessionStore, { Session, SessionId, SessionSeq, SESSION_FORMAT_VERSION, type SessionEvent, type UserMessage } from '@deepseek-ai/dsh-session'
-import AgentRegistry, { agentEvents, Inbox, type Agent } from '@deepseek-ai/dsh-agent'
+import AgentRegistry, { agentEvents, type Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { FileSystem, FsTargetKey, FsVersion } from '@deepseek-ai/dsh-fs'
 import type {
@@ -43,6 +43,8 @@ import { resolveConfig } from '../src/config.ts'
 import { findProjectRoot } from '../src/files.ts'
 import { candidateScopeKey, renderInstructionChanges, renderWorkspaceInstructionSet, USER_GLOBAL_DIRECTORY, USER_GLOBAL_FILE } from '../src/render.ts'
 import { MockAdapter, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
+import { sessionBackedInbox, unsupportedInbox } from '../../../core/agent-loop/tests/inbox-helpers.ts'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 
 /** Per-candidate reconciliation scope key: directory paired with the file name. */
 const sk = (directory: string, candidateName: string): string => candidateScopeKey(directory, candidateName)
@@ -190,12 +192,12 @@ function stubAgent(cwd?: string, seed: readonly SessionEvent[] = []): Agent {
   const session = Session.create(id, seed, cwd === undefined
     ? undefined
     : { version: SESSION_FORMAT_VERSION, id, createdAt: 0, cwd, isSeeded: false })
-  return {
+  const agent: Agent = {
     ctx: new Context(),
     id: SessionId('a1'),
     options: {},
     session,
-    inbox: new Inbox(session, { inserted: () => {}, discarded: () => {}, claimed: () => {} }),
+    inbox: unsupportedInbox(),
     status: 'idle',
     send: () => {},
     followup: () => {},
@@ -205,6 +207,8 @@ function stubAgent(cwd?: string, seed: readonly SessionEvent[] = []): Agent {
     runMaintenance: task => task(new AbortController().signal),
     whenIdle: () => Promise.resolve(),
   }
+  sessionBackedInbox(agent)
+  return agent
 }
 
 function stubToolExecution(
@@ -255,7 +259,7 @@ function baselineEvents(agent: Agent): SessionEvent[] {
 async function appendAdditionalContexts(ctx: Context, agent: Agent): Promise<SessionSeq | undefined> {
   await syncedWorkspaceContext(ctx, agent)
   let lastSeq: SessionSeq | undefined
-  for (const claimed of agent.inbox.claim('next-step', 1)) {
+  for (const claimed of agent.inbox.splice('next-step', 0, agent.inbox.nextStep.length, [])) {
     if (claimed.source.kind !== 'agent-instructions') continue
     const event = agent.session.append('user/message', claimed, { surfaceOp: 'append' })
     ctx.emit('session/event', agent.session, event)
@@ -273,7 +277,7 @@ async function composeBaselinePrefix(ctx: Context, agent: Agent): Promise<Messag
     { messages: [], turn: 1, step: 1, signal },
     () => Promise.resolve({ kind: 'enter' as const, messages: [] }),
   )
-  const claimed = agent.inbox.claim('next-step', 1)
+  const claimed = agent.inbox.splice('next-step', 0, agent.inbox.nextStep.length, [])
   const decision = await agentEvents(ctx, agent).waterfall(
     'agent/pre-step',
     { messages: claimed, turn: 1, step: 2, signal },
@@ -1365,7 +1369,7 @@ describe('workspace context request injection', () => {
       await ctx.plugin(workspaceContext, { dshHome: home, maxBytes: 65536 })
       const resumed = stubAgent(root, original.session.snapshotEvents())
       agentEvents(ctx, resumed).emit('agent/session-start', { source: 'resume' })
-      const claimed = resumed.inbox.claim('next-step', 1)
+      const claimed = resumed.inbox.splice('next-step', 0, resumed.inbox.nextStep.length, [])
       const decision = await agentEvents(ctx, resumed).waterfall(
         'agent/pre-step',
         { messages: claimed, turn: 1, step: 1, signal: AbortSignal.timeout(1000) },
@@ -1411,7 +1415,7 @@ describe('workspace context request injection', () => {
       await ctx.plugin(workspaceContext, { dshHome: home, maxBytes: 65536 })
       const resumed = stubAgent(root, original.session.snapshotEvents())
       agentEvents(ctx, resumed).emit('agent/session-start', { source: 'resume' })
-      const staleClaim = resumed.inbox.claim('next-step', 1)
+      const staleClaim = resumed.inbox.splice('next-step', 0, resumed.inbox.nextStep.length, [])
       const staleDecision = await agentEvents(ctx, resumed).waterfall(
         'agent/pre-step',
         { messages: staleClaim, turn: 1, step: 1, signal: AbortSignal.timeout(1000) },
@@ -1464,7 +1468,7 @@ describe('workspace context request injection', () => {
       await resumedCtx.plugin(workspaceContext, { dshHome: home, maxBytes })
       const resumed = stubAgent(root, original.session.snapshotEvents())
       agentEvents(resumedCtx, resumed).emit('agent/session-start', { source: 'resume' })
-      const claimed = resumed.inbox.claim('next-step', 1)
+      const claimed = resumed.inbox.splice('next-step', 0, resumed.inbox.nextStep.length, [])
       const decision = await agentEvents(resumedCtx, resumed).waterfall(
         'agent/pre-step',
         { messages: claimed, turn: 1, step: 1, signal: AbortSignal.timeout(1000) },
@@ -1696,7 +1700,7 @@ describe('workspace context request injection', () => {
         content: [{ type: 'text', text: 'compacted summary' }],
         source: { kind: 'plugin', plugin: 'compact' },
       }), {
-        surfaceOp: { op: 'replace', start: baseline!.seq, end: baseline!.seq },
+        surfaceOp: { op: 'replace', startSeq: baseline!.seq, endSeq: baseline!.seq },
         sourceEventSeqs: [baseline!.seq],
       })
 
@@ -1729,7 +1733,7 @@ describe('workspace context request injection', () => {
         content: [{ type: 'text', text: 'compacted summary' }],
         source: { kind: 'plugin', plugin: 'compact' },
       }), {
-        surfaceOp: { op: 'replace', start: baseline!.seq, end: baseline!.seq },
+        surfaceOp: { op: 'replace', startSeq: baseline!.seq, endSeq: baseline!.seq },
         sourceEventSeqs: [baseline!.seq],
       })
       const prompt = createUserMessage({
@@ -2550,9 +2554,10 @@ describe('dynamic nested workspace context injection', () => {
       await ctx.plugin(LocalFileSystem, { cwd: '/' })
       await ctx.plugin(ToolFs)
       await ctx.plugin(workspaceContext, { dshHome: home, maxBytes: 65536 })
+      await ctx.plugin(SessionProjectionRegistry)
       await ctx.plugin(AgentLoop, { agents: [] })
       ctx.llm.registerAdapter(['mock'], adapter)
-      const agent = ctx.agentLoop.create(SessionId('workspace-context-abort'), { provider: 'mock', model: 'mock' }, { cwd: root })
+      const agent = await ctx.agentLoop.create(SessionId('workspace-context-abort'), { provider: 'mock', model: 'mock' }, { cwd: root })
       ctx.tools.register(defineContentToolFixture({
         name: 'abort_step',
         description: 'Abort the current test step.',
@@ -3626,7 +3631,7 @@ describe('dynamic nested workspace context injection', () => {
         content: [{ type: 'text', text: 'compacted summary' }],
         source: { kind: 'plugin', plugin: 'compact' },
       }), {
-        surfaceOp: { op: 'replace', start: SessionSeq(contextSeq), end: SessionSeq(contextSeq) },
+        surfaceOp: { op: 'replace', startSeq: SessionSeq(contextSeq), endSeq: SessionSeq(contextSeq) },
         sourceEventSeqs: [SessionSeq(contextSeq)],
       })
 
@@ -3673,7 +3678,7 @@ describe('dynamic nested workspace context injection', () => {
         content: [{ type: 'text', text: 'compacted summary' }],
         source: { kind: 'plugin', plugin: 'compact' },
       }), {
-        surfaceOp: { op: 'replace', start: baseline!.seq, end: baseline!.seq },
+        surfaceOp: { op: 'replace', startSeq: baseline!.seq, endSeq: baseline!.seq },
         sourceEventSeqs: [baseline!.seq],
       })
 
@@ -4646,7 +4651,7 @@ describe('workspace context inbox synchronization', () => {
       await mountFileToolsAndWorkspaceContext(ctx, { dshHome: home, maxBytes: 65536 })
       const agent = stubAgent(join(root, 'pkg'))
       await syncedWorkspaceContext(ctx, agent)
-      const claimed = agent.inbox.claim('next-step', 1)
+      const claimed = agent.inbox.splice('next-step', 0, agent.inbox.nextStep.length, [])
       await write(join(root, 'pkg/AGENTS.md'), 'new claimed rule with more detail')
       const downstream = { kind: 'enter' as const, messages: claimed }
 

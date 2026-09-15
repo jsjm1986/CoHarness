@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import AgentRegistry, { Inbox } from '@deepseek-ai/dsh-agent'
+import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import type { Session } from '@deepseek-ai/dsh-session'
@@ -19,6 +19,7 @@ import type { JobOutcome } from '@deepseek-ai/dsh-jobs'
 import type { MuxFrame, RpcRequest } from '@deepseek-ai/dsh-host-apiproxy/api'
 import { RpcId } from '@deepseek-ai/dsh-host-apiproxy/api/rpc'
 import { createApiProxy } from '@deepseek-ai/dsh-host-apiproxy'
+import { sessionBackedInbox, unsupportedInbox } from '../../../core/agent-loop/tests/inbox-helpers.ts'
 
 type JobFrame = Extract<MuxFrame, { type: 'session/jobs' }>
 
@@ -57,10 +58,11 @@ async function harness(withRegistry: boolean): Promise<{ ctx: Context; session: 
   const agent = {
     id: session.id,
     session,
-    inbox: new Inbox(session, { inserted: () => {}, discarded: () => {}, claimed: () => {} }),
+    inbox: unsupportedInbox(),
     status: 'idle',
     ctx,
   } as Agent
+  sessionBackedInbox(agent)
   ctx.agents.register(agent)
   return { ctx, session, agent }
 }

@@ -23,6 +23,7 @@ import { Notifier } from './notifier.ts'
 import { ProjectionValueStore } from './projection-store.ts'
 import { hasConversationContent, Session } from './session.ts'
 import type { SessionRemotes } from './remotes.ts'
+import type { RemoteFailure } from '@deepseek-ai/dsh-typert-protocol'
 
 /**
  * List arrival lifecycle, orthogonal to the pull-activity `state` axis:
@@ -58,7 +59,8 @@ export interface SessionListSnapshot {
 /** One parent-addressed durable catalog projected through the sessions snapshot. */
 export interface SubagentCatalogSnapshot extends SubagentCatalog {
   state: 'loading' | 'ready' | 'error'
-  error: RpcError | null
+  /** Remote refusal once catalog load rides the generated Remote; `RpcError` while a carrier still reports through the domain catalog. */
+  error: RpcError | RemoteFailure | null
 }
 
 interface CatalogInflight {
@@ -394,7 +396,7 @@ export class SessionManager {
     this.notifier.markDirty()
     const operation = (async () => {
       try {
-        const { result } = await this.api.subagents.list({ parentSessionId })
+        const result = await this.remote.subagents.list(parentSessionId)
         if (result.ok) {
           const parentAvailable = this.catalogInflight.get(parentSessionId)?.parentAvailableOverride
             ?? result.value.parentAvailable
@@ -1121,7 +1123,7 @@ export class SessionManager {
 
   /** Fold request-local row mutations into one catalog result before publication. */
   private withCatalogMutations(
-    entries: SubagentCatalog['entries'],
+    entries: readonly SubagentCatalog['entries'][number][],
     expandableRows: ReadonlySet<SessionId>,
     activityRows: ReadonlyMap<SessionId, 'running' | 'inactive'>,
   ): SubagentCatalog['entries'] {

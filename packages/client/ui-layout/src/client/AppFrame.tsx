@@ -36,33 +36,56 @@ function CenterColumn(props: { children?: ReactNode }) {
   return <div className={css.centerCol}>{props.children}</div>
 }
 
-/** Details column grid item; width 0 keeps the subtree mounted (never unmount on close). */
+/**
+ * Details column grid item: a track, not a box. The column never clips — the
+ * panel shell anchors a fixed-width surface to the column's right edge (the
+ * frame's edge, which never moves) and slides it off-edge while closed, so a
+ * conceding track never crops the panel into a strip. The track only decides
+ * whether the center makes room.
+ */
 function DetailsColumn(props: { children?: ReactNode }) {
   return <div className={css.detailsCol}>{props.children}</div>
 }
 
 /**
  * One drag handle: pointer capture, rAF-throttled dx reports against the drag-start origin.
- * `side` keys the hover-reveal CSS to the owning column.
+ * `side` keys the hover-reveal CSS to the owning column. The gesture ends on
+ * pointerup, pointercancel, lost pointer capture, or unmount (a concession
+ * collapse can remove the handle mid-gesture) — every path runs the same
+ * endDrag settle so the frame never keeps a stale data-dragging.
  */
 function DragHandle(props: { side: 'sidebar' | 'details'; left: number; onStart: () => void; onDrag: (dx: number) => void; onEnd: () => void }) {
   const [dragging, setDragging] = useState(false)
   const origin = useRef(0)
   const latest = useRef(0)
   const frame = useRef<number | null>(null)
+  const capture = useRef<{ element: HTMLDivElement; id: number } | null>(null)
   const callbacks = useRef({ onStart: props.onStart, onDrag: props.onDrag, onEnd: props.onEnd })
   callbacks.current = { onStart: props.onStart, onDrag: props.onDrag, onEnd: props.onEnd }
 
+  const endDrag = useCallback(() => {
+    const active = capture.current
+    if (active === null) return
+    capture.current = null
+    if (frame.current !== null) { cancelAnimationFrame(frame.current); frame.current = null }
+    if (active.element.hasPointerCapture(active.id)) active.element.releasePointerCapture(active.id)
+    setDragging(false)
+    callbacks.current.onEnd()
+  }, [])
+  useEffect(() => endDrag, [endDrag])
+
   const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0 || capture.current !== null) return
     e.preventDefault()
     e.currentTarget.setPointerCapture(e.pointerId)
+    capture.current = { element: e.currentTarget, id: e.pointerId }
     origin.current = e.clientX
     latest.current = e.clientX
     callbacks.current.onStart()
     setDragging(true)
   }, [])
   const onPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
+    if (capture.current?.id !== e.pointerId) return
     latest.current = e.clientX
     frame.current ??= requestAnimationFrame(() => {
       frame.current = null
@@ -70,13 +93,13 @@ function DragHandle(props: { side: 'sidebar' | 'details'; left: number; onStart:
     })
   }, [])
   const onPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
-    e.currentTarget.releasePointerCapture(e.pointerId)
-    if (frame.current !== null) { cancelAnimationFrame(frame.current); frame.current = null }
-    callbacks.current.onDrag(latest.current - origin.current)
-    setDragging(false)
-    callbacks.current.onEnd()
-  }, [])
+    if (capture.current?.id !== e.pointerId) return
+    callbacks.current.onDrag(e.clientX - origin.current)
+    endDrag()
+  }, [endDrag])
+  const onPointerCancel = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (capture.current?.id === e.pointerId) endDrag()
+  }, [endDrag])
 
   return (
     <div
@@ -87,6 +110,8 @@ function DragHandle(props: { side: 'sidebar' | 'details'; left: number; onStart:
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
+      onLostPointerCapture={onPointerCancel}
     />
   )
 }
@@ -195,6 +220,11 @@ export function AppFrame({
   const cols = computeColumns(viewport, sidebarPreference, overlayPanels || detailsSession === undefined ? 0 : panels.details)
   const colsRef = useRef(cols)
   colsRef.current = cols
+  // The details panel is a fixed-width surface anchored to the frame's right
+  // edge; the track's concession may release its room without shrinking it,
+  // and a close slides it off-edge at its last rendered width.
+  const detailsPanelWidth = useRef(DETAILS_DEFAULT)
+  if (cols.details > 0) detailsPanelWidth.current = cols.details
   const drawerOpen = mode === 'compact' && panels.narrowExpanded
   const detailsOpen = overlayPanels && detailsSession !== undefined && panels.details > 0
 
@@ -337,9 +367,19 @@ export function AppFrame({
             </div>
           </>
         )
-        : <DetailsColumn>{panels.detailsSessionId === undefined ? renderSlot('details', {}) : (
-          <SessionProvider sessionId={panels.detailsSessionId}>{() => renderSlot('details', {})}</SessionProvider>
-        )}</DetailsColumn>}
+        : (
+          <DetailsColumn>
+            <div
+              className={css.detailsPanel}
+              style={{ width: detailsPanelWidth.current }}
+              data-open={cols.details > 0 || undefined}
+            >
+              {panels.detailsSessionId === undefined ? renderSlot('details', {}) : (
+                <SessionProvider sessionId={panels.detailsSessionId}>{() => renderSlot('details', {})}</SessionProvider>
+              )}
+            </div>
+          </DetailsColumn>
+        )}
       <div className={css.overlayLayer} data-shell-overlay>
         {renderSlot('shell.overlay', {})}
       </div>

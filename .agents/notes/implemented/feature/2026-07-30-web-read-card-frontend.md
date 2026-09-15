@@ -36,7 +36,7 @@ Whole-row collapse/expand (defaulting every tool call to collapsed) is owned by 
 
 `ui-primitives` gains `ReadBlock` and `highlightLines`; no new runtime dependency (shiki was already present for `CodeBlock`). `ReadBlock` reads only the read view's fields, so it stays a pure function of what the render intent carries — no session lookups, replay-safe like the presenters that produce the view. A UI without the read capability still gets the backend's `content` fallback (the envelope-stripped text) through the generic card, unchanged.
 
-A read row in the Web chat now carries the file content resident, a deliberate density increase over a summary-only row, bounded by the chat cap. A `run_code` sub-dispatch does not reach a read card on the shipped wire for the same reason a nested bash call does not reach a terminal card: `session.ts` folds `tool/code-dispatch(-start)` with `resultView: null`, so a nested read keeps the generic flattened form.
+A read row in the Web chat now carries the file content resident, a deliberate density increase over a summary-only row, bounded by the chat cap. A `run_code` sub-dispatch does not reach a read card on the shipped wire for the same reason a nested bash call does not reach a terminal card: `session.ts` folds `tool/ptc-dispatch(-start)` with `resultView: null`, so a nested read keeps the generic flattened form.
 
 ## Testing
 

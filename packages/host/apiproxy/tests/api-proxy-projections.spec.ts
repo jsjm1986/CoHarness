@@ -10,7 +10,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { z } from 'zod'
-import AgentRegistry, { Inbox } from '@deepseek-ai/dsh-agent'
+import AgentRegistry from '@deepseek-ai/dsh-agent'
 import { AttachmentStore } from '@deepseek-ai/dsh-attachment'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
@@ -22,6 +22,7 @@ import UserQuestionService from '@deepseek-ai/dsh-user-questions'
 import type { MuxFrame, RpcRequest } from '@deepseek-ai/dsh-host-apiproxy/api'
 import { RpcId } from '@deepseek-ai/dsh-host-apiproxy/api/rpc'
 import { createApiProxy } from '@deepseek-ai/dsh-host-apiproxy'
+import { sessionBackedInbox, unsupportedInbox } from '../../../core/agent-loop/tests/inbox-helpers.ts'
 
 declare module '@deepseek-ai/dsh-session-projection/types' {
   interface SessionProjectionStateMap {
@@ -70,7 +71,9 @@ async function harness(withRegistry: boolean): Promise<{ ctx: Context; session: 
   if (withRegistry) await ctx.plugin(SessionProjectionRegistry)
   const session = ctx.sessions.create()
   // The gateway reads both the session and durable inbox baseline.
-  ctx.agents.register({ id: session.id, session, inbox: new Inbox(session, { inserted: () => {}, discarded: () => {}, claimed: () => {} }), status: 'idle', ctx } as Agent)
+  const agent = { id: session.id, session, inbox: unsupportedInbox(), status: 'idle', ctx } as Agent
+  sessionBackedInbox(agent)
+  ctx.agents.register(agent)
   return { ctx, session }
 }
 

@@ -263,7 +263,7 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
 
   it('keeps known descendants reachable across a stale empty catalog response', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-subagent-stale-catalog'))
-    const pattern = '**/api/subagent.list'
+    const pattern = '**/api/subagents/list'
     let firstClaimed = false
     let emptyDelivered = false
     let trailingRequested = false
@@ -510,7 +510,7 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
     const input = page.locator('textarea:enabled').first()
     await input.waitFor()
     const promptResponse = page.waitForResponse(response =>
-      new URL(response.url()).pathname === '/api/subagent.prompt')
+      new URL(response.url()).pathname === '/api/subagents/prompt')
     await input.fill(POST_FORK_FOLLOWUP)
     await input.press('Enter')
     const promptReceipt = await (await promptResponse).json() as {

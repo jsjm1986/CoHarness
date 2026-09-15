@@ -61,6 +61,33 @@ describe('createLayoutStore', () => {
     expect(store.getSnapshot().sidebar).toBe(400)
   })
 
+  it('narrow openDetails collapses the squeeze-open sidebar: one narrow surface at a time', () => {
+    const { store, actions } = createLayoutStore().create()
+    actions.setNarrow(true)
+    actions.toggleSidebar()
+    expect(store.getSnapshot().narrowExpanded).toBe(true)
+    actions.openDetails()
+    expect(store.getSnapshot()).toMatchObject({ details: DETAILS_DEFAULT, narrowExpanded: false })
+  })
+
+  it('narrow toggleSidebar while details is open swaps surfaces instead of sharing the frame', () => {
+    const { store, actions } = createLayoutStore().create()
+    actions.setNarrow(true)
+    actions.openDetails()
+    actions.toggleSidebar()
+    expect(store.getSnapshot()).toMatchObject({ details: 0, narrowExpanded: true })
+    // The swap is symmetric: opening details again re-collapses the rail.
+    actions.openDetails()
+    expect(store.getSnapshot()).toMatchObject({ details: DETAILS_DEFAULT, narrowExpanded: false })
+  })
+
+  it('wide toggleSidebar is unaffected by an open details panel', () => {
+    const { store, actions } = createLayoutStore().create()
+    actions.openDetails()
+    actions.toggleSidebar()
+    expect(store.getSnapshot()).toMatchObject({ sidebar: 0, details: DETAILS_DEFAULT })
+  })
+
   it('collapseNarrow drops only the override (scrim tap / compact navigation)', () => {
     const { store, actions } = createLayoutStore().create()
     actions.setSidebar(400)

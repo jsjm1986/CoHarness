@@ -14,6 +14,7 @@ import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import AgentLoop, { CONFIGURED_AGENT_IDENTITIES_KEY } from '@deepseek-ai/dsh-agent-loop'
 import { MockAdapter, textResponse } from './mock-adapter.ts'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 
 const dirs: string[] = []
 afterEach(async () => { for (const d of dirs.splice(0)) await rm(d, { recursive: true, force: true }) })
@@ -33,6 +34,7 @@ async function makeCoreContext(): Promise<Context> {
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(AgentRegistry)
+  await ctx.plugin(SessionProjectionRegistry)
   return ctx
 }
 
@@ -328,6 +330,7 @@ describe('config-driven session id', () => {
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
     await ctx.plugin(AgentRegistry)
+    await ctx.plugin(SessionProjectionRegistry)
     const loopFiber = await ctx.plugin(AgentLoop, {
       agents: [{ id: SessionId('main'), provider: 'mock', model: 'mock', resumeSessionId: SessionId('deferred') }],
     })
@@ -354,8 +357,10 @@ describe('config-driven session id', () => {
     await ctx1.plugin(ToolRuntime)
     await ctx1.plugin(AgentRegistry)
     await ctx1.plugin(JsonlSessionPersistence, { root })
+    await ctx1.plugin(SessionProjectionRegistry)
     await ctx1.plugin(AgentLoop, { agents: [{ id: SessionId('cfg'), provider: 'mock', model: 'mock' }] })
     ctx1.llm.registerAdapter(['mock'], new MockAdapter([textResponse('cfg')]))
+    await expect.poll(() => ctx1.agents.list().length).toBe(1)
     const a1 = ctx1.agents.list()[0] as Agent
     expect(a1.id).toBe(a1.session.id)
     expect(a1.session.id).toMatch(idPattern)
@@ -373,8 +378,10 @@ describe('config-driven session id', () => {
     await ctx2.plugin(ToolRuntime)
     await ctx2.plugin(AgentRegistry)
     await ctx2.plugin(JsonlSessionPersistence, { root })
+    await ctx2.plugin(SessionProjectionRegistry)
     await ctx2.plugin(AgentLoop, { agents: [{ id: SessionId('cfg'), provider: 'mock', model: 'mock' }] })
     ctx2.llm.registerAdapter(['mock'], new MockAdapter([textResponse('cfg2')]))
+    await expect.poll(() => ctx2.agents.list().length).toBe(1)
     const a2 = ctx2.agents.list()[0] as Agent
     expect(a2.id).toBe(a2.session.id)
     expect(a2.session.id).toMatch(idPattern)
@@ -397,6 +404,7 @@ describe('config-driven session id', () => {
     await ctx1.plugin(ToolRuntime)
     await ctx1.plugin(AgentRegistry)
     await ctx1.plugin(JsonlSessionPersistence, { root })
+    await ctx1.plugin(SessionProjectionRegistry)
     await ctx1.plugin(AgentLoop, { agents: [] })
     ctx1.llm.registerAdapter(['mock'], new MockAdapter([textResponse('first')]))
     const a1 = (await ctx1.agents.create({ sessionId: SessionId('sticky-1') })).agent
@@ -413,6 +421,7 @@ describe('config-driven session id', () => {
     await ctx2.plugin(ToolRuntime)
     await ctx2.plugin(AgentRegistry)
     await ctx2.plugin(JsonlSessionPersistence, { root })
+    await ctx2.plugin(SessionProjectionRegistry)
     await ctx2.plugin(AgentLoop, { agents: [{ id: SessionId('main'), provider: 'mock', model: 'mock', resumeSessionId: SessionId('sticky-1') }] })
     ctx2.llm.registerAdapter(['mock'], new MockAdapter([textResponse('second')]))
 
@@ -438,6 +447,7 @@ describe('config-driven session id', () => {
     await ctx.plugin(ToolRuntime)
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(JsonlSessionPersistence, { root })
+    await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(AgentLoop, { agents: [{ id: SessionId('main'), provider: 'mock', model: 'mock', resumeSessionId: SessionId('does-not-exist') }] })
     const warn = vi.spyOn((ctx.agentLoop as unknown as { ctx: { logger: { warn: (...a: unknown[]) => void } } }).ctx.logger, 'warn')
       .mockImplementation(() => undefined)

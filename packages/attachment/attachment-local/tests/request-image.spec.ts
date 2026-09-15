@@ -3,10 +3,11 @@ import { mkdtemp, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
+import { requestImageDimensions } from '@deepseek-ai/dsh-attachment'
 import sharp from 'sharp'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CompressionLimiter } from '../src/compression-limiter.ts'
-import LocalAttachmentStore, { pruneRequestImageCache, requestImageDimensions } from '../src/index.ts'
+import LocalAttachmentStore, { pruneRequestImageCache } from '../src/index.ts'
 
 const homes: string[] = []
 

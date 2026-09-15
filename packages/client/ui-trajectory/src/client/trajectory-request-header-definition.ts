@@ -1,20 +1,29 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {
-  ConversationMatch, ConversationNodeDefinition, ConversationPromptSnapshot,
-  RequestPromptChange,
+  ConversationContextReader, ConversationMatch, ConversationNodeDefinition,
+  ConversationPromptSnapshot, RequestPromptChange,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { trajectoryNode } from './trajectory-definition-common.ts'
 import type { TrajectoryRequestHeaderState } from './trajectory-contract.ts'
 
-function requestPrompt(match: ConversationMatch): ConversationPromptSnapshot {
+/** Structural view of the ui-conversation `system-prompt` Context state. */
+interface SystemPromptContextState {
+  readonly text: string
+}
+
+function requestPrompt(
+  match: ConversationMatch,
+  reader: ConversationContextReader,
+): ConversationPromptSnapshot {
   if (match.event.type !== 'request/header') {
     throw new Error('trajectory-request-header start requires request/header')
   }
   const header = match.event.data.header
   const tools: unknown = header.tools
+  const system = reader.previous<SystemPromptContextState>('system-prompt')?.state.text ?? ''
   return {
     config: header.config,
-    system: header.system ?? '',
+    system,
     tools: Array.isArray(tools) ? tools as ConversationPromptSnapshot['tools'] : [],
   }
 }
@@ -49,7 +58,7 @@ const trajectoryRequestHeaderDefinition: ConversationNodeDefinition<TrajectoryRe
     ? { id: String(event.seq), role: 'start' }
     : null,
   start: (_context, match, reader) => {
-    const prompt = requestPrompt(match)
+    const prompt = requestPrompt(match, reader)
     const previous = reader.previous<TrajectoryRequestHeaderState>('trajectory-request-header')
       ?.state.prompt
     const change = promptChange(previous, prompt, match)

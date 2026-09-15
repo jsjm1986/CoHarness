@@ -1978,7 +1978,7 @@ describe('trace and exact read rendering', () => {
         }),
       },
       {
-        surfaceOp: { op: 'replace', start: SessionSeq(0), end: SessionSeq(0) },
+        surfaceOp: { op: 'replace', startSeq: SessionSeq(0), endSeq: SessionSeq(0) },
         sourceEventSeqs: [SessionSeq(0)],
       },
     )

@@ -17,7 +17,7 @@
  * @module @deepseek-ai/dsh-token-meter/surface-projection
  */
 
-import { deriveEventMessage, isSurfaceEvent, SessionSeq } from '@deepseek-ai/dsh-session'
+import { deriveEventMessage, isSurfaceEvent, SessionSeq, validateSurfaceMetadata } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 // Type-only: the `compaction/*` SessionEventMap merges (shadow-price events).
 import type {} from '@deepseek-ai/dsh-compaction'
@@ -81,16 +81,18 @@ export function foldSurfaceProjection(
   if (!isSurfaceEvent(event)) return { deltaTokens: 0, claim: undefined }
   const message = deriveEventMessage(event)
   const tokens = message === null ? 0 : estimateMessage(message)
-  const op = event.surfaceOp
-  if (op === 'append') return { deltaTokens: tokens, claim: undefined }
+  // Committed pre-rename logs still carry `start`/`end`; validateSurfaceMetadata
+  // normalizes both spellings into the canonical op.
+  const op = validateSurfaceMetadata(event)
+  if (op === undefined || op === 'append') return { deltaTokens: tokens, claim: undefined }
   // Sessions recorded before the shadow-price protocol log replacements with
   // no adjacent metering event; the bounded state cannot reconstruct the
   // replaced range's price, so fold those neutrally — historical replay
   // degrades to drift instead of failing.
   if (claim === undefined) return { deltaTokens: 0, claim: undefined }
-  if (claim.start !== op.start || claim.end !== op.end) {
+  if (claim.start !== op.startSeq || claim.end !== op.endSeq) {
     throw new Error(
-      `token surface: replace at seq ${event.seq} over range ${op.start}-${op.end} has no adjacent shadow price`
+      `token surface: replace at seq ${event.seq} over range ${op.startSeq}-${op.endSeq} has no adjacent shadow price`
       + ` (armed claim covers ${claim.start}-${claim.end})`,
     )
   }

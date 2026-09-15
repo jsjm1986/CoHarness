@@ -20,6 +20,7 @@ import type { InjectFace, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-sl
 import type {} from './slot-contract.ts'
 import type { SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { CustomProviderCard } from './CustomProviderCard.tsx'
+import type { ModelDiscoveryProbe } from './ModelListEditor.tsx'
 import { deriveKeyRef, messageOf, protocolChoices, providerUsable } from './store.ts'
 import type { ModelsSettingsStore, ProviderRow } from './store.ts'
 import type { SettingsSchemaOperations } from './schema-operations.ts'
@@ -40,7 +41,9 @@ export interface ModelsSectionInjected {
     snapshot: ModelsSettingsStore['store']
   }
   /** Wire faces the editor writes through. */
-  api: Pick<IApiClient, 'settings' | 'credentials' | 'llm'>
+  api: Pick<IApiClient, 'settings' | 'credentials'>
+  /** Discovery probe for interrogating a provider endpoint. */
+  discoverModels: ModelDiscoveryProbe
   /** Settings schema and immutable path callbacks. */
   schema: SettingsSchemaOperations
   /** Section copy. */
@@ -53,6 +56,7 @@ export interface ModelsSectionInjected {
   projectBinding?: (projectId: number) => {
     controller: ModelsSettingsStore
     api: ProjectModelsApi
+    discoverModels: ModelDiscoveryProbe
   } | undefined
   /** Route pattern used by the custom-provider creation card. */
   providerIdPattern?: RegExp
@@ -92,7 +96,7 @@ interface EditorTarget extends ProviderIdentity {
 /** Values that vary around the shared provider-editor rendering. */
 interface ProviderEditorRenderProps extends Pick<
   ProviderEditorProps,
-  'namespace' | 'schema' | 'api' | 't' | 'readOnly' | 'credentialScope' | 'projectId' | 'onClose'
+  'namespace' | 'schema' | 'api' | 'discoverModels' | 't' | 'readOnly' | 'credentialScope' | 'projectId' | 'onClose'
 > {
   target: EditorTarget
 }
@@ -199,10 +203,10 @@ export function providerCopy(template: string, target: ProviderIdentity): string
  * @returns the section, or null while the shell has not injected yet.
  */
 export function ModelsSection(props: ModelsSectionProps): ReactNode {
-  const { controller, useSnapshot, api, schema, t } = props
+  const { controller, useSnapshot, api, discoverModels, schema, t } = props
   if (
     controller === undefined || useSnapshot === undefined || api === undefined
-    || schema === undefined || t === undefined
+    || discoverModels === undefined || schema === undefined || t === undefined
   ) return null
   const renderSlot = props.renderSlot ?? (() => null)
   return (
@@ -212,6 +216,7 @@ export function ModelsSection(props: ModelsSectionProps): ReactNode {
         controller,
         useSnapshot,
         api,
+        discoverModels,
         schema,
         t,
         ...props.managementScope === undefined ? {} : { managementScope: props.managementScope },
@@ -232,6 +237,7 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
     : undefined
   const controller = binding?.controller ?? injected.controller
   const api = binding?.api ?? injected.api
+  const discoverModels = binding?.discoverModels ?? injected.discoverModels
   const { schema, t } = injected
   const managementScope = injected.settingsScope === 'project'
     ? 'project'
@@ -440,6 +446,7 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
                   namespace,
                   schema,
                   api,
+                  discoverModels,
                   t,
                   readOnly: !state.writable,
                   credentialScope: managementScope,
@@ -537,6 +544,7 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
                   namespace,
                   schema,
                   api,
+                  discoverModels,
                   t,
                   readOnly: !state.writable,
                   credentialScope: managementScope,
@@ -579,6 +587,7 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
                 schema={schema}
                 settingsPath={addTarget.settingsPath}
                 api={api}
+                discoverModels={discoverModels}
                 t={t}
                 readOnly={!state.writable}
                 credentialScope={managementScope}
@@ -608,6 +617,7 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
                   /* v8 ignore next -- the card only opens from a button disabled without this namespace */
                   revision={state.namespaces.get('llm-pi-ai')?.revision ?? 0}
                   api={api}
+                  discoverModels={discoverModels}
                   t={t}
                   readOnly={!state.writable}
                   credentialScope={managementScope}

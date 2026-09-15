@@ -40,7 +40,7 @@ try {
   if (mode !== 'FULL') {
     const [agent] = ctx.get('agents')?.roots() ?? []
     if (agent === undefined) throw new Error('session-telemetry-otel driver requires one root agent')
-    recordFeedback(agent.session, 'fixture feedback')
+    recordFeedback(agent.session, { text: 'fixture feedback' })
     if (mode === 'FEEDBACK_ONLY') {
       await runFixtureTurn(ctx, { task: 'post-feedback private suffix' })
     }

@@ -100,6 +100,15 @@ function fromHeaderLine(line: HeaderLine): SessionStorageMetadata {
   if (Object.hasOwn(line, 'sandboxMode') || Object.hasOwn(line, 'approvalPolicy')) {
     throw new Error('session header uses retired policy baseline fields')
   }
+  // Upstream marks seeded lineage with a required boolean `isSeeded` header key
+  // while this build carries the cut as `seedLength`. Reading that artifact
+  // silently would drop its fork lineage, so refuse it outright; `isSeeded:
+  // false` is structurally identical to an unseeded header here and passes.
+  if ((line as { isSeeded?: unknown }).isSeeded === true && line.seedLength === undefined) {
+    throw new SessionFormatUnsupportedError(
+      `session "${line.id}" marks seeded lineage without a seedLength; the artifact was written by a different harness build`,
+    )
+  }
   return {
     meta: {
       version: line.version,

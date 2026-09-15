@@ -1300,9 +1300,14 @@ function createSingleDocumentTransferHandler(
       const name = sourceName(document.docId)
       try {
         const sourceUrl = `http://127.0.0.1:${String(sourceRuntime.port)}/api/documents/content?id=${encodeURIComponent(document.docId)}`
+        // The copy needs the declared byte count and identity bytes; asking for
+        // identity encoding keeps a compressed runtime response from dropping
+        // content-length.
+        const sourceHeaders = headersFor(sourceRuntime, sourceAssertion)
+        sourceHeaders.set('accept-encoding', 'identity')
         const sourceResponse = await fetch(sourceUrl, {
           method: 'GET',
-          headers: headersFor(sourceRuntime, sourceAssertion),
+          headers: sourceHeaders,
           signal,
         })
         if (!sourceResponse.ok || sourceResponse.body === null) {

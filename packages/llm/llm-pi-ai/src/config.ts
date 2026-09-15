@@ -29,6 +29,7 @@ import {
   resolveRouteModels,
   SUPPORTED_THINKING_FORMATS,
   THINKING_LEVELS,
+  THINKING_TOKEN_BUDGET_FIELDS,
 } from './catalog.ts'
 import type {
   PiAiCompatProfile,
@@ -244,8 +245,8 @@ const compatProfile: z<PiAiCompatProfile> = z.object({
   thinkingFormat: z.union(SUPPORTED_THINKING_FORMATS),
   chatTemplateKwargs: z.dict(chatTemplateKwarg),
   chatTemplateArgs: z.dict(chatTemplateKwarg),
-  thinkingTokenBudgetField: z.union(['thinking_token_budget', 'thinking_budget', 'thinking_budget_tokens'] as const),
-  vllmPriority: z.number(),
+  thinkingTokenBudgetField: z.union(THINKING_TOKEN_BUDGET_FIELDS),
+  vllmPriority: z.number().step(1),
   supportsMaxOutputTokens: z.boolean(),
   supportsThinkingTokenBudget: z.boolean(),
   supportsStrictMode: z.boolean(),

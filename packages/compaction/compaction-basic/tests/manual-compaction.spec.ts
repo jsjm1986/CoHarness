@@ -110,7 +110,7 @@ async function loopHarness(): Promise<LoopHarness> {
   const adapter = new TextAdapter()
   ctx.llm.registerAdapter([MODEL], adapter)
   const compact = new GatedCompactionEngine(ctx, { auto: false })
-  const agent = ctx.agentLoop.create(SessionId('manual-compact'), { provider: MODEL, model: MODEL })
+  const agent = await ctx.agentLoop.create(SessionId('manual-compact'), { provider: MODEL, model: MODEL })
   const log: string[] = []
   ctx.on('session/event', (_session, event) => {
     if (event.type === 'turn/start') log.push('turn/start')
@@ -274,7 +274,7 @@ describe('compactNow through the real loop', () => {
     const second = (adapter.requests[1] ?? []).map(message => message.content
       .map(block => block.type === 'text' ? block.text : '')
       .join(''))
-    expect(second[0]).toContain('checkpoint')
+    expect(second[1]).toContain('checkpoint')
     expect(second.at(-1)).toBe('after compaction')
     expect(second.some(text => text.includes(PROMPT))).toBe(false)
   })
@@ -309,7 +309,7 @@ describe('compactNow through the real loop', () => {
     }))
     await agent.whenIdle()
     const messages = derivedText(agent.session)
-    expect(messages[0]).toContain('checkpoint')
+    expect(messages[1]).toContain('checkpoint')
     expect(messages.filter(text => text.includes('INJECTED CONTEXT'))).toHaveLength(1)
   })
 
@@ -331,7 +331,7 @@ describe('compactNow through the real loop', () => {
 
     expect(attempts).toEqual(['compaction/start', 'compaction/summary'])
     expect(result).not.toBeNull()
-    expect(derivedText(agent.session)[0]).toContain('checkpoint')
+    expect(derivedText(agent.session)[1]).toContain('checkpoint')
     expect(agent.session.snapshotEvents().filter(event => event.type === 'user/message'
       && event.data.source.kind === 'plugin' && event.data.source.plugin === 'listener')).toHaveLength(0)
     const types = compactEvents(agent.session).map(event => event.type)
@@ -495,7 +495,7 @@ describe('compactNow transaction and failure classification', () => {
         content: [{ type: 'text', text: 'competing replacement' }],
         source: { kind: 'plugin', plugin: 'rival' },
       }), {
-        surfaceOp: { op: 'replace', start: head!, end: head! },
+        surfaceOp: { op: 'replace', startSeq: head!, endSeq: head! },
         sourceEventSeqs: [head!],
       })
     }
@@ -516,7 +516,7 @@ describe('compactNow transaction and failure classification', () => {
         content: [{ type: 'text', text: 'rewritten middle node' }],
         source: { kind: 'plugin', plugin: 'rival' },
       }), {
-        surfaceOp: { op: 'replace', start: middle!, end: middle! },
+        surfaceOp: { op: 'replace', startSeq: middle!, endSeq: middle! },
         sourceEventSeqs: [middle!],
       })
     }
@@ -547,7 +547,7 @@ describe('compactNow transaction and failure classification', () => {
           content: [{ type: 'text', text: 'late competing replacement' }],
           source: { kind: 'plugin', plugin: 'rival' },
         }), {
-          surfaceOp: { op: 'replace', start: head, end: head },
+          surfaceOp: { op: 'replace', startSeq: head, endSeq: head },
           sourceEventSeqs: [head],
         })
       })

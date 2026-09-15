@@ -161,12 +161,14 @@ export const Config: z<ConnectionConfig> = z.object({
  */
 const PRIVILEGED_METHODS = new Set([
   // A preset composition names the plugins a session runs, so reading one is
-  // reconnaissance; copy and remove rearrange what the deployment offers, and
+  // reconnaissance; copy and delete rearrange what the deployment offers, and
   // openDocument drives the host desktop — all more than the roster beside
-  // them. (Authoring is copy-only, so no method here accepts composition text
-  // or a path; the pin is about who may manage the roster at all.)
+  // them. Authoring is copy-only, so no method here accepts composition text
+  // or a path; the pin is about who may manage the roster at all. The Remote
+  // paths carry the same payloads the dotted routes once did, so the pin
+  // follows the endpoint, not the carrier.
   //
-  // CHOOSING one is not pinned, and `agentPreset.list` is not either. Picking a
+  // CHOOSING one is not pinned, and the roster list is not either. Picking a
   // preset looks like escalation — one of them mounts the toolset that edits the
   // live runtime — but `session.create` already takes an `agentPreset`, so
   // pinning only the switch would leave the same capability one method over.
@@ -174,10 +176,10 @@ const PRIVILEGED_METHODS = new Set([
   // deployment's own default already carries `bash` and the filesystem tools, so
   // any caller that may start a session at all can already run commands as this
   // process. Pinning the switch would be a fence beside an open gate.
-  'agentPreset.read',
-  'agentPreset.copy',
+  'agentPresets/read',
+  'agentPresets/copy',
+  'agentPresets/deletePreset',
   'agentPreset.openDocument',
-  'agentPreset.remove',
   'host.pickDirectory',
   'host.openPath',
   'settings.describe',
@@ -189,6 +191,8 @@ const PRIVILEGED_METHODS = new Set([
   'credentials.set',
   'credentials.unset',
   'llm.discoverModels',
+  // Model discovery probes provider endpoints from the host on both carriers.
+  'llm/discoverModels',
 ])
 
 /**
@@ -234,14 +238,6 @@ export function apply(ctx: Context, config?: ConnectionConfig): void {
   const fetchHandler = connection.createSharedFetchHandler(API_PATH, {
     async fetch(request) {
       const pathname = new URL(request.url).pathname
-      const method = pathname.startsWith(`${API_PATH}/`)
-        ? pathname.slice(API_PATH.length + 1)
-        : undefined
-      if (method !== undefined
-        && PRIVILEGED_METHODS.has(method)
-        && !isTrustedApiRequest(request, [])) {
-        return new Response('forbidden', { status: 403 })
-      }
       if (request.method === 'GET' && (pathname === MUX_EVENTS_PATH || pathname === HOST_EVENTS_PATH)) {
         return new Response('upgrade required', {
           status: 426,
@@ -263,7 +259,7 @@ export function apply(ctx: Context, config?: ConnectionConfig): void {
       }
       return carrier.fetch(request)
     },
-  })
+  }, { loopbackEndpoints: PRIVILEGED_METHODS })
   const route: WebRoute = {
     kind: 'prefix',
     path: API_PATH,

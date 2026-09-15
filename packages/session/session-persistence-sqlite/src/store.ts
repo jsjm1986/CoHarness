@@ -59,6 +59,7 @@ export interface SqliteStoreOptions {
 /** SQLite implementation of the coordinator's physical backend hooks. */
 export class SqliteStore implements PersistenceBackend<number> {
   readonly name = 'session-persistence-sqlite'
+  readonly supportsBodyMigration = true
   private db!: DatabaseSync
   private databaseConstructor!: typeof import('node:sqlite')['DatabaseSync']
   private storeIdentity!: string
@@ -174,11 +175,16 @@ export class SqliteStore implements PersistenceBackend<number> {
     return { ...rowToStorage(snapshot.row), events: preserved.filter(event => event.seq >= fromSeq) }
   }
 
-  /** Publish a current-format header generation without rewriting event rows. */
+  /**
+   * Publish the migrated generation in one transaction: event rows are
+   * replaced with the migrated body, then the header row moves to the
+   * current-format metadata. A version-equal row means a concurrent
+   * publisher already committed the successor.
+   */
   async migrateStored(
     sourceStorage: SessionStorageMetadata,
     currentStorage: SessionStorageMetadata,
-    _events: readonly SessionEvent[],
+    events: readonly SessionEvent[],
     sourceRevision: PersistenceRevision,
     signal?: AbortSignal,
   ): Promise<void> {
@@ -188,17 +194,22 @@ export class SqliteStore implements PersistenceBackend<number> {
     this.db.exec(sql('begin-immediate'))
     try {
       validateSchemaForMutation(this.databaseConstructor, this.db, this.databasePath)
-      const row = this.rowFor(sourceStorage.meta.id)
-      if (row === undefined) throw new Error(`session ${sourceStorage.meta.id} metadata row is missing`)
+      const id = sourceStorage.meta.id
+      const row = this.rowFor(id)
+      if (row === undefined) throw new Error(`session ${id} metadata row is missing`)
       if (String(sqliteRevision(this.storeIdentity, row)) !== String(sourceRevision)) {
-        throw new Error(`session ${sourceStorage.meta.id} changed while its format migration was preparing`)
+        throw new Error(`session ${id} changed while its format migration was preparing`)
       }
       if (row.version === currentStorage.meta.version) {
         this.db.exec(sql('commit'))
         return
       }
-      const updated = this.db.prepare(sql('update-session-version')).run(currentStorage.meta.version, sourceStorage.meta.id)
-      if (Number(updated.changes) !== 1) throw new Error(`session ${sourceStorage.meta.id} metadata row is missing`)
+      this.db.prepare(sql('delete-event-extensions-from')).run(id, 0)
+      this.db.prepare(sql('delete-events-from')).run(id, 0)
+      const insert = this.insertStatement()
+      for (const record of packChunkRuns(events)) this.insertRecord(insert, id, bindRecord(record))
+      this.writeRow(currentStorage)
+      this.incrementRevision(id)
       this.db.exec(sql('commit'))
     } catch (error: unknown) {
       this.rollback(error, 'format migration')

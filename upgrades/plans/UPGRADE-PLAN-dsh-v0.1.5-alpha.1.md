@@ -20,7 +20,7 @@
 
 | 领域 | 当前 CoHarness | 与 alpha.1 的判断 |
 | --- | --- | --- |
-| Session 格式 | `SESSION_FORMAT_VERSION = 3`，v0/v1→v2 与 v2→v3 均走 adjacent migration；v2→v3 生成 chronology-preserving system/message、surface reference remap 和 immutable successor；CoHarness 保留 `code` preset 与 `tool/code-dispatch*` 作为业务兼容词汇 | `adapted`，CoHarness 扩展事件保留原 payload；核心 message carrier 在迁移入口校验，保留旧 generation 并在 provider 不支持流式时安全 fallback |
+| Session 格式 | `SESSION_FORMAT_VERSION = 3`，v0/v1→v2 与 v2→v3 均走 adjacent migration；v2→v3 生成 chronology-preserving system/message、surface reference remap 和 immutable successor；CoHarness 以 `ptc` 为正典词汇（preset、事件名、`:ptc:` 子调用 id、`tools-ptc` 归属），`code` preset、`tool/code-dispatch*`、`tools-code-mode` 与 `mode: 'code'` 仅在读取/配置边界作为兼容别名归一化 | `adapted`，CoHarness 扩展事件保留原 payload；核心 message carrier 在迁移入口校验，保留旧 generation 并在 provider 不支持流式时安全 fallback |
 | Agent API | `ctx.agent` 已移除；setup 为 `(agentCtx, agent)`，子代理显式传递 `parentAgent` | `adapted`，Gateway/ACP/子代理/Headless 消费方已更新 |
 | Inbox | CoHarness `Inbox` 保留兼容构造器；ApiProxy 已有 agent-free cold `inbox` projection，AgentLoop live owner 仍使用现有 O(1) implementation | `equivalent/retain`，不重复搬运上游 class 拆分；后续 major 版本再移除兼容构造器 |
 | 系统提示词 | prefix/suffix、runtime context 和 V3 `system/message` surface 投影已接入；`systemPromptUpdate: in-history` 由 adapter capability 决定 | `adapt`，保留单一 prompt owner，不重复建立第二套 prompt history |
@@ -35,7 +35,7 @@
 | 空消息/空队列编辑 | 需要核对每个 Host、SDK、ACP、Gateway 入口是否都拒绝空文本和空白编辑 | `required`，统一 admission helper，保留图片-only/file-only |
 | 目标暂停 | CoHarness Goal 已有 activation 和 manual state，需要确认模型驱动 resume 是否受人工暂停保护 | `required`，人工暂停是持久事实，模型不能自动恢复 |
 | 项目根目录错误 | agent-instructions 需区分权限/I/O 错误和“没有项目” | `adapt`，错误直达调用方，禁止向父目录错误回退 |
-| PTC/code 命名 | CoHarness 已将 PTC/legacy code 作为兼容语义维护 | `adapt`，V2→V3 迁移中重命名历史 source/type，保留 replay 兼容 |
+| PTC/code 命名 | 上游两阶段更名已对齐：`ptc` 为正典运行/配置/preset 词汇，`code` 仅保留为读取/配置兼容别名 | `adapted`，persistence 读取归一化替代 generation 重写（CoHarness v3 已随 code 词汇发布，不重写 committed generation），replay 兼容保持 |
 | Typert forwarding | 上游修复了跨包 forwarding visit identity 和显式边优先级 | `adapt`，核对 CoHarness Typert registry/generator，不直接替换生成器 |
 | Native | CoHarness 保持独立 `node-addon-landlock-run` 版本线；上游改为 `node-addon-system` 并增加 flock | `retain/adapt`，不在本版本重命名 Landlock 包；评估 flock 对跨进程 Session lock 的增益 |
 | fs-ext | 当前依赖图不应引入 `fs-ext` 本地编译负担 | `equivalent`，确认 lockfile 和构建无该依赖，不复制上游 native 包树 |
@@ -52,7 +52,7 @@
 2. 目标版本提升到 3；旧 generation 永不覆盖、删除或自动降级。
 3. V2→V3 stage 逐条审计 CoHarness 现有 message carrier：`user/message`、`assistant/message`、`tool/result`、Inbox inserted、title request 和 assistant stream；CoHarness 的 team/delivery/feedback 扩展事件保留原始 payload，不猜测其业务坐标。
 4. 将旧 `request/header.system` 转为带确定性 identity 的 `system/message` surface；在无法证明 chronology 或消息 identity 安全时拒绝迁移并保留原 generation。
-5. 将 `tools-code-mode`、旧 `tool/code-dispatch*`、`agentPreset: code` 解释为现有 CoHarness PTC 语义；不重命名这些业务可见 identity，系统 identity 使用确定性 hash，避免破坏 Workbench、spill、replay 和 preset owner。
+5. 运行词汇更名为 PTC（`tool/ptc-dispatch*`、`tools-ptc`、`agentPreset: ptc`、`:ptc:` 子调用 id）；`tools-code-mode`、旧 `tool/code-dispatch*`、`agentPreset: code` 在 persistence 读取链归一化为 PTC 语义后投影，committed generation 字节不动；系统 identity 使用确定性 hash，避免破坏 Workbench、spill、replay 和 preset owner。
 6. JSONL、SQLite、Gateway 分别实现 bounded/streaming restore；没有分页能力时使用受控整体 fallback，并记录降级。
 7. 在发布前执行备份、复制 dry-run、torn-tail、并发写入、取消、失败回滚、重启恢复和 seeded inherited cut 验收。
 8. 更新 TypeScript/Python SDK、ACP、Headless、Web snapshot 和生成 catalog；V3 读取不支持降级回到 v2。
@@ -148,7 +148,7 @@
 
 ## 本轮已落地的实现证据
 
-- Session V3：`system/message`、v2→v3 immutable migration、核心 carrier admission、surface reference remap、compact assistant stream 和 failed `assistant/attempt` 已进入现有 Session/JSONL/SQLite/Gateway owner；`code`/`tool/code-dispatch*` 保持 CoHarness 业务 identity，未审计的扩展事件不被迁移器重写。
+- Session V3：`system/message`、v2→v3 immutable migration、核心 carrier admission、surface reference remap、compact assistant stream 和 failed `assistant/attempt` 已进入现有 Session/JSONL/SQLite/Gateway owner；PTC 为正典 identity，legacy `code`/`tool/code-dispatch*`/`tools-code-mode` 由读取归一化兼容，未审计的扩展事件不被迁移器重写。
 - Cordis/Typert：`Context.agent` 已删除；Agent setup 与 parent ownership 显式化；Remote decorator 使用版本化 prototype descriptor；Typert generator 已支持 package-local forwarding、显式 Remote stream marker 和真实 CompilerHost resolution。
 - 业务安全：Host prompt/queue edit 拒绝空白内容；Goal 人工 pause 会取消非模型发起的运行；root marker 只吞明确缺失，权限/I/O 失败原样返回。
 - 第三方运行时：Codex、Claude Agent SDK 和 Claude Code fixture 已更新，协议测试通过；CoHarness Gateway、ACL、Documents、Workbench 和 Open in App 继续作为 owner。

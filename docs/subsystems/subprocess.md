@@ -252,7 +252,7 @@ The abstract [`SubprocessRuntime`](../../packages/subprocess/subprocess/src/inde
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
 <a id="ctxe2b--e2bruntime"></a>
 
@@ -269,7 +269,7 @@ Creates one lazily consumable E2B SDK handle and deletes the sandbox at timeout 
 async getSandbox(): Promise<Sandbox>
 ```
 
-Source: [`packages/e2b/e2b/src/index.ts:74`](../../packages/e2b/e2b/src/index.ts)
+Source: [`packages/e2b/e2b/src/index.ts`](../../packages/e2b/e2b/src/index.ts)
 
 <a id="ctxsubprocess--subprocessruntime-abstract-seam"></a>
 
@@ -280,9 +280,9 @@ Abstract subprocess service. Subclass, implement spawn, and load the subclass as
 Implementations must honor these semantics:
 
 - Executable paths belong to one execution world shared with the mounted filesystem provider.
-- spawn returns immediately with a live handle; `done` resolves at process close with exit facts and rejects only for spawn-level failures.
+- spawn returns a live handle synchronously. Target identity remains provider-private; `done` resolves with the spawned command's exit facts and may reject for spawn or provider failures.
 - Collect-mode readers are offset-based and non-consuming, so independent readers never consume one another's output; lossy reads report truncation and the spill file holding the complete stream when one exists. Piped streams are handed to the caller raw and never buffered here.
-- SubprocessHandle.terminate (and the spec's abort signal) escalates SIGTERM→grace→SIGKILL — the only termination verb — tree-scoped on every platform. SubprocessHandle.waitForExit observes whole-tree liveness, so a consumer-owned teardown ladder can hold each tier on real quiescence.
+- SubprocessHandle.terminate (and the spec's abort signal) starts the provider's documented procedure against its managed range. SubprocessHandle.waitForExit observes that same range so a consumer-owned teardown ladder can hold each tier on real quiescence; each provider documents its signalling and observability limits.
 - Disposal of the service terminates all still-running managed processes and awaits their exit.
 - spawnTerminal owns terminal allocation, text transport, foreground groups, signalling, and whole-session quiescence behind one awaited termination method; readiness and persistent-shell policy stay in the PTY consumer. Its output stream ends after queued terminal output when the top-level process exits.
 
@@ -305,18 +305,19 @@ abstract resolveExecutable( command: string, env?: Readonly<Record<string, strin
  * applies no defaults.
  * @param spec - argv, directory, stdio dispositions, grace, cancellation, and environment.
  * @returns the live process handle (streams/readers, signalling, outcome promise).
+ * @throws synchronously when pre-aborted or when argv, cwd, environment, or grace is invalid before handle creation.
  */
 abstract spawn(spec: SubprocessSpawnSpec): SubprocessHandle
 
 /**
  * Allocate a real terminal and start one owned process session. This is the
  * only non-pipe process primitive: implementations own terminal byte I/O,
- * foreground groups, signals, and complete session-tree cleanup.
+ * foreground groups, signals, and whole-session quiescence.
  * @param spec - fully specified argv, cwd, environment, dimensions, grace, and allocation cancellation.
  * @returns the live terminal handle after allocation succeeds.
  */
 abstract spawnTerminal(spec: SubprocessTerminalSpawnSpec): Promise<SubprocessTerminalHandle>
 ```
 
-Source: [`packages/subprocess/subprocess/src/index.ts:102`](../../packages/subprocess/subprocess/src/index.ts)
+Source: [`packages/subprocess/subprocess/src/index.ts`](../../packages/subprocess/subprocess/src/index.ts)
 <!-- END GENERATED cordis-surface -->

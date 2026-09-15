@@ -7,8 +7,11 @@ describe('presetDisplayName', () => {
     expect(presetDisplayName({ id: 'standard', trust: 'system', name: 'ignored' }, translate)).toBe('translated:presetStandardName')
     expect(presetDisplayName({ id: 'mine', trust: 'user', name: '我的模式' }, translate)).toBe('我的模式')
     expect(presetDisplayName({ id: 'unknown', trust: 'system' }, translate)).toBe('unknown')
+    expect(presetDisplayText({ id: 'ptc', trust: 'system' }, translate)).toEqual({
+      name: 'translated:presetPtcName', description: 'translated:presetPtcDescription',
+    })
     expect(presetDisplayText({ id: 'code', trust: 'system' }, translate)).toEqual({
-      name: 'translated:presetCodeName', description: 'translated:presetCodeDescription',
+      name: 'translated:presetPtcName', description: 'translated:presetPtcDescription',
     })
     expect(presetDisplayText({ id: 'mine-with-description', trust: 'user', name: 'Mine', description: 'Custom' }, translate))
       .toEqual({ name: 'Mine', description: 'Custom' })

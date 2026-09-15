@@ -3770,8 +3770,21 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
                 </div>
 
                 <div className={css.caption}>
-                  <span>{visibleScope}</span>
-                  {refreshing && <span className={css.refreshingStatus} role="status" aria-live="polite">{pendingScopeLabel === '' ? t('modal.refreshing') : t('scope.switch.loading', { name: pendingScopeLabel })}</span>}
+                  <span className={css.captionLeading}>
+                    {pageDocs.length > 0 && (
+                      <label className={css.check}>
+                        <input
+                          ref={headerCheckRef}
+                          type="checkbox"
+                          checked={headerState === 'all'}
+                          aria-label={t('selection.selectPage')}
+                          onChange={togglePage}
+                        />
+                      </label>
+                    )}
+                    <span>{visibleScope}</span>
+                    {refreshing && <span className={css.refreshingStatus} role="status" aria-live="polite">{pendingScopeLabel === '' ? t('modal.refreshing') : t('scope.switch.loading', { name: pendingScopeLabel })}</span>}
+                  </span>
                   {!loading && <span>{t('modal.count', { count: String(totalDocuments ?? filtered.length) })}</span>}
                 </div>
 
@@ -3866,19 +3879,6 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
                 </div>
               ) : (
                 <div className={css.list} role="list" aria-label={t('modal.title')} data-documents-list="" data-documents-scrollport="list">
-                  {pageDocs.length > 0 && (
-                    <div className={css.listHeader}>
-                      <label className={css.check}>
-                        <input
-                          ref={headerCheckRef}
-                          type="checkbox"
-                          checked={headerState === 'all'}
-                          aria-label={t('selection.selectPage')}
-                          onChange={togglePage}
-                        />
-                      </label>
-                    </div>
-                  )}
                   {currentPage === 1 && filteredDirectories.map(renderDirectory)}
                   {groups === null
                     ? pageDocs.map(renderRow)

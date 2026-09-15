@@ -227,6 +227,30 @@ describe('archive-gateway synchronization', () => {
     await ctx.fiber.dispose()
   })
 
+  it('keeps an unreadable archived session in the set without a payload', async () => {
+    const broken = SessionId('archive-broken')
+    const healthy = SessionId('archive-healthy')
+    const entries = [archivedEntry(broken, 1), archivedEntry(healthy, 2)]
+    const request = vi.fn<GatewayRequest>(async () => gatewayResponse())
+    const ctx = await syncContext({
+      snapshot: { revision: 15, archivedSessionIds: [broken, healthy] },
+      entries,
+      readFrom: async (id: SessionId) => {
+        if (id === broken) throw new Error('corrupt session log')
+        return { meta: entries.find(entry => entry.sessionId === id)!.header, events: [event('user/message', 0, 'ok')] }
+      },
+      request,
+    })
+    await vi.waitFor(() => { expect(request).toHaveBeenCalledOnce() })
+    const payload = JSON.parse(requestBody(request.mock.calls[0]?.[1])) as {
+      archivedSessionIds: string[]
+      sessions: Array<{ sessionId: string }>
+    }
+    expect(payload.archivedSessionIds).toEqual([broken, healthy])
+    expect(payload.sessions.map(session => session.sessionId)).toEqual([healthy])
+    await ctx.fiber.dispose()
+  })
+
   it('caps one multibyte search row without emitting broken UTF-8', async () => {
     const id = SessionId('archive-long-search-row')
     const entries = [archivedEntry(id, 1)]

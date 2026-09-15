@@ -9,7 +9,6 @@ import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
-import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import * as SubagentFork from '@deepseek-ai/dsh-subagent-fork-in-process'
 import * as SubagentSpawn from '@deepseek-ai/dsh-subagent-spawn-in-process'
@@ -48,24 +47,28 @@ class GatedAdapter extends LlmAdapter {
 const testToolSignal = new AbortController().signal
 
 const roots: string[] = []
-afterEach(() => {
+const contexts: Context[] = []
+afterEach(async () => {
+  // Dispose live contexts before removing roots: agent write handles keep lock
+  // files open under their owning fibers until the fiber drains.
+  for (const ctx of contexts.splice(0)) await ctx.fiber.dispose()
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 async function setupWith(adapter: MockAdapter | GatedAdapter, park = true) {
   const ctx = new Context()
+  contexts.push(ctx)
   await mountAgentLoopTestDependencies(ctx)
   const root = mkdtempSync(join(tmpdir(), 'dsh-tool-subagent-control-'))
   roots.push(root)
   await ctx.plugin(JsonlSessionPersistence, { root })
   await ctx.plugin(AgentLoop, { agents: [] })
-  await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(SubagentRuntime)
   await ctx.plugin(SubagentSpawn, { providerName: 'spawn' })
   await ctx.plugin(SubagentFork, { providerName: 'fork' })
   await ctx.plugin(tool)
   ctx.llm.registerAdapter(['mock'], adapter)
-  const parent = ctx.agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
+  const parent = await ctx.agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
   if (park) parkParent(ctx, parent)
   return { ctx, parent, adapter }
 }
@@ -165,7 +168,7 @@ describe('dsh-tool-subagent-control', () => {
 
   it('JSON-encodes a caller-supplied parent id in the initial return instruction', async () => {
     const { ctx } = await setup([textResponse('child done')])
-    const parent = ctx.agentLoop.create(SessionId('parent"\nagent'), { provider: 'mock', model: 'mock' })
+    const parent = await ctx.agentLoop.create(SessionId('parent"\nagent'), { provider: 'mock', model: 'mock' })
     parkParent(ctx, parent)
     const started = await ctx.subagents.startContinuable({
       provider: 'spawn',
@@ -218,7 +221,7 @@ describe('dsh-tool-subagent-control', () => {
       senderSessionId: started.childId,
     })
     expect(delivered[0]?.message.content).toEqual([
-      { type: 'text', text: `Agent ${started.childId} sent a message:` },
+      { type: 'text', text: `Agent ${started.childId} sent a message: ` },
       { type: 'text', text: 'CHILD_FINDING' },
     ])
 
@@ -254,7 +257,7 @@ describe('dsh-tool-subagent-control', () => {
       senderSessionId: parent.id,
     })
     expect(followUp?.type === 'user/message' && followUp.data.content).toEqual([
-      { type: 'text', text: `Agent ${parent.id} sent a message:` },
+      { type: 'text', text: `Agent ${parent.id} sent a message: ` },
       { type: 'text', text: 'and then?' },
     ])
   })
@@ -285,7 +288,7 @@ describe('dsh-tool-subagent-control', () => {
       : [])
     expect(prompts).toEqual([
       'long work',
-      `Agent ${parent.id} sent a message:`,
+      `Agent ${parent.id} sent a message: `,
       'also consider Y',
     ])
   })
@@ -309,7 +312,7 @@ describe('dsh-tool-subagent-control', () => {
       signal: testToolSignal,
     })
     await waitNoActivation(ctx, started.childId)
-    const stranger = ctx.agentLoop.create(SessionId('stranger'), { provider: 'mock', model: 'mock' })
+    const stranger = await ctx.agentLoop.create(SessionId('stranger'), { provider: 'mock', model: 'mock' })
 
     const result = await callTool(ctx, 'send_message', {
       agent_id: started.childId,
@@ -328,6 +331,7 @@ describe('dsh-tool-subagent-control', () => {
 
   it('unregisters with its plugin fiber (HMR safety)', async () => {
     const ctx = new Context()
+    contexts.push(ctx)
     await mountAgentLoopTestDependencies(ctx)
     await ctx.plugin(AgentLoop, { agents: [] })
     await ctx.plugin(SubagentRuntime)
@@ -407,9 +411,9 @@ describe('dsh-tool-subagent-control interrupt_agent', () => {
       : [])
     expect(prompts).toEqual([
       'long work',
-      `Agent ${parent.id} sent a message:`,
+      `Agent ${parent.id} sent a message: `,
       'parked follow-up',
-      `Agent ${parent.id} sent a message:`,
+      `Agent ${parent.id} sent a message: `,
       'wake up',
     ])
   })
@@ -474,7 +478,7 @@ describe('dsh-tool-subagent-control interrupt_agent', () => {
     await vi.waitFor(() => { expect(adapter.requests).toHaveLength(2) })
     const targetAgent = ctx.agents.get(target.childId)!
     const siblingAgent = ctx.agents.get(sibling.childId)!
-    const stranger = ctx.agentLoop.create(SessionId('stranger'), { provider: 'mock', model: 'mock' })
+    const stranger = await ctx.agentLoop.create(SessionId('stranger'), { provider: 'mock', model: 'mock' })
     const cancelSpy = vi.spyOn(targetAgent, 'cancel')
 
     const self = await callTool(ctx, 'interrupt_agent', { agent_id: target.childId }, targetAgent)

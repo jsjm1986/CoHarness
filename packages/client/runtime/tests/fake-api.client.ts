@@ -9,6 +9,7 @@ import type {
 import { RpcId } from '@deepseek-ai/dsh-client-connection/client'
 import type { SessionHistoryIndex } from '@deepseek-ai/dsh-client-connection/client'
 import type { SessionRemotes } from '../src/client/sessions/remotes.ts'
+import type { SubagentPromptRequest } from '@deepseek-ai/dsh-api-remotes/client'
 
 /** Programmable-default workspace row (branded id, ISO-ish times). */
 function fakeWorkspace(id: string, over: Partial<WorkspaceView> = {}): WorkspaceView {
@@ -57,17 +58,33 @@ interface StreamConn<F> {
 }
 
 /**
- * Commands Remote double: the generated face delivers the carrier's outcome, so
- * a test that programs nothing sees an empty catalog and an unmatched line.
+ * Remote double: the generated face delivers the carrier's outcome, so a test
+ * that programs nothing sees an empty catalog and an unmatched line. When the
+ * bench's FakeApiClient is passed, the subagent namespace bridges to its
+ * programmable handlers and call record — the session's Remote call is the
+ * same host conversation the domain endpoint carried.
+ * @param api - the bench client whose subagent handlers answer Remote calls.
  * @returns the Remote namespaces the session cluster calls.
  */
-export function fakeRemote(): SessionRemotes {
+export function fakeRemote(api?: FakeApiClient): SessionRemotes {
   return {
     commands: {
       list: () => Promise.resolve({ ok: true, value: [] }),
       execute: () => Promise.resolve({ ok: true, value: undefined }),
     },
-  }
+    subagents: api === undefined ? {
+      list: () => Promise.resolve({ ok: true, value: { entries: [], parentAvailable: false } }),
+      prompt: () => Promise.resolve({ ok: true, value: { messageId: 'fk-mid' } }),
+      interruptByParent: () => Promise.resolve({ ok: true, value: { accepted: true } }),
+    } : {
+      list: (parentSessionId: SessionId) =>
+        api.subagents.list({ parentSessionId }).then(({ result }) => result as never),
+      prompt: (request: SubagentPromptRequest) =>
+        api.subagents.prompt({ ...request, content: [...request.content] }).then(({ result }) => result as never),
+      interruptByParent: (childSessionId: SessionId, parentSessionId: SessionId, mode: 'continuable') =>
+        api.subagents.interrupt({ childSessionId, parentSessionId, mode }).then(({ result }) => result as never),
+    },
+  } as SessionRemotes
 }
 
 export class FakeApiClient implements IApiClient {
@@ -200,7 +217,13 @@ export class FakeApiClient implements IApiClient {
   onSubagentInterrupt: (payload: unknown) => Promise<RpcResponse<{ accepted: true }>>
     = () => Promise.resolve(ok({ accepted: true as const }))
 
-  readonly subagents: IApiClient['subagents'] = {
+  // Programmable handlers keep the Remote-bridged methods beside the
+  // domain's remaining `history` endpoint.
+  readonly subagents: IApiClient['subagents'] & {
+    list: (payload: unknown) => Promise<RpcResponse<{ entries: never[]; parentAvailable: boolean }>>
+    prompt: (payload: unknown) => Promise<RpcResponse<{ messageId: never }>>
+    interrupt: (payload: unknown) => Promise<RpcResponse<{ accepted: true }>>
+  } = {
     list: (payload: unknown) => this.record('subagent.list', payload, this.onSubagentList(payload)),
     history: (payload: unknown, signal?: AbortSignal) => {
       this.lastHistorySignal = signal
@@ -272,32 +295,12 @@ export class FakeApiClient implements IApiClient {
 
 
   readonly agentPresets: IApiClient['agentPresets'] = {
-    list: (payload: unknown) => this.record('agentPreset.list', payload, Promise.resolve(ok({ presets: [], authorable: false, hasDocument: false }))),
-    select: (payload: { agentPreset: string }) =>
-      this.record('agentPreset.select', payload, Promise.resolve(ok({ agentPreset: payload.agentPreset }))),
-    read: (payload: { agentPreset: string }) =>
-      this.record('agentPreset.read', payload, Promise.resolve(ok({
-        agentPreset: payload.agentPreset, trust: 'user' as const, content: '',
-      }))),
-    copy: (payload: { agentPreset: string }) =>
-      this.record('agentPreset.copy', payload, Promise.resolve(ok({ agentPreset: payload.agentPreset }))),
     openDocument: (payload: { agentPreset: string }) =>
       this.record('agentPreset.openDocument', payload, Promise.resolve(ok({ opened: true as const }))),
-    remove: (payload: { agentPreset: string }) =>
-      this.record('agentPreset.remove', payload, Promise.resolve(ok({}))),
   }
 
   readonly skills: IApiClient['skills'] = {
     list: (payload: unknown) => this.record('skill.list', payload, this.onSkillList(payload)),
-  }
-
-  readonly goals: IApiClient['goals'] = {
-    create: payload => this.record('goal.create', payload, Promise.resolve(ok({ ref: { id: 'fake-goal' as never, revision: 1 } }))),
-    edit: payload => this.record('goal.edit', payload, Promise.resolve(ok({ ref: { id: 'fake-goal' as never, revision: 1 } }))),
-    pause: payload => this.record('goal.pause', payload, Promise.resolve(ok({ ref: { id: 'fake-goal' as never, revision: 1 } }))),
-    resume: payload => this.record('goal.resume', payload, Promise.resolve(ok({ ref: { id: 'fake-goal' as never, revision: 1 } }))),
-    complete: payload => this.record('goal.complete', payload, Promise.resolve(ok({ ref: { id: 'fake-goal' as never, revision: 1 } }))),
-    clear: payload => this.record('goal.clear', payload, Promise.resolve(ok({ cleared: true as const }))),
   }
 
   readonly settings: IApiClient['settings'] = {

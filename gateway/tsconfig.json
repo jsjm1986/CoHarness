@@ -7,10 +7,14 @@
     "noUncheckedIndexedAccess": true,
     "allowImportingTsExtensions": true,
     "paths": {
-      "@deepseek-ai/dsh-llm/discovery": ["../packages/llm/llm/src/discovery.ts"]
+      "@deepseek-ai/dsh-llm/discovery": ["../packages/llm/llm/src/discovery.ts"],
+      "@deepseek-ai/dsh-typert-protocol": ["../packages/typert/protocol/src/index.ts"],
+      "@deepseek-ai/dsh-session-format": ["../packages/session/session-format/src/catalog-default.ts"],
+      "@deepseek-ai/dsh-session-format/surface": ["../packages/session/session-format/src/surface.ts"],
+      "@deepseek-ai/dsh-util-values": ["../packages/util/values/src/index.ts"]
     },
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["src", "tests", "scripts"]
+  "include": ["src", "tests", "scripts", "../packages/typert/protocol/src/index.ts"]
 }

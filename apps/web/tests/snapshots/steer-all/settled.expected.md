@@ -31,7 +31,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{clock}}
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -40,9 +43,10 @@
 - button "Commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write
-- button "Select model":
-  - text: Select model
+- button "Select model, current DeepSeek-V4-Flash":
+  - text: DeepSeek-V4-Flash
   - img
+- button "0% of context used"
 - button "Send message" [disabled]
 - button "1 turns · 2 steps · {{throughput}} tok/s":
   - img

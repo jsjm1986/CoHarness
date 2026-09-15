@@ -18,7 +18,7 @@ Remote authorization now has three explicit layers, all fail-closed on omission.
 
    However, the apiproxy's `authorizeTypertRemote` fires before the service is reached, and an endpoint absent from all three tables is rejected with `manage` before the service can authorize. A fourth admission set `PROJECT_TYPERT_REGISTRY_AUTHORIZED` therefore admits `resolveRequestRun` and `invoke` past the default deny so the service's own per-Session authorization can run. The admission is gated by the same principal capture that verified project membership, so no unauthenticated caller reaches the service.
 
-Unclassified endpoints keep the default `manage` refusal; the deny test uses `commands/execute`, a real mutating process-wide Remote that must stay refused. `dynamicCordisRunner/syncInspectManifest`, `resolveInspectQuery`, and the inspect surface remain unclassified and denied in project scope until individually classified.
+Unclassified endpoints keep the default `manage` refusal; the deny test uses `commands/execute`, a real mutating process-wide Remote that must stay refused. `syncInspectManifest` is admitted through `PROJECT_TYPERT_REGISTRY_AUTHORIZED` — the manifest carries no Session identity and the registry owns the process-global mirror — while `resolveInspectQuery` sits in the Session table with `write`, since a Client answer injects model-visible data into the owning conversation.
 
 ## Alternatives considered
 

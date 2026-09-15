@@ -66,7 +66,7 @@ class CatalogAdapter extends LlmAdapter {
   }
 }
 
-/** In-process Code Mode seam fake that invokes the real registry bindings. */
+/** In-process PTC seam fake that invokes the real registry bindings. */
 class FakeRuntime extends CodeRuntime {
   readonly language = 'typescript'
   readonly isolation = 'fake'
@@ -272,7 +272,7 @@ describe('read_image happy path', () => {
     expect(result.isError).toBe(false)
   })
 
-  it('forwards a nested Code Mode image through the outer run_code context', async () => {
+  it('forwards a nested PTC image through the outer run_code context', async () => {
     await writeFile(join(dir, 'red.png'), PNG_1X1)
     const ctx = await setup({ toolMode: 'code' })
     const runtime = ctx.codeRuntime as FakeRuntime
@@ -283,7 +283,7 @@ describe('read_image happy path', () => {
 
     const result = await call(ctx, RUN_CODE_NAME, {
       code: 'return await tools.read_image({ file_path: "red.png" })',
-      description: 'Read the image through Code Mode',
+      description: 'Read the image through PTC',
     }, agentOn('vision-model'))
 
     expect(result.isError).toBe(false)

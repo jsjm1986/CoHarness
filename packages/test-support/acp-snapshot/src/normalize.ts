@@ -379,6 +379,10 @@ export function normalizeSessionLog(
       if ('createdAt' in data) data.createdAt = 0
       if ('updatedAt' in data) data.updatedAt = 0
     }
+    if (record.type === 'subagent/catalog' && record.data !== null && typeof record.data === 'object') {
+      const data = record.data as Record<string, unknown>
+      if ('childCreatedAt' in data) data.childCreatedAt = 0
+    }
     if (Object.hasOwn(record, 'sourceEventSeqs')) {
       record.sourceEventSeqs = decodeSeqRanges(record.sourceEventSeqs)
     }

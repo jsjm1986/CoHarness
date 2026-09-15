@@ -22,7 +22,7 @@
  */
 
 import { discoverModelsAtEndpoint, LlmError, supportsModelListing } from '@deepseek-ai/dsh-llm'
-import type { LlmDiscoveredModel, LlmEndpointResolutionCache, LlmModelDiscoveryRequest } from '@deepseek-ai/dsh-llm'
+import type { LlmDiscoveredModel, LlmEndpointResolutionCache, LlmModelDiscoveryOperation } from '@deepseek-ai/dsh-llm'
 import { catalogModels } from './catalog.ts'
 
 /** Host-owned profile inputs that a configuration draft deliberately omits. */
@@ -49,7 +49,7 @@ export interface StoredModelDiscoveryProfile {
  *   refuses or fails the request, or the reply is not a model listing.
  */
 export async function discoverModels(
-  request: LlmModelDiscoveryRequest,
+  request: LlmModelDiscoveryOperation,
   storedProfile?: () => StoredModelDiscoveryProfile | undefined,
   cache?: LlmEndpointResolutionCache,
 ): Promise<readonly LlmDiscoveredModel[]> {

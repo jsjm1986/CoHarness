@@ -15,6 +15,7 @@ import { PostgresAccountPreferencesService } from '../src/postgres/account-prefe
 import { PostgresAuthService } from '../src/postgres/auth-service.ts'
 import { PostgresCollaborationService } from '../src/postgres/collaboration-service.ts'
 import { ConversationRepository } from '../src/postgres/conversation-repository.ts'
+import type { ConversationEvent, ConversationHeader } from '../src/postgres/conversation-repository.ts'
 import { createPostgresPool, runMigrations } from '../src/postgres/database.ts'
 import { PostgresInstanceRepository } from '../src/postgres/instance-repository.ts'
 import {
@@ -160,7 +161,7 @@ describePg('PostgreSQL baseline', () => {
         session_id,seq,event_type,occurred_at,event,payload_bytes
       ) VALUES('legacy-nul-session',0,'user/message',now(),$1::json,octet_length($1::text))`, [legacyEvent])
       const migrated = await runMigrations(pool, MIGRATIONS)
-      expect(migrated).toEqual({ applied: [16, 17, 18, 19, 20, 21, 22, 23], current: 23 })
+      expect(migrated).toEqual({ applied: [16, 17, 18, 19, 20, 21, 22, 23, 24], current: 24 })
       const legacyFacts = await pool.query<{
         has_visible_content: boolean
         visible_content_seq: string | null
@@ -176,7 +177,7 @@ describePg('PostgreSQL baseline', () => {
       await rm(legacyMigrations, { recursive: true, force: true })
     }
     expect(await runMigrations(pool, MIGRATIONS))
-      .toEqual({ applied: [], current: 23 })
+      .toEqual({ applied: [], current: 24 })
     const pushTables = await pool.query<{ table_name: string }>(`SELECT table_name
       FROM information_schema.tables
       WHERE table_schema='harness' AND table_name IN ('push_devices','push_deliveries')
@@ -661,6 +662,174 @@ describePg('PostgreSQL baseline', () => {
       sessionFormatVersion: 0, createdAt: Date.now() })
     await expect(sessions.append(otherSession, batchId, events))
       .rejects.toThrow(/batch id reused with different content/)
+  })
+
+  it('migrates a legacy body transactionally, preserves the predecessor, and accepts continuation', async () => {
+    const sessions = new ConversationRepository(pool)
+    const sessionId = `migrate-${randomUUID().slice(0, 8)}`
+    const now = Date.now()
+    await sessions.create({ id: sessionId, organizationId, creatorUserId: userId,
+      sessionFormatVersion: 0, createdAt: now, cwd: '/tmp/migrate' })
+    const events = [
+      { type: 'user/message', seq: 0, time: now, data: {
+        content: [{ type: 'text', text: 'legacy migrate-search marker' }],
+        source: { kind: 'user' },
+      } },
+      { type: 'turn/start', seq: 1, time: now + 1, data: { turn: 1 } },
+    ]
+    await sessions.append(sessionId, randomUUID(), events)
+    const source = (await sessions.revision(sessionId))!
+    const migrate = (_header: ConversationHeader, stored: ConversationEvent[]) => ({
+      sessionFormatVersion: 3,
+      seedLength: null,
+      events: [
+        { type: 'system/message', seq: 0, time: stored[0]!.time, surfaceOp: 'append', data: {
+          message: { id: 'migrated-system', content: [{ type: 'text', text: 'migrated preamble' }] },
+        } },
+        ...stored.map((event, index) => ({ ...event, seq: index + 1 })),
+      ],
+    })
+    const first = await sessions.migrate(sessionId, `mig-${sessionId}`, source, 3, migrate)
+    expect(first).toEqual({ status: 'committed', revision: '3:3', nextSeq: 3, seedLength: null })
+
+    const active = await sessions.readFrom(sessionId, 0)
+    expect(active.map(event => event.seq)).toEqual([0, 1, 2])
+    expect(active.map(event => event.type)).toEqual(['system/message', 'user/message', 'turn/start'])
+    const header = await sessions.readHeader(sessionId)
+    expect(header).toMatchObject({ sessionFormatVersion: 3 })
+    expect(header?.seedLength).toBeUndefined()
+    expect((await sessions.search(organizationId, 'migrate-search'))[0])
+      .toMatchObject({ sessionId, seq: 1 })
+    const counters = await pool.query<{
+      next_seq: string; event_count: string; has_visible_content: boolean; visible_content_seq: string | null
+    }>(`SELECT next_seq::text,event_count::text,has_visible_content,visible_content_seq::text
+      FROM harness.conversation_sessions WHERE id=$1`, [sessionId])
+    expect(counters.rows).toEqual([{ next_seq: '3', event_count: '3', has_visible_content: true, visible_content_seq: '1' }])
+
+    const receipts = await pool.query<{
+      from_format_version: number; to_format_version: number; source_revision: string; event_count: string
+    }>(`SELECT from_format_version,to_format_version,source_revision,event_count::text
+      FROM harness.conversation_migrations WHERE session_id=$1`, [sessionId])
+    expect(receipts.rows).toEqual([{
+      from_format_version: 0, to_format_version: 3, source_revision: source, event_count: '2',
+    }])
+    const preserved = await pool.query<{ seq: string; event_type: string }>(`SELECT me.seq::text,me.event_type
+      FROM harness.conversation_migrated_events me
+      JOIN harness.conversation_migrations m ON m.id=me.migration_id
+      WHERE m.session_id=$1 ORDER BY me.seq`, [sessionId])
+    expect(preserved.rows).toEqual([
+      { seq: '0', event_type: 'user/message' },
+      { seq: '1', event_type: 'turn/start' },
+    ])
+
+    await expect(sessions.migrate(sessionId, `mig-${sessionId}`, first.revision, 3, migrate))
+      .resolves.toMatchObject({ status: 'current', nextSeq: 3 })
+    await expect(sessions.migrate(sessionId, `mig-other-${sessionId}`, first.revision, 3, migrate))
+      .resolves.toMatchObject({ status: 'current', nextSeq: 3 })
+
+    await expect(sessions.append(sessionId, randomUUID(), [
+      { type: 'user/message', seq: 3, time: now + 9, data: {
+        content: [{ type: 'text', text: 'continued after migration' }],
+        source: { kind: 'user' },
+      } },
+    ])).resolves.toBe('inserted')
+    expect((await sessions.readFrom(sessionId, 0)).map(event => event.seq)).toEqual([0, 1, 2, 3])
+  })
+
+  it('rejects stale revisions, gaps, and downgrades without touching the body', async () => {
+    const sessions = new ConversationRepository(pool)
+    const sessionId = `migrate-stale-${randomUUID().slice(0, 8)}`
+    const now = Date.now()
+    await sessions.create({ id: sessionId, organizationId, creatorUserId: userId,
+      sessionFormatVersion: 0, createdAt: now })
+    const events = [
+      { type: 'turn/start', seq: 0, time: now, data: { turn: 1 } },
+      { type: 'turn/end', seq: 1, time: now + 1, data: { turn: 1, reason: { kind: 'completed' } } },
+    ]
+    await sessions.append(sessionId, randomUUID(), events)
+    const source = (await sessions.revision(sessionId))!
+    const identity = (_header: ConversationHeader, stored: ConversationEvent[]) => ({
+      sessionFormatVersion: 3,
+      seedLength: null,
+      events: stored.map((event, index) => ({ ...event, seq: index })),
+    })
+
+    await sessions.append(sessionId, randomUUID(), [
+      { type: 'turn/start', seq: 2, time: now + 2, data: { turn: 2 } },
+    ])
+    await expect(sessions.migrate(sessionId, 'mig-stale', source, 3, identity))
+      .rejects.toThrow(/conversation changed while its format migration was preparing/)
+
+    const current = (await sessions.revision(sessionId))!
+    await expect(sessions.migrate(sessionId, 'mig-gap', current, 3,
+      (_header, stored) => ({
+        sessionFormatVersion: 3,
+        seedLength: null,
+        events: stored.map((event, index) => ({ ...event, seq: index + 7 })),
+      })))
+      .rejects.toThrow(/invalid successor body/)
+    await expect(sessions.migrate(sessionId, 'mig-mismatch', current, 3,
+      (_header, stored) => ({
+        sessionFormatVersion: 2,
+        seedLength: null,
+        events: stored.map((event, index) => ({ ...event, seq: index })),
+      })))
+      .rejects.toThrow(/invalid successor body/)
+
+    expect((await pool.query(
+      `SELECT 1 FROM harness.conversation_migrations WHERE session_id=$1`, [sessionId],
+    )).rows).toEqual([])
+    expect((await sessions.readFrom(sessionId, 0)).map(event => event.seq)).toEqual([0, 1, 2])
+    expect((await sessions.readHeader(sessionId))?.sessionFormatVersion).toBe(0)
+
+    const upgraded = (_header: ConversationHeader, stored: ConversationEvent[]) => ({
+      sessionFormatVersion: 3,
+      seedLength: null,
+      events: stored.map((event, index) => ({ ...event, seq: index })),
+    })
+    const committed = await sessions.migrate(sessionId, 'mig-done', current, 3, upgraded)
+    expect(committed.status).toBe('committed')
+    await expect(sessions.migrate(sessionId, 'mig-down', committed.revision, 2, upgraded))
+      .rejects.toThrow(/already uses a newer format/)
+    await expect(sessions.migrate(sessionId, 'mig-done', committed.revision, 3, upgraded))
+      .resolves.toMatchObject({ status: 'current' })
+  })
+
+  it('remigrates a child session and recomputes the root mirror', async () => {
+    const sessions = new ConversationRepository(pool)
+    const suffix = randomUUID().slice(0, 8)
+    const rootId = `migrate-root-${suffix}`
+    const childId = `migrate-child-${suffix}`
+    const now = Date.now()
+    await sessions.create({ id: rootId, organizationId, creatorUserId: userId,
+      sessionFormatVersion: 0, createdAt: now })
+    await sessions.create({ id: childId, organizationId, creatorUserId: userId,
+      sessionFormatVersion: 0, createdAt: now, rootSessionId: rootId, parentSessionId: rootId })
+    await sessions.append(childId, randomUUID(), [
+      { type: 'user/message', seq: 0, time: now, data: {
+        content: [{ type: 'text', text: 'child legacy prompt' }],
+        source: { kind: 'user' },
+      } },
+    ])
+    const source = (await sessions.revision(childId))!
+    const result = await sessions.migrate(childId, `mig-${childId}`, source, 3,
+      (_header, stored) => ({
+        sessionFormatVersion: 3,
+        seedLength: null,
+        events: [
+          { type: 'system/message', seq: 0, time: stored[0]!.time, surfaceOp: 'append', data: {
+            message: { id: 'child-system', content: [{ type: 'text', text: 'child preamble' }] },
+          } },
+          ...stored.map((event, index) => ({ ...event, seq: index + 1 })),
+        ],
+      }))
+    expect(result.status).toBe('committed')
+    const root = await pool.query<{
+      has_visible_content: boolean; visible_content_seq: string | null
+    }>(`SELECT has_visible_content,visible_content_seq::text
+      FROM harness.conversation_sessions WHERE id=$1`, [rootId])
+    expect(root.rows).toEqual([{ has_visible_content: true, visible_content_seq: '1' }])
+    expect((await sessions.readFrom(childId, 0)).map(event => event.seq)).toEqual([0, 1])
   })
 
   it('allocates mounted project runtimes at or above the configured base', async () => {

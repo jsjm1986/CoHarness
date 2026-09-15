@@ -120,3 +120,4 @@
 - **`BlockAssembler` 只处理核心块类型**：如果插件添加块类型的流从未由 `block-end` 关闭，`blocks()` 会抛出异常。
 - **`APP_IDENTITY.url` 指向一个尚不存在的仓库**：该公开主页必须在发布前可访问。
 - **`GenerateOptions.sessionId` 是本地声明的品牌类型**：导入 dsh-session 的 `SessionId` 会产生循环；未来拥有 id 的包可以消除该权宜之计。
+- **`zod` 是生成的 Typert 契约面的运行时依赖，不是 `src` 的依赖。** 发布的 `./typert` 与 `./remote` 出口解析到不经打包的 `lib/typert.*.js` 文件，其中包含裸 `zod` 导入。manifest 必须保留 `zod`；只有当两份生成 JavaScript 契约面都不存在时，`knip.config.ts` 才注入 workspace 级例外，已构建 checkout 则由 Knip 直接观察该导入。

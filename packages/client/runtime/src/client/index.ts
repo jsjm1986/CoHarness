@@ -266,7 +266,7 @@ declare module '@deepseek-ai/cordis' {
 }
 
 /** Required services: the wire handle and Client Typert registry. */
-export const inject = ['connection', 'typert', 'remote', 'remote.commands']
+export const inject = ['connection', 'typert', 'remote', 'remote.commands', 'remote.subagents']
 
 /** Mounts the browser runtime services and connection stream.
  * @param ctx - Client Cordis context.

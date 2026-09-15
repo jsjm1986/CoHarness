@@ -628,7 +628,9 @@ function main(): void {
   const all = patterns(reverse)
   const files = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' })
     .split('\0')
-    .filter(file => file !== '' && !excluded(file))
+    // ls-files reads the index: an unstaged deletion still lists the path, and
+    // a vanished worktree file has no imports left to rewrite.
+    .filter(file => file !== '' && !excluded(file) && existsSync(resolve(root, file)))
 
   const counts = new Map<string, { files: number; lines: number }>()
   const failures: string[] = []

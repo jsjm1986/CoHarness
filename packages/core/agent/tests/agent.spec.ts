@@ -1,10 +1,8 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { Context, Service, symbols } from '@deepseek-ai/cordis'
-import { createUserMessage, freezeMessage } from '@deepseek-ai/dsh-llm'
-import { Session, SessionId, type UserMessage } from '@deepseek-ai/dsh-session'
+import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import AgentRegistry, {
   agentEvents,
-  Inbox,
 } from '@deepseek-ai/dsh-agent'
 import TypertRegistry from '@deepseek-ai/dsh-typert-registry'
 
@@ -16,6 +14,7 @@ import type {
   CreateAgentOptions,
   ResumeAgentOptions,
 } from '@deepseek-ai/dsh-agent'
+import { unsupportedInbox } from '../../../core/agent-loop/tests/inbox-helpers.ts'
 
 function stubAgent(rawId: string, overrides: Partial<Agent> = {}): Agent {
   const id = SessionId(rawId)
@@ -24,7 +23,7 @@ function stubAgent(rawId: string, overrides: Partial<Agent> = {}): Agent {
     id,
     options: {},
     session,
-    inbox: new Inbox(session, { inserted: () => {}, discarded: () => {}, claimed: () => {} }),
+    inbox: unsupportedInbox(),
     status: 'idle',
     ctx: new Context(),
     send: () => {},
@@ -37,152 +36,6 @@ function stubAgent(rawId: string, overrides: Partial<Agent> = {}): Agent {
   }
   return Object.assign(agent, overrides)
 }
-
-describe('Inbox', () => {
-  it('rejects an invalid durable splice during reconstruction', () => {
-    const session = Session.create(SessionId('invalid-inbox-replay'))
-    session.append('agent/inbox/spliced', {
-      target: 'next-turn',
-      start: 1,
-      inserted: [],
-    })
-
-    expect(() => new Inbox(session, { inserted: () => {}, discarded: () => {}, claimed: () => {} }))
-      .toThrow('invalid persisted inbox splice at session seq 0')
-  })
-
-  it('replaces a pending message by identity across both lists', () => {
-    const session = Session.create(SessionId('replace-inbox'))
-    const inserted: UserMessage[] = []
-    const discarded: UserMessage[] = []
-    const inbox = new Inbox(session, {
-      claimed: () => {},
-      inserted: message => void inserted.push(message),
-      discarded: message => void discarded.push(message),
-    })
-    const original = createUserMessage({
-      content: [{ type: 'text', text: 'original' }],
-      source: { kind: 'user' },
-    })
-    const nextStep = createUserMessage({
-      content: [{ type: 'text', text: 'step' }],
-      source: { kind: 'user' },
-    })
-    const replacement = createUserMessage({
-      content: [{ type: 'text', text: 'replacement' }],
-      source: { kind: 'user' },
-    })
-    const editedStep = freezeMessage({
-      ...nextStep,
-      content: [{ type: 'text', text: 'edited step' }],
-    })
-    inbox.append('next-turn', original)
-    inbox.append('next-step', nextStep)
-
-    expect(inbox.replace(createUserMessage({
-      content: [{ type: 'text', text: 'missing' }],
-      source: { kind: 'user' },
-    }).id, replacement)).toBe(false)
-    expect(inbox.replace(original.id, replacement)).toBe(true)
-    expect(inbox.replace(nextStep.id, editedStep)).toBe(true)
-    expect(inbox.nextTurn).toEqual([replacement])
-    expect(inbox.nextStep).toEqual([editedStep])
-    expect(discarded).toEqual([original, nextStep])
-    expect(inserted).toEqual([original, nextStep, replacement, editedStep])
-    expect(() => { inbox.replace(editedStep.id, replacement) })
-      .toThrow(`message "${replacement.id}" is already pending`)
-  })
-
-  it('normalizes splice coordinates, rejects duplicate identities, and reports missing removals', () => {
-    const session = Session.create(SessionId('splice-inbox'))
-    const inbox = new Inbox(session, { inserted: () => {}, discarded: () => {}, claimed: () => {} })
-    const first = createUserMessage({
-      content: [{ type: 'text', text: 'first' }],
-      source: { kind: 'user' },
-    })
-    const second = createUserMessage({
-      content: [{ type: 'text', text: 'second' }],
-      source: { kind: 'user' },
-    })
-
-    inbox.splice('next-turn', Number.NaN, Number.NaN, [first, second])
-    expect(inbox.nextTurn).toEqual([first, second])
-    expect(inbox.splice('next-turn', -1, 1, [])).toEqual([second])
-    expect(inbox.remove(second.id)).toBe(false)
-    expect(() => { inbox.append('next-step', first) }).toThrow(`message "${first.id}" is already pending`)
-  })
-
-  it('clears both pending lists as durable cancellations', () => {
-    const session = Session.create(SessionId('clear-inbox'))
-    const discarded: UserMessage[] = []
-    const inbox = new Inbox(session, {
-      claimed: () => {},
-      inserted: () => {},
-      discarded: message => void discarded.push(message),
-    })
-    const nextTurn = createUserMessage({ content: [{ type: 'text', text: 'turn' }], source: { kind: 'user' } })
-    const nextStep = createUserMessage({ content: [{ type: 'text', text: 'step' }], source: { kind: 'user' } })
-    inbox.append('next-turn', nextTurn)
-    inbox.append('next-step', nextStep)
-    const beforeClear = session.snapshotEvents().length
-
-    inbox.clear()
-
-    expect(inbox.hasPending).toBe(false)
-    expect(discarded).toEqual([nextStep, nextTurn])
-    expect(session.snapshotEvents().slice(beforeClear).map(event => event.type === 'agent/inbox/spliced'
-      ? event.data
-      : event.type)).toEqual([
-      { target: 'next-step', start: 0, removedCount: 1, inserted: [], outcome: 'canceled' },
-      { target: 'next-turn', start: 0, removedCount: 1, inserted: [], outcome: 'canceled' },
-    ])
-
-    inbox.clear()
-    expect(session.snapshotEvents()).toHaveLength(beforeClear + 2)
-  })
-
-  it('enforces count and UTF-8 byte quotas across both targets', () => {
-    const session = Session.create(SessionId('bounded-inbox'))
-    const inbox = new Inbox(
-      session,
-      { inserted: () => {}, discarded: () => {}, claimed: () => {} },
-      { maxMessages: 2, maxBytes: 300 },
-    )
-    const first = createUserMessage({ content: [{ type: 'text', text: 'first' }], source: { kind: 'user' } })
-    const second = createUserMessage({ content: [{ type: 'text', text: 'second' }], source: { kind: 'user' } })
-    const third = createUserMessage({ content: [{ type: 'text', text: 'third' }], source: { kind: 'user' } })
-
-    inbox.append('next-turn', first)
-    inbox.append('next-step', second)
-    expect(() => { inbox.append('next-turn', third) }).toThrow('inbox message limit reached')
-    expect(inbox.nextTurn).toEqual([first])
-    expect(inbox.nextStep).toEqual([second])
-
-    const tiny = new Inbox(
-      Session.create(SessionId('tiny-inbox')),
-      { inserted: () => {}, discarded: () => {}, claimed: () => {} },
-      { maxBytes: 1 },
-    )
-    expect(() => { tiny.append('next-turn', first) }).toThrow('inbox byte limit reached')
-  })
-
-  it('keeps identity lookup correct after prepend, remove, and replacement', () => {
-    const session = Session.create(SessionId('indexed-inbox'))
-    const inbox = new Inbox(session, { inserted: () => {}, discarded: () => {}, claimed: () => {} })
-    const first = createUserMessage({ content: [{ type: 'text', text: 'first' }], source: { kind: 'user' } })
-    const second = createUserMessage({ content: [{ type: 'text', text: 'second' }], source: { kind: 'user' } })
-    const third = createUserMessage({ content: [{ type: 'text', text: 'third' }], source: { kind: 'user' } })
-    inbox.append('next-turn', first)
-    inbox.append('next-turn', second)
-    inbox.prepend('next-turn', third)
-    expect(inbox.remove(first.id)).toBe(true)
-    expect(inbox.replace(second.id, first)).toBe(true)
-    expect(inbox.nextTurn.map(message => message.id)).toEqual([third.id, first.id])
-    expect(inbox.remove(third.id)).toBe(true)
-    expect(inbox.remove(first.id)).toBe(true)
-    expect(inbox.hasPending).toBe(false)
-  })
-})
 
 describe('AgentRegistry', () => {
   it('contributes Agent lookup and scoped Context providers while Typert is live', async () => {

@@ -90,7 +90,7 @@ function wireEvent(event: SessionEvent): DeepSeekSessionLogWireEvent {
       ? {}
       : surfaceOp === 'append'
         ? { surfaceOp }
-        : { surfaceOp: { op: 'replace' as const, start: Number(surfaceOp.start), end: Number(surfaceOp.end) } },
+        : { surfaceOp: { op: 'replace' as const, start: Number(surfaceOp.startSeq), end: Number(surfaceOp.endSeq) } },
   }
 }
 
@@ -176,7 +176,11 @@ export function apply(ctx: Context, config: Config): void {
       return {
         value,
         accept: () => {
-          session.append('session-log-deepseek/delivery-accepted', { sessionId: session.id, throughSeq })
+          session.append('session-log-deepseek/delivery-accepted', {
+            sessionId: session.id,
+            sessionFormatVersion: session.header.version,
+            throughSeq,
+          })
           if (audit) {
             ctx.logger.info(`session-log-deepseek: accepted session ${session.id} through seq ${throughSeq}`)
           }

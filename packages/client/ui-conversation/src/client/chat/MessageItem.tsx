@@ -9,9 +9,8 @@ import type {
   ModelRetryNode, PendingSubmission, TurnErrorNode, UserMessageNode,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { isSessionPersistenceFailureMessage } from '@deepseek-ai/dsh-client-runtime/client'
-import { JsonBlock, MessageText, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
+import { JsonBlock, MessageText, ReferenceIcon, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps, MessageImageSource } from '../contract/slots.ts'
-import { ReferenceIcon } from '../ReferenceIcon.tsx'
 import { CompactionItem } from './CompactionItem.tsx'
 import { ContextInjectionRow } from './ContextInjectionRow.tsx'
 import { MessageIconActions } from './MessageIconActions.tsx'

@@ -8,7 +8,7 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import { hasConversationContent as hasSessionConversationContent } from '@deepseek-ai/dsh-session/surface'
 import type {
   HistoryEntry, HistoryOmittedSpan, IApiClient, MessageId, MuxFrame, PromptContentPart, QueueAction, RpcError,
-  RpcId, RpcResponse, RpcResult, SessionId, SubagentAddress, ToolEventView,
+  RpcId, RpcResponse, RpcResult, SessionId, SubagentAddress, SubagentPromptRequestId, ToolEventView,
 } from '@deepseek-ai/dsh-api-remotes/client'
 // Value import from the inline-safe wire layer (not the connection plugin):
 // plugin-to-plugin value imports are a bundle purity error.
@@ -28,6 +28,7 @@ import type { PendingInteraction } from './pending.ts'
 import { PendingWait } from './pending.ts'
 import { Notifier } from './notifier.ts'
 import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
+import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import type { SessionRemotes } from './remotes.ts'
 import { ProjectionValueStore } from './projection-store.ts'
 import type { ProjectionsBaseline } from './projection-store.ts'
@@ -349,7 +350,7 @@ export class Session implements SessionFace {
     mode: 'queue' | 'steer',
     signal?: AbortSignal,
     requestId?: RpcId,
-  ): Promise<RpcResult<{ accepted: true }>> {
+  ): Promise<RpcResult<{ accepted: true }> | RemoteResult<{ accepted: true }>> {
     this.promptError = null
     this.lastAgentError = null
     // Synchronous, before the first await: the blank → engaging edge must be
@@ -358,7 +359,7 @@ export class Session implements SessionFace {
     this.promptAttempted = true
     if (this.blankBit) this.firstPromptPendingTurn = true
     this.notifier.markDirty()
-    let result: RpcResult<{ accepted: true }>
+    let result: RpcResult<{ accepted: true }> | RemoteResult<{ accepted: true }>
     try {
       if (this.address === undefined) {
         result = (await this.api.sessions.prompt({
@@ -377,16 +378,27 @@ export class Session implements SessionFace {
             details: { childSessionId: this.address.childSessionId },
           },
         }
+      } else if (content.some(part => part.type === 'document')) {
+        result = {
+          ok: false,
+          error: new RemoteError(
+            'subagent/attachment-invalid',
+            'subagent continuation does not accept documents',
+            { reason: 'SUBAGENT_FILE_UNSUPPORTED' },
+          ),
+        }
       } else {
-        // Continuable children accept the same upload-shaped text/image parts
-        // as ordinary sessions; the Host admits image bytes before inbox
-        // acceptance. Documents remain an ordinary-session capability.
-        const routed = (await this.api.subagents.prompt({
-          ...this.address,
-          ...(requestId === undefined ? {} : { requestId }),
-          content: content.filter((part): part is Extract<typeof part, { type: 'text' | 'image' }> => part.type === 'text' || part.type === 'image'),
+        // The preceding branch rejects document parts before the narrower
+        // subagent wire type is used; this array is not filtered or reordered.
+        const routed = await this.remote.subagents.prompt({
+          requestId: randomUUID() as SubagentPromptRequestId,
+          parentSessionId: this.address.parentSessionId,
+          childSessionId: this.address.childSessionId,
+          mode: 'continuable',
+          delivery: mode,
+          content: content as Exclude<PromptContentPart, { readonly type: 'document' }>[],
           clientTimeZone: resolvedClientTimeZone(),
-        }, signal)).result
+        }, signal)
         result = routed.ok ? { ok: true, value: { accepted: true } } : routed
       }
     } catch (error) {
@@ -439,13 +451,13 @@ export class Session implements SessionFace {
   /**
    * Stop the active turn while the Host preserves pending inbox work; failures
    * land in promptError (same error-strip display slot). A continuable
-   * subagent address routes through `subagent.interrupt`, whose durable
+   * subagent address routes through `subagents/interruptByParent`, whose durable
    * parent-address authority works without a live parent Agent; a one-shot
    * address stays uncancellable (the UI offers no stop action, so this arm is
    * defensive).
    * @returns the cancel result.
    */
-  async cancel(): Promise<RpcResult<{ accepted: true }>> {
+  async cancel(): Promise<RpcResult<{ accepted: true }> | RemoteResult<{ accepted: true }>> {
     const address = this.address
     if (address !== undefined && address.mode === 'one-shot') {
       const result: RpcResult<{ accepted: true }> = {
@@ -460,10 +472,14 @@ export class Session implements SessionFace {
       this.notifier.markDirty()
       return result
     }
-    let result: RpcResult<{ accepted: true }>
+    let result: RpcResult<{ accepted: true }> | RemoteResult<{ accepted: true }>
     try {
       result = address !== undefined
-        ? (await this.api.subagents.interrupt(address)).result
+        ? await this.remote.subagents.interruptByParent(
+          address.childSessionId,
+          address.parentSessionId,
+          'continuable',
+        )
         : (await this.api.sessions.cancel({ sessionId: this.sessionId })).result
     } catch (error) {
       result = transportError(error)

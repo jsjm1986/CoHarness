@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import AgentRegistry, { Inbox } from '@deepseek-ai/dsh-agent'
+import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent, AgentCancelCause, InboxTarget } from '@deepseek-ai/dsh-agent'
 import { CallId } from '@deepseek-ai/dsh-llm'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
@@ -10,6 +10,7 @@ import ToolRuntime from '@deepseek-ai/dsh-tools'
 import type { ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import { registerScheduleTools } from '../src/tools.ts'
 import { runScheduleTransaction } from '../src/transaction.ts'
+import { unsupportedInbox } from '../../../core/agent-loop/tests/inbox-helpers.ts'
 
 const signal = new AbortController().signal
 const contexts: Context[] = []
@@ -24,7 +25,7 @@ interface ToolHarness {
 
 function stubAgent(ctx: Context, id: string): Agent {
   const session = ctx.sessions.create(SessionId(id))
-  const inbox = new Inbox(session, { inserted: () => {}, discarded: () => {}, claimed: () => {} })
+  const inbox = unsupportedInbox()
   return {
     id: session.id,
     options: {},

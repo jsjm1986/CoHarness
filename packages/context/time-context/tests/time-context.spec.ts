@@ -4,12 +4,13 @@ import Loader from '@deepseek-ai/cordis-plugin-loader'
 import { createUserMessage, CallId, LlmAdapter } from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { Session, SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
-import AgentRegistry, { agentEvents, Inbox, type Agent } from '@deepseek-ai/dsh-agent'
+import AgentRegistry, { agentEvents, type Agent } from '@deepseek-ai/dsh-agent'
 import { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import * as timeContext from '@deepseek-ai/dsh-time-context'
 import type { Config } from '@deepseek-ai/dsh-time-context'
+import { unsupportedInbox } from '../../../core/agent-loop/tests/inbox-helpers.ts'
 
 const BASE = Date.parse('2026-07-14T00:00:00.000Z')
 const ORIGINAL_TIME_ZONE = process.env['TZ']
@@ -40,7 +41,7 @@ function sessionAgent(session: Session, id = 'agent'): Agent {
     id: SessionId(id),
     options: {},
     session,
-    inbox: new Inbox(session, { inserted: () => {}, discarded: () => {}, claimed: () => {} }),
+    inbox: unsupportedInbox(),
     status: 'running',
     ctx: new Context(),
     send: () => {},
@@ -295,7 +296,7 @@ describe('durable step context', () => {
       content: [{ type: 'text', text: 'compacted history' }],
       source: { kind: 'plugin', plugin: 'compaction-basic' },
     }), {
-      surfaceOp: { op: 'replace', start: user.seq, end: reading.seq },
+      surfaceOp: { op: 'replace', startSeq: user.seq, endSeq: reading.seq },
       sourceEventSeqs: [user.seq, reading.seq],
     })
     original.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
@@ -421,7 +422,7 @@ describe('real agent-loop request history', () => {
       subject.cancel({ kind: 'user' })
       return next()
     })
-    const agent = ctx.agentLoop.create(SessionId(`late-${mode}`), { provider: 'mock', model: 'mock' })
+    const agent = await ctx.agentLoop.create(SessionId(`late-${mode}`), { provider: 'mock', model: 'mock' })
 
     agent.followup(createUserMessage({ content: [{ type: 'text', text: 'start' }], source: { kind: 'user' } }))
     await agent.whenIdle()
@@ -444,7 +445,7 @@ describe('real agent-loop request history', () => {
         return [{ type: 'text' as const, text: 'advanced' }]
       },
     }))
-    const agent = ctx.agentLoop.create(SessionId('loop'), { provider: 'mock', model: 'mock' })
+    const agent = await ctx.agentLoop.create(SessionId('loop'), { provider: 'mock', model: 'mock' })
 
     agent.followup(createUserMessage({ content: [{ type: 'text', text: 'start' }], source: { kind: 'user' } }))
     await agent.whenIdle()

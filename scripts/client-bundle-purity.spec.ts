@@ -78,9 +78,16 @@ describe('client bundle purity gate', () => {
   it('lets inline-safe wire layers inline', () => {
     expect(resolveId('@deepseek-ai/dsh-host-apiproxy/api')).toBeNull()
     expect(resolveId('@deepseek-ai/dsh-session/surface')).toBeNull()
+    expect(resolveId('@deepseek-ai/dsh-session-format/surface')).toBeNull()
     expect(resolveId('@deepseek-ai/dsh-brand')).toBeNull()
     expect(resolveId('@deepseek-ai/dsh-util-crypto')).toBeNull()
     expect(resolveId('@deepseek-ai/dsh-util-values')).toBeNull()
+    expect(resolveId('@deepseek-ai/dsh-typert-protocol')).toBeNull()
+  })
+
+  it('admits only the pinned session-format surface subpath', () => {
+    expect(() => resolveId('@deepseek-ai/dsh-session-format')).toThrow(/purity/)
+    expect(() => resolveId('@deepseek-ai/dsh-session-format/catalog')).toThrow(/purity/)
   })
 
   it('lets exact generated Remote contributions inline without admitting their package implementation', () => {

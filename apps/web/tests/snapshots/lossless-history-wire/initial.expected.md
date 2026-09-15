@@ -54,7 +54,13 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{date}} {{clock}} Ran for {{duration}}
+- button "Usage 450 tok · Cache hit 75%":
+  - img
+  - text: Usage 450 tok · Cache hit 75%
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{date}} {{clock}}
 - button "1 intermediate message" [expanded]:
   - text: 1 intermediate message
   - img
@@ -75,7 +81,13 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{date}} {{clock}} Ran for {{duration}}
+- button "Usage 450 tok · Cache hit 75%":
+  - img
+  - text: Usage 450 tok · Cache hit 75%
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{date}} {{clock}}
 - button "1 intermediate message" [expanded]:
   - text: 1 intermediate message
   - img
@@ -96,7 +108,13 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{date}} {{clock}} Ran for {{duration}}
+- button "Usage 450 tok · Cache hit 75%":
+  - img
+  - text: Usage 450 tok · Cache hit 75%
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{date}} {{clock}}
 - button "1 tool call · 2 intermediate messages" [expanded]:
   - text: 1 tool call · 2 intermediate messages
   - img
@@ -128,7 +146,13 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{date}} {{clock}} Ran for {{duration}}
+- button "Usage 900 tok · Cache hit 75%":
+  - img
+  - text: Usage 900 tok · Cache hit 75%
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{date}} {{clock}}
 - button "Process details" [expanded]:
   - text: Process details
   - img
@@ -145,7 +169,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{date}} {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{date}} {{clock}}
 - button "Back to bottom":
   - img
 - textbox "Message the agent"
@@ -156,8 +183,8 @@
 - button "Commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write
-- button "Select model":
-  - text: Select model
+- button "Select model, current DeepSeek-V4-Flash":
+  - text: DeepSeek-V4-Flash
   - img
 - button "Send message" [disabled]
 - button "8 turns · 9 steps · {{throughput}} tok/s":

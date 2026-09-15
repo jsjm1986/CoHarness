@@ -14,6 +14,20 @@ import { mkdir, open } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
+/** Prefix shared by default-root creation and startup discovery. */
+export const DEFAULT_ROOT_PREFIX = 'dsh-spill-'
+
+/**
+ * Test a caught value for a Node system error code.
+ *
+ * @param error The caught value.
+ * @param code The expected system error code.
+ * @returns Whether the code matches.
+ */
+export function isErrno(error: unknown, code: string): boolean {
+  return error instanceof Error && (error as NodeJS.ErrnoException).code === code
+}
+
 let defaultRoot: string | undefined
 
 /**
@@ -25,7 +39,7 @@ let defaultRoot: string | undefined
  * @returns The lazily-created private spill root.
  */
 export function privateRoot(): string {
-  defaultRoot ??= mkdtempSync(join(tmpdir(), 'dsh-spill-'))
+  defaultRoot ??= mkdtempSync(join(tmpdir(), DEFAULT_ROOT_PREFIX))
   return defaultRoot
 }
 

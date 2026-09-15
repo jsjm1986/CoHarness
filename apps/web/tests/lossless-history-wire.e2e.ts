@@ -75,7 +75,6 @@ interface WirePageEvidence {
 interface StableUiEvidence {
   stats: string
   tool: string
-  settledFooter: string
   interruptedTextCount: number
   interruptedReasoningCount: number
   stoppedCount: number
@@ -493,12 +492,10 @@ async function firstBrowserHistoryPage(
 async function stableUiEvidence(page: Page, scaffold: WebScaffold): Promise<StableUiEvidence> {
   const stats = page.locator('[data-composer-stats]').first()
   const tails = page.locator('[data-chat-flow-kind="turn-tail"]')
-  const tailCount = await tails.count()
-  if (tailCount < 2) throw new Error('expected settled and interrupted turn tails')
+  if (await tails.count() < 2) throw new Error('expected settled and interrupted turn tails')
   return {
     stats: (await stats.textContent()) ?? '',
     tool: await captureStableAria(page, '[data-sample="bash"]', scaffold.workspaceCwd),
-    settledFooter: (await tails.nth(tailCount - 2).textContent()) ?? '',
     interruptedTextCount: await page.getByText(INTERRUPTED_TEXT, { exact: true }).count(),
     interruptedReasoningCount: await page.getByRole('button', {
       name: new RegExp(`^Think ${INTERRUPTED_REASONING}`),
@@ -653,15 +650,25 @@ describe('web e2e: lossless history wire pagination', () => {
     expect(initialUi.stats).toContain(FULL_COUNTS)
     expect(initialUi.stats).toContain('Cache hit 75%')
     expect(initialUi.stats).toContain('tok')
-    const usageButton = page.getByRole('button', { name: /Cache hit 75%/u })
+    const usageButton = page.locator('[data-composer-stats]').first()
+      .getByRole('button', { name: /Cache hit 75%/u })
     await usageButton.click()
     const usageDetails = page.locator('[data-session-stats-usage]')
     await usageDetails.waitFor({ timeout: 10_000 })
     expect((await usageDetails.textContent()) ?? '').toMatch(/input/i)
     expect((await usageDetails.textContent()) ?? '').toContain('Output')
     await usageButton.press('Escape')
-    expect(initialUi.settledFooter).not.toContain('TTFT')
-    expect(initialUi.settledFooter).not.toContain('tok/s')
+    // Per-turn TTFT and throughput live in the turn-time dialog; with the
+    // chunk runs still omitted the settled tail's dialog carries neither row.
+    const initialTails = page.locator('[data-chat-flow-kind="turn-tail"]')
+    const initialTimeButton = initialTails.nth((await initialTails.count()) - 2)
+      .getByRole('button', { name: /Ran for/u })
+    await initialTimeButton.click()
+    const initialTimeDetails = page.locator('[data-turn-time-details]')
+    await initialTimeDetails.waitFor({ timeout: 10_000 })
+    expect((await initialTimeDetails.textContent()) ?? '').not.toContain('TTFT')
+    expect((await initialTimeDetails.textContent()) ?? '').not.toContain('tok/s')
+    await initialTimeButton.press('Escape')
     expect(initialUi.interruptedTextCount).toBe(1)
     expect(initialUi.interruptedReasoningCount).toBe(1)
     expect(initialUi.stoppedCount).toBe(1)
@@ -738,8 +745,17 @@ describe('web e2e: lossless history wire pagination', () => {
     await timeDetails.waitFor({ timeout: 10_000 })
     expect((await timeDetails.textContent()) ?? '').toContain('TTFT')
     await timeButton.press('Escape')
-    expect(expandedUi.settledFooter).toContain('TTFT')
-    expect(expandedUi.settledFooter).toContain('tok/s')
+    // The filled chunk runs land TTFT and decode throughput on the settled
+    // tail's turn-time dialog rather than inline footer text.
+    const expandedTails = page.locator('[data-chat-flow-kind="turn-tail"]')
+    const expandedTimeButton = expandedTails.nth((await expandedTails.count()) - 2)
+      .getByRole('button', { name: /Ran for/u })
+    await expandedTimeButton.click()
+    const turnTimeDetails = page.locator('[data-turn-time-details]')
+    await turnTimeDetails.waitFor({ timeout: 10_000 })
+    expect((await turnTimeDetails.textContent()) ?? '').toContain('TTFT')
+    expect((await turnTimeDetails.textContent()) ?? '').toContain('tok/s')
+    await expandedTimeButton.press('Escape')
     expect(expandedUi.interruptedTextCount).toBe(1)
 
     const pages = await Promise.all(historyReads)

@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { Context } from '@deepseek-ai/cordis'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
+import type { Agent } from '@deepseek-ai/dsh-agent'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import SessionStore, { SESSION_FORMAT_VERSION, SessionId, SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
@@ -27,7 +28,11 @@ import { MockAdapter, textResponse } from '../../../core/agent-loop/tests/mock-a
 type Script = ConstructorParameters<typeof MockAdapter>[0]
 
 const roots: string[] = []
-afterEach(() => {
+const contexts: Context[] = []
+afterEach(async () => {
+  // Dispose live contexts before removing roots: agent write handles keep lock
+  // files open under their owning fibers until the fiber drains.
+  for (const ctx of contexts.splice(0)) await ctx.fiber.dispose()
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
@@ -37,12 +42,19 @@ async function setup(
   options: { sessionProjections?: boolean; projectionCache?: boolean } = {},
 ) {
   const ctx = new Context()
-  await mountAgentLoopTestDependencies(ctx)
+  contexts.push(ctx)
   const root = mkdtempSync(join(tmpdir(), 'dsh-subagent-list-'))
   roots.push(root)
+  if (options.sessionProjections === false) {
+    // The missing-registry failure is checked before parent resolution, so the
+    // store and the subagents service alone reach it.
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(SubagentRuntime)
+    return { ctx, parent: { id: SessionId('no-projections-parent') } as Agent }
+  }
+  await mountAgentLoopTestDependencies(ctx)
   await ctx.plugin(JsonlSessionPersistence, { root })
   await ctx.plugin(AgentLoop, { agents: [] })
-  if (options.sessionProjections !== false) await ctx.plugin(SessionProjectionRegistry)
   if (options.projectionCache === true) {
     await ctx.plugin(Storage)
     ctx.storage.backend.register('memory', new MemoryStorageBackend(new MemoryMediaPool()))
@@ -55,7 +67,7 @@ async function setup(
   await ctx.plugin(SubagentSpawn, { providerName: 'spawn' })
   await ctx.plugin(SubagentFork, { providerName: 'fork' })
   ctx.llm.registerAdapter(['mock'], new MockAdapter(script))
-  const parent = ctx.agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
+  const parent = await ctx.agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
   return { ctx, parent }
 }
 
@@ -64,7 +76,7 @@ const testSignal = new AbortController().signal
 /** Start one continuable child through the real service path and await Activation release. */
 async function startChild(
   ctx: Context,
-  parent: ReturnType<Context['agentLoop']['create']>,
+  parent: Agent,
   label: string,
 ): Promise<SessionId> {
   const started = await ctx.subagents.startContinuable({
@@ -156,6 +168,7 @@ const hostileProjectionDefinition = {
 describe('SubagentRuntime.listChildren', () => {
   it('lists live children without persistence, query services, or the continuation runtime', async () => {
     const ctx = new Context()
+    contexts.push(ctx)
     await ctx.plugin(SessionStore)
     await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(SubagentRuntime)
@@ -191,6 +204,7 @@ describe('SubagentRuntime.listChildren', () => {
 
   it('fails loud when the session store is not mounted', async () => {
     const ctx = new Context()
+    contexts.push(ctx)
     await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(SubagentRuntime)
     await expect(ctx.subagents.listChildren(SessionId('no-store-parent'))).rejects.toThrow(
@@ -692,7 +706,7 @@ describe('SubagentRuntime.listChildren', () => {
         content: [{ type: 'text', text: 'summary of everything' }],
         source: { kind: 'plugin', plugin: 'compact' },
       }),
-      surfaceOp: { op: 'replace', start: SessionSeq(1), end: SessionSeq(1) },
+      surfaceOp: { op: 'replace', startSeq: SessionSeq(1), endSeq: SessionSeq(1) },
       sourceEventSeqs: [SessionSeq(1)],
     })
     const compacted = await authorChild(ctx, '00000000-0000-4000-8000-00000000c1de', {

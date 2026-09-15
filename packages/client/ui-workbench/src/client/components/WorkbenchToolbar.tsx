@@ -1,7 +1,10 @@
 /** Workbench controls, Workspace/session chooser, and compact pane tabs. */
 import { useEffect, useState } from 'react'
 import type { PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
-import { Button, IconChevronDownOutline14, IconPlusOutline16, Menu, Modal, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
+import {
+  Button, IconChevronDownOutline14, IconCopyOutline16, IconEditOutline16, IconLogoutOutline16,
+  IconPlusOutline16, IconTrashOutline16, Menu, Modal, StateDot,
+} from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { WorkspaceResourceRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import type { AddPaneResult, ConversationViewportMode, SessionId, SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
@@ -173,12 +176,12 @@ export function WorkbenchToolbar({
         }} items={[
           ...(listWorkbenches?.() ?? [{ id: 'default', name: '我的工作台', paneIds: [], updatedAt: Date.now() }]).map(item => ({ id: item.id, label: `${item.name} · ${item.paneIds.length}/4` })),
           { type: 'separator' as const, id: 'workbench-actions-separator' },
-          { id: '__new', label: t('newWorkbench') },
-          { id: '__rename', label: t('renameWorkbench') },
-          { id: '__duplicate', label: t('duplicateWorkbench') },
-          { id: '__delete', label: t('deleteWorkbench'), danger: true },
+          { id: '__new', label: t('newWorkbench'), icon: <IconPlusOutline16 /> },
+          { id: '__rename', label: t('renameWorkbench'), icon: <IconEditOutline16 /> },
+          { id: '__duplicate', label: t('duplicateWorkbench'), icon: <IconCopyOutline16 /> },
+          { id: '__delete', label: t('deleteWorkbench'), icon: <IconTrashOutline16 />, danger: true },
           { type: 'separator' as const, id: 'workbench-exit-separator' },
-          { id: '__exit', label: t('exitWorkbench') },
+          { id: '__exit', label: t('exitWorkbench'), icon: <IconLogoutOutline16 /> },
         ]} selectedId={viewport.mode === 'workbench' ? currentWorkbench?.()?.id : undefined} anchor={<button type="button" className={css.workbenchTrigger} aria-label="选择工作台" aria-haspopup="menu" aria-expanded={workbenchMenuOpen} onClick={() => { setWorkbenchMenuOpen(value => !value) }}>{viewport.mode === 'workbench' ? currentWorkbench?.()?.name ?? t('mode') : t('mode')} <IconChevronDownOutline14 /></button>} />
         {viewport.mode === 'workbench' && <span className={css.paneCount} aria-label={`${viewport.paneIds.length}/4`}>{viewport.paneIds.length}/4</span>}
       </div>

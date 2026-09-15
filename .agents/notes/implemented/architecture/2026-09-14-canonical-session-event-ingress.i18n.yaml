@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-14-canonical-session-event-ingress.md
+2026-09-14-canonical-session-event-ingress.md: 3e237563476d2d7bd7de5a25aaeaf25ed6625855
+2026-09-14-canonical-session-event-ingress.zh.md: 33d72310ef390b0a427fcefee2b60b3c48d78e76

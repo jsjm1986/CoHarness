@@ -221,25 +221,25 @@ describe('SQLite session search', () => {
   it('defaults and validates opening policy and persisted inspection concurrency through its Cordis config', async () => {
     const defaultCtx = await liveContext()
     expect((defaultCtx.sessionQuery as SqliteSessionQueryEngine).config.openAt).toBe('startup')
-    expect((defaultCtx.sessionQuery as SqliteSessionQueryEngine).config.persistedInspectConcurrency)
+    expect((defaultCtx.sessionQuery as SqliteSessionQueryEngine).config.persistedReadConcurrency)
       .toBe(SESSION_QUERY_DEFAULT_PERSISTED_INSPECT_CONCURRENCY)
 
     const configuredValue = 2
     const configured = new SqliteSessionQueryEngine.Config({
       path: ':memory:',
       openAt: 'first-search',
-      persistedInspectConcurrency: configuredValue,
+      persistedReadConcurrency: configuredValue,
     })
     expect(configured.openAt).toBe('first-search')
-    expect(configured.persistedInspectConcurrency).toBe(configuredValue)
+    expect(configured.persistedReadConcurrency).toBe(configuredValue)
     const configuredCtx = await liveContext(configured)
-    expect((configuredCtx.sessionQuery as SqliteSessionQueryEngine).config.persistedInspectConcurrency)
+    expect((configuredCtx.sessionQuery as SqliteSessionQueryEngine).config.persistedReadConcurrency)
       .toBe(configuredValue)
 
-    for (const persistedInspectConcurrency of [0, Number.MAX_SAFE_INTEGER + 1]) {
+    for (const persistedReadConcurrency of [0, Number.MAX_SAFE_INTEGER + 1]) {
       expect(() => new SqliteSessionQueryEngine.Config({
         path: ':memory:',
-        persistedInspectConcurrency,
+        persistedReadConcurrency,
       })).toThrow()
     }
     expect(() => new SqliteSessionQueryEngine.Config({
@@ -440,7 +440,7 @@ describe('SQLite session search', () => {
       { type: 'assistant/chunk', seq: SessionSeq(1), time: 11, data: { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'needle raw' } } },
       { type: 'user/message', seq: SessionSeq(2), time: 12, data: createUserMessage({
         content: [{ type: 'text', text: 'needle summary' }], source: { kind: 'plugin', plugin: 'test' },
-      }), surfaceOp: { op: 'replace', start: SessionSeq(0), end: SessionSeq(0) }, sourceEventSeqs: [SessionSeq(0)] },
+      }), surfaceOp: { op: 'replace', startSeq: SessionSeq(0), endSeq: SessionSeq(0) }, sourceEventSeqs: [SessionSeq(0)] },
       { type: 'turn/end', seq: SessionSeq(3), time: 13, data: { turn: 1, reason: { kind: 'error', error: { message: 'needle failure', code: 'UNKNOWN' } } } },
     ]
     ctx.sessions.create(SessionId('a'), { seed: events, meta: { cwd: '/a', parentSession: parent, createdAt: 20 } })
@@ -735,8 +735,8 @@ describe('SQLite session search', () => {
       { path: ':memory:', maxLimit: 1e100 },
       { path: ':memory:', snippetChars: 0 },
       { path: ':memory:', readWindowMax: -1 },
-      { path: ':memory:', persistedInspectConcurrency: 0 },
-      { path: ':memory:', persistedInspectConcurrency: Number.MAX_SAFE_INTEGER + 1 },
+      { path: ':memory:', persistedReadConcurrency: 0 },
+      { path: ':memory:', persistedReadConcurrency: Number.MAX_SAFE_INTEGER + 1 },
       { path: ':memory:', defaultLimit: 3, maxLimit: 2 },
       { path: ':memory:', openAt: 'later' },
       { path: ':memory:', journalMode: 'memory' },

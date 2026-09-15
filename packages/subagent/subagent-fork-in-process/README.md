@@ -31,7 +31,7 @@ See [`dsh-subagent-spawn-in-process`](../subagent-spawn-in-process/README.md) fo
 
 #### What the model sees
 
-The child receives the parent's balanced completed-turn surface prefix, then the new task content verbatim. A configured persona shadows prompt text in the child's fresh scope; a tool restriction filters its global wire schemas, executable lookup, and Code Mode SDK bindings but not standalone guidance. The parent's tool view and authority are not inherited. An optional structured-output request adds its child-only contract. The parent's current in-flight turn is excluded.
+The child receives the parent's balanced completed-turn surface prefix, then the new task content verbatim. A configured persona shadows prompt text in the child's fresh scope; a tool restriction filters its global wire schemas, executable lookup, and PTC mode SDK bindings but not standalone guidance. The parent's tool view and authority are not inherited. An optional structured-output request adds its child-only contract. The parent's current in-flight turn is excluded.
 
 #### Token effect
 
@@ -58,4 +58,4 @@ Append-only; newly visible content follows the reusable request prefix and does 
 ## Known Limitations and Deferred Work
 
 - **The seed is a one-time snapshot** — the child sees the parent's completed turns as of the fork and nothing the parent logs afterwards; there is no live context sharing.
-- **Fork lifecycle policy differs by composition** — the base bundle and the ACP/headless examples bind the fork delegation tool to `backgroundMode: one-shot`, while the Web app agent presets (`code`, `cordis`, `standard`) select `continuable`. Both keep the inherited prefix eligible for reuse because parent and child messaging definitions match byte for byte; explicit persona, tool filtering, generated-SDK, or route changes can still break equality. Rationale: [the cache-preserving fork Agent Note](../../../.agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.md).
+- **Fork lifecycle policy differs by composition** — the base bundle and the ACP/headless examples bind the fork delegation tool to `backgroundMode: one-shot`, while the Web app agent presets (`ptc`, `cordis`, `standard`) select `continuable`. Both keep the inherited prefix eligible for reuse because parent and child messaging definitions match byte for byte; explicit persona, tool filtering, generated-SDK, or route changes can still break equality. Rationale: [the cache-preserving fork Agent Note](../../../.agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.md).

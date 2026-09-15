@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-agent-tool-presentation",
-  "description": "Agent-plane presentation selector: composes one agent's tools as Code Mode, native, or both",
+  "description": "Agent-plane presentation selector: composes one agent's tools as PTC, native, or both",
   "version": "0.1.5-alpha.1.coharness.1",
   "publishConfig": {
     "access": "public"

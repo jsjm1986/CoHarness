@@ -24,7 +24,7 @@ interface Bench {
 function bench(): Bench {
   const ctx = new Context()
   const api = new FakeApiClient()
-  const svc = new SessionRuntime(ctx, api, fakeRemote())
+  const svc = new SessionRuntime(ctx, api, fakeRemote(api))
   return { ctx, api, svc }
 }
 

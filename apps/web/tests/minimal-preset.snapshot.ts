@@ -111,7 +111,8 @@ describe('minimal agent preset', () => {
       editor: text(editor),
     }).toMatchInlineSnapshot(`
       {
-        "bash": "PERSISTED:{{cwd}}/persistent-state\n[Command finished with exit code 0]",
+        "bash": "PERSISTED:{{cwd}}/persistent-state
+      [Command finished with exit code 0]",
         "editor": "Here's the content of {{cwd}}/preset-smoke.txt with line numbers (which has a total of 2 lines):
            1  MINIMAL_EDITOR_OK
            2",

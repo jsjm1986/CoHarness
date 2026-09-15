@@ -375,6 +375,9 @@ describe('Gateway document transfer broker', () => {
     }])
     expect(JSON.stringify(result)).not.toContain('/private/should-not-leak')
     expect(fetch).toHaveBeenCalledTimes(4)
+    // The copy reads declared length and identity bytes; a compressed runtime
+    // response drops content-length, so the source fetch asks for identity.
+    expect(((fetch.mock.calls[0]?.[1] as RequestInit).headers as Headers).get('accept-encoding')).toBe('identity')
     expect(fetch.mock.calls[1]?.[0]).toContain('/api/documents/uploads')
     expect(runtime.audit).toHaveBeenCalledWith(expect.objectContaining({ action: 'documents.transfer' }))
   })

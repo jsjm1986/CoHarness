@@ -13,6 +13,7 @@ import type { StreamChunk } from '@deepseek-ai/dsh-llm'
 import {
   CallId,
   createAssistantMessage,
+  createMessage,
   createToolResultMessage,
   createUserMessage,
 } from '@deepseek-ai/dsh-llm'
@@ -198,10 +199,18 @@ function appendTitle(session: Session, title: string, messageSeq: SessionSeq): v
 }
 
 function appendRequestHeader(session: Session, turn: number, step: number): void {
+  session.append('system/message', {
+    turn,
+    step,
+    message: createMessage({
+      role: 'system',
+      content: [{ type: 'text', text: `Synthetic performance system prompt for turn ${String(turn)}, step ${String(step)}.` }],
+      source: { kind: 'plugin', plugin: 'test-fixture' },
+    }),
+  }, { surfaceOp: 'append' })
   session.append('request/header', {
     header: {
       config: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
-      system: `Synthetic performance system prompt for turn ${String(turn)}, step ${String(step)}.`,
     },
     reason: turn === 1 && step === 1 ? 'initial' : 'change',
   })

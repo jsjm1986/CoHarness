@@ -43,7 +43,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{clock}}
 - button "5 tool calls · 6 intermediate messages":
   - text: 5 tool calls · 6 intermediate messages
   - img
@@ -104,7 +107,10 @@
 - button "Branch into a new conversation":
   - img
 - tooltip "Branch into a new conversation"
-- text: {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{clock}}
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -113,9 +119,10 @@
 - button "Commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write
-- button "Select model":
-  - text: Select model
+- button "Select model, current DeepSeek-V4-Flash":
+  - text: DeepSeek-V4-Flash
   - img
+- button "9% of context used"
 - button "Send message" [disabled]
 - button "2 turns · 12 steps · {{throughput}} tok/s":
   - img

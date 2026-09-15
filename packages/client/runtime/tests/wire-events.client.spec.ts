@@ -80,6 +80,7 @@ async function mount(): Promise<Bench> {
   }
   ctx.reflect.provide('connection', handle)
   ctx.reflect.provide('remote.commands', fakeRemote().commands)
+  ctx.reflect.provide('remote.subagents', fakeRemote().subagents)
   await ctx.plugin(RuntimeClient).await()
   return bench
 }

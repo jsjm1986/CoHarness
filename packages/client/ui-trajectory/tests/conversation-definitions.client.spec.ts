@@ -28,6 +28,25 @@ registerTrajectoryAssistantDefinition(registrationContext)
 registerTrajectoryToolDefinition(registrationContext)
 registerTrajectoryCompactionDefinitions(registrationContext)
 
+/** Minimal stand-in for ui-conversation's `system-prompt` Context, which the
+ * request-header Definition resolves through `reader.previous`. */
+const systemPromptStub: ConversationNodeDefinition<{ text: string }> = {
+  kind: 'system-prompt',
+  match: event => event.type === 'system/message'
+    ? { id: String(event.seq), role: 'start' }
+    : null,
+  start: (_context, match) => ({
+    text: match.event.type === 'system/message'
+      ? match.event.data.message.content
+        .filter(block => block.type === 'text')
+        .map(block => block.type === 'text' ? block.text : '')
+        .join('\n')
+      : '',
+  }),
+  update: context => context.state,
+}
+DEFINITIONS.push(systemPromptStub)
+
 class TestEventDefinitions {
   entries(): readonly ConversationNodeDefinition[] {
     return DEFINITIONS
@@ -209,14 +228,14 @@ describe('Trajectory conversation Definitions', () => {
       at(4, 'tool/call', {
         turn: 1, step: 1, callId: 'root-b', name: 'parallel', arguments: '{}',
       }),
-      at(5, 'tool/code-dispatch-start', {
+      at(5, 'tool/ptc-dispatch-start', {
         rootCallId: 'root-a',
         parentCallId: 'root-a',
         subCallId: 'child',
         name: 'read',
         arguments: { path: 'README.md' },
       }),
-      at(6, 'tool/code-dispatch', {
+      at(6, 'tool/ptc-dispatch', {
         rootCallId: 'root-a',
         parentCallId: 'root-a',
         subCallId: 'child',
@@ -280,30 +299,39 @@ describe('Trajectory conversation Definitions', () => {
   it('classifies claimed inbox input as steering and consumes one inherited prompt change', () => {
     const value = assembler([
       at(1, 'turn/start', { turn: 1 }),
-      at(2, 'request/header', {
+      at(2, 'system/message', {
+        turn: 1,
+        step: 1,
+        message: {
+          role: 'system',
+          id: 'system-1',
+          content: [{ type: 'text', text: 'system prompt' }],
+          source: { kind: 'plugin', plugin: 'test' },
+        },
+      }, { surfaceOp: 'append' }),
+      at(3, 'request/header', {
         reason: 'initial',
         header: {
           config: { provider: 'test', model: 'test' },
-          system: 'system prompt',
           tools: [],
         },
       }),
-      at(3, 'step/start', { turn: 1, step: 1 }),
-      at(4, 'assistant/message', {
+      at(4, 'step/start', { turn: 1, step: 1 }),
+      at(5, 'assistant/message', {
         turn: 1,
         step: 1,
         message: assistantMessage('assistant-1', 'first'),
       }),
-      at(5, 'step/end', { turn: 1, step: 1 }),
-      at(6, 'agent/inbox/spliced', {
+      at(6, 'step/end', { turn: 1, step: 1 }),
+      at(7, 'agent/inbox/spliced', {
         target: 'next-step', start: 0, removedCount: 0, inserted: [{ id: 'm1' }],
       }),
-      at(7, 'agent/inbox/spliced', {
+      at(8, 'agent/inbox/spliced', {
         target: 'next-step', start: 0, removedCount: 1, inserted: [],
       }),
-      at(8, 'step/start', { turn: 1, step: 2 }),
+      at(9, 'step/start', { turn: 1, step: 2 }),
     ])
-    value.append(at(9, 'user/message', {
+    value.append(at(10, 'user/message', {
       id: 'm1',
       role: 'user',
       content: [{ type: 'text', text: 'steer here' }],
@@ -312,14 +340,14 @@ describe('Trajectory conversation Definitions', () => {
     value.flush()
 
     const steering = snapshot(value)
-    expect(steering.eventNodes.find(node => node.seq === 9)?.kind).toBe('steering')
-    expect(steering.eventLocations.get(9)).toMatchObject({
+    expect(steering.eventNodes.find(node => node.seq === 10)?.kind).toBe('steering')
+    expect(steering.eventLocations.get(10)).toMatchObject({
       kind: 'step',
       turn: { turn: 1 },
       step: { step: 2 },
     })
 
-    value.append(at(10, 'assistant/message', {
+    value.append(at(11, 'assistant/message', {
       turn: 1,
       step: 2,
       message: assistantMessage('assistant-2', 'second'),

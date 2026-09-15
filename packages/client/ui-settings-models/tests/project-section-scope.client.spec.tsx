@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ModelsSection } from '../src/client/ModelsSection.tsx'
 import type { ModelsSectionProps } from '../src/client/ModelsSection.tsx'
 import type { ProviderRow } from '../src/client/store.ts'
@@ -51,6 +51,7 @@ function props(overrides: Partial<ModelsSectionProps> = {}): ModelsSectionProps 
     controller: personal,
     useSnapshot: (() => personal.store.getSnapshot()) as never,
     api: {} as never,
+    discoverModels: vi.fn(),
     schema: settingsSchema,
     t: key => en[key],
     ...overrides,
@@ -64,7 +65,7 @@ describe('ModelsSection project scope', () => {
     render(<ModelsSection {...props({
       settingsScope: 'project',
       projectId: 7,
-      projectBinding: () => ({ controller: project, api: {} as never }),
+      projectBinding: () => ({ controller: project, api: {} as never, discoverModels: vi.fn() }),
     })} />)
     expect(screen.getByText('Project relay')).toBeTruthy()
     expect(screen.queryByText('Personal relay')).toBeNull()

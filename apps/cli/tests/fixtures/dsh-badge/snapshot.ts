@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import { Context } from '@deepseek-ai/cordis'
-import { agentEvents, Inbox, type Agent } from '@deepseek-ai/dsh-agent'
+import { agentEvents, type Agent, type Inbox } from '@deepseek-ai/dsh-agent'
 import { CallId } from '@deepseek-ai/dsh-llm'
 import { boot, loadOverlayPatches } from '@deepseek-ai/dsh-app-boot'
 import { SessionId } from '@deepseek-ai/dsh-session'
@@ -24,7 +24,16 @@ try {
     id: agentId,
     options: {},
     session,
-    inbox: new Inbox(session, { inserted: () => {}, discarded: () => {}, claimed: () => {} }),
+    inbox: {
+      nextTurn: [],
+      nextStep: [],
+      clear() { throw new Error('snapshot agent inbox is read-only') },
+      append() { throw new Error('snapshot agent inbox is read-only') },
+      prepend() { throw new Error('snapshot agent inbox is read-only') },
+      replace() { throw new Error('snapshot agent inbox is read-only') },
+      remove() { throw new Error('snapshot agent inbox is read-only') },
+      splice() { throw new Error('snapshot agent inbox is read-only') },
+    } satisfies Inbox,
     status: 'idle',
     send: () => {},
     followup: () => {},

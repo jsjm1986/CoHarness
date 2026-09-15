@@ -71,7 +71,7 @@ export interface ISession {
     mode: 'queue' | 'steer',
     signal?: AbortSignal,
     requestId?: RpcId,
-  ): Promise<RpcResult<{ accepted: true }>>
+  ): Promise<RpcResult<{ accepted: true }> | RemoteResult<{ accepted: true }>>
   /**
    * Resolve one durable image referenced by this session.
    * @param attachmentId - opaque id found in the folded session log.
@@ -92,7 +92,7 @@ export interface ISession {
    * order after the Host reaches cancellation quiescence.
    * @returns acceptance, or the business error.
    */
-  cancel(): Promise<RpcResult<{ accepted: true }>>
+  cancel(): Promise<RpcResult<{ accepted: true }> | RemoteResult<{ accepted: true }>>
   /**
    * Rename this session (explicit user title; pins it against automatic
    * regeneration).

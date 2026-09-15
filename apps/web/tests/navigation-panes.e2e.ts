@@ -349,7 +349,7 @@ describe('web e2e: navigation & panes over a rich seeded session', () => {
       const input = page.locator('textarea').first()
       const slashDownloadPromise = page.waitForEvent('download', { timeout: 30_000 })
       await input.fill('/export')
-      await page.getByRole('option', { name: /export/u }).waitFor({ timeout: 10_000 })
+      await page.getByRole('option', { name: /export/iu }).waitFor({ timeout: 10_000 })
       await input.press('Enter')
       const slashDownload = await slashDownloadPromise
       expect(slashDownload.suggestedFilename()).toBe(download.suggestedFilename())

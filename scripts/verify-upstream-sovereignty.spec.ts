@@ -15,7 +15,7 @@ import {
 
 const root = resolve(import.meta.dirname, '..')
 
-const SYNCED_COMMIT = '82a5fd61a7cf5c293cec4bdff68f455398d685e9'
+const SYNCED_COMMIT = 'fb2c4b9e698e30edb738bca4cf0618587db7d203'
 
 function synthetic(overrides: Record<string, unknown> = {}): unknown {
   return {
@@ -134,7 +134,7 @@ describe('checked-in manifest', () => {
 
   it('loads scripts/upstream-sync.json pinned at the mirrored release tag', () => {
     expect(manifest.version).toBe(2)
-    expect(manifest.syncedTag).toBe('dsh-v0.1.3-alpha.2')
+    expect(manifest.syncedTag).toBe('dsh-v0.1.5-rc.2')
     expect(manifest.syncedCommit).toBe(SYNCED_COMMIT)
   })
 

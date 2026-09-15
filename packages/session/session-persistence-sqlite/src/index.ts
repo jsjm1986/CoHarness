@@ -140,7 +140,7 @@ export class SqliteSessionPersistence extends SessionPersistence {
     return this.coordinator.readFrom(id, fromSeq, signal)
   }
 
-  /** Publish a current-format metadata generation while preserving event rows.
+  /** Publish the migrated generation: event rows and header in one transaction.
    * @param sourceStorage - legacy storage metadata.
    * @param currentStorage - normalized storage metadata.
    * @param events - validated events.

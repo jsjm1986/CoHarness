@@ -23,7 +23,7 @@ afterEach(async () => {
   root = undefined
 })
 
-async function load(): Promise<Context> {
+async function load(compression: 'none' | 'gzip' = 'none'): Promise<Context> {
   root = await mkdtemp(join(tmpdir(), 'dsh-userdoc-http-loader-'))
   const uploads = join(root, 'uploads')
   const config = join(root, 'cordis.yml')
@@ -32,6 +32,7 @@ async function load(): Promise<Context> {
     '  config:',
     "    host: '127.0.0.1'",
     '    port: 0',
+    `    compression: ${compression}`,
     "- name: '@deepseek-ai/dsh-client-connection'",
     "- name: '@deepseek-ai/dsh-userdoc-local'",
     '  config:',
@@ -99,5 +100,43 @@ describe('real Loader composition', () => {
     expect(entry?.fiber).toBeDefined()
     await entry!.fiber!.dispose()
     expect((await fetch(`${origin}/api/documents`)).status).toBe(404)
+  })
+
+  it('serves identity bytes with a declared length under gzip compression', { timeout: 60_000 }, async () => {
+    const ctx = await load('gzip')
+    const origin = `http://127.0.0.1:${String(ctx.webServer.port)}`
+    const started = await fetch(`${origin}/api/documents/uploads`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ version: 1, name: 'loader.bin', directory: '', bytes: 6, fingerprint: 'loader' }),
+    })
+    const session = await started.json() as { uploadId: string }
+    const data = new TextEncoder().encode('loader')
+    const digest = createHash('sha256').update(data).digest('hex')
+    await fetch(`${origin}/api/documents/uploads/${session.uploadId}/chunks/0`, {
+      method: 'PUT',
+      headers: {
+        'content-range': 'bytes 0-5/6',
+        'content-length': '6',
+        'x-dsh-chunk-sha256': digest,
+      },
+      body: data,
+    })
+    await fetch(`${origin}/api/documents/uploads/${session.uploadId}/complete`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ version: 1, sha256: digest }),
+    })
+    let completed = await fetch(`${origin}/api/documents/uploads/${session.uploadId}`)
+    for (let attempt = 0; completed.status === 202 && attempt < 50; attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 2))
+      completed = await fetch(`${origin}/api/documents/uploads/${session.uploadId}`)
+    }
+    const ref = (await completed.json() as { ref: { docId: string } }).ref
+
+    const downloaded = await fetch(`${origin}/api/documents/content?id=${encodeURIComponent(ref.docId)}`)
+    expect(downloaded.status).toBe(200)
+    expect(downloaded.headers.get('content-encoding')).not.toBe('gzip')
+    expect(downloaded.headers.get('content-length')).toBe('6')
+    expect(downloaded.headers.get('cache-control')).toContain('no-transform')
+    expect(await downloaded.text()).toBe('loader')
   })
 })

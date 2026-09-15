@@ -16,7 +16,6 @@
 
 import { useId, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { DiscoveredModelView, IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
 import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import { formatCapacity, parseCapacity } from './DeepSeekModelsEditor.tsx'
 import type { DeepSeekModelDraft } from './DeepSeekModelsEditor.tsx'
@@ -66,6 +65,40 @@ export interface ProbeTarget {
   apiKey?: string
 }
 
+/** One probe request to the model-discovery endpoint. */
+export interface ModelDiscoveryRequest {
+  /** Provider route the draft edits, when one exists. */
+  provider?: string
+  /** Endpoint to interrogate. */
+  baseURL?: string
+  /** Wire protocol the endpoint speaks, when the draft names one. */
+  api?: string
+  /** Credential for this interrogation alone. */
+  apiKey?: string
+}
+
+/** One model an interrogated endpoint advertises. */
+export interface ModelDiscoveryView {
+  /** Model id the endpoint accepts. */
+  id: string
+  /** Human-readable name when the endpoint supplies one. */
+  name?: string
+  /** Maximum combined request and response context, when disclosed. */
+  contextWindow?: number
+  /** Maximum output tokens, when disclosed. */
+  maxTokens?: number
+  /** Accepted request modalities when the source discloses them; absent means unknown. */
+  inputModalities?: readonly string[]
+}
+
+/** Probe outcome; the ambient face is the generated `llm` Remote result. */
+export type ModelDiscoveryOutcome =
+  | { ok: true; value: readonly ModelDiscoveryView[] }
+  | { ok: false; error: { message: string } }
+
+/** Interrogate one endpoint for the models it advertises. */
+export type ModelDiscoveryProbe = (settingsNs: string, request: ModelDiscoveryRequest) => Promise<ModelDiscoveryOutcome>
+
 /** Props of {@link ModelListEditor}. */
 export interface ModelListEditorProps {
   /** The rows as currently drafted. */
@@ -85,8 +118,8 @@ export interface ModelListEditorProps {
    * told what the field already says.
    */
   probeBlocked?: keyof typeof en | undefined
-  /** Wire face the fetch action calls. */
-  api: Pick<IApiClient, 'llm'>
+  /** Discovery probe the fetch action calls; project scope routes through the project transport. */
+  discoverModels: ModelDiscoveryProbe
   /** Section copy. */
   t: (key: keyof typeof en) => string
   /** Disable every control (read-only deployment or a pending write). */
@@ -148,7 +181,7 @@ function capacitySpelling(value: number | undefined): string {
 }
 
 /** Adopt a candidate, keeping whatever capacities the provider disclosed. */
-function adopt(candidate: DiscoveredModelView): ModelDraft {
+function adopt(candidate: ModelDiscoveryView): ModelDraft {
   return {
     id: candidate.id,
     ...candidate.name === undefined ? {} : { name: candidate.name },
@@ -182,10 +215,10 @@ function copyEfforts(model: ModelDraft): ReasoningEfforts {
  * @returns the model-list editor.
  */
 export function ModelListEditor(props: ModelListEditorProps): ReactNode {
-  const { models, onChange, probe, api, t, disabled } = props
+  const { models, onChange, probe, discoverModels, t, disabled } = props
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<string | undefined>(undefined)
-  const [candidates, setCandidates] = useState<readonly DiscoveredModelView[] | undefined>(undefined)
+  const [candidates, setCandidates] = useState<readonly ModelDiscoveryView[] | undefined>(undefined)
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set())
   const capacityHelpPrefix = useId()
   const [candidateQuery, setCandidateQuery] = useState('')
@@ -357,18 +390,17 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
     setBusy(true)
     setFailure(undefined)
     try {
-      const response = await api.llm.discoverModels({
-        settingsNs: probe.settingsNs,
+      const response = await discoverModels(probe.settingsNs, {
         ...probe.provider === undefined ? {} : { provider: probe.provider },
         ...probe.baseURL === undefined || probe.baseURL.length === 0 ? {} : { baseURL: probe.baseURL },
         ...probe.api === undefined ? {} : { api: probe.api },
         ...probe.apiKey === undefined ? {} : { apiKey: probe.apiKey },
       })
-      if (!response.result.ok) {
-        setFailure(response.result.error.message)
+      if (!response.ok) {
+        setFailure(response.error.message)
         return
       }
-      const found = response.result.value.models
+      const found = response.value
       if (found.length === 0) {
         setFailure(t('fetchEmpty'))
         return

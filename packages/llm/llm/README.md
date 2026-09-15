@@ -116,3 +116,4 @@ Pass-through; the registry preserves the assembled request prefix, while the sel
 - **`BlockAssembler` handles core block kinds only** — a plugin-added block type whose stream is never closed by `block-end` makes `blocks()` throw.
 - **`APP_IDENTITY.url` names a repository that does not exist yet** — the public home must be reachable before release.
 - **`GenerateOptions.sessionId` is a locally-declared brand** — importing dsh-session's `SessionId` would cycle; a future ids-owning package would dissolve the workaround.
+- **`zod` is a runtime dependency of generated Typert faces, not of `src`.** The published `./typert` and `./remote` exports resolve to unbundled `lib/typert.*.js` files with bare `zod` imports. The manifest must retain `zod`; `knip.config.ts` adds a workspace-scoped exception only when neither generated JavaScript face exists, while a built checkout lets Knip observe the import directly.

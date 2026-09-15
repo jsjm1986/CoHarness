@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import InvariantRegistry, { InvariantError } from '@deepseek-ai/dsh-invariants'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import * as ToolInvariant from '../src/invariant.ts'
 import '../src/model-selection-state.ts'
+import { subagentModelSelectionProjectionDefinition } from '../src/model-selection-state.ts'
 
 const selectableSchema = {
   name: 'subagent',
@@ -24,8 +26,10 @@ function agent(withPolicy: boolean): { session: Session } {
 async function run(withPolicy: boolean, schemas: readonly object[]): Promise<unknown> {
   const ctx = new Context()
   ctx.provide('tools', { schemas: () => schemas } as never)
+  await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(InvariantRegistry)
   await ctx.plugin(ToolInvariant)
+  ctx.sessionProjections.register(subagentModelSelectionProjectionDefinition)
   const payload = {
     agent: agent(withPolicy),
     messages: [],

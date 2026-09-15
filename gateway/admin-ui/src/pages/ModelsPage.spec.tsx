@@ -156,6 +156,25 @@ describe('ModelsPage', () => {
     expect(screen.queryByRole('button', { name: '登记模型' })).toBeNull()
   })
 
+  it('routes the discovery probe through the organization model endpoint', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.discoverOrganizationModels).mockResolvedValue({
+      models: [{ id: 'chat-probed', name: 'Probed Chat' }],
+    })
+    render(<ModelsPage />)
+    await screen.findByText('组织主连接')
+    await user.click(screen.getByRole('button', { name: '编辑 组织主连接 (org-primary)' }))
+    await user.click(screen.getByText('自定义设置'))
+    await user.click(screen.getByRole('button', { name: '获取可用模型' }))
+
+    await waitFor(() => expect(api.discoverOrganizationModels).toHaveBeenCalledWith(expect.objectContaining({
+      provider: 'org-primary',
+      baseURL: profile.baseURL,
+      api: profile.api,
+    })))
+    expect(await screen.findByText('chat-probed')).toBeTruthy()
+  })
+
   it('shows personal registration history without exposing an organization write action', async () => {
     const user = userEvent.setup()
     render(<ModelsPage />)

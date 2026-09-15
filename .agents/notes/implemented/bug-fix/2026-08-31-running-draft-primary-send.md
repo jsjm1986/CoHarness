@@ -20,7 +20,7 @@ The `InputBar` component tests cover empty, text, cleared, submitted, image-only
 
 ## Related
 
-The empty-draft Cmd/Ctrl+Enter whole-queue gesture remains owned by [Steer the whole Web queue with an empty-draft Cmd/Ctrl+Enter](../feature/2026-08-06-web-queue-steer-all-gesture.md); this note defines the pointer action for an actionable draft.
+The empty-draft Cmd/Ctrl+Enter whole-queue gesture remains owned by [Steer the whole Web queue with an empty-draft Cmd/Ctrl+Enter](../../archived/feature/2026-08-06-web-queue-steer-all-gesture.md); this note defines the pointer action for an actionable draft.
 
 ## Alternatives considered
 

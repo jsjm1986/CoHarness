@@ -135,6 +135,7 @@ export function validateUpstreamSyncManifest(raw: unknown, repoRoot: string): Up
       if (!Array.isArray(removed) || removed.length === 0) {
         fail(`manifest package "${key}" removedUpstreamPaths must be a non-empty array`)
       }
+      const removedPaths: string[] = []
       for (const removedPath of removed) {
         if (typeof removedPath !== 'string' || !removedPath.startsWith(`packages/${key}/`) || removedPath.split('/').includes('..')) {
           fail(`manifest package "${key}" removedUpstreamPaths entry must be a "packages/${key}/…" path, got ${JSON.stringify(removedPath)}`)
@@ -142,8 +143,9 @@ export function validateUpstreamSyncManifest(raw: unknown, repoRoot: string): Up
         if (existsSync(resolve(repoRoot, removedPath))) {
           fail(`manifest package "${key}" lists removedUpstreamPaths entry "${removedPath}" that exists on disk`)
         }
+        removedPaths.push(removedPath)
       }
-      entry.removedUpstreamPaths = [...removed]
+      entry.removedUpstreamPaths = removedPaths
     }
     packages[key] = entry
   }

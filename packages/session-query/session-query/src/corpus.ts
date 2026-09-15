@@ -45,7 +45,7 @@ export class SessionCorpus {
 
   constructor(
     private readonly _ctx: Context,
-    private readonly _persistedInspectConcurrency: number,
+    private readonly _persistedReadConcurrency: number,
   ) {
     this._optionalPersistenceFiber = _ctx.inject(['sessionPersistence'], (childCtx: Context) => {
       const service = childCtx.sessionPersistence
@@ -214,7 +214,7 @@ export class SessionCorpus {
         await resolvePersisted(unresolved[index] as SessionId)
       }
     }
-    const workerCount = Math.min(this._persistedInspectConcurrency, unresolved.length)
+    const workerCount = Math.min(this._persistedReadConcurrency, unresolved.length)
     const settlements = await Promise.allSettled(
       Array.from({ length: workerCount }, () => worker()),
     )

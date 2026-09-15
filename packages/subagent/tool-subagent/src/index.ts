@@ -38,10 +38,11 @@ import type {} from './model-selection-settings.ts'
 import {
   recordSubagentModelSelection,
   subagentModelSelectionPolicy,
+  subagentModelSelectionProjectionDefinition,
 } from './model-selection-state.ts'
 
 export const name = 'tool-subagent'
-export const inject = ['tools', 'subagents', 'systemPrompt']
+export const inject = ['tools', 'subagents', 'systemPrompt', 'sessionProjections']
 
 /** Prompt order after bounded delegation policy and before child messaging. */
 const SUBAGENT_SECTION_ORDER = FIRST_PARTY_SECTION_ORDER.TOOL_SUBAGENT
@@ -306,6 +307,12 @@ function resolveDelegationRun(
   }
 }
 
+/**
+ * Install one delegation-tool composition.
+ * @param ctx - Context that owns the registrations.
+ * @param config - delegation-tool configuration.
+ * @param session - unpublished Session supplied by a direct Agent setup; omit for a standing composition.
+ */
 export function apply(ctx: Context, config: Config, session?: Session): void {
   // Direct apply() bypasses Schemastery's numeric constraints. A direct-apply
   // omission stays capless (the schema default only runs through the loader).
@@ -319,6 +326,7 @@ export function apply(ctx: Context, config: Config, session?: Session): void {
   const toolName = config.toolName ?? 'subagent'
 
   const modelSelectionCapable = config.modelSelectionSettings === true
+  ctx.sessionProjections.register(subagentModelSelectionProjectionDefinition)
 
   const assertSubagentProviderConfiguration = (subagentProvider: SubagentProvider): void => {
     if (typeof config.maxDepth === 'number' && !subagentProvider.capabilities.depthLimit) {
@@ -327,12 +335,12 @@ export function apply(ctx: Context, config: Config, session?: Session): void {
         + 'set maxDepth: \'provider-managed\' to leave the recursion budget to the provider',
       )
     }
-    if (config.agentOptions !== undefined && subagentProvider.capabilities.agentOptions === false) {
+    if (config.agentOptions !== undefined && !subagentProvider.capabilities.agentOptions) {
       throw new Error(
         `tool-subagent: provider "${subagentProvider.name}" does not support child agentOptions`,
       )
     }
-    if (modelSelectionCapable && subagentProvider.capabilities.agentOptions === false) {
+    if (modelSelectionCapable && !subagentProvider.capabilities.agentOptions) {
       throw new Error(
         `tool-subagent: provider "${subagentProvider.name}" does not support child model selection`,
       )
@@ -492,21 +500,15 @@ export function apply(ctx: Context, config: Config, session?: Session): void {
           if (requiresRoutePreflight) {
             const llm = runtimeCtx.get('llm')
             if (llm === undefined) {
-              // Legacy providers may own their configured route without a
-              // provider-neutral LLM registry. A model-facing override still
-              // needs the registry so it fails before child creation.
-              if (hasDelegationModelRequest(modelRequest)) {
-                throw new Error('cannot resolve the selected child LLM route because the `llm` service is unavailable')
-              }
-            } else {
-              await preflightChildLlmRoute(
-                llm,
-                parentOptions,
-                requestedChildAgentOptions,
-                exec.signal,
-                providerRouteDefaults === undefined,
-              )
+              throw new Error('cannot resolve the selected child LLM route because the `llm` service is unavailable')
             }
+            await preflightChildLlmRoute(
+              llm,
+              parentOptions,
+              requestedChildAgentOptions,
+              exec.signal,
+              providerRouteDefaults === undefined,
+            )
             if (runtimeCtx.subagents.getProvider(config.provider) !== subagentProvider) {
               throw new Error(`subagent provider "${config.provider}" changed while resolving the child LLM route; retry the delegation`)
             }
@@ -621,20 +623,28 @@ export function apply(ctx: Context, config: Config, session?: Session): void {
   const selectForSession = (target: Session): ModelSelectionPolicy | undefined => {
     const freshSession = target.firstLiveSeq === 0
       && target.eventAt(SessionSeq(0))?.type !== 'session/end-seed'
-    let allowedModels = subagentModelSelectionPolicy(target)
+    let allowedModels = subagentModelSelectionPolicy(ctx.sessionProjections, target)
     if (allowedModels === undefined) {
       const parentId = target.header.origin === 'subagent'
         ? target.header.parentSession
         : undefined
       if (parentId !== undefined) {
-        const parent = ctx.get('agents')?.get(parentId)
-        allowedModels = parent === undefined ? undefined : subagentModelSelectionPolicy(parent.session)
+        const sessions = ctx.get('sessions')
+        if (sessions === undefined) {
+          throw new Error('tool-subagent: child model-selection inheritance requires the Session registry')
+        }
+        const parent = sessions.get(parentId)
+        allowedModels = parent === undefined
+          ? undefined
+          : subagentModelSelectionPolicy(ctx.sessionProjections, parent)
       } else if (freshSession) {
         const current = settings.current()
         allowedModels = current.enabled ? current.allowedModels : undefined
       }
     }
-    if (allowedModels !== undefined) recordSubagentModelSelection(target, allowedModels)
+    if (allowedModels !== undefined) {
+      recordSubagentModelSelection(ctx.sessionProjections, target, allowedModels)
+    }
     return allowedModels === undefined ? undefined : { routes: allowedModels }
   }
 
@@ -644,11 +654,11 @@ export function apply(ctx: Context, config: Config, session?: Session): void {
   }
   const compositionScope = scopeOf(ctx)
   if (compositionScope === undefined) {
-    throw new Error('tool-subagent: `modelSelectionSettings` requires an Agent or preset scope')
+    throw new Error('tool-subagent: standing `modelSelectionSettings` requires a scoped preset Context')
   }
   const agents = ctx.get('agents')
-  /* v8 ignore next -- Agent and preset scopes are minted only by the Agent registry. */
-  if (agents === undefined) throw new Error('tool-subagent: scoped model-selection settings require the Agent registry')
+  /* v8 ignore next -- shipped preset compositions always include the Agent registry. */
+  if (agents === undefined) throw new Error('tool-subagent: standing `modelSelectionSettings` requires the Agent registry')
   const scopedInstalls = new WeakMap<Agent, ReturnType<Context['inject']>>()
   const installing = new WeakSet<Agent>()
   const belongsToComposition = (candidate: Agent): boolean =>
@@ -679,16 +689,14 @@ export function apply(ctx: Context, config: Config, session?: Session): void {
     })
   }
   const reconcileComposedAgents = (): void => {
-    // Every Agent and preset scope is minted by the Agent registry; the scope
-    // check above makes this same-process typed relationship authoritative.
     for (const candidate of agents.list()) {
       if (belongsToComposition(candidate)) installScoped(candidate)
       else removeScoped(candidate)
     }
   }
-  // A shipped preset is mounted once in a standing scope. Its listener admits
-  // only descendant Agents and installs the sampled tool definition in each
-  // Agent's own scope, so a later settings change cannot mutate a live session.
+  // The preset-scoped listener admits descendant Agents and installs the
+  // sampled tool definition in each Agent's own scope, so a later settings
+  // change cannot mutate a live session.
   ctx.on('agent/created', ({ agent: created }) => {
     installScoped(created)
   })
@@ -700,4 +708,5 @@ export function apply(ctx: Context, config: Config, session?: Session): void {
   // Presets are optional for this Consumer; keep the event name available at
   // runtime without making the package depend on the preset roster's types.
   ctx.on('agent-preset/recomposed' as never, reconcileComposedAgents as never)
+  reconcileComposedAgents()
 }

@@ -8,6 +8,7 @@ import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import { MockAdapter, textResponse } from './mock-adapter.ts'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 
 async function harness(adapter: MockAdapter): Promise<Context> {
   const ctx = new Context()
@@ -16,6 +17,7 @@ async function harness(adapter: MockAdapter): Promise<Context> {
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(AgentRegistry)
+  await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(AgentLoop, { agents: [] })
   ctx.llm.registerAdapter(['mock'], adapter)
   return ctx
@@ -31,7 +33,7 @@ describe('agent/request-error', () => {
   it('does not offer middleware failures to request recovery', async () => {
     const adapter = new MockAdapter([textResponse('unused')])
     const ctx = await harness(adapter)
-    const agent = ctx.agentLoop.create(SessionId('request-error-narrow'), { provider: 'mock', model: 'mock' })
+    const agent = await ctx.agentLoop.create(SessionId('request-error-narrow'), { provider: 'mock', model: 'mock' })
     let recoveries = 0
     ctx.on('agent/request', () => {
       throw new LlmError('middleware failed', 'MIDDLEWARE')
@@ -54,7 +56,7 @@ describe('agent/request-error', () => {
       textResponse('ok'),
     ])
     const ctx = await harness(adapter)
-    const agent = ctx.agentLoop.create(SessionId('request-error-retry'), { provider: 'mock', model: 'mock' })
+    const agent = await ctx.agentLoop.create(SessionId('request-error-retry'), { provider: 'mock', model: 'mock' })
     const seen: {
       turn: number
       step: number
@@ -103,7 +105,7 @@ describe('agent/request-error', () => {
   it('lets cancellation win over a retry action', async () => {
     const adapter = new MockAdapter([fail('busy', 'RATE_LIMIT'), textResponse('unused')])
     const ctx = await harness(adapter)
-    const agent = ctx.agentLoop.create(SessionId('request-error-cancel'), { provider: 'mock', model: 'mock' })
+    const agent = await ctx.agentLoop.create(SessionId('request-error-cancel'), { provider: 'mock', model: 'mock' })
     ctx.on('agent/request-error', async ({ agent: subject }) => {
       subject.cancel({ kind: 'user' })
       return { kind: 'retry' }
@@ -123,7 +125,7 @@ describe('agent/request-error', () => {
   it('does not retry when the recovery listener fails before returning its action', async () => {
     const adapter = new MockAdapter([fail('busy', 'RATE_LIMIT'), textResponse('unused')])
     const ctx = await harness(adapter)
-    const agent = ctx.agentLoop.create(SessionId('request-error-recovery-failed'), {
+    const agent = await ctx.agentLoop.create(SessionId('request-error-recovery-failed'), {
       provider: 'mock',
       model: 'mock',
     })

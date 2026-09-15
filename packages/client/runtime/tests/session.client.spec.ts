@@ -169,7 +169,7 @@ const TEST_CONVERSATION: ConversationRuntime = {
 }
 
 function makeSession(api = new FakeApiClient()): { api: FakeApiClient; session: Session } {
-  return { api, session: new Session(SID, api, fakeRemote(), { conversation: TEST_CONVERSATION }) }
+  return { api, session: new Session(SID, api, fakeRemote(api), { conversation: TEST_CONVERSATION }) }
 }
 
 function chatEvents(snapshot: ConversationSnapshot): readonly TestEventState[] {
@@ -475,7 +475,7 @@ describe('live event path', () => {
         entries: () => [testViewDefinition()],
       } as unknown as ConversationRuntime['views'],
     }
-    const session = new Session(SID, api, fakeRemote(), { conversation })
+    const session = new Session(SID, api, fakeRemote(api), { conversation })
     await session.open()
     const snapshots: ConversationSnapshot[] = []
     session.subscribe(() => { snapshots.push(session.getSnapshot()) })
@@ -788,7 +788,7 @@ describe('conversation-tier history', () => {
 describe('prompt and cancel errors', () => {
   it('routes an addressed child through non-activating history, continuation prompt, and interrupt only', async () => {
     const api = new FakeApiClient()
-    const session = new Session(SID, api, fakeRemote(), {
+    const session = new Session(SID, api, fakeRemote(api), {
       address: { parentSessionId: PARENT, childSessionId: SID, mode: 'continuable' },
       parentAvailable: true,
     })
@@ -806,7 +806,9 @@ describe('prompt and cancel errors', () => {
     ])
     expect(api.callsOf('subagent.prompt')).toEqual([
       {
+        requestId: expect.any(String) as string,
         parentSessionId: PARENT, childSessionId: SID, mode: 'continuable',
+        delivery: 'queue',
         content: [{ type: 'text', text: '继续' }],
         clientTimeZone: new Intl.DateTimeFormat().resolvedOptions().timeZone,
       },
@@ -827,7 +829,7 @@ describe('prompt and cancel errors', () => {
 
   it('forwards upload-shaped image parts to a continuable child', async () => {
     const api = new FakeApiClient()
-    const session = new Session(SID, api, fakeRemote(), {
+    const session = new Session(SID, api, fakeRemote(api), {
       address: { parentSessionId: PARENT, childSessionId: SID, mode: 'continuable' },
       parentAvailable: true,
     })
@@ -838,9 +840,11 @@ describe('prompt and cancel errors', () => {
     ]
     await expect(session.prompt(content, 'queue')).resolves.toMatchObject({ ok: true })
     expect(api.callsOf('subagent.prompt')).toEqual([{
+      requestId: expect.any(String) as string,
       parentSessionId: PARENT,
       childSessionId: SID,
       mode: 'continuable',
+      delivery: 'queue',
       content,
       clientTimeZone: new Intl.DateTimeFormat().resolvedOptions().timeZone,
     }])
@@ -851,7 +855,7 @@ describe('prompt and cancel errors', () => {
     api.onSubagentInterrupt = () => Promise.resolve(err({
       code: 'subagent-unauthorized', message: 'nope', details: { childSessionId: SID },
     }) as never)
-    const session = new Session(SID, api, fakeRemote(), {
+    const session = new Session(SID, api, fakeRemote(api), {
       address: { parentSessionId: PARENT, childSessionId: SID, mode: 'continuable' },
       parentAvailable: true,
     })
@@ -865,7 +869,7 @@ describe('prompt and cancel errors', () => {
 
   it('keeps one-shot history readable without exposing prompt or cancel transport', async () => {
     const api = new FakeApiClient()
-    const session = new Session(SID, api, fakeRemote(), {
+    const session = new Session(SID, api, fakeRemote(api), {
       address: { parentSessionId: PARENT, childSessionId: SID, mode: 'one-shot' },
     })
     await session.open()

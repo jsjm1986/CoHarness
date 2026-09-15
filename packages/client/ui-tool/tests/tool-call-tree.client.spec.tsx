@@ -63,9 +63,9 @@ describe('ToolCallTree', () => {
   })
 
   it('recursively renders a selected leaf without selecting its ancestors', () => {
-    const leaf = root('parent:code:1:code:1', { name: 'read', argsRaw: '{"path":"a.ts"}' })
+    const leaf = root('parent:ptc:1:ptc:1', { name: 'read', argsRaw: '{"path":"a.ts"}' })
     const child = {
-      ...root('parent:code:1', { name: 'run_code', argsRaw: '{"code":"return 1"}' }),
+      ...root('parent:ptc:1', { name: 'run_code', argsRaw: '{"code":"return 1"}' }),
       subCalls: [leaf],
     }
     const block = {
@@ -75,10 +75,10 @@ describe('ToolCallTree', () => {
     const view = render(<ToolCallTree {...props(block, leaf.callId)} />)
     const nests = view.container.querySelectorAll('[data-subcalls]')
     expect(nests[0]?.parentElement).toBe(view.container.querySelector('[data-chat-call-id="parent"]'))
-    expect(nests[1]?.parentElement).toBe(view.container.querySelector('[data-chat-call-id="parent:code:1"]'))
+    expect(nests[1]?.parentElement).toBe(view.container.querySelector('[data-chat-call-id="parent:ptc:1"]'))
     expect(view.container.querySelector('[data-chat-call-id="parent"]')?.hasAttribute('data-selected')).toBe(false)
-    expect(view.container.querySelector('[data-chat-call-id="parent:code:1"]')?.hasAttribute('data-selected')).toBe(false)
-    expect(view.container.querySelector('[data-chat-call-id="parent:code:1:code:1"]')?.getAttribute('data-selected')).toBe('true')
+    expect(view.container.querySelector('[data-chat-call-id="parent:ptc:1"]')?.hasAttribute('data-selected')).toBe(false)
+    expect(view.container.querySelector('[data-chat-call-id="parent:ptc:1:ptc:1"]')?.getAttribute('data-selected')).toBe('true')
     expect(nests).toHaveLength(2)
   })
 

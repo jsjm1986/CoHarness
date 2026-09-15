@@ -44,7 +44,6 @@ const SQL_RESOURCES = [
   'synchronous-full',
   'trusted-schema-off',
   'update-session-revision',
-  'update-session-version',
   'upsert-session',
   'upsert-session-extension',
 ] as const

@@ -189,7 +189,6 @@
   visibility: hidden;
   overflow: hidden;
   background: var(--dsw-alias-bg-base);
-  border-left: 0.5px solid var(--dsw-alias-border-l2);
   transition:
     transform var(--ds-transition-duration-slow) var(--ds-ease-in-out),
     visibility var(--ds-transition-duration-slow) step-end;
@@ -216,7 +215,9 @@
 @media (prefers-reduced-motion: reduce) {
   .scrim,
   .drawer,
-  .detailsOverlay {
+  .detailsOverlay,
+  .detailsPanel,
+  .detailsPanel[data-open] {
     transition: none;
   }
 }
@@ -252,21 +253,53 @@
   padding-bottom: var(--dsw-safe-bottom);
 }
 
+/*
+ * The details column never clips: its occupant panel anchors a fixed width to
+ * the column's right edge (the frame's edge, which never moves) and lets the
+ * track decide whether the center makes room. With no track the panel hangs
+ * over the center from a zero-width column; while the track animates the panel
+ * stays put. The occupant draws its own left border.
+ */
 .detailsCol {
+  position: relative;
   min-width: 0;
+  overflow: visible;
+}
+
+/*
+ * The details panel shell: the fixed-width surface that slides on and off the
+ * frame's right edge rather than unmounting or shrinking under the track.
+ * Hidden is translated fully off-edge — the frame's overflow clip finishes
+ * it — and visibility flips after the slide so the box is out of reach once
+ * off-edge; both directions ride the frame's track transition variables so
+ * the panel's left edge and the conversation's right edge travel together.
+ * Below the frame overlay layer (20); the resize handle (11) stays above it.
+ */
+.detailsPanel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
   overflow: hidden;
-  border-left: 0.5px solid var(--dsw-alias-border-l3);
+  background: var(--dsw-alias-bg-base);
+  transform: translateX(100%);
+  visibility: hidden;
+  transition:
+    transform var(--ds-transition-duration-slow) var(--ds-ease-in-out),
+    visibility 0s linear var(--ds-transition-duration-slow);
 }
 
-/* The details subtree stays mounted at zero width, so its border must not paint
-   a 1px seam. The collapsed sidebar instead retains a bordered compact rail. */
-.frame[data-details-collapsed] .detailsCol {
-  border-left: none;
+.detailsPanel[data-open] {
+  transform: none;
+  visibility: visible;
+  transition: transform var(--ds-transition-duration-slow) var(--ds-ease-in-out);
 }
 
-/* Drag handles are frame children (columns clip overflow): an 8px hit strip
-   centered on the column border via inline left, above column content. Details
-   adds a visible 12x32 pill at vertical center; sidebar keeps only the hit strip. */
+/* Drag handles are frame children: an 8px hit strip centered on the column
+   border via inline left, above column content. No handle draws a visible
+   pill. The details handle sits above the hanging details panel (10) so it
+   stays grabbable while the panel slides across the center. */
 .handle {
   position: absolute;
   top: 0;
@@ -274,9 +307,9 @@
   width: 8px;
   margin-left: -4px;
   cursor: col-resize;
-  z-index: 2;
+  z-index: 11;
   touch-action: none;
-  /* Rides the same curve as the tracks so the pill stays on the moving
+  /* Rides the same curve as the tracks so the strip stays on the moving
      border during collapse/expand; paused while dragging (frame rule). */
   transition: left var(--ds-transition-duration-slow) var(--ds-ease-in-out);
 }
@@ -289,45 +322,6 @@
   .handle {
     transition: none;
   }
-}
-
-.handle[data-side='details']::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 12px;
-  height: 32px;
-  border-radius: 10px;
-  box-sizing: border-box;
-  background: var(--dsw-alias-button-floating-fill);
-  border: 0.5px solid var(--dsw-alias-border-l2-darkmode-thin);
-  /* Hover affordance: the details pill hides until the pointer is over its
-     column, the strip itself, or a drag. */
-  opacity: 0;
-  transition:
-    opacity var(--ds-transition-duration-slow) var(--ds-ease-in-out),
-    background var(--ds-transition-duration-slow) var(--ds-ease-in-out);
-}
-
-.detailsCol:hover ~ .handle[data-side='details']::after,
-.handle[data-side='details']:hover::after,
-.handle[data-side='details'][data-dragging='true']::after {
-  opacity: 1;
-}
-
-/* No hover to reveal the pill on touch surfaces (expanded-mode tablets). */
-@media (pointer: coarse) {
-  .handle[data-side='details']::after {
-    opacity: 1;
-  }
-}
-
-.handle[data-side='details']:hover::after,
-.handle[data-side='details'][data-dragging='true']::after {
-  background: var(--dsw-alias-button-floating-hover);
-  border-color: var(--dsw-alias-border-l3);
 }
 
 .overlayLayer {

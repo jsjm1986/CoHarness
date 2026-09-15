@@ -16,7 +16,7 @@ Click **Choose workspace**, add the project directory where you started `dsh`, a
 
 ## Use personal documents
 
-Open **Documents** to upload and manage files in your personal document workspace. Personal documents are separate from the selected project workspace. In a personal session, ask the Agent something like “Find my annual report and summarize it.” The standard, code, and cordis presets can list your personal documents by name and read a selected text document, so you do not need to upload the same file into the chat again. A project session does not inherit the personal workspace; attach a file or use an explicitly shared project document instead.
+Open **Documents** to upload and manage files in your personal document workspace. Personal documents are separate from the selected project workspace. In a personal session, ask the Agent something like “Find my annual report and summarize it.” The standard, ptc, and cordis presets can list your personal documents by name and read a selected text document, so you do not need to upload the same file into the chat again. A project session does not inherit the personal workspace; attach a file or use an explicitly shared project document instead.
 
 ## Run a task
 

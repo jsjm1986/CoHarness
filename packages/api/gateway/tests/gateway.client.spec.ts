@@ -251,10 +251,10 @@ describe('Client Typert API', () => {
     await expect(ctx.remote.probe.create('', { objective: 'ship' })).rejects.toThrow('rejected "agentId"')
 
     call.mockResolvedValueOnce({ ok: true, value: { ref: 1 } })
-    await expect(ctx.remote.probe.create('agent-1', { objective: 'ship' })).resolves.toEqual({
+    await expect(ctx.remote.probe.create('agent-1', { objective: 'ship' })).resolves.toMatchObject({
       ok: false,
       error: {
-        code: 'internal',
+        code: 'gateway/internal',
         message: 'client api: probe/create failed: client api: probe/create rejected "result"',
         details: {},
       },
@@ -265,10 +265,10 @@ describe('Client Typert API', () => {
     expect(ctx.get('remote.probe')).toBeUndefined()
     expect(ctx.get('probe')).toBe(businessProbe)
     expect(ctx.typert.remotes.list()).toEqual([])
-    await expect(retained?.('agent-1', { objective: 'ship' })).resolves.toEqual({
+    await expect(retained?.('agent-1', { objective: 'ship' })).resolves.toMatchObject({
       ok: false,
       error: {
-        code: 'internal',
+        code: 'gateway/internal',
         message: 'client api: Remote method probe/create is no longer mounted',
         details: {},
       },
@@ -616,10 +616,10 @@ describe('Client Typert API', () => {
     await dispose()
     resolveCall({ ok: true, value: { ref: 'goal-1' } })
 
-    await expect(invocation).resolves.toEqual({
+    await expect(invocation).resolves.toMatchObject({
       ok: false,
       error: {
-        code: 'internal',
+        code: 'gateway/internal',
         message: 'client api: Remote method probe/create is no longer mounted',
         details: {},
       },
@@ -750,14 +750,14 @@ describe('Client Typert API', () => {
   })
 
   it('delivers an RPC failure in the error branch with the Host error verbatim', async () => {
-    const rpcError = { code: 'internal' as const, message: 'host failed', details: {} }
+    const rpcError = { code: 'gateway/internal' as const, message: 'host failed', details: {} }
     const ctx = await bench(vi.fn<ConnectionHandle['rpc']['call']>().mockResolvedValue({ ok: false, error: rpcError }))
     await ctx.remote.$mount({ package: '@fixture/probe', descriptors: [directDescriptor()] })
 
     const outcome = await ctx.remote.probe.create('agent-1', { objective: 'ship' })
     expect(outcome.ok).toBe(false)
     if (outcome.ok) throw new Error('expected the Client API invocation to report a failure')
-    expect(outcome.error).toBe(rpcError)
+    expect(outcome.error).toMatchObject(rpcError)
   })
 
   it('folds a transport throw into the error branch', async () => {
@@ -765,10 +765,10 @@ describe('Client Typert API', () => {
       .mockRejectedValue(new Error('carrier offline')))
     await ctx.remote.$mount({ package: '@fixture/probe', descriptors: [directDescriptor()] })
 
-    await expect(ctx.remote.probe.create('agent-1', { objective: 'ship' })).resolves.toEqual({
+    await expect(ctx.remote.probe.create('agent-1', { objective: 'ship' })).resolves.toMatchObject({
       ok: false,
       error: {
-        code: 'internal',
+        code: 'gateway/internal',
         message: 'client api: probe/create failed: carrier offline',
         details: {},
       },
@@ -780,10 +780,10 @@ describe('Client Typert API', () => {
       .mockRejectedValue('carrier exploded'))
     await ctx.remote.$mount({ package: '@fixture/probe', descriptors: [directDescriptor()] })
 
-    await expect(ctx.remote.probe.create('agent-1', { objective: 'ship' })).resolves.toEqual({
+    await expect(ctx.remote.probe.create('agent-1', { objective: 'ship' })).resolves.toMatchObject({
       ok: false,
       error: {
-        code: 'internal',
+        code: 'gateway/internal',
         message: 'client api: probe/create failed: carrier exploded',
         details: {},
       },

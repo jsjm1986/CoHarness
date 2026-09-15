@@ -109,7 +109,7 @@ describe('route-aware image pricing', () => {
     const node = measurement.nodes[0]!
     expect(node.tokens).toBe(expectedNode)
     expect(node.heuristicTokens).toBe(estimateMessage(message))
-    expect(node.tokens).toBeGreaterThan(node.heuristicTokens!)
+    expect(node.tokens).toBeGreaterThan(node.heuristicTokens)
     expect(measurement.baseline.kind).toBe('estimated')
     expect(measurement.surfaceTokens).toBe(expectedNode)
     expect(measurement.totalTokens).toBe(expectedNode)

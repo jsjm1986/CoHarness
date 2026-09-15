@@ -36,6 +36,7 @@ import * as toolJobs from '@deepseek-ai/dsh-tool-jobs'
 import AgentLoop, { type Config as AgentLoopConfig } from '@deepseek-ai/dsh-agent-loop'
 import * as llmRetry from '@deepseek-ai/dsh-llm-retry'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 
 export const name = 'agent-spine-demo'
 
@@ -269,6 +270,7 @@ export function apply(ctx: Context, config: Config): void {
   // rendered order, so workspace instructions must precede the skill catalog.
   if (skillsEnabled) ctx.plugin(toolSkill, config.skills?.tool ?? {})
   if (config.toolJobs !== false) ctx.plugin(toolJobs, config.toolJobs ?? {})
+  ctx.plugin(SessionProjectionRegistry)
   ctx.plugin(AgentLoop, {
     agents: config.agents ?? [],
     ...config.maxParallelToolCalls !== undefined ? { maxParallelToolCalls: config.maxParallelToolCalls } : {},

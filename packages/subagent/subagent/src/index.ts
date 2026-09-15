@@ -31,7 +31,7 @@
  * @module @deepseek-ai/dsh-subagent
  */
 
-import { Context, Service } from '@deepseek-ai/cordis'
+import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { scopeTarget } from '@deepseek-ai/dsh-scope'
 import type { Scoped } from '@deepseek-ai/dsh-scope'
@@ -39,33 +39,49 @@ import { assertObjectJsonSchema } from '@deepseek-ai/dsh-tools'
 import type { ContentBlock, MessageId, MessageSource } from '@deepseek-ai/dsh-llm'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { SessionId } from '@deepseek-ai/dsh-session'
+import type { AdmittedPromptContentPart } from '@deepseek-ai/dsh-attachment'
+import { collaborationRemoteRefusal } from '@deepseek-ai/dsh-collaboration'
+import type { CollaborationAuthority, CollaborationParticipant } from '@deepseek-ai/dsh-collaboration'
+import { canonicalClientTimeZone } from '@deepseek-ai/dsh-util-time'
+import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
+import {
+  catalogView, rejectCatalogRead, rejectPrompt, validateControlRequest,
+} from './control.ts'
+import type {
+  SubagentCatalog,
+  SubagentInterruptReceipt,
+  SubagentPromptContentPart,
+  SubagentPromptRequest,
+  SubagentPromptReceipt,
+  SubagentPromptRequestId,
+} from './control-types.ts'
 import type {
   ContinuableCreateRequest,
   ContinuableCreateSpec,
+  ContinuableStart,
+  ContinuableStartSpec,
   ResolvedSubagentStartRequest,
   SubagentCapabilities,
+  SubagentInterruptAuthority,
   SubagentProvider,
   SubagentRun,
   SubagentRunEndInfo,
   SubagentRunInfo,
+  SubagentSendMessageOptions,
   SubagentStartRequest,
 } from './types.ts'
+import type { SubagentDelivery } from './inbox.ts'
 import { SubagentError } from './error.ts'
 import { assertSubagentMaxDepth } from './depth.ts'
 import { createActivationObserver, createLifecycleEmitter, observeRun } from './lifecycle.ts'
 import type { ActivationObserver, LifecycleEmitter } from './lifecycle.ts'
 import SubagentContinuationManager from './continuation.ts'
-import type {
-  ContinuableStart,
-  ContinuableStartSpec,
-  SubagentInterruptAuthority,
-  SubagentSendMessageOptions,
-} from './continuation.ts'
 import { listChildren as listSubagentChildren, listDescendants as listSubagentDescendants } from './list-children.ts'
 import type { SubagentDescendantListEntry, SubagentListEntry } from './list-children.ts'
 import { snapshotSubagentDescriptor } from './descriptor.ts'
+import { establishCatalogChild, subagentCatalogProjectionDefinition } from './catalog.ts'
 import { subagentIdentityProjectionDefinition, subagentTimingProjectionDefinition } from './projection.ts'
-import { queueSubagentPrompt } from './internal.ts'
+import { deliverSubagentPrompt } from './internal.ts'
 
 export * from './out-of-process.ts'
 export { AssistantOutputFold, finalAssistantOutput } from './assistant-output.ts'
@@ -110,15 +126,16 @@ export {
   SubagentDepthError,
 } from './child-agent.ts'
 export type { ChildComposition, DelegatedPolicyOverrides } from './child-agent.ts'
+export type { AgentMessageSource, SubagentSettledMessageSource } from './continuation-messages.ts'
 export type {
-  AgentMessageSource,
   ContinuableStart,
   ContinuableStartSpec,
   SubagentInterruptAuthority,
   SubagentSendMessageOptions,
-  SubagentSettledMessageSource,
-} from './continuation.ts'
-export type { SubagentDescendantListEntry, SubagentListEntry } from './list-children.ts'
+} from './types.ts'
+export type { SubagentDescendantListEntry } from './list-children.ts'
+export type {} from './catalog.ts'
+export type * from './control-types.ts'
 export type { SubagentRunEndInfo, SubagentRunInfo } from './types.ts'
 export type { SubagentIdentityProjection, SubagentTimingProjection } from './projection-types.ts'
 
@@ -160,6 +177,18 @@ declare module '@deepseek-ai/cordis' {
      * @mode emit
      */
     'subagent/end'(this: Scoped<SubagentRuntime>, info: SubagentRunEndInfo): void
+    /**
+     * Admit one continuable prompt's uploaded content before the child inbox
+     * accepts it. The first listener returning blocks owns admission; returning
+     * `undefined` defers to the next listener, then to the attachment store.
+     * @param parent - live Agent of the prompting parent Session.
+     * @param content - ordered wire prompt parts awaiting durable admission.
+     * @mode serial
+     */
+    'subagent/prompt-admission'(
+      parent: Agent,
+      content: readonly SubagentPromptContentPart[],
+    ): Promise<AdmittedPromptContentPart[] | undefined> | AdmittedPromptContentPart[] | undefined
   }
 }
 
@@ -184,8 +213,22 @@ function positiveLimit(value: number | undefined, fallback: number, label: strin
   return resolved
 }
 
+/**
+ * Provenance attached to one browser prompt's durable user message. The Host
+ * declares the `user-rpc` message source and depends on this package, so the
+ * exact accepted record is described here and the correlation id rides the
+ * durable message the Client reconciles its optimistic prompt against.
+ */
+interface BrowserPromptSource {
+  readonly kind: 'user'
+  readonly rpcId: SubagentPromptRequestId
+  readonly clientTimeZone?: string
+  /** Authenticated project participant permanently attributed to this prompt. */
+  readonly participant?: CollaborationParticipant
+}
+
 /** Named provider registry with one-shot runs, durable discovery, and continuable-child operations. */
-export class SubagentRuntime extends Service {
+export class SubagentRuntime extends TypertRemoteService {
   static Config: z<Config> = z.object({
     maxContinuableActivations: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER)
       .default(DEFAULT_MAX_CONTINUABLE_ACTIVATIONS),
@@ -231,6 +274,7 @@ export class SubagentRuntime extends Service {
     ctx.inject(['sessionProjections'], (projectionCtx) => {
       projectionCtx.sessionProjections.register(subagentTimingProjectionDefinition)
       projectionCtx.sessionProjections.register(subagentIdentityProjectionDefinition)
+      projectionCtx.sessionProjections.register(subagentCatalogProjectionDefinition)
     })
   }
 
@@ -271,7 +315,7 @@ export class SubagentRuntime extends Service {
   }
 
   /**
-   * Queue one host-protocol message as a distinct direct-child turn.
+   * Deliver one host-protocol message to a direct continuable child.
    * Symbol-keyed so host adapters can preserve their own provenance without
    * widening the public Service Definition or impersonating an Agent sender.
    * @param parent - exact live direct parent authorizing delivery.
@@ -279,17 +323,21 @@ export class SubagentRuntime extends Service {
    * @param content - host-authored content to deliver.
    * @param source - durable host-protocol provenance.
    * @param signal - caller cancellation before inbox acceptance.
+   * @param delivery - Queue as a distinct turn or Steer at the nearest step.
    * @returns the accepted message's inbox id.
    * @internal
    */
-  [queueSubagentPrompt](
+  private [deliverSubagentPrompt](
     parent: Agent,
     childId: SessionId,
     content: ContentBlock[],
     source: MessageSource,
     signal: AbortSignal,
+    delivery: SubagentDelivery,
   ): Promise<MessageId> {
-    return this.requireContinuations().queuePrompt(parent, childId, content, source, signal)
+    return delivery === 'steer'
+      ? this.requireContinuations().steerPrompt(parent, childId, content, source, signal)
+      : this.requireContinuations().queuePrompt(parent, childId, content, source, signal)
   }
 
   /**
@@ -396,6 +444,200 @@ export class SubagentRuntime extends Service {
   }
 
   /**
+   * Remote face of {@link listChildren} for one browser: the durable listing
+   * plus live Agent activity and the delivery-time parent availability hint.
+   * Parent availability is a hint; {@link prompt} performs the authoritative
+   * check. Named apart from the provider-name {@link list}, which owns the
+   * member.
+   * @param parentSessionId - parent session whose direct children are listed.
+   * @param signal - carrier cancellation forwarded to Session queries.
+   * @returns the catalog view for that parent.
+   * @throws {RemoteError} `gateway/bad-request` for an empty parent id,
+   *   `collaboration-forbidden` for a refused Session authorization,
+   *   `gateway/cancelled` for an aborted read,
+   *   `subagent/projections-unavailable` when the deployment has no projection
+   *   registry, otherwise `gateway/internal`.
+   */
+  @Remote('list')
+  async remoteExportList(parentSessionId: SessionId, signal: AbortSignal): Promise<SubagentCatalog> {
+    validateControlRequest('subagent.list', { parentSessionId })
+    await this.authorizeControlTier(parentSessionId, 'read')
+    try {
+      return catalogView(this.ctx, parentSessionId, await this.listChildren(parentSessionId, signal))
+    } catch (error: unknown) {
+      return rejectCatalogRead(error, signal)
+    }
+  }
+
+  /**
+   * Deliver one browser-authored message to a continuable child through the
+   * exact live direct parent, retaining the caller-minted request identity,
+   * validated browser zone, and authenticated project participant on the
+   * accepted message. Success identifies the message the child's inbox
+   * accepted; later execution is independent of this call. Queue delivery
+   * targets a later turn; steer delivery targets the nearest step and retains
+   * the Agent loop's best-effort fallback semantics. Image parts are admitted
+   * and persisted through the attachment store before delivery, and the
+   * child's model must accept image input.
+   * @param request - durable address, delivery, minted identity, content, and optional browser zone.
+   * @param signal - carrier cancellation, owning the call until inbox acceptance.
+   * @returns the accepted message's inbox identity.
+   * @throws {RemoteError} `gateway/bad-request`, `collaboration-forbidden`,
+   *   `subagent/attachment-invalid`, `subagent/invalid-time-zone`,
+   *   `subagent/parent-unavailable`, `subagent/not-resumable`,
+   *   `subagent/unauthorized`, `subagent/delivery-unavailable`,
+   *   `gateway/cancelled`, or `gateway/internal`.
+   */
+  @Remote('prompt')
+  async prompt(request: SubagentPromptRequest, signal: AbortSignal): Promise<SubagentPromptReceipt> {
+    const { parentSessionId, childSessionId, clientTimeZone, delivery } = request
+    validateControlRequest('subagent.prompt', request)
+    if (!request.content.some(part => part.type === 'image' || part.text.trim() !== '')) {
+      throw new RemoteError(
+        'gateway/bad-request',
+        'prompt content must include non-whitespace text or an attachment',
+        {},
+      )
+    }
+    const canonicalTimeZone = clientTimeZone === undefined
+      ? undefined
+      : canonicalClientTimeZone(clientTimeZone)
+    if (clientTimeZone !== undefined && canonicalTimeZone === undefined) {
+      throw new RemoteError(
+        'subagent/invalid-time-zone',
+        'clientTimeZone must be UTC or a valid IANA Area/Location name',
+        { value: clientTimeZone },
+      )
+    }
+    const parent = this.ctx.get('agents')?.get(parentSessionId)
+    if (parent === undefined) {
+      throw new RemoteError(
+        'subagent/parent-unavailable',
+        `parent session "${parentSessionId}" is not live`,
+        { parentSessionId },
+      )
+    }
+    const authority = await this.authorizeControlTier(parentSessionId, 'write')
+    if (authority !== undefined) {
+      try {
+        await authority.authorize(childSessionId, 'write')
+      } catch (error: unknown) {
+        throw collaborationRemoteRefusal(error, 'write', childSessionId)
+      }
+    }
+    const participant = authority?.participant.scope.kind === 'project' ? authority.participant : undefined
+    const source: BrowserPromptSource = {
+      kind: 'user',
+      rpcId: request.requestId,
+      ...(canonicalTimeZone === undefined ? {} : { clientTimeZone: canonicalTimeZone }),
+      ...(participant === undefined ? {} : { participant }),
+    }
+    try {
+      // Admission precedes delivery: image parts become durable references
+      // here, so the child inbox only ever accepts Host-persisted attachments.
+      let content: ContentBlock[] | undefined = await this.ctx.serial(
+        'subagent/prompt-admission',
+        parent,
+        request.content,
+      )
+      if (content === undefined) {
+        if (request.content.every((part): part is Extract<SubagentPromptContentPart, { type: 'text' }> => part.type === 'text')) {
+          content = request.content.map(part => ({ type: 'text', text: part.text }))
+        } else {
+          const attachments = this.ctx.get('attachments')
+          if (attachments === undefined) throw new Error('subagent image prompt requires an attachment store')
+          content = await attachments.admitPromptContent(request.content)
+        }
+      }
+      return {
+        messageId: await this[deliverSubagentPrompt](
+          parent,
+          childSessionId,
+          content,
+          source,
+          signal,
+          delivery,
+        ),
+      }
+    } catch (error: unknown) {
+      return rejectPrompt(error, childSessionId, signal)
+    }
+  }
+
+  /**
+   * Remote face of {@link interrupt} under one durable parent address. No
+   * catalog, history, persistence, or parent Agent lookup runs: the Session
+   * authorization tiers and the core primitive's lineage check together
+   * authorize the address, which is what keeps a live child interruptible
+   * while its parent Agent is offline. Absent, idle, and already-completed
+   * targets are accepted no-ops there.
+   * @param childSessionId - durable child session id to interrupt.
+   * @param parentSessionId - durable direct parent whose authority is claimed.
+   * @param mode - required continuable-address discriminator.
+   * @returns acknowledgement that the cancel signal was admitted, not that the target is quiescent.
+   * @throws {RemoteError} `gateway/bad-request` for an empty id,
+   *   `collaboration-forbidden` for a refused Session authorization,
+   *   `subagent/unauthorized` when the address does not own the live target,
+   *   otherwise `gateway/internal`.
+   */
+  @Remote('interruptByParent')
+  async interruptByParent(
+    childSessionId: SessionId,
+    parentSessionId: SessionId,
+    mode: 'continuable',
+  ): Promise<SubagentInterruptReceipt> {
+    validateControlRequest('subagent.interrupt', { childSessionId, parentSessionId, mode })
+    const authority = await this.authorizeControlTier(parentSessionId, 'write')
+    if (authority !== undefined) {
+      try {
+        await authority.authorize(childSessionId, 'write')
+      } catch (error: unknown) {
+        throw collaborationRemoteRefusal(error, 'write', childSessionId)
+      }
+    }
+    try {
+      this.interrupt(childSessionId, { kind: 'user', parentSessionId })
+    } catch (error: unknown) {
+      if (error instanceof SubagentError && error.code === 'UNAUTHORIZED') {
+        throw new RemoteError(
+          'subagent/unauthorized',
+          'subagent does not belong to this parent',
+          { childSessionId },
+          { cause: error },
+        )
+      }
+      throw new RemoteError('gateway/internal', 'subagent interrupt failed', {}, { cause: error })
+    }
+    return { accepted: true }
+  }
+
+  /**
+   * Capture the request authority for one control operation. The Gateway
+   * authorization matrix owns the project-scope Session check before dispatch;
+   * a personal-scope principal performs the same per-Session check here.
+   * @param sessionId - Session the caller addresses.
+   * @param action - operation the caller attempts.
+   * @returns the captured authority, or undefined without collaboration.
+   * @throws {RemoteError} `collaboration-forbidden` for a refused authorization.
+   */
+  private async authorizeControlTier(
+    sessionId: SessionId,
+    action: 'read' | 'write',
+  ): Promise<CollaborationAuthority | undefined> {
+    const collaboration = this.ctx.get('collaboration')
+    if (collaboration === undefined) return undefined
+    try {
+      const authority = collaboration.capture()
+      if (authority.participant.scope.kind === 'personal') {
+        await authority.authorize(sessionId, action)
+      }
+      return authority
+    } catch (error: unknown) {
+      throw collaborationRemoteRefusal(error, action, sessionId)
+    }
+  }
+
+  /**
    * Register a provider under its name. Registration is effect-scoped and HMR
    * safe; removing a provider blocks new starts but does not revoke runs that
    * were already returned to their holders.
@@ -443,6 +685,8 @@ export class SubagentRuntime extends Service {
    * fulfills; a rejection therefore has no run for the caller to dispose and
    * emits no run lifecycle events. Post-publication turn and infrastructure
    * failures settle through the returned run.
+   * A catalog append failure disposes the run and handles its result rejection;
+   * the caller receives the catalog error even if disposal also fails.
    * @param name - the provider to use.
    * @param request - child label, prompt, parent, signal, and optional capabilities.
    * @returns the published holder-owned run.
@@ -458,7 +702,25 @@ export class SubagentRuntime extends Service {
       ...request.label !== undefined ? { label: request.label } : {},
     })
     const resolved: ResolvedSubagentStartRequest = { ...request, descriptor }
-    return observeRun(this.emitLifecycle, name, request.parent, await provider.start(resolved))
+    const run = await provider.start(resolved)
+    const child = run.localAgent?.session
+    if (child !== undefined) {
+      try {
+        establishCatalogChild(request.parent.session, child.header, descriptor)
+      } catch (error: unknown) {
+        // No caller receives this run; the catalog error owns the failed start.
+        void run.result.catch(() => undefined)
+        try {
+          await run.dispose()
+        } catch (cleanupError: unknown) {
+          this.ctx.logger.warn(
+            `subagent: disposal after catalog append failure also failed: ${String(cleanupError)}`,
+          )
+        }
+        throw error
+      }
+    }
+    return observeRun(this.emitLifecycle, name, request.parent, run)
   }
 
   /**

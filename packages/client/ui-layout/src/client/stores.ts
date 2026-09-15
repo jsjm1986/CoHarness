@@ -55,10 +55,15 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
       setSidebar: (d, px: number) => { d.sidebar = clampWidth(px, SIDEBAR_MIN, SIDEBAR_MAX) },
       setDetails: (d, px: number) => { d.details = clampWidth(px, DETAILS_MIN, DETAILS_MAX) },
       // Narrow toggles flip only the override: the width preference survives
-      // untouched, so re-widening restores the pre-squeeze layout.
+      // untouched, so re-widening restores the pre-squeeze layout. The narrow
+      // surfaces are exclusive — re-expanding the sidebar while the details
+      // overlay is open swaps surfaces instead of pinning the conversation
+      // into a strip between them.
       toggleSidebar: (d) => {
-        if (d.narrow) d.narrowExpanded = !d.narrowExpanded
-        else d.sidebar = d.sidebar === 0 ? SIDEBAR_DEFAULT : 0
+        if (d.narrow) {
+          if (d.details !== 0) { d.details = 0; delete d.detailsSessionId }
+          d.narrowExpanded = !d.narrowExpanded
+        } else d.sidebar = d.sidebar === 0 ? SIDEBAR_DEFAULT : 0
       },
       // Crossing the breakpoint in either direction drops the override: the
       // narrow default is auto-collapsed, the wide state is the preference.
@@ -72,6 +77,10 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
       collapseNarrow: (d) => { d.narrowExpanded = false },
       openDetails: (d, sessionId?: SessionId) => {
         if (d.details === 0) d.details = DETAILS_DEFAULT
+        // The same exclusivity from the other side: the details overlay
+        // replaces the squeeze-open sidebar / compact drawer rather than
+        // sharing the narrow frame with it.
+        d.narrowExpanded = false
         if (sessionId === undefined) delete d.detailsSessionId
         else d.detailsSessionId = sessionId
       },

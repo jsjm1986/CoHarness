@@ -40,6 +40,7 @@
     "@deepseek-ai/dsh-gateway-runtime": "workspace:^",
     "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/dsh-session": "workspace:^",
+    "@deepseek-ai/dsh-session-format": "workspace:^",
     "@deepseek-ai/dsh-session-persistence": "workspace:^"
   },
   "devDependencies": {
@@ -48,6 +49,7 @@
     "@deepseek-ai/dsh-gateway-runtime": "workspace:^",
     "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/dsh-session": "workspace:^",
+    "@deepseek-ai/dsh-session-format": "workspace:^",
     "@deepseek-ai/dsh-session-persistence": "workspace:^"
   }
 }

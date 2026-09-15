@@ -203,16 +203,16 @@ const TOOL_PACKAGES: ToolPackage[] = [
   {
     pkg: '@deepseek-ai/dsh-tools',
     dir: 'tools',
-    source: 'packages/core/tools/src/code-mode.ts',
+    source: 'packages/core/tools/src/ptc.ts',
     requires: ['ctx.tools', 'ctx.codeRuntime (execution time)', 'ctx.systemPrompt'],
-    writes: ['tool/call', 'one tool/code-dispatch-start + tool/code-dispatch pair per bridged sub-call', 'tool/result'],
+    writes: ['tool/call', 'one tool/ptc-dispatch-start + tool/ptc-dispatch pair per bridged sub-call', 'tool/result'],
     // The registry's OWN tool: run_code exists only under a non-native mode
     // (the registry registers it in its constructor; the code runtime is read
     // at assembly/execution time, so the schema harvest needs none mounted).
-    toolsConfig: { mode: 'code' },
+    toolsConfig: { mode: 'ptc' },
     async mount() {},
     note:
-      'Owned by the tool registry as a reserved transport outside filterable capability layers under `mode: code` / `mode: both` (see the Code Mode Agent Note). Under `code` it is the registry\'s only wire contribution; the other visible capabilities are declared in a generated SDK section in the loaded runtime\'s language, and a program calls them through bindings scheduled under the native concurrency contract (submission-ordered starts and policy; concurrency-safe bodies overlap up to `maxParallelSubCalls`) that re-enter the complete guarded tool pipeline and link each nested execution to this outer result.',
+      'Owned by the tool registry as a reserved transport outside filterable capability layers under `mode: ptc` / `mode: both` (see the PTC mode Agent Note). Under `ptc` it is the registry\'s only wire contribution; the other visible capabilities are declared in a generated SDK section in the loaded runtime\'s language, and a program calls them through bindings scheduled under the native concurrency contract (submission-ordered starts and policy; concurrency-safe bodies overlap up to `maxParallelSubCalls`) that re-enter the complete guarded tool pipeline and link each nested execution to this outer result.',
   },
   {
     pkg: '@deepseek-ai/dsh-plan-mode',
@@ -481,11 +481,12 @@ const TOOL_PACKAGES: ToolPackage[] = [
     pkg: '@deepseek-ai/dsh-tool-subagent',
     dir: 'tool-subagent',
     source: 'packages/subagent/tool-subagent/src/index.ts',
-    requires: ['ctx.tools', 'ctx.subagents', 'ctx.systemPrompt'],
+    requires: ['ctx.tools', 'ctx.subagents', 'ctx.systemPrompt', 'ctx.sessionProjections'],
     writes: ['tool/call', 'tool/result', 'child session events through the chosen provider'],
     shippedNames: ['subagent', 'subagent_fork'],
     async mount(ctx) {
       await ctx.plugin(SubagentRuntime)
+      await ctx.plugin(SessionProjectionRegistry)
       registerCatalogSubagentProvider(ctx, 'mock')
       await ctx.plugin(ToolSubagent, { provider: 'mock' })
     },

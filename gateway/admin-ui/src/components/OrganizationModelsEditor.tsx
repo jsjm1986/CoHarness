@@ -1,6 +1,7 @@
 import { useMemo, useSyncExternalStore } from 'react'
 import { Context } from '@deepseek-ai/cordis'
 import { ModelsSection } from '../../../../packages/client/ui-settings-models/src/client/ModelsSection.tsx'
+import type { ModelDiscoveryProbe } from '../../../../packages/client/ui-settings-models/src/client/ModelListEditor.tsx'
 import {
   ModelsSettingsStore,
   type ModelsSettingsState,
@@ -62,6 +63,14 @@ export function OrganizationModelsEditor({ onChanged }: { onChanged: () => void 
   )
   const useSnapshot = useMemo(() => bindSnapshot(controller), [controller])
   const t = useMemo(() => (key: keyof typeof zh) => organizationCopy[key], [])
+  // The shared section probes a provider endpoint through this page's own
+  // facade so discovery stays inside the organization REST surface.
+  const discoverModels = useMemo<ModelDiscoveryProbe>(() => async (settingsNs, request) => {
+    const response = await api.llm.discoverModels({ settingsNs, ...request })
+    return response.result.ok
+      ? { ok: true, value: response.result.value.models }
+      : { ok: false, error: { message: response.result.error.message } }
+  }, [api])
 
   // The organization facade exposes only configured org-* profiles. The
   // shared section therefore keeps only its declaration action when no
@@ -72,6 +81,7 @@ export function OrganizationModelsEditor({ onChanged }: { onChanged: () => void 
         controller={controller}
         useSnapshot={useSnapshot as never}
         api={api as never}
+        discoverModels={discoverModels}
         schema={schema}
         t={t}
         managementScope="organization"

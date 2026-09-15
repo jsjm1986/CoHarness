@@ -405,6 +405,17 @@ describe('normalizeSessionLog', () => {
     expect(out).toContain('"decision":"block"') // the decision is the behavior — kept
   })
 
+  it('zeroes a subagent/catalog childCreatedAt (wall-clock creation stamp) but keeps the entry', () => {
+    const ev = JSON.stringify({
+      type: 'subagent/catalog', seq: 2, time: 5,
+      data: { version: 0, childId: 'c', childCreatedAt: 1789326076382, mode: 'continuable', label: 'L' },
+    })
+    const out = normalizeSessionLog(`${header({})}\n${ev}\n`, ctx)
+    expect(out).toContain('"childCreatedAt":0')
+    expect(out).not.toContain('1789326076382')
+    expect(out).toContain('"mode":"continuable"')
+  })
+
   it('zeroes a packed chunk row\'s time0 and dt gaps but keeps seq0 and payload', () => {
     const row = JSON.stringify({
       type: 'text-chunks', seq0: 7, time0: 999,
@@ -676,7 +687,7 @@ describe('scrubSystemPrompts', () => {
     const record = {
       type: 'system/message', seq: 4, time: 5,
       data: { turn: 1, step: 2, message: { role: 'system', id: 'system-id', content: [{ type: 'text', text: 'private prompt' }] } },
-      surfaceOp: { op: 'replace', start: 0, end: 0 }, sourceEventSeqs: [0],
+      surfaceOp: { op: 'replace', startSeq: 0, endSeq: 0 }, sourceEventSeqs: [0],
     }
     const raw = `${JSON.stringify(record)}\n`
     expect(JSON.parse(scrubSystemPrompts(raw))).toEqual({

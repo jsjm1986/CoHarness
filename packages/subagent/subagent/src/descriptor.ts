@@ -21,7 +21,7 @@
  * @module @deepseek-ai/dsh-subagent/descriptor
  */
 
-import { snapshotJsonValue } from '@deepseek-ai/dsh-session'
+import { snapshotJsonValue } from '@deepseek-ai/dsh-util-values'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { ToolRestriction } from '@deepseek-ai/dsh-tools'
@@ -45,7 +45,7 @@ declare module '@deepseek-ai/dsh-session/types' {
  * Supporting another composition input is a deliberate version change, never
  * an implicit extra field.
  */
-export const SUBAGENT_DESCRIPTOR_VERSION = 2
+export const SUBAGENT_DESCRIPTOR_VERSION = 3
 
 /** Fields shared by every supported `subagent/descriptor` payload. */
 interface SubagentDescriptorBase {

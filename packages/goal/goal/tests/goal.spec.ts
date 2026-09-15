@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import AgentRegistry, { agentEvents, Inbox } from '@deepseek-ai/dsh-agent'
+import AgentRegistry, { agentEvents } from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { createUserMessage, HarnessError } from '@deepseek-ai/dsh-llm'
 import SessionStore, { Session, SessionId, type UserMessage } from '@deepseek-ai/dsh-session'
@@ -11,6 +11,7 @@ import GoalService, {
   foldGoal,
 } from '@deepseek-ai/dsh-goal'
 import type { GoalChangeMeta, GoalRef, GoalSnapshotChangeMeta } from '@deepseek-ai/dsh-goal'
+import { sessionBackedInbox, unsupportedInbox } from '../../../core/agent-loop/tests/inbox-helpers.ts'
 
 interface StubAgent {
   agent: Agent
@@ -24,28 +25,28 @@ function nextTurn(session: Session): number {
 
 /** Mirror the public Agent.inject contract for domain tests. */
 function appendInjection(session: Session, input: UserMessage): void {
-  new Inbox(session, { inserted: () => {}, discarded: () => {}, claimed: () => {} }).append('next-step', input)
+  session.append('agent/inbox/spliced', { target: 'next-step', start: 0, inserted: [input] })
 }
 
 /** Build a registry-compatible agent around one concrete session. */
 function stubAgentForSession(session: Session): StubAgent {
   const id = session.id
-  const inbox = new Inbox(session, { inserted: () => {}, discarded: () => {}, claimed: () => {} })
   const agent: Agent = {
     id,
     options: {},
     session,
-    inbox,
+    inbox: unsupportedInbox(),
     ctx: new Context(),
     status: 'idle',
     send: () => {},
     followup: () => {},
     steer: () => {},
-    inject(input) { inbox.append('next-step', input) },
+    inject(input) { this.inbox.append('next-step', input) },
     cancel() {},
     runMaintenance: task => task(new AbortController().signal),
     whenIdle() { return Promise.resolve() },
   }
+  sessionBackedInbox(agent)
   return {
     agent,
     session,
@@ -571,9 +572,9 @@ describe('goal replay validation', () => {
       content: [{ type: 'text', text: 'unrelated pending context' }],
       source: { kind: 'plugin', plugin: 'test' },
     })
-    const inbox = new Inbox(session, { inserted: () => {}, discarded: () => {}, claimed: () => {} })
-    inbox.append('next-step', message)
-    expect(inbox.remove(message.id)).toBe(true)
+    const { agent } = stubAgentForSession(session)
+    agent.inbox.append('next-step', message)
+    expect(agent.inbox.remove(message.id)).toBe(true)
     expect(foldGoal(session.snapshotEvents())).toMatchObject({ goal: { id: change.goal.id, revision: 1 } })
   })
 

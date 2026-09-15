@@ -8,10 +8,9 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Scoped } from '@deepseek-ai/dsh-scope'
 import type { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
-import type { LlmCallConfig, LlmFailure, ResolvedRetryPolicy } from '@deepseek-ai/dsh-llm'
+import type { LlmCallConfig, LlmFailure, MessageId, ResolvedRetryPolicy } from '@deepseek-ai/dsh-llm'
 import type { AgentCancelCause, Session, SessionEvent, SessionId, UserMessage } from '@deepseek-ai/dsh-session'
 export type { AgentCancelCause } from '@deepseek-ai/dsh-session'
-import type { Inbox } from './inbox.ts'
 import type { InboxTarget } from './types.ts'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 declare module '@deepseek-ai/dsh-system-prompt' {
@@ -51,6 +50,61 @@ export interface CancelOptions {
  * it is not a third observable status.
  */
 export type AgentStatus = 'idle' | 'running'
+
+/** Agent-owned access to pending work; concrete storage belongs to the driver. */
+export interface Inbox {
+  /** Prompts awaiting individual turns. */
+  readonly nextTurn: readonly UserMessage[]
+  /** Input awaiting the next step boundary. */
+  readonly nextStep: readonly UserMessage[]
+
+  /** Durably cancel all pending input, clearing next-step before next-turn. */
+  clear(): void
+
+  /**
+   * Append one message to a pending list.
+   * @param target - pending list to extend.
+   * @param message - message to append.
+   */
+  append(target: InboxTarget, message: UserMessage): void
+
+  /**
+   * Prepend one message to a pending list.
+   * @param target - pending list to extend.
+   * @param message - message to prepend.
+   */
+  prepend(target: InboxTarget, message: UserMessage): void
+
+  /**
+   * Replace one pending message in place.
+   * @param messageId - identity of the pending message to replace.
+   * @param newMessage - replacement message.
+   * @returns whether the message was still pending.
+   */
+  replace(messageId: MessageId, newMessage: UserMessage): boolean
+
+  /**
+   * Remove one pending message.
+   * @param messageId - identity of the pending message to remove.
+   * @returns whether the message was still pending.
+   */
+  remove(messageId: MessageId): boolean
+
+  /**
+   * Apply standard splice semantics and durably record the normalized result.
+   * @param target - pending list to mutate.
+   * @param start - splice position.
+   * @param deleteCount - maximum number of messages to remove.
+   * @param inserted - messages to insert at the resolved position.
+   * @returns messages removed by the splice.
+   */
+  splice(
+    target: InboxTarget,
+    start: number,
+    deleteCount: number,
+    inserted: UserMessage[],
+  ): UserMessage[]
+}
 
 /** Whether and with which messages the loop enters a proposed step. */
 export type PreStepDecision =

@@ -6,7 +6,7 @@
 
 ## 安装
 
-将此函数插件挂载到已经提供 `ctx.userDocs`、`ctx.tools` 和 `ctx.systemPrompt` 的 Agent preset。随附 Web 的 `standard`、`code` 与 `cordis` preset 都包含该行；最小 preset 可以省略它，使个人文档不进入其工具目录。
+将此函数插件挂载到已经提供 `ctx.userDocs`、`ctx.tools` 和 `ctx.systemPrompt` 的 Agent preset。随附 Web 的 `standard`、`ptc` 与 `cordis` preset 都包含该行；最小 preset 可以省略它，使个人文档不进入其工具目录。
 
 ## 工具
 

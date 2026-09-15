@@ -160,12 +160,12 @@ describe('render branch tails', () => {
     snap.runningCalls = [{
       callId: 'p1', name: 'run_code', argsRaw: '{}', turn: 1, step: 1,
       time: 7_000, callView: null, subCalls: [{
-        kind: 'tool-result', seq: 8, time: 8_000, callId: 'p1:code:1',
+        kind: 'tool-result', seq: 8, time: 8_000, callId: 'p1:ptc:1',
         call: { name: 'run_code', argsRaw: '{"code":"return 1"}' },
         callTime: 8_000,
         content: [], isError: false, callView: null, resultView: null,
         subCalls: [{
-          kind: 'tool-result', seq: 9, time: 9_000, callId: 'p1:code:1:code:1',
+          kind: 'tool-result', seq: 9, time: 9_000, callId: 'p1:ptc:1:ptc:1',
           call: { name: 'read', argsRaw: '{"path":"notes/demo.txt"}' },
           callTime: 8_500,
           content: [{ type: 'text', text: longText }], isError: false, callView: null, resultView: null,
@@ -175,7 +175,7 @@ describe('render branch tails', () => {
     }]
     snap.chat = chatSnapshotFixture({ runningCalls: snap.runningCalls })
     const chat = createChatStore().create()
-    chat.actions.select({ turnSeq: 9, callId: 'p1:code:1:code:1', toolName: 'read' } satisfies SelectionTarget)
+    chat.actions.select({ turnSeq: 9, callId: 'p1:ptc:1:ptc:1', toolName: 'read' } satisfies SelectionTarget)
     const emptyList = createSnapshotStore<SessionListState>(
       { ids: [], byId: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined })
     const emptyWorkspaces = createSnapshotStore<WorkspaceListState>({
@@ -215,7 +215,7 @@ describe('render branch tails', () => {
     expect(view.getByTestId('tool-details-seat')).toBeTruthy()
     expect(owners).toHaveLength(1)
     expect(owners[0]?.block).toMatchObject({
-      callId: 'p1:code:1:code:1',
+      callId: 'p1:ptc:1:ptc:1',
       call: { name: 'read', argsRaw: '{"path":"notes/demo.txt"}' },
       content: [{ type: 'text', text: longText }],
     })

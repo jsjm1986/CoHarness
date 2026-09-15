@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
-import AgentRegistry, { Inbox, type Agent } from '@deepseek-ai/dsh-agent'
+import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
 import SandboxProvider from '@deepseek-ai/dsh-sandbox'
 import type { ConfinedArgv, SandboxPolicy } from '@deepseek-ai/dsh-sandbox'
 import SandboxPolicyService, { setSandboxMode } from '@deepseek-ai/dsh-sandbox-policy'
@@ -22,6 +22,7 @@ import type {
   SubprocessTerminalHandle,
   SubprocessTerminalSpawnSpec,
 } from '@deepseek-ai/dsh-subprocess'
+import { unsupportedInbox } from '../../../core/agent-loop/tests/inbox-helpers.ts'
 
 class EmptySandbox extends SandboxProvider {
   confine(_argv: readonly string[], _policy: SandboxPolicy): ConfinedArgv {
@@ -53,7 +54,7 @@ function agent(ctx: Context, cwd?: string): Agent {
     version: 0, id, createdAt: 0, isSeeded: false, ...cwd === undefined ? {} : { cwd },
   })
   return {
-    id, options: {}, session, inbox: new Inbox(session, { inserted: () => {}, discarded: () => {}, claimed: () => {} }),
+    id, options: {}, session, inbox: unsupportedInbox(),
     status: 'idle',
     ctx,
     send: () => {},
@@ -575,7 +576,7 @@ describe('terminal-bash plugin shape', () => {
     const session = ctx.sessions.create(SessionId('mode-owner'))
     const ownerFiber = await ctx.plugin(() => {})
     const owner: Agent = {
-      id: session.id, options: {}, session, inbox: new Inbox(session, { inserted: () => {}, discarded: () => {}, claimed: () => {} }),
+      id: session.id, options: {}, session, inbox: unsupportedInbox(),
       status: 'idle',
       ctx: ownerFiber.ctx,
       send: () => {},
@@ -624,7 +625,7 @@ describe('terminal-bash plugin shape', () => {
     const session = ctx.sessions.create(SessionId('pending-mode-owner'))
     const ownerFiber = await ctx.plugin(() => {})
     const owner: Agent = {
-      id: session.id, options: {}, session, inbox: new Inbox(session, { inserted: () => {}, discarded: () => {}, claimed: () => {} }),
+      id: session.id, options: {}, session, inbox: unsupportedInbox(),
       status: 'idle',
       ctx: ownerFiber.ctx,
       send: () => {},

@@ -14,7 +14,7 @@
  * more than the row it targeted.
  */
 
-import type { IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
+import type { ClientRemote, IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import { beginRosterRead, messageOf, writeDefaultPreset } from './settings-store.ts'
 
@@ -133,7 +133,13 @@ export class AgentPresetSectionController {
   readonly store: SnapshotStore<AgentPresetSectionState> = createSnapshotStore(INITIAL)
 
   constructor(
+    private readonly remote: Pick<ClientRemote, 'agentPresets'>,
     private readonly api: Pick<IApiClient, 'agentPresets' | 'settings'>,
+    /**
+     * Whether the connected host can open a preset directory on a native
+     * desktop (host.describe's canOpenPath, read per load).
+     */
+    private readonly canOpenDocument: () => boolean,
     /**
      * Called after this page changes the roster DIRECTORY, so the other
      * surfaces reading the same roster re-read it. A settings field moving is
@@ -162,9 +168,10 @@ export class AgentPresetSectionController {
    * @returns once the snapshot reflects the host.
    */
   async load(): Promise<void> {
-    const roster = await beginRosterRead(this.api, this.store)
+    const roster = await beginRosterRead(this.remote, this.store)
     if (roster === undefined) return
-    const { presets, authorable, hasDocument } = roster
+    const { presets, authorable } = roster
+    const hasDocument = this.canOpenDocument()
     if (presets.length === 0) {
       // Nothing to manage leaves nothing to keep a dialog open over.
       this.set({ status: 'unavailable', rows: [], authorable, hasDocument, copy: null, view: null })
@@ -194,12 +201,12 @@ export class AgentPresetSectionController {
     if (!this.store.getSnapshot().authorable) return
     this.set({ error: null })
     try {
-      const response = await this.api.agentPresets.read({ agentPreset: id })
-      if (!response.result.ok) {
-        this.set({ error: response.result.error.message })
+      const response = await this.remote.agentPresets.read(id)
+      if (!response.ok) {
+        this.set({ error: response.error.message })
         return
       }
-      const { name, content } = response.result.value
+      const { name, content } = response.value
       this.set({ view: { id, title: name ?? id, content } })
     } catch (error) {
       this.set({ error: messageOf(error) })
@@ -258,13 +265,14 @@ export class AgentPresetSectionController {
     this.patchCopy({ saving: true, error: null })
     try {
       const name = draft.name.trim()
-      const response = await this.api.agentPresets.copy({
-        from: draft.from,
-        agentPreset: draft.id,
-        ...name === '' ? {} : { name },
-      })
-      if (!response.result.ok) {
-        this.patchCopy({ saving: false, error: response.result.error.message })
+      // Every declared parameter is passed even when optional: the Remote
+      // face checks arity against the declaration and rejects a short call.
+      // An empty display name goes as `undefined` — absent rather than
+      // empty, so the host falls back to the id.
+      const response = await this.remote.agentPresets.copy(
+        draft.from, draft.id, name === '' ? undefined : name)
+      if (!response.ok) {
+        this.patchCopy({ saving: false, error: response.error.message })
         return
       }
       this.set({ copy: null })
@@ -322,9 +330,9 @@ export class AgentPresetSectionController {
     if (!this.store.getSnapshot().authorable) return
     this.set({ deleting: true, error: null })
     try {
-      const response = await this.api.agentPresets.remove({ agentPreset: pendingDelete })
-      if (!response.result.ok) {
-        this.set({ deleting: false, pendingDelete: null, error: response.result.error.message })
+      const response = await this.remote.agentPresets.deletePreset(pendingDelete)
+      if (!response.ok) {
+        this.set({ deleting: false, pendingDelete: null, error: response.error.message })
         return
       }
       this.set({ deleting: false, pendingDelete: null })

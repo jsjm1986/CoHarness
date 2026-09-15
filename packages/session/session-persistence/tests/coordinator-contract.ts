@@ -115,7 +115,7 @@ function legacyMessageLog(): SessionEvent[] {
         isError: false,
       },
       sourceEventSeqs: [5],
-      surfaceOp: { op: 'replace', start: 5, end: 5 },
+      surfaceOp: { op: 'replace', startSeq: 5, endSeq: 5 },
     },
     { type: 'step/end', seq: 7, time: 9, data: { turn: 1, step: 1 } },
     { type: 'turn/end', seq: 8, time: 10, data: { turn: 1, reason: { kind: 'completed' } } },
@@ -739,7 +739,7 @@ export function runCoordinatorContract(name: string, makeFixture: () => Promise<
           type: 'tool/result',
           seq: 0,
           time: 1,
-          surfaceOp: { op: 'replace', start: -1, end: -1 },
+          surfaceOp: { op: 'replace', startSeq: -1, endSeq: -1 },
           data: {
             turn: 1,
             step: 1,

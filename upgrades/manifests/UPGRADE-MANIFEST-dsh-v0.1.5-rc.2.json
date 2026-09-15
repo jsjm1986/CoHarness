@@ -83,7 +83,7 @@
       ],
       "localOwner": "fs Service Definition and local/E2B providers",
       "evidence": "readByteRange implementation and focused tests",
-      "reviewState": "pending-cumulative-source-review"
+      "reviewState": "implemented-local-tests-passing"
     },
     {
       "id": "workspace-files-remote-read",
@@ -99,7 +99,7 @@
       ],
       "localOwner": "ApiProxy workspaceFiles + client runtime resources",
       "evidence": "11 real local-FS ApiProxy tests, 25 resource lifecycle tests; explicit runtime binding; full changes-stream, browser and PostgreSQL acceptance pending.",
-      "reviewState": "pending-cumulative-source-review"
+      "reviewState": "implemented-local-tests-passing"
     },
     {
       "id": "feedback-sidecar",
@@ -114,7 +114,7 @@
       ],
       "localOwner": "message-feedback sidecar and command-feedback",
       "evidence": "CoHarness storage and telemetry policy remain authoritative",
-      "reviewState": "pending-cumulative-source-review"
+      "reviewState": "implemented-local-tests-passing"
     },
     {
       "id": "delivered-file-visuals",
@@ -128,7 +128,7 @@
       ],
       "localOwner": "ui-deliverables",
       "evidence": "Shared LinkIcon/FileTypeIcon and cloud-safe Workbench/produced-file preview tests pass; server openPath remains loopback-only.",
-      "reviewState": "pending-cumulative-source-review"
+      "reviewState": "implemented-local-tests-passing"
     },
     {
       "id": "upstream-ui-package-replacement",
@@ -139,7 +139,7 @@
       "upstreamCommits": [],
       "localOwner": "existing ui-conversation/ui-sidebar/ui-workbench",
       "evidence": "package replacement is incompatible with multi-runtime cloud UI",
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "implemented-local-tests-passing",
       "noUpstreamCommitReason": "decision covers local policy, not an upstream commit range"
     },
     {
@@ -151,7 +151,7 @@
       "upstreamCommits": [],
       "localOwner": "Android/native/deployment owners",
       "evidence": "requires separate platform release and external acceptance",
-      "reviewState": "pending-cumulative-source-review",
+      "reviewState": "deferred-platform-review",
       "noUpstreamCommitReason": "decision covers local policy, not an upstream commit range"
     },
     {
@@ -286,5 +286,56 @@
       "reviewState": "local-tests-passing-ci-unverified"
     }
   ],
-  "evidenceScope": "Only explicitly recorded current-worktree commands are validation evidence. Historical CI and inventory counts do not prove this upgrade."
+  "evidenceScope": "Only explicitly recorded current-worktree commands are validation evidence. Historical CI and inventory counts do not prove this upgrade.",
+  "staleResidueAudited": {
+    "definition": "Source files byte-identical to the adopted upstream baseline while the rc.2 target changed them; audited across the alpha.1/alpha.2/rc.1/rc.2 adoption span, not only the last leg.",
+    "result": "no residue remains under the same comparison",
+    "syncedToTarget": "Files with no fork-owned behavior took rc.2 content; consumers, package exports, and tests were adapted where the upstream API moved (command-feedback FeedbackRecord + ./types export, E2B remote process-group tracking, sqlite persistedInspectConcurrency, exact fs not-read diagnostic, otel session.format_version).",
+    "deferred": [
+      {
+        "file": "packages/client/ui-attachment/src/AttachmentRail.tsx",
+        "with": "file-attachment feature cluster (renderItem API, FileCard, upload wire)"
+      },
+      {
+        "file": "packages/client/ui-attachment/src/client/ComposerAttachments.module.css",
+        "with": "file-attachment feature cluster"
+      },
+      {
+        "file": "packages/client/ui-attachment/src/client/labels.ts",
+        "with": "file-attachment feature cluster (locale keys)"
+      },
+      {
+        "file": "packages/context/session-reference/src/config.ts",
+        "with": "dynamic reference budgets + spill.ts"
+      },
+      {
+        "file": "packages/feedback/message-feedback/src/types.ts",
+        "with": "upstream feedback event-log redesign"
+      },
+      {
+        "file": "packages/subagent/subagent/src/internal.ts",
+        "with": "subagent control-plane/inbox cluster"
+      }
+    ],
+    "retained": [
+      {
+        "file": "packages/client/ui-primitives/src/markdown/MessageText.tsx",
+        "reason": "upstream deleted; live local references in ui-primitives index and ui-conversation"
+      },
+      {
+        "file": "packages/client/ui-primitives/src/markdown/MessageText.module.css",
+        "reason": "upstream deleted; paired styles of retained component"
+      },
+      {
+        "file": "packages/feedback/message-feedback/src/spec.ts",
+        "reason": "upstream deleted; owns local durable sidecar schema consumed by index.ts"
+      },
+      {
+        "file": "packages/subagent/subagent/src/descriptor-seed.ts",
+        "reason": "upstream deleted; seedDescriptorTurn still exported by index.ts"
+      }
+    ],
+    "upstreamOnly": "a2-to-rc.2 also touched packages CoHarness does not carry (ui-chat, ui-dockkit, ui-sidebar-documentpreview, ui-sidebar-files, ui-sidebar-right) — unchanged under the ui-package-tree reject decision.",
+    "verification": "affected-package vitest runs pass (fs 330, host session/persistence/subagent/e2b 884, client tree 4487); build:lib:host + typecheck:contracts-ready + oxlint clean"
+  }
 }

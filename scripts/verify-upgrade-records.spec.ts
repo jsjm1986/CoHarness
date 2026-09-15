@@ -40,11 +40,11 @@ function manifest(overrides: Record<string, unknown> = {}): Record<string, unkno
 
 describe('checkMatrix', () => {
   it('accepts a conforming schema v2 matrix', () => {
-    expect(() => checkMatrix('m.json', matrix())).not.toThrow()
+    expect(() => { checkMatrix('m.json', matrix()) }).not.toThrow()
   })
 
   it('skips strict checks for legacy schema versions', () => {
-    expect(() => checkMatrix('m.json', { schemaVersion: 1 })).not.toThrow()
+    expect(() => { checkMatrix('m.json', { schemaVersion: 1 }) }).not.toThrow()
   })
 
   it.each([
@@ -54,7 +54,7 @@ describe('checkMatrix', () => {
     ['a missing target commit', { target: { tag: 'x' } }],
     ['empty rows', { rows: [] }],
   ] as const)('rejects %s', (_label, patch) => {
-    expect(() => checkMatrix('m.json', matrix(patch))).toThrow('upgrade-records:')
+    expect(() => { checkMatrix('m.json', matrix(patch)) }).toThrow('upgrade-records:')
   })
 
   it.each([
@@ -64,26 +64,26 @@ describe('checkMatrix', () => {
     ['a short upstream commit id', { upstreamCommits: ['abc123'] }],
     ['empty coverage entirely', { upstreamCommits: [], commitScope: undefined, noUpstreamCommitReason: undefined }],
   ] as const)('rejects a row with %s', (_label, patch) => {
-    expect(() => checkMatrix('m.json', matrix({ rows: [matrixRow(patch)] }))).toThrow('upgrade-records:')
+    expect(() => { checkMatrix('m.json', matrix({ rows: [matrixRow(patch)] })) }).toThrow('upgrade-records:')
   })
 
   it('accepts a commitScope in place of enumerated commits', () => {
-    expect(() => checkMatrix('m.json', matrix({ rows: [matrixRow({ upstreamCommits: [], commitScope: ['packages/session'] })] }))).not.toThrow()
+    expect(() => { checkMatrix('m.json', matrix({ rows: [matrixRow({ upstreamCommits: [], commitScope: ['packages/session'] })] })) }).not.toThrow()
   })
 
   it('accepts a noUpstreamCommitReason in place of commits', () => {
-    expect(() => checkMatrix('m.json', matrix({ rows: [matrixRow({ upstreamCommits: [], commitScope: undefined, noUpstreamCommitReason: 'local-only policy' })] }))).not.toThrow()
+    expect(() => { checkMatrix('m.json', matrix({ rows: [matrixRow({ upstreamCommits: [], commitScope: undefined, noUpstreamCommitReason: 'local-only policy' })] })) }).not.toThrow()
   })
 
   it('requires evidence when a row claims released', () => {
-    expect(() => checkMatrix('m.json', matrix({ rows: [matrixRow({ reviewState: 'released' })] }))).toThrow('evidence')
-    expect(() => checkMatrix('m.json', matrix({ rows: [matrixRow({ reviewState: 'released', evidence: 'ci run' })] }))).not.toThrow()
+    expect(() => { checkMatrix('m.json', matrix({ rows: [matrixRow({ reviewState: 'released' })] })) }).toThrow('evidence')
+    expect(() => { checkMatrix('m.json', matrix({ rows: [matrixRow({ reviewState: 'released', evidence: 'ci run' })] })) }).not.toThrow()
   })
 })
 
 describe('checkManifest', () => {
   it('accepts a conforming schema v2 manifest', () => {
-    expect(() => checkManifest('f.json', manifest())).not.toThrow()
+    expect(() => { checkManifest('f.json', manifest()) }).not.toThrow()
   })
 
   it.each([
@@ -93,7 +93,7 @@ describe('checkManifest', () => {
     ['a missing targetVersion', { targetVersion: undefined }],
     ['empty decisions', { decisions: [] }],
   ] as const)('rejects %s', (_label, patch) => {
-    expect(() => checkManifest('f.json', manifest(patch))).toThrow('upgrade-records:')
+    expect(() => { checkManifest('f.json', manifest(patch)) }).toThrow('upgrade-records:')
   })
 })
 
@@ -112,16 +112,16 @@ describe('checkInventoryCoverage', () => {
       matrixRow({ upstreamCommits: [SHA] }),
       matrixRow({ upstreamCommits: [], commitScope: ['packages/client', 'packages/fs'] }),
     ] })
-    expect(() => checkInventoryCoverage('i.json', inv, m)).not.toThrow()
+    expect(() => { checkInventoryCoverage('i.json', inv, m) }).not.toThrow()
   })
 
   it('fails when a carried commit is unclaimed', () => {
     const m = matrix({ rows: [matrixRow({ upstreamCommits: [SHA] })] })
-    expect(() => checkInventoryCoverage('i.json', inv, m)).toThrow('upgrade-records:')
+    expect(() => { checkInventoryCoverage('i.json', inv, m) }).toThrow('upgrade-records:')
   })
 
   it('does not require coverage for upstreamOnly or none commits', () => {
     const only = { commits: inv.commits.filter(c => c.bucket === 'upstreamOnly') }
-    expect(() => checkInventoryCoverage('i.json', only, matrix())).not.toThrow()
+    expect(() => { checkInventoryCoverage('i.json', only, matrix()) }).not.toThrow()
   })
 })

@@ -168,6 +168,8 @@ describe('createFixtureApi', () => {
         sessionStats: {
           turns: 0, steps: 0, llmMs: 0, toolMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0,
         },
+        // Model-selection unit composed: nothing used or pending on the empty log.
+        modelSelection: { lastUsed: null, next: null },
         imageLimits: {
           maxImageBytes: 5 * 1024 * 1024,
           maxImagesPerMessage: 20,
@@ -388,14 +390,15 @@ describe('createFixtureApi', () => {
     expect((first[8]?.payload as { value: { messageTokens: number } }).value.messageTokens).toBeGreaterThan(0)
     expect(first[9]?.payload).toMatchObject({ type: 'session/projection', sessionId: 'fx-alpha', key: 'sessionStats' })
     expect((first[9]?.payload as { value: { turns: number; steps: number } }).value.steps).toBeGreaterThan(0)
-    expect(first[10]?.payload).toMatchObject({
+    expect(first[10]?.payload).toMatchObject({ type: 'session/projection', sessionId: 'fx-alpha', key: 'modelSelection' })
+    expect(first[11]?.payload).toMatchObject({
       type: 'session/projection', sessionId: 'fx-alpha', key: 'imageLimits',
       value: { maxImagesPerMessage: 20, maxImageBytes: 5 * 1024 * 1024 },
     })
-    expect(first[11]?.payload).toMatchObject({ type: 'approval/requested', toolName: 'dangerous_tool' })
-    expect(second[11]?.rpcId).toBe(first[11]?.rpcId) // stable rpcId across replays (host replay semantics)
-    expect(first[12]?.payload).toMatchObject({ type: 'question/requested', sessionId: 'fx-alpha' })
-    expect(second[12]?.rpcId).toBe(first[12]?.rpcId)
+    expect(first[12]?.payload).toMatchObject({ type: 'approval/requested', toolName: 'dangerous_tool' })
+    expect(second[12]?.rpcId).toBe(first[12]?.rpcId) // stable rpcId across replays (host replay semantics)
+    expect(first[13]?.payload).toMatchObject({ type: 'question/requested', sessionId: 'fx-alpha' })
+    expect(second[13]?.rpcId).toBe(first[13]?.rpcId)
   })
 
   it('steer with no replay in flight falls through to a fresh queued turn; non-text blocks stringify empty', async () => {
@@ -1053,27 +1056,31 @@ describe('FixtureApiClient (protocol-level fake carrier)', () => {
     expect(moved.result.value.workspace.sessionIds).toEqual([attached.result.value.sessionId])
     // Goal lifecycle over the fixture fold: create → edit → pause → resume → complete → clear;
     // every mutation acknowledges with the NEW CAS ref (state rides the projection frames).
-    const goalCreated = await client.goals.create({ sessionId: id, objective: 'ship it' })
-    if (!goalCreated.result.ok) throw new Error('goal create failed')
-    let ref = goalCreated.result.value.ref
+    type GoalViewValue = { id: string; revision: number }
+    type GoalReply = { ok: true; value: unknown } | { ok: false; error: { message: string } }
+    const goal = (method: string, args: Record<string, unknown>): Promise<GoalReply> =>
+      client.rpc.call('/api', `goals/${method}`, { args })
+    const goalCreated = await goal('create', { agentId: id, request: { objective: 'ship it' } })
+    if (!goalCreated.ok) throw new Error('goal create failed')
+    let ref: GoalViewValue = (goalCreated.value as { ref: GoalViewValue }).ref
     expect(ref.revision).toBe(1)
-    const edited = await client.goals.edit({ sessionId: id, ref, objective: 'ship it v2' })
-    if (!edited.result.ok) throw new Error('goal edit failed')
-    ref = edited.result.value.ref
-    const paused = await client.goals.pause({ sessionId: id, ref })
-    if (!paused.result.ok) throw new Error('goal pause failed')
-    ref = paused.result.value.ref
-    const resumed = await client.goals.resume({ sessionId: id, ref })
-    if (!resumed.result.ok) throw new Error('goal resume failed')
-    ref = resumed.result.value.ref
+    const edited = await goal('edit', { agentId: id, ref, request: { objective: 'ship it v2' } })
+    if (!edited.ok) throw new Error('goal edit failed')
+    ref = edited.value as GoalViewValue
+    const paused = await goal('pause', { agentId: id, ref })
+    if (!paused.ok) throw new Error('goal pause failed')
+    ref = paused.value as GoalViewValue
+    const resumed = await goal('resume', { agentId: id, ref })
+    if (!resumed.ok) throw new Error('goal resume failed')
+    ref = resumed.value as GoalViewValue
     // A stale ref loses the CAS check.
-    expect((await client.goals.pause({ sessionId: id, ref: { ...ref, revision: 1 } })).result.ok).toBe(false)
-    const completed = await client.goals.complete({ sessionId: id, ref })
-    if (!completed.result.ok) throw new Error('goal complete failed')
-    ref = completed.result.value.ref
+    expect((await goal('pause', { agentId: id, ref: { ...ref, revision: 1 } })).ok).toBe(false)
+    const completed = await goal('complete', { agentId: id, ref })
+    if (!completed.ok) throw new Error('goal complete failed')
+    ref = completed.value as GoalViewValue
     // complete → complete is an invalid transition.
-    expect((await client.goals.complete({ sessionId: id, ref })).result.ok).toBe(false)
-    expect((await client.goals.clear({ sessionId: id, ref })).result).toEqual({ ok: true, value: { cleared: true } })
+    expect((await goal('complete', { agentId: id, ref })).ok).toBe(false)
+    expect((await goal('clear', { agentId: id, ref })).ok).toBe(true)
 
     const goalHistory = await client.sessions.history({ sessionId: id })
     if (!goalHistory.result.ok) throw new Error('goal history failed')

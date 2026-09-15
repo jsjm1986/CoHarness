@@ -4,7 +4,7 @@ import { posix, win32 } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import { FsError } from '@deepseek-ai/dsh-fs'
 import type { FileSystem, FsInfo, FsObservation, FsTarget, FsVersion } from '@deepseek-ai/dsh-fs'
-import { collaborationRefusal } from '@deepseek-ai/dsh-collaboration'
+import { CollaborationError, collaborationRefusal } from '@deepseek-ai/dsh-collaboration'
 import type { CollaborationAuthority } from '@deepseek-ai/dsh-collaboration'
 import type { Session, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-persistence'
@@ -136,6 +136,7 @@ function readFailure(error: unknown, sessionId: SessionId, path: string, signal:
     return { code: 'cancelled', message: 'Workspace file operation was cancelled.', details: {} }
   }
   if (error instanceof FileFailure) return error.error
+  if (error instanceof CollaborationError) return collaborationRefusal(error, 'read', sessionId)
   if (error instanceof FsError) {
     if (error.code === 'FS_PERMISSION_DENIED' || error.code === 'FS_SANDBOX_DENIED') return { code: 'collaboration-forbidden', message: 'Workspace file access is not permitted.', details: { sessionId, action: 'read', reason: 'forbidden' } }
     const codes: Partial<Record<FsError['code'], FileFailureCode>> = {
@@ -285,6 +286,9 @@ interface ChangeOptions {
 
 /**
  * Forward Agent observations through one bounded, coalescing Host-stream queue.
+ * Every drained frame re-runs `readableSessionIds` and `authorize`, so access
+ * committed by any Gateway instance converges within one coalesced batch —
+ * no cross-process invalidation bus.
  * @param ctx - current Host plugin context.
  * @param options - stream authority, lifetime, and publication callbacks.
  * @returns synchronous listener removal and cancellation.

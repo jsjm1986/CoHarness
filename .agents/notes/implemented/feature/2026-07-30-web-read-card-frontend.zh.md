@@ -36,7 +36,7 @@ Status: implemented
 
 `ui-primitives` 增加 `ReadBlock` 和 `highlightLines`；没有新的运行时依赖（shiki 已因 `CodeBlock` 存在）。`ReadBlock` 只读取读取视图的字段，因此保持为渲染意图所承载内容的纯函数 —— 无会话查询，与产出该视图的 presenter 一样可安全回放。没有读取能力的 UI 仍通过通用卡片拿到后端的 `content` 回退（剥掉外壳的文本），保持不变。
 
-Web 聊天里的读取行现在常驻承载文件内容，是相对纯摘要行的一次刻意的密度增加，受聊天上限约束。按已发布的协议格式，`run_code` 子派发不会到达读取卡片，与嵌套 bash 调用到不了终端卡片同因：`session.ts` 把 `tool/code-dispatch(-start)` 折叠为 `resultView: null`，因此嵌套读取保持通用的摊平形式。
+Web 聊天里的读取行现在常驻承载文件内容，是相对纯摘要行的一次刻意的密度增加，受聊天上限约束。按已发布的协议格式，`run_code` 子派发不会到达读取卡片，与嵌套 bash 调用到不了终端卡片同因：`session.ts` 把 `tool/ptc-dispatch(-start)` 折叠为 `resultView: null`，因此嵌套读取保持通用的摊平形式。
 
 ## Testing
 

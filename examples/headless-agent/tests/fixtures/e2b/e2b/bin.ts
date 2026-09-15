@@ -1,8 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { boot } from '@deepseek-ai/dsh-app-boot'
-import { Inbox } from '@deepseek-ai/dsh-agent'
-import type { Agent } from '@deepseek-ai/dsh-agent'
+import type { Agent, Inbox } from '@deepseek-ai/dsh-agent'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-fs-e2b'
 import type {} from '@deepseek-ai/dsh-bash-local'
@@ -20,7 +19,16 @@ const owner: Agent = {
   id: ownerId,
   options: {},
   session,
-  inbox: new Inbox(session, { inserted: () => {}, discarded: () => {}, claimed: () => {} }),
+  inbox: {
+    nextTurn: [],
+    nextStep: [],
+    clear() { throw new Error('fixture owner inbox is read-only') },
+    append() { throw new Error('fixture owner inbox is read-only') },
+    prepend() { throw new Error('fixture owner inbox is read-only') },
+    replace() { throw new Error('fixture owner inbox is read-only') },
+    remove() { throw new Error('fixture owner inbox is read-only') },
+    splice() { throw new Error('fixture owner inbox is read-only') },
+  } satisfies Inbox,
   status: 'idle',
   ctx: ownerFiber.ctx,
   send() {},

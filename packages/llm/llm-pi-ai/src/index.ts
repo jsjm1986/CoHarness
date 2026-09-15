@@ -370,8 +370,8 @@ export function apply(ctx: Context, config: Config): void {
   // except the stored credential and deployment-owned headers: the curated UI
   // accepts neither, so an already-configured route supplies both inside the
   // Host rather than widening the discovery request.
-  ctx.llm.registerModelDiscovery(NS, request => discoverModels(
-    request,
+  ctx.llm.registerModelDiscovery(NS, (request, signal) => discoverModels(
+    { ...request, ...signal === undefined ? {} : { signal } },
     () => storedDiscoveryProfile(request.provider),
     endpointCache,
   ))

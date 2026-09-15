@@ -17,11 +17,11 @@ import type {
   AgentOptions,
   AgentSetup,
   CreateAgentOptions,
-  InboxLimits,
   ResumeAgentOptions,
   SessionStartSource,
   TurnBoundaryProjection,
 } from '@deepseek-ai/dsh-agent'
+import type { InboxLimits } from './inbox.ts'
 import { errorChain } from '@deepseek-ai/dsh-llm'
 import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
 import { SessionId, SessionPreparation, SessionSeq } from '@deepseek-ai/dsh-session'
@@ -356,7 +356,7 @@ function validateConfiguredAgents(agents: Config['agents']): void {
 
 /** Concrete agent factory and driver service. */
 export class AgentLoop extends Service implements AgentFactory {
-  static inject = ['agents', 'sessions', 'llm', 'tools', 'systemPrompt']
+  static inject = ['agents', 'sessions', 'llm', 'tools', 'systemPrompt', 'sessionProjections']
 
   /** Runtime schema for declarative agents. */
   static Config = z.object({
@@ -427,14 +427,9 @@ export class AgentLoop extends Service implements AgentFactory {
       onChange: () => {},
     })
     validateConfiguredAgents(this.config.agents)
-    // Keep the boundary projection optional for compact/headless assemblies;
-    // full applications mount it with the registry and authority readers use
-    // its O(1) current state. Register on this service fiber so disposal owns
-    // the unit without adding a synthetic child plugin effect.
-    const projections = ctx.get('sessionProjections')
-    if (projections !== undefined) {
-      ctx.effect(() => projections.register(turnBoundaryProjectionDefinition), 'agentLoop.turnBoundaryProjection()')
-    }
+    // Register only after every config validation above has passed, so a
+    // rejected constructor leaves no projection unit behind.
+    ctx.sessionProjections.register(turnBoundaryProjectionDefinition)
     this.ownership = new FactoryOwnership(ctx.fiber)
     this.runtime = { ctx }
     ctx.effect(() => () => this.ownership.dispose(), 'agentLoop.transactions()')
@@ -449,7 +444,10 @@ export class AgentLoop extends Service implements AgentFactory {
         const configuredId = sessionId ?? SessionId(`${id}-session-${randomUUID()}`)
         const persistence = sessionId === undefined ? undefined : ctx.get('sessionPersistence')
         if (persistence === undefined) {
-          this.create(configuredId, options, meta)
+          const startup = this.create(configuredId, options, meta).then(() => undefined, (error: unknown) => {
+            this.reportConfiguredStartupFailure(id, 'restore', configuredId, error)
+          })
+          this.ownership.trackStartup(startup)
         } else {
           const startup = this.restoreOrCreateConfigured(ctx, persistence, configuredId, options, meta).catch((error: unknown) => {
             this.reportConfiguredStartupFailure(id, 'restore', configuredId, error)
@@ -715,20 +713,38 @@ export class AgentLoop extends Service implements AgentFactory {
   /**
    * Create an agent and session under one caller-supplied identity, owned by
    * the accessing fiber. Constructor-driven config calls mint a fresh combined
-   * id before entering this boundary.
+   * id before entering this boundary. When a persistence backend is mounted,
+   * the session's write handle is acquired before publication, so an already
+   * owned or already persisted id fails inside this call rather than racing
+   * the coordinator's write path later.
    * @param id - shared agent/session identity.
    * @param options - concrete loop options.
    * @param meta - optional fresh-session workspace metadata.
    * @returns the published running agent.
    */
-  create(id: SessionId, options: AgentOptions = {}, meta: Pick<SessionHeader, 'cwd'> = {}): Agent {
-    using preparation = SessionPreparation.create(this.runtime.ctx.sessions.prepare(id, { meta }))
-    const prepared = this.prepare(this.ctx, id, options, preparation.session)
+  async create(id: SessionId, options: AgentOptions = {}, meta: Pick<SessionHeader, 'cwd'> = {}): Promise<Agent> {
+    const preparation = SessionPreparation.create(this.runtime.ctx.sessions.prepare(id, { meta }))
+    const persistence = this.runtime.ctx.get('sessionPersistence')
+    let handle: SessionHandle | undefined
     try {
-      return prepared.publish('startup').agent
-    } catch (error: unknown) {
-      void prepared.dispose()
-      throw error
+      if (persistence !== undefined) {
+        handle = await persistence.createHandle(preparation.session.header, preparation.session.inheritedEventCount)
+      }
+      const published = await this.setupAndPublish(
+        this.ctx,
+        id,
+        preparation,
+        options,
+        undefined,
+        undefined,
+        'startup',
+        handle,
+      )
+      handle = undefined
+      return published.agent
+    } finally {
+      preparation[Symbol.dispose]()
+      if (handle !== undefined) await handle.close()
     }
   }
 

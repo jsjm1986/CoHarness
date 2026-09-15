@@ -33,7 +33,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -46,7 +49,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{clock}}
 - button "1 tool call · 2 intermediate messages":
   - text: 1 tool call · 2 intermediate messages
   - img
@@ -62,7 +68,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{clock}}
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -71,9 +80,10 @@
 - button "Commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write
-- button "Select model":
-  - text: Select model
+- button "Select model, current DeepSeek-V4-Flash":
+  - text: DeepSeek-V4-Flash
   - img
+- button "0% of context used"
 - button "Send message" [disabled]
 - button "3 turns · 7 steps":
   - img

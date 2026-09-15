@@ -140,6 +140,7 @@ function harness(options: {
     controller,
     useModels: bindSnapshotSelector(controller.store),
     api: face as never,
+    discoverModels: vi.fn(() => Promise.resolve({ ok: true as const, value: [] })),
     schema: settingsSchema,
     t: key => en[key],
   }

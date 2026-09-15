@@ -32,6 +32,7 @@
   ],
   "license": "MIT",
   "peerDependencies": {
+    "@deepseek-ai/dsh-http-proxy": "workspace:^",
     "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/dsh-timeout": "workspace:^",
     "@deepseek-ai/dsh-web": "workspace:^",
@@ -43,6 +44,7 @@
     "undici": "^8.10.0"
   },
   "devDependencies": {
+    "@deepseek-ai/dsh-http-proxy": "workspace:^",
     "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/dsh-timeout": "workspace:^",
     "@deepseek-ai/dsh-web": "workspace:^",

@@ -23,7 +23,7 @@ Key points:
 - **The subagent list does not depend on session-query**: enumeration is completed by a subagent-owned live-preferred merge, and mode/label is retrieved through `ctx.sessionProjections`; deployments without a query backend list as usual.
 - **Value retrieval is a three-rung compute-and-discard ladder**: a live child reads `sessionProjections.snapshot()` (the registry's existing watermark cache, zero log reads); a cold child first reads the optional `sessionProjectionCache.cachedSnapshot(header)`, using the value directly when a non-null `subagent` identity passing the seq gate (`seq >= seedLength ?? 0`) is among its values; otherwise it pays one full `persistence.inspect` read plus one `registry.restore({}, events, 0)` fold; beyond that, absent is absent — no cache of its own, no write-back, no index.
 - **The `subagent` projection unit is the sole authority over the fold rules**: the live snapshot, the cold restore, and GUI history's detached fold all compute through the registry; no second copy of descriptor-interpretation logic exists.
-- **The header, the descriptor (v2), session-persistence, session-projection(-cache), and session-query(-sqlite) are all untouched**; pre-existing data acquires exact values through one `inspect` computation the first time it is listed — no degraded unknown state, no migration.
+- **The header, the descriptor, session-persistence, session-projection(-cache), and session-query(-sqlite) are all untouched**; pre-existing data acquires exact values through one `inspect` computation the first time it is listed — no degraded unknown state, no migration.
 
 Relationship to existing notes:
 

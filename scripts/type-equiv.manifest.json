@@ -123,6 +123,11 @@
     },
     {
       "doc": "docs/subsystems/core.md",
+      "symbol": "Inbox",
+      "source": "packages/core/agent/src/runtime-types.ts"
+    },
+    {
+      "doc": "docs/subsystems/core.md",
       "symbol": "InboxTarget",
       "source": "packages/core/agent/src/types.ts"
     },
@@ -219,42 +224,42 @@
     {
       "doc": "docs/subsystems/collaboration.md",
       "symbol": "CollaborationAction",
-      "source": "packages/context/collaboration/src/index.ts"
+      "source": "packages/context/collaboration/src/types.ts"
     },
     {
       "doc": "docs/subsystems/collaboration.md",
       "symbol": "CollaborationInteractionKind",
-      "source": "packages/context/collaboration/src/index.ts"
+      "source": "packages/context/collaboration/src/types.ts"
     },
     {
       "doc": "docs/subsystems/collaboration.md",
       "symbol": "CollaborationVisibility",
-      "source": "packages/context/collaboration/src/index.ts"
+      "source": "packages/context/collaboration/src/types.ts"
     },
     {
       "doc": "docs/subsystems/collaboration.md",
       "symbol": "CollaborationParticipant",
-      "source": "packages/context/collaboration/src/index.ts"
+      "source": "packages/context/collaboration/src/types.ts"
     },
     {
       "doc": "docs/subsystems/collaboration.md",
       "symbol": "CollaborationAccess",
-      "source": "packages/context/collaboration/src/index.ts"
+      "source": "packages/context/collaboration/src/types.ts"
     },
     {
       "doc": "docs/subsystems/collaboration.md",
       "symbol": "CollaborationSessionCreation",
-      "source": "packages/context/collaboration/src/index.ts"
+      "source": "packages/context/collaboration/src/types.ts"
     },
     {
       "doc": "docs/subsystems/collaboration.md",
       "symbol": "CollaborationAuthority",
-      "source": "packages/context/collaboration/src/index.ts"
+      "source": "packages/context/collaboration/src/types.ts"
     },
     {
       "doc": "docs/subsystems/collaboration.md",
       "symbol": "CollaborationErrorCode",
-      "source": "packages/context/collaboration/src/index.ts"
+      "source": "packages/context/collaboration/src/types.ts"
     },
     {
       "doc": "docs/subsystems/goal.md",
@@ -902,7 +907,7 @@
     },
     {
       "doc": "docs/subsystems/tools.md",
-      "symbol": "CodeDispatchLog",
+      "symbol": "PtcDispatchLog",
       "source": "packages/core/tools/src/index.ts"
     },
     {
@@ -1408,22 +1413,22 @@
     {
       "doc": "docs/subsystems/subagent.md",
       "symbol": "AgentMessageSource",
-      "source": "packages/subagent/subagent/src/continuation.ts"
+      "source": "packages/subagent/subagent/src/continuation-messages.ts"
     },
     {
       "doc": "docs/subsystems/subagent.md",
       "symbol": "SubagentSettledMessageSource",
-      "source": "packages/subagent/subagent/src/continuation.ts"
+      "source": "packages/subagent/subagent/src/continuation-messages.ts"
     },
     {
       "doc": "docs/subsystems/subagent.md",
       "symbol": "SubagentSendMessageOptions",
-      "source": "packages/subagent/subagent/src/continuation.ts"
+      "source": "packages/subagent/subagent/src/types.ts"
     },
     {
       "doc": "docs/subsystems/subagent.md",
       "symbol": "SubagentInterruptAuthority",
-      "source": "packages/subagent/subagent/src/continuation.ts"
+      "source": "packages/subagent/subagent/src/types.ts"
     },
     {
       "doc": "docs/subsystems/subagent.md",
@@ -1433,7 +1438,7 @@
     {
       "doc": "docs/subsystems/subagent.md",
       "symbol": "ContinuableStart",
-      "source": "packages/subagent/subagent/src/continuation.ts"
+      "source": "packages/subagent/subagent/src/types.ts"
     },
     {
       "doc": "docs/subsystems/subagent.md",

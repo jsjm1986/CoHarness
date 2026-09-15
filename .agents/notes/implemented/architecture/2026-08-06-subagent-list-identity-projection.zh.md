@@ -23,7 +23,7 @@ mode 与 label 由新的 `subagent` projection unit（纯身份两臂）折叠�
 - **subagent 列表不依赖 session-query**：枚举由 subagent 自管的 live-preferred 合并完成，mode/label 经 `ctx.sessionProjections` 取值；没有 query backend 的部署照常列表。
 - **取值三级「算完即止」阶梯**：live child 读 `sessionProjections.snapshot()`（注册表既有水位缓存，零日志读）；cold child 先读可选 `sessionProjectionCache.cachedSnapshot(header)`，values 含非 null 且过 seq 门（`seq >= seedLength ?? 0`）的 `subagent` 身份即直接用；否则一次 `persistence.inspect` 整读加 `registry.restore({}, events, 0)` 折叠；再没有就没有——不自建缓存、无回写、无索引。
 - **`subagent` projection unit 是折叠规则唯一权威**：live snapshot、cold restore、GUI history 的 detached 折叠全部经 registry 计算，不存在第二份描述符解释逻辑。
-- **header、描述符（v2）、session-persistence、session-projection(-cache)、session-query(-sqlite) 全部零改动**；存量数据第一次被列表时一次 `inspect` 现算获得精确值，无 unknown 降级态、无迁移。
+- **header、描述符、session-persistence、session-projection(-cache)、session-query(-sqlite) 全部零改动**；存量数据第一次被列表时一次 `inspect` 现算获得精确值，无 unknown 降级态、无迁移。
 
 与既有记录的关系：
 

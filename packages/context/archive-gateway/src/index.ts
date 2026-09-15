@@ -327,7 +327,24 @@ async function* archiveSyncBatches(
     const generation = projectionCache.generation(id)
     const cached = projectionCache.get(id)
     const projection = cached ?? await loadArchiveProjection(ctx, entry)
-    if (cached === undefined) projectionCache.set(id, projection, generation)
+      .catch((error: unknown) => {
+        // An unreadable artifact still belongs in the archive set; its stored
+        // record persists while this pass contributes no payload fields.
+        ctx.logger.warn(`archive sync skipped unreadable session '${id}': ${String(error)}`)
+        return undefined
+      })
+    if (cached === undefined && projection !== undefined) projectionCache.set(id, projection, generation)
+    if (projection === undefined) {
+      titleCache.delete(id)
+      if (batch.archivedSessionIds.length >= ARCHIVE_SYNC_SESSION_BATCH_SIZE) {
+        emitted = true
+        yield takeSyncBatch(batch)
+        batch = emptySyncBatch()
+        batchNumber++
+      }
+      batch.archivedSessionIds.push(id)
+      continue
+    }
     const title = projection.title
     if (title === undefined) titleCache.delete(id)
     else rememberTitle(titleCache, id, title)

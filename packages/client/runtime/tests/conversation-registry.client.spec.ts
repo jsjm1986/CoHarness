@@ -145,7 +145,7 @@ describe('Conversation registries', () => {
     api.onList = () => Promise.resolve(ok({
       items: [{ sessionId, updatedAt: 1, running: false, blank: true }],
     }) as never)
-    const sessions = new SessionRuntime(ctx, api, fakeRemote())
+    const sessions = new SessionRuntime(ctx, api, fakeRemote(api))
     await sessions.refresh()
     await Promise.resolve()
     sessions.scope(sessionId)

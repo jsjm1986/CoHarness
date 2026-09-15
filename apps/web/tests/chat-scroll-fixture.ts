@@ -5,6 +5,7 @@
 import {
   CallId,
   createAssistantMessage,
+  createMessage,
   createToolResultMessage,
   createUserMessage,
 } from '@deepseek-ai/dsh-llm'
@@ -65,10 +66,18 @@ function markerHelpers(prefix: string): ChatScrollMarkers {
 }
 
 function appendRequestHeader(session: Session, turn: number, step: number): void {
+  session.append('system/message', {
+    turn,
+    step,
+    message: createMessage({
+      role: 'system',
+      content: [{ type: 'text', text: `Synthetic chat-scroll request for turn ${String(turn)}, step ${String(step)}.` }],
+      source: { kind: 'plugin', plugin: 'test-fixture' },
+    }),
+  }, { surfaceOp: 'append' })
   session.append('request/header', {
     header: {
       config: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
-      system: `Synthetic chat-scroll request for turn ${String(turn)}, step ${String(step)}.`,
     },
     reason: turn === 1 && step === 1 ? 'initial' : 'change',
   })

@@ -1,3 +1,4 @@
+import { spawn as nodeSpawn, spawnSync as nodeSpawnSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, statSync, unlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -78,6 +79,10 @@ vi.mock('node:fs', async (importOriginal) => {
       actual.unlinkSync(path)
     },
   }
+})
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>()
+  return { ...actual, spawn: vi.fn(actual.spawn), spawnSync: vi.fn(actual.spawnSync) }
 })
 
 const spillDir = mkdtempSync(join(tmpdir(), 'dsh-subprocess-spec-'))
@@ -169,6 +174,31 @@ describe('spawnSubprocess', () => {
         .toThrow(`subprocess graceMs must be a positive finite number no greater than ${MAX_TIMER_DELAY_MS}`)
     },
   )
+
+  it('hides the child window on Windows without changing output or tree-root options', async () => {
+    const result = await finish(spawnSubprocess(spec('echo hello'), {
+      spillDir,
+      platform: 'win32',
+      taskkill: () => {},
+    }))
+    expect(vi.mocked(nodeSpawn).mock.calls.at(-1)?.[2]).toMatchObject({
+      windowsHide: true,
+      detached: false,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    expect(result).toMatchObject({ exitCode: 0, signal: null, stdout: { text: 'hello\n', truncated: false } })
+  })
+
+  it('hides the taskkill helper window', () => {
+    const taskkill = vi.mocked(nodeSpawnSync)
+    taskkill.mockReturnValueOnce({} as never)
+    taskkillProcessTree(77)
+    expect(taskkill).toHaveBeenLastCalledWith(
+      'taskkill',
+      ['/PID', '77', '/T', '/F'],
+      { stdio: 'ignore', windowsHide: true },
+    )
+  })
 
   it('captures stdout on success', async () => {
     const result = await finish(spawnSubprocess(spec('echo hello')))

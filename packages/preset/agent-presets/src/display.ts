@@ -9,8 +9,8 @@
 export type BuiltInPresetCopyKey =
   | 'presetStandardName'
   | 'presetStandardDescription'
-  | 'presetCodeName'
-  | 'presetCodeDescription'
+  | 'presetPtcName'
+  | 'presetPtcDescription'
   | 'presetMinimalName'
   | 'presetMinimalDescription'
   | 'presetCordisName'
@@ -41,7 +41,9 @@ interface PresetLocaleKeys {
 
 const BUILT_IN_KEYS: Readonly<Partial<Record<string, PresetLocaleKeys>>> = {
   standard: { name: 'presetStandardName', description: 'presetStandardDescription' },
-  code: { name: 'presetCodeName', description: 'presetCodeDescription' },
+  ptc: { name: 'presetPtcName', description: 'presetPtcDescription' },
+  // Pre-rename preset id carried by released `agent-preset/selected` records.
+  code: { name: 'presetPtcName', description: 'presetPtcDescription' },
   minimal: { name: 'presetMinimalName', description: 'presetMinimalDescription' },
   cordis: { name: 'presetCordisName', description: 'presetCordisDescription' },
 }

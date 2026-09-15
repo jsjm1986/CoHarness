@@ -22,7 +22,14 @@ async function bench(isLoopback = true, settings?: object, services: object = {}
   ctx.provide('locale', locale)
   // The plugins inject `remote`; forwarded events reach them through the
   // same `$dispatch` handoff the connection sink makes.
-  new TestRemote(ctx)
+  const remote = new TestRemote(ctx) as TestRemote & {
+    llm: Record<string, (...args: never[]) => Promise<unknown>>
+  }
+  // The generated llm namespace, mounted the way the assembled Client Remote
+  // would expose it: one object under both ctx.remote.llm and the remote.llm
+  // service key the plugin injects.
+  remote.llm = { discoverModels: () => Promise.resolve({ ok: true as const, value: [] }) }
+  ctx.provide('remote.llm', remote.llm as never)
   // Without a settings face the mirror's reads fail and stay contained; the
   // Models join itself never fetches until a section actually loads. The real
   // ui-settings apply also provides the settingsSchema service.
@@ -49,7 +56,7 @@ function declare(slots: SlotRegistry): () => void {
 
 describe('ui-settings-models apply', () => {
   it('declares the services it uses', () => {
-    expect(inject).toEqual(['slots', 'locale', 'connection', 'remote', 'settingsScope', 'settingsSchema'])
+    expect(inject).toEqual(['slots', 'locale', 'connection', 'remote', 'remote.llm', 'settingsScope', 'settingsSchema'])
   })
 
   it('registers the models nav entry for declarations before or after apply', async () => {

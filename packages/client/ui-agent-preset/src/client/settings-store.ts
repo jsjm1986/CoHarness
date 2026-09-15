@@ -7,7 +7,8 @@
  * namespace's `default` field, which is what the host resolves at creation.
  */
 
-import type { IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
+import type { ClientRemote, IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
+import type { AgentPresetRoster } from '@deepseek-ai/dsh-agent-presets/types'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SettingsDescribeFace } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { SettingsWritableReason } from '@deepseek-ai/dsh-client-runtime/client'
@@ -64,30 +65,10 @@ export interface AgentPresetOption {
 }
 
 /** One roster entry exactly as the host reports it. */
-export interface RosterPreset {
-  /** Preset id and directory name. */
-  id: string
-  /** Whether the preset ships with the deployment or was authored locally. */
-  trust: 'system' | 'user'
-  /** Whether a session that names no preset gets this one. */
-  isDefault: boolean
-  /** Display name the preset published, absent when it published none. */
-  name?: string
-  /** One sentence on what the preset is for. */
-  description?: string
-  /** Why the preset cannot compose a session, absent when it can. */
-  broken?: string
-}
+export type RosterPreset = AgentPresetRoster['presets'][number]
 
-/** The roster the host answered with. */
-export interface RosterValue {
-  /** Every preset the deployment composes, in the order the host lists them. */
-  presets: readonly RosterPreset[]
-  /** Whether this browser may author presets at all. */
-  authorable: boolean
-  /** Whether the host can open a preset directory on a native desktop. */
-  hasDocument: boolean
-}
+/** The roster the host answered with: every preset plus whether this browser may author. */
+export type RosterValue = AgentPresetRoster
 
 /** The roster, or the message to show in its place. */
 export type RosterRead = { ok: true; value: RosterValue } | { ok: false; error: string }
@@ -99,15 +80,15 @@ export type RosterRead = { ok: true; value: RosterValue } | { ok: false; error: 
  * `ok: false` envelope — and every surface treats them identically. Folding
  * them here keeps each store's `load` about what it does with a roster rather
  * than about how the call can fail.
- * @param api - the agent-preset wire face.
+ * @param remote - the agent-preset Remote namespace.
  * @returns the roster, or the message to show in its place.
  */
-export async function readRoster(api: Pick<IApiClient, 'agentPresets'>): Promise<RosterRead> {
+export async function readRoster(remote: Pick<ClientRemote, 'agentPresets'>): Promise<RosterRead> {
   try {
-    const response = await api.agentPresets.list({})
-    return response.result.ok
-      ? { ok: true, value: response.result.value }
-      : { ok: false, error: response.result.error.message }
+    const response = await remote.agentPresets.list()
+    return response.ok
+      ? { ok: true, value: response.value }
+      : { ok: false, error: response.error.message }
   } catch (error) {
     return { ok: false, error: messageOf(error) }
   }
@@ -120,18 +101,18 @@ export async function readRoster(api: Pick<IApiClient, 'agentPresets'>): Promise
  * A surface that gets `undefined` returns without touching its snapshot
  * further — either another read owns it, or this one already wrote the
  * failure. What differs between surfaces starts after this.
- * @param api - the agent-preset wire face.
+ * @param remote - the agent-preset Remote namespace.
  * @param store - the surface's own snapshot store.
  * @returns the roster, or undefined when the caller should return.
  */
 export async function beginRosterRead<S extends { status: string; error: string | null }>(
-  api: Pick<IApiClient, 'agentPresets'>,
+  remote: Pick<ClientRemote, 'agentPresets'>,
   store: SnapshotStore<S>,
 ): Promise<RosterValue | undefined> {
   const before = store.getSnapshot()
   if (before.status === 'loading') return undefined
   store.set({ ...before, status: 'loading', error: null })
-  const roster = await readRoster(api)
+  const roster = await readRoster(remote)
   if (roster.ok) return roster.value
   store.set({ ...store.getSnapshot(), status: 'error', error: roster.error })
   return undefined
@@ -195,11 +176,13 @@ export class AgentPresetSettingsController {
   readonly store: SnapshotStore<AgentPresetSettingsState> = createSnapshotStore(INITIAL)
 
   /**
-   * @param api - the agent-preset and settings wire faces (roster and default write).
+   * @param api - the settings wire face (default write).
+   * @param remote - the agent-preset Remote namespace (roster reads).
    * @param describeFace - the shared mirror's describe face (writability source).
    */
   constructor(
     private readonly api: IApiClient,
+    private readonly remote: Pick<ClientRemote, 'agentPresets'>,
     private readonly describeFace: SettingsDescribeFace,
   ) {}
 
@@ -214,7 +197,7 @@ export class AgentPresetSettingsController {
    * @returns once the snapshot reflects the host.
    */
   async load(): Promise<void> {
-    const roster = await beginRosterRead(this.api, this.store)
+    const roster = await beginRosterRead(this.remote, this.store)
     if (roster === undefined) return
     const { presets } = roster
     const [first] = presets

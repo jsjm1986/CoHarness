@@ -36,7 +36,7 @@
 
 普通类（不是 Cordis 服务）。活跃会话通过 `ctx.sessions.create()` 创建，脱离态的回放或检查会话通过 `Session.create()` 创建；脱离态工厂不会发布生命周期事件，也不会将会话绑定到 fiber。
 
-- `session.append(type, data, opts?)` 会为持久数据和 surface 元数据制作快照并冻结它们，构造事件的 `SessionSeq`，校验标记形态、被引用的源事件序号、替换覆盖完整性，以及仅修改内容的单个 `tool/result` 重写，随后同步提交，再在彼此独立的失败收容下通知观察者。对已挂接会话的重入追加会被拒绝，运行时检查也覆盖扩宽后的联合类型和已加载日志。
+- `session.append(type, data, opts?)` 会为持久数据和 surface 元数据制作快照并冻结它们，构造事件的 `SessionSeq`，校验规范化载荷字段（`validateSessionEventData`：`request/header` 省略 `header.system` 与空的 `tools`/`adapterDefaults`，携带 `error` 的 `tool/result` 要求 `content[0].isError`）、标记形态、被引用的源事件序号、替换覆盖完整性，以及仅修改内容的单个 `tool/result` 重写，随后同步提交，再在彼此独立的失败收容下通知观察者。对已挂接会话的重入追加会被拒绝，运行时检查也覆盖扩宽后的联合类型和已加载日志。
 - `session.deriveMessages()` 对每个新的 surface 条目只做一次增量投影，并返回一个新数组，其中包含这些条目存储的完整、带标识且冻结的消息。assistant 消息的模型来源会保留生成该消息的提供方和模型，以及适配器私有回放状态。surface 重写会重建投影；不存在原始日志回退。
 - `session.deriveEventMessage(event)` 是重建和请求检查使用的规范逐事件投影。
 - `session.surface` 暴露只读 `SessionSurface` 视图，由会话唯一的增量 surface 管理器所有；每次提交重写，`replaceGeneration` 都会变化。
@@ -51,7 +51,7 @@
 
 持久值需要一种已接受的表示，不能先检查再二次读取。`isJsonValue(value)` 是布尔判断函数；`snapshotJsonValue(value)` 在一趟迭代中校验并复制普通值，无效输入返回 `undefined`，getter 抛出的异常则向外传播。快照辅助函数接受除 `-0` 外的有限 JSON 数值（JSON 会将其改写为 `0`）、稠密普通数组、普通对象或 null 原型对象；它会在规范化前拒绝循环引用、不支持的标量和特殊原型，同时不施加调用栈深度限制。
 
-会话事件导入将所有权与消息校验分开处理。`snapshotSessionEvent(event)` 会先克隆借用的事件，再校验并冻结其中带标识的消息。`adoptSessionEvent(event)` 原地执行相同的消息处理并返回原事件；调用方只有在移交独占的对象图，且该对象图没有与其他事件共享可变子对象时，才可以使用此函数。
+会话事件导入将所有权与消息校验分开处理。`snapshotSessionEvent(event)` 会先克隆借用的事件，再校验并冻结其中带标识的消息。`adoptSessionEvent(event)` 原地执行相同的消息处理并返回原事件；调用方只有在移交独占的对象图，且该对象图没有与其他事件共享可变子对象时，才可以使用此函数。两条路径与 `append` 应用相同的规范化载荷与事件本地 surface 元数据校验；不检查历史关联。
 
 ### 分片行存储编解码器（`chunk-rows.ts`）
 

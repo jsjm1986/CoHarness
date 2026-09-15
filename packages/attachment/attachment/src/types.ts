@@ -52,6 +52,16 @@ export interface EncodedImageAttachment {
   name?: string
 }
 
+/** Host prompt content whose image bytes await admission. */
+export type AttachmentAdmissionPart =
+  | { readonly type: 'text'; readonly text: string }
+  | ({ readonly type: 'image' } & EncodedImageAttachment)
+
+/** Host-admitted prompt content with every image represented by its durable reference. */
+export type AdmittedPromptContentPart =
+  | { readonly type: 'text'; readonly text: string }
+  | { readonly type: 'image'; readonly attachment: ImageAttachmentRef }
+
 /** Request to validate and durably commit one image. */
 export interface SaveImageAttachment {
   data: Uint8Array

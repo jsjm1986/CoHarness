@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   CENTER_MIN, clampWidth, computeColumns,
-  DETAILS_DEFAULT, DETAILS_MIN, SIDEBAR_COLLAPSED, SIDEBAR_DEFAULT, SIDEBAR_MIN,
+  DETAILS_DEFAULT, DETAILS_MIN, SIDEBAR_COLLAPSED, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN,
 } from '@deepseek-ai/dsh-client-ui-layout/src/client/columns.ts'
 
 // Numeric preference form (0 = closed); helpers keep the scenario names readable.
@@ -35,9 +35,9 @@ describe('computeColumns', () => {
   })
 
   it('step 2: details shrinks first, center pinned at min', () => {
-    // 280 + 360 + 640 = 1280 > 1250; details concedes to 1250-280-640 = 330.
-    const cols = computeColumns(1250, open(SIDEBAR_DEFAULT), open(DETAILS_DEFAULT))
-    expect(cols).toEqual({ sidebar: 280, center: CENTER_MIN, details: 330 })
+    // 280 + 360 + 400 = 1040 > 1000; details concedes to 1000-280-400 = 320.
+    const cols = computeColumns(1000, open(SIDEBAR_DEFAULT), open(DETAILS_DEFAULT))
+    expect(cols).toEqual({ sidebar: 280, center: CENTER_MIN, details: 320 })
   })
 
   it('boundary: exactly at the step-1/step-2 seam', () => {
@@ -48,15 +48,15 @@ describe('computeColumns', () => {
   })
 
   it('step 3: details auto-closes when its min still starves center — sidebar holds its preference', () => {
-    // 280 + 300 + 640 = 1220 > 1210 → details 0; sidebar untouched: center = 1210-280 = 930.
-    const cols = computeColumns(1210, open(SIDEBAR_DEFAULT), open(DETAILS_DEFAULT))
-    expect(cols).toEqual({ sidebar: 280, center: 930, details: 0 })
+    // 420 + 300 + 400 = 1120 > 1100 → details 0; sidebar untouched: center = 1100-420 = 680.
+    const cols = computeColumns(1100, open(SIDEBAR_MAX), open(DETAILS_DEFAULT))
+    expect(cols).toEqual({ sidebar: 420, center: 680, details: 0 })
   })
 
   it('the sidebar never concedes: center absorbs the deficit below CENTER_MIN', () => {
-    // 700 < 280+640: sidebar keeps 280, center takes 420 < CENTER_MIN.
-    const cols = computeColumns(700, open(SIDEBAR_DEFAULT), closed(DETAILS_DEFAULT))
-    expect(cols).toEqual({ sidebar: SIDEBAR_DEFAULT, center: 420, details: 0 })
+    // 650 < 280+400: sidebar keeps 280, center takes 370 < CENTER_MIN.
+    const cols = computeColumns(650, open(SIDEBAR_DEFAULT), closed(DETAILS_DEFAULT))
+    expect(cols).toEqual({ sidebar: SIDEBAR_DEFAULT, center: 370, details: 0 })
   })
 
   it('sidebar-closed narrow window: details concedes then auto-closes', () => {
@@ -78,7 +78,8 @@ describe('computeColumns', () => {
   })
 
   it('recovery is pure: re-widening restores preferred widths untouched', () => {
-    const squeezed = computeColumns(1100, open(SIDEBAR_DEFAULT), open(DETAILS_DEFAULT))
+    // Below the details floor (280+300+400 = 980) the track releases entirely.
+    const squeezed = computeColumns(950, open(SIDEBAR_DEFAULT), open(DETAILS_DEFAULT))
     expect(squeezed.details).toBe(0)
     const restored = computeColumns(1920, open(SIDEBAR_DEFAULT), open(DETAILS_DEFAULT))
     expect(restored.details).toBe(DETAILS_DEFAULT)
@@ -87,7 +88,7 @@ describe('computeColumns', () => {
 })
 
 describe('computeColumns — degenerate viewports', () => {
-  it('sidebar closed and viewport below CENTER_MIN: details auto-closes, center takes the rest', () => {
+  it('sidebar closed and viewport starved: details auto-closes, center takes the rest', () => {
     // Reaches step 3's auto-close with the compact rail sidebar.
     expect(computeColumns(500, closed(300), open(DETAILS_DEFAULT)))
       .toEqual({ sidebar: SIDEBAR_COLLAPSED, center: 500 - SIDEBAR_COLLAPSED, details: 0 })

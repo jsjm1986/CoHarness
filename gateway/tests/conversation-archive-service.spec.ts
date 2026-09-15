@@ -114,7 +114,10 @@ describe('ConversationArchiveService', () => {
         calls.push([text, values])
         if (text.includes('SELECT id FROM harness.projects')) return { rows: [{ id: 'project-internal' }], rowCount: 1 }
         if (text.includes('SELECT s.id')) return {
-          rows: [{ id: 'child', root_session_id: 'root' }, { id: 'root', root_session_id: 'root' }], rowCount: 2,
+          rows: [
+            { id: 'child', root_session_id: 'root', owned: true },
+            { id: 'root', root_session_id: 'root', owned: true },
+          ], rowCount: 2,
         }
         if (text.includes('SELECT state,sync_revision')) return { rows: [], rowCount: 0 }
         if (text.includes('SELECT c.id::text')) return { rows: [], rowCount: 0 }
@@ -181,7 +184,10 @@ describe('ConversationArchiveService', () => {
     const query = vi.fn(async (text: string) => {
       if (text.includes('SELECT id FROM harness.projects')) return { rows: [{ id: 'project-internal' }], rowCount: 1 }
       if (text.includes('SELECT s.id')) return {
-        rows: [{ id: 'child', root_session_id: 'actual-root' }, { id: 'root', root_session_id: 'actual-root' }],
+        rows: [
+          { id: 'child', root_session_id: 'actual-root', owned: true },
+          { id: 'root', root_session_id: 'actual-root', owned: true },
+        ],
         rowCount: 2,
       }
       return { rows: [], rowCount: 0 }
@@ -193,6 +199,48 @@ describe('ConversationArchiveService', () => {
       sessions: [{ sessionId: 'child', rootSessionId: 'root', header: { parentSession: 'root' } }],
     }, { kind: 'project', id: 4 })).rejects.toThrow(/incorrect lineage root/)
     expect(pool.connect).not.toHaveBeenCalled()
+  })
+
+  it('rejects a snapshot that claims a session owned by another scope', async () => {
+    const query = vi.fn(async (text: string) => {
+      if (text.includes('SELECT id FROM harness.users')) return { rows: [{ id: 'user-internal' }], rowCount: 1 }
+      if (text.includes('SELECT s.id')) return {
+        rows: [{ id: 'foreign', root_session_id: 'foreign', owned: false }], rowCount: 1,
+      }
+      return { rows: [], rowCount: 0 }
+    })
+    const pool = { query, connect: vi.fn() } as unknown as Pool
+    const service = new ConversationArchiveService({ ...context, pool })
+    await expect(service.syncRuntimeSnapshot({
+      runtime: { kind: 'user', id: 2 }, revision: 1, archivedSessionIds: ['foreign'],
+      sessions: [{ sessionId: 'foreign', header: {} }],
+    }, { kind: 'user', id: 2 })).rejects.toThrow(/outside the authenticated runtime/)
+    expect(pool.connect).not.toHaveBeenCalled()
+  })
+
+  it('syncs a runtime-local session that has no stored conversation row', async () => {
+    const calls: Array<[string, unknown[] | undefined]> = []
+    const client = {
+      query: vi.fn(async (text: string, values?: unknown[]) => {
+        calls.push([text, values])
+        if (text.includes('SELECT id FROM harness.users')) return { rows: [{ id: 'user-internal' }], rowCount: 1 }
+        return { rows: [], rowCount: 0 }
+      }),
+      release: vi.fn(),
+    }
+    const pool = { connect: vi.fn(async () => client), query: client.query } as unknown as Pool
+    const service = new ConversationArchiveService({ ...context, pool })
+    const commands = await service.syncRuntimeSnapshot({
+      runtime: { kind: 'user', id: 2 }, revision: 5,
+      archivedSessionIds: ['local-only'],
+      sessions: [{
+        sessionId: 'local-only', rootSessionId: 'local-only',
+        header: {}, title: 'Local', messageCount: 3, rootMessageCount: 3,
+      }],
+    }, { kind: 'user', id: 2 })
+    expect(commands).toEqual([])
+    const insert = calls.find(([text]) => text.includes('INSERT INTO harness.conversation_archive_records'))
+    expect(insert?.[1]).toEqual(expect.arrayContaining(['local-only', 'user', 2]))
   })
 
   it('does not recursively remove a directory recorded as a content path', async () => {

@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { createMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
-import type { ContentBlock, ToolSchema } from '@deepseek-ai/dsh-llm'
+import type { ContentBlock, SystemMessage, ToolSchema } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { Session, SessionEvent, SessionSeq as SessionSeqType } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
@@ -14,9 +14,8 @@ import { CompactionId } from '@deepseek-ai/dsh-compaction'
 import { contextBreakdownProjectionDefinition } from '../src/breakdown-projection.ts'
 import {
   estimateContent,
-  estimateHeader,
   estimateMessage,
-  estimateSystemTokens,
+  estimateSystemMessage,
   estimateToolsTokens,
 } from '../src/estimate.ts'
 
@@ -49,6 +48,15 @@ function appendUser(session: Session, text: string): SessionSeqType {
   }), { surfaceOp: 'append' }).seq
 }
 
+/** One system prompt on the surface, attributed to a plugin producer. */
+function systemMessage(text: string): SystemMessage {
+  return createMessage({
+    role: 'system',
+    content: [{ type: 'text', text }],
+    source: { kind: 'plugin', plugin: 'test' },
+  })
+}
+
 /**
  * Meter one upcoming replacement the way compaction-basic does: price the
  * replaced span from the measurement service's own nodes and log the
@@ -76,14 +84,18 @@ describe('contextBreakdown session projection', () => {
     expect(projected(ctx, session)).toEqual({ systemTokens: 0, toolsTokens: 0, messageTokens: 0 })
   })
 
-  it('prices the newest envelope last-wins and pushes no change for a restated one', async () => {
+  it('prices the newest envelope and system head last-wins and pushes no change for a restated one', async () => {
     const { ctx, session } = await harness()
+    const system = systemMessage('You are terse.')
+    const systemSeq = session.append('system/message', {
+      turn: 1, step: 1, message: system,
+    }, { surfaceOp: 'append' }).seq
     session.append('request/header', {
-      header: { config: CONFIG, system: 'You are terse.', tools: TOOLS },
+      header: { config: CONFIG, tools: TOOLS },
       reason: 'initial',
     })
     expect(projected(ctx, session)).toEqual({
-      systemTokens: estimateSystemTokens({ config: CONFIG, system: 'You are terse.' }),
+      systemTokens: estimateSystemMessage(system),
       toolsTokens: estimateToolsTokens({ config: CONFIG, tools: TOOLS }),
       messageTokens: 0,
     })
@@ -91,15 +103,84 @@ describe('contextBreakdown session projection', () => {
     const changed: string[] = []
     ctx.sessionProjections.onChanged((_session, key) => { changed.push(key) })
     session.append('request/header', {
-      header: { config: CONFIG, system: 'You are terse.', tools: TOOLS },
+      header: { config: CONFIG, tools: TOOLS },
       reason: 'change',
     })
     session.append('todo/write', { todos: [] })
     expect(changed).not.toContain('contextBreakdown')
 
-    // A system-less, tool-less envelope prices back to zero.
+    // An empty system rewrite and a tool-less envelope price back to zero.
+    session.append('system/message', {
+      turn: 1, step: 1,
+      message: createMessage({
+        role: 'system',
+        content: [],
+        source: { kind: 'plugin', plugin: 'test' },
+      }),
+    }, {
+      surfaceOp: { op: 'replace', startSeq: systemSeq, endSeq: systemSeq },
+      sourceEventSeqs: [systemSeq],
+    })
     session.append('request/header', { header: { config: CONFIG }, reason: 'change' })
     expect(projected(ctx, session)).toEqual({ systemTokens: 0, toolsTokens: 0, messageTokens: 0 })
+  })
+
+  it('prices an in-history chain: effective prompt in system, superseded nodes in messages', async () => {
+    const { ctx, session } = await harness()
+    const head = systemMessage('prompt version one')
+    session.append('system/message', {
+      turn: 1, step: 1, message: head,
+    }, { surfaceOp: 'append' })
+    const tail = systemMessage('prompt version two, longer')
+    const tailSeq = session.append('system/message', {
+      turn: 1, step: 2, message: tail,
+    }, { surfaceOp: 'append' }).seq
+    // The newest nonempty system node is the effective prompt; the superseded
+    // head stays model-visible and belongs to the message figure.
+    expect(projected(ctx, session)).toEqual({
+      systemTokens: estimateSystemMessage(tail),
+      toolsTokens: 0,
+      messageTokens: estimateSystemMessage(head),
+    })
+
+    // Emptying the tail drops its price everywhere; the head becomes the
+    // effective prompt again.
+    session.append('system/message', {
+      turn: 1, step: 3,
+      message: createMessage({
+        role: 'system', content: [], source: { kind: 'plugin', plugin: 'test' },
+      }),
+    }, {
+      surfaceOp: { op: 'replace', startSeq: tailSeq, endSeq: tailSeq },
+      sourceEventSeqs: [tailSeq],
+    })
+    expect(projected(ctx, session)).toEqual({
+      systemTokens: estimateSystemMessage(head),
+      toolsTokens: 0,
+      messageTokens: 0,
+    })
+
+    // A newer in-history tail takes effect again, then a metered compaction
+    // shadows it: its conserved price lands in the summary's replacement, the
+    // head keeps the system figure, and the summary prices as a message.
+    const tail2 = systemMessage('prompt version three')
+    const tail2Seq = session.append('system/message', {
+      turn: 1, step: 4, message: tail2,
+    }, { surfaceOp: 'append' }).seq
+    const summary = createUserMessage({
+      content: [{ type: 'text', text: 'summary' }],
+      source: { kind: 'plugin', plugin: 'test' },
+    })
+    appendSummaryMeter(ctx, session, tail2Seq, tail2Seq)
+    session.append('user/message', summary, {
+      surfaceOp: { op: 'replace', startSeq: tail2Seq, endSeq: tail2Seq },
+      sourceEventSeqs: [tail2Seq],
+    })
+    expect(projected(ctx, session)).toEqual({
+      systemTokens: estimateSystemMessage(head),
+      toolsTokens: 0,
+      messageTokens: estimateMessage(summary),
+    })
   })
 
   it('sums surface appends and skips an empty-content assistant message', async () => {
@@ -132,7 +213,7 @@ describe('contextBreakdown session projection', () => {
     })
     appendSummaryMeter(ctx, session, first, second)
     session.append('user/message', summary, {
-      surfaceOp: { op: 'replace', start: first, end: second },
+      surfaceOp: { op: 'replace', startSeq: first, endSeq: second },
       sourceEventSeqs: [first, second],
     })
     expect(projected(ctx, session).messageTokens).toBe(estimateMessage(summary))
@@ -148,7 +229,7 @@ describe('contextBreakdown session projection', () => {
       return messageTokens
     }
     session.append('request/header', {
-      header: { config: CONFIG, system: 'You are terse.', tools: TOOLS },
+      header: { config: CONFIG, tools: TOOLS },
       reason: 'initial',
     })
     expect(agree()).toBe(0)
@@ -176,7 +257,7 @@ describe('contextBreakdown session projection', () => {
       content: [{ type: 'text', text: 'summary' }],
       source: { kind: 'plugin', plugin: 'test' },
     }), {
-      surfaceOp: { op: 'replace', start: question, end: answer },
+      surfaceOp: { op: 'replace', startSeq: question, endSeq: answer },
       sourceEventSeqs: [question, answer],
     })
     expect(agree()).toBeLessThan(grown)
@@ -189,7 +270,7 @@ describe('contextBreakdown session projection', () => {
       seq: SessionSeq(9),
       time: 0,
       data: createUserMessage({ content: [{ type: 'text', text: 'x' }], source: { kind: 'user' } }),
-      surfaceOp: { op: 'replace', start, end },
+      surfaceOp: { op: 'replace', startSeq: start, endSeq: end },
       sourceEventSeqs: [start, end],
     } as unknown as SessionEvent)
     const append = (seq: SessionSeq): SessionEvent => ({
@@ -244,8 +325,9 @@ describe('contextBreakdown session projection', () => {
       if (row === undefined) throw new Error('contextBreakdown checkpoint row is missing')
       return Object.keys(row.val as Record<string, unknown>).sort()
     }
-    // Growth adds no per-node bookkeeping to the durable state.
-    expect(stateKeys()).toEqual(['messageTokens', 'systemTokens', 'toolsTokens'])
+    // Surface growth adds no per-node bookkeeping to the durable state; the
+    // systems list is bounded by live system nodes (none here), not the surface.
+    expect(stateKeys()).toEqual(['messageTokens', 'systems', 'toolsTokens'])
     const shadowed = session.surface.nodes.slice(
       session.surface.nodes.indexOf(first),
       session.surface.nodes.indexOf(last) + 1,
@@ -255,10 +337,10 @@ describe('contextBreakdown session projection', () => {
       content: [{ type: 'text', text: 'summary' }],
       source: { kind: 'plugin', plugin: 'test' },
     }), {
-      surfaceOp: { op: 'replace', start: first, end: last },
+      surfaceOp: { op: 'replace', startSeq: first, endSeq: last },
       sourceEventSeqs: [...shadowed],
     })
-    expect(stateKeys()).toEqual(['messageTokens', 'systemTokens', 'toolsTokens'])
+    expect(stateKeys()).toEqual(['messageTokens', 'systems', 'toolsTokens'])
     expect(projected(ctx, session).messageTokens)
       .toBe(ctx.tokenMeter.measure(session).surfaceTokens)
   })
@@ -269,8 +351,12 @@ describe('contextBreakdown session projection', () => {
     await ctx.plugin(SessionProjectionRegistry)
     const meterFiber = await ctx.plugin(TokenMeter)
     const session = ctx.sessions.create()
+    const system = systemMessage('You are terse.')
+    session.append('system/message', {
+      turn: 1, step: 1, message: system,
+    }, { surfaceOp: 'append' })
     session.append('request/header', {
-      header: { config: CONFIG, system: 'You are terse.' },
+      header: { config: CONFIG },
       reason: 'initial',
     })
     appendUser(session, 'abcd')
@@ -283,7 +369,7 @@ describe('contextBreakdown session projection', () => {
 
     await ctx.plugin(TokenMeter)
     expect(ctx.sessionProjections.viewCheckpoint(checkpoint).contextBreakdown).toEqual({
-      systemTokens: estimateSystemTokens({ config: CONFIG, system: 'You are terse.' }),
+      systemTokens: estimateSystemMessage(system),
       toolsTokens: 0,
       messageTokens: 9,
     })
@@ -303,16 +389,17 @@ describe('shared estimator', () => {
     expect(estimateContent([unknown])).toBe(4 + Math.ceil(JSON.stringify(unknown).length / 4))
   })
 
-  it('prices envelope parts independently and absent parts to zero', () => {
-    expect(estimateSystemTokens(undefined)).toBe(0)
-    expect(estimateSystemTokens({ config: CONFIG })).toBe(0)
-    expect(estimateSystemTokens({ config: CONFIG, system: 'abcdefgh' })).toBe(6)
+  it('prices envelope and system-message parts independently and absent parts to zero', () => {
+    const empty = createMessage({
+      role: 'system',
+      content: [],
+      source: { kind: 'plugin', plugin: 'test' },
+    })
+    expect(estimateSystemMessage(empty)).toBe(0)
+    expect(estimateSystemMessage(systemMessage('abcdefgh'))).toBe(6)
     expect(estimateToolsTokens(undefined)).toBe(0)
     expect(estimateToolsTokens({ config: CONFIG, tools: [] })).toBe(0)
     expect(estimateToolsTokens({ config: CONFIG, tools: TOOLS }))
       .toBe(Math.ceil(JSON.stringify(TOOLS).length / 4) + 4)
-    expect(estimateHeader(undefined)).toBe(0)
-    expect(estimateHeader({ config: CONFIG, system: 'abcdefgh', tools: TOOLS }))
-      .toBe(6 + Math.ceil(JSON.stringify(TOOLS).length / 4) + 4)
   })
 })

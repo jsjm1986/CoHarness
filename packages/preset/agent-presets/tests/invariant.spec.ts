@@ -13,6 +13,7 @@ import InvariantRegistry from '@deepseek-ai/dsh-invariants'
 import { describe, expect, it } from 'vitest'
 import AgentPresets, { livePresetMounts, type Config } from '@deepseek-ai/dsh-agent-presets'
 import * as AgentPresetsInvariant from '@deepseek-ai/dsh-agent-presets/invariant'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures')
 const ROOTS = [
@@ -30,6 +31,7 @@ async function harness(roster: Partial<Config> = {}): Promise<Context> {
   await ctx.plugin(SystemPrompt, { persona: '' })
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(AgentRegistry)
+  await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(AgentPresets, { default: 'standard', roots: ROOTS, includeUserRoot: false, ...roster })
   await ctx.plugin(InvariantRegistry)

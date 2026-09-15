@@ -143,13 +143,13 @@ function acceptsEdge(state: ToolState, parent: string, child: string): boolean {
 
 function updateDispatch(state: ToolState, match: ConversationMatch): ToolState {
   const event = match.event
-  if (event.type !== 'tool/code-dispatch-start' && event.type !== 'tool/code-dispatch') return state
+  if (event.type !== 'tool/ptc-dispatch-start' && event.type !== 'tool/ptc-dispatch') return state
   const data = event.data
   const parentCallId = String(data.parentCallId)
   const subCallId = String(data.subCallId)
   const siblings = state.children.get(parentCallId) ?? []
   const index = siblings.findIndex(candidate => candidate.callId === subCallId)
-  if (event.type === 'tool/code-dispatch-start') {
+  if (event.type === 'tool/ptc-dispatch-start') {
     if (index >= 0 || !acceptsEdge(state, parentCallId, subCallId)) return state
     const children = new Map(state.children)
     children.set(parentCallId, [...siblings, childCall(match, data)])
@@ -241,7 +241,7 @@ export const toolDefinition: ConversationNodeDefinition<ToolState> = {
     if (event.type === 'tool/result' && isAppendSurfaceEvent(event)) {
       return { id: String(event.data.message.source.callId), role: 'update' }
     }
-    if (event.type === 'tool/code-dispatch-start' || event.type === 'tool/code-dispatch') {
+    if (event.type === 'tool/ptc-dispatch-start' || event.type === 'tool/ptc-dispatch') {
       const rootCallId: unknown = event.data.rootCallId
       return typeof rootCallId === 'string' && rootCallId !== ''
         ? { id: rootCallId, role: 'update' }

@@ -99,7 +99,7 @@ interface StoredImageAttachment {
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
 <a id="ctxattachments--attachmentstore-abstract-seam"></a>
 
@@ -122,6 +122,15 @@ abstract validateImage(input: SaveImageAttachment): Promise<void>
  * @returns durable normalized attachment references in the same order after every member succeeds.
  */
 async saveImages(inputs: readonly SaveImageAttachment[]): Promise<readonly ImageAttachmentRef[]>
+
+/**
+ * Admit one Host prompt and replace each uploaded image with its durable reference.
+ * Text parts pass through unchanged. A prompt without image parts performs no storage operation.
+ * @param content - prompt parts in message order.
+ * @returns admitted prompt parts in the same order as `content`.
+ * @throws AttachmentError when the image batch is refused.
+ */
+async admitPromptContent( content: readonly AttachmentAdmissionPart[], ): Promise<AdmittedPromptContentPart[]>
 
 /**
  * Validate and durably commit one image before its owning session event is appended.
@@ -160,7 +169,7 @@ imageHostPath(_ref: ImageAttachmentRef): string | undefined
 readImageRequest( ref: ImageAttachmentRef, policy: ImageRequestPolicy, signal?: AbortSignal, ): Promise<RequestImageAttachment>
 ```
 
-Source: [`packages/attachment/attachment/src/index.ts:38`](../../packages/attachment/attachment/src/index.ts)
+Source: [`packages/attachment/attachment/src/index.ts`](../../packages/attachment/attachment/src/index.ts)
 
 <a id="ctxuserdocs--userdocstore-abstract-seam"></a>
 
@@ -396,5 +405,5 @@ abstract openRead(docId: UserDocId): Promise<{ ref: UserDocRef; body: ReadableSt
 abstract remove(docId: UserDocId, signal?: AbortSignal): Promise<void>
 ```
 
-Source: [`packages/attachment/userdoc/src/index.ts:137`](../../packages/attachment/userdoc/src/index.ts)
+Source: [`packages/attachment/userdoc/src/index.ts`](../../packages/attachment/userdoc/src/index.ts)
 <!-- END GENERATED cordis-surface -->

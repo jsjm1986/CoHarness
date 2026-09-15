@@ -16,7 +16,7 @@ Status: implemented
 2. `PROJECT_TYPERT_PROCESS_WIDE_READS` 在主体捕获已验证成员身份后放行无 Session 身份的进程级只读调用：`pluginInventory/list` 与 `dynamicCordisRunner/inventory`。由于清单行携带按会话的插件元数据，所属服务自行过滤：项目作用域下 `inventory()` 丢弃 Session 不在 `authority.readableSessionIds` 内的行，私有会话不会泄露其插件元数据；个人作用域与无协作组合保留全部行。
 3. 注册表解析授权覆盖仅宿主注册表知道会话身份的两个远程：`resolveRequestRun` 按待决请求的所属会话授权 `approve`，`invoke` 按插件的所属会话授权 `write`，两者都在 `DynamicCordisRunnerService` 内部通过共享的 `collaborationRefusal`（现从 `dsh-collaboration` 导出，是该拒绝的 code/message/details 映射的唯一归属）执行。AsyncLocalStorage 把请求主体带进服务，`capture()` 解析出与 apiproxy 相同的授权。
 
-未分类端点保持默认 `manage` 拒绝；拒绝测试使用 `commands/execute`，一个必须继续被拒绝的真实可变更进程级远程。`dynamicCordisRunner/syncInspectManifest`、`resolveInspectQuery` 与检查界面仍未分类，在被逐个分类之前在项目作用域保持拒绝。
+未分类端点保持默认 `manage` 拒绝；拒绝测试使用 `commands/execute`，一个必须继续被拒绝的真实可变更进程级远程。`syncInspectManifest` 经 `PROJECT_TYPERT_REGISTRY_AUTHORIZED` 放行——清单不携带 Session 身份，注册表持有进程级镜像；`resolveInspectQuery` 归入会话表并按 `write` 授权，因为客户端应答会向所属会话注入模型可见数据。
 
 ## 备选方案
 

@@ -52,6 +52,7 @@
   "devDependencies": {
     "@deepseek-ai/cordis-plugin-loader": "workspace:^",
     "@deepseek-ai/dsh-command-feedback": "workspace:^",
+    "@deepseek-ai/dsh-http-proxy": "workspace:^",
     "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/dsh-llm": "workspace:^",
     "@deepseek-ai/dsh-session": "workspace:^",

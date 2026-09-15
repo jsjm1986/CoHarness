@@ -41,7 +41,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{clock}} Ran for {{duration}}
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{clock}}
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
@@ -61,7 +64,10 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{clock}}
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -70,6 +76,7 @@
 - button "Commands":
   - img
 - 'button "Access mode, current: Custom"': Custom
+- button "6% of context used"
 - button "Send message" [disabled]
 - button "2 turns · 2 steps · {{throughput}} tok/s":
   - img

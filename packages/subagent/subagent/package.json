@@ -30,6 +30,14 @@
       "types": "./lib/types/client.d.ts",
       "default": "./lib/types/client.js"
     },
+    "./typert": {
+      "types": "./lib/typert.host.d.ts",
+      "default": "./lib/typert.host.js"
+    },
+    "./remote": {
+      "types": "./lib/typert.remote-client.d.ts",
+      "default": "./lib/typert.remote-client.js"
+    },
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
@@ -37,10 +45,16 @@
     "lib/index.js",
     "lib/invariant.js",
     "lib/types/**/*.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "lib/typert.host.js",
+    "lib/typert.host.d.ts",
+    "lib/typert.remote-client.js",
+    "lib/typert.remote-client.d.ts"
   ],
   "license": "MIT",
   "dependencies": {
+    "@deepseek-ai/dsh-chunked-list": "workspace:^",
+    "@deepseek-ai/dsh-util-values": "workspace:^",
     "@deepseek-ai/schemastery": "workspace:^",
     "zod": "^4.4.3"
   },
@@ -60,7 +74,11 @@
     "@deepseek-ai/dsh-jobs": "workspace:^",
     "@deepseek-ai/dsh-tools": "workspace:^",
     "@deepseek-ai/dsh-user-approval": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
+    "@deepseek-ai/cordis": "workspace:^",
+    "@deepseek-ai/dsh-typert-protocol": "workspace:^",
+    "@deepseek-ai/dsh-collaboration": "workspace:^",
+    "@deepseek-ai/dsh-util-time": "workspace:^",
+    "@deepseek-ai/dsh-attachment": "workspace:^"
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/dsh-agent-presets": {
@@ -106,6 +124,10 @@
     "@deepseek-ai/dsh-jobs": "workspace:^",
     "@deepseek-ai/dsh-tools": "workspace:^",
     "@deepseek-ai/dsh-user-approval": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
+    "@deepseek-ai/cordis": "workspace:^",
+    "@deepseek-ai/dsh-typert-protocol": "workspace:^",
+    "@deepseek-ai/dsh-collaboration": "workspace:^",
+    "@deepseek-ai/dsh-util-time": "workspace:^",
+    "@deepseek-ai/dsh-attachment": "workspace:^"
   }
 }

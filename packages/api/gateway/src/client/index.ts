@@ -10,12 +10,14 @@ import type { ConnectionHandle, SessionId } from '@deepseek-ai/dsh-client-connec
 import type {
   InvocationDescriptor,
   TypertClientRemote,
+  RemoteFailure,
   RemoteResult,
   TypertCodec,
   TypertDisposer,
   TypertRemoteContribution,
   TypertRemoteEvent,
 } from '@deepseek-ai/dsh-typert-protocol'
+import { RemoteError, remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
 
 interface MountToken {
   active: boolean
@@ -453,11 +455,15 @@ class ClientRemoteService extends Service implements TypertClientRemote {
     try {
       const result = await targetConnection.rpc.call('/api', endpoint, { args }, signal)
       if (!mountActive(token)) return withdrawn(endpoint)
-      if (!result.ok) return { ok: false, error: result.error }
+      if (!result.ok) return { ok: false, error: rebuiltFailure(result.error) }
       return { ok: true, value: parse(descriptor.result, result.value, endpoint, 'result') }
     } catch (error) {
       // Carrier throws (offline, abort, a rejected result payload) are outcomes
       // of the call, not assembly faults, so they join the same error branch.
+      // A caller-aborted call is a cancellation even when the local throw wins
+      // the race against the wire round-trip, so it gets the same code the
+      // Host would have produced.
+      if (signal.aborted) return cancelledFailure(endpoint, error)
       return carrierFailure(endpoint, error)
     }
   }
@@ -643,14 +649,42 @@ function parse(codec: TypertCodec, value: unknown, endpoint: string, field: stri
 }
 
 /** The namespace retired before or during the call, so no request outcome exists. */
-function withdrawn(endpoint: string): RemoteResult<never> {
+function withdrawn(endpoint: string): Extract<RemoteResult<never>, { readonly ok: false }> {
   return internalFailure(`client api: Remote method ${endpoint} is no longer mounted`)
 }
 
-function carrierFailure(endpoint: string, error: unknown): RemoteResult<never> {
+function carrierFailure(endpoint: string, error: unknown): Extract<RemoteResult<never>, { readonly ok: false }> {
   return internalFailure(`client api: ${endpoint} failed: ${error instanceof Error ? error.message : String(error)}`)
 }
 
-function internalFailure(message: string): RemoteResult<never> {
-  return { ok: false, error: { code: 'internal', message, details: {} } }
+function cancelledFailure(endpoint: string, cause: unknown): Extract<RemoteResult<never>, { readonly ok: false }> {
+  return {
+    ok: false,
+    error: new RemoteError('gateway/cancelled', `client api: Remote invocation "${endpoint}" was aborted`, {}, { cause }),
+  }
+}
+
+function internalFailure(message: string): Extract<RemoteResult<never>, { readonly ok: false }> {
+  return { ok: false, error: new RemoteError('gateway/internal', message, {}) }
+}
+
+/**
+ * Whether a caught value is a Remote failure this face delivered or threw.
+ * The one consumer-facing discrimination point: marked instances carry their
+ * Host code; anything else is a local fault the caller should let crash.
+ * @param error - a caught value.
+ * @returns true when the value narrows to RemoteFailure.
+ */
+export function isRemoteFailure(error: unknown): error is RemoteFailure {
+  return remoteErrorOf(error) !== undefined
+}
+
+/**
+ * Rebuild the wire failure as a local RemoteError instance so the error branch
+ * carries a real Error and `throw result.error` keeps throw semantics. The code
+ * is passed through verbatim without runtime validation: a code outside this
+ * Client's merged map still surfaces as-is, so a newer Host stays readable.
+ */
+function rebuiltFailure(error: { code: string; message: string; details: object }): RemoteFailure {
+  return new RemoteError(error.code as never, error.message, error.details as never)
 }

@@ -182,7 +182,7 @@ function conversation(): HistoryValue {
           content: [{ type: 'text', text: '<context_checkpoint>summary</context_checkpoint>' }],
           source: { kind: 'plugin', plugin: 'compact' },
         },
-        surfaceOp: { op: 'replace', start: SessionSeq(1), end: SessionSeq(6) },
+        surfaceOp: { op: 'replace', startSeq: SessionSeq(1), endSeq: SessionSeq(6) },
         sourceEventSeqs: [SessionSeq(1), SessionSeq(6), SessionSeq(9)],
       },
     },

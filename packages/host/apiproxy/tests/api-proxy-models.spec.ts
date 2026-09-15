@@ -21,6 +21,7 @@ import type {
 } from '@deepseek-ai/dsh-llm'
 import SessionStore from '@deepseek-ai/dsh-session'
 import type { SessionId } from '@deepseek-ai/dsh-session'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import UserQuestionService from '@deepseek-ai/dsh-user-questions'
 import type { RpcRequest } from '@deepseek-ai/dsh-host-apiproxy/api/rpc'
@@ -80,7 +81,8 @@ async function harness(logged?: {
   provider: string
   model: string
   reasoningEffort?: ReasoningEffortId
-}): Promise<{
+  adapterDefaults?: { reasoningEffort?: true }
+}, options?: { withRegistry?: boolean }): Promise<{
   ctx: Context
   agent: Agent
   sessionId: SessionId
@@ -91,6 +93,7 @@ async function harness(logged?: {
   await ctx.plugin(LlmRuntime)
   await ctx.plugin(UserQuestionService)
   await ctx.plugin(AgentRegistry)
+  if (options?.withRegistry === true) await ctx.plugin(SessionProjectionRegistry)
   ctx.llm.registerAdapter(['deepseek-official'], new CatalogAdapter('DeepSeek', [
     { provider: 'deepseek-official', id: 'deepseek-chat', name: 'DeepSeek Chat' },
     {
@@ -112,7 +115,11 @@ async function harness(logged?: {
   ]))
   const session = ctx.sessions.create()
   if (logged !== undefined) {
-    session.append('request/header', { header: { config: logged }, reason: 'initial' })
+    const { adapterDefaults, ...config } = logged
+    session.append('request/header', {
+      header: { config, ...adapterDefaults === undefined ? {} : { adapterDefaults } },
+      reason: 'initial',
+    })
   }
   const agent = {
     id: session.id,
@@ -235,7 +242,7 @@ describe('Web session model selection', () => {
       id: 'summary', role: 'user', source: { kind: 'plugin', plugin: 'compact' },
       content: [{ type: 'text', text: 'image summarized' }],
     } as never, {
-      surfaceOp: { op: 'replace', start: SessionSeq(0), end: SessionSeq(agent.session.seq - 1) },
+      surfaceOp: { op: 'replace', startSeq: SessionSeq(0), endSeq: SessionSeq(agent.session.seq - 1) },
       sourceEventSeqs: agent.session.snapshotEvents().map(event => event.seq),
     })
     ;(agent.inbox.nextTurn as UserMessage[]).push({
@@ -615,6 +622,113 @@ describe('Web session model selection', () => {
     expect(catalog.current).toEqual({ provider: 'deleted-gateway', model: 'deleted-model' })
     expect(catalog.groups.flatMap(group => group.models.map(model => `${group.id}/${model.id}`)))
       .not.toContain('deleted-gateway/deleted-model')
+    await ctx.fiber.dispose()
+  })
+
+  it('logs a durable model/selection that never enters derived history', async () => {
+    const { ctx, agent, sessionId } = await harness()
+    const api = createApiProxy(ctx, {
+      defaultModelSelection: () => ({ provider: 'deepseek-official', model: 'deepseek-chat' }),
+      cwd: '/tmp',
+    })
+
+    const before = agent.session.deriveMessages().length
+    expectValue(await api.sessions.selectModel(request({
+      sessionId, provider: 'deepseek-official', model: 'deepseek-reasoner', reasoningEffort: 'max',
+    })))
+    const events = agent.session.snapshotEvents()
+    const selections = events.filter(event => event.type === 'model/selection')
+    expect(selections).toHaveLength(1)
+    expect(selections[0]?.data).toEqual({
+      provider: 'deepseek-official', model: 'deepseek-reasoner', reasoningEffort: 'max',
+    })
+    expect(agent.session.deriveMessages()).toHaveLength(before)
+    await ctx.fiber.dispose()
+  })
+
+  it('restores a pending durable selection over the logged request header', async () => {
+    const { ctx, agent, sessionId } = await harness({
+      provider: 'deepseek-official',
+      model: 'deepseek-chat',
+    }, { withRegistry: true })
+    const api = createApiProxy(ctx, {
+      defaultModelSelection: () => ({ provider: 'deepseek-official', model: 'deepseek-chat' }),
+      cwd: '/tmp',
+    })
+    agent.session.append('model/selection', {
+      provider: 'deepseek-official', model: 'deepseek-reasoner', reasoningEffort: 'max',
+    })
+
+    expect(expectValue(await api.sessions.models(request({ sessionId }))).current)
+      .toEqual({ provider: 'deepseek-official', model: 'deepseek-reasoner', reasoningEffort: 'max' })
+    expect(ctx.sessionProjections.snapshot(agent.session).values.modelSelection)
+      .toEqual({
+        lastUsed: { provider: 'deepseek-official', model: 'deepseek-chat' },
+        next: { provider: 'deepseek-official', model: 'deepseek-reasoner', reasoningEffort: 'max' },
+      })
+    await ctx.fiber.dispose()
+  })
+
+  it('lets a matching request header retire the pending selection', async () => {
+    const { ctx, agent, sessionId } = await harness(undefined, { withRegistry: true })
+    const api = createApiProxy(ctx, {
+      defaultModelSelection: () => ({ provider: 'deepseek-official', model: 'deepseek-chat' }),
+      cwd: '/tmp',
+    })
+
+    expectValue(await api.sessions.selectModel(request({
+      sessionId, provider: 'deepseek-official', model: 'deepseek-reasoner', reasoningEffort: 'high',
+    })))
+    // The header the pending selection produced retires it; a later request
+    // header then drives the selection again instead of the stale pending one.
+    agent.session.append('request/header', {
+      header: { config: { provider: 'deepseek-official', model: 'deepseek-reasoner', reasoningEffort: ReasoningEffortId('high') } },
+      reason: 'initial',
+    })
+    agent.session.append('request/header', {
+      header: { config: { provider: 'deepseek-official', model: 'deepseek-chat' } },
+      reason: 'initial',
+    })
+    expect(expectValue(await api.sessions.models(request({ sessionId }))).current)
+      .toEqual({ provider: 'deepseek-official', model: 'deepseek-chat' })
+    await ctx.fiber.dispose()
+  })
+
+  it('keeps a pending selection when the request header names another route', async () => {
+    const { ctx, agent, sessionId } = await harness(undefined, { withRegistry: true })
+    const api = createApiProxy(ctx, {
+      defaultModelSelection: () => ({ provider: 'deepseek-official', model: 'deepseek-chat' }),
+      cwd: '/tmp',
+    })
+
+    expectValue(await api.sessions.selectModel(request({
+      sessionId, provider: 'deepseek-official', model: 'deepseek-reasoner',
+    })))
+    // A request already in flight under the old route does not consume a
+    // selection made for the next request.
+    agent.session.append('request/header', {
+      header: { config: { provider: 'deepseek-official', model: 'deepseek-chat' } },
+      reason: 'initial',
+    })
+    expect(expectValue(await api.sessions.models(request({ sessionId }))).current)
+      .toEqual({ provider: 'deepseek-official', model: 'deepseek-reasoner', reasoningEffort: 'high' })
+    await ctx.fiber.dispose()
+  })
+
+  it('does not restore an adapter-defaulted effort as an explicit selection', async () => {
+    const { ctx, sessionId } = await harness({
+      provider: 'deepseek-official',
+      model: 'deepseek-reasoner',
+      reasoningEffort: ReasoningEffortId('high'),
+      adapterDefaults: { reasoningEffort: true },
+    }, { withRegistry: true })
+    const api = createApiProxy(ctx, {
+      defaultModelSelection: () => ({ provider: 'deepseek-official', model: 'deepseek-chat' }),
+      cwd: '/tmp',
+    })
+
+    expect(expectValue(await api.sessions.models(request({ sessionId }))).current)
+      .toEqual({ provider: 'deepseek-official', model: 'deepseek-reasoner' })
     await ctx.fiber.dispose()
   })
 })

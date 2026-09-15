@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
@@ -11,7 +11,14 @@
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "isolatedModules": true,
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    "paths": {
+      "@deepseek-ai/cordis": ["../../vendor/cordis/lib/types/index.d.ts"],
+      "@deepseek-ai/cosmokit": ["../../vendor/cosmokit/lib/types/index.d.ts"],
+      "@deepseek-ai/schemastery": ["../../vendor/schemastery/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-client-runtime/client": ["../../packages/client/runtime/src/client/index.ts"],
+      "@deepseek-ai/dsh-client-ui-primitives": ["./src/model-settings-primitives.ts"]
+    }
   },
-  "include": ["src"]
+  "include": ["src", "../../scripts/types/client-build-environment/index.d.ts"]
 }

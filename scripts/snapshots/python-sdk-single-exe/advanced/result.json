@@ -962,13 +962,13 @@
       }
     },
     {
-      "type": "tool/code-dispatch-start",
+      "type": "tool/ptc-dispatch-start",
       "seq": 40,
       "time": 0,
       "data": {
         "rootCallId": "advanced-code",
         "parentCallId": "advanced-code",
-        "subCallId": "advanced-code:code:1",
+        "subCallId": "advanced-code:ptc:1",
         "name": "snapshot_double",
         "arguments": {
           "value": 21
@@ -976,13 +976,13 @@
       }
     },
     {
-      "type": "tool/code-dispatch",
+      "type": "tool/ptc-dispatch",
       "seq": 41,
       "time": 0,
       "data": {
         "rootCallId": "advanced-code",
         "parentCallId": "advanced-code",
-        "subCallId": "advanced-code:code:1",
+        "subCallId": "advanced-code:ptc:1",
         "name": "snapshot_double",
         "arguments": {
           "value": 21
@@ -3336,13 +3336,13 @@
       "payload": {
         "sessionId": "{{parent}}",
         "event": {
-          "type": "tool/code-dispatch-start",
+          "type": "tool/ptc-dispatch-start",
           "seq": 40,
           "time": 0,
           "data": {
             "rootCallId": "advanced-code",
             "parentCallId": "advanced-code",
-            "subCallId": "advanced-code:code:1",
+            "subCallId": "advanced-code:ptc:1",
             "name": "snapshot_double",
             "arguments": {
               "value": 21
@@ -3356,13 +3356,13 @@
       "payload": {
         "sessionId": "{{parent}}",
         "event": {
-          "type": "tool/code-dispatch",
+          "type": "tool/ptc-dispatch",
           "seq": 41,
           "time": 0,
           "data": {
             "rootCallId": "advanced-code",
             "parentCallId": "advanced-code",
-            "subCallId": "advanced-code:code:1",
+            "subCallId": "advanced-code:ptc:1",
             "name": "snapshot_double",
             "arguments": {
               "value": 21

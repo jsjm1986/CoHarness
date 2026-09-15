@@ -23,6 +23,7 @@ A shipping web-tool deployment sets the provider backstop above the tool budget,
 - Sends an explicit product `User-Agent`, never a browser disguise.
 - Rejects unsupported (e.g. binary) content types with `WEB_UNSUPPORTED_CONTENT_TYPE`.
 - Resolves every hostname before connecting and rejects loopback, private, link-local, multicast, and other non-public addresses (`WEB_BLOCKED_URL`). The validated address set is pinned for the request so a DNS rebinding response cannot switch the connection to a private destination.
+- Honors the centralized outbound proxy policy ([`dsh-http-proxy`](../../util/http-proxy/README.md)): `proxyRouteFor(url)` runs before resolution, and a proxied route tunnels through the policy dispatcher with origin DNS resolving proxy-side, so local resolution and pinning are skipped. A non-public IP literal still takes the validated path and is refused rather than handed to the proxy.
 
 ## Config
 

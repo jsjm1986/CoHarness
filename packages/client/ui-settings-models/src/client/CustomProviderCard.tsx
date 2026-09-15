@@ -26,7 +26,7 @@ import { apiKeyFailure } from './apiKey.ts'
 import { EditorFooter } from './EditorFooter.tsx'
 import { validatePiAiModels } from './DeepSeekModelsEditor.tsx'
 import { ModelListEditor } from './ModelListEditor.tsx'
-import type { ModelDraft } from './ModelListEditor.tsx'
+import type { ModelDiscoveryProbe, ModelDraft } from './ModelListEditor.tsx'
 import { deriveKeyRef, messageOf } from './store.ts'
 import type { en } from './locales.ts'
 import styles from './ModelsSection.module.css'
@@ -56,8 +56,10 @@ export interface CustomProviderCardProps {
    * than a silent overwrite of its whole profile.
    */
   revision: number
-  /** Wire faces for the write and for interrogating the endpoint. */
-  api: Pick<IApiClient, 'settings' | 'credentials' | 'llm'>
+  /** Wire faces for the write. */
+  api: Pick<IApiClient, 'settings' | 'credentials'>
+  /** Discovery probe for interrogating the endpoint. */
+  discoverModels: ModelDiscoveryProbe
   /** Section copy. */
   t: (key: keyof typeof en) => string
   /** Disable writes (read-only settings provider). */
@@ -78,7 +80,7 @@ export interface CustomProviderCardProps {
  * @returns the creation card.
  */
 export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
-  const { taken, protocols, api, t } = props
+  const { taken, protocols, api, discoverModels, t } = props
   // Captured at mount, like the editor's: the write must be judged against the
   // section this card was drafted over, not whatever it grew into meanwhile.
   const [openedAt] = useState(() => props.revision)
@@ -281,7 +283,7 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
           ...keyValue.length === 0 ? {} : { apiKey: keyValue },
         }}
         probeBlocked={keyFailure === 'keyBlank' ? 'keyBlankNew' : keyFailure}
-        api={api}
+        discoverModels={discoverModels}
         t={t}
         disabled={profileDisabled}
       />

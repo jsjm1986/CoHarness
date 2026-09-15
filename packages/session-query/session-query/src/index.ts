@@ -57,6 +57,7 @@ export { SessionSearchCursor } from './cursor.ts'
 export type { Config, SessionQueryErrorCode } from './config.ts'
 export {
   SESSION_QUERY_DEFAULT_PERSISTED_INSPECT_CONCURRENCY,
+  SESSION_QUERY_DEFAULT_PREPARED_SESSION_CACHE_SIZE,
   SESSION_QUERY_READ_WINDOW_MAX,
   SessionQueryError,
 } from './config.ts'
@@ -99,15 +100,15 @@ export abstract class SessionQueryEngine extends Service {
         'SESSION_QUERY_INVALID_CONFIG',
       )
     }
-    const persistedInspectConcurrency = config.persistedInspectConcurrency
+    const persistedReadConcurrency = config.persistedReadConcurrency
       ?? SESSION_QUERY_DEFAULT_PERSISTED_INSPECT_CONCURRENCY
-    if (!Number.isSafeInteger(persistedInspectConcurrency) || persistedInspectConcurrency < 1) {
+    if (!Number.isSafeInteger(persistedReadConcurrency) || persistedReadConcurrency < 1) {
       throw new SessionQueryError(
-        'session-query: persistedInspectConcurrency must be a positive safe integer',
+        'session-query: persistedReadConcurrency must be a positive safe integer',
         'SESSION_QUERY_INVALID_CONFIG',
       )
     }
-    this._corpus = new SessionCorpus(ctx, persistedInspectConcurrency)
+    this._corpus = new SessionCorpus(ctx, persistedReadConcurrency)
   }
 
   /**

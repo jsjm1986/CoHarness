@@ -24,6 +24,7 @@ import { ModelsSettingsStore } from './store.ts'
 import { createSettingsSchemaOperations } from './schema-operations.ts'
 import { en, zh, type ModelsKey } from './locales.ts'
 import { ProjectModelsBridge } from './project-store.ts'
+import type { ModelDiscoveryProbe } from './ModelListEditor.tsx'
 
 export type { ModelsSectionInjected, ModelsSectionProps } from './ModelsSection.tsx'
 export type { ModelsFooterOwnerProps, ProviderCardExtrasOwnerProps } from './slot-contract.ts'
@@ -55,7 +56,7 @@ export function refreshIfLoaded(controller: ModelsSettingsStore): void {
  * ui-settings' apply, whose activation order relative to this one is NOT
  * constrained; registration depends on each slot through `slots.inject()`.
  */
-export const inject = ['slots', 'locale', 'connection', 'remote', 'settingsScope', 'settingsSchema']
+export const inject = ['slots', 'locale', 'connection', 'remote', 'remote.llm', 'settingsScope', 'settingsSchema']
 
 /**
  * Register the Models section once the `settings.section` declaration is on
@@ -73,16 +74,29 @@ export function apply(ctx: ClientContext): void {
   const projectBindings = new Map<number, {
     bridge: ProjectModelsBridge
     controller: ModelsSettingsStore
+    discoverModels: ModelDiscoveryProbe
   }>()
-  const projectBinding = (projectId: number): { controller: ModelsSettingsStore; api: ProjectModelsBridge['api'] } | undefined => {
+  const projectBinding = (projectId: number): {
+    controller: ModelsSettingsStore
+    api: ProjectModelsBridge['api']
+    discoverModels: ModelDiscoveryProbe
+  } | undefined => {
     if (projectTransport === undefined) return undefined
     const existing = projectBindings.get(projectId)
-    if (existing !== undefined) return { controller: existing.controller, api: existing.bridge.api }
+    if (existing !== undefined) {
+      return { controller: existing.controller, api: existing.bridge.api, discoverModels: existing.discoverModels }
+    }
     const bridge = new ProjectModelsBridge(projectId, projectTransport)
     const projectController = new ModelsSettingsStore(bridge.api, schema, bridge.describe())
-    const binding = { bridge, controller: projectController }
+    const discoverModels: ModelDiscoveryProbe = async (settingsNs, request) => {
+      const response = await bridge.api.llm.discoverModels({ settingsNs, ...request })
+      return response.result.ok
+        ? { ok: true, value: response.result.value.models }
+        : { ok: false, error: { message: response.result.error.message } }
+    }
+    const binding = { bridge, controller: projectController, discoverModels }
     projectBindings.set(projectId, binding)
-    return { controller: projectController, api: bridge.api }
+    return { controller: projectController, api: bridge.api, discoverModels }
   }
   // Registration-time text (the nav label thunk) and the inject faces share
   // one bound translate; copy freshness rides the locale revision.
@@ -91,6 +105,7 @@ export function apply(ctx: ClientContext): void {
     controller,
     hooks: { snapshot: controller.store },
     api: connection.api,
+    discoverModels: (settingsNs, request) => ctx.remote.llm.discoverModels(settingsNs, request),
     schema,
     t,
     projectBinding,
@@ -99,6 +114,7 @@ export function apply(ctx: ClientContext): void {
     controller,
     hooks: { models: controller.store },
     api: connection.api,
+    discoverModels: (settingsNs, request) => ctx.remote.llm.discoverModels(settingsNs, request),
     schema,
     t,
   })

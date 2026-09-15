@@ -73,7 +73,7 @@ interface ReadOnlyCredentialLayer {
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.zh.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.zh.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
 <a id="ctxauthorization--authorizationservice"></a>
 
@@ -134,7 +134,7 @@ cancel(key: CredentialKey): void
 async begin(request: AuthorizationRequest): Promise<AuthorizationOutcome>
 ```
 
-Source: [`packages/credentials/authorization/src/index.ts:182`](../../packages/credentials/authorization/src/index.ts)
+Source: [`packages/credentials/authorization/src/index.ts`](../../packages/credentials/authorization/src/index.ts)
 
 <a id="ctxcredentials--credentialprovider-abstract-seam"></a>
 
@@ -235,7 +235,7 @@ abstract modifyRecord( key: CredentialKey, mutate: (current: CredentialRecord | 
 abstract deleteRecord(key: CredentialKey): Promise<void>
 ```
 
-Source: [`packages/credentials/credentials/src/index.ts:189`](../../packages/credentials/credentials/src/index.ts)
+Source: [`packages/credentials/credentials/src/index.ts`](../../packages/credentials/credentials/src/index.ts)
 
 <a id="authorization-events"></a>
 
@@ -259,7 +259,7 @@ One authorization attempt has finished and released its key. Fires for every ter
 'authorization/settled'(key: CredentialKey, settlement: AuthorizationSettlement): void
 ```
 
-Source: [`packages/credentials/authorization/src/index.ts:57`](../../packages/credentials/authorization/src/index.ts)
+Source: [`packages/credentials/authorization/src/index.ts`](../../packages/credentials/authorization/src/index.ts)
 
 <a id="credentials-events"></a>
 
@@ -285,7 +285,7 @@ Committed change to a stored credential record: a `modifyRecord` that wrote, a `
 'credentials/record-updated'(key: CredentialKey): void
 ```
 
-Source: [`packages/credentials/credentials/src/types.ts:87`](../../packages/credentials/credentials/src/types.ts)
+Source: [`packages/credentials/credentials/src/types.ts`](../../packages/credentials/credentials/src/types.ts)
 
 <a id="credentialsreference-updated--emit"></a>
 
@@ -309,5 +309,5 @@ Committed change to a provider-managed credential source: a `set`, an `unset`, o
 'credentials/reference-updated'(ref: CredentialRef): void
 ```
 
-Source: [`packages/credentials/credentials/src/types.ts:75`](../../packages/credentials/credentials/src/types.ts)
+Source: [`packages/credentials/credentials/src/types.ts`](../../packages/credentials/credentials/src/types.ts)
 <!-- END GENERATED cordis-surface -->

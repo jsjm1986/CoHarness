@@ -2,12 +2,14 @@
 /** Model-list editing, endpoint interrogation, and hand-declared provider creation. */
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { Mock } from 'vitest'
 import Schema from '@deepseek-ai/schemastery'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import type { RpcResponse, SettingsNamespaceView } from '@deepseek-ai/dsh-api-remotes/client'
 import { ModelsSection, providerCopy } from '../src/client/ModelsSection.tsx'
 import type { ModelsSectionInjected, ModelsSectionProps } from '../src/client/ModelsSection.tsx'
 import { CustomProviderCard } from '../src/client/CustomProviderCard.tsx'
+import type { ModelDiscoveryProbe } from '../src/client/ModelListEditor.tsx'
 import { formatCapacity, parseCapacity } from '../src/client/DeepSeekModelsEditor.tsx'
 import { SettingsDescribeMirror } from '@deepseek-ai/dsh-client-ui-settings/src/client/settings-mirror.ts'
 import { ModelsSettingsStore, deriveKeyRef, protocolChoices } from '../src/client/store.ts'
@@ -79,7 +81,7 @@ function scriptedFace(options: {
   baseProviders?: Record<string, unknown>
   /** Routes the adapter reports as hand-declared; the rest come back as shipped. */
   declaredRoutes?: readonly string[]
-  discover?: ReturnType<typeof vi.fn>
+  discover?: Mock<ModelDiscoveryProbe>
   mutate?: ReturnType<typeof vi.fn>
   set?: ReturnType<typeof vi.fn>
 } = {}) {
@@ -87,7 +89,7 @@ function scriptedFace(options: {
     openai: { apiKeyEnv: 'OPENAI_API_KEY', baseURL: 'https://proxy.example/v1' },
   }
   const namespace = piAiNamespace(providers, options.userProviders ?? providers, options.baseProviders ?? {})
-  const discover = options.discover ?? vi.fn(() => Promise.resolve(ok({ models: [] })))
+  const discover = options.discover ?? vi.fn<ModelDiscoveryProbe>(() => Promise.resolve({ ok: true as const, value: [] }))
   const mutate = options.mutate ?? vi.fn(() => Promise.resolve(ok(namespace)))
   const set = options.set ?? vi.fn(() => Promise.resolve(ok({})))
   const face = {
@@ -104,7 +106,6 @@ function scriptedFace(options: {
         })),
       }))),
       models: vi.fn(() => Promise.resolve(ok({ groups: [], failures: [] }))),
-      discoverModels: discover,
     },
     settings: {
       describe: vi.fn(() => Promise.resolve(ok({ writable: true, namespaces: [namespace] }))),
@@ -134,9 +135,9 @@ interface MutateCall {
 
 /** The first interrogation payload; fails the case when nothing was asked. */
 function firstProbe(discover: ReturnType<typeof vi.fn>): unknown {
-  const call = (discover.mock.calls as unknown as [unknown][])[0]?.[0]
-  if (call === undefined) throw new Error('no interrogation was recorded')
-  return call
+  const [settingsNs, request] = (discover.mock.calls as unknown as [string, Record<string, unknown>][])[0] ?? []
+  if (request === undefined) throw new Error('no interrogation was recorded')
+  return { settingsNs, ...request }
 }
 
 /** The first recorded settings write; fails the case when nothing was written. */
@@ -158,6 +159,7 @@ async function mountSection(
     controller,
     useSnapshot: bindSnapshotSelector(controller.store),
     api: scripted.face as never,
+    discoverModels: scripted.discover,
     schema: settingsSchema,
     t,
   }
@@ -509,7 +511,7 @@ describe('capacity spellings', () => {
 
 describe('endpoint interrogation', () => {
   it('asks the endpoint the form shows, with a key that is not yet stored', async () => {
-    const discover = vi.fn(() => Promise.resolve(ok({ models: [{ id: 'acme-large', contextWindow: 65_536 }] })))
+    const discover = vi.fn(() => Promise.resolve({ ok: true as const, value: [{ id: 'acme-large', contextWindow: 65_536 }] }))
     await mountSection({ discover })
     openEditor('openai')
 
@@ -529,7 +531,7 @@ describe('endpoint interrogation', () => {
   })
 
   it('carries the protocol the profile already names', async () => {
-    const discover = vi.fn(() => Promise.resolve(ok({ models: [] })))
+    const discover = vi.fn(() => Promise.resolve({ ok: true as const, value: [] }))
     await mountSection({
       discover,
       providers: { openai: { baseURL: 'https://proxy.example/v1', api: 'openai-responses' } },
@@ -548,12 +550,13 @@ describe('endpoint interrogation', () => {
   })
 
   it('adopts only the picked candidates, keeping a row the user already tuned', async () => {
-    const discover = vi.fn(() => Promise.resolve(ok({
-      models: [
+    const discover = vi.fn(() => Promise.resolve({
+      ok: true as const,
+      value: [
         { id: 'kept', contextWindow: 999 },
         { id: 'fresh', contextWindow: 4096, name: 'Fresh', inputModalities: ['text', 'image'] },
       ],
-    })))
+    }))
     const { mutate } = await mountSection({
       discover,
       providers: { openai: { baseURL: 'https://proxy.example/v1', models: [{ id: 'kept', contextWindow: 111 }] } },
@@ -576,9 +579,10 @@ describe('endpoint interrogation', () => {
   })
 
   it('keeps the rows editable when the provider cannot be interrogated', async () => {
-    const discover = vi.fn(() => Promise.resolve(
-      fail('https://proxy.example/v1/models answered 401; check the API key', 'model-discovery-failed'),
-    ))
+    const discover = vi.fn(() => Promise.resolve({
+      ok: false as const,
+      error: { message: 'https://proxy.example/v1/models answered 401; check the API key' },
+    }))
     await mountSection({ discover })
     openEditor('openai')
 
@@ -590,7 +594,7 @@ describe('endpoint interrogation', () => {
   })
 
   it('reports an empty listing and a rejected transport', async () => {
-    const empty = vi.fn(() => Promise.resolve(ok({ models: [] })))
+    const empty = vi.fn(() => Promise.resolve({ ok: true as const, value: [] }))
     await mountSection({ discover: empty })
     openEditor('openai')
     fireEvent.click(screen.getByText(en.fetchModels))
@@ -605,7 +609,7 @@ describe('endpoint interrogation', () => {
   })
 
   it('can be asked for a configured route even with no endpoint', async () => {
-    const discover = vi.fn(() => Promise.resolve(ok({ models: [{ id: 'from-registry' }] })))
+    const discover = vi.fn(() => Promise.resolve({ ok: true as const, value: [{ id: 'from-registry' }] }))
     await mountSection({ discover, providers: { openai: {} } })
     openEditor('openai')
 
@@ -624,6 +628,7 @@ describe('endpoint interrogation', () => {
     render(
       <CustomProviderCard
         taken={[]} protocols={PROTOCOLS} revision={7} api={scripted.face as never}
+        discoverModels={scripted.discover}
         t={t} readOnly={false} onClose={vi.fn()}
       />,
     )
@@ -657,7 +662,7 @@ describe('endpoint interrogation', () => {
   })
 
   it('closes the picker without adopting anything on cancel', async () => {
-    const discover = vi.fn(() => Promise.resolve(ok({ models: [{ id: 'fresh' }] })))
+    const discover = vi.fn(() => Promise.resolve({ ok: true as const, value: [{ id: 'fresh' }] }))
     const { mutate } = await mountSection({ discover })
     openEditor('openai')
 
@@ -671,9 +676,10 @@ describe('endpoint interrogation', () => {
   })
 
   it('toggles a candidate off and back on before adopting', async () => {
-    const discover = vi.fn(() => Promise.resolve(ok({
-      models: [{ id: 'a' }, { id: 'b', maxTokens: 2048 }],
-    })))
+    const discover = vi.fn(() => Promise.resolve({
+      ok: true as const,
+      value: [{ id: 'a' }, { id: 'b', maxTokens: 2048 }],
+    }))
     const { mutate } = await mountSection({ discover })
     openEditor('openai')
 
@@ -692,9 +698,10 @@ describe('endpoint interrogation', () => {
   })
 
   it('filters by model id or name and scopes bulk selection to visible candidates', async () => {
-    const discover = vi.fn(() => Promise.resolve(ok({
-      models: [{ id: 'alpha' }, { id: 'opaque-id', name: 'Beta Display' }, { id: 'gamma' }],
-    })))
+    const discover = vi.fn(() => Promise.resolve({
+      ok: true as const,
+      value: [{ id: 'alpha' }, { id: 'opaque-id', name: 'Beta Display' }, { id: 'gamma' }],
+    }))
     await mountSection({ discover })
     openEditor('openai')
 
@@ -795,6 +802,7 @@ describe('hand-declared providers', () => {
         protocols={PROTOCOLS}
         revision={7}
         api={scripted.face as never}
+        discoverModels={scripted.discover}
         t={t}
         readOnly={false}
         onClose={onClose}

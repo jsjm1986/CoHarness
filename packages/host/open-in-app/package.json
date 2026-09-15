@@ -41,6 +41,7 @@
   },
   "license": "MIT",
   "dependencies": {
+    "@deepseek-ai/dsh-launch-environment": "workspace:^",
     "@deepseek-ai/dsh-native-command": "workspace:^",
     "@deepseek-ai/dsh-subprocess": "workspace:^",
     "@deepseek-ai/schemastery": "workspace:^"

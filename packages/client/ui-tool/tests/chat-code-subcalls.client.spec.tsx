@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// Code Mode sub-call acceptance on the REAL machinery stack (same bench as
+// PTC sub-call acceptance on the REAL machinery stack (same bench as
 // chat-toolview-slot.spec): a run_code result renders the 'code' variant row
 // (description summary, program body), its logged sub-dispatches render as
 // always-visible nested rows through the SAME keyed toolview hole — the bash
@@ -65,7 +65,7 @@ const subCall = (
   seq: number, parent: string, n: number, name: string, args: object, resultText: string, isError = false,
 ): ToolCallBlock => ({
   kind: 'tool-result', seq, time: seq * 1_000,
-  callId: `${parent}:code:${n}`,
+  callId: `${parent}:ptc:${n}`,
   call: { name, argsRaw: JSON.stringify(args) },
   callTime: seq * 1_000,
   content: [{ type: 'text', text: resultText }], isError, callView: null, resultView: null,
@@ -301,7 +301,7 @@ describe('run_code sub-calls through the real chat machinery', () => {
   it('a started-but-unsettled sub-call renders the running state exactly like a native in-flight row', async () => {
     const parent = 'call-live'
     const runningSub: ToolCallBlock = {
-      callId: `${parent}:code:1`, name: 'grep', argsRaw: '{"pattern":"todo"}',
+      callId: `${parent}:ptc:1`, name: 'grep', argsRaw: '{"pattern":"todo"}',
       turn: 0, step: 0, time: 21_000, callView: null, subCalls: [],
     }
     const b = await bench(snapshotWith([], [runningSub], [runningCode(parent)]))

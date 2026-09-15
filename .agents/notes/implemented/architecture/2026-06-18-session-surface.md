@@ -24,12 +24,12 @@ Every `SessionEvent` gains two optional fields (structural metadata, like `seq`/
 ```ts
 export type SurfaceOp =
   | 'append'                                    // normal tail append
-  | { op: 'replace'; start: number; end: number }  // shadow [start, end] inclusive
+  | { op: 'replace'; startSeq: number; endSeq: number }  // shadow [startSeq, endSeq] inclusive
 ```
 
 1. **Append** — add the new event seq to the tail. Used by `user/message`, `assistant/message`, `tool/result`, `context/message`. The loop passes `surfaceOp: 'append'` on all such appends and records `sourceEventSeqs` where applicable: every successful `assistant/message` records its complete `assistant/chunk` source set, including `[]`, while `tool/result` records its `tool/call` source.
 
-2. **Replace** — remove entries from `start` through `end` (both inclusive) and insert the new event seq in their place. Both `start` and `end` must be present in the current surface; `start === end` replaces one entry. The event's `sourceEventSeqs` must contain every shadowed surface seq. The shadowed events remain in the log but are no longer on the surface.
+2. **Replace** — remove entries from `startSeq` through `endSeq` (both inclusive) and insert the new event seq in their place. Both endpoints must be present in the current surface and reference earlier events; `startSeq === endSeq` replaces one entry. The event's `sourceEventSeqs` must contain every shadowed surface seq. The shadowed events remain in the log but are no longer on the surface. When node 0 holds a `system/message`, a range covering it must be a `system/message` over exactly that node. Committed logs written before the field rename carry `start`/`end` keys; readers normalize them to `startSeq`/`endSeq` while writers always emit the canonical keys.
 
 ### SurfaceManager: delta-based, not full rebuild
 
@@ -56,7 +56,7 @@ Every surface-eligible event must carry `surfaceOp` or it would disappear from d
 ## Alternatives considered
 
 - **Per-plugin `agent/request` wrapping** (the pre-surface pattern for history manipulation) — listener-ordering fragility, no durable record of what was changed, and every new manipulation forces another change to core `deriveMessages()`.
-- **Half-open `[start, endExclusive)` replace ranges** — rejected: endpoints are named by surface event seqs, and single-entry replacement (`start === end`) reads naturally with inclusive semantics.
+- **Half-open `[start, endExclusive)` replace ranges** — rejected: endpoints are named by surface event seqs, and single-entry replacement (`startSeq === endSeq`) reads naturally with inclusive semantics.
 - **Linked node objects plus a seq map** — rejected: production did not read predecessor links, the only successor use was the next array position, and replacement already required linear `indexOf` lookup. A single seq array preserves the same asymptotic behavior with one representation to validate.
 - **Full rebuild behind a dirty flag** instead of delta processing — O(N²) over a session's lifetime: every single-event append would rescan all prior events.
 
@@ -68,6 +68,6 @@ Every surface-eligible event must carry `surfaceOp` or it would disappear from d
 - **`packages/session/session-persistence-jsonl`**: No changes required.
 - **`packages/session/session-persistence`**: Abstract interface unchanged.
 
-The surface is the foundation history manipulation ships on — dsh-compaction's compaction rides it. A compaction or tool-result-pruner plugin appends one of the existing message-producing event types (a `user/message` carrying the summary, say) with `surfaceOp: { op: 'replace', start, end }` and `sourceEventSeqs` covering the shadowed entries — the new event takes the range's place on the surface while the plugin's own trace events (e.g. `compaction/start`, `compaction/end`) stay off it. Replay preserves the decision deterministically.
+The surface is the foundation history manipulation ships on — dsh-compaction's compaction rides it. A compaction or tool-result-pruner plugin appends one of the existing message-producing event types (a `user/message` carrying the summary, say) with `surfaceOp: { op: 'replace', startSeq, endSeq }` and `sourceEventSeqs` covering the shadowed entries — the new event takes the range's place on the surface while the plugin's own trace events (e.g. `compaction/start`, `compaction/end`) stay off it. Replay preserves the decision deterministically.
 
 A `tool/result` replacement may rewrite exactly one current `tool/result` and must preserve every data field except `content`. Session acceptance enforces this rule together with positional range and cited source-event validation, independent of optional diagnostic plugins.

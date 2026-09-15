@@ -14,18 +14,18 @@ agent（智能体）的唯一具体实现插件和循环驱动器。其包内部
 
 调用方 fiber 与 AgentLoop 提供方共同拥有 agent。`AgentFactory.createAgent(ownerCtx, options)` 与 `resume(ownerCtx, options)` 显式接收调用方所有权，而工厂为 `sessions`/`llm`/`tools`/`systemPrompt` 保留自身的依赖上下文；这样，调用方可以只注入 `agents`，而不会缩减新 agent 的服务接口。调用方卸载、handle dispose（资源释放）或提供方卸载都会汇合到同一个记忆化的完全停稳边界。提供方关闭会同时等待资源 teardown，以及已经观测到停用的公开 create/resume 包装层，因此依赖消失后，任何 continuation 都无法继续发布。
 
-挂载 `ctx.sessionPersistence` 后，这些异步工厂入口会在发布前取得一个写入 `SessionHandle`。新建流程通过句柄登记 header，恢复流程打开已有 id。句柄由已发布的生命周期持有，并在 Agent 与 Session 完成排空后关闭，因此第二个写入者会在发布前被拒绝，销毁后 id 可以再次使用。同步的内存 `ctx.agentLoop.create()` 仍作为兼容性便利入口，不占用持久化句柄。
+挂载 `ctx.sessionPersistence` 后，每条创建入口（包括 `ctx.agentLoop.create()`）都会在发布前取得一个写入 `SessionHandle`。新建流程通过句柄登记 header，恢复流程打开已有 id。句柄由已发布的生命周期持有，并在 Agent 与 Session 完成排空后关闭，因此第二个写入者会在发布前被拒绝，销毁后 id 可以再次使用。
 
 每个 agent 与其会话共享一个由调用方选择的 `SessionId`，并假设它在全局唯一；意外的 UUID 冲突不属于受支持模型。两个使用同一 id 的并发操作都可以进行准备，但最终的 `enter()` 调用会裁决发布，所有失败方都会回滚各自的私有资源。每次 detach 都绑定到确切进入的对象，因此陈旧 disposer 无法移除之后出现的同 id 替代项。在同步创建通知期间请求的 detach 会等待该次分发退栈，从而保留 created/disposed 配对。Teardown 按以下顺序执行：停止并排空 → 撤销作用域 → detach agent → detach 会话。私有作用域清理完成后，该 id 即可复用。不具否决能力的普通 `agent/*` 通知通过 `agentEvents(ctx, agent)` 发出；逐步骤组装通过 `assembleContextFor(agent)` 完成。
 
-- `ctx.agentLoop.create(id: SessionId, options?: AgentOptions, meta?: { cwd?: string }): Agent`：在确切共享的 agent／会话 id 下同步创建，不运行 setup，并随调用方 fiber 一同 dispose。声明式配置把 `agents[].id` 视为稳定 label，通常会先生成 `${label}-session-<uuid>`，再调用此边界。应用也可以提供稳定且确切的 `sessionId`：首次使用时创建；重新挂载且持久化内容已存在时，则恢复已经实体化的历史。`resumeSessionId` 要求并加载现有的持久化 id，且与 `sessionId` 互斥。这样，默认情况下每次重启都会创建新会话，从而避免冲突，也无需保留第二个实时路由身份。
+- `ctx.agentLoop.create(id: SessionId, options?: AgentOptions, meta?: { cwd?: string }): Promise<Agent>`：在确切共享的 agent／会话 id 下异步创建，不运行 setup，并随调用方 fiber 一同 dispose。声明式配置把 `agents[].id` 视为稳定 label，通常会先生成 `${label}-session-<uuid>`，再调用此边界。应用也可以提供稳定且确切的 `sessionId`：首次使用时创建；重新挂载且持久化内容已存在时，则恢复已经实体化的历史。`resumeSessionId` 要求并加载现有的持久化 id，且与 `sessionId` 互斥。这样，默认情况下每次重启都会创建新会话，从而避免冲突，也无需保留第二个实时路由身份。
 
 `AgentLoop` 还实现 `AgentFactory` 约定，并通过 `ctx.agents.setFactory(this)` 注册自身，因此插件会通过 `ctx.agents` 创建／恢复 agent：
 
 - `ctx.agents.create({ sessionId, meta?, seed?, agentOptions?, setup?, signal? }): Promise<AgentHandle>`：使用调用方提供的共享 id 以编程方式创建。它会等待尚未发布的 setup 事务，然后才返回；`meta` 携带 cwd／谱系／seed 边界元数据，`seed` 则在会话边界验证并快照持久值后，重建 fork 子级的前缀。`signal` 只在此 Promise 结算前生效。返回的 [`AgentHandle`](../agent/README.zh.md) 拥有确切的 teardown 能力。
 - `ctx.agents.resume({ resumeSessionId, agentOptions?, setup?, signal? }): Promise<AgentHandle>`：通过 `ctx.sessionPersistence` 加载持久化会话（参见[会话持久化](../../../.agents/notes/implemented/architecture/2026-06-14-session-persistence.zh.md)），使用同一 id 注册 agent，重建历史，然后针对全新且尚未发布的 agent 作用域等待 setup，再执行受回滚保护的发布。轮次编号和派生历史从已加载日志继续。此操作要求存在会话持久化后端（不会硬注入，因此非持久化 demo 仍能工作；缺少持久化时，`resume` 会以明确错误拒绝）。`signal` 仅用于创建。返回 `AgentHandle`。
 
-配置驱动的 `ctx.agentLoop.create()` 路径让循环 fiber 拥有其 agent（该路径会丢弃 handle）。对于以编程方式创建的 agent，handle 持有者是唯一面向消费方的 teardown 能力；AgentLoop 提供方卸载是一条独立的结构性 teardown 边，而不是向应用代码公开的另一个 handle。
+配置驱动的 `ctx.agentLoop.create()` 路径让循环 fiber 拥有其 agent（该路径只返回裸 `Agent`，不产生 `AgentHandle`）。对于以编程方式创建的 agent，handle 持有者是唯一面向消费方的 teardown 能力；AgentLoop 提供方卸载是一条独立的结构性 teardown 边，而不是向应用代码公开的另一个 handle。
 
 ### 注入的服务
 
@@ -63,13 +63,13 @@ interface Config {
 
 统一的 `send()` 原语按（`target` × `wakeup`）路由内容与来源；`followup`/`steer`/`inject` 是它的固定预设别名。`followup()` 追加到 `next-turn` FIFO 并唤醒驱动器，`steer()` 追加到 `next-step` inbox 并唤醒驱动器，`inject()` 则追加到同一个 `next-step` inbox，但不唤醒驱动器。在轮次边界，驱动器会先打开持久轮次，再原子领取待处理的 next-step 输入和一条排队提示词；在步骤之间则只领取 next-step 输入。领取操作通过仅执行删除的 splice 移除整批消息，并为每条消息各发出一次 `agent/inbox/claimed { message, turn }`。随后 `agent/pre-step` 返回拒绝结果，或返回将进入拟议步骤的完整消息。拒绝后，已领取批次保持已删除，并关闭不含步骤的轮次；领取后插入的输入仍等待后续处理，而空闲注入会一直等待，直到 follow-up 或 steering 唤醒驱动器。
 
-每次 inbox 变更都会在修改实时投影之前，先发布一条规范化的 `agent/inbox/spliced` 事件。因此，插入、编辑、移除、领取与取消都通过同一组标准 splice 坐标回放。普通删除携带 `outcome: 'canceled'` 并发出 `agent/inbox/discarded { message }`；领取使用不带 outcome 的纯删除，随后由循环发出 `agent/inbox/claimed`。每次插入都会发出 `agent/inbox/inserted { message }`。`MessageId` 在两个待处理列表之间保持唯一，持久事件的同步观察方可以从 splice 前投影重建被移除的值。
+每次 inbox 变更都会提交一条规范化的 `agent/inbox/spliced` 事件。投影注册表同步折叠该事件，因此 `Session.append()` 返回时实时投影已反映该 splice。插入、编辑、移除、领取与取消都通过同一组标准 splice 坐标回放。普通删除携带 `outcome: 'canceled'` 并发出 `agent/inbox/discarded { message }`；领取使用不带 outcome 的纯删除并发出 `agent/inbox/claimed`。每次插入都会发出 `agent/inbox/inserted { message }`。`MessageId` 在两个待处理列表之间保持唯一。需要被移除消息的消费方使用 claimed 或 discarded 通知，而不是依赖 splice 前的 `session/event` 视图。
 
-挂载 `dsh-session-projection` 时，AgentLoop 还会注册 host-only 的 `turnBoundary` projection。它记录打开的轮次和最近的步骤边界，供授权读取方使用，不增加第二条事件流；没有该可选注册表的组装继续使用相同的 loop 生命周期。
+AgentLoop 要求挂载 session-projection 注册表（`sessionProjections` 在其 inject 列表中），并在其上注册 host-only 的 `turnBoundary` projection。该投影记录打开的轮次和最近的步骤边界，供授权读取方使用，不增加第二条事件流。
 
 ### 循环生命周期（`agent.ts`）
 
-驱动器在其整个生命周期内拥有一个 agent，并在 `ctx.agents.withInitiator(agent, ...)` 内运行。包私有的编排入口点会恢复确切的 Agent，一次性派生 `agent.session`，并让操作局部的辅助函数捕获它，而不是通过浅层接口继续传递具体驱动器或每次操作的 `Session`。如果显式 `Session` 正是辅助函数的实际接口，该辅助函数会保留它；创建、持久化加载、未发布 setup、服务、worker、进程、持久化和 wire 协议则继续保留各自的显式身份。[agent 服务](../agent/README.zh.md#initiating-agent-scope)规定传播、teardown 和分离工作规则。
+驱动器在其整个生命周期内拥有一个 agent，并在 `ctx.agents.withInitiator(agent, ...)` 内运行。其包内私有的 `ReactLoopInbox` 构造器在 agent 作用域上注册 host-only 的 `agentInbox` 投影，随后用该投影执行结构化命令和仅限循环的领取。注册表引用计数让共享键保持活跃，直到最后一个 agent 作用域卸载。包私有的编排入口点会恢复确切的 Agent，一次性派生 `agent.session`，并让操作局部的辅助函数捕获它，而不是通过浅层接口继续传递具体驱动器或每次操作的 `Session`。如果显式 `Session` 正是辅助函数的实际接口，该辅助函数会保留它；创建、持久化加载、未发布 setup、服务、worker、进程、持久化和 wire 协议则继续保留各自的显式身份。[agent 服务](../agent/README.zh.md#initiating-agent-scope)规定传播、teardown 和分离工作规则。
 
 每次提供方调用成功结束时，都会恰好追加一个 `assistant/message` 完成锚点，包括无内容调用和以 `max-tokens` 结束的调用。该锚点原样记录组装后的内容，在 `sourceEventSeqs` 中列出确切的分片 seq（流没有分片时为 `[]`），并在用量可用时包含用量；空内容不会进入派生消息历史。轮次取消打断流式输出时，如果非空文本或推理内容已送达用户，循环也会追加一个带 `interrupted: true` 的锚点。该锚点引用对应的分片 seq，并把已渲染的前缀放入派生消息历史，使下一次请求包含用户看到的内容。未分派的工具调用会被省略，空流或只包含工具调用的流不会生成锚点；提供方故障也不提交 assistant 内容（[决策](../../../.agents/notes/implemented/architecture/2026-08-10-cancelled-stream-prefix-finalize.zh.md)）。
 

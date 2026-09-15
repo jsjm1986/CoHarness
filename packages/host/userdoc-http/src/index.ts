@@ -1733,7 +1733,9 @@ async function download(ctx: Context, req: IncomingMessage, res: ServerResponse,
       'content-disposition': inline ? 'inline' : `attachment; filename*=UTF-8''${encodeURIComponent(opened.ref.name)}`,
       'x-content-type-options': 'nosniff',
       ...(inline ? { 'content-security-policy': "default-src 'none'; img-src 'self' data:; frame-ancestors 'none'; sandbox" } : {}),
-      'cache-control': 'private, no-store',
+      // Stored bytes are the contract: no-transform keeps the response
+      // compression layer from hiding content-length or rewriting the body.
+      'cache-control': 'private, no-store, no-transform',
     }
     res.writeHead(200, headers)
     if (req.method === 'HEAD') {

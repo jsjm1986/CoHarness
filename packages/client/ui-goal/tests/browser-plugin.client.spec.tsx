@@ -181,7 +181,7 @@ describe('ui-goal browser plugin', () => {
       await b.fiber.await()
       const verbs = b.entry()!.inject!(sid('s1'))
       for (const result of [await verbs.onEdit('x'), await verbs.onPause(), await verbs.onResume(), await verbs.onClear()]) {
-        expect(result).toEqual({ ok: false, error: { code: 'no-current-goal', message: 'no current goal to mutate', details: {} } })
+        expect(result).toEqual({ ok: false, error: { code: 'no-current-goal', message: 'no current goal to mutate' } })
       }
       expect(b.calls).toHaveLength(0)
     }

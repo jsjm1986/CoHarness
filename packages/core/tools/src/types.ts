@@ -7,8 +7,8 @@
 import type { CallId } from '@deepseek-ai/dsh-llm/brand'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm/types'
 
-/** Payload recorded when one nested Code Mode Tool dispatch starts. */
-export interface CodeDispatchStartEventData {
+/** Payload recorded when one nested PTC Tool dispatch starts. */
+export interface PtcDispatchStartEventData {
   rootCallId: CallId
   parentCallId: CallId
   subCallId: CallId
@@ -16,8 +16,8 @@ export interface CodeDispatchStartEventData {
   arguments: unknown
 }
 
-/** Payload recorded when one nested Code Mode Tool dispatch settles. */
-export interface CodeDispatchEventData extends CodeDispatchStartEventData {
+/** Payload recorded when one nested PTC Tool dispatch settles. */
+export interface PtcDispatchEventData extends PtcDispatchStartEventData {
   isError: boolean
   content: ContentBlock[]
 }
@@ -26,7 +26,7 @@ declare module '@deepseek-ai/dsh-session/types' {
   interface SessionEventMap {
     /**
      * One sub-dispatch STARTING inside a `run_code` program: the parent
-     * `run_code` call id, the deterministic sub-call id (`<parent>:code:<n>`,
+     * `run_code` call id, the deterministic sub-call id (`<parent>:ptc:<n>`,
      * numbered in submission order), and the tool `name` with its
      * JSON-normalized `arguments` — the exact value dispatched, normalized
      * BEFORE dispatch, so this append can never fail on payload shape.
@@ -34,13 +34,13 @@ declare module '@deepseek-ai/dsh-session/types' {
      * submission), so a start means the tool body pipeline was entered; a
      * call abandoned in the queue logs nothing. Log-only: `deriveMessages()`
      * ignores it; UIs use it for live per-sub-call running state and pair it
-     * with `tool/code-dispatch` by `subCallId` (timing = the two events'
+     * with `tool/ptc-dispatch` by `subCallId` (timing = the two events'
      * `time` fields).
      */
-    'tool/code-dispatch-start': CodeDispatchStartEventData
+    'tool/ptc-dispatch-start': PtcDispatchStartEventData
     /**
      * One bridged sub-dispatch SETTLING: the pairing ids (matching the
-     * `tool/code-dispatch-start` with the same `subCallId`), the tool `name`
+     * `tool/ptc-dispatch-start` with the same `subCallId`), the tool `name`
      * with the same JSON-normalized `arguments`, and the sub-call's complete
      * model-facing outcome in `tool/result`'s own vocabulary
      * (`content` + `isError`), so UIs render a sub-call through the exact
@@ -53,6 +53,22 @@ declare module '@deepseek-ai/dsh-session/types' {
      * before returning), so its execution-enclosure relation holds by
      * construction.
      */
-    'tool/code-dispatch': CodeDispatchEventData
+    'tool/ptc-dispatch': PtcDispatchEventData
+    /**
+     * The pre-rename spelling of `tool/ptc-dispatch-start`, recorded by builds
+     * before the PTC rename. Persistence accepts it on read and normalizes
+     * the type to `tool/ptc-dispatch-start` before projection, so released
+     * logs keep one downstream vocabulary.
+     * @deprecated Write `tool/ptc-dispatch-start`.
+     */
+    'tool/code-dispatch-start': PtcDispatchStartEventData
+    /**
+     * The pre-rename spelling of `tool/ptc-dispatch`, recorded by builds
+     * before the PTC rename. Persistence accepts it on read and normalizes
+     * the type to `tool/ptc-dispatch` before projection, so released logs
+     * keep one downstream vocabulary.
+     * @deprecated Write `tool/ptc-dispatch`.
+     */
+    'tool/code-dispatch': PtcDispatchEventData
   }
 }

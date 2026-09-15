@@ -572,7 +572,7 @@ describe('DetailsPanel Output section', () => {
   // The panel resolves a sub-dispatch through the same material as a native
   // call, so a sub-call that DID carry terminal views would render the card.
   // The shipped wire cannot produce that yet: `session.ts` folds
-  // `tool/code-dispatch(-start)` with `callView: null`/`resultView: null`, and
+  // `tool/ptc-dispatch(-start)` with `callView: null`/`resultView: null`, and
   // the host's `viewFor` only presents top-level `tool/call`/`tool/result`. This
   // pins the resolution path with views injected directly, and the arm below
   // pins what the shipped path actually shows today.

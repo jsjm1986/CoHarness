@@ -5,6 +5,7 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
+  readFileSync,
   readdirSync,
   realpathSync,
   statSync,
@@ -45,42 +46,61 @@ function requireAsset(directory: string, suffix: string, failures: string[]): vo
 }
 
 /**
- * Make the standalone Gateway's compiled ESM graph resolve the one workspace
- * package it imports at runtime. The Gateway is intentionally outside the
+ * Workspace packages the standalone Gateway's compiled ESM graph imports at
+ * runtime, each paired with a built entry file proving the package built.
+ */
+const GATEWAY_RUNTIME_PACKAGES: readonly { directory: string; entry: string }[] = [
+  { directory: 'packages/llm/llm', entry: 'lib/types/discovery.js' },
+  { directory: 'packages/session/session-format', entry: 'lib/index.js' },
+]
+
+/**
+ * Make the standalone Gateway's compiled ESM graph resolve the workspace
+ * packages it imports at runtime. The Gateway is intentionally outside the
  * pnpm workspace, so a clean git-archive release does not get pnpm's usual
  * workspace symlink automatically. The relative link keeps the release
  * self-contained and survives copying the complete release directory.
  */
-function ensureGatewayRuntimePackage(): void {
-  const packageRoot = resolve(root, 'packages/llm/llm')
-  const packageManifest = join(packageRoot, 'package.json')
-  const packageEntry = join(packageRoot, 'lib/types/discovery.js')
-  if (!existsSync(packageManifest) || !existsSync(packageEntry)) {
-    throw new Error(`build-production: Gateway runtime package is incomplete: ${packageRoot}`)
-  }
-  const link = resolve(root, 'gateway/node_modules/@deepseek-ai/dsh-llm')
-  mkdirSync(dirname(link), { recursive: true })
-  const expected = realpathSync(packageRoot)
-  const existing = lstatSync(link, { throwIfNoEntry: false })
-  if (existing !== undefined) {
-    const actual = realpathSync(link)
-    if (actual !== expected) {
-      throw new Error(`build-production: Gateway runtime package link points to ${actual}, expected ${expected}`)
+function ensureGatewayRuntimePackages(): void {
+  for (const pkg of GATEWAY_RUNTIME_PACKAGES) {
+    const packageRoot = resolve(root, pkg.directory)
+    const packageManifest = join(packageRoot, 'package.json')
+    const packageEntry = join(packageRoot, pkg.entry)
+    if (!existsSync(packageManifest) || !existsSync(packageEntry)) {
+      throw new Error(`build-production: Gateway runtime package is incomplete: ${packageRoot}`)
     }
-    return
+    const manifest = JSON.parse(readFileSync(packageManifest, 'utf8')) as { name?: string }
+    if (typeof manifest.name !== 'string' || manifest.name === '') {
+      throw new Error(`build-production: Gateway runtime package has no name: ${packageRoot}`)
+    }
+    const link = resolve(root, 'gateway/node_modules', ...manifest.name.split('/'))
+    mkdirSync(dirname(link), { recursive: true })
+    const expected = realpathSync(packageRoot)
+    const existing = lstatSync(link, { throwIfNoEntry: false })
+    if (existing !== undefined) {
+      const actual = realpathSync(link)
+      if (actual !== expected) {
+        throw new Error(`build-production: Gateway runtime package link points to ${actual}, expected ${expected}`)
+      }
+      continue
+    }
+    symlinkSync(relative(dirname(link), packageRoot), link, 'dir')
   }
-  symlinkSync(relative(dirname(link), packageRoot), link, 'dir')
 }
 
-/** Verify the release-local Gateway package link without mutating a verify-only run. */
-function gatewayRuntimePackageLinkValid(): boolean {
-  const packageRoot = resolve(root, 'packages/llm/llm')
-  const link = resolve(root, 'gateway/node_modules/@deepseek-ai/dsh-llm')
-  try {
-    return realpathSync(link) === realpathSync(packageRoot)
-  } catch {
-    return false
-  }
+/** Verify the release-local Gateway package links without mutating a verify-only run. */
+function gatewayRuntimePackageLinksValid(): boolean {
+  return GATEWAY_RUNTIME_PACKAGES.every((pkg) => {
+    const packageRoot = resolve(root, pkg.directory)
+    try {
+      const manifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')) as { name?: string }
+      if (typeof manifest.name !== 'string' || manifest.name === '') return false
+      const link = resolve(root, 'gateway/node_modules', ...manifest.name.split('/'))
+      return realpathSync(link) === realpathSync(packageRoot)
+    } catch {
+      return false
+    }
+  })
 }
 
 function verifyArtifacts(): void {
@@ -106,8 +126,8 @@ function verifyArtifacts(): void {
     'packages/context/archive-gateway/lib/index.js',
     'packages/context/archive-gateway/lib/invariant.js',
   ]) requireFile(resolve(root, path), failures)
-  if (!gatewayRuntimePackageLinkValid()) {
-    failures.push(resolve(root, 'gateway/node_modules/@deepseek-ai/dsh-llm'))
+  if (!gatewayRuntimePackageLinksValid()) {
+    failures.push(resolve(root, 'gateway/node_modules/@deepseek-ai'))
   }
   requireAsset(resolve(root, 'apps/web/dist/assets'), '.js', failures)
   requireAsset(resolve(root, 'apps/web/dist/assets'), '.css', failures)
@@ -137,7 +157,7 @@ if (!process.argv.includes('--verify-only')) {
     { label: 'Admin UI', cwd: resolve(root, 'gateway/admin-ui'), args: ['run', 'build'] },
   ]
   for (const step of steps) {
-    if (step.label === 'Gateway artifact') ensureGatewayRuntimePackage()
+    if (step.label === 'Gateway artifact') ensureGatewayRuntimePackages()
     run(step)
   }
 }

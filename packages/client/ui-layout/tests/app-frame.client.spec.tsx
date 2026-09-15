@@ -254,13 +254,13 @@ describe('AppFrame', () => {
   })
 
   it('drag base is the rendered (concession-clamped) width, not the preference', () => {
-    frameWidth = 1250 // step-2 squeeze: details renders 330 while preference is 360
+    frameWidth = 1030 // step-2 squeeze: details renders 350 while preference is 360
     const { frame, instance } = mountFrame()
     act(() => { instance.actions.openDetails() })
-    expect(tracks(frame)).toEqual([280, 330])
+    expect(tracks(frame)).toEqual([280, 350])
     const handles = frame.querySelectorAll('[class*="handle"]')
     drag(handles[1]!, 920, 930) // shrink by 10 from the rendered width
-    expect(instance.getSnapshot().details).toBe(320)
+    expect(instance.getSnapshot().details).toBe(340)
   })
 
   it('details column stays mounted at zero width', () => {
@@ -268,6 +268,33 @@ describe('AppFrame', () => {
     expect(tracks(frame)).toEqual([280, 0])
     expect(getByTestId('details-content')).toBeTruthy()
     expect(frame.hasAttribute('data-details-collapsed')).toBe(true)
+  })
+
+  it('details panel is a self-anchored slide surface, not a clipped track child', () => {
+    // Sidebar 400 lifts the details floor (400+300+400 = 1100) into the
+    // expanded band: at 1150 the track resolves squeezed (350 < 360).
+    frameWidth = 1150
+    const { frame, instance } = mountFrame()
+    act(() => { instance.actions.setSidebar(400) })
+    const panel = () => frame.querySelector<HTMLElement>('[class*="detailsPanel"]')!
+    // Never opened: mounted at the default width, hidden off the frame edge.
+    expect(panel().hasAttribute('data-open')).toBe(false)
+    expect(panel().style.width).toBe('360px')
+    act(() => { instance.actions.openDetails() })
+    expect(panel().hasAttribute('data-open')).toBe(true)
+    expect(panel().style.width).toBe('350px') // the resolved track width, not the preference
+    // Concession releases the track: the surface stays mounted and slides off.
+    frameWidth = 1099
+    act(() => { fireResize?.(); vi.advanceTimersByTime(20) })
+    expect(tracks(frame)).toEqual([400, 0])
+    expect(panel().hasAttribute('data-open')).toBe(false)
+    expect(panel().querySelector('[data-testid="details-content"]')).toBeTruthy()
+    expect(panel().style.width).toBe('350px')
+    // Re-widening slides it back at the resolved width.
+    frameWidth = 1150
+    act(() => { fireResize?.(); vi.advanceTimersByTime(20) })
+    expect(panel().hasAttribute('data-open')).toBe(true)
+    expect(panel().style.width).toBe('350px')
   })
 
   it('closed sidebar keeps its compact rail with mounted slot content and collapsed owner props', () => {
@@ -283,9 +310,9 @@ describe('AppFrame', () => {
   it('viewport shrink triggers the concession chain via ResizeObserver', () => {
     const { frame, instance } = mountFrame()
     act(() => { instance.actions.openDetails() })
-    frameWidth = 1250
+    frameWidth = 1030
     act(() => { fireResize?.(); vi.advanceTimersByTime(20) })
-    expect(tracks(frame)).toEqual([280, 330])
+    expect(tracks(frame)).toEqual([280, 350])
     frameWidth = 1920
     act(() => { fireResize?.(); vi.advanceTimersByTime(20) })
     expect(tracks(frame)).toEqual([280, 360])
@@ -360,6 +387,29 @@ describe('AppFrame — medium-viewport auto-collapse', () => {
     act(() => { (scrims[0] as HTMLElement).click() })
     expect(overlay.hasAttribute('data-open')).toBe(false)
     expect(instance.getSnapshot().details).toBe(0)
+  })
+
+  it('opening details collapses the squeeze-open sidebar instead of crowding the center', () => {
+    frameWidth = 900
+    const { frame, instance } = mountFrame()
+    act(() => { instance.actions.toggleSidebar() })
+    expect(tracks(frame)).toEqual([280, 0])
+    act(() => { instance.actions.openDetails() })
+    // One narrow surface at a time: the sidebar collapses rather than
+    // squeezing the conversation between rail and overlay.
+    expect(tracks(frame)).toEqual([SIDEBAR_COLLAPSED, 0])
+    expect(frame.querySelector('[class*="detailsOverlay"]')!.hasAttribute('data-open')).toBe(true)
+  })
+
+  it('the rail toggle while the details overlay is open swaps surfaces', () => {
+    frameWidth = 900
+    const { frame, instance } = mountFrame()
+    act(() => { instance.actions.openDetails() })
+    expect(frame.querySelector('[class*="detailsOverlay"]')!.hasAttribute('data-open')).toBe(true)
+    act(() => { instance.actions.toggleSidebar() })
+    expect(instance.getSnapshot().details).toBe(0)
+    expect(frame.querySelector('[class*="detailsOverlay"]')!.hasAttribute('data-open')).toBe(false)
+    expect(tracks(frame)).toEqual([280, 0])
   })
 })
 
@@ -544,8 +594,124 @@ describe('AppFrame — unmount with an in-flight resize frame', () => {
   it('double resize inside one frame rides the pending rAF (??= guard)', () => {
     const { frame, instance } = mountFrame()
     act(() => { instance.actions.openDetails() })
-    frameWidth = 1250
+    frameWidth = 1030
     act(() => { fireResize?.(); fireResize?.(); vi.advanceTimersByTime(20) })
-    expect(tracks(frame)).toEqual([280, 330])
+    expect(tracks(frame)).toEqual([280, 350])
+  })
+})
+
+describe('AppFrame — drag settle paths', () => {
+  it('a non-primary pointerdown is ignored (no gesture, no capture)', () => {
+    const { frame } = mountFrame()
+    const handle = frame.querySelectorAll('[class*="handle"]')[0]!
+    act(() => {
+      handle.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, clientX: 280, button: 2, bubbles: true }))
+    })
+    expect(handle.hasAttribute('data-dragging')).toBe(false)
+    expect(frame.hasAttribute('data-dragging')).toBe(false)
+    // A follow-up move/up pair on that pointer is inert: nothing was captured.
+    act(() => {
+      handle.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, clientX: 400, bubbles: true }))
+      vi.advanceTimersByTime(20)
+      handle.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, clientX: 400, bubbles: true }))
+    })
+    expect(tracks(frame)).toEqual([280, 0])
+  })
+
+  it('a second pointer cannot hijack an in-flight gesture', () => {
+    const { frame, instance } = mountFrame()
+    const handle = frame.querySelectorAll('[class*="handle"]')[0]!
+    act(() => { handle.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, clientX: 280, bubbles: true })) })
+    act(() => {
+      // Second press while pointer 1 is active: ignored entirely.
+      handle.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 2, clientX: 999, bubbles: true }))
+      handle.dispatchEvent(new PointerEvent('pointermove', { pointerId: 2, clientX: 900, bubbles: true }))
+      handle.dispatchEvent(new PointerEvent('pointerup', { pointerId: 2, clientX: 900, bubbles: true }))
+      vi.advanceTimersByTime(20)
+    })
+    act(() => {
+      handle.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, clientX: 330, bubbles: true }))
+      vi.advanceTimersByTime(20)
+      handle.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, clientX: 330, bubbles: true }))
+    })
+    expect(instance.getSnapshot().sidebar).toBe(330)
+    expect(frame.hasAttribute('data-dragging')).toBe(false)
+  })
+
+  it('lostpointercapture settles the gesture (clears data-dragging, releases capture)', () => {
+    const { frame } = mountFrame()
+    const handle = frame.querySelectorAll('[class*="handle"]')[0]!
+    act(() => { handle.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, clientX: 280, bubbles: true })) })
+    expect(frame.hasAttribute('data-dragging')).toBe(true)
+    act(() => {
+      handle.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, clientX: 320, bubbles: true }))
+      // The browser steals or releases capture (e.g. a competing gesture):
+      // the pending rAF and the drag affordance must both settle.
+      handle.dispatchEvent(new PointerEvent('lostpointercapture', { pointerId: 1, bubbles: true }))
+    })
+    expect(frame.hasAttribute('data-dragging')).toBe(false)
+    expect(handle.hasAttribute('data-dragging')).toBe(false)
+    // The flush after settle is a no-op — the pending rAF was cancelled.
+    expect(() => { act(() => { vi.advanceTimersByTime(20) }) }).not.toThrow()
+  })
+
+  it('pointercancel settles the gesture without committing a trailing move', () => {
+    const { frame, instance } = mountFrame()
+    const handle = frame.querySelectorAll('[class*="handle"]')[0]!
+    const before = instance.getSnapshot().sidebar
+    act(() => { handle.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, clientX: 280, bubbles: true })) })
+    act(() => {
+      handle.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, clientX: 340, bubbles: true }))
+      // Cancel before the rAF flush: no trailing commit, gesture ends.
+      handle.dispatchEvent(new PointerEvent('pointercancel', { pointerId: 1, bubbles: true }))
+      vi.advanceTimersByTime(20)
+    })
+    expect(instance.getSnapshot().sidebar).toBe(before)
+    expect(frame.hasAttribute('data-dragging')).toBe(false)
+  })
+
+  it('a concession collapse that unmounts the other handle still lets the active gesture settle', () => {
+    // 1050 + sidebar 280: details resolves 360 (280+360+400 = 1040 ≤ 1050).
+    // Dragging the sidebar to 420 pushes past the details floor (s+700)
+    // mid-gesture: the details handle unmounts while the sidebar gesture
+    // keeps its own capture record.
+    frameWidth = 1050
+    const { frame, instance } = mountFrame()
+    act(() => { instance.actions.openDetails() })
+    expect(tracks(frame)).toEqual([280, 360])
+    const sidebarHandle = frame.querySelectorAll('[class*="handle"]')[0]!
+    act(() => { sidebarHandle.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, clientX: 280, bubbles: true })) })
+    act(() => {
+      sidebarHandle.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, clientX: 420, bubbles: true }))
+      vi.advanceTimersByTime(20)
+    })
+    expect(tracks(frame)).toEqual([420, 0]) // details track released mid-gesture
+    expect(frame.querySelectorAll('[class*="handle"]')).toHaveLength(1)
+    expect(frame.hasAttribute('data-dragging')).toBe(true) // the live gesture survives
+    act(() => { sidebarHandle.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, clientX: 420, bubbles: true })) })
+    expect(frame.hasAttribute('data-dragging')).toBe(false)
+    expect(instance.getSnapshot().sidebar).toBe(420)
+    expect(instance.getSnapshot().details).toBe(360) // preference untouched
+  })
+
+  it('a mid-gesture viewport shrink that unmounts the dragged handle settles via unmount cleanup', () => {
+    // Sidebar 420 puts the details floor (420+300+400 = 1120) inside the
+    // expanded band: shrinking to 1100 releases the track without leaving the
+    // mode, so the dragged handle unmounts mid-gesture.
+    frameWidth = 1200
+    const { frame, instance } = mountFrame()
+    act(() => { instance.actions.setSidebar(420) })
+    act(() => { instance.actions.openDetails() })
+    expect(tracks(frame)).toEqual([420, 360])
+    const detailsHandle = frame.querySelectorAll('[class*="handle"]')[1]!
+    act(() => { detailsHandle.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, clientX: 840, bubbles: true })) })
+    frameWidth = 1100
+    act(() => { fireResize?.(); vi.advanceTimersByTime(20) })
+    expect(tracks(frame)).toEqual([420, 0])
+    expect(frame.querySelectorAll('[class*="handle"]')).toHaveLength(1) // sidebar only
+    expect(frame.hasAttribute('data-dragging')).toBe(false)
+    // A trailing pointerup on the detached handle is inert.
+    act(() => { detailsHandle.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, clientX: 800, bubbles: true })) })
+    expect(frame.hasAttribute('data-dragging')).toBe(false)
   })
 })

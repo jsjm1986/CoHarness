@@ -147,6 +147,8 @@ function fail<T>(message: string, code = 'settings-rejected'): RpcResponse<T> {
   }
 }
 
+const discoverModels = vi.fn(() => Promise.resolve({ ok: true as const, value: [] }))
+
 function scriptedFace(overrides: {
   update?: ReturnType<typeof vi.fn>
   replace?: ReturnType<typeof vi.fn>
@@ -208,6 +210,7 @@ async function mountFace(
     controller,
     useSnapshot: bindSnapshotSelector(controller.store),
     api: face as never,
+    discoverModels,
     schema: settingsSchema,
     t,
     ...section,
@@ -338,6 +341,7 @@ describe('ModelsSection', () => {
       controller={controller}
       useSnapshot={bindSnapshotSelector(controller.store)}
       api={face as never}
+      discoverModels={discoverModels}
       schema={settingsSchema}
       t={t}
     />)
@@ -362,6 +366,7 @@ describe('ModelsSection', () => {
       controller={controller}
       useSnapshot={bindSnapshotSelector(controller.store)}
       api={face as never}
+      discoverModels={discoverModels}
       schema={settingsSchema}
       t={t}
     />)
@@ -446,6 +451,7 @@ describe('ModelsSection', () => {
       schema={settingsSchema}
       settingsPath={[]}
       api={face as never}
+      discoverModels={discoverModels}
       t={t}
       readOnly={false}
       credentialOnly
@@ -736,6 +742,7 @@ describe('ModelsSection', () => {
       schema={settingsSchema}
       settingsPath={[]}
       api={face as never}
+      discoverModels={discoverModels}
       t={t}
       readOnly={false}
       onClose={() => {}}
@@ -772,6 +779,7 @@ describe('ModelsSection', () => {
       schema={settingsSchema}
       settingsPath={[]}
       api={face as never}
+      discoverModels={discoverModels}
       t={t}
       readOnly={false}
       credentialScope="organization"
@@ -1017,6 +1025,7 @@ describe('ModelsSection', () => {
       schema={settingsSchema}
       settingsPath={[]}
       api={face as never}
+      discoverModels={discoverModels}
       t={t}
       readOnly={false}
       onClose={() => {}}
@@ -1183,6 +1192,7 @@ describe('ModelsSection', () => {
         controller={controller}
         useSnapshot={bindSnapshotSelector(controller.store)}
         api={face as never}
+        discoverModels={discoverModels}
         schema={settingsSchema}
         t={t}
       />)
@@ -1322,6 +1332,7 @@ describe('ModelsSection', () => {
       controller={controller}
       useSnapshot={bindSnapshotSelector(controller.store)}
       api={face.face as never}
+      discoverModels={discoverModels}
       schema={settingsSchema}
       t={t}
     />)
@@ -1344,6 +1355,7 @@ describe('ModelsSection', () => {
       controller={controller}
       useSnapshot={bindSnapshotSelector(controller.store)}
       api={face as never}
+      discoverModels={discoverModels}
       schema={settingsSchema}
       t={t}
     />)
@@ -1405,6 +1417,7 @@ describe('ModelsSection', () => {
       controller={controller}
       useSnapshot={bindSnapshotSelector(controller.store)}
       api={face as never}
+      discoverModels={discoverModels}
       schema={settingsSchema}
       t={t}
     />)

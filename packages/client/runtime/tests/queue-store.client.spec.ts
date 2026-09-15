@@ -215,7 +215,7 @@ describe('queue snapshot intake', () => {
 describe('queue operation transport', () => {
   it('addresses the session.updateQueue RPC without optimistic local mutation', async () => {
     const api = new FakeApiClient()
-    const session = new Session(SID, api, fakeRemote())
+    const session = new Session(SID, api, fakeRemote(api))
     session.handleMuxEnvelope(rid('env-op'), queueFrame([{ id: 'q-op', body: 'pending' }]))
     const before = session.getSnapshot().queue
 

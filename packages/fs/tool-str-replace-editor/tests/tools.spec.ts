@@ -6,7 +6,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { FsVersion } from '@deepseek-ai/dsh-fs'
 import { CallId } from '@deepseek-ai/dsh-llm'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
-import AgentRegistry, { Inbox } from '@deepseek-ai/dsh-agent'
+import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
 import * as FsPolicy from '@deepseek-ai/dsh-fs-observation-policy'
@@ -15,6 +15,7 @@ import SandboxPolicy from '@deepseek-ai/dsh-sandbox-policy'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import * as ToolStrReplaceEditor from '@deepseek-ai/dsh-tool-str-replace-editor'
+import { unsupportedInbox } from '../../../core/agent-loop/tests/inbox-helpers.ts'
 
 const contexts: Context[] = []
 const roots: string[] = []
@@ -33,7 +34,7 @@ function agent(ctx: Context, cwd: string): Agent {
     id,
     options: {},
     session,
-    inbox: new Inbox(session, { inserted: () => {}, discarded: () => {}, claimed: () => {} }),
+    inbox: unsupportedInbox(),
     status: 'idle',
     ctx: scope.ctx,
     send: () => {},

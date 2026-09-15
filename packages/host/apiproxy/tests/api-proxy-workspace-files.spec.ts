@@ -561,4 +561,157 @@ describe('workspaceFiles RPC', () => {
     bounded()
   })
 
+  it('reports a file deleted between metadata and content probes', async () => {
+    const { api, ctx, root, session } = await harness()
+    writeFileSync(join(root, 'file'), 'data')
+    const payload = { sessionId: session.id, path: 'file' }
+    const signal = new AbortController().signal
+    expect((await api.workspaceFiles.stat(request(payload))).result.ok).toBe(true)
+    const read = ctx.fs.readByteRange.bind(ctx.fs)
+    vi.spyOn(ctx.fs, 'readByteRange').mockImplementation(async (...args) => {
+      rmSync(join(root, 'file'))
+      return read(...args)
+    })
+    const result = await api.workspaceFiles.readBytes(request(payload), signal)
+    expect(result.result).toMatchObject({ ok: false, error: { code: 'workspace-file/not-found' } })
+  })
+
+  it('pages a file larger than the byte limit without materializing it whole', async () => {
+    const { api, root, session } = await harness({ maxBytes: 65_536, maxLines: 10_000 })
+    writeFileSync(join(root, 'large.log'), 'x'.repeat(200_000))
+    const payload = { sessionId: session.id, path: 'large.log' }
+    const signal = new AbortController().signal
+    const first = expectOk(await api.workspaceFiles.readBytes(request({ ...payload, length: 65_536 }), signal))
+    expect(Buffer.from(first.bytes, 'base64')).toHaveLength(65_536)
+    expect(first.eof).toBe(false)
+    const second = expectOk(await api.workspaceFiles.readBytes(
+      request({ ...payload, offset: 65_536, length: 65_536, version: first.version }), signal))
+    expect(second.eof).toBe(false)
+    const tail = expectOk(await api.workspaceFiles.readBytes(request({ ...payload, offset: 131_072, version: first.version }), signal))
+    expect(Buffer.from(tail.bytes, 'base64')).toHaveLength(65_536)
+    expect(tail.eof).toBe(false)
+    const last = expectOk(await api.workspaceFiles.readBytes(request({ ...payload, offset: 196_608, version: first.version }), signal))
+    expect(Buffer.from(last.bytes, 'base64')).toHaveLength(200_000 - 196_608)
+    expect(last.eof).toBe(true)
+    expect((await api.workspaceFiles.readBytes(request({ ...payload, length: 65_537 }), signal)).result)
+      .toMatchObject({ ok: false, error: { code: 'workspace-file/too-large' } })
+  })
+
+  it('keeps the version token stable for an unchanged file across list and stat', async () => {
+    const { api, root, session } = await harness()
+    writeFileSync(join(root, 'file'), 'data')
+    const listed = expectOk(await api.workspaceFiles.list(request({ sessionId: session.id })))
+    const entry = listed.entries.find(item => item.path === 'file')
+    expect(entry?.version).toBeDefined()
+    const first = expectOk(await api.workspaceFiles.stat(request({ sessionId: session.id, path: 'file' })))
+    const second = expectOk(await api.workspaceFiles.stat(request({ sessionId: session.id, path: 'file' })))
+    expect(first.version).toBe(entry?.version)
+    expect(second.version).toBe(first.version)
+  })
+
+  it('confines project-scope reads to the deployment root and exempts personal principals', async () => {
+    const outside = realpathSync.native(mkdtempSync(join(tmpdir(), 'dsh-workspace-files-external-')))
+    cleanups.push(() => { rmSync(outside, { recursive: true, force: true }) })
+    writeFileSync(join(outside, 'secret.txt'), 'secret')
+
+    const { api: projectApi, ctx: projectCtx } = await harness({ authority: authority('rw') })
+    const foreign = projectCtx.sessions.create(SessionId('foreign-workspace'), { meta: { cwd: outside } })
+    const resolve = vi.spyOn(projectCtx.fs, 'resolve')
+    const denied = await projectApi.workspaceFiles.stat(request({ sessionId: foreign.id, path: 'secret.txt' }))
+    expect(denied.result).toMatchObject({ ok: false, error: { code: 'collaboration-forbidden' } })
+    expect(JSON.stringify(denied)).not.toContain(outside)
+    expect(resolve).not.toHaveBeenCalled()
+
+    const personalActor = authority('rw')
+    Object.assign(personalActor.participant, { scope: { kind: 'personal' } })
+    const { api: personalApi, ctx: personalCtx } = await harness({ authority: personalActor })
+    const external = personalCtx.sessions.create(SessionId('personal-workspace'), { meta: { cwd: outside } })
+    expect((await personalApi.workspaceFiles.stat(request({ sessionId: external.id, path: 'secret.txt' }))).result)
+      .toMatchObject({ ok: true, value: { bytes: 6 } })
+  })
+
+  it('binds each request to the addressed session workspace', async () => {
+    const { api, ctx, root, session } = await harness()
+    const otherRoot = realpathSync.native(mkdtempSync(join(tmpdir(), 'dsh-workspace-files-other-')))
+    cleanups.push(() => { rmSync(otherRoot, { recursive: true, force: true }) })
+    writeFileSync(join(root, 'a.txt'), 'a')
+    writeFileSync(join(otherRoot, 'b.txt'), 'b')
+    const other = ctx.sessions.create(SessionId('other-workspace'), { meta: { cwd: otherRoot } })
+    const first = expectOk(await api.workspaceFiles.list(request({ sessionId: session.id })))
+    expect(first.entries.map(entry => entry.path)).toEqual(['a.txt'])
+    const second = expectOk(await api.workspaceFiles.list(request({ sessionId: other.id })))
+    expect(second.entries.map(entry => entry.path)).toEqual(['b.txt'])
+  })
+
+  it('exposes only bounded read methods on the browser surface', async () => {
+    const { api } = await harness()
+    expect(Object.keys(api.workspaceFiles).sort()).toEqual(['list', 'read', 'readBytes', 'stat'])
+  })
+
+  it('skips observations for a session detached before its batch drains', async () => {
+    const { ctx, root } = await harness()
+    writeFileSync(join(root, 'file'), 'data')
+    const target = await ctx.fs.resolve('file')
+    const detached = ctx.sessions.prepare(SessionId('detached-workspace'), { meta: { cwd: root } })
+    const detach = ctx.sessions.enter(detached)
+    ctx.sessions.announce(detached)
+    const live = ctx.sessions.create(SessionId('live-workspace'), { meta: { cwd: root } })
+    let releaseRoot!: () => void
+    const gate = new Promise<void>((resolve) => { releaseRoot = resolve })
+    let rootCalls = 0
+    const frames: unknown[] = []
+    const stop = subscribeWorkspaceFileChanges(ctx, {
+      authority: undefined, signal: new AbortController().signal,
+      publish: (frame) => { frames.push(frame) }, fail: vi.fn(),
+      validateRoot: async (cwd) => { rootCalls += 1; if (rootCalls === 1) await gate; return cwd },
+    })
+    ctx.emit('fs/observed', target, { kind: 'absent' }, { agent: { session: live } })
+    await vi.waitFor(() => { expect(rootCalls).toBe(1) })
+    ctx.emit('fs/observed', target, { kind: 'present', version: FsVersion('late') }, { agent: { session: detached } })
+    detach()
+    releaseRoot()
+    await vi.waitFor(() => { expect(frames).toHaveLength(1) })
+    expect(frames[0]).toMatchObject({ type: 'host/workspace-file-changed', sessionId: live.id })
+    stop()
+  })
+
+  it('drops frames for access revoked on a peer Gateway instance before the batch drains', async () => {
+    const { ctx, root, session } = await harness()
+    writeFileSync(join(root, 'file'), 'data')
+    const target = await ctx.fs.resolve('file')
+    // Two Host streams backed by one committed ACL row: a revoke committed
+    // through either instance is re-read at drain time, so the peer stream
+    // converges within the coalesced batch without an invalidation bus.
+    const granted = new Set<SessionId>([session.id])
+    const actorFor = (): CollaborationAuthority => ({
+      ...authority('ro'),
+      readableSessionIds: async ids => new Set(ids.filter(id => granted.has(id))),
+    })
+    const publishedA: unknown[] = []
+    const publishedB: unknown[] = []
+    const signal = new AbortController().signal
+    const stopA = subscribeWorkspaceFileChanges(ctx, {
+      authority: actorFor(), signal,
+      publish: (frame) => { publishedA.push(frame) }, fail: vi.fn(),
+      validateRoot: async cwd => cwd,
+    })
+    const stopB = subscribeWorkspaceFileChanges(ctx, {
+      authority: actorFor(), signal,
+      publish: (frame) => { publishedB.push(frame) }, fail: vi.fn(),
+      validateRoot: async cwd => cwd,
+    })
+    ctx.emit('fs/observed', target, { kind: 'present', version: FsVersion('v1') }, { agent: { session } })
+    await vi.waitFor(() => {
+      expect(publishedA).toHaveLength(1)
+      expect(publishedB).toHaveLength(1)
+    })
+    granted.clear()
+    ctx.emit('fs/observed', target, { kind: 'present', version: FsVersion('v2') }, { agent: { session } })
+    await new Promise<void>((resolve) => { setTimeout(resolve, 20) })
+    expect(publishedA).toHaveLength(1)
+    expect(publishedB).toHaveLength(1)
+    stopA()
+    stopB()
+  })
+
 })

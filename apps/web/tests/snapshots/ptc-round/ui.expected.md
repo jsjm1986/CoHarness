@@ -1,0 +1,54 @@
+- banner:
+  - tablist:
+    - tab "Chat" [selected]
+    - tab "Trajectory"
+  - navigation "Session hierarchy":
+    - 'button "Using ONE run_code program: run" [disabled]'
+  - img
+  - text: Standard mode
+  - button "Session log":
+    - text: Session log
+    - img
+- separator "Adjust transcript content width"
+- button "1 tool call · 2 intermediate messages":
+  - text: 1 tool call · 2 intermediate messages
+  - img
+- text: "Using ONE run_code program: run bash `echo CODE_ROUND_OK`, then read the file missing.txt catching its error in the program. Return an object with both outcomes. Then reply DONE and stop. {{clock}}"
+- button "Copy":
+  - img
+- button "Think The program ran successfully. Let me now reply DONE as instructed.":
+  - img
+  - img
+  - text: Think The program ran successfully. Let me now reply DONE as instructed.
+- paragraph: DONE
+- button "Copy":
+  - img
+- button "Good response":
+  - img
+- button "Bad response":
+  - img
+- button "Branch into a new conversation":
+  - img
+- button "Ran for {{duration}}":
+  - img
+  - text: Ran for {{duration}}
+- text: {{clock}}
+- textbox "Message the agent"
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
+- button "Commands":
+  - img
+- 'button "Access mode, current: Workspace Write"': Workspace Write
+- button "Select model, current DeepSeek-V4-Flash":
+  - text: DeepSeek-V4-Flash
+  - img
+- button "7% of context used"
+- button "Send message" [disabled]
+- button "1 turns · 2 steps · {{throughput}} tok/s":
+  - img
+  - text: 1 turns · 2 steps{{throughput}} tok/s
+- button "17.5K tok · Cache hit 52%":
+  - img
+  - text: 17.5K tokCache hit 52%

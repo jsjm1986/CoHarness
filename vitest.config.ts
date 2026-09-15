@@ -143,7 +143,7 @@ const processBoundTests = [
 export default defineConfig({
   plugins: [pathsPlugin(), standardDecoratorPlugin()],
   test: {
-    setupFiles: ['./scripts/test-invariants.ts'],
+    setupFiles: ['./scripts/test-proxy-environment.ts', './scripts/test-invariants.ts'],
     // .tsx: client component specs (jsdom via per-file @vitest-environment pragma).
     include: testIncludes,
     exclude: windowsUnsupportedTests,
@@ -159,7 +159,7 @@ export default defineConfig({
           // MaybeLocal in cjs_lexer::Parse) from worker threads on macOS,
           // Linux, and Windows. Forked workers avoid that shared thread path.
           pool: 'forks',
-          setupFiles: ['./scripts/test-invariants.ts'],
+          setupFiles: ['./scripts/test-proxy-environment.ts', './scripts/test-invariants.ts'],
           include: testIncludes,
           exclude: [
             ...windowsUnsupportedTests,
@@ -174,7 +174,7 @@ export default defineConfig({
           name: 'process-bound',
           execArgv: vitestExecArgv,
           pool: 'forks',
-          setupFiles: ['./scripts/test-invariants.ts'],
+          setupFiles: ['./scripts/test-proxy-environment.ts', './scripts/test-invariants.ts'],
           include: processBoundTests,
           exclude: [
             ...windowsUnsupportedTests,

@@ -1142,22 +1142,25 @@ export class ConversationArchiveService {
       ? await this.internalProjectId(this.context.pool, runtime.id)
       : await this.internalUserId(this.context.pool, runtime.id)
     if (owner === null) throw new Error('archive runtime owner is unavailable')
-    const result = await this.context.pool.query<{ id: string; root_session_id: string }>(`SELECT s.id,s.root_session_id
+    // Runtime-local sessions have no conversation_sessions row until the gateway
+    // materializes one, so ownership is enforced only against existing rows.
+    const result = await this.context.pool.query<{ id: string; root_session_id: string; owned: boolean }>(`SELECT s.id,s.root_session_id,
+        (($3::text='project' AND s.project_id=$4::uuid)
+          OR ($3::text='user' AND s.project_id IS NULL AND s.creator_user_id=$4::uuid)) AS owned
       FROM harness.conversation_sessions s
-      WHERE s.organization_id=$1 AND s.id=ANY($2::text[])
-        AND (($3::text='project' AND s.project_id=$4::uuid)
-          OR ($3::text='user' AND s.project_id IS NULL AND s.creator_user_id=$4::uuid))`, [
+      WHERE s.organization_id=$1 AND s.id=ANY($2::text[])`, [
       this.context.organizationId,
       unique,
       runtime.kind,
       owner,
     ])
-    if (result.rows.length !== unique.length) {
+    if (result.rows.some(row => !row.owned)) {
       throw new Error('archive snapshot contains a session outside the authenticated runtime')
     }
     const roots = new Map(result.rows.map(row => [row.id, row.root_session_id]))
     for (const pair of rootPairs) {
-      if (roots.get(pair.sessionId) !== pair.rootSessionId) {
+      const stored = roots.get(pair.sessionId)
+      if (stored !== undefined && stored !== pair.rootSessionId) {
         throw new Error('archive snapshot contains a session with an incorrect lineage root')
       }
     }

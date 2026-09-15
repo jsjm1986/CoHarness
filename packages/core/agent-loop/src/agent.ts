@@ -11,12 +11,12 @@ import type {
   AgentOptions,
   AgentStatus,
   CancelOptions,
-  InboxLimits,
   InboxTarget,
   PreStepDecision,
   RequestErrorAction,
 } from '@deepseek-ai/dsh-agent'
-import { Inbox, agentEvents, assembleContextFor } from '@deepseek-ai/dsh-agent'
+import { agentEvents, assembleContextFor } from '@deepseek-ai/dsh-agent'
+import { ReactLoopInbox, type InboxLimits } from './inbox.ts'
 import type { GenerateOptions, LlmCallConfig, PreparedLlmCall } from '@deepseek-ai/dsh-llm'
 import {
   BlockAssembler,
@@ -64,7 +64,7 @@ function requestProposal(header: EpochHeader): LlmCallConfig {
 
 /** Drives one session through turn and step boundaries. */
 export class ReactLoopAgent implements Agent {
-  readonly inbox: Inbox
+  readonly inbox: ReactLoopInbox
   private phase: Phase
   private activityDone: Promise<void> = Promise.resolve()
 
@@ -96,21 +96,15 @@ export class ReactLoopAgent implements Agent {
     inboxLimits?: InboxLimits,
   ) {
     this.dispatch = agentEvents(loopCtx, this)
-    this.inbox = new Inbox(session, {
-      inserted: (message) => { this.dispatch.emit('agent/inbox/inserted', { message }) },
-      discarded: (message) => {
-        this.pendingWakes.delete(message.id)
-        this.dispatch.emit('agent/inbox/discarded', { message })
-      },
-      claimed: (message, turn) => {
-        this.pendingWakes.delete(message.id)
-        this.dispatch.emit('agent/inbox/claimed', { message, turn })
-      },
-    }, inboxLimits)
-    const lastTurn = session.snapshotEvents().findLast(event => event.type === 'turn/start')?.data.turn ?? 0
-    this.phase = { kind: 'idle', lastTurn }
     this.scope = createScope(loopCtx, this)
     this.ctx = this.scope.ctx
+    this.inbox = new ReactLoopInbox(this.ctx.sessionProjections, session, this.dispatch, inboxLimits)
+    // Wake bookkeeping follows the durable inbox outcome, not the splice request.
+    this.ctx.on('agent/inbox/discarded', ({ message }) => { this.pendingWakes.delete(message.id) })
+    this.ctx.on('agent/inbox/claimed', ({ message }) => { this.pendingWakes.delete(message.id) })
+    /* v8 ignore next -- the loop registers its own turnBoundary unit, so the key is always present */
+    const lastTurn = this.loopCtx.sessionProjections.stateOf(session, 'turnBoundary')?.lastTurn ?? 0
+    this.phase = { kind: 'idle', lastTurn }
     this.runtimeContext = new RuntimeContextProjection(this.ctx, session)
     this.systemPrompt = new SystemPromptProjection(session)
   }
