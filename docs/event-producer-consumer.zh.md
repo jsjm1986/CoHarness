@@ -80,7 +80,7 @@
 | `workflow/phase` | `emit` | [`packages/workflow/workflow/src/index.ts:51`](../packages/workflow/workflow/src/index.ts) | [`workflow`](../packages/workflow/workflow) (`events.dispatch`) | - |
 | `workflow/start` | `emit` | [`packages/workflow/workflow/src/index.ts:43`](../packages/workflow/workflow/src/index.ts) | [`workflow`](../packages/workflow/workflow) (`events.dispatch`) | [`workflow`](../packages/workflow/workflow) |
 | `workspace-files/authorize` | `serial` | [`packages/host/apiproxy/src/workspace-files.ts:22`](../packages/host/apiproxy/src/workspace-files.ts) | `apiproxy` (`serial`) | - |
-| `workspace/archive-changed` | `emit` | [`packages/workspace/workspace/src/index.ts:77`](../packages/workspace/workspace/src/index.ts) | [`workspace`](../packages/workspace/workspace) (`emit`) | [`archive-gateway`](../packages/context/archive-gateway) |
+| `workspace/archive-changed` | `emit` | [`packages/workspace/workspace/src/index.ts:76`](../packages/workspace/workspace/src/index.ts) | [`workspace`](../packages/workspace/workspace) (`emit`) | [`archive-gateway`](../packages/context/archive-gateway) |
 
 ## 包源码中出现的非 harness 或未声明事件字符串
 
