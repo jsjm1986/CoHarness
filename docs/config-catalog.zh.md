@@ -897,10 +897,17 @@ export interface Config {
   defaultTimeoutMs?: number
   /** Character cap for the `hook/result` event's persisted stderr summary. */
   stderrSummaryMaxChars?: number
+  /**
+   * Character cap for one piece of hook-authored text entering model context —
+   * a merged blocking reason, one `additionalContext` entry, a stop reason.
+   * Hook output is host-controlled input; the bound keeps a runaway hook from
+   * flooding a request.
+   */
+  modelFeedbackMaxChars?: number
 }
 ```
 
-Source: [`packages/hooks/hooks-claude-code/src/index.ts:45`](../packages/hooks/hooks-claude-code/src/index.ts)
+Source: [`packages/hooks/hooks-claude-code/src/index.ts:47`](../packages/hooks/hooks-claude-code/src/index.ts)
 
 <a id="deepseek-aidsh-hooks-codex"></a>
 
@@ -924,10 +931,17 @@ export interface Config {
   defaultTimeoutMs?: number
   /** Character cap for the `hook/result` event's persisted stderr summary. */
   stderrSummaryMaxChars?: number
+  /**
+   * Character cap for one piece of hook-authored text entering model context —
+   * a merged blocking reason, one `additionalContext` entry, a stop reason.
+   * Hook output is host-controlled input; the bound keeps a runaway hook from
+   * flooding a request.
+   */
+  modelFeedbackMaxChars?: number
 }
 ```
 
-Source: [`packages/hooks/hooks-codex/src/index.ts:44`](../packages/hooks/hooks-codex/src/index.ts)
+Source: [`packages/hooks/hooks-codex/src/index.ts:46`](../packages/hooks/hooks-codex/src/index.ts)
 
 <a id="deepseek-aidsh-host-apiproxy"></a>
 

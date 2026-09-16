@@ -374,7 +374,7 @@
       "sovereignty": "adapted"
     },
     "hooks/hook-protocol": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "hooks/hooks-claude-code": {
       "sovereignty": "adapted"

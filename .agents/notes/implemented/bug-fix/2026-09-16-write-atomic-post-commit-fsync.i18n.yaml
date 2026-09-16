@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-16-write-atomic-post-commit-fsync.md
-2026-09-16-write-atomic-post-commit-fsync.md: 9db4a99160157117a0dbf0ab61ae7d2dbeccae80
-2026-09-16-write-atomic-post-commit-fsync.zh.md: 8c5d1142826c850d2b413456285de95adcc1d38b
+2026-09-16-write-atomic-post-commit-fsync.md: ea2bb268b8618e14113bdebd42709c63622f0260
+2026-09-16-write-atomic-post-commit-fsync.zh.md: 0670060b0022c935349fa20d36c06d2c096e825a

@@ -370,8 +370,8 @@ export class AclSandbox {
     }
 
     const native = spawnSandboxed(api, token, { command: options.command, args, cwd })
-    const stdout = drainPipe(api, native.stdoutRead)
-    const stderr = drainPipe(api, native.stderrRead)
+    const stdout = drainPipe(api, native.stdoutRead, native.process)
+    const stderr = drainPipe(api, native.stderrRead, native.process)
     // waitForExit is deliberately NOT started here: WaitForSingleObject blocks
     // the thread and would starve the drains while the child is still running
     // (pipe-buffer deadlock). The drains resolve only after the child closed

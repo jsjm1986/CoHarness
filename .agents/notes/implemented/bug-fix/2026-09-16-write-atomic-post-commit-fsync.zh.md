@@ -24,4 +24,4 @@
 
 ## 验证
 
-`json-backend.spec.ts` 覆盖两侧分界：提交点前失败拒绝并回滚，rename 后的 fsync 失败记 warning 且后端保留已提交状态。
+`json-backend.spec.ts` 覆盖两侧分界：提交点前失败拒绝并回滚，rename 后的 fsync 失败被就地容忍且后端保留已提交状态。

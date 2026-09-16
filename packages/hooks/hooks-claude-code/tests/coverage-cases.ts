@@ -47,6 +47,7 @@ type HarnessOpts = {
   pluginRoot?: string
   projectDir?: string
   stderrSummaryMaxChars?: number
+  modelFeedbackMaxChars?: number
   defaultTimeoutMs?: number
   sessionRoot?: string
 }
@@ -205,6 +206,34 @@ export function defineCoverageCases(group: CoverageGroup): void {
         await expect(harness(path, adapter, { defaultTimeoutMs: bad }))
           .rejects.toThrow(/hooks-claude-code: defaultTimeoutMs must be a positive integer/)
       }
+    })
+
+    it('rejects a non-positive or fractional modelFeedbackMaxChars at load', async () => {
+      const d = dir()
+      const path = hooks(d, {})
+      for (const bad of [0, -5, 1.5, Number.NaN]) {
+        const adapter = new MockAdapter([])
+        await expect(harness(path, adapter, { modelFeedbackMaxChars: bad }))
+          .rejects.toThrow(/hooks-claude-code: modelFeedbackMaxChars must be a positive integer/)
+      }
+    })
+
+    it('caps a blocking reason bound for model context (modelFeedbackMaxChars)', async () => {
+      const d = dir()
+      const s = sh(d, 'long.sh', '#!/usr/bin/env bash\nprintf "x%.0s" {1..600} >&2\nexit 2\n')
+      const path = hooks(d, { PreToolUse: [{ hooks: [{ type: 'command', command: s }] }] })
+      const adapter = new MockAdapter([toolCallResponse('c1', 'echo', {}), textResponse('done')])
+      const ctx = await harness(path, adapter, { modelFeedbackMaxChars: 20 })
+      ctx.tools.register(defineContentToolFixture({ name: 'echo', description: 'e', parameters: {}, async execute() { return [{ type: 'text', text: 'x' }] } }))
+      const agent = await ctx.agentLoop.create(SessionId('a1'), { provider: 'mock', model: 'mock' })
+      agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } }))
+      await waitForIdle(ctx, agent)
+      const result = events(agent).find(e => e.type === 'tool/result')
+      const text = result?.type === 'tool/result'
+        ? result.data.message.content[0].content.find(b => b.type === 'text')?.text
+        : undefined
+      // The tool-deny path prefixes the capped reason with "Error: ".
+      expect(text).toBe(`Error: ${'x'.repeat(20)}…`)
     })
 
     it('the stderr summary cap is plugin config (stderrSummaryMaxChars)', async () => {

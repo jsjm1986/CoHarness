@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-17-pipe-drain-post-exit-grace.md
+2026-09-17-pipe-drain-post-exit-grace.md: e19fc488180d52ab33ddd1971b8ae62cc1f154a8
+2026-09-17-pipe-drain-post-exit-grace.zh.md: 31fbde0ce89fb46b66dae049b12d3fad778b6e8e

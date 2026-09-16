@@ -732,15 +732,27 @@ export abstract class SettingsProvider extends Service {
       const next = deepFreeze(this.resolve(registration.schema, registration.base, section, registration.validate))
       await this.persist(ns, section)
       // The write reached storage either way; the cache must say so. Commit
-      // only when this registration is still the namespace owner — a fiber
-      // disposed (or replaced) mid-persist must not receive the notification.
+      // through whoever owns the namespace NOW: a fiber disposed mid-persist
+      // gets no notification, and a replacement registration re-resolves the
+      // persisted section under its own schema/base rather than inheriting
+      // this write's resolved value.
       this.document[ns] = section
-      // TODO(settings-replacement-resync): Re-resolve any replacement registration
-      // from this persisted section so an old in-flight write cannot leave it stale.
-      if (this.registrations.get(ns) === registration && !this.isStopped()) {
-        this.bumpRevision(registration, current, section)
-        this.commit(registration, next, 'update')
+      const owner = this.registrations.get(ns)
+      if (owner === undefined || this.isStopped()) return
+      let ownerNext: unknown
+      if (owner === registration) {
+        ownerNext = next
+      } else {
+        try {
+          ownerNext = deepFreeze(this.resolve(owner.schema, owner.base, section, owner.validate))
+        } catch (error) {
+          this.ctx.logger.warn('settings: keeping last good "%s" after invalid stored section', owner.ns)
+          this.ctx.logger.warn(error)
+          return
+        }
       }
+      this.bumpRevision(owner, current, section)
+      this.commit(owner, ownerNext, 'update')
     })
     this.writeQueues.set(ns, run)
     return run

@@ -360,10 +360,11 @@ describe('drainPipe', () => {
     const api = {
       peekNamedPipe: vi.fn(() => 0),
       getLastError: vi.fn(() => abi.ERROR_NO_DATA),
+      waitForSingleObject: vi.fn(() => 0x102),
       closeHandle,
       formatMessageW: vi.fn(() => 0),
     } as unknown as Win32Bindings
-    return drainPipe(api, 30n as NativePtr).then((buffer) => {
+    return drainPipe(api, 30n as NativePtr, 200n as NativePtr).then((buffer) => {
       expect(buffer.length).toBe(0)
       expect(closeHandle).toHaveBeenCalledWith(30n)
     })
@@ -373,10 +374,11 @@ describe('drainPipe', () => {
     const api = {
       peekNamedPipe: vi.fn(() => 0),
       getLastError: vi.fn(() => 5),
+      waitForSingleObject: vi.fn(() => 0x102),
       closeHandle: vi.fn(() => 1),
       formatMessageW: vi.fn(() => 0),
     } as unknown as Win32Bindings
-    return expect(drainPipe(api, 30n as NativePtr)).rejects.toMatchObject({ api: 'PeekNamedPipe' })
+    return expect(drainPipe(api, 30n as NativePtr, 200n as NativePtr)).rejects.toMatchObject({ api: 'PeekNamedPipe' })
   })
 
   it('reports a ReadFile failure after data was reported available', () => {
@@ -387,10 +389,11 @@ describe('drainPipe', () => {
       }),
       readFile: vi.fn(() => 0),
       getLastError: vi.fn(() => 5),
+      waitForSingleObject: vi.fn(() => 0x102),
       closeHandle: vi.fn(() => 1),
       formatMessageW: vi.fn(() => 0),
     } as unknown as Win32Bindings
-    return expect(drainPipe(api, 30n as NativePtr)).rejects.toMatchObject({ api: 'ReadFile' })
+    return expect(drainPipe(api, 30n as NativePtr, 200n as NativePtr)).rejects.toMatchObject({ api: 'ReadFile' })
   })
 
   it('drains one chunk and stops at ERROR_BROKEN_PIPE', () => {
@@ -408,12 +411,30 @@ describe('drainPipe', () => {
         return 1
       }),
       getLastError: vi.fn(() => abi.ERROR_BROKEN_PIPE),
+      waitForSingleObject: vi.fn(() => 0x102),
       closeHandle: vi.fn(() => 1),
       formatMessageW: vi.fn(() => 0),
     } as unknown as Win32Bindings
-    return drainPipe(api, 30n as NativePtr).then((buffer) => {
+    return drainPipe(api, 30n as NativePtr, 200n as NativePtr).then((buffer) => {
       expect(buffer.toString('utf8')).toBe('ab')
     })
+  })
+
+  it('accepts the collected prefix when a descendant outlives the child past the grace', async () => {
+    const closeHandle = vi.fn(() => 1)
+    const api = {
+      // The pipe never reports EOF: a descendant still holds the write end.
+      peekNamedPipe: vi.fn((_pipe: unknown, _buffer: unknown, _size: unknown, _read: unknown, totalAvail: NativePtr) => {
+        koffi.encode(totalAvail, 'uint32', 0)
+        return 1
+      }),
+      waitForSingleObject: vi.fn(() => 0), // WAIT_OBJECT_0: the child already exited.
+      closeHandle,
+      formatMessageW: vi.fn(() => 0),
+    } as unknown as Win32Bindings
+    const buffer = await drainPipe(api, 30n as NativePtr, 200n as NativePtr, 5)
+    expect(buffer.length).toBe(0)
+    expect(closeHandle).toHaveBeenCalledWith(30n)
   })
 })
 

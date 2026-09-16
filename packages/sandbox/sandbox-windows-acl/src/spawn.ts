@@ -166,14 +166,30 @@ export function spawnSandboxed(
   }
 }
 
+/** Tail bound for a descendant-held write end after the child itself exits. */
+const PIPE_DRAIN_POST_EXIT_GRACE_MS = 2_000
+
 /**
  * Drain one pipe read end to a Buffer via non-blocking PeekNamedPipe polling.
+ * A descendant that inherited the write end keeps the pipe open past the
+ * child's exit, so the EOF wait is bounded once the child is gone: after
+ * `graceMs` without a clean EOF the drain accepts the collected prefix —
+ * `wait()` must not hang on a lingering grandchild.
  * @param api - the binding table.
  * @param handle - the pipe read end to drain (closed when done).
- * @returns the complete pipe contents.
+ * @param process - the child process handle, polled non-blockingly for exit.
+ * @param graceMs - bound on post-exit EOF waiting; defaults to
+ * {@link PIPE_DRAIN_POST_EXIT_GRACE_MS}.
+ * @returns the collected pipe contents.
  */
-export async function drainPipe(api: Win32Bindings, handle: NativePtr): Promise<Buffer> {
+export async function drainPipe(
+  api: Win32Bindings,
+  handle: NativePtr,
+  process: NativePtr,
+  graceMs = PIPE_DRAIN_POST_EXIT_GRACE_MS,
+): Promise<Buffer> {
   const chunks: Buffer[] = []
+  let exitedAt: number | undefined
   for (;;) {
     const bytesReadSlot = allocUint32()
     const totalAvailSlot = allocUint32()
@@ -193,6 +209,12 @@ export async function drainPipe(api: Win32Bindings, handle: NativePtr): Promise<
       }
       chunks.push(chunk.subarray(0, decodeUint32(readSlot)))
     }
+    // WAIT_OBJECT_0 is 0: a zero-timeout wait reports exit without consuming
+    // the process handle, which waitForExit still owns.
+    if (exitedAt === undefined && api.waitForSingleObject(process, 0) === 0) {
+      exitedAt = Date.now()
+    }
+    if (exitedAt !== undefined && Date.now() - exitedAt >= graceMs) break
     // Small backoff instead of setImmediate: a bare next-tick would busy-poll
     // the pipe at full event-loop speed while the child produces no output.
     await new Promise<void>(resolve => setTimeout(resolve, 1))

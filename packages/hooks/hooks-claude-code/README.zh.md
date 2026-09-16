@@ -16,6 +16,7 @@ const config: Config = {
   projectDir: '/path/to/project',    // optional: replaces ${CLAUDE_PROJECT_DIR} AND sets the hook env var; defaults to the session cwd when omitted
   defaultTimeoutMs: 600_000,         // optional: per-hook timeout when a hook sets none (CC default)
   stderrSummaryMaxChars: 500,        // optional: char cap on the hook/result event's persisted stderr summary
+  modelFeedbackMaxChars: 2_000,      // optional: char cap on one hook-authored text bound for model context
 }
 ```
 
