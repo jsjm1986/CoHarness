@@ -15,4 +15,11 @@ describe('ModelSelect.module.css', () => {
     expect(css).toContain(".sectionContent .option[aria-checked='true']")
     expect(css).toContain('font-size: 11px')
   })
+
+  it('collapses the trigger to its glyph inside a narrow composer row', () => {
+    expect(css).toMatch(/\.triggerGlyph\s*\{[^}]*display:\s*none/u)
+    const tier = css.match(/@container\s*\(max-width:\s*480px\)\s*\{(?<body>[^@]*)\}/u)?.groups?.body ?? ''
+    expect(tier).toMatch(/\.triggerLabel,\s*\.triggerEffort\s*\{[^}]*display:\s*none/u)
+    expect(tier).toMatch(/\.triggerGlyph\s*\{[^}]*display:\s*inline-flex/u)
+  })
 })

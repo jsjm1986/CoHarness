@@ -20,7 +20,7 @@ import clsx from 'clsx'
 import type { ModelReasoningEffort, ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
 import {
   IconCheckOutline16, IconChevronDownOutline14, IconChevronRightOutline14,
-  IconChevronLeftOutline14, MobileSheetBackdrop, IconWarningOutline16, Toast, useMediaQuery,
+  IconChevronLeftOutline14, IconSparkle16, MobileSheetBackdrop, IconWarningOutline16, Toast, useMediaQuery,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ModelSelectInjected } from './slots.ts'
@@ -352,6 +352,10 @@ export function ModelSelect(
           }
         }}
       >
+        {/* The glyph is the narrow-container fallback: the row's anonymous
+            inline-size container collapses the label below the readable
+            width, leaving icon + chevron; the title still names the model. */}
+        <span className={css.triggerGlyph} aria-hidden><IconSparkle16 /></span>
         <span className={css.triggerLabel}>{modelLabel}</span>
         {effortLabel !== undefined && <span className={css.triggerEffort}>{effortLabel}</span>}
         <IconChevronDownOutline14 className={clsx(css.chevron, open && css.chevronOpen)} />
