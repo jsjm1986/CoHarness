@@ -3,11 +3,10 @@
     - tab "Chat" [selected]
     - tab "Trajectory"
   - navigation "Session hierarchy":
-    - button "{{workspace}}" [disabled]
+    - button "m1" [disabled]
   - button "Session log":
     - text: Session log
     - img
-- separator "Adjust transcript content width"
 - navigation "Turn navigation":
   - button "Jump to turn 1"
   - button "Jump to turn 2"
@@ -586,3 +585,4 @@
 - button "28 turns · 28 steps":
   - img
   - text: 28 turns · 28 steps
+- separator "Adjust transcript content width"

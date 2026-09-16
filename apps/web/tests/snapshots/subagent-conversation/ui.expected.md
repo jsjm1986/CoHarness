@@ -4,7 +4,6 @@
     - tab "Trajectory"
   - navigation "Session hierarchy":
     - button "Ask a research subagent to"
-    - text: /
     - button "3 subagents":
       - text: 3 subagents
       - img
@@ -18,7 +17,6 @@
   - button "Session log":
     - text: Session log
     - img
-- separator "Adjust transcript content width"
 - navigation "Turn navigation":
   - button "Jump to turn 1"
   - button "Jump to turn 2"
@@ -84,3 +82,4 @@
 - button "15.7K tok · Cache hit 99%":
   - img
   - text: 15.7K tokCache hit 99%
+- separator "Adjust transcript content width"

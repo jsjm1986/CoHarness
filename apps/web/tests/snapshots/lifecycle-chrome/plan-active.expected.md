@@ -25,7 +25,6 @@
 - button "Settings":
   - img
   - text: Settings
-- separator "Adjust transcript content width"
 - text: Into the Unknown Preview
 - button "Choose workspace":
   - img
@@ -51,3 +50,4 @@
   - text: DeepSeek-V4-Flash
   - img
 - button "Send message" [disabled]
+- separator "Adjust transcript content width"

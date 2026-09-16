@@ -7,7 +7,6 @@
   - button "Session log":
     - text: Session log
     - img
-- separator "Adjust transcript content width"
 - text: Research notes what changed? Referenced session · Research notes {{clock}}
 - button "Copy":
   - img
@@ -26,3 +25,4 @@
   - text: DeepSeek-V4-Flash
   - img
 - button "Send message" [disabled]
+- separator "Adjust transcript content width"

@@ -3,11 +3,10 @@
     - tab "Chat" [selected]
     - tab "Trajectory"
   - navigation "Session hierarchy":
-    - button "{{workspace}}" [disabled]
+    - button "WIRE_USER_01" [disabled]
   - button "Session log":
     - text: Session log
     - img
-- separator "Adjust transcript content width"
 - navigation "Turn navigation":
   - button "Jump to turn 1"
   - button "Jump to turn 2"
@@ -254,3 +253,4 @@
 - button "3.6K tok · Cache hit 75%":
   - img
   - text: 3.6K tokCache hit 75%
+- separator "Adjust transcript content width"

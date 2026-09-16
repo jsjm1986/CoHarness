@@ -9,7 +9,6 @@
   - button "Session log":
     - text: Session log
     - img
-- separator "Adjust transcript content width"
 - button "1 tool call · 2 intermediate messages" [expanded]:
   - text: 1 tool call · 2 intermediate messages
   - img
@@ -60,3 +59,4 @@
 - button "29 tok · Cache hit 0%":
   - img
   - text: 29 tokCache hit 0%
+- separator "Adjust transcript content width"

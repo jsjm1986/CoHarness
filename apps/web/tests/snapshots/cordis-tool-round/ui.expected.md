@@ -9,7 +9,6 @@
   - button "Session log":
     - text: Session log
     - img
-- separator "Adjust transcript content width"
 - navigation "Turn navigation":
   - button "Jump to turn 1"
   - button "Jump to turn 2"
@@ -91,3 +90,4 @@
 - button "66.8K tok · Cache hit 77%":
   - img
   - text: 66.8K tokCache hit 77%
+- separator "Adjust transcript content width"

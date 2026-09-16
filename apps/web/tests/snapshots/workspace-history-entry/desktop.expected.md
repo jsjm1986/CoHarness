@@ -1,4 +1,3 @@
-- separator "Adjust transcript content width"
 - button "2 tool calls · 2 intermediate messages":
   - text: 2 tool calls · 2 intermediate messages
   - img

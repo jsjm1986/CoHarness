@@ -9,7 +9,6 @@
   - button "Session log":
     - text: Session log
     - img
-- separator "Adjust transcript content width"
 - img
 - text: plan Plan mode on. Use /plan off to leave.
 - button "1 tool call · 2 intermediate messages":
@@ -54,3 +53,4 @@
 - button "10.6K tok · Cache hit 51%":
   - img
   - text: 10.6K tokCache hit 51%
+- separator "Adjust transcript content width"

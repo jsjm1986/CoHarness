@@ -4,7 +4,6 @@
     - tab "Trajectory"
   - navigation "Session hierarchy":
     - button "Ask a research subagent to"
-    - text: /
     - button "3 subagents":
       - text: 3 subagents
       - img
@@ -15,10 +14,10 @@
   - button "Session log":
     - text: Session log
     - img
-- separator "Adjust transcript content width"
 - text: Give one concrete event sourcing example. {{clock}}
 - button "Copy":
   - img
 - status:
   - strong: This subagent is read-only for now
   - text: The parent session is offline; reopen it to continue sending messages.
+- separator "Adjust transcript content width"

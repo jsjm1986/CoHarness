@@ -449,9 +449,15 @@ function observeHistoryPages(page: Page, reads: Array<Promise<WirePageEvidence>>
   })
 }
 
+/** Marker reads scope to the transcript: the session title is the first
+ * prompt's text and legitimately shows USER_MARKERS[0] in header and sidebar. */
+function transcript(page: Page) {
+  return page.locator('[data-conversation-scroll]:visible').first()
+}
+
 async function markerCount(page: Page): Promise<number> {
   const counts = await Promise.all(MESSAGE_MARKERS.map(marker =>
-    page.getByText(marker, { exact: true }).count()))
+    transcript(page).getByText(marker, { exact: true }).count()))
   return counts.reduce((total, count) => total + count, 0)
 }
 
@@ -617,7 +623,7 @@ describe('web e2e: lossless history wire pagination', () => {
       timeout: 15_000,
     }).toBe(1)
 
-    expect(await page.getByText(USER_MARKERS[0] as string, { exact: true }).count()).toBe(0)
+    expect(await transcript(page).getByText(USER_MARKERS[0] as string, { exact: true }).count()).toBe(0)
     await expect.poll(() => page.getByRole('button', { name: 'Load earlier' }).count(), {
       timeout: 10_000,
     }).toBe(1)
@@ -679,7 +685,7 @@ describe('web e2e: lossless history wire pagination', () => {
 
   it('fills Trajectory detail and restores Chat goldens', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-lossless-history-expanded'))
-    while (await page.getByText(USER_MARKERS[0] as string, { exact: true }).count() === 0) {
+    while (await transcript(page).getByText(USER_MARKERS[0] as string, { exact: true }).count() === 0) {
       expect(loadOlderOperations).toBeLessThan(10)
       const beforeReadCount = historyReads.length
       const beforeMarkerCount = await markerCount(page)
@@ -707,7 +713,7 @@ describe('web e2e: lossless history wire pagination', () => {
       timeout: 10_000,
     }).toBe(0)
     for (const marker of MESSAGE_MARKERS) {
-      expect(await page.getByText(marker, { exact: true }).count(), marker).toBe(1)
+      expect(await transcript(page).getByText(marker, { exact: true }).count(), marker).toBe(1)
     }
     const olderConversationPages = (await Promise.all(historyReads))
       .filter(current => current.detail === 'conversation' && current.beforeSeq !== undefined)
@@ -730,7 +736,7 @@ describe('web e2e: lossless history wire pagination', () => {
     // Every loaded turn is settled and folds its intermediate rows.
     await expandTurnProcesses(page)
     for (const marker of MESSAGE_MARKERS) {
-      expect(await page.getByText(marker, { exact: true }).count(), marker).toBe(1)
+      expect(await transcript(page).getByText(marker, { exact: true }).count(), marker).toBe(1)
     }
     for (const marker of REASONING_MARKERS) {
       expect(await page.getByRole('button', { name: new RegExp(`^Think ${marker}`) }).count(), marker)

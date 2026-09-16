@@ -4,7 +4,6 @@
     - tab "Trajectory"
   - navigation "Session hierarchy":
     - button "Ask a research subagent to"
-    - text: /
     - button "1 subagent running":
       - text: 1 subagent
       - img
@@ -15,7 +14,6 @@
   - button "Session log":
     - text: Session log
     - img
-- separator "Adjust transcript content width"
 - button "Process details" [expanded]:
   - text: Process details
   - img
@@ -42,3 +40,4 @@
 - 'button "Access mode, current: Custom" [disabled]': Custom
 - button "Stop generating"
 - button "Send message" [disabled]
+- separator "Adjust transcript content width"
