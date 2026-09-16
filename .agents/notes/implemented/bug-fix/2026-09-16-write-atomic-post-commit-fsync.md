@@ -24,4 +24,4 @@ A durable-but-failed-fsync write reports success, matching what is actually on d
 
 ## Verification
 
-`json-backend.spec.ts` covers the split: a pre-commit failure rejects and rolls back, while a post-rename fsync failure logs a warning and the backend retains the committed state.
+`json-backend.spec.ts` covers the split: a pre-commit failure rejects and rolls back, while a post-rename fsync failure is contained and the backend retains the committed state.

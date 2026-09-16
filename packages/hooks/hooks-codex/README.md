@@ -23,6 +23,7 @@ const config: Config = {
   model: 'deepseek-v4',                      // optional: stamped on every payload (Codex includes `model`)
   defaultTimeoutMs: 600_000,                 // optional: per-hook timeout when a hook sets none
   stderrSummaryMaxChars: 500,                // optional: char cap on the hook/result event's persisted stderr summary
+  modelFeedbackMaxChars: 2_000,              // optional: char cap on one hook-authored text bound for model context
 }
 ```
 

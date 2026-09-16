@@ -264,10 +264,11 @@ export class SessionRuntime implements ISessions {
   /**
    * Persisted selection cell (the durable half of `list.current`). Private on
    * purpose: reads go through the list snapshot; writes through {@link
-   * SessionRuntime.open} / {@link SessionRuntime.clear}. Projection
-   * validates it against the live list instead of destructively pruning, so a
-   * selection survives transient list states (reconnect re-pull) and
-   * resurfaces when its session returns.
+   * SessionRuntime.open} / {@link SessionRuntime.clear}. The in-memory
+   * projection is non-destructive — a masked current resurfaces when its
+   * session returns — but a projection with no current also wipes this cell,
+   * so a reload lands on empty even when the live selection would have
+   * resurfaced a masked id.
    */
   private readonly selection: SnapshotStore<SessionSelection>
 

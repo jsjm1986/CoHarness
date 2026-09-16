@@ -68,6 +68,25 @@ export function summarizeStderr(stderr: string, maxChars: number): string | unde
 }
 
 /**
+ * Reference default for a bridge's `modelFeedbackMaxChars` — the bound on one
+ * piece of hook-authored text (a merged reason, one `additionalContext` entry,
+ * a `stopReason`) before it reaches model context.
+ */
+export const DEFAULT_MODEL_FEEDBACK_MAX_CHARS = 2_000
+
+/**
+ * Bound one hook-authored text destined for model context at `maxChars` with
+ * an ellipsis, like {@link summarizeStderr} but without trimming — reasons and
+ * contexts are already decoded text, not raw streams.
+ * @param text - the hook-authored text.
+ * @param maxChars - the character cap (the bridge's config value).
+ * @returns the text, capped.
+ */
+export function capModelFeedback(text: string, maxChars: number): string {
+  return text.length > maxChars ? text.slice(0, maxChars) + '…' : text
+}
+
+/**
  * Append a `hook/invoked` event naming the handler and hook point to `session`.
  * @param session - the session whose open turn records the event.
  * @param invocation - the invocation identity; an absent `matcher` is omitted from the payload.

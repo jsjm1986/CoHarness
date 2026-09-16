@@ -24,8 +24,10 @@ import type { PostToolDecision, PreToolDecision, ToolExecution, ToolExecutionRes
 import {
   appendHookInvoked,
   appendHookResult,
+  capModelFeedback,
   createDetachedRuns,
   DEFAULT_HOOK_TIMEOUT_MS,
+  DEFAULT_MODEL_FEEDBACK_MAX_CHARS,
   DEFAULT_STDERR_SUMMARY_MAX_CHARS,
   matchesMatcher,
   mergeHookOutputs,
@@ -55,6 +57,13 @@ export interface Config {
   defaultTimeoutMs?: number
   /** Character cap for the `hook/result` event's persisted stderr summary. */
   stderrSummaryMaxChars?: number
+  /**
+   * Character cap for one piece of hook-authored text entering model context —
+   * a merged blocking reason, one `additionalContext` entry, a stop reason.
+   * Hook output is host-controlled input; the bound keeps a runaway hook from
+   * flooding a request.
+   */
+  modelFeedbackMaxChars?: number
 }
 
 export const Config: z<Config> = z.object({
@@ -62,6 +71,7 @@ export const Config: z<Config> = z.object({
   model: z.string().default(''),
   defaultTimeoutMs: z.number().default(DEFAULT_HOOK_TIMEOUT_MS),
   stderrSummaryMaxChars: z.number().default(DEFAULT_STDERR_SUMMARY_MAX_CHARS),
+  modelFeedbackMaxChars: z.number().default(DEFAULT_MODEL_FEEDBACK_MAX_CHARS),
 })
 
 let handlerCounter = 0
@@ -82,6 +92,9 @@ export function apply(ctx: Context, config: Config): void {
   // Validate before config parsing so a bad value cannot be hidden by its early return.
   const stderrSummaryMaxChars = config.stderrSummaryMaxChars ?? DEFAULT_STDERR_SUMMARY_MAX_CHARS
   assertPositiveInteger('stderrSummaryMaxChars', stderrSummaryMaxChars)
+  const modelFeedbackMaxChars = config.modelFeedbackMaxChars ?? DEFAULT_MODEL_FEEDBACK_MAX_CHARS
+  assertPositiveInteger('modelFeedbackMaxChars', modelFeedbackMaxChars)
+  const cap = (text: string): string => capModelFeedback(text, modelFeedbackMaxChars)
   const defaultTimeoutMs = config.defaultTimeoutMs ?? DEFAULT_HOOK_TIMEOUT_MS
   assertPositiveInteger('defaultTimeoutMs', defaultTimeoutMs)
   let parsed: CodexHookConfig = {}
@@ -174,7 +187,7 @@ export function apply(ctx: Context, config: Config): void {
 
   function contextFrom(merged: MergedHookOutcome): UserMessage | undefined {
     if (merged.additionalContext.length === 0) return undefined
-    const content: ContentBlock[] = merged.additionalContext.map(text => ({ type: 'text', text }))
+    const content: ContentBlock[] = merged.additionalContext.map(text => ({ type: 'text', text: cap(text) }))
     return createUserMessage({ content, source: PLUGIN_SOURCE })
   }
 
@@ -227,7 +240,7 @@ export function apply(ctx: Context, config: Config): void {
     const turn = lastTurn(exec.agent)
     const merged = await runPoint('PreToolUse', exec.name, preToolPayload(ctx, exec, model), { ...exec.agent ? { agent: exec.agent } : {}, turn, signal: exec.signal })
     /* jscpd:ignore-end */
-    if (merged.decision === 'deny') return { kind: 'deny', reason: merged.reason ?? 'blocked by PreToolUse hook' }
+    if (merged.decision === 'deny') return { kind: 'deny', reason: cap(merged.reason ?? 'blocked by PreToolUse hook') }
     return next()
   })
 
@@ -238,7 +251,7 @@ export function apply(ctx: Context, config: Config): void {
     const merged = await runPoint('PostToolUse', exec.name, postToolPayload(ctx, exec, result, model), { ...exec.agent ? { agent: exec.agent } : {}, turn, signal: exec.signal })
     const context = contextFrom(merged)
     if (merged.decision === 'deny') {
-      return { kind: 'block', feedback: [{ type: 'text', text: merged.reason ?? 'blocked by PostToolUse hook' }], ...context ? { additionalContexts: [context] } : {} }
+      return { kind: 'block', feedback: [{ type: 'text', text: cap(merged.reason ?? 'blocked by PostToolUse hook') }], ...context ? { additionalContexts: [context] } : {} }
     }
     // Context alone is not a veto: DELEGATE, then fold our context onto the
     // downstream decision (a downstream block carries it too).
@@ -265,7 +278,7 @@ export function apply(ctx: Context, config: Config): void {
       // A blocking Stop hook forces continuation; a block with no reason (exit 2,
       // empty stderr) still forces it — fall back to a generic steering line
       // rather than letting the turn stop.
-      const text = merged.reason ?? 'continue: blocked by Stop hook'
+      const text = cap(merged.reason ?? 'continue: blocked by Stop hook')
       agent.steer(createUserMessage({ content: [{ type: 'text', text }], source: PLUGIN_SOURCE }))
     }
   })

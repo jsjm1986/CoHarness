@@ -39,7 +39,6 @@ const SQL_RESOURCES = [
   'select-user-object-count',
   'select-user-version',
   'set-application-id',
-  'set-user-version-18',
   'set-user-version-20',
   'synchronous-full',
   'trusted-schema-off',

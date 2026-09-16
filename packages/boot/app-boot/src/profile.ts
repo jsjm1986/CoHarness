@@ -26,7 +26,7 @@ import { createRequire } from 'node:module'
 import {
   existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, symlinkSync, unlinkSync, writeFileSync,
 } from 'node:fs'
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type { EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
 import { applyEntryPatches, type PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
@@ -378,7 +378,13 @@ export function loadProfile(
     if (declared === undefined) {
       throw new Error(`${binName}: profile bundle ${JSON.stringify(packageName)} declares no dsh.bundle in its package.json`)
     }
-    const patchPath = join(packageDir, declared)
+    // The declared patch is a package-internal file; a bundle escaping its own
+    // directory reaches files the profile layer never agreed to compose.
+    const patchPath = resolve(packageDir, declared)
+    const inside = relative(packageDir, patchPath)
+    if (isAbsolute(declared) || inside === '..' || inside.startsWith(`..${sep}`) || isAbsolute(inside)) {
+      throw new Error(`${binName}: profile bundle ${JSON.stringify(packageName)} declares dsh.bundle.patch ${JSON.stringify(declared)} outside its package directory`)
+    }
     return { packageName, packageDir, patchPath, patches: loadOverlayPatches(binName, patchPath) }
   })
   const patchPath = join(dir, PROFILE_PATCH_FILENAME)

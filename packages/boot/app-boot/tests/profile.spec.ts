@@ -6,7 +6,7 @@
 
 import { lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   composeEntries,
@@ -141,6 +141,25 @@ describe('loadProfile', () => {
     writeProfileManifest(dir, { name: 'bare' })
     const bare = loadProfile('t', 'demo', anchor, home)
     expect(bare.layers).toEqual([])
+  })
+
+  it('rejects a bundle patch declared outside its package directory', () => {
+    const anchor = stageInstallation({})
+    const appDir = dirname(anchor)
+    const home = tmp()
+    const dir = resolveProfileDir('demo', home)
+    initProfile(dir, ['escaping-bundle'])
+    for (const declared of ['../escape.yml', join(appDir, 'escape.yml')]) {
+      const bundleDir = join(appDir, 'node_modules', 'escaping-bundle')
+      mkdirSync(bundleDir, { recursive: true })
+      writeFileSync(join(bundleDir, 'package.json'), JSON.stringify({
+        name: 'escaping-bundle',
+        version: '0.0.0',
+        dsh: { bundle: { patch: declared } },
+      }))
+      expect(() => loadProfile('t', 'demo', anchor, home))
+        .toThrow('outside its package directory')
+    }
   })
 
   it('auto-initializes only shipped templates and fails loud otherwise', () => {

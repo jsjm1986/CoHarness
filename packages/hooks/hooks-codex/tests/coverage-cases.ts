@@ -33,7 +33,7 @@ function hooks(d: string, h: unknown): string {
   writeFileSync(join(d, 'hooks.json'), JSON.stringify({ hooks: h })); return join(d, 'hooks.json')
 }
 
-type HarnessOpts = { stderrSummaryMaxChars?: number; defaultTimeoutMs?: number; sessionRoot?: string }
+type HarnessOpts = { stderrSummaryMaxChars?: number; modelFeedbackMaxChars?: number; defaultTimeoutMs?: number; sessionRoot?: string }
 async function harness(configPath: string, adapter: MockAdapter, opts: HarnessOpts = {}): Promise<Context> {
   const ctx = new Context()
   contexts.push(ctx)
@@ -306,6 +306,32 @@ export function defineCoverageCases(groups: CoverageGroup | readonly CoverageGro
         await expect(harness(join(d, 'hooks.json'), adapter, { defaultTimeoutMs: bad }))
           .rejects.toThrow(/hooks-codex: defaultTimeoutMs must be a positive integer/)
       }
+    })
+
+    it('rejects a non-positive or fractional modelFeedbackMaxChars at load', async () => {
+      const d = dir()
+      hooks(d, {})
+      for (const bad of [0, -5, 1.5, Number.NaN]) {
+        const adapter = new MockAdapter([])
+        await expect(harness(join(d, 'hooks.json'), adapter, { modelFeedbackMaxChars: bad }))
+          .rejects.toThrow(/hooks-codex: modelFeedbackMaxChars must be a positive integer/)
+      }
+    })
+
+    it('caps a blocking reason bound for model context (modelFeedbackMaxChars)', async () => {
+      const d = dir()
+      hooks(d, { PreToolUse: [{ hooks: [{ type: 'command', command: sh(d, 'l.sh', '#!/usr/bin/env bash\nprintf "x%.0s" {1..600} >&2\nexit 2\n') }] }] })
+      const adapter = new MockAdapter([toolCallResponse('c1', 'Bash', { command: 'x' }), textResponse('done')])
+      const ctx = await harness(join(d, 'hooks.json'), adapter, { modelFeedbackMaxChars: 20 })
+      ctx.tools.register(defineContentToolFixture({ name: 'Bash', description: 'b', parameters: { command: { type: 'string' } }, async execute() { return [{ type: 'text', text: 'ok' }] } }))
+      const agent = await ctx.agentLoop.create(SessionId('a1'), { provider: 'mock', model: 'mock' })
+      agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } })); await waitForIdle(ctx, agent)
+      const r = events(agent).find(e => e.type === 'tool/result')
+      const text = r?.type === 'tool/result'
+        ? r.data.message.content[0].content.find(b => b.type === 'text')?.text
+        : undefined
+      // The tool-deny path prefixes the capped reason with "Error: ".
+      expect(text).toBe(`Error: ${'x'.repeat(20)}…`)
     })
 
     it('the stderr summary cap is plugin config (stderrSummaryMaxChars)', async () => {
