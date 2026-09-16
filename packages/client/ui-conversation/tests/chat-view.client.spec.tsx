@@ -1342,6 +1342,31 @@ describe('ChatView', () => {
     expect(view.queryByLabelText('回到底部')).toBeNull()
   })
 
+  it('re-pins when a browser clamp lands on the floor after an un-ledgered scroll', () => {
+    const h = makeHarness({ nodes: [user(1, 'q'), assistant(2, 'a')] })
+    const view = render(<h.ChatView {...h.props} />)
+    const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
+    const metrics = installScrollMetrics(scroller, 1_000, 300)
+    // Browser scroll anchoring during a reflow writes scrollTop off the ledger:
+    // same delivered-position deviation as reader input, so follow disarms and
+    // the back-to-bottom button mounts.
+    readerScroll(scroller, 500)
+    expect(view.getByLabelText('回到底部')).toBeTruthy()
+    expect(h.chatScroll.read()).not.toBeNull()
+    // The shrink-clamp then lands exactly on the floor — still off the ledger
+    // (floor < observedTop), so ownership must come from geometry: pinned
+    // again, button gone, saved position cleared.
+    metrics.setLayout(700, 500)
+    fireEvent.scroll(scroller)
+    expect(scroller.scrollTop).toBe(400)
+    expect(view.queryByLabelText('回到底部')).toBeNull()
+    expect(h.chatScroll.read()).toBeNull()
+    // Follow re-armed: streaming growth reaches the tail again.
+    metrics.setHeight(900)
+    act(() => { h.set({ running: true }) })
+    expect(scroller.scrollTop).toBe(600)
+  })
+
   it('keeps following when a stream-finalization shrink clamp delivers its scroll', () => {
     const h = makeHarness({ nodes: [user(1, 'q'), assistant(2, 'a')] })
     const view = render(<h.ChatView {...h.props} />)

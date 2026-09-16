@@ -577,15 +577,24 @@ export function ChatView({
     // the current ownership state.
     const floor = Math.max(0, el.scrollHeight - el.clientHeight)
     const movedByReader = Math.abs(el.scrollTop - Math.min(observedTopRef.current, floor)) > 0.5
-    const isAtBottom = movedByReader
-      ? floor - el.scrollTop <= FOLLOW_THRESHOLD + 1
-      : atBottomRef.current
+    // Geometry decides at-bottom, not the ledger: browser writes (shrink
+    // clamps, scroll anchoring) never reach observedTop, so inheriting a stale
+    // `false` ref would strand a floor-landed reader unpinned with the
+    // back-to-bottom button stuck on.
+    const isAtBottom = floor - el.scrollTop <= FOLLOW_THRESHOLD + 1
     if (!movedByReader && isAtBottom) {
       // A follow write delivered its own scroll event (every stream publication
       // while pinned): the reader is at the tail, so the tail row names the
       // active turn and no hit-test is needed.
       const tailTurn = lastNode === undefined ? undefined : nodeTurn(lastNode)
       if (tailTurn !== undefined) setActiveTurn(tailTurn)
+      if (!atBottomRef.current) {
+        // Re-pinning from an un-ledgered write clears the stale saved position
+        // the same way a reader scroll back to the bottom does.
+        anchorRef.current = null
+        chatScroll.save(null)
+      }
+      setAtBottom(true)
       toBottom(el)
       return
     }
