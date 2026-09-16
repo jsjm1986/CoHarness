@@ -17,7 +17,8 @@ Do not use CoHarness as the sole security control for untrusted workloads. Prefe
 ## Responsible operation
 
 - Review plugins, profiles, patches, commands, and model routes before enabling them.
-- Keep WebFetch, plugin metadata, and Session-log upload disabled unless their endpoint, redaction, rate, audit, and rollback policy has been approved.
+- Keep plugin metadata and Session-log upload disabled unless their endpoint, redaction, rate, audit, and rollback policy has been approved.
+- The shipped base profile enables `web_fetch` to validated public destinations without per-call approval; deployments with a stricter network policy override the `tool-web` row.
 - Back up accessible files and databases; test restoration before migrations or release activation.
 - Keep the Gateway behind TLS and its authentication flow; never expose an unauthenticated runtime port.
 - Monitor logs, process trees, outbound requests, storage growth, and failed authorization decisions.

@@ -10,7 +10,7 @@ CoHarness 可以执行模型生成的代码、加载插件、访问部署开放�
 
 ## 决策
 
-仓库根目录发布 `SAFETY.md` 和 `SAFETY.zh.md`，作为面向运维人员的安全权威入口。文档说明项目尚未审计且处于发布前阶段，列出沙箱和授权的限制，要求最小权限与经过测试的备份，并规定 WebFetch、插件 metadata 和 Session-log upload 在端点、脱敏、限流、审计和回滚控制获批前保持显式关闭。该提示不取代 Gateway 认证、TLS、沙箱或部署方审查。
+仓库根目录发布 `SAFETY.md` 和 `SAFETY.zh.md`，作为面向运维人员的安全权威入口。文档说明项目尚未审计且处于发布前阶段，列出沙箱和授权的限制，要求最小权限与经过测试的备份，并规定插件 metadata 和 Session-log upload 在端点、脱敏、限流、审计和回滚控制获批前保持显式关闭。文档同时记录出厂基础 Profile 默认启用 `web_fetch`，仅允许经验证的公开目的地且无需逐次批准，因此网络策略更严格的部署应覆盖 `tool-web` 行（默认值理由见 [Shared-base Web fetch default](../feature/2026-09-01-shared-base-web-fetch-default.zh.md)）。该提示不取代 Gateway 认证、TLS、沙箱或部署方审查。
 
 ## 考虑过的替代方案
 
