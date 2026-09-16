@@ -31,6 +31,7 @@ async function harness(services: { connection?: unknown; workspaceResources?: un
   const sessions = {
     ensureSession: vi.fn(async () => true), createSession: vi.fn(async () => A), setBaseRuntimeTarget: vi.fn(),
     runtimeTargetFor: vi.fn((_id: SessionId) => undefined as { kind: 'project'; projectId: number } | undefined),
+    list: { getSnapshot: () => ({ current: A as SessionId | undefined }) },
   }
   ctx.provide('conversationViewport', viewport as never)
   ctx.provide('sessions', sessions as never)
@@ -42,7 +43,6 @@ async function harness(services: { connection?: unknown; workspaceResources?: un
     'conversation.workbench.toolbar': { kind: 'single', scope: 'root' },
     'conversation.workbench.empty': { kind: 'single', scope: 'root' },
     'conversation.workbench.pane.header': { kind: 'list', scope: 'session' },
-    'conversation.session.header.utilities': { kind: 'list', scope: 'session' },
   } } as never, () => null)
   const fiber = await ctx.plugin({ inject, apply }).await()
   const actions = (slots.entries('conversation.workbench.toolbar')[0]!.inject as unknown as () => {
@@ -63,6 +63,8 @@ async function harness(services: { connection?: unknown; workspaceResources?: un
     listWorkspaceDirectory(owner: unknown, path: string, signal: AbortSignal): Promise<unknown>
     readPreview(request: unknown, signal: AbortSignal): Promise<unknown>
     readBytesPreview(request: unknown, signal: AbortSignal): Promise<unknown>
+    filesAvailable(): boolean
+    openFiles(): void
   })()
   return { ctx, slots, fiber, sessions, viewport, snapshot, actions }
 }
@@ -266,16 +268,14 @@ describe('workspace file serving', () => {
       expect(pane.filesAvailable()).toBe(true)
       expect(resources.hasProvider).toHaveBeenCalledWith({ kind: 'base' })
       pane.openFiles()
-      const utility = (h.slots.entries('conversation.session.header.utilities')[0]!.inject as unknown as (id: SessionId) => {
-        filesAvailable(): boolean
-        openFiles(): void
-        inWorkbench(): boolean
-      })(A)
-      expect(utility.inWorkbench()).toBe(true)
+      expect(h.actions.filesAvailable()).toBe(false)
+      h.actions.openFiles()
+      h.snapshot.set({ mode: 'workbench', paneIds: [A], activePaneId: A, paneRatios: [1] })
+      expect(h.actions.filesAvailable()).toBe(true)
+      h.actions.openFiles()
       h.snapshot.set({ mode: 'single', paneIds: [], paneRatios: [] })
-      expect(utility.inWorkbench()).toBe(false)
-      expect(utility.filesAvailable()).toBe(true)
-      utility.openFiles()
+      expect(h.actions.filesAvailable()).toBe(true)
+      h.actions.openFiles()
     } finally { await h.ctx.fiber.dispose() }
   })
 

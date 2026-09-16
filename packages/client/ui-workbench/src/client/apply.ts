@@ -11,7 +11,6 @@ import type { WorkbenchCatalog } from './catalog.ts'
 import { WorkbenchEmpty } from './components/WorkbenchEmpty.tsx'
 import { WorkbenchPaneHeader } from './components/WorkbenchPaneHeader.tsx'
 import { WorkbenchToolbar } from './components/WorkbenchToolbar.tsx'
-import { WorkspaceFilesAction } from './components/WorkspaceFilesAction.tsx'
 import { createWorkbenchStore, type WorkspaceBrowserOwner } from './stores.ts'
 import { en, NS, zh } from './locales.ts'
 
@@ -60,6 +59,26 @@ export function apply(ctx: ClientContext): void {
     if (disposed || available !== true) return { ok: false as const, reason: 'unknown' as const }
     return replace ? viewport.replaceActive(item.sessionId) : viewport.add(item.sessionId)
   }
+  // The files entry appears wherever the toolbar hosts a Session: the toolbar
+  // row above the workbench grid and the Session header's leading seat in the
+  // single-conversation view. Provider availability follows runtime connection
+  // state, so evaluate it at render time instead of freezing it into the
+  // inject face.
+  const filesAvailable = (sessionId: SessionId) => () =>
+    connection?.isLoopback === false
+    && ctx.get('workspaceResources')?.hasProvider(ctx.sessions.runtimeTargetFor?.(sessionId) ?? { kind: 'base' as const }) === true
+  const openFiles = (sessionId: SessionId) => () => {
+    ctx.slots.bindStore(chooser).actions.openBrowser({
+      sessionId,
+      runtimeTarget: ctx.sessions.runtimeTargetFor?.(sessionId) ?? { kind: 'base' as const },
+    })
+  }
+  const activeSessionId = (): SessionId | undefined => {
+    const snap = viewport.snapshot.getSnapshot()
+    return snap.mode === 'workbench'
+      ? (snap.activePaneId ?? snap.paneIds[0])
+      : ctx.sessions.list.getSnapshot().current
+  }
   ctx.slots.inject('conversation.workbench.toolbar', () => ctx.slots.register({
     name: 'conversation.workbench.toolbar',
     locale: NS,
@@ -107,6 +126,14 @@ export function apply(ctx: ClientContext): void {
         markCatalogReady: () => { if (!disposed) viewport.markCatalogReady() },
         setMode: (mode: 'single' | 'workbench') => { viewport.setMode(mode) },
         resources: ctx.get('workspaceResources'),
+        filesAvailable: () => {
+          const sessionId = activeSessionId()
+          return sessionId !== undefined && filesAvailable(sessionId)()
+        },
+        openFiles: () => {
+          const sessionId = activeSessionId()
+          if (sessionId !== undefined) openFiles(sessionId)()
+        },
         openWorkspaceResource: (request: WorkspaceResourceOpenRequest) => {
           ctx.slots.bindStore(chooser).actions.openPreview(request)
         },
@@ -156,20 +183,6 @@ export function apply(ctx: ClientContext): void {
   ctx.slots.inject('conversation.workbench.empty', () => ctx.slots.register({
     name: 'conversation.workbench.empty', locale: NS, store: chooser,
   }, WorkbenchEmpty))
-  // The files entry appears on each conversation surface that hosts a Session:
-  // the pane header inside the workbench grid, and the Session-header utilities
-  // in the single-conversation view. Provider availability follows runtime
-  // connection state, so evaluate it at render time instead of freezing it
-  // into the inject face.
-  const filesAvailable = (sessionId: SessionId) => () =>
-    connection?.isLoopback === false
-    && ctx.get('workspaceResources')?.hasProvider(ctx.sessions.runtimeTargetFor?.(sessionId) ?? { kind: 'base' as const }) === true
-  const openFiles = (sessionId: SessionId) => () => {
-    ctx.slots.bindStore(chooser).actions.openBrowser({
-      sessionId,
-      runtimeTarget: ctx.sessions.runtimeTargetFor?.(sessionId) ?? { kind: 'base' as const },
-    })
-  }
   ctx.slots.inject('conversation.workbench.pane.header', () => ctx.slots.register({
     name: 'conversation.workbench.pane.header',
     id: 'workbench-pane-header',
@@ -184,14 +197,4 @@ export function apply(ctx: ClientContext): void {
       openFiles: openFiles(sessionId),
     }),
   }, WorkbenchPaneHeader))
-  ctx.slots.inject('conversation.session.header.utilities', () => ctx.slots.register({
-    name: 'conversation.session.header.utilities',
-    id: 'workspace-files',
-    locale: NS,
-    inject: (sessionId: SessionId) => ({
-      filesAvailable: filesAvailable(sessionId),
-      openFiles: openFiles(sessionId),
-      inWorkbench: () => viewport.snapshot.getSnapshot().mode === 'workbench',
-    }),
-  }, WorkspaceFilesAction))
 }

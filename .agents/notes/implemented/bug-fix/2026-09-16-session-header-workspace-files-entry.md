@@ -10,18 +10,18 @@ The Workspace file browser shipped with the workbench registered its entry point
 
 ## Decision
 
-The same `filesAvailable`/`openFiles` session binding is now contributed to `conversation.session.header.utilities` as `workspace-files`, rendered by `WorkspaceFilesAction`. The utilities seat is the session-scoped home for optional runtime utilities (open-in-app already lives there), so the control lands in the right-aligned utility group rather than the title-adjacent action row. While the viewport runs in workbench mode the entry returns `null`: every visible Session already sits inside a grid pane whose pane header carries the identical button, so rendering it in each pane's Session header would double the affordance. Availability keeps the pane header's rule — remote connection plus a `workspaceResources` provider for the Session's runtime target — so loopback desktops keep their native open-path behavior without a dead button.
+`WorkbenchToolbar` now advertises file browsing itself: a `filesAvailable`/`openFiles` inject pair renders the same folder icon button in the toolbar's action group. The toolbar already mounts on every conversation surface — as the grid's top row in workbench mode and as the Session header's `leading` seat in the single-conversation view — so one registration covers both. The toolbar binding resolves the addressed Session at call time: the active pane in workbench mode, `sessions.list.current` otherwise, then shares the pane header's availability rule — remote connection plus a `workspaceResources` provider for that Session's runtime target — so loopback desktops keep their native open-path behavior without a dead button. The per-pane header button stays as the direct per-pane control; the toolbar entry is the surface-level counterpart the shipped e2e contract already described.
 
 ## Alternatives considered
 
-**Move the entry off the pane header entirely.** Rejected: the pane chrome is the workbench surface's compact action cluster, and relocating the control into each pane's Session header would change accepted workbench layout for no behavioral gain.
+**Register a second entry on `conversation.session.header.utilities`.** Rejected: the session header mounts inside every workbench pane too, so an unconditional entry would double the affordance per pane, and suppressing it on `mode === 'workbench'` adds a mode predicate the toolbar placement does not need.
 
-**Render in both seats unconditionally.** Rejected: workbench panes mount `conversation.session.header` too, so an unconditional entry would draw two folder buttons per pane.
+**Toolbar entry bound to a fixed Session.** Rejected: the toolbar outlives session switches, so the binding resolves the active Session at call time rather than capturing one at inject time.
 
 ## Consequences
 
-Single conversations on hosted runtimes show the folder button in the Session header's utility group and open the same `WorkspaceFileBrowser` the workbench uses; workbench panes are unchanged. The store, browser, and preview plumbing are shared, so a browser opened from either surface routes to the Session's own runtime target.
+Single conversations on hosted runtimes show the folder button in the workbench toolbar seat inside their Session header and open the same `WorkspaceFileBrowser` the workbench uses; workbench panes are unchanged. The store, browser, and preview plumbing are shared, so a browser opened from either surface routes to the addressed Session's own runtime target.
 
 ## Verification
 
-`workbench.client.spec.tsx` covers the button's render, click-through, workbench-mode suppression, and hidden states without provider or opener; `apply.client.spec.ts` asserts the utilities registration binds the same `filesAvailable`/`openFiles` pair and reports `inWorkbench` from the viewport snapshot.
+`workbench.client.spec.tsx` covers the toolbar button's render, click-through, and hidden states without provider or opener; `apply.client.spec.ts` asserts the toolbar inject resolves the active pane Session in workbench mode and the current Session in single mode; `apps/web/tests/workspace-files.e2e.ts` drives the real browser through the toolbar button to a live preview.

@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import type { PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import {
-  Button, IconChevronDownOutline14, IconCopyOutline16, IconEditOutline16, IconLogoutOutline16,
+  Button, IconChevronDownOutline14, IconCopyOutline16, IconEditOutline16, IconFolderOpenOutline16, IconLogoutOutline16,
   IconPlusOutline16, IconTrashOutline16, Menu, Modal, StateDot,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -35,6 +35,10 @@ interface Actions {
   listWorkspaceDirectory?: ListWorkspaceDirectory
   openWorkspaceResource?: OpenWorkspaceResource
   resources?: WorkspaceResourceRegistry | undefined
+  /** Provider availability for the addressed Session's runtime, evaluated at render time. */
+  filesAvailable?: () => boolean
+  /** Open the Workspace file browser for the active Session and runtime target. */
+  openFiles?: () => void
 }
 type Props = PropsRuntime<'conversation.workbench.toolbar'> & PropsLocale<typeof NS>
   & PropsStore<ReturnType<typeof createWorkbenchStore>> & Actions
@@ -57,7 +61,7 @@ export function WorkbenchToolbar({
   chooseSession, focusSession, createSession, hydrateCatalog, markCatalogReady, setMode,
   listWorkbenches, currentWorkbench, switchWorkbench, createWorkbench, renameWorkbench,
   duplicateWorkbench, deleteWorkbench, readPreview, readBytesPreview,
-  listWorkspaceDirectory, openWorkspaceResource, resources, t,
+  listWorkspaceDirectory, openWorkspaceResource, resources, filesAvailable, openFiles, t,
 }: Props) {
   const { pickerOpen, replace, preview, browser } = useStore(state => state)
   const sessions = useSessions(s => s)
@@ -189,6 +193,17 @@ export function WorkbenchToolbar({
         {viewport.mode === 'workbench' && <span className={css.paneCount} aria-label={`${viewport.paneIds.length}/4`}>{viewport.paneIds.length}/4</span>}
       </div>
       <div className={css.toolbarActions}>
+        {filesAvailable?.() === true && openFiles !== undefined && (
+          <button
+            type="button"
+            className={css.iconAction}
+            aria-label={t('files')}
+            title={t('files')}
+            onClick={() => { openFiles() }}
+          >
+            <IconFolderOpenOutline16 />
+          </button>
+        )}
         {viewport.mode === 'workbench' && (
           <Button size="sm" variant="toolbar" icon={<IconPlusOutline16 />} onClick={() => { setError(undefined); actions.openPicker() }}>
             {t('add')}
