@@ -553,6 +553,42 @@ describe('second review regressions', () => {
     ])
   })
 
+  it('keeps the replacement last good when its schema rejects a mid-persist write', async () => {
+    const { ctx, provider } = await boot({ persistDelayMs: 30 })
+    let scopeA: SettingsScope<ThemeConfig> | undefined
+    const fiberA = ctx.plugin({
+      inject: ['settings'],
+      apply: (child: Context) => {
+        scopeA = child.settings.register(settingsNamespace('ui-theme'), ThemeSchema)
+      },
+    })
+    await fiberA
+    const pending = scopeA!.update({ theme: 'light' })
+    await new Promise(resolve => setTimeout(resolve, 5))
+    await fiberA.dispose()
+    // The replacement registers while the stored document still holds no
+    // section, so its owner-specific constraint passes on the schema
+    // defaults — then the landed write is unserviceable under it.
+    const watcherB = vi.fn()
+    let scopeB: SettingsScope<ThemeConfig> | undefined
+    const fiberB = ctx.plugin({
+      inject: ['settings'],
+      apply: (child: Context) => {
+        scopeB = child.settings.register(settingsNamespace('ui-theme'), ThemeSchema, {
+          validate: (value) => {
+            if (value.theme === 'light') throw new Error('light theme is not offered in this build')
+          },
+        })
+        scopeB.watch(watcherB)
+      },
+    })
+    await fiberB
+    await pending
+    expect(provider.doc['ui-theme']).toEqual({ theme: 'light' })
+    expect(scopeB!.get()).toEqual({ theme: 'dark', fontSize: 14 })
+    expect(watcherB).not.toHaveBeenCalled()
+  })
+
   it('drains in-flight writes at service dispose and rejects later ones', async () => {
     const { ctx, provider, fiber } = await boot({ persistDelayMs: 20 })
     const service = ctx.settings
